@@ -204,9 +204,38 @@ test('all patient PUT adapters wire one transactional set-primary operation with
         assert.doesNotMatch(source, deleteMemberships, `${file} must not replace memberships`);
     }
     const profile = fs.readFileSync(path.join(process.cwd(), 'lib/patient-profile-service.ts'), 'utf8');
-    assert.match(profile, /import\s*\{[^}]*\bupdatePatientOperation\b[^}]*\}\s*from\s*'\.\/patient-update-operation'/);
-    assert.equal(profile.match(/\bupdatePatientOperation\s*\(/g)?.length, 1);
-    assert.match(profile, /return updatePatientOperation\(\{/);
+    const dispatch = fs.readFileSync(path.join(process.cwd(), 'lib/patient-profile-update-dispatch.ts'), 'utf8');
+    // WUL-576 inserts the canonical dispatch; the existing writer still owns
+    // the sole membership transaction. Require both hops, not a decorative port.
+    const assertDispatchWiring = (service: string, executor: string) => {
+        assert.match(service, /import\s*\{\s*createPatientProfileUpdateExecution,\s*dispatchPatientProfileUpdate\s*\}\s*from\s*'\.\/patient-profile-update-dispatch'/);
+        assert.equal(service.match(/\bcreatePatientProfileUpdateExecution\s*\(/g)?.length, 1);
+        assert.match(service, /const execution = createPatientProfileUpdateExecution\(\{/);
+        assert.equal(service.match(/\bdispatchPatientProfileUpdate\s*\(/g)?.length, 1);
+        assert.match(service, /const outcome = await dispatchPatientProfileUpdate\(execution, execution\.command\);/);
+        assert.match(service, /return outcome\.result;/);
+        assert.doesNotMatch(service, /\bupdatePatientOperation\s*\(/, 'service must not bypass the dispatch');
+        assert.match(executor, /import\s*\{[^}]*\bupdatePatientOperation\b[^}]*\}\s*from\s*'\.\/patient-update-operation'/);
+        assert.equal(executor.match(/\bupdatePatientOperation\s*\(/g)?.length, 1);
+        assert.match(executor, /return updatePatientOperation\(\{/);
+        assert.match(executor, /setPrimaryAmbulatory:\s*input\.setPrimaryAmbulatory/);
+        assert.match(executor, /values:\s*values,\s*setPrimaryAmbulatory:\s*command\.setPrimaryAmbulatory/);
+        assert.match(executor, /authorizeCommit:\s*authorizeCommit,\s*audit:\s*audit,\s*\}\);/);
+        assert.doesNotMatch(executor, /\bupsertPrimaryAmbulatoryMembership\s*\(/);
+        assert.doesNotMatch(executor, deleteMemberships);
+    };
+    assertDispatchWiring(profile, dispatch);
+    for (const [source, before, after] of [
+        ['service', 'dispatchPatientProfileUpdate(execution, execution.command)', 'updatePatientOperation({})'],
+        ['service', "'./patient-profile-update-dispatch'", "'./unapproved-profile-update-dispatch'"],
+        ['executor', 'setPrimaryAmbulatory: command.setPrimaryAmbulatory', 'setPrimaryAmbulatory: false'],
+    ] as const) {
+        const original = source === 'service' ? profile : dispatch;
+        const changed = original.replace(before, after);
+        assert.notEqual(changed, original);
+        assert.throws(() => assertDispatchWiring(source === 'service' ? changed : profile,
+            source === 'executor' ? changed : dispatch), `${source}: ${before}`);
+    }
     assert.match(profile, /setPrimaryAmbulatory:\s*Object\.prototype\.hasOwnProperty\.call\(body, 'ambulatoryId'\)/);
     assert.match(profile, /values:\s*normalized\.values/);
     assert.match(profile, /audit:\s*context\.audit\(\),\s*\}\);/);
