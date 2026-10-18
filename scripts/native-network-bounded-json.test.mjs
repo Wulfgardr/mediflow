@@ -50,8 +50,11 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
         },
         getNetworkModeGateResponse: async () => { events.push('mode'); return stage === 'mode' ? denied() : null; },
         requireAccountSession: async () => { events.push('session'); return stage === 'session' ? null : context.session; },
+        resolveNetworkScope: (...args) => load('lib/network-write-context.ts').resolveNetworkScope(...args),
         cookies: async () => ({ get: () => undefined }),
-        getNetworkIdentitySummary: async () => {
+        getNetworkIdentitySummary: async (session, activeAmbulatoryId) => {
+            assert.equal(session, context.session);
+            assert.equal(activeAmbulatoryId, null);
             events.push('scope');
             return { scope: { effectiveAmbulatoryId: stage === 'scope' ? null : context.scopeAmbulatoryId } };
         },
@@ -70,7 +73,8 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
     function load(relative) {
         if (cache.has(relative)) return cache.get(relative);
         assert.ok([`app/api/${route}/route.ts`, 'lib/native-network-json-body.ts', 'lib/bounded-request-body.ts', 'lib/attachment-payload.ts', 'lib/patient-json-object.ts', 'lib/prescription-json-body.ts',
-            'lib/entry-write-input.ts', 'lib/therapy-write-input.ts', 'lib/api-v1-clinical-write-normalization.ts', 'lib/status-normalization.ts'].includes(relative), `unexpected production import ${relative}`);
+            'lib/entry-write-input.ts', 'lib/therapy-write-input.ts', 'lib/api-v1-clinical-write-normalization.ts', 'lib/status-normalization.ts',
+            'lib/network-write-context.ts', 'lib/network-request-scope.ts'].includes(relative), `unexpected production import ${relative}`);
         const source = fs.readFileSync(path.join(root, relative), 'utf8');
         const exports = {};
         cache.set(relative, exports);
@@ -100,7 +104,14 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
             if (name === '@/lib/therapy-write-input') {
                 return load('lib/therapy-write-input.ts');
             }
-            if (relative.startsWith('lib/') && name.startsWith('./')) return load(`lib/${name.slice(2)}.ts`);
+            // Load the real resolver and binder. Only these fixed auth/identity
+            // dependencies of the resolver module use the closed stub set below.
+            const syntheticScopeDependency = relative === 'lib/network-write-context.ts' && [
+                './network-home-base-server', './network-contract', './security/local-api-auth',
+                './network-discovery-auth', './security/server-auth', './security/paired-native-session',
+                './security/archive-write-request',
+            ].includes(name);
+            if (relative.startsWith('lib/') && name.startsWith('./') && !syntheticScopeDependency) return load(`lib/${name.slice(2)}.ts`);
             return new Proxy({}, { get(_target, key) {
                 if (key in stubs) return stubs[key];
                 if (/^[A-Z][A-Z_]+$/.test(key)) return key;
@@ -194,6 +205,33 @@ test('patient PUT checks mode, capability, account session and scope before read
         assert.equal(h.calls.length, 0);
         assert.equal(f.counts().pulls, 0);
     }
+});
+
+test('patient PUT rejects a different scope assertion before parsing or service effects', async () => {
+    const h = harness('v1/network/patients/[id]');
+    const f = request(h, '{}', { 'x-mediflow-expected-ambulatory-id': 'synthetic-other', 'content-length': '999999999' });
+    const response = await h.route.PUT(f.req, ctx);
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), { error: 'Network scope unavailable' });
+    assert.ok(h.events.indexOf('auth') < h.events.indexOf('scope'));
+    assert.equal(h.events.includes('headers'), true);
+    assert.equal(h.events.includes('body'), false);
+    assert.equal(h.events.includes('parse'), false);
+    assert.equal(h.calls.length, 0);
+    assert.deepEqual(f.counts(), { pulls: 0, cancels: 0 });
+});
+
+test('patient PUT admits a matching scope assertion with the original request and payload', async () => {
+    const h = harness('v1/network/patients/[id]');
+    const payload = { version: 2, notes: 'ENC:aQ==:ZGF0YQ==' };
+    const f = request(h, JSON.stringify(payload), { 'x-mediflow-expected-ambulatory-id': 'synthetic-scope' });
+    assert.equal((await h.route.PUT(f.req, ctx)).status, 200);
+    assert.equal(h.calls.length, 1);
+    assert.equal(h.calls[0][0].request, f.req);
+    assert.equal(h.calls[0][0].scopeAmbulatoryId, 'synthetic-scope');
+    assert.deepEqual(h.calls[0].at(-1), payload);
+    assert.ok(h.events.indexOf('scope') < h.events.indexOf('parse'));
+    assert.ok(h.events.indexOf('parse') < h.events.indexOf('service'));
 });
 
 test('malformed login and ambulatory DELETE keep existing fallback, not size rejection', async () => {

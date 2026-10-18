@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 import Database from 'better-sqlite3';
 import { ambulatories, patients, patientsToAmbulatories } from './schema';
@@ -18,7 +18,8 @@ process.env.MEDIFLOW_DATA_DIR = dataDir;
 const oldToken = process.env.MEDIFLOW_LOCAL_API_TOKEN;
 process.env.MEDIFLOW_LOCAL_API_TOKEN = 'c05-synthetic-token';
 type SyntheticAuthority = ReturnType<typeof syntheticNetworkPatientAuthority>;
-const state = { web: true, v1: true, network: true, generation: '', authority: null as SyntheticAuthority | null };
+const state = { web: true, v1: true, network: true, scope: 'c05-a' as string | null, generation: '', authority: null as SyntheticAuthority | null };
+const scopeResolverUrl = new URL('./network-write-context.ts', import.meta.url).href;
 const stateKey = Symbol.for(`c05-auth-${dataDir}`);
 (globalThis as unknown as Record<symbol, typeof state>)[stateKey] = state;
 
@@ -37,16 +38,27 @@ exports.requireLocalApiToken=()=>s.v1?null:Response.json({error:'Unauthorized'},
 exports.hasValidLocalApiToken=()=>s.v1;`);
 const network = shim('network.cjs', `const s=globalThis[Symbol.for(${JSON.stringify(`c05-auth-${dataDir}`)})];
 exports.authenticateNetworkPairedClient=async()=>s.network?s.authority?.pairedClient??null:null;
-exports.getNetworkIdentitySummary=async()=>({scope:{effectiveAmbulatoryId:'c05-a'}});`);
+exports.getNetworkIdentitySummary=async(session,activeAmbulatoryId)=>{
+    require('node:assert/strict').equal(session,s.authority?.session);
+    require('node:assert/strict').equal(activeAmbulatoryId,'c05-a');
+    return {scope:{effectiveAmbulatoryId:s.scope}};
+};`);
 const mode = shim('mode.cjs', `exports.getNetworkModeGateResponse=async()=>null;
 const s=globalThis[Symbol.for(${JSON.stringify(`c05-auth-${dataDir}`)})];
-exports.requireNetworkCapabilityContext=async(request)=>s.network&&s.authority?({ok:true,context:{request,scopeAmbulatoryId:'c05-a',pairedClient:s.authority.pairedClient,session:s.authority.session}}):({ok:false,response:Response.json({error:'Unauthorized'},{status:401})});`);
+// Resolve the actual request-bound scope, while keeping synthetic auth admission.
+exports.resolveNetworkScope=(...args)=>require(${JSON.stringify(fileURLToPath(scopeResolverUrl))}).resolveNetworkScope(...args);
+exports.requireNetworkCapabilityContext=async(request)=>{
+    if(!s.network||!s.authority) return {ok:false,response:Response.json({error:'Unauthorized'},{status:401})};
+    const scopeAmbulatoryId=await exports.resolveNetworkScope(s.authority.session,request);
+    if(!scopeAmbulatoryId) return {ok:false,response:Response.json({error:'Network scope unavailable'},{status:403})};
+    return {ok:true,context:{request,scopeAmbulatoryId,pairedClient:s.authority.pairedClient,session:s.authority.session}};
+};`);
 const paired = shim('paired.cjs', `const s=globalThis[Symbol.for(${JSON.stringify(`c05-auth-${dataDir}`)})];
 exports.requireAccountSession=async()=>s.authority?.session??null;`);
 const headers = shim('headers.cjs', `exports.cookies=async()=>({get:(name)=>name==='ambulatory_id'?{name,value:'c05-a'}:undefined});`);
 const { registerHooks } = load('node:module') as {
-    registerHooks: (hooks: { resolve: (specifier: string, context: unknown,
-        next: (specifier: string, context: unknown) => { url: string }) => { url: string; shortCircuit?: boolean } }) => { deregister: () => void };
+    registerHooks: (hooks: { resolve: (specifier: string, context: { parentURL?: string },
+        next: (specifier: string, context: { parentURL?: string }) => { url: string }) => { url: string; shortCircuit?: boolean } }) => { deregister: () => void };
 };
 const replacements: Record<string, string> = {
     '@/lib/security/server-auth': auth,
@@ -57,7 +69,10 @@ const replacements: Record<string, string> = {
     'next/headers': headers,
 };
 const hooks = registerHooks({ resolve(specifier, context, next) {
-    const url = replacements[specifier];
+    // Only the real resolver's identity lookup receives this synthetic dependency.
+    // Its scope assertion helper and the clinical writer stay production code.
+    const url = context.parentURL === scopeResolverUrl && specifier === './network-home-base-server'
+        ? network : replacements[specifier];
     return url ? { url, shortCircuit: true } : next(specifier, context);
 } });
 
@@ -89,7 +104,7 @@ function reset() {
     dbServer.insert(patients).values({ id: 'c05-patient', firstName: 'Ada', lastName: 'Sintetica',
         taxCode: 'C05SYNTHETIC', ambulatoryId: 'c05-a', version: 3 }).run();
     dbServer.insert(patientsToAmbulatories).values({ patientId: 'c05-patient', ambulatoryId: 'c05-a' }).run();
-    state.web = true; state.v1 = true; state.network = true;
+    state.web = true; state.v1 = true; state.network = true; state.scope = 'c05-a';
 }
 
 function snapshot() {
@@ -186,6 +201,27 @@ const cap = 4_194_304;
 const fullSnapshot = () => ({ patients: sql.prepare('SELECT * FROM patients ORDER BY id').all(),
     memberships: sql.prepare('SELECT * FROM patients_to_ambulatories ORDER BY patient_id').all(),
     audit: sql.prepare('SELECT * FROM audit_events ORDER BY event_id').all() });
+
+test('network PUT admits a matching scope assertion through the real resolver and writer', async () => {
+    reset(); const before = snapshot();
+    const request = requestFor(native, JSON.stringify({ version: 3, firstName: 'Bea' }));
+    request.headers.set('x-mediflow-expected-ambulatory-id', 'c05-a');
+    assert.equal((await put(native, request)).status, 200);
+    assert.deepEqual(snapshot(), { ...before, firstName: 'Bea', version: 4, audit: before.audit + 1 });
+});
+
+for (const missingScope of [false, true]) test(`network PUT rejects ${missingScope ? 'absent scope' : 'different scope assertion'} before body access with zero effects`, async () => {
+    reset(); const before = fullSnapshot();
+    if (missingScope) state.scope = null;
+    const request = requestFor(native, '{}');
+    request.headers.set('x-mediflow-expected-ambulatory-id', missingScope ? 'c05-a' : 'c05-other');
+    Object.defineProperty(request, 'body', { get() { throw new Error('poison-stream-read'); } });
+    const response = await put(native, request);
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), { error: 'Network scope unavailable' });
+    assert.deepEqual(fullSnapshot(), before);
+});
+
 for (const [name, item, collection] of [['web', web, webCreate], ['v1', v1, v1Create], ['network', native, nativeCreate]] as const) {
     for (const method of ['POST', 'PUT', 'DELETE'] as const) {
         const invoke = (request: Request) => {
