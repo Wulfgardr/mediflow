@@ -149,3 +149,33 @@ passi (Fasi 0-1) sono quindi deliberatamente comuni a tutte le proposte.
   superficie WebView vicino al plaintext su Win/Linux (mitigato: decrittazione
   solo nel processo nativo, bind loopback, token per-lancio, documentato vs
   ADR 0065; non peggiore della web app odierna che gia gira React nel browser).
+
+## Emendamento 2026-10-18: autorità della verticale profilo e note
+
+[WUL-582](https://linear.app/wulfgardr/issue/WUL-582) verifica la lettura del
+profilo e l'aggiornamento delle note del paziente prima della migrazione del
+writer. Il percorso opzionale `LocalPatientsDataSource` possiede oggi anche
+scritture SQLite che non attraversano l'audit obbligatorio del servizio Node.
+La sola presenza del flag `MEDIFLOW_LOCAL_AUTHORITY` non qualifica queste
+scritture come equivalenti al servizio.
+
+Per questa verticale, `fetchPatient` e `updatePatient` delegano sempre al
+client HTTP esistente, anche con chiave sbloccata e ambulatorio esplicito.
+Il client trasmette le credenziali e la sessione già previste; l'host decide
+ammissione, ambito, attualità e commit. Un errore HTTP non abilita un ripiego
+SQLite. Il contenuto `ENC` resta invariato e la chiave non attraversa il
+confine. Le prove mantengono un archivio sintetico locale come sentinella:
+la query o la modifica del profilo non devono aprirlo né modificarlo.
+
+Gli store Swift e i relativi test restano disponibili. Elenchi, creazione
+paziente e sotto-risorse del percorso locale opzionale restano fuori da questa
+verticale e non sono dichiarati qualificati dall'emendamento. Non viene
+quindi affermata un'autorità unica per l'intero prodotto.
+
+La direzione nativa e offline dell'ADR è conservata. La delega della verticale
+è una convergenza temporanea sul servizio già provato, non l'adozione definitiva
+di Node. Un futuro writer nativo può sostituirla dopo le prove previste da
+WUL-573/WUL-706/WUL-709: stessa autorità dei dati, custodia delle chiavi,
+ammissione e revoca, commit condizionale con audit, recupero e ritorno al
+percorso corrente prima di qualsiasi effetto. Non sono introdotti nuovi
+formati, schema o conversioni dei dati.
