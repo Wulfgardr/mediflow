@@ -226,7 +226,7 @@
     {
       "area": "documenti",
       "feature": "Referti recenti (Evidence Stack tile, view sintesi)",
-      "web": "card riassuntiva ultimi 4 document insight (components/evidence-stack-tile.tsx)",
+      "web": "sintesi archiviate espandibili in DocumentInsightsPanel (components/document-insights-panel.tsx) e document insight nella timeline (components/clinical-river-timeline.tsx), montati in app/patients/[id]/modules/page.tsx",
       "native": "full: Evidence Stack nativo (card ultimi 4 insight) in sola lettura, dai documentInsights decifrati",
       "boundary": "full: nessun boundary aggiuntivo necessario (lettura da detail paziente esistente)",
       "gap": "full-parity",

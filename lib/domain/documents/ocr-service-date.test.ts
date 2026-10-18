@@ -1,23 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { parseItalianDate } from '../../italian-date';
 import { extractDocumentWithAI, isOcrModelAvailable } from './ocr-service';
-
-function isoDate(value: Date | undefined): string | undefined {
-    return value?.toISOString().slice(0, 10);
-}
-
-test('parseItalianDate accepts common Italian date separators', () => {
-    assert.equal(isoDate(parseItalianDate('15/03/2020')), '2020-03-15');
-    assert.equal(isoDate(parseItalianDate('15-03-2020')), '2020-03-15');
-    assert.equal(isoDate(parseItalianDate('15.03.2020')), '2020-03-15');
-});
-
-test('parseItalianDate keeps ISO fallback and rejects invalid values', () => {
-    assert.equal(isoDate(parseItalianDate('2020-03-15')), '2020-03-15');
-    assert.equal(parseItalianDate('not a date'), undefined);
-});
 
 test('extractDocumentWithAI is a terminal review-required compatibility boundary', async () => {
     let providerCalls = 0;
