@@ -1,10 +1,8 @@
 import { jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 import { readPatientJsonObject } from '@/lib/patient-json-object';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import {
     authenticateNetworkPairedClient,
-    getNetworkIdentitySummary,
 } from '@/lib/network-home-base-server';
 import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read';
 import {
@@ -15,16 +13,9 @@ import {
     NETWORK_PATIENT_WRITE_CAPABILITY,
     updateNetworkScopedPatient,
 } from '@/lib/network-patient-write';
-import { getNetworkModeGateResponse, requireNetworkCapabilityContext } from '@/lib/network-write-context';
+import { getNetworkModeGateResponse, requireNetworkCapabilityContext, resolveNetworkScope } from '@/lib/network-write-context';
 import { forbiddenResponse, unauthorizedResponse } from '@/lib/security/server-auth';
 import { requireAccountSession } from '@/lib/security/paired-native-session';
-
-async function resolveNetworkScope(session: Awaited<ReturnType<typeof requireAccountSession>>) {
-    const cookieStore = await cookies();
-    const activeAmbulatoryId = cookieStore.get('ambulatory_id')?.value ?? null;
-    const identity = await getNetworkIdentitySummary(session, activeAmbulatoryId);
-    return identity.scope.effectiveAmbulatoryId;
-}
 
 async function requireNetworkPatientWriteContext(
     request: Request,
@@ -47,7 +38,7 @@ async function requireNetworkPatientWriteContext(
     const session = await requireAccountSession(request);
     if (!session) return { ok: false, response: unauthorizedResponse() };
 
-    const scopeAmbulatoryId = await resolveNetworkScope(session);
+    const scopeAmbulatoryId = await resolveNetworkScope(session, request);
     if (!scopeAmbulatoryId) {
         return {
             ok: false,
@@ -84,7 +75,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     try {
         const { id } = await params;
-        const scopeAmbulatoryId = await resolveNetworkScope(session);
+        const scopeAmbulatoryId = await resolveNetworkScope(session, request);
         if (!scopeAmbulatoryId) {
             return NextResponse.json({ error: 'Network scope unavailable' }, { status: 403 });
         }

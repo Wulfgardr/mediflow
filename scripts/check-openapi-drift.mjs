@@ -215,6 +215,58 @@ function normalizeRequestBody(requestBody, document) {
     };
 }
 
+function normalizeParameters(pathItem, operation, document) {
+    const effective = new Map();
+    for (const list of [pathItem.parameters ?? [], operation.parameters ?? []]) {
+        if (!Array.isArray(list)) throw new Error('Invalid OpenAPI parameter list');
+        const localKeys = new Set();
+        for (let parameter of list) {
+            const seen = new Set();
+            while (parameter?.$ref) {
+                const ref = parameter.$ref;
+                if (seen.has(ref)) throw new Error(`Cyclic OpenAPI parameter: ${ref}`);
+                seen.add(ref);
+                parameter = resolveRef(document, ref);
+            }
+            if (!parameter || !['path', 'query', 'header', 'cookie'].includes(parameter.in)
+                || typeof parameter.name !== 'string' || !parameter.name
+                || (parameter.required !== undefined && typeof parameter.required !== 'boolean')) {
+                throw new Error('Invalid or unresolved OpenAPI parameter');
+            }
+            const name = parameter.in === 'header' ? parameter.name.toLowerCase() : parameter.name;
+            const key = `${parameter.in}:${name}`;
+            if (localKeys.has(key)) throw new Error(`Duplicate OpenAPI parameter: ${key}`);
+            localKeys.add(key);
+            const normalized = {
+                in: parameter.in, name, required: parameter.required ?? false,
+                schema: canonicalSchema(normalizeSchema(parameter.schema, document)),
+            };
+            for (const option of ['style', 'explode', 'allowReserved', 'allowEmptyValue', 'content']) {
+                if (parameter[option] !== undefined) normalized[option] = stable(parameter[option]);
+            }
+            // OpenAPI lets an operation override the same (in, name) parameter
+            // inherited from its path; it cannot silently remove other ones.
+            effective.set(key, stable(normalized));
+        }
+    }
+    return [...effective.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([, value]) => value);
+}
+
+function parameterDiff(base, current, label) {
+    const key = parameter => `${parameter.in}:${parameter.name}`;
+    const before = new Map(base.map(parameter => [key(parameter), parameter]));
+    const after = new Map(current.map(parameter => [key(parameter), parameter]));
+    const changedExisting = [...before].some(([id, parameter]) =>
+        !after.has(id) || JSON.stringify(parameter) !== JSON.stringify(after.get(id)));
+    const added = [...after].filter(([id]) => !before.has(id)).map(([, parameter]) => parameter);
+    return {
+        breaking: changedExisting || added.some(parameter => parameter.required)
+            ? [`${label} changed parameters`] : [],
+        additive: added.filter(parameter => !parameter.required)
+            .map(parameter => `${label} optional parameter ${key(parameter)} was added`),
+    };
+}
+
 function normalizeSpec(document) {
     const operations = new Map();
     for (const [apiPath, pathItem] of Object.entries(document?.paths ?? {})) {
@@ -223,12 +275,7 @@ function normalizeSpec(document) {
             const operation = pathItem[method];
             operations.set(`${method.toUpperCase()} ${apiPath}`, {
                 security: stable(operation.security ?? document.security ?? []),
-                parameters: stable((operation.parameters ?? []).map((parameter) => ({
-                    in: parameter.in,
-                    name: parameter.name,
-                    required: parameter.required ?? false,
-                    schema: normalizeSchema(parameter.schema, document)
-                }))),
+                parameters: normalizeParameters(pathItem, operation, document),
                 requestBody: normalizeRequestBody(operation.requestBody, document),
                 responses: stable(Object.fromEntries(
                     Object.keys(operation.responses ?? {}).sort().map((code) => [code, normalizeResponse(operation.responses[code], document)])
@@ -404,9 +451,9 @@ function compareOperations(baseOperations, currentOperations) {
         if (JSON.stringify(baseOperation.security) !== JSON.stringify(currentOperation.security)) {
             breaking.push(`${operationKey} changed auth requirements`);
         }
-        if (JSON.stringify(baseOperation.parameters) !== JSON.stringify(currentOperation.parameters)) {
-            breaking.push(`${operationKey} changed parameters`);
-        }
+        const parameters = parameterDiff(baseOperation.parameters, currentOperation.parameters, operationKey);
+        breaking.push(...parameters.breaking);
+        additive.push(...parameters.additive);
         if (JSON.stringify(baseOperation.requestBody) !== JSON.stringify(currentOperation.requestBody)) {
             const requestDiff = schemaDiff(baseOperation.requestBody, currentOperation.requestBody, 'request', `${operationKey} request`);
             breaking.push(...(requestDiff.breaking ?? []));
@@ -602,7 +649,76 @@ const OBJ = (properties, required) => ({ type: 'object', properties, ...(require
 const STR = { type: 'string' };
 
 function runSelfTest() {
+    const parameterSpec = (pathParameters = [], operationParameters = [], definitions = {}) => ({
+        paths: { '/probe': { parameters: pathParameters, get: { parameters: operationParameters, responses: {} } } },
+        components: { parameters: definitions },
+    });
+    const header = { in: 'header', name: 'x-synthetic-scope', required: false, schema: STR };
+    const query = { in: 'query', name: 'filter', required: false, schema: STR };
+    const headerRef = { $ref: '#/components/parameters/Scope' };
+    const parameterBreaking = difference => difference.breaking.includes('GET /probe changed parameters');
     const cases = [
+        {
+            name: 'nuovo header opzionale su operazione → additive, senza override',
+            run: () => diffOf(parameterSpec(), parameterSpec([], [header])),
+            expect: d => d.breaking.length === 0 && d.additive.length === 1,
+        },
+        {
+            name: 'parametro opzionale di path via ref viene confrontato → additive',
+            run: () => diffOf(parameterSpec(), parameterSpec([headerRef], [], { Scope: header })),
+            expect: d => d.breaking.length === 0 && d.additive.length === 1,
+        },
+        ...['path', 'operation'].map(level => ({
+            name: `nuovo parametro obbligatorio ${level} via ref → breaking`,
+            run: () => diffOf(parameterSpec(), parameterSpec(
+                level === 'path' ? [headerRef] : [], level === 'operation' ? [headerRef] : [],
+                { Scope: { ...header, required: true } })),
+            expect: parameterBreaking,
+        })),
+        {
+            name: 'parametro preesistente rimosso resta breaking anche con aggiunta opzionale',
+            run: () => diffOf(parameterSpec([query]), parameterSpec([], [header])),
+            expect: parameterBreaking,
+        },
+        {
+            name: 'override di operazione che rende obbligatorio il parametro di path → breaking',
+            run: () => diffOf(parameterSpec([header]), parameterSpec([header], [{ ...header, required: true }])),
+            expect: parameterBreaking,
+        },
+        {
+            name: 'tipo del parametro referenziato cambiato → breaking',
+            run: () => diffOf(parameterSpec([headerRef], [], { Scope: header }),
+                parameterSpec([headerRef], [], { Scope: { ...header, schema: { type: 'integer' } } })),
+            expect: parameterBreaking,
+        },
+        {
+            name: 'serializzazione di parametro cambiata → breaking',
+            run: () => diffOf(parameterSpec([], [query]), parameterSpec([], [{ ...query, explode: false }])),
+            expect: parameterBreaking,
+        },
+        {
+            name: 'ref inlinato, ordine e maiuscole header equivalenti → nessun segnale',
+            run: () => diffOf(parameterSpec([headerRef, query], [], { Scope: header }),
+                parameterSpec([], [query, { ...header, name: header.name.toUpperCase() }])),
+            expect: d => d.breaking.length === 0 && d.additive.length === 0,
+        },
+        {
+            name: 'aggiunta opzionale non nasconde una restrizione preesistente',
+            run: () => diffOf(parameterSpec([query]), parameterSpec([query], [header, { ...query, required: true }])),
+            expect: d => parameterBreaking(d) && d.additive.length === 1,
+        },
+        ...[
+            parameterSpec([headerRef]),
+            parameterSpec([headerRef], [], { Scope: headerRef }),
+            parameterSpec([], [header, { ...header, name: header.name.toUpperCase() }]),
+        ].map((document, index) => ({
+            name: `parametro irrisolto/ciclico/duplicato ${index + 1} → errore, mai ignorato`,
+            run: () => {
+                try { normalizeSpec(document); return false; }
+                catch (error) { return /OpenAPI parameter/.test(error.message); }
+            },
+            expect: rejected => rejected === true,
+        })),
         {
             name: 'project native riconosce solo il wrapper autenticato con POST e DELETE',
             run: () => hasRecognizedApiV1AuthGuard(

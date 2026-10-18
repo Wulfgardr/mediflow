@@ -6,6 +6,11 @@ della PR; gli esiti CI della revisione pubblicata sono registrati nella
 [PR #558](https://github.com/Wulfgardr/mediflow/pull/558), con head e merge
 effettivi. Non si attribuiscono alla nuova head i risultati di una precedente.
 
+**Perimetro storico:** questo verbale descrive il commit tombstone
+`e51a86e9f23934ef35815f0a078b8500886fbc91`. La continuazione della stessa
+consegna, con review dell'intero diff e correzioni di produzione, è nel
+[verbale successivo](./2026-10-18-pr558-full-review-repairs.md).
+
 ## Causa verificata e modifica
 
 La head pubblicata all'ingresso era
@@ -47,7 +52,7 @@ closure, shadowing, chiamate opzionali e query estranee sono respinti.
 È un controllo statico delimitato e conservativo, non un'analisi generale
 del flusso dati TypeScript; restano necessarie le prove runtime e HTTP.
 
-**Nessuna modifica di produzione in questa tranche.** Porta, route, writer,
+**Nessuna modifica di produzione nel solo commit tombstone e51.** Porta, route, writer,
 audit, schema, prove lifecycle/cascade e workflow conservano i byte della
 base. Sono preservati v3/ChatGPT, CSV, Diario/rendering iPad, font, asset e
 geometrie. Il merge CI finale deve continuare a includere `main` e le PR
@@ -80,9 +85,11 @@ mentre l'asserzione confrontava direttamente oggetti Symbol; il confronto
 booleano conserva la stessa identità ed evita di formattare i grafi AST
 nel messaggio di errore. I 12 test della versione finale sono passati.
 
-Queste review sono limitate al guard e all'helper locale. **Non sostituiscono
-la review indipendente di Codex su auth, chiavi, scritture e audit dell'intera
-head finale. Il merge resta a Codex.**
+Queste review storiche sono limitate al guard e all'helper locale e non
+sostituiscono la review indipendente di auth, chiavi, scritture e audit
+dell'intera head finale. Lo steering `s20261018merge` affida ora a Pro
+review mediante un revisore distinto dagli autori, verifica CI e merge
+ordinario; Codex osserva. La disposizione finale è pubblicata sulla PR.
 
 ## Ripristino dell'ambiente e riproduzione
 
@@ -150,7 +157,7 @@ non equivalgono a quella qualifica.
 
 ## Handoff per la prossima Pro
 
-**Punto di partenza:** dopo il merge e la review indipendente di Codex,
+**Punto di partenza:** dopo la review indipendente e il merge ordinario di Pro,
 rileggere `origin/main` integrato, PR #558 e WUL-574/582/706/714. Verificare
 che il merge includa la head finale di questa tranche e gli aggiornamenti
 #560–562; registrare lo SHA realmente integrato. Se la PR è ancora aperta,

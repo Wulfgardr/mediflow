@@ -144,7 +144,7 @@ impl RuntimeSession {
         let parts: Vec<_> = version.split('.').collect();
         if parts.len() != 3
             || parts[0] != "1"
-            || parts[1].parse::<u64>().ok().is_none_or(|minor| minor < 12)
+            || parts[1].parse::<u64>().ok().is_none_or(|minor| minor < 13)
             || parts[2].parse::<u64>().is_err()
         {
             return Err(RuntimeError::UnsupportedProtocol);
@@ -282,8 +282,9 @@ impl RuntimeSession {
             {
                 return Err(RuntimeError::Forbidden);
             }
-            // The existing server falls back to the node default for an unknown
-            // cookie scope. A requested different scope must never accept that.
+            // Negotiate the per-request scope assertion before accessing data.
+            // An older host may ignore the header, so identity equality alone
+            // cannot admit a subsequent scoped operation.
             let identity = self.inner.client.json(
                 Method::GET,
                 &["api", "v1", "network", "identity"],
@@ -302,12 +303,7 @@ impl RuntimeSession {
                 self.lock();
             }
             let identity = identity?;
-            if identity["scope"]["effectiveAmbulatoryId"].as_str() != Some(scope)
-                || identity["operator"]["userId"].as_str() != Some(&self.inner.user.id)
-                || identity["operator"]["authChannel"] != "native"
-            {
-                return Err(RuntimeError::Forbidden);
-            }
+            require_bound_scope_identity(&identity, scope, &self.inner.user.id)?;
             self.ensure_open()?;
         }
         let result = self.inner.client.json(
@@ -1391,6 +1387,19 @@ fn valid_wire_version(version: u64) -> Result<()> {
     validate_version(version).map_err(|_| RuntimeError::InvalidResponse)
 }
 
+fn require_bound_scope_identity(identity: &Value, scope: &str, user_id: &str) -> Result<()> {
+    if identity["scope"]["requestBinding"] != "expected-ambulatory-id-v1" {
+        return Err(RuntimeError::UnsupportedProtocol);
+    }
+    if identity["scope"]["effectiveAmbulatoryId"].as_str() != Some(scope)
+        || identity["operator"]["userId"].as_str() != Some(user_id)
+        || identity["operator"]["authChannel"] != "native"
+    {
+        return Err(RuntimeError::Forbidden);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1423,6 +1432,47 @@ mod tests {
             Zeroizing::new([7; 32]),
         )
     }
+    #[test]
+    fn scoped_operations_require_host_support_and_exact_native_identity() {
+        let identity = json!({
+            "scope": {"effectiveAmbulatoryId": "scope-a", "requestBinding": "expected-ambulatory-id-v1"},
+            "operator": {"userId": "synthetic-user", "authChannel": "native"}
+        });
+        assert_eq!(
+            require_bound_scope_identity(&identity, "scope-a", "synthetic-user"),
+            Ok(())
+        );
+        for unsupported in [Value::Null, json!(false), json!("unknown-v2")] {
+            let mut old_host = identity.clone();
+            old_host["scope"]["requestBinding"] = unsupported;
+            assert_eq!(
+                require_bound_scope_identity(&old_host, "scope-a", "synthetic-user"),
+                Err(RuntimeError::UnsupportedProtocol)
+            );
+        }
+        let mut old_host = identity.clone();
+        old_host["scope"]
+            .as_object_mut()
+            .unwrap()
+            .remove("requestBinding");
+        assert_eq!(
+            require_bound_scope_identity(&old_host, "scope-a", "synthetic-user"),
+            Err(RuntimeError::UnsupportedProtocol)
+        );
+        for (group, field, value) in [
+            ("scope", "effectiveAmbulatoryId", "scope-default"),
+            ("operator", "userId", "different-user"),
+            ("operator", "authChannel", "web"),
+        ] {
+            let mut mismatched = identity.clone();
+            mismatched[group][field] = json!(value);
+            assert_eq!(
+                require_bound_scope_identity(&mismatched, "scope-a", "synthetic-user"),
+                Err(RuntimeError::Forbidden)
+            );
+        }
+    }
+
     #[test]
     fn read_binding_separates_session_patient_scope_version_and_locked_field() {
         let first = session();
@@ -1720,13 +1770,16 @@ mod tests {
             let (mut identity, _) = listener.accept().unwrap();
             let first = read_request(&mut identity);
             assert!(first.starts_with("GET /api/v1/network/identity "));
+            assert!(first.contains("\r\nx-mediflow-expected-ambulatory-id: scope-a\r\n"));
             send_reply(
                 &mut identity,
-                r#"{"scope":{"effectiveAmbulatoryId":"scope-a"},"operator":{"userId":"synthetic-user","authChannel":"native"}}"#,
+                r#"{"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}}"#,
             );
             drop(identity);
             let (mut stream, _) = listener.accept().unwrap();
-            seen_tx.send(read_request(&mut stream)).unwrap();
+            let request = read_request(&mut stream);
+            assert!(request.contains("\r\nx-mediflow-expected-ambulatory-id: scope-a\r\n"));
+            seen_tx.send(request).unwrap();
             release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
             if let Some(reply) = reply {
                 send_reply(&mut stream, &reply);

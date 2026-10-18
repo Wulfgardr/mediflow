@@ -17,6 +17,7 @@ import { forbiddenResponse, requireSession, unauthorizedResponse } from './secur
 import { requirePairedNativeSession } from './security/paired-native-session';
 import { archiveWriteRequestDenial } from './security/archive-write-request';
 import type { ServerSession } from './security/server-session';
+import { bindNetworkRequestScope } from './network-request-scope';
 
 export type NetworkWriteContext = {
     request: Request;
@@ -25,11 +26,11 @@ export type NetworkWriteContext = {
     session: ServerSession;
 };
 
-export async function resolveNetworkScope(session: ServerSession): Promise<string | null> {
+export async function resolveNetworkScope(session: ServerSession, request: Request): Promise<string | null> {
     const cookieStore = await cookies();
     const activeAmbulatoryId = cookieStore.get('ambulatory_id')?.value ?? null;
     const identity = await getNetworkIdentitySummary(session, activeAmbulatoryId);
-    return identity.scope.effectiveAmbulatoryId;
+    return bindNetworkRequestScope(request, identity.scope.effectiveAmbulatoryId);
 }
 
 // WUL-307: disabling network-home-base keeps pairings stored but makes their
@@ -60,7 +61,7 @@ export async function requireNetworkCapabilityContext(
     const archiveDenial = archiveWriteRequestDenial(request, session);
     if (archiveDenial) return { ok: false, response: archiveDenial };
 
-    const scopeAmbulatoryId = await resolveNetworkScope(session);
+    const scopeAmbulatoryId = await resolveNetworkScope(session, request);
     if (!scopeAmbulatoryId) {
         return {
             ok: false,

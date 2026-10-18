@@ -1,0 +1,806 @@
+BEGIN scope-final-unit bytes=23735 sha256=b3dff8237c532b1b95d82f1a1fa80223f26d6dc092e5dff60d2748f43f7c3575
+TAP version 13
+# Subtest: buildNetworkNodeSummary falls back to clinic or host name and keeps local-only as default
+ok 1 - buildNetworkNodeSummary falls back to clinic or host name and keeps local-only as default
+  ---
+  duration_ms: 1.117168
+  type: 'test'
+  ...
+# Subtest: buildNetworkSessionSummary exposes network-unpaired when home-base mode is enabled
+ok 2 - buildNetworkSessionSummary exposes network-unpaired when home-base mode is enabled
+  ---
+  duration_ms: 0.272422
+  type: 'test'
+  ...
+# Subtest: buildNetworkSessionSummary exposes paired-online when at least one trusted client exists
+ok 3 - buildNetworkSessionSummary exposes paired-online when at least one trusted client exists
+  ---
+  duration_ms: 0.188285
+  type: 'test'
+  ...
+# Subtest: buildNetworkCapabilitiesResponse disables pairing bootstrap while node stays local-only
+ok 4 - buildNetworkCapabilitiesResponse disables pairing bootstrap while node stays local-only
+  ---
+  duration_ms: 0.445763
+  type: 'test'
+  ...
+# Subtest: buildNetworkCapabilitiesResponse surfaces centralized AI availability when the node runtime is ready
+ok 5 - buildNetworkCapabilitiesResponse surfaces centralized AI availability when the node runtime is ready
+  ---
+  duration_ms: 0.525233
+  type: 'test'
+  ...
+# Subtest: buildNetworkReplicaSummary keeps offline-deferred and conflict-review as explicit preview states
+ok 6 - buildNetworkReplicaSummary keeps offline-deferred and conflict-review as explicit preview states
+  ---
+  duration_ms: 0.143086
+  type: 'test'
+  ...
+# Subtest: evaluateNetworkDataPlaneModeGate rejects paired-client requests while home-base mode is off
+ok 7 - evaluateNetworkDataPlaneModeGate rejects paired-client requests while home-base mode is off
+  ---
+  duration_ms: 0.213453
+  type: 'test'
+  ...
+# Subtest: evaluateNetworkDataPlaneModeGate passes paired-client requests while home-base mode is on
+ok 8 - evaluateNetworkDataPlaneModeGate passes paired-client requests while home-base mode is on
+  ---
+  duration_ms: 0.803564
+  type: 'test'
+  ...
+# Subtest: createPairingIntentDraft rejects requests while home-base mode is disabled
+ok 9 - createPairingIntentDraft rejects requests while home-base mode is disabled
+  ---
+  duration_ms: 0.336008
+  type: 'test'
+  ...
+# Subtest: createPairingIntentDraft emits a PHI-safe pending bootstrap when home-base mode is enabled
+ok 10 - createPairingIntentDraft emits a PHI-safe pending bootstrap when home-base mode is enabled
+  ---
+  duration_ms: 1.314896
+  type: 'test'
+  ...
+# Subtest: deriveNetworkIdentitySummary requires node credentials when only device pairing exists
+ok 11 - deriveNetworkIdentitySummary requires node credentials when only device pairing exists
+  ---
+  duration_ms: 0.698836
+  type: 'test'
+  ...
+# Subtest: deriveNetworkIdentitySummary binds operator and scope when a session context exists
+ok 12 - deriveNetworkIdentitySummary binds operator and scope when a session context exists
+  ---
+  duration_ms: 0.15185
+  type: 'test'
+  ...
+# Subtest: create: an explicit different scope is denied at admission without clinical/audit effects
+ok 13 - create: an explicit different scope is denied at admission without clinical/audit effects
+  ---
+  duration_ms: 121.110952
+  type: 'test'
+  ...
+# Subtest: update: an explicit different scope is denied at admission without clinical/audit effects
+ok 14 - update: an explicit different scope is denied at admission without clinical/audit effects
+  ---
+  duration_ms: 4.259605
+  type: 'test'
+  ...
+# Subtest: delete: an explicit different scope is denied at admission without clinical/audit effects
+ok 15 - delete: an explicit different scope is denied at admission without clinical/audit effects
+  ---
+  duration_ms: 3.307277
+  type: 'test'
+  ...
+# Subtest: restore: an explicit different scope is denied at admission without clinical/audit effects
+ok 16 - restore: an explicit different scope is denied at admission without clinical/audit effects
+  ---
+  duration_ms: 2.969546
+  type: 'test'
+  ...
+# Subtest: patient-list, patient-detail and shared capability admissions reject an explicit different scope
+ok 17 - patient-list, patient-detail and shared capability admissions reject an explicit different scope
+  ---
+  duration_ms: 6.838151
+  type: 'test'
+  ...
+# Subtest: the patient commit guard independently rechecks the request scope assertion
+ok 18 - the patient commit guard independently rechecks the request scope assertion
+  ---
+  duration_ms: 2.740881
+  type: 'test'
+  ...
+# Subtest: an explicitly matching request scope retains the ordinary patient writer and required audit
+ok 19 - an explicitly matching request scope retains the ordinary patient writer and required audit
+  ---
+  duration_ms: 6.79108
+  type: 'test'
+  ...
+# Subtest: native create: valid write commits clinical data and one required audit
+ok 20 - native create: valid write commits clinical data and one required audit
+  ---
+  duration_ms: 3.427569
+  type: 'test'
+  ...
+# Subtest: native create: pending body after pairing revocation has no clinical/audit effect
+ok 21 - native create: pending body after pairing revocation has no clinical/audit effect
+  ---
+  duration_ms: 23.712694
+  type: 'test'
+  ...
+# Subtest: native create: pending body after mode revocation has no clinical/audit effect
+ok 22 - native create: pending body after mode revocation has no clinical/audit effect
+  ---
+  duration_ms: 4.317413
+  type: 'test'
+  ...
+# Subtest: native create: pending body after capability revocation has no clinical/audit effect
+ok 23 - native create: pending body after capability revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.266004
+  type: 'test'
+  ...
+# Subtest: native create: pending body after token revocation has no clinical/audit effect
+ok 24 - native create: pending body after token revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.017539
+  type: 'test'
+  ...
+# Subtest: native create: pending body after session revocation has no clinical/audit effect
+ok 25 - native create: pending body after session revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.347207
+  type: 'test'
+  ...
+# Subtest: native create: pending body after user revocation has no clinical/audit effect
+ok 26 - native create: pending body after user revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.099022
+  type: 'test'
+  ...
+# Subtest: native create: pending body after scope revocation has no clinical/audit effect
+ok 27 - native create: pending body after scope revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.866891
+  type: 'test'
+  ...
+# Subtest: native update: valid write commits clinical data and one required audit
+ok 28 - native update: valid write commits clinical data and one required audit
+  ---
+  duration_ms: 5.106305
+  type: 'test'
+  ...
+# Subtest: native update: pending body after pairing revocation has no clinical/audit effect
+ok 29 - native update: pending body after pairing revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.99154
+  type: 'test'
+  ...
+# Subtest: native update: pending body after mode revocation has no clinical/audit effect
+ok 30 - native update: pending body after mode revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.032702
+  type: 'test'
+  ...
+# Subtest: native update: pending body after capability revocation has no clinical/audit effect
+ok 31 - native update: pending body after capability revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.209158
+  type: 'test'
+  ...
+# Subtest: native update: pending body after token revocation has no clinical/audit effect
+ok 32 - native update: pending body after token revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.284092
+  type: 'test'
+  ...
+# Subtest: native update: pending body after session revocation has no clinical/audit effect
+ok 33 - native update: pending body after session revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.192433
+  type: 'test'
+  ...
+# Subtest: native update: pending body after user revocation has no clinical/audit effect
+ok 34 - native update: pending body after user revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.279374
+  type: 'test'
+  ...
+# Subtest: native update: pending body after scope revocation has no clinical/audit effect
+ok 35 - native update: pending body after scope revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.17071
+  type: 'test'
+  ...
+# Subtest: native delete: valid write commits clinical data and one required audit
+ok 36 - native delete: valid write commits clinical data and one required audit
+  ---
+  duration_ms: 3.792049
+  type: 'test'
+  ...
+# Subtest: native delete: pending body after pairing revocation has no clinical/audit effect
+ok 37 - native delete: pending body after pairing revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.451184
+  type: 'test'
+  ...
+# Subtest: native delete: pending body after mode revocation has no clinical/audit effect
+ok 38 - native delete: pending body after mode revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.675422
+  type: 'test'
+  ...
+# Subtest: native delete: pending body after capability revocation has no clinical/audit effect
+ok 39 - native delete: pending body after capability revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.688202
+  type: 'test'
+  ...
+# Subtest: native delete: pending body after token revocation has no clinical/audit effect
+ok 40 - native delete: pending body after token revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.222659
+  type: 'test'
+  ...
+# Subtest: native delete: pending body after session revocation has no clinical/audit effect
+ok 41 - native delete: pending body after session revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.778518
+  type: 'test'
+  ...
+# Subtest: native delete: pending body after user revocation has no clinical/audit effect
+ok 42 - native delete: pending body after user revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.849726
+  type: 'test'
+  ...
+# Subtest: native delete: pending body after scope revocation has no clinical/audit effect
+ok 43 - native delete: pending body after scope revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.139062
+  type: 'test'
+  ...
+# Subtest: native restore: valid write commits clinical data and one required audit
+ok 44 - native restore: valid write commits clinical data and one required audit
+  ---
+  duration_ms: 3.764717
+  type: 'test'
+  ...
+# Subtest: native restore: pending body after pairing revocation has no clinical/audit effect
+ok 45 - native restore: pending body after pairing revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.648361
+  type: 'test'
+  ...
+# Subtest: native restore: pending body after mode revocation has no clinical/audit effect
+ok 46 - native restore: pending body after mode revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.72707
+  type: 'test'
+  ...
+# Subtest: native restore: pending body after capability revocation has no clinical/audit effect
+ok 47 - native restore: pending body after capability revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.815644
+  type: 'test'
+  ...
+# Subtest: native restore: pending body after token revocation has no clinical/audit effect
+ok 48 - native restore: pending body after token revocation has no clinical/audit effect
+  ---
+  duration_ms: 6.445017
+  type: 'test'
+  ...
+# Subtest: native restore: pending body after session revocation has no clinical/audit effect
+ok 49 - native restore: pending body after session revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.527809
+  type: 'test'
+  ...
+# Subtest: native restore: pending body after user revocation has no clinical/audit effect
+ok 50 - native restore: pending body after user revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.521199
+  type: 'test'
+  ...
+# Subtest: native restore: pending body after scope revocation has no clinical/audit effect
+ok 51 - native restore: pending body after scope revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.118942
+  type: 'test'
+  ...
+# Subtest: web create: valid write commits clinical data and one required audit
+ok 52 - web create: valid write commits clinical data and one required audit
+  ---
+  duration_ms: 6.124874
+  type: 'test'
+  ...
+# Subtest: web create: pending body after pairing revocation has no clinical/audit effect
+ok 53 - web create: pending body after pairing revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.991509
+  type: 'test'
+  ...
+# Subtest: web create: pending body after mode revocation has no clinical/audit effect
+ok 54 - web create: pending body after mode revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.903196
+  type: 'test'
+  ...
+# Subtest: web create: pending body after capability revocation has no clinical/audit effect
+ok 55 - web create: pending body after capability revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.052612
+  type: 'test'
+  ...
+# Subtest: web create: pending body after token revocation has no clinical/audit effect
+ok 56 - web create: pending body after token revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.85288
+  type: 'test'
+  ...
+# Subtest: web create: pending body after session revocation has no clinical/audit effect
+ok 57 - web create: pending body after session revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.773461
+  type: 'test'
+  ...
+# Subtest: web create: pending body after user revocation has no clinical/audit effect
+ok 58 - web create: pending body after user revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.24011
+  type: 'test'
+  ...
+# Subtest: web create: pending body after scope revocation has no clinical/audit effect
+ok 59 - web create: pending body after scope revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.589503
+  type: 'test'
+  ...
+# Subtest: web update: valid write commits clinical data and one required audit
+ok 60 - web update: valid write commits clinical data and one required audit
+  ---
+  duration_ms: 4.085913
+  type: 'test'
+  ...
+# Subtest: web update: pending body after pairing revocation has no clinical/audit effect
+ok 61 - web update: pending body after pairing revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.468149
+  type: 'test'
+  ...
+# Subtest: web update: pending body after mode revocation has no clinical/audit effect
+ok 62 - web update: pending body after mode revocation has no clinical/audit effect
+  ---
+  duration_ms: 4.001215
+  type: 'test'
+  ...
+# Subtest: web update: pending body after capability revocation has no clinical/audit effect
+ok 63 - web update: pending body after capability revocation has no clinical/audit effect
+  ---
+  duration_ms: 4.559449
+  type: 'test'
+  ...
+# Subtest: web update: pending body after token revocation has no clinical/audit effect
+ok 64 - web update: pending body after token revocation has no clinical/audit effect
+  ---
+  duration_ms: 7.494181
+  type: 'test'
+  ...
+# Subtest: web update: pending body after session revocation has no clinical/audit effect
+ok 65 - web update: pending body after session revocation has no clinical/audit effect
+  ---
+  duration_ms: 7.319819
+  type: 'test'
+  ...
+# Subtest: web update: pending body after user revocation has no clinical/audit effect
+ok 66 - web update: pending body after user revocation has no clinical/audit effect
+  ---
+  duration_ms: 4.928096
+  type: 'test'
+  ...
+# Subtest: web update: pending body after scope revocation has no clinical/audit effect
+ok 67 - web update: pending body after scope revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.431354
+  type: 'test'
+  ...
+# Subtest: web delete: valid write commits clinical data and one required audit
+ok 68 - web delete: valid write commits clinical data and one required audit
+  ---
+  duration_ms: 3.698408
+  type: 'test'
+  ...
+# Subtest: web delete: pending body after pairing revocation has no clinical/audit effect
+ok 69 - web delete: pending body after pairing revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.6405
+  type: 'test'
+  ...
+# Subtest: web delete: pending body after mode revocation has no clinical/audit effect
+ok 70 - web delete: pending body after mode revocation has no clinical/audit effect
+  ---
+  duration_ms: 4.016067
+  type: 'test'
+  ...
+# Subtest: web delete: pending body after capability revocation has no clinical/audit effect
+ok 71 - web delete: pending body after capability revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.935585
+  type: 'test'
+  ...
+# Subtest: web delete: pending body after token revocation has no clinical/audit effect
+ok 72 - web delete: pending body after token revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.284362
+  type: 'test'
+  ...
+# Subtest: web delete: pending body after session revocation has no clinical/audit effect
+ok 73 - web delete: pending body after session revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.139222
+  type: 'test'
+  ...
+# Subtest: web delete: pending body after user revocation has no clinical/audit effect
+ok 74 - web delete: pending body after user revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.131201
+  type: 'test'
+  ...
+# Subtest: web delete: pending body after scope revocation has no clinical/audit effect
+ok 75 - web delete: pending body after scope revocation has no clinical/audit effect
+  ---
+  duration_ms: 6.313018
+  type: 'test'
+  ...
+# Subtest: web restore: valid write commits clinical data and one required audit
+ok 76 - web restore: valid write commits clinical data and one required audit
+  ---
+  duration_ms: 3.293736
+  type: 'test'
+  ...
+# Subtest: web restore: pending body after pairing revocation has no clinical/audit effect
+ok 77 - web restore: pending body after pairing revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.294697
+  type: 'test'
+  ...
+# Subtest: web restore: pending body after mode revocation has no clinical/audit effect
+ok 78 - web restore: pending body after mode revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.416471
+  type: 'test'
+  ...
+# Subtest: web restore: pending body after capability revocation has no clinical/audit effect
+ok 79 - web restore: pending body after capability revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.960212
+  type: 'test'
+  ...
+# Subtest: web restore: pending body after token revocation has no clinical/audit effect
+ok 80 - web restore: pending body after token revocation has no clinical/audit effect
+  ---
+  duration_ms: 6.674644
+  type: 'test'
+  ...
+# Subtest: web restore: pending body after session revocation has no clinical/audit effect
+ok 81 - web restore: pending body after session revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.804978
+  type: 'test'
+  ...
+# Subtest: web restore: pending body after user revocation has no clinical/audit effect
+ok 82 - web restore: pending body after user revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.268558
+  type: 'test'
+  ...
+# Subtest: web restore: pending body after scope revocation has no clinical/audit effect
+ok 83 - web restore: pending body after scope revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.239894
+  type: 'test'
+  ...
+# Subtest: create: revocation in final asynchronous preparation is denied inside transaction
+ok 84 - create: revocation in final asynchronous preparation is denied inside transaction
+  ---
+  duration_ms: 1.31071
+  type: 'test'
+  ...
+# Subtest: update: revocation in final asynchronous preparation is denied inside transaction
+ok 85 - update: revocation in final asynchronous preparation is denied inside transaction
+  ---
+  duration_ms: 1.4633
+  type: 'test'
+  ...
+# Subtest: delete: revocation in final asynchronous preparation is denied inside transaction
+ok 86 - delete: revocation in final asynchronous preparation is denied inside transaction
+  ---
+  duration_ms: 1.528329
+  type: 'test'
+  ...
+# Subtest: restore: revocation in final asynchronous preparation is denied inside transaction
+ok 87 - restore: revocation in final asynchronous preparation is denied inside transaction
+  ---
+  duration_ms: 1.207995
+  type: 'test'
+  ...
+# Subtest: aiSummary=forged: profile and create deny derived fields without clinical/audit effects
+ok 88 - aiSummary=forged: profile and create deny derived fields without clinical/audit effects
+  ---
+  duration_ms: 2.300606
+  type: 'test'
+  ...
+# Subtest: aiSummary=null: profile and create deny derived fields without clinical/audit effects
+ok 89 - aiSummary=null: profile and create deny derived fields without clinical/audit effects
+  ---
+  duration_ms: 2.122978
+  type: 'test'
+  ...
+# Subtest: aiSummaryGeneratedAt=forged: profile and create deny derived fields without clinical/audit effects
+ok 90 - aiSummaryGeneratedAt=forged: profile and create deny derived fields without clinical/audit effects
+  ---
+  duration_ms: 2.006291
+  type: 'test'
+  ...
+# Subtest: aiSummaryGeneratedAt=null: profile and create deny derived fields without clinical/audit effects
+ok 91 - aiSummaryGeneratedAt=null: profile and create deny derived fields without clinical/audit effects
+  ---
+  duration_ms: 2.331803
+  type: 'test'
+  ...
+# Subtest: aiSummaryContextHash=forged: profile and create deny derived fields without clinical/audit effects
+ok 92 - aiSummaryContextHash=forged: profile and create deny derived fields without clinical/audit effects
+  ---
+  duration_ms: 2.166684
+  type: 'test'
+  ...
+# Subtest: aiSummaryContextHash=null: profile and create deny derived fields without clinical/audit effects
+ok 93 - aiSummaryContextHash=null: profile and create deny derived fields without clinical/audit effects
+  ---
+  duration_ms: 2.530793
+  type: 'test'
+  ...
+# Subtest: documentInsights=forged: profile and create deny derived fields without clinical/audit effects
+ok 94 - documentInsights=forged: profile and create deny derived fields without clinical/audit effects
+  ---
+  duration_ms: 1.94627
+  type: 'test'
+  ...
+# Subtest: documentInsights=null: profile and create deny derived fields without clinical/audit effects
+ok 95 - documentInsights=null: profile and create deny derived fields without clinical/audit effects
+  ---
+  duration_ms: 2.554098
+  type: 'test'
+  ...
+# Subtest: profile allowlist preserves ordinary sealed/null fields and ignores extension metadata
+ok 96 - profile allowlist preserves ordinary sealed/null fields and ignores extension metadata
+  ---
+  duration_ms: 2.049796
+  type: 'test'
+  ...
+# Subtest: a second SQLite writer revokes mode while the patient waits for its IMMEDIATE transaction
+ok 97 - a second SQLite writer revokes mode while the patient waits for its IMMEDIATE transaction
+  ---
+  duration_ms: 200.328161
+  type: 'test'
+  ...
+# Subtest: an expected scope asserts the resolved context and never grants or substitutes a scope
+ok 98 - an expected scope asserts the resolved context and never grants or substitutes a scope
+  ---
+  duration_ms: 16.073444
+  type: 'test'
+  ...
+# Subtest: headerless clients retain the existing resolved cookie/default scope
+ok 99 - headerless clients retain the existing resolved cookie/default scope
+  ---
+  duration_ms: 0.381036
+  type: 'test'
+  ...
+# Subtest: scope assertions preserve opaque IDs with one canonical encoding
+ok 100 - scope assertions preserve opaque IDs with one canonical encoding
+  ---
+  duration_ms: 0.7146
+  type: 'test'
+  ...
+# Subtest: malformed, unencoded, empty and duplicate scope assertions are rejected
+ok 101 - malformed, unencoded, empty and duplicate scope assertions are rejected
+  ---
+  duration_ms: 0.530231
+  type: 'test'
+  ...
+1..101
+# tests 101
+# suites 0
+# pass 101
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2930.83648
+END scope-final-unit
+
+BEGIN scope-final-tombstone-static bytes=1473 sha256=f45570ea14433d7c7c94b5716b7c202074d2bfde389199daba6b4c05f29530c9
+✔ patient DELETE routes delegate one version-guarded tombstone and required audit transaction (120.561973ms)
+✔ patient GET and PUT handlers preserve tombstones through the profile port and writer (404 contract) (89.573068ms)
+✔ profile tombstone guard rejects broken imports, delegation, filters, 404s and final updates (266.832815ms)
+ℹ 20 in-memory rejection cases per route; production files unchanged
+✔ the schema owner keeps the additive ensureColumn guards for the tombstone columns (0.252281ms)
+✔ primary patient list reads exclude soft-deleted patients (0.259482ms)
+✔ ambulatories/clear is membership-based, soft-deletes and stays test-only (0.301125ms)
+✔ the membership-clear helper tombstones with the dedicated reason (0.162926ms)
+✔ AST guard isolates direct patient-read chains and normalizes their fingerprints (2.602452ms)
+✔ AST allowlist consumes fingerprints and rejects stale, substituted, or duplicate reads (0.842663ms)
+✔ AST guard follows a local immutable predicate without accepting aliases, mutation, or shadowing (1.941213ms)
+✔ AST guard follows AND-only predicate paths and invalidates every query after an unsafe use (14.831428ms)
+ℹ 19 rejected AND/escape cases, plus all-use invalidation of two patient queries
+✔ patients table access stays behind activePatients() outside the allowlist (856.093797ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1612.360637
+END scope-final-tombstone-static
+
+BEGIN scope-final-openapi-selftest bytes=1873 sha256=ec17ff1d5407b401fdc6a320bbf47458880b8975b52cd1d690dc3d58c1564d02
+ok   nuovo header opzionale su operazione → additive, senza override
+ok   parametro opzionale di path via ref viene confrontato → additive
+ok   nuovo parametro obbligatorio path via ref → breaking
+ok   nuovo parametro obbligatorio operation via ref → breaking
+ok   parametro preesistente rimosso resta breaking anche con aggiunta opzionale
+ok   override di operazione che rende obbligatorio il parametro di path → breaking
+ok   tipo del parametro referenziato cambiato → breaking
+ok   serializzazione di parametro cambiata → breaking
+ok   ref inlinato, ordine e maiuscole header equivalenti → nessun segnale
+ok   aggiunta opzionale non nasconde una restrizione preesistente
+ok   parametro irrisolto/ciclico/duplicato 1 → errore, mai ignorato
+ok   parametro irrisolto/ciclico/duplicato 2 → errore, mai ignorato
+ok   parametro irrisolto/ciclico/duplicato 3 → errore, mai ignorato
+ok   project native riconosce solo il wrapper autenticato con POST e DELETE
+ok   project native senza wrapper autenticato resta rifiutato
+ok   campo di RISPOSTA nuovo e obbligatorio → breaking (la regressione WUL-542)
+ok   campo di risposta nuovo e opzionale → solo additive
+ok   campo di risposta rimosso → breaking
+ok   campo preesistente che entra nei required → breaking
+ok   campo che esce dai required → additive, mai breaking
+ok   required nuovo dentro un array di risposta → breaking, con [] nel label
+ok   $ref inlinato senza cambiare nulla → nessun segnale
+ok   schema rinominato a contenuto identico → nessun segnale
+ok   varianti oneOf riordinate → nessun segnale
+ok   request body con `required` booleano → nessuna eccezione, e il campo obbligatorio è breaking
+ok   nessuna differenza → nessun segnale
+ok   valore fisso `const` cambiato → segnalato
+ok   valore fisso `const` invariato → nessun segnale
+
+self-test: 28/28 casi passano
+END scope-final-openapi-selftest
+
+BEGIN scope-final-openapi-verified bytes=31 sha256=7f0815b325bd7532f6e7ad9f78ccd71e05bc2a5ef3bda0114e6aefa177174f39
+OpenAPI contract guard passed.
+END scope-final-openapi-verified
+
+BEGIN scope-final-typecheck bytes=180 sha256=579d4bca72a72c510704c915c33513533d4a6dd62919df877f2388700e66df2f
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> medical-record-app@0.9.0 typecheck
+> tsc -p tsconfig.typecheck.json --noEmit
+
+END scope-final-typecheck
+
+BEGIN scope-final-lint bytes=0 sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+END scope-final-lint
+
+BEGIN scope-rust-tests bytes=3316 sha256=1ac64a7720ac7ef2b7829e7cefed5e14b52ad23bcb2bb764e669b9d7bdee1879
+    Finished `test` profile [unoptimized] target(s) in 0.25s
+     Running unittests src/lib.rs (/tmp/mediflow-r08ef12a/transport-fix-target/debug/deps/mediflow_runtime_client-1f5fd9bc18b7a7bc)
+
+running 30 tests
+test crypto::tests::v3_normalizes_nfkc_without_trimming_or_scalar_truncation ... ok
+test crypto::tests::web_and_swift_field_golden_matches_bytes ... ok
+test catalogs::tests::catalog_bounds_reject_truncation_and_ambiguous_bulk_codes ... ok
+test catalogs::tests::catalog_dtos_preserve_identifiers_labels_and_nullable_flags ... ok
+test catalogs::tests::terminology_preserves_provenance_and_does_not_invent_missing_translation ... ok
+test crypto::tests::unicode_null_and_reserved_prefix_are_unambiguous ... ok
+test crypto::tests::independent_node_unicode_and_structured_fields_decode ... ok
+test http::tests::write_failures_do_not_claim_rejection_when_effects_are_unknown ... ok
+test http::tests::opaque_cookie_ids_match_node_and_next_golden_without_injection ... ok
+test http::tests::only_explicit_loopback_may_use_http_and_credentials_are_origin_bound ... ok
+test http::tests::query_values_cannot_inject_another_parameter_fragment_or_path ... ok
+test http::tests::opaque_resource_ids_keep_spaces_unicode_and_literal_percent_in_one_segment ... ok
+test session::tests::bad_ciphertext_is_locked_and_nullable_notes_remain_distinct_from_empty ... ok
+test session::tests::catalog_route_query_and_lock_stay_inside_the_existing_session_gate ... ok
+test session::tests::aggregate_filters_reject_invalid_dates_ranges_limits_and_empty_types ... ok
+test session::tests::clone_lock_wipes_key_and_duplicate_gate_is_shared ... ok
+test session::tests::late_read_cannot_reinstall_the_consumed_write_prerequisite ... ok
+test session::tests::agenda_uses_existing_global_route_and_preserves_decrypted_checkup_parent ... ok
+test session::tests::dropped_write_response_is_unknown_and_cannot_be_replayed_without_read ... ok
+test session::tests::patient_profile_patch_distinguishes_absence_clear_and_value_and_requires_matching_read ... ok
+test session::tests::one_inflight_write_blocks_duplicate_and_late_ack_after_lock_is_unknown ... ok
+test session::tests::late_read_after_lock_never_delivers_clinical_data ... ok
+test session::tests::scoped_operations_require_host_support_and_exact_native_identity ... ok
+test session::tests::versions_follow_positive_javascript_safe_integer_contract ... ok
+test session::tests::read_binding_separates_session_patient_scope_version_and_locked_field ... ok
+test session::tests::global_diary_decrypts_in_server_order_and_binds_each_parent_without_fanout ... ok
+test session::tests::patient_creation_seals_optional_fields_and_requires_a_version_one_ack ... ok
+test session::tests::sparse_patient_update_seals_only_changed_fields_and_never_replays_unknown_writes ... ok
+test session::tests::attachment_list_requires_payload_key_omission_before_decrypting ... ok
+test crypto::tests::canonical_native_v3_unlock_and_wrap_golden ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.79s
+
+     Running unittests src/bin/mediflow-runtime-probe.rs (/tmp/mediflow-r08ef12a/transport-fix-target/debug/deps/mediflow_runtime_probe-c44bee38238bad51)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+END scope-rust-tests
+
+BEGIN gpui-blocker-tests bytes=5523 sha256=6a330d16ebf2dccda013afa93cb70e1e1fa9a3081633a3d30a6b974a976e08c4
+   Compiling mediflow-gpui-patient-pilot v0.1.0 (/tmp/mediflow-r08ef12a/fixes/experiments/gpui-patient-pilot/app)
+    Finished `test` profile [unoptimized] target(s) in 2.60s
+     Running unittests src/main.rs (/tmp/mediflow-recovery-keyboard-target/debug/deps/mediflow_gpui_patient_pilot-c31670b25444d792)
+
+running 53 tests
+test components::tests::clinical_reading_keeps_paragraphs_and_does_not_render_markup ... ok
+test clinical_text::tests::html_entities_decode_once_and_clinical_comparisons_remain_literal ... ok
+test clinical_text::tests::malformed_or_unsupported_rich_content_is_retained_with_an_explicit_label ... ok
+test demo::tests::ordinary_save_is_only_saved_after_independent_service_reread ... ok
+test clinical_text::tests::nested_lists_and_blocks_keep_boundaries_numbering_and_continuations ... ok
+test demo::tests::uncertain_commit_and_failed_reread_do_not_report_success ... ok
+test clinical_text::tests::headings_quotes_aliases_and_depth_exhaustion_do_not_drop_original_content ... ok
+test demo::tests::conflict_preserves_other_postation_and_local_draft ... ok
+test documents::tests::data_url_requires_exact_type_size_canonical_base64_and_raw_limit ... ok
+test clinical_text::tests::overlapping_emphasis_stays_disjoint_and_crossed_out_text_is_explicit_in_copy ... ok
+test editing::tests::coded_therapy_name_cannot_diverge_from_its_preserved_identity ... ok
+test editing::tests::dates_and_nullable_values_change_only_when_explicitly_edited ... ok
+test editing::tests::checkup_edit_reopens_the_chosen_local_day_and_preserves_unchanged_timestamps ... ok
+test editing::tests::ambiguous_checkup_edits_are_rejected_but_known_original_instants_are_preserved ... ok
+test documents::tests::remote_metadata_cannot_supply_a_download_path ... ok
+test editing::tests::decrypted_and_live_record_is_required_before_constructing_any_update ... ok
+test editing::tests::title_edit_preserves_rich_body_setting_and_recorded_time_exactly ... ok
+test navigation::tests::every_product_area_has_a_distinct_test_identifier_and_current_route ... ok
+test editing::tests::moving_a_checkup_day_keeps_its_local_clock_across_a_timezone_change ... ok
+test navigation::tests::narrow_and_enlarged_text_reflow_without_hiding_navigation ... ok
+test navigation::tests::worklist_navigation_uses_visible_order_and_focused_row_before_old_selection ... ok
+test editing::tests::qualified_observation_results_and_reference_text_survive_unrelated_edits ... ok
+test navigation::tests::worklist_navigation_stops_at_both_edges_and_accepts_an_empty_result ... ok
+test patient_forms::tests::changing_a_name_emits_only_that_field_and_never_reserializes_notes ... ok
+test patient_forms::tests::creation_keeps_missing_dates_missing_and_rejects_invalid_calendar_days ... ok
+test references::tests::copies_preserve_source_labels_and_distinguish_false_from_missing ... ok
+test shell::tests::acknowledged_creation_never_becomes_resendable_when_reread_fails ... ok
+test references::tests::only_systems_implemented_by_this_search_contract_are_offered ... ok
+test patient_forms::tests::clearing_a_field_differs_from_omitting_it_and_locked_fields_are_preserved ... ok
+test shell::tests::agenda_groups_use_recorded_status_and_calendar_date_without_inventing_a_due_date ... ok
+test shell::tests::current_interface_links_cannot_inject_paths_queries_or_fragments ... ok
+test shell::tests::calendar_intervals_include_whole_local_days_and_preserve_unbounded_ends ... ok
+test shell::tests::clinical_dates_reject_invalid_days_without_normalizing_into_another_month ... ok
+test shell::tests::calendar_intervals_reject_invalid_or_reversed_dates_before_a_read ... ok
+test shell::tests::existing_timestamp_appointments_retain_their_instant_and_local_display ... ok
+test shell::tests::new_checkups_keep_the_chosen_local_day_time_and_agenda_membership ... ok
+test shell::tests::new_checkups_require_an_explicit_valid_unambiguous_local_time_before_review_or_write ... ok
+test shell::tests::new_observation_preserves_qualified_strings_and_decimal_punctuation ... ok
+test shell::tests::unreadable_diagnoses_are_distinct_from_an_empty_problem_list ... ok
+test documents::tests::a_copy_never_overwrites_an_existing_file_and_round_trips_exact_bytes ... ok
+test text_input::tests::caret_reveal_keeps_visible_lines_still_and_scrolls_large_lines_within_content ... ok
+test shell::tests::new_entry_is_a_separate_action_and_lock_stays_available_inside_inputs ... ok
+test shell::tests::worklist_keymap_does_not_capture_other_views_or_modified_characters ... ok
+test shell::tests::worklist_keymap_keeps_characters_and_arrows_in_every_text_input ... ok
+test tests::launch_does_not_treat_demo_as_a_connected_archive_or_accept_secret_flags ... ok
+test text_input::tests::committing_identical_preedit_leaves_the_next_character_after_it ... ok
+test text_input::tests::malformed_offsets_never_slice_inside_a_character ... ok
+test text_input::tests::ime_highlights_are_disjoint_and_keep_both_styles_in_the_intersection ... ok
+test text_input::tests::platform_offsets_preserve_italian_and_surrogate_boundaries ... ok
+test text_input::tests::password_caret_maps_display_bullets_to_unicode_input_without_exposing_text ... ok
+test text_input::tests::native_surrounding_text_never_exports_passwords_or_stale_ranges ... ok
+test shell::tests::focus_recovery_preserves_surviving_editors_and_window_deactivation ... ok
+test shell::tests::disappearing_controls_restore_the_real_workspace_keyboard_dispatch ... ok
+
+test result: ok. 53 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.37s
+
+END gpui-blocker-tests
+
+BEGIN gpui-blocker-clippy bytes=174 sha256=789b81876a7f26d2678212fad2358e13f770833da814b57b463ca9a54894ab57
+    Checking mediflow-gpui-patient-pilot v0.1.0 (/tmp/mediflow-r08ef12a/fixes/experiments/gpui-patient-pilot/app)
+    Finished `dev` profile [unoptimized] target(s) in 1.28s
+END gpui-blocker-clippy

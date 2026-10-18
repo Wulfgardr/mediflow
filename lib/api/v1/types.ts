@@ -381,6 +381,8 @@ export type NetworkIdentityOperatorSummary = {
 /* @Codex */
 export type NetworkIdentityScopeSummary = {
     policy: 'session-context-else-node-default';
+    /** Absent on older hosts; clients must negotiate before asserting scope. */
+    requestBinding?: 'expected-ambulatory-id-v1';
     effectiveAmbulatoryId: string | null;
     effectiveAmbulatoryName: string | null;
     defaultAmbulatoryId: string | null;

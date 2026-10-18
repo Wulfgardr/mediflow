@@ -91,7 +91,8 @@ di questa UI resta sintetica e non è un test di un archivio clinico collegato.
 Sono stati verificati anche il passaggio Giorno/Grafite, il blocco della
 conferma mentre è aperta la richiesta di scarto e il blocco della navigazione
 Alt+freccia dopo «Nascondi dati». Le
-[schermate](../../experiments/gpui-patient-pilot/README.md#schermate-della-prova-linux)
+[schermate della revisione](../../experiments/gpui-patient-pilot/evidence/linux-review.png)
+e [del salvataggio Grafite](../../experiments/gpui-patient-pilot/evidence/linux-saved-grafite.png)
 e il [record con digest](../../experiments/gpui-patient-pilot/evidence/local-verification.json)
 identificano il codice e il binario locale osservato. Una correzione visiva
 conserva il contrasto dell'indicazione di bozza anche nella richiesta di scarto.

@@ -8,6 +8,7 @@ import { NETWORK_MODE_KEY, normalizeNetworkOperatingMode, evaluateNetworkDataPla
 import { NETWORK_PAIRING_STATE_KEY, parseNetworkPairingState } from './network-pairing-model';
 import { authenticatePairedClientRequest } from './network-paired-client-auth';
 import type { NetworkWriteContext } from './network-write-context';
+import { bindNetworkRequestScope } from './network-request-scope';
 import { isPairedNativeServerSession, peekSession } from './security/server-session';
 import {
     mintResourcePort, beginResourceUse, commitResourceUse, abortResourceUse, releaseResourcePort,
@@ -71,7 +72,8 @@ export async function prepareNetworkPatientCommitGuard(
             .where(eq(ambulatories.id, activeAmbulatoryId)).get() : undefined;
         const scope = selected ?? tx.select({ id: ambulatories.id }).from(ambulatories)
             .where(eq(ambulatories.isDefault, true)).get();
-        if (!scope || scope.id !== context.scopeAmbulatoryId) {
+        if (!scope || scope.id !== context.scopeAmbulatoryId
+            || bindNetworkRequestScope(context.request, scope.id) !== scope.id) {
             return { status: 403, value: { error: 'Network scope unavailable' } };
         }
         return null;

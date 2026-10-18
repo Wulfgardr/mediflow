@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.37.0
+  version: 1.38.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -52,6 +52,15 @@ info:
     Existing tombstone fields/defaults, validation order, CAS and required audit
     remain unchanged. POST/PUT still reject empty bodies. Paired checkup
     POST/PUT are unchanged; this does not complete WUL-720.
+    Network protocol 1.13 adds an optional, canonical percent-encoded
+    x-mediflow-expected-ambulatory-id header on the operations that declare it.
+    It asserts the already authenticated effective scope; it never grants or
+    selects a scope. A present assertion that does not match returns 403 before
+    data access or mutation. Headerless clients retain cookie/default resolution.
+    Identity advertises scope.requestBinding=expected-ambulatory-id-v1; clients
+    relying on the assertion must require this marker before a scoped operation,
+    since older hosts may ignore unknown headers. The patient transaction guard
+    also rechecks the assertion with its existing current-scope validation.
 servers:
   - url: https://127.0.0.1:3443
     description: Local HTTPS endpoint for native clients via TLS proxy.
@@ -417,6 +426,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/identity:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -440,6 +451,8 @@ paths:
                 $ref: '#/components/schemas/NetworkIdentitySummary'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/revision:
@@ -504,6 +517,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/visit-draft:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     post:
       x-mediflow-json-max-bytes: 4194304
       tags:
@@ -757,6 +772,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
+      parameters:
+        - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
       x-mediflow-json-max-bytes: 4194304
       tags:
         - Network
@@ -789,6 +806,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/ambulatories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     put:
       x-mediflow-json-max-bytes: 4194304
       tags:
@@ -869,6 +888,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/ambulatories/clear:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     post:
       x-mediflow-json-max-bytes: 4194304
       tags:
@@ -913,6 +934,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/drugs:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -972,6 +995,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/exemptions:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -1034,6 +1059,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/terminology/who/readiness:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
       - Network
@@ -1095,6 +1122,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/WhoNetworkError'
   /api/v1/network/terminology/who/search:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
       - Network
@@ -1164,6 +1193,8 @@ paths:
           minLength: 1
           maxLength: 160
   /api/v1/network/terminology/who/code-check:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
       - Network
@@ -1236,6 +1267,8 @@ paths:
           type: string
           const: 2026-01
   /api/v1/network/terminology/search:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -1290,6 +1323,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/terminology/resolve:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -1336,6 +1371,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/terminology/systems:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -1367,6 +1404,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/service-prescriptions:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -1459,6 +1498,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/service-prescriptions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     put:
       x-mediflow-json-max-bytes: 4194304
       tags:
@@ -1510,6 +1551,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/service-prescription-items:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -1608,6 +1651,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/service-prescription-items/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     put:
       x-mediflow-json-max-bytes: 4194304
       tags:
@@ -1660,6 +1705,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/service-catalog:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -1718,6 +1765,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/prosthetic-prescriptions:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -1816,6 +1865,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/prosthetic-prescriptions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     put:
       x-mediflow-json-max-bytes: 4194304
       tags:
@@ -1874,6 +1925,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -1976,6 +2029,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/checkups:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -2038,6 +2093,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/entries:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -2097,6 +2154,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -2251,6 +2310,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/restore:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     post:
       x-mediflow-json-max-bytes: 4194304
       tags:
@@ -2305,6 +2366,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/entries:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -2454,6 +2517,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/entries/{entryId}:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -2568,6 +2633,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/therapies:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -2697,6 +2764,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/therapies/{therapyId}:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -2812,6 +2881,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/checkups:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -2934,6 +3005,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/checkups/{checkupId}:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -3043,6 +3116,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/observations:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -3174,6 +3249,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/observations/{observationId}:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -3287,6 +3364,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/attachments:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -3450,6 +3529,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/attachments/{attachmentId}:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -3494,6 +3575,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/fse/validate-patient:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     get:
       tags:
         - Network
@@ -3532,6 +3615,8 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/fse/validate-document:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
     post:
       x-mediflow-json-max-bytes: 4194304
       tags:
@@ -3592,6 +3677,22 @@ components:
       name: mediflow_session
       description: Operator session cookie required for the remote network data plane.
   parameters:
+    ExpectedAmbulatoryScope:
+      name: x-mediflow-expected-ambulatory-id
+      in: header
+      required: false
+      description: >-
+        Optional consistency assertion for the effective ambulatory scope already
+        resolved from the authenticated context. Encode the opaque ID exactly
+        once with JavaScript encodeURIComponent (UTF-8 and uppercase percent
+        escapes). Empty, malformed, noncanonical, combined duplicate or mismatched
+        values return 403. This header cannot select or grant an ambulatory.
+        Omission retains the existing cookie/default policy. Clients must first
+        require identity.scope.requestBinding=expected-ambulatory-id-v1; hosts
+        predating network protocol 1.13 do not promise to enforce this header.
+      schema:
+        type: string
+        minLength: 1
     AmbulatoryId:
       name: id
       in: path
@@ -4853,6 +4954,13 @@ components:
         policy:
           type: string
           const: session-context-else-node-default
+        requestBinding:
+          type: string
+          const: expected-ambulatory-id-v1
+          description: >-
+            Advertised by hosts that enforce ExpectedAmbulatoryScope on each
+            declared operation. Absent on older hosts; clients must not infer
+            this support from effectiveAmbulatoryId or a successful preflight.
         effectiveAmbulatoryId:
           type:
             - string

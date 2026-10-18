@@ -1,3 +1,4 @@
+mod appointments;
 mod clinical_text;
 mod components;
 mod demo;
