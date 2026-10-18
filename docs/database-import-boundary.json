@@ -1805,7 +1805,7 @@
       "file": "scripts/stage-headless-runtime.mjs",
       "kind": "require-base",
       "expression": "createRequire(path.join(layout.web, 'package.json'))",
-      "sourceSha256": "792fae7f60e58f7006c9d55dcbcdd3ae6c30cee07659452e1a3add116c5b7e03",
+      "sourceSha256": "47a70e783aa54809e1d6d24a5646acc6e5623d3c0bf07080d156ef1e6626cfff",
       "count": 1,
       "reason": "Existing staging verifier imports the generated launcher from its selected runtime payload. This exact source digest is required."
     },
@@ -1813,7 +1813,7 @@
       "file": "scripts/stage-headless-runtime.mjs",
       "kind": "require-base",
       "expression": "createRequire(path.join(ROOT, 'package.json'))",
-      "sourceSha256": "792fae7f60e58f7006c9d55dcbcdd3ae6c30cee07659452e1a3add116c5b7e03",
+      "sourceSha256": "47a70e783aa54809e1d6d24a5646acc6e5623d3c0bf07080d156ef1e6626cfff",
       "count": 1,
       "reason": "Existing staging verifier imports the generated launcher from its selected runtime payload. This exact source digest is required."
     },
@@ -1829,7 +1829,7 @@
       "file": "scripts/source-runtime.mjs",
       "kind": "require-base",
       "expression": "createRequire(path.join(web, 'package.json'))",
-      "sourceSha256": "2b023a5a86135437df941b91246ca53aaa4a35aa49d7d8aa1dae2bb78a06d394",
+      "sourceSha256": "3efc04a7469eef8d6b857f1bf0bfc982013d8f4e3d0a297d22db3eb11410ca42",
       "count": 1,
       "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
     },
@@ -1837,7 +1837,7 @@
       "file": "scripts/source-runtime.mjs",
       "kind": "require",
       "expression": "createRequire(path.join(web, 'package.json'))(path.join(web, 'server.js'))",
-      "sourceSha256": "2b023a5a86135437df941b91246ca53aaa4a35aa49d7d8aa1dae2bb78a06d394",
+      "sourceSha256": "3efc04a7469eef8d6b857f1bf0bfc982013d8f4e3d0a297d22db3eb11410ca42",
       "count": 1,
       "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
     },
@@ -1845,7 +1845,7 @@
       "file": "scripts/stage-headless-runtime.mjs",
       "kind": "dynamic",
       "expression": "import(pathToFileURL(launcher).href)",
-      "sourceSha256": "792fae7f60e58f7006c9d55dcbcdd3ae6c30cee07659452e1a3add116c5b7e03",
+      "sourceSha256": "47a70e783aa54809e1d6d24a5646acc6e5623d3c0bf07080d156ef1e6626cfff",
       "count": 1,
       "reason": "Existing staging verifier imports the generated launcher from its selected runtime payload. This exact source digest is required."
     },
@@ -1861,7 +1861,7 @@
       "file": "scripts/source-runtime.mjs",
       "kind": "dynamic",
       "expression": "import(pathToFileURL(path.join(web, 'scripts/mediflow-headless-supervisor.mjs')).href)",
-      "sourceSha256": "2b023a5a86135437df941b91246ca53aaa4a35aa49d7d8aa1dae2bb78a06d394",
+      "sourceSha256": "3efc04a7469eef8d6b857f1bf0bfc982013d8f4e3d0a297d22db3eb11410ca42",
       "count": 1,
       "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
     },
@@ -1869,7 +1869,7 @@
       "file": "scripts/source-runtime.mjs",
       "kind": "dynamic",
       "expression": "import(pathToFileURL(path.join(web, 'scripts/register-strip-types-loader.mjs')).href)",
-      "sourceSha256": "2b023a5a86135437df941b91246ca53aaa4a35aa49d7d8aa1dae2bb78a06d394",
+      "sourceSha256": "3efc04a7469eef8d6b857f1bf0bfc982013d8f4e3d0a297d22db3eb11410ca42",
       "count": 1,
       "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
     },

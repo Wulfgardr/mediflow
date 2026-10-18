@@ -3,11 +3,48 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { load as loadYaml } from 'js-yaml';
 import { collectCiDispositionSelections, collectAppleInstallabilityBinding, verifyDispositionConsumer } from './ci-disposition-selection.mjs';
 import { collectNpmScriptBinding } from './explicit-npm-test-selection.mjs';
 const root = path.resolve(import.meta.dirname, '..');
+
+test('canonical prebuild refuses metadata admission before loading dependency verification code', t => {
+  const prebuild = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).scripts.prebuild;
+  const allowed = ['node scripts/build-input-metadata.mjs --source .', 'node scripts/node-runtime-contract.mjs verify'];
+  assert.ok(prebuild.split(' && ').every(command => allowed.includes(command)), 'fixture only executes the two fixed build admission commands');
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'prebuild-admission-order-'));
+  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(temp, 'scripts'));
+  fs.writeFileSync(path.join(temp, 'scripts/build-input-metadata.mjs'), "console.log('SYNTHETIC_METADATA_DENIED'); process.exit(73);\n");
+  fs.writeFileSync(path.join(temp, 'scripts/node-runtime-contract.mjs'), "import fs from 'node:fs'; fs.writeFileSync('dependency-code-loaded', 'loaded');\n");
+  const result = spawnSync(prebuild, { cwd: temp, shell: true, encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' } });
+  assert.equal(result.status, 73, result.stderr);
+  assert.match(result.stdout, /SYNTHETIC_METADATA_DENIED/u);
+  assert.equal(fs.existsSync(path.join(temp, 'dependency-code-loaded')), false);
+  fs.writeFileSync(path.join(temp, 'scripts/build-input-metadata.mjs'), "console.log('SYNTHETIC_METADATA_ADMITTED');\n");
+  const admitted = spawnSync(prebuild, { cwd: temp, shell: true, encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' } });
+  assert.equal(admitted.status, 0, admitted.stderr);
+  assert.match(admitted.stdout, /SYNTHETIC_METADATA_ADMITTED/u);
+  assert.equal(fs.readFileSync(path.join(temp, 'dependency-code-loaded'), 'utf8'), 'loaded');
+  assert.deepEqual(prebuild.split(' && '), allowed);
+});
+
+test('canonical prebuild reaches the real metadata CLI and denies a synthetic private input before dependency loading', t => {
+  const prebuild = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).scripts.prebuild;
+  assert.equal(prebuild, 'node scripts/build-input-metadata.mjs --source . && node scripts/node-runtime-contract.mjs verify');
+  const temp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'prebuild-real-metadata-')));
+  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(temp, 'scripts'));
+  fs.copyFileSync(path.join(root, 'scripts/build-input-metadata.mjs'), path.join(temp, 'scripts/build-input-metadata.mjs'));
+  fs.writeFileSync(path.join(temp, 'scripts/node-runtime-contract.mjs'), "import fs from 'node:fs'; fs.writeFileSync('dependency-code-loaded', 'unexpected');\n");
+  fs.writeFileSync(path.join(temp, 'synthetic.sqlite-wal'), 'Synthetic build input only.');
+  const result = spawnSync(prebuild, { cwd: temp, shell: true, encoding: 'utf8',
+    env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '', MEDIFLOW_DATA_DIR: '' } });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /Build input metadata: private file is reachable/u);
+  assert.equal(fs.existsSync(path.join(temp, 'dependency-code-loaded')), false);
+});
 
 test('production sparse checkouts omit one exact file while retaining committed identity and other test sources', t => {
   const checkouts = ['web-core.yml', 'e2e.yml'].map(file => {

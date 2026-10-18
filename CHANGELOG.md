@@ -14,6 +14,12 @@ versione pubblicata né attestano tutte le interazioni sulle piattaforme.
 
 ### Avvio
 
+- Prima di compilare o copiare il runtime di produzione, un controllo dei soli
+  metadati rifiuta archivi DB/SQLite e sidecar, directory dati o ambienti privati
+  e alias non ammessi. Il controllo precede anche la verifica delle dipendenze
+  nel comando `npm run build`; un input rifiutato richiede un'area di build pulita.
+  La DerivedData Mac predefinita rimane esterna ai sorgenti
+  ([guida nativa](./docs/native-launch.md)).
 - Un solo lanciatore per macOS, Windows e Linux: `MediFlow.command`,
   `MediFlow.cmd` e `MediFlow.sh` chiedono come vuoi usare MediFlow e avviano
   la build di produzione nell'uso ordinario. La configurazione sta nella
