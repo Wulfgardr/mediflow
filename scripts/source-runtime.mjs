@@ -137,8 +137,12 @@ async function buildSourceRuntime(root = ROOT, args = []) {
 // Trust comes from the reviewed source/build and its external ledger, not an
 // attacker-replaceable signature in the payload. No application imports here.
 export function verifySourceRuntime(root = ROOT) {
+  const web = standaloneDirectory(root);
+  // Reuse may run from a checkout with private data: inspect only the sealed
+  // payload, before the ledger or any payload content can be read.
+  assertBuildInputMetadata({ sourceRoot: web, payloadRoot: web, allowPayloadAliases: false });
   assertNodeRuntime(readNodeContract(root));
-  const web = standaloneDirectory(root), ledger = readJson(ledgerPath(web));
+  const ledger = readJson(ledgerPath(web));
   if (ledger.profile !== 'standalone' || ledger.closure?.buildIdentity !== 'REVISION_AND_BUILD_ID_MATCH') {
     throw new Error('Source runtime build identity is missing');
   }
