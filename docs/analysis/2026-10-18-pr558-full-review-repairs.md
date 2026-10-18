@@ -135,7 +135,9 @@ opzionale come breaking; è passato solo dopo la correzione semantica del
 guard e i suoi casi negativi. Le esecuzioni valide usano i permessi già
 autorizzati, directory sintetiche temporanee e copia legacy disabilitata.
 L'helper subreaper esistente raccoglie soltanto propri figli già terminati;
-in questo batch non ha inviato segnali e non restano figli residui.
+nel primo batch di correzioni non ha inviato segnali e non restavano figli
+residui. Il tentativo unit completo di CI-02, descritto sotto, ha una
+disposizione distinta e non è una prova riuscita.
 
 ### Follow-up della CI: binding Cargo della selezione
 
@@ -168,6 +170,70 @@ quella aggiornata distingue i risultati conservati dai nuovi test del
 selettore. Nessun nuovo sorgente di prodotto, run nativo facoltativo o
 ampliamento generico per ottenere verde. La nuova revisione richiede
 nuovo binding della review completa e CI propria prima del merge.
+
+### Follow-up CI-02: harness JSON e resolver reale
+
+Il successivo `62d876c6b873a1923aeee78732f938ca54ab81b3` ha chiuso
+Repository Guards. Il suo [Web Core](https://github.com/Wulfgardr/mediflow/actions/runs/39111174889/job/117627448105),
+checkout `9b157b3a8bc6f66dd9cf03a19a8a33d822fecc81`, è invece terminato
+con **7.116 casi: 7.057 PASS, 25 FAIL, 34 SKIP**. La causa dei 25 fallimenti
+è verificata nei due harness JSON: mancava la dipendenza `resolveNetworkScope`
+ora usata dalla route PUT. I precedenti fallimenti della selezione non
+ricorrono in questa run. Le altre sei run di 62d sono SUCCESS, con i due
+job Apple build/UI ancora SKIPPED; sono esiti di quella revisione.
+
+[`patient-json-envelope.test.ts`](../../lib/patient-json-envelope.test.ts)
+ora carica il resolver di produzione: il suo lookup dell'identità riceve
+la fixture soltanto per l'importer esatto; il binder della richiesta e il
+writer clinico restano reali. L'ammissione sintetica conserva il rifiuto
+di autenticazione e applica lo stesso resolver prima di costruire il
+contesto. [`native-network-bounded-json.test.mjs`](../../scripts/native-network-bounded-json.test.mjs)
+ammette i due moduli reali del resolver/binder e sette dipendenze nominate
+di autenticazione/identità nel proprio loader chiuso. Una dipendenza
+imprevista continua a fallire.
+
+I **200 casi di test esistenti** e le loro aspettative sono conservati. I cinque casi aggiunti
+verificano asserzione di scope uguale, diversa o scope effettivo assente,
+richiesta originale e payload invariati, versione e audit del commit reale.
+Lo scope assente viene rifiutato prima di headers/body/parse; un'asserzione
+diversa richiede soltanto la lettura dell'header e non entra nel parser o
+nel servizio. Budget JSON, abort/cancel, errori e assenza di effetti su
+pazienti, appartenenze e audit non vengono allargati.
+
+| Prova di CI-02 | Esito e attribuzione |
+| --- | --- |
+| Due harness prima della correzione, head 62d | **200 casi, 175 PASS, 25 FAIL, zero SKIP**: riproduzione locale della causa CI |
+| Due harness corretti | **205 PASS, zero FAIL/SKIP**; i 200 casi precedenti più cinque nuovi |
+| ESLint dei due file | **PASS** |
+| Typecheck del merge 9b157b3 con i due harness corretti | **PASS**; include main 2dde e #560–562 |
+| `npm run test:unit` completo locale | **INCONCLUSIVO**, interrotto con exit 143 per prerequisiti dell'ambiente; non attestato come PASS |
+
+Il tentativo completo ereditava il fuso New York e un `node_modules`
+esterno al root consentito al worker PDF: i corrispondenti casi isolati
+sono tornati PASS impostando UTC e copiando le dipendenze dentro il
+checkout, senza cambiare restrizioni o test. Mancava inoltre Chromium
+1208; i download ufficiali di Chrome e della sola headless shell hanno
+restituito ZIP incompleti. Il caso `post-stop-io-failure` della maintenance
+è rimasto in attesa perché il processo locale root può scrivere anche
+dopo `chmod 500`, mentre la fixture richiede un utente ordinario. Sono
+stati fermati soltanto i sei processi dell'albero identificato del runner
+locale; la ricevuta registra i SIGTERM manuali separatamente dai zero
+segnali dell'helper subreaper. La directory sintetica bloccata è stata
+rimossa dopo aver verificato l'assenza dei suoi processi. L'helper aveva
+segnalato figli residui al proprio ritorno: non si dichiara un cleanup
+generale sincrono riuscito per questa esecuzione.
+
+I transcript dei 205 casi, del lint e del typecheck sono nei log aggregati.
+Quello dei 205 casi è un array JSON di righe che conserva anche newline e
+spazi finali dei nomi dei casi con corpo vuoto: concatenando le stringhe
+si ricostruiscono esattamente i byte e il digest del TAP originale.
+Il tentativo completo inconclusivo, le diagnosi e i due download falliti
+sono registrati nella ricevuta con esito e digest dei log locali non
+pubblicati. La prova completa obbligatoria è il comando canonico eseguito
+da Web Core sulla **successiva head pubblicata**, inclusi i gruppi seriali
+che le run fallite non avevano raggiunto. Il risultato va verificato prima
+del merge; questo documento non lo anticipa. Nessun file di produzione,
+workflow o esclusione è cambiato per CI-02.
 
 ### Comandi riproducibili
 
@@ -211,6 +277,29 @@ I mock Rust richiedono loopback locale. `--offline` è riproducibile quando
 le dipendenze fissate sono già presenti. I workflow canonici restano la
 prova della revisione pubblicata sui runner dei sistemi operativi.
 
+Per i due harness JSON e il comando unit completo usare Node 24, dipendenze
+installate nel checkout e un utente ordinario, come nel Web Core Ubuntu.
+Il gruppo componenti richiede il Chromium della versione Playwright
+fissata nel lock (`npx playwright install --with-deps chromium`). Non usare
+un symlink verso dipendenze esterne al root ammesso al worker PDF.
+
+```python
+import os
+import subprocess
+import tempfile
+
+if hasattr(os, "geteuid") and os.geteuid() == 0:
+    raise SystemExit("Eseguire come utente ordinario: la suite verifica anche i permessi del filesystem.")
+with tempfile.TemporaryDirectory(prefix="mediflow-pr558-json-") as data:
+    env = dict(os.environ, MEDIFLOW_DATA_DIR=data,
+               MEDIFLOW_E2E_DISABLE_LEGACY_COPY="1", TZ="UTC")
+    subprocess.run([
+        "node", "scripts/run-strip-types.mjs", "--test", "--test-reporter=tap",
+        "lib/patient-json-envelope.test.ts", "scripts/native-network-bounded-json.test.mjs",
+    ], env=env, check=True)
+    subprocess.run(["npm", "run", "test:unit"], env=env, check=True)
+```
+
 ## Consegna, conservazione e prossima sessione
 
 Lo [steering pubblico](https://github.com/Wulfgardr/mediflow/pull/558#issuecomment-6246684340)
@@ -233,6 +322,17 @@ WUL-575 nella sequenza del pilota WUL-573. Il
 separa i servizi affidabili da riusare dalle decisioni su canonicalizzazione
 prima della cifratura, vista interna distinta dall'ORM, registri operativi
 e destino dell'autorità SQLite Swift opzionale.
+
+La disposizione di [WUL-574](https://linear.app/wulfgardr/issue/WUL-574)
+considera anche la sua sezione "Confronto preparatorio sul codice corrente":
+la tabella confronta **sole note del paziente e solo contenuto di una voce
+di Diario**, con otto criteri e fonti della revisione `0de709b8`.
+La precedente tabella della preparazione 09x, che escludeva F10, non basta
+quindi a dichiarare mancante il secondo candidato. Il confronto successivo
+in Linear va riconciliato con i writer e i chiamanti correnti; lo stato dei
+quattro criteri è registrato nella consegna della PR dopo quella verifica.
+WUL-735/630 sono stati riletti come Done e non vengono riaperti. I GO di
+WUL-573/580/736 restano decisioni distinte dalla selezione della verticale.
 
 Prima di dichiarare un solo writer occorre decidere e provare convergenza
 o ritiro di `LocalPatientsDataSource`, oppure qualificare esplicitamente
