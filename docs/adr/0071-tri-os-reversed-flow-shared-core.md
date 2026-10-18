@@ -159,23 +159,33 @@ scritture SQLite che non attraversano l'audit obbligatorio del servizio Node.
 La sola presenza del flag `MEDIFLOW_LOCAL_AUTHORITY` non qualifica queste
 scritture come equivalenti al servizio.
 
-Per questa verticale, `fetchPatient` e `updatePatient` delegano sempre al
-client HTTP esistente, anche con chiave sbloccata e ambulatorio esplicito.
-Il client trasmette le credenziali e la sessione già previste; l'host decide
-ammissione, ambito, attualità e commit. Un errore HTTP non abilita un ripiego
-SQLite. Il contenuto `ENC` resta invariato e la chiave non attraversa il
-confine. Le prove mantengono un archivio sintetico locale come sentinella:
-la query o la modifica del profilo non devono aprirlo né modificarlo.
+La factory di produzione Apple usa interamente `HomeBasePatientsClient`.
+L'opzione `MEDIFLOW_LOCAL_AUTHORITY` è ritirata: non deve più scegliere un
+archivio SQLite per liste, creazione o sottorisorse. Deviare solo dettaglio e
+UPDATE al servizio crea infatti una combinazione non ammessa: il database
+locale può essere diverso dall'host configurato, anche quando entrambi usano
+lo stesso identificativo paziente. Un indirizzo di loopback non prova identità
+dell'archivio. La revisione ha rilevato questo rischio prima dell'integrazione.
 
-Gli store Swift e i relativi test restano disponibili. Elenchi, creazione
-paziente e sotto-risorse del percorso locale opzionale restano fuori da questa
-verticale e non sono dichiarati qualificati dall'emendamento. Non viene
-quindi affermata un'autorità unica per l'intero prodotto.
+Tutte le operazioni del workspace passano quindi allo stesso host già
+configurato, inclusi creazione, elenco, dettaglio, lifecycle e sottorisorse.
+Credenziali, sessione, ambito, attualità e commit conservano le verifiche
+HTTP esistenti. Un errore non abilita un writer SQLite alternativo. ENC e
+custodia della chiave restano invariati. La cache cifrata del client conserva
+i propri vincoli server/scope/sessione/operatore e la sola consultazione già
+prevista; non diventa un'autorità di scrittura.
 
-La direzione nativa e offline dell'ADR è conservata. La delega della verticale
-è una convergenza temporanea sul servizio già provato, non l'adozione definitiva
-di Node. Un futuro writer nativo può sostituirla dopo le prove previste da
-WUL-573/WUL-706/WUL-709: stessa autorità dei dati, custodia delle chiavi,
-ammissione e revoca, commit condizionale con audit, recupero e ritorno al
-percorso corrente prima di qualsiasi effetto. Non sono introdotti nuovi
-formati, schema o conversioni dei dati.
+L'adattatore locale senza più caller di produzione è ritirato. Gli store
+Swift e i loro test restano necessari come lavoro sperimentale per il nucleo
+nativo. Le prove della factory reale devono dimostrare la selezione HTTP anche
+con chiave disponibile e vecchio flag presente; i percorsi del client HTTP
+conservano la verifica di creazione, lettura, modifica ed errori. I test della
+vecchia selezione locale non sono usati per giustificare un flusso misto.
+
+La direzione nativa e offline dell'ADR è conservata. La convergenza temporanea
+sul servizio già provato non è l'adozione definitiva di Node. Un futuro writer
+nativo può sostituirlo dopo le prove previste da WUL-573/WUL-706/WUL-709:
+stessa autorità dei dati, custodia delle chiavi, ammissione e revoca, commit
+condizionale con audit, recupero e ritorno al percorso corrente prima di
+qualsiasi effetto. Non sono introdotti nuovi formati, schema o conversioni
+dei dati.
