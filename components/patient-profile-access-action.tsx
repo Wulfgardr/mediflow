@@ -43,7 +43,7 @@ export function PatientProfileAccessAction({ patientId, ambulatoryId }: Readonly
                     <option value="none">Nessun accesso aggiuntivo</option><option value="notes">Solo note</option><option value="profile">Profilo completo e note</option>
                 </select>
             </label>
-            <button type="button" className="mf-button-primary" disabled={busy || active || !ambulatoryId} onClick={() => void activate()}>{busy ? 'Attivazione…' : 'Conferma e attiva assistente'}</button>
+            <button type="button" className={workspaceStyles.headerPrimaryAction} disabled={busy || active || !ambulatoryId} onClick={() => void activate()}>{busy ? 'Attivazione…' : 'Conferma e attiva assistente'}</button>
             <p role="status">{ambulatoryId ? message : 'Accesso non disponibile: manca l’ambulatorio del paziente.'}</p>
         </div>
     </details>;
