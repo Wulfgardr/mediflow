@@ -33,7 +33,7 @@ una riga inserita; non apre una seconda connessione.
 
 | Punto di scrittura | Operazione e motivo | Stato corrente |
 | --- | --- | --- |
-| [patient-update-operation.ts:74](../lib/patient-update-operation.ts#L74) | Aggiornamento/archiviazione/riattivazione profilo: comprende versione e membership. | Transazione immediata; Web, API v1 e paired convergono qui. |
+| [patient-update-operation.ts](../lib/patient-update-operation.ts) | Aggiornamento/archiviazione/riattivazione profilo: comprende versione e membership. | Transazione immediata; Web, API v1 e paired convergono qui. La capacità Web sulle note rivedute dell'[ADR0149](./adr/0149-reviewed-profile-notes-commit.md) conserva la ricevuta verificata nello stesso evento obbligatorio, senza un altro writer o ledger. |
 | [patient-delete-operation.ts:40](../lib/patient-delete-operation.ts#L40) | Eliminazione logica paziente: cambia visibilità e versione. | Evento e mutazione nella stessa transazione Web/v1. |
 | [patients/route.ts:140](../app/api/patients/route.ts#L140) | Creazione locale: il wrapper `writeCreateAudit` attesta il paziente creato, compresa la variante con ambulatorio. | Chiamate :160 e :176 dentro le rispettive transazioni. |
 | [v1/patients/route.ts:105](../app/api/v1/patients/route.ts#L105) | Creazione API v1: nuova autorità paziente e associazione. | Audit richiesto nella transazione. |

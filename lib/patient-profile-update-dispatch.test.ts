@@ -5,7 +5,8 @@ import type { PatientProfileUpdateEnvelope } from './patient-profile-update-cont
 
 const load = createRequire(import.meta.url);
 const writer = load('./patient-update-operation.ts') as typeof import('./patient-update-operation');
-const { createPatientProfileUpdateExecution, dispatchPatientProfileUpdate } = load('./patient-profile-update-dispatch.ts') as typeof import('./patient-profile-update-dispatch');
+const { createPatientProfileUpdateExecution, dispatchPatientProfileUpdate, createPatientProfileNotesCommitExecution,
+    dispatchReviewedPatientProfileNotes } = load('./patient-profile-update-dispatch.ts') as typeof import('./patient-profile-update-dispatch');
 
 function hostInput() {
     return {
@@ -134,4 +135,29 @@ test('legacy executor consumes command target, payload and host guard before ret
     assert.equal(received.authorizeCommit, guard);
     assert.deepEqual(received.audit, input.audit);
     assert.equal(await dispatchPatientProfileUpdate(execution, execution.command), result);
+});
+
+test('reviewed notes retain one execution and cannot cross the ordinary dispatch boundary', async t => {
+    let received: Parameters<typeof writer.updatePatientOperation>[0] | undefined;
+    const call = t.mock.method(writer, 'updatePatientOperation', (input: Parameters<typeof writer.updatePatientOperation>[0]) => {
+        received = input; return denied;
+    });
+    const execution = createPatientProfileNotesCommitExecution(hostInput());
+    const ordinary = createPatientProfileUpdateExecution(hostInput());
+    const permit = Object.freeze({ policy: 'patient-profile.notes.commit.v1' as const,
+        reference: `ppr_${'a'.repeat(64)}`, digest: 'b'.repeat(64), ambulatoryId: 'synthetic-scope',
+        authorizeCommit: () => true as const });
+    await assert.rejects(dispatchPatientProfileUpdate(execution, execution.command), /review permit unavailable/);
+    await assert.rejects(dispatchReviewedPatientProfileNotes(ordinary, ordinary.command, permit), /review permit unavailable/);
+    await assert.rejects(dispatchReviewedPatientProfileNotes(execution,
+        { ...execution.command, payload: { notes: null } }, permit), /command mismatch/);
+    assert.equal(call.mock.callCount(), 0);
+    const first = dispatchReviewedPatientProfileNotes(execution, execution.command, permit);
+    assert.equal(dispatchReviewedPatientProfileNotes(execution, execution.command, permit), first);
+    await first;
+    assert.equal(call.mock.callCount(), 1);
+    assert.ok(received);
+    assert.equal(received.reviewedNotes?.command, execution.command);
+    assert.equal(received.reviewedNotes?.permit, permit);
+    await assert.rejects(dispatchPatientProfileUpdate(execution, execution.command), /review permit unavailable/);
 });

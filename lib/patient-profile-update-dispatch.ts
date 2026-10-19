@@ -6,6 +6,7 @@ import { updatePatientOperation, type PatientUpdateOperationResult } from './pat
 import type { normalizePatientUpdateInput } from './patient-write-normalization';
 import type { NetworkPatientCommitGuard } from './network-patient-commit-authority';
 import type { RequiredAuditContext } from './security/audit';
+import type { ProfileNotesCommitPermit } from './security/patient-profile-notes-commit-journal';
 
 type HostUpdateInput = Readonly<{
     patientId: string; expectedVersion: number;
@@ -26,17 +27,20 @@ class ProfileUpdateExecution {
     readonly command: PatientProfileUpdateEnvelope;
     readonly #audit: RequiredAuditContext;
     readonly #authorizeCommit: NetworkPatientCommitGuard | undefined;
+    readonly #requiresNotesReview: boolean;
     #result: Promise<PatientProfileUpdateOutcome> | undefined;
 
-    constructor(input: HostUpdateInput) {
+    constructor(input: HostUpdateInput, requiresNotesReview = false) {
         this.#audit = { ...input.audit, flags: [...input.audit.flags] };
         this.#authorizeCommit = input.authorizeCommit;
+        this.#requiresNotesReview = requiresNotesReview;
         this.command = createPatientProfileUpdateCommand(input);
         Object.freeze(this);
     }
 
-    dispatch(candidate: PatientProfileUpdateEnvelope): Promise<PatientProfileUpdateOutcome> {
+    dispatch(candidate: PatientProfileUpdateEnvelope, notesPermit?: ProfileNotesCommitPermit): Promise<PatientProfileUpdateOutcome> {
         if (!isDeepStrictEqual(candidate, this.command)) return Promise.reject(new Error('Patient profile execution command mismatch'));
+        if (this.#requiresNotesReview !== (notesPermit !== undefined)) return Promise.reject(new Error('Patient profile review permit unavailable'));
         if (this.#result) return this.#result;
         let resolve!: (result: PatientProfileUpdateOutcome) => void;
         const pending = new Promise<PatientProfileUpdateOutcome>(accept => { resolve = accept; });
@@ -45,7 +49,7 @@ class ProfileUpdateExecution {
             purpose: this.command.purpose, executionId: this.command.executionId,
             correlationId: this.command.correlationId, idempotencyKey: this.command.idempotencyKey };
         try {
-            const result = executeLegacyPatientProfileUpdate(this.command, this.#audit, this.#authorizeCommit);
+            const result = executeLegacyPatientProfileUpdate(this.command, this.#audit, this.#authorizeCommit, notesPermit);
             resolve(Object.freeze(result.status === 200 ? { ...identity, kind: 'applied', result } : { ...identity, kind: 'refused', result }));
         } catch (error) { resolve(Object.freeze({ ...identity, kind: 'uncertain', error })); }
         return pending;
@@ -76,7 +80,7 @@ export function createPatientProfileUpdateCommand(input: HostUpdateInput): Patie
 }
 
 function executeLegacyPatientProfileUpdate(command: PatientProfileUpdateEnvelope, audit: RequiredAuditContext,
-    authorizeCommit: NetworkPatientCommitGuard | undefined): PatientUpdateOperationResult {
+    authorizeCommit: NetworkPatientCommitGuard | undefined, notesPermit: ProfileNotesCommitPermit | undefined): PatientUpdateOperationResult {
     const values = { ...command.payload,
         birthDate: command.payload.birthDate === undefined ? undefined : command.payload.birthDate === null ? null : new Date(command.payload.birthDate),
         aiSummaryGeneratedAt: command.payload.aiSummaryGeneratedAt === undefined ? undefined : command.payload.aiSummaryGeneratedAt === null ? null : new Date(command.payload.aiSummaryGeneratedAt),
@@ -86,7 +90,7 @@ function executeLegacyPatientProfileUpdate(command: PatientProfileUpdateEnvelope
         patientId: command.target.patientId, expectedVersion: command.target.expectedVersion,
         values: values, setPrimaryAmbulatory: command.setPrimaryAmbulatory,
         scopeAmbulatoryId: command.scope.kind === 'ambulatory' ? command.scope.ambulatoryId : undefined,
-        authorizeCommit: authorizeCommit, audit: audit,
+        authorizeCommit: authorizeCommit, reviewedNotes: notesPermit ? { command, permit: notesPermit } : undefined, audit: audit,
     });
 }
 
@@ -94,7 +98,18 @@ export function createPatientProfileUpdateExecution(input: HostUpdateInput): Pro
     return new ProfileUpdateExecution(input);
 }
 
+/** A retained notes preparation cannot be consumed by the ordinary dispatch. */
+export function createPatientProfileNotesCommitExecution(input: HostUpdateInput): ProfileUpdateExecution {
+    return new ProfileUpdateExecution(input, true);
+}
+
 export function dispatchPatientProfileUpdate(execution: ProfileUpdateExecution, command: PatientProfileUpdateEnvelope): Promise<PatientProfileUpdateOutcome> {
     if (!(execution instanceof ProfileUpdateExecution)) return Promise.reject(new Error('Patient profile execution unavailable'));
     return execution.dispatch(command);
+}
+
+export function dispatchReviewedPatientProfileNotes(execution: ProfileUpdateExecution, command: PatientProfileUpdateEnvelope,
+    permit: ProfileNotesCommitPermit): Promise<PatientProfileUpdateOutcome> {
+    if (!(execution instanceof ProfileUpdateExecution)) return Promise.reject(new Error('Patient profile execution unavailable'));
+    return execution.dispatch(command, permit);
 }

@@ -89,6 +89,12 @@ L'[ADR 0148](./adr/0148-profile-notes-review-dry-run.md) compone la revisione
 umana delle sole note in una prova Web di sviluppo: comando e contenuto ENC
 unici, PIN fresco, attestazione e selezione correnti, consumo monouso.
 L'esito della prova non viene accettato dal writer e non modifica la cartella.
+L'[ADR 0149](./adr/0149-reviewed-profile-notes-commit.md) delimita il successivo
+salvataggio Web delle sole note: permesso distinto, ammissione corrente nel
+writer esistente e ricevuta recuperabile nello stesso audit del commit.
+L'[ADR 0150 / BT-06](./adr/0150-patient-profile-pilot-recovery.md) separa l'identità
+durevole della ricevuta dall'autorizzazione corrente e documenta il drill C15
+prima e dopo il pilota, con dati sintetici e sessioni precedenti invalidate.
 I job di build Web Core, E2E e Cross-platform `build-start` sui tre sistemi
 usano un checkout sparse non-cone della stessa revisione: non materializzano
 soltanto la fixture SQLite dei test Swift.

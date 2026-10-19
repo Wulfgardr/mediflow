@@ -15,6 +15,9 @@ import { NETWORK_FSE_VALIDATE_CAPABILITY } from './network-contract';
 import { eq } from 'drizzle-orm';
 import { ambulatories, patients, patientsToAmbulatories, settings, users } from './schema';
 import type { RequiredAuditContext } from './security/audit';
+import { PROFILE_NOTES_COMMIT_POLICY } from './patient-profile-notes-commit-contract';
+import { resolveHeadlessCanonicalCapability } from './headless/canonical-capability-catalog';
+import { resolveApplicationOperation } from './headless/application-operation-registry';
 
 const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-profile-port-'));
@@ -32,6 +35,7 @@ const webRoute = load('../app/api/patients/[id]/route.ts') as typeof import('../
 const v1Route = load('../app/api/v1/patients/[id]/route.ts') as typeof import('../app/api/v1/patients/[id]/route');
 const networkRoute = load('../app/api/v1/network/patients/[id]/route.ts') as typeof import('../app/api/v1/network/patients/[id]/route');
 const fseRoute = load('../app/api/v1/network/fse/validate-patient/route.ts') as typeof import('../app/api/v1/network/fse/validate-patient/route');
+const notesCommitRoute = load('../app/api/patients/[id]/notes-commit/route.ts') as typeof import('../app/api/patients/[id]/notes-commit/route');
 let authority: ReturnType<typeof syntheticNetworkPatientAuthority>;
 let webSession: ReturnType<typeof issueSyntheticWebSessionContext>;
 
@@ -110,6 +114,29 @@ function audit(): RequiredAuditContext {
     return { archiveGeneration: row.generation, actorType: 'user', actorRef: 'profile-host-user',
         sourceSurface: 'web', requestId: 'profile-host-request', flags: ['auth:session'] };
 }
+
+test('named notes commit is unavailable to local-token, native and paired capabilities or headless identifiers', async () => {
+    reset();
+    for (const channel of ['local-token', 'native', 'paired', 'fse'] as const) {
+        selectSession('native');
+        if (channel === 'local-token') cookieState.cookies.clear();
+        if (channel === 'fse') grant([NETWORK_FSE_VALIDATE_CAPABILITY]);
+        const headers = new Headers(request(channel === 'local-token' ? 'api-v1' : channel === 'native' ? 'web' : 'network').headers);
+        headers.set('origin', 'http://127.0.0.1'); headers.set('sec-fetch-site', 'same-origin');
+        headers.set('x-mediflow-archive-generation', currentArchiveGeneration()); headers.set('content-type', 'application/json');
+        const before = snapshot();
+        let resolvedPatient = false;
+        const response = await notesCommitRoute.POST(new Request(`http://127.0.0.1/api/patients/${patientId}/notes-commit`, {
+            method: 'POST', headers, body: JSON.stringify({ kind: 'prepare', expectedRevision: 4, expectedSelectionEpoch: 0, notes: null }),
+        }), { params: Promise.resolve({ get id() { resolvedPatient = true; return patientId; } }) });
+        assert.ok(response.status === 401 || response.status === 403, `${channel}: ${response.status}`);
+        assert.equal(resolvedPatient, false);
+        assert.deepEqual(snapshot(), before);
+    }
+    assert.equal(resolveHeadlessCanonicalCapability(PROFILE_NOTES_COMMIT_POLICY), null);
+    const unavailable = resolveApplicationOperation(PROFILE_NOTES_COMMIT_POLICY, PROFILE_NOTES_COMMIT_POLICY);
+    assert.equal(unavailable.status, 'denied'); assert.equal(unavailable.applyPolicy, 'none'); assert.equal(unavailable.writesPerformed, 0);
+});
 
 test('three projections preserve ciphertext, nulls and epoch dates without read effects', async () => {
     reset();
