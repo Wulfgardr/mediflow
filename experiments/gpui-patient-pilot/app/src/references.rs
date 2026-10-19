@@ -374,10 +374,11 @@ mod tests {
             ]
         );
         assert_eq!(ReferenceKind::Drugs.limit(), 50);
+        assert_eq!(ReferenceKind::Who.limit(), 25);
         assert!(
             ReferenceKind::ALL
                 .into_iter()
-                .filter(|kind| *kind != ReferenceKind::Drugs)
+                .filter(|kind| !matches!(kind, ReferenceKind::Drugs | ReferenceKind::Who))
                 .all(|kind| kind.limit() == 200)
         );
     }
