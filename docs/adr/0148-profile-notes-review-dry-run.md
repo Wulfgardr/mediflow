@@ -1,6 +1,6 @@
 # ADR 0148 — Revisione monouso delle note, senza scrittura
 
-Data: 2026-10-19. Stato: Proposed; accettazione con review e merge.
+Data: 2026-10-19. Stato: Accepted; review indipendente e integrazione della PR #569.
 Riferimenti: WUL-584, ADR 0098, ADR 0146, ADR 0147.
 
 ## Decisione

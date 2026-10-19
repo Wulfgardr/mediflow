@@ -1,6 +1,6 @@
 /* @Codex */
 import { z } from 'zod';
-import { isProfileResult, PROFILE_QUERY_MAX_RESULT_BYTES } from '../../../lib/patient-profile-scoped-contract.ts';
+import { isProfileResult, PROFILE_QUERY_MAX_RESULT_BYTES } from '../../patient-profile-contracts/src/query.ts';
 
 export const TERMINOLOGY_OPERATION_ID = 'mediflow.terminology.search.v1' as const;
 export const OPEN_LOOPS_OPERATION_ID = 'mediflow.patient.open_loops.read.v1' as const;

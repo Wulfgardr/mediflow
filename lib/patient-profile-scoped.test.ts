@@ -13,7 +13,7 @@ import { bindSessionToArchive, currentArchiveGeneration } from './security/archi
 import { serializeNetworkPairingState, NETWORK_PAIRING_STATE_KEY } from './network-pairing-model';
 import { ambulatories, patients, patientsToAmbulatories, settings, users } from './schema';
 import { isProfileResult, PROFILE_FIELD_NAMES, PROFILE_QUERY_MAX_RESULT_BYTES, assertProfileResultBudget,
-    type ProfileQuery, type ProfileResult } from './patient-profile-scoped-contract';
+    type ProfileQuery, type ProfileResult } from '../packages/patient-profile-contracts/src/query';
 
 const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-scoped-profile-'));

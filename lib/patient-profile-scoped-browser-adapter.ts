@@ -1,7 +1,7 @@
 'use client';
 
 import { isProfileResult, assertProfileResultBudget, type ProfileProjection, type ProfileQuery,
-    type ProfileResult, type ProfileQueryErrorCode } from './patient-profile-scoped-contract';
+    type ProfileResult, type ProfileQueryErrorCode } from '../packages/patient-profile-contracts/src/query';
 
 type ErrorCode = ProfileQueryErrorCode | 'operation_superseded' | 'response_invalid';
 type Sources = Readonly<{ fetch?: typeof fetch; now?: () => number }>;

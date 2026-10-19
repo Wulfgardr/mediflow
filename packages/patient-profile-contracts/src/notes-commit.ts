@@ -1,5 +1,5 @@
 import { isProfileReviewView, parseProfileReviewInput, PROFILE_REVIEW_POLICY,
-    type ProfileReviewInput, type ProfileReviewView } from './patient-profile-review-contract';
+    type ProfileReviewInput, type ProfileReviewView } from './review.ts';
 
 export const PROFILE_NOTES_COMMIT_POLICY = 'patient-profile.notes.commit.v1' as const;
 export type ProfileNotesCommitInput = ProfileReviewInput

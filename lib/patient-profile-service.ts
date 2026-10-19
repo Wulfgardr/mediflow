@@ -24,7 +24,7 @@ import { ambulatories, settings, users } from './schema';
 import { apiFailure, archiveReplacementResponse } from './api-error-response';
 import { parseProfileQuery, ProfileQueryError, PROFILE_FIELD_NAMES, PROFILE_QUERY_RESULT_SCHEMA,
     PROFILE_QUERY_OPERATION_ID, assertProfileResultBudget, type ProfileFields, type ProfileProjection,
-    type ProfileQuery, type ProfileResult } from './patient-profile-scoped-contract';
+    type ProfileQuery, type ProfileResult } from '../packages/patient-profile-contracts/src/query';
 import { acquireAuthenticatedWebSessionProjectionOwnerContext } from './security/server-auth';
 import { serverSessionProjectionOwnerProductionOwner } from './security/server-session-projection-owner-production-internal';
 import { nativeProfileSelectionOwner } from './security/native-profile-selection-owner';
@@ -46,9 +46,9 @@ import { SessionPhysicianReviewAuthorityError, type SessionPhysicianReviewAuthor
 import { FreshReviewPinError, verifyFreshReviewPin } from './security/fresh-review-pin-uniqueness';
 import { readBoundedJsonBody } from './bounded-request-body';
 import { PROFILE_REVIEW_MAX_NOTES_BYTES, PROFILE_REVIEW_POLICY, PROFILE_REVIEW_TTL_MS,
-    parseProfileReviewInput, type ProfileReviewView, type ProfileReviewReceipt } from './patient-profile-review-contract';
+    parseProfileReviewInput, type ProfileReviewView, type ProfileReviewReceipt } from '../packages/patient-profile-contracts/src/review';
 import { PROFILE_NOTES_COMMIT_POLICY, parseProfileNotesCommitInput,
-    type ProfileNotesCommitView, type ProfileNotesCommitReceipt } from './patient-profile-notes-commit-contract';
+    type ProfileNotesCommitView, type ProfileNotesCommitReceipt } from '../packages/patient-profile-contracts/src/notes-commit';
 import { profileNotesCommitReference, readProfileNotesCommitReceipt, ProfileNotesCommitError } from './security/patient-profile-notes-commit-journal';
 import { archiveWriteRequestDenial } from './security/archive-write-request';
 
