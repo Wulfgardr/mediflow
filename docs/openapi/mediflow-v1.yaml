@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.39.0
+  version: 1.40.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -31,7 +31,7 @@ info:
     routing, remote therapy/checkup/observation hard delete, and advanced
     identity scoping remain follow-up workstreams.
     ADR 0124 bounds serialized network JSON bodies in UTF-8 bytes: 64 KiB for
-    pairing intents, 4 MiB for other JSON operations, and the attachment formula
+    pairing intents and ADR 0153 scale preparations, 4 MiB for other JSON operations, and the attachment formula
     declared on its operation (29 MiB by default). Oversize bodies return 413
     JSON_BODY_TOO_LARGE. These are new input-size restrictions; fields are not
     truncated. Existing admission/auth and separate field limits still apply.
@@ -72,6 +72,141 @@ tags:
   - name: Network
     description: Home-base network contract for explicit pairing, capability discovery, and PHI-safe session gating.
 paths:
+  /api/v1/network/scales:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
+    get:
+      tags: [Network]
+      operationId: readNetworkScaleCatalog
+      summary: Read the serializable active clinical scale catalog
+      description: |
+        ADR0153. Requires network.catalogs.readonly, current paired-device
+        credentials, operator session, home-base mode and resolved ambulatory
+        scope. No query parameters. The current catalog contains five active
+        choice instruments; legacy tinetti is not an active alias. Descriptors
+        contain no executable scoring functions. Source and use-limit metadata
+        are preserved; hold-proposed-not-enforced is not a new admission gate.
+        Every response is no-store. This read performs no clinical or audit write.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      responses:
+        '200':
+          description: Current serializable definitions and their revision; no write permission.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ScaleCatalog'}
+        '400':
+          description: Query parameters are not accepted.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ScaleBoundaryError'}
+        '401':
+          description: Session or paired-device authority missing, changed or retired.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ScaleBoundaryError'}
+        '403':
+          description: Required capability, home-base mode or ambulatory scope denied.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ScaleBoundaryError'
+                  - $ref: '#/components/schemas/NetworkDataPlaneModeDenied'
+        '409':
+          description: Archive replaced or request context retired; read the current context again.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ScaleBoundaryError'}
+        '503':
+          description: Catalog unavailable or a definition is unsupported; no partial catalog or fallback.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ScaleBoundaryError'}
+  /api/v1/network/patients/{id}/scales/prepare:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
+    post:
+      tags: [Network]
+      operationId: prepareNetworkPatientScale
+      summary: Prepare a canonical scale result for review without recording it
+      x-mediflow-json-max-bytes: 65536
+      description: |
+        ADR0153. Requires BOTH network.catalogs.readonly and
+        network.replica.readonly-patients, current paired-device credentials,
+        operator session, home-base mode, ambulatory membership and a current
+        selection opened through the existing profile-query. expectedSelectionEpoch
+        is the host epoch, not a local UI counter. Patient identity comes from
+        the route; caller revisions can only veto an already authorized context.
+        Authority and selection are rechecked after asynchronous body admission
+        in the read transaction. No query parameters. JSON has an inclusive
+        65536-byte UTF-8 limit. All required answers must match declared numeric
+        choices; no coercion or imputation. Caller scores, interpretations,
+        metadata and unknown fields are rejected. prepareScaleSubmission is the
+        sole calculator. Responses are no-store and plaintext answers/results
+        are not persisted or logged. The result is a draft, not a write permit,
+        human confirmation receipt or ciphertext attestation. The client keeps
+        the canonical submission, applies the diary's two-step review, seals it
+        with its existing key and uses the existing entry POST with type scale.
+        That POST still requires write-clinical-diary; complete decrypted
+        readback requires readonly-clinical-diary. The keyless host cannot attest
+        plaintext/ciphertext equality against a modified client.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Already selected patient identifier; never selected by the body.
+          schema: {type: string, minLength: 1, maxLength: 160}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ScalePreparationRequest'}
+      responses:
+        '200':
+          description: Canonical draft and observed context; no clinical or audit write.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ScalePreparation'}
+        '400':
+          description: Malformed or unsupported input, retired/unknown instrument, incomplete/foreign answers, or query parameters.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ScaleBoundaryError'}
+        '401':
+          description: Session or paired-device authority missing, changed or retired.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ScaleBoundaryError'}
+        '403':
+          description: Required capability, home-base mode, scope or active patient membership denied.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ScaleBoundaryError'
+                  - $ref: '#/components/schemas/NetworkDataPlaneModeDenied'
+        '409':
+          description: Catalog revision, patient version or actual host selection changed, request cancelled, or archive replaced.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ScaleBoundaryError'}
+        '413':
+          description: JSON exceeds the inclusive 65536-byte UTF-8 limit; code JSON_BODY_TOO_LARGE.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ScaleBoundaryError'}
+        '503':
+          description: Preparation unavailable; no result or automatic fallback.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ScaleBoundaryError'}
   /api/v1/network/ai/functions:
     get:
       operationId: ReadNativeFunctionPreferences
@@ -2699,6 +2834,11 @@ paths:
         eligible. A repeated explicit entry ID with identical content returns
         200 without a new mutation or audit, after current patient/scope admission;
         different content returns 409. A missing or soft-deleted parent returns 404.
+        ADR0153 additionally rechecks archive generation, pairing/token, mode,
+        capability, original session, current account role and scope inside the
+        same IMMEDIATE transaction before duplicate lookup or mutation. Revocation
+        during body reading denies ordinary and scale writes, including replay.
+        A scale preparation supplies no write authority or profile CAS to this endpoint.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -2832,6 +2972,9 @@ paths:
         parents return 404; archived-only parents remain eligible. Restoring an
         entry with deletedAt:null does not restore its parent. Audit failure rolls
         back all entry changes and the version increment.
+        ADR0153 additionally rechecks archive generation, pairing/token, mode,
+        capability, original session, current account role and scope inside the
+        same IMMEDIATE transaction before mutation, including ordinary entry lifecycle.
       security:
         - pairedClientId: []
           pairedClientToken: []
@@ -4310,6 +4453,161 @@ components:
               value:
                 error: Failed to fetch patient
   schemas:
+    NetworkDataPlaneModeDenied:
+      type: object
+      additionalProperties: false
+      required: [error, code, message]
+      properties:
+        error: {type: string, const: Forbidden}
+        code: {type: string, const: NETWORK_MODE_DISABLED}
+        message: {type: string}
+    ScaleBoundaryError:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error: {type: string}
+        code: {type: string}
+    ScaleChoiceQuestion:
+      type: object
+      additionalProperties: false
+      required: [id, text, type, options]
+      properties:
+        id: {type: string}
+        text: {type: string}
+        type: {type: string, const: choice}
+        options:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [label, value]
+            properties:
+              label: {type: string}
+              value: {type: number}
+    ScaleInstrumentProvenance:
+      type: object
+      additionalProperties: false
+      required: [instrumentId, instrumentVersion, definitionVersion, sourceId, sourceUrl, sourceDocumentVersion, language, translationStatus, riskClassification]
+      properties:
+        instrumentId: {type: string}
+        instrumentVersion: {type: string}
+        definitionVersion: {type: string}
+        sourceId: {type: string}
+        sourceUrl: {type: string, format: uri}
+        sourceDocumentVersion: {type: string}
+        language: {type: string}
+        translationStatus: {type: string}
+        riskClassification: {type: string}
+    ScaleUseContract:
+      type: object
+      additionalProperties: false
+      required: [evidenceCheckedOn, evidenceReference, language, missingAnswers, clinicalReviewer, rightsReviewer, permissionReference, permissionAttestation, newUseDecision, definitionVersion, sourceId, sourceBinding, population, scoring, interpretation, interpretationVersion, translation, rights, reviewGap]
+      properties:
+        evidenceCheckedOn: {type: string}
+        evidenceReference: {type: string}
+        language: {type: string}
+        missingAnswers: {type: string}
+        clinicalReviewer: {type: [string, 'null']}
+        rightsReviewer: {type: [string, 'null']}
+        permissionReference: {type: [string, 'null']}
+        permissionAttestation: {type: string}
+        newUseDecision:
+          type: string
+          description: Existing review-gap record, not an admission decision or clinical endorsement.
+        definitionVersion: {type: string}
+        sourceId: {type: string}
+        sourceBinding: {type: string}
+        population: {type: string}
+        scoring: {type: string}
+        interpretation: {type: string}
+        interpretationVersion: {type: string}
+        translation: {type: string}
+        rights: {type: string}
+        reviewGap: {type: string}
+    ScaleCatalog:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, preparationVersion, catalogRevision, scales]
+      properties:
+        contractVersion: {type: integer, const: 1}
+        preparationVersion: {type: string, const: mediflow.scales.prepare.v1}
+        catalogRevision:
+          type: string
+          pattern: '^sha256:[a-f0-9]{64}$'
+          description: Deterministic digest of descriptors and explicit preparation version; not a signature.
+        scales:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, title, description, questions, useContract]
+            properties:
+              id: {type: string}
+              title: {type: string}
+              description: {type: string}
+              questions:
+                type: array
+                minItems: 1
+                items: {$ref: '#/components/schemas/ScaleChoiceQuestion'}
+              instrument: {$ref: '#/components/schemas/ScaleInstrumentProvenance'}
+              useContract: {$ref: '#/components/schemas/ScaleUseContract'}
+    ScalePreparationRequest:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, scaleId, answers, expectedCatalogRevision, expectedPatientVersion, expectedSelectionEpoch]
+      properties:
+        contractVersion: {type: integer, const: 1}
+        scaleId: {type: string, minLength: 1, maxLength: 160}
+        answers:
+          type: object
+          description: Exact active question IDs and explicit numeric choices; all required, with no foreign keys or imputation.
+          additionalProperties: {type: number}
+        expectedCatalogRevision: {type: string, pattern: '^sha256:[a-f0-9]{64}$'}
+        expectedPatientVersion: {type: integer, minimum: 1, maximum: 9007199254740991}
+        expectedSelectionEpoch: {type: integer, minimum: 0, maximum: 9007199254740991}
+    ScaleSubmission:
+      type: object
+      additionalProperties: false
+      required: [title, content, metadata]
+      properties:
+        title: {type: string}
+        content: {type: string}
+        metadata:
+          type: object
+          additionalProperties: false
+          required: [title, scaleId, score, interpretation, interpretationVersion, answers]
+          properties:
+            title: {type: string}
+            scaleId: {type: string}
+            score: {type: number}
+            interpretation: {type: string}
+            interpretationVersion: {type: string}
+            answers:
+              type: object
+              additionalProperties: {type: number}
+            instrument: {$ref: '#/components/schemas/ScaleInstrumentProvenance'}
+    ScalePreparation:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, preparationVersion, catalogRevision, status, context, submission]
+      properties:
+        contractVersion: {type: integer, const: 1}
+        preparationVersion: {type: string, const: mediflow.scales.prepare.v1}
+        catalogRevision: {type: string, pattern: '^sha256:[a-f0-9]{64}$'}
+        status: {type: string, const: draft}
+        context:
+          type: object
+          additionalProperties: false
+          required: [patientId, ambulatoryId, patientVersion, selectionEpoch]
+          properties:
+            patientId: {type: string}
+            ambulatoryId: {type: string}
+            patientVersion: {type: integer, minimum: 1, maximum: 9007199254740991}
+            selectionEpoch: {type: integer, minimum: 0, maximum: 9007199254740991}
+        submission: {$ref: '#/components/schemas/ScaleSubmission'}
     ScopedPatientProfileQuery:
       oneOf:
         - type: object

@@ -16,6 +16,7 @@ const REPORT_PATH = resolveReportPath();
 const READ_PATIENTS_CAPABILITY = 'network.replica.readonly-patients';
 const READ_DIARY_CAPABILITY = 'network.replica.readonly-clinical-diary';
 const WRITE_DIARY_CAPABILITY = 'network.replica.write-clinical-diary';
+const CATALOG_CAPABILITY = 'network.catalogs.readonly';
 const VISIT_DRAFT_CAPABILITY = 'network.compute.visit-draft';
 const SEALED_TITLE = 'ENC:dGl0bGVpdg==:dGl0bGVjaXBoZXI=';
 const SEALED_CONTENT = 'ENC:Y29udGVudGl2:Y29udGVudGNpcGhlcg==';
@@ -50,7 +51,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
             'Desk iPad diary readonly',
         );
         const diaryWriter = await pairClient(
-            [READ_PATIENTS_CAPABILITY, READ_DIARY_CAPABILITY, WRITE_DIARY_CAPABILITY, VISIT_DRAFT_CAPABILITY],
+            [READ_PATIENTS_CAPABILITY, READ_DIARY_CAPABILITY, WRITE_DIARY_CAPABILITY, VISIT_DRAFT_CAPABILITY, CATALOG_CAPABILITY],
             'Desk iPad diary writer',
         );
 
@@ -132,6 +133,49 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         assert.equal(visitDraft.json?.safety?.rawAudioPersisted, false);
         assert.deepEqual(visitDraft.json?.safety?.writesPerformed, []);
         assert.deepEqual(await listAuditEvents(sessionHeaders), auditBeforeVisitDraft);
+
+        // ADR0153: exercise compiled HTTP routes and the existing profile owner together.
+        const scaleHeaders = { ...pairedHeaders(diaryWriter), ...sessionHeaders,
+            'x-mediflow-expected-ambulatory-id': encodeURIComponent(ambulatoryId) };
+        const noCatalogGrant = await request('GET', '/api/v1/network/scales', {
+            headers: { ...pairedHeaders(readOnlyClient), ...sessionHeaders },
+        });
+        assert.equal(noCatalogGrant.response.status, 403);
+        const noScaleSession = await request('POST', `/api/v1/network/patients/${patientId}/scales/prepare`, { body: {} });
+        assert.equal(noScaleSession.response.status, 401);
+        const scaleCatalog = await request('GET', '/api/v1/network/scales', { headers: scaleHeaders });
+        assert.equal(scaleCatalog.response.status, 200);
+        assert.equal(scaleCatalog.response.headers.get('cache-control'), 'no-store');
+        assert.equal(scaleCatalog.json?.scales.length, 5);
+        const selectionEpoch = await request('GET', '/api/v1/network/patient-profile/selection-epoch', { headers: scaleHeaders });
+        assert.equal(selectionEpoch.response.status, 200);
+        const selectedProfile = await request('POST', `/api/v1/network/patients/${patientId}/profile-query`, {
+            headers: scaleHeaders, body: { kind: 'open', contractVersion: 1, projection: 'profile',
+                expectedSelectionEpoch: selectionEpoch.json.selectionEpoch },
+        });
+        assert.equal(selectedProfile.response.status, 200);
+        const vector = JSON.parse(fs.readFileSync(new URL('./fixtures/clinical-scales-v1.json', import.meta.url), 'utf8'));
+        const scaleInput = { contractVersion: 1, scaleId: vector.scaleId, answers: vector.valid[1].answers,
+            expectedCatalogRevision: scaleCatalog.json.catalogRevision,
+            expectedPatientVersion: selectedProfile.json.currentness.revision,
+            expectedSelectionEpoch: selectedProfile.json.currentness.selectionEpoch };
+        const auditBeforeScale = await listAuditEvents(sessionHeaders);
+        const scaleDraft = await request('POST', `/api/v1/network/patients/${patientId}/scales/prepare`, { headers: scaleHeaders, body: scaleInput });
+        assert.equal(scaleDraft.response.status, 200, JSON.stringify(scaleDraft.json));
+        assert.equal(scaleDraft.response.headers.get('cache-control'), 'no-store');
+        assert.equal(scaleDraft.json.status, 'draft'); assert.equal(scaleDraft.json.context.patientId, patientId);
+        assert.deepEqual(scaleDraft.json.submission.metadata.answers, vector.valid[1].answers);
+        assert.equal(scaleDraft.json.submission.metadata.score, vector.valid[1].score);
+        assert.deepEqual(scaleDraft.json.submission.metadata.instrument, vector.instrument);
+        const inventedScale = await request('POST', `/api/v1/network/patients/${patientId}/scales/prepare`, {
+            headers: scaleHeaders, body: { ...scaleInput, score: 999 },
+        });
+        assert.equal(inventedScale.response.status, 400);
+        const staleScale = await request('POST', `/api/v1/network/patients/${patientId}/scales/prepare`, {
+            headers: scaleHeaders, body: { ...scaleInput, expectedPatientVersion: scaleInput.expectedPatientVersion + 1 },
+        });
+        assert.equal(staleScale.response.status, 409);
+        assert.deepEqual(await listAuditEvents(sessionHeaders), auditBeforeScale);
 
         const readOnlyCreate = await request('POST', `/api/v1/network/patients/${patientId}/entries`, {
             headers: {
