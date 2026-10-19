@@ -5,14 +5,26 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs', '.cjs', '.mts', '.cts']);
+const PROFILE_PACKAGE = 'packages/patient-profile-contracts/src/';
+const PROFILE_ROUTES = new Set([
+    'app/api/patients/[id]/route.ts',
+    'app/api/v1/patients/[id]/route.ts',
+    'app/api/v1/network/patients/[id]/route.ts',
+    'app/api/patients/[id]/profile-query/route.ts',
+    'app/api/v1/network/patients/[id]/profile-query/route.ts',
+    'app/api/patients/[id]/notes-commit/route.ts',
+    'app/api/patient-profile/review/route.ts',
+    'app/api/patient-profile/selection-epoch/route.ts',
+    'app/api/v1/network/patient-profile/selection-epoch/route.ts',
+]);
 const DIRECTORY_SURFACES = [
     { relative: 'packages/aip/src', required: true },
     { relative: 'packages/mini/src', required: true },
     { relative: 'packages/mcp/src', required: false },
+    { relative: PROFILE_PACKAGE, required: true },
 ];
-const PROFILE_CONTRACT = 'lib/patient-profile-scoped-contract.ts';
 const FILE_SURFACES = [{ relative: 'scripts/intelligent-host-mcp-stdio.mjs', required: true },
-    { relative: PROFILE_CONTRACT, required: false }];
+    ...[...PROFILE_ROUTES].map(relative => ({ relative, required: true }))];
 const FORBIDDEN_EXTERNAL = new Set([
     'better-sqlite3', 'drizzle-orm', 'server-only', 'next/headers', 'next/server',
     'node:http', 'node:https', 'node:http2', 'node:net', 'node:tls', 'node:dgram',
@@ -21,7 +33,6 @@ const FORBIDDEN_EXTERNAL = new Set([
 ]);
 const NATIVE_SEGMENT = /(?:^|[-_/@.])(xpc|swift|vision|metal|mlx|cuda|cudnn)(?:$|[-_/@.])/iu;
 const ALLOWED_PURE_LIB_MODULES = new Set([
-    PROFILE_CONTRACT,
     'lib/terminology', 'lib/terminology.ts',
     'lib/headless/application-operation-registry', 'lib/headless/application-operation-registry.ts',
 ]);
@@ -52,6 +63,19 @@ function boundaryImport(specifier, file) {
 
 function forbiddenSpecifier(specifier, file) {
     const normalized = specifier.trim().toLowerCase();
+    if (file.startsWith(PROFILE_PACKAGE)) {
+        const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier.replaceAll('\\', '/')));
+        return specifier.startsWith('.') && target.startsWith(PROFILE_PACKAGE) && target.endsWith('.ts')
+            ? null : 'pure profile package permits only relative TypeScript dependencies inside its source graph';
+    }
+    if (PROFILE_ROUTES.has(file)) {
+        const target = specifier.startsWith('.')
+            ? path.posix.normalize(path.posix.join(path.posix.dirname(file), normalized))
+            : normalized.replace(/^@\//u, '');
+        return /(?:^|\/)lib\/(?:db(?:[-./]|$)|schema(?:\.|\/|$))/u.test(target)
+            || /^(?:better-sqlite3|drizzle-orm|node:sqlite|sqlite3)(?:\/|$)/u.test(normalized)
+            ? 'profile route must delegate database and schema access to the application service' : null;
+    }
     if (boundaryImport(specifier, file)) return 'database or Web boundary import is forbidden';
     if (FORBIDDEN_EXTERNAL.has(normalized)
         || normalized.startsWith('better-sqlite3/') || normalized.startsWith('drizzle-orm/')
@@ -75,14 +99,20 @@ function calledName(node) {
 export function validateHeadlessPortableSource(sourceText, file = 'packages/aip/src/input.ts') {
     const parsed = sourceFile(sourceText, file);
     const issues = parsed.parseDiagnostics.map((diagnostic) => `${file}:${line(parsed, diagnostic.start ?? 0)}: syntax error`);
-    const inspectSpecifier = (node, specifier) => {
-        if (file === PROFILE_CONTRACT) {
-            issues.push(`${file}:${line(parsed, node.getStart(parsed))}: pure profile contract must remain a dependency-free leaf`);
+    if (file.startsWith(PROFILE_PACKAGE)) {
+        for (const reference of [...parsed.referencedFiles, ...parsed.typeReferenceDirectives, ...parsed.libReferenceDirectives]) {
+            issues.push(`${file}:${line(parsed, reference.pos)}: type reference directives are forbidden in the pure profile package: ${reference.fileName}`);
         }
+    }
+    const inspectSpecifier = (node, specifier) => {
         const reason = forbiddenSpecifier(specifier, file);
         if (reason) issues.push(`${file}:${line(parsed, node.getStart(parsed))}: ${reason}: ${specifier}`);
     };
     const visit = (node) => {
+        if (file.startsWith(PROFILE_PACKAGE) && ts.isIdentifier(node)
+            && ['window', 'document', 'navigator', 'localStorage', 'sessionStorage', 'process', 'Deno', 'Bun'].includes(node.text)) {
+            issues.push(`${file}:${line(parsed, node.getStart(parsed))}: platform global is forbidden in the pure profile package: ${node.text}`);
+        }
         if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier) {
             if (ts.isStringLiteralLike(node.moduleSpecifier)) inspectSpecifier(node, node.moduleSpecifier.text);
             else issues.push(`${file}:${line(parsed, node.getStart(parsed))}: computed module specifier is forbidden`);
@@ -91,6 +121,11 @@ export function validateHeadlessPortableSource(sourceText, file = 'packages/aip/
             const expression = node.moduleReference.expression;
             if (expression && ts.isStringLiteralLike(expression)) inspectSpecifier(node, expression.text);
             else issues.push(`${file}:${line(parsed, node.getStart(parsed))}: computed module specifier is forbidden`);
+        }
+        if (ts.isImportTypeNode(node)) {
+            const argument = node.argument;
+            if (ts.isLiteralTypeNode(argument) && ts.isStringLiteralLike(argument.literal)) inspectSpecifier(node, argument.literal.text);
+            else issues.push(`${file}:${line(parsed, node.getStart(parsed))}: computed type module specifier is forbidden`);
         }
         if (ts.isCallExpression(node)) {
             const dynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;

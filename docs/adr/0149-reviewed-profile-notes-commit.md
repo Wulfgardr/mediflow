@@ -1,6 +1,6 @@
 # ADR 0149 — Salvataggio delle note rivedute e recupero dell'esito
 
-Data: 2026-10-19. Stato: Proposed; accettazione con review indipendente e merge.
+Data: 2026-10-19. Stato: Accepted con l'integrazione protetta; review indipendente favorevole.
 Riferimenti: WUL-577, WUL-585, ADR 0098, ADR 0147, ADR 0148.
 
 ## Decisione e ambito

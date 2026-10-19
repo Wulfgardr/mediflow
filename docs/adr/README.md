@@ -14,6 +14,8 @@ verifica dello stato successivo.
 
 ## Decisioni richiamate
 
+- [0152-profile-contract-platform-boundary.md](./0152-profile-contract-platform-boundary.md): BT-08; dipendenze OS e framework negli adapter host, contratti verificati senza DOM e qualifica delle applicazioni installate distinta.
+- [0151-profile-contract-package-topology.md](./0151-profile-contract-package-topology.md): BT-07; pacchetto puro dei contratti profilo già provati, owner Node e conformità condivisa senza nuovi writer o trasformazioni dei dati.
 - [0150-patient-profile-pilot-recovery.md](./0150-patient-profile-pilot-recovery.md): BT-06; recupero C15 prima/dopo il pilota, ricevuta storica conservata e autorizzazione corrente verificata senza riattivare sessioni o prove precedenti.
 - [0145-rust-gpui-connected-client.md](./0145-rust-gpui-connected-client.md): client Rust/GPUI paired, Windows/Linux espliciti, sblocco v3 e prove old/new; writer e integrazioni mobile restano distinti.
 - [0141-local-checkup-json-body-bound.md](./0141-local-checkup-json-body-bound.md): Proposed; nuovo cap locale 4 MiB e involucro oggetto per i quattro POST/PUT checkup, con DELETE e paired esclusi.

@@ -11,7 +11,7 @@ const roots = [
 ];
 const allowedExternal = new Set(['zod', '@modelcontextprotocol/server', '@modelcontextprotocol/server/stdio',
   'node:process', 'node:util']);
-const pureProfileContract = resolve(root, 'lib/patient-profile-scoped-contract.ts');
+const pureProfileContract = resolve(root, 'packages/patient-profile-contracts/src/query.ts');
 const allowedAip = new Set([resolve(root, 'packages/aip/src/child-ipc-contract.ts')]);
 const allowedMini = new Set([
   resolve(root, 'packages/mini/src/protocol.ts'), resolve(root, 'packages/mini/src/session.ts'),

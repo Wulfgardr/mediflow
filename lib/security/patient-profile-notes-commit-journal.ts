@@ -6,7 +6,7 @@ import { assertArchiveGeneration } from '../archive-generation';
 import { auditEvents } from '../schema';
 import { PATIENT_PROFILE_UPDATE_OPERATION, type PatientProfileUpdateEnvelope } from '../patient-profile-update-contract';
 import { PROFILE_NOTES_COMMIT_POLICY, parseProfileNotesCommitJournal,
-    type ProfileNotesCommitJournal, type ProfileNotesCommitReceipt } from '../patient-profile-notes-commit-contract';
+    type ProfileNotesCommitJournal, type ProfileNotesCommitReceipt } from '../../packages/patient-profile-contracts/src/notes-commit';
 import type { RequiredAuditContext } from './audit';
 
 type Transaction = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];

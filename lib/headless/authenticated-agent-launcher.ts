@@ -39,7 +39,7 @@ import {
   type AuthenticatedAgentLauncherV1ErrorCode, type Child, type Context, type OperationState,
 } from './authenticated-agent-launcher-contract.ts';
 import { PROFILE_QUERY_OPERATION_ID, parseProfileQuery, isProfileResult, assertProfileResultBudget,
-  type ProfileQuery, type ProfileResult } from '../patient-profile-scoped-contract.ts';
+  type ProfileQuery, type ProfileResult } from '../../packages/patient-profile-contracts/src/query.ts';
 
 import { createAuthenticatedSessionScopeRegistryV1 } from './authenticated-session-scope-registry.ts';
 

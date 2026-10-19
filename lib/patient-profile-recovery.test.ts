@@ -17,7 +17,7 @@ import { currentArchiveGeneration } from './security/archive-session-generation'
 import { ArchiveReplacedError } from './archive-generation';
 import { readProfileNotesCommitReceipt } from './security/patient-profile-notes-commit-journal';
 import { ambulatories, patients, patientsToAmbulatories, users } from './schema';
-import { isProfileNotesCommitReceipt, isProfileNotesCommitView } from './patient-profile-notes-commit-contract';
+import { isProfileNotesCommitReceipt, isProfileNotesCommitView } from '../packages/patient-profile-contracts/src/notes-commit';
 import { decryptData, encryptData, generateMasterKey } from './security/security';
 import { createRecoveryWrapping, createUnlockWrapping, hashAccessVerifier, openRecoveryWrapping } from './security/unlock-credential';
 import { encryptRecoveryBackup, type RecoveryKit } from './recovery-backup';

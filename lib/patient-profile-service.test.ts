@@ -15,7 +15,7 @@ import { NETWORK_FSE_VALIDATE_CAPABILITY } from './network-contract';
 import { eq } from 'drizzle-orm';
 import { ambulatories, patients, patientsToAmbulatories, settings, users } from './schema';
 import type { RequiredAuditContext } from './security/audit';
-import { PROFILE_NOTES_COMMIT_POLICY } from './patient-profile-notes-commit-contract';
+import { PROFILE_NOTES_COMMIT_POLICY } from '../packages/patient-profile-contracts/src/notes-commit';
 import { resolveHeadlessCanonicalCapability } from './headless/canonical-capability-catalog';
 import { resolveApplicationOperation } from './headless/application-operation-registry';
 

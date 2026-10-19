@@ -6,9 +6,9 @@ import { Button } from './ui/button';
 import { db } from '@/lib/db';
 import { createPatientProfileScopedBrowserAdapter } from '@/lib/patient-profile-scoped-browser-adapter';
 import { isProfileReviewView, PROFILE_REVIEW_POLICY, type ProfileReviewInput,
-    type ProfileReviewView } from '@/lib/patient-profile-review-contract';
+    type ProfileReviewView } from '@/packages/patient-profile-contracts/src/review';
 import { isProfileNotesCommitReceipt, isProfileNotesCommitReference, isProfileNotesCommitView, PROFILE_NOTES_COMMIT_POLICY,
-    type ProfileNotesCommitInput, type ProfileNotesCommitView, type ProfileNotesCommitReceipt } from '@/lib/patient-profile-notes-commit-contract';
+    type ProfileNotesCommitInput, type ProfileNotesCommitView, type ProfileNotesCommitReceipt } from '@/packages/patient-profile-contracts/src/notes-commit';
 
 type Mode = 'review-only' | 'commit';
 type Prepared = ProfileReviewView | ProfileNotesCommitView;

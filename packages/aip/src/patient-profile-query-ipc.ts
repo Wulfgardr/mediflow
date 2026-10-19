@@ -1,6 +1,6 @@
 import { types } from 'node:util';
 import { parseProfileQuery, isProfileResult, assertProfileResultBudget, PROFILE_FIELD_NAMES, PROFILE_QUERY_OPERATION_ID,
-  type ProfileQuery, type ProfileResult, type ProfileQueryErrorCode } from '../../../lib/patient-profile-scoped-contract.ts';
+  type ProfileQuery, type ProfileResult, type ProfileQueryErrorCode } from '../../patient-profile-contracts/src/query.ts';
 
 export const PATIENT_PROFILE_QUERY_IPC_SCHEMA_V1 = 'mediflow.patient-profile.ipc.v1' as const;
 export const PATIENT_PROFILE_QUERY_IPC_MAX_FRAME_BYTES_V1 = 48 * 1024;

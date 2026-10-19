@@ -31,7 +31,9 @@ jobs:
         run: npm ci
       - name: Deny DB, Web, native and network imports in portable surfaces
         run: npm run check:headless-portable-imports
-      - name: Run the shared AIP, Mini and MCP contracts
+      - name: Typecheck profile contracts without DOM or framework types
+        run: node node_modules/typescript/bin/tsc -p packages/patient-profile-contracts/tsconfig.json
+      - name: Run the shared AIP, Mini, MCP and profile conformance contracts
         run: npm run test:headless-portable
       - name: Verify cross-platform launcher identity and safe reuse
         run: npm run test:launcher-helpers

@@ -1546,7 +1546,7 @@ function validateReviewedNotesProfileAuditPort({ spec, routeSource, profileSourc
         ['./patient-profile-update-dispatch', 'dispatchReviewedPatientProfileNotes'],
         ['./security/fresh-review-pin-uniqueness', 'verifyFreshReviewPin'],
         ['./security/session-physician-review-authority-production', 'sessionPhysicianReviewAuthority'],
-        ['./patient-profile-notes-commit-contract', 'PROFILE_NOTES_COMMIT_POLICY'],
+        ['../packages/patient-profile-contracts/src/notes-commit', 'PROFILE_NOTES_COMMIT_POLICY'],
         ['./security/archive-write-request', 'archiveWriteRequestDenial'],
     ];
     const imports = importNames.map(([module, name]) => importedBinding(profile.sourceFile, profile.checker, module, name));
