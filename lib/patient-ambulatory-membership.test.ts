@@ -221,17 +221,24 @@ test('all patient PUT adapters wire one transactional set-primary operation with
         assert.match(executor, /return updatePatientOperation\(\{/);
         assert.match(executor, /setPrimaryAmbulatory:\s*input\.setPrimaryAmbulatory/);
         assert.match(executor, /values:\s*values,\s*setPrimaryAmbulatory:\s*command\.setPrimaryAmbulatory/);
-        assert.match(executor, /authorizeCommit:\s*authorizeCommit,\s*audit:\s*audit,\s*\}\);/);
+        const writerArguments = executor.match(/return updatePatientOperation\(\{([\s\S]*?)\n\s*\}\);/)?.[1];
+        assert.ok(writerArguments, 'dispatch must pass the transaction guard and audit to the writer');
+        assert.match(writerArguments, /authorizeCommit:\s*authorizeCommit,/);
+        assert.match(writerArguments, /audit:\s*audit,/);
         assert.doesNotMatch(executor, /\bupsertPrimaryAmbulatoryMembership\s*\(/);
         assert.doesNotMatch(executor, deleteMemberships);
     };
     assertDispatchWiring(profile, dispatch);
     for (const [source, before, after] of [
         ['service', 'createPatientProfileUpdateExecution,', ''],
-        ['service', ', dispatchPatientProfileUpdate }', ' }'],
+        ['service', 'dispatchPatientProfileUpdate,', ''],
         ['service', 'dispatchPatientProfileUpdate(execution, execution.command)', 'updatePatientOperation({})'],
         ['service', "'./patient-profile-update-dispatch'", "'./unapproved-profile-update-dispatch'"],
         ['executor', 'setPrimaryAmbulatory: command.setPrimaryAmbulatory', 'setPrimaryAmbulatory: false'],
+        ['executor', 'authorizeCommit: authorizeCommit,', ''],
+        ['executor', 'authorizeCommit: authorizeCommit,', 'authorizeCommit: undefined,'],
+        ['executor', 'audit: audit,', ''],
+        ['executor', 'audit: audit,', 'audit: undefined,'],
     ] as const) {
         const original = source === 'service' ? profile : dispatch;
         const changed = original.replace(before, after);
@@ -250,7 +257,18 @@ test('all patient PUT adapters wire one transactional set-primary operation with
     assert.match(operation, /behavior:\s*'immediate'/);
     assert.match(operation, /import\s*\{\s*upsertPrimaryAmbulatoryMembership\s*\}\s*from\s*'\.\/patient-ambulatory-membership'/);
     assert.equal(operation.match(/\bupsertPrimaryAmbulatoryMembership\s*\(/g)?.length, 1);
-    assert.match(operation, /if\s*\(input\.setPrimaryAmbulatory\)\s*\{\s*upsertPrimaryAmbulatoryMembership\(tx, input\.patientId, input\.values\.ambulatoryId\);\s*\}\s*writeAuditEventInTransaction\(tx,/);
+    const assertTransactionWiring = (source: string) => {
+        const transaction = source.match(/return dbServer\.transaction\(\(tx\)[^{]*\{([\s\S]*?)\},\s*\{ behavior:\s*'immediate'\s*\}\);/)?.[1];
+        assert.ok(transaction, 'membership and required audit must share the immediate transaction');
+        assert.match(transaction, /if\s*\(input\.setPrimaryAmbulatory\)\s*\{\s*upsertPrimaryAmbulatoryMembership\(tx, input\.patientId, input\.values\.ambulatoryId\);\s*\}/);
+        assert.match(transaction, /writeAuditEventInTransaction\(tx,/);
+    };
+    assertTransactionWiring(operation);
+    for (const call of ['upsertPrimaryAmbulatoryMembership(tx,', 'writeAuditEventInTransaction(tx,']) {
+        const changed = operation.replace(call, call.replace('(tx,', '(dbServer,'));
+        assert.notEqual(changed, operation);
+        assert.throws(() => assertTransactionWiring(changed), `${call} must use the transaction owner`);
+    }
     assert.match(operation, /import\s*\{[^}]*\bwriteAuditEventInTransaction\b[^}]*\}\s*from\s*'\.\/security\/audit'/);
     assert.equal(operation.match(/\bwriteAuditEventInTransaction\s*\(/g)?.length, 1);
     assert.doesNotMatch(operation, deleteMemberships);
