@@ -23,6 +23,7 @@
     "legacy-node-service": "Existing Node services/owners with direct authority or handle dependencies; see authority-census and mutation CSV for ownership and guarantees.",
     "sqlite-infrastructure": "Existing schema/open/repair/maintenance primitives. Not an alternative clinical writer or permission to run maintenance.",
     "reference-data": "Reference catalog SQL, distinct from clinical patient command dispatch.",
+    "paired-scale-read": "ADR0153: current authority, membership and selection reads for scale preparation. No clinical writer or key access; persistence delegates to the ordinary entry operation.",
     "runtime-entry": "Declared runtime/maintenance entry or its local dependencies, outside the Web/lib source roots.",
     "synthetic-support": "Existing synthetic-support source; inclusion is conservative and does not authorize real data access."
   },
@@ -1199,6 +1200,17 @@
       ],
       "count": 1,
       "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/network-scale-service.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "paired-scale-read"
     },
     {
       "file": "lib/patient-delete-operation.ts",

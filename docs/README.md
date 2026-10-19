@@ -99,6 +99,10 @@ Gli [ADR 0151](./adr/0151-profile-contract-package-topology.md) e
 [0152](./adr/0152-profile-contract-platform-boundary.md) delimitano l'estrazione
 dei contratti provati in un pacchetto puro, con conformità Node 24 sui tre
 sistemi e dipendenze di piattaforma conservate negli adapter host.
+L'[ADR 0153](./adr/0153-paired-scale-preparation-and-diary-currentness.md)
+porta catalogo e preparazione delle Scale al servizio TypeScript condiviso,
+in sola lettura, e ricontrolla l'autorità corrente nel writer del diario paired.
+La soglia e la rilettura GPUI restano parte della composizione client.
 I job di build Web Core, E2E e Cross-platform `build-start` sui tre sistemi
 usano un checkout sparse non-cone della stessa revisione: non materializzano
 soltanto la fixture SQLite dei test Swift.

@@ -38,13 +38,18 @@ function currentSession(context: NetworkWriteContext): boolean {
 }
 
 export async function prepareNetworkPatientCommitGuard(
-    context: NetworkWriteContext, capability: string,
+    context: NetworkWriteContext, capability: string | readonly string[],
 ): Promise<NetworkPatientCommitGuard> {
+    // The host names every required capability; an empty set cannot authorize a read or write.
+    const capabilities = typeof capability === 'string' ? [capability] : Array.isArray(capability) ? [...capability] : [];
+    if (!capabilities.length || capabilities.some(value => typeof value !== 'string' || !value || value.trim() !== value)
+        || new Set(capabilities).size !== capabilities.length) throw new TypeError('Invalid required network capabilities');
+    Object.freeze(capabilities);
     const generation = archiveGenerationForSession(context.session);
     const activeAmbulatoryId = (await cookies()).get('ambulatory_id')?.value ?? null;
     return (tx) => {
-        // Fixed reads under the patient's IMMEDIATE write lock. No await occurs
-        // from these checks through clinical/membership/required-audit commit.
+        // Fixed reads in the caller's transaction. Writers hold IMMEDIATE; read-only
+        // services use the same current authority without acquiring write permission.
         const setting = (key: string) => tx.select({ value: settings.value }).from(settings)
             .where(eq(settings.key, key)).get()?.value ?? null;
         assertArchiveGeneration(tx, generation);
@@ -60,7 +65,7 @@ export async function prepareNetworkPatientCommitGuard(
         }
         const mode = evaluateNetworkDataPlaneModeGate(normalizeNetworkOperatingMode(setting(NETWORK_MODE_KEY)));
         if (!mode.allowed) return { status: mode.status, value: mode.value };
-        if (!paired.grantedCapabilities.includes(capability)) return { status: 403, value: { error: 'Forbidden' } };
+        if (!capabilities.every(value => paired.grantedCapabilities.includes(value))) return { status: 403, value: { error: 'Forbidden' } };
         if (!currentSession(context)) return { status: 401, value: { error: 'Unauthorized' } };
         const user = tx.select({ username: users.username, role: users.role }).from(users)
             .where(eq(users.id, context.session.userId)).get();
