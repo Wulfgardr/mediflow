@@ -144,7 +144,10 @@ pub fn read_selected_file(path: &Path) -> Result<Upload, DocumentError> {
 }
 
 pub fn original_readable(attachment: &Attachment) -> bool {
-    !attachment.locked_fields.iter().any(|field| matches!(field.as_str(), "name" | "path" | "data"))
+    !attachment
+        .locked_fields
+        .iter()
+        .any(|field| matches!(field.as_str(), "name" | "path" | "data"))
 }
 
 pub fn decode_attachment(attachment: &Attachment) -> Result<Zeroizing<Vec<u8>>, DocumentError> {
@@ -233,17 +236,27 @@ mod tests {
             "id":"synthetic-document", "patientId":"synthetic-patient",
             "name":"Documento sintetico.txt", "path":"Documento sintetico.txt",
             "type":"text/plain", "size":4, "data":"data:text/plain;base64,w6jDqQ=="
-        })).unwrap();
-        attachment.locked_fields = vec!["summarySnapshot".into(), "parseEvidenceArtifactSnapshot".into()];
+        }))
+        .unwrap();
+        attachment.locked_fields = vec![
+            "summarySnapshot".into(),
+            "parseEvidenceArtifactSnapshot".into(),
+        ];
         let upload = Upload {
             name: attachment.name.clone(),
             mime_type: attachment.mime_type.clone(),
             bytes: Arc::new(Zeroizing::new("èé".as_bytes().to_vec())),
         };
-        assert_eq!(decode_attachment(&attachment).unwrap().as_slice(), "èé".as_bytes());
+        assert_eq!(
+            decode_attachment(&attachment).unwrap().as_slice(),
+            "èé".as_bytes()
+        );
         assert!(upload.matches(&attachment));
         attachment.locked_fields.push("data".into());
-        assert_eq!(decode_attachment(&attachment).unwrap_err(), DocumentError::Locked);
+        assert_eq!(
+            decode_attachment(&attachment).unwrap_err(),
+            DocumentError::Locked
+        );
         assert!(!upload.matches(&attachment));
     }
 
