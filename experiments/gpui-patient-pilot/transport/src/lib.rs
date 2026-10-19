@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+mod ai_preferences;
 mod catalogs;
 mod crypto;
 mod dto;
@@ -13,12 +14,13 @@ mod session;
 mod tls;
 mod who;
 
+pub use ai_preferences::*;
 pub use catalogs::*;
 pub use dto::*;
 pub use error::{Result, RuntimeError};
 pub use http::{PairingCredentials, RuntimeClient, RuntimeConfig};
 pub use profile_query::{ProfileCurrentness, ProfileProjection};
-pub use session::{ProfileQueryIntent, RuntimeSession};
+pub use session::{AiPreferencesContext, ProfileQueryIntent, RuntimeSession};
 pub use who::{
     WHO_ATTRIBUTION, WhoEntry, WhoReadiness, WhoReadinessStatus, WhoReceipt, WhoSearchResponse,
     WhoSource, normalize_who_query,

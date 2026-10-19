@@ -1,6 +1,7 @@
 //! Connected clinical workspace. GPUI owns presentation; the runtime owns records,
 //! encryption policy, authorization and writes. No clinical data is persisted here.
 
+mod ai_preferences;
 mod ai_status;
 mod document_details;
 mod therapy_picker;
@@ -36,6 +37,7 @@ use crate::references::{ReferenceKind, ReferenceRows};
 use crate::text_input::{InputChanged, TextInput};
 use crate::theme::{CODES, SYSTEM, Theme, VOICE};
 
+use ai_preferences::AiPreferences;
 use ai_status::AiRuntimeObservation;
 use therapy_picker::TherapySelection;
 use who_lookup::WhoLookup;
@@ -365,6 +367,7 @@ pub struct ClinicalApp {
     reference_registry: Load<Vec<TerminologyRegistryEntry>>,
     ai_status: Load<AiRuntimeObservation>,
     ai_refresh_target: ScrollTarget,
+    ai_preferences: AiPreferences,
     who: WhoLookup,
     selected_id: Option<String>,
     patient: PatientData,
@@ -569,6 +572,7 @@ impl ClinicalApp {
             reference_search_target: ScrollTarget::new(&area_scroll, cx),
             reference_run_target: ScrollTarget::new(&area_scroll, cx),
             ai_refresh_target: ScrollTarget::new(&area_scroll, cx),
+            ai_preferences: AiPreferences::new(&area_scroll, cx),
             who: WhoLookup::new(&area_scroll, cx),
             area_scroll,
             reference_kind: ReferenceKind::Drugs,
@@ -683,6 +687,7 @@ impl ClinicalApp {
     }
 
     fn next_epoch(&mut self) {
+        self.ai_preferences.reset();
         self.who.reset();
         self.patient.document_details_id = None;
         if let Some(intent) = self.profile_query_intent.take() {
@@ -714,7 +719,14 @@ impl ClinicalApp {
                 if let Err(error) = &result
                     && error.is_auth_failure()
                 {
-                    let message = ui_error(error);
+                    let message = if this.ai_preferences.is_saving() {
+                        format!(
+                            "Salvataggio delle preferenze AI non verificato. {}",
+                            ui_error(error)
+                        )
+                    } else {
+                        ui_error(error)
+                    };
                     this.disconnect(cx);
                     this.message = Some((message, true));
                     return;
@@ -1091,6 +1103,9 @@ impl ClinicalApp {
     }
 
     fn navigate(&mut self, area: Area, cx: &mut Context<Self>) {
+        if self.ai_preferences_blocks_navigation(cx) {
+            return;
+        }
         if self.form.is_some() {
             self.message = Some((
                 "Completa o scarta la bozza prima di cambiare area.".into(),
@@ -1267,7 +1282,11 @@ impl ClinicalApp {
                 self.who.reveal_if_focused(window, cx);
             }
         } else if self.area == Area::Settings {
-            self.ai_refresh_target.reveal_if_focused(window, cx);
+            if self.ai_preferences.active {
+                self.ai_preferences.reveal_if_focused(window, cx);
+            } else {
+                self.ai_refresh_target.reveal_if_focused(window, cx);
+            }
         }
     }
 
@@ -1420,6 +1439,7 @@ impl ClinicalApp {
 
     fn request_discard(&mut self, action: Discard, cx: &mut Context<Self>) {
         if action == Discard::Lock {
+            let ai_pending = self.ai_preferences.is_saving();
             let pending = self
                 .form
                 .as_ref()
@@ -1427,7 +1447,13 @@ impl ClinicalApp {
             self.disconnect(cx);
             if pending {
                 self.message = Some(("Sessione bloccata. Una scrittura era in corso: verifica la scheda dopo l'accesso.".into(), false));
+            } else if ai_pending {
+                self.message = Some(("Sessione bloccata. Un salvataggio AI era in corso: rileggi le preferenze dopo l’accesso.".into(), false));
             }
+            return;
+        }
+        if action == Discard::Reload && self.ai_preferences.active {
+            self.load_ai_preferences(cx);
             return;
         }
         if self
@@ -3966,6 +3992,9 @@ impl ClinicalApp {
     }
 
     fn settings_view(&self, cx: &Context<Self>) -> Div {
+        if self.ai_preferences.active {
+            return self.ai_preferences_view(cx);
+        }
         let theme = self.theme;
         let origin = self
             .session
@@ -3991,6 +4020,11 @@ impl ClinicalApp {
                     }))))
             .child(button("clinical-workspace-increased-contrast", if self.increased_contrast { "Contrasto dei filetti: aumentato" } else { "Aumenta il contrasto dei filetti" }, theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| { this.increased_contrast = !this.increased_contrast; cx.notify(); })))
+            .child(button("clinical-workspace-ai-preferences-open", "Preferenze funzioni AI…", theme, false, true)
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.area_scroll.set_offset(gpui::point(px(0.), px(0.)));
+                    this.load_ai_preferences(cx);
+                })))
             .child(self.ai_status_view(cx))
             .child(div().border_t_1().border_color(theme.rule).pt(px(24.)).flex().flex_col().gap(px(12.))
                 .child(section("clinical-workspace-connection-heading", "ARCHIVIO COLLEGATO", theme))
@@ -4517,6 +4551,9 @@ impl Render for ClinicalApp {
         });
         self.theme = Theme::for_dark(self.dark).sized(self.text_scale, self.increased_contrast);
         let theme = self.theme;
+        if self.ai_preferences.active {
+            self.ai_preferences.prepare_render(window, cx);
+        }
         for field in &self.login_fields {
             field
                 .editor
@@ -4657,6 +4694,7 @@ impl Render for ClinicalApp {
             .on_action(cx.listener(|this, _: &Escape, window, cx| {
                 if this.discard.take().is_some() {
                     cx.notify();
+                } else if this.cancel_ai_preview(cx) {
                 } else if this.close_drug_search(cx) {
                     this.focus_after_render = true;
                     this.focus_first_field = true;
