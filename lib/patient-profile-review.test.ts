@@ -88,7 +88,7 @@ async function prepareCommit(notes: string | null = null): Promise<ProfileNotesC
 function processCommit(t: TestContext, mode: 'race' | 'before-commit' | 'after-commit' | 'receipt', expected?: Pick<ProfileReviewView, 'reference' | 'digest'>) {
     const child = spawn(process.execPath, ['--experimental-strip-types', '--import',
         fileURLToPath(new URL('../scripts/register-strip-types-loader.mjs', import.meta.url)),
-        fileURLToPath(new URL('./patient-profile-notes-commit-process-fixture.ts', import.meta.url)), mode,
+        fileURLToPath(new URL('./patient-profile-notes-commit-process.fixture.ts', import.meta.url)), mode,
         ...(expected ? [expected.reference, expected.digest] : [])], { env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir,
         MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', MEDIFLOW_TEST_PROFILE_NOTES_PROCESS: '1' }, stdio: ['pipe', 'pipe', 'pipe'] });
     let buffer = '', stderr = '', crash: string | null = null;

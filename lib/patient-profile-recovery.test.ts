@@ -35,7 +35,10 @@ const commitRoute = load('../app/api/patients/[id]/notes-commit/route.ts') as ty
 const ordinaryRoute = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route');
 const queryRoute = load('../app/api/patients/[id]/profile-query/route.ts') as typeof import('../app/api/patients/[id]/profile-query/route');
 const { createPhysicianReviewAttestationStore } = load('./security/physician-review-attestation-store.ts') as typeof import('./security/physician-review-attestation-store');
-const user = { id: 'synthetic-review-user', username: 'synthetic-review-user', role: 'user' };
+const SYNTHETIC_USER = 'synthetic-review-user';
+const SYNTHETIC_ADMIN = 'synthetic-recovery-admin';
+const SYNTHETIC_OTHER_USER = 'synthetic-other-user';
+const user = { id: SYNTHETIC_USER, username: SYNTHETIC_USER, role: 'user' };
 const PIN = '3817';
 const patientId = 'synthetic-patient-a';
 const context = { params: Promise.resolve({ id: patientId }) };
@@ -79,7 +82,7 @@ function target(stage: string) {
 function restoredProcess(directory: string, input: Record<string, unknown>) {
     const output = execFileSync(process.execPath, ['--experimental-strip-types', '--import',
         fileURLToPath(new URL('../scripts/register-strip-types-loader.mjs', import.meta.url)),
-        fileURLToPath(new URL('./patient-profile-notes-commit-process-fixture.ts', import.meta.url)), 'recovery'], {
+        fileURLToPath(new URL('./patient-profile-notes-commit-process.fixture.ts', import.meta.url)), 'recovery'], {
         env: { ...process.env, MEDIFLOW_DATA_DIR: directory, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', MEDIFLOW_TEST_PROFILE_NOTES_PROCESS: '1' },
         input: JSON.stringify(input), encoding: 'utf8', timeout: 20_000,
     });
@@ -94,14 +97,14 @@ test('complete pilot recovery preserves both snapshots and the committed receipt
     const key = await generateMasterKey();
     const wrapping = await createUnlockWrapping(key, 'passphrase sintetica del recovery');
     const recovery = await createRecoveryWrapping(key);
-    const admin = { id: 'synthetic-recovery-admin', username: 'synthetic-recovery-admin', role: 'admin' };
+    const admin = { id: SYNTHETIC_ADMIN, username: SYNTHETIC_ADMIN, role: 'admin' };
     const kit: RecoveryKit = { schemaVersion: 'mediflow.recovery-kit.v1', username: admin.username,
         wrappedMasterKey: recovery.wrappedMasterKey, salt: recovery.salt };
     const credentials = { passwordHash: bcrypt.hashSync(PIN, 4), encryptedMasterKey: wrapping.encryptedMasterKey, salt: wrapping.salt,
         unlockVerifierHash: await hashAccessVerifier(wrapping.verifier), recoveryWrappedMasterKey: recovery.wrappedMasterKey,
         recoverySalt: recovery.salt, recoveryVerifierHash: await hashAccessVerifier(recovery.verifier) };
     dbServer.insert(users).values([{ ...user, ...credentials }, { ...admin, ...credentials, passwordHash: bcrypt.hashSync('7392', 4) },
-        { id: 'synthetic-other-user', username: 'synthetic-other-user', role: 'user', ...credentials,
+        { id: SYNTHETIC_OTHER_USER, username: SYNTHETIC_OTHER_USER, role: 'user', ...credentials,
             passwordHash: bcrypt.hashSync('6258', 4) }]).run();
     dbServer.insert(ambulatories).values([
         { id: 'synthetic-scope', name: 'Synthetic scope', type: 'live', isDefault: true },
