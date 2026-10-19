@@ -1246,6 +1246,17 @@
       "classification": "legacy-node-service"
     },
     {
+      "file": "lib/population-demographics-service.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
       "file": "lib/prosthetic-prescription-write.ts",
       "target": "lib/db-server.ts",
       "capability": "server:lib/db-server.ts",

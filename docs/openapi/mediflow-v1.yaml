@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.40.0
+  version: 1.41.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -72,6 +72,106 @@ tags:
   - name: Network
     description: Home-base network contract for explicit pairing, capability discovery, and PHI-safe session gating.
 paths:
+  /api/v1/network/analytics/demographics:
+    get:
+      tags:
+        - Network
+      operationId: readPopulationDemographics
+      summary: Read current active-population demographics in the client calendar
+      description: >-
+        ADR 0154. Requires paired admission, network-home-base mode, the current
+        operator session and network.replica.readonly-patients. The three query
+        parameters must each occur exactly once; unknown parameters are rejected.
+        The host selects only birthDate, isAdi and isArchived from active M2M
+        members of the effective ambulatory, then applies the canonical
+        buildAnalyticsStats policy, excluding archived patients. No cohort limit,
+        profile selection, clinical write or audit write. Diagnoses are not read
+        or decrypted, and diagnostic counts are omitted. Original session,
+        pairing, role, scope and archive authority are checked after awaits,
+        before and after the read in one synchronous read transaction. This is
+        an observed snapshot, not an authority or population revision. All
+        responses are Cache-Control no-store. JSON output is bounded to 4096
+        UTF-8 bytes; results are never truncated.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: minAge
+          in: query
+          required: true
+          description: Canonical unsigned decimal integer, no leading zero except zero itself. Inclusive bound.
+          schema: {type: integer, minimum: 0, maximum: 120}
+        - name: maxAge
+          in: query
+          required: true
+          description: Same integer syntax as minAge. Inclusive; reversed bounds are normalized.
+          schema: {type: integer, minimum: 0, maximum: 120}
+        - name: timeZone
+          in: query
+          required: true
+          description: >-
+            Explicit IANA calendar recognized by host Intl, including UTC.
+            Numeric offsets, whitespace and unknown zones are rejected. The
+            response canonicalizes aliases; there is no implicit host fallback.
+            Stored birth instants are retained and the observation instant is host-owned.
+          schema: {type: string, minLength: 1, maxLength: 100}
+        - name: x-mediflow-expected-ambulatory-id
+          in: header
+          required: true
+          description: >-
+            Required current-scope assertion. Encode the opaque effective ID
+            exactly once with JavaScript encodeURIComponent. Cannot select or
+            grant an ambulatory; missing or mismatched values return 403.
+          schema: {type: string, minLength: 1}
+        - name: x-mediflow-archive-generation
+          in: header
+          required: true
+          description: Required assertion of the admitted session's current archive; never a credential.
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Complete demographic snapshot, including zero counts for a genuinely empty population.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PopulationDemographicsResult'
+        '400':
+          description: ANALYTICS_INVALID_QUERY; no patient projection was read.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PopulationDemographicsError'
+        '401':
+          description: Missing, mismatched or retired paired device or operator session, including a changed user role.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PopulationDemographicsError'
+        '403':
+          description: Missing capability, NETWORK_MODE_DISABLED, or unavailable/mismatched current scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PopulationDemographicsError'
+        '409':
+          description: ARCHIVE_REPLACED for non-current archive assertions or replacement; ANALYTICS_CANCELLED for an aborted read.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PopulationDemographicsError'
+        '413':
+          description: ANALYTICS_OUTPUT_TOO_LARGE; the whole result is withheld.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PopulationDemographicsError'
+        '500':
+          description: Generic internal_error; no SQL, exception, input or record details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PopulationDemographicsError'
   /api/v1/network/scales:
     parameters:
       - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
@@ -4453,6 +4553,67 @@ components:
               value:
                 error: Failed to fetch patient
   schemas:
+    PopulationDemographicsResult:
+      type: object
+      additionalProperties: false
+      required: [operation, contractVersion, scope, ageRange, timeZone, observedAt, stats]
+      properties:
+        operation: {type: string, const: population-demographics.read.v1}
+        contractVersion: {type: integer, const: 1}
+        scope:
+          type: object
+          additionalProperties: false
+          required: [ambulatoryId, archiveGeneration]
+          properties:
+            ambulatoryId: {type: string, minLength: 1}
+            archiveGeneration: {type: string, format: uuid}
+        ageRange:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items: {type: integer, minimum: 0, maximum: 120}
+          description: Normalized inclusive minimum and maximum, in that order.
+        timeZone: {type: string, minLength: 1, maxLength: 100}
+        observedAt: {type: string, format: date-time}
+        stats:
+          type: object
+          additionalProperties: false
+          required: [totalInRange, withBirthDate, withoutBirthDate, adiCount, ageDist]
+          properties:
+            totalInRange: {type: integer, minimum: 0}
+            withBirthDate:
+              type: integer
+              minimum: 0
+              description: Valid birth-date coverage before age filtering.
+            withoutBirthDate:
+              type: integer
+              minimum: 0
+              description: Missing or invalid birth dates before age filtering.
+            adiCount:
+              type: integer
+              minimum: 0
+              description: ADI patients within the selected age range only.
+            ageDist:
+              type: object
+              additionalProperties: false
+              required: ['0-18', '19-64', '65-80', '80+']
+              properties:
+                '0-18': {type: integer, minimum: 0}
+                '19-64': {type: integer, minimum: 0}
+                '65-80': {type: integer, minimum: 0}
+                '80+': {type: integer, minimum: 0, description: Strictly older than 80.}
+    PopulationDemographicsError:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error: {type: string}
+        code:
+          type: string
+          enum: [ANALYTICS_INVALID_QUERY, ANALYTICS_SCOPE_UNAVAILABLE, ARCHIVE_REPLACED, ANALYTICS_CANCELLED, ANALYTICS_OUTPUT_TOO_LARGE, NETWORK_MODE_DISABLED, internal_error]
+        message:
+          type: string
+          description: Existing NETWORK_MODE_DISABLED explanation when supplied by the common admission guard.
     NetworkDataPlaneModeDenied:
       type: object
       additionalProperties: false
