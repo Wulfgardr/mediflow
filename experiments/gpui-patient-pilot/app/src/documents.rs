@@ -21,7 +21,7 @@ pub struct Upload {
 }
 impl Upload {
     pub fn matches(&self, attachment: &Attachment) -> bool {
-        attachment.locked_fields.is_empty()
+        original_readable(attachment)
             && attachment.name == self.name
             && attachment.mime_type == self.mime_type
             && attachment.size == self.bytes.len() as u64
@@ -143,8 +143,12 @@ pub fn read_selected_file(path: &Path) -> Result<Upload, DocumentError> {
     })
 }
 
+pub fn original_readable(attachment: &Attachment) -> bool {
+    !attachment.locked_fields.iter().any(|field| matches!(field.as_str(), "name" | "path" | "data"))
+}
+
 pub fn decode_attachment(attachment: &Attachment) -> Result<Zeroizing<Vec<u8>>, DocumentError> {
-    if !attachment.locked_fields.is_empty() {
+    if !original_readable(attachment) {
         return Err(DocumentError::Locked);
     }
     decode_payload(
@@ -222,6 +226,26 @@ pub fn write_download(path: &Path, bytes: &[u8]) -> Result<(), DocumentError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unreadable_optional_snapshots_do_not_hide_a_readable_original() {
+        let mut attachment: Attachment = serde_json::from_value(serde_json::json!({
+            "id":"synthetic-document", "patientId":"synthetic-patient",
+            "name":"Documento sintetico.txt", "path":"Documento sintetico.txt",
+            "type":"text/plain", "size":4, "data":"data:text/plain;base64,w6jDqQ=="
+        })).unwrap();
+        attachment.locked_fields = vec!["summarySnapshot".into(), "parseEvidenceArtifactSnapshot".into()];
+        let upload = Upload {
+            name: attachment.name.clone(),
+            mime_type: attachment.mime_type.clone(),
+            bytes: Arc::new(Zeroizing::new("èé".as_bytes().to_vec())),
+        };
+        assert_eq!(decode_attachment(&attachment).unwrap().as_slice(), "èé".as_bytes());
+        assert!(upload.matches(&attachment));
+        attachment.locked_fields.push("data".into());
+        assert_eq!(decode_attachment(&attachment).unwrap_err(), DocumentError::Locked);
+        assert!(!upload.matches(&attachment));
+    }
 
     #[test]
     fn data_url_requires_exact_type_size_canonical_base64_and_raw_limit() {
