@@ -11,6 +11,7 @@ mod http;
 mod profile_query;
 mod session;
 mod tls;
+mod who;
 
 pub use catalogs::*;
 pub use dto::*;
@@ -18,6 +19,10 @@ pub use error::{Result, RuntimeError};
 pub use http::{PairingCredentials, RuntimeClient, RuntimeConfig};
 pub use profile_query::{ProfileCurrentness, ProfileProjection};
 pub use session::{ProfileQueryIntent, RuntimeSession};
+pub use who::{
+    WHO_ATTRIBUTION, WhoEntry, WhoReadiness, WhoReadinessStatus, WhoReceipt, WhoSearchResponse,
+    WhoSource, normalize_who_query,
+};
 
 pub(crate) const MAX_SAFE_VERSION: u64 = 9_007_199_254_740_991;
 

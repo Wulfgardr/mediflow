@@ -118,6 +118,61 @@ pub struct PatientDetail {
     pub locked_fields: Vec<String>,
 }
 
+/// Display projection of the host's status-only AI response. Enabled settings
+/// are not model health checks or permission to execute a clinical operation.
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiRuntimeStatus {
+    pub local_runtime: AiLocalRuntimeStatus,
+    pub central_runtime: AiCentralRuntimeStatus,
+    pub kill_switches: AiFunctionSwitches,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiLocalRuntimeStatus {
+    pub state: AiLocalState,
+    pub clinical_model: Option<String>,
+    pub reasoning_model: Option<String>,
+    pub ocr_model: Option<String>,
+}
+
+#[derive(Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AiLocalState {
+    Configured,
+    Misconfigured,
+}
+
+#[derive(Clone, Deserialize)]
+pub struct AiCentralRuntimeStatus {
+    pub state: AiCentralState,
+}
+
+#[derive(Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AiCentralState {
+    Disabled,
+    Available,
+    Unavailable,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiFunctionSwitches {
+    pub patient_insight: AiFunctionSwitch,
+    pub document_synthesis: AiFunctionSwitch,
+    pub smart_import: AiFunctionSwitch,
+    pub treatment_reasoning: AiFunctionSwitch,
+}
+
+#[derive(Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AiFunctionSwitch {
+    Enabled,
+    Disabled,
+}
+
 impl PatientDetail {
     pub fn display_name(&self) -> String {
         format!("{} {}", self.first_name, self.last_name)
