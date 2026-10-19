@@ -91,7 +91,7 @@ e script di fixture sono classificati qui sotto, non eliminati dall'analisi.
 
 ## Verticale profilo e sole note: confine S0
 
-Questa mappa del 18 ottobre 2026 dettaglia lettura e UPDATE del profilo.
+Questa mappa del 19 ottobre 2026 dettaglia lettura e UPDATE del profilo.
 La selezione della factory Apple riguarda tutto il workspace, perché separare
 profilo e sottorisorse fra archivi diversi non è ammesso. [ADR0146](./adr/0146-patient-profile-query-application-boundary.md)
 definisce il confine della lettura; [ADR0071](./adr/0071-tri-os-reversed-flow-shared-core.md)
@@ -105,7 +105,8 @@ non apre SQLite e non è una migrazione del nucleo clinico.
 | Vista e attualità della lettura | `queryPatientProfile` privato, `PatientProfileView`, `activePatients` | Vista interna esplicita, nessun tipo ORM nel contratto. SELECT corrente, tombstone escluse, nessun effetto clinico/audit. Non è un handle durevole né una promessa di validità dopo la risposta: WUL-583 resta separata. |
 | Autorità dell'UPDATE | PUT Web/local-v1 → `updatePatientProfile`; PUT paired → [updateNetworkScopedPatient](../lib/network-patient-write.ts) → stessa porta | Body e metadati non emettono identità o ricevute. L'host sceglie audit e versione attesa; paired ammette solo i campi previsti e richiede ENC per quelli sensibili. L'audit non è costruito dal corpo della richiesta. |
 | Validità al commit | [prepareNetworkPatientCommitGuard](../lib/network-patient-commit-authority.ts), [updatePatientOperation](../lib/patient-update-operation.ts) | Il guard paired ricontrolla generazione, dispositivo, modalità, capability, sessione/ruolo e scope nella transazione IMMEDIATE. Il writer ricontrolla paziente/versione e committa paziente, membership e audit insieme. Questo non estende automaticamente tutti i guard paired al diverso contratto Web/local-v1. |
-| Esito e ricevuta | `updatePatientOperation` → `{success:true}` o errore; client → rilettura | L'ack HTTP attuale non è la futura ricevuta firmata/idempotente del pilota. Timeout e perdita della risposta non provano un rollback; i client non devono ritentare implicitamente la scrittura. WUL-584/585 restano aperte. |
+| Esito degli UPDATE ordinari | `updatePatientOperation` → `{success:true}` o errore; client → rilettura | Gli ingressi qualificati conservano il loro ack. Timeout e perdita della risposta non provano un rollback; i client non devono ritentare implicitamente la scrittura. |
+| Commit delle note rivedute | POST [notes-commit](../app/api/patients/[id]/notes-commit/route.ts) → `commitPatientProfileNotesHttp` → dispatch trattenuto → stesso `updatePatientOperation` | La capacità Web `patient-profile.notes.commit.v1` richiede ammissione corrente e, in aggiunta, selezione, attestazione e PIN fresco. Il permesso viene consumato nell'IMMEDIATE prima del CAS. Un solo evento audit conserva impronte e ricevuta verificata; il recupero è una lettura autorizzata dello stesso autore e ambito, anche dopo il riavvio. [ADR0149](./adr/0149-reviewed-profile-notes-commit.md). |
 | Percorso Swift | `PairedPatientsWorkspaceModel.makeClient` → `HomeBasePatientsClient` | L'intero workspace usa lo stesso servizio. La chiave sbloccata e il vecchio flag locale non selezionano un secondo archivio. Gli store Core rimangono disponibili e testati, senza caller del workspace di produzione. La cache cifrata conserva il binding all'host e la consultazione già prevista. |
 
 ### Comando prima della cifratura e custodia delle chiavi
@@ -141,6 +142,11 @@ le sole note una volta, conserva l'envelope host e ne restituisce il cifrato
 alla UI per una decifratura rigorosa. Impronta, selezione, versione e
 attestazione appartengono al binding host; il gesto presenta solo riferimento,
 impronta e PIN fresco. Il risultato `reviewed` non abilita alcun writer.
+La distinta capacità dell'[ADR 0149](./adr/0149-reviewed-profile-notes-commit.md)
+mostra anche il destinatario e l'azione, conserva l'esecuzione preparata e
+aggiunge il permesso di commit alla normale ammissione del writer. L'esito
+durevole è ricavato dalla singola riga audit; un esito review-only, un grant
+F10/SOAP o un identificatore dichiarato da un altro client non lo autorizzano.
 L'unificazione semantica pre-ENC fra superfici resta da provare in WUL-580.
 
 ### Operazione clinica e capacità intelligenti
@@ -160,6 +166,8 @@ commit dalla presenza del descrittore di lettura.
 
 Le prove di comportamento sono in [patient-profile-service.test](../lib/patient-profile-service.test.ts),
 [patient-update-operation.test](../lib/patient-update-operation.test.ts) e
+[patient-profile-review.test](../lib/patient-profile-review.test.ts), con SQLite e
+processi reali per commit, concorrenza, arresto e recupero. Restano pertinenti le
 [PairedPatientsWorkspaceModelLifecycleTests](../native/MediFlowMac/Tests/MediFlowAppleSharedTests/PairedPatientsWorkspaceModelLifecycleTests.swift).
 Le prove degli store SQLite restano conservate. CI e qualifica installata
 vanno associate alla revisione effettivamente eseguita, non inferite dalla mappa.
