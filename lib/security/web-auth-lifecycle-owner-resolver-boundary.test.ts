@@ -10,6 +10,7 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const OWNER_STEM = ['web-auth-life', 'cycle-owner'].join('');
 const PACKAGE = `@mediflow/${OWNER_STEM}`;
 const PACKAGE_SOURCE_MANIFEST = `packages/${OWNER_STEM}/package.json`;
+const PROFILE_CONTRACTS_MANIFEST = 'packages/patient-profile-contracts/package.json';
 const SYNTHETIC_PLUGIN_MANIFEST = 'plugins/mediflow-synthetic/package.json';
 const D1A = `lib/security/${OWNER_STEM}-boundary.test.ts`;
 const D1B = `lib/security/${OWNER_STEM}-resolver-boundary.test.ts`;
@@ -151,13 +152,14 @@ const inventoryErrors = (files: readonly string[]): string[] => {
         || /^babel\.config\./u.test(path.basename(file)) || /^\.babelrc(?:\.|$)/u.test(path.basename(file)));
     const errors: string[] = [];
     if (canonical(nextConfigs) !== canonical(['next.config.ts'])) errors.push('inventory:next-config');
-    // Exact reviewed packages only; synthetic isolation grants no resolver exemption.
+    // Exact reviewed packages only (ADR0151/0152 include the pure profile contracts);
+    // synthetic isolation grants no resolver exemption.
     const reviewedPackages = [
         ['package.json'],
         ['package.json', PACKAGE_SOURCE_MANIFEST],
         ['package.json', SYNTHETIC_PLUGIN_MANIFEST],
         ['package.json', PACKAGE_SOURCE_MANIFEST, SYNTHETIC_PLUGIN_MANIFEST],
-    ];
+    ].flatMap((inventory) => [inventory, [...inventory, PROFILE_CONTRACTS_MANIFEST]]);
     if (!reviewedPackages.map((inventory) => canonical(inventory.sort())).includes(canonical(packages)))
         errors.push('inventory:package');
     if (alternates.length > 0) errors.push('inventory:alternate-resolver');
@@ -231,21 +233,26 @@ test('denies alternate resolver files, nested packages, and loss of the combined
         [GUARD_SCRIPT]: `node scripts/run-strip-types.mjs --test ${D1A}` } }), []);
 });
 
-test('allows only the reviewed synthetic package alongside either owner-package inventory', () => {
-    for (const ownerFiles of [[], [PACKAGE_SOURCE_MANIFEST]]) {
+test('allows only the reviewed synthetic and profile packages alongside either owner-package inventory', () => {
+    for (const ownerFiles of [[], [PACKAGE_SOURCE_MANIFEST], [PROFILE_CONTRACTS_MANIFEST],
+        [PACKAGE_SOURCE_MANIFEST, PROFILE_CONTRACTS_MANIFEST]]) {
         const baseline = ['next.config.ts', 'package.json', ...ownerFiles];
         assert.deepEqual(inventoryErrors(baseline), []);
         assert.deepEqual(inventoryErrors([...baseline, SYNTHETIC_PLUGIN_MANIFEST]), []);
         for (const file of ['plugins/package.json', 'plugins/mediflow/package.json',
             'plugins/mediflow-synthetic-copy/package.json', 'plugins/mediflow-synthetic/src/package.json',
             'plugins/mediflow-synthetic/owner-shim/package.json', 'packages/mediflow-synthetic/package.json',
+            'packages/patient-profile-contracts-copy/package.json', 'packages/patient-profile-contracts/src/package.json',
+            'packages/patient-profile-contracts/owner-shim/package.json',
             'lib/security/package.json']) {
             assert.deepEqual(inventoryErrors([...baseline, file]), ['inventory:package'], file);
             assert.deepEqual(inventoryErrors([...baseline, SYNTHETIC_PLUGIN_MANIFEST, file]),
                 ['inventory:package'], file);
         }
         for (const file of ['plugins/mediflow-synthetic/next.config.ts',
-            'plugins/mediflow-synthetic/jsconfig.json', 'plugins/mediflow-synthetic/.babelrc']) {
+            'plugins/mediflow-synthetic/jsconfig.json', 'plugins/mediflow-synthetic/.babelrc',
+            'packages/patient-profile-contracts/next.config.ts', 'packages/patient-profile-contracts/jsconfig.json',
+            'packages/patient-profile-contracts/.babelrc']) {
             assert.notDeepEqual(inventoryErrors([...baseline, SYNTHETIC_PLUGIN_MANIFEST, file]), [], file);
         }
     }
