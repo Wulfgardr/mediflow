@@ -110,6 +110,16 @@ passano insieme nella bozza; dose, motivo e date conservano i valori inseriti.
 «Annulla scelta del farmaco» ripristina l'identità precedente. La registrazione
 segue la revisione e la conferma della terapia, con rilettura dei quattro campi.
 
+In Documenti, «Sintesi e fonte» apre i contenuti già salvati ricevuti con
+l'elenco: sintesi, nome e data della fonte, estratto e stato di elaborazione.
+La vista distingue contenuti assenti, non leggibili, formato non supportato
+e una fonte che indica un altro documento; non attesta la corrispondenza con
+l'originale attuale. I testi lunghi sono abbreviati con un avviso esplicito.
+L'apertura non richiede il blob, non avvia inferenze e non scrive metadati.
+La selezione viene ritirata quando si rilegge o si cambia contesto. «Salva
+una copia…» resta una richiesta esplicita dell'originale; un errore nella
+sola sintesi o fonte non la disabilita se l'originale è leggibile.
+
 Una bozza resta legata a paziente, ambulatorio e sessione. La revisione mostra
 che cosa verrà registrato; una conferma separata invia la richiesta una sola
 volta. «Registrata» appare soltanto dopo una nuova lettura con versione e
@@ -125,6 +135,25 @@ il cambio di contesto e il blocco invalidano le risposte ancora in volo.
 Il rientro in Impostazioni legge di nuovo la configurazione. Questa vista
 non qualifica la disponibilità dei modelli, non avvia generazioni e non
 modifica la configurazione AI.
+
+«Preferenze funzioni AI» apre una sottopagina GPUI sul contratto nativo v1
+esistente: GET/POST `/api/v1/network/ai/functions` e POST `/preview`. Serve
+un operatore amministratore e l'autorizzazione esplicita dell'host per quel
+dispositivo/operatore; il client non crea o concede permessi. Le preferenze
+valgono per tutti gli operatori dell'host. Le opzioni sono solo quelle del
+catalogo restituito, con disponibilità dichiarata come configurazione, non
+come inferenza verificata. La v1 non espone il provider portable v2.
+
+Una sola bozza per funzione o preset attraversa anteprima dell'host, gesto
+separato di conferma e rilettura. L'anteprima deve restituire lo stesso comando,
+catalogo e zero scritture; «salvate e rilette» richiede uguaglianza dei valori
+e delle revisioni proposti, applicati e riletti. Conflitti, rifiuti o esiti
+incerti conservano la bozza e l'ultimo contesto, marcato da rileggere, ma
+ritirano l'anteprima: nessun retry automatico. La rilettura esplicita conserva
+la bozza nella stessa sessione; cambi di contesto e blocco cancellano il
+contesto di richiesta e impediscono risposte tardive o riletture successive
+al ritiro. Una scrittura già inviata richiede riconciliazione sull'host.
+Nessuna nuova route, writer clinica, installazione o inferenza viene aggiunta.
 
 In Repertori, «ICD-11 WHO» consulta il servizio locale dell'host tramite le
 route paired esistenti readiness/search v2 (ADR 0115, **no contract impact**).

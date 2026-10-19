@@ -1,7 +1,9 @@
 //! Connected clinical workspace. GPUI owns presentation; the runtime owns records,
 //! encryption policy, authorization and writes. No clinical data is persisted here.
 
+mod ai_preferences;
 mod ai_status;
+mod document_details;
 mod therapy_picker;
 mod who_lookup;
 
@@ -35,6 +37,7 @@ use crate::references::{ReferenceKind, ReferenceRows};
 use crate::text_input::{InputChanged, TextInput};
 use crate::theme::{CODES, SYSTEM, Theme, VOICE};
 
+use ai_preferences::AiPreferences;
 use ai_status::AiRuntimeObservation;
 use therapy_picker::TherapySelection;
 use who_lookup::WhoLookup;
@@ -303,6 +306,7 @@ struct PatientData {
     observations: Load<Vec<Observation>>,
     checkups: Load<Vec<Checkup>>,
     attachments: Load<Vec<Attachment>>,
+    document_details_id: Option<String>,
 }
 impl Default for PatientData {
     fn default() -> Self {
@@ -313,6 +317,7 @@ impl Default for PatientData {
             observations: Load::Idle,
             checkups: Load::Idle,
             attachments: Load::Idle,
+            document_details_id: None,
         }
     }
 }
@@ -362,6 +367,7 @@ pub struct ClinicalApp {
     reference_registry: Load<Vec<TerminologyRegistryEntry>>,
     ai_status: Load<AiRuntimeObservation>,
     ai_refresh_target: ScrollTarget,
+    ai_preferences: AiPreferences,
     who: WhoLookup,
     selected_id: Option<String>,
     patient: PatientData,
@@ -566,6 +572,7 @@ impl ClinicalApp {
             reference_search_target: ScrollTarget::new(&area_scroll, cx),
             reference_run_target: ScrollTarget::new(&area_scroll, cx),
             ai_refresh_target: ScrollTarget::new(&area_scroll, cx),
+            ai_preferences: AiPreferences::new(&area_scroll, cx),
             who: WhoLookup::new(&area_scroll, cx),
             area_scroll,
             reference_kind: ReferenceKind::Drugs,
@@ -680,7 +687,9 @@ impl ClinicalApp {
     }
 
     fn next_epoch(&mut self) {
+        self.ai_preferences.reset();
         self.who.reset();
+        self.patient.document_details_id = None;
         if let Some(intent) = self.profile_query_intent.take() {
             intent.cancel();
         }
@@ -710,7 +719,14 @@ impl ClinicalApp {
                 if let Err(error) = &result
                     && error.is_auth_failure()
                 {
-                    let message = ui_error(error);
+                    let message = if this.ai_preferences.is_saving() {
+                        format!(
+                            "Salvataggio delle preferenze AI non verificato. {}",
+                            ui_error(error)
+                        )
+                    } else {
+                        ui_error(error)
+                    };
                     this.disconnect(cx);
                     this.message = Some((message, true));
                     return;
@@ -1046,6 +1062,7 @@ impl ClinicalApp {
         self.patient.observations = Load::Loading;
         self.patient.checkups = Load::Loading;
         self.patient.attachments = Load::Loading;
+        self.patient.document_details_id = None;
         let s = session.clone();
         let a = scope.clone();
         let p = id.clone();
@@ -1086,6 +1103,9 @@ impl ClinicalApp {
     }
 
     fn navigate(&mut self, area: Area, cx: &mut Context<Self>) {
+        if self.ai_preferences_blocks_navigation(cx) {
+            return;
+        }
         if self.form.is_some() {
             self.message = Some((
                 "Completa o scarta la bozza prima di cambiare area.".into(),
@@ -1262,7 +1282,11 @@ impl ClinicalApp {
                 self.who.reveal_if_focused(window, cx);
             }
         } else if self.area == Area::Settings {
-            self.ai_refresh_target.reveal_if_focused(window, cx);
+            if self.ai_preferences.active {
+                self.ai_preferences.reveal_if_focused(window, cx);
+            } else {
+                self.ai_refresh_target.reveal_if_focused(window, cx);
+            }
         }
     }
 
@@ -1415,6 +1439,7 @@ impl ClinicalApp {
 
     fn request_discard(&mut self, action: Discard, cx: &mut Context<Self>) {
         if action == Discard::Lock {
+            let ai_pending = self.ai_preferences.is_saving();
             let pending = self
                 .form
                 .as_ref()
@@ -1422,7 +1447,13 @@ impl ClinicalApp {
             self.disconnect(cx);
             if pending {
                 self.message = Some(("Sessione bloccata. Una scrittura era in corso: verifica la scheda dopo l'accesso.".into(), false));
+            } else if ai_pending {
+                self.message = Some(("Sessione bloccata. Un salvataggio AI era in corso: rileggi le preferenze dopo l’accesso.".into(), false));
             }
+            return;
+        }
+        if action == Discard::Reload && self.ai_preferences.active {
+            self.load_ai_preferences(cx);
             return;
         }
         if self
@@ -3645,7 +3676,10 @@ impl ClinicalApp {
             .when(self.patient.attachments.ready().is_some_and(Vec::is_empty), |el| el.child(text!("Nessun documento presente nella scheda.")))
             .children(self.patient.attachments.ready().into_iter().flatten().map(|row| {
                 let name = if row.locked_fields.iter().any(|field| field == "name") { "Nome del documento non leggibile".into() } else { row.name.clone() };
-                let available = !self.document_busy && self.form.is_none() && row.locked_fields.is_empty();
+                let can_open = !self.document_busy && self.form.is_none();
+                let available = can_open && documents::original_readable(row);
+                let details_open = self.patient.document_details_id.as_deref() == Some(row.id.as_str());
+                let details_id = row.id.clone();
                 let id = row.id.clone();
                 div().id(SharedString::from(format!("clinical-workspace-document-{id}")))
                     .min_w_0().max_w_full()
@@ -3653,11 +3687,16 @@ impl ClinicalApp {
                     .child(div().min_w_0().max_w_full().font_weight(FontWeight::MEDIUM).child(text!(name)))
                     .child(div().min_w_0().max_w_full().text_size(px(theme.size(12.))).text_color(theme.secondary)
                         .child(text!(format!("{} · {} · {}", row.mime_type, format_size(row.size), display_date(row.created_at.as_deref())))))
-                    .child(button(format!("clinical-workspace-download-document-{id}"), "Salva una copia…", theme, false, available)
-                        .when(available, |el| el.on_click(cx.listener(move |this, _, _, cx| this.download_document(&id, cx)))))
+                    .child(div().min_w_0().max_w_full().flex().flex_wrap().gap(px(8.))
+                        .child(button(format!("clinical-workspace-document-details-{id}"), if details_open { "Chiudi sintesi e fonte" } else { "Sintesi e fonte" }, theme, false, can_open)
+                            .aria_expanded(details_open)
+                            .when(can_open, |el| el.on_click(cx.listener(move |this, _, _, cx| this.toggle_document_details(&details_id, cx)))))
+                        .child(button(format!("clinical-workspace-download-document-{id}"), "Salva una copia…", theme, false, available)
+                            .when(available, |el| el.on_click(cx.listener(move |this, _, _, cx| this.download_document(&id, cx))))))
+                    .when(details_open, |el| el.child(self.document_details_view(row)))
             }))
             .child(div().text_color(theme.secondary).child(text!("Ogni caricamento richiede revisione e conferma. Il limite per file è 10 MiB. Le copie vengono salvate soltanto nella destinazione che scegli.")))
-            .child(self.current_module_button("clinical-workspace-manage-documents", "Anteprima e contenuti del documento…", PatientSection::Documents, cx))
+            .child(self.current_module_button("clinical-workspace-manage-documents", "Anteprima dell'originale e gestione…", PatientSection::Documents, cx))
     }
 
     fn current_module_button(
@@ -3953,6 +3992,9 @@ impl ClinicalApp {
     }
 
     fn settings_view(&self, cx: &Context<Self>) -> Div {
+        if self.ai_preferences.active {
+            return self.ai_preferences_view(cx);
+        }
         let theme = self.theme;
         let origin = self
             .session
@@ -3978,6 +4020,11 @@ impl ClinicalApp {
                     }))))
             .child(button("clinical-workspace-increased-contrast", if self.increased_contrast { "Contrasto dei filetti: aumentato" } else { "Aumenta il contrasto dei filetti" }, theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| { this.increased_contrast = !this.increased_contrast; cx.notify(); })))
+            .child(button("clinical-workspace-ai-preferences-open", "Preferenze funzioni AI…", theme, false, true)
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.area_scroll.set_offset(gpui::point(px(0.), px(0.)));
+                    this.load_ai_preferences(cx);
+                })))
             .child(self.ai_status_view(cx))
             .child(div().border_t_1().border_color(theme.rule).pt(px(24.)).flex().flex_col().gap(px(12.))
                 .child(section("clinical-workspace-connection-heading", "ARCHIVIO COLLEGATO", theme))
@@ -4504,6 +4551,9 @@ impl Render for ClinicalApp {
         });
         self.theme = Theme::for_dark(self.dark).sized(self.text_scale, self.increased_contrast);
         let theme = self.theme;
+        if self.ai_preferences.active {
+            self.ai_preferences.prepare_render(window, cx);
+        }
         for field in &self.login_fields {
             field
                 .editor
@@ -4644,6 +4694,7 @@ impl Render for ClinicalApp {
             .on_action(cx.listener(|this, _: &Escape, window, cx| {
                 if this.discard.take().is_some() {
                     cx.notify();
+                } else if this.cancel_ai_preview(cx) {
                 } else if this.close_drug_search(cx) {
                     this.focus_after_render = true;
                     this.focus_first_field = true;
@@ -5253,7 +5304,7 @@ impl ClinicalApp {
             .ready()
             .into_iter()
             .flatten()
-            .find(|row| row.id == document_id && row.locked_fields.is_empty())
+            .find(|row| row.id == document_id && documents::original_readable(row))
         else {
             return;
         };

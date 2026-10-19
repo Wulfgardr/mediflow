@@ -130,10 +130,15 @@ pub fn heading(id: &'static str, label: impl Into<SharedString>, theme: Theme) -
         .child(text!(label))
 }
 
-pub fn section(id: &'static str, label: impl Into<SharedString>, theme: Theme) -> Stateful<Div> {
+pub fn section(
+    id: impl Into<SharedString>,
+    label: impl Into<SharedString>,
+    theme: Theme,
+) -> Stateful<Div> {
+    let id = id.into();
     let label = label.into();
     div()
-        .id(id)
+        .id(id.clone())
         .accessibility_id(id)
         .role(Role::Heading)
         .aria_label(label.clone())
@@ -148,14 +153,15 @@ pub fn section(id: &'static str, label: impl Into<SharedString>, theme: Theme) -
 }
 
 pub fn notice(
-    id: &'static str,
+    id: impl Into<SharedString>,
     message: impl Into<SharedString>,
     theme: Theme,
     error: bool,
 ) -> Stateful<Div> {
+    let id = id.into();
     let message = message.into();
     div()
-        .id(id)
+        .id(id.clone())
         .accessibility_id(id)
         .role(if error { Role::Alert } else { Role::Status })
         .aria_label(message.clone())
