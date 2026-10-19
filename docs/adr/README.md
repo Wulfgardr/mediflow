@@ -14,6 +14,7 @@ verifica dello stato successivo.
 
 ## Decisioni richiamate
 
+- [0154-population-demographics-read-boundary.md](./0154-population-demographics-read-boundary.md): WUL-771; lettura demografica della popolazione paired, proiezione minima e calendario client esplicito nel calcolo TypeScript condiviso, senza diagnosi o autorità di audit.
 - [0153-paired-scale-preparation-and-diary-currentness.md](./0153-paired-scale-preparation-and-diary-currentness.md): WUL-771; catalogo e preparazione Scale TypeScript in sola lettura, selezione corrente e guard transazionale nel diario paired esistente, con garanzia keyless esplicita.
 - [0152-profile-contract-platform-boundary.md](./0152-profile-contract-platform-boundary.md): BT-08; dipendenze OS e framework negli adapter host, contratti verificati senza DOM e qualifica delle applicazioni installate distinta.
 - [0151-profile-contract-package-topology.md](./0151-profile-contract-package-topology.md): BT-07; pacchetto puro dei contratti profilo già provati, owner Node e conformità condivisa senza nuovi writer o trasformazioni dei dati.

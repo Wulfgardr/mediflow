@@ -261,11 +261,12 @@ test('publishes an exact deeply immutable non-authorizing graph', () => {
   assert.equal(visited.size > 250, true);
 });
 
-test('classifies all 38 OpenAPI GETs without admitting separate native authority to the 32 read candidates', () => {
+test('classifies all 39 OpenAPI GETs without admitting separate native authority to the 32 read candidates', () => {
   // ADR 0135 keeps host-wide configuration under native authority. ADR 0115
   // authorizes WHO only as paired consultation and leaves its Headless packet separate.
   // ADR 0146 keeps scoped profile admission outside this non-authorizing planner inventory.
   // ADR 0153 exposes the scale catalog through paired admission, not a Headless channel.
+  // ADR 0154 adds a named paired demographic snapshot without a Headless operation grant.
   const excludedPrimaryOpenApiAuthority = [
     {
       route: '/api/v1/network/patient-profile/selection-epoch',
@@ -297,6 +298,11 @@ test('classifies all 38 OpenAPI GETs without admitting separate native authority
       openApiOperationId: 'readNetworkScaleCatalog',
       runtimeRef: 'app/api/v1/network/scales/route.ts',
     },
+    {
+      route: '/api/v1/network/analytics/demographics',
+      openApiOperationId: 'readPopulationDemographics',
+      runtimeRef: 'app/api/v1/network/analytics/demographics/route.ts',
+    },
   ] as const;
   // ADR 0134 publishes this native-only status route in a supplemental OpenAPI
   // document. It is not a primary /api/v1 read-plan candidate.
@@ -307,7 +313,7 @@ test('classifies all 38 OpenAPI GETs without admitting separate native authority
     },
   ] as const;
   const observed = openApiNetworkGets();
-  assert.equal(observed.length, 38);
+  assert.equal(observed.length, 39);
   for (const excluded of excludedPrimaryOpenApiAuthority) {
     assert.deepEqual(observed.filter(([route]) => route === excluded.route), [
       [excluded.route, excluded.openApiOperationId],

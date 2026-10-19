@@ -103,6 +103,9 @@ L'[ADR 0153](./adr/0153-paired-scale-preparation-and-diary-currentness.md)
 porta catalogo e preparazione delle Scale al servizio TypeScript condiviso,
 in sola lettura, e ricontrolla l'autorità corrente nel writer del diario paired.
 La soglia e la rilettura GPUI restano parte della composizione client.
+L'[ADR 0154](./adr/0154-population-demographics-read-boundary.md) propone la
+lettura host della demografia nello scope paired corrente: aggregatore TS
+canonico, calendario client esplicito e nessuna lettura di diagnosi o audit.
 I job di build Web Core, E2E e Cross-platform `build-start` sui tre sistemi
 usano un checkout sparse non-cone della stessa revisione: non materializzano
 soltanto la fixture SQLite dei test Swift.
