@@ -85,6 +85,10 @@ L'[ADR 0147](./adr/0147-canonical-patient-profile-update-dispatch.md) definisce
 il comando canonico di aggiornamento e il dispatch unico verso il writer Node
 esistente: deduplicazione interna per esecuzione, senza idempotenza durevole
 tra richieste, prova umana o migrazione di scritture a Rust.
+L'[ADR 0148](./adr/0148-profile-notes-review-dry-run.md) compone la revisione
+umana delle sole note in una prova Web di sviluppo: comando e contenuto ENC
+unici, PIN fresco, attestazione e selezione correnti, consumo monouso.
+L'esito della prova non viene accettato dal writer e non modifica la cartella.
 I job di build Web Core, E2E e Cross-platform `build-start` sui tre sistemi
 usano un checkout sparse non-cone della stessa revisione: non materializzano
 soltanto la fixture SQLite dei test Swift.
