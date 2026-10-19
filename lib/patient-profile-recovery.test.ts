@@ -93,7 +93,7 @@ test.after(() => {
     for (const directory of [sourceDir, ...destinations]) rmSync(directory, { recursive: true, force: true });
 });
 
-test('complete pilot recovery preserves both snapshots and the committed receipt without restoring authority', { timeout: 90_000 }, async () => {
+test('complete pilot recovery preserves all snapshots and the committed receipt without restoring authority', { timeout: 90_000 }, async () => {
     const key = await generateMasterKey();
     const wrapping = await createUnlockWrapping(key, 'passphrase sintetica del recovery');
     const recovery = await createRecoveryWrapping(key);
@@ -132,8 +132,17 @@ test('complete pilot recovery preserves both snapshots and the committed receipt
     // A later existing lifecycle operation must survive recovery without changing the historical receipt.
     const archived = await ordinaryRoute.PUT(request({ version: 5, isArchived: true, archiveReason: 'other', archiveNote: otherCiphertext }), context);
     assert.equal(archived.status, 200, await archived.clone().text());
+    const archivedState = contents(dbServer.$client);
+    const archivedArtifact = await encryptRecoveryBackup(createRecoverySnapshot(dbServer.$client, admin.id), key);
+    const unarchived = await ordinaryRoute.PUT(request({ version: 6, isArchived: false }), context);
+    assert.equal(unarchived.status, 200, await unarchived.clone().text());
+    const inverseRead = await ordinaryRoute.GET(request(null), context);
+    assert.equal(inverseRead.status, 200, await inverseRead.clone().text());
+    const inverse = await inverseRead.json();
+    assert.equal(inverse.version, 7); assert.equal(inverse.isArchived, false);
+    assert.equal(inverse.archiveReason, null); assert.equal(inverse.archiveNote, null);
     const oldSession = login('recovery-source-pending');
-    const pending = await prepare(null, 6);
+    const pending = await prepare(null, 7);
     const generation = currentArchiveGeneration();
     const after = contents(dbServer.$client);
     const afterArtifact = await encryptRecoveryBackup(createRecoverySnapshot(dbServer.$client, admin.id), key);
@@ -147,8 +156,10 @@ test('complete pilot recovery preserves both snapshots and the committed receipt
         let afterDirectory = '';
         for (const [stage, artifact, expected, version, notes, isArchived] of [
             ['before', beforeArtifact, before, 4, initialNotes, false],
-            ['after', afterArtifact, after, 6, committedNotes, true],
+            ['archived', archivedArtifact, archivedState, 6, committedNotes, true],
+            ['after', afterArtifact, after, 7, committedNotes, false],
         ] as const) {
+            const hasReceipt = stage !== 'before';
             const directory = target(stage); if (stage === 'after') afterDirectory = directory;
             const restored = await restoreRecoveryBackup({ artifact, kit, recoveryKey: recovery.recoveryKey, destination: join(directory, 'medical.db') });
             assert.notEqual(restored.archiveGeneration, generation);
@@ -158,17 +169,17 @@ test('complete pilot recovery preserves both snapshots and the committed receipt
             finally { database.close(); }
             const result = restoredProcess(directory, input);
             assert.equal(result.oldSession.status, 401); assert.equal(result.oldGeneration.status, 409);
-            assert.equal(result.pending.status, 409); assert.equal(result.scope.status, stage === 'after' ? 409 : 503);
-            assert.equal(result.actor.status, stage === 'after' ? 409 : 503);
+            assert.equal(result.pending.status, 409); assert.equal(result.scope.status, hasReceipt ? 409 : 503);
+            assert.equal(result.actor.status, hasReceipt ? 409 : 503);
             assert.equal(result.legacy.status, 200); assert.equal(result.scoped.status, 200);
             assert.equal(result.legacy.body.notes, notes); assert.equal(result.legacy.body.version, version);
             assert.equal(result.legacy.body.isArchived, isArchived);
             assert.equal((result.scoped.body.profile as Record<string, unknown>).notes, notes);
             assert.equal((result.scoped.body.profile as Record<string, unknown>).isArchived, isArchived);
             assert.equal((result.scoped.body.currentness as Record<string, unknown>).revision, version);
-            assert.equal(result.receipt.status, stage === 'after' ? 200 : 503,
+            assert.equal(result.receipt.status, hasReceipt ? 200 : 503,
                 'a new authorized session must recover the same receipt after archive-generation rotation');
-            if (stage === 'after') {
+            if (hasReceipt) {
                 assert.deepEqual(result.receipt.body, receipt); assert.deepEqual(result.replay.body, receipt);
                 assert.equal(result.replay.status, 200);
                 // A host caller cannot bypass the current-generation fence by reading the journal directly.
@@ -202,9 +213,9 @@ test('complete pilot recovery preserves both snapshots and the committed receipt
         const legacyNotes = await seal('Nuova nota sintetica dal percorso precedente.');
         const legacy = restoredProcess(afterDirectory, { ...input, legacyNotes });
         assert.equal(legacy.write.status, 200); assert.equal(legacy.legacy.body.notes, legacyNotes);
-        assert.equal(legacy.legacy.body.version, 7); assert.equal(legacy.legacy.body.isArchived, true);
+        assert.equal(legacy.legacy.body.version, 8); assert.equal(legacy.legacy.body.isArchived, false);
         assert.equal((legacy.scoped.body.profile as Record<string, unknown>).notes, legacyNotes);
-        assert.equal((legacy.scoped.body.currentness as Record<string, unknown>).revision, 7);
+        assert.equal((legacy.scoped.body.currentness as Record<string, unknown>).revision, 8);
         assert.deepEqual(legacy.receipt.body, receipt, 'legacy edits do not rewrite the historical pilot receipt');
         const final = readTarget(afterDirectory);
         assert.equal(final.audit_events.length, after.audit_events.length + 1);
