@@ -1,7 +1,9 @@
 //! Connected clinical workspace. GPUI owns presentation; the runtime owns records,
 //! encryption policy, authorization and writes. No clinical data is persisted here.
 
+mod ai_status;
 mod therapy_picker;
+mod who_lookup;
 
 use gpui::{
     App, ClipboardItem, Context, Div, Entity, FocusHandle, FontWeight, KeyBinding, Role,
@@ -33,7 +35,9 @@ use crate::references::{ReferenceKind, ReferenceRows};
 use crate::text_input::{InputChanged, TextInput};
 use crate::theme::{CODES, SYSTEM, Theme, VOICE};
 
+use ai_status::AiRuntimeObservation;
 use therapy_picker::TherapySelection;
+use who_lookup::WhoLookup;
 
 actions!(
     mediflow_connected,
@@ -356,6 +360,9 @@ pub struct ClinicalApp {
     drug_count: Load<u64>,
     exemption_count: Load<u64>,
     reference_registry: Load<Vec<TerminologyRegistryEntry>>,
+    ai_status: Load<AiRuntimeObservation>,
+    ai_refresh_target: ScrollTarget,
+    who: WhoLookup,
     selected_id: Option<String>,
     patient: PatientData,
     core: Workspace,
@@ -526,6 +533,11 @@ impl ClinicalApp {
                 cx,
             )
         });
+        let reference_subscription =
+            cx.subscribe(&reference_search, |this, _, _: &InputChanged, cx| {
+                this.who_query_changed();
+                cx.notify();
+            });
         let mut app = Self {
             session: None,
             pairing: None,
@@ -553,6 +565,8 @@ impl ClinicalApp {
             menu_targets: std::array::from_fn(|_| ScrollTarget::new(&area_scroll, cx)),
             reference_search_target: ScrollTarget::new(&area_scroll, cx),
             reference_run_target: ScrollTarget::new(&area_scroll, cx),
+            ai_refresh_target: ScrollTarget::new(&area_scroll, cx),
+            who: WhoLookup::new(&area_scroll, cx),
             area_scroll,
             reference_kind: ReferenceKind::Drugs,
             reference_rows: Load::Idle,
@@ -561,6 +575,7 @@ impl ClinicalApp {
             drug_count: Load::Idle,
             exemption_count: Load::Idle,
             reference_registry: Load::Idle,
+            ai_status: Load::Idle,
             selected_id: None,
             patient: PatientData::default(),
             core: Workspace::default(),
@@ -593,7 +608,7 @@ impl ClinicalApp {
             profile_scroll,
             epoch: 0,
             profile_query_intent: None,
-            _subscriptions: vec![subscription, global_subscription],
+            _subscriptions: vec![subscription, global_subscription, reference_subscription],
         };
         let quit = cx.on_app_quit(|this, cx| {
             this.retire_form(cx);
@@ -665,11 +680,13 @@ impl ClinicalApp {
     }
 
     fn next_epoch(&mut self) {
+        self.who.reset();
         if let Some(intent) = self.profile_query_intent.take() {
             intent.cancel();
         }
         self.document_busy = false;
         self.edit_pending = false;
+        self.ai_status = Load::Idle;
         self.epoch = self
             .epoch
             .checked_add(1)
@@ -938,6 +955,8 @@ impl ClinicalApp {
             self.load_global_area(cx);
         } else if self.area == Area::References {
             self.load_references(cx);
+        } else if self.area == Area::Settings {
+            self.load_ai_status(cx);
         } else {
             self.load_patients(cx);
         }
@@ -1094,6 +1113,8 @@ impl ClinicalApp {
                 self.load_references(cx);
             } else if area == Area::Patients {
                 self.load_patients(cx);
+            } else if area == Area::Settings {
+                self.load_ai_status(cx);
             } else {
                 self.next_epoch();
             }
@@ -1235,7 +1256,13 @@ impl ClinicalApp {
         } else if self.area == Area::References
             && !self.reference_search_target.reveal_if_focused(window, cx)
         {
-            self.reference_run_target.reveal_if_focused(window, cx);
+            if !self.reference_run_target.reveal_if_focused(window, cx)
+                && self.reference_kind == ReferenceKind::Who
+            {
+                self.who.reveal_if_focused(window, cx);
+            }
+        } else if self.area == Area::Settings {
+            self.ai_refresh_target.reveal_if_focused(window, cx);
         }
     }
 
@@ -1439,9 +1466,15 @@ impl ClinicalApp {
             return;
         }
         self.next_epoch();
+        if self.area == Area::Settings {
+            self.load_ai_status(cx);
+            return;
+        }
         if self.area == Area::References {
             if self.scope.is_none() {
                 self.load_ambulatories(cx);
+            } else if self.reference_kind == ReferenceKind::Who {
+                self.request_who(false, cx);
             } else {
                 self.drug_count = Load::Idle;
                 self.exemption_count = Load::Idle;
@@ -3945,6 +3978,7 @@ impl ClinicalApp {
                     }))))
             .child(button("clinical-workspace-increased-contrast", if self.increased_contrast { "Contrasto dei filetti: aumentato" } else { "Aumenta il contrasto dei filetti" }, theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| { this.increased_contrast = !this.increased_contrast; cx.notify(); })))
+            .child(self.ai_status_view(cx))
             .child(div().border_t_1().border_color(theme.rule).pt(px(24.)).flex().flex_col().gap(px(12.))
                 .child(section("clinical-workspace-connection-heading", "ARCHIVIO COLLEGATO", theme))
                 .child(text!(origin))
@@ -5277,6 +5311,12 @@ impl ClinicalApp {
             return;
         };
         self.next_epoch();
+        if self.reference_kind == ReferenceKind::Who {
+            // Opening/navigating never submits a WHO query or probes a service.
+            self.reference_rows = Load::Idle;
+            cx.notify();
+            return;
+        }
         self.reference_query = self.reference_search.read(cx).value().trim().to_owned();
         self.reference_rows = Load::Loading;
         let kind = self.reference_kind;
@@ -5371,8 +5411,11 @@ impl ClinicalApp {
                         .aria_selected(self.scope.as_deref() == Some(&id))
                         .when(self.scope.as_deref() == Some(&id), |el| el.bg(theme.selected).border_color(theme.fresh))
                         .on_click(cx.listener(move |this, _, _, cx| this.change_scope(&id, cx)))
-                })))
-            .child(div().min_w_0().flex().flex_wrap().gap(px(8.))
+                })));
+        if self.reference_kind == ReferenceKind::Who {
+            return pane.child(self.who_view(cx));
+        }
+        pane = pane.child(div().min_w_0().flex().flex_wrap().gap(px(8.))
                 .when(self.text_scale >= 2.5, |el| el.flex_col().items_stretch())
                 .child(self.reference_search_target.attach_enabled(
                     div().id("clinical-workspace-reference-search-anchor").flex_1().min_w(px(160.)).max_w_full()
@@ -5419,7 +5462,7 @@ impl ClinicalApp {
         }
         pane.child(div().border_t_1().border_color(theme.rule).pt(px(16.)).flex().flex_col().gap(px(12.))
             .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary).child(text!(format!("Ogni ricerca mostra al massimo {} risultati. Affina nome o codice per trovare altri riferimenti; il limite non prova che il repertorio sia completo.", self.reference_kind.limit()))))
-            .child(button("clinical-workspace-reference-other-systems", "ICD-11 e altri repertori…", theme, false, true)
+            .child(button("clinical-workspace-reference-other-systems", "Catalogo ICD-11 incorporato e altri repertori…", theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| this.open_current(Area::References.current_path(), cx))))
             .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary).child(text!("Gli altri sistemi usano il loro percorso nell'interfaccia corrente."))))
     }
