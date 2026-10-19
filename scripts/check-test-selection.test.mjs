@@ -57,7 +57,7 @@ test('a deleted file still listed by git is not read as a test', () => {
 const sourceRoot = fileURLToPath(new URL('..', import.meta.url));
 const pilot = 'experiments/gpui-patient-pilot';
 const pilotWorkflow = '.github/workflows/rust-gpui-pilot.yml';
-const pilotFiles = ['client/tests/flow.rs', 'app/src/clinical_text.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/shell/ai_status.rs', 'app/src/shell/therapy_picker.rs', 'app/src/shell/who_lookup.rs', 'app/src/text_input.rs',
+const pilotFiles = ['client/tests/flow.rs', 'app/src/clinical_text.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/shell/ai_status.rs', 'app/src/shell/document_details.rs', 'app/src/shell/therapy_picker.rs', 'app/src/shell/who_lookup.rs', 'app/src/text_input.rs',
   'transport/src/catalogs.rs', 'transport/src/crypto.rs', 'transport/src/http.rs', 'transport/src/profile_query.rs', 'transport/src/session.rs', 'transport/src/who.rs', 'transport/src/bin/mediflow-runtime-probe.rs'].map(file => `${pilot}/${file}`);
 const pilotTestCall = `cargo test --manifest-path ${pilot}/Cargo.toml --workspace --all-targets --locked`;
 function pilotFixture(t) {
@@ -72,7 +72,7 @@ function pilotFixture(t) {
   }
   for (const file of [...pilotFiles, `${pilot}/client/src/lib.rs`, `${pilot}/transport/src/bin/mediflow-runtime-probe.rs`, `${pilot}/Cargo.lock`]) write(file, 'must not execute');
   write(`${pilot}/app/src/main.rs`, '// synthetic binding fixture\nmod appointments;\nmod clinical_text;\nmod components;\nmod demo;\nmod demo_app;\nmod documents;\nmod editing;\nmod icons;\nmod navigation;\nmod patient_forms;\nmod references;\nmod shell;\nmod text_input;\nmod theme;\nfn main() {}');
-  write(`${pilot}/app/src/shell.rs`, '//! Synthetic shell binding fixture\nmod ai_status;\nmod therapy_picker;\nmod who_lookup;');
+  write(`${pilot}/app/src/shell.rs`, '//! Synthetic shell binding fixture\nmod ai_status;\nmod document_details;\nmod therapy_picker;\nmod who_lookup;');
   write(`${pilot}/transport/src/lib.rs`, '//! Synthetic library binding fixture\n#![forbid(unsafe_code)]\nmod catalogs;\nmod crypto;\nmod dto;\nmod error;\nmod http;\nmod profile_query;\nmod session;\nmod tls;\nmod who;');
   for (const file of ['run.mjs', 'prepare-runtime.mjs', 'js-client.mjs', 'compare.mjs', 'verify-vectors.mjs']) {
     write(`${pilot}/comparison/${file}`, readFileSync(path.join(sourceRoot, pilot, 'comparison', file)));
@@ -123,6 +123,8 @@ test('GPUI coverage fails closed when Cargo membership, modules or actual CI inv
     [`${pilot}/app/src/shell.rs`, 'mod therapy_picker;', '#[cfg(feature = "optional")]\nmod therapy_picker;'],
     [`${pilot}/app/src/shell.rs`, 'mod ai_status;', '// mod ai_status;'],
     [`${pilot}/app/src/shell.rs`, 'mod ai_status;', '#[cfg(feature = "optional")]\nmod ai_status;'],
+    [`${pilot}/app/src/shell.rs`, 'mod document_details;', '// mod document_details;'],
+    [`${pilot}/app/src/shell.rs`, 'mod document_details;', '#[cfg(feature = "optional")]\nmod document_details;'],
     [`${pilot}/app/src/shell.rs`, 'mod who_lookup;', '// mod who_lookup;'],
     [`${pilot}/app/src/shell.rs`, 'mod who_lookup;', '#[cfg(feature = "optional")]\nmod who_lookup;'],
     [`${pilot}/transport/src/lib.rs`, 'mod session;', '#[cfg(feature = "optional")]\nmod session;'],
