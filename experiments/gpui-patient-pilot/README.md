@@ -117,6 +117,28 @@ contenuti attesi. In caso di conflitto, rifiuto, risposta persa o rilettura
 non disponibile, l'esito rimane esplicito e la bozza resta recuperabile.
 Il client non interpreta un timeout come mancata scrittura.
 
+In Impostazioni, «Stato funzioni AI» consulta la configurazione dell'archivio
+tramite il discovery paired esistente: quattro funzioni, runtime locale e
+centrale, modelli clinico e di ragionamento. «Rileggi stato AI» aggiorna i
+valori e l'ora di ricezione. Ogni nuova lettura ritira lo stato precedente;
+il cambio di contesto e il blocco invalidano le risposte ancora in volo.
+Il rientro in Impostazioni legge di nuovo la configurazione. Questa vista
+non qualifica la disponibilità dei modelli, non avvia generazioni e non
+modifica la configurazione AI.
+
+In Repertori, «ICD-11 WHO» consulta il servizio locale dell'host tramite le
+route paired esistenti readiness/search v2 (ADR 0115, **no contract impact**).
+La lettura passiva dello stato e la ricerca richiedono azioni esplicite.
+«Configurato» resta distinto da una risposta osservata; titoli inglesi,
+release, risultati parziali o vuoti, origine e tempi restano visibili.
+La copia conserva anche URI canonico, binding e digest della provenienza;
+non applica codici né scrive schede. Cambio query, repertorio, ambulatorio,
+connessione o annullamento impediscono la consegna di risposte precedenti.
+Il servizio locale resta opzionale: nessun avvio, retry, accesso diretto a
+WHO o repertorio alternativo automatico. Il catalogo incorporato v3 e il
+controllo puntuale dei codici restano nel percorso web; questa consultazione
+non li qualifica come supportati dal contratto paired v2.
+
 | Tastiera del client collegato | Azione |
 | --- | --- |
 | Tab / Maiusc+Tab | Percorre i controlli. |
@@ -140,6 +162,7 @@ soltanto da un comando esplicito dell'operatore.
 | `client` | Macchina a stati indipendente da GPUI per bozza, revisione, richieste correlate e rilettura delle note. |
 | `transport` | Autenticazione paired v3, chiavi temporanee, TLS, DTO, letture e scritture nominate sulle route esistenti. |
 | `app/src/shell.rs` | Finestra collegata, navigazione, ambulatorio, moduli clinici e lavoro asincrono. |
+| `app/src/shell/who_lookup.rs`, `transport/src/who.rs` | Consultazione WHO esplicita e parser del contratto paired v2, senza autorità o fonti alternative. |
 | `app/src/text_input.rs` | Input locale Unicode, IME, selezione e modalità segreta. |
 | `app/src/theme.rs` | Token del prodotto, caratteri, dimensioni e adattamenti di piattaforma. |
 | `app/src/demo.rs`, `demo_app.rs` | Fixture e scenari del vecchio pilota, attivati soltanto da `--demo`. |

@@ -16,14 +16,16 @@ pub enum ReferenceKind {
     Atc,
     Loinc,
     Ucum,
+    Who,
 }
 impl ReferenceKind {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Drugs,
         Self::Exemptions,
         Self::Atc,
         Self::Loinc,
         Self::Ucum,
+        Self::Who,
     ];
     pub fn id(self) -> &'static str {
         match self {
@@ -32,6 +34,7 @@ impl ReferenceKind {
             Self::Atc => "clinical-workspace-reference-atc",
             Self::Loinc => "clinical-workspace-reference-loinc",
             Self::Ucum => "clinical-workspace-reference-ucum",
+            Self::Who => "clinical-workspace-reference-who",
         }
     }
     pub fn title(self) -> &'static str {
@@ -41,6 +44,7 @@ impl ReferenceKind {
             Self::Atc => "ATC",
             Self::Loinc => "LOINC",
             Self::Ucum => "UCUM",
+            Self::Who => "ICD-11 WHO",
         }
     }
     pub fn system(self) -> Option<TerminologySystem> {
@@ -48,11 +52,15 @@ impl ReferenceKind {
             Self::Atc => Some(TerminologySystem::Atc),
             Self::Loinc => Some(TerminologySystem::Loinc),
             Self::Ucum => Some(TerminologySystem::Ucum),
-            Self::Drugs | Self::Exemptions => None,
+            Self::Drugs | Self::Exemptions | Self::Who => None,
         }
     }
     pub fn limit(self) -> u16 {
-        if self == Self::Drugs { 50 } else { 200 }
+        match self {
+            Self::Drugs => 50,
+            Self::Who => 25,
+            _ => 200,
+        }
     }
 }
 
