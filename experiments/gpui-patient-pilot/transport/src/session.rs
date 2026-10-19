@@ -1,4 +1,8 @@
 use crate::{
+    ai_preferences::{
+        AI_PREFERENCES_LIMIT, AI_PREFERENCES_PATH, AI_PREVIEW_PATH, parse_preferences,
+        parse_preferences_preview,
+    },
     crypto::{self, MasterKey},
     http::{DOCUMENT_LIMIT, JSON_LIMIT},
     profile_query::{ProfileLease, display_profile, parse_profile_response},
@@ -84,6 +88,19 @@ impl ProfileQueryIntent {
         if let Ok(mut active) = self.active.lock() {
             *active = false;
         }
+    }
+}
+
+/// A local cancellation fence for one settings context, bound to this exact
+/// session. It conveys no host permission and never contains a grant.
+#[derive(Clone)]
+pub struct AiPreferencesContext {
+    owner: Weak<SessionInner>,
+    active: Arc<AtomicBool>,
+}
+impl AiPreferencesContext {
+    pub fn cancel(&self) {
+        self.active.store(false, Ordering::Release);
     }
 }
 
@@ -470,6 +487,123 @@ impl RuntimeSession {
         let status = parse_ai_runtime_status(response.value)?;
         self.check_read_epoch(response.epoch)?;
         Ok(status)
+    }
+
+    pub fn ai_preferences_context(&self) -> AiPreferencesContext {
+        AiPreferencesContext {
+            owner: Arc::downgrade(&self.inner),
+            active: Arc::new(AtomicBool::new(true)),
+        }
+    }
+    fn check_ai_preferences_context(&self, context: &AiPreferencesContext) -> Result<()> {
+        self.ensure_open()?;
+        if !context.owner.ptr_eq(&Arc::downgrade(&self.inner))
+            || !context.active.load(Ordering::Acquire)
+        {
+            return Err(RuntimeError::ReadRequired);
+        }
+        // A display hint cannot grant this operation. The named host route
+        // rechecks the current role, pairing, session and explicit grant.
+        if self.user().role != "admin" {
+            return Err(RuntimeError::Forbidden);
+        }
+        Ok(())
+    }
+    fn request_ai_preferences(
+        &self,
+        context: &AiPreferencesContext,
+        method: Method,
+        path: &[&str],
+        body: Option<&Value>,
+        mutation: bool,
+    ) -> Result<Value> {
+        self.check_ai_preferences_context(context)?;
+        let result = self.request(
+            method,
+            path,
+            &[],
+            None,
+            body,
+            mutation,
+            AI_PREFERENCES_LIMIT,
+        );
+        // request() retires a session rejected by the host. Preserve that
+        // signal so the window clears its context and returns to login.
+        if result.as_ref().is_err_and(|error| error.is_auth_failure()) {
+            return result;
+        }
+        if self.check_ai_preferences_context(context).is_err() {
+            return Err(if mutation {
+                RuntimeError::Indeterminate
+            } else if self.is_locked() {
+                RuntimeError::Locked
+            } else {
+                RuntimeError::ReadRequired
+            });
+        }
+        result
+    }
+    pub fn read_ai_preferences(
+        &self,
+        context: &AiPreferencesContext,
+    ) -> Result<AiFunctionPreferences> {
+        let epoch = self.inner.read_epoch.load(Ordering::Acquire);
+        self.check_read_epoch(epoch)?;
+        let result = parse_preferences(self.request_ai_preferences(
+            context,
+            Method::GET,
+            AI_PREFERENCES_PATH,
+            None,
+            false,
+        )?)?;
+        self.check_read_epoch(epoch)?;
+        Ok(result)
+    }
+    pub fn preview_ai_preferences(
+        &self,
+        context: &AiPreferencesContext,
+        command: &AiPreferencesCommand,
+    ) -> Result<AiPreferencesPreview> {
+        let epoch = self.inner.read_epoch.load(Ordering::Acquire);
+        self.check_read_epoch(epoch)?;
+        let value = self.request_ai_preferences(
+            context,
+            Method::POST,
+            AI_PREVIEW_PATH,
+            Some(&command.wire()?),
+            false,
+        )?;
+        let result = parse_preferences_preview(value, command)?;
+        self.check_read_epoch(epoch)?;
+        Ok(result)
+    }
+    /// A separate user confirmation sends the exact preview command once, then
+    /// rereads the existing host route. No retry, clinical writer or inference.
+    pub fn apply_ai_preferences(
+        &self,
+        context: &AiPreferencesContext,
+        preview: &AiPreferencesPreview,
+    ) -> Result<AiPreferencesReadback> {
+        self.check_ai_preferences_context(context)?;
+        let _guard = self.begin_write()?;
+        let applied = self.request_ai_preferences(
+            context,
+            Method::POST,
+            AI_PREFERENCES_PATH,
+            Some(&preview.command().wire()?),
+            true,
+        )?;
+        let applied = parse_preferences(applied).map_err(|_| RuntimeError::Indeterminate)?;
+        // In particular, do not start another request after lock/navigation.
+        self.check_ai_preferences_context(context)
+            .map_err(|_| RuntimeError::Indeterminate)?;
+        let observed =
+            self.request_ai_preferences(context, Method::GET, AI_PREFERENCES_PATH, None, false)?;
+        let observed = parse_preferences(observed).map_err(|_| RuntimeError::Indeterminate)?;
+        Ok(AiPreferencesReadback {
+            matches_confirmation: applied == preview.proposed && observed == applied,
+            observed,
+        })
     }
 
     pub fn list_ambulatories(&self) -> Result<Vec<Ambulatory>> {
@@ -2120,6 +2254,249 @@ mod tests {
             "killSwitches": { "patientInsight":"enabled", "smartImport":"disabled", "documentSynthesis":"enabled", "treatmentReasoning":"disabled" },
             "guardrails":[]
         })
+    }
+
+    #[test]
+    fn ai_preferences_use_paired_preview_then_exact_confirmation_and_readback() {
+        use crate::ai_preferences::tests::{preferences_wire, preview_wire};
+        for changed_after_save in [false, true] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let context = session.ai_preferences_context();
+            let (seen_tx, seen_rx) = mpsc::channel();
+            let server = thread::spawn(move || {
+                let mut preview_body = Value::Null;
+                let mut proposed = preferences_wire();
+                proposed["revision"] = json!(format!("sha256_{}", "d".repeat(64)));
+                for row in proposed["functions"].as_array_mut().unwrap() {
+                    row["enabled"] = json!(false);
+                }
+                for (index, expected) in [
+                    "GET /api/v1/network/ai/functions ",
+                    "POST /api/v1/network/ai/functions/preview ",
+                    "POST /api/v1/network/ai/functions ",
+                    "GET /api/v1/network/ai/functions ",
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    let (mut stream, _) = listener.accept().unwrap();
+                    let request = read_request(&mut stream);
+                    assert!(request.starts_with(expected));
+                    for header in [
+                        "x-mediflow-paired-client-id: synthetic-device",
+                        "x-mediflow-paired-client-token:",
+                        "cookie:",
+                        "x-mediflow-source-surface: native",
+                        "x-mediflow-archive-generation: synthetic-generation",
+                    ] {
+                        assert!(request.contains(header), "{header}");
+                    }
+                    assert!(
+                        !request.contains("authorization:")
+                            && !request.contains("expected-ambulatory-id:")
+                    );
+                    let body = match index {
+                        0 => preferences_wire(),
+                        1 => {
+                            preview_body =
+                                serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1)
+                                    .unwrap();
+                            json!({"schemaVersion":"mediflow.function-preferences-preview.v1", "command":preview_body,
+                                "proposed":proposed, "writesPerformed":0})
+                        }
+                        2 => {
+                            let posted: Value =
+                                serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1)
+                                    .unwrap();
+                            assert_eq!(posted, preview_body);
+                            assert_eq!(posted["presetId"], "all_off");
+                            proposed.clone()
+                        }
+                        _ => {
+                            if changed_after_save {
+                                proposed["revision"] = json!(format!("sha256_{}", "f".repeat(64)));
+                            }
+                            proposed.clone()
+                        }
+                    };
+                    seen_tx.send(index).unwrap();
+                    send_reply(&mut stream, &body.to_string());
+                }
+            });
+            let snapshot = session.read_ai_preferences(&context).unwrap();
+            let command = AiPreferencesCommand::new(
+                &snapshot,
+                AiPreferenceChange::Preset {
+                    preset_id: AiPreferencePreset::AllOff,
+                },
+            )
+            .unwrap();
+            let preview = session.preview_ai_preferences(&context, &command).unwrap();
+            assert_eq!(seen_rx.try_iter().collect::<Vec<_>>(), [0, 1]);
+            assert_eq!(
+                preview.proposed,
+                parse_preferences(preview_wire(&command)["proposed"].clone()).unwrap()
+            );
+            // Preview alone sent no configuration POST. Confirmation is separate.
+            let readback = session.apply_ai_preferences(&context, &preview).unwrap();
+            assert_eq!(readback.matches_confirmation, !changed_after_save);
+            assert!(readback.observed.functions.iter().all(|row| !row.enabled));
+            assert_eq!(seen_rx.try_iter().collect::<Vec<_>>(), [2, 3]);
+            server.join().unwrap();
+            assert!(
+                session.inner.reads.lock().unwrap().is_empty(),
+                "no clinical write receipt"
+            );
+        }
+    }
+
+    #[test]
+    fn ai_preferences_denial_conflict_and_lost_response_never_retry_or_claim_readback() {
+        use crate::ai_preferences::tests::{preferences_wire, preview_wire};
+        for (status, expected) in [
+            (401, RuntimeError::Authentication),
+            (403, RuntimeError::Forbidden),
+            (409, RuntimeError::Conflict),
+            (503, RuntimeError::Indeterminate),
+            (0, RuntimeError::Indeterminate),
+        ] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let context = session.ai_preferences_context();
+            let command = AiPreferencesCommand::new(
+                &parse_preferences(preferences_wire()).unwrap(),
+                AiPreferenceChange::Preset {
+                    preset_id: AiPreferencePreset::AllOff,
+                },
+            )
+            .unwrap();
+            let preview = parse_preferences_preview(preview_wire(&command), &command).unwrap();
+            let server = thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                assert!(
+                    read_request(&mut stream).starts_with("POST /api/v1/network/ai/functions ")
+                );
+                if status != 0 {
+                    write!(
+                        stream,
+                        "HTTP/1.1 {status} Test\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    )
+                    .unwrap();
+                }
+                listener
+            });
+            assert!(
+                matches!(session.apply_ai_preferences(&context, &preview), Err(error) if error == expected)
+            );
+            assert_eq!(session.is_locked(), expected.is_auth_failure());
+            let listener = server.join().unwrap();
+            listener.set_nonblocking(true).unwrap();
+            assert!(
+                matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
+            );
+        }
+    }
+
+    #[test]
+    fn ai_preferences_context_role_and_lock_fence_precede_any_request() {
+        use crate::ai_preferences::tests::{preferences_wire, preview_wire};
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let context = session.ai_preferences_context();
+        let command = AiPreferencesCommand::new(
+            &parse_preferences(preferences_wire()).unwrap(),
+            AiPreferenceChange::Preset {
+                preset_id: AiPreferencePreset::AllOff,
+            },
+        )
+        .unwrap();
+        let preview = parse_preferences_preview(preview_wire(&command), &command).unwrap();
+        let foreign = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        assert!(matches!(
+            foreign.read_ai_preferences(&context),
+            Err(RuntimeError::ReadRequired)
+        ));
+        context.cancel();
+        assert!(matches!(
+            session.read_ai_preferences(&context),
+            Err(RuntimeError::ReadRequired)
+        ));
+        assert!(matches!(
+            session.preview_ai_preferences(&context, &command),
+            Err(RuntimeError::ReadRequired)
+        ));
+        assert!(matches!(
+            session.apply_ai_preferences(&context, &preview),
+            Err(RuntimeError::ReadRequired)
+        ));
+        let mut non_admin = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        Arc::get_mut(&mut non_admin.inner).unwrap().user.role = "user".into();
+        assert!(matches!(
+            non_admin.read_ai_preferences(&non_admin.ai_preferences_context()),
+            Err(RuntimeError::Forbidden)
+        ));
+        let context = session.ai_preferences_context();
+        session.lock();
+        assert!(matches!(
+            session.apply_ai_preferences(&context, &preview),
+            Err(RuntimeError::Locked)
+        ));
+        assert!(
+            matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
+        );
+    }
+
+    #[test]
+    fn ai_preferences_retirement_during_apply_suppresses_followup_read() {
+        use crate::ai_preferences::tests::{preferences_wire, preview_wire};
+        for lock in [false, true] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let context = session.ai_preferences_context();
+            let command = AiPreferencesCommand::new(
+                &parse_preferences(preferences_wire()).unwrap(),
+                AiPreferenceChange::Preset {
+                    preset_id: AiPreferencePreset::AllOff,
+                },
+            )
+            .unwrap();
+            let preview = parse_preferences_preview(preview_wire(&command), &command).unwrap();
+            let proposed = serde_json::to_string(&preview.proposed).unwrap();
+            let (seen_tx, seen_rx) = mpsc::channel();
+            let (release_tx, release_rx) = mpsc::channel();
+            let server = thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                assert!(
+                    read_request(&mut stream).starts_with("POST /api/v1/network/ai/functions ")
+                );
+                seen_tx.send(()).unwrap();
+                release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                send_reply(&mut stream, &proposed);
+                listener
+            });
+            let writer = session.clone();
+            let request_context = context.clone();
+            let worker =
+                thread::spawn(move || writer.apply_ai_preferences(&request_context, &preview));
+            seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            if lock {
+                session.lock();
+            } else {
+                context.cancel();
+            }
+            release_tx.send(()).unwrap();
+            assert!(matches!(
+                worker.join().unwrap(),
+                Err(RuntimeError::Indeterminate)
+            ));
+            let listener = server.join().unwrap();
+            listener.set_nonblocking(true).unwrap();
+            assert!(
+                matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
+            );
+        }
     }
 
     #[test]
