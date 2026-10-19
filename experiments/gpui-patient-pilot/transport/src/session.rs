@@ -2788,7 +2788,12 @@ mod tests {
                     "summarySnapshot":"Sintesi salvata: città 🩺",
                     "parseEvidenceArtifactSnapshot":"{\"schemaVersion\":\"synthetic\"}",
                     "ocrQueueUpdatedAt":"2026-10-19T08:30:00Z"}),
-                &["name", "path", "summarySnapshot", "parseEvidenceArtifactSnapshot"],
+                &[
+                    "name",
+                    "path",
+                    "summarySnapshot",
+                    "parseEvidenceArtifactSnapshot",
+                ],
             )
             .unwrap();
         let sealed_payload = encoder
@@ -2822,9 +2827,18 @@ mod tests {
                 let rows = result.unwrap();
                 assert_eq!(rows.len(), 1);
                 assert_eq!(rows[0].name, "Documento città 🩺");
-                assert_eq!(rows[0].summary_snapshot.as_deref(), Some("Sintesi salvata: città 🩺"));
-                assert_eq!(rows[0].parse_evidence_artifact_snapshot.as_deref(), Some("{\"schemaVersion\":\"synthetic\"}"));
-                assert_eq!(rows[0].ocr_queue_updated_at.as_deref(), Some("2026-10-19T08:30:00Z"));
+                assert_eq!(
+                    rows[0].summary_snapshot.as_deref(),
+                    Some("Sintesi salvata: città 🩺")
+                );
+                assert_eq!(
+                    rows[0].parse_evidence_artifact_snapshot.as_deref(),
+                    Some("{\"schemaVersion\":\"synthetic\"}")
+                );
+                assert_eq!(
+                    rows[0].ocr_queue_updated_at.as_deref(),
+                    Some("2026-10-19T08:30:00Z")
+                );
                 assert!(rows[0].data.is_none());
                 assert!(rows[0].locked_fields.is_empty());
             } else {
@@ -2849,7 +2863,10 @@ mod tests {
             let attachment = session.attachment(row, "patient-a", None).unwrap();
             assert!(attachment.summary_snapshot.is_none());
             assert!(attachment.parse_evidence_artifact_snapshot.is_none());
-            assert_eq!(attachment.locked_fields, ["summarySnapshot", "parseEvidenceArtifactSnapshot"]);
+            assert_eq!(
+                attachment.locked_fields,
+                ["summarySnapshot", "parseEvidenceArtifactSnapshot"]
+            );
             assert_eq!(attachment.name, "Documento sintetico");
         }
     }

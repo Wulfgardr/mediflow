@@ -130,7 +130,11 @@ pub fn heading(id: &'static str, label: impl Into<SharedString>, theme: Theme) -
         .child(text!(label))
 }
 
-pub fn section(id: impl Into<SharedString>, label: impl Into<SharedString>, theme: Theme) -> Stateful<Div> {
+pub fn section(
+    id: impl Into<SharedString>,
+    label: impl Into<SharedString>,
+    theme: Theme,
+) -> Stateful<Div> {
     let id = id.into();
     let label = label.into();
     div()
