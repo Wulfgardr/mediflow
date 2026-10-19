@@ -1,5 +1,6 @@
 /* @Codex */
 import 'server-only';
+import { createSingleUseConfirmationOwner } from './single-use-confirmation';
 
 import { createHash, randomBytes } from 'node:crypto';
 import { types } from 'node:util';
@@ -19,8 +20,7 @@ const PROOF_TTL_MS = 30_000;
 const PROOF_DIGEST_DOMAIN = 'mediflow.headless.checkup-status.confirmation-proof.v1';
 const isProxy = types.isProxy, isPromise = types.isPromise;
 
-type ProofRecord = { proposalRef: string; proofRefHash: string; confirmedAt: number; expiresAt: number; restartGeneration: number;
-    state: 'available' | 'terminal' };
+type ProofRecord = Readonly<{ proposalRef: string; proofRefHash: string; confirmedAt: number; expiresAt: number; restartGeneration: number }>;
 
 function record<T extends object>(value: T): Readonly<T> {
     return Object.freeze(Object.assign(Object.create(null), value)) as Readonly<T>;
@@ -99,16 +99,15 @@ export function createHeadlessCheckupStatusTransitionInternalCandidateV1(sources
         readHostScopeCandidate: () => observe(scopeSource),
     }));
     const knownProposals = new Set<string>();
-    const proofs = new WeakMap<object, ProofRecord>();
+    const proofs = createSingleUseConfirmationOwner<ProofRecord>();
     let restartGeneration = 0, disposed = false;
     const nextRef = (kind: 'proposal' | 'idempotency'): string =>
         `${kind === 'proposal' ? 'hcsp_' : 'hcsi_'}${randomBytes(32).toString('hex')}`;
     const consumeConfirmation = (proofValue: unknown, bindingValue: unknown,
         operation: (proof: unknown) => unknown): unknown => {
         if (disposed || !proofValue || typeof proofValue !== 'object') return null;
-        const proof = proofs.get(proofValue);
-        if (!proof || proof.state !== 'available') return null;
-        proof.state = 'terminal';
+        const proof = proofs.consume(proofValue);
+        if (!proof) return null;
         const binding = exact(bindingValue, BINDING_KEYS, true);
         if (!binding || binding.operationId !== OPERATION_ID || binding.proposalRef !== proof.proposalRef
             || proof.restartGeneration !== restartGeneration || !knownProposals.has(proof.proposalRef)) return null;
@@ -137,7 +136,7 @@ export function createHeadlessCheckupStatusTransitionInternalCandidateV1(sources
         dispose() {
             return guarded(() => {
                 if (disposed) return;
-                disposed = true; knownProposals.clear(); storage.dispose(); core.dispose();
+                disposed = true; knownProposals.clear(); proofs.clear(); storage.dispose(); core.dispose();
             });
         },
     });
@@ -174,10 +173,9 @@ export function createHeadlessCheckupStatusTransitionInternalCandidateV1(sources
                     || !knownProposals.has(proposalRef)) throw new HeadlessCheckupStatusTransitionV1Error('confirmation_required');
                 const issuedAt = now(), expiresAt = issuedAt + PROOF_TTL_MS;
                 if (!Number.isSafeInteger(expiresAt)) throw new HeadlessCheckupStatusTransitionV1Error('operation_unavailable');
-                const secret = randomBytes(32).toString('hex'), proof = Object.freeze(Object.create(null));
-                proofs.set(proof, { proposalRef, proofRefHash: digest(PROOF_DIGEST_DOMAIN, secret), confirmedAt: issuedAt, expiresAt,
-                    restartGeneration, state: 'available' });
-                return proof;
+                const secret = randomBytes(32).toString('hex');
+                return proofs.issue({ proposalRef, proofRefHash: digest(PROOF_DIGEST_DOMAIN, secret), confirmedAt: issuedAt, expiresAt,
+                    restartGeneration });
             });
         },
         restart(): void {
@@ -185,7 +183,7 @@ export function createHeadlessCheckupStatusTransitionInternalCandidateV1(sources
                 if (disposed || restartGeneration >= Number.MAX_SAFE_INTEGER) {
                     throw new HeadlessCheckupStatusTransitionV1Error('operation_unavailable');
                 }
-                restartGeneration += 1; knownProposals.clear(); storage.restart();
+                restartGeneration += 1; knownProposals.clear(); proofs.clear(); storage.restart();
             });
         },
     });

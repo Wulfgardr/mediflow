@@ -29,27 +29,9 @@ class ProfileUpdateExecution {
     #result: Promise<PatientProfileUpdateOutcome> | undefined;
 
     constructor(input: HostUpdateInput) {
-        if ((input.scopeAmbulatoryId === undefined) !== (input.authorizeCommit === undefined)) throw new Error('Patient profile admission mismatch');
-        const payload = Object.fromEntries(PATIENT_PROFILE_UPDATE_FIELDS.flatMap(field => {
-            const value = input.values[field];
-            return value === undefined ? [] : [[field, value instanceof Date ? value.toISOString() : value]];
-        })) as PatientProfileUpdatePayload;
         this.#audit = { ...input.audit, flags: [...input.audit.flags] };
         this.#authorizeCommit = input.authorizeCommit;
-        this.command = Object.freeze({
-            operationId: PATIENT_PROFILE_UPDATE_OPERATION.id,
-            contractVersion: PATIENT_PROFILE_UPDATE_OPERATION.version,
-            executionId: randomUUID(), correlationId: input.audit.requestId ?? null, idempotencyKey: randomUUID(),
-            executor: 'legacy-node', purpose: 'patient-profile-update',
-            author: Object.freeze({ kind: input.audit.actorType, ref: input.audit.actorRef, surface: input.audit.sourceSurface }),
-            authorization: Object.freeze({ kind: 'existing-host-admission',
-                commitGuard: input.authorizeCommit ? 'paired-transaction' : 'archive-audit' }),
-            scope: Object.freeze(input.scopeAmbulatoryId === undefined ? { kind: 'local' } : { kind: 'ambulatory', ambulatoryId: input.scopeAmbulatoryId }),
-            confirmation: 'legacy-not-attested',
-            target: Object.freeze({ patientId: input.patientId, expectedVersion: input.expectedVersion }),
-            payload: Object.freeze(payload), normalizedAt: input.values.updatedAt!.toISOString(),
-            setPrimaryAmbulatory: input.setPrimaryAmbulatory,
-        });
+        this.command = createPatientProfileUpdateCommand(input);
         Object.freeze(this);
     }
 
@@ -68,6 +50,29 @@ class ProfileUpdateExecution {
         } catch (error) { resolve(Object.freeze({ ...identity, kind: 'uncertain', error })); }
         return pending;
     }
+}
+
+/** The review may retain this value; only ProfileUpdateExecution owns a writer. */
+export function createPatientProfileUpdateCommand(input: HostUpdateInput): PatientProfileUpdateEnvelope {
+    if ((input.scopeAmbulatoryId === undefined) !== (input.authorizeCommit === undefined)) throw new Error('Patient profile admission mismatch');
+    const payload = Object.fromEntries(PATIENT_PROFILE_UPDATE_FIELDS.flatMap(field => {
+        const value = input.values[field];
+        return value === undefined ? [] : [[field, value instanceof Date ? value.toISOString() : value]];
+    })) as PatientProfileUpdatePayload;
+    return Object.freeze({
+            operationId: PATIENT_PROFILE_UPDATE_OPERATION.id,
+            contractVersion: PATIENT_PROFILE_UPDATE_OPERATION.version,
+            executionId: randomUUID(), correlationId: input.audit.requestId ?? null, idempotencyKey: randomUUID(),
+            executor: 'legacy-node', purpose: 'patient-profile-update',
+            author: Object.freeze({ kind: input.audit.actorType, ref: input.audit.actorRef, surface: input.audit.sourceSurface }),
+            authorization: Object.freeze({ kind: 'existing-host-admission',
+                commitGuard: input.authorizeCommit ? 'paired-transaction' : 'archive-audit' }),
+            scope: Object.freeze(input.scopeAmbulatoryId === undefined ? { kind: 'local' } : { kind: 'ambulatory', ambulatoryId: input.scopeAmbulatoryId }),
+            confirmation: 'legacy-not-attested',
+            target: Object.freeze({ patientId: input.patientId, expectedVersion: input.expectedVersion }),
+            payload: Object.freeze(payload), normalizedAt: input.values.updatedAt!.toISOString(),
+            setPrimaryAmbulatory: input.setPrimaryAmbulatory,
+    });
 }
 
 function executeLegacyPatientProfileUpdate(command: PatientProfileUpdateEnvelope, audit: RequiredAuditContext,
