@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { types } from 'node:util';
-import { ProfileQueryError, type ProfileQuery, type ProfileResult } from '../patient-profile-scoped-contract.ts';
+import { ProfileQueryError, type ProfileQuery, type ProfileResult } from '../../packages/patient-profile-contracts/src/query.ts';
 
 import { PATIENT_PROFILE_QUERY_IPC_SCHEMA_V1, decodePatientProfileQueryIpcFrameV1,
   encodePatientProfileQueryIpcFrameV1, type PatientProfileQueryIpcFrameV1 } from

@@ -17,7 +17,7 @@ import {
 import { createPortableSupervisorCheckupWebSessionPortV1 } from
     './portable-supervisor-checkup-web-session-port.ts';
 import { acquirePatientProfileQueryHostPort, type PatientProfileQueryHostPort } from './patient-profile-query-host-port';
-import type { ProfileProjection } from '../patient-profile-scoped-contract';
+import type { ProfileProjection } from '../../packages/patient-profile-contracts/src/query';
 import { createPatientProfileQueryWebDispatcher } from './patient-profile-query-web-dispatcher';
 
 const INPUT_KEYS = ['expectedPatientId', 'selectionEpoch'] as const;

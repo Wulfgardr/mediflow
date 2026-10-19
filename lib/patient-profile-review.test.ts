@@ -13,11 +13,11 @@ import { issueSyntheticWebSessionContext, retireSyntheticWebSession } from './se
 import { clearAllSessions } from './security/server-session';
 import { currentArchiveGeneration } from './security/archive-session-generation';
 import { ambulatories, auditEvents, observations, patients, patientsToAmbulatories, physicianReviewAttestations, users } from './schema';
-import { isProfileReviewView, PROFILE_REVIEW_POLICY, type ProfileReviewView } from './patient-profile-review-contract';
+import { isProfileReviewView, PROFILE_REVIEW_POLICY, type ProfileReviewView } from '../packages/patient-profile-contracts/src/review';
 import { decryptData, encryptData } from './security/security';
-import { isProfileResult, PROFILE_FIELD_NAMES } from './patient-profile-scoped-contract';
+import { isProfileResult, PROFILE_FIELD_NAMES } from '../packages/patient-profile-contracts/src/query';
 import { isProfileNotesCommitReceipt, isProfileNotesCommitView, PROFILE_NOTES_COMMIT_POLICY,
-    type ProfileNotesCommitView } from './patient-profile-notes-commit-contract';
+    type ProfileNotesCommitView } from '../packages/patient-profile-contracts/src/notes-commit';
 
 const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-profile-review-'));

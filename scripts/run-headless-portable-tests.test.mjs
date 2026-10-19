@@ -15,6 +15,7 @@ async function selectionFixture(t) {
         'packages/aip/src/fixture.test.ts',
         'packages/mini/src/fixture.test.ts',
         'packages/mcp/src/fixture.test.ts',
+        'packages/patient-profile-contracts/test/conformance.test.mjs',
         'scripts/check-headless-portable-imports.test.mjs',
         'scripts/intelligent-host-mcp-stdio.test.mjs',
         'scripts/mediflow-headless-supervisor-athena.test.mjs',
@@ -44,7 +45,7 @@ async function assertSelectionFailure(root, expectedPath) {
 
 test('rejects each missing required package or script even when other tests remain', async (t) => {
     for (const missing of [
-        'packages/aip', 'packages/mini', 'packages/mcp',
+        'packages/aip', 'packages/mini', 'packages/mcp', 'packages/patient-profile-contracts',
         'scripts/check-headless-portable-imports.test.mjs',
         'scripts/intelligent-host-mcp-stdio.test.mjs',
         'scripts/mediflow-headless-supervisor-athena.test.mjs',
@@ -143,15 +144,16 @@ test('can be imported from stdin without treating the importing program as the C
     assert.doesNotMatch(result.stderr, /UNEXPECTED_CHILD/u);
 });
 
-test('collects only sorted AIP, Mini, MCP, stdio MCP and Supervisor composition tests', async () => {
+test('collects only sorted AIP, Mini, MCP, profile, stdio MCP and Supervisor composition tests', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'mediflow-headless-tests-'));
     try {
-        for (const directory of ['packages/aip/src', 'packages/mini/src', 'packages/mcp/src', 'scripts', 'lib']) {
+        for (const directory of ['packages/aip/src', 'packages/mini/src', 'packages/mcp/src', 'packages/patient-profile-contracts/test', 'scripts', 'lib']) {
             await mkdir(path.join(root, directory), { recursive: true });
         }
         for (const file of [
             'packages/aip/src/z.test.ts', 'packages/aip/src/not-a-test.ts',
             'packages/mini/src/a.test.ts', 'packages/mcp/src/server.test.mts',
+            'packages/patient-profile-contracts/test/conformance.test.mjs',
             'scripts/check-headless-portable-imports.test.mjs',
             'scripts/intelligent-host-mcp-stdio.test.mjs',
             'scripts/mediflow-headless-supervisor-athena.test.mjs',
@@ -161,6 +163,7 @@ test('collects only sorted AIP, Mini, MCP, stdio MCP and Supervisor composition 
             'packages/aip/src/z.test.ts',
             'packages/mcp/src/server.test.mts',
             'packages/mini/src/a.test.ts',
+            'packages/patient-profile-contracts/test/conformance.test.mjs',
             'scripts/check-headless-portable-imports.test.mjs',
             'scripts/intelligent-host-mcp-stdio.test.mjs',
             'scripts/mediflow-headless-supervisor-athena.test.mjs',

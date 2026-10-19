@@ -2,7 +2,7 @@ import 'server-only';
 
 import { randomBytes } from 'node:crypto';
 import { types } from 'node:util';
-import type { ProfileProjection } from '../patient-profile-scoped-contract';
+import type { ProfileProjection } from '../../packages/patient-profile-contracts/src/query';
 import { decodePatientProfileQueryIpcFrameV1 } from '../../packages/aip/src/patient-profile-query-ipc.ts';
 
 import {

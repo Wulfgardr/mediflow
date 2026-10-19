@@ -7,7 +7,7 @@ import test from 'node:test';
 import { createAuthenticatedAgentLauncherV1 } from './authenticated-agent-launcher.ts';
 import { createPatientProfileQuerySupervisorPortV1 } from '../security/patient-profile-query-supervisor-port.ts';
 import { decodePatientProfileQueryIpcFrameV1, encodePatientProfileQueryIpcFrameV1 } from '../../packages/aip/src/patient-profile-query-ipc.ts';
-import { type ProfileQuery, type ProfileResult } from '../patient-profile-scoped-contract.ts';
+import { type ProfileQuery, type ProfileResult } from '../../packages/patient-profile-contracts/src/query.ts';
 
 const OPERATION = 'patient-profile.read.v1';
 const HANDLE = `pph_${'b'.repeat(64)}`;

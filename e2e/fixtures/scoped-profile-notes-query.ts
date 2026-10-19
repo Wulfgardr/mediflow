@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { parseProfileQuery, assertProfileResultBudget, type ProfileQuery, type ProfileResult } from '../../lib/patient-profile-scoped-contract';
+import { parseProfileQuery, assertProfileResultBudget, type ProfileQuery, type ProfileResult } from '../../packages/patient-profile-contracts/src/query';
 
 type OpenNotes = Extract<ProfileQuery, { kind: 'open' }>;
 type ObservedRequest = Readonly<{ method(): string; url(): string; postDataJSON(): unknown }>;

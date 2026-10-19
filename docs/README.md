@@ -95,6 +95,10 @@ writer esistente e ricevuta recuperabile nello stesso audit del commit.
 L'[ADR 0150 / BT-06](./adr/0150-patient-profile-pilot-recovery.md) separa l'identità
 durevole della ricevuta dall'autorizzazione corrente e documenta il drill C15
 prima e dopo il pilota, con dati sintetici e sessioni precedenti invalidate.
+Gli [ADR 0151](./adr/0151-profile-contract-package-topology.md) e
+[0152](./adr/0152-profile-contract-platform-boundary.md) delimitano l'estrazione
+dei contratti provati in un pacchetto puro, con conformità Node 24 sui tre
+sistemi e dipendenze di piattaforma conservate negli adapter host.
 I job di build Web Core, E2E e Cross-platform `build-start` sui tre sistemi
 usano un checkout sparse non-cone della stessa revisione: non materializzano
 soltanto la fixture SQLite dei test Swift.
