@@ -1,6 +1,8 @@
 //! Connected clinical workspace. GPUI owns presentation; the runtime owns records,
 //! encryption policy, authorization and writes. No clinical data is persisted here.
 
+mod therapy_picker;
+
 use gpui::{
     App, ClipboardItem, Context, Div, Entity, FocusHandle, FontWeight, KeyBinding, Role,
     ScrollAnchor, ScrollHandle, SharedString, Stateful, Subscription, Window, WindowAppearance,
@@ -8,10 +10,10 @@ use gpui::{
 };
 use mediflow_patient_client::{PatientProfile, ReadFailure, UpdateOutcome, Workspace};
 use mediflow_runtime_client::{
-    AgendaFilter, Ambulatory, Attachment, Checkup, CheckupDraft, Entry, EntryDraft,
-    GlobalEntryFilter, Observation, ObservationDraft, PairingCredentials, PatientDetail,
-    PatientSummary, ProfileQueryIntent, RuntimeClient, RuntimeConfig, RuntimeError, RuntimeSession,
-    TerminologyRegistryEntry, TerminologyRegistryStatus, Therapy, TherapyDraft,
+    AgendaFilter, Ambulatory, Attachment, Checkup, CheckupDraft, DrugCatalogItem, Entry,
+    EntryDraft, GlobalEntryFilter, Observation, ObservationDraft, PairingCredentials,
+    PatientDetail, PatientSummary, ProfileQueryIntent, RuntimeClient, RuntimeConfig, RuntimeError,
+    RuntimeSession, TerminologyRegistryEntry, TerminologyRegistryStatus, Therapy, TherapyDraft,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -30,6 +32,8 @@ use crate::patient_forms;
 use crate::references::{ReferenceKind, ReferenceRows};
 use crate::text_input::{InputChanged, TextInput};
 use crate::theme::{CODES, SYSTEM, Theme, VOICE};
+
+use therapy_picker::TherapySelection;
 
 actions!(
     mediflow_connected,
@@ -110,6 +114,7 @@ struct Field {
     label: &'static str,
     editor: Entity<TextInput>,
     rich_source: Option<String>,
+    read_only: bool,
     choices: &'static [(&'static str, &'static str)],
     scroll_target: Option<ScrollTarget>,
 }
@@ -133,6 +138,7 @@ impl Field {
             label,
             editor,
             rich_source: None,
+            read_only: false,
             choices: &[],
             scroll_target: None,
         }
@@ -151,7 +157,7 @@ impl Field {
 fn first_text_editor(fields: &[Field]) -> Option<&Field> {
     fields
         .iter()
-        .find(|field| field.rich_source.is_none() && field.choices.is_empty())
+        .find(|field| !field.read_only && field.rich_source.is_none() && field.choices.is_empty())
 }
 
 // Explicit targets keep Tab navigation visible in the existing Div scroll panes.
@@ -270,8 +276,14 @@ struct Form {
     edit: Option<editing::Record>,
     patient_original: Option<PatientDetail>,
     created_id: Option<String>,
+    therapy: Option<TherapySelection>,
     state: FormState,
     _subscriptions: Vec<Subscription>,
+}
+impl Form {
+    fn selected_drug(&self) -> Option<&DrugCatalogItem> {
+        self.therapy.as_ref().and_then(TherapySelection::selected)
+    }
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Discard {
@@ -628,6 +640,9 @@ impl ClinicalApp {
 
     fn retire_form(&mut self, cx: &mut App) {
         if let Some(form) = self.form.take() {
+            if let Some(therapy) = &form.therapy {
+                therapy.retire(cx);
+            }
             for field in &form.fields {
                 field.editor.update(cx, |input, cx| input.retire(cx));
             }
@@ -1187,7 +1202,11 @@ impl ClinicalApp {
                     .any(|target| target.reveal_if_focused(window, cx));
             }
         } else if let Some(form) = &self.form {
-            if !reveal_fields(&form.fields, window, cx)
+            if !form
+                .therapy
+                .as_ref()
+                .is_some_and(|therapy| therapy.reveal_if_focused(window, cx))
+                && !reveal_fields(&form.fields, window, cx)
                 && Layout::for_window(f32::from(window.viewport_size().width), self.text_scale)
                     .magnified
             {
@@ -1657,6 +1676,8 @@ impl ClinicalApp {
             edit: None,
             patient_original: None,
             created_id: None,
+            therapy: (kind == FormKind::Therapy)
+                .then(|| TherapySelection::new(&self.profile_scroll, cx)),
             state: FormState::Draft,
             _subscriptions: subscriptions,
         });
@@ -1695,6 +1716,7 @@ impl ClinicalApp {
             cx.notify();
             return;
         }
+        self.close_drug_search(cx);
         self.form.as_mut().expect("reviewed form").state = FormState::Review;
         self.message = None;
         if Layout::for_window(f32::from(window.viewport_size().width), self.text_scale).magnified {
@@ -1745,6 +1767,7 @@ impl ClinicalApp {
         let patient_original = form.patient_original.clone();
         let upload = form.upload.clone();
         let edit = form.edit.clone();
+        let selected_drug = form.selected_drug().cloned();
         let values: Vec<_> = form.fields.iter().map(|field| field.value(cx)).collect();
         if let Err(message) = validate_form_values(form, &values) {
             self.message = Some((message, true));
@@ -1802,7 +1825,7 @@ impl ClinicalApp {
                 cx,
             );
         } else if let Some(record) = edit {
-            self.run(move || record.submit(&session, &scope, &values), |this, result, cx| {
+            self.run(move || record.submit(&session, &scope, &values, selected_drug.as_ref()), |this, result, cx| {
                 match result {
                     Ok(true) => this.saved("Modifica registrata e riletta dalla scheda.", cx),
                     Ok(false) => this.save_unconfirmed(false, "La rilettura non conferma tutti i dati modificati. Verifica la scheda prima di un nuovo invio.".into(), cx),
@@ -1880,7 +1903,7 @@ impl ClinicalApp {
                 this.load_sections(cx);
             }, cx);
         } else {
-            self.run(move || save_new_record(&session, &scope, &id, kind, &values), |this, result, cx| {
+            self.run(move || save_new_record(&session, &scope, &id, kind, &values, selected_drug.as_ref()), |this, result, cx| {
                 match result {
                     Ok(true) => this.saved("Elemento registrato e riletto dalla scheda.", cx),
                     Ok(false) => this.save_unconfirmed(false, "La rilettura non conferma tutti i dati inviati. La bozza resta disponibile.".into(), cx),
@@ -1988,7 +2011,7 @@ impl ClinicalApp {
         let Some(form) = &self.form else {
             return;
         };
-        let text = if let Some(upload) = &form.upload {
+        let mut text = if let Some(upload) = &form.upload {
             format!(
                 "Documento scelto, non confermato
 {}
@@ -2005,6 +2028,10 @@ impl ClinicalApp {
                 .collect::<Vec<_>>()
                 .join("\n\n")
         };
+        if let Some(drug) = form.selected_drug() {
+            text.push_str("\n\nFarmaco scelto dal repertorio\n");
+            text.push_str(&crate::references::drug_text(drug));
+        }
         cx.write_to_clipboard(ClipboardItem::new_string(text));
         self.message = Some((
             "Bozza copiata. Non è una conferma di registrazione.".into(),
@@ -3644,7 +3671,7 @@ impl ClinicalApp {
                 .child(div().text_color(theme.secondary).child(text!(match form.kind {
                     FormKind::Notes => "La conferma sostituisce soltanto le note della scheda del paziente indicato.",
                     FormKind::Entry => "Questa voce è una nota di diario. Per una visita strutturata, un contatto remoto o allegati usa l'editor corrente.",
-                    FormKind::Therapy => "Indica farmaco, dose e data. I repertori sono disponibili nell’area dedicata; nessuna scelta terapeutica viene dedotta.",
+                    FormKind::Therapy => "Scegli il farmaco dal repertorio oppure riporta una terapia a testo libero. Verifica dose, motivo e date: la scelta della confezione non li modifica.",
                     FormKind::Observation => "Riporta il valore e le codifiche presenti nel referto. Non vengono dedotte unità, intervalli o interpretazioni cliniche.",
                     FormKind::Document => "Il documento scelto verrà aggiunto alla scheda del paziente indicato. Verifica nome, formato e dimensione prima di registrarlo.",
                     FormKind::Checkup if form.edit.is_none() => "Indica la data e l'ora del controllo nel fuso del computer. L'orario è richiesto e non viene scelto automaticamente.",
@@ -3657,7 +3684,10 @@ impl ClinicalApp {
                 .child(div().font_family(CODES).child(text!(upload.mime_type.clone())))
                 .child(text!(format!("{} · copia scelta in memoria", format_size(upload.bytes.len() as u64))))
                 .child(div().text_color(theme.secondary).child(text!("Il formato è associato all'estensione del file. La conferma non interpreta il contenuto e non apre il documento.")))))
-            .children(form.fields.iter().enumerate().map(|(index, field)| self.field_view(field, format!("clinical-workspace-form-field-{index}"), cx)))
+            .when(form.kind == FormKind::Therapy, |el| el.child(self.therapy_picker_view(cx)))
+            .children(form.fields.iter().enumerate()
+                .filter(|(index, field)| !(form.kind == FormKind::Therapy && *index == 0 && field.read_only))
+                .map(|(index, field)| self.field_view(field, format!("clinical-workspace-form-field-{index}"), cx)))
             .when(form.kind == FormKind::Entry && !review, |el| el.child(div().text_size(px(theme.size(12.))).text_color(theme.secondary)
                 .child(text!("Il testo della nuova nota è semplice. Le voci già presenti conservano il loro formato originale nell'archivio."))))
     }
@@ -4420,10 +4450,12 @@ impl Render for ClinicalApp {
             window.focus(&self.focus, cx);
         }
         if std::mem::take(&mut self.focus_first_field)
-            && let Some(field) = self
-                .form
-                .as_ref()
-                .and_then(|form| first_text_editor(&form.fields))
+            && let Some(form) = &mut self.form
+            && !form
+                .therapy
+                .as_mut()
+                .is_some_and(|therapy| therapy.focus_initial(window, cx))
+            && let Some(field) = first_text_editor(&form.fields)
         {
             field.editor.update(cx, |input, cx| input.focus(window, cx));
             if let Some(target) = &field.scroll_target {
@@ -4454,13 +4486,22 @@ impl Render for ClinicalApp {
         }
         self.reference_search
             .update(cx, |input, cx| input.configure(theme, false, cx));
-        if let Some(form) = &self.form {
+        if let Some(form) = &mut self.form {
+            if let Some(therapy) = &mut form.therapy {
+                therapy.prepare_render(
+                    theme,
+                    form.state == FormState::Draft && self.discard.is_none(),
+                    window,
+                    cx,
+                );
+            }
             for field in &form.fields {
                 field.editor.update(cx, |input, cx| {
                     input.configure(
                         theme,
                         form.state != FormState::Draft
                             || self.discard.is_some()
+                            || field.read_only
                             || field.rich_source.is_some()
                             || !field.choices.is_empty(),
                         cx,
@@ -4568,6 +4609,10 @@ impl Render for ClinicalApp {
             .on_action(cx.listener(|this, _: &Review, window, cx| this.review_form(window, cx)))
             .on_action(cx.listener(|this, _: &Escape, window, cx| {
                 if this.discard.take().is_some() {
+                    cx.notify();
+                } else if this.close_drug_search(cx) {
+                    this.focus_after_render = true;
+                    this.focus_first_field = true;
                     cx.notify();
                 } else if this
                     .form
@@ -4710,8 +4755,14 @@ fn validate_form_values(form: &Form, values: &[String]) -> Result<(), String> {
             Err("Scegli il documento da aggiungere.".into())
         }
         _ => form.edit.as_ref().map_or_else(
-            || validate_form(form.kind, values),
-            |record| record.draft(values).map(|_| ()),
+            || {
+                if form.kind == FormKind::Therapy {
+                    new_therapy_draft(values, form.selected_drug()).map(|_| ())
+                } else {
+                    validate_form(form.kind, values)
+                }
+            },
+            |record| record.draft(values, form.selected_drug()).map(|_| ()),
         ),
     }
 }
@@ -4890,7 +4941,8 @@ impl ClinicalApp {
     ) {
         let fields: Vec<_> = specifications
             .into_iter()
-            .map(|spec| {
+            .enumerate()
+            .map(|(index, spec)| {
                 let mut field = Field::new(
                     spec.id,
                     spec.label,
@@ -4901,7 +4953,11 @@ impl ClinicalApp {
                     cx,
                 )
                 .with_scroll(&self.profile_scroll, cx);
-                field.rich_source = spec.rich.then_some(spec.value);
+                if kind == FormKind::Therapy && index == 0 {
+                    field.read_only = spec.rich;
+                } else {
+                    field.rich_source = spec.rich.then_some(spec.value);
+                }
                 field.choices = spec.choices;
                 field
             })
@@ -4922,6 +4978,8 @@ impl ClinicalApp {
             edit,
             patient_original: None,
             created_id: None,
+            therapy: (kind == FormKind::Therapy)
+                .then(|| TherapySelection::new(&self.profile_scroll, cx)),
             state: FormState::Draft,
             _subscriptions: subscriptions,
         });
@@ -5125,7 +5183,7 @@ impl ClinicalApp {
                             this.document_busy = false;
                             match result {
                                 Ok(Ok(upload)) if this.form.is_none() && this.can_write(FormKind::Document) => {
-                                    this.form = Some(Form { kind: FormKind::Document, fields: vec![], upload: Some(upload), edit: None, patient_original: None, created_id: None, state: FormState::Draft, _subscriptions: vec![] });
+                                    this.form = Some(Form { kind: FormKind::Document, fields: vec![], upload: Some(upload), edit: None, patient_original: None, created_id: None, therapy: None, state: FormState::Draft, _subscriptions: vec![] });
                                     this.show_sections = false;
                                     this.patient_section = PatientSection::Documents;
                                     this.directory = false;
@@ -5583,6 +5641,29 @@ fn new_observation_draft(values: &[String]) -> Result<ObservationDraft, RuntimeE
     })
 }
 
+fn new_therapy_draft(
+    values: &[String],
+    selected_drug: Option<&DrugCatalogItem>,
+) -> Result<TherapyDraft, String> {
+    validate_form(FormKind::Therapy, values)?;
+    let mut draft = TherapyDraft {
+        drug_name: if selected_drug.is_some() {
+            values[0].clone()
+        } else {
+            values[0].trim().into()
+        },
+        dosage: values[1].clone(),
+        status: "active".into(),
+        start_date: date_for_write(&values[2])?,
+        motivation: (!values[3].trim().is_empty()).then(|| values[3].clone()),
+        ..Default::default()
+    };
+    if let Some(drug) = selected_drug {
+        editing::apply_drug_choice(&mut draft, drug)?;
+    }
+    Ok(draft)
+}
+
 fn after_create_read<T>(
     result: Result<T, RuntimeError>,
     matches: impl FnOnce(T) -> bool,
@@ -5602,6 +5683,7 @@ fn save_new_record(
     patient_id: &str,
     kind: FormKind,
     values: &[String],
+    selected_drug: Option<&DrugCatalogItem>,
 ) -> Result<bool, RuntimeError> {
     validate_form(kind, values).map_err(|_| RuntimeError::InvalidInput)?;
     match kind {
@@ -5628,14 +5710,8 @@ fn save_new_record(
             })
         }
         FormKind::Therapy => {
-            let draft = TherapyDraft {
-                drug_name: values[0].trim().into(),
-                dosage: values[1].clone(),
-                status: "active".into(),
-                start_date: date_for_write(&values[2]).map_err(|_| RuntimeError::InvalidInput)?,
-                motivation: (!values[3].trim().is_empty()).then(|| values[3].clone()),
-                ..Default::default()
-            };
+            let draft =
+                new_therapy_draft(values, selected_drug).map_err(|_| RuntimeError::InvalidInput)?;
             let created = session.create_therapy(scope, patient_id, &draft)?;
             after_create_read(
                 session.read_therapy(scope, patient_id, &created.id),
@@ -5644,12 +5720,7 @@ fn save_new_record(
                         && row.patient_id == patient_id
                         && row.deleted_at.is_none()
                         && row.locked_fields.is_empty()
-                        && row.drug_name == draft.drug_name
-                        && row.dosage == draft.dosage
-                        && row.status == draft.status
-                        && row.start_date == draft.start_date
-                        && row.motivation == draft.motivation
-                        && row.end_date == draft.end_date
+                        && editing::therapy_matches(&row, &draft)
                         && created.version.is_none_or(|version| row.version == version)
                 },
             )
@@ -6111,6 +6182,7 @@ mod tests {
             edit: None,
             patient_original: None,
             created_id: None,
+            therapy: None,
             state,
             _subscriptions: vec![],
         });
