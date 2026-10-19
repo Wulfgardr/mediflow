@@ -362,8 +362,11 @@ pub struct Attachment {
     pub mime_type: String,
     pub size: u64,
     pub path: String,
+    pub summary_snapshot: Option<String>,
+    pub parse_evidence_artifact_snapshot: Option<String>,
     pub ocr_queue_state: Option<String>,
     pub ocr_queue_reason: Option<String>,
+    pub ocr_queue_updated_at: Option<String>,
     pub created_at: Option<String>,
     /// Present only for an explicit detail read. Never persisted by this crate.
     pub data: Option<String>,
