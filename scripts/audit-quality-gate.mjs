@@ -1273,6 +1273,7 @@ function validatePatientProfileDispatch(source) {
     const uuid = importedBinding(sourceFile, checker, 'node:crypto', 'randomUUID');
     const equality = importedBinding(sourceFile, checker, 'node:util', 'isDeepStrictEqual');
     const executor = namedFunction(sourceFile, 'executeLegacyPatientProfileUpdate');
+    const commandBuilder = namedFunction(sourceFile, 'createPatientProfileUpdateCommand', true);
     const create = namedFunction(sourceFile, 'createPatientProfileUpdateExecution', true);
     const dispatch = namedFunction(sourceFile, 'dispatchPatientProfileUpdate', true);
     const classes = sourceFile.statements.filter(node => ts.isClassDeclaration(node) && node.name?.text === 'ProfileUpdateExecution');
@@ -1282,14 +1283,16 @@ function validatePatientProfileDispatch(source) {
     const constructor = constructors.length === 1 ? constructors[0] : null;
     const method = methods.length === 1 ? methods[0] : null;
     const bindings = [operation, descriptor, fields, uuid, equality];
-    if (sourceFile.parseDiagnostics.length || !owner || !constructor || !method || !executor || !create || !dispatch
+    if (sourceFile.parseDiagnostics.length || !owner || !constructor || !method || !executor || !commandBuilder || !create || !dispatch
         || bindings.some(binding => !binding || bindingIsWritten(sourceFile, checker, binding.symbol))
-        || [method, executor, create, dispatch].some(node => ts.getModifiers(node)?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword))) {
+        || [method, executor, commandBuilder, create, dispatch].some(node => ts.getModifiers(node)?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword))) {
         return ['profile dispatch must retain its fixed host constructor, dispatcher, legacy executor and real imports'];
     }
     const classBinding = checker.getSymbolAtLocation(owner.name);
     const executorBinding = checker.getSymbolAtLocation(executor.name);
+    const builderBinding = checker.getSymbolAtLocation(commandBuilder.name);
     if (bindingIsWritten(sourceFile, checker, classBinding) || bindingIsWritten(sourceFile, checker, executorBinding)
+        || bindingIsWritten(sourceFile, checker, builderBinding)
         || !statementsEqual(create.body, ['return new ProfileUpdateExecution(input);'])
         || !statementsEqual(dispatch.body, [
             "if (!(execution instanceof ProfileUpdateExecution)) return Promise.reject(new Error('Patient profile execution unavailable'));",
@@ -1311,11 +1314,9 @@ function validatePatientProfileDispatch(source) {
     ]) || bindingCalls(sourceFile, checker, executorBinding).length !== 1) {
         problems.push('profile execution must register its terminal Promise before the one synchronous writer and bind applied/refused/uncertain outcomes to that execution');
     }
-    const body = constructor.body?.statements ?? [];
-    const commandStatement = body[4];
-    const assignment = commandStatement && ts.isExpressionStatement(commandStatement) && ts.isBinaryExpression(commandStatement.expression)
-        ? commandStatement.expression : null;
-    const freeze = assignment?.right;
+    const body = commandBuilder.body?.statements ?? [];
+    const commandStatement = body[2];
+    const freeze = commandStatement && ts.isReturnStatement(commandStatement) ? commandStatement.expression : null;
     const object = freeze && ts.isCallExpression(freeze) && compact(freeze.expression) === 'Object.freeze'
         && freeze.arguments.length === 1 && ts.isObjectLiteralExpression(freeze.arguments[0]) ? freeze.arguments[0] : null;
     const expected = {
@@ -1328,12 +1329,17 @@ function validatePatientProfileDispatch(source) {
         payload: 'Object.freeze(payload)', normalizedAt: 'input.values.updatedAt!.toISOString()', setPrimaryAmbulatory: 'input.setPrimaryAmbulatory',
     };
     const props = object && exactPropertyAssignments(object, Object.keys(expected));
-    if (body.length !== 6 || compact(assignment?.left) !== 'this.command'
+    if (commandBuilder.parameters.length !== 1 || compact(commandBuilder.parameters[0].name) !== 'input'
+        || bindingCalls(sourceFile, checker, builderBinding).length !== 1
+        || !statementsEqual(constructor.body, [
+            'this.#audit = { ...input.audit, flags: [...input.audit.flags] };',
+            'this.#authorizeCommit = input.authorizeCommit;',
+            'this.command = createPatientProfileUpdateCommand(input);',
+            'Object.freeze(this);',
+        ])
+        || body.length !== 3
         || compact(body[0]) !== "if((input.scopeAmbulatoryId===undefined)!==(input.authorizeCommit===undefined))thrownewError('Patient profile admission mismatch');"
         || compact(body[1]) !== "constpayload=Object.fromEntries(PATIENT_PROFILE_UPDATE_FIELDS.flatMap(field=>{constvalue=input.values[field];returnvalue===undefined?[]:[[field,valueinstanceofDate?value.toISOString():value]];}))asPatientProfileUpdatePayload;"
-        || compact(body[2]) !== 'this.#audit={...input.audit,flags:[...input.audit.flags]};'
-        || compact(body[3]) !== 'this.#authorizeCommit=input.authorizeCommit;'
-        || compact(body[5]) !== 'Object.freeze(this);'
         || !props || Object.entries(expected).some(([name, value]) => compact(props.get(name)?.initializer) !== tokens(value))) {
         problems.push('profile command must be immutable and host-derived with an explicit payload, admission, confirmation, scope and separate execution key');
     }
