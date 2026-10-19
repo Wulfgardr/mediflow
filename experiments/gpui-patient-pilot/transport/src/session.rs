@@ -102,6 +102,8 @@ pub(crate) enum CatalogRoute {
     TerminologySystems,
     TerminologySearch,
     TerminologyResolve,
+    WhoReadiness,
+    WhoSearch,
 }
 impl CatalogRoute {
     fn path(&self) -> &'static [&'static str] {
@@ -111,6 +113,8 @@ impl CatalogRoute {
             Self::TerminologySystems => &["api", "v1", "network", "terminology", "systems"],
             Self::TerminologySearch => &["api", "v1", "network", "terminology", "search"],
             Self::TerminologyResolve => &["api", "v1", "network", "terminology", "resolve"],
+            Self::WhoReadiness => crate::who::READINESS_PATH,
+            Self::WhoSearch => &["api", "v1", "network", "terminology", "who", "search"],
         }
     }
     fn allows_query(&self, key: &str) -> bool {
@@ -120,6 +124,14 @@ impl CatalogRoute {
             Self::TerminologySystems => false,
             Self::TerminologySearch => matches!(key, "q" | "system" | "limit"),
             Self::TerminologyResolve => matches!(key, "system" | "code"),
+            Self::WhoReadiness => false,
+            Self::WhoSearch => key == "q",
+        }
+    }
+    fn response_limit(&self) -> usize {
+        match self {
+            Self::WhoReadiness | Self::WhoSearch => crate::who::WHO_LIMIT,
+            _ => JSON_LIMIT,
         }
     }
 }
@@ -435,7 +447,8 @@ impl RuntimeSession {
         if query.iter().any(|(key, _)| !route.allows_query(key)) {
             return Err(RuntimeError::InvalidInput);
         }
-        let response = self.read_json_query(Some(scope), route.path(), query, JSON_LIMIT)?;
+        let response =
+            self.read_json_query(Some(scope), route.path(), query, route.response_limit())?;
         let value = decode(response.value)?;
         self.check_read_epoch(response.epoch)?;
         Ok(value)
@@ -448,6 +461,15 @@ impl RuntimeSession {
             return Err(RuntimeError::ReadRequired);
         }
         Ok(())
+    }
+
+    /// Host configuration via the existing paired discovery route. No patient
+    /// query, configuration grant, inference request or writer receipt is used.
+    pub fn read_ai_runtime_status(&self) -> Result<AiRuntimeStatus> {
+        let response = self.read_json(None, &["api", "v1", "network", "ai-runtime"], 32 * 1024)?;
+        let status = parse_ai_runtime_status(response.value)?;
+        self.check_read_epoch(response.epoch)?;
+        Ok(status)
     }
 
     pub fn list_ambulatories(&self) -> Result<Vec<Ambulatory>> {
@@ -1856,6 +1878,44 @@ impl RuntimeSession {
 }
 
 type Field = (&'static str, bool, bool); // wire name, required, accepts structured JSON
+
+fn parse_ai_runtime_status(value: Value) -> Result<AiRuntimeStatus> {
+    // Do not render an unknown contract, or one claiming execution authority,
+    // as the status-only projection this client actually understands.
+    for (pointer, expected) in [
+        ("/plane", json!("ai-plane-separate-from-data-plane")),
+        ("/localRuntime/provider", json!("ollama")),
+        ("/localRuntime/targetPolicy", json!("loopback-only")),
+        ("/centralRuntime/accessMode", json!("status-only")),
+        ("/centralRuntime/executionAuthorized", json!(false)),
+        ("/centralRuntime/requiresPairing", json!(true)),
+        ("/centralRuntime/executionTarget", json!("paired-home-base")),
+        (
+            "/fabric/schemaVersion",
+            json!("mediflow.ai.network-fabric-status.v1"),
+        ),
+        ("/fabric/contractVersion", json!("mediflow.ai.fabric.v1")),
+        ("/fabric/access", json!("status_only")),
+        ("/fabric/pairedExecution", json!("not_authorized")),
+        ("/fabric/egressGateOpen", json!(false)),
+        ("/fabric/readinessNote", json!("available_unqualified")),
+        ("/fabric/fallback", json!("denied_by_contract")),
+        (
+            "/fallbackPolicy",
+            json!("ai-unavailable-no-automatic-fallback"),
+        ),
+        (
+            "/rolloutGate",
+            json!("lane-benchmarks-and-rollout-governance-required"),
+        ),
+    ] {
+        if value.pointer(pointer) != Some(&expected) {
+            return Err(RuntimeError::InvalidResponse);
+        }
+    }
+    decode(value)
+}
+
 const PATIENT_PROFILE_SEALED: &[&str] = &["address", "phone", "caregiver"];
 const PATIENT_FIELDS: &[Field] = &[
     ("address", false, false),
@@ -2041,6 +2101,121 @@ mod tests {
             Zeroizing::new([7; 32]),
         )
     }
+
+    fn ai_status_wire() -> Value {
+        json!({
+            "plane":"ai-plane-separate-from-data-plane", "mode":"centralized-available",
+            "localRuntime": { "provider":"ollama", "state":"configured", "targetPolicy":"loopback-only",
+                "hardwareProfile":"unknown", "clinicalModel":"synthetic-model", "reasoningModel":null, "ocrModel":null },
+            "centralRuntime": { "state":"available", "capabilityStatus":"available", "requiresPairing":true,
+                "executionTarget":"paired-home-base", "accessMode":"status-only", "executionAuthorized":false },
+            "fabric": { "schemaVersion":"mediflow.ai.network-fabric-status.v1", "contractVersion":"mediflow.ai.fabric.v1",
+                "access":"status_only", "pairedExecution":"not_authorized", "egressGateOpen":false,
+                "readinessNote":"available_unqualified", "fallback":"denied_by_contract",
+                "venues": { "local_process":"configured", "home_base":"host_configured", "on_device":"not_implemented", "cloud":"egress_profile_closed" } },
+            "fallbackPolicy":"ai-unavailable-no-automatic-fallback", "rolloutGate":"lane-benchmarks-and-rollout-governance-required",
+            "surfaces":["patient-insight","smart-import","document-synthesis","treatment-reasoning"],
+            "killSwitches": { "patientInsight":"enabled", "smartImport":"disabled", "documentSynthesis":"enabled", "treatmentReasoning":"disabled" },
+            "guardrails":[]
+        })
+    }
+
+    #[test]
+    fn ai_runtime_status_preserves_disabled_and_missing_values_and_rejects_new_authority() {
+        let mut wire = ai_status_wire();
+        let configured = parse_ai_runtime_status(wire.clone()).unwrap();
+        assert!(configured.kill_switches.patient_insight == AiFunctionSwitch::Enabled);
+        assert!(configured.kill_switches.smart_import == AiFunctionSwitch::Disabled);
+        assert_eq!(
+            configured.local_runtime.clinical_model.as_deref(),
+            Some("synthetic-model")
+        );
+        assert!(configured.local_runtime.reasoning_model.is_none());
+        for (local, central) in [("misconfigured", "unavailable"), ("configured", "disabled")] {
+            wire["localRuntime"]["state"] = json!(local);
+            wire["centralRuntime"]["state"] = json!(central);
+            let status = parse_ai_runtime_status(wire.clone()).unwrap();
+            assert!(
+                (status.local_runtime.state == AiLocalState::Configured) == (local == "configured")
+            );
+            assert!(
+                (status.central_runtime.state == AiCentralState::Disabled)
+                    == (central == "disabled")
+            );
+        }
+        for (pointer, replacement) in [
+            ("/centralRuntime/executionAuthorized", json!(true)),
+            ("/centralRuntime/accessMode", json!("execute")),
+            ("/fabric/schemaVersion", json!("unknown")),
+            ("/fabric/pairedExecution", json!("authorized")),
+            ("/fabric/egressGateOpen", json!(true)),
+            ("/fabric/readinessNote", json!("qualified")),
+            ("/fabric/fallback", json!("automatic")),
+            ("/killSwitches/patientInsight", Value::Null),
+            ("/killSwitches/smartImport", json!("unknown")),
+            ("/localRuntime/state", json!("running")),
+            ("/centralRuntime/state", json!("ready-for-inference")),
+        ] {
+            let mut changed = ai_status_wire();
+            *changed.pointer_mut(pointer).unwrap() = replacement;
+            assert!(
+                matches!(
+                    parse_ai_runtime_status(changed),
+                    Err(RuntimeError::InvalidResponse)
+                ),
+                "{pointer}"
+            );
+        }
+        wire["killSwitches"]
+            .as_object_mut()
+            .unwrap()
+            .remove("treatmentReasoning");
+        assert!(matches!(
+            parse_ai_runtime_status(wire),
+            Err(RuntimeError::InvalidResponse)
+        ));
+    }
+
+    #[test]
+    fn ai_runtime_status_uses_only_paired_discovery_and_drops_a_response_after_lock() {
+        for lock_during_read in [false, true] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let reader = session.clone();
+            let (seen_tx, seen_rx) = mpsc::channel();
+            let (release_tx, release_rx) = mpsc::channel();
+            let server = thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with("GET /api/v1/network/ai-runtime "));
+                assert!(request.contains("\r\nx-mediflow-paired-client-id: synthetic-device\r\n"));
+                assert!(request.contains("\r\ncookie: "));
+                assert!(
+                    !request.contains("authorization:")
+                        && !request.contains("expected-ambulatory-id:")
+                );
+                seen_tx.send(()).unwrap();
+                release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                send_reply(&mut stream, &ai_status_wire().to_string());
+            });
+            let worker = thread::spawn(move || reader.read_ai_runtime_status());
+            seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            if lock_during_read {
+                session.lock();
+            }
+            release_tx.send(()).unwrap();
+            let result = worker.join().unwrap();
+            server.join().unwrap();
+            if lock_during_read {
+                assert!(matches!(result, Err(RuntimeError::Locked)));
+            } else {
+                assert!(result.unwrap().central_runtime.state == AiCentralState::Available);
+            }
+            assert!(session.inner.reads.lock().unwrap().is_empty());
+            assert!(session.inner.profile_reads.lock().unwrap().is_empty());
+        }
+    }
+
     #[test]
     fn scoped_operations_require_host_support_and_exact_native_identity() {
         let identity = json!({
@@ -2484,6 +2659,119 @@ mod tests {
         session.lock();
         release.send(()).unwrap();
         assert!(matches!(worker.join().unwrap(), Err(RuntimeError::Locked)));
+        server.join().unwrap();
+    }
+
+    fn who_readiness_fixture(status: &str) -> Value {
+        json!({"schemaVersion":"mediflow.reference-data.icd11-who-readiness.v2",
+            "status":status,"releaseId":"2026-01","language":"en","deployment":"local",
+            "bindingId":"who.icd11.v2.2026-01.mms.en.local.v1",
+            "imageDigest":format!("sha256:{}", "a".repeat(64)),
+            "datasetSnapshotId":format!("sha256:{}", "b".repeat(64)),
+            "lastLiveObservedAt":if status == "available" {Some("2026-10-19T00:00:00.000Z")} else {None},
+            "lastResultSource":null})
+    }
+
+    #[test]
+    fn who_readiness_http_keeps_scope_auth_status_and_byte_limit() {
+        for (status, body, oversized, expected) in [
+            (
+                503,
+                who_readiness_fixture("configured"),
+                false,
+                Ok(WhoReadinessStatus::Configured),
+            ),
+            (
+                200,
+                who_readiness_fixture("available"),
+                false,
+                Ok(WhoReadinessStatus::Available),
+            ),
+            (
+                200,
+                who_readiness_fixture("configured"),
+                false,
+                Err(RuntimeError::InvalidResponse),
+            ),
+            (
+                503,
+                json!({"status":"configured"}),
+                false,
+                Err(RuntimeError::InvalidResponse),
+            ),
+            (
+                401,
+                json!({"error":"Unauthorized"}),
+                false,
+                Err(RuntimeError::Authentication),
+            ),
+            (
+                503,
+                who_readiness_fixture("configured"),
+                true,
+                Err(RuntimeError::TooLarge),
+            ),
+        ] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            admit_fixture_read(&session);
+            let server = thread::spawn(move || {
+                let (mut identity, _) = listener.accept().unwrap();
+                assert!(read_request(&mut identity).starts_with("GET /api/v1/network/identity "));
+                send_reply(
+                    &mut identity,
+                    r#"{"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}}"#,
+                );
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(
+                    request
+                        .starts_with("GET /api/v1/network/terminology/who/readiness HTTP/1.1\r\n")
+                );
+                assert!(request.contains("\r\nx-mediflow-expected-ambulatory-id: scope-a\r\n"));
+                assert!(request.contains("\r\nx-mediflow-paired-client-id: synthetic-device\r\n"));
+                assert!(request.contains("\r\nx-mediflow-source-surface: native\r\n"));
+                let body = body.to_string();
+                let length = if oversized { 65_537 } else { body.len() };
+                write!(stream, "HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {length}\r\nConnection: close\r\n\r\n{body}").unwrap();
+            });
+            assert_eq!(
+                session
+                    .read_who_readiness("scope-a")
+                    .map(|value| value.status),
+                expected
+            );
+            if status == 401 {
+                assert!(session.is_locked());
+            }
+            server.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn who_delivery_after_lock_and_unadmitted_scope_are_rejected() {
+        let body = who_readiness_fixture("available").to_string();
+        let (url, seen, release, server) = delayed_server(Some(&body));
+        let session = session_at(&url);
+        assert_eq!(
+            session.search_who("scope-a", "synthetic"),
+            Err(RuntimeError::Forbidden)
+        );
+        admit_fixture_read(&session);
+        let clone = session.clone();
+        let worker = thread::spawn(move || clone.read_who_readiness("scope-a"));
+        assert!(
+            seen.recv_timeout(Duration::from_secs(5))
+                .unwrap()
+                .starts_with("GET /api/v1/network/terminology/who/readiness ")
+        );
+        session.lock();
+        release.send(()).unwrap();
+        assert_eq!(worker.join().unwrap(), Err(RuntimeError::Locked));
+        assert_eq!(
+            session.search_who("scope-a", "synthetic"),
+            Err(RuntimeError::Locked)
+        );
         server.join().unwrap();
     }
 

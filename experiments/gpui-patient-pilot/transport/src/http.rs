@@ -274,6 +274,10 @@ impl RuntimeClient {
         limit: usize,
         archive_generation: Option<&str>,
     ) -> Result<RawResponse> {
+        // Only this exact existing read-only contract delivers typed readiness
+        // with 503. Keep every other route's HTTP failure semantics unchanged.
+        let who_readiness =
+            !mutation && method == Method::GET && path == crate::who::READINESS_PATH;
         let url = self.endpoint(path, query)?;
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -316,7 +320,7 @@ impl RuntimeClient {
         }
         let response = request.send().map_err(|_| uncertain(mutation))?;
         let status = response.status().as_u16();
-        if !(200..300).contains(&status) {
+        if !(200..300).contains(&status) && !(who_readiness && status == 503) {
             return Err(classify_status(status, mutation));
         }
         if response
@@ -341,6 +345,9 @@ impl RuntimeClient {
             } else {
                 RuntimeError::TooLarge
             });
+        }
+        if who_readiness {
+            crate::who::validate_readiness_http(status, &body)?;
         }
         Ok(RawResponse { headers, body })
     }
