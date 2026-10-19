@@ -112,7 +112,7 @@ export function PatientProfileReviewPilot({ patientId }: Readonly<{ patientId: s
     }
 
     return <section className="mx-auto max-w-3xl space-y-5 p-6" data-testid="patient-profile-review-pilot">
-        <h1 className="text-2xl font-semibold">Prova di revisione delle note</h1>
+        <h1 className="type-page-title">Prova di revisione delle note</h1>
         <p>Il contenuto viene preparato e mostrato per la conferma. Questa prova non salva modifiche nella cartella.</p>
         {value.kind === 'loading' || value.kind === 'pending' ? <p role="status">Verifica in corso…</p> : null}
         {value.kind === 'unavailable' ? <p role="alert">{value.message}</p> : null}
