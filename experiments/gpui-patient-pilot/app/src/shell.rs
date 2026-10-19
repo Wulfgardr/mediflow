@@ -2,6 +2,7 @@
 //! encryption policy, authorization and writes. No clinical data is persisted here.
 
 mod ai_status;
+mod document_details;
 mod therapy_picker;
 mod who_lookup;
 
@@ -303,6 +304,7 @@ struct PatientData {
     observations: Load<Vec<Observation>>,
     checkups: Load<Vec<Checkup>>,
     attachments: Load<Vec<Attachment>>,
+    document_details_id: Option<String>,
 }
 impl Default for PatientData {
     fn default() -> Self {
@@ -313,6 +315,7 @@ impl Default for PatientData {
             observations: Load::Idle,
             checkups: Load::Idle,
             attachments: Load::Idle,
+            document_details_id: None,
         }
     }
 }
@@ -681,6 +684,7 @@ impl ClinicalApp {
 
     fn next_epoch(&mut self) {
         self.who.reset();
+        self.patient.document_details_id = None;
         if let Some(intent) = self.profile_query_intent.take() {
             intent.cancel();
         }
@@ -1046,6 +1050,7 @@ impl ClinicalApp {
         self.patient.observations = Load::Loading;
         self.patient.checkups = Load::Loading;
         self.patient.attachments = Load::Loading;
+        self.patient.document_details_id = None;
         let s = session.clone();
         let a = scope.clone();
         let p = id.clone();
@@ -3645,7 +3650,10 @@ impl ClinicalApp {
             .when(self.patient.attachments.ready().is_some_and(Vec::is_empty), |el| el.child(text!("Nessun documento presente nella scheda.")))
             .children(self.patient.attachments.ready().into_iter().flatten().map(|row| {
                 let name = if row.locked_fields.iter().any(|field| field == "name") { "Nome del documento non leggibile".into() } else { row.name.clone() };
-                let available = !self.document_busy && self.form.is_none() && row.locked_fields.is_empty();
+                let can_open = !self.document_busy && self.form.is_none();
+                let available = can_open && documents::original_readable(row);
+                let details_open = self.patient.document_details_id.as_deref() == Some(row.id.as_str());
+                let details_id = row.id.clone();
                 let id = row.id.clone();
                 div().id(SharedString::from(format!("clinical-workspace-document-{id}")))
                     .min_w_0().max_w_full()
@@ -3653,11 +3661,16 @@ impl ClinicalApp {
                     .child(div().min_w_0().max_w_full().font_weight(FontWeight::MEDIUM).child(text!(name)))
                     .child(div().min_w_0().max_w_full().text_size(px(theme.size(12.))).text_color(theme.secondary)
                         .child(text!(format!("{} · {} · {}", row.mime_type, format_size(row.size), display_date(row.created_at.as_deref())))))
-                    .child(button(format!("clinical-workspace-download-document-{id}"), "Salva una copia…", theme, false, available)
-                        .when(available, |el| el.on_click(cx.listener(move |this, _, _, cx| this.download_document(&id, cx)))))
+                    .child(div().min_w_0().max_w_full().flex().flex_wrap().gap(px(8.))
+                        .child(button(format!("clinical-workspace-document-details-{id}"), if details_open { "Chiudi sintesi e fonte" } else { "Sintesi e fonte" }, theme, false, can_open)
+                            .aria_expanded(details_open)
+                            .when(can_open, |el| el.on_click(cx.listener(move |this, _, _, cx| this.toggle_document_details(&details_id, cx)))))
+                        .child(button(format!("clinical-workspace-download-document-{id}"), "Salva una copia…", theme, false, available)
+                            .when(available, |el| el.on_click(cx.listener(move |this, _, _, cx| this.download_document(&id, cx))))))
+                    .when(details_open, |el| el.child(self.document_details_view(row)))
             }))
             .child(div().text_color(theme.secondary).child(text!("Ogni caricamento richiede revisione e conferma. Il limite per file è 10 MiB. Le copie vengono salvate soltanto nella destinazione che scegli.")))
-            .child(self.current_module_button("clinical-workspace-manage-documents", "Anteprima e contenuti del documento…", PatientSection::Documents, cx))
+            .child(self.current_module_button("clinical-workspace-manage-documents", "Anteprima dell'originale e gestione…", PatientSection::Documents, cx))
     }
 
     fn current_module_button(
@@ -5253,7 +5266,7 @@ impl ClinicalApp {
             .ready()
             .into_iter()
             .flatten()
-            .find(|row| row.id == document_id && row.locked_fields.is_empty())
+            .find(|row| row.id == document_id && documents::original_readable(row))
         else {
             return;
         };

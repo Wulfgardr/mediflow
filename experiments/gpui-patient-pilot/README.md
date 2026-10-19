@@ -110,6 +110,16 @@ passano insieme nella bozza; dose, motivo e date conservano i valori inseriti.
 «Annulla scelta del farmaco» ripristina l'identità precedente. La registrazione
 segue la revisione e la conferma della terapia, con rilettura dei quattro campi.
 
+In Documenti, «Sintesi e fonte» apre i contenuti già salvati ricevuti con
+l'elenco: sintesi, nome e data della fonte, estratto e stato di elaborazione.
+La vista distingue contenuti assenti, non leggibili, formato non supportato
+e una fonte che indica un altro documento; non attesta la corrispondenza con
+l'originale attuale. I testi lunghi sono abbreviati con un avviso esplicito.
+L'apertura non richiede il blob, non avvia inferenze e non scrive metadati.
+La selezione viene ritirata quando si rilegge o si cambia contesto. «Salva
+una copia…» resta una richiesta esplicita dell'originale; un errore nella
+sola sintesi o fonte non la disabilita se l'originale è leggibile.
+
 Una bozza resta legata a paziente, ambulatorio e sessione. La revisione mostra
 che cosa verrà registrato; una conferma separata invia la richiesta una sola
 volta. «Registrata» appare soltanto dopo una nuova lettura con versione e
