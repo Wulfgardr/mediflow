@@ -53,11 +53,14 @@ riservato alla sola scrittura SOAP da ADR 0097 e ADR 0103.
 
 ## Aggiornamento inventario 0.9.1 — 2026-10-19
 
-L'OpenAPI primario censisce ora 38 `GET` network: i 32 candidati originali e
-6 ingressi con autorita separata, enumerati esattamente dal
+L'OpenAPI primario censisce ora 39 `GET` network: i 32 candidati originali e
+7 ingressi con autorita separata, enumerati esattamente dal
 [test del piano](../../lib/headless/canonical-read-plan.test.ts).
 `GET /api/v1/network/scales` (`readNetworkScaleCatalog`, ADR 0153) appartiene
-all'ammissione paired e resta escluso dai candidati Headless. Lo status nativo
+all'ammissione paired e resta escluso dai candidati Headless. Anche
+`GET /api/v1/network/analytics/demographics` (`readPopulationDemographics`,
+ADR 0154) espone soltanto lo snapshot paired nominato, senza diventare un
+candidato o grant Headless. Lo status nativo
 ChatGPT ordinario, documentato nell'OpenAPI supplementare di ADR 0134, resta
 censito separatamente. I 66 anchor e il loro contratto non cambiano.
 
