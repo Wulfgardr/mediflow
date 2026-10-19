@@ -12,9 +12,10 @@ import { installNetworkPatientCookieFixture } from './network-patient-authority-
 import { issueSyntheticWebSessionContext, retireSyntheticWebSession } from './security/web-auth-lifecycle-owner-test-fixture';
 import { clearAllSessions } from './security/server-session';
 import { currentArchiveGeneration } from './security/archive-session-generation';
-import { ambulatories, auditEvents, patients, patientsToAmbulatories, physicianReviewAttestations, users } from './schema';
+import { ambulatories, auditEvents, observations, patients, patientsToAmbulatories, physicianReviewAttestations, users } from './schema';
 import { isProfileReviewView, PROFILE_REVIEW_POLICY, type ProfileReviewView } from './patient-profile-review-contract';
-import { encryptData } from './security/security';
+import { decryptData, encryptData } from './security/security';
+import { isProfileResult, PROFILE_FIELD_NAMES } from './patient-profile-scoped-contract';
 import { isProfileNotesCommitReceipt, isProfileNotesCommitView, PROFILE_NOTES_COMMIT_POLICY,
     type ProfileNotesCommitView } from './patient-profile-notes-commit-contract';
 
@@ -28,6 +29,7 @@ const route = load('../app/api/patient-profile/review/route.ts') as typeof impor
 const commitRoute = load('../app/api/patients/[id]/notes-commit/route.ts') as typeof import('../app/api/patients/[id]/notes-commit/route');
 const ordinaryRoute = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route');
 const queryRoute = load('../app/api/patients/[id]/profile-query/route.ts') as typeof import('../app/api/patients/[id]/profile-query/route');
+const epochRoute = load('../app/api/patient-profile/selection-epoch/route.ts') as typeof import('../app/api/patient-profile/selection-epoch/route');
 const { createPhysicianReviewAttestationStore } = load('./security/physician-review-attestation-store.ts') as typeof import('./security/physician-review-attestation-store');
 const { sessionPhysicianReviewAuthority } = load('./security/session-physician-review-authority-production.ts') as typeof import('./security/session-physician-review-authority-production');
 const SYNTHETIC_USER = 'synthetic-review-user';
@@ -38,8 +40,8 @@ let session: ReturnType<typeof issueSyntheticWebSessionContext>;
 let epoch = 0;
 let sequence = 0;
 
-function request(body: unknown, path = '/api/patient-profile/review') {
-    return new Request(new URL(path, 'http://127.0.0.1'), { method: 'POST', headers: {
+function request(body: unknown, path = '/api/patient-profile/review', method = 'POST') {
+    return new Request(new URL(path, 'http://127.0.0.1'), { method, headers: {
         'content-type': 'application/json', origin: 'http://127.0.0.1', 'sec-fetch-site': 'same-origin',
         'x-mediflow-archive-generation': currentArchiveGeneration(),
     }, body: JSON.stringify(body) });
@@ -223,6 +225,99 @@ test('reviewed notes use the real writer once, return the same audit receipt and
     assert.equal(legacy.status, 200, await legacy.clone().text());
     assert.equal(dbServer.select().from(patients).where(eq(patients.id, view.recipient.id)).get()?.version, 6);
     assert.deepEqual(await (await commit({ kind: 'receipt', reference: view.reference, digest: view.digest })).json(), receipt);
+});
+
+test('reviewed notes retain encrypted identity, membership and a clinical sentinel through archive and unarchive', async t => {
+    await reset();
+    const patientId = 'synthetic-patient-a', observationId = 'synthetic-lifecycle-observation';
+    const path = `/api/patients/${patientId}`, context = { params: Promise.resolve({ id: patientId }) };
+    const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+    const seal = async (value: string) => {
+        const encrypted = await encryptData(value, key); return `ENC:${encrypted.iv}:${encrypted.data}`;
+    };
+    const noteText = 'Nota sintetica conservata durante archiviazione e riattivazione.';
+    const [firstName, lastName, taxCode, notes, archiveReason, archiveNote, sentinelNotes] = await Promise.all([
+        'Ada', 'Sintetica', 'SYNTHETIC-LIFECYCLE', noteText, 'Motivo sintetico', 'Dettaglio sintetico', 'Osservazione sintetica invariata',
+    ].map(seal));
+    dbServer.update(patients).set({ firstName, lastName, taxCode }).where(eq(patients.id, patientId)).run();
+    dbServer.insert(ambulatories).values({ id: 'synthetic-secondary-scope', name: 'Synthetic second scope', type: 'live' }).run();
+    dbServer.insert(patientsToAmbulatories).values({ patientId, ambulatoryId: 'synthetic-secondary-scope', assignedAt: new Date(0) }).run();
+    t.after(() => { dbServer.delete(observations).where(eq(observations.id, observationId)).run(); });
+    dbServer.insert(observations).values({ id: observationId, patientId, codeSystem: 'synthetic', code: 'sentinel',
+        display: 'Synthetic sentinel', unitSystem: 'synthetic', unitCode: 'unit', value: '1', notes: sentinelNotes,
+        observedAt: new Date(0), version: 3 }).run();
+    const patient = () => dbServer.select().from(patients).where(eq(patients.id, patientId)).get()!;
+    const original = patient();
+    const related = () => ({ memberships: dbServer.select().from(patientsToAmbulatories).all(),
+        observations: dbServer.select().from(observations).all(),
+        otherPatient: dbServer.select().from(patients).where(eq(patients.id, 'synthetic-patient-b')).get() });
+    const originalRelated = related();
+    const previousAuditIds = new Set(dbServer.select().from(auditEvents).all().map(row => row.eventId));
+    const put = (body: Record<string, unknown>) => ordinaryRoute.PUT(request(body, path, 'PUT'), context);
+    async function assertCurrentState(version: number, isArchived: boolean) {
+        const row = patient();
+        assert.deepEqual(row, { ...original, notes, version, isArchived,
+            archiveReason: isArchived ? archiveReason : null, archiveNote: isArchived ? archiveNote : null, updatedAt: row.updatedAt });
+        assert.deepEqual(related(), originalRelated);
+        const beforeRead = snapshot();
+        const legacyResponse = await ordinaryRoute.GET(request(undefined, path, 'GET'), context);
+        assert.equal(legacyResponse.status, 200, await legacyResponse.clone().text());
+        const legacy = await legacyResponse.json();
+        assert.equal(legacy.id, patientId); assert.equal(legacy.version, version);
+        assert.equal(legacy.isArchived, isArchived); assert.equal(legacy.deletedAt, null); assert.equal(legacy.notes, notes);
+        // The previous selection is stale after a write; obtain the current epoch before reopening.
+        const epochResponse = await epochRoute.GET(request(undefined, '/api/patient-profile/selection-epoch', 'GET'));
+        assert.equal(epochResponse.status, 200, await epochResponse.clone().text());
+        const scopedResponse = await queryRoute.POST(request({ kind: 'open', contractVersion: 1, projection: 'profile',
+            expectedSelectionEpoch: (await epochResponse.json()).selectionEpoch }, `${path}/profile-query`), context);
+        assert.equal(scopedResponse.status, 200, await scopedResponse.clone().text());
+        const scoped: unknown = await scopedResponse.json(); assert.ok(isProfileResult(scoped));
+        assert.equal(scoped.projection, 'profile'); assert.equal(scoped.currentness.revision, version);
+        assert.deepEqual(scoped.profile, Object.fromEntries(PROFILE_FIELD_NAMES.map(field => [field, legacy[field]])));
+        assert.deepEqual(snapshot(), beforeRead);
+    }
+
+    const reviewed = await prepareCommit(notes);
+    const committed = await commit(confirmation(reviewed)); assert.equal(committed.status, 200, await committed.clone().text());
+    const receipt: unknown = await committed.json(); assert.ok(isProfileNotesCommitReceipt(receipt));
+    assert.equal(receipt.revision, 5); await assertCurrentState(5, false);
+
+    const archive = { version: 5, isArchived: true, archiveReason, archiveNote };
+    const archived = await put(archive); assert.equal(archived.status, 200, await archived.clone().text());
+    await assertCurrentState(6, true);
+    const beforeRetry = snapshot(), stale = await put(archive);
+    assert.equal(stale.status, 409); assert.equal((await stale.json()).code, 'VERSION_CONFLICT');
+    assert.deepEqual(snapshot(), beforeRetry);
+
+    const unarchive = { version: 6, isArchived: false };
+    dbServer.$client.exec(`CREATE TEMP TRIGGER synthetic_lifecycle_audit_fault BEFORE INSERT ON audit_events
+        WHEN NEW.event_type = 'patient.restored' AND NEW.subject_ref = 'synthetic-patient-a'
+        BEGIN SELECT RAISE(ABORT, 'synthetic lifecycle audit failure'); END`);
+    try { assert.equal((await put(unarchive)).status, 500); }
+    finally { dbServer.$client.exec('DROP TRIGGER synthetic_lifecycle_audit_fault'); }
+    assert.deepEqual(snapshot(), beforeRetry);
+    const restored = await put(unarchive); assert.equal(restored.status, 200, await restored.clone().text());
+    // The existing inverse intentionally clears archiveReason/archiveNote; identity and ciphertext stay intact.
+    await assertCurrentState(7, false);
+    const [, iv, data] = patient().notes!.split(':');
+    assert.equal(await decryptData(data, iv, key), noteText);
+    const audit = dbServer.select().from(auditEvents).all().filter(row => !previousAuditIds.has(row.eventId));
+    assert.equal(audit.length, 3);
+    for (const row of audit) {
+        assert.equal(row.actorRef, user.id); assert.equal(row.subjectRef, patientId);
+        assert.equal(row.outcome, 'success'); assert.equal(row.sourceSurface, 'web');
+    }
+    assert.deepEqual(audit.map(row => {
+        const metadata = JSON.parse(row.redactedMetadata!);
+        return { eventType: row.eventType, revision: metadata.resourceVersion, changedFields: metadata.changedFields.sort() };
+    }).sort((a, b) => a.revision - b.revision), [
+        { eventType: 'patient.updated', revision: 5, changedFields: ['notes'] },
+        { eventType: 'patient.updated', revision: 6, changedFields: ['archiveNote', 'archiveReason', 'isArchived'] },
+        { eventType: 'patient.restored', revision: 7, changedFields: ['archiveNote', 'archiveReason', 'isArchived'] },
+    ]);
+    const afterLifecycle = snapshot();
+    assert.deepEqual(await (await commit({ kind: 'receipt', reference: reviewed.reference, digest: reviewed.digest })).json(), receipt);
+    assert.deepEqual(snapshot(), afterLifecycle);
 });
 
 test('receipt recovery needs the current actor and scope, but never reactivates a proof or requires the old selection', async () => {

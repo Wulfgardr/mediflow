@@ -83,3 +83,16 @@ dichiarata uguali, un solo commit/audit e poi 409. Una revoca paired durante
 le attese deve impedire la scrittura. Il writer conserva la propria transazione,
 membership, ENC e audit obbligatorio; la review indipendente esamina il diff
 finale prima dell'integrazione.
+
+## Ciclo reversibile del pilota (WUL-578)
+
+Il ciclo scelto è l'archiviazione `isArchived: true` e la riattivazione
+`isArchived: false` già presenti nell'aggiornamento del profilo. Entrambe passano
+da questo dispatch e dallo stesso writer. Il paziente archiviato resta leggibile
+dal dettaglio ordinario e dalla query scoped; la riattivazione azzera
+intenzionalmente `archiveReason` e `archiveNote`, conservando identità,
+associazioni e altri dati clinici. La prova continua in
+[`patient-profile-review.test.ts`](../../lib/patient-profile-review.test.ts)
+parte dalle note rivedute dell'ADR0149, attraversa il ciclo con SQLite e AES reali
+e verifica CAS, audit, rollback e rilettura, compresa la ricevuta delle note
+dopo gli avanzamenti di versione. Non modifica la semantica della rimozione logica.
