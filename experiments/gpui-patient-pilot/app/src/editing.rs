@@ -3,8 +3,8 @@
 
 use crate::appointments;
 use mediflow_runtime_client::{
-    Checkup, CheckupDraft, Entry, EntryDraft, Observation, ObservationDraft, RuntimeError,
-    RuntimeSession, Therapy, TherapyDraft,
+    Checkup, CheckupDraft, DrugCatalogItem, Entry, EntryDraft, Observation, ObservationDraft,
+    RuntimeError, RuntimeSession, Therapy, TherapyDraft,
 };
 
 #[derive(Clone)]
@@ -181,8 +181,7 @@ impl Record {
                 // fields describing a different drug.
                 if has_drug_identity(row) {
                     fields[0].rich = true;
-                    fields[0].label =
-                        "Farmaco codificato: per sostituirlo usa la gestione della terapia";
+                    fields[0].label = "Farmaco codificato";
                 }
                 fields
             }
@@ -286,13 +285,18 @@ impl Record {
             }
         }
     }
-    pub fn draft(&self, values: &[String]) -> Result<Draft, String> {
-        self.draft_in_zone(values, &chrono::Local)
+    pub fn draft(
+        &self,
+        values: &[String],
+        selected_drug: Option<&DrugCatalogItem>,
+    ) -> Result<Draft, String> {
+        self.draft_in_zone(values, selected_drug, &chrono::Local)
     }
 
     fn draft_in_zone<T: chrono::TimeZone>(
         &self,
         values: &[String],
+        selected_drug: Option<&DrugCatalogItem>,
         zone: &T,
     ) -> Result<Draft, String> {
         if !self.readable() {
@@ -302,13 +306,25 @@ impl Record {
         if values.len() != fields.len() {
             return Err("Il modulo non corrisponde all'elemento letto.".into());
         }
-        for (field, value) in fields.iter().zip(values) {
+        let changed_drug = if let Some(drug) = selected_drug {
+            let Self::Therapy(row) = self else {
+                return Err("La scelta del farmaco appartiene soltanto alla terapia.".into());
+            };
+            validate_drug_choice(&values[0], drug)?;
+            row.drug_name != drug.name
+                || row.aic.as_ref() != Some(&drug.aic)
+                || row.atc != drug.atc
+                || row.active_principle != drug.active_principle
+        } else {
+            false
+        };
+        for (index, (field, value)) in fields.iter().zip(values).enumerate() {
             if value.contains('\0')
                 || value.encode_utf16().count() > mediflow_patient_client::MAX_NOTES_UTF16
             {
                 return Err("Un campo contiene troppo testo o caratteri non accettati.".into());
             }
-            if field.rich && value != &field.value {
+            if field.rich && value != &field.value && !(index == 0 && selected_drug.is_some()) {
                 return Err("Questo campo deve restare invariato in questa modifica. Usa la gestione dell'elemento per sostituirlo.".into());
             }
             if !field.choices.is_empty()
@@ -318,10 +334,11 @@ impl Record {
                 return Err("Scegli uno degli stati disponibili.".into());
             }
         }
-        if fields
-            .iter()
-            .zip(values)
-            .all(|(field, value)| &field.value == value)
+        if !changed_drug
+            && fields
+                .iter()
+                .zip(values)
+                .all(|(field, value)| &field.value == value)
         {
             return Err("Nessuna modifica da registrare.".into());
         }
@@ -353,7 +370,7 @@ impl Record {
                 {
                     return Err("La fine della terapia precede l'inizio. Controlla le date.".into());
                 }
-                Draft::Therapy(TherapyDraft {
+                let mut draft = TherapyDraft {
                     drug_name: values[0].clone(),
                     dosage: values[1].clone(),
                     status: values[4].clone(),
@@ -365,7 +382,11 @@ impl Record {
                     active_principle: row.active_principle.clone(),
                     diagnosis_code: row.diagnosis_code.clone(),
                     diagnosis_name: row.diagnosis_name.clone(),
-                })
+                };
+                if let Some(drug) = selected_drug {
+                    apply_drug_choice(&mut draft, drug)?;
+                }
+                Draft::Therapy(draft)
             }
             Self::Observation(row) => {
                 Draft::Observation(ObservationDraft {
@@ -401,8 +422,11 @@ impl Record {
         session: &RuntimeSession,
         scope: &str,
         values: &[String],
+        selected_drug: Option<&DrugCatalogItem>,
     ) -> Result<bool, RuntimeError> {
-        let draft = self.draft(values).map_err(|_| RuntimeError::InvalidInput)?;
+        let draft = self
+            .draft(values, selected_drug)
+            .map_err(|_| RuntimeError::InvalidInput)?;
         let expected = self
             .version()
             .checked_add(1)
@@ -473,19 +497,7 @@ impl Draft {
                     && same_instant(&row.date, &draft.date)
                     && row.setting == draft.setting
             }
-            (Self::Therapy(draft), Record::Therapy(row)) => {
-                row.drug_name == draft.drug_name
-                    && row.dosage == draft.dosage
-                    && row.status == draft.status
-                    && same_instant(&row.start_date, &draft.start_date)
-                    && same_optional_instant(row.end_date.as_deref(), draft.end_date.as_deref())
-                    && row.motivation == draft.motivation
-                    && row.aic == draft.aic
-                    && row.atc == draft.atc
-                    && row.active_principle == draft.active_principle
-                    && row.diagnosis_code == draft.diagnosis_code
-                    && row.diagnosis_name == draft.diagnosis_name
-            }
+            (Self::Therapy(draft), Record::Therapy(row)) => therapy_matches(row, draft),
             (Self::Observation(draft), Record::Observation(row)) => {
                 row.code_system == draft.code_system
                     && row.code == draft.code
@@ -510,6 +522,44 @@ impl Draft {
             _ => false,
         }
     }
+}
+
+pub fn validate_drug_choice(name: &str, drug: &DrugCatalogItem) -> Result<(), String> {
+    let valid = |value: &str| {
+        !contract_trim(value).is_empty()
+            && !value.chars().any(char::is_control)
+            && value.encode_utf16().count() <= mediflow_patient_client::MAX_NOTES_UTF16
+    };
+    if name != drug.name || !valid(&drug.name) || !valid(&drug.aic) {
+        return Err("Il farmaco e il codice AIC non corrispondono alla scelta. Cerca e scegli di nuovo la confezione.".into());
+    }
+    Ok(())
+}
+
+/// A selection replaces the whole drug identity. Absent catalog fields clear
+/// the old identity's values; no dose, indication or clinical choice is inferred.
+pub fn apply_drug_choice(draft: &mut TherapyDraft, drug: &DrugCatalogItem) -> Result<(), String> {
+    validate_drug_choice(&draft.drug_name, drug)?;
+    draft.drug_name = drug.name.clone();
+    draft.aic = Some(drug.aic.clone());
+    draft.atc = drug.atc.clone();
+    draft.active_principle = drug.active_principle.clone();
+    Ok(())
+}
+
+/// Creation and update confirm the same complete therapy projection.
+pub fn therapy_matches(row: &Therapy, draft: &TherapyDraft) -> bool {
+    row.drug_name == draft.drug_name
+        && row.dosage == draft.dosage
+        && row.status == draft.status
+        && same_instant(&row.start_date, &draft.start_date)
+        && same_optional_instant(row.end_date.as_deref(), draft.end_date.as_deref())
+        && row.motivation == draft.motivation
+        && row.aic == draft.aic
+        && row.atc == draft.atc
+        && row.active_principle == draft.active_principle
+        && row.diagnosis_code == draft.diagnosis_code
+        && row.diagnosis_name == draft.diagnosis_name
 }
 
 fn day(value: &str) -> String {
@@ -639,7 +689,8 @@ mod tests {
                 assert_eq!(fields[3].choices[0], ("pending", "Da completare"));
                 let mut values: Vec<_> = fields.into_iter().map(|field| field.value).collect();
                 values[0] = "Titolo modificato".into();
-                let Draft::Checkup(draft) = record.draft_in_zone(&values, &zone).unwrap() else {
+                let Draft::Checkup(draft) = record.draft_in_zone(&values, None, &zone).unwrap()
+                else {
                     panic!("checkup draft expected");
                 };
                 assert_eq!(draft.date, date, "{zone}");
@@ -647,7 +698,8 @@ mod tests {
                 assert_eq!(draft.notes.as_deref(), Some("Note sintetiche"));
                 values[3] = "completed".into();
                 values[4] = String::new();
-                let Draft::Checkup(draft) = record.draft_in_zone(&values, &zone).unwrap() else {
+                let Draft::Checkup(draft) = record.draft_in_zone(&values, None, &zone).unwrap()
+                else {
                     panic!("checkup draft expected");
                 };
                 assert_eq!(draft.date, date);
@@ -681,7 +733,7 @@ mod tests {
                 .map(|field| field.value)
                 .collect();
             values[1] = next_day.into();
-            let Draft::Checkup(draft) = record.draft_in_zone(&values, &zone).unwrap() else {
+            let Draft::Checkup(draft) = record.draft_in_zone(&values, None, &zone).unwrap() else {
                 panic!("checkup draft expected");
             };
             assert_eq!(draft.date, expected, "{zone}");
@@ -714,7 +766,7 @@ mod tests {
             values[1] = target_day.into();
             values[2] = target_time.into();
             assert!(
-                record.draft_in_zone(&values, &zone).is_err(),
+                record.draft_in_zone(&values, None, &zone).is_err(),
                 "{zone}: {target_day} {target_time}"
             );
         }
@@ -730,7 +782,7 @@ mod tests {
                 .map(|field| field.value)
                 .collect();
             values[0] = "Titolo modificato".into();
-            let Draft::Checkup(draft) = record.draft_in_zone(&values, &zone).unwrap() else {
+            let Draft::Checkup(draft) = record.draft_in_zone(&values, None, &zone).unwrap() else {
                 panic!("checkup draft expected");
             };
             assert_eq!(
@@ -738,7 +790,7 @@ mod tests {
                 "a known instant must not be reinterpreted through a DST fold"
             );
             values[2] = "01:31".into();
-            assert!(record.draft_in_zone(&values, &zone).is_err());
+            assert!(record.draft_in_zone(&values, None, &zone).is_err());
         }
     }
 
@@ -754,9 +806,9 @@ mod tests {
             .into_iter()
             .map(|field| field.value)
             .collect::<Vec<_>>();
-        assert!(record.draft(&values).is_err());
+        assert!(record.draft(&values, None).is_err());
         values[0] = "  Titolo corretto 🩺  ".into();
-        let Draft::Entry(draft) = record.draft(&values).unwrap() else {
+        let Draft::Entry(draft) = record.draft(&values, None).unwrap() else {
             panic!()
         };
         assert_eq!(draft.content, original.content);
@@ -765,7 +817,7 @@ mod tests {
         assert_eq!(draft.setting, original.setting);
         values[2] = "Voce precedente Città 🩺".into();
         assert!(
-            record.draft(&values).is_err(),
+            record.draft(&values, None).is_err(),
             "a lossy plain replacement must not erase existing formatting"
         );
     }
@@ -801,7 +853,7 @@ mod tests {
             .map(|field| field.value)
             .collect::<Vec<_>>();
         values[1] = "2026-10-18".into();
-        let draft = record.draft(&values).unwrap();
+        let draft = record.draft(&values, None).unwrap();
         original.date = "2026-10-17T22:25:40.125Z".into();
         assert!(
             draft.matches(&Record::Entry(original.clone())),
@@ -840,7 +892,7 @@ mod tests {
                 .map(|field| field.value)
                 .collect::<Vec<_>>();
             values[5] = "Nota corretta 🩺".into();
-            let Draft::Observation(draft) = record.draft(&values).unwrap() else {
+            let Draft::Observation(draft) = record.draft(&values, None).unwrap() else {
                 panic!()
             };
             assert_eq!(draft.value, row.value);
@@ -850,13 +902,13 @@ mod tests {
             assert_eq!(draft.observed_at, row.observed_at);
             values[2] = "\u{feff}  positivo, debole  \u{feff}".into();
             values[6] = "  <2,5  ".into();
-            let Draft::Observation(draft) = record.draft(&values).unwrap() else {
+            let Draft::Observation(draft) = record.draft(&values, None).unwrap() else {
                 panic!()
             };
             assert_eq!(draft.value, "positivo, debole");
             assert_eq!(draft.ref_low.as_deref(), Some("  <2,5  "));
             values[2] = "\u{feff}".into();
-            assert!(record.draft(&values).is_err());
+            assert!(record.draft(&values, None).is_err());
         }
     }
     #[test]
@@ -885,7 +937,7 @@ mod tests {
                 .map(|field| field.value)
                 .collect::<Vec<_>>();
             values[1] = "Dose corretta esplicitamente".into();
-            let Draft::Therapy(draft) = record.draft(&values).unwrap() else {
+            let Draft::Therapy(draft) = record.draft(&values, None).unwrap() else {
                 panic!()
             };
             assert_eq!(draft.drug_name, row.drug_name);
@@ -895,7 +947,7 @@ mod tests {
             assert_eq!(draft.motivation, row.motivation);
             values[0] = "Un altro farmaco".into();
             assert!(
-                record.draft(&values).is_err(),
+                record.draft(&values, None).is_err(),
                 "the draft guard must also reject a tampered retained field"
             );
         }
@@ -907,7 +959,70 @@ mod tests {
             .map(|field| field.value)
             .collect::<Vec<_>>();
         values[0] = "Preparazione manuale corretta".into();
-        assert!(record.draft(&values).is_ok());
+        assert!(record.draft(&values, None).is_ok());
+    }
+
+    #[test]
+    fn catalog_drug_selection_replaces_the_whole_identity_and_readback_checks_every_part() {
+        let original: Therapy = serde_json::from_value(serde_json::json!({
+            "id":"therapy-synthetic", "patientId":"patient-synthetic", "version":7,
+            "drugName":"Farmaco sintetico", "aic":"000111111", "atc":"SYN-OLD",
+            "activePrinciple":"Principio precedente", "dosage":"Dose riportata",
+            "motivation":"<p>Motivo conservato</p>", "status":"active",
+            "startDate":"2026-10-17T08:15:00Z", "diagnosisCode":"SYN-DIAG",
+            "diagnosisName":"Indicazione riportata"
+        }))
+        .unwrap();
+        let selected: DrugCatalogItem = serde_json::from_value(serde_json::json!({
+            "name":"Farmaco sintetico", "aic":"000222222", "atc":null, "activePrinciple":null,
+            "packaging":"Confezione sintetica diversa"
+        }))
+        .unwrap();
+        let record = Record::Therapy(original.clone());
+        let mut values: Vec<_> = record
+            .fields()
+            .into_iter()
+            .map(|field| field.value)
+            .collect();
+        // A different AIC with the same name is still an explicit drug change.
+        let Draft::Therapy(draft) = record.draft(&values, Some(&selected)).unwrap() else {
+            panic!()
+        };
+        assert_eq!(draft.aic.as_deref(), Some("000222222"));
+        assert!(draft.atc.is_none() && draft.active_principle.is_none());
+        assert_eq!(draft.dosage, original.dosage);
+        assert_eq!(draft.motivation, original.motivation);
+        assert_eq!(draft.diagnosis_code, original.diagnosis_code);
+        assert_eq!(draft.diagnosis_name, original.diagnosis_name);
+        assert_eq!(draft.start_date, original.start_date);
+        let mut readback = original.clone();
+        readback.aic = draft.aic.clone();
+        readback.atc = draft.atc.clone();
+        readback.active_principle = draft.active_principle.clone();
+        assert!(therapy_matches(&readback, &draft));
+        for part in ["name", "aic", "atc", "principle"] {
+            let mut wrong = readback.clone();
+            match part {
+                "name" => wrong.drug_name = "Altra descrizione".into(),
+                "aic" => wrong.aic = original.aic.clone(),
+                "atc" => wrong.atc = original.atc.clone(),
+                _ => wrong.active_principle = original.active_principle.clone(),
+            }
+            assert!(
+                !therapy_matches(&wrong, &draft),
+                "unconfirmed identity component: {part}"
+            );
+        }
+        values[0] = "Rinomina isolata".into();
+        assert!(record.draft(&values, Some(&selected)).is_err());
+        let mut invalid = selected.clone();
+        invalid.aic.clear();
+        assert!(validate_drug_choice(&invalid.name, &invalid).is_err());
+        values[0] = selected.name.clone();
+        assert!(record.draft(&values, Some(&invalid)).is_err());
+        // The same choice cannot grant permission to replace a rich indication.
+        values[3] = "Motivo riscritto fuori dall'editor".into();
+        assert!(record.draft(&values, Some(&selected)).is_err());
     }
     #[test]
     fn decrypted_and_live_record_is_required_before_constructing_any_update() {
@@ -920,9 +1035,9 @@ mod tests {
             .map(|field| field.value)
             .collect::<Vec<_>>();
         values[0] = "Corretto".into();
-        assert!(record.draft(&values).is_err());
+        assert!(record.draft(&values, None).is_err());
         let mut original = entry();
         original.deleted_at = Some("2026-10-17".into());
-        assert!(Record::Entry(original).draft(&values).is_err());
+        assert!(Record::Entry(original).draft(&values, None).is_err());
     }
 }

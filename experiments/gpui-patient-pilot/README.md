@@ -104,8 +104,11 @@ dell'anagrafica distinguono campi omessi, valori e svuotamenti espliciti.
 Diario, terapie, parametri e controlli hanno moduli nativi versionati; il
 corpo HTML già registrato viene conservato durante la modifica di titolo e
 data. Le stringhe dei risultati clinici non vengono convertite in numeri.
-La sostituzione di un farmaco con AIC/ATC usa ancora il selettore corrente,
-che aggiorna insieme nome e codici.
+Il selettore nativo cerca nel repertorio dell'archivio e permette di scegliere
+o sostituire esplicitamente un farmaco. Nome, AIC, ATC e principio attivo
+passano insieme nella bozza; dose, motivo e date conservano i valori inseriti.
+«Annulla scelta del farmaco» ripristina l'identità precedente. La registrazione
+segue la revisione e la conferma della terapia, con rilettura dei quattro campi.
 
 Una bozza resta legata a paziente, ambulatorio e sessione. La revisione mostra
 che cosa verrà registrato; una conferma separata invia la richiesta una sola

@@ -72,51 +72,37 @@ impl ReferenceRows {
     pub fn render(&self, theme: Theme) -> Div {
         let list = div().min_w_0().max_w_full().flex().flex_col();
         match self {
-            Self::Drugs(rows) => list.children(rows.iter().map(|row| {
-                let copied = drug_text(row);
-                result_row(theme)
-                    .child(code_line("AIC", &row.aic, theme))
-                    .child(
-                        div()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(text!(row.name.clone())),
-                    )
-                    .children([
-                        optional_line("Principio attivo", row.active_principle.as_deref(), theme),
-                        optional_line("Confezione", row.packaging.as_deref(), theme),
-                        optional_line("Azienda", row.company.as_deref(), theme),
-                        optional_line("Classe", row.class.as_deref(), theme),
-                    ])
-                    .when(row.atc.is_some(), |el| {
-                        el.child(code_line(
-                            "ATC",
-                            row.atc.as_deref().unwrap_or_default(),
-                            theme,
-                        ))
-                    })
-                    .child(
-                        div()
-                            .text_color(theme.secondary)
-                            .child(text!(row.price.map_or_else(
+            Self::Drugs(rows) => {
+                list.children(rows.iter().map(|row| {
+                    let copied = drug_text(row);
+                    result_row(theme)
+                        .child(drug_description(row, theme))
+                        .children([
+                            optional_line("Azienda", row.company.as_deref(), theme),
+                            optional_line("Classe", row.class.as_deref(), theme),
+                        ])
+                        .child(div().text_color(theme.secondary).child(text!(
+                            row.price.map_or_else(
                                 || "Prezzo non riportato".into(),
                                 |price| {
                                     format!("Prezzo di catalogo: € {price:.2}").replace('.', ",")
                                 }
-                            ))),
-                    )
-                    .child(
-                        button(
-                            format!("clinical-workspace-copy-drug-{}", row.aic),
-                            "Copia riferimento",
-                            theme,
-                            false,
-                            true,
+                            )
+                        )))
+                        .child(
+                            button(
+                                format!("clinical-workspace-copy-drug-{}", row.aic),
+                                "Copia riferimento",
+                                theme,
+                                false,
+                                true,
+                            )
+                            .on_click(move |_, _, cx| {
+                                cx.write_to_clipboard(ClipboardItem::new_string(copied.clone()))
+                            }),
                         )
-                        .on_click(move |_, _, cx| {
-                            cx.write_to_clipboard(ClipboardItem::new_string(copied.clone()))
-                        }),
-                    )
-            })),
+                }))
+            }
             Self::Exemptions(rows) => list.children(rows.iter().map(|row| {
                 let copied = exemption_text(row);
                 result_row(theme)
@@ -210,6 +196,42 @@ impl ReferenceRows {
     }
 }
 
+/// The same identity and packaging are shown in the catalog and the therapy
+/// chooser; each caller supplies its own explicit action.
+pub fn drug_description(row: &DrugCatalogItem, theme: Theme) -> Div {
+    drug_identity(
+        &row.name,
+        Some(&row.aic),
+        row.atc.as_deref(),
+        row.active_principle.as_deref(),
+        theme,
+    )
+    .child(optional_line("Confezione", row.packaging.as_deref(), theme))
+}
+
+pub fn drug_identity(
+    name: &str,
+    aic: Option<&str>,
+    atc: Option<&str>,
+    active_principle: Option<&str>,
+    theme: Theme,
+) -> Div {
+    div()
+        .min_w_0()
+        .max_w_full()
+        .flex()
+        .flex_col()
+        .gap(px(8.))
+        .when_some(aic, |el, code| el.child(code_line("AIC", code, theme)))
+        .child(
+            div()
+                .font_weight(FontWeight::SEMIBOLD)
+                .child(text!(name.to_owned())),
+        )
+        .child(optional_line("Principio attivo", active_principle, theme))
+        .when_some(atc, |el, code| el.child(code_line("ATC", code, theme)))
+}
+
 fn result_row(theme: Theme) -> Div {
     div()
         .min_w_0()
@@ -269,7 +291,7 @@ fn push_optional(out: &mut Vec<String>, label: &str, value: Option<&str>) {
         out.push(format!("{label}: {value}"));
     }
 }
-fn drug_text(row: &DrugCatalogItem) -> String {
+pub fn drug_text(row: &DrugCatalogItem) -> String {
     let mut out = vec![row.name.clone(), format!("AIC: {}", row.aic)];
     for (label, value) in [
         ("Principio attivo", row.active_principle.as_deref()),
