@@ -9,6 +9,7 @@ import type { dbServer } from '../db-server';
 import type { ServerSession } from './server-session';
 import { archiveGenerationForSession } from './archive-session-generation';
 import { assertArchiveGeneration } from '../archive-generation';
+import { parseProfileNotesCommitJournal, type ProfileNotesCommitJournal } from '../patient-profile-notes-commit-contract';
 
 export const AUDIT_SCHEMA_VERSION = 1 as const;
 
@@ -99,6 +100,7 @@ export type AifaAuditChange = {
 };
 
 export type AuditRedactedMetadata = {
+    profileNotesCommit?: ProfileNotesCommitJournal;
     aifaCatalog?: AifaAuditChange;
     changedFields?: string[];
     resourceVersion?: number;
@@ -306,6 +308,11 @@ export function sanitizeAuditMetadata(value: AuditRedactedMetadata | null | unde
     const counts = normalizeCount(value.counts);
 
     const sanitized: AuditRedactedMetadata = {};
+    if (value.profileNotesCommit !== undefined) {
+        const journal = parseProfileNotesCommitJournal(value.profileNotesCommit);
+        if (!journal) throw new Error('Invalid profile notes commit audit metadata');
+        sanitized.profileNotesCommit = journal;
+    }
     const change = value.aifaCatalog;
     if (change && (change.mode === 'remote' || change.mode === 'manual') && typeof change.forcedReduction === 'boolean') {
         const canonical = (manifest: AifaCatalogManifest | null): AifaCatalogManifest | null => {
@@ -341,9 +348,14 @@ export function classifyPatientMutationEvent(previousIsArchived: boolean | null,
 }
 
 function buildAuditEventRow(input: AuditWriteInput): typeof auditEvents.$inferInsert {
-    const eventId = uuidv4();
     const occurredAt = input.occurredAt ?? new Date();
     const redactedMetadata = sanitizeAuditMetadata(input.redactedMetadata);
+    const journal = redactedMetadata?.profileNotesCommit;
+    if (journal && (input.eventType !== 'patient.updated' || input.outcome !== 'success' || input.subjectType !== 'patient'
+        || input.actorType !== 'user' || input.sourceSurface !== 'web' || occurredAt.getTime() !== journal.receipt.committedAt)) {
+        throw new Error('Invalid profile notes commit audit event');
+    }
+    const eventId = journal?.receipt.reference ?? uuidv4();
     return {
         eventId,
         schemaVersion: AUDIT_SCHEMA_VERSION,
@@ -357,7 +369,7 @@ function buildAuditEventRow(input: AuditWriteInput): typeof auditEvents.$inferIn
         sourceSurface: input.sourceSurface,
         requestId: input.requestId ?? null,
         redactedMetadata: redactedMetadata ? JSON.stringify(redactedMetadata) : null,
-        createdAt: new Date(),
+        createdAt: journal ? occurredAt : new Date(),
     };
 }
 

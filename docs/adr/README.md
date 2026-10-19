@@ -14,6 +14,7 @@ verifica dello stato successivo.
 
 ## Decisioni richiamate
 
+- [0150-patient-profile-pilot-recovery.md](./0150-patient-profile-pilot-recovery.md): BT-06; recupero C15 prima/dopo il pilota, ricevuta storica conservata e autorizzazione corrente verificata senza riattivare sessioni o prove precedenti.
 - [0145-rust-gpui-connected-client.md](./0145-rust-gpui-connected-client.md): client Rust/GPUI paired, Windows/Linux espliciti, sblocco v3 e prove old/new; writer e integrazioni mobile restano distinti.
 - [0141-local-checkup-json-body-bound.md](./0141-local-checkup-json-body-bound.md): Proposed; nuovo cap locale 4 MiB e involucro oggetto per i quattro POST/PUT checkup, con DELETE e paired esclusi.
 - [0137-rust-boundary-pilot-proposal.md](./0137-rust-boundary-pilot-proposal.md): proposta WUL-706 subordinata al pilota 0.9.1; confronto IPC/FFI, codec isolato e rollback, senza adozione runtime o cambio UI.

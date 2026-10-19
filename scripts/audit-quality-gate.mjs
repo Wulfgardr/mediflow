@@ -78,6 +78,13 @@ const REQUIRED_ROUTE_AUDIT = [
             target: 'patient-update.web', eventType: 'patient.updated', transactionalPatientUpdate: true }],
     },
     {
+        route: 'app/api/patients/[id]/notes-commit/route.ts', events: ['patient.updated'], reason: 'reviewed notes share the patient writer and one atomic audit receipt',
+        writerContracts: [{ handler: 'POST', serviceModule: '@/lib/patient-profile-service', serviceExport: 'commitPatientProfileNotesHttp',
+            profileFile: 'lib/patient-profile-service.ts', dispatchFile: 'lib/patient-profile-update-dispatch.ts',
+            ownerFile: 'lib/patient-update-operation.ts', ownerName: 'updatePatientOperation',
+            target: 'patient-notes-commit.web', eventType: 'patient.updated', transactionalPatientUpdate: true, reviewedNotesCommit: true }],
+    },
+    {
         route: 'app/api/patients/[id]/route.ts', events: ['patient.deleted'], reason: 'patient delete requires one transactional audit owner',
         writerContracts: [{ handler: 'DELETE', serviceModule: '@/lib/patient-delete-operation', serviceExport: 'deletePatientOperation',
             ownerFile: 'lib/patient-delete-operation.ts', ownerName: 'deletePatientOperation',
@@ -1254,16 +1261,18 @@ function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridg
     return problems;
 }
 
+function sourceTokens(text) {
+    const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, ts.LanguageVariant.Standard, text);
+    const result = [];
+    for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) result.push(scanner.getTokenText());
+    return result.join('');
+}
+
 function validatePatientProfileDispatch(source) {
     const checked = checkedSource('lib/patient-profile-update-dispatch.ts', source);
     const { sourceFile, checker } = checked;
     const problems = [];
-    const tokens = text => {
-        const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, ts.LanguageVariant.Standard, text);
-        const result = [];
-        for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) result.push(scanner.getTokenText());
-        return result.join('');
-    };
+    const tokens = sourceTokens;
     const compact = node => tokens(node?.getText(sourceFile) ?? '');
     const statementsEqual = (body, expected) => body?.statements.length === expected.length
         && expected.every((text, index) => compact(body.statements[index]) === tokens(text));
@@ -1276,6 +1285,8 @@ function validatePatientProfileDispatch(source) {
     const commandBuilder = namedFunction(sourceFile, 'createPatientProfileUpdateCommand', true);
     const create = namedFunction(sourceFile, 'createPatientProfileUpdateExecution', true);
     const dispatch = namedFunction(sourceFile, 'dispatchPatientProfileUpdate', true);
+    const createNotes = namedFunction(sourceFile, 'createPatientProfileNotesCommitExecution', true);
+    const dispatchNotes = namedFunction(sourceFile, 'dispatchReviewedPatientProfileNotes', true);
     const classes = sourceFile.statements.filter(node => ts.isClassDeclaration(node) && node.name?.text === 'ProfileUpdateExecution');
     const owner = classes.length === 1 ? classes[0] : null;
     const constructors = owner?.members.filter(ts.isConstructorDeclaration) ?? [];
@@ -1283,9 +1294,9 @@ function validatePatientProfileDispatch(source) {
     const constructor = constructors.length === 1 ? constructors[0] : null;
     const method = methods.length === 1 ? methods[0] : null;
     const bindings = [operation, descriptor, fields, uuid, equality];
-    if (sourceFile.parseDiagnostics.length || !owner || !constructor || !method || !executor || !commandBuilder || !create || !dispatch
+    if (sourceFile.parseDiagnostics.length || !owner || !constructor || !method || !executor || !commandBuilder || !create || !dispatch || !createNotes || !dispatchNotes
         || bindings.some(binding => !binding || bindingIsWritten(sourceFile, checker, binding.symbol))
-        || [method, executor, commandBuilder, create, dispatch].some(node => ts.getModifiers(node)?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword))) {
+        || [method, executor, commandBuilder, create, dispatch, createNotes, dispatchNotes].some(node => ts.getModifiers(node)?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword))) {
         return ['profile dispatch must retain its fixed host constructor, dispatcher, legacy executor and real imports'];
     }
     const classBinding = checker.getSymbolAtLocation(owner.name);
@@ -1293,13 +1304,20 @@ function validatePatientProfileDispatch(source) {
     const builderBinding = checker.getSymbolAtLocation(commandBuilder.name);
     if (bindingIsWritten(sourceFile, checker, classBinding) || bindingIsWritten(sourceFile, checker, executorBinding)
         || bindingIsWritten(sourceFile, checker, builderBinding)
+        || [createNotes, dispatchNotes].some(node => bindingIsWritten(sourceFile, checker, checker.getSymbolAtLocation(node.name)))
         || !statementsEqual(create.body, ['return new ProfileUpdateExecution(input);'])
+        || !statementsEqual(createNotes.body, ['return new ProfileUpdateExecution(input, true);'])
+        || !statementsEqual(dispatchNotes.body, [
+            "if (!(execution instanceof ProfileUpdateExecution)) return Promise.reject(new Error('Patient profile execution unavailable'));",
+            'return execution.dispatch(command, permit);',
+        ])
         || !statementsEqual(dispatch.body, [
             "if (!(execution instanceof ProfileUpdateExecution)) return Promise.reject(new Error('Patient profile execution unavailable'));",
             'return execution.dispatch(command);',
         ])) problems.push('profile dispatch must consume only its issued execution with no alternate writer or await');
     if (!statementsEqual(method.body, [
         "if (!isDeepStrictEqual(candidate, this.command)) return Promise.reject(new Error('Patient profile execution command mismatch'));",
+        "if (this.#requiresNotesReview !== (notesPermit !== undefined)) return Promise.reject(new Error('Patient profile review permit unavailable'));",
         'if (this.#result) return this.#result;',
         'let resolve!: (result: PatientProfileUpdateOutcome) => void;',
         'const pending = new Promise<PatientProfileUpdateOutcome>(accept => { resolve = accept; });',
@@ -1307,7 +1325,7 @@ function validatePatientProfileDispatch(source) {
         `const identity = { operationId: this.command.operationId, contractVersion: this.command.contractVersion,
             purpose: this.command.purpose, executionId: this.command.executionId,
             correlationId: this.command.correlationId, idempotencyKey: this.command.idempotencyKey };`,
-        `try { const result = executeLegacyPatientProfileUpdate(this.command, this.#audit, this.#authorizeCommit);
+        `try { const result = executeLegacyPatientProfileUpdate(this.command, this.#audit, this.#authorizeCommit, notesPermit);
             resolve(Object.freeze(result.status === 200 ? { ...identity, kind: 'applied', result } : { ...identity, kind: 'refused', result }));
         } catch (error) { resolve(Object.freeze({ ...identity, kind: 'uncertain', error })); }`,
         'return pending;',
@@ -1334,6 +1352,7 @@ function validatePatientProfileDispatch(source) {
         || !statementsEqual(constructor.body, [
             'this.#audit = { ...input.audit, flags: [...input.audit.flags] };',
             'this.#authorizeCommit = input.authorizeCommit;',
+            'this.#requiresNotesReview = requiresNotesReview;',
             'this.command = createPatientProfileUpdateCommand(input);',
             'Object.freeze(this);',
         ])
@@ -1349,10 +1368,11 @@ function validatePatientProfileDispatch(source) {
     const writerExpected = {
         operationId: 'command.operationId', contractVersion: 'command.contractVersion', patientId: 'command.target.patientId',
         expectedVersion: 'command.target.expectedVersion', values: 'values', setPrimaryAmbulatory: 'command.setPrimaryAmbulatory',
-        scopeAmbulatoryId: "command.scope.kind === 'ambulatory' ? command.scope.ambulatoryId : undefined", authorizeCommit: 'authorizeCommit', audit: 'audit',
+        scopeAmbulatoryId: "command.scope.kind === 'ambulatory' ? command.scope.ambulatoryId : undefined", authorizeCommit: 'authorizeCommit',
+        reviewedNotes: 'notesPermit ? { command, permit: notesPermit } : undefined', audit: 'audit',
     };
     const writerProps = input && ts.isObjectLiteralExpression(input) ? exactPropertyAssignments(input, Object.keys(writerExpected)) : null;
-    if (executor.parameters.length !== 3 || !call || call.questionDotToken || call.arguments.length !== 1
+    if (executor.parameters.length !== 4 || !call || call.questionDotToken || call.arguments.length !== 1
         || !ts.isReturnStatement(call.parent) || call.parent !== executor.body.statements.at(-1)
         || !isReachableCall(call, executor) || !writerProps || input.properties.at(-1)?.name?.text !== 'audit'
         || Object.entries(writerExpected).some(([name, value]) => compact(writerProps.get(name)?.initializer ?? writerProps.get(name)?.name) !== tokens(value))
@@ -1493,9 +1513,96 @@ function validatePatientProfileAuditPort({ spec, routeSource, profileSource, dis
     return problems;
 }
 
+/* Only this Web adapter can select the named notes policy; it retains the prepared
+ * execution and supplies the existing synchronous review owner to the same writer. */
+function validateReviewedNotesProfileAuditPort({ spec, routeSource, profileSource, dispatchSource }) {
+    const problems = validatePatientProfileDispatch(dispatchSource ?? '');
+    const route = checkedSource('route.ts', routeSource);
+    const profile = checkedSource(spec.profileFile, profileSource ?? '');
+    const compact = node => sourceTokens(node?.getText() ?? '');
+    const delegate = importedBinding(route.sourceFile, route.checker, spec.serviceModule, spec.serviceExport);
+    const wrapper = importedBinding(route.sourceFile, route.checker, '@/lib/security/archive-request-context', 'withArchiveRequestContext');
+    const declarations = (root, name) => {
+        const result = [];
+        const visit = node => {
+            if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name) result.push(node);
+            ts.forEachChild(node, visit);
+        };
+        visit(root); return result;
+    };
+    const post = declarations(route.sourceFile, 'POST');
+    if (route.sourceFile.parseDiagnostics.length || !delegate || !wrapper || post.length !== 1
+        || [delegate, wrapper].some(binding => bindingIsWritten(route.sourceFile, route.checker, binding.symbol))
+        || bindingCalls(route.sourceFile, route.checker, delegate.symbol).length !== 1
+        || compact(post[0]?.parent.parent) !== sourceTokens(`export const POST = withArchiveRequestContext(
+            (request: Request, context: Readonly<{ params: Promise<{ id: string }> }>) =>
+                commitPatientProfileNotesHttp(request, async () => (await context.params).id));`)) {
+        problems.push('reviewed notes route must use the real archive wrapper and exact patient-bound Web service');
+    }
+    const entry = namedFunction(profile.sourceFile, spec.serviceExport, true);
+    const workflow = namedFunction(profile.sourceFile, 'profileNotesWorkflow');
+    const importNames = [
+        ['./patient-profile-update-dispatch', 'createPatientProfileNotesCommitExecution'],
+        ['./patient-profile-update-dispatch', 'dispatchReviewedPatientProfileNotes'],
+        ['./security/fresh-review-pin-uniqueness', 'verifyFreshReviewPin'],
+        ['./security/session-physician-review-authority-production', 'sessionPhysicianReviewAuthority'],
+        ['./patient-profile-notes-commit-contract', 'PROFILE_NOTES_COMMIT_POLICY'],
+        ['./security/archive-write-request', 'archiveWriteRequestDenial'],
+    ];
+    const imports = importNames.map(([module, name]) => importedBinding(profile.sourceFile, profile.checker, module, name));
+    if (profile.sourceFile.parseDiagnostics.length || !entry || !workflow
+        || compact(entry.body) !== sourceTokens('{ return profileNotesWorkflow(request, patientId); }')
+        || imports.some(binding => !binding || bindingIsWritten(profile.sourceFile, profile.checker, binding.symbol))
+        || importNames.some(([, name]) => localBindingExists(workflow, name))
+        || localBindingExists(workflow, 'withProfileReviewSelection')
+        || bindingIsWritten(profile.sourceFile, profile.checker, profile.checker.getSymbolAtLocation(workflow.name))) {
+        problems.push('reviewed notes must retain the shared host workflow and approved policy, PIN, authority and dispatch imports');
+        return problems;
+    }
+    const [factory, dispatcher, pin] = imports;
+    const dispatchCalls = bindingCalls(profile.sourceFile, profile.checker, dispatcher.symbol);
+    const factoryCalls = bindingCalls(profile.sourceFile, profile.checker, factory.symbol);
+    const expectedDeclarations = {
+        policy: 'requestedPatient ? PROFILE_NOTES_COMMIT_POLICY : PROFILE_REVIEW_POLICY',
+        execution: 'patientId ? createPatientProfileNotesCommitExecution(hostInput) : null',
+        command: 'execution?.command ?? createPatientProfileUpdateCommand(hostInput)',
+        pin: 'await verifyFreshReviewPin(input.candidatePin)',
+        authorizeCommit: `(): true => withProfileReviewSelection(context, current, review.binding.epoch, review.binding.command.target.expectedVersion,
+            request.signal, (patient, ambulatoryId) => sessionPhysicianReviewAuthority.withCurrentAuthority(authority, () => {
+                const binding = review.binding;
+                const now = Date.now();
+                if (now < review.lastObservedAt || now >= binding.expiresAt) return scopedFail('handle_expired');
+                review.lastObservedAt = now;
+                if (current.review !== review || pin.actorRef !== authority.actorRef || pin.sessionRef !== context.session.id
+                    || binding.sessionId !== context.session.id || binding.ambulatoryId !== ambulatoryId
+                    || binding.command.target.patientId !== patient.id || binding.policy !== policy
+                    || binding.recipient.firstName !== patient.firstName || binding.recipient.lastName !== patient.lastName) return scopedFail('selection_conflict');
+                if (current.confirmations.consume(review.proof) !== binding) return scopedFail('handle_unavailable');
+                retireProfileReview(current);
+                return true as const;
+            }))`,
+    };
+    if (factoryCalls.length !== 1 || dispatchCalls.length !== 1 || bindingCalls(workflow, profile.checker, pin.symbol).length !== 1
+        || Object.entries(expectedDeclarations).some(([name, expected]) => {
+            const found = declarations(workflow, name);
+            return found.length !== 1 || !(found[0].parent.flags & ts.NodeFlags.Const)
+                || compact(found[0].initializer) !== sourceTokens(expected)
+                || bindingIsWritten(workflow, profile.checker, profile.checker.getSymbolAtLocation(found[0].name));
+        })
+        || compact(dispatchCalls[0]) !== sourceTokens(`dispatchReviewedPatientProfileNotes(review.execution, review.binding.command, Object.freeze({
+            policy: PROFILE_NOTES_COMMIT_POLICY, reference: review.binding.reference, digest: review.binding.digest,
+            ambulatoryId: review.binding.ambulatoryId, authorizeCommit,
+        }))`)) {
+        problems.push('reviewed notes must dispatch the retained command once with its synchronous current host review and fresh PIN');
+    }
+    return problems;
+}
+
 /* bounded C04 patient-update contract; this source guard complements the real transaction tests. */
 export function validateRequiredPatientUpdateAudit({ spec, routeSource, coreSource, auditSource, profileSource = null, dispatchSource = null }) {
-    const problems = spec.profileFile
+    const problems = spec.reviewedNotesCommit
+        ? validateReviewedNotesProfileAuditPort({ spec, routeSource, profileSource, dispatchSource })
+        : spec.profileFile
         ? validatePatientProfileAuditPort({ spec, routeSource, profileSource: profileSource ?? '', dispatchSource })
         : validateDelegatedRouteAudit({ spec, routeSource, serviceSource: coreSource });
     const core = checkedSource(spec.ownerFile, coreSource);
@@ -1568,9 +1675,9 @@ export function validateRequiredPatientUpdateAudit({ spec, routeSource, coreSour
         problems.push('patient update must use the transaction before membership and required audit');
     }
     const input = audit.arguments[1] && unwrap(audit.arguments[1]);
-    const props = input && ts.isObjectLiteralExpression(input)
-        ? exactPropertyAssignments(input, ['eventType', 'outcome', 'archiveGeneration', 'actorType', 'actorRef',
-            'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata']) : null;
+    const auditKeys = ['eventType', 'outcome', 'archiveGeneration', 'actorType', 'actorRef',
+        'subjectType', 'subjectRef', 'sourceSurface', 'requestId', ...(spec.profileFile ? ['occurredAt'] : []), 'redactedMetadata'];
+    const props = input && ts.isObjectLiteralExpression(input) ? exactPropertyAssignments(input, auditKeys) : null;
     const event = props?.get('eventType')?.initializer;
     const subject = props?.get('subjectType')?.initializer;
     const subjectRef = props?.get('subjectRef')?.initializer;
@@ -1603,6 +1710,32 @@ export function validateRequiredPatientUpdateAudit({ spec, routeSource, coreSour
             core.checker.getSymbolAtLocation(ownerInput)) || subjectRef.name.text !== 'patientId'
         || !outcome || !ts.isStringLiteral(outcome) || outcome.text !== 'success') {
         problems.push('required audit must classify the patient event and bind the same patient subject');
+    }
+
+    if (spec.reviewedNotesCommit) {
+        const compact = node => sourceTokens(node?.getText(core.sourceFile) ?? '');
+        const journalImports = ['profileNotesCommitKey', 'createProfileNotesCommitJournal', 'readProfileNotesCommitReceipt']
+            .map(name => importedBinding(core.sourceFile, core.checker, './security/patient-profile-notes-commit-journal', name));
+        const expected = [
+            "if (reviewed && reviewed.permit.authorizeCommit(tx) !== true) throw new ProfileNotesCommitError('commit_denied');",
+            'const journal = key ? createProfileNotesCommitJournal(key, Date.now()) : undefined;',
+            'const receipt = replay ? readProfileNotesCommitReceipt(tx, replay) : null;',
+            "if (replay && !receipt) throw new ProfileNotesCommitError('receipt_unavailable');",
+        ].map(text => callback.body.statements.find(statement => compact(statement) === sourceTokens(text)));
+        const metadata = props?.get('redactedMetadata')?.initializer;
+        const metadataProps = metadata && ts.isObjectLiteralExpression(metadata)
+            ? exactPropertyAssignments(metadata, ['profileNotesCommit', 'changedFields', 'resourceVersion', 'flags']) : null;
+        if (journalImports.some(binding => !binding || bindingIsWritten(core.sourceFile, core.checker, binding.symbol))
+            || expected.some(statement => !statement) || updates.length !== 1
+            || expected[0].pos >= updates[0].pos || expected[1].pos <= updates[0].pos || expected[1].pos >= audit.pos
+            || expected[2].pos <= audit.pos || expected[3].pos <= expected[2].pos
+            || compact(props?.get('occurredAt')?.initializer) !== sourceTokens('journal ? new Date(journal.receipt.committedAt) : undefined')
+            || compact(metadataProps?.get('profileNotesCommit')?.initializer) !== 'journal'
+            || !journalImports[0] || bindingCalls(owner, core.checker, journalImports[0].symbol).length !== 1
+            || !journalImports[1] || bindingCalls(owner, core.checker, journalImports[1].symbol).length !== 1
+            || !journalImports[2] || bindingCalls(owner, core.checker, journalImports[2].symbol).length !== 2) {
+            problems.push('reviewed notes must consume admission before CAS and create, audit and reread the one receipt inside the same transaction');
+        }
     }
 
     const auditFile = checkedSource('lib/security/audit.ts', auditSource);

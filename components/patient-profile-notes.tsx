@@ -72,6 +72,7 @@ export function PatientProfileNotes({ patientId, patientVersion }: Readonly<{ pa
     }, [patientId, patientVersion, revisionAvailable, user?.id, isLocked, isAuthenticated, client, attempt]);
     return <div data-testid="patient-profile-notes">
         <PatientProfileNotesView value={value} />
+        {!isLocked && isAuthenticated && revisionAvailable ? <a className="mt-2 block underline" href={`/patients/${encodeURIComponent(patientId)}/notes-review`}>Rivedi e salva le note</a> : null}
         {value.state === 'unavailable' && !isLocked ? <button type="button" className="mf-button-secondary mt-2" onClick={() => { setScoped(current => ({ ...current, value: { state: 'pending' } })); setAttempt(current => current + 1); }}>Riapri le note</button> : null}
     </div>;
 }

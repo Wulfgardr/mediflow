@@ -1051,6 +1051,7 @@ test('patient-update audit guard binds the PUT delegate, patient subject and req
         export async function PUT() { const commit = updatePatientOperation({ patientId: 'synthetic' }); return commit; }`;
     const auditCall = `writeAuditEventInTransaction(tx, {
             eventType: classifyPatientMutationEvent(existing.isArchived ?? null, input.values.isArchived), outcome: 'success',
+            archiveGeneration: input.audit.archiveGeneration,
             actorType: input.audit.actorType, actorRef: input.audit.actorRef,
             subjectType: 'patient', subjectRef: input.patientId,
             sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
@@ -1186,7 +1187,8 @@ for (const [routePath, auditContextExport] of [
             ['profile rewrites the admitted callback', change('profileSource', 'const outcome = await dispatchPatientProfileUpdate(execution, execution.command)',
                 'context.audit = () => body.audit; const outcome = await dispatchPatientProfileUpdate(execution, execution.command)')],
             ['profile dispatches another command', change('profileSource', 'dispatchPatientProfileUpdate(execution, execution.command)', 'dispatchPatientProfileUpdate(execution, body.command)')],
-            ['profile loses final admitted guard', change('profileSource', 'authorizeCommit,', 'authorizeCommit: undefined,')],
+            ['profile loses final admitted guard', change('profileSource',
+                'authorizeCommit,\n        audit: context.audit(),', 'authorizeCommit: undefined,\n        audit: context.audit(),')],
             ['profile uses raw body values', change('profileSource',
                 'expectedVersion: context.expectedVersion,\n        values: normalized.values,',
                 'expectedVersion: context.expectedVersion,\n        values: body,')],
@@ -1217,6 +1219,38 @@ for (const [routePath, auditContextExport] of [
         }
     });
 }
+
+test('reviewed notes audit guard keeps the named host permit and durable receipt in the patient transaction', () => {
+    const spec = { handler: 'POST', serviceModule: '@/lib/patient-profile-service', serviceExport: 'commitPatientProfileNotesHttp',
+        profileFile: 'lib/patient-profile-service.ts', ownerFile: 'lib/patient-update-operation.ts',
+        ownerName: 'updatePatientOperation', reviewedNotesCommit: true };
+    const original = { spec,
+        routeSource: fs.readFileSync('app/api/patients/[id]/notes-commit/route.ts', 'utf8'),
+        profileSource: fs.readFileSync(spec.profileFile, 'utf8'),
+        coreSource: fs.readFileSync(spec.ownerFile, 'utf8'),
+        dispatchSource: fs.readFileSync('lib/patient-profile-update-dispatch.ts', 'utf8'),
+        auditSource: fs.readFileSync('lib/security/audit.ts', 'utf8') };
+    assert.deepEqual(validateRequiredPatientUpdateAudit(original), []);
+    for (const [file, before, after] of [
+        ['routeSource', "'@/lib/security/archive-request-context'", "'@/lib/unapproved-archive-wrapper'"],
+        ['routeSource', '(await context.params).id', 'request.headers.get("patient-id")'],
+        ['profileSource', 'return profileNotesWorkflow(request, patientId);', 'return profileNotesWorkflow(request, null);'],
+        ['profileSource', 'patientId ? createPatientProfileNotesCommitExecution(hostInput)', 'patientId ? createPatientProfileUpdateExecution(hostInput)'],
+        ['profileSource', 'await verifyFreshReviewPin(input.candidatePin)', 'await fakePin(input.candidatePin)'],
+        ['profileSource', 'current.confirmations.consume(review.proof) !== binding', 'false'],
+        ['profileSource', 'dispatchReviewedPatientProfileNotes(review.execution, review.binding.command,', 'dispatchReviewedPatientProfileNotes(review.execution, body.command,'],
+        ['dispatchSource', 'return new ProfileUpdateExecution(input, true);', 'return new ProfileUpdateExecution(input, false);'],
+        ['dispatchSource', 'this.#requiresNotesReview !== (notesPermit !== undefined)', 'false'],
+        ['dispatchSource', 'reviewedNotes: notesPermit ? { command, permit: notesPermit } : undefined', 'reviewedNotes: undefined'],
+        ['coreSource', 'reviewed.permit.authorizeCommit(tx) !== true', 'false'],
+        ['coreSource', 'profileNotesCommit: journal,', 'profileNotesCommit: undefined,'],
+        ['coreSource', 'const receipt = replay ? readProfileNotesCommitReceipt(tx, replay) : null;', 'const receipt = journal?.receipt;'],
+    ]) {
+        const mutated = replaceOnce(original[file], before, after);
+        assertParseClean(file, mutated);
+        assert.notDeepEqual(validateRequiredPatientUpdateAudit({ ...original, [file]: mutated }), [], `${file}: ${before}`);
+    }
+});
 
 /* C05 DELETE mutations use the frozen real source shape, without modifying runtime files. */
 test('patient-delete audit guard binds both DELETE routes to one tombstone and required tx writer', () => {

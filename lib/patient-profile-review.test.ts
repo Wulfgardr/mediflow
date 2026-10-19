@@ -3,16 +3,20 @@ import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
 import { installNetworkPatientCookieFixture } from './network-patient-authority-test-fixture';
 import { issueSyntheticWebSessionContext, retireSyntheticWebSession } from './security/web-auth-lifecycle-owner-test-fixture';
 import { clearAllSessions } from './security/server-session';
 import { currentArchiveGeneration } from './security/archive-session-generation';
-import { ambulatories, patients, patientsToAmbulatories, physicianReviewAttestations, users } from './schema';
+import { ambulatories, auditEvents, patients, patientsToAmbulatories, physicianReviewAttestations, users } from './schema';
 import { isProfileReviewView, PROFILE_REVIEW_POLICY, type ProfileReviewView } from './patient-profile-review-contract';
 import { encryptData } from './security/security';
+import { isProfileNotesCommitReceipt, isProfileNotesCommitView, PROFILE_NOTES_COMMIT_POLICY,
+    type ProfileNotesCommitView } from './patient-profile-notes-commit-contract';
 
 const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-profile-review-'));
@@ -21,6 +25,8 @@ const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db
 const cookieState: { cookies: Map<string, string>; onCookies?: () => void } = { cookies: new Map() };
 const cleanup = installNetworkPatientCookieFixture(dataDir, cookieState);
 const route = load('../app/api/patient-profile/review/route.ts') as typeof import('../app/api/patient-profile/review/route');
+const commitRoute = load('../app/api/patients/[id]/notes-commit/route.ts') as typeof import('../app/api/patients/[id]/notes-commit/route');
+const ordinaryRoute = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route');
 const queryRoute = load('../app/api/patients/[id]/profile-query/route.ts') as typeof import('../app/api/patients/[id]/profile-query/route');
 const { createPhysicianReviewAttestationStore } = load('./security/physician-review-attestation-store.ts') as typeof import('./security/physician-review-attestation-store');
 const { sessionPhysicianReviewAuthority } = load('./security/session-physician-review-authority-production.ts') as typeof import('./security/session-physician-review-authority-production');
@@ -32,8 +38,8 @@ let session: ReturnType<typeof issueSyntheticWebSessionContext>;
 let epoch = 0;
 let sequence = 0;
 
-function request(body: unknown) {
-    return new Request('http://127.0.0.1/api/patient-profile/review', { method: 'POST', headers: {
+function request(body: unknown, path = '/api/patient-profile/review') {
+    return new Request(new URL(path, 'http://127.0.0.1'), { method: 'POST', headers: {
         'content-type': 'application/json', origin: 'http://127.0.0.1', 'sec-fetch-site': 'same-origin',
         'x-mediflow-archive-generation': currentArchiveGeneration(),
     }, body: JSON.stringify(body) });
@@ -70,7 +76,49 @@ async function prepare(notes: string | null = null): Promise<ProfileReviewView> 
     const view: unknown = await response.json(); assert.ok(isProfileReviewView(view));
     assert.equal(response.headers.get('cache-control'), 'no-store'); return view;
 }
-const confirmation = (view: ProfileReviewView, candidatePin = PIN) => ({ kind: 'confirm', reference: view.reference, digest: view.digest, candidatePin });
+const confirmation = (view: Pick<ProfileReviewView, 'reference' | 'digest'>, candidatePin = PIN) => ({ kind: 'confirm', reference: view.reference, digest: view.digest, candidatePin });
+function commit(body: unknown, id = 'synthetic-patient-a') {
+    return commitRoute.POST(request(body, `/api/patients/${id}/notes-commit`), { params: Promise.resolve({ id }) });
+}
+async function prepareCommit(notes: string | null = null): Promise<ProfileNotesCommitView> {
+    const response = await commit({ kind: 'prepare', expectedRevision: 4, expectedSelectionEpoch: epoch, notes });
+    assert.equal(response.status, 200, await response.clone().text());
+    const view: unknown = await response.json(); assert.ok(isProfileNotesCommitView(view)); return view;
+}
+function processCommit(t: TestContext, mode: 'race' | 'before-commit' | 'after-commit' | 'receipt', expected?: Pick<ProfileReviewView, 'reference' | 'digest'>) {
+    const child = spawn(process.execPath, ['--experimental-strip-types', '--import',
+        fileURLToPath(new URL('../scripts/register-strip-types-loader.mjs', import.meta.url)),
+        fileURLToPath(new URL('./patient-profile-notes-commit-process-fixture.ts', import.meta.url)), mode,
+        ...(expected ? [expected.reference, expected.digest] : [])], { env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir,
+        MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', MEDIFLOW_TEST_PROFILE_NOTES_PROCESS: '1' }, stdio: ['pipe', 'pipe', 'pipe'] });
+    let buffer = '', stderr = '', crash: string | null = null;
+    const results: { status: number; body: unknown }[] = [];
+    let ready!: (value: Pick<ProfileReviewView, 'reference' | 'digest'>) => void;
+    let rejectReady!: (error: Error) => void;
+    const prepared = new Promise<Pick<ProfileReviewView, 'reference' | 'digest'>>((resolve, reject) => { ready = resolve; rejectReady = reject; });
+    // Receipt workers have no preparation; keep an unused rejected readiness from escaping.
+    void prepared.catch(() => undefined);
+    child.stdout.on('data', value => {
+        buffer += String(value);
+        for (let end = buffer.indexOf('\n'); end >= 0; end = buffer.indexOf('\n')) {
+            const line = buffer.slice(0, end); buffer = buffer.slice(end + 1);
+            const message = JSON.parse(line);
+            if (message.kind === 'ready') ready({ reference: message.reference, digest: message.digest });
+            else if (message.kind === 'result') results.push(message);
+            else if (message.kind === 'crash') crash = message.stage;
+        }
+    });
+    child.stderr.on('data', value => { stderr = (stderr + String(value)).slice(-4096); });
+    const finished = new Promise<{ code: number | null; signal: NodeJS.Signals | null; results: typeof results; stderr: string; crash: string | null }>((resolve, reject) => {
+        child.on('error', error => { rejectReady(error); reject(error); });
+        child.on('close', (code, signal) => {
+            rejectReady(new Error(`Synthetic worker exited before preparation: ${code} ${signal} ${stderr}`));
+            resolve({ code, signal, results, stderr, crash });
+        });
+    });
+    t.after(() => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); });
+    return { prepared, finished, go: () => child.stdin.end('go\n') };
+}
 function revoke() { dbServer.update(physicianReviewAttestations).set({ status: 'revoked', revokedAt: new Date() }).where(eq(physicianReviewAttestations.actorRef, user.id)).run(); }
 test.after(() => { clearAllSessions(); cleanup(); dbServer.$client.close(); rmSync(dataDir, { recursive: true, force: true }); });
 
@@ -147,5 +195,178 @@ test('expiry and a regressing clock refuse confirmation without rearming the rev
         child.mock.method(Date, 'now', () => direction === 'expired' ? view.expiresAt : view.expiresAt - 60_000);
         assert.equal((await route.POST(request(confirmation(view)))).status, 410);
         assert.equal((await route.POST(request(confirmation(view)))).status, 409);
+    });
+});
+
+test('reviewed notes use the real writer once, return the same audit receipt and retain ordinary notes save', async () => {
+    await reset();
+    const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+    const encrypted = await encryptData('Nota clinica interamente sintetica.', key);
+    const notes = `ENC:${encrypted.iv}:${encrypted.data}`;
+    const count = dbServer.select().from(auditEvents).all().length;
+    const view = await prepareCommit(notes);
+    assert.deepEqual(view.recipient, { id: 'synthetic-patient-a', firstName: 'Ada', lastName: 'Sintetica' });
+    assert.equal(view.action, 'replace-notes'); assert.equal(view.notes, notes);
+    const response = await commit(confirmation(view)); assert.equal(response.status, 200, await response.clone().text());
+    const receipt: unknown = await response.json(); assert.ok(isProfileNotesCommitReceipt(receipt));
+    assert.equal(receipt.revision, 5); assert.equal(receipt.previousRevision, 4);
+    assert.equal(dbServer.select().from(patients).where(eq(patients.id, view.recipient.id)).get()?.notes, notes);
+    assert.equal(dbServer.select().from(patients).where(eq(patients.id, view.recipient.id)).get()?.version, 5);
+    assert.equal(dbServer.select().from(auditEvents).all().length, count + 1);
+    const metadata = dbServer.select().from(auditEvents).where(eq(auditEvents.eventId, view.reference)).get()!.redactedMetadata!;
+    for (const forbidden of [notes, 'Nota clinica', 'Ada', 'Sintetica', view.recipient.id, user.id, 'candidatePin', 'encryptedMasterKey']) assert.equal(metadata.includes(forbidden), false);
+    assert.deepEqual(await (await commit(confirmation(view))).json(), receipt);
+    assert.equal((await commit({ ...confirmation(view), digest: '0'.repeat(64) })).status, 409);
+    assert.equal(dbServer.select().from(auditEvents).all().length, count + 1);
+
+    const legacy = await ordinaryRoute.PUT(request({ version: 5, notes: null }), { params: Promise.resolve({ id: view.recipient.id }) });
+    assert.equal(legacy.status, 200, await legacy.clone().text());
+    assert.equal(dbServer.select().from(patients).where(eq(patients.id, view.recipient.id)).get()?.version, 6);
+    assert.deepEqual(await (await commit({ kind: 'receipt', reference: view.reference, digest: view.digest })).json(), receipt);
+});
+
+test('receipt recovery needs the current actor and scope, but never reactivates a proof or requires the old selection', async () => {
+    await reset(); const view = await prepareCommit();
+    const receipt = await (await commit(confirmation(view))).json();
+    clearAllSessions();
+    session = issueSyntheticWebSessionContext(user, `profile-recovery-${++sequence}`);
+    cookieState.cookies.set('mediflow_session', session.session.id); cookieState.cookies.set('mediflow_auth_control', session.controlId);
+    revoke();
+    const before = snapshot();
+    const recovery = { kind: 'receipt', reference: view.reference, digest: view.digest };
+    assert.deepEqual(await (await commit(recovery)).json(), receipt);
+    assert.deepEqual(await (await commit(confirmation(view, ''))).json(), receipt);
+    assert.equal((await commit(recovery, 'synthetic-patient-b')).status, 409);
+    assert.deepEqual(snapshot(), before);
+    const OTHER_USER = 'synthetic-recovery-other';
+    const other = { id: OTHER_USER, username: OTHER_USER, role: 'user' };
+    dbServer.insert(users).values({ ...other, passwordHash: 'synthetic-unusable', encryptedMasterKey: 'synthetic-unused', salt: 'synthetic-unused' }).run();
+    const foreign = issueSyntheticWebSessionContext(other, `profile-recovery-other-${++sequence}`);
+    cookieState.cookies.set('mediflow_session', foreign.session.id); cookieState.cookies.set('mediflow_auth_control', foreign.controlId);
+    assert.equal((await commit(recovery)).status, 409);
+    cookieState.cookies.set('mediflow_session', session.session.id); cookieState.cookies.set('mediflow_auth_control', session.controlId);
+    dbServer.insert(ambulatories).values({ id: 'synthetic-other-scope', name: 'Synthetic second scope', type: 'live' }).run();
+    dbServer.insert(patientsToAmbulatories).values({ patientId: 'synthetic-patient-a', ambulatoryId: 'synthetic-other-scope' }).run();
+    cookieState.cookies.set('ambulatory_id', 'synthetic-other-scope');
+    assert.equal((await commit(recovery)).status, 409);
+});
+
+test('commit policy cannot consume dry-run review and denies changed context or forged admission without effects', async t => {
+    await reset(); const dryRun = await prepare(); const before = snapshot();
+    assert.equal((await commit(confirmation(dryRun))).status, 409); assert.deepEqual(snapshot(), before);
+    for (const extra of [{ confirmed: true }, { policy: PROFILE_NOTES_COMMIT_POLICY }, { idempotencyKey: 'caller-key' }]) {
+        assert.equal((await commit({ kind: 'prepare', expectedRevision: 4, expectedSelectionEpoch: epoch, notes: null, ...extra })).status, 400);
+    }
+    for (const change of ['selection', 'version', 'role', 'attestation', 'lock', 'recipient', 'wrong-pin'] as const) await t.test(change, async () => {
+        await reset(); const view = await prepareCommit();
+        if (change === 'selection') { await select('synthetic-patient-b'); await select('synthetic-patient-a'); }
+        if (change === 'version') dbServer.update(patients).set({ version: 5 }).where(eq(patients.id, 'synthetic-patient-a')).run();
+        if (change === 'role') dbServer.update(users).set({ role: 'admin' }).where(eq(users.id, user.id)).run();
+        if (change === 'attestation') revoke();
+        if (change === 'lock') retireSyntheticWebSession(session.session);
+        if (change === 'recipient') dbServer.update(patients).set({ firstName: 'Synthetic changed name' }).where(eq(patients.id, 'synthetic-patient-a')).run();
+        const before = snapshot();
+        assert.ok((await commit(confirmation(view, change === 'wrong-pin' ? '9999' : PIN))).status >= 400);
+        assert.deepEqual(snapshot(), before);
+    });
+});
+
+test('recovery seals a pending or unconfirmed command before returning not committed', async () => {
+    await reset(); const view = await prepareCommit(), before = snapshot();
+    const response = await commit({ kind: 'receipt', reference: view.reference, digest: view.digest });
+    assert.deepEqual(await response.json(), { kind: 'not_committed', policy: PROFILE_NOTES_COMMIT_POLICY, reference: view.reference, digest: view.digest });
+    assert.equal((await commit(confirmation(view))).status, 409); assert.deepEqual(snapshot(), before);
+    const next = await prepareCommit();
+    let release!: () => void;
+    const waiting = new Promise<void>(resolve => { release = resolve; });
+    let entered!: () => void;
+    const atPin = new Promise<void>(resolve => { entered = resolve; });
+    let reads = 0;
+    cookieState.onCookies = async () => { if (++reads === 4) { entered(); await waiting; } };
+    const pending = commit(confirmation(next));
+    await Promise.race([atPin, pending.then(() => { throw new Error('Synthetic PIN boundary was not reached'); })]);
+    cookieState.onCookies = undefined;
+    const recovery = await commit({ kind: 'receipt', reference: next.reference, digest: next.digest });
+    release(); assert.equal((await pending).status, 409);
+    assert.equal((await recovery.json()).kind, 'not_committed'); assert.deepEqual(snapshot(), before);
+});
+
+test('recovery never reports absence while another real session can still commit', { timeout: 15_000 }, async t => {
+    await reset(); const count = dbServer.select().from(auditEvents).all().length;
+    const worker = processCommit(t, 'race'), expected = await worker.prepared;
+    const response = await commit({ kind: 'receipt', ...expected });
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).code, 'receipt_unavailable');
+    assert.equal(dbServer.select().from(patients).where(eq(patients.id, 'synthetic-patient-a')).get()?.version, 4);
+    assert.equal(dbServer.select().from(auditEvents).all().length, count);
+    worker.go(); const result = await worker.finished;
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.results[0]?.status, 200);
+    assert.ok(isProfileNotesCommitReceipt(result.results[0].body));
+    assert.deepEqual(await (await commit({ kind: 'receipt', ...expected })).json(), result.results[0].body);
+    assert.equal(dbServer.select().from(patients).where(eq(patients.id, 'synthetic-patient-a')).get()?.version, 5);
+    assert.equal(dbServer.select().from(auditEvents).all().length, count + 1);
+});
+
+test('audit insertion and receipt construction failures roll back the real patient CAS', async t => {
+    for (const fault of ['audit-abort', 'audit-ignore', 'receipt-clock'] as const) await t.test(fault, async child => {
+        await reset(); const view = await prepareCommit(), before = snapshot();
+        let afterUpdate = false;
+        if (fault === 'receipt-clock') {
+            dbServer.$client.function('synthetic_receipt_clock', () => {
+                afterUpdate = true; child.mock.method(Date, 'now', () => Number.NaN); return 1;
+            });
+            dbServer.$client.exec(`CREATE TEMP TRIGGER synthetic_receipt_fault AFTER UPDATE OF version ON patients
+                BEGIN SELECT synthetic_receipt_clock(); END`);
+        } else dbServer.$client.exec(`CREATE TEMP TRIGGER synthetic_audit_fault BEFORE INSERT ON audit_events
+            WHEN NEW.event_id LIKE 'ppr_%' BEGIN SELECT RAISE(${fault === 'audit-abort' ? "ABORT, 'synthetic audit failure'" : 'IGNORE'}); END`);
+        try { assert.ok((await commit(confirmation(view))).status >= 400); }
+        finally { child.mock.restoreAll(); dbServer.$client.exec('DROP TRIGGER IF EXISTS synthetic_audit_fault'); dbServer.$client.exec('DROP TRIGGER IF EXISTS synthetic_receipt_fault'); }
+        if (fault === 'receipt-clock') assert.equal(afterUpdate, true);
+        assert.deepEqual(snapshot(), before);
+        assert.equal((await commit(confirmation(view))).status, 409);
+    });
+});
+
+test('two real processes confirming the same patient revision have one winner and one audit', { timeout: 15_000 }, async t => {
+    await reset(); const count = dbServer.select().from(auditEvents).all().length;
+    const first = processCommit(t, 'race'), second = processCommit(t, 'race');
+    const views = await Promise.all([first.prepared, second.prepared]);
+    assert.notEqual(views[0].reference, views[1].reference);
+    first.go(); second.go();
+    const completed = await Promise.all([first.finished, second.finished]);
+    for (const result of completed) assert.equal(result.code, 0, result.stderr);
+    assert.deepEqual(completed.map(result => result.results[0]?.status).sort(), [200, 409]);
+    assert.equal(dbServer.select().from(patients).where(eq(patients.id, 'synthetic-patient-a')).get()?.version, 5);
+    assert.equal(dbServer.select().from(auditEvents).all().length, count + 1);
+});
+
+test('real process termination before commit rolls back; after commit a new process recovers the same receipt', { timeout: 20_000 }, async t => {
+    // Each real worker admits a new session. Its durable generation fence is
+    // independent of the clinical transaction and survives an abrupt stop.
+    const clinicalState = () => Object.fromEntries(Object.entries(snapshot())
+        .filter(([table]) => table !== 'archive_session_generations'));
+    for (const mode of ['before-commit', 'after-commit'] as const) await t.test(mode, async current => {
+        await reset(); const before = clinicalState();
+        const worker = processCommit(current, mode), expected = await worker.prepared;
+        worker.go(); const stopped = await worker.finished;
+        assert.equal(stopped.crash, mode, stopped.stderr);
+        assert.ok(stopped.signal === 'SIGKILL' || (process.platform === 'win32' && stopped.code === 1), stopped.stderr);
+        assert.equal(stopped.results.length, 0);
+        const recovery = processCommit(current, 'receipt', expected);
+        const result = await recovery.finished; assert.equal(result.code, 0, result.stderr);
+        if (mode === 'before-commit') {
+            assert.equal(result.results[0]?.status, 503);
+            assert.deepEqual(clinicalState(), before);
+            assert.equal((result.results[0].body as { code: string }).code, 'receipt_unavailable');
+        } else {
+            assert.equal(result.results[0]?.status, 200);
+            const receipt = result.results[0].body; assert.ok(isProfileNotesCommitReceipt(receipt));
+            assert.equal(receipt.revision, 5);
+            assert.equal(dbServer.select().from(patients).where(eq(patients.id, 'synthetic-patient-a')).get()?.version, 5);
+            const after = snapshot();
+            assert.deepEqual(await (await commit({ kind: 'receipt', ...expected })).json(), receipt);
+            assert.deepEqual(snapshot(), after);
+        }
     });
 });
