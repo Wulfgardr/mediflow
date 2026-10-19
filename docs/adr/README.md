@@ -14,6 +14,7 @@ verifica dello stato successivo.
 
 ## Decisioni richiamate
 
+- [0153-paired-scale-preparation-and-diary-currentness.md](./0153-paired-scale-preparation-and-diary-currentness.md): WUL-771; catalogo e preparazione Scale TypeScript in sola lettura, selezione corrente e guard transazionale nel diario paired esistente, con garanzia keyless esplicita.
 - [0152-profile-contract-platform-boundary.md](./0152-profile-contract-platform-boundary.md): BT-08; dipendenze OS e framework negli adapter host, contratti verificati senza DOM e qualifica delle applicazioni installate distinta.
 - [0151-profile-contract-package-topology.md](./0151-profile-contract-package-topology.md): BT-07; pacchetto puro dei contratti profilo già provati, owner Node e conformità condivisa senza nuovi writer o trasformazioni dei dati.
 - [0150-patient-profile-pilot-recovery.md](./0150-patient-profile-pilot-recovery.md): BT-06; recupero C15 prima/dopo il pilota, ricevuta storica conservata e autorizzazione corrente verificata senza riattivare sessioni o prove precedenti.

@@ -395,7 +395,7 @@ export function buildNetworkCapabilitiesResponse(input: {
                 'network.catalogs.readonly',
                 operatingMode === 'network-home-base' ? 'available' : 'disabled',
                 true,
-                'Read-only access to local reference catalogs and terminology lookup from a paired client with a valid operator session; excludes catalog sync and offline distribution.'
+                'Read-only access to local reference catalogs, terminology and active scale descriptors; scale preparation also requires readonly-patients and current profile selection. Excludes catalog sync, offline distribution and clinical writes.'
             ),
             capability(
                 'network.replica.readonly-documents',

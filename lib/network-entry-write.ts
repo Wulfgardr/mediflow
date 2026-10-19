@@ -5,12 +5,13 @@ import { entryExpectedVersion, prepareEntryCreate, prepareEntryUpdate } from './
 import { createEntryOperation, updateEntryOperation } from './entry-write-operation';
 import { isSealedValue } from './network-patient-lifecycle';
 import type { NetworkWriteContext } from './network-write-context';
+import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
 
 export const NETWORK_ENTRY_WRITE_CAPABILITY = 'network.replica.write-clinical-diary';
 
 type Context = NetworkWriteContext & { patientId: string };
 type UpdateContext = Context & { entryId: string };
-type Result = { status: 200 | 201 | 400 | 403 | 404 | 409 | 413; value: Record<string, unknown> };
+type Result = { status: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 413; value: Record<string, unknown> };
 
 const FORBIDDEN_WRITE = new Set(['aiSummary', 'documentInsights', 'documentInsightId', 'sourceDocumentId']);
 const FORBIDDEN_CREATE = new Set(['patientId', 'createdAt', 'updatedAt', 'version']);
@@ -53,9 +54,10 @@ export async function createNetworkScopedEntry(context: Context, body: Record<st
     if (boundary) return boundary;
     const prepared = prepareEntryCreate(body, 'network', context.patientId);
     if (!prepared.ok) return { status: prepared.status, value: { error: prepared.error } };
+    const authorizeCommit = await prepareNetworkPatientCommitGuard(context, NETWORK_ENTRY_WRITE_CAPABILITY);
     return createEntryOperation({ patientId: context.patientId, id: prepared.id,
         values: prepared.values, changedFields: prepared.changedFields, mode: 'network',
-        scopeAmbulatoryId: context.scopeAmbulatoryId, audit: audit(context) });
+        scopeAmbulatoryId: context.scopeAmbulatoryId, audit: audit(context), authorizeCommit });
 }
 
 export async function updateNetworkScopedEntry(context: UpdateContext, body: Record<string, unknown>): Promise<Result> {
@@ -66,8 +68,9 @@ export async function updateNetworkScopedEntry(context: UpdateContext, body: Rec
     if (boundary) return boundary;
     const prepared = prepareEntryUpdate(body, 'network');
     if (!prepared.ok) return { status: prepared.status, value: { error: prepared.error } };
+    const authorizeCommit = await prepareNetworkPatientCommitGuard(context, NETWORK_ENTRY_WRITE_CAPABILITY);
     return updateEntryOperation({ patientId: context.patientId, entryId: context.entryId,
         expectedVersion: prepared.expectedVersion, values: prepared.values,
         changedFields: prepared.changedFields, mode: 'network',
-        scopeAmbulatoryId: context.scopeAmbulatoryId, audit: audit(context) });
+        scopeAmbulatoryId: context.scopeAmbulatoryId, audit: audit(context), authorizeCommit });
 }
