@@ -89,6 +89,28 @@ async function assertDenied(value: Promise<unknown>, code: SessionPhysicianRevie
     await assert.rejects(value, (error) => error instanceof SessionPhysicianReviewAuthorityError && error.code === code);
 }
 
+test('final review gate denies asynchronous sources or callback results without unhandled rejections', async () => {
+    for (const delayed of ['attestation', 'account', 'callback'] as const) {
+        const session = issueSyntheticWebSession(USER, `review-final-${sequence += 1}`); sessions.push(session);
+        let final = false, effects = 0;
+        const service = createSessionPhysicianReviewAuthorityService({
+            resolvePrincipal: () => ({ actorRef: USER.id, sessionRef: session.id }), readCurrentSession: () => session,
+            readAttestation: () => final && delayed === 'attestation' ? Promise.reject(new Error('synthetic delayed source')) : activeAttestation(),
+            readAccount: () => final && delayed === 'account' ? Promise.reject(new Error('synthetic delayed source')) : { id: USER.id, lockedUntil: null },
+        });
+        const authority = await service.derive(); final = true;
+        assert.throws(() => service.withCurrentAuthority(authority, () => {
+            effects++; return Promise.reject(new Error('synthetic asynchronous callback'));
+        }), { code: 'storage_unavailable' });
+        assert.equal(effects, delayed === 'callback' ? 1 : 0);
+        if (delayed === 'callback') {
+            assert.throws(() => service.withCurrentAuthority(authority, () => { throw new Error('superseded review'); }), /superseded review/u);
+            assert.equal(service.withCurrentAuthority(authority, () => 1), 1);
+        } else assert.throws(() => service.withCurrentAuthority(authority, () => 1), { code: 'projection_unavailable' });
+    }
+    await new Promise<void>(resolve => setImmediate(resolve));
+});
+
 test('derives a frozen active P1/P2 authority only for the current non-sliding web session', async () => {
     const { service, session } = fixture();
     const expiry = session.expiresAt;
@@ -197,7 +219,9 @@ test('deduplicates concurrent derivation and revokes the authority through canon
 
 test('exposes no caller identity, transport grant, route, or persistence seam', () => {
     const source = readFileSync(new URL('./session-physician-review-authority.ts', import.meta.url), 'utf8');
-    assert.equal(fixture().service.derive.length, 0);
-    assert.doesNotMatch(source, /\b(cookies|headers|Request|URL|role|device|gesture|provider|apply)\b/u);
+    const { service } = fixture();
+    assert.equal(service.derive.length, 0);
+    assert.deepEqual(Object.keys(service).sort(), ['derive', 'recheck', 'withCurrentAuthority']);
+    assert.doesNotMatch(source, /\b(cookies|headers|Request|URL|role|device|gesture|provider)\b/u);
     assert.doesNotMatch(source, /app\/api|NextResponse|dbServer\.(?:insert|update|delete)/u);
 });

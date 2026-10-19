@@ -1,6 +1,7 @@
 import 'server-only';
 
 import crypto from 'crypto';
+import { types } from 'node:util';
 
 import type { AuthenticatedReviewPrincipalV1 } from './authenticated-review-principal';
 import type { ServerSession } from './server-session';
@@ -81,6 +82,17 @@ function fail(code: SessionPhysicianReviewAuthorityErrorCode): never {
     throw new SessionPhysicianReviewAuthorityError(code);
 }
 
+const promiseThen = Promise.prototype.then;
+function synchronous<T>(value: T): T {
+    if (types.isPromise(value)) {
+        Reflect.apply(promiseThen, value, [undefined, () => undefined]);
+        return fail('storage_unavailable');
+    }
+    if (value !== null && (typeof value === 'object' || typeof value === 'function')
+        && typeof (value as { then?: unknown }).then === 'function') return fail('storage_unavailable');
+    return value;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -148,6 +160,13 @@ export function createSessionPhysicianReviewAuthorityService(sources: SessionPhy
     const markerKey = crypto.randomBytes(32);
     const clock = sources.clock ?? Date.now;
 
+    const revocationGeneration = (actorRef: string, attestation: unknown, account: unknown): string => {
+        const verifiedAttestation = verifyAttestation(attestation, actorRef);
+        const verifiedAccount = verifyAccount(account, actorRef, clock());
+        return marker(markerKey, 'revocation', [actorRef, verifiedAttestation.updatedAt.getTime(),
+            verifiedAccount.lockedUntil?.getTime() ?? null]);
+    };
+
     const readSnapshot = async (): Promise<SnapshotRead> => {
         let principal: AuthenticatedReviewPrincipalV1;
         let session: ServerSession | null;
@@ -177,18 +196,12 @@ export function createSessionPhysicianReviewAuthorityService(sources: SessionPhy
                 if (error instanceof SessionPhysicianReviewAuthorityError) throw error;
                 return fail('storage_unavailable');
             }
-            const verifiedAttestation = verifyAttestation(attestation, principal.actorRef);
-            const verifiedAccount = verifyAccount(account, principal.actorRef, clock());
             const snapshot = Object.freeze({
                 actorRef: principal.actorRef,
                 expiresAt: current.expiresAt,
                 sessionId: current.id,
                 sessionGeneration: marker(markerKey, 'session', [current.id, current.userId, current.createdAt]),
-                revocationGeneration: marker(markerKey, 'revocation', [
-                    principal.actorRef,
-                    verifiedAttestation.updatedAt.getTime(),
-                    verifiedAccount.lockedUntil?.getTime() ?? null,
-                ]),
+                revocationGeneration: revocationGeneration(principal.actorRef, attestation, account),
             });
             committed = commitResourceUse(use);
             if (!committed) return fail('session_unavailable');
@@ -284,6 +297,31 @@ export function createSessionPhysicianReviewAuthorityService(sources: SessionPhy
                 return fail('projection_stale');
             }
             return record.authority;
+        },
+
+        /** Final synchronous review gate. Async sources cannot authorize this section. */
+        withCurrentAuthority<T>(candidate: unknown, operation: () => T): T {
+            const record = isRecord(candidate) ? issued.get(candidate) : undefined;
+            if (!record?.port || records.get(record.snapshot.sessionId) !== record) return fail('projection_unavailable');
+            const use = beginResourceUse(record.port);
+            let committed = false;
+            let authorityValidated = false;
+            try {
+                if (!use || clock() >= record.snapshot.expiresAt) return fail('session_unavailable');
+                const actorRef = record.snapshot.actorRef;
+                const attestation = synchronous(sources.readAttestation(actorRef));
+                const account = synchronous(sources.readAccount(actorRef));
+                const generation = revocationGeneration(actorRef, attestation, account);
+                if (generation !== record.snapshot.revocationGeneration) return fail('projection_stale');
+                authorityValidated = true;
+                const result = synchronous(operation());
+                committed = commitResourceUse(use);
+                if (!committed) { authorityValidated = false; return fail('session_unavailable'); }
+                return result;
+            } catch (error) {
+                if (!authorityValidated) discard(record);
+                throw error;
+            } finally { if (use && !committed) abortResourceUse(use); }
         },
     });
 }

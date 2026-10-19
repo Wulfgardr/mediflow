@@ -5,7 +5,8 @@ import { patients, patientsToAmbulatories } from './schema';
 import { activePatients } from './patient-lifecycle';
 import { normalizePatientUpdateInput } from './patient-write-normalization';
 import type { PatientUpdateOperationResult } from './patient-update-operation';
-import { createPatientProfileUpdateExecution, dispatchPatientProfileUpdate } from './patient-profile-update-dispatch';
+import { createPatientProfileUpdateCommand, createPatientProfileUpdateExecution, dispatchPatientProfileUpdate } from './patient-profile-update-dispatch';
+import type { PatientProfileUpdateEnvelope } from './patient-profile-update-contract';
 import { NextResponse } from 'next/server';
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
@@ -15,8 +16,8 @@ import { getNetworkModeGateResponse, resolveNetworkScope, requireNetworkCapabili
 import { NETWORK_FSE_VALIDATE_CAPABILITY } from './network-contract';
 import { PATIENT_PROFILE_READ_OPERATION, type PatientProfileActor, type PatientProfileQuery, type PatientProfileView } from './patient-profile-query';
 import type { NetworkPatientCommitGuard } from './network-patient-commit-authority';
-import type { RequiredAuditContext } from './security/audit';
-import { randomBytes } from 'node:crypto';
+import { auditContextFromSession, requestIdFromRequest, type RequiredAuditContext } from './security/audit';
+import { createHash, randomBytes } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { ambulatories, settings, users } from './schema';
 import { apiFailure, archiveReplacementResponse } from './api-error-response';
@@ -38,6 +39,13 @@ import { NETWORK_PAIRING_STATE_KEY, parseNetworkPairingState } from './network-p
 import type { StoredNetworkPairedClient } from './network-pairing-model';
 import { currentArchiveGeneration } from './security/archive-session-generation';
 import type { PatientProfileQueryHostPort } from './security/patient-profile-query-host-port';
+import { createSingleUseConfirmationOwner } from './security/single-use-confirmation';
+import { sessionPhysicianReviewAuthority } from './security/session-physician-review-authority-production';
+import { SessionPhysicianReviewAuthorityError, type SessionPhysicianReviewAuthorityV1 } from './security/session-physician-review-authority';
+import { FreshReviewPinError, verifyFreshReviewPin } from './security/fresh-review-pin-uniqueness';
+import { readBoundedJsonBody } from './bounded-request-body';
+import { PROFILE_REVIEW_MAX_NOTES_BYTES, PROFILE_REVIEW_POLICY, PROFILE_REVIEW_TTL_MS,
+    parseProfileReviewInput, type ProfileReviewView, type ProfileReviewReceipt } from './patient-profile-review-contract';
 
 type PatientRecord = typeof patients.$inferSelect;
 export type PatientProfileReadInput = Readonly<{ request: Request } & (
@@ -170,13 +178,26 @@ type ScopedReferences = {
     registration: ServerSessionSelectionDependentRegistrationV1;
     handles: Map<string, Readonly<{ lane: ScopedContext['lane']; maximumProjection: ProfileProjection;
         purpose: string; patientId: string; ambulatoryId: string; revision: number; expiresAt: number }>>;
+    confirmations: ReturnType<typeof createSingleUseConfirmationOwner<ProfileReviewBinding>>;
+    reviewGeneration: number;
+    review: { binding: ProfileReviewBinding; proof: object; phase: 'ready' | 'verifying'; lastObservedAt: number } | null;
 };
+type ProfileReviewBinding = Readonly<{
+    command: PatientProfileUpdateEnvelope; authority: SessionPhysicianReviewAuthorityV1;
+    role: 'physician_terminal_review'; policy: typeof PROFILE_REVIEW_POLICY;
+    sessionId: string; ambulatoryId: string; epoch: number; createdAt: number; expiresAt: number;
+    reference: string; digest: string;
+}>;
 const scopedReferences = new WeakMap<ServerSessionProfileSelectionOwner, ScopedReferences>();
 const scopedHostPorts = new WeakMap<PatientProfileQueryHostPort, Readonly<{
     context: ScopedContext; state: ScopedReferences; active(): boolean;
 }>>();
 
 function scopedFail(code: ConstructorParameters<typeof ProfileQueryError>[0]): never { throw new ProfileQueryError(code); }
+
+function retireProfileReview(state: ScopedReferences): void {
+    state.confirmations.clear(); state.review = null; state.reviewGeneration++;
+}
 
 function currentProfileScope(request: Request, cookie: string | null): string {
     const active = cookie ? dbServer.select({ id: ambulatories.id }).from(ambulatories).where(eq(ambulatories.id, cookie)).get() : undefined;
@@ -201,7 +222,7 @@ function withCurrentProfileSession<T>(context: ScopedContext, operation: () => T
     const revoked = () => {
         const state = scopedReferences.get(context.owner);
         if (state) {
-            state.active = false; state.handles.clear(); scopedReferences.delete(context.owner);
+            state.active = false; state.handles.clear(); retireProfileReview(state); scopedReferences.delete(context.owner);
             context.process.selectionLifecycleController.unregisterDependent(state.scope, state.registration);
         }
         try { context.owner.dispose(); } catch { /* References are already terminal. */ }
@@ -237,10 +258,11 @@ function references(context: ScopedContext): ScopedReferences {
     const { selectionLifecycleController: lifecycle } = context.process;
     const accepted = lifecycle.withCurrentSelection(context.session, scope => {
         const registration = lifecycle.registerDependent(scope, () => {
-            if (state) { state.active = false; state.handles.clear(); }
+            if (state) { state.active = false; state.handles.clear(); retireProfileReview(state); }
         });
         if (!registration) return;
-        state = { active: true, epoch, scope, registration, handles: new Map() };
+        state = { active: true, epoch, scope, registration, handles: new Map(),
+            confirmations: createSingleUseConfirmationOwner<ProfileReviewBinding>(), review: null, reviewGeneration: 0 };
     });
     if (!accepted || !state) return scopedFail('selection_conflict');
     scopedReferences.set(context.owner, state);
@@ -374,6 +396,119 @@ export async function readPatientProfileSelectionEpochHttp(request: Request, sur
         const response = NextResponse.json({ contractVersion: 1, selectionEpoch });
         response.headers.set('Cache-Control', 'no-store'); return response;
     } catch (error) { return profileQueryFailureResponse(error); }
+}
+
+function withProfileReviewSelection<T>(context: ScopedContext, state: ScopedReferences, epoch: number, revision: number,
+    signal: AbortSignal, operation: (patient: PatientProfileView, ambulatoryId: string, expiresAt: number) => T): T {
+    return withCurrentProfileSession(context, () => {
+        if (!state.active || scopedReferences.get(context.owner) !== state || state.epoch !== epoch || signal.aborted) return scopedFail('selection_conflict');
+        const ambulatoryId = context.currentScope();
+        let result: { value: T } | undefined;
+        let failure: unknown;
+        const accepted = context.process.selectionBindingController.withCurrentDependentBinding(state.scope, state.registration, binding => {
+            try {
+                result = { value: context.owner.withLeaseCriticalSection(context.session, selected => {
+                    if (selected.ambulatoryId !== ambulatoryId || binding.selection.selectionEpoch !== epoch) return scopedFail('scope_denied');
+                    const patient = queryPatientProfile({ operation: PROFILE_QUERY_OPERATION_ID,
+                        actor: { kind: 'operator', ref: context.session.userId, role: context.session.role, channel: 'web' },
+                        purpose: context.purpose, patientId: selected.patientId, scope: { kind: 'ambulatory', ambulatoryId } });
+                    if (!patient) return scopedFail('query_unavailable');
+                    if (patient.version !== revision || patient.version !== binding.patientVersion) return scopedFail('revision_conflict');
+                    return operation(patient, ambulatoryId, binding.selection.expiresAt);
+                }) };
+            } catch (error) { failure = error; }
+        });
+        if (failure !== undefined) throw failure;
+        if (!accepted || !state.active || !result) return scopedFail('selection_conflict');
+        return result.value;
+    });
+}
+
+/** WUL-584: a terminal human review in memory. This port has no dispatch or writer. */
+export async function reviewPatientProfileHttp(request: Request): Promise<NextResponse> {
+    if (process.env.NODE_ENV === 'production') return new NextResponse(null, { status: 404 });
+    let state: ScopedReferences | undefined;
+    let claimed: ScopedReferences['review'] = null;
+    try {
+        const context = await admitScopedProfileRequest(request, 'web'); if (context instanceof NextResponse) return context;
+        if (context.session.authChannel !== 'web' || !isTrustedWebMutationRequest(request)) return forbiddenResponse();
+        const body = await readBoundedJsonBody(request, PROFILE_REVIEW_MAX_NOTES_BYTES + 1024, 'request-json',
+            { signal: request.signal, deadline: Infinity });
+        if (!body.ok) return apiFailure('input_invalid', 'Richiesta di revisione non valida.', body.status);
+        if (!body.value || typeof body.value !== 'object' || Array.isArray(body.value)) return scopedFail('input_invalid');
+        const input = parseProfileReviewInput(body.value as Record<string, unknown>);
+        if (!input) return scopedFail('input_invalid');
+        state = withCurrentProfileSession(context, () => references(context));
+        let output: ProfileReviewView | ProfileReviewReceipt | Readonly<{ kind: 'cancelled' }>;
+        if (input.kind === 'prepare') {
+            retireProfileReview(state);
+            const generation = state.reviewGeneration;
+            if (input.notes !== null && Buffer.byteLength(input.notes, 'utf8') > PROFILE_REVIEW_MAX_NOTES_BYTES) return scopedFail('output_too_large');
+            const authority = await sessionPhysicianReviewAuthority.derive();
+            if (authority.actorRef !== context.session.userId) return scopedFail('scope_denied');
+            const current = state;
+            output = withProfileReviewSelection(context, current, input.expectedSelectionEpoch, input.expectedRevision, request.signal,
+                (patient, ambulatoryId, selectionDeadline) => sessionPhysicianReviewAuthority.withCurrentAuthority(authority, () => {
+                    if (current.reviewGeneration !== generation) return scopedFail('selection_conflict');
+                    const normalized = normalizePatientUpdateInput({ notes: input.notes }, { expectedVersion: patient.version });
+                    if (!normalized.ok) return scopedFail('input_invalid');
+                    const audit = auditContextFromSession(context.session);
+                    const command = createPatientProfileUpdateCommand({ patientId: patient.id, expectedVersion: patient.version,
+                        values: normalized.values, setPrimaryAmbulatory: false,
+                        audit: { ...audit, archiveGeneration: audit.archiveGeneration,
+                            requestId: requestIdFromRequest(request), flags: [`auth:${audit.authContext}`] } });
+                    const createdAt = Date.now();
+                    const expiresAt = Math.min(createdAt + PROFILE_REVIEW_TTL_MS, authority.expiresAt, selectionDeadline);
+                    if (createdAt >= expiresAt) return scopedFail('handle_expired');
+                    const content = { command, authority, role: 'physician_terminal_review' as const, policy: PROFILE_REVIEW_POLICY,
+                        sessionId: context.session.id, ambulatoryId, epoch: current.epoch, createdAt, expiresAt,
+                        reference: `ppr_${randomBytes(32).toString('hex')}` };
+                    const binding: ProfileReviewBinding = Object.freeze({ ...content,
+                        digest: createHash('sha256').update(JSON.stringify(content)).digest('hex') });
+                    retireProfileReview(current);
+                    current.review = { binding, proof: current.confirmations.issue(binding), phase: 'ready', lastObservedAt: createdAt };
+                    return { kind: 'prepared', policy: binding.policy, reference: binding.reference, digest: binding.digest,
+                        notes: command.payload.notes ?? null, expectedRevision: command.target.expectedVersion,
+                        selectionEpoch: binding.epoch, expiresAt };
+                }));
+        } else {
+            const review = state.review;
+            if (!review || review.binding.reference !== input.reference) return scopedFail('handle_unavailable');
+            if (input.kind === 'cancel') {
+                retireProfileReview(state); output = { kind: 'cancelled' };
+            } else {
+                if (review.binding.digest !== input.digest) { retireProfileReview(state); return scopedFail('selection_conflict'); }
+                if (review.phase !== 'ready') return scopedFail('selection_conflict');
+                claimed = review; review.phase = 'verifying';
+                const now = Date.now();
+                if (now < review.lastObservedAt || now >= review.binding.expiresAt) return scopedFail('handle_expired');
+                review.lastObservedAt = now;
+                const pin = await verifyFreshReviewPin(input.candidatePin);
+                const authority = await sessionPhysicianReviewAuthority.recheck(review.binding.authority);
+                const current = state;
+                output = withProfileReviewSelection(context, current, review.binding.epoch, review.binding.command.target.expectedVersion,
+                    request.signal, (patient, ambulatoryId) => sessionPhysicianReviewAuthority.withCurrentAuthority(authority, () => {
+                        const binding = review.binding;
+                        const now = Date.now();
+                        if (now < review.lastObservedAt || now >= binding.expiresAt) return scopedFail('handle_expired');
+                        review.lastObservedAt = now;
+                        if (current.review !== review || pin.actorRef !== authority.actorRef || pin.sessionRef !== context.session.id
+                            || binding.sessionId !== context.session.id || binding.ambulatoryId !== ambulatoryId
+                            || binding.command.target.patientId !== patient.id || binding.policy !== PROFILE_REVIEW_POLICY) return scopedFail('selection_conflict');
+                        if (current.confirmations.consume(review.proof) !== binding) return scopedFail('handle_unavailable');
+                        retireProfileReview(current);
+                        return { kind: 'reviewed', policy: PROFILE_REVIEW_POLICY, writesPerformed: 0 };
+                    }));
+            }
+        }
+        const response = NextResponse.json(output); response.headers.set('Cache-Control', 'no-store'); return response;
+    } catch (error) {
+        if (state && claimed && state.review === claimed) retireProfileReview(state);
+        if (error instanceof FreshReviewPinError || error instanceof SessionPhysicianReviewAuthorityError) {
+            return apiFailure('review_denied', 'Revisione non ammessa. Riapri la prova e verifica la sessione e il PIN.', 403);
+        }
+        return profileQueryFailureResponse(error);
+    }
 }
 
 export async function acquireScopedPatientProfileHostPort(projection: ProfileProjection, expiresAt: number): Promise<PatientProfileQueryHostPort | null> {
