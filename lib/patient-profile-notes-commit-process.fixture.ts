@@ -21,6 +21,7 @@ const cleanup = installNetworkPatientCookieFixture(cookieDir, cookieState);
 const queryRoute = load('../app/api/patients/[id]/profile-query/route.ts') as typeof import('../app/api/patients/[id]/profile-query/route');
 const commitRoute = load('../app/api/patients/[id]/notes-commit/route.ts') as typeof import('../app/api/patients/[id]/notes-commit/route');
 const SYNTHETIC_USER = 'synthetic-review-user';
+const SYNTHETIC_OTHER_USER = 'synthetic-other-user';
 const PIN = '3817';
 const user = { id: SYNTHETIC_USER, username: SYNTHETIC_USER, role: 'user' };
 const session = issueSyntheticWebSessionContext(user, `profile-worker-${process.pid}`);
@@ -64,7 +65,7 @@ try {
             cookieState.cookies.set('ambulatory_id', 'synthetic-other-scope');
             await collect('scope', commitRoute.POST(request(receiptInput), context));
             cookieState.cookies.set('ambulatory_id', 'synthetic-scope');
-            const other = issueSyntheticWebSessionContext({ id: 'synthetic-other-user', username: 'synthetic-other-user', role: 'user' }, `recovery-other-${process.pid}`);
+            const other = issueSyntheticWebSessionContext({ id: SYNTHETIC_OTHER_USER, username: SYNTHETIC_OTHER_USER, role: 'user' }, `recovery-other-${process.pid}`);
             cookieState.cookies.set('mediflow_session', other.session.id); cookieState.cookies.set('mediflow_auth_control', other.controlId);
             await collect('actor', commitRoute.POST(request(receiptInput), context));
             cookieState.cookies.set('mediflow_session', session.session.id); cookieState.cookies.set('mediflow_auth_control', session.controlId);
