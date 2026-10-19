@@ -5,6 +5,7 @@ import { buildEntryVersionConflictPayload } from './entry-concurrency';
 import { activePatients } from './patient-lifecycle';
 import { writeAuditEventInTransaction, type RequiredAuditContext } from './security/audit';
 import { entries, patients, patientsToAmbulatories } from './schema';
+import type { NetworkPatientCommitGuard } from './network-patient-commit-authority';
 
 type CreateInput = {
     patientId: string;
@@ -14,6 +15,7 @@ type CreateInput = {
     mode: 'web' | 'v1' | 'network';
     scopeAmbulatoryId?: string;
     audit: RequiredAuditContext;
+    authorizeCommit?: NetworkPatientCommitGuard;
 };
 
 type UpdateInput = {
@@ -25,9 +27,10 @@ type UpdateInput = {
     mode: 'web' | 'v1' | 'network';
     scopeAmbulatoryId?: string;
     audit: RequiredAuditContext;
+    authorizeCommit?: NetworkPatientCommitGuard;
 };
 
-type Result = { status: 200 | 201 | 404 | 409; value: Record<string, unknown> };
+type Result = { status: 200 | 201 | 401 | 403 | 404 | 409; value: Record<string, unknown> };
 type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 
 function networkScopeContains(tx: Tx, patientId: string, ambulatoryId: string): boolean {
@@ -53,6 +56,8 @@ function sameNetworkCreate(existing: typeof entries.$inferSelect, values: typeof
 /* IMMEDIATE acquires the writer lock before parent/scope and duplicate reads. */
 export function createEntryOperation(input: CreateInput): Result {
     return dbServer.transaction((tx): Result => {
+        const denial = input.authorizeCommit?.(tx);
+        if (denial) return denial;
         const admitted = input.mode === 'network'
             ? networkScopeContains(tx, input.patientId, input.scopeAmbulatoryId!)
                 && activeParentExists(tx, input.patientId)
@@ -85,6 +90,8 @@ export function createEntryOperation(input: CreateInput): Result {
 /* matched UPDATE IGNORE is an integrity fault, not an optimistic conflict. */
 export function updateEntryOperation(input: UpdateInput): Result {
     return dbServer.transaction((tx): Result => {
+        const denial = input.authorizeCommit?.(tx);
+        if (denial) return denial;
         const existing = input.mode === 'network'
             ? tx.select({ entry: entries }).from(entries)
                 .innerJoin(patientsToAmbulatories, eq(entries.patientId, patientsToAmbulatories.patientId))

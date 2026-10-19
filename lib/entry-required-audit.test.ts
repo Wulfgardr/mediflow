@@ -8,12 +8,15 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import Database from 'better-sqlite3';
+import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } from './network-patient-authority-test-fixture';
+import { NETWORK_PAIRING_STATE_KEY, serializeNetworkPairingState } from './network-pairing-model';
+import { clearAllSessions } from './security/server-session';
 
 const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-c05-diary-synthetic-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 process.env.MEDIFLOW_LOCAL_API_TOKEN = 'c05-diary-synthetic-token';
-const state: { session: Record<string, unknown> | null } = {
+const state: { session: Record<string, unknown> | null; networkContext?: ReturnType<typeof syntheticNetworkPatientAuthority> } = {
     session: { id: 'synthetic-web', userId: 'synthetic-admin', role: 'admin', authChannel: 'web' },
 };
 const stateKey = Symbol.for(`c05-diary-seam-${dataDir}`);
@@ -30,7 +33,8 @@ exports.unauthorizedResponse=()=>Response.json({error:'Unauthorized'},{status:40
 exports.forbiddenResponse=()=>Response.json({error:'Forbidden'},{status:403});`);
 const token = seam('token.cjs', `exports.requireLocalApiToken=(request)=>request.headers.get('authorization')==='Bearer c05-diary-synthetic-token'?null:Response.json({error:'Unauthorized'},{status:401});
 exports.hasValidLocalApiToken=(request)=>request.headers.get('authorization')==='Bearer c05-diary-synthetic-token';`);
-const network = seam('network.cjs', `exports.requireNetworkWriteContext=async(request)=>({ok:true,context:{request,scopeAmbulatoryId:'c05-diary-a',pairedClient:{clientId:'synthetic-paired'},session:{id:'synthetic-native',userId:'synthetic-admin',role:'admin',authChannel:'native'}}});`);
+const network = seam('network.cjs', `const state=globalThis[Symbol.for(${JSON.stringify(`c05-diary-seam-${dataDir}`)})];
+exports.requireNetworkWriteContext=async(request)=>({ok:true,context:{...state.networkContext,request}});`);
 const { registerHooks } = load('node:module') as {
     registerHooks: (hooks: { resolve: (specifier: string, context: unknown,
         next: (specifier: string, context: unknown) => { url: string }) => { url: string; shortCircuit?: boolean } }) => { deregister: () => void };
@@ -45,8 +49,16 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     return url ? { url, shortCircuit: true } : next(specifier, context);
 } });
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
-const archiveGeneration = bindSyntheticArchiveSessions('synthetic-web', 'synthetic-local', 'synthetic-native');
+const archiveGeneration = bindSyntheticArchiveSessions('synthetic-web', 'synthetic-local');
 openDbServer();
+// Admission stays isolated in this audit suite; the transaction now receives a real paired session.
+state.networkContext = syntheticNetworkPatientAuthority(dbServer, 'c05-diary-a', { userId: 'synthetic-admin', clientId: 'synthetic-paired' });
+state.networkContext.pairedClient.grantedCapabilities.push('network.replica.write-clinical-diary');
+dbServer.$client.prepare('UPDATE settings SET value=? WHERE key=?').run(JSON.stringify({
+    ...JSON.parse(serializeNetworkPairingState({ clients: [state.networkContext.pairedClient], intents: [] })), archiveGeneration,
+}), NETWORK_PAIRING_STATE_KEY);
+const cookieState = { cookies: new Map([['ambulatory_id', 'c05-diary-a'], ['mediflow_session', state.networkContext.session.id]]) };
+const cleanupCookies = installNetworkPatientCookieFixture(dataDir, cookieState);
 const { ambulatories, patients, patientsToAmbulatories, entries } = load('./schema.ts') as typeof import('./schema.ts');
 const webCreate = load('../app/api/entries/route.ts') as typeof import('../app/api/entries/route.ts');
 const webItem = load('../app/api/entries/[id]/route.ts') as typeof import('../app/api/entries/[id]/route.ts');
@@ -62,7 +74,7 @@ const nextId = (name: string) => `c05-diary-${++serial}-${name}`;
 test.after(() => {
     const report = process.env.MEDIFLOW_DIARY_CANDIDATE_REPORT;
     if (report) writeFileSync(report, `${JSON.stringify({ observations }, null, 2)}\n`);
-    sql.close(); dbServer.$client.close(); hooks.deregister();
+    clearAllSessions(); cleanupCookies(); sql.close(); dbServer.$client.close(); hooks.deregister();
     delete (globalThis as unknown as Record<symbol, typeof state>)[stateKey];
     rmSync(dataDir, { recursive: true, force: true });
 });
@@ -70,7 +82,7 @@ test.after(() => {
 function seed(name: string, withEntry: boolean, deleted = false, archived = false) {
     const patientId = nextId(`${name}-patient`);
     const entryId = nextId(`${name}-entry`);
-    dbServer.insert(ambulatories).values({ id: 'c05-diary-a', name: 'Synthetic diary ambulatory', type: 'live' }).onConflictDoNothing().run();
+    dbServer.insert(ambulatories).values({ id: 'c05-diary-a', name: 'Synthetic diary ambulatory', type: 'live', isDefault: true }).onConflictDoNothing().run();
     dbServer.insert(patients).values({ id: patientId, firstName: 'Synthetic', lastName: 'Patient',
         taxCode: `SYN${serial}`, deletedAt: deleted ? new Date('2026-01-01T00:00:00Z') : null,
         notes: 'ENC:synthetic:patient', isArchived: archived }).run();
@@ -117,6 +129,7 @@ async function invoke(surface: Surface, operation: Operation, ids: { patientId: 
             : operation === 'PUT' ? v1Item.PUT(req, { params: Promise.resolve({ id: ids.patientId, entryId: ids.entryId }) })
                 : v1Item.DELETE(req, { params: Promise.resolve({ id: ids.patientId, entryId: ids.entryId }) });
     }
+    for (const [key, value] of state.networkContext!.request.headers) req.headers.set(key, value);
     return operation === 'POST' ? networkCreate.POST(req, { params: Promise.resolve({ id: ids.patientId }) })
         : networkItem.PUT(req, { params: Promise.resolve({ id: ids.patientId, entryId: ids.entryId }) });
 }
