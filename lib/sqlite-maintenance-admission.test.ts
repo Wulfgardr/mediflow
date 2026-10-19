@@ -347,16 +347,19 @@ for (const fail of [false, true]) {
         try {
             assert.equal(await message(w.worker), 'SERIALIZING');
             let snapshotStarted = false;
-            const maintenance = runWithSqliteMaintenance(f.target, { timeoutMs: 5000 }, async () => {
+            // Release and observe the owned writer in the existing drain phase.
+            // Polling the gate first can spend the budget while the test still
+            // withholds COMPLETE, and leaves maintenance rejection unobserved.
+            await runWithSqliteMaintenance(f.target, { timeoutMs: 5000, drain: async () => {
+                assert.equal(fs.existsSync(path.join(store(f.target), 'intent.json')), true);
+                assert.equal(snapshotStarted, false);
+                w.worker.send('COMPLETE');
+                assert.equal(await w.terminal, fail ? 1 : 0, w.output());
+            } }, async () => {
                 snapshotStarted = true;
                 const db = new Database(f.target, { readonly: true });
                 try { await db.backup(path.join(f.dir, 'snapshot.db')); } finally { db.close(); }
             });
-            await waitIntent(f.target);
-            assert.equal(snapshotStarted, false);
-            w.worker.send('COMPLETE');
-            assert.equal(await w.terminal, fail ? 1 : 0, w.output());
-            await maintenance;
             assert.match(w.output(), /NATIVE_HANDLES:\{"opened":1,"closed":1,"stillOpen":0\}/);
             const snapshot = new Database(path.join(f.dir, 'snapshot.db'), { readonly: true });
             try {
