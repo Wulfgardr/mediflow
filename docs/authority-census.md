@@ -134,7 +134,14 @@ essere esplicita e preservare significato e cifrato precedente.
 `normalizePatientUpdateInput` riceve già ENC e normalizza il contenitore:
 non verifica il significato del plaintext. Le chiavi non vengono spostate
 nel server per aggirare questo limite. Envelope canonico, autorizzazione
-umana monouso ed estrazione portabile restano WUL-584/580.
+umana monouso ed estrazione portabile hanno confini distinti.
+Il comando canonico e il dispatch sono descritti nell'ADR 0147. La prova
+WUL-584 dell'[ADR 0148](./adr/0148-profile-notes-review-dry-run.md) prepara
+le sole note una volta, conserva l'envelope host e ne restituisce il cifrato
+alla UI per una decifratura rigorosa. Impronta, selezione, versione e
+attestazione appartengono al binding host; il gesto presenta solo riferimento,
+impronta e PIN fresco. Il risultato `reviewed` non abilita alcun writer.
+L'unificazione semantica pre-ENC fra superfici resta da provare in WUL-580.
 
 ### Operazione clinica e capacità intelligenti
 

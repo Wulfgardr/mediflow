@@ -961,6 +961,19 @@ class MedicalApiClient {
         signal.throwIfAborted(); return result;
     }
 
+    async decryptPatientProfileReviewNotes(notes: string | null): Promise<string | null> {
+        const signal = this.getSessionReadSignal(); signal.throwIfAborted();
+        const key = this.masterKey;
+        if (!key) throw new Error('Sessione bloccata.');
+        if (notes === null) return null;
+        const parts = /^ENC:([A-Za-z0-9+/]+=*):([A-Za-z0-9+/]+=*)$/u.exec(notes);
+        if (!parts) throw new Error('Contenuto della revisione non decifrabile.');
+        const value = await decryptData(parts[2], parts[1], key);
+        signal.throwIfAborted();
+        if (typeof value !== 'string') throw new Error('Contenuto della revisione non decifrabile.');
+        return value;
+    }
+
     setKey(key: CryptoKey | null) {
         const previousReads = this.sessionReads;
         this.masterKey = key;

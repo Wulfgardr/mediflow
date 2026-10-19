@@ -208,7 +208,8 @@ test('all patient PUT adapters wire one transactional set-primary operation with
     // WUL-576 inserts the canonical dispatch; the existing writer still owns
     // the sole membership transaction. Require both hops, not a decorative port.
     const assertDispatchWiring = (service: string, executor: string) => {
-        assert.match(service, /import\s*\{\s*createPatientProfileUpdateExecution,\s*dispatchPatientProfileUpdate\s*\}\s*from\s*'\.\/patient-profile-update-dispatch'/);
+        assert.match(service, /import\s*\{[^}]*\bcreatePatientProfileUpdateExecution\b[^}]*\}\s*from\s*'\.\/patient-profile-update-dispatch'/);
+        assert.match(service, /import\s*\{[^}]*\bdispatchPatientProfileUpdate\b[^}]*\}\s*from\s*'\.\/patient-profile-update-dispatch'/);
         assert.equal(service.match(/\bcreatePatientProfileUpdateExecution\s*\(/g)?.length, 1);
         assert.match(service, /const execution = createPatientProfileUpdateExecution\(\{/);
         assert.equal(service.match(/\bdispatchPatientProfileUpdate\s*\(/g)?.length, 1);
@@ -226,6 +227,8 @@ test('all patient PUT adapters wire one transactional set-primary operation with
     };
     assertDispatchWiring(profile, dispatch);
     for (const [source, before, after] of [
+        ['service', 'createPatientProfileUpdateExecution,', ''],
+        ['service', ', dispatchPatientProfileUpdate }', ' }'],
         ['service', 'dispatchPatientProfileUpdate(execution, execution.command)', 'updatePatientOperation({})'],
         ['service', "'./patient-profile-update-dispatch'", "'./unapproved-profile-update-dispatch'"],
         ['executor', 'setPrimaryAmbulatory: command.setPrimaryAmbulatory', 'setPrimaryAmbulatory: false'],
