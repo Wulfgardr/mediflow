@@ -974,6 +974,20 @@ class MedicalApiClient {
         return value;
     }
 
+    async decryptPatientProfileReviewRecipient(recipient: Readonly<{ firstName: string; lastName: string }>): Promise<string> {
+        const signal = this.getSessionReadSignal(); signal.throwIfAborted();
+        if (!this.masterKey) throw new Error('Sessione bloccata.');
+        const name = async (stored: string): Promise<string> => {
+            // Qualified legacy names can already be plaintext. ENC values must decrypt fully;
+            // a locked placeholder or failed ciphertext is never a reviewable recipient.
+            const value = stored.startsWith('ENC:') ? await this.decryptPatientProfileReviewNotes(stored) : stored;
+            if (!value?.trim() || isLockedDataPlaceholder(value) || value.length > 2048) throw new Error('Destinatario non leggibile.');
+            return value;
+        };
+        const [firstName, lastName] = await Promise.all([name(recipient.firstName), name(recipient.lastName)]);
+        signal.throwIfAborted(); return `${lastName} ${firstName}`;
+    }
+
     setKey(key: CryptoKey | null) {
         const previousReads = this.sessionReads;
         this.masterKey = key;
