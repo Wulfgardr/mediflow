@@ -1,6 +1,6 @@
 import 'server-only';
 
-import type { ProfileProjection, ProfileQuery, ProfileResult } from '../patient-profile-scoped-contract';
+import type { ProfileProjection, ProfileQuery, ProfileResult } from '../../packages/patient-profile-contracts/src/query';
 import { acquireScopedPatientProfileHostPort, isCurrentScopedPatientProfileResult } from '../patient-profile-service';
 
 export type PatientProfileQueryHostPort = Readonly<{

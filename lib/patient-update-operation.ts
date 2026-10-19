@@ -14,7 +14,7 @@ import { PATIENT_PROFILE_UPDATE_OPERATION, type PatientProfileUpdateContract, ty
 import type { NetworkPatientCommitGuard, NetworkPatientCommitDenial } from './network-patient-commit-authority';
 import { createProfileNotesCommitJournal, profileNotesCommitKey, readProfileNotesCommitReceipt, ProfileNotesCommitError,
     type ProfileNotesCommitPermit } from './security/patient-profile-notes-commit-journal';
-import type { ProfileNotesCommitReceipt } from './patient-profile-notes-commit-contract';
+import type { ProfileNotesCommitReceipt } from '../packages/patient-profile-contracts/src/notes-commit';
 
 type PatientUpdateValues = Partial<typeof patients.$inferInsert>;
 

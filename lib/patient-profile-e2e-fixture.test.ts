@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { scopedNotesOpenInput, syntheticScopedNotesView } from '../e2e/fixtures/scoped-profile-notes-query';
-import { isProfileResult } from './patient-profile-scoped-contract';
+import { isProfileResult } from '../packages/patient-profile-contracts/src/query';
 
 const origin = 'http://127.0.0.1:3000';
 const patientId = 'synthetic-fixture-patient';

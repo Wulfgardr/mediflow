@@ -9,7 +9,7 @@ import type { dbServer } from '../db-server';
 import type { ServerSession } from './server-session';
 import { archiveGenerationForSession } from './archive-session-generation';
 import { assertArchiveGeneration } from '../archive-generation';
-import { parseProfileNotesCommitJournal, type ProfileNotesCommitJournal } from '../patient-profile-notes-commit-contract';
+import { parseProfileNotesCommitJournal, type ProfileNotesCommitJournal } from '../../packages/patient-profile-contracts/src/notes-commit';
 
 export const AUDIT_SCHEMA_VERSION = 1 as const;
 

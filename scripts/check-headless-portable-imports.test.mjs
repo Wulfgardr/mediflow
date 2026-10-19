@@ -6,6 +6,21 @@ import test from 'node:test';
 
 import { runHeadlessPortableImportGuard, validateHeadlessPortableSource } from './check-headless-portable-imports.mjs';
 
+async function profileSurfaces(root) {
+    for (const file of [
+        'packages/patient-profile-contracts/src/query.ts',
+        'app/api/patients/[id]/route.ts', 'app/api/v1/patients/[id]/route.ts',
+        'app/api/v1/network/patients/[id]/route.ts', 'app/api/patients/[id]/notes-commit/route.ts',
+        'app/api/patients/[id]/profile-query/route.ts',
+        'app/api/v1/network/patients/[id]/profile-query/route.ts',
+        'app/api/patient-profile/review/route.ts', 'app/api/patient-profile/selection-epoch/route.ts',
+        'app/api/v1/network/patient-profile/selection-epoch/route.ts',
+    ]) {
+        await mkdir(path.dirname(path.join(root, file)), { recursive: true });
+        await writeFile(path.join(root, file), 'export const version = 1;');
+    }
+}
+
 test('accepts only portable package and stdio dependencies', () => {
     const source = `
         import { types } from 'node:util';
@@ -54,10 +69,11 @@ test('scans all mandatory surfaces, optional MCP package and rejects symlink esc
         await writeFile(path.join(root, 'packages/mini/src/cli.ts'), "import { stdin } from 'node:process'; void stdin;\n");
         await writeFile(path.join(root, 'packages/mcp/src/server.ts'), "import { core } from '../../aip/src/core.ts'; void core;\n");
         await writeFile(path.join(root, 'scripts/intelligent-host-mcp-stdio.mjs'), "import '../packages/mcp/src/server.ts';\n");
+        await profileSurfaces(root);
     }
     try {
         await reset();
-        assert.deepEqual(await runHeadlessPortableImportGuard(root), { files: 4, surfaces: 4 });
+        assert.deepEqual(await runHeadlessPortableImportGuard(root), { files: 14, surfaces: 14 });
 
         await writeFile(path.join(root, 'packages/mcp/src/server.ts'), "import '../../../lib/db-server.ts';\n");
         await assert.rejects(runHeadlessPortableImportGuard(root), /database or Web boundary import/u);
@@ -73,20 +89,39 @@ test('scans all mandatory surfaces, optional MCP package and rejects symlink esc
     } finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test('admits only the exact dependency-free profile contract and scans its contents', async () => {
-    assert.deepEqual(validateHeadlessPortableSource("import '../../../lib/patient-profile-scoped-contract.ts';", 'packages/aip/src/profile.ts'), []);
+test('scans the complete profile package graph and denies framework, OS and browser dependencies', async () => {
+    assert.deepEqual(validateHeadlessPortableSource("import '../../patient-profile-contracts/src/query.ts';", 'packages/aip/src/profile.ts'), []);
     assert.notDeepEqual(validateHeadlessPortableSource("import '../../../lib/patient-profile-service.ts';", 'packages/aip/src/profile.ts'), []);
-    const root = await mkdtemp(path.join(os.tmpdir(), 'mediflow-profile-leaf-'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'mediflow-profile-package-'));
     try {
         for (const p of ['packages/aip/src', 'packages/mini/src', 'scripts', 'lib']) await mkdir(path.join(root, p), { recursive: true });
         await writeFile(path.join(root, 'scripts/intelligent-host-mcp-stdio.mjs'), '');
-        const target = path.join(root, 'lib/patient-profile-scoped-contract.ts');
+        await profileSurfaces(root);
+        const entry = path.join(root, 'packages/patient-profile-contracts/src/query.ts');
+        const target = path.join(root, 'packages/patient-profile-contracts/src/helper.ts');
+        await writeFile(entry, "export * from './helper.ts';");
         await writeFile(target, 'export const version = 1;');
         await runHeadlessPortableImportGuard(root);
-        for (const source of ["import 'server-only';", "export * from './helper.ts';",
-            "import Database from 'better-sqlite3';", "await import('./helper.ts');", "require('./helper.ts');"]) {
+        for (const source of ["import 'server-only';", "import 'next/navigation';", "import 'node:fs';",
+            "export type Shape = import('next').NextConfig;", "export type Host = typeof import('../../../lib/db-server');",
+            '/// <reference types="react" />', '/// <reference path="../../../lib/db-server.ts" />', '/// <reference lib="dom" />',
+            "import Database from 'better-sqlite3';", "export * from '../../../aip/src/helper.ts';",
+            "import '../../../native/Keychain.ts';", "await import('mlx');", "require('node:os');",
+            'const platform = process.platform;', 'const page = document.body;']) {
             await writeFile(target, source);
-            await assert.rejects(runHeadlessPortableImportGuard(root), /dependency-free leaf/u);
+            await assert.rejects(runHeadlessPortableImportGuard(root), /pure profile package/u, source);
         }
+        await rm(path.join(root, 'packages/patient-profile-contracts/src'), { recursive: true });
+        await assert.rejects(runHeadlessPortableImportGuard(root), /required surface is missing/u);
     } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('profile HTTP routes delegate DB and schema access while retaining their Web adapters', () => {
+    const route = 'app/api/patients/[id]/notes-commit/route.ts';
+    assert.deepEqual(validateHeadlessPortableSource("import { NextResponse } from 'next/server'; import { commit } from '@/lib/patient-profile-service';", route), []);
+    for (const source of ["import { dbServer } from '@/lib/db-server';", "export { patients } from '@/lib/schema';",
+        "import Database from 'better-sqlite3';", "await import('drizzle-orm');", "import 'node:sqlite';",
+        "import '../../../../../lib/schema.ts';"]) {
+        assert.notDeepEqual(validateHeadlessPortableSource(source, route), [], source);
+    }
 });

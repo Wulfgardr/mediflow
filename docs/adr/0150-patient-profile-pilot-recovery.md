@@ -1,6 +1,6 @@
 # ADR 0150 / BT-06 — Recupero del pilota e continuità delle ricevute
 
-Data: 2026-10-19. Stato: Proposed; accettazione con review indipendente e merge.
+Data: 2026-10-19. Stato: Accepted con l'integrazione protetta; review indipendente favorevole.
 Riferimenti: WUL-579, WUL-730, ADR 0144 archive-generation, ADR 0149.
 
 ## Problema

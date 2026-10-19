@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { PROFILE_QUERY_MAX_RESULT_BYTES, assertProfileResultBudget, isProfileResult } from '../../../lib/patient-profile-scoped-contract.ts';
+import { PROFILE_QUERY_MAX_RESULT_BYTES, assertProfileResultBudget, isProfileResult } from '../../patient-profile-contracts/src/query.ts';
 import { encodePatientProfileQueryIpcFrameV1 as encode, decodePatientProfileQueryIpcFrameV1 as decode } from './patient-profile-query-ipc.ts';
 const request = { schemaVersion: 'mediflow.patient-profile.ipc.v1', type: 'query',
   requestRef: `ppqr_${'a'.repeat(32)}`, operationId: 'patient-profile.read.v1',

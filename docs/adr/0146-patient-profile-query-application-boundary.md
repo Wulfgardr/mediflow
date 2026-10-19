@@ -6,7 +6,7 @@ Riferimenti: WUL-582, WUL-575, ADR 0071, ADR 0145.
 ## Incremento S1: vista scoped e riferimenti host (WUL-583)
 
 Il pilota espone `patient-profile.read.v1` con `contractVersion: 1`, distinto
-dalla revisione del paziente. `lib/patient-profile-scoped-contract.ts` definisce
+dalla revisione del paziente. `packages/patient-profile-contracts/src/query.ts` definisce
 una vista consegnabile separata dallo snapshot interno: non contiene `id`,
 `ambulatoryId`, percorsi, SQL o righe ORM. La proiezione `profile` ammette soltanto
 nome, cognome, codice fiscale, nascita, indirizzo, telefono, caregiver, diagnosi,

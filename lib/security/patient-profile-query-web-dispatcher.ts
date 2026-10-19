@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { ProfileQueryError, assertProfileResultBudget } from '../patient-profile-scoped-contract';
+import { ProfileQueryError, assertProfileResultBudget } from '../../packages/patient-profile-contracts/src/query';
 import { isCurrentPatientProfileQueryResult, type PatientProfileQueryHostPort } from './patient-profile-query-host-port';
 import { PATIENT_PROFILE_QUERY_IPC_SCHEMA_V1, decodePatientProfileQueryIpcFrameV1,
     encodePatientProfileQueryIpcFrameV1 } from '../../packages/aip/src/patient-profile-query-ipc';

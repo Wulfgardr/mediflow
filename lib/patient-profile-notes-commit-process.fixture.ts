@@ -7,7 +7,7 @@ import { installNetworkPatientCookieFixture } from './network-patient-authority-
 import { issueSyntheticWebSessionContext } from './security/web-auth-lifecycle-owner-test-fixture';
 import { clearAllSessions } from './security/server-session';
 import { currentArchiveGeneration } from './security/archive-session-generation';
-import { isProfileNotesCommitView } from './patient-profile-notes-commit-contract';
+import { isProfileNotesCommitView } from '../packages/patient-profile-contracts/src/notes-commit';
 
 const dataDir = process.env.MEDIFLOW_DATA_DIR;
 if (process.env.MEDIFLOW_TEST_PROFILE_NOTES_PROCESS !== '1' || !dataDir || !basename(dataDir).startsWith('mediflow-profile-review-')) {

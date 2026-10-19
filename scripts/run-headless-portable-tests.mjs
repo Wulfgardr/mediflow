@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { acquireTestDataDir, cleanupTestDataDir } from './test-data-dir.mjs';
 
 const repoRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
-const packageRoots = ['packages/aip', 'packages/mini', 'packages/mcp'];
+const packageRoots = ['packages/aip', 'packages/mini', 'packages/mcp', 'packages/patient-profile-contracts'];
 const scriptTests = [
     'scripts/check-headless-portable-imports.test.mjs',
     'scripts/intelligent-host-mcp-stdio.test.mjs',
