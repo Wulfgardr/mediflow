@@ -7,6 +7,7 @@ mod analytics;
 mod document_details;
 mod scales;
 mod therapy_picker;
+mod view_state;
 mod who_lookup;
 
 use gpui::{
@@ -44,6 +45,7 @@ use ai_status::AiRuntimeObservation;
 use analytics::AnalyticsArea;
 use scales::{ScaleArea, ScaleAssessment};
 use therapy_picker::TherapySelection;
+use view_state::{ReadLoad, ReadObject, ViewState};
 use who_lookup::WhoLookup;
 
 actions!(
@@ -308,22 +310,22 @@ enum Discard {
 }
 
 struct PatientData {
-    detail: Load<PatientDetail>,
-    entries: Load<Vec<Entry>>,
-    therapies: Load<Vec<Therapy>>,
-    observations: Load<Vec<Observation>>,
-    checkups: Load<Vec<Checkup>>,
+    detail: ReadLoad<PatientDetail>,
+    entries: ReadLoad<Vec<Entry>>,
+    therapies: ReadLoad<Vec<Therapy>>,
+    observations: ReadLoad<Vec<Observation>>,
+    checkups: ReadLoad<Vec<Checkup>>,
     attachments: Load<Vec<Attachment>>,
     document_details_id: Option<String>,
 }
 impl Default for PatientData {
     fn default() -> Self {
         Self {
-            detail: Load::Idle,
-            entries: Load::Idle,
-            therapies: Load::Idle,
-            observations: Load::Idle,
-            checkups: Load::Idle,
+            detail: ReadLoad::Idle,
+            entries: ReadLoad::Idle,
+            therapies: ReadLoad::Idle,
+            observations: ReadLoad::Idle,
+            checkups: ReadLoad::Idle,
             attachments: Load::Idle,
             document_details_id: None,
         }
@@ -409,6 +411,9 @@ pub struct ClinicalApp {
     focus_after_render: bool,
     focus_search_after_render: bool,
     profile_scroll: gpui::ScrollHandle,
+    read_state_focus: [FocusHandle; 5],
+    read_state_commands: Vec<(ReadObject, ViewState)>,
+    read_timer: Option<gpui::Task<()>>,
     epoch: u64,
     profile_query_intent: Option<ProfileQueryIntent>,
     _subscriptions: Vec<Subscription>,
@@ -625,6 +630,9 @@ impl ClinicalApp {
             focus_after_render: false,
             focus_search_after_render: false,
             profile_scroll,
+            read_state_focus: std::array::from_fn(|_| cx.focus_handle()),
+            read_state_commands: Vec::new(),
+            read_timer: None,
             epoch: 0,
             profile_query_intent: None,
             _subscriptions: vec![subscription, global_subscription, reference_subscription],
@@ -702,6 +710,8 @@ impl ClinicalApp {
     }
 
     fn next_epoch(&mut self) {
+        self.read_timer = None;
+        self.read_state_commands.clear();
         self.ai_preferences.reset();
         self.who.reset();
         self.patient.document_details_id = None;
@@ -1058,7 +1068,7 @@ impl ClinicalApp {
         self.show_other = false;
         self.patient_section = PatientSection::Overview;
         self.patient = PatientData::default();
-        self.patient.detail = Load::Loading;
+        self.patient.detail = ReadLoad::loading();
         self.message = None;
         self.verified = None;
         let patient_id = id.to_owned();
@@ -1069,18 +1079,20 @@ impl ClinicalApp {
                 Ok(patient) => {
                     this.core
                         .receive_read(&request, Ok(profile_for_core(&patient)));
-                    this.patient.detail = Load::Ready(patient);
+                    this.patient.detail = ReadLoad::Ready(patient);
                 }
                 Err(error) => {
                     this.core
                         .receive_read(&request, Err(ReadFailure::Unavailable));
-                    this.patient.detail = Load::Failed(ui_error(error));
+                    this.patient.detail = ReadLoad::Failed(error);
                 }
             },
             cx,
         );
         if self.area != Area::Scales {
             self.load_sections(cx);
+        } else {
+            self.watch_patient_reads(cx);
         }
         cx.notify();
     }
@@ -1093,18 +1105,19 @@ impl ClinicalApp {
         ) else {
             return;
         };
-        self.patient.entries = Load::Loading;
-        self.patient.therapies = Load::Loading;
-        self.patient.observations = Load::Loading;
-        self.patient.checkups = Load::Loading;
+        self.patient.entries = ReadLoad::loading();
+        self.patient.therapies = ReadLoad::loading();
+        self.patient.observations = ReadLoad::loading();
+        self.patient.checkups = ReadLoad::loading();
         self.patient.attachments = Load::Loading;
         self.patient.document_details_id = None;
+        self.watch_patient_reads(cx);
         let s = session.clone();
         let a = scope.clone();
         let p = id.clone();
         self.run(
             move || s.list_entries(&a, &p),
-            |this, result, _| this.patient.entries = Load::from_result(result),
+            |this, result, _| this.patient.entries = ReadLoad::from_result(result),
             cx,
         );
         let s = session.clone();
@@ -1112,7 +1125,7 @@ impl ClinicalApp {
         let p = id.clone();
         self.run(
             move || s.list_therapies(&a, &p),
-            |this, result, _| this.patient.therapies = Load::from_result(result),
+            |this, result, _| this.patient.therapies = ReadLoad::from_result(result),
             cx,
         );
         let s = session.clone();
@@ -1120,7 +1133,7 @@ impl ClinicalApp {
         let p = id.clone();
         self.run(
             move || s.list_observations(&a, &p),
-            |this, result, _| this.patient.observations = Load::from_result(result),
+            |this, result, _| this.patient.observations = ReadLoad::from_result(result),
             cx,
         );
         let s = session.clone();
@@ -1128,7 +1141,7 @@ impl ClinicalApp {
         let p = id.clone();
         self.run(
             move || s.list_checkups(&a, &p),
-            |this, result, _| this.patient.checkups = Load::from_result(result),
+            |this, result, _| this.patient.checkups = ReadLoad::from_result(result),
             cx,
         );
         self.run(
@@ -1605,19 +1618,19 @@ impl ClinicalApp {
             };
             let id = request.patient_id.clone();
             let intent = self.profile_intent(&session);
-            self.patient.detail = Load::Loading;
+            self.patient.detail = ReadLoad::loading();
             self.run(
                 move || session.open_patient_profile(&scope, &id, &intent),
                 move |this, result, _| match result {
                     Ok(patient) => {
                         this.core
                             .receive_read(&request, Ok(profile_for_core(&patient)));
-                        this.patient.detail = Load::Ready(patient);
+                        this.patient.detail = ReadLoad::Ready(patient);
                     }
                     Err(error) => {
                         this.core
                             .receive_read(&request, Err(ReadFailure::Unavailable));
-                        this.patient.detail = Load::Failed(ui_error(error));
+                        this.patient.detail = ReadLoad::Failed(error);
                     }
                 },
                 cx,
@@ -2028,7 +2041,7 @@ impl ClinicalApp {
                                     } else {
                                         this.core.receive_read(&request, Ok(profile_for_core(&patient)));
                                     }
-                                    this.patient.detail = Load::Ready(patient);
+                                    this.patient.detail = ReadLoad::Ready(patient);
                                 }
                                 Err(error) => {
                                     if error.is_auth_failure() {
@@ -2993,7 +3006,7 @@ impl ClinicalApp {
                         .text_size(px(theme.body()))
                         .child(text!("Allergie: dato non disponibile")),
                 )
-                .child(self.patient_notes(patient))
+                .child(self.patient_notes(patient, cx))
                 .child(
                     button(
                         "clinical-workspace-open-profile",
@@ -3008,17 +3021,17 @@ impl ClinicalApp {
                     })),
                 );
         } else {
-            pane = pane.child(notice(
+            pane = pane.child(self.patient_read_hint(
                 "clinical-workspace-preview-state",
-                self.patient.detail.message().unwrap_or_default().to_owned(),
-                theme,
-                matches!(self.patient.detail, Load::Failed(_)),
+                &self.patient.detail,
+                ReadObject::Scheda,
+                cx,
             ));
         }
         pane
     }
 
-    fn patient_notes(&self, patient: &PatientDetail) -> Div {
+    fn patient_notes(&self, patient: &PatientDetail, cx: &Context<Self>) -> Div {
         let theme = self.theme;
         let (content, unavailable) = if patient.field_locked("notes") {
             (
@@ -3057,7 +3070,8 @@ impl ClinicalApp {
                         theme.ink
                     })
                     .child(if unavailable {
-                        div().child(text!(content)).into_any_element()
+                        self.unreadable_field("clinical-workspace-notes-unreadable", cx)
+                            .into_any_element()
                     } else {
                         clinical_text::render(&content, theme)
                     }),
@@ -3101,24 +3115,12 @@ impl ClinicalApp {
                             cx.notify();
                         })),
                     )
-                    .child(notice(
+                    .child(self.patient_read_hint(
                         "clinical-workspace-detail-state",
-                        self.patient.detail.message().unwrap_or_default().to_owned(),
-                        theme,
-                        matches!(self.patient.detail, Load::Failed(_)),
-                    ))
-                    .child(
-                        button(
-                            "clinical-workspace-detail-retry",
-                            "Rileggi scheda",
-                            theme,
-                            false,
-                            true,
-                        )
-                        .on_click(
-                            cx.listener(|this, _, _, cx| this.request_discard(Discard::Reload, cx)),
-                        ),
-                    ),
+                        &self.patient.detail,
+                        ReadObject::Scheda,
+                        cx,
+                    )),
             );
         };
         let writable = !patient.is_archived && patient.deleted_at.is_none() && self.form.is_none();
@@ -3365,48 +3367,253 @@ impl ClinicalApp {
         } else {
             diagnosis_labels(patient.diagnoses.as_deref())
         };
-        let mut overview = div().flex().flex_col().gap(px(28.))
-            .child(div().flex().flex_col().gap(px(8.))
-                .child(section("clinical-workspace-quadro-heading", "QUADRO", theme))
-                .child(div().font_family(VOICE).text_size(px(theme.size(22.))).child(text!("Problemi e contesto")))
-                .when(diagnoses.is_err(), |el| el.child(notice("clinical-workspace-diagnoses-unavailable", "I problemi non sono leggibili. Apri la scheda corrente per verificarli.", theme, true)))
-                .when(diagnoses.as_ref().is_ok_and(Vec::is_empty), |el| el.child(div().text_color(theme.secondary).child(text!("Nessun problema riportato nella scheda."))))
-                .children(diagnoses.unwrap_or_default().into_iter().map(|label| div().border_b_1().border_color(theme.rule)
-                    .py(px(12.)).child(text!(label)))))
-            .child(div().flex().flex_col().gap(px(8.))
-                .child(section("clinical-workspace-active-therapies-heading", "TERAPIE ATTIVE", theme))
-                .when(self.patient.therapies.message().is_some(), |el| el.child(self.load_hint("clinical-workspace-therapies-state", &self.patient.therapies)))
-                .when(self.patient.therapies.ready().is_some_and(|rows| !rows.iter().any(|row| row.status == "active" && row.deleted_at.is_none())), |el| el.child(div().text_color(theme.secondary).child(text!("Nessuna terapia attiva riportata."))))
-                .children(self.patient.therapies.ready().into_iter().flatten().filter(|row| row.status == "active" && row.deleted_at.is_none()).map(|row| {
-                    div().border_b_1().border_color(theme.rule).py(px(12.)).flex().flex_col().gap(px(4.))
-                        .child(div().font_weight(FontWeight::MEDIUM).child(text!(row.drug_name.clone())))
-                        .child(div().text_color(theme.secondary).child(text!(row.dosage.clone())))
-                })))
-            .child(div().flex().flex_col().gap(px(8.))
-                .child(section("clinical-workspace-followup-heading", "PROSSIMI CONTROLLI", theme))
-                .child(button("clinical-workspace-open-checkups", "Tutti i controlli", theme, false, self.form.is_none())
-                    .when(self.form.is_none(), |el| el.on_click(cx.listener(|this, _, _, cx| this.section_selected(PatientSection::Checkups, cx)))))
-                .when(self.patient.checkups.message().is_some(), |el| el.child(self.load_hint("clinical-workspace-checkups-state", &self.patient.checkups)))
-                .when(self.patient.checkups.ready().is_some_and(|rows| !rows.iter().any(|row| row.status == "pending" && row.deleted_at.is_none())), |el| el.child(div().text_color(theme.secondary).child(text!("Nessun controllo da completare riportato."))))
-                .children(self.patient.checkups.ready().into_iter().flatten().filter(|row| row.status == "pending" && row.deleted_at.is_none()).map(|row| {
-                    div().border_b_1().border_color(theme.rule).py(px(12.)).flex().flex_col().gap(px(4.))
-                        .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary).child(text!(display_date(Some(&row.date)))))
-                        .child(text!(row.title.clone()))
-                })))
-            .child(self.patient_notes(patient))
-            .child(div().flex().flex_wrap().gap(px(8.))
-                .child(button("clinical-workspace-edit-notes", "Modifica note", theme, false,
-                    self.form.is_none() && !patient.is_archived && patient.deleted_at.is_none() && !patient.field_locked("notes") && self.can_write(FormKind::Notes))
-                    .when(self.form.is_none() && !patient.is_archived && patient.deleted_at.is_none() && !patient.field_locked("notes") && self.can_write(FormKind::Notes), |el|
-                        el.on_click(cx.listener(|this, _, window, cx| this.open_form(FormKind::Notes, window, cx)))))
-                .child(button("clinical-workspace-edit-profile", "Modifica anagrafica", theme, false, self.form.is_none() && self.can_write(FormKind::PatientProfile) && !patient.is_archived)
-                    .when(self.form.is_none() && self.can_write(FormKind::PatientProfile) && !patient.is_archived, |el| el.on_click(cx.listener(|this, _, _, cx| this.edit_patient_profile(cx)))))
-                .child(button("clinical-workspace-current-profile", "Altri dati della scheda…", theme, false, true)
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        if let Some(path) = this.current_patient_path("edit") { this.open_current(&path, cx); }
-                    }))));
+        let mut overview = div()
+            .flex()
+            .flex_col()
+            .gap(px(28.))
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.))
+                    .child(section(
+                        "clinical-workspace-quadro-heading",
+                        "QUADRO",
+                        theme,
+                    ))
+                    .child(
+                        div()
+                            .font_family(VOICE)
+                            .text_size(px(theme.size(22.)))
+                            .child(text!("Problemi e contesto")),
+                    )
+                    .when(diagnoses.is_err(), |el| {
+                        el.child(
+                            self.unreadable_field("clinical-workspace-diagnoses-unavailable", cx),
+                        )
+                    })
+                    .when(diagnoses.as_ref().is_ok_and(Vec::is_empty), |el| {
+                        el.child(
+                            div()
+                                .text_color(theme.secondary)
+                                .child(text!("Nessun problema riportato nella scheda.")),
+                        )
+                    })
+                    .children(diagnoses.unwrap_or_default().into_iter().map(|label| {
+                        div()
+                            .border_b_1()
+                            .border_color(theme.rule)
+                            .py(px(12.))
+                            .child(text!(label))
+                    })),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.))
+                    .child(section(
+                        "clinical-workspace-active-therapies-heading",
+                        "TERAPIE ATTIVE",
+                        theme,
+                    ))
+                    .when(
+                        self.patient.therapies.state(ReadObject::Terapie).is_some(),
+                        |el| {
+                            el.child(self.patient_read_hint(
+                                "clinical-workspace-therapies-state",
+                                &self.patient.therapies,
+                                ReadObject::Terapie,
+                                cx,
+                            ))
+                        },
+                    )
+                    .when(
+                        self.patient.therapies.ready().is_some_and(|rows| {
+                            !rows
+                                .iter()
+                                .any(|row| row.status == "active" && row.deleted_at.is_none())
+                        }),
+                        |el| {
+                            el.child(self.empty_read_state(
+                                "clinical-workspace-therapies-empty",
+                                ReadObject::Terapie,
+                                cx,
+                            ))
+                        },
+                    )
+                    .children(
+                        self.patient
+                            .therapies
+                            .ready()
+                            .into_iter()
+                            .flatten()
+                            .filter(|row| row.status == "active" && row.deleted_at.is_none())
+                            .map(|row| {
+                                div()
+                                    .border_b_1()
+                                    .border_color(theme.rule)
+                                    .py(px(12.))
+                                    .flex()
+                                    .flex_col()
+                                    .gap(px(4.))
+                                    .child(
+                                        div()
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .child(text!(row.drug_name.clone())),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_color(theme.secondary)
+                                            .child(text!(row.dosage.clone())),
+                                    )
+                            }),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.))
+                    .child(section(
+                        "clinical-workspace-followup-heading",
+                        "PROSSIMI CONTROLLI",
+                        theme,
+                    ))
+                    .child(
+                        button(
+                            "clinical-workspace-open-checkups",
+                            "Tutti i controlli",
+                            theme,
+                            false,
+                            self.form.is_none(),
+                        )
+                        .when(self.form.is_none(), |el| {
+                            el.on_click(cx.listener(|this, _, _, cx| {
+                                this.section_selected(PatientSection::Checkups, cx)
+                            }))
+                        }),
+                    )
+                    .when(
+                        self.patient.checkups.state(ReadObject::Controlli).is_some(),
+                        |el| {
+                            el.child(self.patient_read_hint(
+                                "clinical-workspace-checkups-state",
+                                &self.patient.checkups,
+                                ReadObject::Controlli,
+                                cx,
+                            ))
+                        },
+                    )
+                    .when(
+                        self.patient.checkups.ready().is_some_and(|rows| {
+                            !rows
+                                .iter()
+                                .any(|row| row.status == "pending" && row.deleted_at.is_none())
+                        }),
+                        |el| {
+                            el.child(self.empty_read_state(
+                                "clinical-workspace-checkups-empty",
+                                ReadObject::Controlli,
+                                cx,
+                            ))
+                        },
+                    )
+                    .children(
+                        self.patient
+                            .checkups
+                            .ready()
+                            .into_iter()
+                            .flatten()
+                            .filter(|row| row.status == "pending" && row.deleted_at.is_none())
+                            .map(|row| {
+                                div()
+                                    .border_b_1()
+                                    .border_color(theme.rule)
+                                    .py(px(12.))
+                                    .flex()
+                                    .flex_col()
+                                    .gap(px(4.))
+                                    .child(
+                                        div()
+                                            .text_size(px(theme.size(12.)))
+                                            .text_color(theme.secondary)
+                                            .child(text!(display_date(Some(&row.date)))),
+                                    )
+                                    .child(text!(row.title.clone()))
+                            }),
+                    ),
+            )
+            .child(self.patient_notes(patient, cx))
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .gap(px(8.))
+                    .child(
+                        button(
+                            "clinical-workspace-edit-notes",
+                            "Modifica note",
+                            theme,
+                            false,
+                            self.form.is_none()
+                                && !patient.is_archived
+                                && patient.deleted_at.is_none()
+                                && !patient.field_locked("notes")
+                                && self.can_write(FormKind::Notes),
+                        )
+                        .when(
+                            self.form.is_none()
+                                && !patient.is_archived
+                                && patient.deleted_at.is_none()
+                                && !patient.field_locked("notes")
+                                && self.can_write(FormKind::Notes),
+                            |el| {
+                                el.on_click(cx.listener(|this, _, window, cx| {
+                                    this.open_form(FormKind::Notes, window, cx)
+                                }))
+                            },
+                        ),
+                    )
+                    .child(
+                        button(
+                            "clinical-workspace-edit-profile",
+                            "Modifica anagrafica",
+                            theme,
+                            false,
+                            self.form.is_none()
+                                && self.can_write(FormKind::PatientProfile)
+                                && !patient.is_archived,
+                        )
+                        .when(
+                            self.form.is_none()
+                                && self.can_write(FormKind::PatientProfile)
+                                && !patient.is_archived,
+                            |el| {
+                                el.on_click(
+                                    cx.listener(|this, _, _, cx| this.edit_patient_profile(cx)),
+                                )
+                            },
+                        ),
+                    )
+                    .child(
+                        button(
+                            "clinical-workspace-current-profile",
+                            "Altri dati della scheda…",
+                            theme,
+                            false,
+                            true,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            if let Some(path) = this.current_patient_path("edit") {
+                                this.open_current(&path, cx);
+                            }
+                        })),
+                    ),
+            );
         if !patient.locked_fields.is_empty() {
-            overview = overview.child(notice("clinical-workspace-locked-fields", "Alcuni campi cifrati non sono leggibili. Il campo vuoto non prova l'assenza del dato.", theme, true));
+            overview =
+                overview.child(self.unreadable_field("clinical-workspace-locked-fields", cx));
         }
         overview
     }
@@ -3438,10 +3645,9 @@ impl ClinicalApp {
                     .on_click(cx.listener(|this, _, _, cx| {
                         if let Some(path) = this.current_patient_path("modules#diario") { this.open_current(&path, cx); }
                     }))))
-            .when(self.patient.entries.message().is_some(), |el| el.child(self.load_hint("clinical-workspace-entries-state", &self.patient.entries)))
-            .when(self.patient.entries.ready().is_some() && rows.is_empty(), |el| el.child(div().py(px(24.)).flex().flex_col().gap(px(12.))
-                .child(div().font_family(VOICE).text_size(px(theme.size(22.))).child(text!("Il diario è vuoto")))
-                .child(div().text_color(theme.secondary).child(text!("Una nuova voce resta una bozza finché non la confermi.")))))
+            .when(self.patient.entries.state(ReadObject::Diario).is_some(), |el| el.child(self.patient_read_hint("clinical-workspace-entries-state", &self.patient.entries, ReadObject::Diario, cx)))
+            .when(self.patient.entries.ready().is_some() && rows.is_empty(), |el| el.child(
+                self.empty_read_state("clinical-workspace-entries-empty", ReadObject::Diario, cx)))
             .children(rows.into_iter().map(|entry| {
                 let id = entry.id.clone();
                 let edit_id = id.clone();
@@ -3450,14 +3656,14 @@ impl ClinicalApp {
                 let title = if entry.locked_fields.iter().any(|field| field == "title") { "Titolo non leggibile".into() } else { entry.title.clone() };
                 let prose = if entry.locked_fields.iter().any(|field| field == "content") { "Il testo cifrato non è leggibile con questo accesso.".into() } else { plain_text(&entry.content) };
                 let clipboard = format!("{} · {}\n{}\n{}", display_date(Some(&entry.date)), entry_type_label(&entry.entry_type), title, prose);
-                div().id(SharedString::from(format!("clinical-workspace-entry-{id}"))).role(Role::Article)
+                div().id(SharedString::from(format!("clinical-workspace-entry-{id}"))).debug_selector(|| format!("clinical-workspace-entry-{id}")).role(Role::Article)
                     .aria_label(SharedString::from(format!("{}, {}", title, display_date(Some(&entry.date)))))
                     .border_b_1().border_color(theme.rule).pb(px(24.)).flex().flex_col().gap(px(8.))
                     .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary)
                         .child(text!(format!("{} · {}", display_date(Some(&entry.date)), entry_type_label(&entry.entry_type)))))
                     .child(div().font_family(VOICE).text_size(px(theme.size(22.))).child(text!(title)))
                     .child(if entry.locked_fields.iter().any(|field| field == "content") {
-                        div().text_color(theme.critical).child(text!(prose)).into_any_element()
+                        self.unreadable_field("clinical-workspace-entry-unreadable", cx).into_any_element()
                     } else { clinical_text::render(&entry.content, theme) })
                     .child(button(format!("clinical-workspace-edit-entry-{id}"), "Modifica voce", theme, false, editable)
                         .when(editable, |el| el.on_click(cx.listener(move |this, _, _, cx| this.edit_record(editing::Kind::Entry, &edit_id, cx)))))
@@ -3510,15 +3716,26 @@ impl ClinicalApp {
                         }),
                     ),
             )
-            .when(self.patient.therapies.message().is_some(), |el| {
-                el.child(self.load_hint(
-                    "clinical-workspace-therapies-state",
-                    &self.patient.therapies,
-                ))
-            })
+            .when(
+                self.patient.therapies.state(ReadObject::Terapie).is_some(),
+                |el| {
+                    el.child(self.patient_read_hint(
+                        "clinical-workspace-therapies-state",
+                        &self.patient.therapies,
+                        ReadObject::Terapie,
+                        cx,
+                    ))
+                },
+            )
             .when(
                 self.patient.therapies.ready().is_some_and(Vec::is_empty),
-                |el| el.child(text!("Nessuna terapia presente nella scheda.")),
+                |el| {
+                    el.child(self.empty_read_state(
+                        "clinical-workspace-therapies-empty",
+                        ReadObject::Terapie,
+                        cx,
+                    ))
+                },
             )
             .children(
                 self.patient
@@ -3585,11 +3802,10 @@ impl ClinicalApp {
                             .when(
                                 row.locked_fields.iter().any(|field| field == "motivation"),
                                 |el| {
-                                    el.child(
-                                        div()
-                                            .text_color(theme.critical)
-                                            .child(text!("Motivo della terapia non leggibile.")),
-                                    )
+                                    el.child(self.unreadable_field(
+                                        "clinical-workspace-therapy-unreadable",
+                                        cx,
+                                    ))
                                 },
                             )
                             .when(
@@ -3665,15 +3881,29 @@ impl ClinicalApp {
                         }),
                     ),
             )
-            .when(self.patient.observations.message().is_some(), |el| {
-                el.child(self.load_hint(
-                    "clinical-workspace-observations-state",
-                    &self.patient.observations,
-                ))
-            })
+            .when(
+                self.patient
+                    .observations
+                    .state(ReadObject::Parametri)
+                    .is_some(),
+                |el| {
+                    el.child(self.patient_read_hint(
+                        "clinical-workspace-observations-state",
+                        &self.patient.observations,
+                        ReadObject::Parametri,
+                        cx,
+                    ))
+                },
+            )
             .when(
                 self.patient.observations.ready().is_some() && rows.is_empty(),
-                |el| el.child(text!("Nessun parametro presente nella scheda.")),
+                |el| {
+                    el.child(self.empty_read_state(
+                        "clinical-workspace-observations-empty",
+                        ReadObject::Parametri,
+                        cx,
+                    ))
+                },
             )
             .children(rows.into_iter().map(|row| {
                 let id = row.id.clone();
@@ -3732,9 +3962,10 @@ impl ClinicalApp {
                         row.locked_fields.iter().any(|field| field == "notes"),
                         |el| {
                             el.child(
-                                div()
-                                    .text_color(theme.critical)
-                                    .child(text!("Note del parametro non leggibili.")),
+                                self.unreadable_field(
+                                    "clinical-workspace-observation-unreadable",
+                                    cx,
+                                ),
                             )
                         },
                     )
@@ -4691,6 +4922,7 @@ impl Render for ClinicalApp {
         if self.ai_preferences.active {
             self.ai_preferences.prepare_render(window, cx);
         }
+        self.prepare_read_state_focus(window, cx);
         self.scales.prepare_render(theme, window, cx);
         self.analytics.prepare_render(theme, cx);
         for field in &self.login_fields {
@@ -5018,7 +5250,7 @@ impl ClinicalApp {
         }
         self.selected_id = Some(row.id.clone());
         self.patient = PatientData::default();
-        self.patient.detail = Load::Ready(row);
+        self.patient.detail = ReadLoad::Ready(row);
         self.patient_section = PatientSection::Overview;
         self.area = Area::Patients;
         self.directory = false;
@@ -5081,7 +5313,7 @@ impl ClinicalApp {
             this.edit_pending = false;
             match result {
                 Ok(row) if this.form.is_none() && this.selected_id.as_deref() == Some(&row.id) && !row.is_archived && row.deleted_at.is_none() => {
-                    this.patient.detail = Load::Ready(row.clone());
+                    this.patient.detail = ReadLoad::Ready(row.clone());
                     this.stage_fields(FormKind::PatientProfile, patient_forms::fields(Some(&row)), None, cx);
                     if let Some(form) = &mut this.form { form.patient_original = Some(row); }
                 }
@@ -5319,14 +5551,26 @@ impl ClinicalApp {
                         }),
                     ),
             )
-            .when(self.patient.checkups.message().is_some(), |el| {
-                el.child(
-                    self.load_hint("clinical-workspace-checkups-state", &self.patient.checkups),
-                )
-            })
+            .when(
+                self.patient.checkups.state(ReadObject::Controlli).is_some(),
+                |el| {
+                    el.child(self.patient_read_hint(
+                        "clinical-workspace-checkups-state",
+                        &self.patient.checkups,
+                        ReadObject::Controlli,
+                        cx,
+                    ))
+                },
+            )
             .when(
                 self.patient.checkups.ready().is_some() && rows.is_empty(),
-                |el| el.child(text!("Nessun controllo presente nella scheda.")),
+                |el| {
+                    el.child(self.empty_read_state(
+                        "clinical-workspace-checkups-empty",
+                        ReadObject::Controlli,
+                        cx,
+                    ))
+                },
             )
             .children(rows.into_iter().map(|row| {
                 let id = row.id.clone();
@@ -5361,9 +5605,9 @@ impl ClinicalApp {
                     .when(
                         row.locked_fields.iter().any(|field| field == "notes"),
                         |el| {
-                            el.child(text!(
-                                "Note del controllo non leggibili con questo accesso."
-                            ))
+                            el.child(
+                                self.unreadable_field("clinical-workspace-checkup-unreadable", cx),
+                            )
                         },
                     )
                     .when(
