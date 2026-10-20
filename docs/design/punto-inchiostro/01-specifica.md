@@ -338,7 +338,9 @@ Regole che valgono per tutti:
   sola al nuovo archivio.
 - La copia offline si nomina con l'ora in cui è stata letta, e solo se c'è.
 - Lo stato è una regione annunciata ai lettori di schermo; il fuoco va sul
-  suo comando, se c'è, altrimenti resta dov'era.
+  suo comando, se c'è, altrimenti resta dov'era. Le letture in background
+  non interrompono la compilazione di un modulo: non tolgono il fuoco
+  all'editor della bozza, e il loro comando resta visibile e premibile.
 
 ## Movimento
 
