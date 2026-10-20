@@ -20,6 +20,8 @@ export type AmbulatoryMutationValue = Record<string, unknown>;
 export type AmbulatoryMutationResponse = { status: 200 | 201 | 400 | 401 | 403 | 404 | 409; value: AmbulatoryMutationValue };
 
 export type HostAmbulatoryContext = { request: Request; session: ServerSession };
+export type GuardedNetworkAmbulatoryContext = NetworkWriteContext & { authorizeCommit: NetworkPatientCommitGuard };
+export type AmbulatoryCoreContext = HostAmbulatoryContext | GuardedNetworkAmbulatoryContext;
 type AmbulatoryWriteContext = HostAmbulatoryContext | NetworkWriteContext;
 type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 
@@ -83,12 +85,14 @@ function affected(row: Pick<AmbulatoryRow, 'id' | 'version'>): { id: string; ver
     return { id: row.id, version: row.version };
 }
 
-/* a network surface never commits without an authority recheck prepared by its writer. */
+/* a network surface never commits without an authority recheck carried by its admitted context. */
 function requireCommitGuard(
-    surface: 'host' | 'network', authorizeCommit: NetworkPatientCommitGuard | undefined,
+    context: AmbulatoryCoreContext, surface: 'host' | 'network',
 ): NetworkPatientCommitGuard | undefined {
-    if (surface === 'network' && !authorizeCommit) throw new TypeError('Network ambulatory writes require a commit guard');
-    return authorizeCommit;
+    if (surface !== 'network') return undefined;
+    const guard = (context as Partial<GuardedNetworkAmbulatoryContext>).authorizeCommit;
+    if (!guard) throw new TypeError('Network ambulatory writes require a commit guard');
+    return guard;
 }
 
 /* network writers recheck current authority inside the same commit transaction. */
@@ -112,9 +116,9 @@ function validateParent(
     return null;
 }
 
-export function createAmbulatory(context: AmbulatoryWriteContext, rawBody: Record<string, unknown>, surface: 'host' | 'network' = 'host',
-    authorizeCommit?: NetworkPatientCommitGuard): AmbulatoryMutationResponse {
-    requireCommitGuard(surface, authorizeCommit);
+export function createAmbulatory(context: AmbulatoryCoreContext, rawBody: Record<string, unknown>,
+    surface: 'host' | 'network' = 'host'): AmbulatoryMutationResponse {
+    const authorizeCommit = requireCommitGuard(context, surface);
     const name = typeof rawBody.name === 'string' ? rawBody.name.trim() : '';
     if (!name) return { status: 400, value: { error: 'Ambulatory name is required' } };
     const type = normalizeType(rawBody.type, false);
@@ -168,9 +172,9 @@ export function createAmbulatory(context: AmbulatoryWriteContext, rawBody: Recor
     }, { behavior: 'immediate' });
 }
 
-export function updateAmbulatory(context: AmbulatoryWriteContext, id: string, rawBody: Record<string, unknown>, surface: 'host' | 'network' = 'host',
-    authorizeCommit?: NetworkPatientCommitGuard): AmbulatoryMutationResponse {
-    requireCommitGuard(surface, authorizeCommit);
+export function updateAmbulatory(context: AmbulatoryCoreContext, id: string, rawBody: Record<string, unknown>,
+    surface: 'host' | 'network' = 'host'): AmbulatoryMutationResponse {
+    const authorizeCommit = requireCommitGuard(context, surface);
     const expectedVersion = parseExpectedVersion(rawBody.version);
     if (expectedVersion === null) return { status: 400, value: { error: 'Version is required' } };
     return dbServer.transaction((tx): AmbulatoryMutationResponse => {
@@ -232,9 +236,9 @@ export function updateAmbulatory(context: AmbulatoryWriteContext, id: string, ra
     }, { behavior: 'immediate' });
 }
 
-export function deleteAmbulatory(context: AmbulatoryWriteContext, id: string, expectedVersion: unknown, surface: 'host' | 'network' = 'host',
-    authorizeCommit?: NetworkPatientCommitGuard): AmbulatoryMutationResponse {
-    requireCommitGuard(surface, authorizeCommit);
+export function deleteAmbulatory(context: AmbulatoryCoreContext, id: string, expectedVersion: unknown,
+    surface: 'host' | 'network' = 'host'): AmbulatoryMutationResponse {
+    const authorizeCommit = requireCommitGuard(context, surface);
     const parsedVersion = parseExpectedVersion(expectedVersion);
     if (parsedVersion === null) return { status: 400, value: { error: 'Version is required' } };
     return dbServer.transaction((tx): AmbulatoryMutationResponse => {
@@ -272,13 +276,12 @@ export function deleteAmbulatory(context: AmbulatoryWriteContext, id: string, ex
 }
 
 export async function clearAmbulatory(
-    context: AmbulatoryWriteContext,
+    context: AmbulatoryCoreContext,
     ambulatoryId: string,
     expectedVersion: unknown,
     surface: 'host' | 'network' = 'host',
-    authorizeCommit?: NetworkPatientCommitGuard,
 ): Promise<AmbulatoryMutationResponse> {
-    requireCommitGuard(surface, authorizeCommit);
+    const authorizeCommit = requireCommitGuard(context, surface);
     const parsedVersion = parseExpectedVersion(expectedVersion);
     if (parsedVersion === null) return { status: 400, value: { error: 'Version is required' } };
     if (context.session.role !== 'admin') return { status: 403, value: { error: 'Forbidden' } };

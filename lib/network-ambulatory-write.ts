@@ -5,13 +5,13 @@ import { clearAmbulatory, createAmbulatory, deleteAmbulatory, updateAmbulatory, 
 
 export const NETWORK_AMBULATORY_WRITE_CAPABILITY = 'network.ambulatories.write';
 
-/* the network writer owns the async guard before its synchronous commit path. */
+/* the network writer carries the async guard into the admitted core context. */
 export async function createNetworkAmbulatory(
     context: NetworkWriteContext,
     body: Record<string, unknown>,
 ): Promise<AmbulatoryMutationResponse> {
-    const authorizeCommit = await prepareNetworkPatientCommitGuard(context, NETWORK_AMBULATORY_WRITE_CAPABILITY);
-    return createAmbulatory(context, body, 'network', authorizeCommit);
+    return createAmbulatory({ ...context, authorizeCommit: await prepareNetworkPatientCommitGuard(
+        context, NETWORK_AMBULATORY_WRITE_CAPABILITY) }, body, 'network');
 }
 
 export async function updateNetworkAmbulatory(
@@ -19,8 +19,8 @@ export async function updateNetworkAmbulatory(
     id: string,
     body: Record<string, unknown>,
 ): Promise<AmbulatoryMutationResponse> {
-    const authorizeCommit = await prepareNetworkPatientCommitGuard(context, NETWORK_AMBULATORY_WRITE_CAPABILITY);
-    return updateAmbulatory(context, id, body, 'network', authorizeCommit);
+    return updateAmbulatory({ ...context, authorizeCommit: await prepareNetworkPatientCommitGuard(
+        context, NETWORK_AMBULATORY_WRITE_CAPABILITY) }, id, body, 'network');
 }
 
 export async function deleteNetworkAmbulatory(
@@ -28,8 +28,8 @@ export async function deleteNetworkAmbulatory(
     id: string,
     body: Record<string, unknown>,
 ): Promise<AmbulatoryMutationResponse> {
-    const authorizeCommit = await prepareNetworkPatientCommitGuard(context, NETWORK_AMBULATORY_WRITE_CAPABILITY);
-    return deleteAmbulatory(context, id, body.version, 'network', authorizeCommit);
+    return deleteAmbulatory({ ...context, authorizeCommit: await prepareNetworkPatientCommitGuard(
+        context, NETWORK_AMBULATORY_WRITE_CAPABILITY) }, id, body.version, 'network');
 }
 
 export async function clearNetworkAmbulatory(
@@ -37,6 +37,6 @@ export async function clearNetworkAmbulatory(
     ambulatoryId: string,
     body: Record<string, unknown>,
 ): Promise<AmbulatoryMutationResponse> {
-    const authorizeCommit = await prepareNetworkPatientCommitGuard(context, NETWORK_AMBULATORY_WRITE_CAPABILITY);
-    return clearAmbulatory(context, ambulatoryId, body.version, 'network', authorizeCommit);
+    return clearAmbulatory({ ...context, authorizeCommit: await prepareNetworkPatientCommitGuard(
+        context, NETWORK_AMBULATORY_WRITE_CAPABILITY) }, ambulatoryId, body.version, 'network');
 }
