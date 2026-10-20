@@ -444,7 +444,8 @@ impl ClinicalApp {
     }
 
     pub(super) fn prepare_read_state_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let objects = if self.form.is_some()
+        let background = self.form.is_some();
+        let objects = if background
             && Layout::for_window(f32::from(window.viewport_size().width), self.text_scale).wide
         {
             vec![ReadObject::Terapie, ReadObject::Controlli]
@@ -462,6 +463,7 @@ impl ClinicalApp {
         if let Some((object, _)) = commands
             .iter()
             .find(|command| !self.read_state_commands.contains(command))
+            .filter(|_| !background)
         {
             window.focus(&self.read_state_focus[object.index()], cx);
         }
@@ -560,6 +562,7 @@ impl ClinicalApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpui::Focusable;
     use serde_json::json;
     use std::{
         io::{Read, Write},
@@ -1092,6 +1095,115 @@ mod tests {
         host.assert_no_record_writes();
     }
 
+    #[gpui::test]
+    fn open_form_keeps_editor_focus_and_text_when_background_reads_fail(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = SyntheticHost::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        cx.simulate_resize(gpui::size(px(1400.), px(900.)));
+        view.update(cx, |app, _| enter_profile(app, &host));
+        cx.update_window_entity(&view, |app, window, cx| {
+            app.open_form(FormKind::Entry, window, cx)
+        });
+        draw(cx);
+        let editor = view.read_with(cx, |app, _| {
+            app.form.as_ref().unwrap().fields[0].editor.clone()
+        });
+        cx.update(|window, cx| {
+            assert!(
+                editor.read(cx).focus_handle(cx).is_focused(window),
+                "the module must start with its first editor focused"
+            );
+        });
+        cx.simulate_input("Bozza medica");
+        draw(cx);
+        let before = host.requests.lock().unwrap().clone();
+        view.update(cx, |app, cx| {
+            app.patient.therapies = ReadLoad::Failed(RuntimeError::InvalidResponse);
+            app.patient.checkups = ReadLoad::Failed(RuntimeError::InvalidResponse);
+            cx.notify();
+        });
+        draw(cx);
+        cx.update(|window, cx| {
+            assert!(
+                editor.read(cx).focus_handle(cx).is_focused(window),
+                "a background read failure must not move focus away from the open module"
+            );
+        });
+        cx.simulate_input(" salvata");
+        view.read_with(cx, |app, cx| {
+            let draft = app.form.as_ref().unwrap();
+            assert_eq!(
+                draft.fields[0].value(cx),
+                "Bozza medica salvata",
+                "keystrokes must land in the draft editor after a background read failure"
+            );
+        });
+        assert!(
+            cx.debug_bounds("clinical-workspace-therapies-state-command")
+                .is_some()
+        );
+        assert!(
+            cx.debug_bounds("clinical-workspace-checkups-state-command")
+                .is_some()
+        );
+        cx.run_until_parked();
+        assert!(
+            host.requests.lock().unwrap().len() == before.len(),
+            "a background read failure must not schedule any HTTP read"
+        );
+        host.therapy_status.store(200, Ordering::Release);
+        let watched = host.requests.lock().unwrap().len();
+        let bounds = cx
+            .debug_bounds("clinical-workspace-therapies-state-command")
+            .unwrap();
+        cx.simulate_click(bounds.center(), gpui::Modifiers::default());
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert!(app.patient.therapies.ready().is_some())
+        });
+        let requests = host.requests.lock().unwrap();
+        assert_eq!(
+            requests
+                .iter()
+                .skip(watched)
+                .filter(|request| request.contains("/therapies "))
+                .count(),
+            1,
+            "the state command is still reachable and retries only therapies"
+        );
+        assert!(
+            !requests
+                .iter()
+                .skip(watched)
+                .any(|request| request.contains("/checkups ")),
+            "the therapies retry must not reread the checkups"
+        );
+        assert!(
+            !requests
+                .iter()
+                .skip(watched)
+                .any(|request| request.contains("/entries ")),
+            "the therapies retry must not reread the diary"
+        );
+        drop(requests);
+        host.assert_no_record_writes();
+        view.read_with(cx, |app, cx| {
+            assert_eq!(
+                app.form.as_ref().unwrap().fields[0].value(cx),
+                "Bozza medica salvata",
+                "the draft text must survive the retry"
+            );
+        });
+        assert!(
+            cx.debug_bounds("clinical-workspace-checkups-state-command")
+                .is_some()
+        );
+        host.assert_no_record_writes();
+    }
+
     struct SyntheticHost {
         session: RuntimeSession,
         socket: std::net::SocketAddr,
@@ -1132,7 +1244,9 @@ mod tests {
                             "archiveGeneration":"synthetic-generation", "salt":"AwMDAwMDAwMDAwMDAwMDAw==",
                             "encryptedMasterKey":"v3:BQUFBQUFBQUFBQUFAm40aZvQGpityOwyLKhsE40tJdbsjtrugIXzoJ/lk9gjlh5j7pIPeh7DLQ7ikGhA"})
                     } else if route.starts_with("GET /api/v1/network/capabilities ") {
-                        json!({"protocolVersion":"1.13.0", "operatingMode":"network-home-base", "capabilities":[]})
+                        json!({"protocolVersion":"1.13.0", "operatingMode":"network-home-base",
+                            "capabilities":[{"key":"network.replica.write-clinical-diary",
+                                "requiresPairing":true, "status":"available"}]})
                     } else if route.starts_with("GET /api/v1/network/ambulatories ") {
                         json!([{"id":"scope-a", "name":"Ambulatorio sintetico", "isDefault":true, "version":1}])
                     } else if route.starts_with("GET /api/v1/network/identity ") {
