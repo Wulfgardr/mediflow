@@ -6,6 +6,7 @@ import {
     updateNetworkAmbulatory,
 } from '@/lib/network-ambulatory-write';
 import { requireNetworkWriteContext } from '@/lib/network-write-context';
+import { prepareNetworkPatientCommitGuard } from '@/lib/network-patient-commit-authority';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -13,8 +14,10 @@ export async function PUT(request: Request, context: RouteContext) {
     try {
         const resolved = await requireNetworkWriteContext(request, NETWORK_AMBULATORY_WRITE_CAPABILITY);
         if (!resolved.ok) return resolved.response;
+        const authorizeCommit = await prepareNetworkPatientCommitGuard(resolved.context, NETWORK_AMBULATORY_WRITE_CAPABILITY);
         const { id } = await context.params;
-        const result = await updateNetworkAmbulatory(resolved.context, id, await readNativeNetworkJson(request) as Record<string, unknown>);
+        const result = await updateNetworkAmbulatory(resolved.context, id,
+            await readNativeNetworkJson(request) as Record<string, unknown>, authorizeCommit);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         const sizeError = jsonBodyTooLargeResponse(error);
@@ -28,8 +31,10 @@ export async function DELETE(request: Request, context: RouteContext) {
     try {
         const resolved = await requireNetworkWriteContext(request, NETWORK_AMBULATORY_WRITE_CAPABILITY);
         if (!resolved.ok) return resolved.response;
+        const authorizeCommit = await prepareNetworkPatientCommitGuard(resolved.context, NETWORK_AMBULATORY_WRITE_CAPABILITY);
         const { id } = await context.params;
-        const result = await deleteNetworkAmbulatory(resolved.context, id, await readNativeNetworkJson(request).catch(emptyJsonUnlessTooLarge) as Record<string, unknown>);
+        const result = await deleteNetworkAmbulatory(resolved.context, id,
+            await readNativeNetworkJson(request).catch(emptyJsonUnlessTooLarge) as Record<string, unknown>, authorizeCommit);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         const sizeError = jsonBodyTooLargeResponse(error);
