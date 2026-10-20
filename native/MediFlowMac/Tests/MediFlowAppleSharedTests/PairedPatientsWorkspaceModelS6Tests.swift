@@ -239,12 +239,48 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
         HomeBaseMutationAcknowledgement(success: true)
     }
 
+    var accountProfile = HomeBaseAccountProfile(userId: "operator-1", username: ["synthetic", "profile"].joined(separator: "-"),
+        displayName: "Dott. Bianchi", ambulatoryName: "Centro Salute",
+        profileVersion: "opaque-initial", archiveGeneration: "synthetic-generation")
+    var profileReadCount = 0
+    var profileWriteCount = 0
+    var profileReadError: HomeBaseClientError?
+    var profileWriteError: HomeBaseClientError?
+    var profileDelay: CheckedContinuation<Void, Never>?
+    var holdProfileResponse = false
+    var holdProfileRead = false
+    var profileReadDelay: CheckedContinuation<Void, Never>?
+
+    func configureProfile(error: HomeBaseClientError? = nil, hold: Bool = false) {
+        profileWriteError = error
+        holdProfileResponse = hold
+    }
+    func configureProfileRead(hold: Bool) { holdProfileRead = hold }
+    func releaseProfileRead() { profileReadDelay?.resume(); profileReadDelay = nil }
+    func releaseProfile() { profileDelay?.resume(); profileDelay = nil }
+    func fetchAccountProfile(credentials: HomeBasePairedCredentials, sessionCookie: String) async throws -> HomeBaseAccountProfile {
+        profileReadCount += 1
+        if holdProfileRead { await withCheckedContinuation { profileReadDelay = $0 } }
+        if let profileReadError { throw profileReadError }
+        return accountProfile
+    }
     func updateProfile(
-        userId: String, displayName: String, ambulatoryName: String,
+        expectedVersion: String, displayName: String?, ambulatoryName: String?, archiveGeneration: String,
         credentials: HomeBasePairedCredentials, sessionCookie: String
-    ) async throws -> HomeBaseMutationAcknowledgement {
-        if let profileError { throw profileError }
-        return HomeBaseMutationAcknowledgement(success: true)
+    ) async throws -> HomeBaseAccountProfile {
+        profileWriteCount += 1
+        if holdProfileResponse { await withCheckedContinuation { profileDelay = $0 } }
+        if let error = profileWriteError ?? profileError { throw error }
+        guard expectedVersion == accountProfile.profileVersion, archiveGeneration == accountProfile.archiveGeneration else {
+            throw HomeBaseClientError.profileVersionConflict(accountProfile)
+        }
+        let normalizedName = displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedClinic = ambulatoryName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        accountProfile = HomeBaseAccountProfile(userId: "operator-1", username: ["synthetic", "profile"].joined(separator: "-"),
+            displayName: normalizedName?.isEmpty == false ? normalizedName : nil,
+            ambulatoryName: normalizedClinic?.isEmpty == false ? normalizedClinic : nil,
+            profileVersion: "opaque-updated", archiveGeneration: archiveGeneration, changed: true)
+        return accountProfile
     }
 
     func createAmbulatory(

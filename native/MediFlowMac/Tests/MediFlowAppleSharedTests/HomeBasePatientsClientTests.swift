@@ -2370,10 +2370,12 @@ final class HomeBasePatientsClientTests: XCTestCase {
                 XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
                 XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
                 let payload = try self.requestObject(request)
-                XCTAssertEqual(payload["id"] as? String, "user-1")
+                XCTAssertNil(payload["id"])
+                XCTAssertEqual(payload["expectedVersion"] as? String, "opaque-profile-version")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-archive-generation"), "synthetic-generation")
                 XCTAssertEqual(payload["displayName"] as? String, "Dott.ssa Ada")
                 XCTAssertEqual(payload["ambulatoryName"] as? String, "Centro Salute")
-                return (response, Data(#"{"success":true}"#.utf8))
+                return (response, Data(#"{"userId":"user-1","username":"synthetic","displayName":"Dott.ssa Ada","ambulatoryName":"Centro Salute","profileVersion":"opaque-profile-version","archiveGeneration":"synthetic-generation","changed":true}"#.utf8))
             case ("POST", "/api/v1/network/ambulatories"):
                 let payload = try self.requestObject(request)
                 XCTAssertEqual(payload["id"] as? String, "amb-new")
@@ -2488,7 +2490,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
 
         _ = try await source.changePin(currentPin: "1357", newPin: "2468", encryptedMasterKey: "v2:wrapped", salt: "AAECAwQFBgcICQoLDA0ODw==", credentials: creds, sessionCookie: cookie)
         _ = try await source.logout(credentials: creds, sessionCookie: cookie)
-        _ = try await source.updateProfile(userId: "user-1", displayName: "Dott.ssa Ada", ambulatoryName: "Centro Salute", credentials: creds, sessionCookie: cookie)
+        _ = try await source.updateProfile(expectedVersion: "opaque-profile-version", displayName: "Dott.ssa Ada", ambulatoryName: "Centro Salute", archiveGeneration: "synthetic-generation", credentials: creds, sessionCookie: cookie)
         _ = try await source.createAmbulatory(payload: HomeBaseAmbulatoryCreatePayload(id: "amb-new", name: "Sede Nuova", type: "test"), credentials: creds, sessionCookie: cookie)
         _ = try await source.updateAmbulatory(id: "amb-new", payload: HomeBaseAmbulatoryUpdatePayload(expectedVersion: 1, name: "Sede Aggiornata", description: .null), credentials: creds, sessionCookie: cookie)
         _ = try await source.deleteAmbulatory(id: "amb-new", expectedVersion: 2, credentials: creds, sessionCookie: cookie)
@@ -2719,6 +2721,72 @@ final class HomeBasePatientsClientTests: XCTestCase {
         }
     }
     #endif
+
+    func testAccountProfileTransportReadsCurrentVersionAndEncodesNullableNamesWithoutId() async throws {
+        var methods: [String] = []
+        let client = makeClient { request in
+            methods.append(request.httpMethod ?? "GET")
+            XCTAssertEqual(request.url?.path, "/api/auth/profile")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), self.cookie)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cache-Control"), "no-store")
+            XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalAndRemoteCacheData)
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if request.httpMethod == "GET" {
+                return (response, Data(#"{"operation":"account-profile.read.v1","contractVersion":1,"userId":"synthetic-user","username":"synthetic","displayName":"Nome corrente","ambulatoryName":null,"profileVersion":"opaque-current","archiveGeneration":"generation-current"}"#.utf8))
+            }
+            let body = try self.requestObject(request)
+            XCTAssertEqual(Set(body.keys), Set(["expectedVersion", "displayName", "ambulatoryName"]))
+            XCTAssertEqual(body["expectedVersion"] as? String, "opaque-current")
+            XCTAssertTrue(body["displayName"] is NSNull)
+            XCTAssertTrue(body["ambulatoryName"] is NSNull)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-archive-generation"), "generation-current")
+            return (response, Data(#"{"userId":"synthetic-user","username":"synthetic","displayName":null,"ambulatoryName":null,"profileVersion":"opaque-next","archiveGeneration":"generation-current","changed":true}"#.utf8))
+        }
+        let current = try await client.fetchAccountProfile(credentials: creds, sessionCookie: cookie)
+        XCTAssertEqual(current.profileVersion, "opaque-current")
+        let updated = try await client.updateProfile(expectedVersion: current.profileVersion, displayName: nil,
+            ambulatoryName: nil, archiveGeneration: current.archiveGeneration, credentials: creds, sessionCookie: cookie)
+        XCTAssertEqual(updated.profileVersion, "opaque-next")
+        XCTAssertEqual(methods, ["GET", "PUT"])
+    }
+
+    func testAccountProfileConflictAndArchiveReplacementHaveDistinctErrorsAndNoRetry() async throws {
+        for code in ["PROFILE_VERSION_CONFLICT", "ARCHIVE_REPLACED"] {
+            var requests = 0
+            let client = makeClient { request in
+                requests += 1
+                let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 409, httpVersion: nil, headerFields: nil)!
+                return (response, Data("""
+                {"code":"\(code)","userId":"synthetic-user","username":"synthetic","displayName":"Altro client","ambulatoryName":null,"profileVersion":"opaque-other","archiveGeneration":"generation-current"}
+                """.utf8))
+            }
+            do {
+                _ = try await client.updateProfile(expectedVersion: "old", displayName: "Bozza", ambulatoryName: nil,
+                    archiveGeneration: "generation-current", credentials: creds, sessionCookie: cookie)
+                XCTFail("Expected conflict")
+            } catch let error as HomeBaseClientError {
+                if code == "ARCHIVE_REPLACED" { XCTAssertEqual(error, .archiveReplaced) }
+                else if case .profileVersionConflict(let profile) = error { XCTAssertEqual(profile.displayName, "Altro client") }
+                else { XCTFail("Unexpected error: \(error)") }
+            }
+            XCTAssertEqual(requests, 1)
+        }
+    }
+
+    func testAccountProfileRejectsLegacyAcknowledgementAndWrongReadOperation() async throws {
+        for payload in [#"{"success":true}"#, #"{"operation":"other","contractVersion":1,"userId":"u","username":"synthetic","displayName":null,"ambulatoryName":null,"profileVersion":"v","archiveGeneration":"g"}"#] {
+            let client = makeClient { request in
+                let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+                return (response, Data(payload.utf8))
+            }
+            do {
+                _ = try await client.fetchAccountProfile(credentials: creds, sessionCookie: cookie)
+                XCTFail("Expected contract failure")
+            } catch let error as HomeBaseClientError { XCTAssertEqual(error, .contract) }
+        }
+    }
 
     private func makeClient(
         handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)

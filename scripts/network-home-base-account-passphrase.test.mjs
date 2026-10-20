@@ -80,7 +80,7 @@ test('an account moves from its PIN to a passphrase, the PIN stops opening it, a
 
     // Every session of the account is retired, including the one that asked.
     for (const sessionHeaders of [pinLogin.webHeaders, unchanged.webHeaders]) {
-        const profile = await request('PUT', '/api/auth/profile', { headers: { ...sessionHeaders }, body: { displayName: 'Synthetic' } });
+        const profile = await request('PUT', '/api/auth/profile', { headers: { ...sessionHeaders }, body: { expectedVersion: 'synthetic-retired-version', displayName: 'Synthetic', ambulatoryName: null } });
         assert.equal(profile.response.status, 401);
     }
 
@@ -150,7 +150,7 @@ test('an account moves from its PIN to a passphrase, the PIN stops opening it, a
 
     // Every session is retired, the old passphrase and the spent recovery key are refused, the new passphrase opens the same key.
     for (const sessionHeaders of [still.webHeaders, afterRefusals.webHeaders]) {
-        const retired = await request('PUT', '/api/auth/profile', { headers: { ...sessionHeaders }, body: { displayName: 'Synthetic' } });
+        const retired = await request('PUT', '/api/auth/profile', { headers: { ...sessionHeaders }, body: { expectedVersion: 'synthetic-retired-version', displayName: 'Synthetic', ambulatoryName: null } });
         assert.equal(retired.response.status, 401);
     }
     assert.equal((await login({ verifier: material.verifier })).response.status, 401);

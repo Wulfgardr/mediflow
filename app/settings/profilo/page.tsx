@@ -2,68 +2,42 @@
 
 // WUL-297 Profilo: moved from the monolithic settings page.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Save, User } from 'lucide-react';
 import { useSecurity } from '@/components/security-provider';
-import { useToast } from '@/components/ui/toast-provider';
+import { AccountProfileEditor, type ProfileEditorState } from '@/lib/security/account-profile-editor';
+import { captureClientAccountAuthority, observeArchiveGeneration } from '@/lib/security/client-auth-api';
 import { WorkProfileSettings } from '@/components/work-profile-onboarding';
 import {
     SETTINGS_CARD_CLASS,
     SETTINGS_INPUT_CLASS,
     SETTINGS_LABEL_CLASS,
     SETTINGS_PRIMARY_BUTTON_CLASS,
+    SETTINGS_SECONDARY_BUTTON_CLASS,
     SettingsSectionIntro,
 } from '@/components/settings/settings-ui';
 
 export default function SettingsProfilePage() {
-    // --- Profile State ---
     const { user, updateUser } = useSecurity();
-    const { showToast } = useToast();
-    const [profile, setProfile] = useState({
-        doctorName: '',
-        clinicName: ''
+    const editor = useRef<AccountProfileEditor | null>(null);
+    const updateUserRef = useRef(updateUser);
+    useEffect(() => { updateUserRef.current = updateUser; }, [updateUser]);
+    const [state, setState] = useState<ProfileEditorState>({
+        draft: { doctorName: '', clinicName: '' }, current: null, busy: false, requiresRead: true, message: '',
     });
-    const [isSavingProfile, setIsSavingProfile] = useState(false);
-
-    // Sync profile with user context
+    const userId = user?.id;
     useEffect(() => {
-        if (user) {
-            setProfile({
-                doctorName: user.displayName || '',
-                clinicName: user.ambulatoryName || ''
-            });
-        }
-    }, [user]);
-
-    const saveProfile = async () => {
-        if (!user) return;
-        setIsSavingProfile(true);
-        try {
-            const res = await fetch('/api/auth/profile', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    id: user.id,
-                    displayName: profile.doctorName,
-                    ambulatoryName: profile.clinicName
-                })
-            });
-
-            if (!res.ok) throw new Error("Update failed");
-
-            updateUser({
-                displayName: profile.doctorName,
-                ambulatoryName: profile.clinicName
-            });
-
-            showToast({ tone: 'success', title: 'Profilo aggiornato' });
-        } catch (e) {
-            console.error(e);
-            showToast({ tone: 'error', title: 'Errore durante il salvataggio del profilo' });
-        } finally {
-            setIsSavingProfile(false);
-        }
-    };
+        if (!userId) return;
+        const owner = new AccountProfileEditor(userId, captureClientAccountAuthority(), setState, (profile, isCurrent) => {
+            observeArchiveGeneration(profile.archiveGeneration);
+            updateUserRef.current({ id: profile.userId, displayName: profile.displayName ?? undefined, ambulatoryName: profile.ambulatoryName ?? undefined }, isCurrent);
+        });
+        editor.current = owner;
+        setState(owner.state);
+        void owner.read();
+        return () => { owner.dispose(); editor.current = null; };
+    }, [userId]);
+    const profile = state.draft;
 
     return (
         <section className="space-y-4" data-testid="settings-profile-section">
@@ -96,7 +70,9 @@ export default function SettingsProfilePage() {
                             name="doctorName"
                             type="text"
                             value={profile.doctorName}
-                            onChange={(e) => setProfile({ ...profile, doctorName: e.target.value })}
+                            onChange={(e) => editor.current?.edit({ ...profile, doctorName: e.target.value })}
+                            disabled={state.busy || !state.current}
+                            maxLength={200}
                             placeholder="es. Dr. Mario Rossi"
                             autoComplete="name"
                             className={SETTINGS_INPUT_CLASS}
@@ -112,22 +88,30 @@ export default function SettingsProfilePage() {
                             name="clinicName"
                             type="text"
                             value={profile.clinicName}
-                            onChange={(e) => setProfile({ ...profile, clinicName: e.target.value })}
+                            onChange={(e) => editor.current?.edit({ ...profile, clinicName: e.target.value })}
+                            disabled={state.busy || !state.current}
+                            maxLength={200}
                             placeholder="es. Studio Medico Centro"
                             autoComplete="organization"
                             className={SETTINGS_INPUT_CLASS}
                         />
                     </div>
 
-                    <div className="pt-2">
+                    {state.message && <p role="status" className="text-sm">{state.message}</p>}
+                    {state.current && state.message && <p className="text-sm">
+                        Valori salvati: {state.current.displayName || 'Nome medico vuoto'} · {state.current.ambulatoryName || 'Nome ambulatorio vuoto'}
+                    </p>}
+                    <div className="flex flex-wrap gap-3 pt-2">
                         <button
-                            onClick={saveProfile}
-                            disabled={isSavingProfile}
+                            onClick={() => void editor.current?.save()}
+                            disabled={state.busy || state.requiresRead || !state.current}
                             className={SETTINGS_PRIMARY_BUTTON_CLASS}
                         >
                             <Save className="w-4 h-4" />
-                            {isSavingProfile ? 'Salvataggio...' : 'Salva profilo'}
+                            {state.busy ? 'Attendi...' : 'Salva profilo'}
                         </button>
+                        <button type="button" onClick={() => void editor.current?.read()} disabled={state.busy}
+                            className={SETTINGS_SECONDARY_BUTTON_CLASS}>Rileggi profilo mantenendo la bozza</button>
                     </div>
                 </div>
             </div>
