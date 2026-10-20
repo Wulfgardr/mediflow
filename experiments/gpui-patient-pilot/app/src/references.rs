@@ -1,13 +1,14 @@
 //! Read-only catalog views. Names, codes and provenance come from the linked
 //! archive; selecting or copying a result never prescribes or changes a record.
 
-use gpui::{ClipboardItem, Div, FontWeight, div, prelude::*, px, text};
+use crate::theme::{TypeRole, TypeStyle};
+use gpui::{ClipboardItem, Div, div, prelude::*, px, text};
 use mediflow_runtime_client::{
     DrugCatalogItem, ExemptionCatalogItem, TerminologyItem, TerminologySystem,
 };
 
 use crate::components::{button, display_date};
-use crate::theme::{CODES, Theme};
+use crate::theme::Theme;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ReferenceKind {
@@ -117,7 +118,7 @@ impl ReferenceRows {
                     .child(code_line("Esenzione", &row.code, theme))
                     .child(
                         div()
-                            .font_weight(FontWeight::MEDIUM)
+                            .type_role(theme, TypeRole::Strong)
                             .child(text!(row.description.clone())),
                     )
                     .children([
@@ -159,7 +160,7 @@ impl ReferenceRows {
                 let copied = terminology_text(row);
                 result_row(theme)
                     .child(code_line(row.system.as_str(), &row.code, theme))
-                    .child(div().font_weight(FontWeight::MEDIUM).child(text!(
+                    .child(div().type_role(theme, TypeRole::Strong).child(text!(
                         row.display_it.as_ref().unwrap_or(&row.display).clone()
                     )))
                     .when(
@@ -233,7 +234,7 @@ pub fn drug_identity(
         .when_some(aic, |el, code| el.child(code_line("AIC", code, theme)))
         .child(
             div()
-                .font_weight(FontWeight::SEMIBOLD)
+                .type_role(theme, TypeRole::Strong)
                 .child(text!(name.to_owned())),
         )
         .child(optional_line("Principio attivo", active_principle, theme))
@@ -259,7 +260,7 @@ fn code_line(label: &str, code: &str, theme: Theme) -> Div {
         .flex_wrap()
         .when(theme.scale >= 2.5, |el| el.flex_col().items_stretch())
         .gap(px(8.))
-        .text_size(px(theme.size(12.)))
+        .type_role(theme, TypeRole::Meta)
         .child(
             div()
                 .min_w_0()
@@ -273,7 +274,7 @@ fn code_line(label: &str, code: &str, theme: Theme) -> Div {
                 .min_w_0()
                 .max_w_full()
                 .whitespace_normal()
-                .font_family(CODES)
+                .type_role(theme, TypeRole::Code)
                 .child(text!(code.to_owned())),
         )
 }

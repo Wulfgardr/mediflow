@@ -14,7 +14,7 @@ use gpui::{
 };
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::theme::{Theme, VOICE};
+use crate::theme::{Theme, TypeRole, TypeStyle};
 
 actions!(
     mediflow_text,
@@ -354,7 +354,15 @@ impl TextInput {
         let target = point(
             position.x,
             position.y
-                + px(self.theme.size(if self.multiline { 28. } else { 20. })) * direction
+                + px(self
+                    .theme
+                    .role(if self.multiline {
+                        TypeRole::Prose
+                    } else {
+                        TypeRole::Body
+                    })
+                    .line_height)
+                    * direction
                 + px(1.),
         );
         let index = layout.index_for_position(target).unwrap_or_else(|i| i);
@@ -823,13 +831,14 @@ impl Render for TextInput {
             .bg(theme.paper)
             .focus(|style| style.border_color(theme.fresh).border_2())
             .text_color(if empty { theme.secondary } else { theme.ink })
-            .text_size(px(if self.multiline {
-                theme.size(17.)
-            } else {
-                theme.body()
-            }))
-            .line_height(px(theme.size(if self.multiline { 28. } else { 20. })))
-            .when(self.multiline, |el| el.font_family(VOICE))
+            .type_role(
+                theme,
+                if self.multiline {
+                    TypeRole::Prose
+                } else {
+                    TypeRole::Body
+                },
+            )
             .on_action(cx.listener(Self::backspace))
             .on_action(cx.listener(Self::delete))
             .on_action(cx.listener(Self::left))

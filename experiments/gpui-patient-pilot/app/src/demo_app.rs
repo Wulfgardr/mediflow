@@ -1,8 +1,9 @@
 //! Explicitly selected process-local demonstration; never a product data source.
 
+use crate::theme::{TypeRole, TypeStyle};
 use gpui::{
-    App, ClipboardItem, Context, Div, Entity, FocusHandle, FontWeight, Role, SharedString,
-    Stateful, Subscription, Window, WindowAppearance, actions, div, prelude::*, px, text,
+    App, ClipboardItem, Context, Div, Entity, FocusHandle, Role, SharedString, Stateful,
+    Subscription, Window, WindowAppearance, actions, div, prelude::*, px, text,
 };
 use mediflow_patient_client::{
     ClientError, PatientProfile, Phase, ReadRequest, UpdateOutcome, Workspace,
@@ -10,7 +11,7 @@ use mediflow_patient_client::{
 
 use crate::demo::{DemoService, Scenario};
 use crate::text_input::{InputChanged, TextInput};
-use crate::theme::{CODES, SYSTEM, Theme, VOICE};
+use crate::theme::Theme;
 
 actions!(
     mediflow_pilot,
@@ -372,8 +373,7 @@ impl PatientApp {
             .rounded(px(theme.control_radius))
             .bg(if primary { theme.fresh } else { theme.paper })
             .text_color(if primary { theme.paper } else { theme.ink })
-            .text_size(px(14.))
-            .font_weight(FontWeight::MEDIUM)
+            .type_role(theme, TypeRole::Body)
             .when(!enabled, |el| el.opacity(0.5))
             .when(enabled, |el| {
                 el.cursor_pointer()
@@ -397,8 +397,7 @@ impl PatientApp {
             .role(Role::Heading)
             .aria_level(2)
             .aria_label(title)
-            .text_size(px(12.))
-            .font_weight(FontWeight::SEMIBOLD)
+            .type_role(self.theme, TypeRole::Section)
             .text_color(self.theme.secondary)
             .child(text!(title))
     }
@@ -427,13 +426,12 @@ impl PatientApp {
                     .justify_between()
                     .child(
                         div()
-                            .font_family(VOICE)
-                            .text_size(px(26.))
+                            .type_role(theme, TypeRole::PageTitle)
                             .child(text!("Pazienti")),
                     )
                     .child(
                         div()
-                            .text_size(px(13.))
+                            .type_role(theme, TypeRole::Meta)
                             .text_color(theme.secondary)
                             .child(text!(format!("{count}"))),
                     ),
@@ -526,11 +524,7 @@ impl PatientApp {
                                     } else {
                                         theme.shade
                                     })
-                                    .font_weight(if selected {
-                                        FontWeight::SEMIBOLD
-                                    } else {
-                                        FontWeight::NORMAL
-                                    })
+                                    .type_role(theme, TypeRole::Strong)
                                     .hover(|style| style.bg(theme.hover))
                                     .focus_visible(|style| {
                                         style.border_2().border_color(theme.fresh)
@@ -553,7 +547,7 @@ impl PatientApp {
                                         |el| {
                                             el.child(
                                                 div()
-                                                    .text_size(px(12.))
+                                                    .type_role(theme, TypeRole::Meta)
                                                     .text_color(theme.secondary)
                                                     .child(text!("Note")),
                                             )
@@ -564,7 +558,7 @@ impl PatientApp {
             )
             .child(
                 div()
-                    .text_size(px(13.))
+                    .type_role(theme, TypeRole::Meta)
                     .text_color(theme.secondary)
                     .child(text!(
                         "Nomi e contenuti inventati. Le modifiche si perdono alla chiusura."
@@ -591,14 +585,16 @@ impl PatientApp {
             .gap(px(4.))
             .child(
                 div()
-                    .text_size(px(13.))
+                    .type_role(self.theme, TypeRole::Meta)
                     .text_color(self.theme.secondary)
                     .child(text!(label)),
             )
             .child(
                 div()
-                    .text_size(px(if code { 12. } else { 14. }))
-                    .when(code, |el| el.font_family(CODES))
+                    .type_role(
+                        self.theme,
+                        if code { TypeRole::Code } else { TypeRole::Body },
+                    )
                     .child(text!(value)),
             )
     }
@@ -617,8 +613,8 @@ impl PatientApp {
             .child(div().p(px(28.)).border_b_1().border_color(theme.rule).flex().flex_wrap().items_center().justify_between().gap(px(16.))
                 .child(div().flex().flex_col().gap(px(8.))
                     .child(div().id("clinical-workspace-patient-name").role(Role::Heading).aria_level(1).aria_label(SharedString::from(profile.display_name()))
-                        .font_family(VOICE).text_size(px(28.)).child(text!(profile.display_name())))
-                    .child(div().text_size(px(13.)).text_color(theme.secondary).child(text!(if profile.is_archived { "Scheda di prova in archivio" } else { "Scheda di prova in carico" }))))
+                        .type_role(theme, TypeRole::Person { compact }).child(text!(profile.display_name())))
+                    .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary).child(text!(if profile.is_archived { "Scheda di prova in archivio" } else { "Scheda di prova in carico" }))))
                 .child(div().flex().flex_wrap().gap(px(8.))
                     .child(self.button("clinical-workspace-reread", "Rileggi la scheda", Command::Refresh, false, !matches!(phase, Phase::Submitting | Phase::Verifying), cx))
                     .child(self.button("clinical-workspace-copy-profile", "Copia scheda", Command::CopyProfile, false, true, cx))))
@@ -636,10 +632,10 @@ impl PatientApp {
                             .child(self.button("clinical-workspace-copy-notes", "Copia note", Command::CopyNotes, false, true, cx)))
                         .when(phase == Phase::Review, |el| el.child(div().id("clinical-workspace-before-notes").role(Role::Group).aria_label("Note attualmente nella scheda")
                             .p(px(16.)).bg(theme.hover).flex().flex_col().gap(px(8.))
-                            .child(div().text_size(px(13.)).text_color(theme.secondary).child(text!("Attualmente nella scheda")))
-                            .child(div().font_family(VOICE).text_size(px(17.)).line_height(px(28.)).child(text!(profile.notes.clone().filter(|s| !s.is_empty()).unwrap_or_else(|| "Nessuna nota.".into()))))))
+                            .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary).child(text!("Attualmente nella scheda")))
+                            .child(div().type_role(theme, TypeRole::Prose).child(text!(profile.notes.clone().filter(|s| !s.is_empty()).unwrap_or_else(|| "Nessuna nota.".into()))))))
                         .child(div().id("clinical-workspace-notes-editor-scroll").max_h(px(304.)).overflow_y_scroll().child(self.notes.clone()))
-                        .child(div().text_size(px(13.)).text_color(theme.secondary).child(text!(if profile.is_archived {
+                        .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary).child(text!(if profile.is_archived {
                             "Scheda in archivio. Note in sola lettura."
                         } else if phase == Phase::Review {
                             "Rileggi il contenuto. Per correggerlo scegli Torna alla bozza."
@@ -653,7 +649,7 @@ impl PatientApp {
         div().id("clinical-workspace-synthetic-scenarios").flex().flex_col().gap(px(8.)).mt(px(12.))
             .child(self.button("clinical-workspace-show-scenarios", if self.show_scenarios { "Chiudi i casi di prova" } else { "Prova un imprevisto" }, Command::ToggleScenarios, false, true, cx))
             .when(self.show_scenarios, |el| el.child(div().flex().flex_col().gap(px(8.)).p(px(12.)).bg(theme.hover)
-                .child(div().text_size(px(13.)).text_color(theme.secondary).child(text!("Scegli cosa accadrà alla prossima registrazione. Il caso si applica una volta, solo ai dati di prova.")))
+                .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary).child(text!("Scegli cosa accadrà alla prossima registrazione. Il caso si applica una volta, solo ai dati di prova.")))
                 .children([
                     ("clinical-workspace-scenario-normal", Scenario::Normal),
                     ("clinical-workspace-scenario-conflict", Scenario::Conflict),
@@ -662,7 +658,7 @@ impl PatientApp {
                     ("clinical-workspace-scenario-read", Scenario::ReadUnavailable),
                 ].into_iter().map(|(id, scenario)| self.button(id, scenario.label(), Command::Scenario(scenario), false, true, cx)
                     .aria_selected(self.scenario == scenario).when(self.scenario == scenario, |el| el.border_color(theme.fresh).bg(theme.selected))))))
-            .when(!self.show_scenarios && self.scenario != Scenario::Normal, |el| el.child(div().text_size(px(13.)).text_color(theme.warning).child(text!(format!("▲ Prossima prova: {}", self.scenario.label())))))
+            .when(!self.show_scenarios && self.scenario != Scenario::Normal, |el| el.child(div().type_role(theme, TypeRole::Meta).text_color(theme.warning).child(text!(format!("▲ Prossima prova: {}", self.scenario.label())))))
     }
 
     fn threshold(&self, profile: &PatientProfile, cx: &mut Context<Self>) -> Stateful<Div> {
@@ -682,9 +678,9 @@ impl PatientApp {
             theme.ink
         };
         let (status, color) = match phase {
-            Phase::Editing => ("● Bozza non registrata", theme.fresh),
-            Phase::Review => ("● Bozza non registrata", foreground),
-            Phase::Saved => ("● Registrata", theme.ink),
+            Phase::Editing => ("Bozza non registrata", theme.fresh),
+            Phase::Review => ("Bozza non registrata", foreground),
+            Phase::Saved => ("Registrata", theme.ink),
             Phase::Conflict => (
                 "▲ La scheda è stata modificata da un'altra postazione di prova. Bozza intatta.",
                 theme.warning,
@@ -701,20 +697,24 @@ impl PatientApp {
             .role(Role::Status).aria_label(status)
             .border_t_1().border_color(if self.workspace.is_dirty() { theme.draft_rule } else { theme.rule })
             .p(px(20.)).bg(background).text_color(foreground).flex().flex_col().gap(px(12.))
-            .child(div().text_color(color).text_size(px(14.)).font_weight(FontWeight::MEDIUM).child(text!(status)))
+            .child(match phase {
+                Phase::Editing | Phase::Review => crate::components::writing_status("demo-writing-status", crate::components::WritingInk::Fresh, theme).into_any_element(),
+                Phase::Saved => crate::components::writing_status("demo-writing-status", crate::components::WritingInk::Dry, theme).into_any_element(),
+                _ => div().text_color(color).type_role(theme, TypeRole::Body).child(text!(status)).into_any_element(),
+            })
             .when(self.discard.is_some(), |el| el.child(div().flex().flex_col().gap(px(12.))
                 .child(text!(if self.discard == Some(DiscardAction::Hide) { "Scartare la bozza e nascondere i dati di prova?" } else { "Scartare la bozza e rileggere le note attuali? Puoi prima copiare le note." }))
                 .child(div().flex().flex_wrap().gap(px(8.))
                     .child(self.button("clinical-workspace-keep-draft", "Mantieni la bozza", Command::KeepDraft, false, true, cx))
                     .child(self.button("clinical-workspace-discard-confirm", if self.discard == Some(DiscardAction::Hide) { "Scarta e nascondi" } else { "Scarta e rileggi" }, Command::Discard, true, true, cx)))))
             .when(review, |el| el.child(div().flex().flex_col().gap(px(12.))
-                .child(div().text_size(px(15.)).font_weight(FontWeight::SEMIBOLD).child(text!(format!("Registrare le note nella scheda di {}?", profile.display_name()))))
-                .child(div().text_size(px(13.)).child(text!("1 elemento: note della scheda. La modifica resta solo in memoria.")))
+                .child(div().type_role(theme, TypeRole::Threshold).child(text!(format!("Registrare le note nella scheda di {}?", profile.display_name()))))
+                .child(div().type_role(theme, TypeRole::Meta).child(text!("1 elemento: note della scheda. La modifica resta solo in memoria.")))
                 .child(div().flex().flex_wrap().gap(px(8.))
                     .child(self.button("clinical-workspace-cancel-review", "Torna alla bozza", Command::Cancel, false, true, cx))
                     .child(self.button("clinical-workspace-confirm-save", "Conferma e registra", Command::Confirm, true, true, cx).track_focus(&self.review_focus)))))
             .when(!review && self.discard.is_none(), |el| el.child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
-                .child(div().text_size(px(13.)).text_color(theme.secondary).child(text!(if phase == Phase::Saved {
+                .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary).child(text!(if phase == Phase::Saved {
                     "Le note sono state rilette dopo la registrazione."
                 } else if matches!(phase, Phase::Conflict | Phase::Indeterminate) {
                     "Copia la bozza se vuoi conservarla, poi rileggi la scheda."
@@ -765,12 +765,12 @@ impl Render for PatientApp {
             }))
             .on_action(cx.listener(|this, _: &PreviousPatient, _, cx| this.step_patient(false, cx)))
             .on_action(cx.listener(|this, _: &NextPatient, _, cx| this.step_patient(true, cx)))
-            .size_full().flex().flex_col().bg(theme.shade).text_color(theme.ink).font_family(SYSTEM).text_size(px(14.))
+            .size_full().flex().flex_col().bg(theme.shade).text_color(theme.ink).type_role(theme, TypeRole::Body)
             .child(div().px(px(28.)).py(px(16.)).flex().flex_wrap().items_center().justify_between().gap(px(12.))
                 .child(div().flex().flex_col().gap(px(4.))
-                    .child(div().font_family(VOICE).text_size(px(28.)).child(text!("MediFlow.")))
+                    .child(div().type_role(theme, TypeRole::Brand).child(text!("MediFlow.")))
                     .child(div().id("clinical-workspace-synthetic-label").role(Role::Note).aria_label("Dati di prova. Modifiche solo in memoria.")
-                        .text_size(px(13.)).text_color(theme.secondary).child(text!("Dati di prova · modifiche solo in memoria"))))
+                        .type_role(theme, TypeRole::Meta).text_color(theme.secondary).child(text!("Dati di prova · modifiche solo in memoria"))))
                 .child(div().flex().flex_wrap().gap(px(8.))
                     .when(single && !self.show_list && !locked, |el| el.child(self.button("clinical-workspace-back-list", "Pazienti", Command::ShowList, false, true, cx)))
                     .child(self.button("clinical-workspace-theme", if self.dark { "Giorno" } else { "Grafite" }, Command::ToggleTheme, false, true, cx))
@@ -783,13 +783,13 @@ impl Render for PatientApp {
             .child(div().flex_1().min_h_0().flex().px(px(if single { 16. } else { 12. })).pb(px(16.))
                 .when(!locked && (!single || self.show_list), |el| el.child(self.sidebar(compact, cx).when(single, |el| el.w_full())))
                 .when(locked, |el| el.child(div().flex_1().flex().flex_col().items_center().justify_center().gap(px(20.)).bg(theme.paper).rounded(px(theme.paper_radius))
-                    .child(div().font_family(VOICE).text_size(px(26.)).child(text!("Dati di prova nascosti")))
+                    .child(div().type_role(theme, TypeRole::PageTitle).child(text!("Dati di prova nascosti")))
                     .child(text!("Le schede sintetiche restano in memoria fino alla chiusura."))
                     .child(self.button("clinical-workspace-resume", "Mostra dati di prova", Command::Resume, true, true, cx))))
                 .when(!locked && (!single || !self.show_list), |el| match profile {
                     Some(ref profile) => el.child(self.profile(profile, compact, cx)),
                     None => el.child(div().flex_1().flex().flex_col().items_center().justify_center().gap(px(20.)).p(px(28.)).bg(theme.paper).rounded(px(theme.paper_radius))
-                        .child(div().font_family(VOICE).text_size(px(26.)).child(text!(if phase == Phase::Unavailable { "La scheda non è disponibile" } else { "Seleziona una scheda di prova" })))
+                        .child(div().type_role(theme, TypeRole::PageTitle).child(text!(if phase == Phase::Unavailable { "La scheda non è disponibile" } else { "Seleziona una scheda di prova" })))
                         .child(text!(if phase == Phase::Unavailable { "La lettura non è riuscita. Nessun dato viene mostrato come vuoto." } else { "Scegli un paziente dall'elenco per leggere o modificare le note." }))
                         .when(phase == Phase::Unavailable, |el| el.child(self.button("clinical-workspace-retry-read", "Riprova", Command::Refresh, true, true, cx)))),
                 }))
