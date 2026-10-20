@@ -169,8 +169,11 @@ In **Analisi**, la fascia d'età scelta viene inviata all'host con il fuso orari
 IANA del computer: `GET /api/v1/network/analytics/demographics` restituisce
 soltanto la proiezione demografica dell'ambulatorio corrente (ADR 0154).
 Il client non calcola età, fasce o indicatori clinici: confronta l'operazione,
-la versione, lo scope, l'archivio, la fascia e il fuso restituiti, poi mostra
-i conteggi dell'host con barre proporzionali e la stessa distribuzione in testo.
+la versione, lo scope, l'archivio e la fascia restituiti, poi mostra i conteggi
+dell'host con barre proporzionali e la stessa distribuzione in testo. Il fuso
+restituito deve essere un nome IANA sintatticamente valido, non la stessa
+stringa inviata: l'host riporta il nome canonicalizzato (`Etc/UTC` diventa
+`UTC`) e la vista dichiara il calendario effettivamente usato.
 Una risposta non coerente, un risultato oltre il limite, un archivio sostituito
 o una lettura annullata non diventano un'analisi vuota riuscita. Se il fuso
 orario non è determinabile la richiesta non parte. Le diagnosi non sono incluse

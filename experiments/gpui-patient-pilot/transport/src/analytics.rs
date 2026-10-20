@@ -130,7 +130,9 @@ pub struct PopulationDemographics {
 
 /// Accepts the host projection only when every closed-contract assertion holds.
 /// The counters stay host values: this parser compares them, it never derives
-/// them from a patient list.
+/// them from a patient list. The time zone is a presentation parameter that the
+/// host reports canonicalized (`Etc/UTC` becomes `UTC`), so only its IANA shape
+/// is asserted; the response value is what the view presents.
 pub(crate) fn parse_demographics(
     value: Value,
     scope: &str,
@@ -145,7 +147,7 @@ pub(crate) fn parse_demographics(
         && result.scope.ambulatory_id == scope
         && result.scope.archive_generation == archive_generation
         && result.age_range == [request.min_age, request.max_age]
-        && result.time_zone == request.time_zone
+        && valid_time_zone(&result.time_zone)
         && stats.age_dist.sum() == Some(stats.total_in_range)
         && stats.total_in_range <= stats.with_birth_date
         && stats.adi_count <= stats.total_in_range
@@ -225,10 +227,6 @@ mod tests {
             (
                 "different ageRange",
                 Box::new(|v| v["ageRange"] = json!([0, 80])),
-            ),
-            (
-                "different timeZone",
-                Box::new(|v| v["timeZone"] = json!("Europe/Paris")),
             ),
             (
                 "incoherent ageDist sum",
@@ -333,5 +331,35 @@ mod tests {
         let mut value = valid_wire();
         value["ageRange"] = json!([20, 80]);
         assert!(parse_demographics(value, "scope-a", "synthetic-generation", &request).is_ok());
+    }
+
+    #[test]
+    fn accepts_the_host_canonical_alias_of_the_requested_time_zone() {
+        for (requested, reported) in [("Etc/UTC", "UTC"), ("Asia/Kolkata", "Asia/Calcutta")] {
+            let request = DemographicsRequest::new(0, 120, requested).unwrap();
+            let mut value = valid_wire();
+            value["timeZone"] = json!(reported);
+            let result =
+                parse_demographics(value, "scope-a", "synthetic-generation", &request).unwrap();
+            assert_eq!(result.time_zone, reported, "{requested}");
+        }
+    }
+
+    #[test]
+    fn rejects_a_reported_time_zone_that_is_not_iana_shaped() {
+        for reported in [
+            json!(""),
+            json!("../etc"),
+            json!(-42),
+            json!("A".repeat(101)),
+        ] {
+            let mut value = valid_wire();
+            value["timeZone"] = reported.clone();
+            assert_eq!(
+                parse(value),
+                Err(RuntimeError::InvalidResponse),
+                "{reported}"
+            );
+        }
     }
 }

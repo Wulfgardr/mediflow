@@ -159,6 +159,13 @@ fn observed_label(value: &str) -> String {
         .unwrap_or_else(|_| "istante non leggibile".into())
 }
 
+fn calendar_label(time_zone: &str, observed_at: &str) -> String {
+    format!(
+        "Età calcolate con il calendario di {time_zone} alla data di osservazione {}.",
+        observed_label(observed_at)
+    )
+}
+
 impl ClinicalApp {
     pub(super) fn load_analytics(&mut self, cx: &mut Context<Self>) {
         self.next_epoch();
@@ -294,6 +301,16 @@ impl ClinicalApp {
                 "Fuso orario della lettura: {}",
                 self.analytics.time_zone.as_deref().unwrap_or("da determinare")
             ))));
+        if let Some(demographics) = self.analytics.state.ready() {
+            pane = pane.child(
+                div()
+                    .text_color(theme.secondary)
+                    .child(text!(calendar_label(
+                        &demographics.time_zone,
+                        &demographics.observed_at
+                    ))),
+            );
+        }
         if let Some((message, error)) = self.analytics.state.notice() {
             pane = pane.child(notice("clinical-analytics-state", message, theme, error));
         }
@@ -661,6 +678,15 @@ mod tests {
             app.load_analytics(cx);
         });
         cx.run_until_parked();
+    }
+
+    #[test]
+    fn view_names_the_host_reported_time_zone_as_the_calendar_used() {
+        let label = calendar_label("UTC", "2026-10-20T08:30:00.000Z");
+        assert!(
+            label.starts_with("Età calcolate con il calendario di UTC alla data di osservazione "),
+            "{label}"
+        );
     }
 
     #[gpui::test]
