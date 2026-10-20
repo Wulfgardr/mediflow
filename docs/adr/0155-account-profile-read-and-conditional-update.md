@@ -10,7 +10,7 @@ che non è stata pubblicata e non è recuperabile. Il numero 0155 è il primo li
 ## Problema
 
 Il client nativo Rust/GPUI deve mostrare e modificare il nome dell'operatore e
-quello dello studio. Oggi l'unica superficie è `PUT /api/auth/profile`:
+quello dello studio. Prima di questo ADR l’unica superficie era `PUT /api/auth/profile`:
 
 - non esiste una lettura. Web e Apple mostrano i valori ricevuti al login, che
   restano fermi se un altro client li cambia;
@@ -33,7 +33,7 @@ di deriva e del giro di backup e ripristino.
 
 Web (`app/settings/profilo/page.tsx`) e Apple
 (`PairedPatientsWorkspaceModel.swift`) usano la PUT attuale senza versione e
-non vanno rotti da questo incremento.
+sono stati migrati dopo il primo incremento host, prima di ritirare la scrittura incondizionata.
 
 ## Opzioni
 
@@ -113,11 +113,48 @@ scritture Web. Poi una sola transazione `IMMEDIATE`:
 6. rilegge la riga e risponde `200` con `changed: true` e il profilo aggiornato,
    compresa la nuova `profileVersion`.
 
-### PUT senza versione
+### Migrazione Web e Apple; compatibilità
 
-Una PUT senza `expectedVersion` mantiene il comportamento attuale per Web e
-Apple. È un debito dichiarato: quei client passeranno alla forma condizionale
-in un'unità successiva, poi la forma incondizionata sarà rimossa.
+Web e Apple leggono `GET /api/auth/profile` all’apertura del profilo; il login
+non fornisce una versione modificabile. La risposta GET è verificata al confine
+client. Apple riusa il trasporto account con cookie e credenziali paired,
+`Cache-Control: no-store` e nessun redirect; la PUT include
+`x-mediflow-archive-generation` dalla lettura. Il Web riusa il trasporto che
+vincola il documento alla generazione osservata, senza cambiare archivio in modo implicito.
+
+La PUT contiene soltanto `expectedVersion`, `displayName` e `ambulatoryName`.
+I client applicano i valori normalizzati restituiti dall’host, anche per il no-op,
+soltanto se richiesta, sessione, soggetto e archivio sono ancora correnti. Il Web
+ricontrolla l’autorità anche quando aggiorna lo stato dell’utente; Apple verifica
+l’identità dell’autorità account (host, pin TLS, pairing, cookie e generazione
+della sessione), sia nel form sia nel proprietario dell’identità operatore.
+Lo scope ambulatoriale e la disponibilità delle letture cliniche non cambiano
+questa autorità e non cancellano la bozza del profilo account. Sul Web una
+sostituzione dell’autorità di sessione invalida le richieste pendenti e richiede
+una rilettura esplicita, conservando la bozza soltanto per lo stesso account e
+archivio; la notifica non espone ETag o credenziali.
+
+Un `409 PROFILE_VERSION_CONFLICT` conserva la bozza e mostra separatamente i
+valori correnti. Il salvataggio resta disabilitato fino al gesto **Rileggi profilo
+mantenendo la bozza**; questa GET mantiene la bozza e permette il confronto.
+Serve poi un nuovo gesto **Salva profilo**. Non esistono retry automatici né
+aggiornamenti silenziosi della versione seguiti da una seconda PUT. Anche una
+risposta persa o non valida richiede una rilettura: la scrittura potrebbe essere
+già avvenuta. La navigazione e il rimontaggio della vista Apple non eseguono
+questa rilettura di recupero: lo stato dell’editor appartiene al workspace,
+mentre il caricamento automatico iniziale avviene una sola volta per autorità.
+Revoca, errore o cambio archivio non vengono presentati come successo.
+
+### PUT senza versione ritirata
+
+Tutti i consumer di produzione Web e Apple usano ora il contratto condizionale.
+Il writer incondizionato e il relativo schema permissivo sono rimossi.
+Richieste senza `expectedVersion`, con versione vuota, con `id`, con nomi mancanti
+o con JSON malformato ricevono `400 Payload non valido`, senza scritture e senza audit.
+I vecchi client che inviano la PUT precedente devono essere aggiornati: nessun
+downgrade silenzioso è previsto. Un nuovo client contro un host precedente che
+non espone la GET non abilita il salvataggio. La migrazione del consumer GPUI
+account resta fuori da questa unità.
 
 ## Conseguenze
 
@@ -126,13 +163,33 @@ in un'unità successiva, poi la forma incondizionata sarà rimossa.
 - Due modifiche concorrenti con la stessa versione attesa: una vince, l'altra
   riceve 409 con lo stato aggiornato.
 - Nessuna migrazione dello schema e nessuna nuova capability.
-- La route ha due semantiche di PUT finché Web e Apple non migrano. Il ramo è
-  scelto dalla sola presenza di `expectedVersion`, e i test coprono entrambi.
+- La route ha una sola semantica di PUT; tutti i consumer devono leggere prima
+  la versione corrente e presentarla nel salvataggio.
 
 ## First Thin Slice
 
 Host: GET e PUT condizionale in `lib/security/profile-update-service.ts` e
 nella route esistente, con test su SQLite reale per versione, conflitto,
 nessuna modifica, archivio sostituito, sessione revocata prima del commit,
-audit nella transazione e invarianza della PUT senza versione. Il consumer GPUI
+audit nella transazione. Il primo incremento conservava la PUT senza versione;
+la successiva migrazione Web/Apple la rifiuta esplicitamente. Il consumer GPUI
 è un'unità successiva che usa questo contratto.
+
+## Verifica della migrazione
+
+I test host esercitano SQLite reale e ammissione Web/paired, successo e rilettura,
+no-op, conflitto senza effetti, versione mancante, rollback di settings/audit,
+revoca e ripristino. I test del controller Web verificano conservazione della
+bozza, errori, risposta persa e scarto delle risposte tardive. L’E2E sintetico
+`e2e/account-profile.spec.ts` esercita due sessioni Web, confronto e rilettura,
+normalizzazione, no-op dopo reload, risposta persa e layout stretto.
+
+I test Apple di `SettingsWorkspaceTests` e `HomeBasePatientsClientTests` coprono
+versione letta dall’host, trasporto con base root o prefisso, null espliciti,
+conflitti, assenza di retry, navigazione durante il recupero, cambio dello scope
+ambulatoriale, cambio sessione/host/archivio e annullamento della lettura. La suite Apple non è stata
+eseguita nella verifica locale del 2026-10-20: non è disponibile Xcode completo.
+I Command Line Tools locali non contengono XCTest e il plug-in SwiftUIMacros
+richiesto dalla SDK SwiftUI. Parsing e controlli del core non sostituiscono
+quindi l’esecuzione della suite Apple nella CI macOS. Nessuna prova su simulatore,
+app installata, volumi Linux o Windows è dichiarata da questa migrazione.

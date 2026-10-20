@@ -4,6 +4,15 @@ import SwiftUI
 import MediFlowCore
 
 struct ClinicalWorkspaceConnection {
+    struct AccountIdentity: Hashable {
+        let clientId: String
+        let clientToken: String
+        let sessionCookie: String
+        let serverURL: String?
+        let tlsPin: String?
+        let sessionGeneration: UInt
+    }
+
     struct Identity: Hashable {
         let clientId: String
         let clientToken: String
@@ -22,6 +31,11 @@ struct ClinicalWorkspaceConnection {
     var serverURL: String? = nil
     var tlsPin: String? = nil
     var sessionGeneration: UInt = 0
+
+    var accountIdentity: AccountIdentity {
+        AccountIdentity(clientId: credentials.clientId, clientToken: credentials.clientToken,
+            sessionCookie: sessionCookie, serverURL: serverURL, tlsPin: tlsPin, sessionGeneration: sessionGeneration)
+    }
 
     var identity: Identity {
         Identity(

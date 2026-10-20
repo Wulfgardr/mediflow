@@ -118,13 +118,13 @@ final class SettingsWorkspaceTests: XCTestCase {
         var saved: (String?, String?)?
         let profile = SettingsProfileModel(
             connectionProvider: { self.connection(source) },
-            profileUpdated: { displayName, ambulatoryName in saved = (displayName, ambulatoryName) },
+            profileUpdated: { profile, _ in saved = (profile.displayName, profile.ambulatoryName) },
             sessionExpired: {}
         )
         let identity = PairedPatientsWorkspaceModel.OperatorIdentity(
             userId: "operator-1", displayName: "Dott. Bianchi", ambulatoryName: "Centro Salute"
         )
-        profile.sync(from: identity)
+        await profile.load(identity: identity)
         profile.displayName = "Dott.ssa Bianchi"
         await profile.save(identity: identity)
 
@@ -133,12 +133,258 @@ final class SettingsWorkspaceTests: XCTestCase {
         XCTAssertEqual(saved?.1, "Centro Salute")
     }
 
-    private func connection(_ source: any HomeBasePatientsDataSource) -> ClinicalWorkspaceConnection {
+    func testProfileConflictRequiresExplicitReadAndPreservesDraft() async {
+        let source = S6MockDataSource(details: [:])
+        let identity = PairedPatientsWorkspaceModel.OperatorIdentity(userId: "operator-1", displayName: "Login obsoleto", ambulatoryName: nil)
+        var applied = 0
+        let model = SettingsProfileModel(connectionProvider: { self.connection(source) },
+            profileUpdated: { _, _ in applied += 1 }, sessionExpired: {})
+        await model.load(identity: identity)
+        XCTAssertEqual(model.displayName, "Dott. Bianchi")
+        model.displayName = "La mia bozza"
+        let other = HomeBaseAccountProfile(userId: "operator-1", username: ["synthetic", "profile"].joined(separator: "-"),
+            displayName: "Altro client", ambulatoryName: "Studio", profileVersion: "other", archiveGeneration: "synthetic-generation")
+        await source.configureProfile(error: .profileVersionConflict(other))
+        await model.save(identity: identity)
+        XCTAssertEqual(model.displayName, "La mia bozza")
+        XCTAssertEqual(model.currentProfile?.displayName, "Altro client")
+        XCTAssertTrue(model.requiresRead)
+        XCTAssertEqual(applied, 1)
+        await model.save(identity: identity)
+        let writes = await source.profileWriteCount
+        XCTAssertEqual(writes, 1)
+        await model.load(identity: identity)
+        await model.load(identity: identity)
+        let navigationReads = await source.profileReadCount
+        XCTAssertEqual(navigationReads, 1)
+        XCTAssertTrue(model.requiresRead)
+        await model.save(identity: identity)
+        let navigationWrites = await source.profileWriteCount
+        XCTAssertEqual(navigationWrites, 1)
+        await model.read(identity: identity)
+        XCTAssertFalse(model.requiresRead)
+        XCTAssertEqual(model.displayName, "La mia bozza")
+        let reads = await source.profileReadCount
+        XCTAssertEqual(reads, 2)
+    }
+
+    func testProfileTransportFailureRequiresReadWithoutAutomaticRetry() async {
+        let source = S6MockDataSource(details: [:], profileError: .transport(.timeout))
+        let identity = PairedPatientsWorkspaceModel.OperatorIdentity(userId: "operator-1", displayName: nil, ambulatoryName: nil)
+        var applied = 0
+        let model = SettingsProfileModel(connectionProvider: { self.connection(source) },
+            profileUpdated: { _, _ in applied += 1 }, sessionExpired: {})
+        await model.load(identity: identity)
+        model.displayName = "Bozza conservata"
+        await model.save(identity: identity)
+        await model.load(identity: identity)
+        await model.load(identity: identity)
+        await model.save(identity: identity)
+        let navigationReads = await source.profileReadCount
+        XCTAssertEqual(navigationReads, 1)
+        XCTAssertTrue(model.requiresRead)
+        XCTAssertEqual(model.displayName, "Bozza conservata")
+        XCTAssertEqual(applied, 1)
+        let writes = await source.profileWriteCount
+        XCTAssertEqual(writes, 1)
+        await model.read(identity: identity)
+        XCTAssertFalse(model.requiresRead)
+        XCTAssertEqual(model.displayName, "Bozza conservata")
+        let explicitReads = await source.profileReadCount
+        XCTAssertEqual(explicitReads, 2)
+    }
+
+    func testLateProfileSaveCannotUpdateAnotherSessionOrLockItOnFailure() async {
+        let failures: [HomeBaseClientError?] = [nil, .httpStatus(401, nil), .archiveReplaced]
+        for failure in failures {
+            let source = S6MockDataSource(details: [:])
+            var connection: ClinicalWorkspaceConnection? = self.connection(source)
+            let identity = PairedPatientsWorkspaceModel.OperatorIdentity(userId: "operator-1", displayName: nil, ambulatoryName: nil)
+            var applied = 0
+            var expired = 0
+            let model = SettingsProfileModel(connectionProvider: { connection },
+                profileUpdated: { _, _ in applied += 1 }, sessionExpired: { expired += 1 })
+            await model.load(identity: identity)
+            model.displayName = "Risposta tardiva"
+            await source.configureProfile(error: failure, hold: true)
+            let pending = Task { await model.save(identity: identity) }
+            let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+            while await source.profileWriteCount == 0, ContinuousClock.now < deadline { await Task.yield() }
+            let writes = await source.profileWriteCount
+            XCTAssertEqual(writes, 1)
+            var replacement = self.connection(source)
+            replacement.sessionGeneration = 1
+            connection = replacement
+            await source.releaseProfile()
+            await pending.value
+            XCTAssertEqual(applied, 1)
+            XCTAssertEqual(expired, 0)
+            XCTAssertNotEqual(model.message, "Profilo aggiornato.")
+        }
+    }
+
+    func testProfileArchiveMismatchNeverAppliesReturnedValues() async {
+        let source = S6MockDataSource(details: [:])
+        let identity = PairedPatientsWorkspaceModel.OperatorIdentity(userId: "operator-1", displayName: nil, ambulatoryName: nil)
+        var applied = 0
+        var expired = 0
+        let model = SettingsProfileModel(connectionProvider: { self.connection(source) },
+            profileUpdated: { _, _ in applied += 1 }, sessionExpired: { expired += 1 })
+        await model.load(identity: identity)
+        model.displayName = "Bozza"
+        let replacement = HomeBaseAccountProfile(userId: "operator-1", username: ["synthetic", "profile"].joined(separator: "-"),
+            displayName: "Altro archivio", ambulatoryName: nil, profileVersion: "replacement", archiveGeneration: "replacement")
+        await source.configureProfile(error: .profileVersionConflict(replacement))
+        await model.save(identity: identity)
+        XCTAssertEqual(model.displayName, "Bozza")
+        XCTAssertEqual(applied, 1)
+        XCTAssertEqual(expired, 1)
+        XCTAssertTrue(model.requiresRead)
+    }
+
+    func testProfileReadArchiveReplacementExpiresSessionWithoutRetry() async {
+        let source = S6MockDataSource(details: [:])
+        await source.configureProfileRead(error: .archiveReplaced)
+        let identity = PairedPatientsWorkspaceModel.OperatorIdentity(userId: "operator-1", displayName: nil, ambulatoryName: nil)
+        var expired = 0
+        let model = SettingsProfileModel(connectionProvider: { self.connection(source) }, profileUpdated: { _, _ in
+            XCTFail("A replaced archive cannot update the identity owner")
+        }, sessionExpired: { expired += 1 })
+        await model.load(identity: identity)
+        await model.load(identity: identity)
+        XCTAssertEqual(expired, 1)
+        XCTAssertNil(model.currentProfile)
+        XCTAssertTrue(model.requiresRead)
+        let reads = await source.profileReadCount
+        XCTAssertEqual(reads, 1)
+    }
+
+    func testLateProfileReadCannotPopulateAReplacementSession() async {
+        let source = S6MockDataSource(details: [:])
+        var connection: ClinicalWorkspaceConnection? = self.connection(source)
+        let identity = PairedPatientsWorkspaceModel.OperatorIdentity(userId: "operator-1", displayName: "Login obsoleto", ambulatoryName: nil)
+        var applied = 0
+        let model = SettingsProfileModel(connectionProvider: { connection },
+            profileUpdated: { _, _ in applied += 1 }, sessionExpired: {})
+        await source.configureProfileRead(hold: true)
+        let pending = Task { await model.load(identity: identity) }
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while await source.profileReadCount == 0, ContinuousClock.now < deadline { await Task.yield() }
+        let reads = await source.profileReadCount
+        XCTAssertEqual(reads, 1)
+        connection = nil
+        await source.releaseProfileRead()
+        await pending.value
+        XCTAssertEqual(applied, 0)
+        XCTAssertEqual(model.displayName, "")
+        XCTAssertNil(model.currentProfile)
+        await model.load(identity: nil)
+        XCTAssertFalse(model.isWorking)
+        XCTAssertTrue(model.requiresRead)
+    }
+
+    func testCancelledProfileReadReleasesBusyStateWithoutApplyingItsResponse() async {
+        let source = S6MockDataSource(details: [:])
+        let identity = PairedPatientsWorkspaceModel.OperatorIdentity(userId: "operator-1", displayName: nil, ambulatoryName: nil)
+        var applied = 0
+        let model = SettingsProfileModel(connectionProvider: { self.connection(source) },
+            profileUpdated: { _, _ in applied += 1 }, sessionExpired: {})
+        await source.configureProfileRead(hold: true)
+        let pending = Task { await model.load(identity: identity) }
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while await source.profileReadCount == 0, ContinuousClock.now < deadline { await Task.yield() }
+        pending.cancel()
+        await source.releaseProfileRead()
+        await pending.value
+        XCTAssertFalse(model.isWorking)
+        XCTAssertTrue(model.requiresRead)
+        XCTAssertEqual(applied, 0)
+        await source.configureProfileRead(hold: false)
+        await model.read(identity: identity)
+        XCTAssertFalse(model.requiresRead)
+        XCTAssertEqual(applied, 1)
+    }
+
+    func testProfileDraftSurvivesAmbulatoryChangesAndTemporaryUnavailability() async {
+        let source = S6MockDataSource(details: [:])
+        var active: ClinicalWorkspaceConnection? = connection(source)
+        let identity = PairedPatientsWorkspaceModel.OperatorIdentity(userId: "operator-1", displayName: nil, ambulatoryName: nil)
+        let model = SettingsProfileModel(connectionProvider: { active }, profileUpdated: { _, _ in }, sessionExpired: {})
+        await model.load(identity: identity)
+        model.displayName = "Bozza medico"
+        model.ambulatoryName = "Bozza studio"
+        active = connection(source, ambulatoryId: "other-scope")
+        await model.load(identity: identity)
+        XCTAssertEqual(model.displayName, "Bozza medico")
+        XCTAssertEqual(model.ambulatoryName, "Bozza studio")
+        active = nil
+        await model.load(identity: identity)
+        XCTAssertEqual(model.displayName, "Bozza medico")
+        active = connection(source, ambulatoryId: "third-scope")
+        await model.load(identity: identity)
+        XCTAssertEqual(model.displayName, "Bozza medico")
+        let reads = await source.profileReadCount
+        XCTAssertEqual(reads, 1)
+        XCTAssertFalse(model.requiresRead)
+    }
+
+    func testProfileSaveAcrossScopeChangeAppliesToCurrentAccountAuthority() async {
+        let source = S6MockDataSource(details: [:])
+        var active = connection(source)
+        let identity = PairedPatientsWorkspaceModel.OperatorIdentity(userId: "operator-1", displayName: nil, ambulatoryName: nil)
+        var applied = 0
+        let model = SettingsProfileModel(connectionProvider: { active }, profileUpdated: { _, authority in
+            XCTAssertEqual(authority, active.accountIdentity)
+            applied += 1
+        }, sessionExpired: {})
+        await model.load(identity: identity)
+        model.displayName = "Nuovo nome"
+        await source.configureProfile(hold: true)
+        let pending = Task { await model.save(identity: identity) }
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while await source.profileWriteCount == 0, ContinuousClock.now < deadline { await Task.yield() }
+        active = connection(source, ambulatoryId: "other-scope")
+        await model.load(identity: identity)
+        await source.releaseProfile()
+        await pending.value
+        XCTAssertEqual(applied, 2)
+        XCTAssertEqual(model.message, "Profilo aggiornato.")
+        XCTAssertFalse(model.isWorking)
+    }
+
+    func testLateProfileReadCannotPopulateAnotherHostOrPairing() async {
+        for replacementKind in ["host", "pairing", "cookie", "session", "tls"] {
+            let source = S6MockDataSource(details: [:])
+            var active = connection(source)
+            let identity = PairedPatientsWorkspaceModel.OperatorIdentity(userId: "operator-1", displayName: nil, ambulatoryName: nil)
+            var applied = 0
+            let model = SettingsProfileModel(connectionProvider: { active }, profileUpdated: { _, _ in applied += 1 }, sessionExpired: {})
+            await source.configureProfileRead(hold: true)
+            let pending = Task { await model.load(identity: identity) }
+            let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+            while await source.profileReadCount == 0, ContinuousClock.now < deadline { await Task.yield() }
+            active = ClinicalWorkspaceConnection(dataSource: source,
+                credentials: HomeBasePairedCredentials(clientId: "client", clientToken: replacementKind == "pairing" ? "replacement" : "token"),
+                sessionCookie: replacementKind == "cookie" ? "sid=replacement" : "sid=test", ambulatoryId: nil, masterKey: key,
+                serverURL: replacementKind == "host" ? "https://127.0.0.1:3444" : nil,
+                tlsPin: replacementKind == "tls" ? "replacement-pin" : nil,
+                sessionGeneration: replacementKind == "session" ? 1 : 0)
+            await source.releaseProfileRead()
+            await pending.value
+            XCTAssertEqual(applied, 0, replacementKind)
+            XCTAssertNil(model.currentProfile, replacementKind)
+            await source.configureProfileRead(hold: false)
+            await model.load(identity: identity)
+            XCTAssertEqual(applied, 1, replacementKind)
+        }
+    }
+
+    private func connection(_ source: any HomeBasePatientsDataSource, ambulatoryId: String? = nil) -> ClinicalWorkspaceConnection {
         ClinicalWorkspaceConnection(
             dataSource: source,
             credentials: HomeBasePairedCredentials(clientId: "client", clientToken: "token"),
             sessionCookie: "sid=test",
-            ambulatoryId: nil,
+            ambulatoryId: ambulatoryId,
             masterKey: key
         )
     }

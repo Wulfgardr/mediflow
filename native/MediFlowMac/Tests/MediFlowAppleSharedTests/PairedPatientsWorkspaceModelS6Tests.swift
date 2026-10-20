@@ -132,6 +132,47 @@ final class PairedPatientsWorkspaceModelS6Tests: XCTestCase {
     }
 
     @MainActor
+    func testProfileRecoveryBelongsToWorkspaceAcrossSettingsRemounts() async {
+        let source = S6MockDataSource(details: [:], profileError: .transport(.timeout))
+        let workspace = makeModel(source: source)
+        workspace.serverURL = "https://localhost:3443"
+        await workspace.configurePairedOnlineForTests(operatorId: "operator-1")
+        let firstMount = workspace.settingsProfileModel
+        await firstMount.load(identity: workspace.operatorIdentity)
+        firstMount.displayName = "Bozza conservata"
+        await firstMount.save(identity: workspace.operatorIdentity)
+        let remount = workspace.settingsProfileModel
+        XCTAssertTrue(firstMount === remount)
+        await remount.load(identity: workspace.operatorIdentity)
+        await remount.save(identity: workspace.operatorIdentity)
+        let reads = await source.profileReadCount
+        let writes = await source.profileWriteCount
+        XCTAssertEqual(reads, 1)
+        XCTAssertEqual(writes, 1)
+        XCTAssertTrue(remount.requiresRead)
+        XCTAssertEqual(remount.displayName, "Bozza conservata")
+        await remount.read(identity: workspace.operatorIdentity)
+        XCTAssertFalse(remount.requiresRead)
+    }
+
+    @MainActor
+    func testProfileIdentityOwnerAcceptsScopeChangeButRejectsRetiredAuthority() async {
+        let source = S6MockDataSource(details: [:])
+        let workspace = makeModel(source: source)
+        workspace.serverURL = "https://localhost:3443"
+        await workspace.configurePairedOnlineForTests(operatorId: "operator-1")
+        let authority = workspace.nativeOperatorConnection!.accountIdentity
+        let profile = HomeBaseAccountProfile(userId: "operator-1", username: ["synthetic", "profile"].joined(separator: "-"),
+            displayName: "Nome host", ambulatoryName: "Studio host", profileVersion: "opaque", archiveGeneration: "synthetic-generation")
+        workspace.ambulatoryId = "other-scope"
+        workspace.noteProfileUpdated(profile, connection: authority)
+        XCTAssertEqual(workspace.operatorIdentity?.displayName, "Nome host")
+        workspace.serverURL = "https://127.0.0.1:3444"
+        workspace.noteProfileUpdated(profile, connection: authority)
+        XCTAssertNil(workspace.operatorIdentity)
+    }
+
+    @MainActor
     private func makeModel(source: S6MockDataSource) -> PairedPatientsWorkspaceModel {
         let suiteName = "PairedPatientsWorkspaceModelS6Tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -239,12 +280,51 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
         HomeBaseMutationAcknowledgement(success: true)
     }
 
+    var accountProfile = HomeBaseAccountProfile(userId: "operator-1", username: ["synthetic", "profile"].joined(separator: "-"),
+        displayName: "Dott. Bianchi", ambulatoryName: "Centro Salute",
+        profileVersion: "opaque-initial", archiveGeneration: "synthetic-generation")
+    var profileReadCount = 0
+    var profileWriteCount = 0
+    var profileReadError: HomeBaseClientError?
+    var profileWriteError: HomeBaseClientError?
+    var profileDelay: CheckedContinuation<Void, Never>?
+    var holdProfileResponse = false
+    var holdProfileRead = false
+    var profileReadDelay: CheckedContinuation<Void, Never>?
+
+    func configureProfile(error: HomeBaseClientError? = nil, hold: Bool = false) {
+        profileWriteError = error
+        holdProfileResponse = hold
+    }
+    func configureProfileRead(error: HomeBaseClientError? = nil, hold: Bool = false) {
+        profileReadError = error
+        holdProfileRead = hold
+    }
+    func releaseProfileRead() { profileReadDelay?.resume(); profileReadDelay = nil }
+    func releaseProfile() { profileDelay?.resume(); profileDelay = nil }
+    func fetchAccountProfile(credentials: HomeBasePairedCredentials, sessionCookie: String) async throws -> HomeBaseAccountProfile {
+        profileReadCount += 1
+        if holdProfileRead { await withCheckedContinuation { profileReadDelay = $0 } }
+        if let profileReadError { throw profileReadError }
+        return accountProfile
+    }
     func updateProfile(
-        userId: String, displayName: String, ambulatoryName: String,
+        expectedVersion: String, displayName: String?, ambulatoryName: String?, archiveGeneration: String,
         credentials: HomeBasePairedCredentials, sessionCookie: String
-    ) async throws -> HomeBaseMutationAcknowledgement {
-        if let profileError { throw profileError }
-        return HomeBaseMutationAcknowledgement(success: true)
+    ) async throws -> HomeBaseAccountProfile {
+        profileWriteCount += 1
+        if holdProfileResponse { await withCheckedContinuation { profileDelay = $0 } }
+        if let error = profileWriteError ?? profileError { throw error }
+        guard expectedVersion == accountProfile.profileVersion, archiveGeneration == accountProfile.archiveGeneration else {
+            throw HomeBaseClientError.profileVersionConflict(accountProfile)
+        }
+        let normalizedName = displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedClinic = ambulatoryName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        accountProfile = HomeBaseAccountProfile(userId: "operator-1", username: ["synthetic", "profile"].joined(separator: "-"),
+            displayName: normalizedName?.isEmpty == false ? normalizedName : nil,
+            ambulatoryName: normalizedClinic?.isEmpty == false ? normalizedClinic : nil,
+            profileVersion: "opaque-updated", archiveGeneration: archiveGeneration, changed: true)
+        return accountProfile
     }
 
     func createAmbulatory(

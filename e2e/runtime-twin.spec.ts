@@ -89,19 +89,18 @@ test('design comparison preserves an unfinished form and profile writes reach st
     const saved = page.waitForResponse(response => response.url().endsWith('/api/auth/profile') && response.request().method() === 'PUT');
     await page.getByRole('button', { name: 'Salva profilo', exact: true }).click();
     expect((await saved).status()).toBe(200);
-    await expect(page.getByText('Profilo aggiornato', { exact: true })).toBeVisible();
+    await expect(page.getByText('Profilo aggiornato.', { exact: true })).toBeVisible();
     await page.reload();
     await expect(name).not.toHaveValue('');
     const stored = await page.evaluate(async () => (await (await fetch('/api/settings/doctorName')).json()).value as string);
     expect(stored).toBe(savedName);
-    // Observe the inherited session-cache defect explicitly. This check proves
-    // the server write, not correctness of the restored operator label.
+    await expect(name).toHaveValue(savedName);
     fs.writeFileSync('tmp-086-twin/profile-reload.json', JSON.stringify({ stored, displayed: await name.inputValue() }, null, 2));
     await name.fill(original);
     const restored = page.waitForResponse(response => response.url().endsWith('/api/auth/profile') && response.request().method() === 'PUT');
     await page.getByRole('button', { name: 'Salva profilo', exact: true }).click();
     expect((await restored).status()).toBe(200);
-    await expect(page.getByText('Profilo aggiornato', { exact: true })).toBeVisible();
+    await expect(page.getByText('Profilo aggiornato.', { exact: true })).toBeVisible();
     await page.goto('/settings/accesso');
     await page.getByRole('button', { name: 'Blocca sessione adesso', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();

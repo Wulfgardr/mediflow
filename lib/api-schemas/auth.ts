@@ -18,24 +18,17 @@ export const authSetupSchema = z.object({
     }
 });
 
-export const authProfileUpdateSchema = z.object({
-    id: z.string().optional(),
-    displayName: optionalTextSchema,
-    ambulatoryName: optionalTextSchema,
-});
-
 /* ADR 0155. The subject is always the session user, so only these three keys
    exist and both names are mandatory (string or null). */
 const conditionalProfileNameSchema = z.string().trim().max(200).nullable()
     .transform((value) => value === null || value.length === 0 ? null : value);
 
 export const authProfileConditionalUpdateSchema = z.object({
-    expectedVersion: z.string(),
+    expectedVersion: z.string().min(1),
     displayName: conditionalProfileNameSchema,
     ambulatoryName: conditionalProfileNameSchema,
 }).strict();
 
 export type AuthSetupPayload = z.infer<typeof authSetupSchema>;
-export type AuthProfileUpdatePayload = z.infer<typeof authProfileUpdateSchema>;
 export type AuthProfileConditionalUpdatePayload = z.infer<typeof authProfileConditionalUpdateSchema>;
 

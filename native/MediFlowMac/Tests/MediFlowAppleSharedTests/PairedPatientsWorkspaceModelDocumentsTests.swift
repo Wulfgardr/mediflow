@@ -515,8 +515,14 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
         HomeBaseMutationAcknowledgement(success: true)
     }
 
-    func updateProfile(userId: String, displayName: String, ambulatoryName: String, credentials: HomeBasePairedCredentials, sessionCookie: String) async throws -> HomeBaseMutationAcknowledgement {
-        HomeBaseMutationAcknowledgement(success: true)
+    func fetchAccountProfile(credentials: HomeBasePairedCredentials, sessionCookie: String) async throws -> HomeBaseAccountProfile {
+        throw HomeBaseClientError.contract
+    }
+    func updateProfile(
+        expectedVersion: String, displayName: String?, ambulatoryName: String?, archiveGeneration: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAccountProfile {
+        throw HomeBaseClientError.contract
     }
 
     func createAmbulatory(payload: HomeBaseAmbulatoryCreatePayload, credentials: HomeBasePairedCredentials, sessionCookie: String) async throws -> HomeBaseAmbulatoryMutationResponse {

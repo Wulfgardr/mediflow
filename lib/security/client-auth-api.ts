@@ -119,6 +119,12 @@ type AuthControlledJsonRequestResult<T> = JsonRequestResult<T> & {
 
 const AUTH_CONTROL_ETAG_MAX_LENGTH = 512;
 let currentAuthControlEtag: string | null = null;
+const accountAuthorityListeners = new Set<() => void>();
+
+export function subscribeClientAccountAuthority(changed: () => void): () => void {
+    accountAuthorityListeners.add(changed);
+    return () => { accountAuthorityListeners.delete(changed); };
+}
 let authHealthRequestInFlight: Promise<AuthControlledJsonRequestResult<AuthHealthPayload>> | null = null;
 
 function strongAuthControlEtag(response: Response): string | null {
@@ -135,7 +141,9 @@ function retainAuthControlEtag(
     const next = strongAuthControlEtag(response);
     if (currentAuthControlEtag !== expected) return { etag: next, state: 'stale' };
     if (!next) return { etag: null, state: 'invalid' };
+    const changed = currentAuthControlEtag !== next;
     currentAuthControlEtag = next;
+    if (changed) for (const listener of accountAuthorityListeners) listener();
     return { etag: next, state: 'accepted' };
 }
 
@@ -410,6 +418,14 @@ export function repairLegacyDbRequest() {
 const GENERATION = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 export const ARCHIVE_REPLACED_EVENT = 'mediflow:archive-replaced';
 let documentGeneration: string | null = null;
+
+/** Captures the current browser session and archive without exposing credentials. */
+export function captureClientAccountAuthority(): () => boolean {
+    const etag = currentAuthControlEtag;
+    const generation = documentGeneration;
+    return () => etag !== null && generation !== null
+        && currentAuthControlEtag === etag && documentGeneration === generation;
+}
 
 /** Never relatch a document that still contains records from the preceding archive. */
 export function rejectReplacedArchive(): never {

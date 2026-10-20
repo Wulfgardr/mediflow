@@ -25,6 +25,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published private(set) var operatorIdentity: OperatorIdentity? {
         didSet { if oldValue?.userId != operatorIdentity?.userId { discardCachedPatientPresentation() } }
     }
+    private(set) lazy var settingsProfileModel = SettingsProfileModel(
+        connectionProvider: { [weak self] in self?.nativeOperatorConnection },
+        profileUpdated: { [weak self] profile, authority in self?.noteProfileUpdated(profile, connection: authority) },
+        sessionExpired: { [weak self] in await self?.lockSessionNow() }
+    )
+
     @Published var serverURL = HomeBasePairedSettings.defaultServerURL {
         didSet { invalidateLoginIfChanged(oldValue, serverURL) }
     }
@@ -920,14 +926,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         reconciliationLine = "Sessione bloccata. Accedi di nuovo per leggere o scrivere."
     }
 
-    /// Keeps the in-memory operator identity aligned after a successful
-    /// PUT /api/auth/profile, so the profile form reopens with saved values.
-    func noteProfileUpdated(displayName: String?, ambulatoryName: String?) {
-        guard let identity = operatorIdentity else { return }
+    func noteProfileUpdated(_ profile: HomeBaseAccountProfile, connection: ClinicalWorkspaceConnection.AccountIdentity) {
+        guard nativeOperatorConnection?.accountIdentity == connection,
+              let identity = operatorIdentity, identity.userId == profile.userId else { return }
         operatorIdentity = OperatorIdentity(
             userId: identity.userId,
-            displayName: displayName,
-            ambulatoryName: ambulatoryName
+            displayName: profile.displayName,
+            ambulatoryName: profile.ambulatoryName
         )
     }
 

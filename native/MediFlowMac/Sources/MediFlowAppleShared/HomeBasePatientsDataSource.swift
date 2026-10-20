@@ -32,10 +32,14 @@ public protocol HomeBasePatientsDataSource: Sendable {
         credentials: HomeBasePairedCredentials, sessionCookie: String
     ) async throws -> HomeBaseMutationAcknowledgement
 
-    func updateProfile(
-        userId: String, displayName: String, ambulatoryName: String,
+    func fetchAccountProfile(
         credentials: HomeBasePairedCredentials, sessionCookie: String
-    ) async throws -> HomeBaseMutationAcknowledgement
+    ) async throws -> HomeBaseAccountProfile
+
+    func updateProfile(
+        expectedVersion: String, displayName: String?, ambulatoryName: String?, archiveGeneration: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAccountProfile
 
     func fetchPatients(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?, includeDeleted: Bool
