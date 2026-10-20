@@ -302,10 +302,43 @@ apre la scheda.
 
 ### Stati di una vista
 
-Ogni vista ha i suoi stati, con testo e azione: vuoto, caricamento, non in
-linea, dato non più attuale, conflitto, accesso negato, campo illeggibile,
-errore. I testi sono nella sezione [Testi](#testi) e nella schermata "Stati"
-del banco. Un dato che non si è potuto leggere non si mostra mai come vuoto.
+Uno stato prende il posto del contenuto che non c'è, nella stessa colonna e
+senza cornice: una riga in grassetto che dice che cosa è successo, una riga
+secondaria che dice che cosa vale ancora, al massimo un comando secondario.
+Il comando principale della vista resta suo. Il tono dà la forma oltre al
+colore: neutro senza segno, attenzione con ▲, critico con ◆.
+
+| Stato | Quando | Tono | Testo | Comando |
+| --- | --- | --- | --- | --- |
+| Vuoto | La lettura è riuscita e non c'è nulla | Neutro | Nessuna terapia in corso. Si nomina la cosa che manca, senza altro | Quello che crea la cosa, se la postazione può farlo |
+| Caricamento | Prima risposta attesa | Neutro | Lettura delle terapie… | Nessuno |
+| Attesa lunga | Nessuna risposta dopo 5 secondi | Neutro | Lettura delle terapie… · L'archivio sta ancora rispondendo, 12 s | Interrompi la lettura, solo se il trasporto la interrompe davvero |
+| Non in linea, con copia | Il computer dell'ambulatorio non risponde e la finestra ha una copia letta | Attenzione | Il computer dell'ambulatorio non risponde. · Stai leggendo la copia delle 10:32; non puoi scrivere. | Riprova la lettura |
+| Non in linea, senza copia | Come sopra, senza copia in questa finestra | Attenzione | Il computer dell'ambulatorio non risponde. · Nessuna copia disponibile in questa finestra. | Riprova la lettura |
+| Dato non più attuale | La versione letta non è più quella registrata | Attenzione | Le terapie sono cambiate alle 19:01 su un'altra postazione. | Rileggi |
+| Archivio sostituito | L'archivio è stato ripristinato da una copia dopo l'apertura | Critico | L'archivio è stato ripristinato da una copia. · Riapri l'archivio prima di continuare. | Riapri l'archivio |
+| Conflitto | Una scrittura respinta perché la scheda è cambiata | Critico | Vedi [Testi](#testi) | Rileggi la scheda, con la bozza conservata |
+| Accesso negato | La postazione o l'account non sono ammessi | Critico | Questa postazione non può vedere le terapie. | Nessuno: riprovare non cambia l'esito |
+| Campo illeggibile | Il dato esiste ma la chiave attuale non lo apre | Critico | Questo dato non si può leggere con la chiave attuale. Non è vuoto. | Nessuno |
+| Errore | Ogni altro fallimento della lettura | Critico | Le terapie non si sono potute leggere. | Riprova la lettura |
+
+Regole che valgono per tutti:
+
+- Un dato che non si è potuto leggere non si mostra mai come vuoto, e una
+  sezione che non si è potuta leggere non svuota le altre. In una lettura
+  parziale ogni sezione tiene il suo stato: il diario letto resta, le terapie
+  negate dicono perché.
+- Un comando compare solo se esiste davvero e può cambiare l'esito. Niente
+  «Riprova» davanti a un accesso negato, niente «Chiedi l'accesso» senza un
+  percorso che lo concede.
+- L'attesa dichiara la fase (lettura, preparazione, invio, verifica) e il
+  tempo trascorso, mai una percentuale inventata. Nessuna ripetizione
+  automatica.
+- L'archivio sostituito ritira la sessione precedente: nessuna bozza passa da
+  sola al nuovo archivio.
+- La copia offline si nomina con l'ora in cui è stata letta, e solo se c'è.
+- Lo stato è una regione annunciata ai lettori di schermo; il fuoco va sul
+  suo comando, se c'è, altrimenti resta dov'era.
 
 ## Movimento
 
@@ -370,14 +403,12 @@ Parole fisse. Niente lineette lunghe, niente frasi di riempimento.
 | Conferma | Registrare nella scheda di Nome, età anni? |
 | Regola della scrittura | La scrittura è unica: o tutto o niente. |
 | Proposta lasciata fuori | Una proposta a matita resta fuori finché non la accetti. |
-| Scrittura fallita | Non registrata. Nulla è stato scritto. |
+| Scrittura fallita | Non registrata. Nulla è stato scritto. Solo dopo un rifiuto che lo attesta |
+| Esito da verificare | Esito da verificare. La registrazione può essere avvenuta: rileggi prima di riprovare. Comando: Rileggi e verifica. Un nuovo invio resta bloccato fino alla verifica |
+| Attesa della scrittura | Verifica della registrazione · 12 s. La bozza è conservata. |
 | Conflitto | La scheda è stata modificata da un'altra postazione alle ora. La bozza è intatta: rileggi la scheda e riprova. |
 | Vuoto | Nessun controllo aperto. (il nome della cosa che manca, senza altro) |
-| Caricamento | Lettura della scheda… |
-| Non in linea | Il computer dell'ambulatorio non risponde. Puoi leggere l'ultima copia, non scrivere. |
-| Dato non più attuale | La scheda è cambiata alle ora su un'altra postazione. |
-| Accesso negato | Questa postazione non può vedere le terapie. |
-| Campo illeggibile | Questo dato non si può leggere con la chiave attuale. Non è vuoto. |
+| Stati di una vista | Vedi [Stati di una vista](#stati-di-una-vista): testo e comando per ciascuno |
 | Legenda dell'elenco | Proposta da rivedere · Bozza tua, non registrata |
 | Sblocco | PIN operatore · Sblocca |
 | Ascolto | vedi [03-ascolto-della-visita.md](./03-ascolto-della-visita.md) |
