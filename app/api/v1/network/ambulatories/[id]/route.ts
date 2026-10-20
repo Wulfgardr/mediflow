@@ -1,5 +1,6 @@
 import { readNativeNetworkJson, jsonBodyTooLargeResponse, emptyJsonUnlessTooLarge } from '@/lib/native-network-json-body';
 import { NextResponse } from 'next/server';
+import { apiInternalError } from '@/lib/api-error-response';
 import {
     deleteNetworkAmbulatory,
     NETWORK_AMBULATORY_WRITE_CAPABILITY,
@@ -19,8 +20,7 @@ export async function PUT(request: Request, context: RouteContext) {
     } catch (error) {
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
-        console.error('API PUT /api/v1/network/ambulatories/[id] error:', error);
-        return NextResponse.json({ error: 'Failed to update ambulatory' }, { status: 500 });
+        return apiInternalError('Update network ambulatory', error);
     }
 }
 
@@ -34,7 +34,6 @@ export async function DELETE(request: Request, context: RouteContext) {
     } catch (error) {
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
-        console.error('API DELETE /api/v1/network/ambulatories/[id] error:', error);
-        return NextResponse.json({ error: 'Failed to delete ambulatory' }, { status: 500 });
+        return apiInternalError('Delete network ambulatory', error);
     }
 }
