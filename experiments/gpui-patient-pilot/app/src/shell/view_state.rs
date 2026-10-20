@@ -9,6 +9,7 @@ pub(super) enum ReadObject {
     Terapie,
     Parametri,
     Controlli,
+    Profilo,
 }
 
 impl ReadObject {
@@ -19,6 +20,7 @@ impl ReadObject {
             Self::Terapie => "le terapie",
             Self::Parametri => "i parametri",
             Self::Controlli => "i controlli",
+            Self::Profilo => "il profilo",
         }
     }
 
@@ -29,6 +31,7 @@ impl ReadObject {
             Self::Terapie => "Lettura delle terapie…",
             Self::Parametri => "Lettura dei parametri…",
             Self::Controlli => "Lettura dei controlli…",
+            Self::Profilo => "Lettura del profilo…",
         }
     }
 
@@ -39,6 +42,7 @@ impl ReadObject {
             Self::Terapie => "Nessuna terapia in corso.",
             Self::Parametri => "Nessun parametro registrato.",
             Self::Controlli => "Nessun controllo aperto.",
+            Self::Profilo => "Nessun profilo disponibile.",
         }
     }
 
@@ -55,6 +59,9 @@ impl ReadObject {
             Self::Controlli => {
                 format!("I controlli sono cambiati alle {time} su un'altra postazione.")
             }
+            Self::Profilo => {
+                format!("Il profilo è cambiato alle {time} su un'altra postazione.")
+            }
         }
     }
 
@@ -65,6 +72,7 @@ impl ReadObject {
             Self::Terapie => "Le terapie non si sono potute leggere.",
             Self::Parametri => "I parametri non si sono potuti leggere.",
             Self::Controlli => "I controlli non si sono potuti leggere.",
+            Self::Profilo => "Il profilo non si è potuto leggere.",
         }
     }
 }
@@ -84,6 +92,7 @@ pub(super) enum ViewStateKind {
         ora: String,
     },
     ArchivioSostituito,
+    EsitoDaVerificare,
     #[allow(
         dead_code,
         reason = "The shared taxonomy includes write conflicts; this adoption is read-only."
@@ -124,6 +133,7 @@ pub(super) enum ViewCommand {
     Riprova,
     Rileggi,
     RileggiScheda,
+    RileggiEVerifica,
 }
 
 impl ViewCommand {
@@ -132,6 +142,7 @@ impl ViewCommand {
             Self::Riprova => "Riprova la lettura",
             Self::Rileggi => "Rileggi",
             Self::RileggiScheda => "Rileggi la scheda",
+            Self::RileggiEVerifica => "Rileggi e verifica",
         }
     }
 }
@@ -160,6 +171,7 @@ impl ViewState {
         evidence: ReadEvidence,
     ) -> Self {
         let kind = match error {
+            RuntimeError::ArchiveReplaced => ViewStateKind::ArchivioSostituito,
             RuntimeError::Forbidden | RuntimeError::Rejected(403) => ViewStateKind::AccessoNegato,
             RuntimeError::Crypto | RuntimeError::LockedField => ViewStateKind::CampoIlleggibile,
             RuntimeError::Conflict if evidence.archive_replaced => {
@@ -185,9 +197,9 @@ impl ViewState {
             ViewStateKind::Vuoto
             | ViewStateKind::Caricamento
             | ViewStateKind::AttesaLunga { .. } => ViewTone::Neutro,
-            ViewStateKind::NonInLinea { .. } | ViewStateKind::NonPiuAttuale { .. } => {
-                ViewTone::Attenzione
-            }
+            ViewStateKind::NonInLinea { .. }
+            | ViewStateKind::NonPiuAttuale { .. }
+            | ViewStateKind::EsitoDaVerificare => ViewTone::Attenzione,
             _ => ViewTone::Critico,
         }
     }
@@ -197,6 +209,7 @@ impl ViewState {
             ViewStateKind::NonInLinea { .. } | ViewStateKind::Errore => Some(ViewCommand::Riprova),
             ViewStateKind::NonPiuAttuale { .. } => Some(ViewCommand::Rileggi),
             ViewStateKind::Conflitto => Some(ViewCommand::RileggiScheda),
+            ViewStateKind::EsitoDaVerificare => Some(ViewCommand::RileggiEVerifica),
             _ => None,
         }
     }
@@ -222,6 +235,10 @@ impl ViewState {
             ViewStateKind::ArchivioSostituito => (
                 "L'archivio è stato ripristinato da una copia.".into(),
                 Some("Riapri l'archivio prima di continuare.".into()),
+            ),
+            ViewStateKind::EsitoDaVerificare => (
+                "Esito da verificare.".into(),
+                Some("La modifica potrebbe essere già stata salvata. Rileggi e verifica prima di inviarne un'altra.".into()),
             ),
             ViewStateKind::Conflitto => (
                 "Non registrata. Nulla è stato scritto.".into(),
@@ -350,13 +367,14 @@ impl<T> ReadLoad<T> {
 }
 
 impl ReadObject {
-    fn index(self) -> usize {
+    pub(super) fn index(self) -> usize {
         match self {
             Self::Scheda => 0,
             Self::Diario => 1,
             Self::Terapie => 2,
             Self::Parametri => 3,
             Self::Controlli => 4,
+            Self::Profilo => 5,
         }
     }
 }
@@ -369,6 +387,7 @@ impl ClinicalApp {
             ReadObject::Terapie => self.patient.therapies.state(object),
             ReadObject::Parametri => self.patient.observations.state(object),
             ReadObject::Controlli => self.patient.checkups.state(object),
+            ReadObject::Profilo => self.account_profile.load.state(object),
         }
     }
 
@@ -502,6 +521,12 @@ impl ClinicalApp {
     }
 
     pub(super) fn retry_patient_read(&mut self, object: ReadObject, cx: &mut Context<Self>) {
+        // The profile belongs to the session, not to the selected patient:
+        // neither a scope nor a selected chart may gate its reread.
+        if object == ReadObject::Profilo {
+            self.load_account_profile(cx);
+            return;
+        }
         if self
             .read_state(object)
             .is_none_or(|state| state.command().is_none())
@@ -551,6 +576,9 @@ impl ClinicalApp {
                     |this, result, _| this.patient.checkups = ReadLoad::from_result(result),
                     cx,
                 );
+            }
+            ReadObject::Profilo => {
+                self.load_account_profile(cx);
             }
             ReadObject::Scheda => unreachable!(),
         }

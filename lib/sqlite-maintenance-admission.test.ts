@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 import { setTimeout as delay } from 'node:timers/promises';
 import Database from 'better-sqlite3';
 import { openAdmittedSqlite, runWithSqliteMaintenance, SqliteMaintenanceHoldError } from './sqlite-maintenance-admission.mjs';
@@ -119,6 +120,29 @@ test('another process admitted first drains before snapshot; subsequent open is 
         if (w.worker.exitCode === null && w.worker.signalCode === null) { w.worker.kill(); await w.terminal; }
         f.cleanup();
     }
+});
+
+test('zero leases after intent publication complete drain even beyond the deadline', async () => {
+    const f = fixture();
+    const timeoutMs = 20;
+    let calls = 0;
+    try {
+        await runWithSqliteMaintenance(f.target, { timeoutMs, drain: async () => {
+            assert.equal(fs.existsSync(path.join(store(f.target), 'intent.json')), true);
+            assert.deepEqual(fs.readdirSync(path.join(store(f.target), 'leases')), []);
+            const started = performance.now();
+            while (performance.now() - started <= timeoutMs) await delay(timeoutMs);
+            assert.throws(() => openAdmittedSqlite(f.target), /maintenance_pending/);
+        } }, () => {
+            calls++;
+            assert.deepEqual(fs.readdirSync(path.join(store(f.target), 'leases')), []);
+            assert.equal(fs.existsSync(path.join(store(f.target), 'intent.json')), true);
+        });
+        assert.equal(calls, 1);
+        assert.equal(fs.existsSync(path.join(store(f.target), 'intent.json')), false);
+        const next = openAdmittedSqlite(f.target);
+        await next.close();
+    } finally { f.cleanup(); }
 });
 
 test('deadline refuses maintenance before callback and leaves native database unchanged', async () => {
