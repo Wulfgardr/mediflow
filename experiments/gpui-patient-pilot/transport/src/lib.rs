@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 mod ai_preferences;
+mod analytics;
 mod catalogs;
 mod crypto;
 mod dto;
@@ -16,6 +17,7 @@ mod tls;
 mod who;
 
 pub use ai_preferences::*;
+pub use analytics::*;
 pub use catalogs::*;
 pub use dto::*;
 pub use error::{Result, RuntimeError};
