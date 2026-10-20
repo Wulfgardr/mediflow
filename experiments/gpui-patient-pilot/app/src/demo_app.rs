@@ -665,6 +665,11 @@ impl PatientApp {
         let phase = self.workspace.phase();
         let theme = self.theme;
         let review = phase == Phase::Review && self.discard.is_none();
+        let surface = if review {
+            crate::components::WritingSurface::Threshold
+        } else {
+            crate::components::WritingSurface::Plane
+        };
         let background = if review {
             theme.threshold
         } else if self.workspace.is_dirty() {
@@ -698,8 +703,8 @@ impl PatientApp {
             .border_t_1().border_color(if self.workspace.is_dirty() { theme.draft_rule } else { theme.rule })
             .p(px(20.)).bg(background).text_color(foreground).flex().flex_col().gap(px(12.))
             .child(match phase {
-                Phase::Editing | Phase::Review => crate::components::writing_status("demo-writing-status", crate::components::WritingInk::Fresh, theme).into_any_element(),
-                Phase::Saved => crate::components::writing_status("demo-writing-status", crate::components::WritingInk::Dry, theme).into_any_element(),
+                Phase::Editing | Phase::Review => crate::components::writing_status("demo-writing-status", crate::components::WritingInk::Fresh, surface, theme).into_any_element(),
+                Phase::Saved => crate::components::writing_status("demo-writing-status", crate::components::WritingInk::Dry, surface, theme).into_any_element(),
                 _ => div().text_color(color).type_role(theme, TypeRole::Body).child(text!(status)).into_any_element(),
             })
             .when(self.discard.is_some(), |el| el.child(div().flex().flex_col().gap(px(12.))

@@ -14,7 +14,7 @@ use gpui::{
 };
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::components::{WritingInk, WritingStyle};
+use crate::components::{WritingInk, WritingStyle, WritingSurface};
 use crate::theme::{Theme, TypeRole, TypeStyle};
 
 actions!(
@@ -842,7 +842,7 @@ impl Render for TextInput {
             .focus(|style| style.border_color(theme.fresh).border_2())
             .text_color(theme.ink)
             .when_some(self.writing_ink, |element, ink| {
-                element.writing_ink(ink, theme)
+                element.writing_ink(ink, WritingSurface::Plane, theme)
             })
             .when(empty, |element| element.text_color(theme.secondary))
             .type_role(
