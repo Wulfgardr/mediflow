@@ -119,6 +119,12 @@ type AuthControlledJsonRequestResult<T> = JsonRequestResult<T> & {
 
 const AUTH_CONTROL_ETAG_MAX_LENGTH = 512;
 let currentAuthControlEtag: string | null = null;
+const accountAuthorityListeners = new Set<() => void>();
+
+export function subscribeClientAccountAuthority(changed: () => void): () => void {
+    accountAuthorityListeners.add(changed);
+    return () => { accountAuthorityListeners.delete(changed); };
+}
 let authHealthRequestInFlight: Promise<AuthControlledJsonRequestResult<AuthHealthPayload>> | null = null;
 
 function strongAuthControlEtag(response: Response): string | null {
@@ -135,7 +141,9 @@ function retainAuthControlEtag(
     const next = strongAuthControlEtag(response);
     if (currentAuthControlEtag !== expected) return { etag: next, state: 'stale' };
     if (!next) return { etag: null, state: 'invalid' };
+    const changed = currentAuthControlEtag !== next;
     currentAuthControlEtag = next;
+    if (changed) for (const listener of accountAuthorityListeners) listener();
     return { etag: next, state: 'accepted' };
 }
 

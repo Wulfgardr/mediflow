@@ -126,8 +126,13 @@ La PUT contiene soltanto `expectedVersion`, `displayName` e `ambulatoryName`.
 I client applicano i valori normalizzati restituiti dall’host, anche per il no-op,
 soltanto se richiesta, sessione, soggetto e archivio sono ancora correnti. Il Web
 ricontrolla l’autorità anche quando aggiorna lo stato dell’utente; Apple verifica
-l’identità completa della connessione, compresa la generazione della sessione,
-sia nel form sia nel proprietario dell’identità operatore.
+l’identità dell’autorità account (host, pin TLS, pairing, cookie e generazione
+della sessione), sia nel form sia nel proprietario dell’identità operatore.
+Lo scope ambulatoriale e la disponibilità delle letture cliniche non cambiano
+questa autorità e non cancellano la bozza del profilo account. Sul Web una
+sostituzione dell’autorità di sessione invalida le richieste pendenti e richiede
+una rilettura esplicita, conservando la bozza soltanto per lo stesso account e
+archivio; la notifica non espone ETag o credenziali.
 
 Un `409 PROFILE_VERSION_CONFLICT` conserva la bozza e mostra separatamente i
 valori correnti. Il salvataggio resta disabilitato fino al gesto **Rileggi profilo
@@ -135,7 +140,10 @@ mantenendo la bozza**; questa GET mantiene la bozza e permette il confronto.
 Serve poi un nuovo gesto **Salva profilo**. Non esistono retry automatici né
 aggiornamenti silenziosi della versione seguiti da una seconda PUT. Anche una
 risposta persa o non valida richiede una rilettura: la scrittura potrebbe essere
-già avvenuta. Revoca, errore o cambio archivio non vengono presentati come successo.
+già avvenuta. La navigazione e il rimontaggio della vista Apple non eseguono
+questa rilettura di recupero: lo stato dell’editor appartiene al workspace,
+mentre il caricamento automatico iniziale avviene una sola volta per autorità.
+Revoca, errore o cambio archivio non vengono presentati come successo.
 
 ### PUT senza versione ritirata
 
@@ -177,8 +185,9 @@ bozza, errori, risposta persa e scarto delle risposte tardive. L’E2E sintetico
 normalizzazione, no-op dopo reload, risposta persa e layout stretto.
 
 I test Apple di `SettingsWorkspaceTests` e `HomeBasePatientsClientTests` coprono
-versione letta dall’host, trasporto, null espliciti, conflitti, assenza di retry e
-cambio sessione/archivio e annullamento della lettura. La suite Apple non è stata
+versione letta dall’host, trasporto con base root o prefisso, null espliciti,
+conflitti, assenza di retry, navigazione durante il recupero, cambio dello scope
+ambulatoriale, cambio sessione/host/archivio e annullamento della lettura. La suite Apple non è stata
 eseguita nella verifica locale del 2026-10-20: non è disponibile Xcode completo.
 I Command Line Tools locali non contengono XCTest e il plug-in SwiftUIMacros
 richiesto dalla SDK SwiftUI. Parsing e controlli del core non sostituiscono

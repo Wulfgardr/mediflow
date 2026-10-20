@@ -2753,25 +2753,56 @@ final class HomeBasePatientsClientTests: XCTestCase {
     }
 
     func testAccountProfileConflictAndArchiveReplacementHaveDistinctErrorsAndNoRetry() async throws {
-        for code in ["PROFILE_VERSION_CONFLICT", "ARCHIVE_REPLACED"] {
-            var requests = 0
-            let client = makeClient { request in
-                requests += 1
-                let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 409, httpVersion: nil, headerFields: nil)!
-                return (response, Data("""
-                {"code":"\(code)","userId":"synthetic-user","username":"synthetic","displayName":"Altro client","ambulatoryName":null,"profileVersion":"opaque-other","archiveGeneration":"generation-current"}
-                """.utf8))
+        for prefix in ["", "/mediflow"] {
+            for code in ["PROFILE_VERSION_CONFLICT", "ARCHIVE_REPLACED"] {
+                for method in ["GET", "PUT"] {
+                    var requests = 0
+                    let client = makeClient(serverURL: "https://localhost:3443\(prefix)") { request in
+                        requests += 1
+                        XCTAssertEqual(request.url?.path, "\(prefix)/api/auth/profile")
+                        XCTAssertEqual(request.httpMethod, method)
+                        let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 409, httpVersion: nil, headerFields: nil)!
+                        return (response, Data("""
+                        {"code":"\(code)","userId":"synthetic-user","username":"synthetic","displayName":"Altro client","ambulatoryName":null,"profileVersion":"opaque-other","archiveGeneration":"generation-current"}
+                        """.utf8))
+                    }
+                    do {
+                        if method == "GET" {
+                            _ = try await client.fetchAccountProfile(credentials: creds, sessionCookie: cookie)
+                        } else {
+                            _ = try await client.updateProfile(expectedVersion: "old", displayName: "Bozza", ambulatoryName: nil,
+                                archiveGeneration: "generation-current", credentials: creds, sessionCookie: cookie)
+                        }
+                        XCTFail("Expected conflict")
+                    } catch let error as HomeBaseClientError {
+                        if code == "ARCHIVE_REPLACED" { XCTAssertEqual(error, .archiveReplaced) }
+                        else if case .profileVersionConflict(let profile) = error { XCTAssertEqual(profile.displayName, "Altro client") }
+                        else { XCTFail("Unexpected error: \(error)") }
+                    }
+                    XCTAssertEqual(requests, 1)
+                }
             }
-            do {
-                _ = try await client.updateProfile(expectedVersion: "old", displayName: "Bozza", ambulatoryName: nil,
-                    archiveGeneration: "generation-current", credentials: creds, sessionCookie: cookie)
-                XCTFail("Expected conflict")
-            } catch let error as HomeBaseClientError {
-                if code == "ARCHIVE_REPLACED" { XCTAssertEqual(error, .archiveReplaced) }
-                else if case .profileVersionConflict(let profile) = error { XCTAssertEqual(profile.displayName, "Altro client") }
-                else { XCTFail("Unexpected error: \(error)") }
+        }
+    }
+
+    func testOtherEndpointsDoNotMapAccountProfileConflictCodes() async throws {
+        for prefix in ["", "/mediflow"] {
+            for code in ["PROFILE_VERSION_CONFLICT", "ARCHIVE_REPLACED"] {
+                var requests = 0
+                let client = makeClient(serverURL: "https://localhost:3443\(prefix)") { request in
+                    requests += 1
+                    XCTAssertEqual(request.url?.path, "\(prefix)/api/v1/network/patients")
+                    let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 409, httpVersion: nil, headerFields: nil)!
+                    return (response, Data("{\"code\":\"\(code)\",\"error\":\"Synthetic rejection\"}".utf8))
+                }
+                do {
+                    _ = try await client.fetchPatients(credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
+                    XCTFail("Expected HTTP rejection")
+                } catch let error as HomeBaseClientError {
+                    XCTAssertEqual(error, .httpStatus(409, "Synthetic rejection"))
+                }
+                XCTAssertEqual(requests, 1)
             }
-            XCTAssertEqual(requests, 1)
         }
     }
 
@@ -2789,6 +2820,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
     }
 
     private func makeClient(
+        serverURL: String = "https://localhost:3443",
         handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)
     ) -> HomeBasePatientsClient {
         MockHomeBaseURLProtocol.requestHandler = handler
@@ -2796,7 +2828,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
         configuration.protocolClasses = [MockHomeBaseURLProtocol.self]
         let session = URLSession(configuration: configuration)
         return HomeBasePatientsClient(
-            configuration: HomeBaseConnectionConfiguration(serverURLString: "https://localhost:3443"),
+            configuration: HomeBaseConnectionConfiguration(serverURLString: serverURL),
             session: session
         )
     }

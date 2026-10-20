@@ -76,3 +76,38 @@ test('a lost save response preserves draft and requires reread without a second 
     await save.click();
     await expect(page.getByRole('status').filter({ hasText: 'Il profilo è già aggiornato.' })).toBeVisible();
 });
+
+test('same-account login in another tab preserves draft and requires an explicit profile read', async ({ page, context }) => {
+    await bootstrapUnlockedSession(page, '1234');
+    await page.goto('/settings/profilo');
+    const save = page.getByRole('button', { name: 'Salva profilo', exact: true });
+    await expect(save).toBeEnabled();
+    await page.getByLabel('Nome medico', { exact: true }).fill('Bozza prima del cambio sessione');
+    let reads = 0;
+    let writes = 0;
+    page.on('request', request => {
+        if (new URL(request.url()).pathname !== '/api/auth/profile') return;
+        if (request.method() === 'GET') reads++;
+        if (request.method() === 'PUT') writes++;
+    });
+    const other = await context.newPage();
+    try {
+        await bootstrapUnlockedSession(other, '1234');
+        const checked = page.waitForResponse(response => response.url().endsWith('/api/auth/check'));
+        await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+        expect((await (await checked).json()).hasSession).toBe(true);
+        await expect(page.getByRole('status').filter({ hasText: 'La sessione è cambiata' })).toBeVisible();
+        await expect(save).toBeDisabled();
+        await expect(page.getByLabel('Nome medico', { exact: true })).toHaveValue('Bozza prima del cambio sessione');
+        expect(reads).toBe(0);
+        expect(writes).toBe(0);
+        await page.getByRole('button', { name: 'Rileggi profilo mantenendo la bozza' }).click();
+        await expect(save).toBeEnabled();
+        await expect(page.getByLabel('Nome medico', { exact: true })).toHaveValue('Bozza prima del cambio sessione');
+        expect(reads).toBe(1);
+        expect(writes).toBe(0);
+        await save.click();
+        await expect(page.getByRole('status').filter({ hasText: 'Profilo aggiornato.' })).toBeVisible();
+        expect(writes).toBe(1);
+    } finally { await other.close(); }
+});
