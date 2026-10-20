@@ -3,6 +3,8 @@
 //! calculated here, and diagnostic counts are deliberately absent.
 
 use crate::{Result, RuntimeError};
+use chrono::{DateTime, Offset, TimeZone, Utc};
+use chrono_tz::Tz;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -23,7 +25,7 @@ pub struct DemographicsRequest {
 
 impl DemographicsRequest {
     pub fn new(min_age: u8, max_age: u8, time_zone: &str) -> Result<Self> {
-        if min_age > 120 || max_age > 120 || !valid_time_zone(time_zone) {
+        if min_age > 120 || max_age > 120 || !recognized_time_zone(time_zone) {
             return Err(RuntimeError::InvalidInput);
         }
         Ok(Self {
@@ -43,6 +45,26 @@ impl DemographicsRequest {
 
     pub fn time_zone(&self) -> &str {
         &self.time_zone
+    }
+}
+
+fn recognized_time_zone(value: &str) -> bool {
+    valid_time_zone(value) && value.parse::<Tz>().is_ok()
+}
+
+fn zone_offset_at(value: &str, at: DateTime<Utc>) -> Option<i32> {
+    let zone = value.parse::<Tz>().ok()?;
+    Some(
+        zone.offset_from_utc_datetime(&at.naive_utc())
+            .fix()
+            .local_minus_utc(),
+    )
+}
+
+fn same_offset_at(request: &str, reported: &str, at: DateTime<Utc>) -> bool {
+    match (zone_offset_at(request, at), zone_offset_at(reported, at)) {
+        (Some(requested), Some(reported)) => requested == reported,
+        _ => false,
     }
 }
 
@@ -130,9 +152,11 @@ pub struct PopulationDemographics {
 
 /// Accepts the host projection only when every closed-contract assertion holds.
 /// The counters stay host values: this parser compares them, it never derives
-/// them from a patient list. The time zone is a presentation parameter that the
-/// host reports canonicalized (`Etc/UTC` becomes `UTC`), so only its IANA shape
-/// is asserted; the response value is what the view presents.
+/// them from a patient list. The host reports the time zone canonicalized
+/// (`Etc/UTC` becomes `UTC`), so the response must name a zone known to
+/// `chrono-tz` whose UTC offset at the reported observation instant matches the
+/// requested zone: the same calendar, not necessarily the same spelling. The
+/// response value is what the view presents.
 pub(crate) fn parse_demographics(
     value: Value,
     scope: &str,
@@ -141,6 +165,9 @@ pub(crate) fn parse_demographics(
 ) -> Result<PopulationDemographics> {
     let result: PopulationDemographics =
         serde_json::from_value(value).map_err(|_| RuntimeError::InvalidResponse)?;
+    let observed_at: DateTime<Utc> = chrono::DateTime::parse_from_rfc3339(&result.observed_at)
+        .map(|at| at.with_timezone(&Utc))
+        .map_err(|_| RuntimeError::InvalidResponse)?;
     let stats = &result.stats;
     let coherent = result.operation == POPULATION_DEMOGRAPHICS_OPERATION
         && result.contract_version == 1
@@ -148,10 +175,10 @@ pub(crate) fn parse_demographics(
         && result.scope.archive_generation == archive_generation
         && result.age_range == [request.min_age, request.max_age]
         && valid_time_zone(&result.time_zone)
+        && same_offset_at(&request.time_zone, &result.time_zone, observed_at)
         && stats.age_dist.sum() == Some(stats.total_in_range)
         && stats.total_in_range <= stats.with_birth_date
-        && stats.adi_count <= stats.total_in_range
-        && chrono::DateTime::parse_from_rfc3339(&result.observed_at).is_ok();
+        && stats.adi_count <= stats.total_in_range;
     if !coherent {
         return Err(RuntimeError::InvalidResponse);
     }
@@ -290,7 +317,7 @@ mod tests {
     }
 
     #[test]
-    fn request_normalizes_bounds_and_accepts_only_iana_shaped_zones() {
+    fn request_normalizes_bounds_and_accepts_only_recognized_iana_zones() {
         let reversed = DemographicsRequest::new(80, 20, "Europe/Rome").unwrap();
         assert_eq!((reversed.min_age(), reversed.max_age()), (20, 80));
         assert!(DemographicsRequest::new(121, 0, "UTC").is_err());
@@ -301,6 +328,8 @@ mod tests {
             "America/Port-au-Prince",
             "Etc/GMT+5",
             "America/Indiana/Indianapolis",
+            "Europe/Kiev",
+            "Europe/Kyiv",
         ] {
             assert!(DemographicsRequest::new(0, 120, zone).is_ok(), "{zone}");
         }
@@ -314,6 +343,7 @@ mod tests {
             "+01:00",
             "Europe/Rome/",
             "Europe/Rom\u{e0}",
+            "Mars/Olympus",
         ] {
             assert!(DemographicsRequest::new(0, 120, zone).is_err(), "{zone}");
         }
@@ -322,7 +352,7 @@ mod tests {
         assert!(DemographicsRequest::new(0, 120, &long).is_err());
         let longest = format!("A{}", "a".repeat(99));
         assert_eq!(longest.len(), 100);
-        assert!(DemographicsRequest::new(0, 120, &longest).is_ok());
+        assert!(DemographicsRequest::new(0, 120, &longest).is_err());
     }
 
     #[test]
@@ -335,7 +365,12 @@ mod tests {
 
     #[test]
     fn accepts_the_host_canonical_alias_of_the_requested_time_zone() {
-        for (requested, reported) in [("Etc/UTC", "UTC"), ("Asia/Kolkata", "Asia/Calcutta")] {
+        for (requested, reported) in [
+            ("Etc/UTC", "UTC"),
+            ("Asia/Kolkata", "Asia/Calcutta"),
+            ("US/Eastern", "America/New_York"),
+            ("Europe/Kiev", "Europe/Kyiv"),
+        ] {
             let request = DemographicsRequest::new(0, 120, requested).unwrap();
             let mut value = valid_wire();
             value["timeZone"] = json!(reported);
@@ -346,12 +381,61 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_reported_time_zone_that_is_not_iana_shaped() {
+    fn rejects_a_reported_time_zone_with_a_different_offset_at_the_observation() {
+        for reported in ["America/New_York", "UTC", "Europe/London", "Mars/Olympus"] {
+            let mut value = valid_wire();
+            value["timeZone"] = json!(reported);
+            assert_eq!(
+                parse(value),
+                Err(RuntimeError::InvalidResponse),
+                "{reported}"
+            );
+        }
+    }
+
+    #[test]
+    fn compares_the_offset_at_the_observation_instant_across_dst() {
+        for reported in ["Europe/Berlin", "Europe/Paris"] {
+            for observed_at in [
+                "2026-01-15T08:30:00.000Z",
+                "2026-03-29T00:30:00.000Z",
+                "2026-07-15T08:30:00.000Z",
+                "2026-10-25T00:30:00.000Z",
+            ] {
+                let mut value = valid_wire();
+                value["timeZone"] = json!(reported);
+                value["observedAt"] = json!(observed_at);
+                assert!(
+                    parse(value).is_ok(),
+                    "{reported} at {observed_at} shares the Roman calendar"
+                );
+            }
+        }
+        for observed_at in [
+            "2026-01-15T08:30:00.000Z",
+            "2026-03-29T00:30:00.000Z",
+            "2026-07-15T08:30:00.000Z",
+            "2026-10-25T00:30:00.000Z",
+        ] {
+            let mut value = valid_wire();
+            value["timeZone"] = json!("Europe/London");
+            value["observedAt"] = json!(observed_at);
+            assert_eq!(
+                parse(value),
+                Err(RuntimeError::InvalidResponse),
+                "{observed_at}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_a_reported_time_zone_that_is_not_iana_shaped_or_unknown() {
         for reported in [
             json!(""),
             json!("../etc"),
             json!(-42),
             json!("A".repeat(101)),
+            json!("Mars/Olympus"),
         ] {
             let mut value = valid_wire();
             value["timeZone"] = reported.clone();

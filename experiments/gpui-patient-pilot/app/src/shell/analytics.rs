@@ -7,11 +7,15 @@ use mediflow_runtime_client::{
     DemographicsRequest, POPULATION_DEMOGRAPHICS_CAPABILITY, PopulationDemographics,
 };
 
+pub(super) type TimeZoneSource = std::rc::Rc<dyn Fn() -> Option<String>>;
+
+const TIME_ZONE_UNDETERMINED: &str = "Il fuso orario di questo computer non è determinabile. L’analisi non viene richiesta senza un fuso esplicito: controlla l’impostazione del sistema e riprova.";
+
 pub(super) struct AnalyticsArea {
     state: AnalyticsState,
     min_age: Entity<TextInput>,
     max_age: Entity<TextInput>,
-    time_zone: Option<String>,
+    time_zone_source: TimeZoneSource,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -35,7 +39,7 @@ impl AnalyticsArea {
             state: AnalyticsState::Idle,
             min_age,
             max_age,
-            time_zone: None,
+            time_zone_source: std::rc::Rc::new(|| iana_time_zone::get_timezone().ok()),
             _subscriptions: subscriptions,
         }
     }
@@ -191,27 +195,15 @@ impl ClinicalApp {
                 return;
             }
         };
-        let Some(time_zone) = self
-            .analytics
-            .time_zone
-            .clone()
-            .or_else(|| iana_time_zone::get_timezone().ok())
-        else {
-            self.analytics.state = AnalyticsState::Failed(
-                "Il fuso orario di questo computer non è determinabile. L’analisi non viene richiesta senza un fuso esplicito: controlla l’impostazione del sistema e riprova."
-                    .into(),
-            );
+        let Some(time_zone) = (self.analytics.time_zone_source)() else {
+            self.analytics.state = AnalyticsState::Failed(TIME_ZONE_UNDETERMINED.into());
             cx.notify();
             return;
         };
-        self.analytics.time_zone = Some(time_zone.clone());
         let request = match DemographicsRequest::new(min_age, max_age, &time_zone) {
             Ok(request) => request,
             Err(_) => {
-                self.analytics.state = AnalyticsState::Failed(
-                    "Il fuso orario di questo computer non è nel formato riconosciuto dall’archivio. Controlla l’impostazione del sistema e riprova."
-                        .into(),
-                );
+                self.analytics.state = AnalyticsState::Failed(TIME_ZONE_UNDETERMINED.into());
                 cx.notify();
                 return;
             }
@@ -299,7 +291,9 @@ impl ClinicalApp {
             )
             .child(div().text_color(theme.secondary).child(text!(format!(
                 "Fuso orario della lettura: {}",
-                self.analytics.time_zone.as_deref().unwrap_or("da determinare")
+                self.analytics.state.ready().map_or("da determinare", |demographics| {
+                    demographics.time_zone.as_str()
+                })
             ))));
         if let Some(demographics) = self.analytics.state.ready() {
             pane = pane.child(
@@ -605,17 +599,19 @@ mod tests {
         let query = route.split_once('?').unwrap().1;
         let mut min_age = None;
         let mut max_age = None;
+        let mut time_zone = None;
         for pair in query.split('&') {
             let (key, value) = pair.split_once('=').unwrap();
             match key {
                 "minAge" => min_age = Some(value.parse::<u8>().unwrap()),
                 "maxAge" => max_age = Some(value.parse::<u8>().unwrap()),
-                "timeZone" => assert_eq!(value, "Europe%2FRome"),
+                "timeZone" => time_zone = Some(value.replace("%2F", "/")),
                 other => panic!("unexpected query parameter: {other}"),
             }
         }
         let min_age = min_age.unwrap();
         let max_age = max_age.unwrap();
+        let time_zone = time_zone.unwrap();
         let stats = if mode == RESPONSE_EMPTY {
             json!({"totalInRange":0, "withBirthDate":2, "withoutBirthDate":1, "adiCount":0,
                 "ageDist":{"0-18":0, "19-64":0, "65-80":0, "80+":0}})
@@ -628,7 +624,7 @@ mod tests {
             "contractVersion": 1,
             "scope": {"ambulatoryId": "scope-a", "archiveGeneration": "synthetic-generation"},
             "ageRange": [min_age, max_age],
-            "timeZone": "Europe/Rome",
+            "timeZone": time_zone,
             "observedAt": "2026-10-20T08:30:00.000Z",
             "stats": stats
         });
@@ -674,7 +670,7 @@ mod tests {
             app.session = Some(host.session.clone());
             app.scope = Some("scope-a".into());
             app.area = Area::Analytics;
-            app.analytics.time_zone = Some("Europe/Rome".into());
+            app.analytics.time_zone_source = std::rc::Rc::new(|| Some("Europe/Rome".to_owned()));
             app.load_analytics(cx);
         });
         cx.run_until_parked();
@@ -743,6 +739,52 @@ mod tests {
             });
             render_window(cx);
         }
+    }
+
+    #[gpui::test]
+    fn analytics_gpui_re_reads_the_time_zone_on_every_read(cx: &mut gpui::TestAppContext) {
+        let host = SyntheticHost::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let calls = std::rc::Rc::new(std::cell::Cell::new(0usize));
+        let counted = calls.clone();
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            app.area = Area::Analytics;
+            app.analytics.time_zone_source = std::rc::Rc::new(move || {
+                let index = counted.get();
+                counted.set(index + 1);
+                Some(["Europe/Rome", "Europe/Berlin"][index.min(1)].to_owned())
+            });
+            app.load_analytics(cx);
+        });
+        cx.run_until_parked();
+        assert_eq!(calls.get(), 1);
+        view.update(cx, |app, cx| app.load_analytics(cx));
+        cx.run_until_parked();
+        assert_eq!(calls.get(), 2);
+        let requests = host.demographics_requests();
+        assert!(
+            requests[0].starts_with(
+                "GET /api/v1/network/analytics/demographics?minAge=0&maxAge=120&timeZone=Europe%2FRome "
+            ),
+            "{}",
+            requests[0]
+        );
+        assert!(
+            requests[1].starts_with(
+                "GET /api/v1/network/analytics/demographics?minAge=0&maxAge=120&timeZone=Europe%2FBerlin "
+            ),
+            "{}",
+            requests[1]
+        );
+        view.read_with(cx, |app, _| {
+            assert_eq!(
+                app.analytics.state.ready().unwrap().time_zone,
+                "Europe/Berlin"
+            );
+        });
     }
 
     #[gpui::test]
