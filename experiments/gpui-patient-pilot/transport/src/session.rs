@@ -6,6 +6,10 @@ use crate::{
     crypto::{self, MasterKey},
     http::{DOCUMENT_LIMIT, JSON_LIMIT},
     profile_query::{ProfileLease, display_profile, parse_profile_response},
+    scales::{
+        SCALE_CATALOG_LIMIT, SCALE_PREPARATION_LIMIT, SCALE_REQUEST_LIMIT,
+        parse_catalog as parse_scale_catalog, parse_preparation as parse_scale_preparation,
+    },
     *,
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -201,6 +205,12 @@ impl RuntimeSession {
                 .lock()
                 .is_ok_and(|capabilities| capabilities.contains(capability))
     }
+    /// Discovery hint for offering the complete Scale action. The host still
+    /// admits every current write and read; this does not grant either capability.
+    pub fn can_record_scale(&self) -> bool {
+        self.can_write("network.replica.write-clinical-diary")
+            && self.can_write("network.replica.readonly-clinical-diary")
+    }
     pub fn refresh_capabilities(&self) -> Result<()> {
         let response =
             self.read_json(None, &["api", "v1", "network", "capabilities"], JSON_LIMIT)?;
@@ -229,6 +239,7 @@ impl RuntimeSession {
             if capability["requiresPairing"] == true
                 && capability["status"] == "available"
                 && (key.starts_with("network.replica.write-")
+                    || key == "network.replica.readonly-clinical-diary"
                     || key == "network.ambulatories.write")
             {
                 granted.insert(key.to_owned());
@@ -425,6 +436,9 @@ impl RuntimeSession {
         }
         if result.as_ref().is_err_and(|error| error.is_auth_failure()) {
             self.lock();
+            // Host authentication failure must retire every presentation, even
+            // when locking has also cancelled the associated profile intent.
+            return result;
         }
         if let Some(intent) = intent
             && self.profile_intent_guard(intent).is_err()
@@ -1275,6 +1289,254 @@ impl RuntimeSession {
     ) -> Result<CreatedResource> {
         self.create_clinical(scope, patient_id, "entries", draft, &["title", "content"])
     }
+
+    pub fn read_scale_catalog(&self, scope: &str) -> Result<ScaleCatalog> {
+        let response = self.read_json(
+            Some(scope),
+            &["api", "v1", "network", "scales"],
+            SCALE_CATALOG_LIMIT,
+        )?;
+        let catalog = parse_scale_catalog(response.value)?;
+        self.check_read_epoch(response.epoch)?;
+        Ok(catalog)
+    }
+
+    /// Refresh the real profile selection before asking the host to calculate.
+    /// The caller supplies neither an epoch nor a score, interpretation or grant.
+    pub fn prepare_scale(
+        &self,
+        scope: &str,
+        patient_id: &str,
+        intent: &ProfileQueryIntent,
+        request: &ScalePreparationRequest,
+    ) -> Result<PreparedScale> {
+        validate_id(patient_id)?;
+        if patient_id.len() > 160 || patient_id.trim() != patient_id {
+            return Err(RuntimeError::InvalidInput);
+        }
+        let patient = self.open_patient_profile(scope, patient_id, intent)?;
+        if patient.is_archived || patient.deleted_at.is_some() {
+            return Err(RuntimeError::Forbidden);
+        }
+        if patient.version != request.patient_version {
+            return Err(RuntimeError::Conflict);
+        }
+        let epoch = self.inner.read_epoch.load(Ordering::Acquire);
+        self.check_profile_intent(intent, epoch)?;
+        let context = self.scale_profile_context(scope, patient_id, intent)?;
+        let body = json!({"contractVersion":1, "scaleId":request.scale_id, "answers":request.answers,
+            "expectedCatalogRevision":request.catalog.catalog_revision(), "expectedPatientVersion":context.patient_version,
+            "expectedSelectionEpoch":context.selection_epoch});
+        if serde_json::to_vec(&body)
+            .map_err(|_| RuntimeError::InvalidInput)?
+            .len()
+            > SCALE_REQUEST_LIMIT
+        {
+            return Err(RuntimeError::TooLarge);
+        }
+        let value = self.request_with_profile_intent(
+            Method::POST,
+            &[
+                "api", "v1", "network", "patients", patient_id, "scales", "prepare",
+            ],
+            &[],
+            Some(scope),
+            Some(&body),
+            false,
+            SCALE_PREPARATION_LIMIT,
+            Some(intent),
+        )?;
+        self.check_profile_intent(intent, epoch)?;
+        if self.scale_profile_context(scope, patient_id, intent)? != context {
+            return Err(RuntimeError::ReadRequired);
+        }
+        parse_scale_preparation(value, request, &context, intent.clone())
+    }
+
+    fn scale_profile_context(
+        &self,
+        scope: &str,
+        patient: &str,
+        intent: &ProfileQueryIntent,
+    ) -> Result<ScalePreparationContext> {
+        drop(self.profile_intent_guard(intent)?);
+        self.profile_target_matches(intent, scope, patient)?;
+        let profiles = self
+            .inner
+            .profile_reads
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?;
+        let lease = profiles
+            .get(&read_key(scope, patient, "patients", patient))
+            .ok_or(RuntimeError::ReadRequired)?;
+        if Instant::now() >= lease.deadline
+            || intent.selection.as_ref().is_none_or(|selection| {
+                selection.host_epoch.load(Ordering::Acquire) != lease.currentness.selection_epoch
+            })
+        {
+            return Err(RuntimeError::ReadRequired);
+        }
+        Ok(ScalePreparationContext {
+            patient_id: patient.into(),
+            ambulatory_id: scope.into(),
+            patient_version: lease.currentness.revision,
+            selection_epoch: lease.currentness.selection_epoch,
+        })
+    }
+
+    /// Local sealing only, called at the explicit confirmation gesture. Retain
+    /// the returned attempt before sending anything and reuse it for any retry.
+    pub fn seal_scale_entry(
+        &self,
+        prepared: &PreparedScale,
+        date: &str,
+        setting: Option<&str>,
+    ) -> Result<ScaleEntryAttempt> {
+        let context = prepared.context();
+        if self.scale_profile_context(
+            &context.ambulatory_id,
+            &context.patient_id,
+            &prepared.intent,
+        )? != *context
+        {
+            return Err(RuntimeError::ReadRequired);
+        }
+        let date = parse_contract_date(date)?
+            .with_timezone(&chrono::Utc)
+            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        if setting.is_some_and(|value| {
+            value.trim().is_empty() || value.len() > 160 || value.chars().any(char::is_control)
+        }) {
+            return Err(RuntimeError::InvalidInput);
+        }
+        let mut random = [0u8; 16];
+        getrandom::fill(&mut random).map_err(|_| RuntimeError::Crypto)?;
+        let id = format!(
+            "scale-{}",
+            random
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>()
+        );
+        let body = self.seal_fields(
+            json!({"id":id, "type":"scale", "title":prepared.submission().title,
+            "content":prepared.submission().content, "metadata":prepared.submission().metadata,
+            "date":date, "setting":setting}),
+            &["title", "content", "metadata"],
+        )?;
+        Ok(ScaleEntryAttempt {
+            prepared: prepared.clone(),
+            body,
+            id,
+            date,
+            setting: setting.map(str::to_owned),
+        })
+    }
+
+    /// The ordinary diary create/read path, with a fixed already sealed body.
+    /// This has no clinical writer or inference endpoint of its own.
+    pub fn create_scale_entry(&self, attempt: &ScaleEntryAttempt) -> Result<ScaleEntryReadback> {
+        let context = attempt.prepared.context();
+        let mut intent = attempt.prepared.intent.clone();
+        let patient =
+            self.read_patient_profile(&context.ambulatory_id, &context.patient_id, &intent)?;
+        if patient.is_archived || patient.deleted_at.is_some() {
+            return Err(RuntimeError::Forbidden);
+        }
+        if self.scale_profile_context(&context.ambulatory_id, &context.patient_id, &intent)?
+            != *context
+        {
+            return Err(RuntimeError::Conflict);
+        }
+        // Reuse the consumed profile binding, including the final pre-send
+        // deadline/selection check after the scoped identity negotiation.
+        self.require_read(
+            &context.ambulatory_id,
+            &context.patient_id,
+            "patients",
+            &context.patient_id,
+            context.patient_version,
+            &[],
+        )?;
+        intent.write_binding = self
+            .inner
+            .reads
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?
+            .get(&read_key(
+                &context.ambulatory_id,
+                &context.patient_id,
+                "patients",
+                &context.patient_id,
+            ))
+            .and_then(|receipt| receipt.profile.clone());
+        if intent.write_binding.is_none() {
+            return Err(RuntimeError::ReadRequired);
+        }
+        {
+            let _guard = self.begin_write()?;
+            let created = self.create_with_profile_intent(
+                &context.ambulatory_id,
+                &[
+                    "api",
+                    "v1",
+                    "network",
+                    "patients",
+                    &context.patient_id,
+                    "entries",
+                ],
+                attempt.body.clone(),
+                JSON_LIMIT,
+                Some(&intent),
+            )?;
+            if created.id != attempt.id || created.version != Some(1) {
+                return Err(RuntimeError::Indeterminate);
+            }
+        }
+        self.read_scale_entry(attempt)
+    }
+
+    /// Reconciliation never sends a mutation. A missing/different row is not a
+    /// verified save and cannot cause a new identity or an automatic retry.
+    pub fn read_scale_entry(&self, attempt: &ScaleEntryAttempt) -> Result<ScaleEntryReadback> {
+        let context = attempt.prepared.context();
+        let intent = &attempt.prepared.intent;
+        drop(self.profile_intent_guard(intent)?);
+        self.profile_target_matches(intent, &context.ambulatory_id, &context.patient_id)?;
+        let patient =
+            self.read_patient_profile(&context.ambulatory_id, &context.patient_id, intent)?;
+        if patient.is_archived || patient.deleted_at.is_some() {
+            return Err(RuntimeError::Forbidden);
+        }
+        if self.scale_profile_context(&context.ambulatory_id, &context.patient_id, intent)?
+            != *context
+        {
+            return Err(RuntimeError::Conflict);
+        }
+        let row = self.read_clinical_with_profile_intent(
+            &context.ambulatory_id,
+            &context.patient_id,
+            "entries",
+            &attempt.id,
+            ENTRY_FIELDS,
+            |row: &mut Entry, locked| {
+                row.locked_fields = locked;
+                (
+                    &row.id,
+                    &row.patient_id,
+                    row.version,
+                    row.deleted_at.is_some(),
+                )
+            },
+            Some(intent),
+        );
+        match row {
+            Ok(row) if attempt.matches(&row) => Ok(ScaleEntryReadback::Verified(row)),
+            Ok(row) => Ok(ScaleEntryReadback::Different(row)),
+            Err(RuntimeError::Missing) => Ok(ScaleEntryReadback::NotFound),
+            Err(error) => Err(error),
+        }
+    }
     pub fn update_entry(
         &self,
         scope: &str,
@@ -1889,14 +2151,37 @@ impl RuntimeSession {
     where
         F: Fn(&mut T, Vec<String>) -> (&str, &str, u64, bool),
     {
+        self.read_clinical_with_profile_intent(scope, patient, domain, id, fields, bind, None)
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn read_clinical_with_profile_intent<T: DeserializeOwned, F>(
+        &self,
+        scope: &str,
+        patient: &str,
+        domain: &str,
+        id: &str,
+        fields: &[Field],
+        bind: F,
+        intent: Option<&ProfileQueryIntent>,
+    ) -> Result<T>
+    where
+        F: Fn(&mut T, Vec<String>) -> (&str, &str, u64, bool),
+    {
         validate_id(patient)?;
         validate_id(id)?;
-        let response = self.read_json(
-            Some(scope),
+        let epoch = self.inner.read_epoch.load(Ordering::Acquire);
+        self.check_read_epoch(epoch)?;
+        let mut value = self.request_with_profile_intent(
+            Method::GET,
             &["api", "v1", "network", "patients", patient, domain, id],
+            &[],
+            Some(scope),
+            None,
+            false,
             JSON_LIMIT,
+            intent,
         )?;
-        let mut value = response.value;
+        self.check_read_epoch(epoch)?;
         let locked = self.decrypt_fields(&mut value, fields)?;
         let mut row: T = decode(value)?;
         let (returned_id, parent, version, deleted) = bind(&mut row, locked.clone());
@@ -1907,7 +2192,10 @@ impl RuntimeSession {
         if deleted {
             return Err(RuntimeError::Missing);
         }
-        self.remember(response.epoch, scope, patient, domain, id, version, locked)?;
+        self.remember(epoch, scope, patient, domain, id, version, locked)?;
+        if let Some(intent) = intent {
+            self.check_profile_intent(intent, epoch)?;
+        }
         self.ensure_open()?;
         Ok(row)
     }
@@ -1964,7 +2252,17 @@ impl RuntimeSession {
         body: Value,
         limit: usize,
     ) -> Result<CreatedResource> {
-        let response = self.request(
+        self.create_with_profile_intent(scope, path, body, limit, None)
+    }
+    fn create_with_profile_intent(
+        &self,
+        scope: &str,
+        path: &[&str],
+        body: Value,
+        limit: usize,
+        intent: Option<&ProfileQueryIntent>,
+    ) -> Result<CreatedResource> {
+        let response = self.request_with_profile_intent(
             Method::POST,
             path,
             &[],
@@ -1972,6 +2270,7 @@ impl RuntimeSession {
             Some(&body),
             true,
             limit,
+            intent,
         )?;
         let created: CreatedResource =
             serde_json::from_value(response).map_err(|_| RuntimeError::Indeterminate)?;
@@ -3677,6 +3976,451 @@ mod tests {
     const PROFILE_POST: &str = "POST /api/v1/network/patients/patient-a/profile-query ";
     fn epoch_wire() -> String {
         json!({"contractVersion":1,"selectionEpoch":2}).to_string()
+    }
+
+    const SCALE_CATALOG_GET: &str = "GET /api/v1/network/scales ";
+    const SCALE_PREPARE_POST: &str = "POST /api/v1/network/patients/patient-a/scales/prepare ";
+    const SCALE_ENTRY_POST: &str = "POST /api/v1/network/patients/patient-a/entries ";
+    const SCALE_ENTRY_GET: &str = "GET /api/v1/network/patients/patient-a/entries/scale-";
+
+    fn scale_preparation_wire() -> Value {
+        json!({"contractVersion":1, "preparationVersion":crate::scales::SCALE_PREPARATION_VERSION,
+            "catalogRevision":format!("sha256:{}", "a".repeat(64)), "status":"draft",
+            "context":{"patientId":"patient-a", "ambulatoryId":"scope-a", "patientVersion":7, "selectionEpoch":3},
+            "submission":{"title":"Strumento sintetico adl", "content":"Contenuto canonico sintetico restituito dall'host.",
+                "metadata":{"title":"Strumento sintetico adl", "scaleId":"adl", "score":97,
+                    "interpretation":"Interpretazione sintetica restituita dall'host, senza calcolo Rust.",
+                    "interpretationVersion":"synthetic-interpretation-v1", "answers":{"synthetic-choice":1}}}})
+    }
+
+    fn scale_preparation_steps(reply: Value) -> Vec<(&'static str, u16, Value)> {
+        vec![
+            (SCALE_CATALOG_GET, 200, crate::scales::synthetic_catalog()),
+            (EPOCH_GET, 200, serde_json::from_str(&epoch_wire()).unwrap()),
+            (PROFILE_POST, 200, profile_wire(&session())),
+            (SCALE_PREPARE_POST, 200, reply),
+        ]
+    }
+
+    // Real bounded HTTP, profile-query and encryption. "$created" and "$entry"
+    // echo the actual caller's random ID/ciphertext; "$drop" loses the reply.
+    fn scale_script(steps: Vec<(&'static str, u16, Value)>, pause_last: bool) -> ProfileScript {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        session
+            .select_profile_patient("scope-a", "patient-a")
+            .unwrap();
+        session
+            .inner
+            .scopes
+            .lock()
+            .unwrap()
+            .insert("scope-a".into());
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let captured = requests.clone();
+        let (seen_tx, seen_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let worker = thread::spawn(move || {
+            let mut index = 0;
+            let mut entry_body = Value::Null;
+            while index < steps.len() {
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.contains("\r\nx-mediflow-expected-ambulatory-id: scope-a\r\n"));
+                assert!(
+                    request.contains("\r\nx-mediflow-archive-generation: synthetic-generation\r\n")
+                );
+                captured.lock().unwrap().push(request.clone());
+                if request.starts_with("GET /api/v1/network/identity ")
+                    && steps[index].0 != "GET /api/v1/network/identity "
+                {
+                    send_reply(
+                        &mut stream,
+                        r#"{"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}}"#,
+                    );
+                    continue;
+                }
+                let (prefix, status, value) = &steps[index];
+                assert!(
+                    request.starts_with(prefix),
+                    "unexpected scale fixture route"
+                );
+                if request.starts_with(SCALE_ENTRY_POST) {
+                    entry_body = scale_request_body(&request);
+                }
+                let _ = seen_tx.send(index);
+                if pause_last && index + 1 == steps.len() {
+                    release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                }
+                let body = match value.as_str() {
+                    Some("$drop") => {
+                        index += 1;
+                        continue;
+                    }
+                    Some("$created") => json!({"id":entry_body["id"], "version":1}),
+                    Some("$entry") | Some("$different-metadata") => {
+                        let mut row = entry_body.clone();
+                        row["patientId"] = json!("patient-a");
+                        row["version"] = json!(1);
+                        if value == "$different-metadata" {
+                            row["metadata"] = json!("{\"score\":98}");
+                        }
+                        row
+                    }
+                    _ => value.clone(),
+                }
+                .to_string();
+                write!(stream, "HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+                index += 1;
+            }
+        });
+        (session, requests, seen_rx, release_tx, worker)
+    }
+    fn scale_request_body(request: &str) -> Value {
+        serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap()
+    }
+    fn prepare_synthetic_scale(session: &RuntimeSession) -> PreparedScale {
+        let catalog = session.read_scale_catalog("scope-a").unwrap();
+        let request = ScalePreparationRequest::new(
+            &catalog,
+            ScaleId::Adl,
+            serde_json::from_value(json!({"synthetic-choice":1})).unwrap(),
+            7,
+        )
+        .unwrap();
+        session
+            .prepare_scale(
+                "scope-a",
+                "patient-a",
+                &session.profile_query_intent(),
+                &request,
+            )
+            .unwrap()
+    }
+
+    #[test]
+    fn scale_prepare_review_and_diary_readback_use_host_epoch_and_canonical_encrypted_submission() {
+        let mut steps = scale_preparation_steps(scale_preparation_wire());
+        steps.extend([
+            (PROFILE_POST, 200, profile_wire(&session())),
+            (SCALE_ENTRY_POST, 201, json!("$created")),
+            (PROFILE_POST, 200, profile_wire(&session())),
+            (SCALE_ENTRY_GET, 200, json!("$entry")),
+        ]);
+        let (session, requests, _, _, server) = scale_script(steps, false);
+        let prepared = prepare_synthetic_scale(&session);
+        assert_eq!(prepared.context().selection_epoch, 3);
+        assert_eq!(prepared.submission().metadata.score.as_u64(), Some(97)); // choice 1 is never scored by Rust.
+        assert!(
+            !requests
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|request| request.starts_with(SCALE_ENTRY_POST))
+        );
+        let attempt = session
+            .seal_scale_entry(&prepared, "2026-10-19T09:00:00+02:00", Some("ambulatory"))
+            .unwrap();
+        assert_eq!(attempt.date(), "2026-10-19T07:00:00.000Z");
+        assert!(
+            !requests
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|request| request.starts_with(SCALE_ENTRY_POST))
+        );
+        let ScaleEntryReadback::Verified(row) = session.create_scale_entry(&attempt).unwrap()
+        else {
+            panic!("full readback required")
+        };
+        assert_eq!(row.content, prepared.submission().content);
+        assert_eq!(
+            serde_json::from_str::<Value>(row.metadata.as_deref().unwrap()).unwrap(),
+            serde_json::to_value(&prepared.submission().metadata).unwrap()
+        );
+        server.join().unwrap();
+        let requests = requests.lock().unwrap();
+        let prepare = scale_request_body(
+            requests
+                .iter()
+                .find(|request| request.starts_with(SCALE_PREPARE_POST))
+                .unwrap(),
+        );
+        assert_eq!(
+            prepare,
+            json!({"contractVersion":1, "scaleId":"adl", "answers":{"synthetic-choice":1},
+            "expectedCatalogRevision":format!("sha256:{}", "a".repeat(64)), "expectedPatientVersion":7, "expectedSelectionEpoch":3})
+        );
+        let write = requests
+            .iter()
+            .find(|request| request.starts_with(SCALE_ENTRY_POST))
+            .unwrap();
+        let body = scale_request_body(write);
+        assert_eq!(body.as_object().unwrap().len(), 7);
+        assert_eq!(body["id"], attempt.id());
+        assert_eq!(body["type"], "scale");
+        for field in ["title", "content", "metadata"] {
+            assert!(body[field].as_str().unwrap().starts_with("ENC:"));
+        }
+        assert!(!write.contains("Strumento sintetico"));
+        assert!(!write.contains("Interpretazione sintetica"));
+        assert!(
+            !requests
+                .iter()
+                .any(|request| request.starts_with("GET /api/v1/network/patients/patient-a "))
+        );
+    }
+
+    #[test]
+    fn scale_unknown_write_retries_only_the_retained_id_date_setting_and_cipherbytes() {
+        let mut steps = scale_preparation_steps(scale_preparation_wire());
+        steps.extend([
+            (PROFILE_POST, 200, profile_wire(&session())),
+            (SCALE_ENTRY_POST, 201, json!("$drop")),
+            (PROFILE_POST, 200, profile_wire(&session())),
+            (SCALE_ENTRY_POST, 200, json!("$created")),
+            (PROFILE_POST, 200, profile_wire(&session())),
+            (SCALE_ENTRY_GET, 200, json!("$entry")),
+        ]);
+        let (session, requests, _, _, server) = scale_script(steps, false);
+        let prepared = prepare_synthetic_scale(&session);
+        let attempt = session
+            .seal_scale_entry(&prepared, "2026-10-19T07:00:00Z", Some("ambulatory"))
+            .unwrap();
+        assert!(matches!(
+            session.create_scale_entry(&attempt),
+            Err(RuntimeError::Indeterminate)
+        ));
+        assert_eq!(
+            requests
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|request| request.starts_with(SCALE_ENTRY_POST))
+                .count(),
+            1
+        );
+        // An explicit later invocation is the retry. There is no automatic send.
+        assert!(matches!(
+            session.create_scale_entry(&attempt),
+            Ok(ScaleEntryReadback::Verified(_))
+        ));
+        server.join().unwrap();
+        let requests = requests.lock().unwrap();
+        let writes: Vec<_> = requests
+            .iter()
+            .filter(|request| request.starts_with(SCALE_ENTRY_POST))
+            .map(|request| request.split_once("\r\n\r\n").unwrap().1)
+            .collect();
+        assert_eq!(writes.len(), 2);
+        assert_eq!(writes[0], writes[1]);
+    }
+
+    #[test]
+    fn scale_readback_never_substitutes_ack_for_metadata_identity_or_version_verification() {
+        let mut steps = scale_preparation_steps(scale_preparation_wire());
+        steps.extend([
+            (PROFILE_POST, 200, profile_wire(&session())),
+            (SCALE_ENTRY_POST, 201, json!("$created")),
+            (PROFILE_POST, 200, profile_wire(&session())),
+            (SCALE_ENTRY_GET, 200, json!("$different-metadata")),
+            (PROFILE_POST, 200, profile_wire(&session())),
+            (SCALE_ENTRY_GET, 404, json!({})),
+            (PROFILE_POST, 200, profile_wire(&session())),
+            (SCALE_ENTRY_GET, 503, json!({})),
+            (PROFILE_POST, 200, profile_wire(&session())),
+            (SCALE_ENTRY_GET, 200, json!("$entry")),
+        ]);
+        let (session, _, _, _, server) = scale_script(steps, false);
+        let prepared = prepare_synthetic_scale(&session);
+        let attempt = session
+            .seal_scale_entry(&prepared, "2026-10-19T07:00:00Z", Some("ambulatory"))
+            .unwrap();
+        assert!(matches!(
+            session.create_scale_entry(&attempt),
+            Ok(ScaleEntryReadback::Different(_))
+        ));
+        assert!(matches!(
+            session.read_scale_entry(&attempt),
+            Ok(ScaleEntryReadback::NotFound)
+        ));
+        assert!(matches!(
+            session.read_scale_entry(&attempt),
+            Err(RuntimeError::Transport)
+        ));
+        let ScaleEntryReadback::Verified(row) = session.read_scale_entry(&attempt).unwrap() else {
+            panic!("canonical reread")
+        };
+        for field in [
+            "id",
+            "patientId",
+            "type",
+            "title",
+            "content",
+            "metadata",
+            "date",
+            "setting",
+            "version",
+            "attachments",
+            "deletedAt",
+        ] {
+            let mut changed = row.clone();
+            match field {
+                "id" => changed.id.push('x'),
+                "patientId" => changed.patient_id.push('x'),
+                "type" => changed.entry_type = "note".into(),
+                "title" => changed.title.push('x'),
+                "content" => changed.content.push('x'),
+                "metadata" => changed.metadata = Some("{}".into()),
+                "date" => changed.date = "2026-10-20T07:00:00.000Z".into(),
+                "setting" => changed.setting = None,
+                "version" => changed.version = 2,
+                "attachments" => changed.attachments = Some("[]".into()),
+                "deletedAt" => changed.deleted_at = Some("2026-10-19T07:01:00Z".into()),
+                _ => unreachable!(),
+            }
+            assert!(!attempt.matches(&changed), "unverified {field}");
+        }
+        let mut locked = row;
+        locked.locked_fields.push("metadata".into());
+        assert!(!attempt.matches(&locked));
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn scale_preparation_rejects_a_different_host_context_without_a_diary_write() {
+        for (pointer, value) in [
+            ("/context/patientId", json!("patient-b")),
+            ("/context/ambulatoryId", json!("scope-b")),
+            ("/context/patientVersion", json!(8)),
+            ("/context/selectionEpoch", json!(4)),
+            ("/submission/metadata/answers/synthetic-choice", json!(0)),
+            (
+                "/catalogRevision",
+                json!(format!("sha256:{}", "b".repeat(64))),
+            ),
+        ] {
+            let mut wire = scale_preparation_wire();
+            *wire.pointer_mut(pointer).unwrap() = value;
+            let (session, requests, _, _, server) =
+                scale_script(scale_preparation_steps(wire), false);
+            let catalog = session.read_scale_catalog("scope-a").unwrap();
+            let request = ScalePreparationRequest::new(
+                &catalog,
+                ScaleId::Adl,
+                serde_json::from_value(json!({"synthetic-choice":1})).unwrap(),
+                7,
+            )
+            .unwrap();
+            assert!(matches!(
+                session.prepare_scale(
+                    "scope-a",
+                    "patient-a",
+                    &session.profile_query_intent(),
+                    &request
+                ),
+                Err(RuntimeError::InvalidResponse)
+            ));
+            server.join().unwrap();
+            assert!(
+                !requests
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|request| request.starts_with(SCALE_ENTRY_POST))
+            );
+        }
+    }
+
+    #[test]
+    fn scale_selection_retirement_blocks_confirm_and_late_preparation() {
+        let (session, requests, _, _, server) =
+            scale_script(scale_preparation_steps(scale_preparation_wire()), false);
+        let prepared = prepare_synthetic_scale(&session);
+        let attempt = session
+            .seal_scale_entry(&prepared, "2026-10-19T07:00:00Z", None)
+            .unwrap();
+        server.join().unwrap();
+        session
+            .select_profile_patient("scope-a", "patient-b")
+            .unwrap();
+        assert!(matches!(
+            session.create_scale_entry(&attempt),
+            Err(RuntimeError::ReadRequired)
+        ));
+        assert!(matches!(
+            session.read_scale_entry(&attempt),
+            Err(RuntimeError::ReadRequired)
+        ));
+        assert!(
+            !requests
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|request| request.starts_with(SCALE_ENTRY_POST))
+        );
+
+        let (session, _, seen, release, server) =
+            scale_script(scale_preparation_steps(scale_preparation_wire()), true);
+        let catalog = session.read_scale_catalog("scope-a").unwrap();
+        let request = ScalePreparationRequest::new(
+            &catalog,
+            ScaleId::Adl,
+            serde_json::from_value(json!({"synthetic-choice":1})).unwrap(),
+            7,
+        )
+        .unwrap();
+        let intent = session.profile_query_intent();
+        let pending = intent.clone();
+        let worker_session = session.clone();
+        let worker = thread::spawn(move || {
+            worker_session.prepare_scale("scope-a", "patient-a", &pending, &request)
+        });
+        while seen.recv_timeout(Duration::from_secs(5)).unwrap() != 3 {}
+        intent.cancel();
+        release.send(()).unwrap();
+        assert!(matches!(
+            worker.join().unwrap(),
+            Err(RuntimeError::ReadRequired)
+        ));
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn scale_host_401_with_profile_intent_stays_authentication_and_local_cancel_stays_unknown() {
+        for (status, cancel) in [(401, false), (201, true)] {
+            let mut steps = scale_preparation_steps(scale_preparation_wire());
+            steps.extend([
+                (PROFILE_POST, 200, profile_wire(&session())),
+                (SCALE_ENTRY_POST, status, json!("$created")),
+            ]);
+            let (session, _, seen, release, server) = scale_script(steps, true);
+            let prepared = prepare_synthetic_scale(&session);
+            let attempt = session
+                .seal_scale_entry(&prepared, "2026-10-19T07:00:00Z", None)
+                .unwrap();
+            let worker_session = session.clone();
+            let worker = thread::spawn(move || worker_session.create_scale_entry(&attempt));
+            while seen.recv_timeout(Duration::from_secs(5)).unwrap() != 5 {}
+            if cancel {
+                prepared.intent.cancel();
+            }
+            release.send(()).unwrap();
+            if cancel {
+                assert!(matches!(
+                    worker.join().unwrap(),
+                    Err(RuntimeError::Indeterminate)
+                ));
+                assert!(!session.is_locked());
+            } else {
+                assert!(matches!(
+                    worker.join().unwrap(),
+                    Err(RuntimeError::Authentication)
+                ));
+                assert!(session.is_locked());
+            }
+            server.join().unwrap();
+        }
     }
 
     #[test]
