@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Save, User } from 'lucide-react';
 import { useSecurity } from '@/components/security-provider';
 import { AccountProfileEditor, type ProfileEditorState } from '@/lib/security/account-profile-editor';
-import { captureClientAccountAuthority, observeArchiveGeneration } from '@/lib/security/client-auth-api';
+import { captureClientAccountAuthority, observeArchiveGeneration, subscribeClientAccountAuthority } from '@/lib/security/client-auth-api';
 import { WorkProfileSettings } from '@/components/work-profile-onboarding';
 import {
     SETTINGS_CARD_CLASS,
@@ -34,8 +34,9 @@ export default function SettingsProfilePage() {
         });
         editor.current = owner;
         setState(owner.state);
+        const unsubscribe = subscribeClientAccountAuthority(() => owner.replaceAuthority(captureClientAccountAuthority()));
         void owner.read();
-        return () => { owner.dispose(); editor.current = null; };
+        return () => { unsubscribe(); owner.dispose(); editor.current = null; };
     }, [userId]);
     const profile = state.draft;
 

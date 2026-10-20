@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { AccountProfileEditor, type AccountProfile } from './account-profile-editor';
+import { captureClientAccountAuthority, checkAuthHealthRequest, subscribeClientAccountAuthority } from './client-auth-api';
 
 const initial: AccountProfile = { userId: 'synthetic-user', username: ['synthetic', 'profile'].join('-'), displayName: 'Nome corrente',
     ambulatoryName: 'Studio corrente', profileVersion: 'opaque-initial', archiveGeneration: 'synthetic-generation' };
@@ -114,3 +115,55 @@ test('the session cache can recheck a queued application after session replaceme
     authority = false;
     assert.equal(mayApply?.(), false);
 });
+
+for (const pendingOperation of [null, 'read', 'save'] as const) {
+    test(`same-account auth replacement preserves draft, unblocks read and rejects late ${pendingOperation}`, async () => {
+        const originalFetch = globalThis.fetch;
+        const generation = 'a1234567-1234-4234-8234-123456789abc';
+        let etag = '"synthetic-session-first"';
+        globalThis.fetch = (async () => Response.json({ status: 'ok', hasSession: true, archiveGeneration: generation },
+            { headers: { ETag: etag } })) as typeof fetch;
+        let unsubscribe = () => {};
+        try {
+            await checkAuthHealthRequest();
+            let next: () => Promise<Response> = async () => read({ ...initial, archiveGeneration: generation });
+            const applied: AccountProfile[] = [];
+            const editor = new AccountProfileEditor(initial.userId, captureClientAccountAuthority(), () => {},
+                profile => applied.push(profile), (async () => next()) as typeof fetch);
+            const notifications: unknown[][] = [];
+            unsubscribe = subscribeClientAccountAuthority((...args) => {
+                notifications.push(args);
+                editor.replaceAuthority(captureClientAccountAuthority());
+            });
+            await editor.read();
+            const draft = { doctorName: 'Bozza stessa persona', clinicName: 'Studio bozza' };
+            editor.edit(draft);
+            let release!: (response: Response) => void;
+            next = () => new Promise(resolve => { release = resolve; });
+            const pending = pendingOperation ? editor[pendingOperation]() : undefined;
+            etag = '"synthetic-session-replacement"';
+            await checkAuthHealthRequest();
+            assert.deepEqual(notifications, [[]], 'notification exposes no credential or ETag');
+            assert.equal(editor.state.busy, false);
+            assert.equal(editor.state.requiresRead, true);
+            assert.match(editor.state.message, /sessione.*Rileggi/);
+            assert.deepEqual(editor.state.draft, draft);
+            if (pendingOperation) {
+                release(Response.json({ ...initial, archiveGeneration: generation, displayName: 'Tardivo',
+                    operation: 'account-profile.read.v1', contractVersion: 1, changed: true }));
+                await pending;
+            }
+            assert.equal(applied.length, 1);
+            let reads = 0;
+            next = async () => { reads++; return read({ ...initial, archiveGeneration: generation, profileVersion: 'fresh' }); };
+            await editor.save();
+            assert.equal(reads, 0);
+            await editor.read();
+            assert.equal(reads, 1);
+            assert.equal(editor.state.requiresRead, false);
+            assert.deepEqual(editor.state.draft, draft);
+            await checkAuthHealthRequest();
+            assert.equal(notifications.length, 1, 'unchanged authority does not invalidate the editor');
+        } finally { unsubscribe(); globalThis.fetch = originalFetch; }
+    });
+}

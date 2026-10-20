@@ -25,6 +25,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published private(set) var operatorIdentity: OperatorIdentity? {
         didSet { if oldValue?.userId != operatorIdentity?.userId { discardCachedPatientPresentation() } }
     }
+    private(set) lazy var settingsProfileModel = SettingsProfileModel(
+        connectionProvider: { [weak self] in self?.nativeOperatorConnection },
+        profileUpdated: { [weak self] profile, authority in self?.noteProfileUpdated(profile, connection: authority) },
+        sessionExpired: { [weak self] in await self?.lockSessionNow() }
+    )
+
     @Published var serverURL = HomeBasePairedSettings.defaultServerURL {
         didSet { invalidateLoginIfChanged(oldValue, serverURL) }
     }
@@ -920,8 +926,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         reconciliationLine = "Sessione bloccata. Accedi di nuovo per leggere o scrivere."
     }
 
-    func noteProfileUpdated(_ profile: HomeBaseAccountProfile, connection: ClinicalWorkspaceConnection.Identity) {
-        guard clinicalWorkspaceConnection?.identity == connection,
+    func noteProfileUpdated(_ profile: HomeBaseAccountProfile, connection: ClinicalWorkspaceConnection.AccountIdentity) {
+        guard nativeOperatorConnection?.accountIdentity == connection,
               let identity = operatorIdentity, identity.userId == profile.userId else { return }
         operatorIdentity = OperatorIdentity(
             userId: identity.userId,

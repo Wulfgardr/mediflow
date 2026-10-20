@@ -132,6 +132,47 @@ final class PairedPatientsWorkspaceModelS6Tests: XCTestCase {
     }
 
     @MainActor
+    func testProfileRecoveryBelongsToWorkspaceAcrossSettingsRemounts() async {
+        let source = S6MockDataSource(details: [:], profileError: .transport(.timeout))
+        let workspace = makeModel(source: source)
+        workspace.serverURL = "https://localhost:3443"
+        await workspace.configurePairedOnlineForTests(operatorId: "operator-1")
+        let firstMount = workspace.settingsProfileModel
+        await firstMount.load(identity: workspace.operatorIdentity)
+        firstMount.displayName = "Bozza conservata"
+        await firstMount.save(identity: workspace.operatorIdentity)
+        let remount = workspace.settingsProfileModel
+        XCTAssertTrue(firstMount === remount)
+        await remount.load(identity: workspace.operatorIdentity)
+        await remount.save(identity: workspace.operatorIdentity)
+        let reads = await source.profileReadCount
+        let writes = await source.profileWriteCount
+        XCTAssertEqual(reads, 1)
+        XCTAssertEqual(writes, 1)
+        XCTAssertTrue(remount.requiresRead)
+        XCTAssertEqual(remount.displayName, "Bozza conservata")
+        await remount.read(identity: workspace.operatorIdentity)
+        XCTAssertFalse(remount.requiresRead)
+    }
+
+    @MainActor
+    func testProfileIdentityOwnerAcceptsScopeChangeButRejectsRetiredAuthority() async {
+        let source = S6MockDataSource(details: [:])
+        let workspace = makeModel(source: source)
+        workspace.serverURL = "https://localhost:3443"
+        await workspace.configurePairedOnlineForTests(operatorId: "operator-1")
+        let authority = workspace.nativeOperatorConnection!.accountIdentity
+        let profile = HomeBaseAccountProfile(userId: "operator-1", username: ["synthetic", "profile"].joined(separator: "-"),
+            displayName: "Nome host", ambulatoryName: "Studio host", profileVersion: "opaque", archiveGeneration: "synthetic-generation")
+        workspace.ambulatoryId = "other-scope"
+        workspace.noteProfileUpdated(profile, connection: authority)
+        XCTAssertEqual(workspace.operatorIdentity?.displayName, "Nome host")
+        workspace.serverURL = "https://127.0.0.1:3444"
+        workspace.noteProfileUpdated(profile, connection: authority)
+        XCTAssertNil(workspace.operatorIdentity)
+    }
+
+    @MainActor
     private func makeModel(source: S6MockDataSource) -> PairedPatientsWorkspaceModel {
         let suiteName = "PairedPatientsWorkspaceModelS6Tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -255,7 +296,10 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
         profileWriteError = error
         holdProfileResponse = hold
     }
-    func configureProfileRead(hold: Bool) { holdProfileRead = hold }
+    func configureProfileRead(error: HomeBaseClientError? = nil, hold: Bool = false) {
+        profileReadError = error
+        holdProfileRead = hold
+    }
     func releaseProfileRead() { profileReadDelay?.resume(); profileReadDelay = nil }
     func releaseProfile() { profileDelay?.resume(); profileDelay = nil }
     func fetchAccountProfile(credentials: HomeBasePairedCredentials, sessionCookie: String) async throws -> HomeBaseAccountProfile {

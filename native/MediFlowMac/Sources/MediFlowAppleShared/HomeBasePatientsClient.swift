@@ -1543,7 +1543,7 @@ public actor HomeBasePatientsClient {
                 if url.path.hasPrefix("/api/v1/network/ai/chatgpt/ordinary/") {
                     throw HomeBaseClientError.httpStatus(httpResponse.statusCode, nil)
                 }
-                if url.path == "/api/auth/profile", httpResponse.statusCode == 409,
+                if url == (try? configuration.serverURL().appendingPathComponent("api/auth/profile")), httpResponse.statusCode == 409,
                    let payload = try? JSONDecoder().decode(APIErrorPayload.self, from: data) {
                     if payload.code == "ARCHIVE_REPLACED" { throw HomeBaseClientError.archiveReplaced }
                     if payload.code == "PROFILE_VERSION_CONFLICT" {

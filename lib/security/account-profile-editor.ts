@@ -21,12 +21,19 @@ export class AccountProfileEditor {
     private active = true;
     constructor(
         private readonly userId: string,
-        private readonly authorityCurrent: () => boolean,
+        private authorityCurrent: () => boolean,
         private readonly changed: (state: ProfileEditorState) => void,
         private readonly apply: (profile: AccountProfile, isCurrent: () => boolean) => void,
         private readonly transport: typeof fetch = fetch,
     ) {}
 
+    replaceAuthority(authorityCurrent: () => boolean) {
+        if (!this.active) return;
+        this.request++;
+        this.authorityCurrent = authorityCurrent;
+        this.publish({ busy: false, requiresRead: true,
+            message: 'La sessione è cambiata. La bozza è conservata. Rileggi il profilo prima di salvare.' });
+    }
     dispose() { this.active = false; this.request++; }
     edit(draft: ProfileDraft) { this.publish({ draft }); }
     private publish(patch: Partial<ProfileEditorState>) {
