@@ -1,6 +1,7 @@
 //! Connected clinical workspace. GPUI owns presentation; the runtime owns records,
 //! encryption policy, authorization and writes. No clinical data is persisted here.
 
+mod account_profile;
 mod ai_preferences;
 mod ai_status;
 mod analytics;
@@ -43,6 +44,7 @@ use crate::references::{ReferenceKind, ReferenceRows};
 use crate::text_input::{InputChanged, TextInput};
 use crate::theme::Theme;
 
+use account_profile::AccountProfile;
 use ai_preferences::AiPreferences;
 use ai_status::AiRuntimeObservation;
 use analytics::AnalyticsArea;
@@ -381,6 +383,7 @@ pub struct ClinicalApp {
     ai_status: Load<AiRuntimeObservation>,
     ai_refresh_target: ScrollTarget,
     ai_preferences: AiPreferences,
+    account_profile: AccountProfile,
     who: WhoLookup,
     scales: ScaleArea,
     analytics: AnalyticsArea,
@@ -414,7 +417,7 @@ pub struct ClinicalApp {
     focus_after_render: bool,
     focus_search_after_render: bool,
     profile_scroll: gpui::ScrollHandle,
-    read_state_focus: [FocusHandle; 5],
+    read_state_focus: [FocusHandle; 6],
     read_state_commands: Vec<(ReadObject, ViewState)>,
     read_timer: Option<gpui::Task<()>>,
     epoch: u64,
@@ -591,6 +594,7 @@ impl ClinicalApp {
             reference_run_target: ScrollTarget::new(&area_scroll, cx),
             ai_refresh_target: ScrollTarget::new(&area_scroll, cx),
             ai_preferences: AiPreferences::new(&area_scroll, cx),
+            account_profile: AccountProfile::new(&area_scroll, Theme::for_dark(false), cx),
             who: WhoLookup::new(&area_scroll, cx),
             scales: ScaleArea::new(&area_scroll, theme, cx),
             analytics: AnalyticsArea::new(theme, cx),
@@ -900,6 +904,7 @@ impl ClinicalApp {
 
     fn disconnect(&mut self, cx: &mut Context<Self>) {
         self.scales.reset(cx);
+        self.account_profile.reset(cx);
         self.focus_after_render = true;
         self.focus_search_after_render = false;
         self.patient_targets.clear();
@@ -1189,6 +1194,7 @@ impl ClinicalApp {
                 self.load_patients(cx);
             } else if area == Area::Settings {
                 self.load_ai_status(cx);
+                self.ensure_account_profile_loaded(cx);
             } else if area == Area::Scales {
                 self.load_scales(cx);
             } else if area == Area::Analytics {
@@ -4364,6 +4370,7 @@ impl ClinicalApp {
             .unwrap_or_default();
         div().w_full().min_w_0().max_w(px(760.)).flex().flex_col().gap(px(28.))
             .child(heading("clinical-workspace-settings-heading", "Impostazioni", theme))
+            .child(self.account_profile_view(cx))
             .child(div().flex().flex_col().gap(px(12.))
                 .child(section("clinical-workspace-appearance-heading", "ASPETTO", theme))
                 .child(div().flex().flex_wrap().gap(px(8.))
@@ -4901,6 +4908,8 @@ impl Render for ClinicalApp {
         if self.ai_preferences.active {
             self.ai_preferences.prepare_render(window, cx);
         }
+        self.account_profile
+            .configure(theme, self.account_profile.read_only(), cx);
         self.prepare_read_state_focus(window, cx);
         self.scales.prepare_render(theme, window, cx);
         self.analytics.prepare_render(theme, cx);

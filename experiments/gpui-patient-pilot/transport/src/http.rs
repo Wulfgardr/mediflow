@@ -53,6 +53,7 @@ pub struct RuntimeClient {
 }
 
 pub(crate) struct RawResponse {
+    pub status: u16,
     pub headers: HeaderMap,
     pub body: Zeroizing<Vec<u8>>,
 }
@@ -325,39 +326,33 @@ impl RuntimeClient {
         }
         let response = request.send().map_err(|_| uncertain(mutation))?;
         let status = response.status().as_u16();
+        let account_profile = path == crate::account_profile::ACCOUNT_PROFILE_PATH;
         if !(200..300).contains(&status) && !(who_readiness && status == 503) {
-            if analytics_read && status == 409 && analytics_cancelled(response) {
-                return Err(RuntimeError::AnalyticsCancelled);
+            if analytics_read && status == 409 {
+                if analytics_cancelled(response) {
+                    return Err(RuntimeError::AnalyticsCancelled);
+                }
+                return Err(RuntimeError::Conflict);
+            }
+            if account_profile && status == 409 {
+                // ADR 0155 is the only route whose 409 body carries the
+                // rejected comparison. Read its bounded body to keep a version
+                // conflict and an archive replacement distinct, but never
+                // treat the conflict body as a confirmed write.
+                let raw = read_response_body(response, limit, mutation)?;
+                return match profile_conflict_code(&raw.body) {
+                    ProfileConflictCode::VersionConflict if mutation => Ok(raw),
+                    ProfileConflictCode::ArchiveReplaced => Err(RuntimeError::ArchiveReplaced),
+                    _ => Err(RuntimeError::Conflict),
+                };
             }
             return Err(classify_status(status, mutation));
         }
-        if response
-            .content_length()
-            .is_some_and(|size| size > limit as u64)
-        {
-            return Err(if mutation {
-                RuntimeError::Indeterminate
-            } else {
-                RuntimeError::TooLarge
-            });
-        }
-        let headers = response.headers().clone();
-        let mut body = Zeroizing::new(Vec::new());
-        response
-            .take(limit as u64 + 1)
-            .read_to_end(&mut body)
-            .map_err(|_| uncertain(mutation))?;
-        if body.len() > limit {
-            return Err(if mutation {
-                RuntimeError::Indeterminate
-            } else {
-                RuntimeError::TooLarge
-            });
-        }
+        let raw = read_response_body(response, limit, mutation)?;
         if who_readiness {
-            crate::who::validate_readiness_http(status, &body)?;
+            crate::who::validate_readiness_http(status, &raw.body)?;
         }
-        Ok(RawResponse { headers, body })
+        Ok(raw)
     }
 
     fn endpoint(&self, path: &[&str], query: &[(&str, &str)]) -> Result<Url> {
@@ -477,6 +472,62 @@ fn uncertain(mutation: bool) -> RuntimeError {
         RuntimeError::Transport
     }
 }
+
+fn read_response_body(
+    response: reqwest::blocking::Response,
+    limit: usize,
+    mutation: bool,
+) -> Result<RawResponse> {
+    let status = response.status().as_u16();
+    if response
+        .content_length()
+        .is_some_and(|size| size > limit as u64)
+    {
+        return Err(if mutation {
+            RuntimeError::Indeterminate
+        } else {
+            RuntimeError::TooLarge
+        });
+    }
+    let headers = response.headers().clone();
+    let mut body = Zeroizing::new(Vec::new());
+    response
+        .take(limit as u64 + 1)
+        .read_to_end(&mut body)
+        .map_err(|_| uncertain(mutation))?;
+    if body.len() > limit {
+        return Err(if mutation {
+            RuntimeError::Indeterminate
+        } else {
+            RuntimeError::TooLarge
+        });
+    }
+    Ok(RawResponse {
+        status,
+        headers,
+        body,
+    })
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ProfileConflictCode {
+    VersionConflict,
+    ArchiveReplaced,
+    Other,
+}
+
+fn profile_conflict_code(body: &[u8]) -> ProfileConflictCode {
+    match serde_json::from_slice::<Value>(body)
+        .ok()
+        .and_then(|value| value["code"].as_str().map(str::to_owned))
+        .as_deref()
+    {
+        Some("PROFILE_VERSION_CONFLICT") => ProfileConflictCode::VersionConflict,
+        Some("ARCHIVE_REPLACED") => ProfileConflictCode::ArchiveReplaced,
+        _ => ProfileConflictCode::Other,
+    }
+}
+
 fn analytics_cancelled(response: reqwest::blocking::Response) -> bool {
     let mut body = Zeroizing::new(Vec::new());
     if response.take(1024).read_to_end(&mut body).is_err() {
