@@ -7,6 +7,9 @@ import test from 'node:test';
 import Database from 'better-sqlite3';
 import { and, eq } from 'drizzle-orm';
 import type { ServerSession } from './security/server-session.ts';
+import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } from './network-patient-authority-test-fixture.ts';
+import { NETWORK_PAIRING_STATE_KEY, serializeNetworkPairingState } from './network-pairing-model.ts';
+import { currentArchiveGeneration } from './security/archive-session-generation.ts';
 
 const ROOT_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 
@@ -22,6 +25,8 @@ type LoadedModules = {
 
 let archiveBound = false;
 let modulesPromise: Promise<LoadedModules> | null = null;
+let cleanupCookies: (() => void) | null = null;
+const cookieState = { cookies: new Map<string, string>() };
 
 function bootstrapDatabaseFile(dataDir: string): void {
     fs.mkdirSync(dataDir, { recursive: true });
@@ -40,6 +45,7 @@ async function loadModules(): Promise<LoadedModules> {
         const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-ambulatory-write-'));
         bootstrapDatabaseFile(dataDir);
         process.env.MEDIFLOW_DATA_DIR = dataDir;
+        cleanupCookies = installNetworkPatientCookieFixture(dataDir, cookieState);
         modulesPromise = Promise.all([
             import('./db-server.ts'), import('./schema.ts'), import('./ambulatory-write.ts'), import('./network-ambulatory-write.ts'),
         ]).then(([dbServerModule, schema, ambulatoryWrite, networkWrite]) => ({
@@ -62,6 +68,8 @@ function request(): Request {
     return new Request('http://localhost/api/v1/network/ambulatories', { headers: { 'x-request-id': 'ambulatory-test-request' } });
 }
 
+test.after(() => { cleanupCookies?.(); });
+
 async function resetDatabase(modules: LoadedModules): Promise<void> {
     modules.dbServer.delete(modules.schema.patientsToAmbulatories).run();
     modules.dbServer.delete(modules.schema.patients).run();
@@ -71,6 +79,24 @@ async function resetDatabase(modules: LoadedModules): Promise<void> {
 
 async function seed(modules: LoadedModules, id: string, isDefault: boolean, version = 1, type: 'live' | 'test' = 'live'): Promise<void> {
     modules.dbServer.insert(modules.schema.ambulatories).values({ id, name: id, isDefault, version, type, createdAt: new Date() }).run();
+}
+
+/* real paired admission and SQLite; only the HTTP cookie adapter is synthetic. */
+function admittedNetworkContext(modules: LoadedModules, scopeAmbulatoryId: string, clientId: string):
+Parameters<LoadedModules['createNetworkAmbulatory']>[0] {
+    cookieState.cookies.clear();
+    const authority = syntheticNetworkPatientAuthority(modules.dbServer, scopeAmbulatoryId, { clientId });
+    authority.pairedClient.grantedCapabilities.push('network.ambulatories.write');
+    const value = JSON.stringify({
+        ...JSON.parse(serializeNetworkPairingState({ clients: [authority.pairedClient], intents: [] })),
+        archiveGeneration: currentArchiveGeneration(),
+    });
+    modules.dbServer.update(modules.schema.settings).set({ value })
+        .where(eq(modules.schema.settings.key, NETWORK_PAIRING_STATE_KEY)).run();
+    cookieState.cookies.set('mediflow_session', authority.session.id);
+    cookieState.cookies.set('ambulatory_id', authority.scopeAmbulatoryId);
+    return { request: authority.request, scopeAmbulatoryId: authority.scopeAmbulatoryId,
+        session: authority.session, pairedClient: authority.pairedClient };
 }
 
 /* direct writer fixtures now pass an admitted synthetic host context. */
@@ -149,10 +175,8 @@ test('test-container clear is admin-only, test-only, version-guarded, and bumps 
 test('network ambulatory writes emit paired-client scope audit flags', async () => {
     const modules = await loadModules();
     await resetDatabase(modules);
-    const context = {
-        request: request(), scopeAmbulatoryId: 'scope-amb', session: adminSession(),
-        pairedClient: { clientId: 'paired-amb-client' },
-    } as Parameters<LoadedModules['createNetworkAmbulatory']>[0];
+    await seed(modules, 'scope-amb', false);
+    const context = admittedNetworkContext(modules, 'scope-amb', 'paired-amb-client');
     const created = await modules.createNetworkAmbulatory(context, { id: 'amb-network', name: 'Network ambulatory' });
     assert.equal(created.status, 201);
     const audit = modules.dbServer.select().from(modules.schema.auditEvents)
@@ -226,11 +250,27 @@ test('paired create forwards field rejection before changing default or audit', 
         audit: modules.dbServer.select().from(modules.schema.auditEvents).all(),
     });
     const before = snapshot();
-    const context = { request: request(), scopeAmbulatoryId: 'paired-field-default', session: adminSession(),
-        pairedClient: { clientId: 'paired-field-client' } } as Parameters<LoadedModules['createNetworkAmbulatory']>[0];
+    const context = admittedNetworkContext(modules, 'paired-field-default', 'paired-field-client');
     const result = await modules.createNetworkAmbulatory(context, {
         id: 'paired-field-candidate', name: 'Synthetic paired', isDefault: true, createdAt: false,
     });
     assert.equal(result.status, 400);
+    assert.deepEqual(snapshot(), before);
+});
+
+test('network surface refuses to write without a commit guard', async () => {
+    const modules = await loadModules();
+    await resetDatabase(modules);
+    await seed(modules, 'unguarded-default', true, 1);
+    const snapshot = () => ({
+        ambulatories: modules.dbServer.select().from(modules.schema.ambulatories).all(),
+        audit: modules.dbServer.select().from(modules.schema.auditEvents).all(),
+    });
+    const before = snapshot();
+    assert.throws(
+        () => modules.createAmbulatory({ request: request(), session: adminSession() },
+            { id: 'unguarded-candidate', name: 'Unguarded' }, 'network'),
+        { name: 'TypeError', message: 'Network ambulatory writes require a commit guard' },
+    );
     assert.deepEqual(snapshot(), before);
 });
