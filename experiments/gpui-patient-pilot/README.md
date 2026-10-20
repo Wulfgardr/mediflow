@@ -165,6 +165,24 @@ successivo payload `ENC` prodotto da un client modificato. Nessuna nuova
 API host, writer, inferenza, lease o regola clinica è introdotta da questo
 consumer. Gli strumenti storici non vengono ricalcolati.
 
+In **Analisi**, la fascia d'età scelta viene inviata all'host con il fuso orario
+IANA del computer: `GET /api/v1/network/analytics/demographics` restituisce
+soltanto la proiezione demografica dell'ambulatorio corrente (ADR 0154).
+Il client non calcola età, fasce o indicatori clinici: confronta l'operazione,
+la versione, lo scope, l'archivio e la fascia restituiti, poi mostra i conteggi
+dell'host con barre proporzionali e la stessa distribuzione in testo. Il fuso
+di sistema viene riletto a ogni lettura. Il fuso restituito deve essere un nome
+IANA riconosciuto dal client e avere lo stesso offset UTC del fuso richiesto
+all'istante di osservazione, non la stessa stringa inviata: l'host riporta il
+nome canonicalizzato (`Etc/UTC` diventa `UTC`) e la vista dichiara il
+calendario effettivamente usato; un fuso con offset diverso viene rifiutato.
+Una risposta non coerente, un risultato oltre il limite, un archivio sostituito
+o una lettura annullata non diventano un'analisi vuota riuscita. Se il fuso
+orario non è determinabile la richiesta non parte. Le diagnosi non sono incluse
+in questa lettura e la vista lo dichiara senza simulare zeri; l'eventuale
+assenza della funzione tra le capability è solo un avviso, perché l'accesso
+resta deciso dall'host.
+
 In Impostazioni, «Stato funzioni AI» consulta la configurazione dell'archivio
 tramite il discovery paired esistente: quattro funzioni, runtime locale e
 centrale, modelli clinico e di ragionamento. «Rileggi stato AI» aggiorna i

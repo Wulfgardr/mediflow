@@ -3,6 +3,7 @@
 
 mod ai_preferences;
 mod ai_status;
+mod analytics;
 mod document_details;
 mod scales;
 mod therapy_picker;
@@ -40,6 +41,7 @@ use crate::theme::{CODES, SYSTEM, Theme, VOICE};
 
 use ai_preferences::AiPreferences;
 use ai_status::AiRuntimeObservation;
+use analytics::AnalyticsArea;
 use scales::{ScaleArea, ScaleAssessment};
 use therapy_picker::TherapySelection;
 use who_lookup::WhoLookup;
@@ -376,6 +378,7 @@ pub struct ClinicalApp {
     ai_preferences: AiPreferences,
     who: WhoLookup,
     scales: ScaleArea,
+    analytics: AnalyticsArea,
     selected_id: Option<String>,
     patient: PatientData,
     core: Workspace,
@@ -582,6 +585,7 @@ impl ClinicalApp {
             ai_preferences: AiPreferences::new(&area_scroll, cx),
             who: WhoLookup::new(&area_scroll, cx),
             scales: ScaleArea::new(&area_scroll, theme, cx),
+            analytics: AnalyticsArea::new(theme, cx),
             area_scroll,
             reference_kind: ReferenceKind::Drugs,
             reference_rows: Load::Idle,
@@ -998,6 +1002,9 @@ impl ClinicalApp {
             self.load_ai_status(cx);
         } else if self.area == Area::Scales {
             self.load_scales(cx);
+        } else if self.area == Area::Analytics {
+            self.analytics.reset(cx);
+            self.load_analytics(cx);
         } else {
             self.load_patients(cx);
         }
@@ -1146,6 +1153,7 @@ impl ClinicalApp {
             self.directory = true;
             if self.area != area {
                 self.scales.reset(cx);
+                self.analytics.reset(cx);
                 self.retire_profile_selection();
                 self.selected_id = None;
                 self.patient = PatientData::default();
@@ -1167,6 +1175,8 @@ impl ClinicalApp {
                 self.load_ai_status(cx);
             } else if area == Area::Scales {
                 self.load_scales(cx);
+            } else if area == Area::Analytics {
+                self.load_analytics(cx);
             } else {
                 self.next_epoch();
             }
@@ -4087,6 +4097,9 @@ impl ClinicalApp {
         if self.area == Area::Scales {
             return area.child(self.scales_view(cx));
         }
+        if self.area == Area::Analytics {
+            return area.child(self.analytics_view(cx));
+        }
         let (description, button_label) = match self.area {
             Area::Agenda => (
                 "L'agenda raccoglie turni e controlli dei pazienti. Il percorso completo è disponibile nell'interfaccia corrente dell'archivio.",
@@ -4099,10 +4112,6 @@ impl ClinicalApp {
             Area::References => (
                 "Cerca farmaci, diagnosi e repertori nell'interfaccia corrente, collegata allo stesso archivio.",
                 "Apri i repertori correnti",
-            ),
-            Area::Analytics => (
-                "Gli indicatori e i confronti dell'archivio sono disponibili nell'interfaccia corrente.",
-                "Apri le analisi correnti",
             ),
             _ => (
                 "Apri il percorso nell'interfaccia corrente.",
@@ -4683,6 +4692,7 @@ impl Render for ClinicalApp {
             self.ai_preferences.prepare_render(window, cx);
         }
         self.scales.prepare_render(theme, window, cx);
+        self.analytics.prepare_render(theme, cx);
         for field in &self.login_fields {
             field
                 .editor

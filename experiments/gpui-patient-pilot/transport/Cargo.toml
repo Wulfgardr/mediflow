@@ -17,6 +17,7 @@ path = "src/bin/mediflow-runtime-probe.rs"
 serde.workspace = true
 serde_json.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["std"] }
+chrono-tz = "0.10"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 aes-gcm = { version = "0.10", features = ["zeroize"] }

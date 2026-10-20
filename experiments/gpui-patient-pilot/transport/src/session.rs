@@ -3,6 +3,10 @@ use crate::{
         AI_PREFERENCES_LIMIT, AI_PREFERENCES_PATH, AI_PREVIEW_PATH, parse_preferences,
         parse_preferences_preview,
     },
+    analytics::{
+        DEMOGRAPHICS_PATH, POPULATION_DEMOGRAPHICS_CAPABILITY, POPULATION_DEMOGRAPHICS_MAX_BYTES,
+        parse_demographics,
+    },
     crypto::{self, MasterKey},
     http::{DOCUMENT_LIMIT, JSON_LIMIT},
     profile_query::{ProfileLease, display_profile, parse_profile_response},
@@ -240,6 +244,7 @@ impl RuntimeSession {
                 && capability["status"] == "available"
                 && (key.starts_with("network.replica.write-")
                     || key == "network.replica.readonly-clinical-diary"
+                    || key == POPULATION_DEMOGRAPHICS_CAPABILITY
                     || key == "network.ambulatories.write")
             {
                 granted.insert(key.to_owned());
@@ -1299,6 +1304,36 @@ impl RuntimeSession {
         let catalog = parse_scale_catalog(response.value)?;
         self.check_read_epoch(response.epoch)?;
         Ok(catalog)
+    }
+
+    /// Reads only the host-owned demographic projection. The caller supplies
+    /// presentation parameters; scope, archive generation and statistics stay
+    /// host assertions.
+    pub fn read_population_demographics(
+        &self,
+        scope: &str,
+        request: &DemographicsRequest,
+    ) -> Result<PopulationDemographics> {
+        let min_age = request.min_age().to_string();
+        let max_age = request.max_age().to_string();
+        let response = self.read_json_query(
+            Some(scope),
+            DEMOGRAPHICS_PATH,
+            &[
+                ("minAge", min_age.as_str()),
+                ("maxAge", max_age.as_str()),
+                ("timeZone", request.time_zone()),
+            ],
+            POPULATION_DEMOGRAPHICS_MAX_BYTES,
+        )?;
+        let demographics = parse_demographics(
+            response.value,
+            scope,
+            &self.inner.user.archive_generation,
+            request,
+        )?;
+        self.check_read_epoch(response.epoch)?;
+        Ok(demographics)
     }
 
     /// Refresh the real profile selection before asking the host to calculate.
@@ -5089,5 +5124,139 @@ mod tests {
         release_tx.send(()).unwrap();
         assert_eq!(worker.join().unwrap(), Err(RuntimeError::ReadRequired));
         server.join().unwrap();
+    }
+
+    fn demographics_wire() -> Value {
+        json!({
+            "operation": POPULATION_DEMOGRAPHICS_OPERATION,
+            "contractVersion": 1,
+            "scope": {"ambulatoryId": "scope-a", "archiveGeneration": "synthetic-generation"},
+            "ageRange": [20, 80],
+            "timeZone": "Europe/Rome",
+            "observedAt": "2026-10-20T08:30:00.000Z",
+            "stats": {
+                "totalInRange": 7,
+                "withBirthDate": 9,
+                "withoutBirthDate": 2,
+                "adiCount": 3,
+                "ageDist": {"0-18": 1, "19-64": 2, "65-80": 3, "80+": 1}
+            }
+        })
+    }
+
+    /// The ordinary scoped request negotiates identity first; only the second
+    /// request is the demographics read under test.
+    fn demographics_server(
+        status: u16,
+        body: &str,
+    ) -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let (seen_tx, seen_rx) = mpsc::channel();
+        let body = body.to_owned();
+        let worker = thread::spawn(move || {
+            let (mut identity, _) = listener.accept().unwrap();
+            let request = read_request(&mut identity);
+            assert!(request.starts_with("GET /api/v1/network/identity "));
+            assert!(request.contains("\r\nx-mediflow-expected-ambulatory-id: scope-a\r\n"));
+            send_reply(
+                &mut identity,
+                r#"{"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}}"#,
+            );
+            drop(identity);
+            let (mut stream, _) = listener.accept().unwrap();
+            let request = read_request(&mut stream);
+            seen_tx.send(request).unwrap();
+            write!(
+                stream,
+                "HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+        });
+        (url, seen_rx, worker)
+    }
+
+    fn admitted_session(base_url: &str) -> RuntimeSession {
+        let session = session_at(base_url);
+        session
+            .inner
+            .scopes
+            .lock()
+            .unwrap()
+            .insert("scope-a".into());
+        session
+    }
+
+    #[test]
+    fn population_demographics_sends_exactly_three_parameters_and_both_scope_assertions() {
+        let (url, seen, worker) = demographics_server(200, &demographics_wire().to_string());
+        let session = admitted_session(&url);
+        let request = DemographicsRequest::new(80, 20, "Europe/Rome").unwrap();
+        let result = session
+            .read_population_demographics("scope-a", &request)
+            .unwrap();
+        let seen = seen.recv_timeout(Duration::from_secs(5)).unwrap();
+        worker.join().unwrap();
+        assert_eq!(
+            seen.lines().next().unwrap(),
+            "GET /api/v1/network/analytics/demographics?minAge=20&maxAge=80&timeZone=Europe%2FRome HTTP/1.1"
+        );
+        assert!(seen.contains("\r\nx-mediflow-expected-ambulatory-id: scope-a\r\n"));
+        assert!(seen.contains("\r\nx-mediflow-archive-generation: synthetic-generation\r\n"));
+        assert!(seen.contains("\r\ncache-control: no-store\r\n"));
+        assert_eq!(result.age_range, [20, 80]);
+        assert_eq!(result.stats.total_in_range, 7);
+        assert_eq!(result.stats.age_dist.from_65_to_80, 3);
+    }
+
+    #[test]
+    fn population_demographics_keeps_denied_conflicts_and_oversize_distinct() {
+        let request = DemographicsRequest::new(0, 120, "Europe/Rome").unwrap();
+        let cases = [
+            (
+                403,
+                r#"{"error":"no","code":"ANALYTICS_SCOPE_UNAVAILABLE"}"#,
+                RuntimeError::Forbidden,
+            ),
+            (
+                409,
+                r#"{"error":"annullata","code":"ANALYTICS_CANCELLED"}"#,
+                RuntimeError::AnalyticsCancelled,
+            ),
+            (
+                409,
+                r#"{"error":"archivio","code":"ARCHIVE_REPLACED"}"#,
+                RuntimeError::Conflict,
+            ),
+            (
+                413,
+                r#"{"error":"grande","code":"ANALYTICS_OUTPUT_TOO_LARGE"}"#,
+                RuntimeError::Rejected(413),
+            ),
+        ];
+        for (status, body, expected) in cases {
+            let (url, seen, worker) = demographics_server(status, body);
+            let session = admitted_session(&url);
+            let result = session.read_population_demographics("scope-a", &request);
+            seen.recv_timeout(Duration::from_secs(5)).unwrap();
+            worker.join().unwrap();
+            assert_eq!(result, Err(expected), "status {status}");
+        }
+    }
+
+    #[test]
+    fn population_demographics_rejects_an_echoed_range_that_was_not_requested() {
+        let mut body = demographics_wire();
+        body["ageRange"] = json!([0, 120]);
+        let (url, seen, worker) = demographics_server(200, &body.to_string());
+        let session = admitted_session(&url);
+        let result = session.read_population_demographics(
+            "scope-a",
+            &DemographicsRequest::new(20, 80, "Europe/Rome").unwrap(),
+        );
+        seen.recv_timeout(Duration::from_secs(5)).unwrap();
+        worker.join().unwrap();
+        assert_eq!(result, Err(RuntimeError::InvalidResponse));
     }
 }

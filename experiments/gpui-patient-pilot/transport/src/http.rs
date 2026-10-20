@@ -278,6 +278,11 @@ impl RuntimeClient {
         // with 503. Keep every other route's HTTP failure semantics unchanged.
         let who_readiness =
             !mutation && method == Method::GET && path == crate::who::READINESS_PATH;
+        // This route alone distinguishes a cancelled read from an archive
+        // replacement inside the same 409 status. Read its bounded error code
+        // without changing any other route's conflict semantics.
+        let analytics_read =
+            !mutation && method == Method::GET && path == crate::analytics::DEMOGRAPHICS_PATH;
         let url = self.endpoint(path, query)?;
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -321,6 +326,9 @@ impl RuntimeClient {
         let response = request.send().map_err(|_| uncertain(mutation))?;
         let status = response.status().as_u16();
         if !(200..300).contains(&status) && !(who_readiness && status == 503) {
+            if analytics_read && status == 409 && analytics_cancelled(response) {
+                return Err(RuntimeError::AnalyticsCancelled);
+            }
             return Err(classify_status(status, mutation));
         }
         if response
@@ -469,6 +477,21 @@ fn uncertain(mutation: bool) -> RuntimeError {
         RuntimeError::Transport
     }
 }
+fn analytics_cancelled(response: reqwest::blocking::Response) -> bool {
+    let mut body = Zeroizing::new(Vec::new());
+    if response.take(1024).read_to_end(&mut body).is_err() {
+        return false;
+    }
+    serde_json::from_slice::<Value>(&body)
+        .ok()
+        .and_then(|value| {
+            value["code"]
+                .as_str()
+                .map(|code| code == "ANALYTICS_CANCELLED")
+        })
+        .unwrap_or(false)
+}
+
 fn classify_status(status: u16, mutation: bool) -> RuntimeError {
     match status {
         401 => RuntimeError::Authentication,

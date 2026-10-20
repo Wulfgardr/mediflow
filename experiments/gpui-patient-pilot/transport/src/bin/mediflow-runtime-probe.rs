@@ -93,6 +93,7 @@ fn runtime_error(phase: &'static str, error: RuntimeError) -> ProbeError {
         RuntimeError::Forbidden => "forbidden",
         RuntimeError::Missing => "missing",
         RuntimeError::Conflict => "conflict",
+        RuntimeError::AnalyticsCancelled => "analytics-cancelled",
         RuntimeError::Locked => "locked",
         RuntimeError::LockedField => "locked-field",
         RuntimeError::ReadRequired => "read-required",
