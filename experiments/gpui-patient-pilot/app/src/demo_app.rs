@@ -633,7 +633,7 @@ impl PatientApp {
                         .when(phase == Phase::Review, |el| el.child(div().id("clinical-workspace-before-notes").role(Role::Group).aria_label("Note attualmente nella scheda")
                             .p(px(16.)).bg(theme.hover).flex().flex_col().gap(px(8.))
                             .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary).child(text!("Attualmente nella scheda")))
-                            .child(div().type_role(theme, TypeRole::Prose).child(text!(profile.notes.clone().filter(|s| !s.is_empty()).unwrap_or_else(|| "Nessuna nota.".into()))))))
+                            .child(div().type_role(theme, TypeRole::Prose).text_color(theme.ink).child(text!(profile.notes.clone().filter(|s| !s.is_empty()).unwrap_or_else(|| "Nessuna nota.".into()))))))
                         .child(div().id("clinical-workspace-notes-editor-scroll").max_h(px(304.)).overflow_y_scroll().child(self.notes.clone()))
                         .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary).child(text!(if profile.is_archived {
                             "Scheda in archivio. Note in sola lettura."
@@ -737,8 +737,17 @@ impl Render for PatientApp {
         let phase = self.workspace.phase();
         let read_only = !matches!(phase, Phase::Ready | Phase::Saved | Phase::Editing)
             || self.workspace.selected().is_some_and(|p| p.is_archived);
-        self.notes
-            .update(cx, |editor, cx| editor.configure(theme, read_only, cx));
+        self.notes.update(cx, |editor, cx| {
+            editor.configure(theme, read_only, cx);
+            editor.set_writing_ink(
+                if matches!(phase, Phase::Ready | Phase::Saved) {
+                    crate::components::WritingInk::Dry
+                } else {
+                    crate::components::WritingInk::Fresh
+                },
+                cx,
+            );
+        });
         self.search.update(cx, |editor, cx| {
             editor.configure(theme, phase == Phase::Locked, cx)
         });
