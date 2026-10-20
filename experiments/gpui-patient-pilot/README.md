@@ -127,6 +127,44 @@ contenuti attesi. In caso di conflitto, rifiuto, risposta persa o rilettura
 non disponibile, l'esito rimane esplicito e la bozza resta recuperabile.
 Il client non interpreta un timeout come mancata scrittura.
 
+In **Scale**, il catalogo paired dell'host espone i cinque strumenti attivi
+e le domande a scelta: ADL, GDS-15, IADL, MMSE e Tinetti POMA-28 v1.
+Si sceglie una persona dall'ambulatorio corrente e si compila ogni risposta.
+Il client non calcola punteggi, non applica soglie cliniche e non interpreta
+le risposte: `GET /api/v1/network/scales` e
+`POST /api/v1/network/patients/{id}/scales/prepare` usano il proprietario
+TypeScript esistente (ADR 0153). La preparazione legge nuovamente la vera
+`profile-query`; revisione paziente, ambulatorio ed epoch della selezione
+host vengono confrontati, senza usare l'epoch della finestra come autorità.
+
+«Prepara e rivedi» mostra risposte, risultato canonico, interpretazione,
+provenienza e limiti restituiti dall'host. La soglia del Diario richiede un
+secondo gesto, «Conferma e registra». Solo allora `RuntimeSession` cifra
+titolo, contenuto e **metadata** e usa l'unica route ordinaria del Diario
+con `type: scale`. Il tentativo conserva identificativo, data, setting e
+cifrati esatti: una risposta incerta non provoca nuovi identificativi,
+ricifratura, ripetizioni o deduplicazione clinica nel client.
+
+Il successo richiede la rilettura della voce e il confronto integrale di
+identità, paziente, tipo, titolo, contenuto, metadata, data, setting e
+versione. Un 404 è soltanto l'assenza osservata nella lettura corrente:
+«Rivedi lo stesso invio» e una nuova conferma possono ripetere soltanto il
+tentativo trattenuto, se il contesto è ancora ammesso. La lettura non ripete
+la scrittura. Rifiuto, conflitto o differenze nella voce mantengono esplicito
+l'esito da verificare; modificare la bozza richiede una nuova preparazione.
+Il blocco o un 401 ritirano bozza e contesto. Una selezione, versione o
+lettura profile scaduta impedisce nuove conferme; una scrittura già inviata
+resta da riconciliare nel Diario. Chiudere la bozza non annulla una voce
+eventualmente già registrata.
+
+La discovery viene usata per offrire l'azione completa soltanto quando
+dichiara disponibili sia scrittura sia rilettura del Diario; ogni richiesta
+resta soggetta all'ammissione corrente dell'host. La preparazione non è un
+grant di scrittura e non attesta crittograficamente il plaintext di un
+successivo payload `ENC` prodotto da un client modificato. Nessuna nuova
+API host, writer, inferenza, lease o regola clinica è introdotta da questo
+consumer. Gli strumenti storici non vengono ricalcolati.
+
 In Impostazioni, «Stato funzioni AI» consulta la configurazione dell'archivio
 tramite il discovery paired esistente: quattro funzioni, runtime locale e
 centrale, modelli clinico e di ragionamento. «Rileggi stato AI» aggiorna i

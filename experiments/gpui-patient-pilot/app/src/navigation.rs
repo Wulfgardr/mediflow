@@ -128,14 +128,15 @@ pub struct Layout {
 impl Layout {
     /// Text enlargement uses the same reflow rules as a smaller container.
     pub fn for_window(width: f32, text_scale: f32) -> Self {
-        let effective = width / text_scale.clamp(1.0, 4.0);
+        let scale = text_scale.clamp(1.0, 4.0);
+        let effective = width / scale;
         let compact = effective < 700.;
         let wide = effective > 1000.;
         Self {
             compact,
             wide,
             magnified: text_scale >= 2.5 || effective < 360.,
-            navigation: if wide { 192. } else { 160. },
+            navigation: (if wide { 192. } else { 160. }) * scale,
             margin: if compact { 16. } else { 28. },
             gap: if wide { 40. } else { 24. },
             row: if compact { 44. } else { 40. },

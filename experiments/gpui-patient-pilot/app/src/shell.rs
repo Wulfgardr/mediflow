@@ -4,6 +4,7 @@
 mod ai_preferences;
 mod ai_status;
 mod document_details;
+mod scales;
 mod therapy_picker;
 mod who_lookup;
 
@@ -39,6 +40,7 @@ use crate::theme::{CODES, SYSTEM, Theme, VOICE};
 
 use ai_preferences::AiPreferences;
 use ai_status::AiRuntimeObservation;
+use scales::{ScaleArea, ScaleAssessment};
 use therapy_picker::TherapySelection;
 use who_lookup::WhoLookup;
 
@@ -234,6 +236,7 @@ impl DateInterval {
 enum FormKind {
     Notes,
     Entry,
+    Scale,
     Therapy,
     Observation,
     Checkup,
@@ -246,6 +249,7 @@ impl FormKind {
         match self {
             Self::Notes => "Note della scheda",
             Self::Entry => "Nuova voce",
+            Self::Scale => "Valutazione con scala",
             Self::Therapy => "Nuova terapia",
             Self::Observation => "Nuovo parametro",
             Self::Document => "Nuovo documento",
@@ -258,6 +262,7 @@ impl FormKind {
         match self {
             Self::Notes => "le note",
             Self::Entry => "una voce di diario",
+            Self::Scale => "la valutazione",
             Self::Therapy => "una terapia",
             Self::Observation => "un parametro",
             Self::Document => "un documento",
@@ -284,6 +289,7 @@ struct Form {
     patient_original: Option<PatientDetail>,
     created_id: Option<String>,
     therapy: Option<TherapySelection>,
+    scale: Option<ScaleAssessment>,
     state: FormState,
     _subscriptions: Vec<Subscription>,
 }
@@ -369,6 +375,7 @@ pub struct ClinicalApp {
     ai_refresh_target: ScrollTarget,
     ai_preferences: AiPreferences,
     who: WhoLookup,
+    scales: ScaleArea,
     selected_id: Option<String>,
     patient: PatientData,
     core: Workspace,
@@ -574,6 +581,7 @@ impl ClinicalApp {
             ai_refresh_target: ScrollTarget::new(&area_scroll, cx),
             ai_preferences: AiPreferences::new(&area_scroll, cx),
             who: WhoLookup::new(&area_scroll, cx),
+            scales: ScaleArea::new(&area_scroll, theme, cx),
             area_scroll,
             reference_kind: ReferenceKind::Drugs,
             reference_rows: Load::Idle,
@@ -662,6 +670,9 @@ impl ClinicalApp {
 
     fn retire_form(&mut self, cx: &mut App) {
         if let Some(form) = self.form.take() {
+            if let Some(scale) = &form.scale {
+                scale.retire();
+            }
             if let Some(therapy) = &form.therapy {
                 therapy.retire(cx);
             }
@@ -722,6 +733,17 @@ impl ClinicalApp {
                     let message = if this.ai_preferences.is_saving() {
                         format!(
                             "Salvataggio delle preferenze AI non verificato. {}",
+                            ui_error(error)
+                        )
+                    } else if this.form.as_ref().is_some_and(|form| {
+                        form.kind == FormKind::Scale
+                            && form
+                                .scale
+                                .as_ref()
+                                .is_some_and(ScaleAssessment::has_attempt)
+                    }) {
+                        format!(
+                            "Salvataggio della valutazione non verificato. {}",
                             ui_error(error)
                         )
                     } else {
@@ -860,6 +882,7 @@ impl ClinicalApp {
     }
 
     fn disconnect(&mut self, cx: &mut Context<Self>) {
+        self.scales.reset(cx);
         self.focus_after_render = true;
         self.focus_search_after_render = false;
         self.patient_targets.clear();
@@ -973,6 +996,8 @@ impl ClinicalApp {
             self.load_references(cx);
         } else if self.area == Area::Settings {
             self.load_ai_status(cx);
+        } else if self.area == Area::Scales {
+            self.load_scales(cx);
         } else {
             self.load_patients(cx);
         }
@@ -1020,7 +1045,9 @@ impl ClinicalApp {
         self.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
         self.selected_id = Some(id.to_owned());
         self.directory = !open;
-        self.area = Area::Patients;
+        if self.area != Area::Scales {
+            self.area = Area::Patients;
+        }
         self.show_other = false;
         self.patient_section = PatientSection::Overview;
         self.patient = PatientData::default();
@@ -1045,7 +1072,9 @@ impl ClinicalApp {
             },
             cx,
         );
-        self.load_sections(cx);
+        if self.area != Area::Scales {
+            self.load_sections(cx);
+        }
         cx.notify();
     }
 
@@ -1116,6 +1145,7 @@ impl ClinicalApp {
             self.show_other = false;
             self.directory = true;
             if self.area != area {
+                self.scales.reset(cx);
                 self.retire_profile_selection();
                 self.selected_id = None;
                 self.patient = PatientData::default();
@@ -1135,6 +1165,8 @@ impl ClinicalApp {
                 self.load_patients(cx);
             } else if area == Area::Settings {
                 self.load_ai_status(cx);
+            } else if area == Area::Scales {
+                self.load_scales(cx);
             } else {
                 self.next_epoch();
             }
@@ -1243,6 +1275,13 @@ impl ClinicalApp {
                     .any(|target| target.reveal_if_focused(window, cx));
             }
         } else if let Some(form) = &self.form {
+            if form
+                .scale
+                .as_ref()
+                .is_some_and(|scale| scale.reveal_if_focused(window, cx))
+            {
+                return;
+            }
             if !form
                 .therapy
                 .as_ref()
@@ -1287,6 +1326,8 @@ impl ClinicalApp {
             } else {
                 self.ai_refresh_target.reveal_if_focused(window, cx);
             }
+        } else if self.area == Area::Scales {
+            self.scales.reveal_if_focused(window, cx);
         }
     }
 
@@ -1456,6 +1497,28 @@ impl ClinicalApp {
             self.load_ai_preferences(cx);
             return;
         }
+        if action == Discard::Reload
+            && self
+                .form
+                .as_ref()
+                .is_some_and(|form| form.kind == FormKind::Scale)
+        {
+            self.reread_scale(cx);
+            return;
+        }
+        if self
+            .form
+            .as_ref()
+            .and_then(|form| form.scale.as_ref())
+            .is_some_and(ScaleAssessment::is_working)
+        {
+            self.message = Some((
+                "Operazione in corso. Attendi l’esito prima di chiudere la valutazione.".into(),
+                false,
+            ));
+            cx.notify();
+            return;
+        }
         if self
             .form
             .as_ref()
@@ -1499,6 +1562,10 @@ impl ClinicalApp {
         self.next_epoch();
         if self.area == Area::Settings {
             self.load_ai_status(cx);
+            return;
+        }
+        if self.area == Area::Scales {
+            self.load_scales(cx);
             return;
         }
         if self.area == Area::References {
@@ -1594,7 +1661,10 @@ impl ClinicalApp {
             .format("%Y-%m-%d")
             .to_string();
         let rows: Vec<(&'static str, &'static str, String, bool)> = match kind {
-            FormKind::Document | FormKind::PatientNew | FormKind::PatientProfile => return,
+            FormKind::Document
+            | FormKind::PatientNew
+            | FormKind::PatientProfile
+            | FormKind::Scale => return,
             FormKind::Checkup => vec![
                 (
                     "clinical-workspace-checkup-title",
@@ -1742,6 +1812,7 @@ impl ClinicalApp {
             created_id: None,
             therapy: (kind == FormKind::Therapy)
                 .then(|| TherapySelection::new(&self.profile_scroll, cx)),
+            scale: None,
             state: FormState::Draft,
             _subscriptions: subscriptions,
         });
@@ -1758,6 +1829,14 @@ impl ClinicalApp {
 
     fn review_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.discard.is_some() {
+            return;
+        }
+        if self
+            .form
+            .as_ref()
+            .is_some_and(|form| form.kind == FormKind::Scale)
+        {
+            self.review_scale(cx);
             return;
         }
         let Some(form) = &self.form else {
@@ -1791,6 +1870,14 @@ impl ClinicalApp {
     }
 
     fn cancel_review(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self
+            .form
+            .as_ref()
+            .is_some_and(|form| form.kind == FormKind::Scale)
+        {
+            self.cancel_scale_review(cx);
+            return;
+        }
         let Some(form) = &mut self.form else {
             return;
         };
@@ -1812,6 +1899,14 @@ impl ClinicalApp {
 
     fn confirm_form(&mut self, cx: &mut Context<Self>) {
         if self.discard.is_some() {
+            return;
+        }
+        if self
+            .form
+            .as_ref()
+            .is_some_and(|form| form.kind == FormKind::Scale)
+        {
+            self.confirm_scale(cx);
             return;
         }
         let Some(form) = &self.form else {
@@ -2075,7 +2170,9 @@ impl ClinicalApp {
         let Some(form) = &self.form else {
             return;
         };
-        let mut text = if let Some(upload) = &form.upload {
+        let mut text = if let Some(scale) = &form.scale {
+            scale.copy_text()
+        } else if let Some(upload) = &form.upload {
             format!(
                 "Documento scelto, non confermato
 {}
@@ -2330,11 +2427,10 @@ impl ClinicalApp {
     ) -> Stateful<Div> {
         let theme = self.theme;
         let id = id.into();
-        let editable = self
-            .form
-            .as_ref()
-            .is_some_and(|form| form.state == FormState::Draft)
-            && self.discard.is_none();
+        let editable = self.form.as_ref().is_some_and(|form| {
+            form.state == FormState::Draft
+                && !form.scale.as_ref().is_some_and(ScaleAssessment::is_working)
+        }) && self.discard.is_none();
         let content = if let Some(source) = &field.rich_source {
             div()
                 .id(id.clone())
@@ -3717,9 +3813,12 @@ impl ClinicalApp {
 
     fn can_write(&self, kind: FormKind) -> bool {
         self.session.as_ref().is_some_and(|session| {
+            if kind == FormKind::Scale {
+                return session.can_record_scale();
+            }
             session.can_write(match kind {
                 FormKind::Notes => "network.replica.write-patient-profile",
-                FormKind::Entry => "network.replica.write-clinical-diary",
+                FormKind::Entry | FormKind::Scale => "network.replica.write-clinical-diary",
                 FormKind::Therapy => "network.replica.write-therapies",
                 FormKind::Observation => "network.replica.write-observations",
                 FormKind::Document => "network.replica.write-documents",
@@ -3743,6 +3842,7 @@ impl ClinicalApp {
                 .child(div().text_color(theme.secondary).child(text!(match form.kind {
                     FormKind::Notes => "La conferma sostituisce soltanto le note della scheda del paziente indicato.",
                     FormKind::Entry => "Questa voce è una nota di diario. Per una visita strutturata, un contatto remoto o allegati usa l'editor corrente.",
+                    FormKind::Scale => "La valutazione utilizza il questionario letto dall'host.",
                     FormKind::Therapy => "Scegli il farmaco dal repertorio oppure riporta una terapia a testo libero. Verifica dose, motivo e date: la scelta della confezione non li modifica.",
                     FormKind::Observation => "Riporta il valore e le codifiche presenti nel referto. Non vengono dedotte unità, intervalli o interpretazioni cliniche.",
                     FormKind::Document => "Il documento scelto verrà aggiunto alla scheda del paziente indicato. Verifica nome, formato e dimensione prima di registrarlo.",
@@ -3785,7 +3885,9 @@ impl ClinicalApp {
         if let Some(action) = self.discard {
             return threshold.bg(theme.draft)
                 .child(div().id("clinical-workspace-discard-question").accessibility_id("clinical-workspace-discard-question").role(Role::AlertDialog).aria_label("Scartare la bozza?")
-                    .child(text!("Scartare la bozza? Il testo non registrato verrà eliminato da questa finestra.")))
+                    .child(text!(if self.form.as_ref().and_then(|form| form.scale.as_ref()).is_some_and(ScaleAssessment::has_attempt) {
+                        "Chiudere la bozza? Un invio potrebbe essere già registrato. La chiusura non annulla una voce nel Diario; copia la bozza e verifica il suo identificativo prima di un nuovo inserimento."
+                    } else { "Scartare la bozza? Il testo non registrato verrà eliminato da questa finestra." })))
                 .child(div().flex().flex_wrap().gap(px(8.))
                     .child(self.form_actions[4].attach(button("clinical-workspace-keep-draft", "Conserva la bozza", theme, true, true))
                         .on_click(cx.listener(|this, _, _, cx| { this.discard = None; cx.notify(); })))
@@ -3831,6 +3933,29 @@ impl ClinicalApp {
             );
             return threshold;
         };
+        if form
+            .scale
+            .as_ref()
+            .is_some_and(ScaleAssessment::is_preparing)
+        {
+            return threshold
+                .bg(theme.draft)
+                .child(
+                    div()
+                        .id("clinical-scale-preparing")
+                        .accessibility_id("clinical-scale-preparing")
+                        .role(Role::Status)
+                        .child(text!("Preparazione della valutazione nell’archivio…")),
+                )
+                .child(text!(
+                    "Le risposte restano una bozza. Nessuna registrazione è in corso."
+                ));
+        }
+        let review_enabled = form.scale.as_ref().is_none_or(ScaleAssessment::can_prepare);
+        let repeated_scale = form
+            .scale
+            .as_ref()
+            .is_some_and(ScaleAssessment::has_attempt);
         let patient_name = if form.kind == FormKind::PatientNew {
             form.fields
                 .iter()
@@ -3854,35 +3979,39 @@ impl ClinicalApp {
                     .child(div().flex().flex_wrap().gap(px(8.))
                         .child(self.form_actions[0].attach(button("clinical-workspace-cancel-form", "Scarta…", theme, false, true))
                             .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Form, cx))))
-                        .child(self.form_actions[1].attach(button("clinical-workspace-review-save", "Registra 1 elemento", theme, true, true))
-                            .on_click(cx.listener(|this, _, window, cx| this.review_form(window, cx)))))),
+                        .child(self.form_actions[1].attach_enabled(button("clinical-workspace-review-save", if form.kind == FormKind::Scale { "Prepara e rivedi" } else { "Registra 1 elemento" }, theme, true, review_enabled), review_enabled)
+                            .when(review_enabled, |el| el.on_click(cx.listener(|this, _, window, cx| this.review_form(window, cx))))))),
             FormState::Review => threshold.bg(theme.threshold).text_color(theme.threshold_text)
-                .child(div().font_weight(FontWeight::SEMIBOLD).child(text!(if form.kind == FormKind::PatientNew { format!("Creare la scheda di {patient_name} nell'ambulatorio selezionato?") } else { format!("Registrare {} nella scheda di {}?", if form.edit.is_some() { "le modifiche" } else { form.kind.noun() }, patient_name) })))
+                .child(div().font_weight(FontWeight::SEMIBOLD).child(text!(if repeated_scale { format!("Ripetere l’invio della stessa valutazione per {patient_name}?") } else if form.kind == FormKind::PatientNew { format!("Creare la scheda di {patient_name} nell'ambulatorio selezionato?") } else { format!("Registrare {} nella scheda di {}?", if form.edit.is_some() { "le modifiche" } else { form.kind.noun() }, patient_name) })))
                 .child(div().text_size(px(theme.size(12.))).child(text!("Controlla il contenuto qui sopra. La registrazione sarà confermata soltanto dopo la rilettura.")))
                 .child(div().flex().flex_wrap().gap(px(8.))
-                    .child(self.form_actions[2].attach(button("clinical-workspace-cancel-review", "Torna alla bozza", theme, false, true))
+                    .child(self.form_actions[2].attach(button("clinical-workspace-cancel-review", if repeated_scale { "Continua la verifica" } else { "Torna alla bozza" }, theme, false, true))
                         .on_click(cx.listener(|this, _, window, cx| this.cancel_review(window, cx))))
                     .child(self.form_actions[3].attach(button("clinical-workspace-confirm-save", "Conferma e registra", theme, true, true))
                         .on_click(cx.listener(|this, _, _, cx| this.confirm_form(cx))))),
             FormState::Saving => threshold.bg(theme.draft)
                 .child(div().id("clinical-workspace-saving-status").accessibility_id("clinical-workspace-saving-status").role(Role::Status).aria_label("Registrazione e rilettura in corso")
-                    .child(text!("Registrazione e rilettura in corso…")))
+                    .child(text!(if form.scale.as_ref().is_some_and(ScaleAssessment::is_reading) { "Rilettura della voce e verifica del contesto in corso…" } else { "Registrazione e rilettura in corso…" })))
                 .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary)
                     .child(text!("La bozza resta visibile fino alla verifica. Non inviare di nuovo."))),
             FormState::Conflict | FormState::Uncertain | FormState::Rejected => {
-                let label = match form.state {
+                let label = if form.kind == FormKind::Scale && !repeated_scale { "Valutazione da rivedere. Le risposte sono conservate." } else { match form.state {
                     FormState::Conflict => "La scheda è cambiata. La bozza è conservata.",
                     FormState::Rejected => "La registrazione è stata rifiutata. La bozza è conservata.",
                     _ => "Esito da verificare. La bozza è conservata.",
-                };
+                }};
                 threshold.bg(theme.draft).child(div().id("clinical-workspace-save-uncertain").accessibility_id("clinical-workspace-save-uncertain").role(Role::Alert).aria_label(label).child(text!(label)))
                     .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary)
-                        .child(text!("Copia il testo se vuoi conservarlo, poi rileggi la scheda prima di una nuova modifica.")))
+                        .child(text!(if form.kind == FormKind::Scale { "La rilettura non invia la valutazione. Le risposte restano in questa finestra fino alla verifica o alla chiusura esplicita." } else { "Copia il testo se vuoi conservarlo, poi rileggi la scheda prima di una nuova modifica." })))
                     .child(div().flex().flex_wrap().gap(px(8.))
                         .child(self.form_actions[6].attach(button("clinical-workspace-copy-draft", "Copia bozza", theme, false, true))
                             .on_click(cx.listener(|this, _, _, cx| this.copy_draft(cx))))
-                        .child(self.form_actions[7].attach(button("clinical-workspace-reconcile", "Rileggi scheda…", theme, true, true))
-                            .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Reload, cx)))))
+                        .child(self.form_actions[7].attach(button("clinical-workspace-reconcile", if form.kind == FormKind::Scale { "Rileggi e verifica" } else { "Rileggi scheda…" }, theme, true, true))
+                            .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Reload, cx))))
+                        .when(form.kind == FormKind::Scale, |el| el.child(self.form_actions[0].attach(button("clinical-scale-close-draft", "Chiudi bozza…", theme, false, true))
+                            .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Form, cx)))))
+                        .when(form.scale.as_ref().is_some_and(ScaleAssessment::retry_ready), |el| el.child(self.form_actions[1].attach(button("clinical-scale-review-retry", "Rivedi lo stesso invio", theme, false, true))
+                            .on_click(cx.listener(|this, _, _, cx| this.review_scale_retry(cx))))))
             }
         }
     }
@@ -3955,6 +4084,9 @@ impl ClinicalApp {
         if self.area == Area::Settings {
             return area.child(self.settings_view(cx));
         }
+        if self.area == Area::Scales {
+            return area.child(self.scales_view(cx));
+        }
         let (description, button_label) = match self.area {
             Area::Agenda => (
                 "L'agenda raccoglie turni e controlli dei pazienti. Il percorso completo è disponibile nell'interfaccia corrente dell'archivio.",
@@ -3971,10 +4103,6 @@ impl ClinicalApp {
             Area::Analytics => (
                 "Gli indicatori e i confronti dell'archivio sono disponibili nell'interfaccia corrente.",
                 "Apri le analisi correnti",
-            ),
-            Area::Scales => (
-                "Il repertorio delle scale e le valutazioni del paziente continuano nell'interfaccia corrente.",
-                "Apri le scale correnti",
             ),
             _ => (
                 "Apri il percorso nell'interfaccia corrente.",
@@ -4554,6 +4682,7 @@ impl Render for ClinicalApp {
         if self.ai_preferences.active {
             self.ai_preferences.prepare_render(window, cx);
         }
+        self.scales.prepare_render(theme, window, cx);
         for field in &self.login_fields {
             field
                 .editor
@@ -4571,6 +4700,9 @@ impl Render for ClinicalApp {
         self.reference_search
             .update(cx, |input, cx| input.configure(theme, false, cx));
         if let Some(form) = &mut self.form {
+            if let Some(scale) = &mut form.scale {
+                scale.prepare_render(window, cx);
+            }
             if let Some(therapy) = &mut form.therapy {
                 therapy.prepare_render(
                     theme,
@@ -4584,6 +4716,7 @@ impl Render for ClinicalApp {
                     input.configure(
                         theme,
                         form.state != FormState::Draft
+                            || form.scale.as_ref().is_some_and(ScaleAssessment::is_working)
                             || self.discard.is_some()
                             || field.read_only
                             || field.rich_source.is_some()
@@ -4632,6 +4765,12 @@ impl Render for ClinicalApp {
             .is_some_and(|form| form.kind == FormKind::PatientNew)
         {
             self.patient_creation_view(layout, cx).into_any_element()
+        } else if self
+            .form
+            .as_ref()
+            .is_some_and(|form| form.kind == FormKind::Scale)
+        {
+            self.scale_workspace_view(layout, cx).into_any_element()
         } else if self.area == Area::Patients && !self.show_other {
             if self.directory {
                 self.directory_view(layout, cx).into_any_element()
@@ -4810,13 +4949,22 @@ impl Render for ClinicalApp {
                             .when(connected, |el| {
                                 el.p(px(if layout.compact { 0. } else { 12. })).gap(px(12.))
                             })
-                            .when(connected && self.message.is_some(), |el| {
-                                let (message, error) = self.message.clone().unwrap_or_default();
-                                el.child(
-                                    notice("clinical-workspace-message", message, theme, error)
-                                        .flex_shrink_0(),
-                                )
-                            })
+                            .when(
+                                connected
+                                    && self.message.is_some()
+                                    && !(layout.magnified
+                                        && self
+                                            .form
+                                            .as_ref()
+                                            .is_some_and(|form| form.kind == FormKind::Scale)),
+                                |el| {
+                                    let (message, error) = self.message.clone().unwrap_or_default();
+                                    el.child(
+                                        notice("clinical-workspace-message", message, theme, error)
+                                            .flex_shrink_0(),
+                                    )
+                                },
+                            )
                             .child(content),
                     ),
             )
@@ -5065,6 +5213,7 @@ impl ClinicalApp {
             created_id: None,
             therapy: (kind == FormKind::Therapy)
                 .then(|| TherapySelection::new(&self.profile_scroll, cx)),
+            scale: None,
             state: FormState::Draft,
             _subscriptions: subscriptions,
         });
@@ -5268,7 +5417,7 @@ impl ClinicalApp {
                             this.document_busy = false;
                             match result {
                                 Ok(Ok(upload)) if this.form.is_none() && this.can_write(FormKind::Document) => {
-                                    this.form = Some(Form { kind: FormKind::Document, fields: vec![], upload: Some(upload), edit: None, patient_original: None, created_id: None, therapy: None, state: FormState::Draft, _subscriptions: vec![] });
+                                    this.form = Some(Form { kind: FormKind::Document, fields: vec![], upload: Some(upload), edit: None, patient_original: None, created_id: None, therapy: None, scale: None, state: FormState::Draft, _subscriptions: vec![] });
                                     this.show_sections = false;
                                     this.patient_section = PatientSection::Documents;
                                     this.directory = false;
@@ -5652,7 +5801,7 @@ fn validate_form_in_zone<T: chrono::TimeZone>(
         FormKind::Observation => 5,
         FormKind::Document => 0,
         FormKind::Checkup => 4,
-        FormKind::PatientNew | FormKind::PatientProfile => {
+        FormKind::PatientNew | FormKind::PatientProfile | FormKind::Scale => {
             return Err("Usa il modulo anagrafico dedicato.".into());
         }
     };
@@ -5696,7 +5845,8 @@ fn validate_form_in_zone<T: chrono::TimeZone>(
         | FormKind::Document
         | FormKind::Checkup
         | FormKind::PatientNew
-        | FormKind::PatientProfile => {
+        | FormKind::PatientProfile
+        | FormKind::Scale => {
             unreachable!()
         }
     };
@@ -5860,9 +6010,11 @@ fn save_new_record(
                 },
             )
         }
-        FormKind::Notes | FormKind::Document | FormKind::PatientNew | FormKind::PatientProfile => {
-            Err(RuntimeError::InvalidInput)
-        }
+        FormKind::Notes
+        | FormKind::Document
+        | FormKind::PatientNew
+        | FormKind::PatientProfile
+        | FormKind::Scale => Err(RuntimeError::InvalidInput),
     }
 }
 
@@ -6277,6 +6429,7 @@ mod tests {
             patient_original: None,
             created_id: None,
             therapy: None,
+            scale: None,
             state,
             _subscriptions: vec![],
         });

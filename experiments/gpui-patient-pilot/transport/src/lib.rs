@@ -10,6 +10,7 @@ mod dto;
 mod error;
 mod http;
 mod profile_query;
+mod scales;
 mod session;
 mod tls;
 mod who;
@@ -20,6 +21,7 @@ pub use dto::*;
 pub use error::{Result, RuntimeError};
 pub use http::{PairingCredentials, RuntimeClient, RuntimeConfig};
 pub use profile_query::{ProfileCurrentness, ProfileProjection};
+pub use scales::*;
 pub use session::{AiPreferencesContext, ProfileQueryIntent, RuntimeSession};
 pub use who::{
     WHO_ATTRIBUTION, WhoEntry, WhoReadiness, WhoReadinessStatus, WhoReceipt, WhoSearchResponse,
