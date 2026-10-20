@@ -443,3 +443,57 @@ test('a replaced archive after admission returns ARCHIVE_REPLACED without effect
     assert.equal((await response.json() as Record<string, unknown>).code, 'ARCHIVE_REPLACED');
     assert.deepEqual(profileRows(nativeUserId), before);
 });
+
+test('archive replacement is only reported to an admitted paired client', async () => {
+    const current = await currentProfile();
+    const body = {
+        expectedVersion: current.profileVersion,
+        displayName: 'Dott. Senza Ammissione',
+        ambulatoryName: 'Studio Senza Ammissione',
+    };
+    dbServer.$client.transaction(() => rotateSqliteArchiveGeneration(dbServer.$client)).immediate();
+    // Pairing state is generation-bound: restore it so only the session binding is stale.
+    const repaired = syntheticNetworkPatientAuthority(dbServer, SCOPE, {
+        clientId: nativeAuthority.pairedClient.clientId,
+        userId: nativeAuthority.session.userId,
+    });
+    const before = profileRows(nativeUserId);
+    const auditsBefore = auditCount();
+
+    const foreignHeaders = {
+        'x-mediflow-paired-client-id': 'synthetic-other-device',
+        'x-mediflow-paired-client-token': 'synthetic-other-device-token',
+    };
+    const getWithoutClient = await profileRoute.GET(new Request(URL));
+    assert.equal(getWithoutClient.status, 401);
+    assert.equal(getWithoutClient.headers.get('cache-control'), 'no-store');
+    const getWithForeignClient = await profileRoute.GET(profileRequest(foreignHeaders));
+    assert.equal(getWithForeignClient.status, 401);
+
+    const putWithoutClient = await profileRoute.PUT(new Request(URL, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+    }));
+    assert.equal(putWithoutClient.status, 401);
+    const putWithForeignClient = await profileRoute.PUT(new Request(URL, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', ...foreignHeaders },
+        body: JSON.stringify(body),
+    }));
+    assert.equal(putWithForeignClient.status, 401);
+    assert.deepEqual(profileRows(nativeUserId), before);
+    assert.equal(auditCount(), auditsBefore);
+
+    const admittedGet = await profileRoute.GET(profileRequest());
+    assert.equal(admittedGet.status, 409);
+    assert.equal((await admittedGet.json() as Record<string, unknown>).code, 'ARCHIVE_REPLACED');
+    const admittedPut = await profileRoute.PUT(request(body));
+    assert.equal(admittedPut.status, 409);
+    assert.equal((await admittedPut.json() as Record<string, unknown>).code, 'ARCHIVE_REPLACED');
+    assert.deepEqual(profileRows(nativeUserId), before);
+    assert.equal(auditCount(), auditsBefore);
+
+    // Keep the synthetic authority's later sessions from leaking into the remaining state.
+    nativeAuthority = repaired;
+});
