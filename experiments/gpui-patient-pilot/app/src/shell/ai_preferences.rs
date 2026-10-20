@@ -336,6 +336,7 @@ impl ClinicalApp {
         }
         self.area_scroll.set_offset(gpui::point(px(0.), px(0.)));
         self.load_ai_status(cx);
+        self.ensure_account_profile_loaded(cx);
         self.focus_after_render = true;
         cx.notify();
     }
