@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+mod account_profile;
 mod ai_preferences;
 mod analytics;
 mod catalogs;
@@ -16,6 +17,7 @@ mod session;
 mod tls;
 mod who;
 
+pub use account_profile::*;
 pub use ai_preferences::*;
 pub use analytics::*;
 pub use catalogs::*;

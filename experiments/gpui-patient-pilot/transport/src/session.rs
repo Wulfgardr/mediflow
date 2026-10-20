@@ -1,4 +1,10 @@
 use crate::{
+    account_profile::{
+        ACCOUNT_PROFILE_LIMIT, ACCOUNT_PROFILE_PATH, AccountProfileRead, AccountProfileSnapshot,
+        AccountProfileUpdate, AccountProfileUpdateOutcome,
+        parse_conflict as parse_account_profile_conflict, parse_read as parse_account_profile_read,
+        parse_update as parse_account_profile_update,
+    },
     ai_preferences::{
         AI_PREFERENCES_LIMIT, AI_PREFERENCES_PATH, AI_PREVIEW_PATH, parse_preferences,
         parse_preferences_preview,
@@ -314,6 +320,32 @@ impl RuntimeSession {
         }
     }
 
+    fn credentials(&self) -> Result<(PairingCredentials, Zeroizing<String>)> {
+        let secrets = self
+            .inner
+            .secrets
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?;
+        self.ensure_open()?;
+        let pairing = secrets.pairing.as_ref().ok_or(RuntimeError::Locked)?;
+        let credentials = (
+            PairingCredentials {
+                id: pairing.id.clone(),
+                token: Zeroizing::new(pairing.token.to_string()),
+            },
+            Zeroizing::new(
+                secrets
+                    .cookie
+                    .as_ref()
+                    .ok_or(RuntimeError::Locked)?
+                    .to_string(),
+            ),
+        );
+        drop(secrets);
+        self.ensure_open()?;
+        Ok(credentials)
+    }
+
     fn ensure_open(&self) -> Result<()> {
         if self.is_locked() {
             Err(RuntimeError::Locked)
@@ -354,29 +386,7 @@ impl RuntimeSession {
         if let Some(scope) = scope {
             validate_scope_id(scope)?;
         }
-        let (pairing, cookie) = {
-            let secrets = self
-                .inner
-                .secrets
-                .lock()
-                .map_err(|_| RuntimeError::Locked)?;
-            self.ensure_open()?;
-            let pairing = secrets.pairing.as_ref().ok_or(RuntimeError::Locked)?;
-            (
-                PairingCredentials {
-                    id: pairing.id.clone(),
-                    token: Zeroizing::new(pairing.token.to_string()),
-                },
-                Zeroizing::new(
-                    secrets
-                        .cookie
-                        .as_ref()
-                        .ok_or(RuntimeError::Locked)?
-                        .to_string(),
-                ),
-            )
-        };
-        self.ensure_open()?;
+        let (pairing, cookie) = self.credentials()?;
         if let Some(scope) = scope {
             if !self
                 .inner
@@ -623,6 +633,67 @@ impl RuntimeSession {
             matches_confirmation: applied == preview.proposed && observed == applied,
             observed,
         })
+    }
+
+    /// ADR 0155 read. The response is closed to the eight documented fields and
+    /// its subject must be this exact session user.
+    pub fn read_account_profile(&self) -> Result<AccountProfileRead> {
+        let epoch = self.inner.read_epoch.load(Ordering::Acquire);
+        self.check_read_epoch(epoch)?;
+        let response = self.read_json(None, ACCOUNT_PROFILE_PATH, ACCOUNT_PROFILE_LIMIT)?;
+        let profile = parse_account_profile_read(response.value, &self.inner.user.id)?;
+        self.check_read_epoch(response.epoch)?;
+        Ok(profile)
+    }
+
+    /// ADR 0155 conditional update. The body is built only by the closed command
+    /// type, so the retired version-less PUT is unreachable. A 409 conflict
+    /// returns the host's current values without any retry; an archive
+    /// replacement stays a distinct error.
+    pub fn update_account_profile(
+        &self,
+        snapshot: &AccountProfileSnapshot,
+        display_name: Option<&str>,
+        ambulatory_name: Option<&str>,
+    ) -> Result<AccountProfileUpdateOutcome> {
+        self.ensure_open()?;
+        let body = AccountProfileUpdate::new(snapshot, display_name, ambulatory_name)?;
+        let encoded = serde_json::to_vec(&body.wire()).map_err(|_| RuntimeError::InvalidInput)?;
+        let _guard = self.begin_write()?;
+        let (pairing, cookie) = self.credentials()?;
+        let result = self.inner.client.raw(
+            Method::PUT,
+            ACCOUNT_PROFILE_PATH,
+            &[],
+            None,
+            &pairing,
+            Some(&cookie),
+            Some(&encoded),
+            true,
+            ACCOUNT_PROFILE_LIMIT,
+            Some(&self.inner.user.archive_generation),
+        );
+        if self.is_locked() {
+            return Err(RuntimeError::Indeterminate);
+        }
+        let response = match result {
+            Ok(response) => response,
+            Err(error) if error.is_auth_failure() => {
+                self.lock();
+                return Err(error);
+            }
+            Err(error) => return Err(error),
+        };
+        let value: Value =
+            serde_json::from_slice(&response.body).map_err(|_| RuntimeError::Indeterminate)?;
+        match response.status {
+            200..=299 => parse_account_profile_update(value, &self.inner.user.id)
+                .map_err(|_| RuntimeError::Indeterminate),
+            409 => parse_account_profile_conflict(value, &self.inner.user.id)
+                .map(|current| AccountProfileUpdateOutcome::VersionConflict { current })
+                .map_err(|_| RuntimeError::Indeterminate),
+            _ => Err(RuntimeError::Indeterminate),
+        }
     }
 
     pub fn list_ambulatories(&self) -> Result<Vec<Ambulatory>> {
@@ -2780,6 +2851,200 @@ mod tests {
         assert!(
             matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
         );
+    }
+
+    fn account_profile_snapshot() -> AccountProfileSnapshot {
+        AccountProfileSnapshot {
+            user_id: "synthetic-user".into(),
+            username: "synthetic".into(),
+            display_name: Some("Dott.ssa Sintetica".into()),
+            ambulatory_name: None,
+            profile_version: "p1:synthetic".into(),
+            archive_generation: "synthetic-generation".into(),
+        }
+    }
+    fn account_profile_read_wire() -> Value {
+        json!({
+            "operation": "account-profile.read.v1", "contractVersion": 1,
+            "userId": "synthetic-user", "username": "synthetic",
+            "displayName": "Dott.ssa Sintetica", "ambulatoryName": null,
+            "profileVersion": "p1:synthetic", "archiveGeneration": "synthetic-generation"
+        })
+    }
+    fn account_profile_update_wire(changed: bool) -> Value {
+        json!({
+            "changed": changed,
+            "userId": "synthetic-user", "username": "synthetic",
+            "displayName": "Dott. Sintetico", "ambulatoryName": null,
+            "profileVersion": "p1:updated", "archiveGeneration": "synthetic-generation"
+        })
+    }
+    fn profile_server(
+        status: u16,
+        body: Value,
+    ) -> (
+        String,
+        mpsc::Receiver<String>,
+        thread::JoinHandle<TcpListener>,
+    ) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let (seen_tx, seen_rx) = mpsc::channel();
+        let worker = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let request = read_request(&mut stream);
+            let body = body.to_string();
+            write!(
+                stream,
+                "HTTP/1.1 {status} Test\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+            let _ = seen_tx.send(request);
+            listener
+        });
+        (url, seen_rx, worker)
+    }
+
+    #[test]
+    fn account_profile_read_and_update_send_only_the_closed_conditional_contract() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let (seen_tx, seen_rx) = mpsc::channel();
+        let expected_body = account_profile_update_wire(true);
+        let read_body = account_profile_read_wire();
+        let server = thread::spawn(move || {
+            for (index, response) in [read_body, expected_body].into_iter().enumerate() {
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                seen_tx.send((index, request)).unwrap();
+                let body = response.to_string();
+                write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                )
+                .unwrap();
+            }
+            listener
+        });
+        let session = session_at(&url);
+        let read = session.read_account_profile().unwrap();
+        assert_eq!(read.display_name.as_deref(), Some("Dott.ssa Sintetica"));
+        let outcome = session
+            .update_account_profile(&read.snapshot(), Some("  Dott. Sintetico  "), Some("   "))
+            .unwrap();
+        let AccountProfileUpdateOutcome::Saved { changed, profile } = outcome else {
+            panic!("expected the confirmed save");
+        };
+        assert!(changed);
+        assert_eq!(profile.ambulatory_name, None);
+        assert_eq!(profile.profile_version, "p1:updated");
+
+        let (index, request) = seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(index, 0);
+        assert!(request.starts_with("GET /api/auth/profile "));
+        for header in [
+            "x-mediflow-paired-client-id: synthetic-device",
+            "x-mediflow-paired-client-token:",
+            "cookie:",
+            "x-mediflow-source-surface: native",
+            "x-mediflow-archive-generation: synthetic-generation",
+        ] {
+            assert!(request.contains(header), "{header}");
+        }
+        let (index, request) = seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(index, 1);
+        assert!(request.starts_with("PUT /api/auth/profile "));
+        assert!(request.contains("x-mediflow-archive-generation: synthetic-generation"));
+        let posted: Value =
+            serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+        assert_eq!(posted.as_object().unwrap().len(), 3);
+        assert_eq!(posted["expectedVersion"], "p1:synthetic");
+        assert_eq!(posted["displayName"], "Dott. Sintetico");
+        assert_eq!(posted["ambulatoryName"], Value::Null);
+        assert!(posted.get("id").is_none() && posted.get("userId").is_none());
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn account_profile_conflict_archive_replacement_and_rejection_stay_distinct() {
+        let conflict = json!({
+            "userId": "synthetic-user", "username": "synthetic",
+            "displayName": "Altro client", "ambulatoryName": "Altro studio",
+            "profileVersion": "p1:other", "archiveGeneration": "synthetic-generation",
+            "code": "PROFILE_VERSION_CONFLICT", "error": "Il profilo è cambiato."
+        });
+        let (url, seen, server) = profile_server(409, conflict);
+        let session = session_at(&url);
+        let outcome = session
+            .update_account_profile(&account_profile_snapshot(), Some("Bozza"), None)
+            .unwrap();
+        let AccountProfileUpdateOutcome::VersionConflict { current } = outcome else {
+            panic!("expected the conflict state");
+        };
+        assert_eq!(current.profile_version, "p1:other");
+        assert_eq!(current.display_name.as_deref(), Some("Altro client"));
+        let request = seen.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert!(request.starts_with("PUT /api/auth/profile "));
+        let listener = server.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(
+            matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock),
+            "a conflict must never trigger an automatic retry"
+        );
+
+        let (url, _, server) =
+            profile_server(409, json!({"error":"archivio","code":"ARCHIVE_REPLACED"}));
+        let session = session_at(&url);
+        assert_eq!(
+            session.update_account_profile(&account_profile_snapshot(), Some("Bozza"), None),
+            Err(RuntimeError::ArchiveReplaced)
+        );
+        let listener = server.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(
+            matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
+        );
+
+        let (url, _, server) = profile_server(400, json!({"error":"Payload non valido"}));
+        let session = session_at(&url);
+        assert_eq!(
+            session.update_account_profile(&account_profile_snapshot(), Some("Bozza"), None),
+            Err(RuntimeError::Rejected(400))
+        );
+        server.join().unwrap();
+
+        let (url, _, server) = profile_server(401, json!({"error":"Unauthorized"}));
+        let session = session_at(&url);
+        assert_eq!(
+            session.update_account_profile(&account_profile_snapshot(), Some("Bozza"), None),
+            Err(RuntimeError::Authentication)
+        );
+        assert!(session.is_locked());
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn account_profile_read_requires_the_session_subject_and_no_archive_substitution() {
+        let mut wire = account_profile_read_wire();
+        wire["userId"] = json!("another-user");
+        let (url, _, server) = profile_server(200, wire);
+        let session = session_at(&url);
+        assert_eq!(
+            session.read_account_profile(),
+            Err(RuntimeError::InvalidResponse)
+        );
+        server.join().unwrap();
+
+        let (url, _, server) =
+            profile_server(409, json!({"error":"archivio","code":"ARCHIVE_REPLACED"}));
+        let session = session_at(&url);
+        assert_eq!(
+            session.read_account_profile(),
+            Err(RuntimeError::ArchiveReplaced)
+        );
+        server.join().unwrap();
     }
 
     #[test]
