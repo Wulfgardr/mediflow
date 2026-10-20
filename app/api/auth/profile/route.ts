@@ -30,7 +30,14 @@ export async function GET(request: Request) {
     }
 
     try {
-        const result = await readAccountProfile(session);
+        const nativeBinding = session.authChannel === 'native'
+            ? await pairedNativeClientBinding(request)
+            : null;
+        if (session.authChannel === 'native' && !nativeBinding) {
+            return conditionalFailure({ error: 'Unauthorized' }, 401);
+        }
+        const result = await readAccountProfile({ session, request, nativeBinding });
+        if (result.kind === 'denied') return conditionalFailure(result.denial.value, result.denial.status);
         if (result.kind === 'not-found') return conditionalFailure({ error: 'User not found' }, 404);
         return NextResponse.json(result.profile, { headers: NO_STORE });
     } catch (error) {
@@ -114,7 +121,7 @@ export async function PUT(request: Request) {
             nativeBinding,
         });
 
-        if (result.kind === 'unauthorized') return conditionalFailure({ error: 'Unauthorized' }, 401);
+        if (result.kind === 'denied') return conditionalFailure(result.denial.value, result.denial.status);
         if (result.kind === 'not-found') return conditionalFailure({ error: 'User not found' }, 404);
         if (result.kind === 'version-conflict') {
             return conditionalFailure({

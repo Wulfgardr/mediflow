@@ -6,13 +6,15 @@ import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 import { eq } from 'drizzle-orm';
 
 import { auditEvents, settings, users } from '@/lib/schema';
 import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } from '@/lib/network-patient-authority-test-fixture';
 import { clearAllSessions, retireServerSessionForLogout } from './server-session';
-import { rotateSqliteArchiveGeneration } from '@/lib/archive-generation';
+import { ArchiveReplacedError, rotateSqliteArchiveGeneration } from '@/lib/archive-generation';
+import { NETWORK_MODE_KEY } from '@/lib/network-contract';
+import { NETWORK_PAIRING_STATE_KEY, serializeNetworkPairingState } from '@/lib/network-pairing-model';
 
 const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-account-profile-'));
@@ -22,6 +24,8 @@ const cleanupCookies = installNetworkPatientCookieFixture(dataDir, cookieState);
 const { dbServer, openDbServer } = load('../db-server.ts') as typeof import('../db-server');
 openDbServer();
 
+const profileService = load('./profile-update-service.ts') as typeof import('./profile-update-service');
+const pairedSessions = load('./paired-native-session.ts') as typeof import('./paired-native-session');
 const profileRoute = load('../../app/api/auth/profile/route.ts') as typeof import('../../app/api/auth/profile/route');
 const checkRoute = load('../../app/api/auth/check/route.ts') as typeof import('../../app/api/auth/check/route');
 const setupRoute = load('../../app/api/auth/setup/route.ts') as typeof import('../../app/api/auth/setup/route');
@@ -174,6 +178,18 @@ async function waitUntil(predicate: () => boolean): Promise<void> {
         await new Promise<void>(resolve => setImmediate(resolve));
     }
     throw new Error('synthetic body reader was not reached');
+}
+
+function beforeNextTransaction(t: TestContext, change: () => void): () => boolean {
+    let reached = false;
+    const transaction = dbServer.transaction.bind(dbServer);
+    t.mock.method(dbServer, 'transaction', (...args: Parameters<typeof dbServer.transaction>) => {
+        assert.equal(dbServer.$client.inTransaction, false);
+        reached = true;
+        change();
+        return transaction(...args);
+    }, { times: 1 });
+    return () => reached;
 }
 
 async function currentProfile(): Promise<{ profileVersion: string }> {
@@ -423,6 +439,115 @@ test('a web conditional PUT requires the archive generation header and then succ
     assert.equal(reread.profileVersion, updated.profileVersion);
     assert.equal(reread.archiveGeneration, webGeneration);
 });
+
+test('account profile admission and commit require no patient capability', async () => {
+    const pairing = JSON.parse(serializeNetworkPairingState({
+        intents: [], clients: [{ ...nativeAuthority.pairedClient, grantedCapabilities: [] }],
+    })) as Record<string, unknown>;
+    pairing.archiveGeneration = nativeAuthority.request.headers.get('x-mediflow-archive-generation');
+    dbServer.update(settings).set({ value: JSON.stringify(pairing) })
+        .where(eq(settings.key, NETWORK_PAIRING_STATE_KEY)).run();
+    const read = await profileRoute.GET(profileRequest());
+    assert.equal(read.status, 200);
+    const current = await read.json() as { profileVersion: string };
+    const auditsBefore = auditCount();
+    const updated = await profileRoute.PUT(request({
+        expectedVersion: current.profileVersion,
+        displayName: 'Synthetic account operator', ambulatoryName: 'Synthetic account clinic',
+    }));
+    assert.equal(updated.status, 200);
+    assert.equal(auditCount(), auditsBefore + 1);
+    nativeAuthority = createNativeAuthority();
+});
+
+test('a restore while profile database resolution yields never returns replacement data', async () => {
+    const readRequest = profileRequest();
+    const session = await pairedSessions.requireAccountSession(readRequest);
+    assert.equal(session, nativeAuthority.session);
+    assert.ok(session);
+    const nativeBinding = await pairedSessions.pairedNativeClientBinding(readRequest);
+    assert.ok(nativeBinding);
+
+    const pending = profileService.readAccountProfile({ session, request: readRequest, nativeBinding }, { db: dbServer });
+    dbServer.$client.transaction(() => {
+        rotateSqliteArchiveGeneration(dbServer.$client);
+        setProfile(nativeUserId, 'Synthetic replacement operator', 'Synthetic replacement clinic');
+    }).immediate();
+    clearAllSessions();
+    const replacement = profileRows(nativeUserId);
+    await assert.rejects(pending, ArchiveReplacedError);
+    assert.deepEqual(profileRows(nativeUserId), replacement);
+    nativeAuthority = createNativeAuthority();
+});
+
+test('GET fences a restore after paired admission and before its read transaction', async (t) => {
+    let replacement: ReturnType<typeof profileRows> | undefined;
+    const reached = beforeNextTransaction(t, () => {
+        dbServer.$client.transaction(() => {
+            rotateSqliteArchiveGeneration(dbServer.$client);
+            setProfile(nativeUserId, 'Synthetic replacement operator', 'Synthetic replacement clinic');
+        }).immediate();
+        clearAllSessions();
+        replacement = profileRows(nativeUserId);
+    });
+    const response = await profileRoute.GET(profileRequest());
+    assert.equal(reached(), true);
+    assert.equal(response.status, 409);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    const body = await response.json() as Record<string, unknown>;
+    assert.equal(body.code, 'ARCHIVE_REPLACED');
+    assert.equal(body.displayName, undefined);
+    assert.equal(body.profileVersion, undefined);
+    assert.deepEqual(profileRows(nativeUserId), replacement);
+    nativeAuthority = createNativeAuthority();
+});
+
+for (const method of ['GET', 'PUT'] as const) {
+    test(`${method}: a session retired immediately before its transaction has no profile or audit effects`, async (t) => {
+        const current = await currentProfile();
+        const before = profileRows(nativeUserId);
+        const reached = beforeNextTransaction(t, () => retireServerSessionForLogout(nativeAuthority.session.id));
+        const response = method === 'GET'
+            ? await profileRoute.GET(profileRequest())
+            : await profileRoute.PUT(request({
+                expectedVersion: current.profileVersion,
+                displayName: 'Synthetic retired operator', ambulatoryName: 'Synthetic retired clinic',
+            }));
+        assert.equal(reached(), true);
+        assert.equal(response.status, 401);
+        assert.equal(response.headers.get('cache-control'), 'no-store');
+        assert.deepEqual(await response.json(), { error: 'Unauthorized' });
+        assert.deepEqual(profileRows(nativeUserId), before);
+        nativeAuthority = createNativeAuthority();
+    });
+}
+
+for (const method of ['GET', 'PUT'] as const) for (const revocation of ['pairing', 'mode'] as const) {
+    test(`${method} rechecks ${revocation} after binding resolution inside its transaction`, async (t) => {
+        const current = await currentProfile();
+        const before = profileRows(nativeUserId);
+        const reached = beforeNextTransaction(t, () => {
+            const key = revocation === 'pairing' ? NETWORK_PAIRING_STATE_KEY : NETWORK_MODE_KEY;
+            const value = revocation === 'pairing'
+                ? serializeNetworkPairingState({ intents: [], clients: [] }) : 'local-only';
+            dbServer.update(settings).set({ value }).where(eq(settings.key, key)).run();
+        });
+        const response = method === 'GET'
+            ? await profileRoute.GET(profileRequest())
+            : await profileRoute.PUT(request({
+                expectedVersion: current.profileVersion,
+                displayName: 'Synthetic revoked operator', ambulatoryName: 'Synthetic revoked clinic',
+            }));
+        assert.equal(reached(), true);
+        assert.equal(response.status, revocation === 'pairing' ? 401 : 403);
+        assert.equal(response.headers.get('cache-control'), 'no-store');
+        const body = await response.json() as Record<string, unknown>;
+        if (revocation === 'mode') assert.equal(body.code, 'NETWORK_MODE_DISABLED');
+        else assert.deepEqual(body, { error: 'Unauthorized' });
+        assert.deepEqual(profileRows(nativeUserId), before);
+        nativeAuthority = createNativeAuthority();
+    });
+}
 
 test('a replaced archive after admission returns ARCHIVE_REPLACED without effects', async () => {
     const current = await currentProfile();

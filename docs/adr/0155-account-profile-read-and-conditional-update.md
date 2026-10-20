@@ -78,6 +78,11 @@ Per una sessione nativa, una generazione d'archivio della sessione diversa da
 quella corrente dà `409 ARCHIVE_REPLACED`. Tutte le risposte sono
 `Cache-Control: no-store`.
 
+La generazione e la sessione corrente sono verificate nella stessa transazione
+sincrona che legge il profilo, dopo la risoluzione del database. Un ripristino
+tra l'ammissione e la lettura non può esporre dati del nuovo archivio con la
+vecchia generazione. Una sessione ritirata dà `401`, senza dati del profilo.
+
 ### Aggiornamento condizionale
 
 `PUT /api/auth/profile` con `expectedVersion` nel corpo. Il corpo deve contenere
@@ -93,7 +98,11 @@ scritture Web. Poi una sola transazione `IMMEDIATE`:
    altrimenti `409 ARCHIVE_REPLACED`;
 2. verifica che la sessione sia ancora quella corrente: chiusa o sostituita
    dà `401`, senza effetti. La verifica riusa la logica di sessione corrente
-   di `lib/network-patient-commit-authority.ts`, estratta senza duplicarla;
+   di `lib/network-patient-commit-authority.ts`, estratta senza duplicarla.
+   Per i client nativi, lettura e aggiornamento rileggono anche pairing e modalità
+   nella transazione attraverso lo stesso controllo usato dal guard network:
+   pairing revocato dà `401`; modalità disabilitata dà `403 NETWORK_MODE_DISABLED`.
+   Il profilo non richiede capability aggiuntive;
 3. ricalcola `profileVersion` dalla riga corrente. Se diverso da `expectedVersion`
    risponde `409 PROFILE_VERSION_CONFLICT` con il profilo corrente e nessun effetto;
 4. se i valori normalizzati coincidono con quelli correnti, non scrive nulla e
