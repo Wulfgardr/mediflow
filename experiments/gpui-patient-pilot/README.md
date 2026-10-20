@@ -192,6 +192,11 @@ Il rientro in Impostazioni legge di nuovo la configurazione. Questa vista
 non qualifica la disponibilità dei modelli, non avvia generazioni e non
 modifica la configurazione AI.
 
+In Impostazioni, «Profilo» legge nome medico e nome ambulatorio da
+`/api/auth/profile` e li salva solo con la versione osservata (`expectedVersion`).
+Un conflitto conserva la bozza e richiede «Salva comunque sopra la versione
+attuale»; un esito incerto blocca ogni nuovo invio fino a «Rileggi e verifica».
+
 «Preferenze funzioni AI» apre una sottopagina GPUI sul contratto nativo v1
 esistente: GET/POST `/api/v1/network/ai/functions` e POST `/preview`. Serve
 un operatore amministratore e l'autorizzazione esplicita dell'host per quel
