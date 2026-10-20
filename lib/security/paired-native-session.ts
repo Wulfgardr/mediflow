@@ -15,8 +15,11 @@ import type { PairedNativeBinding } from './current-session-authority';
 
 export type PairedNativeSession = ServerSession & { authChannel: 'native' };
 
-/** Only the current authenticated device can use its exact server-tagged operator session. */
-export async function requirePairedNativeSession(request: Request): Promise<PairedNativeSession | null> {
+/**
+ * Admission shared by the session requirement and archive-replacement report:
+ * everything a native session must satisfy apart from its archive generation.
+ */
+async function admittedPairedNativeSession(request: Request): Promise<PairedNativeSession | null> {
     try {
         const client = await authenticateNetworkPairedClient(request);
         if (!client || await getNetworkOperatingMode() !== 'network-home-base') return null;
@@ -24,8 +27,7 @@ export async function requirePairedNativeSession(request: Request): Promise<Pair
         if (!bearer || !/^[a-f0-9]{64}$/u.test(bearer)) return null;
         const session = peekSession(bearer);
         const binding = { clientId: client.clientId, clientPlatform: client.clientPlatform, tokenHash: client.tokenHash };
-        if (!session || session.authChannel !== 'native' || !isPairedNativeServerSession(session, binding)
-            || !sessionMatchesArchive(session)) return null;
+        if (!session || session.authChannel !== 'native' || !isPairedNativeServerSession(session, binding)) return null;
         const user = dbServer.select({ id: users.id, username: users.username, role: users.role })
             .from(users).where(eq(users.id, session.userId)).get();
         if (!user || user.username !== session.username || (user.role ?? 'user') !== session.role) {
@@ -36,17 +38,25 @@ export async function requirePairedNativeSession(request: Request): Promise<Pair
     } catch { return null; }
 }
 
+/** Only the current authenticated device can use its exact server-tagged operator session. */
+export async function requirePairedNativeSession(request: Request): Promise<PairedNativeSession | null> {
+    const session = await admittedPairedNativeSession(request);
+    return session !== null && sessionMatchesArchive(session) ? session : null;
+}
+
 /** Account routes share transport, but each channel supplies its own authenticated authority. */
 export async function requireAccountSession(request: Request) {
     return await requireSession() ?? await requirePairedNativeSession(request);
 }
 
-/** A native session whose bound archive was replaced after it was issued. */
-export async function nativeSessionArchiveReplaced(): Promise<boolean> {
-    const bearer = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
-    if (!bearer || !/^[a-f0-9]{64}$/u.test(bearer)) return false;
-    const session = peekSession(bearer);
-    return session !== null && session.authChannel === 'native' && !sessionMatchesArchive(session);
+/**
+ * A native session whose bound archive was replaced after it was issued.
+ * Reported only to a requester that would otherwise be admitted, so an
+ * unauthenticated cookie cannot learn the archive's state.
+ */
+export async function nativeSessionArchiveReplaced(request: Request): Promise<boolean> {
+    const session = await admittedPairedNativeSession(request);
+    return session !== null && !sessionMatchesArchive(session);
 }
 
 /** Re-reads the paired-client tag at commit time; the session alone does not carry it. */

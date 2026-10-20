@@ -25,7 +25,7 @@ function archiveReplacedResponse() {
 export async function GET(request: Request) {
     const session = await requireAccountSession(request);
     if (!session) {
-        if (await nativeSessionArchiveReplaced()) return archiveReplacedResponse();
+        if (await nativeSessionArchiveReplaced(request)) return archiveReplacedResponse();
         return conditionalFailure({ error: 'Unauthorized' }, 401);
     }
 
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
     const session = await requireAccountSession(request);
     if (!session) {
-        if (await nativeSessionArchiveReplaced()) return archiveReplacedResponse();
+        if (await nativeSessionArchiveReplaced(request)) return archiveReplacedResponse();
         return unauthorizedResponse();
     }
 
