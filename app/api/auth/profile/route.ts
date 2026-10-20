@@ -1,14 +1,10 @@
 import { NextResponse } from 'next/server';
-import { forbiddenResponse, unauthorizedResponse } from '@/lib/security/server-auth';
 import { nativeSessionArchiveReplaced, pairedNativeClientBinding, requireAccountSession } from '@/lib/security/paired-native-session';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
-import {
-    authProfileConditionalUpdateSchema,
-    authProfileUpdateSchema,
-} from '@/lib/api-schemas/auth';
-import { INVALID_API_PAYLOAD_ERROR, parseApiBody } from '@/lib/api-schemas/parse';
+import { authProfileConditionalUpdateSchema } from '@/lib/api-schemas/auth';
+import { INVALID_API_PAYLOAD_ERROR } from '@/lib/api-schemas/parse';
 import { apiInternalError, archiveReplacementResponse } from '@/lib/api-error-response';
-import { readAccountProfile, updateProfile, updateProfileConditionally } from '@/lib/security/profile-update-service';
+import { readAccountProfile, updateProfileConditionally } from '@/lib/security/profile-update-service';
 import { ArchiveReplacedError } from '@/lib/archive-generation';
 import { sessionMatchesArchive } from '@/lib/security/archive-session-generation';
 
@@ -49,50 +45,14 @@ export async function PUT(request: Request) {
     const session = await requireAccountSession(request);
     if (!session) {
         if (await nativeSessionArchiveReplaced(request)) return archiveReplacedResponse();
-        return unauthorizedResponse();
+        return conditionalFailure({ error: 'Unauthorized' }, 401);
     }
 
     let rawBody: unknown;
     try {
         rawBody = await request.json();
-    } catch (error) {
-        console.error("Profile update error:", error);
-        return NextResponse.json({ error: "Update failed" }, { status: 500 });
-    }
-
-    // ADR 0155: only the presence of this key chooses the conditional branch.
-    const conditional = typeof rawBody === 'object' && rawBody !== null
-        && Object.prototype.hasOwnProperty.call(rawBody, 'expectedVersion');
-
-    if (!conditional) {
-        try {
-            const parsedBody = parseApiBody(authProfileUpdateSchema, rawBody);
-            if (!parsedBody.ok) return parsedBody.response;
-            const body = parsedBody.data;
-            const requestedId = typeof body?.id === 'string' && body.id.trim().length > 0 ? body.id : session.userId;
-            const displayName = typeof body?.displayName === 'string' ? body.displayName : null;
-            const ambulatoryName = typeof body?.ambulatoryName === 'string' ? body.ambulatoryName : null;
-
-            if (requestedId !== session.userId) {
-                return forbiddenResponse();
-            }
-
-            const result = await updateProfile({
-                session,
-                request,
-                displayName,
-                ambulatoryName,
-            });
-
-            if (result.kind === 'not-found') {
-                return NextResponse.json({ error: 'User not found' }, { status: 404 });
-            }
-
-            return NextResponse.json({ success: true });
-        } catch (error) {
-            console.error("Profile update error:", error);
-            return NextResponse.json({ error: "Update failed" }, { status: 500 });
-        }
+    } catch {
+        return conditionalFailure({ error: INVALID_API_PAYLOAD_ERROR }, 400);
     }
 
     const parsedBody = authProfileConditionalUpdateSchema.safeParse(rawBody);

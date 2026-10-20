@@ -106,9 +106,11 @@ La soglia e la rilettura GPUI restano parte della composizione client.
 L'[ADR 0154](./adr/0154-population-demographics-read-boundary.md) propone la
 lettura host della demografia nello scope paired corrente: aggregatore TS
 canonico, calendario client esplicito e nessuna lettura di diagnosi o audit.
-L'[ADR 0155](./adr/0155-account-profile-read-and-conditional-update.md) propone
+L'[ADR 0155](./adr/0155-account-profile-read-and-conditional-update.md) definisce
 la lettura del profilo dell'account e la sua PUT condizionale: versione derivata
 dal contenuto, archivio e sessione verificati nel commit, audit nella stessa transazione.
+Web e Apple leggono la versione corrente e conservano la bozza in caso di conflitto;
+la PUT senza versione è rifiutata, quindi i client precedenti richiedono un aggiornamento.
 I job di build Web Core, E2E e Cross-platform `build-start` sui tre sistemi
 usano un checkout sparse non-cone della stessa revisione: non materializzano
 soltanto la fixture SQLite dei test Swift.
