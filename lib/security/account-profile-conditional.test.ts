@@ -342,21 +342,29 @@ test('conditional validation rejects extra fields, id, long names and missing na
     assert.equal(body.changed, true);
 });
 
-test('legacy PUT without expectedVersion keeps its unconditional behaviour', async () => {
+test('PUT without expectedVersion fails explicitly without profile or audit effects', async () => {
     const before = profileRows(nativeUserId);
-    const auditsBefore = auditCount();
-    const response = await profileRoute.PUT(request({
-        displayName: 'Dott. Legacy',
-        ambulatoryName: 'Studio Legacy',
+    for (const body of [
+        { displayName: 'Dott. Legacy', ambulatoryName: 'Studio Legacy' },
+        { id: nativeUserId, displayName: 'Dott. Legacy' },
+        { expectedVersion: '', displayName: 'A', ambulatoryName: 'B' },
+    ]) {
+        const response = await profileRoute.PUT(request(body));
+        assert.equal(response.status, 400);
+        assert.equal(response.headers.get('cache-control'), 'no-store');
+        assert.equal((await response.json() as Record<string, unknown>).error, 'Payload non valido');
+        assert.deepEqual(profileRows(nativeUserId), before);
+    }
+});
+
+test('malformed profile JSON is a validation failure without effects', async () => {
+    const before = profileRows(nativeUserId);
+    const response = await profileRoute.PUT(new Request(URL, {
+        method: 'PUT', headers: { ...nativeHeaders(), 'content-type': 'application/json' }, body: '{',
     }));
-    assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { success: true });
-    const rows = profileRows(nativeUserId);
-    assert.equal(rows.user?.displayName, 'Dott. Legacy');
-    assert.equal(rows.user?.ambulatoryName, 'Studio Legacy');
-    assert.equal(rows.settings.doctorName, 'Dott. Legacy');
-    assert.equal(rows.settings.clinicName, 'Studio Legacy');
-    assert.equal(rows.audit.length, auditsBefore + 1);
+    assert.equal(response.status, 400);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(profileRows(nativeUserId), before);
 });
 
 test('an audit failure inside the transaction rolls the profile back', async () => {
@@ -384,6 +392,27 @@ test('an audit failure inside the transaction rolls the profile back', async () 
     }
     assert.equal(response.status, 500);
     assert.deepEqual(profileRows(nativeUserId), before);
+});
+
+test('a settings write failure rolls the profile and audit back together', async () => {
+    const current = await currentProfile();
+    const before = profileRows(nativeUserId);
+    dbServer.$client.exec(`
+        CREATE TRIGGER abort_profile_settings BEFORE UPDATE ON settings
+        WHEN NEW.key = 'clinicName'
+        BEGIN SELECT RAISE(ABORT, 'simulated profile settings failure'); END;
+    `);
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+        const response = await profileRoute.PUT(request({ expectedVersion: current.profileVersion,
+            displayName: 'Synthetic rolled back operator', ambulatoryName: 'Synthetic rolled back clinic' }));
+        assert.equal(response.status, 500);
+        assert.deepEqual(profileRows(nativeUserId), before);
+    } finally {
+        console.error = originalError;
+        dbServer.$client.exec('DROP TRIGGER abort_profile_settings');
+    }
 });
 
 test('a session retired after admission returns 401 without effects', async () => {

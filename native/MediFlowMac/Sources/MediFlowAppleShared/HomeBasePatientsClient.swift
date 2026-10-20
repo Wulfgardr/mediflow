@@ -215,28 +215,43 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseMutationAcknowledgement.self, from: data)
     }
 
+    public func fetchAccountProfile(
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAccountProfile {
+        let url = try configuration.serverURL().appendingPathComponent("api/auth/profile")
+        let headers = accountHeaders(credentials: credentials, sessionCookie: sessionCookie)
+            .merging(["Cache-Control": "no-store"]) { _, new in new }
+        let (data, _) = try await send(to: url, headers: headers)
+        let profile = try decode(HomeBaseAccountProfile.self, from: data)
+        guard profile.operation == "account-profile.read.v1", profile.contractVersion == 1 else {
+            throw HomeBaseClientError.contract
+        }
+        return try validatedAccountProfile(profile)
+    }
+
     public func updateProfile(
-        userId: String,
-        displayName: String,
-        ambulatoryName: String,
-        credentials: HomeBasePairedCredentials,
-        sessionCookie: String
-    ) async throws -> HomeBaseMutationAcknowledgement {
-        let url = try configuration.serverURL()
-            .appendingPathComponent("api")
-            .appendingPathComponent("auth")
-            .appendingPathComponent("profile")
-        let (data, _) = try await send(
-            to: url,
-            method: "PUT",
-            headers: accountHeaders(credentials: credentials, sessionCookie: sessionCookie),
-            body: encode(AuthProfileUpdateRequest(
-                id: userId,
-                displayName: displayName,
-                ambulatoryName: ambulatoryName
-            ))
-        )
-        return try decode(HomeBaseMutationAcknowledgement.self, from: data)
+        expectedVersion: String, displayName: String?, ambulatoryName: String?, archiveGeneration: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAccountProfile {
+        let url = try configuration.serverURL().appendingPathComponent("api/auth/profile")
+        let headers = accountHeaders(credentials: credentials, sessionCookie: sessionCookie)
+            .merging(["Cache-Control": "no-store", "x-mediflow-archive-generation": archiveGeneration]) { _, new in new }
+        let (data, _) = try await send(to: url, method: "PUT", headers: headers,
+            body: encode(AuthProfileUpdateRequest(expectedVersion: expectedVersion,
+                displayName: displayName, ambulatoryName: ambulatoryName)))
+        let profile = try decode(HomeBaseAccountProfile.self, from: data)
+        guard profile.changed != nil, profile.archiveGeneration == archiveGeneration else {
+            throw HomeBaseClientError.contract
+        }
+        return try validatedAccountProfile(profile)
+    }
+
+    private func validatedAccountProfile(_ profile: HomeBaseAccountProfile) throws -> HomeBaseAccountProfile {
+        guard !profile.userId.isEmpty, !profile.username.isEmpty,
+              !profile.profileVersion.isEmpty, !profile.archiveGeneration.isEmpty else {
+            throw HomeBaseClientError.contract
+        }
+        return profile
     }
 
     public func fetchPatients(
@@ -1528,6 +1543,14 @@ public actor HomeBasePatientsClient {
                 if url.path.hasPrefix("/api/v1/network/ai/chatgpt/ordinary/") {
                     throw HomeBaseClientError.httpStatus(httpResponse.statusCode, nil)
                 }
+                if url.path == "/api/auth/profile", httpResponse.statusCode == 409,
+                   let payload = try? JSONDecoder().decode(APIErrorPayload.self, from: data) {
+                    if payload.code == "ARCHIVE_REPLACED" { throw HomeBaseClientError.archiveReplaced }
+                    if payload.code == "PROFILE_VERSION_CONFLICT" {
+                        let profile = try validatedAccountProfile(decode(HomeBaseAccountProfile.self, from: data))
+                        throw HomeBaseClientError.profileVersionConflict(profile)
+                    }
+                }
                 // WUL-308: a 409 carries a structured VERSION_CONFLICT body; surface
                 // it as a typed error so the UI can show expected-vs-current version.
                 if httpResponse.statusCode == 409,
@@ -1715,9 +1738,17 @@ private struct AuthChangePinRequest: Encodable {
 }
 
 private struct AuthProfileUpdateRequest: Encodable {
-    let id: String
-    let displayName: String
-    let ambulatoryName: String
+    let expectedVersion: String
+    let displayName: String?
+    let ambulatoryName: String?
+
+    enum CodingKeys: String, CodingKey { case expectedVersion, displayName, ambulatoryName }
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(expectedVersion, forKey: .expectedVersion)
+        try container.encode(displayName, forKey: .displayName)
+        try container.encode(ambulatoryName, forKey: .ambulatoryName)
+    }
 }
 
 private struct AmbulatoryVersionRequest: Encodable {

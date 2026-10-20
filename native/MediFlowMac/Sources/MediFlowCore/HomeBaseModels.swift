@@ -1813,6 +1813,52 @@ public struct HomeBaseFseDocumentValidationResponse: Codable, Hashable, Sendable
     }
 }
 
+public struct HomeBaseAccountProfile: Decodable, Equatable, Sendable {
+    public let userId: String
+    public let username: String
+    public let displayName: String?
+    public let ambulatoryName: String?
+    public let profileVersion: String
+    public let archiveGeneration: String
+    public let operation: String?
+    public let contractVersion: Int?
+    public let changed: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case userId, username, displayName, ambulatoryName, profileVersion, archiveGeneration, operation, contractVersion, changed
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        guard container.contains(.displayName), container.contains(.ambulatoryName) else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Missing account profile names"))
+        }
+        userId = try container.decode(String.self, forKey: .userId)
+        username = try container.decode(String.self, forKey: .username)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        ambulatoryName = try container.decodeIfPresent(String.self, forKey: .ambulatoryName)
+        profileVersion = try container.decode(String.self, forKey: .profileVersion)
+        archiveGeneration = try container.decode(String.self, forKey: .archiveGeneration)
+        operation = try container.decodeIfPresent(String.self, forKey: .operation)
+        contractVersion = try container.decodeIfPresent(Int.self, forKey: .contractVersion)
+        changed = try container.decodeIfPresent(Bool.self, forKey: .changed)
+    }
+
+    public init(userId: String, username: String, displayName: String?, ambulatoryName: String?,
+                profileVersion: String, archiveGeneration: String, operation: String? = nil,
+                contractVersion: Int? = nil, changed: Bool? = nil) {
+        self.userId = userId
+        self.username = username
+        self.displayName = displayName
+        self.ambulatoryName = ambulatoryName
+        self.profileVersion = profileVersion
+        self.archiveGeneration = archiveGeneration
+        self.operation = operation
+        self.contractVersion = contractVersion
+        self.changed = changed
+    }
+}
+
 public struct HomeBaseMutationAcknowledgement: Decodable, Equatable, Sendable {
     public let success: Bool
 
@@ -1827,6 +1873,8 @@ public enum HomeBaseClientError: LocalizedError, Equatable {
     case missingSessionCookie
     case transport(HomeBaseTransportIssue)
     case httpStatus(Int, String?)
+    case profileVersionConflict(HomeBaseAccountProfile)
+    case archiveReplaced
     case pinChangeConflict(String?)
     case versionConflict(VersionConflictPayload)
     case localAuthorityUnsupported(String)
@@ -1846,6 +1894,10 @@ public enum HomeBaseClientError: LocalizedError, Equatable {
             return "Operazione non autorizzata. Verifica i permessi del dispositivo."
         case .httpStatus(_, let message):
             return message ?? "La richiesta verso l'home-base non e andata a buon fine."
+        case .profileVersionConflict:
+            return "Il profilo è cambiato su un altro dispositivo. Rileggi e confronta i valori prima di salvare."
+        case .archiveReplaced:
+            return "L’archivio è stato sostituito. Accedi di nuovo prima di continuare."
         case .pinChangeConflict(let message):
             return message ?? "Il PIN e stato modificato da un'altra sessione. Ricarica e riprova."
         case .versionConflict(let conflict):

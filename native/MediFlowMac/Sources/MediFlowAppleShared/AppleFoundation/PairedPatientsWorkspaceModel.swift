@@ -920,14 +920,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         reconciliationLine = "Sessione bloccata. Accedi di nuovo per leggere o scrivere."
     }
 
-    /// Keeps the in-memory operator identity aligned after a successful
-    /// PUT /api/auth/profile, so the profile form reopens with saved values.
-    func noteProfileUpdated(displayName: String?, ambulatoryName: String?) {
-        guard let identity = operatorIdentity else { return }
+    func noteProfileUpdated(_ profile: HomeBaseAccountProfile, connection: ClinicalWorkspaceConnection.Identity) {
+        guard clinicalWorkspaceConnection?.identity == connection,
+              let identity = operatorIdentity, identity.userId == profile.userId else { return }
         operatorIdentity = OperatorIdentity(
             userId: identity.userId,
-            displayName: displayName,
-            ambulatoryName: ambulatoryName
+            displayName: profile.displayName,
+            ambulatoryName: profile.ambulatoryName
         )
     }
 

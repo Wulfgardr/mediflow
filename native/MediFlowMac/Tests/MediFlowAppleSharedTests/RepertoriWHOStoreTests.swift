@@ -185,7 +185,15 @@ private actor WHOStoreSource: HomeBasePatientsDataSource {
     func login( username: String?, password: String, credentials: HomeBasePairedCredentials ) async throws -> HomeBaseLoginResult { throw HomeBaseWHOError.unsupported }
     func changePin( currentPin: String, newPin: String, encryptedMasterKey: String, salt: String, credentials: HomeBasePairedCredentials, sessionCookie: String ) async throws -> HomeBaseMutationAcknowledgement { throw HomeBaseWHOError.unsupported }
     func logout( credentials: HomeBasePairedCredentials, sessionCookie: String ) async throws -> HomeBaseMutationAcknowledgement { throw HomeBaseWHOError.unsupported }
-    func updateProfile( userId: String, displayName: String, ambulatoryName: String, credentials: HomeBasePairedCredentials, sessionCookie: String ) async throws -> HomeBaseMutationAcknowledgement { throw HomeBaseWHOError.unsupported }
+    func fetchAccountProfile(credentials: HomeBasePairedCredentials, sessionCookie: String) async throws -> HomeBaseAccountProfile {
+        throw HomeBaseClientError.contract
+    }
+    func updateProfile(
+        expectedVersion: String, displayName: String?, ambulatoryName: String?, archiveGeneration: String,
+        credentials: HomeBasePairedCredentials, sessionCookie: String
+    ) async throws -> HomeBaseAccountProfile {
+        throw HomeBaseClientError.contract
+    }
     func fetchPatients( credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?, includeDeleted: Bool ) async throws -> [HomeBasePatientSummary] { throw HomeBaseWHOError.unsupported }
     func fetchPatients( credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?, includeDiagnoses: Bool ) async throws -> [HomeBasePatientSummary] { throw HomeBaseWHOError.unsupported }
     func fetchNetworkAmbulatories( credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String? ) async throws -> [NetworkAmbulatorySummary] { throw HomeBaseWHOError.unsupported }

@@ -411,6 +411,14 @@ const GENERATION = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9
 export const ARCHIVE_REPLACED_EVENT = 'mediflow:archive-replaced';
 let documentGeneration: string | null = null;
 
+/** Captures the current browser session and archive without exposing credentials. */
+export function captureClientAccountAuthority(): () => boolean {
+    const etag = currentAuthControlEtag;
+    const generation = documentGeneration;
+    return () => etag !== null && generation !== null
+        && currentAuthControlEtag === etag && documentGeneration === generation;
+}
+
 /** Never relatch a document that still contains records from the preceding archive. */
 export function rejectReplacedArchive(): never {
     if (typeof window !== 'undefined') {

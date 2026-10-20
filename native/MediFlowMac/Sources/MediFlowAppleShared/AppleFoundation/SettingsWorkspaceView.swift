@@ -50,15 +50,19 @@ final class SettingsProfileModel: ObservableObject {
     @Published var ambulatoryName = ""
     @Published private(set) var message: String?
     @Published private(set) var isWorking = false
+    @Published private(set) var currentProfile: HomeBaseAccountProfile?
+    @Published private(set) var requiresRead = true
 
     private let connectionProvider: () -> ClinicalWorkspaceConnection?
-    private let profileUpdated: (String?, String?) -> Void
+    private let profileUpdated: (HomeBaseAccountProfile, ClinicalWorkspaceConnection.Identity) -> Void
     private let sessionExpired: () async -> Void
+    private var loadedConnection: ClinicalWorkspaceConnection.Identity?
     private var loadedUserId: String?
+    private var requestGeneration: UInt = 0
 
     init(
         connectionProvider: @escaping () -> ClinicalWorkspaceConnection?,
-        profileUpdated: @escaping (String?, String?) -> Void,
+        profileUpdated: @escaping (HomeBaseAccountProfile, ClinicalWorkspaceConnection.Identity) -> Void,
         sessionExpired: @escaping () async -> Void
     ) {
         self.connectionProvider = connectionProvider
@@ -66,70 +70,113 @@ final class SettingsProfileModel: ObservableObject {
         self.sessionExpired = sessionExpired
     }
 
-    func sync(from identity: PairedPatientsWorkspaceModel.OperatorIdentity?) {
-        guard let identity else {
-            loadedUserId = nil
+    func load(identity: PairedPatientsWorkspaceModel.OperatorIdentity?) async {
+        let connection = connectionProvider()
+        if loadedConnection != connection?.identity || loadedUserId != identity?.userId {
+            requestGeneration &+= 1
+            loadedConnection = connection?.identity
+            loadedUserId = identity?.userId
+            currentProfile = nil
             displayName = ""
             ambulatoryName = ""
-            return
+            requiresRead = true
+            isWorking = false
+            message = nil
         }
-        guard loadedUserId != identity.userId else { return }
-        loadedUserId = identity.userId
-        displayName = identity.displayName ?? ""
-        ambulatoryName = identity.ambulatoryName ?? ""
-        message = nil
+        guard let connection, let identity, !isWorking else { return }
+        requestGeneration &+= 1
+        let generation = requestGeneration
+        let initial = currentProfile == nil
+        isWorking = true
+        requiresRead = true
+        defer {
+            if requestGeneration == generation, connectionProvider()?.identity == connection.identity { isWorking = false }
+        }
+        do {
+            let profile = try await connection.dataSource.fetchAccountProfile(
+                credentials: connection.credentials, sessionCookie: connection.sessionCookie)
+            guard isCurrent(connection, generation) else { return }
+            try validate(profile, userId: identity.userId)
+            currentProfile = profile
+            if initial {
+                displayName = profile.displayName ?? ""
+                ambulatoryName = profile.ambulatoryName ?? ""
+            }
+            requiresRead = false
+            profileUpdated(profile, connection.identity)
+            message = initial ? nil : "Profilo riletto. Confronta i valori salvati con la tua bozza prima di salvare."
+        } catch {
+            guard isCurrent(connection, generation) else { return }
+            await present(error)
+        }
     }
 
     func save(identity: PairedPatientsWorkspaceModel.OperatorIdentity?) async {
-        guard let identity else {
-            message = "Accedi con il PIN operatore prima di aggiornare il profilo."
+        guard !isWorking, !requiresRead, let expected = currentProfile,
+              let identity, identity.userId == expected.userId,
+              let connection = connectionProvider(), loadedConnection == connection.identity else { return }
+        guard displayName.count <= 200, ambulatoryName.count <= 200 else {
+            message = "Usa al massimo 200 caratteri per ciascun nome."
             return
         }
-        guard let connection = connectionProvider() else {
-            message = "Collega l'home-base e accedi con il PIN operatore prima di aggiornare il profilo."
-            return
-        }
-        let displayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let ambulatoryName = ambulatoryName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !displayName.isEmpty, !ambulatoryName.isEmpty else {
-            message = "Inserisci nome visualizzato e nome dell'ambulatorio."
-            return
-        }
-
+        requestGeneration &+= 1
+        let generation = requestGeneration
         isWorking = true
+        requiresRead = true
         message = nil
-        do {
-            let acknowledgement = try await connection.dataSource.updateProfile(
-                userId: identity.userId,
-                displayName: displayName,
-                ambulatoryName: ambulatoryName,
-                credentials: connection.credentials,
-                sessionCookie: connection.sessionCookie
-            )
-            guard acknowledgement.success else { throw HomeBaseClientError.contract }
-            profileUpdated(displayName, ambulatoryName)
-            message = "Profilo aggiornato."
-        } catch {
-            await present(error)
+        defer {
+            if requestGeneration == generation, connectionProvider()?.identity == connection.identity { isWorking = false }
         }
-        isWorking = false
+        do {
+            let profile = try await connection.dataSource.updateProfile(
+                expectedVersion: expected.profileVersion, displayName: displayName,
+                ambulatoryName: ambulatoryName, archiveGeneration: expected.archiveGeneration,
+                credentials: connection.credentials, sessionCookie: connection.sessionCookie)
+            guard isCurrent(connection, generation) else { return }
+            try validate(profile, userId: identity.userId)
+            guard let changed = profile.changed else { throw HomeBaseClientError.contract }
+            currentProfile = profile
+            requiresRead = false
+            displayName = profile.displayName ?? ""
+            ambulatoryName = profile.ambulatoryName ?? ""
+            profileUpdated(profile, connection.identity)
+            message = changed ? "Profilo aggiornato." : "Il profilo è già aggiornato."
+        } catch {
+            guard isCurrent(connection, generation) else { return }
+            requiresRead = true
+            if case HomeBaseClientError.profileVersionConflict(let profile) = error {
+                do {
+                    try validate(profile, userId: identity.userId)
+                    currentProfile = profile
+                    message = "Il profilo è cambiato su un altro dispositivo. La tua bozza è conservata. Rileggi e confronta i valori prima di salvare."
+                } catch { await present(error) }
+            } else { await present(error) }
+        }
+    }
+
+    private func isCurrent(_ connection: ClinicalWorkspaceConnection, _ generation: UInt) -> Bool {
+        !Task.isCancelled && requestGeneration == generation && connectionProvider()?.identity == connection.identity
+    }
+
+    private func validate(_ profile: HomeBaseAccountProfile, userId: String) throws {
+        guard profile.userId == userId, !profile.profileVersion.isEmpty, !profile.archiveGeneration.isEmpty else {
+            throw HomeBaseClientError.contract
+        }
+        if let currentProfile, currentProfile.archiveGeneration != profile.archiveGeneration {
+            throw HomeBaseClientError.archiveReplaced
+        }
     }
 
     private func present(_ error: Error) async {
-        if case HomeBaseClientError.httpStatus(let status, _) = error {
-            switch status {
-            case 401:
-                await sessionExpired()
-                message = "La sessione è scaduta. Accedi di nuovo prima di aggiornare il profilo."
-                return
-            case 403:
-                message = "Non hai l'autorizzazione per aggiornare il profilo."
-                return
-            default:
-                break
-            }
+        if case HomeBaseClientError.httpStatus(401, _) = error {
+            await sessionExpired()
+            return
         }
-        message = "Impossibile aggiornare il profilo: \(error.localizedDescription)"
+        if case HomeBaseClientError.archiveReplaced = error {
+            await sessionExpired()
+            return
+        }
+        message = "Operazione non confermata. La bozza è conservata. Verifica l’accesso e rileggi il profilo prima di riprovare."
     }
 }
 
@@ -400,8 +447,8 @@ struct SettingsWorkspaceView: View {
         self.appearance = appearance
         _profileModel = StateObject(wrappedValue: SettingsProfileModel(
             connectionProvider: { workspaceModel.clinicalWorkspaceConnection },
-            profileUpdated: { displayName, ambulatoryName in
-                workspaceModel.noteProfileUpdated(displayName: displayName, ambulatoryName: ambulatoryName)
+            profileUpdated: { profile, connection in
+                workspaceModel.noteProfileUpdated(profile, connection: connection)
             },
             sessionExpired: { await workspaceModel.lockSessionNow() }
         ))
@@ -464,8 +511,11 @@ struct SettingsWorkspaceView: View {
             }
         }
         .navigationTitle("Impostazioni")
-        .task(id: workspaceModel.operatorIdentity) {
-            profileModel.sync(from: workspaceModel.operatorIdentity)
+        .task(id: workspaceModel.clinicalWorkspaceConnection?.identity) {
+            await profileModel.load(identity: workspaceModel.operatorIdentity)
+        }
+        .task(id: selectedArea) {
+            if selectedArea == .profile { await profileModel.load(identity: workspaceModel.operatorIdentity) }
         }
         .task(id: workspaceModel.connectionState) {
             guard capabilities.hasCapability("network.ambulatories.write") else { return }
@@ -618,11 +668,21 @@ struct SettingsWorkspaceView: View {
     private var profileContent: some View {
         if workspaceModel.operatorIdentity != nil, workspaceModel.clinicalWorkspaceConnection != nil {
             TextField("Nome visualizzato", text: $profileModel.displayName)
+                .disabled(profileModel.isWorking || profileModel.currentProfile == nil)
             TextField("Nome ambulatorio", text: $profileModel.ambulatoryName)
+                .disabled(profileModel.isWorking || profileModel.currentProfile == nil)
             Button("Salva profilo") {
                 Task { await profileModel.save(identity: workspaceModel.operatorIdentity) }
             }
+            .disabled(profileModel.isWorking || profileModel.requiresRead)
+            Button("Rileggi profilo mantenendo la bozza") {
+                Task { await profileModel.load(identity: workspaceModel.operatorIdentity) }
+            }
             .disabled(profileModel.isWorking)
+            if let current = profileModel.currentProfile, profileModel.message != nil {
+                Text("Valori salvati: \(current.displayName ?? "Nome medico vuoto") · \(current.ambulatoryName ?? "Nome ambulatorio vuoto")")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
             if let message = profileModel.message { settingsMessage(message) }
         } else {
             settingsMessage("Collega l'home-base e accedi con il PIN operatore per aggiornare il profilo.")

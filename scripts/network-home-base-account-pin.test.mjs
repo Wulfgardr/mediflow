@@ -118,9 +118,11 @@ test('paired account PIN rotation preserves the master key and sealed patient fi
         assert.equal(winnerLogin.json.encryptedMasterKey, winner.blob);
 
         const profileName = `Account Pin Smoke ${patientId.slice(0, 8)}`;
+        const currentProfile = await request('GET', '/api/auth/profile', { headers: { ...winnerLogin.webHeaders } });
+        assert.equal(currentProfile.response.status, 200);
         const profile = await request('PUT', '/api/auth/profile', {
-            headers: { ...winnerLogin.webHeaders },
-            body: { id: winnerLogin.json.id, displayName: profileName, ambulatoryName: 'Account PIN Ambulatory' },
+            headers: { ...winnerLogin.webHeaders, 'x-mediflow-archive-generation': currentProfile.json.archiveGeneration },
+            body: { expectedVersion: currentProfile.json.profileVersion, displayName: profileName, ambulatoryName: 'Account PIN Ambulatory' },
         });
         assert.equal(profile.response.status, 200);
         const identity = await request('GET', '/api/v1/network/identity', {

@@ -1591,11 +1591,14 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         return HomeBaseMutationAcknowledgement(success: true)
     }
 
+    func fetchAccountProfile(credentials: HomeBasePairedCredentials, sessionCookie: String) async throws -> HomeBaseAccountProfile {
+        throw HomeBaseClientError.contract
+    }
     func updateProfile(
-        userId: String, displayName: String, ambulatoryName: String,
+        expectedVersion: String, displayName: String?, ambulatoryName: String?, archiveGeneration: String,
         credentials: HomeBasePairedCredentials, sessionCookie: String
-    ) async throws -> HomeBaseMutationAcknowledgement {
-        HomeBaseMutationAcknowledgement(success: true)
+    ) async throws -> HomeBaseAccountProfile {
+        throw HomeBaseClientError.contract
     }
 
     func createAmbulatory(

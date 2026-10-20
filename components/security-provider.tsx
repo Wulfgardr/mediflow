@@ -97,7 +97,7 @@ interface SecurityContextType {
         expectedFieldSet: ClinicianSoapEntryFieldSetV1,
     ) => Promise<ClinicianSoapEntryReopenResult>;
     lock: () => void;
-    updateUser: (data: Partial<User>) => void;
+    updateUser: (data: Pick<User, 'id' | 'displayName' | 'ambulatoryName'>, isCurrent: () => boolean) => void;
 }
 
 function formatLockedUntil(lockedUntil?: string) {
@@ -850,7 +850,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 sealClinicianSoapEntry,
                 reopenClinicianSoapEntry,
                 lock,
-                updateUser: (data) => setUser(prev => prev ? { ...prev, ...data } : null)
+                updateUser: (data, isCurrent) => setUser(prev => isCurrent() && prev?.id === data.id ? { ...prev, ...data } : prev)
             }}>
                 {pinResidueNotice}
                 <LockScreen />
@@ -876,7 +876,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             sealClinicianSoapEntry,
             reopenClinicianSoapEntry,
             lock,
-            updateUser: (data) => setUser(prev => prev ? { ...prev, ...data } : null)
+            updateUser: (data, isCurrent) => setUser(prev => isCurrent() && prev?.id === data.id ? { ...prev, ...data } : prev)
         }}>
             <div className="relative min-h-screen">
                 {pinResidueNotice}
