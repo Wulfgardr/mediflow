@@ -171,9 +171,11 @@ soltanto la proiezione demografica dell'ambulatorio corrente (ADR 0154).
 Il client non calcola età, fasce o indicatori clinici: confronta l'operazione,
 la versione, lo scope, l'archivio e la fascia restituiti, poi mostra i conteggi
 dell'host con barre proporzionali e la stessa distribuzione in testo. Il fuso
-restituito deve essere un nome IANA sintatticamente valido, non la stessa
-stringa inviata: l'host riporta il nome canonicalizzato (`Etc/UTC` diventa
-`UTC`) e la vista dichiara il calendario effettivamente usato.
+di sistema viene riletto a ogni lettura. Il fuso restituito deve essere un nome
+IANA riconosciuto dal client e avere lo stesso offset UTC del fuso richiesto
+all'istante di osservazione, non la stessa stringa inviata: l'host riporta il
+nome canonicalizzato (`Etc/UTC` diventa `UTC`) e la vista dichiara il
+calendario effettivamente usato; un fuso con offset diverso viene rifiutato.
 Una risposta non coerente, un risultato oltre il limite, un archivio sostituito
 o una lettura annullata non diventano un'analisi vuota riuscita. Se il fuso
 orario non è determinabile la richiesta non parte. Le diagnosi non sono incluse
