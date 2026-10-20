@@ -521,6 +521,12 @@ impl ClinicalApp {
     }
 
     pub(super) fn retry_patient_read(&mut self, object: ReadObject, cx: &mut Context<Self>) {
+        // The profile belongs to the session, not to the selected patient:
+        // neither a scope nor a selected chart may gate its reread.
+        if object == ReadObject::Profilo {
+            self.load_account_profile(cx);
+            return;
+        }
         if self
             .read_state(object)
             .is_none_or(|state| state.command().is_none())
