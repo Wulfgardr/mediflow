@@ -2,7 +2,7 @@
 //! The archived string is never rewritten. Parsing is iterative and bounded;
 //! unsupported or malformed markup stays visible as its original source.
 
-use crate::components::{WritingInk, WritingStyle};
+use crate::components::{WritingInk, WritingStyle, WritingSurface};
 use crate::theme::Theme;
 use crate::theme::{TypeRole, TypeStyle};
 use gpui::{
@@ -585,7 +585,7 @@ pub fn searchable_text(source: &str) -> String {
 pub fn render(source: &str, ink: WritingInk, theme: Theme) -> AnyElement {
     let document = parse(source);
     let mut content_theme = theme;
-    content_theme.ink = ink.color(theme);
+    content_theme.ink = ink.color(WritingSurface::Plane, theme);
     div().min_w_0().flex().flex_col().gap(px(10. * theme.scale))
         .when(document.unsupported, |element| element.child(
             div().text_color(theme.secondary).type_role(theme, TypeRole::Meta)
@@ -628,7 +628,7 @@ fn block_text(
                 TypeRole::Prose
             },
         )
-        .writing_ink(ink, theme)
+        .writing_ink(ink, WritingSurface::Plane, theme)
         .child(StyledText::new(SharedString::from(content)).with_highlights(highlights))
 }
 

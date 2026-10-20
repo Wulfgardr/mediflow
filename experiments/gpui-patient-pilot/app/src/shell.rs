@@ -31,8 +31,8 @@ use zeroize::Zeroizing;
 use crate::appointments::for_write as appointment_for_write;
 use crate::clinical_text;
 use crate::components::{
-    WritingInk, brand_icon, button, display_date, heading, notice, plain_text, section, tab,
-    writing_status,
+    WritingInk, WritingSurface, brand_icon, button, display_date, heading, notice, plain_text,
+    section, tab, writing_status,
 };
 use crate::documents::{self, Upload};
 use crate::editing;
@@ -4208,7 +4208,7 @@ impl ClinicalApp {
             FormState::Draft => threshold.bg(theme.draft).border_color(theme.draft_rule)
                 .child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
                     .child(div().flex_1().min_w_0().flex().flex_col().gap(px(4.))
-                        .child(writing_status("clinical-workspace-writing-status", WritingInk::Fresh, theme))
+                        .child(writing_status("clinical-workspace-writing-status", WritingInk::Fresh, WritingSurface::Plane, theme))
                         .child(div().type_role(theme, TypeRole::Meta).child(text!(format!("{} · {}", patient_name, form.edit.as_ref().map_or(form.kind.title(), editing::Record::title))))))
                     .child(div().flex().flex_wrap().gap(px(8.))
                         .child(self.form_actions[0].attach(button("clinical-workspace-cancel-form", "Scarta…", theme, false, true))
