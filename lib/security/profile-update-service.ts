@@ -11,9 +11,10 @@ import {
     writeAuditEventInTransaction,
 } from '@/lib/security/audit';
 import { assertArchiveGeneration, ArchiveReplacedError } from '@/lib/archive-generation';
-import { archiveGenerationForSession, currentArchiveGeneration } from '@/lib/security/archive-session-generation';
+import { archiveGenerationForSession } from '@/lib/security/archive-session-generation';
 import { isCurrentServerSession, type PairedNativeBinding } from '@/lib/security/current-session-authority';
 import { settings, users } from '@/lib/schema';
+import { revalidatePairedCommitAuthority, type NetworkPatientCommitDenial } from '@/lib/network-patient-commit-authority';
 import type { dbServer as dbServerType } from '@/lib/db-server';
 import type { ServerSession } from '@/lib/security/server-session';
 
@@ -54,22 +55,30 @@ export type AccountProfileRead = AccountProfileSnapshot & {
     contractVersion: 1;
 };
 
-export type AccountProfileReadResult = { kind: 'success'; profile: AccountProfileRead } | { kind: 'not-found' };
+type ProfileAuthorityDenial = { kind: 'denied'; denial: NetworkPatientCommitDenial };
 
-export type ProfileConditionalUpdateInput = {
+export type AccountProfileReadResult =
+    | { kind: 'success'; profile: AccountProfileRead }
+    | { kind: 'not-found' }
+    | ProfileAuthorityDenial;
+
+export type AccountProfileAuthorityInput = {
     session: ServerSession;
     request: Request;
+    nativeBinding?: PairedNativeBinding | null;
+};
+
+export type ProfileConditionalUpdateInput = AccountProfileAuthorityInput & {
     expectedVersion: string;
     displayName: string | null;
     ambulatoryName: string | null;
-    nativeBinding?: PairedNativeBinding | null;
 };
 
 export type ProfileConditionalUpdateResult =
     | { kind: 'success'; changed: boolean; profile: AccountProfileSnapshot }
     | { kind: 'not-found' }
     | { kind: 'version-conflict'; profile: AccountProfileSnapshot }
-    | { kind: 'unauthorized' };
+    | ProfileAuthorityDenial;
 
 type ProfileRow = {
     id: string;
@@ -109,25 +118,41 @@ function snapshotFromRow(row: ProfileRow, archiveGeneration: string): AccountPro
     };
 }
 
-function requireSessionGeneration(session: ServerSession): string {
-    const generation = archiveGenerationForSession(session);
-    if (!generation || generation !== currentArchiveGeneration()) throw new ArchiveReplacedError();
-    return generation;
+function profileAuthorityDenial(
+    tx: Parameters<Parameters<ProfileDatabase['transaction']>[0]>[0],
+    input: AccountProfileAuthorityInput,
+    generation: string,
+): NetworkPatientCommitDenial | null {
+    if (input.session.authChannel === 'native' && input.nativeBinding) {
+        return revalidatePairedCommitAuthority(tx, {
+            ...input,
+            binding: input.nativeBinding,
+            archiveGeneration: generation,
+        });
+    }
+    return isCurrentServerSession(input.session)
+        ? null
+        : { status: 401, value: { error: 'Unauthorized' } };
 }
 
-/** Reads the session user's profile. No role, hash, salt, key, lock or recovery data leaves. */
 export async function readAccountProfile(
-    session: ServerSession,
+    input: AccountProfileAuthorityInput,
     dependencies: ProfileUpdateServiceDependencies = {},
 ): Promise<AccountProfileReadResult> {
-    const generation = requireSessionGeneration(session);
     const db = await resolveDatabase(dependencies);
-    const row = db.select(profileColumns).from(users).where(eq(users.id, session.userId)).get();
-    if (!row) return { kind: 'not-found' };
-    return {
-        kind: 'success',
-        profile: { operation: 'account-profile.read.v1', contractVersion: 1, ...snapshotFromRow(row, generation) },
-    };
+    return db.transaction((tx) => {
+        const generation = archiveGenerationForSession(input.session);
+        assertArchiveGeneration(tx, generation);
+        if (!generation) throw new ArchiveReplacedError();
+        const denial = profileAuthorityDenial(tx, input, generation);
+        if (denial) return { kind: 'denied', denial } as const;
+        const row = tx.select(profileColumns).from(users).where(eq(users.id, input.session.userId)).get();
+        if (!row) return { kind: 'not-found' } as const;
+        return {
+            kind: 'success',
+            profile: { operation: 'account-profile.read.v1', contractVersion: 1, ...snapshotFromRow(row, generation) },
+        } as const;
+    });
 }
 
 /**
@@ -144,9 +169,8 @@ export async function updateProfileConditionally(
         const generation = archiveGenerationForSession(input.session);
         assertArchiveGeneration(tx, generation);
         if (!generation) throw new ArchiveReplacedError();
-        if (!isCurrentServerSession(input.session, input.nativeBinding ?? null)) {
-            return { kind: 'unauthorized' } as const;
-        }
+        const denial = profileAuthorityDenial(tx, input, generation);
+        if (denial) return { kind: 'denied', denial } as const;
 
         const row = tx.select(profileColumns).from(users).where(eq(users.id, input.session.userId)).get();
         if (!row) return { kind: 'not-found' } as const;
