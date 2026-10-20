@@ -116,6 +116,33 @@ for (const operation of ['create', 'update', 'delete', 'clear'] as const) {
     });
 }
 
+/* A restore replaces the archive after admission; the commit guard must deny with
+   the shared 409 contract and leave every domain and audit row untouched. */
+for (const operation of ['create', 'update', 'delete', 'clear'] as const) {
+    test(`${operation}: archive replacement after admission denies at commit with 409`, async () => {
+        const authority = fixture();
+        let controller!: ReadableStreamDefaultController<Uint8Array>;
+        const stream = new ReadableStream<Uint8Array>({ start(value) { controller = value; } });
+        const request = new Request(url(operation), {
+            method: operation === 'update' ? 'PUT' : operation === 'delete' ? 'DELETE' : 'POST',
+            headers: authority.request.headers, body: stream, duplex: 'half',
+        } as RequestInit);
+        let reading = false;
+        const getReader = request.body!.getReader.bind(request.body);
+        Object.defineProperty(request.body, 'getReader', { value: () => { reading = true; return getReader(); } });
+        const pending = invoke(operation, request);
+        await waitFor(() => reading);
+        const { rotateSqliteArchiveGeneration } = load('./archive-generation.ts') as typeof import('./archive-generation');
+        dbServer.$client.transaction(() => rotateSqliteArchiveGeneration(dbServer.$client)).immediate();
+        const before = snapshot();
+        controller.enqueue(new TextEncoder().encode(JSON.stringify(body(operation)))); controller.close();
+        const response = await pending;
+        assert.equal(response.status, 409);
+        assert.equal((await response.json()).code, 'ARCHIVE_REPLACED');
+        assert.deepEqual(snapshot(), before);
+    });
+}
+
 test('an admitted rename commits with an incremented version and its audit event', async () => {
     const authority = fixture();
     const request = new Request(url('update'), {
