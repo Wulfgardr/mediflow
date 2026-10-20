@@ -1082,7 +1082,7 @@ impl ClinicalApp {
                 let same_descriptor =
                     catalog.descriptor(scale.descriptor.id) == Some(&scale.descriptor);
                 scale.patient_version = patient.version;
-                self.patient.detail = Load::Ready(patient);
+                self.patient.detail = ReadLoad::Ready(patient);
                 if same_descriptor {
                     scale.catalog = catalog;
                     form.state = FormState::Draft;
@@ -1131,7 +1131,7 @@ impl ClinicalApp {
         scale.working = None;
         match result {
             Ok(ScaleEntryReadback::Verified(row)) => {
-                self.patient.entries = Load::Ready(vec![row]);
+                self.patient.entries = ReadLoad::Ready(vec![row]);
                 self.saved(
                     "Valutazione registrata e riletta integralmente dal Diario.",
                     cx,
@@ -1277,11 +1277,20 @@ impl ClinicalApp {
                     },
                 )
                 .when(
-                    matches!(self.patient.detail, Load::Loading | Load::Failed(_)),
+                    matches!(
+                        self.patient.detail,
+                        ReadLoad::Loading { .. } | ReadLoad::Failed(_)
+                    ),
                     |el| {
-                        el.child(
-                            self.load_hint("clinical-scales-profile-state", &self.patient.detail),
-                        )
+                        el.child(notice(
+                            "clinical-scales-profile-state",
+                            match &self.patient.detail {
+                                ReadLoad::Failed(error) => ui_error(error),
+                                _ => "Lettura in corso…".into(),
+                            },
+                            theme,
+                            matches!(self.patient.detail, ReadLoad::Failed(_)),
+                        ))
                     },
                 )
                 .children(
@@ -1303,14 +1312,17 @@ impl ClinicalApp {
                                 ),
                                 theme,
                                 false,
-                                !matches!(self.patient.detail, Load::Loading),
+                                !matches!(self.patient.detail, ReadLoad::Loading { .. }),
                             );
                             row.when_some(target, |row, target| target.attach(row))
-                                .when(!matches!(self.patient.detail, Load::Loading), |el| {
-                                    el.on_click(cx.listener(move |this, _, _, cx| {
-                                        this.select_patient(&id, true, cx)
-                                    }))
-                                })
+                                .when(
+                                    !matches!(self.patient.detail, ReadLoad::Loading { .. }),
+                                    |el| {
+                                        el.on_click(cx.listener(move |this, _, _, cx| {
+                                            this.select_patient(&id, true, cx)
+                                        }))
+                                    },
+                                )
                         }),
                 );
         }
