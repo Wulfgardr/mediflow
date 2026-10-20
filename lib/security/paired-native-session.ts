@@ -11,6 +11,7 @@ import {
 } from './server-session';
 import { requireSession } from './server-auth';
 import { sessionMatchesArchive } from './archive-session-generation';
+import type { PairedNativeBinding } from './current-session-authority';
 
 export type PairedNativeSession = ServerSession & { authChannel: 'native' };
 
@@ -38,4 +39,23 @@ export async function requirePairedNativeSession(request: Request): Promise<Pair
 /** Account routes share transport, but each channel supplies its own authenticated authority. */
 export async function requireAccountSession(request: Request) {
     return await requireSession() ?? await requirePairedNativeSession(request);
+}
+
+/** A native session whose bound archive was replaced after it was issued. */
+export async function nativeSessionArchiveReplaced(): Promise<boolean> {
+    const bearer = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
+    if (!bearer || !/^[a-f0-9]{64}$/u.test(bearer)) return false;
+    const session = peekSession(bearer);
+    return session !== null && session.authChannel === 'native' && !sessionMatchesArchive(session);
+}
+
+/** Re-reads the paired-client tag at commit time; the session alone does not carry it. */
+export async function pairedNativeClientBinding(request: Request): Promise<PairedNativeBinding | null> {
+    const client = await authenticateNetworkPairedClient(request);
+    if (!client) return null;
+    return {
+        clientId: client.clientId,
+        clientPlatform: client.clientPlatform,
+        tokenHash: client.tokenHash,
+    };
 }
