@@ -194,8 +194,12 @@ modifica la configurazione AI.
 
 In Impostazioni, «Profilo» legge nome medico e nome ambulatorio da
 `/api/auth/profile` e li salva solo con la versione osservata (`expectedVersion`).
-Un conflitto conserva la bozza e richiede «Salva comunque sopra la versione
-attuale»; un esito incerto blocca ogni nuovo invio fino a «Rileggi e verifica».
+La lettura automatica avviene una sola volta per autorità (sessione e archivio):
+rientrare in Impostazioni non rilegge e non riabilita il salvataggio. Un conflitto
+conserva la bozza, mostra separatamente i valori correnti ricevuti e non adotta la
+versione del 409; «Salva profilo» resta disabilitato finché «Rileggi profilo
+mantenendo la bozza» aggiorna la base senza toccare la bozza. Un esito incerto
+conserva la bozza e richiede la stessa rilettura esplicita prima di un nuovo invio.
 
 «Preferenze funzioni AI» apre una sottopagina GPUI sul contratto nativo v1
 esistente: GET/POST `/api/v1/network/ai/functions` e POST `/preview`. Serve

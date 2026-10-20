@@ -8,6 +8,15 @@ use mediflow_runtime_client::{
     AccountProfileRead, AccountProfileSnapshot, AccountProfileUpdate, AccountProfileUpdateOutcome,
 };
 
+const REREAD_MESSAGE: &str =
+    "Profilo riletto. Confronta i valori salvati con la tua bozza prima di salvare.";
+const CONFLICT_MESSAGE: &str = "Il profilo è cambiato su un altro dispositivo. La tua bozza è conservata. Rileggi e confronta i valori prima di salvare.";
+const SAVE_CONFIRMED: &str = "Profilo aggiornato.";
+const SAVE_ALREADY_CURRENT: &str = "Il profilo è già aggiornato.";
+const SAVE_UNCONFIRMED: &str = "Salvataggio non confermato. La bozza è conservata. Verifica l’accesso e rileggi il profilo prima di riprovare.";
+const READ_FAILED: &str =
+    "Lettura non riuscita. Verifica l’accesso e rileggi il profilo. La bozza è conservata.";
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Working {
     Read,
@@ -16,10 +25,22 @@ enum Working {
 
 pub(super) struct AccountProfile {
     pub(super) load: ReadLoad<()>,
+    /// Values and version of the last accepted read or write. A 409 never
+    /// replaces this base: only an explicit reread does.
     snapshot: Option<AccountProfileSnapshot>,
-    conflict: bool,
+    /// Current values received with a `PROFILE_VERSION_CONFLICT`, shown next to
+    /// the preserved draft until an explicit reread succeeds.
+    conflict: Option<AccountProfileSnapshot>,
     requires_read: bool,
     working: Option<Working>,
+    /// Bumped whenever the account authority is replaced, so a late reply from
+    /// the previous session or archive cannot reach this editor. The workspace
+    /// epoch is deliberately not involved: AI status refreshes and navigation
+    /// belong to other surfaces.
+    generation: u64,
+    /// The automatic initial read of the current authority has already been
+    /// requested. Navigation must not turn that into an implicit reread.
+    auto_read: bool,
     message: String,
     message_failed: bool,
     failure: Option<ViewStateKind>,
@@ -62,9 +83,11 @@ impl AccountProfile {
         Self {
             load: ReadLoad::Idle,
             snapshot: None,
-            conflict: false,
+            conflict: None,
             requires_read: true,
             working: None,
+            generation: 0,
+            auto_read: false,
             message: String::new(),
             message_failed: false,
             failure: None,
@@ -77,29 +100,17 @@ impl AccountProfile {
     }
 
     pub(super) fn reset(&mut self, cx: &mut Context<ClinicalApp>) {
+        self.generation = self.generation.wrapping_add(1);
         self.load = ReadLoad::Idle;
         self.snapshot = None;
-        self.conflict = false;
+        self.conflict = None;
         self.requires_read = true;
         self.working = None;
+        self.auto_read = false;
         self.message.clear();
         self.message_failed = false;
         self.failure = None;
         self.set_editors("", "", cx);
-    }
-
-    /// A scope or epoch change belongs to the workspace, not to the account
-    /// authority: keep the draft, but a dropped save is no longer confirmed.
-    pub(super) fn prepare_epoch(&mut self) {
-        if self.working == Some(Working::Save) {
-            self.failure = Some(ViewStateKind::EsitoDaVerificare);
-            self.requires_read = true;
-            self.message.clear();
-        }
-        self.working = None;
-        if matches!(self.load, ReadLoad::Loading { .. }) {
-            self.load = ReadLoad::Idle;
-        }
     }
 
     pub(super) fn configure(
@@ -160,19 +171,17 @@ impl AccountProfile {
             && self.working.is_none()
             && !self.requires_read
             && self.names_valid(cx)
-            && (self.conflict || self.dirty(cx))
+            && self.dirty(cx)
+    }
+
+    /// The values to show beside the message: the ones received with a conflict
+    /// while it is unresolved, otherwise the base this editor would update.
+    fn saved_values(&self) -> Option<&AccountProfileSnapshot> {
+        self.conflict.as_ref().or(self.snapshot.as_ref())
     }
 
     pub(super) fn read_only(&self) -> bool {
         self.working.is_some() || self.snapshot.is_none()
-    }
-
-    fn command_label(&self) -> &'static str {
-        if self.conflict {
-            "Salva comunque sopra la versione attuale"
-        } else {
-            "Salva profilo"
-        }
     }
 }
 
@@ -182,6 +191,8 @@ fn normalized(value: Option<&str>) -> Option<String> {
 }
 
 impl ClinicalApp {
+    /// The explicit command behind both the reread button and the state hint.
+    /// It is the only operation that clears `requires_read` by rereading.
     pub(super) fn load_account_profile(&mut self, cx: &mut Context<Self>) {
         let Some(session) = self.session.clone() else {
             return;
@@ -189,14 +200,39 @@ impl ClinicalApp {
         if self.account_profile.working.is_some() {
             return;
         }
-        self.account_profile.load = ReadLoad::loading();
-        self.account_profile.working = Some(Working::Read);
-        self.account_profile.failure = None;
-        self.account_profile.requires_read = true;
-        self.account_profile.message.clear();
-        self.account_profile.message_failed = false;
-        self.run(
-            move || session.read_account_profile(),
+        self.begin_account_profile_read(move || session.read_account_profile(), cx);
+    }
+
+    /// The automatic entry point for Settings. It reads at most once per
+    /// account authority; navigation and remounting never imply a reread.
+    pub(super) fn ensure_account_profile_loaded(&mut self, cx: &mut Context<Self>) {
+        if self.session.is_none() {
+            return;
+        }
+        let state = &self.account_profile;
+        if state.auto_read || state.snapshot.is_some() || state.working.is_some() {
+            return;
+        }
+        self.load_account_profile(cx);
+    }
+
+    fn begin_account_profile_read(
+        &mut self,
+        operation: impl FnOnce() -> Result<AccountProfileRead, RuntimeError> + Send + 'static,
+        cx: &mut Context<Self>,
+    ) {
+        let generation = self.account_profile.generation;
+        let state = &mut self.account_profile;
+        state.auto_read = true;
+        state.load = ReadLoad::loading();
+        state.working = Some(Working::Read);
+        state.failure = None;
+        state.requires_read = true;
+        state.message.clear();
+        state.message_failed = false;
+        self.run_account_profile(
+            generation,
+            operation,
             Self::receive_account_profile_read,
             cx,
         );
@@ -218,7 +254,7 @@ impl ClinicalApp {
                 state.working = None;
                 state.failure = None;
                 state.requires_read = false;
-                state.conflict = false;
+                state.conflict = None;
                 state.message_failed = false;
                 if initial {
                     state.set_editors_from(&snapshot, cx);
@@ -226,16 +262,26 @@ impl ClinicalApp {
                 } else {
                     // A reread follows an uncertain outcome or an explicit
                     // request. The draft stays exactly where the operator left it.
-                    state.message =
-                        "Profilo riletto. Confronta i valori registrati con la tua bozza prima di salvare."
-                            .into();
+                    state.message = REREAD_MESSAGE.into();
                 }
             }
             Err(error) => {
-                state.load = ReadLoad::Failed(error);
                 state.working = None;
                 state.requires_read = true;
-                state.message.clear();
+                if state.snapshot.is_some() {
+                    // The base and the draft survive; the operator still needs
+                    // an explicit reread before another save.
+                    state.load = ReadLoad::Ready(());
+                    state.failure = None;
+                    state.message = READ_FAILED.into();
+                    state.message_failed = true;
+                } else {
+                    // Nothing was ever read for this authority: keep the shared
+                    // read state, whose command retries the initial read.
+                    state.load = ReadLoad::Failed(error);
+                    state.message.clear();
+                    state.message_failed = false;
+                }
             }
         }
     }
@@ -271,7 +317,9 @@ impl ClinicalApp {
             self.account_profile.working = None;
             return;
         };
-        self.run(
+        let generation = self.account_profile.generation;
+        self.run_account_profile(
+            generation,
             move || session.update_account_profile(&snapshot, Some(&display), Some(&ambulatory)),
             Self::receive_account_profile_write,
             cx,
@@ -291,44 +339,83 @@ impl ClinicalApp {
                 state.working = None;
                 state.failure = None;
                 state.requires_read = false;
-                state.conflict = false;
+                state.conflict = None;
                 state.message_failed = false;
                 state.set_editors_from(&profile, cx);
                 state.message = if changed {
-                    "Profilo salvato."
+                    SAVE_CONFIRMED
                 } else {
-                    "Nessuna modifica da salvare."
+                    SAVE_ALREADY_CURRENT
                 }
                 .into();
             }
             Ok(AccountProfileUpdateOutcome::VersionConflict { current }) => {
-                // Nothing was written. Keep the draft untouched and require the
-                // operator's explicit overwrite gesture with the new version.
-                state.snapshot = Some(current);
+                // Nothing was written. Keep both the draft and the old base:
+                // the version from the conflict is never usable until the
+                // operator's explicit reread.
+                state.conflict = Some(current);
                 state.working = None;
                 state.failure = None;
-                state.requires_read = false;
-                state.conflict = true;
-                state.message.clear();
+                state.requires_read = true;
+                state.message = CONFLICT_MESSAGE.into();
                 state.message_failed = false;
             }
             Err(error) => {
                 state.working = None;
-                state.message.clear();
-                state.message_failed = true;
                 state.requires_read = !matches!(error, RuntimeError::InvalidInput);
-                state.conflict = false;
+                state.message_failed = true;
+                state.message = match error {
+                    RuntimeError::Indeterminate
+                    | RuntimeError::InvalidResponse
+                    | RuntimeError::Transport => SAVE_UNCONFIRMED.into(),
+                    _ => String::new(),
+                };
                 state.failure = Some(match error {
                     RuntimeError::ArchiveReplaced => ViewStateKind::ArchivioSostituito,
                     RuntimeError::Forbidden | RuntimeError::Rejected(403) => {
                         ViewStateKind::AccessoNegato
                     }
                     RuntimeError::Transport => ViewStateKind::NonInLinea { copia: None },
-                    RuntimeError::Indeterminate => ViewStateKind::EsitoDaVerificare,
+                    RuntimeError::Indeterminate | RuntimeError::InvalidResponse => {
+                        ViewStateKind::EsitoDaVerificare
+                    }
                     _ => ViewStateKind::Errore,
                 });
             }
         }
+    }
+
+    /// Profile requests belong to the account authority, not to the workspace
+    /// epoch: an AI status refresh or a scope change must not drop the pending
+    /// read, which would leave the section loading with no active request. Only
+    /// a replacement of the authority (which resets the editor) retires a reply.
+    fn run_account_profile<T: Send + 'static>(
+        &self,
+        generation: u64,
+        operation: impl FnOnce() -> Result<T, RuntimeError> + Send + 'static,
+        apply: impl FnOnce(&mut Self, Result<T, RuntimeError>, &mut Context<Self>) + 'static,
+        cx: &mut Context<Self>,
+    ) {
+        let task = cx.background_executor().spawn(async move { operation() });
+        cx.spawn(async move |this, cx| {
+            let result = task.await;
+            let _ = this.update(cx, |this, cx| {
+                if this.account_profile.generation != generation {
+                    return;
+                }
+                if let Err(error) = &result
+                    && error.is_auth_failure()
+                {
+                    let message = ui_error(error);
+                    this.disconnect(cx);
+                    this.message = Some((message, true));
+                    return;
+                }
+                apply(this, result, cx);
+                cx.notify();
+            });
+        })
+        .detach();
     }
 
     pub(super) fn account_profile_view(&self, cx: &Context<Self>) -> Div {
@@ -386,27 +473,25 @@ impl ClinicalApp {
             view =
                 view.child(self.profile_state_view(ViewState::new(ReadObject::Profilo, kind), cx));
         }
-        if state.conflict {
-            view = view
-                .child(notice(
-                    "clinical-workspace-profile-conflict",
-                    "Il profilo è cambiato su un altro dispositivo.",
-                    theme,
-                    false,
-                ))
-                .child(div().text_color(theme.secondary).child(text!(format!(
-                            "Registrato: Nome medico {} · Nome ambulatorio {}",
-                            state
-                                .snapshot
-                                .as_ref()
-                                .and_then(|profile| profile.display_name.as_deref())
-                                .unwrap_or("vuoto"),
-                            state
-                                .snapshot
-                                .as_ref()
-                                .and_then(|profile| profile.ambulatory_name.as_deref())
-                                .unwrap_or("vuoto")
-                        ))));
+        if !state.message.is_empty()
+            && let Some(values) = state.saved_values()
+        {
+            view = view.child(
+                div()
+                    .id("clinical-workspace-profile-values")
+                    .text_color(theme.secondary)
+                    .child(text!(format!(
+                        "Valori salvati: {} · {}",
+                        values
+                            .display_name
+                            .as_deref()
+                            .unwrap_or("Nome medico vuoto"),
+                        values
+                            .ambulatory_name
+                            .as_deref()
+                            .unwrap_or("Nome ambulatorio vuoto"),
+                    ))),
+            );
         }
         if !state.message.is_empty() {
             view = view.child(notice(
@@ -416,19 +501,40 @@ impl ClinicalApp {
                 state.message_failed,
             ));
         }
+        let reread_enabled = self.session.is_some() && state.working.is_none();
         view.child(
-            button(
-                "clinical-workspace-profile-save",
-                state.command_label(),
-                theme,
-                true,
-                save_enabled,
-            )
-            .when(save_enabled, |el| {
-                el.on_click(cx.listener(|this, _, _, cx| {
-                    this.save_account_profile(cx);
-                }))
-            }),
+            div()
+                .flex()
+                .flex_wrap()
+                .gap(px(8.))
+                .child(
+                    button(
+                        "clinical-workspace-profile-save",
+                        "Salva profilo",
+                        theme,
+                        true,
+                        save_enabled,
+                    )
+                    .when(save_enabled, |el| {
+                        el.on_click(cx.listener(|this, _, _, cx| {
+                            this.save_account_profile(cx);
+                        }))
+                    }),
+                )
+                .child(
+                    button(
+                        "clinical-workspace-profile-reread",
+                        "Rileggi profilo mantenendo la bozza",
+                        theme,
+                        false,
+                        reread_enabled,
+                    )
+                    .when(reread_enabled, |el| {
+                        el.on_click(cx.listener(|this, _, _, cx| {
+                            this.load_account_profile(cx);
+                        }))
+                    }),
+                ),
         )
     }
 
@@ -445,6 +551,16 @@ impl ClinicalApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{
+        io::{Read, Write},
+        net::{SocketAddr, TcpListener, TcpStream},
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicBool, Ordering},
+        },
+        thread,
+        time::Duration,
+    };
 
     fn snapshot(
         version: &str,
@@ -486,7 +602,6 @@ mod tests {
             );
             assert_eq!(app.account_profile.display.read(cx).value(), "Dr. Rossi");
             assert!(!app.account_profile.can_save(cx));
-            assert_eq!(app.account_profile.command_label(), "Salva profilo");
 
             app.account_profile
                 .display
@@ -511,7 +626,7 @@ mod tests {
                 }),
                 cx,
             );
-            assert_eq!(app.account_profile.message, "Profilo salvato.");
+            assert_eq!(app.account_profile.message, "Profilo aggiornato.");
             assert_eq!(
                 app.account_profile.display.read(cx).value(),
                 "Dr. Rossi Nuovo"
@@ -526,11 +641,20 @@ mod tests {
                     .profile_version,
                 "sha256_v2"
             );
+
+            app.receive_account_profile_write(
+                Ok(AccountProfileUpdateOutcome::Saved {
+                    changed: false,
+                    profile: snapshot("sha256_v2", Some("Dr. Rossi Nuovo"), Some("Studio Centro")),
+                }),
+                cx,
+            );
+            assert_eq!(app.account_profile.message, "Il profilo è già aggiornato.");
         });
     }
 
     #[gpui::test]
-    fn account_profile_conflict_keeps_the_draft_and_waits_for_an_explicit_overwrite(
+    fn account_profile_conflict_keeps_the_draft_and_never_adopts_the_conflict_version(
         cx: &mut gpui::TestAppContext,
     ) {
         let (view, cx) =
@@ -544,32 +668,62 @@ mod tests {
             app.begin_account_profile_save(cx).unwrap();
             app.receive_account_profile_write(
                 Ok(AccountProfileUpdateOutcome::VersionConflict {
-                    current: snapshot("sha256_v2", Some("Dr. Altro"), None),
+                    current: snapshot("sha256_v2", Some("Dr. Altro"), Some("Studio Altro")),
                 }),
                 cx,
             );
 
             assert_eq!(app.account_profile.display.read(cx).value(), "Dr. Nuovo");
             assert_eq!(app.account_profile.save_attempts, 1);
-            assert!(app.account_profile.conflict);
-            assert!(app.account_profile.can_save(cx));
-            assert_eq!(
-                app.account_profile.command_label(),
-                "Salva comunque sopra la versione attuale"
+            assert!(app.account_profile.requires_read);
+            assert!(!app.account_profile.can_save(cx));
+            assert!(
+                app.begin_account_profile_save(cx).is_none(),
+                "a conflict must not allow another PUT before an explicit reread"
             );
+            assert_eq!(app.account_profile.save_attempts, 1);
             assert_eq!(
                 app.account_profile
                     .snapshot
                     .as_ref()
                     .unwrap()
                     .profile_version,
+                "sha256_v1",
+                "the version from the conflict is never the base"
+            );
+            assert_eq!(
+                app.account_profile
+                    .conflict
+                    .as_ref()
+                    .unwrap()
+                    .profile_version,
                 "sha256_v2"
             );
+            assert_eq!(app.account_profile.message, CONFLICT_MESSAGE);
+            assert!(!app.account_profile.message_failed);
 
+            // The explicit reread updates the base and the version, never the draft.
+            app.receive_account_profile_read(
+                Ok(read("sha256_v3", Some("Dr. Terzo"), Some("Studio Terzo"))),
+                cx,
+            );
+            assert_eq!(app.account_profile.message, REREAD_MESSAGE);
+            assert!(!app.account_profile.requires_read);
+            assert!(app.account_profile.conflict.is_none());
+            assert_eq!(app.account_profile.display.read(cx).value(), "Dr. Nuovo");
+            assert_eq!(
+                app.account_profile
+                    .snapshot
+                    .as_ref()
+                    .unwrap()
+                    .profile_version,
+                "sha256_v3"
+            );
+            assert!(app.account_profile.can_save(cx));
             let (base, _, _) = app
                 .begin_account_profile_save(cx)
-                .expect("the overwrite needs an explicit gesture");
-            assert_eq!(base.profile_version, "sha256_v2");
+                .expect("a new save follows the explicit reread");
+            assert_eq!(base.profile_version, "sha256_v3");
             assert_eq!(app.account_profile.save_attempts, 2);
         });
     }
@@ -594,16 +748,396 @@ mod tests {
                 app.account_profile.failure,
                 Some(ViewStateKind::EsitoDaVerificare)
             );
+            assert_eq!(app.account_profile.message, SAVE_UNCONFIRMED);
+            assert!(app.account_profile.message_failed);
             assert!(app.account_profile.requires_read);
             assert!(!app.account_profile.can_save(cx));
             assert!(app.begin_account_profile_save(cx).is_none());
             assert_eq!(app.account_profile.save_attempts, 1);
             app.receive_account_profile_read(Ok(read("sha256_v2", Some("Dr. Rossi"), None)), cx);
             assert!(!app.account_profile.requires_read);
+            assert_eq!(app.account_profile.message, REREAD_MESSAGE);
             assert!(app.account_profile.can_save(cx));
             let (base, _, _) = app.begin_account_profile_save(cx).unwrap();
             assert_eq!(base.profile_version, "sha256_v2");
             assert_eq!(app.account_profile.save_attempts, 2);
+        });
+    }
+
+    #[gpui::test]
+    fn account_profile_read_is_not_retired_by_an_unrelated_epoch(cx: &mut gpui::TestAppContext) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            app.area = Area::Settings;
+            app.begin_account_profile_read(|| Ok(read("sha256_v1", Some("Dr. Rossi"), None)), cx);
+            // "Rileggi stato AI" advances the workspace epoch while the GET runs.
+            app.next_epoch();
+        });
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert!(
+                app.account_profile.working.is_none(),
+                "the profile must never stay loading without an active read"
+            );
+            assert!(matches!(app.account_profile.load, ReadLoad::Ready(())));
+            assert_eq!(
+                app.account_profile
+                    .snapshot
+                    .as_ref()
+                    .unwrap()
+                    .profile_version,
+                "sha256_v1"
+            );
+            assert_eq!(app.account_profile.display.read(cx).value(), "Dr. Rossi");
+            assert!(!app.account_profile.requires_read);
+        });
+    }
+
+    struct HostState {
+        current: serde_json::Value,
+        conflict: serde_json::Value,
+        put_status: u16,
+        requests: Vec<String>,
+    }
+
+    struct SyntheticProfileHost {
+        session: RuntimeSession,
+        socket: SocketAddr,
+        state: Arc<Mutex<HostState>>,
+        stop: Arc<AtomicBool>,
+        worker: Option<thread::JoinHandle<()>>,
+    }
+
+    impl SyntheticProfileHost {
+        fn new() -> Self {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let socket = listener.local_addr().unwrap();
+            let state = Arc::new(Mutex::new(HostState {
+                current: profile_wire("p1:synthetic", Some("Dr. Rossi"), None),
+                conflict: conflict_wire("p1:other", Some("Dr. Altro"), Some("Studio Altro")),
+                put_status: 200,
+                requests: Vec::new(),
+            }));
+            let shared = state.clone();
+            let stop = Arc::new(AtomicBool::new(false));
+            let stopping = stop.clone();
+            let worker = thread::spawn(move || {
+                loop {
+                    let (mut stream, _) = listener.accept().unwrap();
+                    if stopping.load(Ordering::Acquire) {
+                        break;
+                    }
+                    stream
+                        .set_read_timeout(Some(Duration::from_secs(10)))
+                        .unwrap();
+                    let request = read_request(&mut stream);
+                    let route = request.lines().next().unwrap().to_owned();
+                    let mut host = shared.lock().unwrap();
+                    host.requests.push(route.clone());
+                    let (code, response) = if route.starts_with("GET /api/auth/check ") {
+                        (
+                            200,
+                            serde_json::json!({"status":"ok", "isSetup":true,
+                                "archiveGeneration":"synthetic-generation",
+                                "unlock":{"credential":"passphrase", "kdfVersion":3,
+                                    "salt":"AwMDAwMDAwMDAwMDAwMDAw=="}}),
+                        )
+                    } else if route.starts_with("POST /api/auth/native/login ") {
+                        (
+                            200,
+                            serde_json::json!({"success":true, "id":"synthetic-user",
+                                "username":"synthetic", "role":"admin",
+                                "archiveGeneration":"synthetic-generation",
+                                "salt":"AwMDAwMDAwMDAwMDAwMDAw==",
+                                "encryptedMasterKey":"v3:BQUFBQUFBQUFBQUFAm40aZvQGpityOwyLKhsE40tJdbsjtrugIXzoJ/lk9gjlh5j7pIPeh7DLQ7ikGhA"}),
+                        )
+                    } else if route.starts_with("GET /api/v1/network/capabilities ") {
+                        (
+                            200,
+                            serde_json::json!({"protocolVersion":"1.13.0",
+                                "operatingMode":"network-home-base",
+                                "capabilities":[{"key":"network.replica.write-clinical-diary",
+                                    "requiresPairing":true, "status":"available"}]}),
+                        )
+                    } else if route.starts_with("GET /api/auth/profile ") {
+                        (200, host.current.clone())
+                    } else if route.starts_with("PUT /api/auth/profile ") {
+                        if host.put_status == 200 {
+                            let mut confirmed = host.current.clone();
+                            confirmed["changed"] = serde_json::json!(true);
+                            (200, confirmed)
+                        } else {
+                            (host.put_status, host.conflict.clone())
+                        }
+                    } else if route.starts_with("POST /api/auth/native/logout ") {
+                        (200, serde_json::json!({"success":true}))
+                    } else {
+                        (200, serde_json::json!({}))
+                    };
+                    let response = response.to_string();
+                    write!(
+                        stream,
+                        "HTTP/1.1 {code} Synthetic\r\nContent-Type: application/json\r\nSet-Cookie: mediflow_session={}; Path=/; HttpOnly\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}",
+                        "a".repeat(64),
+                        response.len()
+                    )
+                    .unwrap();
+                }
+            });
+            let client = RuntimeClient::new(RuntimeConfig {
+                base_url: format!("http://{socket}"),
+                tls_pin_sha256: None,
+            })
+            .unwrap();
+            let session = client
+                .login(
+                    PairingCredentials::new("synthetic-device", "x".repeat(64)).unwrap(),
+                    "synthetic",
+                    "Synthetic scales fixture passphrase",
+                )
+                .unwrap();
+            Self {
+                session,
+                socket,
+                state,
+                stop,
+                worker: Some(worker),
+            }
+        }
+
+        fn serve(&self, current: serde_json::Value, conflict: serde_json::Value, put: u16) {
+            let mut state = self.state.lock().unwrap();
+            state.current = current;
+            state.conflict = conflict;
+            state.put_status = put;
+        }
+
+        fn profile_reads(&self) -> usize {
+            self.state
+                .lock()
+                .unwrap()
+                .requests
+                .iter()
+                .filter(|route| route.starts_with("GET /api/auth/profile "))
+                .count()
+        }
+
+        fn profile_writes(&self) -> usize {
+            self.state
+                .lock()
+                .unwrap()
+                .requests
+                .iter()
+                .filter(|route| route.starts_with("PUT /api/auth/profile "))
+                .count()
+        }
+    }
+
+    impl Drop for SyntheticProfileHost {
+        fn drop(&mut self) {
+            self.stop.store(true, Ordering::Release);
+            let _ = TcpStream::connect(self.socket);
+            self.worker.take().unwrap().join().unwrap();
+        }
+    }
+
+    fn profile_wire(
+        version: &str,
+        display: Option<&str>,
+        ambulatory: Option<&str>,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "operation": "account-profile.read.v1",
+            "contractVersion": 1,
+            "userId": "synthetic-user",
+            "username": "synthetic",
+            "displayName": display,
+            "ambulatoryName": ambulatory,
+            "profileVersion": version,
+            "archiveGeneration": "synthetic-generation",
+        })
+    }
+
+    fn conflict_wire(
+        version: &str,
+        display: Option<&str>,
+        ambulatory: Option<&str>,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "userId": "synthetic-user",
+            "username": "synthetic",
+            "displayName": display,
+            "ambulatoryName": ambulatory,
+            "profileVersion": version,
+            "archiveGeneration": "synthetic-generation",
+            "code": "PROFILE_VERSION_CONFLICT",
+            "error": "Il profilo è cambiato su un altro client.",
+        })
+    }
+
+    fn read_request(stream: &mut TcpStream) -> String {
+        let mut bytes = Vec::new();
+        let mut byte = [0];
+        while !bytes.ends_with(b"\r\n\r\n") {
+            stream.read_exact(&mut byte).unwrap();
+            bytes.push(byte[0]);
+            assert!(bytes.len() < 16384);
+        }
+        let header = String::from_utf8(bytes).unwrap();
+        let size = header
+            .lines()
+            .find_map(|line| {
+                line.to_ascii_lowercase()
+                    .strip_prefix("content-length: ")
+                    .map(|length| length.parse::<usize>().unwrap())
+            })
+            .unwrap_or(0);
+        let mut body = vec![0; size];
+        stream.read_exact(&mut body).unwrap();
+        header
+    }
+
+    #[gpui::test]
+    fn account_profile_reads_once_per_authority_and_never_recovers_by_navigation(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = SyntheticProfileHost::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, _| app.session = Some(host.session.clone()));
+
+        view.update(cx, |app, cx| {
+            app.area = Area::Settings;
+            app.ensure_account_profile_loaded(cx);
+        });
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert_eq!(app.account_profile.display.read(cx).value(), "Dr. Rossi");
+            assert!(!app.account_profile.requires_read);
+        });
+        assert_eq!(host.profile_reads(), 1);
+
+        // A conflict received by the host: the draft stays and nothing new can
+        // be sent until the operator rereads.
+        host.serve(
+            profile_wire("p1:third", Some("Dr. Terzo"), Some("Studio Terzo")),
+            conflict_wire("p1:other", Some("Dr. Altro"), Some("Studio Altro")),
+            409,
+        );
+        view.update(cx, |app, cx| {
+            app.account_profile
+                .display
+                .update(cx, |input, cx| input.set_content("Dr. Nuovo", cx));
+            app.save_account_profile(cx);
+        });
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert_eq!(app.account_profile.message, CONFLICT_MESSAGE);
+            assert!(app.account_profile.requires_read);
+            assert!(!app.account_profile.can_save(cx));
+            assert_eq!(
+                app.account_profile
+                    .snapshot
+                    .as_ref()
+                    .unwrap()
+                    .profile_version,
+                "p1:synthetic"
+            );
+            assert_eq!(app.account_profile.display.read(cx).value(), "Dr. Nuovo");
+        });
+        assert_eq!(host.profile_writes(), 1);
+
+        // Leaving and returning to Settings must not read again nor clear the
+        // guard. The AI status refresh on entry advances the workspace epoch.
+        view.update(cx, |app, cx| {
+            app.navigate(Area::Analytics, cx);
+            app.navigate(Area::Settings, cx);
+        });
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert!(app.account_profile.requires_read);
+            assert!(!app.account_profile.can_save(cx));
+            assert!(app.begin_account_profile_save(cx).is_none());
+            assert_eq!(app.account_profile.display.read(cx).value(), "Dr. Nuovo");
+        });
+        assert_eq!(host.profile_reads(), 1);
+        assert_eq!(host.profile_writes(), 1);
+
+        // Only the explicit gesture rereads: the base takes the new version and
+        // the draft is untouched.
+        view.update(cx, |app, cx| app.load_account_profile(cx));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert_eq!(host.profile_reads(), 2);
+            assert_eq!(app.account_profile.message, REREAD_MESSAGE);
+            assert!(!app.account_profile.requires_read);
+            assert_eq!(app.account_profile.display.read(cx).value(), "Dr. Nuovo");
+            assert_eq!(
+                app.account_profile
+                    .snapshot
+                    .as_ref()
+                    .unwrap()
+                    .profile_version,
+                "p1:third"
+            );
+            let (base, _, _) = app
+                .begin_account_profile_save(cx)
+                .expect("the explicit reread enables a new save");
+            assert_eq!(base.profile_version, "p1:third");
+        });
+        assert_eq!(host.profile_writes(), 1);
+    }
+
+    #[gpui::test]
+    fn account_profile_uncertain_save_stays_guarded_after_leaving_settings(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = SyntheticProfileHost::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, _| app.session = Some(host.session.clone()));
+        view.update(cx, |app, cx| {
+            app.area = Area::Settings;
+            app.ensure_account_profile_loaded(cx);
+        });
+        cx.run_until_parked();
+
+        // A 5xx is an unconfirmed write: the request may have been applied.
+        host.serve(
+            profile_wire("p1:synthetic", Some("Dr. Rossi"), None),
+            conflict_wire("p1:other", Some("Dr. Altro"), None),
+            500,
+        );
+        view.update(cx, |app, cx| {
+            app.account_profile
+                .display
+                .update(cx, |input, cx| input.set_content("Dr. Nuovo", cx));
+            app.save_account_profile(cx);
+        });
+        cx.run_until_parked();
+        view.update(cx, |app, _| {
+            assert!(app.account_profile.requires_read);
+            assert_eq!(app.account_profile.message, SAVE_UNCONFIRMED);
+            assert_eq!(app.account_profile.save_attempts, 1);
+        });
+
+        view.update(cx, |app, cx| {
+            app.navigate(Area::Analytics, cx);
+            app.navigate(Area::Settings, cx);
+        });
+        cx.run_until_parked();
+        assert_eq!(host.profile_reads(), 1);
+        assert_eq!(host.profile_writes(), 1);
+        view.update(cx, |app, cx| {
+            assert!(
+                app.account_profile.requires_read,
+                "navigation must not recover an unconfirmed save"
+            );
+            assert!(!app.account_profile.can_save(cx));
+            assert!(app.begin_account_profile_save(cx).is_none());
+            assert_eq!(app.account_profile.save_attempts, 1);
+            assert_eq!(app.account_profile.display.read(cx).value(), "Dr. Nuovo");
         });
     }
 }

@@ -717,7 +717,6 @@ impl ClinicalApp {
         self.read_timer = None;
         self.read_state_commands.clear();
         self.ai_preferences.reset();
-        self.account_profile.prepare_epoch();
         self.who.reset();
         self.patient.document_details_id = None;
         if let Some(intent) = self.profile_query_intent.take() {
@@ -1192,7 +1191,7 @@ impl ClinicalApp {
                 self.load_patients(cx);
             } else if area == Area::Settings {
                 self.load_ai_status(cx);
-                self.load_account_profile(cx);
+                self.ensure_account_profile_loaded(cx);
             } else if area == Area::Scales {
                 self.load_scales(cx);
             } else if area == Area::Analytics {
