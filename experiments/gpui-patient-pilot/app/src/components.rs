@@ -262,7 +262,7 @@ impl WritingInk {
             Self::Dry => "Registrata",
         }
     }
-    fn color(self, theme: Theme) -> gpui::Hsla {
+    pub fn color(self, theme: Theme) -> gpui::Hsla {
         match self {
             Self::Pencil => theme.pencil,
             Self::Fresh => theme.fresh,
@@ -286,6 +286,67 @@ pub fn writing_status(id: impl Into<SharedString>, ink: WritingInk, theme: Theme
         .text_color(color)
         .child(writing_dot(ink, theme))
         .child(writing_word(ink, theme))
+}
+
+pub trait WritingStyle: Styled + Sized {
+    fn writing_ink(self, ink: WritingInk, theme: Theme) -> Self {
+        let element = self.text_color(ink.color(theme));
+        if ink == WritingInk::Pencil {
+            element
+                .pb(px(4.))
+                .border_b_1()
+                .border_dashed()
+                .border_color(theme.pencil)
+        } else {
+            element
+        }
+    }
+}
+impl<T: Styled> WritingStyle for T {}
+
+pub fn number_line(
+    id: &'static str,
+    prefix: &str,
+    number: impl Into<SharedString>,
+    suffix: &str,
+    theme: Theme,
+) -> Stateful<Div> {
+    let number = number.into();
+    div()
+        .id(id)
+        .accessibility_id(id)
+        .role(Role::Status)
+        .aria_label(format!("{prefix}{number}{suffix}"))
+        .debug_selector(move || id.to_owned())
+        .min_w_0()
+        .flex()
+        .flex_row()
+        .items_baseline()
+        .gap(px(4.))
+        .type_role(theme, TypeRole::Body)
+        .text_color(theme.ink)
+        .when(!prefix.is_empty(), |element| {
+            element.child(
+                div()
+                    .debug_selector(move || format!("{id}-meaning"))
+                    .child(text!(prefix.trim().to_owned())),
+            )
+        })
+        .child(
+            div()
+                .debug_selector(move || format!("{id}-number"))
+                .flex_shrink_0()
+                .type_role(theme, TypeRole::Threshold)
+                .child(text!(number)),
+        )
+        .when(!suffix.is_empty(), |element| {
+            element.child(
+                div()
+                    .min_w_0()
+                    .debug_selector(move || format!("{id}-meaning"))
+                    .child(text!(suffix.trim().to_owned())),
+            )
+        })
 }
 
 fn writing_word(ink: WritingInk, theme: Theme) -> Stateful<Div> {
@@ -319,6 +380,34 @@ fn writing_dot(ink: WritingInk, theme: Theme) -> Stateful<Div> {
 mod writing_tests {
     use super::*;
     use gpui::{BorderStyle, Element, Fill};
+
+    #[test]
+    fn number_and_meaning_share_a_body_row_and_accessible_sentence() {
+        for dark in [false, true] {
+            let theme = Theme::for_dark(dark);
+            for (id, prefix, number, suffix, sentence) in [
+                (
+                    "population-test",
+                    "",
+                    "142",
+                    " schede attive tra 0 e 120 anni",
+                    "142 schede attive tra 0 e 120 anni",
+                ),
+                ("score-test", "Punteggio ", "4", "", "Punteggio 4"),
+            ] {
+                let mut row = number_line(id, prefix, number, suffix, theme);
+                let mut node = gpui::accesskit::Node::new(Role::Status);
+                Element::write_a11y_info(&row, &mut node);
+                assert_eq!(node.label(), Some(sentence));
+                assert_eq!(row.text_style().font_weight, Some(gpui::FontWeight::NORMAL));
+                assert_eq!(
+                    row.text_style().color,
+                    Some(gpui::rgb(if dark { 0xe9ecef } else { 0x14161a }).into())
+                );
+                assert_eq!(row.style().flex_direction, Some(gpui::FlexDirection::Row));
+            }
+        }
+    }
 
     #[test]
     fn words_and_dot_shapes_are_explicit_in_both_registers_at_both_scales() {

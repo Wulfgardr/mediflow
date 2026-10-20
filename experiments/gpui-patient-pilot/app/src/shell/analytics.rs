@@ -3,7 +3,6 @@
 //! and diagnostic counts are declared as absent instead of simulated.
 
 use super::*;
-use crate::theme::{TypeRole, TypeStyle};
 use mediflow_runtime_client::{
     DemographicsRequest, POPULATION_DEMOGRAPHICS_CAPABILITY, PopulationDemographics,
 };
@@ -316,18 +315,10 @@ impl ClinicalApp {
         let [min_age, max_age] = demographics.age_range;
         pane = pane
             .child(section("clinical-analytics-population", "POPOLAZIONE", theme))
-            .child(div().flex().flex_col().gap(px(6.)).child(
-                div()
-                    .type_role(theme, TypeRole::Threshold)
-                    .child(text!(stats.total_in_range.to_string())),
+            .child(crate::components::number_line(
+                "clinical-analytics-population-summary", "", stats.total_in_range.to_string(),
+                &format!(" schede attive tra {min_age} e {max_age} anni"), theme,
             ))
-            .child(
-                div()
-                    .type_role(theme, TypeRole::Strong)
-                    .child(text!(format!(
-                        "Schede attive tra {min_age} e {max_age} anni"
-                    ))),
-            )
             .child(div().text_color(theme.secondary).child(text!(format!(
                 "{} con una data di nascita e {} senza, sull’intera popolazione attiva. Le schede senza data restano fuori dal filtro.",
                 schede(stats.with_birth_date),
@@ -710,6 +701,18 @@ mod tests {
         assert!(request.contains("\r\nx-mediflow-expected-ambulatory-id: scope-a\r\n"));
         assert!(request.contains("\r\nx-mediflow-archive-generation: synthetic-generation\r\n"));
         render_window(cx);
+        let row = cx
+            .debug_bounds("clinical-analytics-population-summary")
+            .unwrap();
+        let number = cx
+            .debug_bounds("clinical-analytics-population-summary-number")
+            .unwrap();
+        let meaning = cx
+            .debug_bounds("clinical-analytics-population-summary-meaning")
+            .unwrap();
+        assert!(number.right() <= meaning.left());
+        assert!(number.top() < meaning.bottom() && meaning.top() < number.bottom());
+        assert!(row.top() <= number.top() && row.bottom() >= meaning.bottom());
 
         host.mode.store(RESPONSE_EMPTY, Ordering::Release);
         view.update(cx, |app, cx| app.load_analytics(cx));

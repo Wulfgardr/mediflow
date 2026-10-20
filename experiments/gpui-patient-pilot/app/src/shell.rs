@@ -2466,7 +2466,7 @@ impl ClinicalApp {
                 .flex()
                 .flex_col()
                 .gap(px(8.))
-                .child(clinical_text::render(source, theme))
+                .child(clinical_text::render(source, WritingInk::Fresh, theme))
                 .child(
                     div()
                         .type_role(theme, TypeRole::Meta)
@@ -3065,7 +3065,7 @@ impl ClinicalApp {
                         self.unreadable_field("clinical-workspace-notes-unreadable", cx)
                             .into_any_element()
                     } else {
-                        clinical_text::render(&content, theme)
+                        clinical_text::render(&content, WritingInk::Dry, theme)
                     }),
             )
     }
@@ -3662,7 +3662,7 @@ impl ClinicalApp {
                     .child(div().type_role(theme, TypeRole::Strong).child(text!(title)))
                     .child(if entry.locked_fields.iter().any(|field| field == "content") {
                         self.unreadable_field("clinical-workspace-entry-unreadable", cx).into_any_element()
-                    } else { clinical_text::render(&entry.content, theme) })
+                    } else { clinical_text::render(&entry.content, WritingInk::Dry, theme) })
                     .child(button(format!("clinical-workspace-edit-entry-{id}"), "Modifica voce", theme, false, editable)
                         .when(editable, |el| el.on_click(cx.listener(move |this, _, _, cx| this.edit_record(editing::Kind::Entry, &edit_id, cx)))))
                     .when(!unavailable, |el| el.child(div().flex().child(button(format!("clinical-workspace-copy-entry-{id}"), "Copia voce", theme, false, true)
@@ -3813,6 +3813,7 @@ impl ClinicalApp {
                                     el.child(div().type_role(theme, TypeRole::Prose).child(
                                         clinical_text::render(
                                             row.motivation.as_deref().unwrap_or_default(),
+                                            WritingInk::Dry,
                                             theme,
                                         ),
                                     ))
@@ -3970,6 +3971,7 @@ impl ClinicalApp {
                             el.child(div().type_role(theme, TypeRole::Prose).child(
                                 clinical_text::render(
                                     row.notes.as_deref().unwrap_or_default(),
+                                    WritingInk::Dry,
                                     theme,
                                 ),
                             ))
@@ -4592,6 +4594,7 @@ impl ClinicalApp {
                                             .line_clamp(3)
                                             .child(clinical_text::render(
                                                 row.notes.as_deref().unwrap_or_default(),
+                                                WritingInk::Dry,
                                                 theme,
                                             )),
                                     )
@@ -4714,7 +4717,7 @@ impl ClinicalApp {
                         if row.locked_fields.iter().any(|field| field == "content") {
                             div().child(text!(content)).into_any_element()
                         } else {
-                            clinical_text::render(&row.content, theme)
+                            clinical_text::render(&row.content, WritingInk::Dry, theme)
                         },
                     ))
                     .child(
@@ -4940,7 +4943,8 @@ impl Render for ClinicalApp {
                             || field.rich_source.is_some()
                             || !field.choices.is_empty(),
                         cx,
-                    )
+                    );
+                    input.set_writing_ink(WritingInk::Fresh, cx);
                 });
             }
         }
@@ -5590,6 +5594,7 @@ impl ClinicalApp {
                         |el| {
                             el.child(clinical_text::render(
                                 row.notes.as_deref().unwrap_or_default(),
+                                WritingInk::Dry,
                                 theme,
                             ))
                         },

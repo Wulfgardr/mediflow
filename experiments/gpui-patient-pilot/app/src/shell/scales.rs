@@ -268,6 +268,16 @@ mod tests {
             cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
         enter_scales(&view, &host, cx);
         prepare(&view, cx);
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        let row = cx.debug_bounds("clinical-scale-score").unwrap();
+        let meaning = cx.debug_bounds("clinical-scale-score-meaning").unwrap();
+        let number = cx.debug_bounds("clinical-scale-score-number").unwrap();
+        assert!(meaning.right() <= number.left());
+        assert!(number.top() < meaning.bottom() && meaning.top() < number.bottom());
+        assert!(row.top() <= meaning.top() && row.bottom() >= number.bottom());
         assert!(host.writes().is_empty());
         view.update(cx, |app, cx| app.confirm_scale(cx));
         cx.run_until_parked();
@@ -1521,15 +1531,15 @@ impl ClinicalApp {
         if let Some(prepared) = &scale.prepared {
             let metadata = &prepared.submission().metadata;
             result = result
-                .child(section("clinical-scale-score-label", "PUNTEGGIO", theme))
                 .child(
-                    div()
-                        .id("clinical-scale-score")
-                        .accessibility_id("clinical-scale-score")
-                        .role(Role::Status)
-                        .aria_label(format!("Punteggio: {}", metadata.score))
-                        .type_role(theme, TypeRole::Threshold)
-                        .child(text!(metadata.score.to_string())),
+                    crate::components::number_line(
+                        "clinical-scale-score",
+                        "Punteggio ",
+                        metadata.score.to_string(),
+                        "",
+                        theme,
+                    )
+                    .aria_label(format!("Punteggio: {}", metadata.score)),
                 )
                 .child(
                     div()
@@ -1554,7 +1564,11 @@ impl ClinicalApp {
                     "TESTO CHE VERRÀ REGISTRATO",
                     theme,
                 ))
-                .child(div().child(text!(prepared.submission().content.clone())));
+                .child(clinical_text::render(
+                    &prepared.submission().content,
+                    WritingInk::Fresh,
+                    theme,
+                ));
         } else {
             result = result.child(div().text_color(theme.secondary).child(text!(if scale.is_preparing() { "Preparazione del risultato nell’archivio…" }
                 else { "Il risultato verrà preparato dall’archivio dopo tutte le risposte. Nessuna voce è stata registrata." })));
