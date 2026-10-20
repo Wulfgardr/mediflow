@@ -638,7 +638,7 @@ mod tests {
 
     #[test]
     fn content_inks_keep_prose_and_only_pencil_has_a_dashed_underline() {
-        use gpui::{BorderStyle, rgb};
+        use gpui::{BorderStyle, Length, rgb};
         for (dark, pencil, fresh, dry) in [
             (false, 0x5f6878, 0x2346b0, 0x14161a),
             (true, 0x9aa3b0, 0x9db4ff, 0xe9ecef),
@@ -663,6 +663,11 @@ mod tests {
                     assert_eq!(text.font_weight, Some(FontWeight::NORMAL));
                     let style = content.style();
                     if ink == WritingInk::Pencil {
+                        assert_eq!(style.size.width, Some(Length::Auto));
+                        assert_eq!(style.flex_grow, Some(0.));
+                        assert_eq!(style.flex_shrink, Some(0.));
+                        assert_eq!(style.flex_basis, Some(Length::Auto));
+                        assert_eq!(style.max_size.width, Some(gpui::relative(1.).into()));
                         assert_eq!(style.border_style, Some(BorderStyle::Dashed));
                         assert_eq!(style.border_widths.bottom, Some(px(1.).into()));
                         assert_eq!(style.border_color, Some(rgb(expected).into()));

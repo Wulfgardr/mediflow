@@ -114,7 +114,10 @@ matita colora la prosa e aggiunge un bordo inferiore tratteggiato di 1 px a
 4 px dal blocco di testo; fresco colora la bozza; asciutto usa il colore testo.
 Il ruolo Prose resta Newsreader 17. Come per la parola di stato, GPUI rende
 il tratteggio con un bordo del blocco: non è una sottolineatura tipografica
-per ciascuna riga impaginata.
+per ciascuna riga impaginata. Il contenitore a matita si adatta al testo,
+anziché riempire la colonna. Su una sola riga il bordo segue la frase; su più
+righe arriva fino alla riga più lunga: è l’approssimazione accettata. Il
+limite della prosa resta 64 caratteri per riga.
 
 ## Forma e spazio
 

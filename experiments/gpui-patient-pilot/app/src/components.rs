@@ -293,6 +293,9 @@ pub trait WritingStyle: Styled + Sized {
         let element = self.text_color(ink.color(theme));
         if ink == WritingInk::Pencil {
             element
+                .w_auto()
+                .flex_none()
+                .max_w_full()
                 .pb(px(4.))
                 .border_b_1()
                 .border_dashed()
