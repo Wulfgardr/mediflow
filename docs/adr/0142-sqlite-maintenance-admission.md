@@ -39,7 +39,9 @@ mantengono il blocco della manutenzione; non vengono dedotti da timeout o PID.
 ammissioni. Da quel punto nessuna nuova connessione partecipante può aprirsi;
 quelle già registrate possono completare e chiudersi. La callback viene
 raggiunta soltanto dopo il drain di tutti i lease registrati entro una deadline
-monotona. Timeout prima della callback non tocca il database e consente di
+monotona. La deadline limita l'attesa dei lease: zero lease osservati sotto
+gate dopo la pubblicazione dell'intent costituiscono un drain riuscito anche
+oltre la deadline. Timeout prima della callback non tocca il database e consente di
 annullare soltanto l'intent verificato di quella stessa invocazione.
 
 L'intent resta per tutta la callback. Un errore o crash dopo il suo ingresso
