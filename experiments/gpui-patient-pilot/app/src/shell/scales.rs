@@ -3,6 +3,7 @@
 //! the retained encrypted attempt and the ordinary diary's complete readback.
 
 use super::*;
+use crate::theme::{TypeRole, TypeStyle};
 use mediflow_runtime_client::{
     PreparedScale, ScaleAnswers, ScaleCatalog, ScaleDescriptor, ScaleEntryAttempt,
     ScaleEntryReadback, ScaleId, ScalePreparationRequest,
@@ -1222,8 +1223,7 @@ impl ClinicalApp {
                             ))
                             .child(
                                 div()
-                                    .font_family(VOICE)
-                                    .text_size(px(theme.size(24.)))
+                                    .type_role(theme, TypeRole::Strong)
                                     .child(text!(patient.display_name())),
                             )
                             .child(text!(format!(
@@ -1355,8 +1355,7 @@ impl ClinicalApp {
                         .gap(px(12.))
                         .child(
                             div()
-                                .font_family(VOICE)
-                                .text_size(px(theme.size(24.)))
+                                .type_role(theme, TypeRole::Strong)
                                 .child(text!(scale.title.clone())),
                         )
                         .child(
@@ -1448,9 +1447,9 @@ impl ClinicalApp {
         let question_index = scale.question;
         let mut questions = div().min_w_0().flex_1().flex().flex_col().gap(px(16.));
         if scale.prepared.is_none() && !scale.has_attempt() {
-            questions = questions.child(div().text_size(px(theme.size(12.))).text_color(theme.secondary)
+            questions = questions.child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                 .child(text!(format!("Domanda {} di {} · {} risposte inserite", scale.question + 1, scale.descriptor.questions.len(), scale.answers.len()))))
-                .child(scale.question_target.attach_enabled(heading("clinical-scale-question", question.text.clone(), theme), false))
+                .child(scale.question_target.attach_enabled(heading("clinical-scale-question", question.text.clone(), theme).type_role(theme, TypeRole::Strong), false))
                 .child(div().id("clinical-scale-options").role(Role::Group).aria_label(question.text.clone()).flex().flex_col().gap(px(8.))
                     .children(question.options.iter().enumerate().map(|(index, choice)| {
                         let selected = scale.answers.get(&question.id) == Some(&choice.value);
@@ -1493,7 +1492,7 @@ impl ClinicalApp {
                         .flex_col()
                         .gap(px(4.))
                         .child(text!(question.text.clone()))
-                        .child(div().font_weight(FontWeight::MEDIUM).child(text!(label)))
+                        .child(div().type_role(theme, TypeRole::Strong).child(text!(label)))
                 }));
         }
         questions = questions
@@ -1502,7 +1501,7 @@ impl ClinicalApp {
             }))
             .child(
                 div()
-                    .text_size(px(theme.size(12.)))
+                    .type_role(theme, TypeRole::Meta)
                     .text_color(theme.secondary)
                     .child(text!(
                         "La voce viene registrata nel contesto ambulatoriale selezionato."
@@ -1522,14 +1521,15 @@ impl ClinicalApp {
         if let Some(prepared) = &scale.prepared {
             let metadata = &prepared.submission().metadata;
             result = result
+                .child(section("clinical-scale-score-label", "PUNTEGGIO", theme))
                 .child(
                     div()
                         .id("clinical-scale-score")
                         .accessibility_id("clinical-scale-score")
                         .role(Role::Status)
-                        .font_family(VOICE)
-                        .text_size(px(theme.size(32.)))
-                        .child(text!(format!("Punteggio: {}", metadata.score))),
+                        .aria_label(format!("Punteggio: {}", metadata.score))
+                        .type_role(theme, TypeRole::Threshold)
+                        .child(text!(metadata.score.to_string())),
                 )
                 .child(
                     div()
@@ -1539,7 +1539,7 @@ impl ClinicalApp {
                 )
                 .child(
                     div()
-                        .text_size(px(theme.size(12.)))
+                        .type_role(theme, TypeRole::Meta)
                         .text_color(theme.secondary)
                         .child(text!(format!(
                             "Versione dell’interpretazione: {}",
@@ -1561,7 +1561,7 @@ impl ClinicalApp {
         }
         result = result.child(section("clinical-scale-source-heading", "FONTE E VERSIONE", theme))
             .child(div().child(text!(scale.descriptor.description.clone())))
-            .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary).flex().flex_col().gap(px(8.))
+            .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary).flex().flex_col().gap(px(8.))
                 .child(text!(format!("Fonte indicata: {}", scale.descriptor.use_contract.source_id)))
                 .child(text!(format!("Definizione: {}", scale.descriptor.use_contract.definition_version)))
                 .child(text!(format!("Lingua: {} · Traduzione: {}", scale.descriptor.use_contract.language, scale.descriptor.use_contract.translation)))

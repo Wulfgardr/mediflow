@@ -3,6 +3,7 @@
 //! and diagnostic counts are declared as absent instead of simulated.
 
 use super::*;
+use crate::theme::{TypeRole, TypeStyle};
 use mediflow_runtime_client::{
     DemographicsRequest, POPULATION_DEMOGRAPHICS_CAPABILITY, PopulationDemographics,
 };
@@ -317,13 +318,12 @@ impl ClinicalApp {
             .child(section("clinical-analytics-population", "POPOLAZIONE", theme))
             .child(div().flex().flex_col().gap(px(6.)).child(
                 div()
-                    .font_family(VOICE)
-                    .text_size(px(theme.size(40.)))
+                    .type_role(theme, TypeRole::Threshold)
                     .child(text!(stats.total_in_range.to_string())),
             ))
             .child(
                 div()
-                    .text_size(px(theme.size(18.)))
+                    .type_role(theme, TypeRole::Strong)
                     .child(text!(format!(
                         "Schede attive tra {min_age} e {max_age} anni"
                     ))),

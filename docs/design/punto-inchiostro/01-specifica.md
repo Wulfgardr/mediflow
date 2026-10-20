@@ -101,6 +101,11 @@ Il [guard statico](../../../scripts/check-type-scale.mjs) e lo
 aspetti distinti del contratto. Copertura e limiti sono nell'emendamento
 all'[ADR 0144](../../adr/0144-punto-inchiostro.md).
 
+Nel client nativo i ruoli sono il tipo `TypeRole`: ogni ruolo riunisce
+famiglia, corpo scalato, peso, interlinea e attributi del registro. Il corpo
+libero non è pubblico; i chiamanti scelgono il ruolo per significato e il
+compilatore impedisce di richiedere misure tipografiche arbitrarie.
+
 ## Forma e spazio
 
 Ogni distanza è un multiplo di un'unità di 4 px. Cambiando l'unità, tutta

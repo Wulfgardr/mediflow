@@ -2,7 +2,8 @@
 //! The archived string is never rewritten. Parsing is iterative and bounded;
 //! unsupported or malformed markup stays visible as its original source.
 
-use crate::theme::{Theme, VOICE};
+use crate::theme::Theme;
+use crate::theme::{TypeRole, TypeStyle};
 use gpui::{
     AnyElement, FontStyle, FontWeight, HighlightStyle, Role, SharedString, StrikethroughStyle,
     StyledText, UnderlineStyle, div, prelude::*, px, text,
@@ -582,9 +583,9 @@ pub fn searchable_text(source: &str) -> String {
 
 pub fn render(source: &str, theme: Theme) -> AnyElement {
     let document = parse(source);
-    div().min_w_0().flex().flex_col().gap(px(theme.size(10.)))
+    div().min_w_0().flex().flex_col().gap(px(10. * theme.scale))
         .when(document.unsupported, |element| element.child(
-            div().text_color(theme.secondary).text_size(px(theme.size(12.)))
+            div().text_color(theme.secondary).type_role(theme, TypeRole::Meta)
                 .child(text!("Formattazione non supportata: è mostrato il testo originale. Apri l'editor corrente per verificarla.")),
         ))
         .children(document.blocks.into_iter().enumerate().map(|(index, block)| {
@@ -593,18 +594,15 @@ pub fn render(source: &str, theme: Theme) -> AnyElement {
             let heading = block.heading;
             let marker = block.marker.clone();
             div().id(("clinical-rich-block", index)).role(Role::Paragraph).aria_label(SharedString::from(accessible))
-                .min_w_0().flex().items_start().gap(px(theme.size(8.)))
+                .min_w_0().flex().items_start().gap(px(8. * theme.scale))
                 .pl(px((block.list_depth.saturating_sub(1) as f32 * 18.).min(36.)))
                 .when(block.quote_depth > 0, |element| element
                     .border_l_2().border_color(theme.rule).pl(px(14.)))
                 .when(block.list_depth > 0, |element| element.child(
-                    div().min_w(px(theme.size(22.))).flex_shrink_0()
+                    div().min_w(px(22. * theme.scale)).flex_shrink_0()
                         .text_color(theme.secondary).child(text!(marker.unwrap_or_default())),
                 ))
-                .child(div().flex_1().min_w_0().font_family(VOICE).text_color(theme.ink)
-                    .text_size(px(theme.size(match heading { Some(1) => 25., Some(2) => 22., Some(_) => 19., None => 17. })))
-                    .line_height(px(theme.size(if heading.is_some() { 32. } else { 27. })))
-                    .when(heading.is_some(), |element| element.font_weight(FontWeight::SEMIBOLD))
+                .child(div().flex_1().min_w_0().type_role(theme, if heading.is_some() { TypeRole::Strong } else { TypeRole::Prose }).text_color(theme.ink)
                     .child(StyledText::new(SharedString::from(content)).with_highlights(highlights)))
         }))
         .into_any_element()
