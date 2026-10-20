@@ -1,5 +1,6 @@
 import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 import { NextResponse } from 'next/server';
+import { apiInternalError } from '@/lib/api-error-response';
 import { clearNetworkAmbulatory, NETWORK_AMBULATORY_WRITE_CAPABILITY } from '@/lib/network-ambulatory-write';
 import { requireNetworkWriteContext } from '@/lib/network-write-context';
 
@@ -15,7 +16,6 @@ export async function POST(request: Request) {
     } catch (error) {
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
-        console.error('API POST /api/v1/network/ambulatories/clear error:', error);
-        return NextResponse.json({ error: 'Failed to clear ambulatory' }, { status: 500 });
+        return apiInternalError('Clear network ambulatory', error);
     }
 }
