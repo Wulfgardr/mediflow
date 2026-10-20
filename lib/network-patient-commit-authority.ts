@@ -9,32 +9,21 @@ import { NETWORK_PAIRING_STATE_KEY, parseNetworkPairingState } from './network-p
 import { authenticatePairedClientRequest } from './network-paired-client-auth';
 import type { NetworkWriteContext } from './network-write-context';
 import { bindNetworkRequestScope } from './network-request-scope';
-import { isPairedNativeServerSession, peekSession } from './security/server-session';
-import {
-    mintResourcePort, beginResourceUse, commitResourceUse, abortResourceUse, releaseResourcePort,
-} from './security/web-auth-lifecycle-owner-adapter';
+import { isCurrentServerSession, type PairedNativeBinding } from './security/current-session-authority';
 
 export type NetworkPatientCommitDenial = { status: 401 | 403; value: Record<string, unknown> };
 type Transaction = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 export type NetworkPatientCommitGuard = (tx: Transaction) => NetworkPatientCommitDenial | null;
 
 function currentSession(context: NetworkWriteContext): boolean {
-    const session = context.session;
-    if (session.authChannel === 'native') {
-        const { clientId, clientPlatform, tokenHash } = context.pairedClient;
-        return peekSession(session.id) === session && isPairedNativeServerSession(session, { clientId, clientPlatform, tokenHash });
-    }
-    if (session.authChannel !== 'web') return false;
-    // Authenticate the original owner projection, not a copied/fresh projection.
-    const port = mintResourcePort(session);
-    if (!port) return false;
-    let use: ReturnType<typeof beginResourceUse> = null;
-    try {
-        use = beginResourceUse(port);
-        const current = use !== null && commitResourceUse(use);
-        if (!current && use) abortResourceUse(use);
-        return current;
-    } finally { releaseResourcePort(port); }
+    const binding: PairedNativeBinding | null = context.session.authChannel === 'native'
+        ? {
+            clientId: context.pairedClient.clientId,
+            clientPlatform: context.pairedClient.clientPlatform,
+            tokenHash: context.pairedClient.tokenHash,
+        }
+        : null;
+    return isCurrentServerSession(context.session, binding);
 }
 
 export async function prepareNetworkPatientCommitGuard(
