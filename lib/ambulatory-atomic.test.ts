@@ -6,10 +6,16 @@ import { join } from 'node:path';
 import test from 'node:test';
 import Database from 'better-sqlite3';
 import { spawn } from 'node:child_process';
+import { eq } from 'drizzle-orm';
 import type { ServerSession } from './security/server-session.ts';
+import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } from './network-patient-authority-test-fixture.ts';
+import { NETWORK_PAIRING_STATE_KEY, serializeNetworkPairingState } from './network-pairing-model.ts';
+import { currentArchiveGeneration } from './security/archive-session-generation.ts';
 
 const dataDir = mkdtempSync(join(process.env.MEDIFLOW_DATA_DIR!, 'ambulatory-atomic-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
+const cookieState = { cookies: new Map<string, string>() };
+installNetworkPatientCookieFixture(dataDir, cookieState);
 const { dbServer, openDbServer } = await import('./db-server.ts');
 openDbServer();
 bindSyntheticArchiveSessions('synthetic-session', 'synthetic-native', 'synthetic-local-api');
@@ -28,10 +34,24 @@ const session: ServerSession = {
 const request = new Request('http://localhost/api/ambulatories', {
     headers: { 'x-request-id': 'synthetic-request', 'x-mediflow-source-surface': 'job' },
 });
-const pairedContext = {
-    request, session: { ...session, authChannel: 'native' as const },
-    pairedClient: { clientId: 'synthetic-paired' }, scopeAmbulatoryId: 'synthetic-scope',
-} as Parameters<typeof paired.createNetworkAmbulatory>[0];
+/* real paired admission; the scope cookie follows the default row seeded by each operation. */
+const authority = syntheticNetworkPatientAuthority(dbServer, 'synthetic-scope',
+    { userId: session.userId, clientId: 'synthetic-paired' });
+authority.pairedClient.grantedCapabilities.push('network.ambulatories.write');
+const pairingValue = JSON.stringify({
+    ...JSON.parse(serializeNetworkPairingState({ clients: [authority.pairedClient], intents: [] })),
+    archiveGeneration: currentArchiveGeneration(),
+});
+dbServer.update(schema.settings).set({ value: pairingValue })
+    .where(eq(schema.settings.key, NETWORK_PAIRING_STATE_KEY)).run();
+cookieState.cookies.set('mediflow_session', authority.session.id);
+function pairedContext(): Parameters<typeof paired.createNetworkAmbulatory>[0] {
+    const scope = (sql.prepare('SELECT id FROM ambulatories WHERE is_default=1').get() as { id: string } | undefined)?.id;
+    if (!scope) throw new Error('Synthetic paired scope unavailable');
+    cookieState.cookies.set('ambulatory_id', scope);
+    return { request: authority.request, session: authority.session,
+        pairedClient: authority.pairedClient, scopeAmbulatoryId: scope };
+}
 test.after(() => {
     if (process.env.MEDIFLOW_AMBULATORY_REPORT) {
         writeFileSync(process.env.MEDIFLOW_AMBULATORY_REPORT, JSON.stringify(observations, null, 2));
@@ -126,10 +146,10 @@ async function invoke(op: Operation, x: Ids, version = 3) {
         case 'host-update': return host.updateAmbulatory({ request, session }, x.target, update);
         case 'host-delete': return host.deleteAmbulatory({ request, session }, x.target, version);
         case 'host-clear': return host.clearAmbulatory({ request, session }, x.target, version);
-        case 'paired-create': return paired.createNetworkAmbulatory(pairedContext, body);
-        case 'paired-update': return paired.updateNetworkAmbulatory(pairedContext, x.target, update);
-        case 'paired-delete': return paired.deleteNetworkAmbulatory(pairedContext, x.target, { version });
-        case 'paired-clear': return paired.clearNetworkAmbulatory(pairedContext, x.target, { version });
+        case 'paired-create': return paired.createNetworkAmbulatory(pairedContext(), body);
+        case 'paired-update': return paired.updateNetworkAmbulatory(pairedContext(), x.target, update);
+        case 'paired-delete': return paired.deleteNetworkAmbulatory(pairedContext(), x.target, { version });
+        case 'paired-clear': return paired.clearNetworkAmbulatory(pairedContext(), x.target, { version });
     }
 }
 type Fault = 'AUDIT_FAIL' | 'AUDIT_IGNORE' | 'SECOND_PATIENT_AUDIT_FAIL'
