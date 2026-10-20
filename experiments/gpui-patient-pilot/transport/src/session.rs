@@ -641,7 +641,11 @@ impl RuntimeSession {
         let epoch = self.inner.read_epoch.load(Ordering::Acquire);
         self.check_read_epoch(epoch)?;
         let response = self.read_json(None, ACCOUNT_PROFILE_PATH, ACCOUNT_PROFILE_LIMIT)?;
-        let profile = parse_account_profile_read(response.value, &self.inner.user.id)?;
+        let profile = parse_account_profile_read(
+            response.value,
+            &self.inner.user.id,
+            &self.inner.user.archive_generation,
+        )?;
         self.check_read_epoch(response.epoch)?;
         Ok(profile)
     }
@@ -687,11 +691,27 @@ impl RuntimeSession {
         let value: Value =
             serde_json::from_slice(&response.body).map_err(|_| RuntimeError::Indeterminate)?;
         match response.status {
-            200..=299 => parse_account_profile_update(value, &self.inner.user.id)
-                .map_err(|_| RuntimeError::Indeterminate),
-            409 => parse_account_profile_conflict(value, &self.inner.user.id)
-                .map(|current| AccountProfileUpdateOutcome::VersionConflict { current })
-                .map_err(|_| RuntimeError::Indeterminate),
+            200..=299 => parse_account_profile_update(
+                value,
+                &self.inner.user.id,
+                &self.inner.user.archive_generation,
+            )
+            .map_err(|error| match error {
+                // A snapshot from another archive is never a confirmed save,
+                // but it must stay distinguishable from an unknown outcome.
+                RuntimeError::ArchiveReplaced => RuntimeError::ArchiveReplaced,
+                _ => RuntimeError::Indeterminate,
+            }),
+            409 => parse_account_profile_conflict(
+                value,
+                &self.inner.user.id,
+                &self.inner.user.archive_generation,
+            )
+            .map(|current| AccountProfileUpdateOutcome::VersionConflict { current })
+            .map_err(|error| match error {
+                RuntimeError::ArchiveReplaced => RuntimeError::ArchiveReplaced,
+                _ => RuntimeError::Indeterminate,
+            }),
             _ => Err(RuntimeError::Indeterminate),
         }
     }
@@ -3042,6 +3062,48 @@ mod tests {
         let session = session_at(&url);
         assert_eq!(
             session.read_account_profile(),
+            Err(RuntimeError::ArchiveReplaced)
+        );
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn account_profile_responses_from_another_archive_are_never_adopted() {
+        let mut read = account_profile_read_wire();
+        read["archiveGeneration"] = json!("another-generation");
+        let (url, _, server) = profile_server(200, read);
+        let session = session_at(&url);
+        assert_eq!(
+            session.read_account_profile(),
+            Err(RuntimeError::ArchiveReplaced)
+        );
+        server.join().unwrap();
+
+        let mut update = account_profile_update_wire(true);
+        update["archiveGeneration"] = json!("another-generation");
+        let (url, _, server) = profile_server(200, update);
+        let session = session_at(&url);
+        assert_eq!(
+            session.update_account_profile(&account_profile_snapshot(), Some("Bozza"), None),
+            Err(RuntimeError::ArchiveReplaced)
+        );
+        let listener = server.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(
+            matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock),
+            "a foreign-archive confirmation must not be retried"
+        );
+
+        let conflict = json!({
+            "userId": "synthetic-user", "username": "synthetic",
+            "displayName": "Altro client", "ambulatoryName": "Altro studio",
+            "profileVersion": "p1:other", "archiveGeneration": "another-generation",
+            "code": "PROFILE_VERSION_CONFLICT", "error": "Il profilo è cambiato."
+        });
+        let (url, _, server) = profile_server(409, conflict);
+        let session = session_at(&url);
+        assert_eq!(
+            session.update_account_profile(&account_profile_snapshot(), Some("Bozza"), None),
             Err(RuntimeError::ArchiveReplaced)
         );
         server.join().unwrap();

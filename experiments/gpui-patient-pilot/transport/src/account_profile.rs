@@ -19,7 +19,7 @@ pub struct AccountProfileSnapshot {
 }
 
 impl AccountProfileSnapshot {
-    fn validate(&self, expected_user_id: &str) -> Result<()> {
+    fn validate(&self, expected_user_id: &str, expected_generation: &str) -> Result<()> {
         if self.user_id != expected_user_id
             || validate_id(&self.user_id).is_err()
             || self.username.trim().is_empty()
@@ -30,6 +30,11 @@ impl AccountProfileSnapshot {
             || validate_id(&self.archive_generation).is_err()
         {
             return Err(RuntimeError::InvalidResponse);
+        }
+        // A snapshot from another archive must never become a save base or a
+        // confirmation, even though its generation is a well-formed id.
+        if self.archive_generation != expected_generation {
+            return Err(RuntimeError::ArchiveReplaced);
         }
         Ok(())
     }
@@ -126,7 +131,11 @@ struct SnapshotWire {
 }
 
 impl SnapshotWire {
-    fn into_snapshot(self, expected_user_id: &str) -> Result<AccountProfileSnapshot> {
+    fn into_snapshot(
+        self,
+        expected_user_id: &str,
+        expected_generation: &str,
+    ) -> Result<AccountProfileSnapshot> {
         let snapshot = AccountProfileSnapshot {
             user_id: self.user_id,
             username: self.username,
@@ -135,7 +144,7 @@ impl SnapshotWire {
             profile_version: self.profile_version,
             archive_generation: self.archive_generation,
         };
-        snapshot.validate(expected_user_id)?;
+        snapshot.validate(expected_user_id, expected_generation)?;
         Ok(snapshot)
     }
 }
@@ -166,7 +175,11 @@ struct ConflictWire {
     _error: String,
 }
 
-pub(crate) fn parse_read(value: Value, expected_user_id: &str) -> Result<AccountProfileRead> {
+pub(crate) fn parse_read(
+    value: Value,
+    expected_user_id: &str,
+    expected_generation: &str,
+) -> Result<AccountProfileRead> {
     let wire: ReadWire =
         serde_json::from_value(value).map_err(|_| RuntimeError::InvalidResponse)?;
     if wire.operation != "account-profile.read.v1" || wire.contract_version != 1 {
@@ -180,7 +193,7 @@ pub(crate) fn parse_read(value: Value, expected_user_id: &str) -> Result<Account
         profile_version: wire.profile_version,
         archive_generation: wire.archive_generation,
     }
-    .into_snapshot(expected_user_id)?;
+    .into_snapshot(expected_user_id, expected_generation)?;
     Ok(AccountProfileRead {
         user_id: snapshot.user_id,
         username: snapshot.username,
@@ -194,6 +207,7 @@ pub(crate) fn parse_read(value: Value, expected_user_id: &str) -> Result<Account
 pub(crate) fn parse_update(
     value: Value,
     expected_user_id: &str,
+    expected_generation: &str,
 ) -> Result<AccountProfileUpdateOutcome> {
     let wire: UpdateWire =
         serde_json::from_value(value).map_err(|_| RuntimeError::InvalidResponse)?;
@@ -205,7 +219,7 @@ pub(crate) fn parse_update(
         profile_version: wire.profile_version,
         archive_generation: wire.archive_generation,
     }
-    .into_snapshot(expected_user_id)?;
+    .into_snapshot(expected_user_id, expected_generation)?;
     Ok(AccountProfileUpdateOutcome::Saved {
         changed: wire.changed,
         profile: snapshot,
@@ -215,6 +229,7 @@ pub(crate) fn parse_update(
 pub(crate) fn parse_conflict(
     value: Value,
     expected_user_id: &str,
+    expected_generation: &str,
 ) -> Result<AccountProfileSnapshot> {
     let wire: ConflictWire =
         serde_json::from_value(value).map_err(|_| RuntimeError::InvalidResponse)?;
@@ -229,7 +244,7 @@ pub(crate) fn parse_conflict(
         profile_version: wire.profile_version,
         archive_generation: wire.archive_generation,
     }
-    .into_snapshot(expected_user_id)
+    .into_snapshot(expected_user_id, expected_generation)
 }
 
 /// Matches the host schema: trim, then empty becomes an explicit null. The
@@ -260,6 +275,8 @@ fn valid_opaque(value: &str) -> bool {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    const GENERATION: &str = "synthetic-generation";
 
     fn read_wire() -> Value {
         json!({
@@ -301,7 +318,7 @@ mod tests {
 
     #[test]
     fn profile_read_is_strict_and_bound_to_the_session_user() {
-        let read = parse_read(read_wire(), "synthetic-user").unwrap();
+        let read = parse_read(read_wire(), "synthetic-user", GENERATION).unwrap();
         assert_eq!(read.display_name.as_deref(), Some("Dott.ssa Sintetica"));
         assert!(read.ambulatory_name.is_none());
         assert_eq!(read.profile_version, "p1:synthetic");
@@ -323,21 +340,21 @@ mod tests {
             }
             assert!(
                 matches!(
-                    parse_read(invalid, "synthetic-user"),
+                    parse_read(invalid, "synthetic-user", GENERATION),
                     Err(RuntimeError::InvalidResponse)
                 ),
                 "{pointer}"
             );
         }
         assert!(matches!(
-            parse_read(read_wire(), "another-user"),
+            parse_read(read_wire(), "another-user", GENERATION),
             Err(RuntimeError::InvalidResponse)
         ));
     }
 
     #[test]
     fn profile_update_sends_exactly_three_keys_with_trimmed_optional_names() {
-        let snapshot = parse_read(read_wire(), "synthetic-user")
+        let snapshot = parse_read(read_wire(), "synthetic-user", GENERATION)
             .unwrap()
             .snapshot();
         let body = AccountProfileUpdate::new(&snapshot, Some("  Dott. Sintetico  "), Some("   "))
@@ -359,7 +376,7 @@ mod tests {
 
     #[test]
     fn profile_write_parses_only_the_conditional_contract() {
-        let outcome = parse_update(update_wire(), "synthetic-user").unwrap();
+        let outcome = parse_update(update_wire(), "synthetic-user", GENERATION).unwrap();
         let AccountProfileUpdateOutcome::Saved { changed, profile } = outcome else {
             panic!("expected a saved profile");
         };
@@ -367,7 +384,7 @@ mod tests {
         assert_eq!(profile.display_name.as_deref(), Some("Dott. Sintetico"));
         assert_eq!(profile.profile_version, "p1:updated");
 
-        let current = parse_conflict(conflict_wire(), "synthetic-user").unwrap();
+        let current = parse_conflict(conflict_wire(), "synthetic-user", GENERATION).unwrap();
         assert_eq!(current.display_name.as_deref(), Some("Altro client"));
         assert_eq!(current.profile_version, "p1:other");
 
@@ -385,7 +402,7 @@ mod tests {
             }
             assert!(
                 matches!(
-                    parse_update(invalid, "synthetic-user"),
+                    parse_update(invalid, "synthetic-user", GENERATION),
                     Err(RuntimeError::InvalidResponse)
                 ),
                 "{pointer}"
@@ -404,11 +421,58 @@ mod tests {
             }
             assert!(
                 matches!(
-                    parse_conflict(invalid, "synthetic-user"),
+                    parse_conflict(invalid, "synthetic-user", GENERATION),
                     Err(RuntimeError::InvalidResponse)
                 ),
                 "{pointer}"
             );
         }
+    }
+
+    #[test]
+    fn profile_read_from_another_archive_is_replaced_not_exposed() {
+        let mut other = read_wire();
+        other["archiveGeneration"] = json!("another-generation");
+        assert!(matches!(
+            parse_read(other, "synthetic-user", GENERATION),
+            Err(RuntimeError::ArchiveReplaced)
+        ));
+
+        // A malformed generation is still a malformed response, not a
+        // replacement.
+        let mut malformed = read_wire();
+        malformed["archiveGeneration"] = json!("");
+        assert!(matches!(
+            parse_read(malformed, "synthetic-user", GENERATION),
+            Err(RuntimeError::InvalidResponse)
+        ));
+    }
+
+    #[test]
+    fn profile_write_and_conflict_from_another_archive_are_replaced() {
+        let mut update = update_wire();
+        update["archiveGeneration"] = json!("another-generation");
+        assert!(matches!(
+            parse_update(update, "synthetic-user", GENERATION),
+            Err(RuntimeError::ArchiveReplaced)
+        ));
+
+        let mut conflict = conflict_wire();
+        conflict["archiveGeneration"] = json!("another-generation");
+        assert!(matches!(
+            parse_conflict(conflict, "synthetic-user", GENERATION),
+            Err(RuntimeError::ArchiveReplaced)
+        ));
+
+        // The session's own archive keeps the unchanged behaviour.
+        let AccountProfileUpdateOutcome::Saved { changed, profile } =
+            parse_update(update_wire(), "synthetic-user", GENERATION).unwrap()
+        else {
+            panic!("expected the confirmed save");
+        };
+        assert!(changed);
+        assert_eq!(profile.archive_generation, GENERATION);
+        let current = parse_conflict(conflict_wire(), "synthetic-user", GENERATION).unwrap();
+        assert_eq!(current.archive_generation, GENERATION);
     }
 }
