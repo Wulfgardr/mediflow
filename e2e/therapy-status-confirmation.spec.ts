@@ -7,6 +7,40 @@ const threshold = (page: Page) => page.getByRole('region', { name: 'Cambio di st
 const row = (page: Page, secondary = false) => page.locator('#terapie').getByRole('row').filter({ has: page.getByText(secondary ? 'Farmaco sintetico secondario' : 'Ramipril sintetico 5 mg', { exact: true }) });
 const confirm = (page: Page) => threshold(page).getByRole('button', { name: 'Conferma e registra', exact: true });
 
+async function expectConfirmation(page: Page, question: string) {
+    const region = threshold(page);
+    const title = region.getByRole('heading', { name: question, exact: true, level: 3 });
+    await expect(title).toBeVisible();
+    await expect(title).toHaveClass(/\btype-threshold\b/);
+    await expect(title).toHaveCSS('font-size', '15px');
+    await expect(title).toHaveCSS('font-weight', '600');
+    await expect(region.getByText('Ada Sintetica, 54 anni', { exact: true })).toHaveClass('type-body');
+    await expect(region.getByText('Conferma il cambio di stato', { exact: true })).toHaveCount(0);
+    await expect(region.locator('.lume-point')).toHaveCount(0);
+}
+
+async function expectUncertainOutcome(page: Page) {
+    const region = threshold(page);
+    const title = region.getByRole('heading', { name: 'Esito da verificare', exact: true, level: 3 });
+    await expect(title).toBeVisible();
+    await expect(title).toHaveClass(/\btype-threshold\b/);
+    expect((await region.innerText()).match(/Esito da verificare/g)).toHaveLength(1);
+    await expect(title.locator('[aria-hidden="true"]')).toHaveText('▲');
+    const warningColor = await title.evaluate(element => {
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--lume-signal-warning)';
+        element.append(probe);
+        const color = getComputedStyle(probe).color;
+        probe.remove();
+        return color;
+    });
+    await expect(title).toHaveCSS('color', warningColor);
+    await expect(region.locator('.lume-point')).toHaveCount(0);
+    await expect(region.getByText('La registrazione può essere avvenuta: rileggi prima di riprovare.', { exact: true })).toBeVisible();
+    await expect(region.getByText('Ramipril sintetico 5 mg · 1 cp al mattino', { exact: true })).toBeVisible();
+    await expect(region.getByText('Ada Sintetica, 54 anni', { exact: true })).toBeVisible();
+}
+
 async function fixture(page: Page): Promise<Fixture> {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     return page.evaluate(async () => {
@@ -56,8 +90,7 @@ test('first gesture then return to record issues zero writes', async ({ page }) 
     await open(page, data);
     const { writes } = network(page);
     await row(page).getByRole('button', { name: 'Sospendi', exact: true }).click();
-    await expect(threshold(page)).toContainText('Ada Sintetica');
-    await expect(threshold(page)).toContainText('Sospendere Ramipril sintetico 5 mg, 1 cp al mattino?');
+    await expectConfirmation(page, 'Sospendere Ramipril sintetico 5 mg, 1 cp al mattino?');
     await threshold(page).getByRole('button', { name: 'Torna alla scheda', exact: true }).click();
     await expect(threshold(page)).toHaveCount(0);
     const current = await stored(page, data);
@@ -138,7 +171,7 @@ for (const applied of [true, false]) {
         });
         await row(page).getByRole('button', { name: 'Sospendi', exact: true }).click();
         await confirm(page).click();
-        await expect(threshold(page)).toContainText('La registrazione può essere avvenuta: rileggi prima di riprovare.');
+        await expectUncertainOutcome(page);
         await expect(confirm(page)).toHaveCount(0);
         await expect(row(page).getByRole('button', { name: 'Sospendi', exact: true })).toBeDisabled();
         await expect(row(page, true).getByRole('button', { name: 'Concludi', exact: true })).toBeDisabled();
@@ -183,15 +216,16 @@ for (const theme of ['light', 'dark']) for (const width of [390, 1440]) {
         const { writes } = network(page);
         await page.route(`**/api/therapies/${data.therapyId}`, route => route.request().method() === 'PUT' ? route.abort('failed') : route.continue());
         await row(page).getByRole('button', { name: 'Sospendi', exact: true }).click();
-        await expect(threshold(page)).toBeVisible();
+        await expectConfirmation(page, 'Sospendere Ramipril sintetico 5 mg, 1 cp al mattino?');
         await assertNoHorizontalOverflow(page, [{ label: 'threshold', selector: '[aria-label="Cambio di stato della terapia"]' }]);
         const dir = process.env.THERAPY_SCREENSHOT_DIR || test.info().outputPath('captures');
         await mkdir(dir, { recursive: true });
         const themeName = theme === 'light' ? 'giorno' : 'grafite';
-        await page.screenshot({ path: `${dir}/soglia-${themeName}-${width}.png` });
+        const suffix = process.env.THERAPY_SCREENSHOT_SUFFIX || '';
+        await page.screenshot({ path: `${dir}/soglia-${themeName}-${width}${suffix}.png` });
         await confirm(page).click();
-        await expect(threshold(page)).toContainText('La registrazione può essere avvenuta');
-        await page.screenshot({ path: `${dir}/esito-da-verificare-${themeName}-${width}.png` });
+        await expectUncertainOutcome(page);
+        await page.screenshot({ path: `${dir}/esito-da-verificare-${themeName}-${width}${suffix}.png` });
         expect(writes).toHaveLength(1);
         await assertNoHorizontalOverflow(page, [{ label: 'threshold', selector: '[aria-label="Cambio di stato della terapia"]' }]);
     });
@@ -209,7 +243,7 @@ test('suspend, reactivate and complete each require their own confirmation and p
     ];
     for (const [index, transition] of transitions.entries()) {
         await row(page).getByRole('button', { name: transition.action, exact: true }).click();
-        await expect(threshold(page)).toContainText(`${transition.verb} Ramipril sintetico 5 mg, 1 cp al mattino?`);
+        await expectConfirmation(page, `${transition.verb} Ramipril sintetico 5 mg, 1 cp al mattino?`);
         expect(writes).toHaveLength(index);
         await confirm(page).click();
         await expect(threshold(page).getByText('Registrata', { exact: true })).toBeVisible();
