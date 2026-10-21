@@ -35,9 +35,10 @@ export function isolatedRuntimeArguments(bundle: string): string[] {
 
 type IsolatedRuntime = Readonly<{ url: string }>;
 
-export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRuntimeServices: boolean }>({
+export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRuntimeServices: boolean; pluginLocalUiRuntime: boolean }>({
+  pluginLocalUiRuntime: [false, { option: true }],
   initialRuntimeServices: [false, { option: true }],
-  isolatedRuntime: async ({ initialRuntimeServices }, provide, testInfo) => {
+  isolatedRuntime: async ({ initialRuntimeServices, pluginLocalUiRuntime }, provide, testInfo) => {
     const bundle = path.resolve(process.env.E2E_ISOLATED_STANDALONE_DIR
       || path.join(repositoryRoot, process.env.MEDIFLOW_NEXT_DIST_DIR || '.next', 'standalone'));
     const serverPath = path.join(bundle, 'server.js');
@@ -73,10 +74,11 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
       MEDIFLOW_DATA_DIR: dataDirectory, MEDIFLOW_E2E_DATA_DIR: dataDirectory,
       MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', E2E_DISABLE_LEGACY_COPY: '1',
     };
+    environment.MEDIFLOW_PLUGIN_LOCAL_UI = pluginLocalUiRuntime ? '1' : '0';
     delete environment.MEDIFLOW_RUNTIME_TWIN;
     delete environment.NEXT_PUBLIC_MEDIFLOW_RUNTIME_TWIN;
     const child = spawn(process.execPath, isolatedRuntimeArguments(bundle), {
-      cwd: bundle, env: environment, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+      cwd: bundle, env: environment, stdio: pluginLocalUiRuntime ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'], windowsHide: true,
     });
     const closed = new Promise<void>(resolve => child.once('close', () => resolve()));
     let readySeen = false;
@@ -88,12 +90,12 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
         const deadline = setTimeout(() => reject(new Error('The isolated server did not become ready.')), 30_000);
         const settle = (error?: Error) => { clearTimeout(deadline); if (error) reject(error); else resolve(); };
         let output = '';
-        child.stdout.on('data', (chunk: Buffer) => {
+        child.stdout!.on('data', (chunk: Buffer) => {
           writeSync(log, chunk);
           output = (output + chunk.toString()).slice(-2_048);
           if (!readySeen && /Ready in/u.test(output)) { readySeen = true; settle(); }
         });
-        child.stderr.on('data', (chunk: Buffer) => writeSync(log, chunk));
+        child.stderr!.on('data', (chunk: Buffer) => writeSync(log, chunk));
         child.once('error', () => settle(new Error('The isolated server could not start.')));
         child.once('exit', () => { if (!readySeen) settle(new Error('The isolated server exited before readiness.')); });
       });
@@ -124,7 +126,7 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
         contentType: 'application/json',
         body: JSON.stringify({
           isolated: true, url, node: process.versions.node, platform: process.platform, arch: process.arch,
-          emptyDataBeforeStart: !initialRuntimeServices, initialRuntimeServices, initialEmptyAccount, sourceFingerprint, childStopped: true,
+          emptyDataBeforeStart: !initialRuntimeServices, initialRuntimeServices, pluginLocalUiRuntime, initialEmptyAccount, sourceFingerprint, childStopped: true,
           serverSHA256: createHash('sha256').update(readFileSync(serverPath)).digest('hex'),
           runtimeContractSHA256: createHash('sha256').update(readFileSync(contractPath)).digest('hex'),
           sharedDatabaseUsed: false, accountOrDatabaseRestore: false,

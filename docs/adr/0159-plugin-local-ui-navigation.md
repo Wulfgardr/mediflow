@@ -23,11 +23,15 @@ presenza del paziente o esecuzione di atti. Errori pubblici e diagnostica sono
 fissi, anche per la validazione MCP prima dell'handler. Non esistono resource,
 prompt, progress o metadati con dati del paziente.
 
-Il layout server valuta a ogni rendering su richiesta la stessa condizione della
-route eventi: `MEDIFLOW_PLUGIN_LOCAL_UI=1` e IPC connesso. Espone soltanto
-il booleano `data-plugin-local-ui`; senza quel segnale il client non apre
-l'EventSource. La valutazione avviene dopo `connection()`, quindi non resta
-fissata al momento della build. Il flag abilita solo l'ascolto: non concede
+La pagina `/plugin-local-ui` e il solo layout `/patients/[id]/modules`
+valutano a ogni rendering su richiesta la stessa condizione della route eventi:
+`MEDIFLOW_PLUGIN_LOCAL_UI=1` e IPC connesso. Espongono soltanto il booleano tramite un provider circoscritto ai due consumatori; senza quel
+segnale il client non apre l'EventSource. La valutazione avviene dopo
+`connection()`, quindi non resta
+fissata al momento della build. Il layout radice non legge il runtime né
+richiede rendering dinamico: le altre route conservano il prerendering di main.
+Il controllo post-build confronta il manifest con la baseline statica di
+`b10f4d2567e19169ad332af445a1abb08be0b844`. Il flag abilita solo l'ascolto: non concede
 autorità e la route mantiene i controlli runtime e di origine, con `404`
 fuori dal runtime designato.
 
