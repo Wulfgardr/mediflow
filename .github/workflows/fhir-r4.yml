@@ -35,6 +35,8 @@ jobs:
   fhir-r4-web:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      FHIR_REPORT_DIR: ${{ runner.temp }}/fhir-r4-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -60,20 +62,18 @@ jobs:
           export MEDIFLOW_DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/fhir-test.XXXXXX")"
           npm run test:fhir-r4
       - name: Official offline validator and six required falsifications
-        run: npm run check:fhir-r4 -- --falsify
+        run: npm run check:fhir-r4 -- --falsify --out "$FHIR_REPORT_DIR"
       - name: Publish timing and semantic summary
         if: always()
         run: |
-          for report in tmp-fhir-r4-*/report.txt; do
-            if test -f "$report"; then
-              cat "$report" >> "$GITHUB_STEP_SUMMARY"
-            fi
-          done
+          if test -f "$FHIR_REPORT_DIR/report.txt"; then
+            cat "$FHIR_REPORT_DIR/report.txt" >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Retain synthetic corpus, OperationOutcomes, logs and reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: fhir-r4-web-${{ github.sha }}
-          path: tmp-fhir-r4-*/
+          path: ${{ env.FHIR_REPORT_DIR }}/
           if-no-files-found: error
           retention-days: 14
