@@ -183,6 +183,52 @@ zoom al 200% e 400%, come chiede `DESIGN.md`.
   ("Bozza non registrata", "Proposta da rivedere") e la legenda sotto la
   tabella.
 
+### Provenienza di un documento
+
+Un artefatto conservato non è un fatto clinico accettato. Aprire il dettaglio
+non scrive nulla e non rende accettabile una proposta. La provenienza è la
+carta d'identità della sintesi: nella stessa sezione, senza cornici, l'ordine è
+titolo «Sintesi salvata» → righe Meta di provenienza → testo della sintesi.
+Non ripetere il titolo in una riga Meta.
+
+- **Conservato:** «Salvata il <data>» apre la provenienza soltanto se esiste
+  la data di salvataggio della sintesi nel DTO; altrimenti ometti la riga.
+  La data di caricamento dell'allegato e l'aggiornamento della coda OCR non
+  sono date di salvataggio della sintesi.
+- **Fonte:** «Fonte: <nome allegato>» soltanto quando il collegamento identifica
+  questo documento. Se il collegamento esiste ma il nome è vuoto o composto
+  soltanto da spazi, «Fonte: questo documento (nome non disponibile)»; conserva
+  l'estratto salvato. Se manca la fonte o il collegamento, «Origine non indicata».
+  Se identifica un altro
+  allegato, «Fonte di un altro allegato: non mostrata»: nascondi anche il suo
+  estratto. Senza un collegamento verificabile, non mostrare nome o estratto.
+  Una fonte salvata che esiste ma non si può ispezionare non è una fonte
+  assente: con la chiave attuale illeggibile → «Fonte salvata, non leggibile
+  con la chiave attuale»; malformata → «Fonte salvata, non leggibile»; in uno
+  schema più recente → «Fonte salvata in un formato più recente: non
+  verificabile». Distingui sempre illeggibile da assente: uno stato nuovo non
+  ricade in «Origine non indicata».
+- **Corrispondenza con l'originale:** «Corrisponde all'originale attuale» solo
+  con una prova nel DTO; altrimenti «Corrispondenza con l'originale attuale non
+  verificata». Un collegamento coerente da solo non prova la corrispondenza.
+
+Dichiara nel proprio blocco «Testo da OCR precedente» quando è attestata
+un'elaborazione OCR storica; questo stato non certifica la sintesi o l'estratto.
+Per un estratto accorciato nella vista dichiara «Estratto abbreviato: <n> di
+<m> caratteri», quando i conteggi sono disponibili: la riga Meta sta sotto
+il titolo «Estratto salvato» e prima del testo. Un campo cifrato non
+leggibile usa lo stato «Campo illeggibile», mai lo stato vuoto.
+
+La matita e la parola «Proposta» richiedono che il DTO attesti un contenuto
+proposto da un modello o agente e la sua fonte. Un testo conservato di origine
+ignota usa il colore testo con la riga di provenienza, senza punto: non è
+né matita né «Registrata». Senza verifica attuale della fonte non offrire
+comandi che applichino il contenuto alla cartella.
+
+Il DTO GPUI attuale non attesta data di salvataggio della sintesi, autore
+modello/agente o corrispondenza con l'originale attuale: la vista dichiara
+questi limiti senza nuovi campi né endpoint.
+
 ## Componenti
 
 ### Navigazione
