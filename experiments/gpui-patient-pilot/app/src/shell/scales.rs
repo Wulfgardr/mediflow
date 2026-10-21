@@ -20,7 +20,7 @@ pub(super) struct ScaleArea {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     use serde_json::{Value, json};
     use std::{
@@ -48,6 +48,17 @@ mod tests {
                     "population":"synthetic", "scoring":"synthetic-host-only", "interpretation":"synthetic-host-only",
                     "interpretationVersion":"synthetic-interpretation-v1", "translation":"synthetic", "rights":"synthetic", "reviewGap":"synthetic"}})).collect::<Vec<_>>()})
     }
+    pub(in crate::shell) fn stage_primary_label_fixture(
+        app: &mut ClinicalApp,
+        cx: &mut Context<ClinicalApp>,
+    ) {
+        app.form = None;
+        app.area = Area::Scales;
+        app.scales.catalog = Load::Ready(serde_json::from_value(catalog_wire()).unwrap());
+        app.open_scale_form(ScaleId::Adl, cx);
+        app.choose_scale_answer(0, 1, cx);
+    }
+
     fn profile_wire(epoch: u64) -> Value {
         json!({"schemaVersion":"mediflow.patient.profile-view.v1", "operationId":"patient-profile.read.v1", "contractVersion":1,
             "handle":format!("pph_{}", "a".repeat(64)), "projection":"profile",

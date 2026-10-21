@@ -4812,15 +4812,15 @@ impl ClinicalApp {
                                         .attach_enabled(
                                             button(
                                                 "clinical-workspace-review-save",
-                                                if form.kind == FormKind::Scale {
-                                                    "Prepara e rivedi"
-                                                } else {
-                                                    "Registra 1 elemento"
-                                                },
+                                                threshold_actions::Command::Review
+                                                    .primary_label(form.kind),
                                                 theme,
                                                 true,
                                                 review_enabled,
-                                            ),
+                                            )
+                                            .debug_selector(|| {
+                                                "clinical-workspace-review-save".into()
+                                            }),
                                             review_enabled,
                                         )
                                         .when(review_enabled, |el| {

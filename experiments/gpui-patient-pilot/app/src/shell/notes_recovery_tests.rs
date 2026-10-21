@@ -1058,3 +1058,158 @@ fn threshold_minimum_shell_geometry_and_keyboard_region(cx: &mut gpui::TestAppCo
     }
     assert!(host.writes().is_empty());
 }
+
+#[gpui::test]
+fn threshold_all_primary_labels_fit_three_lines_in_minimum_shell(cx: &mut gpui::TestAppContext) {
+    use super::threshold_actions::{Command, PRIMARY_LABELS};
+    for body in [14., 16.] {
+        let host = Host::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        open(&view, &host, cx);
+        for &(command, specific_kind, label) in PRIMARY_LABELS {
+            let label_selector: &'static str =
+                Box::leak(format!("control-label:{label}").into_boxed_str());
+            cx.update_window_entity(&view, |app, window, cx| {
+                app.form = None;
+                app.area = Area::Patients;
+                app.open_form(FormKind::Notes, window, cx);
+            });
+            let mut checked_cases = 0;
+            for kind in [
+                FormKind::Notes,
+                FormKind::Entry,
+                FormKind::Scale,
+                FormKind::Therapy,
+                FormKind::Observation,
+                FormKind::Checkup,
+                FormKind::Document,
+                FormKind::PatientNew,
+                FormKind::PatientProfile,
+            ] {
+                if specific_kind.is_some_and(|specific| specific != kind)
+                    || command.primary_label(kind) != label
+                    || (command == Command::Copy && kind != FormKind::Notes)
+                {
+                    continue;
+                }
+                let states: &[FormState] = match command {
+                    Command::Review => &[FormState::Draft],
+                    Command::Reread => &[
+                        FormState::Conflict,
+                        FormState::Uncertain,
+                        FormState::Rejected,
+                    ],
+                    Command::Copy => &[FormState::Rejected],
+                    _ => panic!("unexpected primary: {label}"),
+                };
+                for &state in states {
+                    cx.simulate_resize(gpui::size(px(390.), px(640.)));
+                    cx.update_window_entity(&view, |app, window, cx| {
+                        if kind == FormKind::Scale && app.form.as_ref().unwrap().scale.is_none() {
+                            super::scales::tests::stage_primary_label_fixture(app, cx);
+                        }
+                        let form = app.form.as_mut().unwrap();
+                        form.kind = kind;
+                        form.state = state;
+                        if command == Command::Copy {
+                            app.core.lock();
+                            let mut patient = app.patient.detail.ready().unwrap().clone();
+                            patient.is_archived = true;
+                            app.patient.detail = ReadLoad::Ready(patient);
+                        }
+                        app.text_scale = 4.;
+                        app.test_body_size = Some(body);
+                        app.focus_first_field = false;
+                        app.focus_after_render = false;
+                        window.focus(&app.form_actions[command.id_and_action().1].focus, cx);
+                        cx.notify();
+                    });
+                    draw(cx);
+                    cx.update_window_entity(&view, |app, window, cx| {
+                        window.focus(&app.form_actions[command.id_and_action().1].focus, cx);
+                    });
+                    draw(cx);
+                    cx.update(|window, cx| {
+                        assert!(
+                            view.read(cx).form_actions[command.id_and_action().1]
+                                .focus
+                                .is_focused(window),
+                            "primary must be focused: {label}"
+                        )
+                    });
+                    checked_cases += 1;
+                    let text = cx.debug_bounds(label_selector).unwrap_or_else(|| {
+                        panic!("missing primary label {label:?} for {}", kind.title())
+                    });
+                    let lines = f32::from(text.size.height) / (body * 4. * 1.5);
+                    let context =
+                        format!("{label:?}, {}, base={body}, lines={lines}", kind.title());
+                    eprintln!("primary {context}");
+                    assert!(
+                        lines <= 3.,
+                        "{context}: primary exceeds 3 lines; shorten its label"
+                    );
+                    let primary = cx.debug_bounds(command.id_and_action().0).unwrap();
+                    let content = cx.debug_bounds("threshold-scroll").unwrap();
+                    let bar = cx.debug_bounds("threshold-bar").unwrap();
+                    let region = cx.debug_bounds("threshold-recovery-region");
+                    let remaining_region = 640.
+                        - f32::from(content.top())
+                        - (body * 4. * 1.5).ceil()
+                        - f32::from(primary.size.height)
+                        - 25.
+                        - 8.;
+                    assert!(
+                        remaining_region >= 0.,
+                        "{context}: remaining region={remaining_region}"
+                    );
+                    assert!(
+                        content.size.height >= px((body * 4. * 1.5).ceil()),
+                        "{context}: content={content:?}"
+                    );
+                    assert!(
+                        content.top() >= px(0.) && content.bottom() <= bar.top(),
+                        "{context}"
+                    );
+                    if let Some(region) = region {
+                        assert!(
+                            region.size.height >= px(0.)
+                                && region.top() >= bar.top()
+                                && region.bottom() <= primary.top(),
+                            "{context}: region={region:?}"
+                        );
+                    }
+                    eprintln!(
+                        "geometry {context}: content={content:?} region={region:?} primary={primary:?}"
+                    );
+                    assert!(
+                        bar.top() >= px(0.) && bar.bottom() <= px(640.),
+                        "{context}: bar={bar:?}"
+                    );
+                    assert!(
+                        primary.top() >= bar.top()
+                            && primary.bottom() <= px(640.)
+                            && primary.left() >= px(0.)
+                            && primary.right() <= px(390.),
+                        "{context}: primary={primary:?}"
+                    );
+                    assert!(
+                        text.top() >= primary.top()
+                            && text.bottom() <= primary.bottom()
+                            && text.left() >= primary.left()
+                            && text.right() <= primary.right(),
+                        "{context}: text={text:?}"
+                    );
+                    view.read_with(cx, |app, _| {
+                        assert_eq!(app.threshold_mode.get(), ThresholdMode::Compact)
+                    });
+                }
+            }
+            assert!(
+                checked_cases > 0,
+                "uncovered production primary label: {label:?}"
+            );
+        }
+    }
+}
