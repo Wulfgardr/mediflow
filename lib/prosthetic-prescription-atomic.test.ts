@@ -14,6 +14,8 @@ const dir = mkdtempSync(join(root, 'prosthetic-atomic-'));
 process.env.MEDIFLOW_DATA_DIR = dir;
 const { dbServer, openDbServer } = await import('./db-server.ts');
 openDbServer();
+const { commitTerritorialPackTransition } = await import('./territorial-pack-store.ts');
+commitTerritorialPackTransition(openDbServer(), { schemaVersion: 'mediflow.territorial-packs.v1', expectedRevision: 0, preset: 'core+it+lom', confirmed: true }, { actorType: 'system', actorRef: 'synthetic-supervisor', sourceSurface: 'job' }, () => {});
 bindSyntheticArchiveSessions('synthetic-session', 'synthetic-native', 'synthetic-local-api');
 const { patients, ambulatories, patientsToAmbulatories, prostheticPrescriptions } = await import('./schema.ts');
 const writer = await import('./prosthetic-prescription-write.ts');
