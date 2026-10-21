@@ -426,3 +426,74 @@ fn notes_archive_replacement_rejects_recovery_without_granting_new_write_authori
     editor.read_with(cx, |input, _| assert_eq!(input.value(), DRAFT));
     assert_eq!(host.writes().len(), 1);
 }
+
+fn notes_form_presentation(
+    view: &Entity<ClinicalApp>,
+    cx: &mut gpui::VisualTestContext,
+) -> (String, &'static str) {
+    draw(cx);
+    view.read_with(cx, |app, cx| {
+        let form = app.form.as_ref().unwrap();
+        (
+            app.form_subject(form, &app.patient.detail.ready().unwrap().display_name()),
+            form.fields[0].editor.read(cx).accessible_label(),
+        )
+    })
+}
+
+#[gpui::test]
+fn notes_comparison_explains_replacement_and_keeps_only_the_accessible_field_label(
+    cx: &mut gpui::TestAppContext,
+) {
+    let host = Host::new();
+    let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+    open(&view, &host, cx);
+    let (threshold, label) = notes_form_presentation(&view, cx);
+    assert!(cx.debug_bounds("clinical-workspace-field-label").is_some());
+    assert_eq!(label, "Note della scheda");
+    assert!(threshold.contains("Amina Sintetica · Note della scheda"));
+    assert!(!threshold.contains("La tua bozza sostituirà il testo registrato ora."));
+
+    {
+        let mut state = host.state.lock().unwrap();
+        state.version = 2;
+        state.notes = json!(CONCURRENT);
+        state.outcome = 409;
+    }
+    confirm(&view, cx);
+    reread(&view, cx);
+    let (threshold, label) = notes_form_presentation(&view, cx);
+    assert!(cx.debug_bounds("clinical-workspace-field-label").is_none());
+    assert_eq!(label, "Note della scheda, la tua bozza");
+    assert!(threshold.contains(
+        "Amina Sintetica · Note della scheda. La tua bozza sostituirà il testo registrato ora."
+    ));
+
+    let editor = view.read_with(cx, |app, _| {
+        app.form.as_ref().unwrap().fields[0].editor.clone()
+    });
+    cx.update(|window, cx| editor.update(cx, |input, cx| input.focus_and_select(window, cx)));
+    cx.simulate_input(CONCURRENT);
+    cx.run_until_parked();
+    let (threshold, label) = notes_form_presentation(&view, cx);
+    assert!(threshold.contains("Amina Sintetica · Note della scheda"));
+    assert!(!threshold.contains("La tua bozza sostituirà il testo registrato ora."));
+    assert!(cx.debug_bounds("clinical-workspace-field-label").is_none());
+    assert_eq!(label, "Note della scheda, la tua bozza");
+
+    cx.update(|window, cx| editor.update(cx, |input, cx| input.focus_and_select(window, cx)));
+    cx.simulate_input(DRAFT);
+    cx.run_until_parked();
+    cx.update_window_entity(&view, |app, window, cx| app.review_form(window, cx));
+    let (threshold, label) = notes_form_presentation(&view, cx);
+    assert!(threshold.contains(
+        "Amina Sintetica · Note della scheda. La tua bozza sostituirà il testo registrato ora."
+    ));
+    assert!(cx.debug_bounds("clinical-workspace-field-label").is_none());
+    assert_eq!(label, "Note della scheda, la tua bozza");
+    assert_eq!(
+        host.writes().len(),
+        1,
+        "rendering and review must not send the draft"
+    );
+}

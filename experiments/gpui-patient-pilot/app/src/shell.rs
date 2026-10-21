@@ -2626,10 +2626,18 @@ impl ClinicalApp {
             .flex()
             .flex_col()
             .gap(px(8.))
-            .child(
-                div()
-                    .type_role(theme, TypeRole::Body)
-                    .child(text!(field.label)),
+            .when(
+                !self.form.as_ref().is_some_and(|form| {
+                    form.kind == FormKind::Notes && self.core.has_notes_comparison()
+                }),
+                |el| {
+                    el.child(
+                        div()
+                            .debug_selector(|| "clinical-workspace-field-label".into())
+                            .type_role(theme, TypeRole::Body)
+                            .child(text!(field.label)),
+                    )
+                },
             )
             .child(
                 div()
@@ -4255,6 +4263,21 @@ impl ClinicalApp {
             )
     }
 
+    fn form_subject(&self, form: &Form, patient_name: &str) -> String {
+        let mut subject = format!(
+            "{} · {}",
+            patient_name,
+            form.edit
+                .as_ref()
+                .map_or(form.kind.title(), editing::Record::title)
+        );
+        if form.kind == FormKind::Notes && self.core.has_notes_comparison() && self.core.is_dirty()
+        {
+            subject.push_str(". La tua bozza sostituirà il testo registrato ora.");
+        }
+        subject
+    }
+
     fn threshold(&self, layout: Layout, cx: &Context<Self>) -> Stateful<Div> {
         let theme = self.theme;
         let mut threshold = div()
@@ -4361,13 +4384,15 @@ impl ClinicalApp {
                 .map(PatientDetail::display_name)
                 .unwrap_or_default()
         };
+        let comparison = form.kind == FormKind::Notes && self.core.has_notes_comparison();
+        let subject = self.form_subject(form, &patient_name);
         match form.state {
             FormState::Draft => threshold.bg(theme.draft).border_color(theme.draft_rule)
                 .child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
                     .when(layout.compact && form.kind == FormKind::Notes, |el| el.flex_col().items_stretch())
                     .child(div().flex_1().min_w_0().flex().flex_col().gap(px(4.))
                         .child(writing_status("clinical-workspace-writing-status", WritingInk::Fresh, WritingSurface::Plane, theme))
-                        .child(div().type_role(theme, TypeRole::Meta).child(text!(format!("{} · {}", patient_name, form.edit.as_ref().map_or(form.kind.title(), editing::Record::title))))))
+                        .child(div().type_role(theme, TypeRole::Meta).child(text!(subject))))
                     .child(div().flex().flex_wrap().gap(px(8.))
                         .child(self.form_actions[0].attach(button("clinical-workspace-cancel-form", if form.kind == FormKind::Notes { "Scarta la bozza" } else { "Scarta…" }, theme, false, true))
                             .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Form, cx))))
@@ -4375,7 +4400,7 @@ impl ClinicalApp {
                             .when(review_enabled, |el| el.on_click(cx.listener(|this, _, window, cx| this.review_form(window, cx))))))),
             FormState::Review => threshold.bg(theme.threshold).text_color(theme.threshold_text)
                 .child(div().type_role(theme, TypeRole::Threshold).child(text!(if repeated_scale { format!("Ripetere l’invio della stessa valutazione per {patient_name}?") } else if form.kind == FormKind::PatientNew { format!("Creare la scheda di {patient_name} nell'ambulatorio selezionato?") } else { format!("Registrare {} nella scheda di {}?", if form.edit.is_some() { "le modifiche" } else { form.kind.noun() }, patient_name) })))
-                .child(div().type_role(theme, TypeRole::Meta).child(text!("Controlla il contenuto qui sopra. La registrazione sarà confermata soltanto dopo la rilettura.")))
+                .child(div().type_role(theme, TypeRole::Meta).child(text!(if comparison { subject } else { "Controlla il contenuto qui sopra. La registrazione sarà confermata soltanto dopo la rilettura.".into() })))
                 .child(div().flex().flex_wrap().gap(px(8.))
                     .child(self.form_actions[2].attach(button("clinical-workspace-cancel-review", if repeated_scale { "Continua la verifica" } else { "Torna alla bozza" }, theme, false, true))
                         .on_click(cx.listener(|this, _, window, cx| this.cancel_review(window, cx))))
@@ -5127,6 +5152,14 @@ impl Render for ClinicalApp {
                         cx,
                     );
                     input.set_writing_ink(WritingInk::Fresh, cx);
+                    input.set_label(
+                        if form.kind == FormKind::Notes && self.core.has_notes_comparison() {
+                            "Note della scheda, la tua bozza"
+                        } else {
+                            field.label
+                        },
+                        cx,
+                    );
                 });
             }
         }

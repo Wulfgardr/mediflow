@@ -263,7 +263,15 @@ sempre nello stesso ordine, anche nella finestra più larga:
 
 1. «Registrato ora», in inchiostro asciutto, con ora e autore soltanto se
    restituiti dalla fonte.
-2. «La tua bozza», in inchiostro fresco, modificabile.
+2. «La tua bozza», in inchiostro fresco, modificabile. Il campo non ripete
+   l'etichetta visibile «Note della scheda»; mantiene l'etichetta accessibile
+   «Note della scheda, la tua bozza». Fuori dal confronto l'etichetta visibile
+   resta «Note della scheda».
+
+Nel confronto, se la bozza è diversa dal testo registrato, la seconda riga
+della soglia riporta «Nome paziente · Note della scheda. La tua bozza sostituirà
+il testo registrato ora.» La frase di sostituzione resta visibile anche nella
+nuova conferma. Se la bozza coincide con il registrato, la frase non compare.
 
 Sotto resta la soglia normale: si registra soltanto con un nuovo
 «Conferma e registra», sulla nuova versione letta. Nessuna fusione automatica
