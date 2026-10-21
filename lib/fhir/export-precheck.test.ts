@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { FhirScaleScoreError } from './clinical-adapter';
 import { buildFhirBundleFromRecords } from './bundle-mapper';
-import { buildFhirDiagnosisWarningMessage, prepareFhirBundleFromRecords, type FhirDiagnosisCodingWarning } from './export-precheck';
+import { FhirExportPrecheckError, buildFhirDiagnosisWarningMessage, prepareFhirBundleFromRecords, type FhirDiagnosisCodingWarning } from './export-precheck';
 import type { FhirBundleInput } from './types';
 
 function fixture(): FhirBundleInput {
@@ -77,7 +77,7 @@ test('a patient without diagnoses needs no diagnosis warning confirmation', asyn
     assert.deepEqual(await prepareFhirBundleFromRecords(input), buildFhirBundleFromRecords(input));
 });
 
-for (const score of [1.5, 2147483648, -2147483649, NaN, 'invalid', '', ' ', null, undefined, Infinity, -Infinity, '1.5', '2147483648']) {
+for (const score of [1.5, 2147483648, -2147483649, NaN, 'invalid', '', ' ', null, undefined, Infinity, -Infinity, '1.5', '2147483648', '-2147483649', '1.0000000000000001', '1e-999', '1e3']) {
     test(`invalid scale score (${typeof score}) ${String(score)} blocks the entire export before warning confirmation`, async () => {
         const input = fixture();
         input.patient.diagnoses![0].system = 'UNKNOWN';
@@ -95,7 +95,16 @@ for (const score of [1.5, 2147483648, -2147483649, NaN, 'invalid', '', ' ', null
         assert.throws(() => buildFhirBundleFromRecords(input), isBlockingScoreError);
         await assert.rejects(prepareFhirBundleFromRecords(input, () => {
             assert.fail('Blocking errors cannot be bypassed by confirming warnings');
-        }), isBlockingScoreError);
+        }), (error: unknown) => {
+            assert.ok(error instanceof FhirExportPrecheckError);
+            assert.equal(error.code, 'INVALID_SCALE_SCORE');
+            assert.equal(error.severity, 'error');
+            assert.equal(error.category, 'scale');
+            assert.equal(error.recordId, entry.id);
+            assert.equal(error.message, 'INVALID_SCALE_SCORE');
+            assert.equal(JSON.stringify(error).includes('Synthetic scale'), false);
+            return true;
+        });
         assert.deepEqual(input, before);
     });
 }
@@ -106,4 +115,37 @@ test('deleted scales with invalid scores are excluded without blocking export', 
         deletedAt: input.generatedAt, metadata: { score: 1.5 } });
     const bundle = await prepareFhirBundleFromRecords(input);
     assert.deepEqual(bundle, buildFhirBundleFromRecords({ ...input, entries: input.entries.slice(0, -1) }));
+});
+
+for (const title of ['', '   ', undefined, null, 3]) {
+    test(`precheck blocks invalid scale title ${String(title)} before mapping and diagnosis warnings`, async () => {
+        const input = fixture();
+        input.patient.diagnoses![0].system = 'UNKNOWN';
+        input.entries.push({ ...input.entries[1], id: 'synthetic-invalid-title', type: 'scale',
+            metadata: { title, score: 3 } });
+        const before = structuredClone(input);
+        await assert.rejects(prepareFhirBundleFromRecords(input, () => {
+            assert.fail('Invalid titles must block before diagnostic warnings');
+        }), (error: unknown) => {
+            assert.ok(error instanceof FhirExportPrecheckError);
+            assert.equal(error.code, 'INVALID_SCALE_TITLE');
+            assert.equal(error.recordId, 'synthetic-invalid-title');
+            assert.equal(error.message, 'INVALID_SCALE_TITLE');
+            return true;
+        });
+        assert.deepEqual(input, before);
+    });
+}
+
+test('scale precheck blocks before Bundle construction even when another mapper field is invalid', async () => {
+    const input = fixture();
+    input.generatedAt = 'invalid-synthetic-date';
+    input.entries.push({ ...input.entries[1], id: 'synthetic-before-mapping', type: 'scale',
+        metadata: { title: 'Synthetic scale', score: 1.5 } });
+    await assert.rejects(prepareFhirBundleFromRecords(input), (error: unknown) => {
+        assert.ok(error instanceof FhirExportPrecheckError);
+        assert.equal(error.code, 'INVALID_SCALE_SCORE');
+        assert.equal(error.recordId, 'synthetic-before-mapping');
+        return true;
+    });
 });

@@ -1,5 +1,7 @@
 import { Condition, Encounter, MedicationStatement, Observation } from 'fhir/r4';
 import { toFhirDerivedId, toFhirId } from './id';
+import { validateFhirScaleEntry } from './scale-validation';
+export { FhirScaleScoreError, FhirScaleTitleError } from './scale-validation';
 import type { FhirClinicalEntryInput, FhirDiagnosisInput, FhirObservationInput, FhirTherapyInput } from './types';
 
 /* Preserve the legacy recognized-system URIs until the shared DTO v2 migration. */
@@ -68,26 +70,9 @@ export function toFhirEncounter(entry: FhirClinicalEntryInput, patientReference:
     };
 }
 
-export class FhirScaleScoreError extends Error {
-    readonly code = 'INVALID_SCALE_SCORE';
-    readonly severity = 'error';
-
-    constructor(public readonly recordId: string) {
-        super("Esportazione FHIR bloccata: il punteggio della scala deve essere un intero finito tra -2147483648 e 2147483647.");
-        this.name = 'FhirScaleScoreError';
-    }
-}
-
-function toIntegerScaleScore(score: unknown): number | null {
-    const parsed = typeof score === 'number' ? score
-        : typeof score === 'string' && score.trim() !== '' ? Number(score) : NaN;
-    return Number.isInteger(parsed) && parsed >= -2147483648 && parsed <= 2147483647 ? parsed : null;
-}
-
 export function toFhirObservation(entry: FhirClinicalEntryInput, patientReference: string): Observation | null {
     if (entry.type !== 'scale') return null;
-    const score = toIntegerScaleScore(entry.metadata?.score);
-    if (score === null) throw new FhirScaleScoreError(entry.id);
+    const score = validateFhirScaleEntry(entry);
 
     return {
         resourceType: "Observation",
