@@ -1,7 +1,7 @@
 /* WUL-327 */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FhirScaleScoreError, toFhirCondition, toFhirObservation } from './clinical-adapter';
+import { FhirScaleScoreError, FhirScaleTitleError, toFhirCondition, toFhirObservation } from './clinical-adapter';
 import type { FhirClinicalEntryInput, FhirDiagnosisInput } from './types';
 
 const diagnosis: FhirDiagnosisInput = {
@@ -57,7 +57,7 @@ function scaleEntry(score: unknown): FhirClinicalEntryInput {
 }
 
 test('toFhirObservation accetta zero e i punteggi numerici validi', () => {
-    const cases: Array<[unknown, number]> = [[0, 0], ['0', 0], [27, 27], ['27', 27], [-2147483648, -2147483648], [2147483647, 2147483647], ['-2147483648', -2147483648], ['2147483647', 2147483647]];
+    const cases: Array<[unknown, number]> = [[0, 0], ['0', 0], [27, 27], ['27', 27], ['3', 3], ['03', 3], [' 3 ', 3], [-2147483647, -2147483647], [2147483646, 2147483646], ['-2147483647', -2147483647], ['2147483646', 2147483646], [-2147483648, -2147483648], [2147483647, 2147483647], ['-2147483648', -2147483648], ['2147483647', 2147483647]];
     for (const [score, expected] of cases) {
         const resource = toFhirObservation(scaleEntry(score), 'Patient/patient-1');
         assert.ok(resource, `score ${JSON.stringify(score)} deve produrre una Observation`);
@@ -91,9 +91,17 @@ test('toFhirObservation conserva la forma della risorsa per un punteggio valido'
     assert.deepEqual(resource.note, [{ text: 'Valutazione di prova' }]);
 });
 
-for (const score of [1.5, 2147483648, -2147483649, NaN, 'invalid', '1.5', '2147483648', '-2147483649']) {
+for (const score of [1.5, 2147483648, -2147483649, NaN, 'invalid', '1.5', '2147483648', '-2147483649', '1.0000000000000001', '1e-999', '1e3', '999999999999999999999999999999', '-999999999999999999999999999999']) {
     test(`invalid scale score (${typeof score}) ${String(score)} blocks mapping instead of releasing an Observation`, () => {
         assert.throws(() => toFhirObservation(scaleEntry(score), 'Patient/patient-1'),
             { name: 'FhirScaleScoreError' });
+    });
+}
+
+for (const title of ['', '   ', undefined, null, 3]) {
+    test(`toFhirObservation blocks invalid title ${String(title)} even with a valid score`, () => {
+        const entry = scaleEntry(3);
+        entry.metadata!.title = title;
+        assert.throws(() => toFhirObservation(entry, 'Patient/patient-1'), FhirScaleTitleError);
     });
 }

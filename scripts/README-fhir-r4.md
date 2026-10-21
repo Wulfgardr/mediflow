@@ -14,6 +14,18 @@ MEDIFLOW_DATA_DIR=$(mktemp -d) npm run test:fhir-r4
 npm run check:fhir-r4 -- --falsify --out /percorso/nuovo-run
 ```
 
+`test:fhir-r4` include le regressioni dei consumer: esegue i veri handler
+moduli/editor/share e il generatore Web con archivio sintetico e API browser
+simulate. Verifica testo del toast, blocco di download/share e assenza di log
+clinici; non è una prova GUI. Le tre mutazioni in memoria rimuovono il
+precheck scale, anticipano `Number()` e accettano titoli vuoti: i test devono
+fallire rispettivamente in 24, 6 e 9 casi, coprendo tutti e tre i percorsi.
+Il codice sul disco resta invariato. Esecuzione separata delle mutazioni:
+
+```sh
+node --test scripts/fhir-scale-export-falsification.test.mjs
+```
+
 Serve Java 17. In locale è possibile dichiarare un confronto con un JDK già
 installato tramite `MEDIFLOW_FHIR_ALLOW_JAVA_MISMATCH=1`: il report registra
 versione e override. In CI un mismatch è sempre rifiutato, anche con override.
@@ -84,11 +96,19 @@ applica proporzionamenti. La frazione era quindi un dato invalido.
 
 Il mapper ora blocca l'intero export per punteggi vuoti, non numerici, non
 finiti, frazionari o fuori dall'intervallo signed 32-bit. `FhirScaleScoreError`
-(`INVALID_SCALE_SCORE`, severità `error`) risale dal mapper attraverso
-`prepareFhirBundleFromRecords` prima di qualsiasi conferma dei warning.
+(`INVALID_SCALE_SCORE`, severità `error`) protegge il mapper;
+`prepareFhirBundleFromRecords` valida lo stesso snapshot e solleva un
+`FhirExportPrecheckError` tipizzato prima della conferma dei warning diagnostici.
 Nessuna Observation o Bundle parziale viene restituita. Zero ed estremi sono
 validi; le stringhe numeriche intere restano compatibili con gli input legacy.
-Non si arrotonda né si tronca. Le fixture `scale-fraction`, `scale-empty`,
+Sono accettati anche zeri iniziali e spazi esterni (`"03"`, `" 3 "`):
+il testo decimale viene verificato con `BigInt` prima della conversione.
+Frazioni e notazione esponenziale sono rifiutate. Non si arrotonda né si tronca.
+Anche un titolo assente, vuoto o composto da soli spazi blocca l’intero export
+(`INVALID_SCALE_TITLE`). La UI risolve titolo e data dall’ID locale e mostra
+«Esportazione bloccata» con l’indicazione di correggere o eliminare la scala;
+nessun testo clinico è incluso nell’errore tecnico.
+Le fixture `scale-fraction`, `scale-empty`,
 `scale-invalid` e `scale-nonfinite` sono casi bloccanti nei test del precheck,
 non fanno parte del corpus valido.
 

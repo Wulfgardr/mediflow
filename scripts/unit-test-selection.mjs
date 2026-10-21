@@ -5,6 +5,7 @@ export const UNIT_TEST_GROUPS = Object.freeze(['lib', 'components']);
 export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/fhir-r4-gate.test.mjs',
   'scripts/fhir-r4-corpus.test.ts',
+  'scripts/fhir-scale-export-falsification.test.mjs',
   'scripts/owned-synthetic-http-suite.test.mjs',
   'scripts/launcher-helpers.test.mjs',
   'scripts/portable-local-test-selection.test.mjs',
