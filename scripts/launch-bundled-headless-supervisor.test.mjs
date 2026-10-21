@@ -287,7 +287,8 @@ function stagingFixture(t, lane) {
   write(path.join(source, 'drizzle/0000_synthetic.sql'), 'SELECT 1;\n');
   write(path.join(source, 'drizzle/meta/_journal.json'), '{"entries":[]}\n');
   write(path.join(source, 'lib/security/portable-supervisor-production.ts'), 'export const synthetic = true;\n');
-  for (const name of ['scripts/intelligent-host-mcp-stdio.mjs', 'scripts/register-strip-types-loader.mjs',
+  for (const name of ['scripts/intelligent-host-mcp-stdio.mjs', 'scripts/local-ui-mcp-stdio.mjs',
+    'scripts/local-ui-web-navigation.mjs', 'scripts/register-strip-types-loader.mjs',
     'scripts/run-strip-types.mjs', 'scripts/headless-web-server.mjs']) write(path.join(source, name), 'export {};\n');
   write(path.join(source, 'scripts/mediflow-headless-supervisor.mjs'),
     "import fs from 'node:fs'; import path from 'node:path'; import '../lib/security/portable-supervisor-production.ts';\n"

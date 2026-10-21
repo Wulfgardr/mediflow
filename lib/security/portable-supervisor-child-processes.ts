@@ -7,12 +7,14 @@ import {
   AIP_OPERATION_RPC_ENV_KEY_V1,
   AIP_OPERATION_RPC_LATE_BIND_ENV_V1,
 } from '../../packages/aip/src/child-ipc-contract.ts';
+import { LOCAL_UI_RPC_MODE } from '../../packages/mcp/src/local-ui-contract.ts';
 import { resolveAthenaMlxGenerateBin } from '../athena-mlx-launcher-config.ts';
 import type { LateBoundMcpChildPortV1 } from './authenticated-headless-agent-pre-spawned-mcp-child.ts';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const LOADER = path.join(ROOT, 'scripts', 'register-strip-types-loader.mjs');
 const MINI_TARGET = path.join(ROOT, 'packages', 'mini', 'src', 'cli.ts');
+const LOCAL_UI_TARGET = path.join(ROOT, 'scripts', 'local-ui-mcp-stdio.mjs');
 const MCP_TARGET = path.join(ROOT, 'scripts', 'intelligent-host-mcp-stdio.mjs');
 const WEB_BOOTSTRAP = fileURLToPath(new URL('../../scripts/headless-web-server.mjs', import.meta.url));
 const WEB_DIRECTORY = path.join(ROOT, '.next', 'standalone');
@@ -25,7 +27,7 @@ type SpawnChild = (command: string, args: readonly string[], options: SpawnOptio
 
 export type PortableSupervisorChildProcessesOptionsV1 = Readonly<{
   dataDir: string;
-  agentKind?: 'mcp' | 'mini';
+  agentKind?: 'mcp' | 'mini' | 'plugin_local_ui';
   /** Explicit host-owned runner for Web only; no parent environment is inherited here. */
   athenaMlxGenerateBin?: string;
   spawnChild?: SpawnChild;
@@ -113,7 +115,7 @@ export function createPortableSupervisorProductionChildProcessesV1(
   options: PortableSupervisorChildProcessesOptionsV1,
 ): PortableSupervisorProductionChildProcessesV1 {
   const agentKind = options.agentKind ?? 'mcp';
-  if (agentKind !== 'mcp' && agentKind !== 'mini') throw new Error('agent_kind_invalid');
+  if (agentKind !== 'mcp' && agentKind !== 'mini' && agentKind !== 'plugin_local_ui') throw new Error('agent_kind_invalid');
   const athenaMlxGenerateBin = resolveAthenaMlxGenerateBin(options.athenaMlxGenerateBin);
   const nodePath = requireAbsoluteFile(options.nodePath ?? process.execPath, 'node');
   const loaderPath = requireAbsoluteFile(options.loaderPath ?? LOADER, 'loader', ROOT_REAL);
@@ -121,7 +123,7 @@ export function createPortableSupervisorProductionChildProcessesV1(
   const loaderUrl = pathToFileURL(loaderPath).href;
   const mcpTargetPath = agentKind === 'mini'
     ? requireAbsoluteFile(MINI_TARGET, 'mini', ROOT_REAL)
-    : requireAbsoluteFile(options.mcpTargetPath ?? MCP_TARGET, 'mcp', ROOT_REAL);
+    : requireAbsoluteFile(agentKind === 'plugin_local_ui' ? LOCAL_UI_TARGET : options.mcpTargetPath ?? MCP_TARGET, 'mcp', ROOT_REAL);
   const webDirectory = requireAbsoluteDirectory(options.webDirectory ?? WEB_DIRECTORY, 'web_directory');
   const webTargetPath = requireAbsoluteFile(options.webTargetPath ?? WEB_TARGET, 'web', webDirectory);
   const webBootstrap = requireAbsoluteFile(WEB_BOOTSTRAP, 'web_bootstrap', ROOT_REAL);
@@ -144,8 +146,9 @@ export function createPortableSupervisorProductionChildProcessesV1(
   if (athenaMlxGenerateBin !== undefined) {
     webEnvironment.MEDIFLOW_ATHENA_MLX_GENERATE_BIN = athenaMlxGenerateBin;
   }
+  if (agentKind === 'plugin_local_ui') webEnvironment.MEDIFLOW_PLUGIN_LOCAL_UI = '1';
   const mcpEnvironment = {
-    [AIP_OPERATION_RPC_ENV_KEY_V1]: AIP_OPERATION_RPC_LATE_BIND_ENV_V1,
+    [AIP_OPERATION_RPC_ENV_KEY_V1]: agentKind === 'plugin_local_ui' ? LOCAL_UI_RPC_MODE : AIP_OPERATION_RPC_LATE_BIND_ENV_V1,
   } as unknown as NodeJS.ProcessEnv;
   let mcp: ChildProcess;
   try {
@@ -166,7 +169,7 @@ export function createPortableSupervisorProductionChildProcessesV1(
       env: webEnvironment,
       shell: false,
       // Descriptor 2 is the Supervisor's stderr. Its stdout remains reserved for the MCP child.
-      stdio: ['ignore', 2, 2, 'ipc'],
+      stdio: agentKind === 'plugin_local_ui' ? ['ignore', 'ignore', 'ignore', 'ipc'] : ['ignore', 2, 2, 'ipc'],
     });
   } catch { stop(mcp); throw new Error('web_spawn_failed'); }
 

@@ -8,6 +8,7 @@ const root = fileURLToPath(new URL('../../..', import.meta.url));
 const roots = [
   resolve(root, 'packages/mcp/src/server.ts'), resolve(root, 'packages/mini/src/cli.ts'),
   resolve(root, 'scripts/intelligent-host-mcp-stdio.mjs'),
+  resolve(root, 'scripts/local-ui-mcp-stdio.mjs'),
 ];
 const allowedExternal = new Set(['zod', '@modelcontextprotocol/server', '@modelcontextprotocol/server/stdio',
   'node:process', 'node:util']);
@@ -47,6 +48,8 @@ test('keeps the exact MCP and Mini runtime graph on portable Application Service
     resolve(root, 'packages/mcp/src/contracts.ts'), resolve(root, 'packages/mcp/src/operation-client.ts'),
     resolve(root, 'packages/mcp/src/server.ts'), resolve(root, 'packages/mini/src/cli.ts'),
     ...allowedMini,
-    resolve(root, 'scripts/intelligent-host-mcp-stdio.mjs'),
+    resolve(root, 'scripts/intelligent-host-mcp-stdio.mjs'), resolve(root, 'scripts/local-ui-mcp-stdio.mjs'),
+    resolve(root, 'packages/mcp/src/local-ui-server.ts'), resolve(root, 'packages/mcp/src/local-ui-client.ts'),
+    resolve(root, 'packages/mcp/src/local-ui-contract.ts'),
   ].sort());
 });
