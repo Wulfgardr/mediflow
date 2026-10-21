@@ -113,7 +113,7 @@ for (const width of [1440, 390]) {
     await expect(suspendedCard.getByText('Nota sintetica da conservare', { exact: true })).toBeVisible();
     await expect(suspendedCard.getByRole('textbox')).toHaveCount(0);
     await expect(suspendedCard.getByRole('button', { name: 'Modifica', exact: true })).toHaveCount(0);
-    await expect(suspendedCard.getByRole('button', { name: 'Riprendi', exact: true })).toBeVisible();
+    await expect(suspendedCard.getByRole('button', { name: 'Riattiva', exact: true })).toBeVisible();
     const reloaded = (await records(page, data.patientId)).find(item => item.id === data.therapyId);
     expect(reloaded).toMatchObject({ patientId: data.patientId, version: 3, dosage: 'Dose della bozza sintetica', motivation: savedMotivation, status: 'suspended' });
     expect(writes.map(write => write.version)).toEqual([1, 2]);
@@ -127,6 +127,7 @@ test('a list refresh during editing cannot silently advance the draft version', 
   await concurrentEdit(page, data);
   const refreshed = page.waitForResponse(response => response.request().method() === 'GET' && response.url().includes('/api/therapies?'));
   await page.locator('#terapie').getByRole('row').filter({ has: page.getByText('Farmaco sintetico secondario', { exact: true }) }).getByRole('button', { name: 'Sospendi', exact: true }).click();
+  await page.getByRole('button', { name: 'Conferma e registra', exact: true }).click();
   expect((await refreshed).status()).toBe(200);
   await expect(page.locator('#terapie').getByText('Dose concorrente 2', { exact: true })).toBeVisible();
   const response = page.waitForResponse(response => response.request().method() === 'PUT' && response.url().endsWith(`/api/therapies/${data.therapyId}`));

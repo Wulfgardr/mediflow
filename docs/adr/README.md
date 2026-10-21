@@ -14,6 +14,8 @@ verifica dello stato successivo.
 
 ## Decisioni richiamate
 
+- [0157-hl7-conformance-at-clinical-boundaries.md](./0157-hl7-conformance-at-clinical-boundaries.md): **Accepted (2026-10-21)**; WUL-784/785, conformità HL7 per scambi clinici interoperabili con corpus sintetico dei mapper reali e validatore ufficiale in CI; IPS separato, primo documento italiano CDA-PSS 1.5 e confini non HL7 dichiarati.
+
 - [0158-territorial-packs.md](./0158-territorial-packs.md): **Accepted (2026-10-21)**; WUL-785, nucleo internazionale per le nuove installazioni, Italia e Lombardia sotto capacità host versionata, migrazione conservativa e storico leggibile con pacchetto disattivo.
 - [0154-population-demographics-read-boundary.md](./0154-population-demographics-read-boundary.md): WUL-771; lettura demografica della popolazione paired, proiezione minima e calendario client esplicito nel calcolo TypeScript condiviso, senza diagnosi o autorità di audit.
 - [0155-account-profile-read-and-conditional-update.md](./0155-account-profile-read-and-conditional-update.md): WUL-771; lettura del profilo dell'account e aggiornamento condizionale con versione derivata dal contenuto, archivio e sessione verificati nel commit e audit nella stessa transazione.
@@ -132,3 +134,5 @@ prima porzione di lavoro verificabile:
 - [0138-explicit-data-directory-bootstrap.md](./0138-explicit-data-directory-bootstrap.md): impedisce la copia legacy implicita nelle cartelle dati scelte, preservando la migrazione storica verso il default.
 
 - [0143-strong-unlock-credential.md](./0143-strong-unlock-credential.md): stabilisce passphrase di almeno 15 caratteri, verificatore che non espone il segreto al server, chiave solo in memoria, PIN di conferma separato e kit di recupero, con i tempi di derivazione misurati e l'ordine di consegna.
+
+- [0156-therapy-status-uncertain-client-write.md](./0156-therapy-status-uncertain-client-write.md) — **Accepted (2026-10-21)**: delimita il blocco Web dopo esito incerto, separando abort del client, vita del writer host e confronto tramite CAS.
