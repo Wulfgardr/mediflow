@@ -8,6 +8,7 @@ mod analytics;
 mod document_details;
 #[cfg(test)]
 mod notes_recovery_tests;
+#[cfg(test)]
 mod rendered_command;
 mod scales;
 mod therapy_picker;
@@ -4832,8 +4833,8 @@ impl ClinicalApp {
                         .flex_wrap()
                         .gap(px(8.))
                         .when(layout.compact, |el| el.w_full().flex_col().items_stretch())
-                        .child(rendered_command::observe(
-                            self.form_actions[2]
+                        .child({
+                            let command = self.form_actions[2]
                                 .attach(button(
                                     "clinical-workspace-cancel-review",
                                     if repeated_scale {
@@ -4848,10 +4849,13 @@ impl ClinicalApp {
                                 .debug_selector(|| "threshold-back".into())
                                 .on_click(cx.listener(|this, _, window, cx| {
                                     this.cancel_review(window, cx)
-                                })),
-                        ))
-                        .child(rendered_command::observe(
-                            self.form_actions[3]
+                                }));
+                            #[cfg(test)]
+                            let command = rendered_command::observe(command);
+                            command
+                        })
+                        .child({
+                            let command = self.form_actions[3]
                                 .attach(
                                     button(
                                         "clinical-workspace-confirm-save",
@@ -4863,8 +4867,11 @@ impl ClinicalApp {
                                     .debug_selector(|| "clinical-workspace-confirm-save".into())
                                     .aria_label(confirmation_command_label(&patient_name)),
                                 )
-                                .on_click(cx.listener(|this, _, _, cx| this.confirm_form(cx))),
-                        )),
+                                .on_click(cx.listener(|this, _, _, cx| this.confirm_form(cx)));
+                            #[cfg(test)]
+                            let command = rendered_command::observe(command);
+                            command
+                        }),
                 )
                 .when(mode == ThresholdMode::FullPlane, |el| {
                     el.child(self.threshold_detail(mode, cx))

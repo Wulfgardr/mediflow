@@ -70,9 +70,9 @@ function pilotFixture(t) {
   for (const file of [pilotWorkflow, ...['Cargo.toml', 'rust-toolchain.toml', 'client/Cargo.toml', 'transport/Cargo.toml', 'app/Cargo.toml'].map(file => `${pilot}/${file}`)]) {
     write(file, readFileSync(path.join(sourceRoot, file)));
   }
-  for (const file of [...pilotFiles, `${pilot}/client/src/lib.rs`, `${pilot}/transport/src/bin/mediflow-runtime-probe.rs`, `${pilot}/Cargo.lock`]) write(file, 'must not execute');
+  for (const file of [...pilotFiles, `${pilot}/app/src/shell/rendered_command.rs`, `${pilot}/app/src/shell/threshold_actions.rs`, `${pilot}/client/src/lib.rs`, `${pilot}/transport/src/bin/mediflow-runtime-probe.rs`, `${pilot}/Cargo.lock`]) write(file, 'must not execute');
   write(`${pilot}/app/src/main.rs`, '// synthetic binding fixture\nmod appointments;\nmod clinical_text;\nmod components;\nmod demo;\nmod demo_app;\nmod documents;\nmod editing;\nmod icons;\nmod navigation;\nmod patient_forms;\nmod references;\nmod shell;\nmod text_input;\nmod theme;\nfn main() {}');
-  write(`${pilot}/app/src/shell.rs`, '//! Synthetic shell binding fixture\nmod account_profile;\nmod ai_preferences;\nmod ai_status;\nmod analytics;\nmod document_details;\n#[cfg(test)]\nmod notes_recovery_tests;\nmod scales;\nmod therapy_picker;\nmod view_state;\nmod who_lookup;');
+  write(`${pilot}/app/src/shell.rs`, '//! Synthetic shell binding fixture\nmod account_profile;\nmod ai_preferences;\nmod ai_status;\nmod analytics;\nmod document_details;\n#[cfg(test)]\nmod notes_recovery_tests;\n#[cfg(test)]\nmod rendered_command;\nmod scales;\nmod therapy_picker;\nmod threshold_actions;\nmod view_state;\nmod who_lookup;');
   write(`${pilot}/transport/src/lib.rs`, '//! Synthetic library binding fixture\n#![forbid(unsafe_code)]\nmod account_profile;\nmod ai_preferences;\nmod analytics;\nmod catalogs;\nmod crypto;\nmod dto;\nmod error;\nmod http;\nmod profile_query;\nmod scales;\nmod session;\nmod tls;\nmod who;');
   for (const file of ['run.mjs', 'prepare-runtime.mjs', 'js-client.mjs', 'compare.mjs', 'verify-vectors.mjs']) {
     write(`${pilot}/comparison/${file}`, readFileSync(path.join(sourceRoot, pilot, 'comparison', file)));
@@ -119,6 +119,9 @@ test('GPUI coverage fails closed when Cargo membership, modules or actual CI inv
     [`${pilot}/app/Cargo.toml`, 'path = "src/main.rs"', 'path = "src/main.rs"\ntest = false'],
     [`${pilot}/app/src/main.rs`, 'mod demo;', '#[cfg(feature = "optional")]\nmod demo;'],
     [`${pilot}/app/src/main.rs`, 'mod demo;', '// mod demo;'],
+    [`${pilot}/app/src/shell.rs`, 'mod scales;', 'mod unbound_probe;\nmod scales;'],
+    [`${pilot}/app/src/shell.rs`, '#[cfg(test)]\nmod rendered_command;', 'mod rendered_command;'],
+    [`${pilot}/app/src/shell.rs`, 'mod threshold_actions;', '// mod threshold_actions;'],
     [`${pilot}/app/src/shell.rs`, 'mod therapy_picker;', '// mod therapy_picker;'],
     [`${pilot}/app/src/shell.rs`, 'mod therapy_picker;', '#[cfg(feature = "optional")]\nmod therapy_picker;'],
     [`${pilot}/app/src/shell.rs`, 'mod ai_preferences;', '// mod ai_preferences;'],
