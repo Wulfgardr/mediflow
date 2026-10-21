@@ -11,7 +11,7 @@ producer ulteriori, ma questa unità verifica solo Web.
 
 ```sh
 MEDIFLOW_DATA_DIR=$(mktemp -d) npm run test:fhir-r4
-npm run check:fhir-r4 -- --falsify
+npm run check:fhir-r4 -- --falsify --out /percorso/nuovo-run
 ```
 
 Serve Java 17. In locale è possibile dichiarare un confronto con un JDK già
@@ -21,8 +21,13 @@ Non è necessaria una build Next né una copia di database.
 
 Il runner scarica solo JAR e archivi del lock in
 `~/.cache/mediflow-fhir-validator/artifacts`, verifica SHA-256 tramite
-`describeLockedArtifacts`/`verifyValidatorCache`, quindi prepara una cache
-package nuova per ogni run sotto la stessa radice. Verifica anche nome e
+`describeLockedArtifacts`/`verifyValidatorCache`, quindi copia tutti gli artefatti in uno snapshot privato del run, senza hard
+link. Ogni sorgente è aperta con `O_NOFOLLOW`: SHA-256 viene calcolato sugli
+stessi blocchi copiati, nella stessa passata. Lo snapshot ha permessi `0700`
+e i file `0400`. Tar e JVM consumano solo questi percorsi; dopo la verifica
+dello snapshot la cache condivisa non viene più aperta. Una sostituzione
+successiva nella cache non cambia i byte utilizzati. La cache package
+estratta e la home sono nuove per ogni run sotto la stessa radice. Verifica anche nome e
 versione nei `package.json`. Un artefatto presente con hash errato viene
 rifiutato; non viene riscaricato silenziosamente. Il download non riceve
 Bundle o dati paziente. Non si riusano cache FHIR personali o directory
@@ -42,6 +47,14 @@ per la prova IPv6; non è ammesso per IPv4 o nel sandbox macOS.
 `network-denial.json` conserva il risultato. Le dipendenze non fissate non
 possono essere acquisite durante questa fase.
 
+Il wrapper isolato avvia il validatore in modo asincrono in un gruppo di
+processi proprio. Alla deadline di 600 s, a SIGINT/SIGTERM o alla chiusura
+del canale stdin del runner, termina l'intero gruppo con SIGTERM, concede
+2 s e invia SIGKILL se necessario. Attende l'uscita del figlio e la scomparsa
+del gruppo, anche quando il figlio termina lasciando discendenti attivi.
+Il runner attende la chiusura del wrapper prima di pulire home e snapshot;
+la pulizia avviene anche se la scrittura dei report fallisce.
+
 Ogni file deve avere esattamente un `OperationOutcome`, identificato tramite
 l'estensione ufficiale `operationoutcome-file`. Output assente, malformato,
 duplicato o riferito a file estranei è un errore del tool. Il codice di uscita
@@ -52,9 +65,14 @@ non sostituisce l'analisi delle issue. Si distinguono:
 - exit 2: `TOOL_ERROR`, integrità, Java, sandbox, esecuzione, output o
   aspettativa di falsificazione non dimostrata.
 
-Gli output restano in `tmp-fhir-r4-*/`: corpus JSON, manifest, log ufficiale,
-OperationOutcome aggregati, prova rete e report JSON/testo con tempi di
-acquisizione, preparazione, JVM e totale. La CI li conserva per 14 giorni.
+`--out <directory>` sceglie una directory nuova ed esclusiva del run: se esiste
+già viene rifiutata, senza sovrascrivere report precedenti. Senza `--out` si
+crea una directory unica `mediflow-fhir-r4-*` nel temporaneo di sistema,
+fuori dalla repository. Il percorso viene stampato all'avvio. I report sono
+conservati: corpus JSON, manifest, log ufficiale, OperationOutcome aggregati,
+prova rete e report JSON/testo con tempi di acquisizione (snapshot incluso),
+preparazione, JVM e totale. La CI passa un percorso in `runner.temp` legato a
+run ID e tentativo; raccoglie esattamente quel percorso per 14 giorni.
 
 ## Baseline congelata e limiti
 
@@ -98,9 +116,19 @@ attestata.
 
 Le prime tre mutazioni semantiche vengono validate nella stessa JVM del
 corpus; le prove d'integrità usano copie temporanee e la stessa funzione di
-preflight chiamata prima dell'avvio reale. La policy profili visita tutte le
+snapshot chiamata prima dell'avvio reale. La policy profili visita tutte le
 risorse annidate e ammette solo la rispettiva StructureDefinition R4 base.
 Non prova conformità IPS: rifiuta l'affermazione non coperta dal lock.
+
+I test mirati sostituiscono atomicamente JAR e package nella cache dopo la
+verifica: il vero tar estrae ancora il package verificato e un sostituto
+innocuo della JVM legge il JAR sintetico dal percorso dell'invocazione reale,
+senza eseguirlo. Un figlio sintetico e un suo discendente nel sandbox reale
+non sopravvivono al timeout e non scrivono il marker ritardato. Altri test
+coprono cancellazione, escalation SIGKILL, output esclusivo e pulizia dopo
+un errore di scrittura dei report. Le stesse prove usano su macOS
+`sandbox-exec` e in CI Linux `unshare`; la CI Java 17 resta la prova
+canonica del validatore ufficiale.
 
 Implementazione CLI e formato degli output verificati sul
 [sorgente ufficiale 6.9.12](https://github.com/hapifhir/org.hl7.fhir.core/tree/73c432b5f43ddbce979978a760ec4aa81e929094).
