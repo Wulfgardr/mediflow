@@ -31,7 +31,7 @@ export function corpusInputs(): Array<{ id: string; covers: string[]; input: Fhi
     i.entries = ['home', 'ambulatory', undefined].map((setting, n) => ({ id: `visit-${n}`, patientId: i.patient.id, date, type: 'visit', content: 'Synthetic visit', setting: setting as 'home' | 'ambulatory' | undefined }));
     i.entries.push({ id: 'deleted-entry', patientId: i.patient.id, date, type: 'note', content: 'Synthetic deleted', deletedAt: date });
   });
-  for (const [id, score] of Object.entries({ zero: 0, integer: 6, numeric: '3', fraction: 1.5, empty: ' ', invalid: 'invalid', nonfinite: Infinity })) {
+  for (const [id, score] of Object.entries({ zero: 0, integer: 6, numeric: '3' })) {
     add(`scale-${id}`, [`scale:${id}`], i => { i.entries = [{ id: 'scale', patientId: i.patient.id, date, type: 'scale', content: 'Synthetic scale note', metadata: { title: 'Synthetic scale', score, interpretation: 'Synthetic interpretation' } }]; });
   }
   for (const status of ['active', 'suspended', 'completed'] as const) {

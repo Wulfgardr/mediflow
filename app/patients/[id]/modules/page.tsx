@@ -40,6 +40,8 @@ import { AI_PATIENT_INSIGHT_KILL_SWITCH_KEY, isAiPatientInsightEnabledValue } fr
 import { AI_SMART_IMPORT_KILL_SWITCH_KEY, isAiSmartImportEnabledValue } from '@/lib/ai-smart-import-kill-switch';
 import { db, type Checkup, type ExemptionCode } from '@/lib/db';
 import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
+import { FhirExportPrecheckError } from '@/lib/fhir/export-precheck';
+import { buildFhirExportBlockingToast } from '@/lib/fhir/export-error-message';
 import { useLiveQuery, useLiveQueryState } from '@/lib/live-query';
 import { buildPatientWorkspaceFromRecords } from '@/lib/patient-workspace';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -600,6 +602,11 @@ export default function PatientDetailPage() {
 
             showToast('Esportazione FHIR completata.', 'success');
         } catch (error) {
+            if (error instanceof FhirExportPrecheckError) {
+                const entry = await db.entries.get(error.recordId);
+                showToast(buildFhirExportBlockingToast(error, entry?.patientId === id ? entry : undefined));
+                return;
+            }
             console.error('Export failed', error);
             showToast("Errore durante l'esportazione.", 'error');
         }
@@ -619,6 +626,11 @@ export default function PatientDetailPage() {
                 title: `FHIR ${patient.lastName} ${patient.firstName}`,
             });
         } catch (error) {
+            if (error instanceof FhirExportPrecheckError) {
+                const entry = await db.entries.get(error.recordId);
+                showToast(buildFhirExportBlockingToast(error, entry?.patientId === id ? entry : undefined));
+                return;
+            }
             // Dismissing the system sheet is a decision, not a failure.
             if (error instanceof DOMException && error.name === 'AbortError') return;
             console.error('Share failed', error);

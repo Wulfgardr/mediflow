@@ -14,6 +14,8 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
+import { FhirExportPrecheckError } from '@/lib/fhir/export-precheck';
+import { buildFhirExportBlockingToast } from '@/lib/fhir/export-error-message';
 
 function messageFromError(error: unknown, fallback: string): string {
     if (error instanceof ApiConflictError) return error.message;
@@ -114,6 +116,11 @@ export default function EditPatientPage() {
 
                 showToast({ tone: 'success', title: 'Esportazione FHIR completata' });
             } catch (error) {
+                if (error instanceof FhirExportPrecheckError) {
+                    const entry = await db.entries.get(error.recordId);
+                    showToast(buildFhirExportBlockingToast(error, entry?.patientId === id ? entry : undefined));
+                    return;
+                }
                 console.error("Export failed", error);
                 showToast({ tone: 'error', title: 'Errore durante l\'esportazione' });
             }

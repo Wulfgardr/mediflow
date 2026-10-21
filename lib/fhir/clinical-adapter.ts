@@ -1,5 +1,7 @@
 import { Condition, Encounter, MedicationStatement, Observation } from 'fhir/r4';
 import { toFhirDerivedId, toFhirId } from './id';
+import { validateFhirScaleEntry } from './scale-validation';
+export { FhirScaleScoreError, FhirScaleTitleError } from './scale-validation';
 import type { FhirClinicalEntryInput, FhirDiagnosisInput, FhirObservationInput, FhirTherapyInput } from './types';
 
 /* Preserve the legacy recognized-system URIs until the shared DTO v2 migration. */
@@ -68,24 +70,9 @@ export function toFhirEncounter(entry: FhirClinicalEntryInput, patientReference:
     };
 }
 
-/* WUL-327: un punteggio scala è presente solo se è un numero finito
-   (o una stringa non vuota che ne rappresenta uno). Lo zero è un valore
-   clinico valido; il vecchio guard per verità lo scartava, mentre una stringa
-   di soli spazi diventava silenziosamente `valueInteger: 0`. */
-function toFiniteScaleScore(score: unknown): number | null {
-    if (typeof score === 'number') {
-        return Number.isFinite(score) ? score : null;
-    }
-    if (typeof score === 'string' && score.trim() !== '') {
-        const parsed = Number(score);
-        return Number.isFinite(parsed) ? parsed : null;
-    }
-    return null;
-}
-
 export function toFhirObservation(entry: FhirClinicalEntryInput, patientReference: string): Observation | null {
-    const score = toFiniteScaleScore(entry.metadata?.score);
-    if (entry.type !== 'scale' || score === null) return null;
+    if (entry.type !== 'scale') return null;
+    const score = validateFhirScaleEntry(entry);
 
     return {
         resourceType: "Observation",

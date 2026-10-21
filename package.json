@@ -236,7 +236,7 @@
     "test:owned-http": "node scripts/run-owned-synthetic-http-suite.mjs",
     "test:owned-http-standalone": "node scripts/run-owned-synthetic-http-suite.mjs --standalone",
     "check:fhir-r4": "node scripts/validate-fhir-r4.mjs",
-    "test:fhir-r4": "node --test scripts/fhir-r4-gate.test.mjs scripts/verify-fhir-validator-cache.test.mjs && node scripts/run-strip-types.mjs --test scripts/fhir-r4-corpus.test.ts"
+    "test:fhir-r4": "node --test scripts/fhir-r4-gate.test.mjs scripts/verify-fhir-validator-cache.test.mjs scripts/fhir-scale-export-falsification.test.mjs && node scripts/run-strip-types.mjs --test --glob \"lib/fhir/**/*.test.ts\" scripts/fhir-r4-corpus.test.ts"
   },
   "dependencies": {
     "@date-fns/tz": "1.5.0",
