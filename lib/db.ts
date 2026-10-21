@@ -492,7 +492,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         return this.add(item, options as AddOptions);
     }
 
-    async update(id: string, changes: Partial<T>, options?: { suppressNotify?: boolean; attachmentPrecondition?: AttachmentWritePrecondition; sissPrecondition?: SissHandoffWritePrecondition }): Promise<void> {
+    async update(id: string, changes: Partial<T>, options?: { suppressNotify?: boolean; signal?: AbortSignal; attachmentPrecondition?: AttachmentWritePrecondition; sissPrecondition?: SissHandoffWritePrecondition }): Promise<void> {
         const precondition = this.sissWritePayload(id, options?.sissPrecondition) ?? this.attachmentWritePayload(id, options?.attachmentPrecondition);
         const maybeVersion = (changes as Record<string, unknown> | undefined)?.version;
         if (this.requiresVersionedWrite() && typeof maybeVersion !== 'number') {
@@ -502,6 +502,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         const encryptedChanges = await this.encryptItem(changes as T, true);
         const res = await fetch(`${this.endpoint}/${id}`, {
             method: 'PUT',
+            ...(options?.signal ? { signal: options.signal } : {}),
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ...encryptedChanges, ...precondition })
         });
