@@ -10,7 +10,7 @@ import { privateDatabaseDependency } from './build-input-metadata.mjs';
 export { privateDatabaseDependency } from './build-input-metadata.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const SEEDS = ['scripts/mediflow-headless-supervisor.mjs', 'scripts/intelligent-host-mcp-stdio.mjs',
+const SEEDS = ['scripts/mediflow-headless-supervisor.mjs', 'scripts/intelligent-host-mcp-stdio.mjs', 'scripts/local-ui-mcp-stdio.mjs', 'scripts/local-ui-web-navigation.mjs',
   'scripts/node-runtime-contract.mjs', 'scripts/register-strip-types-loader.mjs', 'scripts/run-strip-types.mjs'];
 const TOKEN = '__MEDIFLOW_HEADLESS_ROSTER_SHA256__';
 const PREFIX = 'Resources/WebRuntime/HeadlessRuntime/';
