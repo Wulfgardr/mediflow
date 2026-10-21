@@ -1,12 +1,42 @@
 use super::*;
 
-#[derive(Clone, Copy)]
-enum Command {
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum Command {
     Review,
     Reread,
     Copy,
     Close,
     Retry,
+}
+
+pub(super) const PRIMARY_LABELS: &[(Command, Option<FormKind>, &str)] = &[
+    (Command::Review, Some(FormKind::Scale), "Prepara e rivedi"),
+    (Command::Review, None, "Registra 1 elemento"),
+    (Command::Reread, Some(FormKind::Scale), "Rileggi e verifica"),
+    (Command::Reread, None, "Rileggi la scheda"),
+    (Command::Copy, None, "Copia bozza"),
+];
+
+impl Command {
+    pub(super) fn primary_label(self, kind: FormKind) -> &'static str {
+        PRIMARY_LABELS
+            .iter()
+            .find(|(command, specific_kind, _)| {
+                *command == self && specific_kind.is_none_or(|specific| specific == kind)
+            })
+            .expect("primary command has a label")
+            .2
+    }
+
+    pub(super) fn id_and_action(self) -> (&'static str, usize) {
+        match self {
+            Self::Review => ("clinical-workspace-review-save", 1),
+            Self::Reread => ("clinical-workspace-reconcile", 7),
+            Self::Copy => ("clinical-workspace-copy-draft", 6),
+            Self::Close => ("clinical-scale-close-draft", 0),
+            Self::Retry => ("clinical-scale-review-retry", 1),
+        }
+    }
 }
 
 impl ClinicalApp {
@@ -237,36 +267,12 @@ impl ClinicalApp {
         cx: &Context<Self>,
     ) -> Stateful<Div> {
         let form = self.form.as_ref().unwrap();
-        let (id, label, action) = match command {
-            Command::Review => (
-                "clinical-workspace-review-save",
-                if form.kind == FormKind::Scale {
-                    "Prepara e rivedi"
-                } else {
-                    "Registra 1 elemento"
-                },
-                1,
-            ),
-            Command::Reread => (
-                "clinical-workspace-reconcile",
-                if form.kind == FormKind::Scale {
-                    "Rileggi e verifica"
-                } else {
-                    "Rileggi la scheda"
-                },
-                7,
-            ),
-            Command::Copy => ("clinical-workspace-copy-draft", "Copia bozza", 6),
-            Command::Close => (
-                "clinical-scale-close-draft",
-                if form.kind == FormKind::Scale {
-                    "Chiudi bozza…"
-                } else {
-                    "Scarta la bozza"
-                },
-                0,
-            ),
-            Command::Retry => ("clinical-scale-review-retry", "Rivedi lo stesso invio", 1),
+        let (id, action) = command.id_and_action();
+        let label = match command {
+            Command::Review | Command::Reread | Command::Copy => command.primary_label(form.kind),
+            Command::Close if form.kind == FormKind::Scale => "Chiudi bozza…",
+            Command::Close => "Scarta la bozza",
+            Command::Retry => "Rivedi lo stesso invio",
         };
         let enabled = !matches!(command, Command::Review)
             || form.scale.as_ref().is_none_or(ScaleAssessment::can_prepare);
@@ -305,101 +311,5 @@ impl ClinicalApp {
                 cx.notify();
             }))
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    struct PrimaryMetrics {
-        app: Entity<ClinicalApp>,
-        command: Command,
-    }
-
-    impl Render for PrimaryMetrics {
-        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            self.app.update(cx, |app, cx| {
-                div()
-                    .size_full()
-                    .child(
-                        div()
-                            .w(px(358.))
-                            .child(app.threshold_command(self.command, None, cx)),
-                    )
-            })
-        }
-    }
-
-    #[gpui::test]
-    fn threshold_longest_primary_fits_three_lines_at_the_declared_limit(
-        cx: &mut gpui::TestAppContext,
-    ) {
-        let (root, cx) = cx.add_window_view(|window, cx| {
-            let app = cx.new(|cx| ClinicalApp::new(String::new(), window, cx));
-            app.update(cx, |app, _| {
-                app.form = Some(Form {
-                    kind: FormKind::Notes,
-                    fields: vec![],
-                    upload: None,
-                    edit: None,
-                    patient_original: None,
-                    created_id: None,
-                    therapy: None,
-                    scale: None,
-                    state: FormState::Draft,
-                    _subscriptions: vec![],
-                });
-            });
-            PrimaryMetrics {
-                app,
-                command: Command::Review,
-            }
-        });
-        let app = root.read_with(cx, |root, _| root.app.clone());
-        cx.simulate_resize(gpui::size(px(390.), px(640.)));
-        for body in [14., 16.] {
-            for (kind, command, label, action) in [
-                (FormKind::Notes, Command::Review, "Registra 1 elemento", 1),
-                (FormKind::Scale, Command::Review, "Prepara e rivedi", 1),
-                (FormKind::Notes, Command::Reread, "Rileggi la scheda", 7),
-                (FormKind::Scale, Command::Reread, "Rileggi e verifica", 7),
-                (FormKind::Notes, Command::Copy, "Copia bozza", 6),
-            ] {
-                root.update(cx, |root, cx| {
-                    root.command = command;
-                    cx.notify();
-                });
-                cx.update_window_entity(&app, |app, window, cx| {
-                    app.form.as_mut().unwrap().kind = kind;
-                    app.theme = Theme::for_dark(false);
-                    app.theme.scale = body * 4. / app.theme.body();
-                    window.focus(&app.form_actions[action].focus, cx);
-                    cx.notify();
-                });
-                super::super::notes_recovery_tests::draw(cx);
-                let text = cx
-                    .debug_bounds(match (kind, command) {
-                        (_, Command::Copy) => "control-label:Copia bozza",
-                        (FormKind::Scale, Command::Review) => "control-label:Prepara e rivedi",
-                        (FormKind::Scale, _) => "control-label:Rileggi e verifica",
-                        (_, Command::Review) => "control-label:Registra 1 elemento",
-                        _ => "control-label:Rileggi la scheda",
-                    })
-                    .unwrap();
-                let lines = f32::from(text.size.height) / (body * 4. * 1.5);
-                eprintln!("primary={label:?} base={body} lines={lines} text={text:?}");
-                assert!(lines <= 3., "{label}: {lines} lines");
-                let primary = cx
-                    .debug_bounds(match command {
-                        Command::Review => "clinical-workspace-review-save",
-                        Command::Reread => "clinical-workspace-reconcile",
-                        _ => "clinical-workspace-copy-draft",
-                    })
-                    .unwrap();
-                assert!(primary.size.height <= px(3. * body * 4. * 1.5 + 20.));
-                assert!(primary.left() >= px(0.) && primary.right() <= px(390.));
-            }
-        }
     }
 }

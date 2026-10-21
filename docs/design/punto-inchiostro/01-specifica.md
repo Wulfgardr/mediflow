@@ -348,11 +348,24 @@ Nel recupero Scale il principale è «Rileggi e verifica»; copia, chiusura e
 l'eventuale revisione dello stesso invio restano nel menu. Il piano intero
 resta riservato alla Conferma.
 
+**Vincolo sulle etichette del principale.** Il limite di **3 righe** è un
+vincolo di contenuto, verificato dal test
+`threshold_all_primary_labels_fit_three_lines_in_minimum_shell`. Il test
+enumera il catalogo `PRIMARY_LABELS` usato dalla produzione, senza ricopiare
+le etichette, e verifica nella shell il principale focalizzato, la riga di
+contenuto e il budget non negativo per la regione per tutti gli stati non
+distruttivi che usano quei comandi. Quando la regione è presente ne verifica
+anche la geometria effettiva. Una nuova etichetta entra automaticamente
+nella verifica. Se supera tre righe, **va accorciata**: il principale non si
+comprime, non si tronca e non scorre. Non è previsto un adattamento a runtime
+per etichette che violano questo vincolo.
+
 **Limite geometrico.** Alla finestra minima nativa **390×640**, fino al
 **400%**, con corpo base **14 px** (Linux/Windows) o **16 px** (macOS), il
 principale più lungo richiede al massimo **3 righe**: «Registra 1 elemento»
-e «Rileggi e verifica» raggiungono questo massimo. Le altre etichette
-principali sono «Prepara e rivedi», «Rileggi la scheda» e «Copia bozza».
+e «Rileggi e verifica» raggiungono questo massimo a entrambe le metriche;
+«Rileggi la scheda» richiede due righe a corpo 14 px e tre a corpo 16 px.
+«Prepara e rivedi» e «Copia bozza» richiedono due righe.
 La larghezza del comando è 358 px, quella del testo almeno 330 px
 con bordo di fuoco. A corpo 16 px/400% l'interlinea è 96 px e il principale
 richiede al massimo **3 × 96 + 16 di padding + 4 di bordo = 308 px**.
