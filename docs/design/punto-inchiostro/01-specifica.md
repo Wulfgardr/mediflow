@@ -196,7 +196,10 @@ Non ripetere il titolo in una riga Meta.
   La data di caricamento dell'allegato e l'aggiornamento della coda OCR non
   sono date di salvataggio della sintesi.
 - **Fonte:** «Fonte: <nome allegato>» soltanto quando il collegamento identifica
-  questo documento. Se manca, «Origine non indicata». Se identifica un altro
+  questo documento. Se il collegamento esiste ma il nome è vuoto o composto
+  soltanto da spazi, «Fonte: questo documento (nome non disponibile)»; conserva
+  l'estratto salvato. Se manca la fonte o il collegamento, «Origine non indicata».
+  Se identifica un altro
   allegato, «Fonte di un altro allegato: non mostrata»: nascondi anche il suo
   estratto. Senza un collegamento verificabile, non mostrare nome o estratto.
   Una fonte salvata che esiste ma non si può ispezionare non è una fonte

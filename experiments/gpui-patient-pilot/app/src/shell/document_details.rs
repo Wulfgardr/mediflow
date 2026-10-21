@@ -149,6 +149,9 @@ fn presentation(attachment: &Attachment) -> Vec<DetailBlock> {
             {
                 format!("Fonte: {}", saved.file_name)
             }
+            Source::Present(saved) if saved.attachment_id_present => {
+                "Fonte: questo documento (nome non disponibile)".into()
+            }
             Source::Missing | Source::Present(_) => "Origine non indicata".into(),
             Source::Unreadable => "Fonte salvata, non leggibile con la chiave attuale".into(),
             Source::Invalid => "Fonte salvata, non leggibile".into(),
@@ -474,7 +477,26 @@ mod tests {
         let mut newer = saved_source();
         newer["schemaVersion"] = json!("mediflow.document_parse_evidence_artifact.v2");
         unsupported.parse_evidence_artifact_snapshot = Some(newer.to_string());
-        vec![
+        let unnamed = ["", "   "].map(|file_name| {
+            let mut row = attachment();
+            let mut saved = saved_source();
+            saved["source"]["fileName"] = json!(file_name);
+            row.parse_evidence_artifact_snapshot = Some(saved.to_string());
+            Fixture {
+                attachment: row,
+                expected: vec![
+                    "SINTESI SALVATA".into(),
+                    "Fonte: questo documento (nome non disponibile)".into(),
+                    "Corrispondenza con l'originale attuale non verificata".into(),
+                    "Sintesi città 🩺".into(),
+                    "ESTRATTO SALVATO".into(),
+                    "Estratto sintetico: valore <5; città 🩺".into(),
+                    "ELABORAZIONE PRECEDENTE".into(),
+                    "Stato non disponibile\nAggiornamento registrato: Non disponibile".into(),
+                ],
+            }
+        });
+        let mut fixtures = vec![
             Fixture { attachment: coherent, expected: vec![
                 "SINTESI SALVATA".into(), "Fonte: Fonte città 🩺.txt".into(),
                 "Corrispondenza con l'originale attuale non verificata".into(),
@@ -535,11 +557,13 @@ mod tests {
                 "ELABORAZIONE PRECEDENTE".into(),
                 "Stato non disponibile\nAggiornamento registrato: Non disponibile".into(),
             ] },
-        ]
+        ];
+        fixtures.extend(unnamed);
+        fixtures
     }
 
     #[gpui::test]
-    fn seven_document_renderings_keep_provenance_separate_without_commands_or_requests(
+    fn document_renderings_keep_provenance_separate_without_commands_or_requests(
         cx: &mut gpui::TestAppContext,
     ) {
         use std::net::TcpListener;
@@ -614,6 +638,67 @@ mod tests {
                 );
             }
         }
+    }
+
+    fn assert_linked_source_without_name(file_name: &str) {
+        let mut row = attachment();
+        let mut saved = saved_source();
+        saved["source"]["fileName"] = json!(file_name);
+        row.parse_evidence_artifact_snapshot = Some(saved.to_string());
+        let blocks = presentation(&row);
+        assert!(matches!(
+            &blocks[0],
+            DetailBlock::Text { content, metadata, .. }
+                if content == "Sintesi città 🩺"
+                    && metadata[0] == "Fonte: questo documento (nome non disponibile)"
+        ));
+        assert!(blocks.iter().any(|block| matches!(
+            block,
+            DetailBlock::Text { title: "ESTRATTO SALVATO", content, .. }
+                if content == "Estratto sintetico: valore <5; città 🩺"
+        )));
+        for attachment_id in [None, Some("other-synthetic-document")] {
+            if let Some(id) = attachment_id {
+                saved["source"]["attachmentId"] = json!(id);
+            } else {
+                saved["source"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("attachmentId");
+            }
+            row.parse_evidence_artifact_snapshot = Some(saved.to_string());
+            let blocks = presentation(&row);
+            let expected = if attachment_id.is_some() {
+                "Fonte di un altro allegato: non mostrata"
+            } else {
+                "Origine non indicata"
+            };
+            assert!(matches!(
+                &blocks[0], DetailBlock::Text { metadata, .. } if metadata[0] == expected
+            ));
+            assert!(!blocks.iter().any(|block| matches!(
+                block,
+                DetailBlock::Text {
+                    title: "ESTRATTO SALVATO",
+                    ..
+                }
+            )));
+        }
+        row.parse_evidence_artifact_snapshot = None;
+        assert!(matches!(
+            &presentation(&row)[0],
+            DetailBlock::Text { metadata, .. } if metadata[0] == "Origine non indicata"
+        ));
+    }
+
+    #[test]
+    fn linked_source_with_empty_name_keeps_provenance_and_excerpt() {
+        assert_linked_source_without_name("");
+    }
+
+    #[test]
+    fn linked_source_with_whitespace_name_keeps_provenance_and_excerpt() {
+        assert_linked_source_without_name("   ");
     }
 
     #[test]
