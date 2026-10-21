@@ -222,7 +222,7 @@ for (const coverage of ['omitted', 'included'] as const) {
             assert.deepEqual(first.result?.audit, { coverage, inserted: 0, reused: 0 });
             assert.equal(first.result?.sourceChecksum, raw.manifest.checksum);
             assert.deepEqual(first.after.audit_events, first.before.audit_events);
-            assert.equal(first.after.audit_events.length, 1);
+            assert.equal(first.after.audit_events.length, 2);
             assert.deepEqual(first.after.ambulatories.map(row => (row as { id: string }).id), ['coverage-after']);
             const repeated = restore(dir, artifactPath, mode + '-repeat');
             assert.equal(repeated.error, null);
@@ -270,6 +270,7 @@ test('scheduled snapshot restores original audits, preserves target history and 
         const source = new Database(path.join(sourceDir, 'medical.db'));
         const target = new Database(path.join(targetDir, 'medical.db'));
         try {
+            const initialTargetAudits = target.prepare('SELECT * FROM audit_events ORDER BY event_id').all() as { event_id: string }[];
             seedAudit(source, originalAudit);
             seedAudit(source, { ...originalAudit, eventId: 'synthetic-history-0', outcome: 'denied', subjectRef: null, requestId: null, redactedMetadata: '', createdAt: 0 });
             seedAudit(source, { ...originalAudit, eventId: 'synthetic-history-2', outcome: 'failure', subjectRef: '', requestId: '', redactedMetadata: null, createdAt: 1783000007 });
@@ -282,29 +283,29 @@ test('scheduled snapshot restores original audits, preserves target history and 
             const bytes = fs.readFileSync(exported.artifactPath);
             const digest = createHash('sha256').update(bytes).digest('hex');
             const raw = JSON.parse(bytes.toString());
-            assert.equal(raw.payload.auditEvents.length, 4);
+            assert.equal(raw.payload.auditEvents.length, 5);
             assert.equal(raw.payload.auditEvents.filter((row: { eventType: string }) => row.eventType === 'patient.updated').length, 4);
             const evidence = process.env.MEDIFLOW_AUDIT_EVIDENCE_DIR;
             if (evidence) fs.copyFileSync(exported.artifactPath, path.join(evidence, 'original.mediflow'));
 
             const first = restore(targetDir, exported.artifactPath, 'first');
             assert.equal(first.error, null);
-            assert.deepEqual(first.result?.audit, { coverage: 'included', inserted: 4, reused: 0 });
+            assert.deepEqual(first.result?.audit, { coverage: 'included', inserted: 5, reused: 0 });
             assert.equal(first.result?.sourceChecksum, raw.manifest.checksum);
             assert.equal(first.appendOnly, true);
             const sourceAudits = source.prepare('SELECT * FROM audit_events ORDER BY event_id').all();
             const recovered = target.prepare("SELECT * FROM audit_events WHERE event_id != 'synthetic-target-only' ORDER BY event_id").all();
-            assert.deepEqual(recovered, sourceAudits);
+            assert.deepEqual(recovered, [...sourceAudits, ...initialTargetAudits].sort((a, b) => (a as { event_id: string }).event_id.localeCompare((b as { event_id: string }).event_id)));
             assert.equal((target.prepare("SELECT COUNT(*) AS n FROM audit_events WHERE event_id = 'synthetic-target-only'").get() as { n: number }).n, 1);
             const repeated = restore(targetDir, exported.artifactPath, 'repeat');
-            assert.deepEqual(repeated.result?.audit, { coverage: 'included', inserted: 0, reused: 4 });
+            assert.deepEqual(repeated.result?.audit, { coverage: 'included', inserted: 0, reused: 5 });
             assert.notDeepEqual(repeated.after.archive_generation, repeated.before.archive_generation);
         assert.deepEqual({ ...repeated.after, archive_generation: undefined }, { ...repeated.before, archive_generation: undefined });
 
             const reexport = JSON.parse(runNode(targetDir, ['scripts/run-scheduled-backup.mjs'], {
                 MEDIFLOW_BACKUP_FORCE: '1', MEDIFLOW_BACKUP_DEST_DIR: path.join(work, 'union'),
             })) as { artifactPath: string };
-            assert.equal(JSON.parse(fs.readFileSync(reexport.artifactPath, 'utf8')).payload.auditEvents.length, 5);
+            assert.equal(JSON.parse(fs.readFileSync(reexport.artifactPath, 'utf8')).payload.auditEvents.length, 7);
 
             for (const mode of ['collision', 'abort', 'ignore']) {
                 const dir = path.join(work, mode); prepare(dir);
@@ -320,7 +321,7 @@ test('scheduled snapshot restores original audits, preserves target history and 
                 assert.deepEqual(failed.after, failed.before);
             }
             assert.equal(createHash('sha256').update(fs.readFileSync(exported.artifactPath)).digest('hex'), digest);
-            if (evidence) fs.writeFileSync(path.join(evidence, 'result.json'), JSON.stringify({first:first.result,repeated:repeated.result,sourceAuditCount:4,targetAuditCount:5,originalFileSha256:digest,controls:['collision','abort','ignore']}, null, 2));
+            if (evidence) fs.writeFileSync(path.join(evidence, 'result.json'), JSON.stringify({first:first.result,repeated:repeated.result,sourceAuditCount:5,targetAuditCount:7,originalFileSha256:digest,controls:['collision','abort','ignore']}, null, 2));
         } finally { source.close(); target.close(); }
     } finally { fs.rmSync(work, { recursive: true, force: true }); }
 });
@@ -364,6 +365,7 @@ test('Web export rejects command history committed before the snapshot first rea
         try {
             db.prepare("INSERT INTO ambulatories (id,name,type) VALUES ('first-read-amb','Synthetic first read','synthetic')").run();
             db.prepare("INSERT INTO patients (id,first_name,last_name,tax_code,ambulatory_id,version) VALUES ('first-read-patient','Synthetic','Before','SYNTHETIC-FIRST-READ','first-read-amb',1)").run();
+            const initialAuditIds = (db.prepare('SELECT event_id FROM audit_events').all() as { event_id: string }[]).map(row => row.event_id);
             seedAudit(db, originalAudit);
             assert.equal((db.prepare('SELECT COUNT(*) AS n FROM durable_review_command_states').get() as { n: number }).n, 0);
             assert.equal((db.prepare('SELECT COUNT(*) AS n FROM durable_review_command_operations').get() as { n: number }).n, 0);
@@ -384,7 +386,7 @@ test('Web export rejects command history committed before the snapshot first rea
             assert.equal((db.prepare('SELECT COUNT(*) AS n FROM durable_review_command_states').get() as { n: number }).n, 1);
             assert.equal((db.prepare('SELECT COUNT(*) AS n FROM durable_review_command_operations').get() as { n: number }).n, 1);
             assert.deepEqual(db.prepare('SELECT event_id FROM audit_events ORDER BY event_id').all(),
-                [commandAudit.eventId, originalAudit.eventId].sort().map(event_id => ({ event_id })));
+                [...initialAuditIds, commandAudit.eventId, originalAudit.eventId].sort().map(event_id => ({ event_id })));
             assert.deepEqual(db.prepare("SELECT last_name, version FROM patients WHERE id='first-read-patient'").get(), { last_name: 'After', version: 2 });
         } finally { db.close(); }
     } finally { fs.rmSync(work, { recursive: true, force: true }); }
@@ -396,6 +398,7 @@ test('manual and scheduled producers keep one SQLite snapshot across a concurren
         for (const producer of ['manual', 'scheduled']) {
             const dir = path.join(work, producer); prepare(dir);
             const db = new Database(path.join(dir, 'medical.db'));
+            const initialAuditIds = (db.prepare('SELECT event_id FROM audit_events').all() as { event_id: string }[]).map(row => row.event_id);
             try {
                 db.prepare("INSERT INTO ambulatories (id,name,type) VALUES ('snapshot-amb','Synthetic snapshot','synthetic')").run();
                 db.prepare("INSERT INTO patients (id,first_name,last_name,tax_code,ambulatory_id,version) VALUES ('snapshot-patient','Synthetic','Before','SYNTHETIC-SNAPSHOT','snapshot-amb',1)").run();
@@ -428,7 +431,7 @@ test('manual and scheduled producers keep one SQLite snapshot across a concurren
             const artifact = await parseBackupArtifact(raw);
             assert.equal(artifact.payload.patients[0].lastName, 'Before');
             assert.equal(artifact.payload.patients[0].version, 1);
-            assert.deepEqual(artifact.payload.auditEvents?.map(row => row.eventId), ['synthetic-before']);
+            assert.deepEqual(artifact.payload.auditEvents?.map(row => row.eventId).sort(), [...initialAuditIds, 'synthetic-before'].sort());
             assert.deepEqual(artifact.payload.durableReviewCommandStates, []);
             assert.deepEqual(artifact.payload.durableReviewCommandOperations, []);
             assert.equal(artifact.manifest.recordCounts.durableReviewCommandStates, 0);
@@ -437,7 +440,7 @@ test('manual and scheduled producers keep one SQLite snapshot across a concurren
             try {
                 assert.equal((observed.prepare("SELECT last_name FROM patients WHERE id='snapshot-patient'").get() as { last_name: string }).last_name, 'After');
                 assert.equal((observed.prepare("SELECT version FROM patients WHERE id='snapshot-patient'").get() as { version: number }).version, 2);
-                assert.equal((observed.prepare('SELECT COUNT(*) AS n FROM audit_events').get() as { n: number }).n, 3);
+                assert.equal((observed.prepare('SELECT COUNT(*) AS n FROM audit_events').get() as { n: number }).n, 4);
                 const statesBefore = observed.prepare('SELECT * FROM durable_review_command_states').all();
                 const operationsBefore = observed.prepare('SELECT * FROM durable_review_command_operations').all();
                 const auditsBefore = observed.prepare('SELECT * FROM audit_events ORDER BY event_id').all();

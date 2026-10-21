@@ -29,13 +29,20 @@ function prepareDataDirectory() {
 // trusted bundle composition supplies only its physical Web layout; no CLI/env override.
 export async function runHeadlessSupervisorV1(childOptions = {}) {
   const args = process.argv.slice(2);
-  if (args.length > 0 && !(args.length === 1 && ['--mini', '--maintenance-web'].includes(args[0]))) {
+  if (args[0] !== '--territorial-packs' && args.length > 0 && !(args.length === 1 && ['--mini', '--maintenance-web'].includes(args[0]))) {
     throw new Error('supervisor_arguments_invalid');
   }
   const agentKind = args[0] === '--mini' ? 'mini' : 'mcp';
   assertNodeRuntime(readNodeContract(root));
   verifyNativeBinding(childOptions.webDirectory ?? root);
   prepareDataDirectory();
+
+  if (args[0] === '--territorial-packs') {
+    const { runTerritorialPackMaintenance } = await import('../lib/security/territorial-pack-maintenance.ts');
+    const capability = runTerritorialPackMaintenance(args, process.env.MEDIFLOW_DATA_DIR);
+    process.stdout.write(`${JSON.stringify(capability)}\n`);
+    return;
+  }
 
   if (args[0] === '--maintenance-web') {
     const { runArchiveMaintenanceWebOwner } = await import('../lib/security/archive-maintenance-owner.ts');

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.41.0
+  version: 1.42.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -6374,10 +6374,35 @@ components:
             - network-home-base
         protocolVersion:
           type: string
+        territorialPacks:
+          $ref: '#/components/schemas/TerritorialPackCapability'
         capabilities:
           type: array
           items:
             $ref: '#/components/schemas/NetworkCapability'
+    TerritorialPackCapability:
+      type: object
+      additionalProperties: false
+      required:
+        - schemaVersion
+        - revision
+        - preset
+        - status
+      properties:
+        schemaVersion:
+          type: string
+          enum: [mediflow.territorial-packs.v1]
+        revision:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 9007199254740991
+        preset:
+          type: string
+          enum: [core, core+it, core+it+lom]
+        status:
+          type: string
+          enum: [ready, configuration_error]
     NetworkRevisionSummary:
       type: object
       additionalProperties: false

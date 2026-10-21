@@ -713,7 +713,7 @@ test('restores entries then exact H7b audits then ledger while preserving unrela
             restoreArtifact(targetDataDir, artifactPath);
             assert.equal(countRows(target, 'entries'), 1);
             assert.equal(countRows(target, 'headless_soap_entry_commits'), 1);
-            assert.equal(countRows(target, 'audit_events'), 2);
+            assert.equal(countRows(target, 'audit_events'), 3);
             const restored = target.prepare('SELECT audit_snapshot AS auditSnapshot FROM headless_soap_entry_commits').get() as { auditSnapshot: string };
             assert.equal(restored.auditSnapshot, JSON.stringify(fixture.audit));
         } finally { target.close(); }
@@ -762,11 +762,11 @@ test('blocks current and legacy empty artifacts before clearing a target command
         const protectedDb = new Database(path.join(protectedDataDir, 'medical.db'));
         try {
             seedCommandLedger(protectedDb);
-            assert.deepEqual(countCommandLedger(protectedDb), [1, 1, 1]);
+            assert.deepEqual(countCommandLedger(protectedDb), [1, 1, 2]);
             assert.throws(() => restoreArtifact(protectedDataDir, currentPath), /Restore blocked/);
-            assert.deepEqual(countCommandLedger(protectedDb), [1, 1, 1]);
+            assert.deepEqual(countCommandLedger(protectedDb), [1, 1, 2]);
             assert.throws(() => restoreArtifact(protectedDataDir, legacyPath), /Restore blocked/);
-            assert.deepEqual(countCommandLedger(protectedDb), [1, 1, 1]);
+            assert.deepEqual(countCommandLedger(protectedDb), [1, 1, 2]);
         } finally {
             protectedDb.close();
         }
@@ -909,6 +909,7 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
                 && !LOCAL_ONLY_AUTHORITY_TABLES.has(table) && !AUDIT_DEPENDENT_EMPTY_TABLES.has(table));
             clearBackupTables(sourceDb, clinicalTables);
             clearBackupTables(targetDb, clinicalTables);
+            const targetInitialAudits = readOrderedRows(targetDb, 'audit_events');
             const durableReviewCommand = await populateSyntheticClinicalFixture(sourceDb, sourceActorRef);
             /* Include nonempty synthetic repertory and receipt in the total round-trip gate. */
             const prosthetics = createProstheticsCatalog(sourceDb), catalogBytes = Buffer.from(PROSTHETICS_TEMPLATE);
@@ -929,7 +930,7 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             const headlessSoapReplay = seedHeadlessSoapCommit(sourceDataDir);
 
             for (const table of clinicalTables) {
-                assert.equal(readOrderedRows(targetDb, table).length, 0, `target ${table} must be virgin before restore`);
+                assert.deepEqual(readOrderedRows(targetDb, table), table === 'audit_events' ? targetInitialAudits : [], `target ${table} retains only its initial host audit before restore`);
                 assert.ok(readOrderedRows(sourceDb, table).length > 0, `source ${table} must contain a synthetic fixture`);
             }
 
@@ -971,8 +972,8 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
                 // The activation is a grant of the source host: the attestation reaches the target inactive.
                 const expectedRows: Array<Record<string, unknown>> = table === 'headless_soap_active_role_attestations'
                     ? sourceRows.map((row) => ({ ...row, status: 'inactive', issuer_ref: null, expires_at: null, activated_at: null }))
-                    : sourceRows;
-                assert.equal(targetRows.length, sourceRows.length, `${table} count must survive restore`);
+                    : table === 'audit_events' ? [...sourceRows, ...targetInitialAudits].sort((a, b) => String(a.event_id).localeCompare(String(b.event_id))) : sourceRows;
+                assert.equal(targetRows.length, expectedRows.length, `${table} count must survive restore`);
                 assert.deepEqual(targetRows, expectedRows, `${table} rows must reach the target as the restore contract declares`);
 
                 for (let rowIndex = 0; rowIndex < sourceRows.length; rowIndex += 1) {

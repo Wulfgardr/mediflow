@@ -25,7 +25,8 @@
     "reference-data": "Reference catalog SQL, distinct from clinical patient command dispatch.",
     "paired-scale-read": "ADR0153: current authority, membership and selection reads for scale preparation. No clinical writer or key access; persistence delegates to the ordinary entry operation.",
     "runtime-entry": "Declared runtime/maintenance entry or its local dependencies, outside the Web/lib source roots.",
-    "synthetic-support": "Existing synthetic-support source; inclusion is conservative and does not authorize real data access."
+    "synthetic-support": "Existing synthetic-support source; inclusion is conservative and does not authorize real data access.",
+    "territorial-pack-host": "ADR0158: named host territorial configuration owner and local supervisor maintenance admission; no agent operation or generic settings authority."
   },
   "semantics": {
     "edge": "Exact source path, resolved target, capability, import form, imported symbols and occurrence count. Value imports are conservatively treated as runtime dependencies; explicit type-only imports are not authority.",
@@ -1130,6 +1131,7 @@
       "form": "import",
       "symbols": [
         "dbServer",
+        "openDbServer",
         "runDbServerImmediateTransaction"
       ],
       "count": 1,
@@ -1262,7 +1264,8 @@
       "capability": "server:lib/db-server.ts",
       "form": "import",
       "symbols": [
-        "dbServer"
+        "dbServer",
+        "openDbServer"
       ],
       "count": 1,
       "classification": "legacy-node-service"
@@ -1690,6 +1693,28 @@
       "classification": "legacy-node-service"
     },
     {
+      "file": "lib/security/territorial-pack-maintenance.ts",
+      "target": "lib/sqlite-schema-open.ts",
+      "capability": "server:lib/sqlite-schema-open.ts",
+      "form": "import",
+      "symbols": [
+        "openVersionedSqliteDatabase"
+      ],
+      "count": 1,
+      "classification": "territorial-pack-host"
+    },
+    {
+      "file": "lib/security/territorial-pack-maintenance.ts",
+      "target": "lib/sqlite-maintenance-admission.mjs",
+      "capability": "server:lib/sqlite-maintenance-admission.mjs",
+      "form": "import",
+      "symbols": [
+        "openAdmittedSqlite"
+      ],
+      "count": 1,
+      "classification": "territorial-pack-host"
+    },
+    {
       "file": "lib/service-prescription-write.ts",
       "target": "lib/db-server.ts",
       "capability": "server:lib/db-server.ts",
@@ -1776,6 +1801,17 @@
       ],
       "count": 1,
       "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/territorial-pack-production.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "openDbServer"
+      ],
+      "count": 1,
+      "classification": "territorial-pack-host"
     },
     {
       "file": "lib/therapy-write-operation.ts",
