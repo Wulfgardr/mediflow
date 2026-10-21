@@ -20,7 +20,7 @@ function fixture(ready = true) {
     stdio: ['pipe', 'pipe', 'pipe', 'ipc'] });
   const pending = new Map<number, (value: any) => void>();
   const wire: string[] = [], web: string[] = [], stderr: string[] = [];
-  const childFrames: Record<string, unknown>[] = [];
+  const childFrames: Record<string, unknown>[] = [], parentFrames: Record<string, unknown>[] = [];
   child.on('message', frame => { if (typeof frame === 'string') childFrames.push(JSON.parse(frame)); });
   let buffer = '', counter = 0, terminal: (() => void) | undefined, stopped = false;
   child.stdout!.setEncoding('utf8'); child.stderr!.setEncoding('utf8');
@@ -34,7 +34,7 @@ function fixture(ready = true) {
   });
   const port = { connection: {}, subscribe(listener: (frame: unknown) => void) {
     child.on('message', listener); return () => { child.off('message', listener); };
-  }, publish(frame: string) { child.send(frame); }, onClose() { return () => {}; }, terminate() { child.kill(); } };
+  }, publish(frame: string) { parentFrames.push(JSON.parse(frame)); child.send(frame); }, onClose() { return () => {}; }, terminate() { child.kill(); } };
   let webListener: ((frame: unknown) => void) | undefined;
   const children = { mcpPort: port, subscribeWeb(listener: (frame: unknown) => void) { webListener = listener; return () => {}; },
     sendWeb(frame: string, done: (error: Error | null) => void) { web.push(frame); done(null); },
@@ -42,10 +42,10 @@ function fixture(ready = true) {
     terminateAll() { stopped = true; child.kill(); }, terminateMcp() { child.kill(); }, terminateWeb() {} };
   const runtime = createLocalUiSupervisorRuntime(children as unknown as PortableSupervisorProductionChildProcessesV1);
   if (ready) webListener?.(LOCAL_UI_WEB_READY);
-  const request = (method: string, params: object) => {
+  const request = (method: string, params: object, timeout = 5_000) => {
     const id = ++counter;
     return new Promise<any>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('synthetic_timeout')), 5_000);
+      const timer = setTimeout(() => reject(new Error('synthetic_timeout')), timeout);
       pending.set(id, value => { clearTimeout(timer); resolve(value); });
       child.stdin!.write(JSON.stringify({ jsonrpc: '2.0', id, method, params: { ...params, _meta: META } }) + '\n');
     });
@@ -56,7 +56,7 @@ function fixture(ready = true) {
     return id;
   };
   const notify = (method: string, params: object) => child.stdin!.write(JSON.stringify({ jsonrpc: '2.0', method, params }) + '\n');
-  return { request, detachedRequest, notify, childFrames, web, wire, stderr, runtime, ready: () => webListener?.(LOCAL_UI_WEB_READY), terminal: () => terminal?.(), stopped: () => stopped, child };
+  return { request, detachedRequest, notify, childFrames, parentFrames, web, wire, stderr, runtime, ready: () => webListener?.(LOCAL_UI_WEB_READY), terminal: () => terminal?.(), stopped: () => stopped, child };
 }
 
 test('real MCP and parent admit only enum navigation before any clinical binding', async () => {
@@ -187,5 +187,71 @@ test('MCP cancellation before readiness cancels only that RPC and a new call in 
     assert.notEqual(cancel?.requestId, original.requestId);
     assert.equal(f.stopped(), false);
     assert.equal(f.wire.some(frame => JSON.parse(frame).id === id), false);
+  } finally { f.runtime.terminate(); await exited; }
+});
+
+async function cancelBeforeReadiness(f: ReturnType<typeof fixture>) {
+  const before = f.childFrames.length;
+  const id = f.detachedRequest('tools/call', { name: LOCAL_UI_TOOL_ID, arguments: { intent: 'identity' } });
+  await waitForFrame(() => f.childFrames.length > before);
+  const call = f.childFrames[before];
+  assert.equal(call.method, 'call');
+  f.notify('notifications/cancelled', { requestId: id });
+  await waitForFrame(() => f.parentFrames.some(frame => frame.targetRequestId === call.requestId));
+  assert.equal(f.parentFrames.find(frame => frame.targetRequestId === call.requestId)?.outcome, 'cancelled');
+}
+
+test('the real RPC budget boundary rejects new calls without sacrificing cancellation', async () => {
+  const f = fixture(false);
+  const exited = new Promise(resolve => f.child.once('exit', resolve));
+  try {
+    await f.request('tools/list', {});
+    const timedOut = await f.request('tools/call', { name: LOCAL_UI_TOOL_ID, arguments: { intent: 'search' } }, 11_000);
+    assert.equal(timedOut.result.isError, true);
+    for (let round = 0; round < 127; round++) await cancelBeforeReadiness(f);
+    assert.equal(f.childFrames.length, 255);
+    const id = f.detachedRequest('tools/call', { name: LOCAL_UI_TOOL_ID, arguments: { intent: 'history' } });
+    await waitForFrame(() => f.childFrames.length > 255 || f.wire.some(frame => JSON.parse(frame).id === id));
+    f.notify('notifications/cancelled', { requestId: id });
+    if (f.childFrames.length > 255) {
+      await waitForFrame(() => f.parentFrames.some(frame => frame.requestId === f.childFrames[256]?.requestId));
+    }
+    f.ready(); await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(f.web, []);
+    assert.equal(f.childFrames.length, 255);
+    const denied = JSON.parse(f.wire.find(frame => JSON.parse(frame).id === id)!);
+    assert.deepEqual(denied.result, { isError: true, content: [{ type: 'text', text: 'MediFlow navigation unavailable.' }] });
+    assert.equal(f.stopped(), false);
+    assert.equal((await f.request('tools/list', {})).result.tools.length, 1);
+    assert.deepEqual(f.stderr, []);
+  } finally { f.runtime.terminate(); await exited; }
+});
+
+test('all eight concurrent in-flight calls retain cancellation capacity at the real RPC limit', async () => {
+  const f = fixture(false);
+  const exited = new Promise(resolve => f.child.once('exit', resolve));
+  try {
+    await f.request('tools/list', {});
+    for (let round = 0; round < 120; round++) await cancelBeforeReadiness(f);
+    const ids = Array.from({ length: 8 }, () => f.detachedRequest('tools/call', {
+      name: LOCAL_UI_TOOL_ID, arguments: { intent: 'history' },
+    }));
+    await waitForFrame(() => f.childFrames.length === 248);
+    const calls = f.childFrames.slice(-8);
+    assert.ok(calls.every(frame => frame.method === 'call'));
+    const refused = await f.request('tools/call', { name: LOCAL_UI_TOOL_ID, arguments: { intent: 'search' } });
+    assert.equal(refused.result.isError, true);
+    for (const id of ids) f.notify('notifications/cancelled', { requestId: id });
+    await waitForFrame(() => f.childFrames.filter(frame => frame.method === 'cancel').length === 128);
+    const cancels = f.childFrames.filter(frame => frame.method === 'cancel').slice(-8);
+    await waitForFrame(() => cancels.every(cancel => f.parentFrames.some(frame => frame.requestId === cancel.requestId)));
+    f.ready(); await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(f.web, []);
+    assert.equal(f.childFrames.length, 256);
+    assert.deepEqual(cancels.map(frame => frame.targetRequestId), calls.map(frame => frame.requestId));
+    assert.ok(cancels.every(cancel => f.parentFrames.find(frame => frame.requestId === cancel.requestId)?.outcome === 'cancelled'));
+    assert.ok(ids.every(id => !f.wire.some(frame => JSON.parse(frame).id === id)));
+    assert.equal(f.stopped(), false);
+    assert.deepEqual(f.stderr, []);
   } finally { f.runtime.terminate(); await exited; }
 });
