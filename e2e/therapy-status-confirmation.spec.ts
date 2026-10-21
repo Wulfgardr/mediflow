@@ -370,3 +370,88 @@ test('an authoritative HTTP rejection is distinct from a lost response', async (
     expect(writes).toHaveLength(1);
     expect(await stored(page, data)).toMatchObject({ version: 1, status: 'active' });
 });
+
+
+test('P2 unavailable admission is visibly unsent and checking availability does not retry', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 960 });
+    const data = await fixture(page);
+    await open(page, data);
+    const { writes } = network(page);
+    await row(page).getByRole('button', { name: 'Sospendi', exact: true }).click();
+    await page.evaluate(() => Object.defineProperty(navigator, 'locks', { configurable: true, value: undefined }));
+    await confirm(page).click();
+    await expect(threshold(page).getByRole('heading', { name: 'Cambio di stato bloccato', exact: true })).toBeVisible();
+    await expect(threshold(page)).toContainText('La nuova richiesta non è stata inviata.');
+    await expect(threshold(page)).toContainText('Il controllo locale necessario prima dell’invio non è riuscito.');
+    await expect(threshold(page).getByText('Esito da verificare', { exact: true })).toHaveCount(0);
+    await expect(row(page).getByRole('button', { name: 'Sospendi', exact: true })).toBeDisabled();
+    await threshold(page).getByRole('button', { name: 'Ricontrolla disponibilità', exact: true }).click();
+    await expect(threshold(page).getByRole('button', { name: 'Ricontrolla disponibilità', exact: true })).toBeEnabled();
+    expect(writes).toHaveLength(0);
+    await assertNoHorizontalOverflow(page, [{ label: 'admission block', selector: '[aria-label="Cambio di stato della terapia"]' }]);
+    const dir = process.env.THERAPY_SCREENSHOT_DIR || test.info().outputPath('captures');
+    await mkdir(dir, { recursive: true });
+    await page.screenshot({ path: `${dir}/ammissione-bloccata-390.png` });
+    await page.evaluate(() => { Reflect.deleteProperty(navigator, 'locks'); });
+    await threshold(page).getByRole('button', { name: 'Ricontrolla disponibilità', exact: true }).click();
+    await expect(threshold(page)).toHaveCount(0);
+    await expect(row(page).getByRole('button', { name: 'Sospendi', exact: true })).toBeEnabled();
+    expect(writes).toHaveLength(0);
+    await row(page).getByRole('button', { name: 'Concludi', exact: true }).click();
+    await expectConfirmation(page, 'Concludere Ramipril sintetico 5 mg, 1 cp al mattino?');
+    expect(writes).toHaveLength(0);
+    await confirm(page).click();
+    await expect(threshold(page).getByText('Registrata', { exact: true })).toBeVisible();
+    expect(writes).toHaveLength(1);
+    expect(writes[0].body.status).toBe('completed');
+});
+
+for (const failure of ['corrupt', 'unreadable'] as const) {
+    test(`P2 ${failure} journal has a visible recovery and never clears a previous unknown write`, async ({ page }) => {
+        const data = await fixture(page);
+        const archive = await (await page.request.get('/api/auth/check')).json();
+        const key = `mediflow:therapy-status-write:v1:${encodeURIComponent(archive.archiveGeneration)}:${encodeURIComponent(data.patientId)}`;
+        const value = JSON.stringify({ id: 'previous-synthetic-attempt', patientId: data.patientId, therapyId: data.therapyId, version: 1, outcome: 'unknown' });
+        await page.evaluate(({ key, value, failure }) => {
+            localStorage.setItem(key, failure === 'corrupt' ? '{' : value);
+        }, { key, value, failure });
+        const { writes } = network(page);
+        await open(page, data);
+        if (failure === 'unreadable') {
+            await page.evaluate(() => {
+                const get = Storage.prototype.getItem;
+                Storage.prototype.getItem = function (key: string) {
+                    if (key.startsWith('mediflow:therapy-status-write:v1:')) throw new Error('Synthetic storage unavailable');
+                    return get.call(this, key);
+                };
+                window.addEventListener('restore-therapy-storage', () => { Storage.prototype.getItem = get; }, { once: true });
+                window.dispatchEvent(new StorageEvent('storage', { key: 'mediflow:therapy-status-write:v1:' }));
+            });
+        }
+        await expect(threshold(page).getByRole('heading', { name: 'Cambio di stato bloccato', exact: true })).toBeVisible();
+        await expect(threshold(page)).toContainText('Il registro locale dei tentativi non è leggibile.');
+        await expect(threshold(page)).toContainText('non cancellare i dati del browser');
+        await expect(threshold(page).getByText('La nuova richiesta non è stata inviata.', { exact: true })).toHaveCount(0);
+        await expect(row(page).getByRole('button', { name: 'Sospendi', exact: true })).toBeDisabled();
+        await threshold(page).getByRole('button', { name: 'Ricontrolla disponibilità', exact: true }).click();
+        await expect(threshold(page).getByRole('button', { name: 'Ricontrolla disponibilità', exact: true })).toBeEnabled();
+        await expect(threshold(page)).toContainText('Il registro locale dei tentativi non è leggibile.');
+        expect(writes).toHaveLength(0);
+        const dir = process.env.THERAPY_SCREENSHOT_DIR || test.info().outputPath('captures');
+        await mkdir(dir, { recursive: true });
+        await page.screenshot({ path: `${dir}/registro-${failure}-1440.png` });
+        if (failure === 'corrupt') expect(await page.evaluate(key => localStorage.getItem(key), key)).toBe('{');
+        await page.evaluate(({ key, value }) => {
+            window.dispatchEvent(new Event('restore-therapy-storage'));
+            localStorage.setItem(key, value);
+        }, { key, value });
+        await threshold(page).getByRole('button', { name: 'Ricontrolla disponibilità', exact: true }).click();
+        await expectUncertainOutcome(page);
+        await threshold(page).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
+        await expectUncertainOutcome(page);
+        await expect(row(page).getByRole('button', { name: 'Sospendi', exact: true })).toBeDisabled();
+        expect(await page.evaluate(key => localStorage.getItem(key), key)).toBe(value);
+        expect(writes).toHaveLength(0);
+        expect(await stored(page, data)).toMatchObject({ version: 1, status: 'active' });
+    });
+}

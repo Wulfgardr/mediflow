@@ -84,7 +84,7 @@ for (const outcome of ['resolved', 'rejected', 'aborted'] as const) {
         await h.controller.confirm();
         assert.equal(h.controller.blocked, true);
         assert.equal(h.writes.length, 1);
-        assert.equal(h.controller.snapshot?.original.id, 'therapy');
+        assert.equal(h.controller.snapshot?.original?.id, 'therapy');
         if (outcome === 'resolved') {
             h.setItems([{ ...original, status: 'suspended', version: 2 }]);
             resolve();
@@ -293,4 +293,144 @@ test('corrupt storage or missing Web Locks cannot admit a write', async () => {
         assert.equal(h.writes.length, 0);
         assert.equal(h.controller.blocked, true);
     }
+});
+
+
+const phase = (h: ReturnType<typeof harness>) => h.controller.snapshot?.phase;
+
+function admissionFixture() {
+    const values = new Map<string, string>();
+    let locksAvailable = true;
+    let readable = true;
+    let writable = true;
+    let failAfterLock = false;
+    let archive = 'synthetic-archive';
+    const shared = createTherapyStatusWriteJournal({
+        archive: () => archive,
+        storage: () => ({
+            getItem: key => { if (!readable) throw new Error('Storage unavailable'); return values.get(key) ?? null; },
+            setItem: (key, value) => { if (!writable) throw new Error('Storage full'); values.set(key, value); },
+            removeItem: key => { values.delete(key); },
+        }),
+        locks: () => {
+            if (!locksAvailable) throw new Error('Locks unavailable');
+            return { request: async (...args: Parameters<LockManager['request']>) => {
+                const result = await navigator.locks.request(...args);
+                if (failAfterLock) throw new Error('Lock completion failed');
+                return result;
+            } } as Pick<LockManager, 'request'>;
+        },
+    });
+    return { shared, values, locks: (value: boolean) => { locksAvailable = value; }, read: (value: boolean) => { readable = value; },
+        write: (value: boolean) => { writable = value; }, afterLock: (value: boolean) => { failAfterLock = value; },
+        archive: (value: string) => { archive = value; } };
+}
+const priorCommand = { id: 'prior', therapyId: original.id, patientId: original.patientId, version: 1, outcome: 'unknown' as const };
+
+for (const failure of ['locks', 'write', 'afterLock'] as const) {
+    test(`P2 admission failure (${failure}) is unsent and explicit recovery never retries`, async () => {
+        const f = admissionFixture();
+        const h = harness({ journal: f.shared });
+        h.controller.begin(original, 'suspended', 'Sintetico');
+        if (failure === 'locks') f.locks(false);
+        if (failure === 'write') f.write(false);
+        if (failure === 'afterLock') f.afterLock(true);
+        await h.controller.confirm();
+        assert.equal(phase(h), 'unavailable');
+        assert.equal(h.writes.length, 0);
+        assert.equal(h.controller.blocked, true);
+        if (failure !== 'write') {
+            await h.controller.recheck();
+            assert.equal(phase(h), 'unavailable');
+            assert.equal(h.controller.snapshot?.phase === 'unavailable' && h.controller.snapshot.reason, 'admission');
+            assert.equal(h.writes.length, 0);
+        }
+        f.locks(true); f.write(true); f.afterLock(false);
+        await Promise.all([h.controller.recheck(), h.controller.recheck()]);
+        assert.equal(Boolean(h.controller.snapshot), false);
+        assert.equal(f.shared.get('patient'), null);
+        assert.equal(h.controller.blocked, false);
+        await h.controller.confirm();
+        assert.equal(h.writes.length, 0);
+        h.controller.begin(original, 'completed', 'Sintetico');
+        assert.equal(phase(h), 'confirm');
+        assert.equal(h.writes.length, 0);
+        await h.controller.confirm();
+        assert.equal(h.writes.length, 1);
+    });
+}
+
+for (const failure of ['corrupt', 'unreadable'] as const) {
+    test(`P2 ${failure} storage shows a recoverable block and preserves the previous unknown write`, async () => {
+        const f = admissionFixture();
+        await f.shared.claim(priorCommand);
+        const [key, value] = [...f.values][0];
+        if (failure === 'corrupt') f.values.set(key, '{');
+        else f.read(false);
+        const h = harness({ journal: f.shared });
+        h.controller.recover([original], 'Sintetico');
+        assert.equal(phase(h), 'unavailable');
+        assert.equal(h.controller.blocked, true);
+        await h.controller.recheck();
+        assert.equal(phase(h), 'unavailable');
+        assert.equal(f.values.get(key), failure === 'corrupt' ? '{' : value);
+        f.read(true); f.values.set(key, value);
+        await h.controller.recheck();
+        assert.equal(phase(h), 'uncertain');
+        await h.controller.reread();
+        assert.equal(phase(h), 'uncertain');
+        assert.equal(f.shared.get('patient')?.id, 'prior');
+        assert.equal(h.writes.length, 0);
+    });
+}
+
+test('P2 a prior marker arriving after the prompt survives failed admission and recovery', async () => {
+    const f = admissionFixture();
+    const h = harness({ journal: f.shared });
+    h.controller.begin(original, 'suspended', 'Sintetico');
+    await f.shared.claim(priorCommand);
+    await h.controller.confirm();
+    assert.equal(phase(h), 'unavailable');
+    await h.controller.recheck();
+    assert.equal(phase(h), 'uncertain');
+    assert.equal(f.shared.get('patient')?.id, 'prior');
+    await h.controller.reread();
+    assert.equal(h.controller.blocked, true);
+    assert.equal(h.writes.length, 0);
+});
+
+test('P2 cleanup of an unsent own marker cannot remove a replacement or cross archives', async () => {
+    for (const change of ['replacement', 'archive'] as const) {
+        const f = admissionFixture();
+        const h = harness({ journal: f.shared });
+        h.controller.begin(original, 'suspended', 'Sintetico');
+        f.afterLock(true);
+        await h.controller.confirm();
+        assert.equal(phase(h), 'unavailable');
+        f.afterLock(false);
+        if (change === 'replacement') {
+            const key = [...f.values.keys()][0];
+            f.values.set(key, JSON.stringify(priorCommand));
+        } else f.archive('other-archive');
+        const before = [...f.values];
+        await h.controller.recheck();
+        assert.deepEqual([...f.values], before);
+        assert.equal(phase(h), change === 'replacement' ? 'uncertain' : 'unavailable');
+        assert.equal(h.controller.blocked, true);
+        assert.equal(h.writes.length, 0);
+    }
+});
+
+test('P2 an uninspectable therapy marker is visible and recovery waits for its therapy', async () => {
+    const f = admissionFixture();
+    await f.shared.claim({ ...priorCommand, therapyId: 'missing' });
+    const h = harness({ journal: f.shared });
+    h.controller.recover([original], 'Sintetico');
+    assert.equal(phase(h), 'unavailable');
+    await h.controller.recheck();
+    assert.equal(phase(h), 'unavailable');
+    h.setItems([{ ...original, id: 'missing' }]);
+    await h.controller.recheck();
+    assert.equal(phase(h), 'uncertain');
+    assert.equal(h.writes.length, 0);
 });

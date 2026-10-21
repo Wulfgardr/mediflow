@@ -29,6 +29,22 @@ tentativo: un owner precedente non può cancellare o risolvere il marker di un
 nuovo intento. Senza storage, generazione o Web Locks la PUT non parte.
 Il controller non può riassociarsi a un archivio diverso durante la sua vita.
 
+Un errore di ammissione prima della PUT viene mostrato come blocco di
+disponibilità, distinto dall'esito ignoto di una PUT iniziata. La nuova richiesta
+non è stata inviata, ma questo non esclude un tentativo precedente. Il comando
+esplicito «Ricontrolla disponibilità» verifica il registro sotto lock e rilegge
+le terapie senza inviare modifiche né riproporre la conferma precedente. Se
+non esiste un marker, si torna alla scheda per una nuova scelta e conferma;
+se ne esiste uno, si apre il suo recupero. Un marker del solo tentativo che il
+controller sa di non aver inviato può essere rimosso durante il ricontrollo,
+sempre sotto lock, nello stesso archivio e con verifica dell'identità.
+
+Storage illeggibile, marker corrotto o terapia necessaria non ispezionabile
+producono un blocco visibile con ricontrollo esplicito. Non consentono sblocco
+silenzioso né cancellazione del registro: se la leggibilità non viene
+ripristinata serve assistenza, senza eliminare dati del browser. Il controllo
+di disponibilità non è una ricevuta dell'host e non risolve un esito ignoto.
+
 Il marker non è legato alla durata della sessione: la richiesta già ammessa
 può sopravviverle. Una sessione rinnovata sullo stesso archivio eredita il blocco,
 ma deve ancora ottenere una lettura autorizzata. Il marker non concede alcuna
