@@ -301,7 +301,8 @@ comandi.
 
 La soglia resta ancorata in fondo al piano a ogni scala di testo: scorre
 soltanto il contenuto sopra di essa. Titolo (domanda o stato) e comandi
-restano visibili. Se l'altezza della soglia completa, misurata dal layout
+restano visibili, con lo scorrimento interno descritto sotto per gli stati
+non distruttivi. Se l'altezza della soglia completa, misurata dal layout
 alla larghezza disponibile, supera **un terzo dell'altezza del piano**, si
 usa la **forma compatta**. Il valore esattamente pari a un terzo conserva
 la forma completa: non esiste una soglia fissa di zoom.
@@ -328,8 +329,14 @@ Negli stati non distruttivi, se i comandi della compatta non entrano nel
 piano, resta visibile il comando principale. Gli altri sono nel menu
 «Altre azioni», ancorato alla barra, raggiungibile con Tab e apribile con
 Invio o Spazio; Esc lo chiude e restituisce il fuoco al comando del menu.
-Titolo e stato restano visibili, i dettagli scorrono nel contenuto, che
-conserva un'altezza positiva. Nel recupero Scale il comando principale è
+Il contenuto conserva almeno l'altezza di una riga del testo corrente,
+arrotondata per eccesso al pixel; la barra è limitata allo spazio residuo.
+Si riserva una riga anziché una percentuale fissa perché il minimo deve
+seguire la scala del testo. Se anche la versione con menu supera questo
+spazio, titolo e stato scorrono all'interno della barra, senza troncamento;
+il comando principale e «Altre azioni» restano fissi in fondo. I dettagli
+continuano a scorrere nel contenuto sopra la barra. Nel recupero Scale il
+comando principale è
 «Rileggi e verifica»; «Copia bozza», «Chiudi bozza…» e, quando disponibile,
 «Rivedi lo stesso invio» sono nel menu. Il piano intero resta riservato
 alla Conferma.

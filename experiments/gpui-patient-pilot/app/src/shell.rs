@@ -4532,9 +4532,12 @@ impl ClinicalApp {
                             confirming,
                             layout,
                         );
+                        let minimum_content = px(theme.role(TypeRole::Body).line_height.ceil())
+                            .min(bounds.size.height);
+                        let recovery_height = bounds.size.height - minimum_content;
                         let overflow = decision.mode == ThresholdMode::Compact
                             && !confirming
-                            && essential.height >= bounds.size.height;
+                            && essential.height > recovery_height;
                         if !overflow {
                             menu_open.set(false);
                         }
@@ -4557,7 +4560,18 @@ impl ClinicalApp {
                         } else {
                             let threshold = if decision.mode == ThresholdMode::Compact {
                                 if overflow {
-                                    limited.unwrap_or(compact)
+                                    limited
+                                        .map(|bar| bar.max_h(recovery_height).into_any_element())
+                                        .unwrap_or_else(|| {
+                                            div()
+                                                .id("threshold-recovery-overflow")
+                                                .flex_shrink_0()
+                                                .min_h_0()
+                                                .max_h(recovery_height)
+                                                .overflow_y_scroll()
+                                                .child(compact)
+                                                .into_any_element()
+                                        })
                                 } else {
                                     compact
                                 }
@@ -4569,7 +4583,7 @@ impl ClinicalApp {
                                 .debug_selector(|| "threshold-scroll".into())
                                 .track_scroll(&scroll)
                                 .flex_1()
-                                .min_h_0()
+                                .min_h(if confirming { px(0.) } else { minimum_content })
                                 .min_w_0()
                                 .overflow_y_scroll()
                                 .child(content)
@@ -8006,6 +8020,65 @@ mod tests {
             "draft content viewport excludes bar"
         );
     }
+    #[gpui::test]
+    fn threshold_recovery_reserves_content_with_larger_text_metrics(cx: &mut gpui::TestAppContext) {
+        let (root, cx) = cx.add_window_view(|window, cx| {
+            let app = cx.new(|cx| ClinicalApp::new(String::new(), window, cx));
+            app.update(cx, |app, _| {
+                app.install_patient(serde_json::from_value(serde_json::json!({"id":"synthetic","firstName":"Moretti","lastName":"Elena","taxCode":"SYNTHETIC","version":1})).unwrap());
+                app.form = Some(Form {kind: FormKind::Scale, fields: vec![], upload: None, edit: None, patient_original: None, created_id: None, therapy: None, scale: None, state: FormState::Rejected, _subscriptions: vec![]});
+            });
+            ThresholdTestPlane { app }
+        });
+        let app = root.read_with(cx, |root, _| root.app.clone());
+        cx.simulate_resize(gpui::size(px(390.), px(582.)));
+        for body_size in [54., 56., 57.375] {
+            app.update(cx, |app, cx| {
+                app.text_scale = 4.;
+                app.theme = Theme::for_dark(false).sized(4., false);
+                app.theme.scale = body_size / Theme::for_dark(false).body();
+                cx.notify();
+            });
+            render_clinical_window(cx);
+            let content = cx.debug_bounds("threshold-scroll").unwrap();
+            let bar = cx.debug_bounds("threshold-bar").unwrap();
+            let minimum = px(body_size * 1.5);
+            assert!(
+                content.size.height >= minimum,
+                "body={body_size} bar={bar:?} content={content:?}"
+            );
+            assert!(content.bottom() <= bar.top() && bar.bottom() <= px(582.));
+            let status = cx.debug_bounds("threshold-recovery-status").unwrap();
+            let title = cx.debug_bounds("threshold-recovery-title").unwrap();
+            let state = cx.debug_bounds("threshold-recovery-state").unwrap();
+            assert!(status.size.height > px(0.));
+            assert!(title.size.height + state.size.height > status.size.height);
+            for id in ["clinical-workspace-reconcile", "threshold-other-actions"] {
+                let command = cx.debug_bounds(id).unwrap();
+                assert!(command.top() >= status.bottom() && command.bottom() <= bar.bottom());
+                assert!(command.left() >= px(0.) && command.right() <= px(390.));
+            }
+            let command = cx.debug_bounds("clinical-workspace-reconcile").unwrap();
+            let menu = cx.debug_bounds("threshold-other-actions").unwrap();
+            cx.simulate_event(gpui::ScrollWheelEvent {
+                position: status.center(),
+                delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(-1000.))),
+                modifiers: gpui::Modifiers::default(),
+                touch_phase: gpui::TouchPhase::Moved,
+            });
+            render_clinical_window(cx);
+            assert!(cx.debug_bounds("threshold-recovery-title").unwrap().top() < title.top());
+            assert_eq!(
+                cx.debug_bounds("clinical-workspace-reconcile").unwrap(),
+                command
+            );
+            assert_eq!(cx.debug_bounds("threshold-other-actions").unwrap(), menu);
+            app.read_with(cx, |app, _| {
+                assert_eq!(app.threshold_mode.get(), ThresholdMode::Compact)
+            });
+        }
+    }
+
     #[gpui::test]
     fn threshold_non_destructive_states_keep_their_bar_above_the_fold(
         cx: &mut gpui::TestAppContext,

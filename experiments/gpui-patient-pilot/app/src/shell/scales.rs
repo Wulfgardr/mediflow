@@ -302,7 +302,9 @@ mod tests {
             bar.top() >= px(0.) && bar.bottom() <= px(700.),
             "bar={bar:?} content={content:?}"
         );
-        assert!(content.size.height > px(0.) && content.bottom() <= bar.top());
+        let minimum_content =
+            view.read_with(cx, |app, _| px(app.theme.role(TypeRole::Body).line_height));
+        assert!(content.size.height >= minimum_content && content.bottom() <= bar.top());
         for id in ["clinical-workspace-reconcile", "threshold-other-actions"] {
             let command = cx.debug_bounds(id).expect("rendered command");
             assert!(
