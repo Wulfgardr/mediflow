@@ -2,7 +2,7 @@
 //! archive; selecting or copying a result never prescribes or changes a record.
 
 use crate::theme::{TypeRole, TypeStyle};
-use gpui::{ClipboardItem, Div, div, prelude::*, px, text};
+use gpui::{ClipboardItem, Div, SharedString, Stateful, div, prelude::*, px, text};
 use mediflow_runtime_client::{
     DrugCatalogItem, ExemptionCatalogItem, TerminologyItem, TerminologySystem,
 };
@@ -81,62 +81,74 @@ impl ReferenceRows {
     pub fn render(&self, theme: Theme) -> Div {
         let list = div().min_w_0().max_w_full().flex().flex_col();
         match self {
-            Self::Drugs(rows) => {
-                list.children(rows.iter().map(|row| {
-                    let copied = drug_text(row);
-                    result_row(theme)
-                        .child(drug_description(row, theme))
-                        .children([
-                            optional_line("Azienda", row.company.as_deref(), theme),
-                            optional_line("Classe", row.class.as_deref(), theme),
-                        ])
-                        .child(div().text_color(theme.secondary).child(text!(
-                            row.price.map_or_else(
-                                || "Prezzo non riportato".into(),
-                                |price| {
-                                    format!("Prezzo di catalogo: € {price:.2}").replace('.', ",")
-                                }
-                            )
-                        )))
-                        .child(
-                            button(
-                                format!("clinical-workspace-copy-drug-{}", row.aic),
-                                "Copia riferimento",
-                                theme,
-                                false,
-                                true,
-                            )
-                            .on_click(move |_, _, cx| {
-                                cx.write_to_clipboard(ClipboardItem::new_string(copied.clone()))
-                            }),
+            Self::Drugs(rows) => list.children(rows.iter().map(|row| {
+                let copied = drug_text(row);
+                result_row(format!("reference-drug-{}", row.aic), theme)
+                    .child(drug_description(row, theme))
+                    .children([
+                        optional_line("Azienda", row.company.as_deref(), theme),
+                        optional_line("Classe", row.class.as_deref(), theme),
+                    ])
+                    .child(div().text_color(theme.secondary).child({
+                        let text = text!(row.price.map_or_else(
+                            || "Prezzo non riportato".into(),
+                            |price| {
+                                format!("Prezzo di catalogo: € {price:.2}").replace('.', ",")
+                            }
+                        ));
+                        #[cfg(test)]
+                        let text = crate::shell::rendered_command::observe_text(text);
+                        text
+                    }))
+                    .child(
+                        button(
+                            format!("clinical-workspace-copy-drug-{}", row.aic),
+                            "Copia riferimento",
+                            theme,
+                            false,
+                            true,
                         )
-                }))
-            }
+                        .on_click(move |_, _, cx| {
+                            cx.write_to_clipboard(ClipboardItem::new_string(copied.clone()))
+                        }),
+                    )
+            })),
             Self::Exemptions(rows) => list.children(rows.iter().map(|row| {
                 let copied = exemption_text(row);
-                result_row(theme)
+                result_row(format!("reference-exemption-{}", row.code), theme)
                     .child(code_line("Esenzione", &row.code, theme))
-                    .child(
-                        div()
-                            .type_role(theme, TypeRole::Strong)
-                            .child(text!(row.description.clone())),
-                    )
+                    .child(div().type_role(theme, TypeRole::Strong).child({
+                        let text = text!(row.description.clone());
+                        #[cfg(test)]
+                        let text = crate::shell::rendered_command::observe_text(text);
+                        text
+                    }))
                     .children([
                         optional_line("Tipo", row.kind.as_deref(), theme),
                         optional_line("Fonte", row.source.as_deref(), theme),
                     ])
                     .when(row.start_date.is_some() || row.end_date.is_some(), |el| {
-                        el.child(div().text_color(theme.secondary).child(text!(format!(
-                            "Validità riportata: {} — {}",
-                            display_date(row.start_date.as_deref()),
-                            display_date(row.end_date.as_deref())
-                        ))))
+                        el.child(div().text_color(theme.secondary).child({
+                            let text = text!(format!(
+                                "Validità riportata: {} — {}",
+                                display_date(row.start_date.as_deref()),
+                                display_date(row.end_date.as_deref())
+                            ));
+                            #[cfg(test)]
+                            let text = crate::shell::rendered_command::observe_text(text);
+                            text
+                        }))
                     })
                     .when(row.updated_at.is_some(), |el| {
-                        el.child(div().text_color(theme.secondary).child(text!(format!(
-                            "Aggiornamento: {}",
-                            display_date(row.updated_at.as_deref())
-                        ))))
+                        el.child(div().text_color(theme.secondary).child({
+                            let text = text!(format!(
+                                "Aggiornamento: {}",
+                                display_date(row.updated_at.as_deref())
+                            ));
+                            #[cfg(test)]
+                            let text = crate::shell::rendered_command::observe_text(text);
+                            text
+                        }))
                     })
                     .children([
                         flag_line("Farmaceutica", row.is_pharma, theme),
@@ -158,48 +170,55 @@ impl ReferenceRows {
             })),
             Self::Terminology(rows) => list.children(rows.iter().map(|row| {
                 let copied = terminology_text(row);
-                result_row(theme)
-                    .child(code_line(row.system.as_str(), &row.code, theme))
-                    .child(div().type_role(theme, TypeRole::Strong).child(text!(
-                        row.display_it.as_ref().unwrap_or(&row.display).clone()
-                    )))
-                    .when(
-                        row.display_it
-                            .as_ref()
-                            .is_some_and(|display| display != &row.display),
-                        |el| {
-                            el.child(
-                                div()
-                                    .text_color(theme.secondary)
-                                    .child(text!(row.display.clone())),
-                            )
-                        },
-                    )
-                    .children([
-                        optional_line(
-                            "Unità predefinita del repertorio",
-                            row.default_unit.as_deref(),
-                            theme,
+                result_row(
+                    format!("reference-terminology-{}-{}", row.system.as_str(), row.code),
+                    theme,
+                )
+                .child(code_line(row.system.as_str(), &row.code, theme))
+                .child(div().type_role(theme, TypeRole::Strong).child({
+                    let text = text!(row.display_it.as_ref().unwrap_or(&row.display).clone());
+                    #[cfg(test)]
+                    let text = crate::shell::rendered_command::observe_text(text);
+                    text
+                }))
+                .when(
+                    row.display_it
+                        .as_ref()
+                        .is_some_and(|display| display != &row.display),
+                    |el| {
+                        el.child(div().text_color(theme.secondary).child({
+                            let text = text!(row.display.clone());
+                            #[cfg(test)]
+                            let text = crate::shell::rendered_command::observe_text(text);
+                            text
+                        }))
+                    },
+                )
+                .children([
+                    optional_line(
+                        "Unità predefinita del repertorio",
+                        row.default_unit.as_deref(),
+                        theme,
+                    ),
+                    optional_line("Versione", row.version.as_deref(), theme),
+                    optional_line("Fonte", Some(&row.source), theme),
+                ])
+                .child(
+                    button(
+                        format!(
+                            "clinical-workspace-copy-terminology-{}-{}",
+                            row.system.as_str(),
+                            row.code
                         ),
-                        optional_line("Versione", row.version.as_deref(), theme),
-                        optional_line("Fonte", Some(&row.source), theme),
-                    ])
-                    .child(
-                        button(
-                            format!(
-                                "clinical-workspace-copy-terminology-{}-{}",
-                                row.system.as_str(),
-                                row.code
-                            ),
-                            "Copia riferimento",
-                            theme,
-                            false,
-                            true,
-                        )
-                        .on_click(move |_, _, cx| {
-                            cx.write_to_clipboard(ClipboardItem::new_string(copied.clone()))
-                        }),
+                        "Copia riferimento",
+                        theme,
+                        false,
+                        true,
                     )
+                    .on_click(move |_, _, cx| {
+                        cx.write_to_clipboard(ClipboardItem::new_string(copied.clone()))
+                    }),
+                )
             })),
         }
     }
@@ -232,17 +251,19 @@ pub fn drug_identity(
         .flex_col()
         .gap(px(8.))
         .when_some(aic, |el, code| el.child(code_line("AIC", code, theme)))
-        .child(
-            div()
-                .type_role(theme, TypeRole::Strong)
-                .child(text!(name.to_owned())),
-        )
+        .child(div().type_role(theme, TypeRole::Strong).child({
+            let text = text!(name.to_owned());
+            #[cfg(test)]
+            let text = crate::shell::rendered_command::observe_text(text);
+            text
+        }))
         .child(optional_line("Principio attivo", active_principle, theme))
         .when_some(atc, |el, code| el.child(code_line("ATC", code, theme)))
 }
 
-fn result_row(theme: Theme) -> Div {
+fn result_row(id: String, theme: Theme) -> Stateful<Div> {
     div()
+        .id(SharedString::from(id))
         .min_w_0()
         .max_w_full()
         .border_b_1()
@@ -252,8 +273,9 @@ fn result_row(theme: Theme) -> Div {
         .flex_col()
         .gap(px(8.))
 }
-fn code_line(label: &str, code: &str, theme: Theme) -> Div {
+fn code_line(label: &str, code: &str, theme: Theme) -> Stateful<Div> {
     div()
+        .id(SharedString::from(format!("reference-code-{label}")))
         .min_w_0()
         .max_w_full()
         .flex()
@@ -267,7 +289,12 @@ fn code_line(label: &str, code: &str, theme: Theme) -> Div {
                 .max_w_full()
                 .whitespace_normal()
                 .text_color(theme.secondary)
-                .child(text!(label.to_owned())),
+                .child({
+                    let text = text!(label.to_owned());
+                    #[cfg(test)]
+                    let text = crate::shell::rendered_command::observe_text(text);
+                    text
+                }),
         )
         .child(
             div()
@@ -275,24 +302,38 @@ fn code_line(label: &str, code: &str, theme: Theme) -> Div {
                 .max_w_full()
                 .whitespace_normal()
                 .type_role(theme, TypeRole::Code)
-                .child(text!(code.to_owned())),
+                .child({
+                    let text = text!(code.to_owned());
+                    #[cfg(test)]
+                    let text = crate::shell::rendered_command::observe_text(text);
+                    text
+                }),
         )
 }
-fn optional_line(label: &str, value: Option<&str>, theme: Theme) -> Div {
+fn optional_line(label: &str, value: Option<&str>, theme: Theme) -> Stateful<Div> {
     div()
+        .id(SharedString::from(format!("reference-optional-{label}")))
         .text_color(theme.secondary)
         .when_some(value, |el, value| {
-            el.child(text!(format!("{label}: {value}")))
+            el.child({
+                let text = text!(format!("{label}: {value}"));
+                #[cfg(test)]
+                let text = crate::shell::rendered_command::observe_text(text);
+                text
+            })
         })
 }
-fn flag_line(label: &str, value: Option<bool>, theme: Theme) -> Div {
+fn flag_line(label: &str, value: Option<bool>, theme: Theme) -> Stateful<Div> {
     div()
+        .id(SharedString::from(format!("reference-flag-{label}")))
         .text_color(theme.secondary)
         .when_some(value, |el, value| {
-            el.child(text!(format!(
-                "{label}: {}",
-                if value { "sì" } else { "no" }
-            )))
+            el.child({
+                let text = text!(format!("{label}: {}", if value { "sì" } else { "no" }));
+                #[cfg(test)]
+                let text = crate::shell::rendered_command::observe_text(text);
+                text
+            })
         })
 }
 fn push_optional(out: &mut Vec<String>, label: &str, value: Option<&str>) {
@@ -416,5 +457,102 @@ mod tests {
         assert!(copied.contains("Exact source label\nItaliano: Etichetta originale"));
         assert!(copied.contains("Unità predefinita del repertorio: mg/dL"));
         assert!(copied.ends_with("Versione: v1\nFonte: Fonte ufficiale"));
+    }
+}
+
+#[cfg(test)]
+mod accessibility_tests {
+    use super::*;
+    use crate::shell::rendered_command::assert_unique_texts;
+    use serde_json::json;
+
+    #[gpui::test]
+    fn reference_drugs_accessible_ids(cx: &mut gpui::TestAppContext) {
+        let rows = ReferenceRows::Drugs(
+            (0..2)
+                .map(|i| {
+                    serde_json::from_value(json!({
+                        "aic":format!("00000000{i}"), "name":"Synthetic drug"
+                    }))
+                    .unwrap()
+                })
+                .collect(),
+        );
+        assert_unique_texts(
+            cx,
+            move |_, _| rows.render(Theme::for_dark(false)).into_any_element(),
+            8,
+        );
+    }
+    #[gpui::test]
+    fn reference_exemptions_accessible_ids(cx: &mut gpui::TestAppContext) {
+        let rows = ReferenceRows::Exemptions(
+            (0..2)
+                .map(|i| {
+                    serde_json::from_value(json!({
+                        "code":format!("SYN{i}"), "description":"Synthetic exemption"
+                    }))
+                    .unwrap()
+                })
+                .collect(),
+        );
+        assert_unique_texts(
+            cx,
+            move |_, _| rows.render(Theme::for_dark(false)).into_any_element(),
+            6,
+        );
+    }
+    #[gpui::test]
+    fn reference_terminology_accessible_ids(cx: &mut gpui::TestAppContext) {
+        let rows = ReferenceRows::Terminology((0..2).map(|i| serde_json::from_value(json!({
+            "system":"LOINC", "code":format!("SYN{i}"), "display":"Synthetic term", "source":"Synthetic source"
+        })).unwrap()).collect());
+        assert_unique_texts(
+            cx,
+            move |_, _| rows.render(Theme::for_dark(false)).into_any_element(),
+            8,
+        );
+    }
+    #[gpui::test]
+    fn reference_code_helpers_accessible_ids(cx: &mut gpui::TestAppContext) {
+        assert_unique_texts(
+            cx,
+            |_, _| {
+                div()
+                    .child(drug_identity(
+                        "Synthetic drug",
+                        Some("000000001"),
+                        Some("SYN"),
+                        None,
+                        Theme::for_dark(false),
+                    ))
+                    .into_any_element()
+            },
+            5,
+        );
+    }
+    #[gpui::test]
+    fn reference_optional_helpers_accessible_ids(cx: &mut gpui::TestAppContext) {
+        let drug = serde_json::from_value(json!({"aic":"000000001", "name":"Synthetic drug", "activePrinciple":"Synthetic principle", "packaging":"Synthetic packaging"})).unwrap();
+        assert_unique_texts(
+            cx,
+            move |_, _| drug_description(&drug, Theme::for_dark(false)).into_any_element(),
+            5,
+        );
+    }
+    #[gpui::test]
+    fn reference_flag_helpers_accessible_ids(cx: &mut gpui::TestAppContext) {
+        assert_unique_texts(
+            cx,
+            |_, _| {
+                div()
+                    .children([
+                        flag_line("Farmaceutica", Some(true), Theme::for_dark(false)),
+                        flag_line("Specialistica", Some(false), Theme::for_dark(false)),
+                    ])
+                    .into_any_element()
+            },
+            2,
+        );
     }
 }
