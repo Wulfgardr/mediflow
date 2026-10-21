@@ -106,17 +106,45 @@ con manifest sottili distinti. Installazione, skill e testi del plugin sono
 separabili dal runtime; l'autorità resta quella di MCP/AIP/Headless, senza
 writer, credenziali o gate propri. Le conferme restano nell'interfaccia fidata.
 
+### Chi cambia la capacità
+
+Attivazione e disattivazione sono transizioni di un'operazione host dedicata,
+di cui è proprietario funzionale il **gestore dell'assetto territoriale dell'host**.
+Il nome identifica una responsabilità dell'host, non un nuovo ruolo utente né
+una nuova UI. L'operazione ammette soltanto due canali:
+
+- interfaccia fidata del nodo home-base, con sessione attiva e conferma esplicita;
+- comando di manutenzione del supervisore locale.
+
+Tutti gli altri canali sono negati: scritture generiche delle impostazioni,
+client paired, autodichiarazioni, cache, plugin, MCP e Headless. La chiave
+dell'assetto deve essere registrata come non scrivibile dai canali generici in
+`lib/security/settings-write-policy.ts`. La sola persistenza nell'host non
+basta: [la policy alle righe 116–128](https://github.com/Wulfgardr/mediflow/blob/665bc851d90ceb32626f872a95747d922098b28b/lib/security/settings-write-policy.ts#L116-L128)
+ammette le chiavi non registrate dalle sessioni Web nella revisione citata.
+Ogni transizione registra nell'audit l'assetto precedente e quello nuovo e
+non effettua chiamate esterne.
+
+Per ogni canale negato serve una prova di falsificazione distinta: un tentativo
+di riattivazione deve lasciare la capacità disattiva, il writer operativo
+territoriale negato e il conteggio delle chiamate esterne a zero.
+
 ### Migrazione conservativa
 
 Per decisione di Leonardo, le installazioni esistenti mantengono Italia e
 Lombardia attive come oggi; soltanto le nuove partono dal nucleo internazionale.
-La migrazione registra esplicitamente l'assetto dell'installazione. Non deduce
+La migrazione iniziale usa un percorso host distinto, eseguito una sola volta,
+che registra esplicitamente l'assetto dell'installazione. Non deduce
 attivazione o consenso dalla presenza di un codice fiscale o di altri dati
 paziente. Non elimina né converte i record già registrati.
 
 ### Disattivazione e conservazione
 
-La disattivazione spegne writer e chiamate esterne. Non provoca `DROP`,
+La disattivazione spegne i writer operativi territoriali e le chiamate esterne.
+Il restore rimane una singola operazione del nucleo, con l'autorità e le
+protezioni esistenti del ripristino: ripristina anche le collezioni territoriali
+senza riattivare il modulo né effettuare chiamate esterne. Non concede
+un'eccezione generica ai writer del modulo. La disattivazione non provoca `DROP`,
 `cascade` o `purge`. Reader e decoder storici, chiavi e mapping di cifratura
 restano nel nucleo compatibile, compresi i descriptor SISS/protesica di
 `lib/db.ts:187–196` citati sopra. Lo storico resta raggiungibile attraverso
@@ -132,11 +160,19 @@ e materiale necessario alla lettura e al ripristino.
 La prova obbligatoria usa soltanto dati sintetici e questa sequenza:
 
 **attivo → scrittura → disattivo → riavvio → lettura e audit → backup →
-restore con modulo disattivo → riattivo**.
+restore con modulo disattivo → lettura storica, decifratura e audit ancora
+a modulo disattivo → riattivo**.
 
-Deve verificare identità, contenuto e ciphertext dove applicabile, byte/hash
-degli originali, snapshot, versioni, collegamenti e audit. In stato disattivo
-nessuna chiamata SISS né mutazione territoriale è consentita. I casi includono
+Prima della riattivazione, la prova deve confrontare con l'atteso precedente
+il contenuto leggibile, i byte/hash degli originali, snapshot, versioni,
+collegamenti e audit, verificando anche la conservazione dell'identità e del
+ciphertext dove applicabile. Deve verificare che lo stato sia rimasto disattivo
+e che una richiesta con capacità memorizzata prima della disattivazione resti
+negata. Rendere indisponibile un decoder soltanto dopo il restore deve far
+fallire la prova, anche se torna disponibile alla riattivazione.
+
+In stato disattivo nessuna chiamata esterna né mutazione attraverso i writer
+operativi territoriali è consentita. I casi includono
 catalogo non installato, versione vecchia, backup legacy con assenza dell'audit
 dichiarata e client con capacità memorizzate prima della disattivazione.
 
@@ -163,7 +199,9 @@ ICD-10 e ICD-11, senza sostituzioni automatiche (fonte S12 sotto).
 La prima unità segue il §B5 della ricognizione del 21 ottobre 2026:
 
 1. Contratto minimo di capacità per installazione, autorevole e versionato
-   dall'host, con migrazione conservativa e rifiuto delle autodichiarazioni.
+   dall'host, con operazione dedicata e proprietario nominato, i soli due canali
+   ammessi e prove di falsificazione per ogni canale negato prescritti sopra;
+   migrazione conservativa iniziale su percorso host distinto e monouso.
 2. Rail Web senza link, pannelli e query territoriali nel nucleo; con Italia e
    Lombardia attive, ordine, etichette e comportamento correnti.
 3. Azioni laterali, deep link `#siss`/`#protesica`, PRREG, comandi e route
@@ -174,7 +212,9 @@ La prima unità segue il §B5 della ricognizione del 21 ottobre 2026:
 5. GPUI verifica l'assenza attuale dei pannelli regionali e consuma le capacità
    comuni; non aggiunge pannelli solo per nasconderli. Dichiara i residui Italia.
 6. Schema e storico conservati, con la sequenza completa di disattivazione,
-   backup e ripristino prescritta sopra.
+   backup e ripristino del nucleo prescritta sopra; lettura storica, decifratura,
+   confronto con l'atteso e audit dopo il restore e prima della riattivazione,
+   ancora a modulo disattivo, inclusa la falsificazione del decoder.
 7. CI con assetti nucleo e Italia+Lombardia, archivi sintetici, contratti e
    policy, rendering, chiamate e smoke UI Web/GPUI/Apple. Il nucleo si avvia e
    passa i test senza Lombardia; l'assetto attivo mantiene il comportamento
