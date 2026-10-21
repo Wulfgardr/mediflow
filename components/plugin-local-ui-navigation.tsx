@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import PrivacyBlur from './privacy-blur';
 import { useSecurity } from './security-provider';
 import { db } from '@/lib/db';
 import { LOCAL_UI_INTENTS, type LocalUiIntent } from '@/packages/mcp/src/local-ui-contract';
@@ -33,19 +34,24 @@ export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabe
     let current = true;
     const events = new EventSource('/api/plugin-local-ui/events');
     let expiry: ReturnType<typeof setTimeout> | undefined;
-    const clear = () => { generation.current++; clearTimeout(expiry); setPending(null); };
+    let epochRead: AbortController | undefined;
+    const clear = () => {
+      generation.current++; clearTimeout(expiry); epochRead?.abort(); epochRead = undefined; setPending(null);
+    };
     clear();
     events.onmessage = event => {
       clear(); setMessage('');
       if (!LOCAL_UI_INTENTS.includes(event.data as LocalUiIntent) || signal.aborted || document.visibilityState !== 'visible') return;
-      const intent = event.data as LocalUiIntent, token = generation.current;
+      const intent = event.data as LocalUiIntent, token = generation.current, expiresAt = Date.now() + 15_000;
+      expiry = setTimeout(clear, 15_000);
+      const read = new AbortController(); epochRead = read;
+      const requestSignal = AbortSignal.any([signal, read.signal]);
       const publish = (epoch: number | null) => {
-        if (!current || signal.aborted || token !== generation.current) return;
-        setPending({ intent, epoch, generation: token, expiresAt: Date.now() + 15_000 });
-        expiry = setTimeout(clear, 15_000);
+        if (!current || requestSignal.aborted || token !== generation.current || expiresAt <= Date.now()) return;
+        setPending({ intent, epoch, generation: token, expiresAt });
       };
       if (!patientId || intent === 'search') publish(null);
-      else void selectionEpoch(signal).then(publish).catch(() => { if (current && token === generation.current) clear(); });
+      else void selectionEpoch(requestSignal).then(publish).catch(() => { if (current && token === generation.current) clear(); });
     };
     const onVisibility = () => { if (document.visibilityState !== 'visible') clear(); };
     document.addEventListener('visibilitychange', onVisibility);
@@ -70,7 +76,7 @@ export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabe
   if (isLocked || !isAuthenticated || (!pending && !message)) return null;
   return <aside aria-label="Richieste dal plugin" className="col-span-full space-y-3" data-testid="plugin-local-ui-navigation">
     {pending ? <div role="status" className="rounded-xl border border-current/20 p-4">
-      <p>{labels[pending.intent]}: {patientId ? `conferma sulla cartella aperta di ${patientLabel ?? 'questo paziente'}.` : 'cerca e scegli il paziente in MediFlow.'}</p>
+      <p>{labels[pending.intent]}: {patientId ? <>conferma sulla cartella aperta di <PrivacyBlur>{patientLabel ?? 'questo paziente'}</PrivacyBlur>.</> : 'cerca e scegli il paziente in MediFlow.'}</p>
       <button type="button" className="mf-button-primary mt-3" onClick={() => { void confirm(); }}>{patientId ? 'Apri sulla cartella aperta' : 'Vai alla ricerca locale'}</button>
       <button type="button" className="mf-button-secondary ml-2" onClick={() => { generation.current++; setPending(null); }}>Annulla</button>
     </div> : null}
