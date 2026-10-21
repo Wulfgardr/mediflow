@@ -16,10 +16,12 @@ const META = { 'io.modelcontextprotocol/protocolVersion': '2026-07-28',
 
 function fixture(ready = true) {
   const child = spawn(process.execPath, ['--import', pathToFileURL(`${process.cwd()}/scripts/register-strip-types-loader.mjs`).href,
-    'scripts/local-ui-mcp-stdio.mjs'], { env: { NODE_ENV: 'test', MEDIFLOW_AIP_OPERATION_RPC: LOCAL_UI_RPC_MODE, NODE_NO_WARNINGS: '1' },
+    'scripts/local-ui-mcp-stdio.mjs'], { env: { MEDIFLOW_DATA_DIR: process.env.MEDIFLOW_DATA_DIR, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', NODE_ENV: 'test', MEDIFLOW_AIP_OPERATION_RPC: LOCAL_UI_RPC_MODE, NODE_NO_WARNINGS: '1' },
     stdio: ['pipe', 'pipe', 'pipe', 'ipc'] });
   const pending = new Map<number, (value: any) => void>();
   const wire: string[] = [], web: string[] = [], stderr: string[] = [];
+  const childFrames: Record<string, unknown>[] = [];
+  child.on('message', frame => { if (typeof frame === 'string') childFrames.push(JSON.parse(frame)); });
   let buffer = '', counter = 0, terminal: (() => void) | undefined, stopped = false;
   child.stdout!.setEncoding('utf8'); child.stderr!.setEncoding('utf8');
   child.stderr!.on('data', text => stderr.push(text));
@@ -48,7 +50,13 @@ function fixture(ready = true) {
       child.stdin!.write(JSON.stringify({ jsonrpc: '2.0', id, method, params: { ...params, _meta: META } }) + '\n');
     });
   };
-  return { request, web, wire, stderr, runtime, ready: () => webListener?.(LOCAL_UI_WEB_READY), terminal: () => terminal?.(), stopped: () => stopped, child };
+  const detachedRequest = (method: string, params: object) => {
+    const id = ++counter;
+    child.stdin!.write(JSON.stringify({ jsonrpc: '2.0', id, method, params: { ...params, _meta: META } }) + '\n');
+    return id;
+  };
+  const notify = (method: string, params: object) => child.stdin!.write(JSON.stringify({ jsonrpc: '2.0', method, params }) + '\n');
+  return { request, detachedRequest, notify, childFrames, web, wire, stderr, runtime, ready: () => webListener?.(LOCAL_UI_WEB_READY), terminal: () => terminal?.(), stopped: () => stopped, child };
 }
 
 test('real MCP and parent admit only enum navigation before any clinical binding', async () => {
@@ -150,4 +158,34 @@ test('restricted parent composition contains no clinical owner, lease, port or s
     assert.equal(cancelled.web.length, 0);
 
   } finally { cancelled.runtime.terminate(); }
+});
+
+async function waitForFrame(predicate: () => boolean) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    if (predicate()) return;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  throw new Error('synthetic_frame_timeout');
+}
+
+test('MCP cancellation before readiness cancels only that RPC and a new call in the same session succeeds', async () => {
+  const f = fixture(false);
+  const exited = new Promise(resolve => f.child.once('exit', resolve));
+  try {
+    await f.request('tools/list', {});
+    const id = f.detachedRequest('tools/call', { name: LOCAL_UI_TOOL_ID, arguments: { intent: 'history' } });
+    await waitForFrame(() => f.childFrames.some(frame => frame.method === 'call'));
+    const original = f.childFrames.find(frame => frame.method === 'call')!;
+    f.notify('notifications/cancelled', { requestId: id, reason: 'synthetic per-request cancellation' });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    f.ready();
+    const next = await f.request('tools/call', { name: LOCAL_UI_TOOL_ID, arguments: { intent: 'search' } });
+    assert.deepEqual(next.result.structuredContent, LOCAL_UI_RESULT);
+    assert.deepEqual(f.web.map(frame => JSON.parse(frame).intent), ['search']);
+    const cancel = f.childFrames.find(frame => frame.method === 'cancel');
+    assert.equal(cancel?.targetRequestId, original.requestId);
+    assert.notEqual(cancel?.requestId, original.requestId);
+    assert.equal(f.stopped(), false);
+    assert.equal(f.wire.some(frame => JSON.parse(frame).id === id), false);
+  } finally { f.runtime.terminate(); await exited; }
 });

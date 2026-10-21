@@ -30,13 +30,19 @@ export function createLocalUiClient() {
     if (closed || signal?.aborted || !parsed.success || ++sequence > 256) return Promise.reject(new Error('navigation_unavailable'));
     const requestId = `rpc_ui_${sequence}`;
     return new Promise<typeof LOCAL_UI_RESULT>((resolve, reject) => {
-      const abort = () => finish(false);
+      const abort = () => {
+        if (!pending.has(requestId)) return;
+        try { process.send!(JSON.stringify({ schemaVersion: 'mediflow.aip.operation.request.v1',
+          method: 'cancel', requestId: `rpc_ui_cancel_${++sequence}`, targetRequestId: requestId }),
+        undefined, undefined, () => {}); } catch { /* channel may already be closed */ }
+        finish(false);
+      };
       const finish = (ok: boolean) => {
         if (!pending.delete(requestId)) return;
         clearTimeout(timer); signal?.removeEventListener('abort', abort);
         if (ok) resolve(LOCAL_UI_RESULT); else reject(new Error('navigation_unavailable'));
       };
-      const timer = setTimeout(() => finish(false), 10_000);
+      const timer = setTimeout(abort, 10_000);
       pending.set(requestId, { finish });
       signal?.addEventListener('abort', abort, { once: true });
       try { process.send!(JSON.stringify({ schemaVersion: 'mediflow.aip.operation.request.v1',
