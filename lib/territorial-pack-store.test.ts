@@ -5,7 +5,7 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { initializeSqliteSchema } from './sqlite-schema';
 import { openVersionedSqliteDatabase } from './sqlite-schema-open';
-import { initializeTerritorialPacks, readTerritorialPacks, commitTerritorialPackTransition, requireTerritorialPack } from './territorial-pack-store';
+import { captureHostTerritorialPacks, preserveHostTerritorialPacks, initializeTerritorialPacks, readTerritorialPacks, commitTerritorialPackTransition, requireTerritorialPack } from './territorial-pack-store';
 import { TERRITORIAL_PACK_SETTING_KEY as KEY, TERRITORIAL_PACK_INITIALIZATION_KEY as INIT, TERRITORIAL_PACK_SCHEMA } from './territorial-packs';
 
 function fixture() {
@@ -106,4 +106,24 @@ test('migration rolls back its capability and once marker when the required audi
             assert.equal(events(db).length, 1);
         } finally { db.close(); }
     }
+});
+
+test('replacement preserves host authority atomically when a settings or required audit write fails or is ignored', () => {
+    const host = fixture();
+    host.transaction(() => initializeTerritorialPacks(host, 'new')).immediate();
+    const snapshot = captureHostTerritorialPacks(host)!;
+    try {
+        for (const table of ['settings', 'audit_events']) for (const fault of ['FAIL', 'IGNORE']) {
+            const replacement = fixture();
+            try {
+                replacement.transaction(() => initializeTerritorialPacks(replacement, 'existing')).immediate();
+                const before = replacement.prepare('SELECT * FROM settings ORDER BY key').all();
+                const audit = events(replacement);
+                replacement.exec(`CREATE TRIGGER synthetic_preservation_fault BEFORE INSERT ON ${table} BEGIN SELECT RAISE(${fault}${fault === 'FAIL' ? ", 'synthetic'" : ''}); END`);
+                assert.throws(() => preserveHostTerritorialPacks(replacement, snapshot));
+                assert.deepEqual(replacement.prepare('SELECT * FROM settings ORDER BY key').all(), before);
+                assert.deepEqual(events(replacement), audit);
+            } finally { replacement.close(); }
+        }
+    } finally { host.close(); }
 });
