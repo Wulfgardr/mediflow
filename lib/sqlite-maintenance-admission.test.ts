@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -99,14 +99,16 @@ test('another process admitted first drains before snapshot; subsequent open is 
         lease.database.prepare('INSERT INTO synthetic_values VALUES (?, ?)').run(2, 'DRAIN-B');
         await lease.close(); process.disconnect();
     `, f.dir);
+    let operation: Promise<unknown> | undefined;
     try {
         assert.equal(await message(w.worker), 'OPEN');
         let snapshotStarted = false;
-        const operation = runWithSqliteMaintenance(f.target, { timeoutMs: 5000 }, async () => {
+        operation = runWithSqliteMaintenance(f.target, { timeoutMs: 5000 }, async () => {
             snapshotStarted = true;
             const db = new Database(f.target, { readonly: true });
             try { await db.backup(path.join(f.dir, 'snapshot.db')); } finally { db.close(); }
         });
+        void operation.catch(() => {});
         await waitIntent(f.target);
         assert.equal(snapshotStarted, false);
         assert.throws(() => openAdmittedSqlite(f.target), /maintenance_pending/);
@@ -117,7 +119,87 @@ test('another process admitted first drains before snapshot; subsequent open is 
         try { assert.deepEqual(snapshot.prepare('SELECT value FROM synthetic_values ORDER BY id').all(), [{ value: 'WAL-A' }, { value: 'DRAIN-B' }]); }
         finally { snapshot.close(); }
     } finally {
-        if (w.worker.exitCode === null && w.worker.signalCode === null) { w.worker.kill(); await w.terminal; }
+        if (w.worker.exitCode === null && w.worker.signalCode === null) w.worker.kill();
+        await Promise.allSettled([w.terminal, operation]);
+        f.cleanup();
+    }
+});
+
+test('drain polling does not hold the gate while another process closes its native connection', async () => {
+    const f = fixture();
+    const admission = store(path.join(fs.realpathSync(f.dir), 'medical.db'));
+    const go = path.join(f.dir, 'close-go');
+    const result = path.join(f.dir, 'close-result.json');
+    const w = child(`
+        import fs from 'node:fs';
+        import path from 'node:path';
+        import { setTimeout as delay } from 'node:timers/promises';
+        import { openAdmittedSqlite } from './lib/sqlite-maintenance-admission.mjs';
+        const dir = process.env.MEDIFLOW_DATA_DIR;
+        const lease = openAdmittedSqlite(path.join(dir, 'medical.db'));
+        lease.database.pragma('journal_mode = WAL');
+        lease.database.pragma('wal_autocheckpoint = 0');
+        lease.database.exec("INSERT INTO synthetic_values VALUES (1, 'WAL-A')");
+        process.send('OPEN');
+        while (!fs.existsSync(path.join(dir, 'close-go'))) await delay(2);
+        lease.database.exec("INSERT INTO synthetic_values VALUES (2, 'DRAIN-B')");
+        let reason = 'success';
+        try { await lease.close(); } catch (error) { reason = error.reason; }
+        fs.writeFileSync(path.join(dir, 'close-result.json'), JSON.stringify({ reason, nativeOpen: lease.database.open }));
+        process.disconnect();
+    `, f.dir);
+    const nativeOpen = fs.openSync, nativeClose = fs.closeSync, nativeSync = fs.fsyncSync, nativeRead = fs.readdirSync;
+    const files = new Map<number, string>();
+    let operation: Promise<unknown> | undefined;
+    let armed = false, held = false, snapshotStarted = false;
+    try {
+        assert.equal(await message(w.worker), 'OPEN');
+        fs.openSync = ((file, flags, mode) => {
+            const fd = nativeOpen(file, flags, mode);
+            files.set(fd, String(file));
+            return fd;
+        }) as typeof fs.openSync;
+        fs.closeSync = fd => { files.delete(fd); nativeClose(fd); };
+        fs.fsyncSync = fd => {
+            if (armed && !held && files.get(fd) === path.join(admission, 'gate', 'owner.json')
+                && nativeRead(path.join(admission, 'leases')).length > 0) {
+                held = true;
+                fs.writeFileSync(go, 'close');
+                const deadline = performance.now() + 15_000;
+                const waiter = new Int32Array(new SharedArrayBuffer(4));
+                while (!fs.existsSync(result) && performance.now() < deadline) Atomics.wait(waiter, 0, 0, 5);
+                assert.ok(fs.existsSync(result), 'child must finish close while the polling gate is held');
+            }
+            nativeSync(fd);
+        };
+        fs.readdirSync = ((...args: Parameters<typeof fs.readdirSync>) => {
+            if (armed && String(args[0]) === path.join(admission, 'leases') && !fs.existsSync(path.join(admission, 'gate'))) {
+                fs.writeFileSync(go, 'close');
+            }
+            return nativeRead(...args);
+        }) as typeof fs.readdirSync;
+        operation = runWithSqliteMaintenance(f.target, { timeoutMs: 5000 }, async () => {
+            snapshotStarted = true;
+            const db = new Database(f.target, { readonly: true });
+            try { await db.backup(path.join(f.dir, 'snapshot.db')); } finally { db.close(); }
+        });
+        void operation.catch(() => {});
+        armed = true;
+        assert.equal(await w.terminal, 0, w.output());
+        const closed = JSON.parse(fs.readFileSync(result, 'utf8'));
+        assert.equal(closed.nativeOpen, false);
+        assert.equal(closed.reason, 'success', JSON.stringify({ held, closed, snapshotStarted,
+            leases: nativeRead(path.join(admission, 'leases')).length }));
+        await operation;
+        assert.equal(held, false, 'polling must leave the gate available while leases remain');
+        assert.equal(snapshotStarted, true);
+        const snapshot = new Database(path.join(f.dir, 'snapshot.db'), { readonly: true });
+        try { assert.deepEqual(snapshot.prepare('SELECT value FROM synthetic_values ORDER BY id').all(), [{ value: 'WAL-A' }, { value: 'DRAIN-B' }]); }
+        finally { snapshot.close(); }
+    } finally {
+        if (w.worker.exitCode === null && w.worker.signalCode === null) w.worker.kill();
+        await Promise.allSettled([w.terminal, operation]);
+        fs.openSync = nativeOpen; fs.closeSync = nativeClose; fs.fsyncSync = nativeSync; fs.readdirSync = nativeRead;
         f.cleanup();
     }
 });
@@ -143,6 +225,109 @@ test('zero leases after intent publication complete drain even beyond the deadli
         const next = openAdmittedSqlite(f.target);
         await next.close();
     } finally { f.cleanup(); }
+});
+
+test('final zero-lease verification excludes admission between counting and maintenance', async () => {
+    const f = fixture();
+    const admission = store(path.join(fs.realpathSync(f.dir), 'medical.db'));
+    const intentFile = path.join(admission, 'intent.json');
+    const nativeRead = fs.readdirSync;
+    let armed = false, counts = 0, attempted = false, reason = '';
+    let snapshotStarted = false, snapshotLeases = -1;
+    fs.readdirSync = ((...args: Parameters<typeof fs.readdirSync>) => {
+        const names = nativeRead(...args);
+        if (armed && String(args[0]) === path.join(admission, 'leases') && ++counts === 2) {
+            attempted = true;
+            assert.equal(names.length, 0);
+            const intent = fs.readFileSync(intentFile);
+            // Remove intent only in this fault injection, so the competing
+            // admission tests gate exclusion independently of intent refusal.
+            fs.unlinkSync(intentFile);
+            try {
+                const contender = spawnSync(process.execPath, ['--input-type=module', '-e', `
+                    import path from 'node:path';
+                    import { openAdmittedSqlite } from './lib/sqlite-maintenance-admission.mjs';
+                    try {
+                        const lease = openAdmittedSqlite(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db'));
+                        lease.database.exec("INSERT INTO synthetic_values VALUES (1, 'conflicting-admission')");
+                        lease.database.close();
+                        console.log('admitted');
+                    } catch (error) { console.log(error.reason); }
+                `], { cwd: root, env: { ...process.env, MEDIFLOW_DATA_DIR: f.dir }, encoding: 'utf8', timeout: 20_000 });
+                assert.equal(contender.error, undefined);
+                assert.equal(contender.status, 0, contender.stderr);
+                reason = contender.stdout.trim();
+            } finally { fs.writeFileSync(intentFile, intent); }
+        }
+        return names;
+    }) as typeof fs.readdirSync;
+    try {
+        const outcome = await runWithSqliteMaintenance(f.target, { timeoutMs: 1000, drain: async () => { armed = true; } }, () => {
+            snapshotStarted = true;
+            snapshotLeases = nativeRead(path.join(admission, 'leases')).length;
+        }).catch(error => error);
+        assert.equal(attempted, true);
+        assert.equal(reason, 'admission_busy', JSON.stringify({ reason, snapshotStarted, snapshotLeases }));
+        assert.equal(outcome, undefined);
+        assert.equal(snapshotStarted, true);
+        assert.equal(snapshotLeases, 0);
+    } finally { fs.readdirSync = nativeRead; f.cleanup(); }
+});
+
+test('an advisory zero cannot authorize maintenance after a concurrent admission', async () => {
+    const f = fixture();
+    const admission = store(path.join(fs.realpathSync(f.dir), 'medical.db'));
+    const intentFile = path.join(admission, 'intent.json');
+    const nativeRead = fs.readdirSync;
+    let participant: ReturnType<typeof openAdmittedSqlite> | undefined;
+    let armed = false, injected = false, snapshotStarted = false;
+    fs.readdirSync = ((...args: Parameters<typeof fs.readdirSync>) => {
+        const names = nativeRead(...args);
+        if (armed && !injected && String(args[0]) === path.join(admission, 'leases')
+            && !fs.existsSync(path.join(admission, 'gate'))) {
+            injected = true;
+            assert.equal(names.length, 0);
+            const intent = fs.readFileSync(intentFile);
+            fs.unlinkSync(intentFile);
+            try { participant = openAdmittedSqlite(f.target); }
+            finally { fs.writeFileSync(intentFile, intent); }
+        }
+        return names;
+    }) as typeof fs.readdirSync;
+    try {
+        await assert.rejects(runWithSqliteMaintenance(f.target, { timeoutMs: 20, drain: async () => { armed = true; } }, () => {
+            snapshotStarted = true;
+        }), /drain_timeout/);
+        assert.equal(injected, true);
+        assert.equal(participant?.database.open, true);
+        assert.equal(snapshotStarted, false);
+        assert.equal(nativeRead(path.join(admission, 'leases')).length, 1);
+    } finally {
+        fs.readdirSync = nativeRead;
+        if (participant) await participant.close();
+        f.cleanup();
+    }
+});
+
+test('an unreadable advisory lease directory never authorizes maintenance', async () => {
+    const f = fixture();
+    const admission = store(path.join(fs.realpathSync(f.dir), 'medical.db'));
+    const nativeRead = fs.readdirSync;
+    let armed = false, injected = false, snapshotStarted = false;
+    fs.readdirSync = ((...args: Parameters<typeof fs.readdirSync>) => {
+        if (armed && String(args[0]) === path.join(admission, 'leases') && !fs.existsSync(path.join(admission, 'gate'))) {
+            injected = true;
+            throw Object.assign(new Error('synthetic read denied'), { code: 'EACCES' });
+        }
+        return nativeRead(...args);
+    }) as typeof fs.readdirSync;
+    try {
+        await assert.rejects(runWithSqliteMaintenance(f.target, { drain: async () => { armed = true; } }, () => {
+            snapshotStarted = true;
+        }), /unverified_state/);
+        assert.equal(injected, true);
+        assert.equal(snapshotStarted, false);
+    } finally { fs.readdirSync = nativeRead; f.cleanup(); }
 });
 
 test('deadline refuses maintenance before callback and leaves native database unchanged', async () => {
