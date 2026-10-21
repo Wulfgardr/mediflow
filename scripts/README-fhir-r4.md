@@ -1,6 +1,6 @@
 # Gate Web FHIR R4 base
 
-`npm run check:fhir-r4 -- --falsify` genera 22 Bundle sintetici con
+`npm run check:fhir-r4 -- --falsify` genera 18 Bundle sintetici con
 `buildFhirBundleFromRecords`, li serializza e avvia il validatore ufficiale
 HL7 6.9.12 una sola volta per il corpus e le tre mutazioni semantiche.
 Non importa loader, route o servizi database. Le fixture sono codice in
@@ -74,34 +74,48 @@ prova rete e report JSON/testo con tempi di acquisizione (snapshot incluso),
 preparazione, JVM e totale. La CI passa un percorso in `runner.temp` legato a
 run ID e tentativo; raccoglie esattamente quel percorso per 14 giorni.
 
-## Baseline congelata e limiti
+## Baseline e limiti
 
-Sul mapper di `034aad5b9` il corpus produce **1 errore e 63 warning**:
+Sul mapper iniziale di `ef673f8d3` il corpus di 22 Bundle produceva **1 errore
+e 63 warning**, con stato `PASS_FROZEN_BASELINE`: `scale-fraction` emetteva
+`valueInteger: 1.5`. I punteggi delle cinque scale attive sono somme di item
+interi; MMSE usa il totale grezzo senza correzione normativa e GDS-15 non
+applica proporzionamenti. La frazione era quindi un dato invalido.
+
+Il mapper ora blocca l'intero export per punteggi vuoti, non numerici, non
+finiti, frazionari o fuori dall'intervallo signed 32-bit. `FhirScaleScoreError`
+(`INVALID_SCALE_SCORE`, severità `error`) risale dal mapper attraverso
+`prepareFhirBundleFromRecords` prima di qualsiasi conferma dei warning.
+Nessuna Observation o Bundle parziale viene restituita. Zero ed estremi sono
+validi; le stringhe numeriche intere restano compatibili con gli input legacy.
+Non si arrotonda né si tronca. Le fixture `scale-fraction`, `scale-empty`,
+`scale-invalid` e `scale-nonfinite` sono casi bloccanti nei test del precheck,
+non fanno parte del corpus valido.
+
+Il corpus corrente di 18 Bundle richiede **zero error/fatal**, stato `PASS`
+e **52 warning** espliciti:
 
 | Severità / identificativo | Occorrenze | Motivo |
 | --- | ---: | --- |
-| error `Type_Specific_Checks_DT_Integer_Valid` | 1 | `scale-fraction`: `valueInteger: 1.5` non è un intero FHIR. |
-| warning `DomainResource#dom-6` | 47 | Narrative assenti nelle risorse. |
-| warning `All_observations_should_have_a_performer` | 7 | Il mapper non espone performer. |
-| warning `Terminology_TX_Code_ValueSet_Ext` | 5 | Relazione caregiver e interpretazioni scala solo testuali. |
+| warning `DomainResource#dom-6` | 38 | Narrative assenti nelle risorse. |
+| warning `All_observations_should_have_a_performer` | 6 | Il mapper non espone performer. |
+| warning `Terminology_TX_Code_ValueSet_Ext` | 4 | Relazione caregiver e interpretazioni scala solo testuali. |
 | warning `UNKNOWN_CODESYSTEM` | 2 | ICD-9 legacy e ICD-11 non risolti nella cache offline. |
 | warning `Error_validating_code_running_without_terminology_services` | 2 | UCUM non verificato senza servizi terminologici. |
 
-`r4-warning-baseline.v1.json` e `r4-error-baseline.v1.json` propongono queste
-sole eccezioni alla review della PR. Ogni voce fissa artefatto, severità,
-identificativo ufficiale, percorso, messaggio, numero di occorrenze e motivo.
-Qualsiasi variazione o aumento blocca; una voce scomparsa blocca con
+`r4-error-baseline.v1.json` ha la lista delle eccezioni vuota e modalità
+`strict`. `r4-warning-baseline.v1.json` conserva soltanto i warning degli
+artefatti ancora presenti. Ogni voce fissa artefatto, severità, identificativo
+ufficiale, percorso, messaggio, numero di occorrenze e motivo. Qualsiasi
+variazione o aumento blocca; una voce scomparsa blocca con
 `REMOVE_FROM_BASELINE`. Nessun comando aggiorna automaticamente le baseline.
-L'eccezione agli errori è transitoria e distinta dai warning: questa PR non
-corregge né nasconde il mapper. Il coordinatore decide le unità di correzione.
 
-Il linguaggio ammesso per un corpus senza errori è «validato contro FHIR R4
-4.0.1 base, terminologia non verificata offline». Il corpus corrente **non**
-ha questo esito: passa solo il confronto con la baseline congelata. Il report
-non attribuisce validità terminologica, elenca binding non verificati e
-licenze dichiarate dai package. Nessun artefatto esterno al corpus eredita
-la prova; nessuna parità Swift, IPS, It-Core, CDA o accettazione FSE/terzi è
-attestata.
+Il linguaggio ammesso per il corpus senza errori è «validato contro FHIR R4
+4.0.1 base, terminologia non verificata offline». Il report non attribuisce
+validità terminologica, elenca binding non verificati e licenze dichiarate
+dai package. Nessun artefatto esterno al corpus eredita la prova; nessuna
+parità Swift, IPS, It-Core, CDA o accettazione FSE/terzi è attestata. La prova
+locale con override Java 25 resta non canonica; la CI usa Java 17.
 
 ## Falsificazioni obbligatorie
 

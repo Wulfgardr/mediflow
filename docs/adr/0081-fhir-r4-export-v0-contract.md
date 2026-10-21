@@ -224,25 +224,28 @@ inventato.
 ### Gate R4 base Web — prima unità di ADR 0157 (2026-10-21)
 
 Il workflow `FHIR R4 Web Gate` esegue `npm run check:fhir-r4 -- --falsify`
-su 22 Bundle sintetici serializzati dal mapper Web corrente, più tre
+su 18 Bundle sintetici serializzati dal mapper Web corrente, più tre
 mutazioni semantiche nella stessa JVM. Non è il golden condiviso v2 e non
 attesta parità Apple. Implementazione, preflight, baseline, report e limiti
 sono descritti nel [README del runner](../../scripts/README-fhir-r4.md).
 
-La prima esecuzione sul mapper di `034aad5b9` rileva un errore preesistente:
-la scala frazionaria produce `valueInteger: 1.5`. Il gate parte quindi in
-modalità **baseline congelata**, senza correggere il mapper in questa unità.
-Le baseline separate per errori e warning fissano 1 errore e 63 warning con
-artefatto, identificativo, percorso, messaggio, conteggio e motivo. Nuove
-issue e occorrenze aggiuntive bloccano; le voci scomparse vanno rimosse.
-Le eccezioni sono soggette alla review della PR, non una deroga generale
-al requisito zero errori del gate finale.
+La prima esecuzione sul mapper di `034aad5b9` rilevava un errore preesistente:
+la scala frazionaria produceva `valueInteger: 1.5`; il gate partiva con
+`PASS_FROZEN_BASELINE`, 1 errore e 63 warning. La correzione Web dei punteggi
+scala applica ora il vincolo signed 32-bit della matrice: un punteggio
+invalido blocca il Bundle tramite il precheck, senza arrotondamenti né risorse
+parziali. Le cinque scale attive sommano item interi; MMSE usa il punteggio
+grezzo senza correzione normativa e GDS-15 non applica proporzionamenti.
 
-Il rapporto distingue `PASS_FROZEN_BASELINE`, `SEMANTIC_REJECTION` e
-`TOOL_ERROR`, conserva gli OperationOutcome ufficiali e dichiara i binding
-non verificati offline. Non attribuisce al corpus con errori il linguaggio
-«validato contro FHIR R4 4.0.1 base, terminologia non verificata offline»:
-questo esito richiede zero errori, oltre alla verifica dei warning.
+Le quattro fixture di punteggio invalido sono ora casi bloccanti nei test,
+fuori dal corpus valido. La baseline errori è vuota (`strict`); restano
+52 warning espliciti. Nuove issue e occorrenze aggiuntive bloccano; le voci
+scomparse vanno rimosse. Il rapporto distingue `PASS`, `SEMANTIC_REJECTION`
+e `TOOL_ERROR`, conserva gli OperationOutcome ufficiali e dichiara i binding
+non verificati offline. L'esito «validato contro FHIR R4 4.0.1 base,
+terminologia non verificata offline» richiede zero error/fatal e la verifica
+dei warning. La prova locale con Java 25 e override è non canonica; la CI
+usa Java 17. Il mapper Apple resta da allineare in un'unità distinta.
 La negazione della rete è applicata al processo e provata nello stesso
 isolamento della JVM. Le sei falsificazioni includono anche package alterato
 e claim IPS rifiutato prima dell'esecuzione, senza aggiungere IPS al lock.
