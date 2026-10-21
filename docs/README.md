@@ -514,3 +514,7 @@ WUL-756 di un plugin con soli esempi inventati. Il
 prove e limiti: non qualifica host reale, accesso clinico o distribuzione.
 
 - [Punto d’inchiostro](./design/punto-inchiostro/README.md): specifica visiva e asset della famiglia MediFlow.
+
+La [verifica finita del cambio di stato terapia](./formal/therapy-status/README.md)
+collega statechart, modello TLA+/TLC e test del controller/HTTP al runtime
+indicato; ne dichiara assunzioni e limiti, senza qualificare l’intera applicazione.

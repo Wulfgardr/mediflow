@@ -8,6 +8,11 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import Database from 'better-sqlite3';
+import { createServer } from 'node:http';
+import { once } from 'node:events';
+import { createTherapyStatusConfirmation, createTherapyStatusWriteJournal, type StatusTherapy } from './therapy-status-confirmation';
+import { db as clientDb, ApiConflictError, ApiWriteRejectedError } from './db';
+import { generateMasterKey } from './security/security';
 
 const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-c05-therapy-synthetic-'));
@@ -544,3 +549,104 @@ test('declared oversize never pulls; absent or misleading length still enforces 
     assert.deepEqual(misleading.counts(), { pulls: 2, cancels: 1 });
     assert.deepEqual(readBack(ids.patientId, ids.therapyId), before);
 });
+
+
+for (const interveningNoOp of [false, true]) {
+    test(`HTTP abort settles the real client before the admitted host write; intervening no-op=${interveningNoOp}`, async t => {
+        const ids = seed('http-abort', true);
+        sql.prepare('UPDATE therapies SET drug_name=?, dosage=? WHERE id=?').run('Sintetico', '1 cp', ids.therapyId);
+        let release!: () => void;
+        const gate = new Promise<void>(yes => { release = yes; });
+        let admitted!: () => void;
+        const received = new Promise<void>(yes => { admitted = yes; });
+        let committed!: (status: number) => void;
+        const completed = new Promise<number>(yes => { committed = yes; });
+        let puts = 0;
+        const server = createServer(async (req, res) => {
+            try {
+                let response: Response;
+                if (req.method === 'PUT') {
+                    const chunks: Buffer[] = [];
+                    for await (const chunk of req) chunks.push(Buffer.from(chunk));
+                    puts++;
+                    response = await webItem.PUT(request('PUT', undefined, 'web', Buffer.concat(chunks).toString()), {
+                        get params() { admitted(); return gate.then(() => ({ id: ids.therapyId })); },
+                    });
+                    committed(response.status);
+                } else {
+                    response = await webCreate.GET(new Request(new URL(req.url!, 'http://127.0.0.1')));
+                }
+                res.writeHead(response.status, { 'content-type': 'application/json' });
+                res.end(await response.text());
+            } catch (error) { res.writeHead(500); res.end(String(error)); }
+        });
+        server.listen(0, '127.0.0.1');
+        await once(server, 'listening');
+        const address = server.address();
+        assert(address && typeof address !== 'string');
+        const base = `http://127.0.0.1:${address.port}`;
+        const realFetch = globalThis.fetch;
+        t.mock.method(globalThis, 'fetch', (input: string | URL | Request, init?: RequestInit) =>
+            realFetch(typeof input === 'string' && input.startsWith('/') ? `${base}${input}` : input, init));
+        t.after(async () => { release(); server.closeAllConnections(); await new Promise<void>(yes => server.close(() => yes())); clientDb.setKey(null); });
+        clientDb.setKey(await generateMasterKey());
+        const read = async () => {
+            const response = await realFetch(`${base}/api/therapies?patientId=${ids.patientId}`);
+            assert.equal(response.status, 200);
+            return response.json() as Promise<StatusTherapy[]>;
+        };
+        const original = (await read()).find(item => item.id === ids.therapyId)!;
+        const values = new Map<string, string>();
+        const journal = createTherapyStatusWriteJournal({ archive: () => 'synthetic-archive', locks: () => navigator.locks, storage: () => ({ getItem: key => values.get(key) ?? null,
+            setItem: (key, value) => { values.set(key, value); }, removeItem: key => { values.delete(key); } }) });
+        const session = new AbortController();
+        let clientSettled = false;
+        const owner = () => createTherapyStatusConfirmation({
+            patientId: ids.patientId, journal, isCurrent: () => true, signal: () => session.signal,
+            read, write: async (item: StatusTherapy, target, signal) => {
+                try { await clientDb.therapies.update(item.id, { version: item.version, status: target }, { signal, suppressNotify: true }); }
+                finally { clientSettled = true; }
+            },
+            isConflict: error => error instanceof ApiConflictError, isRejected: error => error instanceof ApiWriteRejectedError,
+            changed: () => {}, refreshed: () => {}, timeoutMs: 250,
+        });
+        const first = owner();
+        first.begin(original, 'suspended', 'Sintetico');
+        const confirmation = first.confirm();
+        await received;
+        await confirmation;
+        await new Promise<void>(yes => setImmediate(yes));
+        assert.equal(clientSettled, true);
+        assert.equal((await read()).find(item => item.id === ids.therapyId)?.version, 3);
+        await first.reread();
+        assert.equal(first.snapshot?.phase, 'uncertain');
+        first.cancel();
+        first.begin(original, 'completed', 'Sintetico');
+        await first.confirm();
+        assert.equal(puts, 1);
+        first.dispose();
+        const fresh = owner();
+        fresh.recover(await read(), 'Sintetico');
+        await fresh.reread();
+        assert.equal(fresh.snapshot?.phase, 'uncertain');
+        assert.equal(fresh.blocked, true);
+        if (interveningNoOp) {
+            const noOp = await invoke('web', 'PUT', ids, { version: 3, status: 'active' });
+            assert.equal(noOp.status, 200);
+            fresh.recover(await read(), 'Sintetico');
+            await fresh.reread();
+            assert.equal(fresh.snapshot?.phase, 'reviewed');
+            assert.equal(fresh.blocked, false);
+        }
+        release();
+        assert.equal(await completed, interveningNoOp ? 409 : 200);
+        await fresh.reread();
+        assert.equal(fresh.snapshot?.phase, 'reviewed');
+        assert.equal(fresh.blocked, false);
+        assert.equal(puts, 1);
+        const after = readBack(ids.patientId, ids.therapyId);
+        assert.equal((after.therapy as Record<string, unknown>).version, 4);
+        assert.equal((after.therapy as Record<string, unknown>).status, interveningNoOp ? 'active' : 'suspended');
+        assert.equal(after.audit.length, 1);
+    });
+}

@@ -8,6 +8,7 @@
   "scripts": {
     "recovery:restore": "node scripts/run-strip-types.mjs scripts/restore-recovery-backup.ts",
     "maintenance:web": "node --experimental-strip-types --import ./scripts/register-strip-types-loader.mjs scripts/mediflow-headless-supervisor.mjs --maintenance-web",
+    "verify:therapy-status": "node scripts/verify-therapy-status.mjs",
     "test:clinical-http": "node scripts/run-clinical-http-suite.mjs",
     "preinstall": "node scripts/node-runtime-contract.mjs verify-node",
     "postinstall": "node scripts/node-runtime-contract.mjs verify",
