@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures/isolated-runtime';
 import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession } from './utils';
 import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
@@ -23,6 +23,13 @@ test('plugin confirmation follows the patient folder Privacy mode ON and OFF', a
   } });
   expect(created.status()).toBe(201);
   const patient = await created.json() as { id: string };
+  // Supply the enabled host declaration alongside the simulated EventSource.
+  await page.route(`**/patients/${patient.id}/modules`, async route => {
+    const response = await route.fetch();
+    const html = await response.text();
+    expect(html).toContain('<html ');
+    await route.fulfill({ response, body: html.replace('<html ', '<html data-plugin-local-ui="true" ') });
+  });
   await page.goto(`/patients/${patient.id}/modules`);
   await expect(page.getByTestId('patient-profile-notes')).not.toContainText('Lettura delle note in corso…');
   await expect.poll(() => page.evaluate(() => (window as any).localUiTestEvents?.some((event: any) => !event.closed))).toBe(true);
@@ -49,4 +56,28 @@ test('plugin confirmation follows the patient folder Privacy mode ON and OFF', a
   await expect.poll(nameFilter).toBe('none');
   await expect(confirmation).toContainText(`${firstName} ${lastName}`);
   await page.screenshot({ path: testInfo.outputPath('privacy-off-again.png') });
+});
+
+test('ordinary runtime makes no plugin event requests and has no console errors', async ({ page }) => {
+  const requests: string[] = [], errors: string[] = [];
+  page.on('request', request => {
+    if (new URL(request.url()).pathname === '/api/plugin-local-ui/events') requests.push(request.url());
+  });
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('pageerror', error => errors.push(error.message));
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const headers = await trustedArchiveWebRequestHeaders(page);
+  const suffix = randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase();
+  const created = await page.request.post('/api/patients', { headers, data: {
+    firstName: 'Navigazione', lastName: `Sintetico ${suffix}`, taxCode: `NAV${suffix}XXX`,
+  } });
+  expect(created.status()).toBe(201);
+  const patient = await created.json() as { id: string };
+  await page.goto(`/patients/${patient.id}/modules`);
+  await expect(page.getByTestId('patient-profile-notes')).not.toContainText('Lettura delle note in corso…');
+  await page.goto('/plugin-local-ui');
+  await expect(page.getByRole('heading', { name: 'Continua in MediFlow', exact: true })).toBeVisible();
+  await expect(page.locator('html')).not.toHaveAttribute('data-plugin-local-ui', 'true');
+  expect(requests).toEqual([]);
+  expect(errors).toEqual([]);
 });

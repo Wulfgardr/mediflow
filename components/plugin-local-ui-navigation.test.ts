@@ -5,12 +5,13 @@ import vm from 'node:vm';
 import ts from 'typescript';
 
 type Element = { type: any; props: Record<string, any> };
-function fixture() {
+function fixture(pluginRuntime = true) {
   let now = 0, index = 0, first = true, events: any, privacy = false;
   const values: any[] = [], effects: Array<() => void> = [];
   const timers: Array<{ at: number; cancelled: boolean; run(): void }> = [];
   const reads: Array<{ signal: AbortSignal; release(): void }> = [];
   const session = new AbortController();
+  const subscriptions: string[] = [];
   const hooks = {
     useState(initial: unknown) {
       const key = index++;
@@ -45,8 +46,8 @@ function fixture() {
   }, Date: { now: () => now }, AbortController, AbortSignal,
   setTimeout(run: () => void, delay: number) { const timer = { at: now + delay, cancelled: false, run }; timers.push(timer); return timer; },
   clearTimeout(timer: typeof timers[number] | undefined) { if (timer) timer.cancelled = true; },
-  EventSource: function () { events = { close() {} }; return events; },
-  document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {}, getElementById() { return null; } },
+  EventSource: function (url: string) { subscriptions.push(url); events = { close() {} }; return events; },
+  document: { documentElement: { dataset: { pluginLocalUi: pluginRuntime ? 'true' : undefined } }, visibilityState: 'visible', addEventListener() {}, removeEventListener() {}, getElementById() { return null; } },
   window: { location: { hash: '' } }, HTMLDetailsElement: class {},
   fetch(_url: string, options: { signal: AbortSignal }) { return new Promise(resolve => {
     reads.push({ signal: options.signal, release: () => resolve({ ok: true, json: async () => ({ contractVersion: 1, selectionEpoch: 1 }) }) });
@@ -65,7 +66,7 @@ function fixture() {
     return [node, ...elements(node.props?.children)];
   };
   render();
-  return { render, elements, reads, session, setPrivacy(value: boolean) { privacy = value; },
+  return { render, elements, reads, session, subscriptions, setPrivacy(value: boolean) { privacy = value; },
     emit(intent = 'history') { events.onmessage({ data: intent }); },
     advance(time: number) { now = time; for (const timer of timers) if (!timer.cancelled && timer.at <= now) { timer.cancelled = true; timer.run(); } },
     async release(index: number) { reads[index].release(); await new Promise(resolve => setImmediate(resolve)); },
@@ -76,6 +77,7 @@ function fixture() {
 
 test('an initial epoch received beyond the event deadline is discarded; a new request in the same document works', async () => {
   const f = fixture();
+  assert.deepEqual(f.subscriptions, ['/api/plugin-local-ui/events']);
   f.emit(); f.advance(16_000); await f.release(0);
   assert.equal(f.render(), null);
   assert.equal(f.reads[0].signal.aborted, true);
@@ -107,4 +109,11 @@ test('the confirmation patient name uses the existing PrivacyBlur policy ON and 
   const visibleName = f.elements(f.render()).find(node => node.type === 'span' && node.props.children === 'Nome Sintetico R1');
   assert.ok(visibleName); assert.equal(visibleName.props.className, undefined);
   assert.ok(JSON.stringify(f.render()).includes('conferma sulla cartella aperta di'));
+});
+
+test('ordinary runtime never subscribes to plugin navigation events', () => {
+  const f = fixture(false);
+  assert.equal(f.render(), null);
+  assert.deepEqual(f.subscriptions, []);
+  assert.deepEqual(f.reads, []);
 });
