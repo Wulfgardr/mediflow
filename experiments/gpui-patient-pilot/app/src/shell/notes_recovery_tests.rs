@@ -87,7 +87,7 @@ impl Host {
                     }
                 }
                 PUT => {
-                    status = state.outcome;
+                    status = if state.replaced { 409 } else { state.outcome };
                     state.outcome = 200;
                     if status != 409 {
                         assert_eq!(body["version"], state.version);
@@ -96,7 +96,8 @@ impl Host {
                         state.version += 1;
                     }
                     if status == 0 { continue; }
-                    if status == 409 { json!({"code":"VERSION_CONFLICT"}) } else { json!({"success":true}) }
+                    if state.replaced { json!({"code":"ARCHIVE_REPLACED"}) }
+                    else if status == 409 { json!({"code":"VERSION_CONFLICT"}) } else { json!({"success":true}) }
                 }
                 "POST /api/auth/native/logout" => json!({"success":true}),
                 value if value.starts_with("GET /api/v1/network/patients/") => json!([]),
@@ -404,7 +405,22 @@ fn notes_patient_change_requires_explicit_discard_and_retires_previous_authority
 }
 
 #[gpui::test]
-fn notes_archive_replacement_rejects_recovery_without_granting_new_write_authority(
+fn notes_archive_replacement_during_put_disconnects_without_resending_draft(
+    cx: &mut gpui::TestAppContext,
+) {
+    let host = Host::new();
+    let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+    open(&view, &host, cx);
+    host.state.lock().unwrap().replaced = true;
+    confirm(&view, cx);
+    assert_archive_disconnected(&view, &host, cx);
+    let state = host.state.lock().unwrap();
+    assert_eq!(state.notes, json!("A: note iniziali"));
+    assert_eq!(state.version, 1);
+}
+
+#[gpui::test]
+fn notes_archive_replacement_during_recovery_disconnects_without_resending_draft(
     cx: &mut gpui::TestAppContext,
 ) {
     let host = Host::new();
@@ -412,19 +428,55 @@ fn notes_archive_replacement_rejects_recovery_without_granting_new_write_authori
     open(&view, &host, cx);
     host.state.lock().unwrap().outcome = 409;
     confirm(&view, cx);
+    view.read_with(cx, |app, _| {
+        assert_eq!(app.core.phase(), Phase::Conflict);
+        assert!(app.form.as_ref().unwrap().state == FormState::Conflict);
+        assert_eq!(app.core.draft_notes(), DRAFT);
+    });
     let editor = view.read_with(cx, |app, _| {
         app.form.as_ref().unwrap().fields[0].editor.clone()
     });
     host.state.lock().unwrap().replaced = true;
     reread(&view, cx);
+    assert_archive_disconnected(&view, &host, cx);
+    editor.read_with(cx, |input, _| assert!(input.value().is_empty()));
+}
+
+fn assert_archive_disconnected(
+    view: &Entity<ClinicalApp>,
+    host: &Host,
+    cx: &mut gpui::VisualTestContext,
+) {
+    draw(cx);
+    assert!(cx.debug_bounds("clinical-notes-recovery-command").is_none());
+    assert!(cx.debug_bounds("clinical-workspace-confirm-save").is_none());
     view.update(cx, |app, cx| {
-        assert_eq!(app.core.phase(), Phase::Conflict);
-        assert!(app.form.as_ref().unwrap().state == FormState::Conflict);
-        assert_eq!(app.core.draft_notes(), DRAFT);
+        assert!(app.session.is_none());
+        assert!(app.scope.is_none());
+        assert!(app.selected_id.is_none());
+        assert!(app.patient.detail.ready().is_none());
+        assert!(app.form.is_none());
+        assert_eq!(app.core.phase(), Phase::Locked);
+        let (message, error) = app.message.as_ref().unwrap();
+        assert!(*error);
+        assert!(message.contains("Riapri l'archivio prima di continuare"));
+        app.reread_notes(cx);
         app.confirm_form(cx);
     });
-    editor.read_with(cx, |input, _| assert_eq!(input.value(), DRAFT));
-    assert_eq!(host.writes().len(), 1);
+    cx.run_until_parked();
+    assert!(host.session.is_locked());
+    let requests_before = host.requests.lock().unwrap().len();
+    assert_eq!(
+        host.session
+            .update_patient_notes("scope-a", "patient-a", 1, DRAFT),
+        Err(RuntimeError::Locked),
+    );
+    assert_eq!(host.requests.lock().unwrap().len(), requests_before);
+    assert_eq!(
+        host.writes().len(),
+        1,
+        "old authority must never resend the draft"
+    );
 }
 
 fn notes_form_presentation(
