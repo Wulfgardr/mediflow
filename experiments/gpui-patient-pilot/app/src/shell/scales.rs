@@ -270,6 +270,83 @@ pub(super) mod tests {
         });
     }
 
+    fn catalog_text_ids(cx: &mut gpui::VisualTestContext) -> Vec<gpui::GlobalElementId> {
+        rendered_command::take_text_nodes();
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        let nodes = rendered_command::take_text_nodes();
+        let count = ScaleId::ALL.len();
+        assert!(count >= 3);
+        assert_eq!(
+            nodes.len(),
+            count * 3,
+            "all catalog texts remain accessible"
+        );
+        let mut ids = HashSet::new();
+        for (id, node) in &nodes {
+            assert_eq!(node.role(), Role::Label);
+            assert!(node.value().is_some_and(|value| !value.is_empty()));
+            assert!(
+                ids.insert(id.clone()),
+                "duplicate accessible text ID: {id:?}, {node:?}"
+            );
+        }
+        nodes.into_iter().map(|(id, _)| id).collect()
+    }
+
+    #[gpui::test]
+    fn scale_catalog_accessible_text_ids_are_unique_and_stable(cx: &mut gpui::TestAppContext) {
+        let host = SyntheticHost::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        enter_scales(&view, &host, cx);
+        let before = catalog_text_ids(cx);
+        assert_eq!(before, catalog_text_ids(cx), "IDs survive redraw");
+        view.update(cx, |app, cx| {
+            if let Load::Ready(catalog) = &mut app.scales.catalog {
+                catalog.scales.reverse();
+            }
+            cx.notify();
+        });
+        let after = catalog_text_ids(cx);
+        let expected: Vec<_> = before
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .rev()
+            .flatten()
+            .cloned()
+            .collect();
+        assert_eq!(after, expected, "IDs follow instruments when reordered");
+    }
+
+    #[gpui::test]
+    fn scale_verified_result_returns_to_catalog_with_unique_accessible_text_ids(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = SyntheticHost::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        enter_scales(&view, &host, cx);
+        prepare(&view, cx);
+        view.update(cx, |app, cx| app.confirm_scale(cx));
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert!(app.form.is_none());
+            assert!(
+                app.verified
+                    .as_ref()
+                    .unwrap()
+                    .contains("riletta integralmente")
+            );
+            assert!(app.area == Area::Scales);
+        });
+        assert_eq!(host.writes().len(), 1);
+        catalog_text_ids(cx);
+    }
+
     #[gpui::test]
     fn threshold_scale_retry_commands_fit_and_menu_is_keyboard_operable(
         cx: &mut gpui::TestAppContext,
@@ -1535,6 +1612,10 @@ impl ClinicalApp {
                 .map(|scale| {
                     let id = scale.id;
                     div()
+                        .id(SharedString::from(format!(
+                            "clinical-scale-catalog-row-{}",
+                            id.as_str()
+                        )))
                         .min_w_0()
                         .max_w_full()
                         .border_t_1()
@@ -1543,20 +1624,27 @@ impl ClinicalApp {
                         .flex()
                         .flex_col()
                         .gap(px(12.))
-                        .child(
-                            div()
-                                .type_role(theme, TypeRole::Strong)
-                                .child(text!(scale.title.clone())),
-                        )
-                        .child(
-                            div()
-                                .text_color(theme.secondary)
-                                .child(text!(scale.description.clone())),
-                        )
-                        .child(text!(format!(
-                            "{} domande · tutte le risposte sono richieste",
-                            scale.questions.len()
-                        )))
+                        .child(div().type_role(theme, TypeRole::Strong).child({
+                            let text = text!(scale.title.clone());
+                            #[cfg(test)]
+                            let text = rendered_command::observe_text(text);
+                            text
+                        }))
+                        .child(div().text_color(theme.secondary).child({
+                            let text = text!(scale.description.clone());
+                            #[cfg(test)]
+                            let text = rendered_command::observe_text(text);
+                            text
+                        }))
+                        .child({
+                            let text = text!(format!(
+                                "{} domande · tutte le risposte sono richieste",
+                                scale.questions.len()
+                            ));
+                            #[cfg(test)]
+                            let text = rendered_command::observe_text(text);
+                            text
+                        })
                         .child(
                             self.scales
                                 .targets
