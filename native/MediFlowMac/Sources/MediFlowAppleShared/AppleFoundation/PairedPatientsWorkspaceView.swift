@@ -276,7 +276,7 @@ struct PairedPatientsWorkspaceView: View {
             Text("Include anagrafica, diagnosi, diario non eliminato, terapie e osservazioni già decifrati nella scheda. I controlli non fanno parte del bundle FHIR. Non invia dati al FSE e non pubblica nulla fuori dal dispositivo.")
         }
         .confirmationDialog(
-            "Validazione FSE con avvisi",
+            "Controllo locale con avvisi",
             isPresented: Binding(
                 get: { model.pendingFHIRWarningValidation != nil },
                 set: { if !$0 { model.dismissFHIRWarningValidation() } }

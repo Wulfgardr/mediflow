@@ -588,7 +588,7 @@ campi AI/documentali.
 | `/api/auth/*` | Web UI e bootstrap client native | Credenziali + session cookie | HTTP localhost | Setup/login/check/logout |
 | `/api/*` | Web UI | Session cookie server | HTTP localhost | CRUD web + proxy locali |
 | `/api/v1/*` | Client nativo macOS | `Authorization: Bearer <token>` | HTTPS locale via TLS proxy | Contratto stabile native |
-| `/api/v1/network/*` | Client paired trusted | Paired client credential + sessione operatore | HTTPS trusted LAN via TLS proxy | Home-base read-only-first + write versionati su ciclo di vita paziente, diario, terapie, checkup, osservazioni, prestazioni e protesica, più export FHIR lato client, validazione FSE, revisione e discovery; cataloghi in sola lettura |
+| `/api/v1/network/*` | Client paired trusted | Paired client credential + sessione operatore | HTTPS trusted LAN via TLS proxy | Home-base read-only-first + write versionati su ciclo di vita paziente, diario, terapie, checkup, osservazioni, prestazioni e protesica, più export FHIR lato client, controllo locale pre-export, revisione e discovery; cataloghi in sola lettura |
 | `/api/proxy/ollama/*` | Web UI (solo runtime browser; lato server il provider parla direttamente al loopback) | Sessione web (`requireSession`) | HTTP localhost | Proxy verso il runtime Ollama locale (`chat` e `generate`) su loopback stretto, con attestazione del modello |
 | `/api/attachments/{id}/local-extraction` | Web UI | Sessione web | HTTP localhost | Estrazione AnyDoc dell'allegato host-owned corrente; preview locale con hash e provenienza, senza write |
 | `/api/ai/patient-insight/preview` | Web UI | Sessione web acquisita prima del payload | HTTP localhost | Preview Patient Insight host-owned con receipt e provenienza PHI-safe |
