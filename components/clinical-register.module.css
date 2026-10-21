@@ -138,9 +138,9 @@
 .statusThreshold { padding: 16px; font: var(--type-body); outline: none; }
 .statusThreshold:focus-visible { box-shadow: var(--lume-focus-ring); }
 .statusThreshold[data-confirming='true'] { background: var(--lume-surface-threshold); color: var(--lume-ink-threshold); }
-.statusThreshold[data-confirming='true'] :global(.lume-ink-state) { color: inherit; }
 .statusThreshold button { font: var(--type-threshold); }
 .statusSummary { flex: 1 1 22rem; min-width: 0; overflow-wrap: anywhere; }
 .statusSummary p { margin-top: 8px; }
+.statusWarning { color: var(--lume-signal-warning); }
 .statusActions { display: flex; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 700px) { .statusActions, .statusActions button { width: 100%; } }

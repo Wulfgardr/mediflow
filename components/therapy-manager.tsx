@@ -693,21 +693,26 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                 <div ref={statusRef} role="region" aria-label="Cambio di stato della terapia" aria-live="polite" tabIndex={-1}
                     className={`${styles.threshold} ${styles.statusThreshold}`} data-confirming={statusConfirmation.phase === 'confirm'}>
                     <div className={styles.statusSummary}>
-                        <InkState state={statusConfirmation.phase === 'registered' ? 'dry' : 'fresh'}>
-                            {statusConfirmation.phase === 'confirm' ? 'Conferma il cambio di stato'
-                                : statusConfirmation.phase === 'registered' ? 'Registrata'
+                        {statusConfirmation.phase === 'confirm' ? <>
+                            <h3 className="type-threshold">{`${statusConfirmation.target === 'suspended' ? 'Sospendere' : statusConfirmation.target === 'completed' ? 'Concludere' : 'Riattivare'} ${statusConfirmation.original.drugName}, ${statusConfirmation.original.dosage}?`}</h3>
+                            <p className="type-body">{statusConfirmation.patientLabel}</p>
+                        </> : statusConfirmation.phase === 'uncertain' ? <>
+                            <h3 className={`type-threshold ${styles.statusWarning}`}><span aria-hidden="true">▲</span> Esito da verificare</h3>
+                            <p className="type-body">La registrazione può essere avvenuta: rileggi prima di riprovare.</p>
+                            <p className="type-body">{statusConfirmation.original.drugName} · {statusConfirmation.original.dosage}</p>
+                            <p className="type-body">{statusConfirmation.patientLabel}</p>
+                        </> : <>
+                            <InkState state={statusConfirmation.phase === 'registered' ? 'dry' : 'fresh'}>
+                                {statusConfirmation.phase === 'registered' ? 'Registrata'
                                     : statusConfirmation.phase === 'writing' ? 'Registrazione in corso'
                                         : statusConfirmation.phase === 'reading' ? 'Rilettura in corso'
                                             : statusConfirmation.phase === 'conflict' ? 'Conflitto'
-                                                : statusConfirmation.phase === 'reviewed' ? 'Terapia riletta'
-                                                    : 'Esito da verificare'}
-                        </InkState>
-                        <p className="type-strong">{statusConfirmation.patientLabel}</p>
-                        <p className="type-body">{statusConfirmation.phase === 'confirm'
-                            ? `${statusConfirmation.target === 'suspended' ? 'Sospendere' : statusConfirmation.target === 'completed' ? 'Concludere' : 'Riattivare'} ${statusConfirmation.original.drugName}, ${statusConfirmation.original.dosage}?`
-                            : `${statusConfirmation.original.drugName} · ${statusConfirmation.original.dosage}`}</p>
+                                                : 'Terapia riletta'}
+                            </InkState>
+                            <p className="type-strong">{statusConfirmation.patientLabel}</p>
+                            <p className="type-body">{statusConfirmation.original.drugName} · {statusConfirmation.original.dosage}</p>
+                        </>}
                         {statusConfirmation.phase === 'conflict' && <p className="type-body">La terapia è stata modificata da un&apos;altra postazione. Nulla è stato scritto.</p>}
-                        {statusConfirmation.phase === 'uncertain' && <p className="type-body">Esito da verificare. La registrazione può essere avvenuta: rileggi prima di riprovare.</p>}
                         {statusConfirmation.readFailed && <p className="type-body">Rilettura non riuscita. Il nuovo invio resta bloccato.</p>}
                         {statusConfirmation.phase === 'writing' && <p className="type-body">Attendi la conferma prima di chiudere.</p>}
                         {statusConfirmation.current && <p className="type-body">Stato attuale: {statusConfirmation.current.status === 'active' ? 'Attiva' : statusConfirmation.current.status === 'suspended' ? 'Sospesa' : 'Conclusa'} · {statusConfirmation.current.drugName} · {statusConfirmation.current.dosage}</p>}
