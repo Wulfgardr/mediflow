@@ -31,6 +31,7 @@ export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabe
     return () => { generation.current++; };
   }, [patientId, patientVersion, user?.id, isAuthenticated, isLocked, signal]);
   useEffect(() => {
+    if (document.documentElement.dataset.pluginLocalUi !== 'true') return;
     let current = true;
     const events = new EventSource('/api/plugin-local-ui/events');
     let expiry: ReturnType<typeof setTimeout> | undefined;

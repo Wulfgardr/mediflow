@@ -1,4 +1,5 @@
 import 'server-only';
+import { isPluginLocalUiRuntime } from './plugin-local-ui-runtime';
 import type { LocalUiIntent } from '../../packages/mcp/src/local-ui-contract';
 
 const symbol = Symbol.for('mediflow.local-ui.navigation.v1');
@@ -17,7 +18,7 @@ export function resetLocalUiNavigation() {
 }
 
 export function localUiEvents(request: Request): Response {
-  if (process.env.MEDIFLOW_PLUGIN_LOCAL_UI !== '1' || !process.connected
+  if (!isPluginLocalUiRuntime()
     || !['same-origin', 'none', null].includes(request.headers.get('sec-fetch-site'))) {
     return new Response(null, { status: 404, headers: { 'Cache-Control': 'no-store' } });
   }
