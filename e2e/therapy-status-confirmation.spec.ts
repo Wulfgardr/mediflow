@@ -1,8 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
+import { differenceInYears } from 'date-fns';
 import { mkdir } from 'node:fs/promises';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow } from './utils';
 
 type Fixture = { patientId: string; therapyId: string; secondId: string };
+const birthDate = '1972-04-12T00:00:00.000Z';
+const patientLabel = (now: Date) => `Ada Sintetica, ${differenceInYears(now, new Date(birthDate))} anni`;
 const threshold = (page: Page) => page.getByRole('region', { name: 'Cambio di stato della terapia', exact: true });
 const row = (page: Page, secondary = false) => page.locator('#terapie').getByRole('row').filter({ has: page.getByText(secondary ? 'Farmaco sintetico secondario' : 'Ramipril sintetico 5 mg', { exact: true }) });
 const confirm = (page: Page) => threshold(page).getByRole('button', { name: 'Conferma e registra', exact: true });
@@ -14,7 +17,7 @@ async function expectConfirmation(page: Page, question: string) {
     await expect(title).toHaveClass(/\btype-threshold\b/);
     await expect(title).toHaveCSS('font-size', '15px');
     await expect(title).toHaveCSS('font-weight', '600');
-    await expect(region.getByText('Ada Sintetica, 54 anni', { exact: true })).toHaveClass('type-body');
+    await expect(region.getByText(patientLabel(new Date()), { exact: true })).toHaveClass('type-body');
     await expect(region.getByText('Conferma il cambio di stato', { exact: true })).toHaveCount(0);
     await expect(region.locator('.lume-point')).toHaveCount(0);
 }
@@ -38,18 +41,18 @@ async function expectUncertainOutcome(page: Page) {
     await expect(region.locator('.lume-point')).toHaveCount(0);
     await expect(region.getByText('La registrazione può essere avvenuta: rileggi prima di riprovare.', { exact: true })).toBeVisible();
     await expect(region.getByText('Ramipril sintetico 5 mg · 1 cp al mattino', { exact: true })).toBeVisible();
-    await expect(region.getByText('Ada Sintetica, 54 anni', { exact: true })).toBeVisible();
+    await expect(region.getByText(patientLabel(new Date()), { exact: true })).toBeVisible();
 }
 
 async function fixture(page: Page): Promise<Fixture> {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-    return page.evaluate(async () => {
+    return page.evaluate(async (birthDate) => {
         const marker = crypto.randomUUID();
         for (const key of ['aiPatientInsightKillSwitch', 'aiSmartImportKillSwitch', 'aiDocumentSynthesisKillSwitch', 'aiTreatmentReasoningKillSwitch']) {
             const response = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value: 'disabled' }) });
             if (!response.ok) throw new Error('Synthetic setting failed');
         }
-        const response = await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firstName: 'Ada', lastName: 'Sintetica', taxCode: `SYN${marker}`, birthDate: '1972-04-12T00:00:00.000Z' }) });
+        const response = await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firstName: 'Ada', lastName: 'Sintetica', taxCode: `SYN${marker}`, birthDate }) });
         if (!response.ok) throw new Error('Synthetic patient failed');
         const { id: patientId } = await response.json();
         const therapyId = `therapy-${marker}`;
@@ -59,7 +62,7 @@ async function fixture(page: Page): Promise<Fixture> {
             if (!added.ok) throw new Error('Synthetic therapy failed');
         }
         return { patientId, therapyId, secondId };
-    });
+    }, birthDate);
 }
 async function open(page: Page, data: Fixture) {
     await page.goto(`/patients/${data.patientId}/modules`);
@@ -84,6 +87,17 @@ async function stored(page: Page, data: Fixture) {
     expect(response.status()).toBe(200);
     return (await response.json() as Array<{ id: string; version: number; status: string }>).find(item => item.id === data.therapyId);
 }
+
+test('patient age advances only on the birthday', () => {
+    const birthday = new Date(birthDate);
+    const dayBefore = new Date(birthday.getTime());
+    dayBefore.setFullYear(dayBefore.getFullYear() + 55);
+    dayBefore.setDate(dayBefore.getDate() - 1);
+    const onBirthday = new Date(birthday.getTime());
+    onBirthday.setFullYear(onBirthday.getFullYear() + 55);
+    expect(patientLabel(dayBefore)).toBe('Ada Sintetica, 54 anni');
+    expect(patientLabel(onBirthday)).toBe('Ada Sintetica, 55 anni');
+});
 
 test('first gesture then return to record issues zero writes', async ({ page }) => {
     const data = await fixture(page);
