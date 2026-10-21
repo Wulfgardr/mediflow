@@ -28,6 +28,10 @@ import {
     notifyApiAuthUnavailable,
 } from './api-table-response';
 
+export class ApiWriteRejectedError extends Error {
+    constructor(readonly status: number) { super('Therapy update rejected'); }
+}
+
 export type ApiVersionConflictPayload =
     | PatientVersionConflictPayload
     | EntryVersionConflictPayload
@@ -511,6 +515,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
             if (res.status === 409 && isApiVersionConflictPayload(payload)) {
                 throw this.buildVersionConflictError(payload);
             }
+            if (this.tableName === 'therapies' && [400, 401, 403, 404, 409, 413, 422, 423].includes(res.status)) throw new ApiWriteRejectedError(res.status);
             if (this.tableName === 'siss_handoff_events') throw new Error(res.status === 409
                 ? 'Il passaggio SISS è cambiato. Ricarica il diario prima di riprovare.' : 'Modifica del passaggio SISS non riuscita.');
             throw new Error("Failed to update item");

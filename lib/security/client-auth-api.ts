@@ -419,6 +419,12 @@ const GENERATION = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9
 export const ARCHIVE_REPLACED_EVENT = 'mediflow:archive-replaced';
 let documentGeneration: string | null = null;
 
+/** Archive identity only; grants no session or write authority. */
+export function clientArchiveGeneration(): string {
+    if (!documentGeneration) throw new Error('Archive generation unavailable.');
+    return documentGeneration;
+}
+
 /** Captures the current browser session and archive without exposing credentials. */
 export function captureClientAccountAuthority(): () => boolean {
     const etag = currentAuthControlEtag;

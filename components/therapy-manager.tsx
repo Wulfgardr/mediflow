@@ -1,10 +1,11 @@
 'use client';
 
 import styles from './clinical-register.module.css';
+import { clientArchiveGeneration } from '@/lib/security/client-auth-api';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createTherapyDeleteRecovery, type DeleteRecovery } from '@/lib/therapy-delete-recovery';
 import { useLiveQuery } from '@/lib/live-query';
-import { ApiConflictError, db, Therapy } from '@/lib/db';
+import { ApiConflictError, ApiWriteRejectedError, db, Therapy } from '@/lib/db';
 import { notifyDbChange } from '@/lib/live-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,7 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Plus, Pill, X, Clock, StopCircle, Trash2, Shield, Ban, Database, Pencil, Play, Beaker } from 'lucide-react';
 import { differenceInYears, format } from 'date-fns';
 import { InkState } from './ui/ink-state';
-import { createTherapyStatusConfirmation, type StatusConfirmation } from '@/lib/therapy-status-confirmation';
+import { createTherapyStatusConfirmation, createTherapyStatusWriteJournal, type StatusConfirmation } from '@/lib/therapy-status-confirmation';
 import { it } from 'date-fns/locale';
 import ICDAutocomplete from './icd-autocomplete';
 import DrugAutocomplete from './drug-autocomplete';
@@ -83,6 +84,8 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     const statusChange = useMemo(() => {
         const controller = createTherapyStatusConfirmation<Therapy>({
             patientId,
+            journal: createTherapyStatusWriteJournal({ storage: () => window.localStorage, archive: clientArchiveGeneration, locks: () => navigator.locks }),
+            isRejected: error => error instanceof ApiWriteRejectedError,
             isCurrent: () => currentPatientId.current === patientId,
             signal: () => db.getSessionReadSignal(),
             read: async (signal) => {
@@ -158,6 +161,19 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     );
 
     const visibleTherapies = therapies || [];
+    useEffect(() => {
+        if (!therapies || !patient || patient.id !== patientId) return;
+        const age = patient.birthDate ? differenceInYears(new Date(), new Date(patient.birthDate)) : NaN;
+        statusChange.recover(therapies, `${patient.firstName} ${patient.lastName}, ${Number.isFinite(age) ? `${age} anni` : 'età non disponibile'}`);
+    }, [therapies, patient, patientId, statusChange]);
+
+    useEffect(() => {
+        const refresh = (event: StorageEvent) => {
+            if (event.key === null || event.key.startsWith('mediflow:therapy-status-write:v1:')) notifyDbChange('therapies');
+        };
+        window.addEventListener('storage', refresh);
+        return () => window.removeEventListener('storage', refresh);
+    }, []);
 
     const activeTherapies = visibleTherapies.filter(t => t.status === 'active');
     const suspendedTherapies = visibleTherapies.filter(t => t.status === 'suspended');
@@ -698,7 +714,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                             <p className="type-body">{statusConfirmation.patientLabel}</p>
                         </> : statusConfirmation.phase === 'uncertain' ? <>
                             <h3 className={`type-threshold ${styles.statusWarning}`}><span aria-hidden="true">▲</span> Esito da verificare</h3>
-                            <p className="type-body">La registrazione può essere avvenuta: rileggi prima di riprovare.</p>
+                            <p className="type-body">La registrazione può essere ancora in corso. Il nuovo invio resta bloccato finché la rilettura non ne chiarisce l’esito.</p>
                             <p className="type-body">{statusConfirmation.original.drugName} · {statusConfirmation.original.dosage}</p>
                             <p className="type-body">{statusConfirmation.patientLabel}</p>
                         </> : <>
@@ -707,12 +723,14 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                     : statusConfirmation.phase === 'writing' ? 'Registrazione in corso'
                                         : statusConfirmation.phase === 'reading' ? 'Rilettura in corso'
                                             : statusConfirmation.phase === 'conflict' ? 'Conflitto'
+                                                : statusConfirmation.phase === 'rejected' ? 'Modifica non registrata'
                                                 : 'Terapia riletta'}
                             </InkState>
                             <p className="type-strong">{statusConfirmation.patientLabel}</p>
                             <p className="type-body">{statusConfirmation.original.drugName} · {statusConfirmation.original.dosage}</p>
                         </>}
                         {statusConfirmation.phase === 'conflict' && <p className="type-body">La terapia è stata modificata da un&apos;altra postazione. Nulla è stato scritto.</p>}
+                        {statusConfirmation.phase === 'rejected' && <p className="type-body">La richiesta è stata rifiutata. Rileggi la terapia prima di scegliere una nuova azione.</p>}
                         {statusConfirmation.readFailed && <p className="type-body">Rilettura non riuscita. Il nuovo invio resta bloccato.</p>}
                         {statusConfirmation.phase === 'writing' && <p className="type-body">Attendi la conferma prima di chiudere.</p>}
                         {statusConfirmation.current && <p className="type-body">Stato attuale: {statusConfirmation.current.status === 'active' ? 'Attiva' : statusConfirmation.current.status === 'suspended' ? 'Sospesa' : 'Conclusa'} · {statusConfirmation.current.drugName} · {statusConfirmation.current.dosage}</p>}
@@ -721,7 +739,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                     <div className={styles.statusActions}>
                         {['confirm', 'registered', 'reviewed'].includes(statusConfirmation.phase) && <button type="button" className="mf-btn-secondary" onClick={() => statusChange.cancel()}>Torna alla scheda</button>}
                         {statusConfirmation.phase === 'confirm' && <button type="button" className="ui-btn-primary" onClick={() => statusChange.confirm()}>Conferma e registra</button>}
-                        {['conflict', 'uncertain'].includes(statusConfirmation.phase) && <button type="button" className="ui-btn-primary" disabled={statusConfirmation.writePending} onClick={() => statusChange.reread()}>{statusConfirmation.conflict ? 'Rileggi la terapia' : 'Rileggi e verifica'}</button>}
+                        {['conflict', 'rejected', 'uncertain'].includes(statusConfirmation.phase) && <button type="button" className="ui-btn-primary" disabled={statusConfirmation.writePending} onClick={() => statusChange.reread()}>{statusConfirmation.conflict ? 'Rileggi la terapia' : 'Rileggi e verifica'}</button>}
                     </div>
                 </div>
             )}
