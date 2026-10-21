@@ -1,6 +1,6 @@
 # ADR 0157 — Conformità HL7 verificabile ai confini clinici
 
-Data: 2026-10-21. Stato: Proposed; accettazione dopo review indipendente in PR.
+Data: 2026-10-21. Stato: Accepted (2026-10-21), dopo la [review indipendente sulla PR #594](https://github.com/Wulfgardr/mediflow/pull/594#pullrequestreview-5598031969), revisione `7eb3f7235`.
 Riferimenti: [WUL-784](https://linear.app/wulfgardr/issue/WUL-784),
 [WUL-785](https://linear.app/wulfgardr/issue/WUL-785),
 [WUL-744](https://linear.app/wulfgardr/issue/WUL-744),
@@ -196,7 +196,7 @@ La sequenza fissata è:
 
 1. Correggere subito le promesse «validazione FSE» nell'interfaccia, come
    incremento distinto dal presente documento.
-2. Sottoporre questo ADR alla review indipendente in PR, mantenendolo Proposed.
+2. Review indipendente in PR completata (accettazione del 2026-10-21).
 3. Eseguire il gate R4 base reale sui Bundle sintetici emessi da Web e Swift.
    Devono fallire le falsificazioni: gender illegale, riferimento rotto, byte
    del JAR alterato prima dell'esecuzione, warning nuovo non revisionato e
