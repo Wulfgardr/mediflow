@@ -86,7 +86,7 @@ impl AnalyticsState {
                     .into(),
             ),
             Err(RuntimeError::AnalyticsCancelled) => Self::Cancelled,
-            Err(RuntimeError::Conflict) => Self::Stale(
+            Err(RuntimeError::Conflict | RuntimeError::ArchiveReplaced) => Self::Stale(
                 "L’archivio è stato sostituito o la lettura non è più attuale. I conteggi non vengono mostrati: rileggi l’analisi."
                     .into(),
             ),
