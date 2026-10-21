@@ -554,7 +554,7 @@ export default function PatientDetailPage() {
         if (validation.hasErrors) {
             showToast({
                 tone: 'error',
-                title: 'Esportazione bloccata: risolvi gli errori di validazione FSE',
+                title: 'Esportazione bloccata: correggi i dati segnalati dal controllo locale',
                 description: buildValidationMessage(validation),
             });
             return null;
@@ -562,7 +562,7 @@ export default function PatientDetailPage() {
 
         if (validation.hasWarnings) {
             const { confirmed } = await confirm({
-                title: 'Warning di validazione FSE',
+                title: 'Controllo locale dell\'esportazione: avvisi',
                 message: `${buildValidationMessage(validation)}\n\nVuoi proseguire comunque con l'export?`,
                 confirmLabel: 'Esporta comunque',
             });

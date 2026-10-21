@@ -3479,12 +3479,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             if validation.hasErrors {
                 self.pendingFHIRWarningValidation = nil
                 self.patientFHIRExportURL = nil
-                self.statusMessage = "Export FHIR bloccato: \(errorCount) errori FSE da correggere."
+                self.statusMessage = "Export FHIR bloccato: \(errorCount) errori del controllo locale da correggere."
                 return
             }
             if validation.hasWarnings && !confirmWarnings {
                 self.pendingFHIRWarningValidation = validation
-                self.statusMessage = "Export FHIR richiede conferma: \(warningCount) avvisi FSE."
+                self.statusMessage = "Export FHIR richiede conferma: \(warningCount) avvisi del controllo locale."
                 return
             }
             self.pendingFHIRWarningValidation = nil
@@ -3926,8 +3926,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             self.fseDocumentValidationResult = response
             self.fseDocumentValidationTargetLabel = label
             self.statusMessage = response.ok
-                ? "Documento FSE valido per il profilo \(response.profile)."
-                : "Documento FSE non valido: \(response.errors.count) errori, \(response.warnings.count) avvisi."
+                ? "Controllo locale superato (profilo \(response.profile)). Non equivale alla validazione del Fascicolo Sanitario."
+                : "Controllo locale non superato: \(response.errors.count) errori, \(response.warnings.count) avvisi."
         }
     }
 
