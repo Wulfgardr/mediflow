@@ -1610,47 +1610,72 @@ impl ClinicalApp {
         self.message = None;
         let intent = self.profile_intent(&session);
         let id = request.patient_id.clone();
-        self.run(move || session.open_patient_profile(&scope, &id, &intent), move |this, result, cx| {
-            let patient = match result {
-                Ok(patient) if !patient.field_locked("notes") => patient,
-                Ok(_) => {
-                    this.core.receive_read(&request, Err(ReadFailure::Invalid));
-                    this.form.as_mut().expect("notes recovery").state = previous;
-                    this.message = Some((ui_error(RuntimeError::LockedField), true));
-                    return;
-                }
-                Err(RuntimeError::ArchiveReplaced) => {
-                    this.disconnect(cx);
-                    this.message = Some((ui_error(RuntimeError::ArchiveReplaced), true));
-                    return;
-                }
-                Err(error) => {
-                    this.core.receive_read(&request, Err(ReadFailure::Unavailable));
-                    this.form.as_mut().expect("notes recovery").state = previous;
-                    this.message = Some((ui_error(error), true));
-                    return;
-                }
-            };
-            if !this.core.receive_read(&request, Ok(profile_for_core(&patient))) {
-                this.form.as_mut().expect("notes recovery").state = previous;
-                this.message = Some((ui_error(RuntimeError::InvalidResponse), true));
-                return;
-            }
-            let writable = !patient.is_archived && patient.deleted_at.is_none();
-            this.patient.detail = ReadLoad::Ready(patient);
-            if this.core.phase() == mediflow_patient_client::Phase::Saved {
-                this.saved("Registrata · contenuto confermato dalla rilettura della scheda.", cx);
-            } else {
-                this.form.as_mut().expect("notes recovery").state = if writable { FormState::Draft } else { FormState::Rejected };
-                if !writable {
-                    this.core.lock();
-                    this.message = Some(("La scheda archiviata è in sola lettura. La bozza resta disponibile per la copia o lo scarto.".into(), true));
-                }
-                this.focus_after_render = true;
-                this.focus_first_field = writable;
-            }
-        }, cx);
+        self.run(
+            move || session.open_patient_profile(&scope, &id, &intent),
+            move |this, result, cx| {
+                let patient = match result {
+                    Ok(patient) if !patient.field_locked("notes") => patient,
+                    Ok(_) => {
+                        this.core.receive_read(&request, Err(ReadFailure::Invalid));
+                        this.form.as_mut().expect("notes recovery").state = previous;
+                        this.message = Some((ui_error(RuntimeError::LockedField), true));
+                        return;
+                    }
+                    Err(RuntimeError::ArchiveReplaced) => {
+                        this.disconnect(cx);
+                        this.message = Some((ui_error(RuntimeError::ArchiveReplaced), true));
+                        return;
+                    }
+                    Err(error) => {
+                        this.core
+                            .receive_read(&request, Err(ReadFailure::Unavailable));
+                        this.form.as_mut().expect("notes recovery").state = previous;
+                        this.message = Some((ui_error(error), true));
+                        return;
+                    }
+                };
+                this.apply_notes_reread(&request, previous, patient, cx);
+            },
+            cx,
+        );
         cx.notify();
+    }
+
+    fn apply_notes_reread(
+        &mut self,
+        request: &mediflow_patient_client::ReadRequest,
+        previous: FormState,
+        patient: PatientDetail,
+        cx: &mut Context<Self>,
+    ) {
+        if !self
+            .core
+            .receive_read(request, Ok(profile_for_core(&patient)))
+        {
+            self.form.as_mut().expect("notes recovery").state = previous;
+            self.message = Some((ui_error(RuntimeError::InvalidResponse), true));
+            return;
+        }
+        let writable = !patient.is_archived && patient.deleted_at.is_none();
+        self.patient.detail = ReadLoad::Ready(patient);
+        if self.core.phase() == mediflow_patient_client::Phase::Saved {
+            self.saved(
+                "Registrata · contenuto confermato dalla rilettura della scheda.",
+                cx,
+            );
+        } else {
+            self.form.as_mut().expect("notes recovery").state = if writable {
+                FormState::Draft
+            } else {
+                FormState::Rejected
+            };
+            if !writable {
+                self.core.lock();
+                self.message = Some(("La scheda non è più modificabile. La bozza resta disponibile per la copia o lo scarto.".into(), true));
+            }
+            self.focus_after_render = true;
+            self.focus_first_field = writable;
+        }
     }
 
     fn finish_discard(&mut self, action: Discard, cx: &mut Context<Self>) {
@@ -4412,6 +4437,20 @@ impl ClinicalApp {
                 .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                     .child(text!("La bozza resta visibile fino alla verifica. Non inviare di nuovo."))),
             FormState::Conflict | FormState::Uncertain | FormState::Rejected => {
+                if form.kind == FormKind::Notes && form.state == FormState::Rejected
+                    && self.core.phase() == mediflow_patient_client::Phase::Locked
+                    && self.patient.detail.ready().is_some_and(|patient| patient.is_archived || patient.deleted_at.is_some())
+                {
+                    let copy_label = "Copia la bozza";
+                    let discard_label = "Scarta la bozza";
+                    return threshold.bg(theme.draft)
+                        .child(notice("clinical-notes-readonly", "La scheda non è più modificabile. La bozza resta disponibile per la copia o lo scarto.", theme, true))
+                        .child(div().flex().flex_wrap().gap(px(8.))
+                            .child(self.form_actions[6].attach(button("clinical-workspace-copy-draft", copy_label, theme, false, true).debug_selector(|| copy_label.into()))
+                                .on_click(cx.listener(|this, _, _, cx| this.copy_draft(cx))))
+                            .child(self.form_actions[0].attach(button("clinical-notes-discard", discard_label, theme, false, true).debug_selector(|| discard_label.into()))
+                                .on_click(cx.listener(|this, _, _, cx| this.finish_discard(Discard::Form, cx)))));
+                }
                 if form.kind == FormKind::Notes && form.state != FormState::Rejected {
                     let kind = if form.state == FormState::Conflict { ViewStateKind::Conflitto } else { ViewStateKind::EsitoDaVerificare };
                     return threshold.child(ViewState::new(ReadObject::Scheda, kind).render(
@@ -4435,7 +4474,7 @@ impl ClinicalApp {
                     .child(div().flex().flex_wrap().gap(px(8.))
                         .child(self.form_actions[6].attach(button("clinical-workspace-copy-draft", "Copia bozza", theme, false, true))
                             .on_click(cx.listener(|this, _, _, cx| this.copy_draft(cx))))
-                        .child(self.form_actions[7].attach(button("clinical-workspace-reconcile", if form.kind == FormKind::Scale { "Rileggi e verifica" } else { "Rileggi scheda…" }, theme, true, true))
+                        .child(self.form_actions[7].attach(button("clinical-workspace-reconcile", if form.kind == FormKind::Scale { "Rileggi e verifica" } else { "Rileggi scheda…" }, theme, true, true).debug_selector(|| "clinical-workspace-reconcile".into()))
                             .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Reload, cx))))
                         .when(form.kind == FormKind::Scale, |el| el.child(self.form_actions[0].attach(button("clinical-scale-close-draft", "Chiudi bozza…", theme, false, true))
                             .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Form, cx)))))
