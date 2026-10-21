@@ -6,6 +6,8 @@ mod ai_preferences;
 mod ai_status;
 mod analytics;
 mod document_details;
+#[cfg(test)]
+mod notes_recovery_tests;
 mod scales;
 mod therapy_picker;
 mod view_state;
