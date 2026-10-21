@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { projectTerritorialPacks, type TerritorialPackCapability } from './territorial-packs';
+import { createDefaultTerritorialPackCapability, type TerritorialPackCapability } from './territorial-pack-contract';
 import type {
     NetworkCapabilitiesResponse,
     NetworkCapability,
@@ -272,7 +272,7 @@ export function buildNetworkCapabilitiesResponse(input: {
         nodeId: input.nodeId,
         operatingMode,
         protocolVersion: NETWORK_PROTOCOL_VERSION,
-        territorialPacks: input.territorialPacks ?? projectTerritorialPacks(undefined),
+        territorialPacks: input.territorialPacks ?? createDefaultTerritorialPackCapability(),
         capabilities: [
             capability(
                 'network.pairing.bootstrap',

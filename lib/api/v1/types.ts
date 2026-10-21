@@ -1,7 +1,7 @@
 // Codex: created 2026-02-01
 
 /* @Codex */
-import type { TerritorialPackCapability } from '../../territorial-packs';
+import type { TerritorialPackCapability } from '../../territorial-pack-contract';
 import type { DocumentOcrQueueReason, DocumentOcrQueueState } from '../../domain/documents/document-ocr-queue';
 
 export type PatientSummary = {
