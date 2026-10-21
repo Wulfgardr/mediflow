@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { assertBaseProfiles, readOutcomes, assessIssues } from './fhir-r4-outcomes.mjs';
+import { isNetworkDenial } from './fhir-validator-offline.mjs';
 import { assertJavaVersion } from './validate-fhir-r4.mjs';
 
 const artifacts = [{ id: 'synthetic', file: 'synthetic.json' }];
@@ -49,4 +50,14 @@ test('Java must match the lock; local explicit override is never honored in CI',
   assert.throws(() => assertJavaVersion('openjdk version "25.0.2"', { javaMajor: 17 }, {}), /JAVA_LOCK_MISMATCH/);
   assert.equal(assertJavaVersion('openjdk version "25.0.2"', { javaMajor: 17 }, { MEDIFLOW_FHIR_ALLOW_JAVA_MISMATCH: '1' }).mismatchOverride, true);
   assert.throws(() => assertJavaVersion('openjdk version "25.0.2"', { javaMajor: 17 }, { CI: 'true', MEDIFLOW_FHIR_ALLOW_JAVA_MISMATCH: '1' }), /JAVA_LOCK_MISMATCH/);
+});
+
+test('network probes reject ambiguous failure and accept absent IPv6 only in a Linux namespace', () => {
+  for (const platform of ['linux', 'darwin']) {
+    for (const code of ['TIMEOUT', 'CONNECTED', 'ECONNREFUSED', 'ENOTFOUND']) assert.equal(isNetworkDenial(code, '::1', platform), false);
+    assert.equal(isNetworkDenial('EPERM', '1.1.1.1', platform), true);
+  }
+  assert.equal(isNetworkDenial('EADDRNOTAVAIL', '::1', 'linux'), true);
+  assert.equal(isNetworkDenial('EADDRNOTAVAIL', '1.1.1.1', 'linux'), false);
+  assert.equal(isNetworkDenial('EADDRNOTAVAIL', '::1', 'darwin'), false);
 });
