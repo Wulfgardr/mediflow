@@ -87,7 +87,7 @@ final class PairedPatientsWorkspaceModelS6Tests: XCTestCase {
         let errorURL = await errorModel.patientFHIRExportURL
         let errorStatus = await errorModel.statusMessage
         XCTAssertNil(errorURL)
-        XCTAssertEqual(errorStatus, "Export FHIR bloccato: 2 errori FSE da correggere.")
+        XCTAssertEqual(errorStatus, "Export FHIR bloccato: 2 errori del controllo locale da correggere.")
 
         let warningModel = await makeModel(source: S6MockDataSource(details: ["p1": patient], validation: Self.validation(warnings: 3)))
         await warningModel.configurePairedOnlineForTests(selectedPatient: patient)
