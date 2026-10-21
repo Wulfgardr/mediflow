@@ -1,4 +1,5 @@
 use super::*;
+use crate::theme::{TypeRole, TypeStyle};
 use std::time::Instant;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -281,15 +282,14 @@ impl ViewState {
             .min_w_0()
             .max_w_full()
             .whitespace_normal()
-            .font_family(SYSTEM)
-            .text_size(px(theme.body()))
+            .type_role(theme, TypeRole::Body)
             .flex()
             .flex_col()
             .items_start()
             .gap(px(8.))
             .child(
                 div()
-                    .font_weight(FontWeight::SEMIBOLD)
+                    .type_role(theme, TypeRole::Strong)
                     .text_color(self.tone().color(theme))
                     .child(text!(first)),
             )

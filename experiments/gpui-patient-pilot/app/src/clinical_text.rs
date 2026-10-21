@@ -2,7 +2,9 @@
 //! The archived string is never rewritten. Parsing is iterative and bounded;
 //! unsupported or malformed markup stays visible as its original source.
 
-use crate::theme::{Theme, VOICE};
+use crate::components::{WritingInk, WritingStyle, WritingSurface};
+use crate::theme::Theme;
+use crate::theme::{TypeRole, TypeStyle};
 use gpui::{
     AnyElement, FontStyle, FontWeight, HighlightStyle, Role, SharedString, StrikethroughStyle,
     StyledText, UnderlineStyle, div, prelude::*, px, text,
@@ -580,39 +582,105 @@ pub fn searchable_text(source: &str) -> String {
     parse(source).plain(false)
 }
 
-pub fn render(source: &str, theme: Theme) -> AnyElement {
+pub fn render(source: &str, ink: WritingInk, theme: Theme) -> AnyElement {
     let document = parse(source);
-    div().min_w_0().flex().flex_col().gap(px(theme.size(10.)))
+    let mut content_theme = theme;
+    content_theme.ink = ink.color(WritingSurface::Plane, theme);
+    div().min_w_0().flex().flex_col().gap(px(10. * theme.scale))
         .when(document.unsupported, |element| element.child(
-            div().text_color(theme.secondary).text_size(px(theme.size(12.)))
+            div().text_color(theme.secondary).type_role(theme, TypeRole::Meta)
                 .child(text!("Formattazione non supportata: è mostrato il testo originale. Apri l'editor corrente per verificarla.")),
         ))
         .children(document.blocks.into_iter().enumerate().map(|(index, block)| {
             let accessible = block.plain(true);
-            let (content, highlights) = block.styled(theme);
+            let (content, highlights) = block.styled(content_theme);
             let heading = block.heading;
             let marker = block.marker.clone();
             div().id(("clinical-rich-block", index)).role(Role::Paragraph).aria_label(SharedString::from(accessible))
-                .min_w_0().flex().items_start().gap(px(theme.size(8.)))
+                .min_w_0().flex().items_start().gap(px(8. * theme.scale))
                 .pl(px((block.list_depth.saturating_sub(1) as f32 * 18.).min(36.)))
                 .when(block.quote_depth > 0, |element| element
                     .border_l_2().border_color(theme.rule).pl(px(14.)))
                 .when(block.list_depth > 0, |element| element.child(
-                    div().min_w(px(theme.size(22.))).flex_shrink_0()
+                    div().min_w(px(22. * theme.scale)).flex_shrink_0()
                         .text_color(theme.secondary).child(text!(marker.unwrap_or_default())),
                 ))
-                .child(div().flex_1().min_w_0().font_family(VOICE).text_color(theme.ink)
-                    .text_size(px(theme.size(match heading { Some(1) => 25., Some(2) => 22., Some(_) => 19., None => 17. })))
-                    .line_height(px(theme.size(if heading.is_some() { 32. } else { 27. })))
-                    .when(heading.is_some(), |element| element.font_weight(FontWeight::SEMIBOLD))
-                    .child(StyledText::new(SharedString::from(content)).with_highlights(highlights)))
+                .child(block_text(content, highlights, heading.is_some(), ink, theme))
         }))
         .into_any_element()
+}
+
+fn block_text(
+    content: String,
+    highlights: Vec<(Range<usize>, HighlightStyle)>,
+    heading: bool,
+    ink: WritingInk,
+    theme: Theme,
+) -> gpui::Div {
+    div()
+        .flex_1()
+        .min_w_0()
+        .type_role(
+            theme,
+            if heading {
+                TypeRole::Strong
+            } else {
+                TypeRole::Prose
+            },
+        )
+        .writing_ink(ink, WritingSurface::Plane, theme)
+        .child(StyledText::new(SharedString::from(content)).with_highlights(highlights))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn content_inks_keep_prose_and_only_pencil_has_a_dashed_underline() {
+        use gpui::{BorderStyle, Length, rgb};
+        for (dark, pencil, fresh, dry) in [
+            (false, 0x5f6878, 0x2346b0, 0x14161a),
+            (true, 0x9aa3b0, 0x9db4ff, 0xe9ecef),
+        ] {
+            for scale in [1., 2.] {
+                let theme = Theme::for_dark(dark).sized(scale, false);
+                for (ink, expected) in [
+                    (WritingInk::Pencil, pencil),
+                    (WritingInk::Fresh, fresh),
+                    (WritingInk::Dry, dry),
+                ] {
+                    let mut content =
+                        block_text("Prosa sintetica".into(), vec![], false, ink, theme);
+                    let text = content.text_style();
+                    assert_eq!(
+                        text.color,
+                        Some(rgb(expected).into()),
+                        "{ink:?}, dark={dark}"
+                    );
+                    assert_eq!(text.font_family.as_deref(), Some("Newsreader"));
+                    assert_eq!(text.font_size, Some(px(17. * scale).into()));
+                    assert_eq!(text.font_weight, Some(FontWeight::NORMAL));
+                    let style = content.style();
+                    if ink == WritingInk::Pencil {
+                        assert_eq!(style.size.width, Some(Length::Auto));
+                        assert_eq!(style.flex_grow, Some(0.));
+                        assert_eq!(style.flex_shrink, Some(0.));
+                        assert_eq!(style.flex_basis, Some(Length::Auto));
+                        assert_eq!(style.max_size.width, Some(gpui::relative(1.).into()));
+                        assert_eq!(style.border_style, Some(BorderStyle::Dashed));
+                        assert_eq!(style.border_widths.bottom, Some(px(1.).into()));
+                        assert_eq!(style.border_color, Some(rgb(expected).into()));
+                        assert_eq!(style.padding.bottom, Some(px(4.).into()));
+                    } else {
+                        assert_eq!(style.border_style, None);
+                        assert_eq!(style.border_widths.bottom, None);
+                        assert_eq!(style.padding.bottom, None);
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn nested_lists_and_blocks_keep_boundaries_numbering_and_continuations() {

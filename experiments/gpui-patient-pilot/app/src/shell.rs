@@ -11,10 +11,12 @@ mod therapy_picker;
 mod view_state;
 mod who_lookup;
 
+use crate::theme::{TypeRole, TypeStyle};
+
 use gpui::{
-    App, ClipboardItem, Context, Div, Entity, FocusHandle, FontWeight, KeyBinding, Role,
-    ScrollAnchor, ScrollHandle, SharedString, Stateful, Subscription, Window, WindowAppearance,
-    actions, div, prelude::*, px, text,
+    App, ClipboardItem, Context, Div, Entity, FocusHandle, KeyBinding, Role, ScrollAnchor,
+    ScrollHandle, SharedString, Stateful, Subscription, Window, WindowAppearance, actions, div,
+    prelude::*, px, text,
 };
 use mediflow_patient_client::{PatientProfile, ReadFailure, UpdateOutcome, Workspace};
 use mediflow_runtime_client::{
@@ -30,7 +32,8 @@ use zeroize::Zeroizing;
 use crate::appointments::for_write as appointment_for_write;
 use crate::clinical_text;
 use crate::components::{
-    brand_icon, button, display_date, heading, notice, plain_text, section, tab,
+    WritingInk, WritingSurface, brand_icon, button, display_date, heading, notice, plain_text,
+    section, tab, writing_status,
 };
 use crate::documents::{self, Upload};
 use crate::editing;
@@ -39,7 +42,7 @@ use crate::navigation::{Area, Layout, PatientSection, adjacent_patient};
 use crate::patient_forms;
 use crate::references::{ReferenceKind, ReferenceRows};
 use crate::text_input::{InputChanged, TextInput};
-use crate::theme::{CODES, SYSTEM, Theme, VOICE};
+use crate::theme::Theme;
 
 use account_profile::AccountProfile;
 use ai_preferences::AiPreferences;
@@ -2243,8 +2246,7 @@ impl ClinicalApp {
                     .flex_auto()
                     .min_w_0()
                     .max_w_full()
-                    .font_family(VOICE)
-                    .text_size(px(self.theme.size(21.)))
+                    .type_role(self.theme, TypeRole::Brand)
                     .child(text!("MediFlow.")),
             )
     }
@@ -2281,12 +2283,15 @@ impl ClinicalApp {
             .bg(if active { theme.selected } else { theme.shade })
             .border_2()
             .border_color(if active { theme.selected } else { theme.shade })
-            .text_size(px(theme.size(if compact { 12. } else { 14. })))
-            .font_weight(if active {
-                FontWeight::SEMIBOLD
-            } else {
-                FontWeight::NORMAL
-            })
+            .type_role(
+                theme,
+                if compact {
+                    TypeRole::Meta
+                } else {
+                    TypeRole::Body
+                },
+            )
+            .when(active, |el| el.type_role(theme, TypeRole::Strong))
             .text_color(color)
             .cursor_pointer()
             .hover(move |s| s.bg(theme.hover))
@@ -2357,14 +2362,14 @@ impl ClinicalApp {
                     .child(
                         div()
                             .px(px(8.))
-                            .text_size(px(theme.size(12.)))
+                            .type_role(theme, TypeRole::Section)
                             .text_color(theme.secondary)
                             .child(text!("ACCESSO PERSONALE")),
                     )
                     .child(
                         div()
                             .px(px(8.))
-                            .text_size(px(theme.body()))
+                            .type_role(theme, TypeRole::Body)
                             .child(text!(operator)),
                     )
                     .child(
@@ -2417,7 +2422,7 @@ impl ClinicalApp {
                     .flex_col()
                     .items_center()
                     .gap(px(4.))
-                    .text_size(px(theme.size(12.)))
+                    .type_role(theme, TypeRole::Meta)
                     .border_2()
                     .border_color(theme.shade)
                     .rounded(px(theme.control_radius))
@@ -2467,10 +2472,10 @@ impl ClinicalApp {
                 .flex()
                 .flex_col()
                 .gap(px(8.))
-                .child(clinical_text::render(source, theme))
+                .child(clinical_text::render(source, WritingInk::Fresh, theme))
                 .child(
                     div()
-                        .text_size(px(theme.size(12.)))
+                        .type_role(theme, TypeRole::Meta)
                         .text_color(theme.secondary)
                         .child(text!(
                             "Contenuto conservato. Questo campo resta invariato in questa modifica."
@@ -2528,8 +2533,7 @@ impl ClinicalApp {
             .gap(px(8.))
             .child(
                 div()
-                    .text_size(px(theme.body()))
-                    .font_weight(FontWeight::MEDIUM)
+                    .type_role(theme, TypeRole::Body)
                     .child(text!(field.label)),
             )
             .child(
@@ -2554,7 +2558,7 @@ impl ClinicalApp {
                     .on_click(cx.listener(|this, _, _, cx| { this.dark_override = Some(!this.dark); cx.notify(); }))))
             .child(div().flex().flex_col().gap(px(8.))
                 .child(heading("clinical-workspace-connect-heading", if paired { "Accedi al tuo archivio" } else { "Collega questo dispositivo" }, theme))
-                .child(div().text_color(theme.secondary).text_size(px(theme.body()))
+                .child(div().text_color(theme.secondary).type_role(theme, TypeRole::Body)
                     .child(text!(if paired { "Sblocca i dati con il tuo account personale." } else { "Usa i dati di abbinamento già assegnati al dispositivo sul computer che ospita l'archivio." }))));
         if let Some(pairing) = &self.pairing {
             panel = panel
@@ -2568,7 +2572,7 @@ impl ClinicalApp {
                         .gap(px(4.))
                         .child(
                             div()
-                                .text_size(px(theme.size(12.)))
+                                .type_role(theme, TypeRole::Section)
                                 .text_color(theme.secondary)
                                 .child(text!("ARCHIVIO SCELTO")),
                         )
@@ -2635,12 +2639,12 @@ impl ClinicalApp {
                 .when(!self.connecting, |el| el.on_click(cx.listener(|this, _, _, cx| this.connect(cx)))))
                 .child(self.login_actions[2].attach_enabled(button("clinical-workspace-change-archive", "Cambia collegamento…", theme, false, !self.connecting), !self.connecting)
                     .when(!self.connecting, |el| el.on_click(cx.listener(|this, _, _, cx| this.forget_pairing(cx)))))
-                .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary)
+                .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                     .child(text!("La frase di accesso non viene salvata su disco. L'abbinamento resta in memoria fino alla chiusura della finestra.")))
         } else {
             panel.child(self.login_actions[1].attach_enabled(button("clinical-workspace-continue-pairing", if self.connecting { "Preparazione in corso…" } else { "Continua con l'accesso" }, theme, true, !self.connecting), !self.connecting)
                 .when(!self.connecting, |el| el.on_click(cx.listener(|this, _, _, cx| this.prepare_pairing(cx)))))
-                .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary)
+                .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                     .child(text!("Il collegamento sarà verificato quando accedi. I dati di abbinamento non vengono salvati su disco.")))
         };
         div()
@@ -2709,7 +2713,7 @@ impl ClinicalApp {
                     .items_center()
                     .child(
                         div()
-                            .text_size(px(theme.size(12.)))
+                            .type_role(theme, TypeRole::Section)
                             .text_color(theme.secondary)
                             .child(text!("AMBULATORIO")),
                     )
@@ -2789,7 +2793,7 @@ impl ClinicalApp {
             .child(
                 div()
                     .text_color(theme.secondary)
-                    .text_size(px(theme.size(12.)))
+                    .type_role(theme, TypeRole::Meta)
                     .child(text!(
                         count
                             .map(|n| format!(
@@ -2830,16 +2834,13 @@ impl ClinicalApp {
                         .flex()
                         .flex_col()
                         .gap(px(12.))
-                        .child(
-                            div()
-                                .font_family(VOICE)
-                                .text_size(px(theme.size(22.)))
-                                .child(text!(if self.query.trim().is_empty() {
-                                    "Nessun paziente in questo elenco"
-                                } else {
-                                    "Nessun paziente corrisponde alla ricerca"
-                                })),
-                        )
+                        .child(div().type_role(theme, TypeRole::Strong).child(text!(
+                            if self.query.trim().is_empty() {
+                                "Nessun paziente in questo elenco"
+                            } else {
+                                "Nessun paziente corrisponde alla ricerca"
+                            }
+                        )))
                         .child(div().text_color(theme.secondary).child(text!(
                             "Controlla l'ambulatorio, l'archivio o il testo cercato."
                         ))),
@@ -2900,16 +2901,12 @@ impl ClinicalApp {
                             .gap(px(4.))
                             .child(
                                 div()
-                                    .font_weight(if selected {
-                                        FontWeight::SEMIBOLD
-                                    } else {
-                                        FontWeight::MEDIUM
-                                    })
+                                    .type_role(theme, TypeRole::Strong)
                                     .child(text!(patient.display_name())),
                             )
                             .child(
                                 div()
-                                    .text_size(px(theme.size(12.)))
+                                    .type_role(theme, TypeRole::Meta)
                                     .text_color(theme.secondary)
                                     .child(text!(format!(
                                         "{}{}{}",
@@ -2927,8 +2924,7 @@ impl ClinicalApp {
                         el.child(
                             div()
                                 .w(px(200.))
-                                .font_family(CODES)
-                                .text_size(px(theme.size(12.)))
+                                .type_role(theme, TypeRole::Code)
                                 .child(text!(patient.tax_code.clone())),
                         )
                     })
@@ -2936,7 +2932,7 @@ impl ClinicalApp {
                         el.child(
                             div()
                                 .text_color(theme.secondary)
-                                .text_size(px(theme.size(12.)))
+                                .type_role(theme, TypeRole::Meta)
                                 .child(text!(display_date(patient.updated_at.as_deref()))),
                         )
                     })
@@ -2990,8 +2986,7 @@ impl ClinicalApp {
             pane = pane
                 .child(
                     div()
-                        .font_family(VOICE)
-                        .text_size(px(theme.size(26.)))
+                        .type_role(theme, TypeRole::PersonPreview)
                         .child(text!(patient.display_name())),
                 )
                 .child(div().text_color(theme.secondary).child(text!(format!(
@@ -3000,8 +2995,7 @@ impl ClinicalApp {
                 ))))
                 .child(
                     div()
-                        .font_family(CODES)
-                        .text_size(px(theme.size(12.)))
+                        .type_role(theme, TypeRole::Code)
                         .child(text!(patient.tax_code.clone())),
                 )
                 .child(
@@ -3009,7 +3003,7 @@ impl ClinicalApp {
                         .border_t_1()
                         .border_color(theme.rule)
                         .pt(px(16.))
-                        .text_size(px(theme.body()))
+                        .type_role(theme, TypeRole::Body)
                         .child(text!("Allergie: dato non disponibile")),
                 )
                 .child(self.patient_notes(patient, cx))
@@ -3067,9 +3061,7 @@ impl ClinicalApp {
             .child(
                 div()
                     .id("clinical-workspace-notes-content")
-                    .font_family(VOICE)
-                    .text_size(px(theme.size(17.)))
-                    .line_height(px(theme.size(26.)))
+                    .type_role(theme, TypeRole::Prose)
                     .text_color(if unavailable {
                         theme.critical
                     } else {
@@ -3079,7 +3071,7 @@ impl ClinicalApp {
                         self.unreadable_field("clinical-workspace-notes-unreadable", cx)
                             .into_any_element()
                     } else {
-                        clinical_text::render(&content, theme)
+                        clinical_text::render(&content, WritingInk::Dry, theme)
                     }),
             )
     }
@@ -3154,14 +3146,22 @@ impl ClinicalApp {
                                 .flex()
                                 .flex_col()
                                 .gap(px(8.))
-                                .child(heading(
-                                    "clinical-workspace-patient-name",
-                                    patient.display_name(),
-                                    theme,
-                                ))
+                                .child(
+                                    heading(
+                                        "clinical-workspace-patient-name",
+                                        patient.display_name(),
+                                        theme,
+                                    )
+                                    .type_role(
+                                        theme,
+                                        TypeRole::Person {
+                                            compact: layout.compact,
+                                        },
+                                    ),
+                                )
                                 .child(
                                     div()
-                                        .text_size(px(theme.size(12.)))
+                                        .type_role(theme, TypeRole::Meta)
                                         .text_color(theme.secondary)
                                         .child(text!(format!(
                                             "Nascita {}{}{}",
@@ -3177,8 +3177,7 @@ impl ClinicalApp {
                                 .when(!layout.compact, |el| {
                                     el.child(
                                         div()
-                                            .font_family(CODES)
-                                            .text_size(px(theme.size(12.)))
+                                            .type_role(theme, TypeRole::Code)
                                             .child(text!(patient.tax_code.clone())),
                                     )
                                 }),
@@ -3207,7 +3206,7 @@ impl ClinicalApp {
                         .accessibility_id("clinical-workspace-allergies")
                         .role(Role::Note)
                         .aria_label("Allergie: dato non disponibile in questa scheda")
-                        .text_size(px(theme.size(12.)))
+                        .type_role(theme, TypeRole::Meta)
                         .text_color(theme.secondary)
                         .child(text!("Allergie: dato non disponibile in questa scheda")),
                 )
@@ -3389,8 +3388,7 @@ impl ClinicalApp {
                     ))
                     .child(
                         div()
-                            .font_family(VOICE)
-                            .text_size(px(theme.size(22.)))
+                            .type_role(theme, TypeRole::Strong)
                             .child(text!("Problemi e contesto")),
                     )
                     .when(diagnoses.is_err(), |el| {
@@ -3465,7 +3463,7 @@ impl ClinicalApp {
                                     .gap(px(4.))
                                     .child(
                                         div()
-                                            .font_weight(FontWeight::MEDIUM)
+                                            .type_role(theme, TypeRole::Strong)
                                             .child(text!(row.drug_name.clone())),
                                     )
                                     .child(
@@ -3542,7 +3540,7 @@ impl ClinicalApp {
                                     .gap(px(4.))
                                     .child(
                                         div()
-                                            .text_size(px(theme.size(12.)))
+                                            .type_role(theme, TypeRole::Meta)
                                             .text_color(theme.secondary)
                                             .child(text!(display_date(Some(&row.date)))),
                                     )
@@ -3665,12 +3663,12 @@ impl ClinicalApp {
                 div().id(SharedString::from(format!("clinical-workspace-entry-{id}"))).debug_selector(|| format!("clinical-workspace-entry-{id}")).role(Role::Article)
                     .aria_label(SharedString::from(format!("{}, {}", title, display_date(Some(&entry.date)))))
                     .border_b_1().border_color(theme.rule).pb(px(24.)).flex().flex_col().gap(px(8.))
-                    .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary)
+                    .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                         .child(text!(format!("{} · {}", display_date(Some(&entry.date)), entry_type_label(&entry.entry_type)))))
-                    .child(div().font_family(VOICE).text_size(px(theme.size(22.))).child(text!(title)))
+                    .child(div().type_role(theme, TypeRole::Strong).child(text!(title)))
                     .child(if entry.locked_fields.iter().any(|field| field == "content") {
                         self.unreadable_field("clinical-workspace-entry-unreadable", cx).into_any_element()
-                    } else { clinical_text::render(&entry.content, theme) })
+                    } else { clinical_text::render(&entry.content, WritingInk::Dry, theme) })
                     .child(button(format!("clinical-workspace-edit-entry-{id}"), "Modifica voce", theme, false, editable)
                         .when(editable, |el| el.on_click(cx.listener(move |this, _, _, cx| this.edit_record(editing::Kind::Entry, &edit_id, cx)))))
                     .when(!unavailable, |el| el.child(div().flex().child(button(format!("clinical-workspace-copy-entry-{id}"), "Copia voce", theme, false, true)
@@ -3679,7 +3677,7 @@ impl ClinicalApp {
                             this.message = Some(("Voce copiata.".into(), false)); cx.notify();
                         })))))
             }))
-            .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary)
+            .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                 .child(text!("Liste, enfasi e barrature conservano il significato del testo registrato. Per modifiche di formattazione e allegati usa l'editor corrente.")))
     }
 
@@ -3770,10 +3768,10 @@ impl ClinicalApp {
                             .child(record_header(
                                 theme,
                                 div()
-                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .type_role(theme, TypeRole::Strong)
                                     .child(text!(row.drug_name.clone())),
                                 div()
-                                    .text_size(px(theme.size(12.)))
+                                    .type_role(theme, TypeRole::Meta)
                                     .text_color(theme.secondary)
                                     .child(text!(therapy_status(&row.status))),
                             ))
@@ -3794,7 +3792,7 @@ impl ClinicalApp {
                             .child(text!(row.dosage.clone()))
                             .child(
                                 div()
-                                    .text_size(px(theme.size(12.)))
+                                    .type_role(theme, TypeRole::Meta)
                                     .text_color(theme.secondary)
                                     .child(text!(format!(
                                         "Dal {}{}",
@@ -3818,15 +3816,13 @@ impl ClinicalApp {
                                 !row.locked_fields.iter().any(|field| field == "motivation")
                                     && row.motivation.is_some(),
                                 |el| {
-                                    el.child(
-                                        div()
-                                            .font_family(VOICE)
-                                            .text_size(px(theme.size(17.)))
-                                            .child(clinical_text::render(
-                                                row.motivation.as_deref().unwrap_or_default(),
-                                                theme,
-                                            )),
-                                    )
+                                    el.child(div().type_role(theme, TypeRole::Prose).child(
+                                        clinical_text::render(
+                                            row.motivation.as_deref().unwrap_or_default(),
+                                            WritingInk::Dry,
+                                            theme,
+                                        ),
+                                    ))
                                 },
                             )
                     }),
@@ -3931,22 +3927,21 @@ impl ClinicalApp {
                     .child(record_header(
                         theme,
                         div()
-                            .font_weight(FontWeight::SEMIBOLD)
+                            .type_role(theme, TypeRole::Strong)
                             .child(text!(row.display.clone())),
                         div()
-                            .font_weight(FontWeight::MEDIUM)
+                            .type_role(theme, TypeRole::Strong)
                             .child(text!(format!("{} {}", row.value, row.unit_code))),
                     ))
                     .child(
                         div()
-                            .text_size(px(theme.size(12.)))
+                            .type_role(theme, TypeRole::Meta)
                             .text_color(theme.secondary)
                             .child(text!(display_date(Some(&row.observed_at)))),
                     )
                     .child(
                         div()
-                            .font_family(CODES)
-                            .text_size(px(theme.size(12.)))
+                            .type_role(theme, TypeRole::Code)
                             .text_color(theme.secondary)
                             .child(text!(format!("{} {}", row.code_system, row.code))),
                     )
@@ -3979,15 +3974,13 @@ impl ClinicalApp {
                         !row.locked_fields.iter().any(|field| field == "notes")
                             && row.notes.is_some(),
                         |el| {
-                            el.child(
-                                div()
-                                    .font_family(VOICE)
-                                    .text_size(px(theme.size(17.)))
-                                    .child(clinical_text::render(
-                                        row.notes.as_deref().unwrap_or_default(),
-                                        theme,
-                                    )),
-                            )
+                            el.child(div().type_role(theme, TypeRole::Prose).child(
+                                clinical_text::render(
+                                    row.notes.as_deref().unwrap_or_default(),
+                                    WritingInk::Dry,
+                                    theme,
+                                ),
+                            ))
                         },
                     )
             }))
@@ -4027,8 +4020,8 @@ impl ClinicalApp {
                 div().id(SharedString::from(format!("clinical-workspace-document-{id}")))
                     .min_w_0().max_w_full()
                     .border_b_1().border_color(theme.rule).py(px(16.)).flex().flex_col().gap(px(8.))
-                    .child(div().min_w_0().max_w_full().font_weight(FontWeight::MEDIUM).child(text!(name)))
-                    .child(div().min_w_0().max_w_full().text_size(px(theme.size(12.))).text_color(theme.secondary)
+                    .child(div().min_w_0().max_w_full().type_role(theme, TypeRole::Strong).child(text!(name)))
+                    .child(div().min_w_0().max_w_full().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                         .child(text!(format!("{} · {} · {}", row.mime_type, format_size(row.size), display_date(row.created_at.as_deref())))))
                     .child(div().min_w_0().max_w_full().flex().flex_wrap().gap(px(8.))
                         .child(button(format!("clinical-workspace-document-details-{id}"), if details_open { "Chiudi sintesi e fonte" } else { "Sintesi e fonte" }, theme, false, can_open)
@@ -4085,7 +4078,7 @@ impl ClinicalApp {
         div().flex().flex_col().gap(px(20.))
             .child(div().flex().flex_col().gap(px(8.))
                 .child(section("clinical-workspace-draft-heading", if review { "RIVEDI PRIMA DI REGISTRARE" } else { "BOZZA NON REGISTRATA" }, theme))
-                .child(div().font_family(VOICE).text_size(px(theme.size(26.))).text_color(theme.fresh).child(text!(form.edit.as_ref().map_or(form.kind.title(), editing::Record::title))))
+                .child(div().type_role(theme, TypeRole::PageTitle).text_color(theme.fresh).child(text!(form.edit.as_ref().map_or(form.kind.title(), editing::Record::title))))
                 .child(div().text_color(theme.secondary).child(text!(match form.kind {
                     FormKind::Notes => "La conferma sostituisce soltanto le note della scheda del paziente indicato.",
                     FormKind::Entry => "Questa voce è una nota di diario. Per una visita strutturata, un contatto remoto o allegati usa l'editor corrente.",
@@ -4099,15 +4092,15 @@ impl ClinicalApp {
                     FormKind::PatientProfile => "La conferma aggiorna soltanto i campi anagrafici che hai modificato. Le note e gli altri dati clinici restano fuori da questa modifica.",
                 }))))
             .when_some(form.upload.as_ref(), |el, upload| el.child(div().flex().flex_col().gap(px(12.))
-                .child(div().font_weight(FontWeight::MEDIUM).child(text!(upload.name.clone())))
-                .child(div().font_family(CODES).child(text!(upload.mime_type.clone())))
+                .child(div().type_role(theme, TypeRole::Strong).child(text!(upload.name.clone())))
+                .child(div().type_role(theme, TypeRole::Meta).child(text!(upload.mime_type.clone())))
                 .child(text!(format!("{} · copia scelta in memoria", format_size(upload.bytes.len() as u64))))
                 .child(div().text_color(theme.secondary).child(text!("Il formato è associato all'estensione del file. La conferma non interpreta il contenuto e non apre il documento.")))))
             .when(form.kind == FormKind::Therapy, |el| el.child(self.therapy_picker_view(cx)))
             .children(form.fields.iter().enumerate()
                 .filter(|(index, field)| !(form.kind == FormKind::Therapy && *index == 0 && field.read_only))
                 .map(|(index, field)| self.field_view(field, format!("clinical-workspace-form-field-{index}"), cx)))
-            .when(form.kind == FormKind::Entry && !review, |el| el.child(div().text_size(px(theme.size(12.))).text_color(theme.secondary)
+            .when(form.kind == FormKind::Entry && !review, |el| el.child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                 .child(text!("Il testo della nuova nota è semplice. Le voci già presenti conservano il loro formato originale nell'archivio."))))
     }
 
@@ -4154,7 +4147,7 @@ impl ClinicalApp {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_size(px(theme.size(12.)))
+                            .type_role(theme, TypeRole::Meta)
                             .text_color(theme.secondary)
                             .child(text!(self.verified.clone().unwrap_or_else(|| {
                                 if self
@@ -4221,16 +4214,16 @@ impl ClinicalApp {
             FormState::Draft => threshold.bg(theme.draft).border_color(theme.draft_rule)
                 .child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
                     .child(div().flex_1().min_w_0().flex().flex_col().gap(px(4.))
-                        .child(div().font_weight(FontWeight::MEDIUM).text_color(theme.fresh).child(text!("● Bozza non registrata")))
-                        .child(div().text_size(px(theme.size(12.))).child(text!(format!("{} · {}", patient_name, form.edit.as_ref().map_or(form.kind.title(), editing::Record::title))))))
+                        .child(writing_status("clinical-workspace-writing-status", WritingInk::Fresh, WritingSurface::Plane, theme))
+                        .child(div().type_role(theme, TypeRole::Meta).child(text!(format!("{} · {}", patient_name, form.edit.as_ref().map_or(form.kind.title(), editing::Record::title))))))
                     .child(div().flex().flex_wrap().gap(px(8.))
                         .child(self.form_actions[0].attach(button("clinical-workspace-cancel-form", "Scarta…", theme, false, true))
                             .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Form, cx))))
                         .child(self.form_actions[1].attach_enabled(button("clinical-workspace-review-save", if form.kind == FormKind::Scale { "Prepara e rivedi" } else { "Registra 1 elemento" }, theme, true, review_enabled), review_enabled)
                             .when(review_enabled, |el| el.on_click(cx.listener(|this, _, window, cx| this.review_form(window, cx))))))),
             FormState::Review => threshold.bg(theme.threshold).text_color(theme.threshold_text)
-                .child(div().font_weight(FontWeight::SEMIBOLD).child(text!(if repeated_scale { format!("Ripetere l’invio della stessa valutazione per {patient_name}?") } else if form.kind == FormKind::PatientNew { format!("Creare la scheda di {patient_name} nell'ambulatorio selezionato?") } else { format!("Registrare {} nella scheda di {}?", if form.edit.is_some() { "le modifiche" } else { form.kind.noun() }, patient_name) })))
-                .child(div().text_size(px(theme.size(12.))).child(text!("Controlla il contenuto qui sopra. La registrazione sarà confermata soltanto dopo la rilettura.")))
+                .child(div().type_role(theme, TypeRole::Threshold).child(text!(if repeated_scale { format!("Ripetere l’invio della stessa valutazione per {patient_name}?") } else if form.kind == FormKind::PatientNew { format!("Creare la scheda di {patient_name} nell'ambulatorio selezionato?") } else { format!("Registrare {} nella scheda di {}?", if form.edit.is_some() { "le modifiche" } else { form.kind.noun() }, patient_name) })))
+                .child(div().type_role(theme, TypeRole::Meta).child(text!("Controlla il contenuto qui sopra. La registrazione sarà confermata soltanto dopo la rilettura.")))
                 .child(div().flex().flex_wrap().gap(px(8.))
                     .child(self.form_actions[2].attach(button("clinical-workspace-cancel-review", if repeated_scale { "Continua la verifica" } else { "Torna alla bozza" }, theme, false, true))
                         .on_click(cx.listener(|this, _, window, cx| this.cancel_review(window, cx))))
@@ -4239,7 +4232,7 @@ impl ClinicalApp {
             FormState::Saving => threshold.bg(theme.draft)
                 .child(div().id("clinical-workspace-saving-status").accessibility_id("clinical-workspace-saving-status").role(Role::Status).aria_label("Registrazione e rilettura in corso")
                     .child(text!(if form.scale.as_ref().is_some_and(ScaleAssessment::is_reading) { "Rilettura della voce e verifica del contesto in corso…" } else { "Registrazione e rilettura in corso…" })))
-                .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary)
+                .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                     .child(text!("La bozza resta visibile fino alla verifica. Non inviare di nuovo."))),
             FormState::Conflict | FormState::Uncertain | FormState::Rejected => {
                 let label = if form.kind == FormKind::Scale && !repeated_scale { "Valutazione da rivedere. Le risposte sono conservate." } else { match form.state {
@@ -4248,7 +4241,7 @@ impl ClinicalApp {
                     _ => "Esito da verificare. La bozza è conservata.",
                 }};
                 threshold.bg(theme.draft).child(div().id("clinical-workspace-save-uncertain").accessibility_id("clinical-workspace-save-uncertain").role(Role::Alert).aria_label(label).child(text!(label)))
-                    .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary)
+                    .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                         .child(text!(if form.kind == FormKind::Scale { "La rilettura non invia la valutazione. Le risposte restano in questa finestra fino alla verifica o alla chiusura esplicita." } else { "Copia il testo se vuoi conservarlo, poi rileggi la scheda prima di una nuova modifica." })))
                     .child(div().flex().flex_wrap().gap(px(8.))
                         .child(self.form_actions[6].attach(button("clinical-workspace-copy-draft", "Copia bozza", theme, false, true))
@@ -4358,7 +4351,7 @@ impl ClinicalApp {
         let selected = self.area;
         area = area.child(div().w_full().min_w_0().max_w(px(720.)).flex().flex_col().gap(px(24.))
             .child(heading("clinical-workspace-area-heading", self.area.title(), theme))
-            .child(div().font_family(VOICE).text_size(px(theme.size(22.))).line_height(px(theme.size(30.))).child(text!(description)))
+            .child(div().type_role(theme, TypeRole::Strong).child(text!(description)))
             .child(notice("clinical-workspace-area-connection", "Quest'area non è ancora integrata nella finestra nativa. Il pulsante apre la funzione esistente; l'accesso potrebbe essere richiesto di nuovo.", theme, false))
             .child(button("clinical-workspace-open-current-area", button_label, theme, true, true)
                 .on_click(cx.listener(move |this, _, _, cx| this.open_current(selected.current_path(), cx)))));
@@ -4426,7 +4419,7 @@ impl ClinicalApp {
                     .child(button("clinical-workspace-global-current", "Interfaccia corrente…", theme, false, true)
                         .on_click(cx.listener(move |this, _, _, cx| this.open_current(selected.current_path(), cx))))))
             .child(div().flex().flex_wrap().items_center().gap(px(8.))
-                .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary).child(text!("AMBULATORIO")))
+                .child(div().type_role(theme, TypeRole::Section).text_color(theme.secondary).child(text!("AMBULATORIO")))
                 .children(self.ambulatories.ready().into_iter().flatten().map(|scope| {
                     let id = scope.id.clone();
                     button(format!("clinical-workspace-global-ambulatory-{id}"), scope.name.clone(), theme, false, true)
@@ -4444,11 +4437,11 @@ impl ClinicalApp {
                     }))
                     .child(self.global_apply_target.attach_enabled(button("clinical-workspace-apply-dates", "Applica intervallo", theme, false, self.scope.is_some()), self.scope.is_some())
                         .when(self.scope.is_some(), |el| el.on_click(cx.listener(|this, _, _, cx| this.apply_global_interval(cx))))))
-                .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary)
+                .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                     .child(text!("I giorni estremi sono inclusi, nel fuso orario di questo computer. Lascia vuoto un campo per non fissare quel limite.")))
                 .when_some(self.global_date_error.as_ref(), |el, error| el.child(notice("clinical-workspace-date-error", format!("{error} L'intervallo applicato non è cambiato."), theme, true)))
                 .child(div().id("clinical-workspace-applied-interval").role(Role::Status)
-                    .text_size(px(theme.size(12.))).child(text!(self.global_interval.description()))))
+                    .type_role(theme, TypeRole::Meta).child(text!(self.global_interval.description()))))
             .child(self.global_search_target.attach_enabled(
                 div().id("clinical-workspace-global-search-anchor").min_w_0().max_w_full()
                     .child(self.global_search.clone()),
@@ -4458,7 +4451,7 @@ impl ClinicalApp {
                 if matches!(self.global_patients, Load::Loading) { "Carico i nomi dei pazienti…" } else { "Alcuni nomi non sono disponibili nell'elenco caricato. Puoi rileggere o aprire la singola scheda." }, theme,
                 matches!(self.global_patients, Load::Failed(_)))))
             .child(if agenda { self.agenda_view(cx) } else { self.global_diary_view(cx) })
-            .child(div().border_t_1().border_color(theme.rule).pt(px(16.)).text_size(px(theme.size(12.))).text_color(theme.secondary)
+            .child(div().border_t_1().border_color(theme.rule).pt(px(16.)).type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                 .child(text!(if agenda { "La lettura comprende al massimo 200 controlli nell'intervallo applicato, dal meno recente. Altri controlli potrebbero non comparire: restringi l'intervallo per cercarli. La ricerca testuale riguarda soltanto i risultati caricati." }
                     else { "La lettura comprende al massimo le 50 voci più recenti nell'intervallo applicato. Le voci eliminate sono escluse. Per cercare voci meno recenti scegli altre date; la ricerca testuale riguarda soltanto i risultati caricati." })))
     }
@@ -4496,8 +4489,7 @@ impl ClinicalApp {
             return content.child(
                 div()
                     .py(px(28.))
-                    .font_family(VOICE)
-                    .text_size(px(theme.size(22.)))
+                    .type_role(theme, TypeRole::Strong)
                     .child(text!("Nessun controllo tra i risultati caricati.")),
             );
         }
@@ -4525,7 +4517,7 @@ impl ClinicalApp {
                     .when(group == AgendaGroup::Overdue, |el| {
                         el.child(
                             div()
-                                .text_size(px(theme.size(12.)))
+                                .type_role(theme, TypeRole::Meta)
                                 .text_color(theme.secondary)
                                 .child(text!(
                                     "Data precedente a oggi, senza completamento registrato."
@@ -4569,21 +4561,20 @@ impl ClinicalApp {
                             .gap(px(8.))
                             .child(record_header(
                                 theme,
-                                div().font_weight(FontWeight::SEMIBOLD).child(text!(name)),
+                                div().type_role(theme, TypeRole::Strong).child(text!(name)),
                                 div()
-                                    .text_size(px(theme.size(12.)))
+                                    .type_role(theme, TypeRole::Meta)
                                     .text_color(theme.secondary)
                                     .child(text!(display_appointment(&row.date))),
                             ))
                             .child(
                                 div()
-                                    .font_family(VOICE)
-                                    .text_size(px(theme.size(22.)))
+                                    .type_role(theme, TypeRole::Strong)
                                     .child(text!(row.title.clone())),
                             )
                             .child(
                                 div()
-                                    .text_size(px(theme.size(12.)))
+                                    .type_role(theme, TypeRole::Meta)
                                     .text_color(theme.secondary)
                                     .child(text!(checkup_status(&row.status))),
                             )
@@ -4606,11 +4597,11 @@ impl ClinicalApp {
                                 |el| {
                                     el.child(
                                         div()
-                                            .font_family(VOICE)
-                                            .text_size(px(theme.size(17.)))
+                                            .type_role(theme, TypeRole::Prose)
                                             .line_clamp(3)
                                             .child(clinical_text::render(
                                                 row.notes.as_deref().unwrap_or_default(),
+                                                WritingInk::Dry,
                                                 theme,
                                             )),
                                     )
@@ -4618,7 +4609,7 @@ impl ClinicalApp {
                             )
                             .child(
                                 div()
-                                    .text_size(px(theme.size(12.)))
+                                    .type_role(theme, TypeRole::Meta)
                                     .text_color(theme.fresh)
                                     .child(text!("Apri scheda")),
                             )
@@ -4669,8 +4660,7 @@ impl ClinicalApp {
                     el.child(
                         div()
                             .py(px(28.))
-                            .font_family(VOICE)
-                            .text_size(px(theme.size(22.)))
+                            .type_role(theme, TypeRole::Strong)
                             .child(text!("Nessuna voce tra i risultati caricati.")),
                     )
                 },
@@ -4719,9 +4709,9 @@ impl ClinicalApp {
                     .gap(px(8.))
                     .child(record_header(
                         theme,
-                        div().font_weight(FontWeight::SEMIBOLD).child(text!(name)),
+                        div().type_role(theme, TypeRole::Strong).child(text!(name)),
                         div()
-                            .text_size(px(theme.size(12.)))
+                            .type_role(theme, TypeRole::Meta)
                             .text_color(theme.secondary)
                             .child(text!(format!(
                                 "{} · {}",
@@ -4729,28 +4719,17 @@ impl ClinicalApp {
                                 entry_type_label(&row.entry_type)
                             ))),
                     ))
+                    .child(div().type_role(theme, TypeRole::Strong).child(text!(title)))
+                    .child(div().type_role(theme, TypeRole::Prose).child(
+                        if row.locked_fields.iter().any(|field| field == "content") {
+                            div().child(text!(content)).into_any_element()
+                        } else {
+                            clinical_text::render(&row.content, WritingInk::Dry, theme)
+                        },
+                    ))
                     .child(
                         div()
-                            .font_family(VOICE)
-                            .text_size(px(theme.size(22.)))
-                            .child(text!(title)),
-                    )
-                    .child(
-                        div()
-                            .font_family(VOICE)
-                            .text_size(px(theme.size(17.)))
-                            .line_height(px(theme.size(26.)))
-                            .child(
-                                if row.locked_fields.iter().any(|field| field == "content") {
-                                    div().child(text!(content)).into_any_element()
-                                } else {
-                                    clinical_text::render(&row.content, theme)
-                                },
-                            ),
-                    )
-                    .child(
-                        div()
-                            .text_size(px(theme.size(12.)))
+                            .type_role(theme, TypeRole::Meta)
                             .text_color(theme.fresh)
                             .child(text!("Apri diario del paziente")),
                     )
@@ -4973,7 +4952,8 @@ impl Render for ClinicalApp {
                             || field.rich_source.is_some()
                             || !field.choices.is_empty(),
                         cx,
-                    )
+                    );
+                    input.set_writing_ink(WritingInk::Fresh, cx);
                 });
             }
         }
@@ -5112,9 +5092,7 @@ impl Render for ClinicalApp {
             .flex_col()
             .bg(theme.shade)
             .text_color(theme.ink)
-            .font_family(SYSTEM)
-            .text_size(px(theme.body()))
-            .line_height(px(theme.size(20.)))
+            .type_role(theme, TypeRole::Body)
             .when(connected && layout.magnified, |el| {
                 el.child(
                     div()
@@ -5596,7 +5574,7 @@ impl ClinicalApp {
                     .gap(px(8.))
                     .child(
                         div()
-                            .text_size(px(theme.size(12.)))
+                            .type_role(theme, TypeRole::Meta)
                             .text_color(theme.secondary)
                             .child(text!(format!(
                                 "{} · {}",
@@ -5604,7 +5582,7 @@ impl ClinicalApp {
                                 checkup_status(&row.status)
                             ))),
                     )
-                    .child(div().font_weight(FontWeight::MEDIUM).child(text!(
+                    .child(div().type_role(theme, TypeRole::Strong).child(text!(
                         if row.locked_fields.iter().any(|field| field == "title") {
                             "Titolo non leggibile".to_owned()
                         } else {
@@ -5625,6 +5603,7 @@ impl ClinicalApp {
                         |el| {
                             el.child(clinical_text::render(
                                 row.notes.as_deref().unwrap_or_default(),
+                                WritingInk::Dry,
                                 theme,
                             ))
                         },
@@ -5867,7 +5846,7 @@ impl ClinicalApp {
                 })))
             .when(self.ambulatories.message().is_some(), |el| el.child(self.load_hint("clinical-workspace-reference-ambulatories-state", &self.ambulatories)))
             .child(div().flex().flex_wrap().gap(px(8.)).items_center()
-                .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary).child(text!("AMBULATORIO")))
+                .child(div().type_role(theme, TypeRole::Section).text_color(theme.secondary).child(text!("AMBULATORIO")))
                 .children(self.ambulatories.ready().into_iter().flatten().map(|scope| {
                     let id = scope.id.clone();
                     button(format!("clinical-workspace-reference-scope-{id}"), scope.name.clone(), theme, false, true)
@@ -5885,10 +5864,10 @@ impl ClinicalApp {
                         .child(self.reference_search.clone()), false))
                 .child(self.reference_run_target.attach_enabled(button("clinical-workspace-reference-run-search", "Cerca", theme, true, self.scope.is_some()), self.scope.is_some())
                     .when(self.scope.is_some(), |el| el.on_click(cx.listener(|this, _, _, cx| this.load_references(cx))))))
-            .when_some(total, |el, total| el.child(div().text_size(px(theme.size(12.))).text_color(theme.secondary)
+            .when_some(total, |el, total| el.child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                 .child(text!(format!("{total} riferimenti nel repertorio completo dell'archivio.")))))
             .when_some(provenance, |el, provenance| {
-                el.child(div().flex().flex_col().gap(px(4.)).text_size(px(theme.size(12.))).text_color(theme.secondary)
+                el.child(div().flex().flex_col().gap(px(4.)).type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                     .child(text!(format!("{} · {}", provenance.display, provenance.source)))
                     .when_some(provenance.version.as_ref(), |el, version| el.child(text!(format!("Versione: {version}"))))
                     .when_some(provenance.updated_at.as_ref(), |el, date| el.child(text!(format!("Aggiornamento riportato: {}", display_date(Some(date))))))
@@ -5912,7 +5891,7 @@ impl ClinicalApp {
             pane = pane
                 .child(
                     div()
-                        .text_size(px(theme.size(12.)))
+                        .type_role(theme, TypeRole::Meta)
                         .text_color(theme.secondary)
                         .child(text!(format!("{} risultati · {query}", rows.len()))),
                 )
@@ -5924,10 +5903,10 @@ impl ClinicalApp {
                 .child(rows.render(theme));
         }
         pane.child(div().border_t_1().border_color(theme.rule).pt(px(16.)).flex().flex_col().gap(px(12.))
-            .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary).child(text!(format!("Ogni ricerca mostra al massimo {} risultati. Affina nome o codice per trovare altri riferimenti; il limite non prova che il repertorio sia completo.", self.reference_kind.limit()))))
+            .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary).child(text!(format!("Ogni ricerca mostra al massimo {} risultati. Affina nome o codice per trovare altri riferimenti; il limite non prova che il repertorio sia completo.", self.reference_kind.limit()))))
             .child(button("clinical-workspace-reference-other-systems", "Catalogo ICD-11 incorporato e altri repertori…", theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| this.open_current(Area::References.current_path(), cx))))
-            .child(div().text_size(px(theme.size(12.))).text_color(theme.secondary).child(text!("Gli altri sistemi usano il loro percorso nell'interfaccia corrente."))))
+            .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary).child(text!("Gli altri sistemi usano il loro percorso nell'interfaccia corrente."))))
     }
 }
 

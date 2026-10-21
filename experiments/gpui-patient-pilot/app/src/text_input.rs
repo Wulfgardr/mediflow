@@ -14,7 +14,8 @@ use gpui::{
 };
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::theme::{Theme, VOICE};
+use crate::components::{WritingInk, WritingStyle, WritingSurface};
+use crate::theme::{Theme, TypeRole, TypeStyle};
 
 actions!(
     mediflow_text,
@@ -73,6 +74,7 @@ pub struct TextInput {
     multiline: bool,
     secret: bool,
     theme: Theme,
+    writing_ink: Option<WritingInk>,
     undo: Vec<Snapshot>,
     redo: Vec<Snapshot>,
 }
@@ -107,6 +109,7 @@ impl TextInput {
             multiline,
             secret: false,
             theme,
+            writing_ink: None,
             undo: Vec::new(),
             redo: Vec::new(),
         }
@@ -122,6 +125,13 @@ impl TextInput {
         self.theme = theme;
         self.read_only = read_only;
         cx.notify();
+    }
+
+    pub fn set_writing_ink(&mut self, ink: WritingInk, cx: &mut Context<Self>) {
+        if self.writing_ink != Some(ink) {
+            self.writing_ink = Some(ink);
+            cx.notify();
+        }
     }
 
     pub fn secret(mut self) -> Self {
@@ -354,7 +364,15 @@ impl TextInput {
         let target = point(
             position.x,
             position.y
-                + px(self.theme.size(if self.multiline { 28. } else { 20. })) * direction
+                + px(self
+                    .theme
+                    .role(if self.multiline {
+                        TypeRole::Prose
+                    } else {
+                        TypeRole::Body
+                    })
+                    .line_height)
+                    * direction
                 + px(1.),
         );
         let index = layout.index_for_position(target).unwrap_or_else(|i| i);
@@ -822,14 +840,19 @@ impl Render for TextInput {
             .rounded(px(theme.control_radius))
             .bg(theme.paper)
             .focus(|style| style.border_color(theme.fresh).border_2())
-            .text_color(if empty { theme.secondary } else { theme.ink })
-            .text_size(px(if self.multiline {
-                theme.size(17.)
-            } else {
-                theme.body()
-            }))
-            .line_height(px(theme.size(if self.multiline { 28. } else { 20. })))
-            .when(self.multiline, |el| el.font_family(VOICE))
+            .text_color(theme.ink)
+            .when_some(self.writing_ink, |element, ink| {
+                element.writing_ink(ink, WritingSurface::Plane, theme)
+            })
+            .when(empty, |element| element.text_color(theme.secondary))
+            .type_role(
+                theme,
+                if self.multiline {
+                    TypeRole::Prose
+                } else {
+                    TypeRole::Body
+                },
+            )
             .on_action(cx.listener(Self::backspace))
             .on_action(cx.listener(Self::delete))
             .on_action(cx.listener(Self::left))

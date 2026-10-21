@@ -1,9 +1,9 @@
 //! Small shared GPUI controls, following the existing product's words and tokens.
 
-use crate::theme::{Theme, VOICE};
+use crate::theme::Theme;
+use crate::theme::{TypeRole, TypeStyle};
 use gpui::{
-    Div, FontWeight, Image, ImageFormat, Img, Role, SharedString, Stateful, div, img, prelude::*,
-    px, text,
+    Div, Image, ImageFormat, Img, Role, SharedString, Stateful, div, img, prelude::*, px, text,
 };
 use std::sync::{Arc, OnceLock};
 
@@ -36,8 +36,7 @@ pub fn button(
         .flex()
         .items_center()
         .justify_center()
-        .text_size(px(theme.body()))
-        .font_weight(FontWeight::SEMIBOLD)
+        .type_role(theme, TypeRole::Strong)
         .rounded(px(theme.control_radius))
         .border_1()
         .border_color(if primary && enabled {
@@ -87,12 +86,14 @@ pub fn tab(id: &'static str, label: &'static str, selected: bool, theme: Theme) 
         .flex()
         .items_center()
         .justify_center()
-        .text_size(px(theme.body()))
-        .font_weight(if selected {
-            FontWeight::SEMIBOLD
-        } else {
-            FontWeight::NORMAL
-        })
+        .type_role(
+            theme,
+            if selected {
+                TypeRole::Strong
+            } else {
+                TypeRole::Body
+            },
+        )
         .text_color(if selected { theme.ink } else { theme.secondary })
         .bg(if selected { theme.paper } else { theme.shade })
         .border_b_2()
@@ -123,9 +124,7 @@ pub fn heading(id: &'static str, label: impl Into<SharedString>, theme: Theme) -
         .min_w_0()
         .max_w_full()
         .whitespace_normal()
-        .font_family(VOICE)
-        .text_size(px(theme.size(26.)))
-        .font_weight(FontWeight::NORMAL)
+        .type_role(theme, TypeRole::PageTitle)
         .text_color(theme.ink)
         .child(text!(label))
 }
@@ -136,7 +135,7 @@ pub fn section(
     theme: Theme,
 ) -> Stateful<Div> {
     let id = id.into();
-    let label = label.into();
+    let label: SharedString = theme.role(TypeRole::Section).label(label.into()).into();
     div()
         .id(id.clone())
         .accessibility_id(id)
@@ -145,8 +144,7 @@ pub fn section(
         .min_w_0()
         .max_w_full()
         .whitespace_normal()
-        .text_size(px(theme.size(12.)))
-        .font_weight(FontWeight::SEMIBOLD)
+        .type_role(theme, TypeRole::Section)
         .text_color(theme.secondary)
         .pb(px(8.))
         .child(text!(label))
@@ -182,7 +180,7 @@ pub fn notice(
         } else {
             theme.secondary
         })
-        .text_size(px(theme.body()))
+        .type_role(theme, TypeRole::Body)
         .child(text!(message))
 }
 
@@ -247,5 +245,318 @@ mod tests {
             plain_text("<p>Pressione <140/90.</p>"),
             "Pressione <140/90."
         );
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WritingInk {
+    Pencil,
+    Fresh,
+    Dry,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WritingSurface {
+    Plane,
+    Threshold,
+}
+
+impl WritingInk {
+    pub fn word(self) -> &'static str {
+        match self {
+            Self::Pencil => "Proposta",
+            Self::Fresh => "Bozza non registrata",
+            Self::Dry => "Registrata",
+        }
+    }
+    pub fn color(self, surface: WritingSurface, theme: Theme) -> gpui::Hsla {
+        if surface == WritingSurface::Threshold {
+            return theme.threshold_text;
+        }
+        match self {
+            Self::Pencil => theme.pencil,
+            Self::Fresh => theme.fresh,
+            Self::Dry => theme.ink,
+        }
+    }
+}
+pub fn writing_status(
+    id: impl Into<SharedString>,
+    ink: WritingInk,
+    surface: WritingSurface,
+    theme: Theme,
+) -> Stateful<Div> {
+    let id = id.into();
+    let color = ink.color(surface, theme);
+
+    div()
+        .id(id.clone())
+        .accessibility_id(id)
+        .role(Role::Status)
+        .aria_label(ink.word())
+        .flex()
+        .items_center()
+        .gap(px(8.))
+        .type_role(theme, TypeRole::Meta)
+        .text_color(color)
+        .child(writing_dot(ink, surface, theme))
+        .child(writing_word(ink, surface, theme))
+}
+
+pub trait WritingStyle: Styled + Sized {
+    fn writing_ink(self, ink: WritingInk, surface: WritingSurface, theme: Theme) -> Self {
+        let element = self.text_color(ink.color(surface, theme));
+        if ink == WritingInk::Pencil {
+            element
+                .w_auto()
+                .flex_none()
+                .max_w_full()
+                .pb(px(4.))
+                .border_b_1()
+                .border_dashed()
+                .border_color(ink.color(surface, theme))
+        } else {
+            element
+        }
+    }
+}
+impl<T: Styled> WritingStyle for T {}
+
+pub fn number_line(
+    id: &'static str,
+    prefix: &str,
+    number: impl Into<SharedString>,
+    suffix: &str,
+    theme: Theme,
+) -> Stateful<Div> {
+    let number = number.into();
+    div()
+        .id(id)
+        .accessibility_id(id)
+        .role(Role::Status)
+        .aria_label(format!("{prefix}{number}{suffix}"))
+        .debug_selector(move || id.to_owned())
+        .min_w_0()
+        .flex()
+        .flex_row()
+        .items_baseline()
+        .gap(px(4.))
+        .type_role(theme, TypeRole::Body)
+        .text_color(theme.ink)
+        .when(!prefix.is_empty(), |element| {
+            element.child(
+                div()
+                    .debug_selector(move || format!("{id}-meaning"))
+                    .child(text!(prefix.trim().to_owned())),
+            )
+        })
+        .child(
+            div()
+                .debug_selector(move || format!("{id}-number"))
+                .flex_shrink_0()
+                .type_role(theme, TypeRole::Threshold)
+                .child(text!(number)),
+        )
+        .when(!suffix.is_empty(), |element| {
+            element.child(
+                div()
+                    .min_w_0()
+                    .debug_selector(move || format!("{id}-meaning"))
+                    .child(text!(suffix.trim().to_owned())),
+            )
+        })
+}
+
+fn writing_word(ink: WritingInk, surface: WritingSurface, theme: Theme) -> Stateful<Div> {
+    div()
+        .id("writing-ink-word")
+        .text_color(ink.color(surface, theme))
+        .child(text!(ink.word()))
+        .when(ink == WritingInk::Pencil, |el| {
+            el.pb(px(4.))
+                .border_b_1()
+                .border_dashed()
+                .border_color(ink.color(surface, theme))
+        })
+}
+
+fn writing_dot(ink: WritingInk, surface: WritingSurface, theme: Theme) -> Stateful<Div> {
+    let color = ink.color(surface, theme);
+    let diameter = theme.role(TypeRole::Meta).size * 0.44;
+    div()
+        .id("writing-ink-dot")
+        .w(px(diameter))
+        .h(px(diameter))
+        .flex_shrink_0()
+        .rounded_full()
+        .when(ink == WritingInk::Pencil, |el| {
+            el.border(px(1.5)).border_color(color)
+        })
+        .when(ink != WritingInk::Pencil, |el| el.bg(color))
+}
+
+#[cfg(test)]
+mod writing_tests {
+    use super::*;
+    use gpui::{BorderStyle, Element, Fill};
+
+    #[test]
+    fn number_and_meaning_share_a_body_row_and_accessible_sentence() {
+        for dark in [false, true] {
+            let theme = Theme::for_dark(dark);
+            for (id, prefix, number, suffix, sentence) in [
+                (
+                    "population-test",
+                    "",
+                    "142",
+                    " schede attive tra 0 e 120 anni",
+                    "142 schede attive tra 0 e 120 anni",
+                ),
+                ("score-test", "Punteggio ", "4", "", "Punteggio 4"),
+            ] {
+                let mut row = number_line(id, prefix, number, suffix, theme);
+                let mut node = gpui::accesskit::Node::new(Role::Status);
+                Element::write_a11y_info(&row, &mut node);
+                assert_eq!(node.label(), Some(sentence));
+                assert_eq!(row.text_style().font_weight, Some(gpui::FontWeight::NORMAL));
+                assert_eq!(
+                    row.text_style().color,
+                    Some(gpui::rgb(if dark { 0xe9ecef } else { 0x14161a }).into())
+                );
+                assert_eq!(row.style().flex_direction, Some(gpui::FlexDirection::Row));
+            }
+        }
+    }
+
+    #[test]
+    fn threshold_inks_keep_readable_words_dots_and_content_with_distinct_shapes() {
+        fn luminance(hex: u32) -> f64 {
+            let linear = |shift: u32| {
+                let channel = f64::from((hex >> shift) & 0xff_u32) / 255.;
+                if channel <= 0.04045 {
+                    channel / 12.92
+                } else {
+                    ((channel + 0.055) / 1.055).powf(2.4)
+                }
+            };
+            0.2126 * linear(16) + 0.7152 * linear(8) + 0.0722 * linear(0)
+        }
+        for (dark, foreground, background) in
+            [(false, 0xffffff, 0x14161a), (true, 0x14161a, 0xe9ecef)]
+        {
+            for scale in [1., 2.] {
+                let theme = Theme::for_dark(dark).sized(scale, false);
+                let color = gpui::rgb(foreground).into();
+                assert_eq!(theme.threshold_text, color);
+                assert_eq!(theme.threshold, gpui::rgb(background).into());
+                let first = luminance(foreground);
+                let second = luminance(background);
+                let contrast = (first.max(second) + 0.05) / (first.min(second) + 0.05);
+                assert!(contrast >= 4.5, "threshold contrast: {contrast}");
+                for (ink, word, hollow) in [
+                    (WritingInk::Pencil, "Proposta", true),
+                    (WritingInk::Fresh, "Bozza non registrata", false),
+                    (WritingInk::Dry, "Registrata", false),
+                ] {
+                    let surface = WritingSurface::Threshold;
+                    let mut status = writing_status("threshold-test", ink, surface, theme);
+                    let mut node = gpui::accesskit::Node::new(Role::Status);
+                    Element::write_a11y_info(&status, &mut node);
+                    assert_eq!(node.label(), Some(word));
+                    assert_eq!(status.text_style().color, Some(color));
+                    let mut word_element = writing_word(ink, surface, theme);
+                    assert_eq!(word_element.text_style().color, Some(color));
+                    let mut content = div().writing_ink(ink, surface, theme);
+                    assert_eq!(content.text_style().color, Some(color));
+                    for style in [word_element.style(), content.style()] {
+                        if hollow {
+                            assert_eq!(style.border_style, Some(BorderStyle::Dashed));
+                            assert_eq!(style.border_widths.bottom, Some(px(1.).into()));
+                            assert_eq!(style.border_color, Some(color));
+                            assert_eq!(style.padding.bottom, Some(px(4.).into()));
+                        } else {
+                            assert_eq!(style.border_style, None);
+                            assert_eq!(style.border_widths.bottom, None);
+                        }
+                    }
+                    let mut dot = writing_dot(ink, surface, theme);
+                    assert_eq!(Element::a11y_role(&dot), None);
+                    let style = dot.style();
+                    assert_eq!(style.size.width, style.size.height);
+                    assert_eq!(style.corner_radii.top_left, Some(px(9999.).into()));
+                    assert_eq!(style.corner_radii.top_right, Some(px(9999.).into()));
+                    assert_eq!(style.corner_radii.bottom_left, Some(px(9999.).into()));
+                    assert_eq!(style.corner_radii.bottom_right, Some(px(9999.).into()));
+                    if hollow {
+                        assert_eq!(style.background, None);
+                        assert_eq!(style.border_color, Some(color));
+                        assert_eq!(style.border_widths.top, Some(px(1.5).into()));
+                        assert_eq!(style.border_widths.right, Some(px(1.5).into()));
+                        assert_eq!(style.border_widths.bottom, Some(px(1.5).into()));
+                        assert_eq!(style.border_widths.left, Some(px(1.5).into()));
+                    } else {
+                        assert_eq!(style.background, Some(Fill::from(color)));
+                        assert_eq!(style.border_widths.top, None);
+                        assert_eq!(style.border_widths.right, None);
+                        assert_eq!(style.border_widths.bottom, None);
+                        assert_eq!(style.border_widths.left, None);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn words_and_dot_shapes_are_explicit_in_both_registers_at_both_scales() {
+        for dark in [false, true] {
+            for scale in [1., 2.] {
+                let theme = Theme::for_dark(dark).sized(scale, false);
+                for (ink, word, hollow, color) in [
+                    (WritingInk::Pencil, "Proposta", true, theme.pencil),
+                    (
+                        WritingInk::Fresh,
+                        "Bozza non registrata",
+                        false,
+                        theme.fresh,
+                    ),
+                    (WritingInk::Dry, "Registrata", false, theme.ink),
+                ] {
+                    let surface = WritingSurface::Plane;
+                    let mut status = writing_status("writing-test", ink, surface, theme);
+                    let mut node = gpui::accesskit::Node::new(Role::Status);
+                    Element::write_a11y_info(&status, &mut node);
+                    assert_eq!(node.label(), Some(word));
+                    assert_eq!(status.text_style().color, Some(color));
+                    let mut word_element = writing_word(ink, surface, theme);
+                    let word_style = word_element.style();
+                    if hollow {
+                        assert_eq!(word_style.border_style, Some(BorderStyle::Dashed));
+                        assert_eq!(word_style.border_widths.bottom, Some(px(1.).into()));
+                        assert_eq!(word_style.padding.bottom, Some(px(4.).into()));
+                        assert_eq!(word_style.border_color, Some(color));
+                    } else {
+                        assert_eq!(word_style.border_widths.bottom, None);
+                    }
+                    let mut dot = writing_dot(ink, surface, theme);
+                    assert_eq!(Element::a11y_role(&dot), None, "the dot is decorative");
+                    let style = dot.style();
+                    assert_eq!(style.corner_radii.top_left, Some(px(9999.).into()));
+                    assert_eq!(style.corner_radii.top_right, Some(px(9999.).into()));
+                    assert_eq!(style.corner_radii.bottom_left, Some(px(9999.).into()));
+                    assert_eq!(style.corner_radii.bottom_right, Some(px(9999.).into()));
+                    assert_eq!(style.size.width, style.size.height);
+                    if hollow {
+                        assert_eq!(style.background, None);
+                        assert_eq!(style.border_widths.top, Some(px(1.5).into()));
+                        assert_eq!(style.border_widths.right, Some(px(1.5).into()));
+                        assert_eq!(style.border_widths.bottom, Some(px(1.5).into()));
+                        assert_eq!(style.border_widths.left, Some(px(1.5).into()));
+                        assert_eq!(style.border_color, Some(color));
+                    } else {
+                        assert_eq!(style.background, Some(Fill::from(color)));
+                        assert_eq!(style.border_widths.top, None);
+                    }
+                }
+            }
+        }
     }
 }

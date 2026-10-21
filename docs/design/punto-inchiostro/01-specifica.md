@@ -101,6 +101,24 @@ Il [guard statico](../../../scripts/check-type-scale.mjs) e lo
 aspetti distinti del contratto. Copertura e limiti sono nell'emendamento
 all'[ADR 0144](../../adr/0144-punto-inchiostro.md).
 
+Nel client nativo i ruoli sono il tipo `TypeRole`: ogni ruolo riunisce
+famiglia, corpo scalato, peso, interlinea e attributi del registro. Il corpo
+libero non è pubblico; i chiamanti scelgono il ruolo per significato e il
+compilatore impedisce di richiedere misure tipografiche arbitrarie. I numeri
+Threshold restano sulla riga del significato: «142 schede attive tra 0 e 120
+anni» in Analisi, sotto «Popolazione», e «Punteggio 4» nelle Scale. Il massimo
+si mostra solo se fornito dall'host.
+
+Lo stato `WritingInk` è passato esplicitamente anche al contenuto nativo:
+matita colora la prosa e aggiunge un bordo inferiore tratteggiato di 1 px a
+4 px dal blocco di testo; fresco colora la bozza; asciutto usa il colore testo.
+Il ruolo Prose resta Newsreader 17. Come per la parola di stato, GPUI rende
+il tratteggio con un bordo del blocco: non è una sottolineatura tipografica
+per ciascuna riga impaginata. Il contenitore a matita si adatta al testo,
+anziché riempire la colonna. Su una sola riga il bordo segue la frase; su più
+righe arriva fino alla riga più lunga: è l’approssimazione accettata. Il
+limite della prosa resta 64 caratteri per riga.
+
 ## Forma e spazio
 
 Ogni distanza è un multiplo di un'unità di 4 px. Cambiando l'unità, tutta
