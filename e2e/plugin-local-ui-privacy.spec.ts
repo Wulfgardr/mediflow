@@ -60,7 +60,7 @@ test.describe('IPC-connected plugin runtime', () => {
       const response = await page.request.get(route);
       expect(response.status()).toBe(200);
       expect(response.headers()['x-nextjs-cache']).toBe('HIT');
-      expect(response.headers()['x-nextjs-prerender']).toBe('1');
+      expect(response.headers()['x-nextjs-prerender']).toMatch(/^1(?:,\s*1)*$/u);
     }
     const subscribed = page.waitForResponse(response => new URL(response.url()).pathname === '/api/plugin-local-ui/events');
     const landing = await page.goto('/plugin-local-ui');
