@@ -485,7 +485,7 @@ impl ClinicalApp {
             Load::Ready(rows) => pane
                 .when(rows.is_empty(), |el| el.child(notice("clinical-workspace-drug-search-state", "Nessun farmaco trovato. Modifica la ricerca o chiudila per conservare il farmaco della bozza.", theme, false)))
                 .children(rows.iter().enumerate().map(|(index, drug)| {
-                    div().id(SharedString::from(format!("clinical-workspace-drug-result-{index}")))
+                    div().id(SharedString::from(format!("clinical-workspace-drug-result-{}", drug.aic)))
                         .min_w_0().max_w_full().border_b_1().border_color(theme.rule).py(px(12.)).flex().flex_col().gap(px(12.))
                         .child(crate::references::drug_description(drug, theme))
                         .child(search.results[index].attach_enabled(button(format!("clinical-workspace-select-drug-{index}"), format!("Usa {} · AIC {}", drug.name, drug.aic), theme, false, enabled), enabled)
@@ -543,6 +543,30 @@ mod tests {
         };
         app.form.as_mut().unwrap().therapy.as_mut().unwrap().search = Some(search);
         (token, editor)
+    }
+
+    #[gpui::test]
+    fn therapy_picker_helpers_accessible_ids(cx: &mut gpui::TestAppContext) {
+        let mut app: Option<Entity<ClinicalApp>> = None;
+        rendered_command::assert_unique_texts(
+            cx,
+            move |window, cx| {
+                let app = app.get_or_insert_with(|| {
+                    cx.new(|cx| {
+                        let mut app = ClinicalApp::new(String::new(), window, cx);
+                        stage(&mut app, false, cx);
+                        let (token, _) = pending(&mut app, cx);
+                        let first = catalog_drug();
+                        let mut second = first.clone();
+                        second.aic = "000333333".into();
+                        assert!(app.receive_drug_results(token, Ok(vec![first, second]), cx));
+                        app
+                    })
+                });
+                app.update(cx, |app, cx| app.therapy_picker_view(cx).into_any_element())
+            },
+            14,
+        );
     }
 
     #[gpui::test]
