@@ -11,7 +11,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { Plus, Pill, X, Clock, StopCircle, Trash2, Shield, Ban, Database, Pencil, Play, Beaker } from 'lucide-react';
-import { format } from 'date-fns';
+import { differenceInYears, format } from 'date-fns';
+import { InkState } from './ui/ink-state';
+import { createTherapyStatusConfirmation, type StatusConfirmation } from '@/lib/therapy-status-confirmation';
 import { it } from 'date-fns/locale';
 import ICDAutocomplete from './icd-autocomplete';
 import DrugAutocomplete from './drug-autocomplete';
@@ -73,7 +75,46 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
         value: DeleteRecovery<Therapy> | null;
     } | null>(null);
     const deleteRef = useRef<HTMLDivElement>(null);
-    const statusWriting = useRef(false);
+    const [statusState, setStatusState] = useState<{
+        owner: ReturnType<typeof createTherapyStatusConfirmation<Therapy>>;
+        value: StatusConfirmation<Therapy> | null;
+    } | null>(null);
+    const statusRef = useRef<HTMLDivElement>(null);
+    const statusChange = useMemo(() => {
+        const controller = createTherapyStatusConfirmation<Therapy>({
+            patientId,
+            isCurrent: () => currentPatientId.current === patientId,
+            signal: () => db.getSessionReadSignal(),
+            read: async (signal) => {
+                const [items, parent] = await Promise.all([
+                    db.therapies.query({ patientId }).toArray({ signal, rejectAuthUnavailable: true }),
+                    db.patients.get(patientId, { signal }),
+                ]);
+                if (!parent || parent.id !== patientId) throw new Error('Patient unavailable');
+                return items;
+            },
+            write: (therapy, status) => db.therapies.update(therapy.id, {
+                version: therapy.version, status, updatedAt: new Date(),
+                ...(status === 'completed' ? { endDate: new Date() } : status === 'active' ? { endDate: null } : {}),
+            }, { suppressNotify: true }),
+            isConflict: (error) => error instanceof ApiConflictError,
+            changed: (value) => setStatusState({ owner: controller, value }),
+            refreshed: () => notifyDbChange('therapies'),
+        });
+        return controller;
+    }, [patientId]);
+    useLayoutEffect(() => {
+        currentPatientId.current = patientId;
+        statusChange.activate();
+        return () => statusChange.dispose();
+    }, [statusChange, patientId]);
+    const statusConfirmation = statusState?.owner === statusChange ? statusState.value : null;
+    useEffect(() => {
+        if (statusConfirmation) {
+            statusRef.current?.focus();
+            statusRef.current?.scrollIntoView({ block: 'nearest' });
+        }
+    }, [statusConfirmation]);
     const deletion = useMemo(() => {
         const controller = createTherapyDeleteRecovery<Therapy>({
             patientId,
@@ -95,7 +136,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     }, [deletion, patientId]);
     const deleteRecovery = deleteState?.owner === deletion ? deleteState.value : null;
     const deleteBusy = !!deleteRecovery && ['prompt', 'writing', 'reading', 'confirming'].includes(deleteRecovery.phase);
-    useRuntimeTwinPendingForm(isAdding || !!deleteRecovery);
+    useRuntimeTwinPendingForm(isAdding || !!deleteRecovery || !!statusConfirmation);
     useEffect(() => { if (deleteRecovery && !deleteBusy) deleteRef.current?.focus(); }, [deleteRecovery, deleteBusy]);
 
     const therapies = useLiveQuery(
@@ -128,7 +169,8 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     });
 
     const startEditing = (therapy: Therapy) => {
-        if (deletion.blocked || statusWriting.current || isSaving || isReading || therapy.patientId !== patientId) return;
+        if (deletion.blocked || statusChange.blocked || isSaving || isReading || therapy.patientId !== patientId) return;
+        statusChange.cancel();
         const context = { patientId, id: therapy.id, version: therapy.version, editing: true };
         activeDraft.current = context;
         setDraft(context);
@@ -165,7 +207,8 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     };
 
     const startAdding = () => {
-        if (deletion.blocked || statusWriting.current || saving.current || isReading) return;
+        if (deletion.blocked || statusChange.blocked || saving.current || isReading) return;
+        statusChange.cancel();
         cancelEditing();
         const context = { patientId, id: uuidv4(), editing: false };
         activeDraft.current = context;
@@ -231,7 +274,8 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
 
     const onSubmit = async (data: TherapyFormValues) => {
         const context = activeDraft.current;
-        if (deletion.blocked || statusWriting.current || saving.current || recovery || !context || context.patientId !== patientId) return;
+        if (deletion.blocked || statusChange.blocked || saving.current || recovery || !context || context.patientId !== patientId) return;
+        statusChange.cancel();
         saving.current = true;
         setIsSaving(true);
         let therapyCreated = false;
@@ -315,43 +359,23 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
         }
     };
 
-    const updateStatus = async (id: string, status: Therapy['status']) => {
-        if (deletion.blocked || statusWriting.current || saving.current || isReading) return;
+    const updateStatus = (id: string, status: Therapy['status']) => {
+        if (deletion.blocked || statusChange.blocked || saving.current || isReading) return;
         const therapy = visibleTherapies.find((item) => item.id === id);
-        if (!therapy || typeof therapy.version !== 'number') {
-            showToast({ tone: 'error', title: 'Versione terapia non disponibile', description: 'Ricarica la pagina e riprova.' });
-            return;
-        }
-        const patch: { status: Therapy['status']; updatedAt: Date; endDate?: Date | null } = { status, updatedAt: new Date() };
-        /* WUL-UIUX: endDate esiste in schema ma non veniva mai valorizzata;
-           la conclusione la registra. Alla riattivazione va azzerata con null
-           ESPLICITO: undefined verrebbe eliminato da JSON.stringify e il backend
-           non lo cancellerebbe (la route pulisce endDate solo su null o ''). */
-        if (status === 'completed') patch.endDate = new Date();
-        if (status === 'active') patch.endDate = null;
-        statusWriting.current = true;
-        try {
-            await db.therapies.update(id, { ...patch, version: therapy.version });
-        } catch (error) {
-            console.error('Failed to update therapy status', error);
-            if (error instanceof ApiConflictError) {
-                notifyDbChange('therapies');
-                showToast({ tone: 'error', title: 'Terapia aggiornata altrove', description: 'I dati sono stati ricaricati. Controlla e riprova.' });
-                return;
-            }
-            showToast({ tone: 'error', title: 'Aggiornamento terapia fallito' });
-        } finally {
-            statusWriting.current = false;
-        }
+        if (!therapy || !patient || patient.id !== patientId) return;
+        const age = patient.birthDate ? differenceInYears(new Date(), new Date(patient.birthDate)) : NaN;
+        const patientLabel = `${patient.firstName} ${patient.lastName}, ${Number.isFinite(age) ? `${age} anni` : 'età non disponibile'}`;
+        statusChange.begin(therapy, status, patientLabel);
     };
 
     const handleSoftDelete = async (id: string) => {
-        if (deletion.blocked || statusWriting.current || saving.current || isReading || isAdding) return;
+        if (deletion.blocked || statusChange.blocked || saving.current || isReading || isAdding) return;
         const therapy = visibleTherapies.find((item) => item.id === id);
         if (!therapy || therapy.patientId !== patientId || !Number.isSafeInteger(therapy.version) || (therapy.version ?? 0) < 1) {
             showToast({ tone: 'error', title: 'Versione terapia non disponibile', description: 'Ricarica la pagina e riprova.' });
             return;
         }
+        statusChange.cancel();
         await deletion.begin(therapy, () => confirm({
             title: 'Eliminare questo farmaco dalla cartella?',
             message: 'Usa Elimina solo per errori di inserimento; per una terapia interrotta scegli Sospendi o Concludi.',
@@ -367,7 +391,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     const newButton = !isAdding ? (
         <button
             onClick={startAdding}
-            disabled={!!deleteRecovery}
+            disabled={!!deleteRecovery || statusChange.blocked}
             className="ui-btn-primary"
         >
             <Plus className="w-4 h-4" />
@@ -652,19 +676,50 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                             <td className={`${styles.secondaryColumn} lume-code`}>{t.atc && <div>ATC {t.atc}</div>}{t.aic && <div>AIC {t.aic}</div>}{!t.atc && !t.aic && '—'}</td>
                             <td><div className={`${styles.controls} ${styles.rowControls}`}>
                                 {group.status === 'active' ? <>
-                                    <button disabled={!!deleteRecovery} onClick={() => startEditing(t)} title="Modifica terapia"><Pencil size={14} aria-hidden />Modifica</button>
-                                    <button disabled={!!deleteRecovery} onClick={() => updateStatus(t.id, 'suspended')} title="Sospendi temporaneamente"><Clock size={14} aria-hidden />Sospendi</button>
-                                    <button disabled={!!deleteRecovery} onClick={() => updateStatus(t.id, 'completed')} title="Termina terapia"><StopCircle size={14} aria-hidden />Concludi</button>
-                                    <button disabled={!!deleteRecovery || isAdding} onClick={() => handleSoftDelete(t.id)} title="Elimina solo se inserito per errore" aria-label={`Elimina ${t.drugName} solo se inserito per errore`}><Trash2 size={16} aria-hidden /></button>
+                                    <button disabled={!!deleteRecovery || statusChange.blocked} onClick={() => startEditing(t)} title="Modifica terapia"><Pencil size={14} aria-hidden />Modifica</button>
+                                    <button disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'suspended')} title="Sospendi temporaneamente"><Clock size={14} aria-hidden />Sospendi</button>
+                                    <button disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'completed')} title="Termina terapia"><StopCircle size={14} aria-hidden />Concludi</button>
+                                    <button disabled={!!deleteRecovery || statusChange.blocked || isAdding} onClick={() => handleSoftDelete(t.id)} title="Elimina solo se inserito per errore" aria-label={`Elimina ${t.drugName} solo se inserito per errore`}><Trash2 size={16} aria-hidden /></button>
                                 </> : group.status === 'suspended' ? <>
-                                    <button disabled={!!deleteRecovery} onClick={() => updateStatus(t.id, 'active')}><Play size={14} aria-hidden />Riprendi</button>
-                                    <button disabled={!!deleteRecovery} onClick={() => updateStatus(t.id, 'completed')}><StopCircle size={14} aria-hidden />Concludi</button>
-                                </> : <button disabled={!!deleteRecovery} onClick={() => updateStatus(t.id, 'active')}>Riattiva</button>}
+                                    <button disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'active')}><Play size={14} aria-hidden />Riattiva</button>
+                                    <button disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'completed')}><StopCircle size={14} aria-hidden />Concludi</button>
+                                </> : <button disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'active')}>Riattiva</button>}
                             </div>{group.status === 'completed' && <small className={styles.compactOnly}>Conclusa il {format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</small>}</td>
                         </tr>)}
                     </tbody></table>
                 </section>)}
             </>}
+            {statusConfirmation && (
+                <div ref={statusRef} role="region" aria-label="Cambio di stato della terapia" aria-live="polite" tabIndex={-1}
+                    className={`${styles.threshold} ${styles.statusThreshold}`} data-confirming={statusConfirmation.phase === 'confirm'}>
+                    <div className={styles.statusSummary}>
+                        <InkState state={statusConfirmation.phase === 'registered' ? 'dry' : 'fresh'}>
+                            {statusConfirmation.phase === 'confirm' ? 'Conferma il cambio di stato'
+                                : statusConfirmation.phase === 'registered' ? 'Registrata'
+                                    : statusConfirmation.phase === 'writing' ? 'Registrazione in corso'
+                                        : statusConfirmation.phase === 'reading' ? 'Rilettura in corso'
+                                            : statusConfirmation.phase === 'conflict' ? 'Conflitto'
+                                                : statusConfirmation.phase === 'reviewed' ? 'Terapia riletta'
+                                                    : 'Esito da verificare'}
+                        </InkState>
+                        <p className="type-strong">{statusConfirmation.patientLabel}</p>
+                        <p className="type-body">{statusConfirmation.phase === 'confirm'
+                            ? `${statusConfirmation.target === 'suspended' ? 'Sospendere' : statusConfirmation.target === 'completed' ? 'Concludere' : 'Riattivare'} ${statusConfirmation.original.drugName}, ${statusConfirmation.original.dosage}?`
+                            : `${statusConfirmation.original.drugName} · ${statusConfirmation.original.dosage}`}</p>
+                        {statusConfirmation.phase === 'conflict' && <p className="type-body">La terapia è stata modificata da un&apos;altra postazione. Nulla è stato scritto.</p>}
+                        {statusConfirmation.phase === 'uncertain' && <p className="type-body">Esito da verificare. La registrazione può essere avvenuta: rileggi prima di riprovare.</p>}
+                        {statusConfirmation.readFailed && <p className="type-body">Rilettura non riuscita. Il nuovo invio resta bloccato.</p>}
+                        {statusConfirmation.phase === 'writing' && <p className="type-body">Attendi la conferma prima di chiudere.</p>}
+                        {statusConfirmation.current && <p className="type-body">Stato attuale: {statusConfirmation.current.status === 'active' ? 'Attiva' : statusConfirmation.current.status === 'suspended' ? 'Sospesa' : 'Conclusa'} · {statusConfirmation.current.drugName} · {statusConfirmation.current.dosage}</p>}
+                        {statusConfirmation.phase === 'reviewed' && <p className="type-body">Controlla i dati riletti. Per cambiare lo stato, scegli di nuovo l’azione nella scheda e confermala.</p>}
+                    </div>
+                    <div className={styles.statusActions}>
+                        {['confirm', 'registered', 'reviewed'].includes(statusConfirmation.phase) && <button type="button" className="mf-btn-secondary" onClick={() => statusChange.cancel()}>Torna alla scheda</button>}
+                        {statusConfirmation.phase === 'confirm' && <button type="button" className="ui-btn-primary" onClick={() => statusChange.confirm()}>Conferma e registra</button>}
+                        {['conflict', 'uncertain'].includes(statusConfirmation.phase) && <button type="button" className="ui-btn-primary" onClick={() => statusChange.reread()}>{statusConfirmation.conflict ? 'Rileggi la terapia' : 'Rileggi e verifica'}</button>}
+                    </div>
+                </div>
+            )}
         </section>
     );
 }
