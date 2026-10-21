@@ -4029,7 +4029,7 @@ impl ClinicalApp {
                             .when(can_open, |el| el.on_click(cx.listener(move |this, _, _, cx| this.toggle_document_details(&details_id, cx)))))
                         .child(button(format!("clinical-workspace-download-document-{id}"), "Salva una copia…", theme, false, available)
                             .when(available, |el| el.on_click(cx.listener(move |this, _, _, cx| this.download_document(&id, cx))))))
-                    .when(details_open, |el| el.child(self.document_details_view(row)))
+                    .when(details_open, |el| el.child(self.document_details_view(row, cx)))
             }))
             .child(div().text_color(theme.secondary).child(text!("Ogni caricamento richiede revisione e conferma. Il limite per file è 10 MiB. Le copie vengono salvate soltanto nella destinazione che scegli.")))
             .child(self.current_module_button("clinical-workspace-manage-documents", "Anteprima dell'originale e gestione…", PatientSection::Documents, cx))
