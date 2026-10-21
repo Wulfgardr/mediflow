@@ -424,6 +424,10 @@ pub struct ClinicalApp {
     threshold_question: ScrollTarget,
     threshold_menu_open: std::rc::Rc<std::cell::Cell<bool>>,
     threshold_menu_focus: FocusHandle,
+    threshold_region_focus: FocusHandle,
+    threshold_region_scroll: ScrollHandle,
+    #[cfg(test)]
+    test_body_size: Option<f32>,
     threshold_menu_scroll: ScrollHandle,
     threshold_menu_targets: [ScrollTarget; 3],
     threshold_mode: std::rc::Rc<std::cell::Cell<ThresholdMode>>,
@@ -620,6 +624,7 @@ impl ClinicalApp {
                 cx.notify();
             });
         let threshold_menu_scroll = ScrollHandle::new();
+        let threshold_region_scroll = ScrollHandle::new();
         let mut app = Self {
             session: None,
             pairing: None,
@@ -691,6 +696,10 @@ impl ClinicalApp {
             threshold_question: ScrollTarget::new(&profile_scroll, cx),
             threshold_menu_open: std::rc::Rc::new(std::cell::Cell::new(false)),
             threshold_menu_focus: cx.focus_handle().tab_stop(true),
+            threshold_region_focus: cx.focus_handle().tab_stop(true),
+            threshold_region_scroll,
+            #[cfg(test)]
+            test_body_size: None,
             threshold_menu_scroll: threshold_menu_scroll.clone(),
             threshold_menu_targets: std::array::from_fn(|_| {
                 ScrollTarget::new(&threshold_menu_scroll, cx)
@@ -1366,6 +1375,11 @@ impl ClinicalApp {
                 self.threshold_menu_scroll.scroll_to_item(index);
                 window.refresh();
             }
+            return;
+        }
+        if self.threshold_menu_focus.is_focused(window) {
+            self.threshold_region_scroll.scroll_to_item(1);
+            window.refresh();
             return;
         }
         if self.threshold_mode.get() == ThresholdMode::FullPlane {
@@ -4477,6 +4491,7 @@ impl ClinicalApp {
             && self.discard.is_none();
         let detail = self.threshold_detail(ThresholdMode::Compact, cx);
         let limited = self.threshold_recovery(layout, cx);
+        let has_recovery_region = limited.is_some();
         let content = content.into_any_element();
         let scroll = self.profile_scroll.clone();
         let mode = self.threshold_mode.clone();
@@ -4587,9 +4602,11 @@ impl ClinicalApp {
                                 .min_w_0()
                                 .overflow_y_scroll()
                                 .child(content)
-                                .when(decision.mode == ThresholdMode::Compact, |el| {
-                                    el.child(div().p(px(layout.margin)).child(detail))
-                                });
+                                .when(
+                                    decision.mode == ThresholdMode::Compact
+                                        && (!overflow || !has_recovery_region),
+                                    |el| el.child(div().p(px(layout.margin)).child(detail)),
+                                );
                             let mut plane = div().size_full().flex().flex_col().min_w_0();
                             if decision.scrolls_with_content {
                                 scrolling = scrolling.child(threshold);
@@ -5773,6 +5790,10 @@ impl Render for ClinicalApp {
             )
         });
         self.theme = Theme::for_dark(self.dark).sized(self.text_scale, self.increased_contrast);
+        #[cfg(test)]
+        if let Some(body) = self.test_body_size {
+            self.theme.scale = body * self.text_scale / Theme::for_dark(false).body();
+        }
         let theme = self.theme;
         if self.ai_preferences.active {
             self.ai_preferences.prepare_render(window, cx);
@@ -5942,6 +5963,7 @@ impl Render for ClinicalApp {
                 if this.threshold_menu_open.get() {
                     this.threshold_menu_open.set(false);
                     window.focus(&this.threshold_menu_focus, cx);
+                    this.reveal_focused(window, cx);
                     cx.notify();
                 } else if this.discard.take().is_some() {
                     cx.notify();
@@ -8048,20 +8070,14 @@ mod tests {
                 "body={body_size} bar={bar:?} content={content:?}"
             );
             assert!(content.bottom() <= bar.top() && bar.bottom() <= px(582.));
-            let status = cx.debug_bounds("threshold-recovery-status").unwrap();
+            let region = cx.debug_bounds("threshold-recovery-region").unwrap();
             let title = cx.debug_bounds("threshold-recovery-title").unwrap();
-            let state = cx.debug_bounds("threshold-recovery-state").unwrap();
-            assert!(status.size.height > px(0.));
-            assert!(title.size.height + state.size.height > status.size.height);
-            for id in ["clinical-workspace-reconcile", "threshold-other-actions"] {
-                let command = cx.debug_bounds(id).unwrap();
-                assert!(command.top() >= status.bottom() && command.bottom() <= bar.bottom());
-                assert!(command.left() >= px(0.) && command.right() <= px(390.));
-            }
+            assert!(region.size.height > px(0.));
             let command = cx.debug_bounds("clinical-workspace-reconcile").unwrap();
-            let menu = cx.debug_bounds("threshold-other-actions").unwrap();
+            assert!(command.top() >= region.bottom() && command.bottom() <= bar.bottom());
+            assert!(command.left() >= px(0.) && command.right() <= px(390.));
             cx.simulate_event(gpui::ScrollWheelEvent {
-                position: status.center(),
+                position: region.center(),
                 delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(-1000.))),
                 modifiers: gpui::Modifiers::default(),
                 touch_phase: gpui::TouchPhase::Moved,
@@ -8072,7 +8088,6 @@ mod tests {
                 cx.debug_bounds("clinical-workspace-reconcile").unwrap(),
                 command
             );
-            assert_eq!(cx.debug_bounds("threshold-other-actions").unwrap(), menu);
             app.read_with(cx, |app, _| {
                 assert_eq!(app.threshold_mode.get(), ThresholdMode::Compact)
             });

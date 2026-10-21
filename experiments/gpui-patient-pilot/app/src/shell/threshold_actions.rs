@@ -72,6 +72,10 @@ impl ClinicalApp {
             "Scale"
         } else if form.kind == FormKind::Notes {
             "Note"
+        } else if form.kind == FormKind::PatientNew {
+            "Nuova anagrafica"
+        } else if form.kind == FormKind::Therapy {
+            "Terapia"
         } else {
             "Scrittura"
         };
@@ -81,9 +85,7 @@ impl ClinicalApp {
             .debug_selector(|| "threshold-other-actions-menu".into())
             .role(Role::Menu)
             .aria_label("Altre azioni")
-            .absolute()
-            .bottom(gpui::relative(1.))
-            .w_full()
+            .w(self.threshold_region_scroll.bounds().size.width)
             .max_h(px(356.))
             .overflow_y_scroll()
             .track_scroll(&self.threshold_menu_scroll)
@@ -118,59 +120,113 @@ impl ClinicalApp {
                 .flex()
                 .flex_col()
                 .gap(px(8.))
-                .child(
-                    div()
-                        .id("threshold-recovery-status")
-                        .debug_selector(|| "threshold-recovery-status".into())
+                .child({
+                    let region = div()
+                        .id("threshold-recovery-region")
+                        .accessibility_id("threshold-recovery-region")
+                        .debug_selector(|| "threshold-recovery-region".into())
+                        .role(Role::Region)
+                        .aria_label(format!("{title}, {state}"))
+                        .track_focus(&self.threshold_region_focus)
+                        .focus(move |style| style.bg(theme.selected))
+                        .flex()
+                        .flex_col()
+                        .flex_1()
                         .min_h_0()
-                        .overflow_y_scroll()
-                        .role(Role::Status)
-                        .type_role(theme, TypeRole::Section)
-                        .child(
-                            div()
-                                .debug_selector(|| "threshold-recovery-title".into())
-                                .child(text!(title)),
-                        )
-                        .child(
-                            div()
-                                .debug_selector(|| "threshold-recovery-state".into())
-                                .child(text!(state)),
-                        ),
-                )
-                .child(self.threshold_command(primary, None, cx))
-                .child(
-                    div()
-                        .flex_shrink_0()
-                        .relative()
                         .min_w_0()
+                        .overflow_y_scroll()
+                        .track_scroll(&self.threshold_region_scroll)
+                        .on_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, window, cx| {
+                            if !this.threshold_region_focus.is_focused(window) {
+                                return;
+                            }
+                            let scroll = &this.threshold_region_scroll;
+                            let line = this.theme.role(TypeRole::Body).line_height;
+                            let page = f32::from(scroll.bounds().size.height);
+                            let mut offset = scroll.offset();
+                            offset.y = match event.keystroke.key.as_str() {
+                                "up" | "left" => offset.y + px(line),
+                                "down" | "right" => offset.y - px(line),
+                                "pageup" => offset.y + px(page),
+                                "pagedown" => offset.y - px(page),
+                                "home" => px(0.),
+                                "end" => -scroll.max_offset().y,
+                                _ => return,
+                            };
+                            scroll.set_offset(offset);
+                            window.refresh();
+                            cx.stop_propagation();
+                        }))
                         .child(
-                            button(
-                                "threshold-other-actions",
-                                "Altre azioni",
-                                theme,
-                                false,
-                                true,
-                            )
-                            .debug_selector(|| "threshold-other-actions".into())
-                            .type_role(theme, TypeRole::Section)
-                            .track_focus(&self.threshold_menu_focus)
-                            .aria_expanded(self.threshold_menu_open.get())
-                            .on_click(cx.listener(
-                                |this, _, window, cx| {
-                                    this.threshold_menu_open
-                                        .set(!this.threshold_menu_open.get());
-                                    if this.threshold_menu_open.get() {
-                                        this.threshold_menu_scroll.scroll_to_item(0);
-                                        window.focus(&this.threshold_menu_targets[0].focus, cx);
-                                    }
-                                    cx.notify();
-                                },
-                            )),
+                            div()
+                                .id("threshold-recovery-status")
+                                .debug_selector(|| "threshold-recovery-status".into())
+                                .flex_shrink_0()
+                                .role(Role::Status)
+                                .type_role(theme, TypeRole::Section)
+                                .child(
+                                    div()
+                                        .debug_selector(|| "threshold-recovery-title".into())
+                                        .child(text!(title)),
+                                )
+                                .child(
+                                    div()
+                                        .debug_selector(|| "threshold-recovery-state".into())
+                                        .child(text!(state)),
+                                ),
                         )
-                        .when(self.threshold_menu_open.get(), |el| {
-                            el.child(gpui::deferred(menu).priority(1))
-                        }),
-                ),
+                        .child(
+                            div()
+                                .flex_shrink_0()
+                                .relative()
+                                .min_w_0()
+                                .child({
+                                    let command = button(
+                                        "threshold-other-actions",
+                                        "Altre azioni",
+                                        theme,
+                                        false,
+                                        true,
+                                    )
+                                    .debug_selector(|| "threshold-other-actions".into())
+                                    .type_role(theme, TypeRole::Section)
+                                    .track_focus(&self.threshold_menu_focus)
+                                    .aria_expanded(self.threshold_menu_open.get())
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.threshold_menu_open
+                                            .set(!this.threshold_menu_open.get());
+                                        if this.threshold_menu_open.get() {
+                                            this.threshold_menu_scroll.scroll_to_item(0);
+                                            window.focus(&this.threshold_menu_targets[0].focus, cx);
+                                        }
+                                        cx.notify();
+                                    }));
+                                    #[cfg(test)]
+                                    let command = rendered_command::observe(command);
+                                    command
+                                })
+                                .when(self.threshold_menu_open.get(), |el| {
+                                    el.child(
+                                        gpui::deferred(
+                                            gpui::anchored()
+                                                .anchor(gpui::Anchor::BottomLeft)
+                                                .snap_to_window_with_margin(px(8.))
+                                                .child(menu),
+                                        )
+                                        .priority(1),
+                                    )
+                                }),
+                        )
+                        .child(
+                            div()
+                                .flex_shrink_0()
+                                .child(self.threshold_detail(ThresholdMode::Compact, cx)),
+                        );
+                    #[cfg(test)]
+                    let region = rendered_command::observe(region);
+                    region
+                })
+                .child(self.threshold_command(primary, None, cx)),
         )
     }
 
@@ -249,5 +305,101 @@ impl ClinicalApp {
                 cx.notify();
             }))
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct PrimaryMetrics {
+        app: Entity<ClinicalApp>,
+        command: Command,
+    }
+
+    impl Render for PrimaryMetrics {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            self.app.update(cx, |app, cx| {
+                div()
+                    .size_full()
+                    .child(
+                        div()
+                            .w(px(358.))
+                            .child(app.threshold_command(self.command, None, cx)),
+                    )
+            })
+        }
+    }
+
+    #[gpui::test]
+    fn threshold_longest_primary_fits_three_lines_at_the_declared_limit(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (root, cx) = cx.add_window_view(|window, cx| {
+            let app = cx.new(|cx| ClinicalApp::new(String::new(), window, cx));
+            app.update(cx, |app, _| {
+                app.form = Some(Form {
+                    kind: FormKind::Notes,
+                    fields: vec![],
+                    upload: None,
+                    edit: None,
+                    patient_original: None,
+                    created_id: None,
+                    therapy: None,
+                    scale: None,
+                    state: FormState::Draft,
+                    _subscriptions: vec![],
+                });
+            });
+            PrimaryMetrics {
+                app,
+                command: Command::Review,
+            }
+        });
+        let app = root.read_with(cx, |root, _| root.app.clone());
+        cx.simulate_resize(gpui::size(px(390.), px(640.)));
+        for body in [14., 16.] {
+            for (kind, command, label, action) in [
+                (FormKind::Notes, Command::Review, "Registra 1 elemento", 1),
+                (FormKind::Scale, Command::Review, "Prepara e rivedi", 1),
+                (FormKind::Notes, Command::Reread, "Rileggi la scheda", 7),
+                (FormKind::Scale, Command::Reread, "Rileggi e verifica", 7),
+                (FormKind::Notes, Command::Copy, "Copia bozza", 6),
+            ] {
+                root.update(cx, |root, cx| {
+                    root.command = command;
+                    cx.notify();
+                });
+                cx.update_window_entity(&app, |app, window, cx| {
+                    app.form.as_mut().unwrap().kind = kind;
+                    app.theme = Theme::for_dark(false);
+                    app.theme.scale = body * 4. / app.theme.body();
+                    window.focus(&app.form_actions[action].focus, cx);
+                    cx.notify();
+                });
+                super::super::notes_recovery_tests::draw(cx);
+                let text = cx
+                    .debug_bounds(match (kind, command) {
+                        (_, Command::Copy) => "control-label:Copia bozza",
+                        (FormKind::Scale, Command::Review) => "control-label:Prepara e rivedi",
+                        (FormKind::Scale, _) => "control-label:Rileggi e verifica",
+                        (_, Command::Review) => "control-label:Registra 1 elemento",
+                        _ => "control-label:Rileggi la scheda",
+                    })
+                    .unwrap();
+                let lines = f32::from(text.size.height) / (body * 4. * 1.5);
+                eprintln!("primary={label:?} base={body} lines={lines} text={text:?}");
+                assert!(lines <= 3., "{label}: {lines} lines");
+                let primary = cx
+                    .debug_bounds(match command {
+                        Command::Review => "clinical-workspace-review-save",
+                        Command::Reread => "clinical-workspace-reconcile",
+                        _ => "clinical-workspace-copy-draft",
+                    })
+                    .unwrap();
+                assert!(primary.size.height <= px(3. * body * 4. * 1.5 + 20.));
+                assert!(primary.left() >= px(0.) && primary.right() <= px(390.));
+            }
+        }
     }
 }

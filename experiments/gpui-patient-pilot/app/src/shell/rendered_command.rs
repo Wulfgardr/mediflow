@@ -4,7 +4,12 @@ pub(super) fn observe(element: Stateful<Div>) -> gpui::AnyElement {
     Observed(element).into_any_element()
 }
 
+pub(super) fn clip(id: &str) -> gpui::Bounds<gpui::Pixels> {
+    MASKS.with(|masks| *masks.borrow().get(id).expect("real prepaint mask"))
+}
+
 thread_local! {
+    static MASKS: std::cell::RefCell<HashMap<String, gpui::Bounds<gpui::Pixels>>> = std::cell::RefCell::new(HashMap::new());
     static NODES: std::cell::RefCell<HashMap<String, (gpui::accesskit::Node, gpui::Bounds<gpui::Pixels>)>> = std::cell::RefCell::new(HashMap::new());
 }
 
@@ -69,6 +74,12 @@ impl gpui::Element for Observed {
     ) -> Self::PrepaintState {
         let mut node = gpui::accesskit::Node::new(self.0.a11y_role().expect("real command role"));
         self.0.write_a11y_info(&mut node);
+        MASKS.with(|masks| {
+            masks.borrow_mut().insert(
+                node.author_id().unwrap().to_string(),
+                window.content_mask().bounds,
+            );
+        });
         NODES.with(|nodes| {
             nodes
                 .borrow_mut()
