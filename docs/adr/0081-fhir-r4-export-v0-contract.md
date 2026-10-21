@@ -221,6 +221,32 @@ inventato.
   sostituisce il gate esterno.
 - Il validatore esterno non entra nel runtime prodotto.
 
+### Gate R4 base Web — prima unità di ADR 0157 (2026-10-21)
+
+Il workflow `FHIR R4 Web Gate` esegue `npm run check:fhir-r4 -- --falsify`
+su 22 Bundle sintetici serializzati dal mapper Web corrente, più tre
+mutazioni semantiche nella stessa JVM. Non è il golden condiviso v2 e non
+attesta parità Apple. Implementazione, preflight, baseline, report e limiti
+sono descritti nel [README del runner](../../scripts/README-fhir-r4.md).
+
+La prima esecuzione sul mapper di `034aad5b9` rileva un errore preesistente:
+la scala frazionaria produce `valueInteger: 1.5`. Il gate parte quindi in
+modalità **baseline congelata**, senza correggere il mapper in questa unità.
+Le baseline separate per errori e warning fissano 1 errore e 63 warning con
+artefatto, identificativo, percorso, messaggio, conteggio e motivo. Nuove
+issue e occorrenze aggiuntive bloccano; le voci scomparse vanno rimosse.
+Le eccezioni sono soggette alla review della PR, non una deroga generale
+al requisito zero errori del gate finale.
+
+Il rapporto distingue `PASS_FROZEN_BASELINE`, `SEMANTIC_REJECTION` e
+`TOOL_ERROR`, conserva gli OperationOutcome ufficiali e dichiara i binding
+non verificati offline. Non attribuisce al corpus con errori il linguaggio
+«validato contro FHIR R4 4.0.1 base, terminologia non verificata offline»:
+questo esito richiede zero errori, oltre alla verifica dei warning.
+La negazione della rete è applicata al processo e provata nello stesso
+isolamento della JVM. Le sei falsificazioni includono anche package alterato
+e claim IPS rifiutato prima dell'esecuzione, senza aggiungere IPS al lock.
+
 ### Linguaggio utente e claim
 
 - L'interfaccia usa `controllo locale dei dati`, non `controllo FSE`,
