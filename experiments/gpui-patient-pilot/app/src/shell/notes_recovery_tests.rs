@@ -22,6 +22,7 @@ struct HostState {
     epoch: u64,
     outcome: u16,
     replaced: bool,
+    archived: bool,
 }
 struct Host {
     session: RuntimeSession,
@@ -43,6 +44,7 @@ impl Host {
             epoch: 1,
             outcome: 200,
             replaced: false,
+            archived: false,
         }));
         let shared = state.clone();
         let stop = Arc::new(AtomicBool::new(false));
@@ -83,7 +85,7 @@ impl Host {
                             "currentness":{"revision":state.version,"selectionEpoch":state.epoch,"observedAt":1000,"expiresAt":61000},
                             "profile":{"firstName":"Amina","lastName":"Sintetica","taxCode":"SYNTHETIC","birthDate":null,
                                 "address":null,"phone":null,"caregiver":null,"diagnoses":null,"exemptions":null,"notes":state.notes,
-                                "isAdi":false,"isArchived":false,"statusReason":null,"archiveReason":null,"archiveNote":null}})
+                                "isAdi":false,"isArchived":state.archived,"statusReason":null,"archiveReason":null,"archiveNote":null}})
                     }
                 }
                 PUT => {
@@ -548,4 +550,88 @@ fn notes_comparison_explains_replacement_and_keeps_only_the_accessible_field_lab
         1,
         "rendering and review must not send the draft"
     );
+}
+
+#[gpui::test]
+fn notes_nonwritable_recovery_offers_copy_and_discard_and_releases_navigation(
+    cx: &mut gpui::TestAppContext,
+) {
+    for deleted in [false, true] {
+        let host = Host::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        open(&view, &host, cx);
+        host.state.lock().unwrap().outcome = 409;
+        confirm(&view, cx);
+        if deleted {
+            view.update(cx, |app, cx| {
+                let mut patient = app.patient.detail.ready().unwrap().clone();
+                patient.deleted_at = Some("2026-10-21T10:00:00Z".into());
+                patient.version += 1;
+                let request = app.core.reread_preserving_draft().unwrap();
+                app.form.as_mut().unwrap().state = FormState::Saving;
+                app.apply_notes_reread(&request, FormState::Conflict, patient, cx);
+                cx.notify();
+            });
+        } else {
+            host.state.lock().unwrap().archived = true;
+            reread(&view, cx);
+        }
+        draw(cx);
+        view.read_with(cx, |app, cx| {
+            assert!(app.form.as_ref().unwrap().state == FormState::Rejected);
+            assert_eq!(app.core.phase(), Phase::Locked);
+            assert_eq!(app.form.as_ref().unwrap().fields[0].value(cx), DRAFT);
+            assert!(!app.navigation_shortcuts_available());
+        });
+        assert!(cx.debug_bounds("clinical-notes-recovery-command").is_none());
+        assert!(cx.debug_bounds("clinical-workspace-reconcile").is_none());
+        assert!(cx.debug_bounds("clinical-workspace-review-save").is_none());
+        assert!(cx.debug_bounds("clinical-workspace-confirm-save").is_none());
+        let copy = cx.debug_bounds("Copia la bozza").unwrap();
+        let discard = cx.debug_bounds("Scarta la bozza").unwrap();
+        cx.simulate_click(copy.center(), gpui::Modifiers::default());
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            assert_eq!(
+                cx.read_from_clipboard().unwrap().text().as_deref(),
+                Some(format!("Note della scheda\n{DRAFT}").as_str())
+            );
+        });
+        view.read_with(cx, |app, cx| {
+            assert_eq!(app.form.as_ref().unwrap().fields[0].value(cx), DRAFT);
+        });
+        let before = host.requests.lock().unwrap().len();
+        cx.simulate_click(discard.center(), gpui::Modifiers::default());
+        cx.run_until_parked();
+        draw(cx);
+        view.read_with(cx, |app, _| {
+            assert!(app.form.is_none());
+            assert!(app.discard.is_none());
+            assert!(app.navigation_shortcuts_available());
+            assert!(app.patient.detail.ready().is_some());
+            assert!(
+                app.patient
+                    .detail
+                    .ready()
+                    .is_some_and(|patient| patient.is_archived || patient.deleted_at.is_some())
+            );
+        });
+        assert_eq!(
+            host.requests.lock().unwrap().len(),
+            before,
+            "discard must not send any request"
+        );
+        view.update(cx, |app, cx| app.select_patient("patient-b", true, cx));
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert_eq!(app.selected_id.as_deref(), Some("patient-b"));
+            assert_eq!(app.core.selected_id(), Some("patient-b"));
+        });
+        assert_eq!(
+            host.writes().len(),
+            1,
+            "recovery, copy, discard and navigation must not write"
+        );
+    }
 }
