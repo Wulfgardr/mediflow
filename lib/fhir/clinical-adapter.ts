@@ -68,24 +68,26 @@ export function toFhirEncounter(entry: FhirClinicalEntryInput, patientReference:
     };
 }
 
-/* WUL-327: un punteggio scala è presente solo se è un numero finito
-   (o una stringa non vuota che ne rappresenta uno). Lo zero è un valore
-   clinico valido; il vecchio guard per verità lo scartava, mentre una stringa
-   di soli spazi diventava silenziosamente `valueInteger: 0`. */
-function toFiniteScaleScore(score: unknown): number | null {
-    if (typeof score === 'number') {
-        return Number.isFinite(score) ? score : null;
+export class FhirScaleScoreError extends Error {
+    readonly code = 'INVALID_SCALE_SCORE';
+    readonly severity = 'error';
+
+    constructor(public readonly recordId: string) {
+        super("Esportazione FHIR bloccata: il punteggio della scala deve essere un intero finito tra -2147483648 e 2147483647.");
+        this.name = 'FhirScaleScoreError';
     }
-    if (typeof score === 'string' && score.trim() !== '') {
-        const parsed = Number(score);
-        return Number.isFinite(parsed) ? parsed : null;
-    }
-    return null;
+}
+
+function toIntegerScaleScore(score: unknown): number | null {
+    const parsed = typeof score === 'number' ? score
+        : typeof score === 'string' && score.trim() !== '' ? Number(score) : NaN;
+    return Number.isInteger(parsed) && parsed >= -2147483648 && parsed <= 2147483647 ? parsed : null;
 }
 
 export function toFhirObservation(entry: FhirClinicalEntryInput, patientReference: string): Observation | null {
-    const score = toFiniteScaleScore(entry.metadata?.score);
-    if (entry.type !== 'scale' || score === null) return null;
+    if (entry.type !== 'scale') return null;
+    const score = toIntegerScaleScore(entry.metadata?.score);
+    if (score === null) throw new FhirScaleScoreError(entry.id);
 
     return {
         resourceType: "Observation",

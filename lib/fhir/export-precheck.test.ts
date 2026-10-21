@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { FhirScaleScoreError } from './clinical-adapter';
 import { buildFhirBundleFromRecords } from './bundle-mapper';
 import { buildFhirDiagnosisWarningMessage, prepareFhirBundleFromRecords, type FhirDiagnosisCodingWarning } from './export-precheck';
 import type { FhirBundleInput } from './types';
@@ -74,4 +75,35 @@ test('a patient without diagnoses needs no diagnosis warning confirmation', asyn
     const input = fixture();
     delete input.patient.diagnoses;
     assert.deepEqual(await prepareFhirBundleFromRecords(input), buildFhirBundleFromRecords(input));
+});
+
+for (const score of [1.5, 2147483648, -2147483649, NaN, 'invalid', '', ' ', null, undefined, Infinity, -Infinity, '1.5', '2147483648']) {
+    test(`invalid scale score (${typeof score}) ${String(score)} blocks the entire export before warning confirmation`, async () => {
+        const input = fixture();
+        input.patient.diagnoses![0].system = 'UNKNOWN';
+        const entry = { ...input.entries[1], id: 'synthetic-invalid-score', type: 'scale' as const,
+            metadata: { title: 'Synthetic scale', score } };
+        input.entries.push(entry);
+        const before = structuredClone(input);
+        const isBlockingScoreError = (error: unknown) => {
+            assert.ok(error instanceof FhirScaleScoreError);
+            assert.equal(error.code, 'INVALID_SCALE_SCORE');
+            assert.equal(error.severity, 'error');
+            assert.equal(error.recordId, entry.id);
+            return true;
+        };
+        assert.throws(() => buildFhirBundleFromRecords(input), isBlockingScoreError);
+        await assert.rejects(prepareFhirBundleFromRecords(input, () => {
+            assert.fail('Blocking errors cannot be bypassed by confirming warnings');
+        }), isBlockingScoreError);
+        assert.deepEqual(input, before);
+    });
+}
+
+test('deleted scales with invalid scores are excluded without blocking export', async () => {
+    const input = fixture();
+    input.entries.push({ ...input.entries[1], id: 'synthetic-deleted-scale', type: 'scale',
+        deletedAt: input.generatedAt, metadata: { score: 1.5 } });
+    const bundle = await prepareFhirBundleFromRecords(input);
+    assert.deepEqual(bundle, buildFhirBundleFromRecords({ ...input, entries: input.entries.slice(0, -1) }));
 });

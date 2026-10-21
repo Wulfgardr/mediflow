@@ -2,17 +2,7 @@
   "schemaVersion": 1,
   "sourceRevision": "034aad5b9d44a5e7797f73f30754e203c3196ec8",
   "validatorVersion": "6.9.12",
-  "mode": "frozen-existing-errors",
-  "review": "Proposed explicit exceptions for coordinator PR review; no automatic baseline updates",
-  "entries": [
-    {
-      "artifact": "scale-fraction",
-      "severity": "error",
-      "identifier": "Type_Specific_Checks_DT_Integer_Valid",
-      "path": "Bundle.entry[2].resource/*Observation/obs-scale*/.value.ofType(integer)",
-      "message": "The value '1.5' is not a valid integer",
-      "count": 1,
-      "reason": "Existing Web scale mapper serializes fractional score 1.5 as valueInteger. FHIR integer violation is frozen, not corrected or claimed conformant in this PR."
-    }
-  ]
+  "mode": "strict",
+  "review": "No error or fatal exceptions; invalid scale scores block export before serialization",
+  "entries": []
 }

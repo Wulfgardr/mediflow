@@ -1,7 +1,7 @@
 /* WUL-327 */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { toFhirCondition, toFhirObservation } from './clinical-adapter';
+import { FhirScaleScoreError, toFhirCondition, toFhirObservation } from './clinical-adapter';
 import type { FhirClinicalEntryInput, FhirDiagnosisInput } from './types';
 
 const diagnosis: FhirDiagnosisInput = {
@@ -57,7 +57,7 @@ function scaleEntry(score: unknown): FhirClinicalEntryInput {
 }
 
 test('toFhirObservation accetta zero e i punteggi numerici validi', () => {
-    const cases: Array<[unknown, number]> = [[0, 0], ['0', 0], [27, 27], ['27', 27]];
+    const cases: Array<[unknown, number]> = [[0, 0], ['0', 0], [27, 27], ['27', 27], [-2147483648, -2147483648], [2147483647, 2147483647], ['-2147483648', -2147483648], ['2147483647', 2147483647]];
     for (const [score, expected] of cases) {
         const resource = toFhirObservation(scaleEntry(score), 'Patient/patient-1');
         assert.ok(resource, `score ${JSON.stringify(score)} deve produrre una Observation`);
@@ -65,17 +65,17 @@ test('toFhirObservation accetta zero e i punteggi numerici validi', () => {
     }
 });
 
-test('toFhirObservation tratta come assenti i punteggi vuoti o non numerici senza inventare zero', () => {
+test('toFhirObservation blocca i punteggi vuoti o non numerici senza inventare zero', () => {
     const missing: unknown[] = [null, undefined, '', '   ', Number.NaN, 'abc', Number.POSITIVE_INFINITY];
     for (const score of missing) {
-        const resource = toFhirObservation(scaleEntry(score), 'Patient/patient-1');
-        assert.equal(resource, null, `score ${JSON.stringify(score)} deve restare assente`);
+        assert.throws(() => toFhirObservation(scaleEntry(score), 'Patient/patient-1'), FhirScaleScoreError);
     }
 });
 
-test('toFhirObservation ignora le voci non-scala e i metadata assenti', () => {
+test('toFhirObservation ignora le voci non-scala ma blocca le scale senza metadata', () => {
     assert.equal(toFhirObservation({ ...scaleEntry(5), type: 'note' }, 'Patient/patient-1'), null);
-    assert.equal(toFhirObservation({ ...scaleEntry(0), metadata: undefined }, 'Patient/patient-1'), null);
+    assert.equal(toFhirObservation({ ...scaleEntry(NaN), type: 'note' }, 'Patient/patient-1'), null);
+    assert.throws(() => toFhirObservation({ ...scaleEntry(0), metadata: undefined }, 'Patient/patient-1'), FhirScaleScoreError);
 });
 
 test('toFhirObservation conserva la forma della risorsa per un punteggio valido', () => {
@@ -90,3 +90,10 @@ test('toFhirObservation conserva la forma della risorsa per un punteggio valido'
     assert.deepEqual(resource.interpretation, [{ text: 'Stabile' }]);
     assert.deepEqual(resource.note, [{ text: 'Valutazione di prova' }]);
 });
+
+for (const score of [1.5, 2147483648, -2147483649, NaN, 'invalid', '1.5', '2147483648', '-2147483649']) {
+    test(`invalid scale score (${typeof score}) ${String(score)} blocks mapping instead of releasing an Observation`, () => {
+        assert.throws(() => toFhirObservation(scaleEntry(score), 'Patient/patient-1'),
+            { name: 'FhirScaleScoreError' });
+    });
+}
