@@ -2163,7 +2163,7 @@ impl ClinicalApp {
                                     this.patient.detail = ReadLoad::Ready(patient);
                                 }
                                 Err(error) => {
-                                    if error.is_auth_failure() {
+                                    if error.is_auth_failure() || error == RuntimeError::ArchiveReplaced {
                                         this.disconnect(cx);
                                         this.message = Some((ui_error(error), true));
                                         return;
