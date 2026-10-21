@@ -27,8 +27,8 @@ export function createLocalUiClient() {
   process.on('message', onMessage); process.once('disconnect', close);
   return Object.freeze({ close, navigate(input: unknown, signal?: AbortSignal) {
     const parsed = localUiArgumentsSchema.safeParse(input);
-    if (closed || signal?.aborted || !parsed.success || ++sequence > 256) return Promise.reject(new Error('navigation_unavailable'));
-    const requestId = `rpc_ui_${sequence}`;
+    if (closed || signal?.aborted || !parsed.success || sequence + pending.size + 2 > 256) return Promise.reject(new Error('navigation_unavailable'));
+    const requestId = `rpc_ui_${++sequence}`;
     return new Promise<typeof LOCAL_UI_RESULT>((resolve, reject) => {
       const abort = () => {
         if (!pending.has(requestId)) return;
