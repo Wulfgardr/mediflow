@@ -296,6 +296,21 @@ mod tests {
             });
             cx.run_until_parked();
         }
+        for body in [14., 16.] {
+            cx.simulate_resize(gpui::size(px(390.), px(640.)));
+            view.update(cx, |app, cx| {
+                app.test_body_size = Some(body);
+                cx.notify();
+            });
+            super::super::notes_recovery_tests::draw(cx);
+            super::super::notes_recovery_tests::assert_minimum_geometry(&view, cx, "Scale", body);
+        }
+        view.update(cx, |app, cx| {
+            app.test_body_size = None;
+            cx.notify();
+        });
+        cx.simulate_resize(gpui::size(px(390.), px(700.)));
+        super::super::notes_recovery_tests::draw(cx);
         let bar = cx.debug_bounds("threshold-bar").unwrap();
         let content = cx.debug_bounds("threshold-scroll").unwrap();
         assert!(
@@ -329,7 +344,7 @@ mod tests {
             window.refresh();
             window.draw(cx).clear(cx);
         });
-        cx.simulate_keystrokes("tab");
+        cx.simulate_keystrokes("shift-tab");
         cx.update(|window, cx| {
             assert!(
                 view.read(cx).threshold_menu_focus.is_focused(window),
