@@ -279,9 +279,6 @@ impl RuntimeClient {
         // with 503. Keep every other route's HTTP failure semantics unchanged.
         let who_readiness =
             !mutation && method == Method::GET && path == crate::who::READINESS_PATH;
-        // This route alone distinguishes a cancelled read from an archive
-        // replacement inside the same 409 status. Read its bounded error code
-        // without changing any other route's conflict semantics.
         let analytics_read =
             !mutation && method == Method::GET && path == crate::analytics::DEMOGRAPHICS_PATH;
         let url = self.endpoint(path, query)?;
@@ -328,21 +325,19 @@ impl RuntimeClient {
         let status = response.status().as_u16();
         let account_profile = path == crate::account_profile::ACCOUNT_PROFILE_PATH;
         if !(200..300).contains(&status) && !(who_readiness && status == 503) {
-            if analytics_read && status == 409 {
-                if analytics_cancelled(response) {
-                    return Err(RuntimeError::AnalyticsCancelled);
-                }
-                return Err(RuntimeError::Conflict);
-            }
-            if account_profile && status == 409 {
-                // ADR 0155 is the only route whose 409 body carries the
-                // rejected comparison. Read its bounded body to keep a version
-                // conflict and an archive replacement distinct, but never
-                // treat the conflict body as a confirmed write.
-                let raw = read_response_body(response, limit, mutation)?;
-                return match profile_conflict_code(&raw.body) {
-                    ProfileConflictCode::VersionConflict if mutation => Ok(raw),
-                    ProfileConflictCode::ArchiveReplaced => Err(RuntimeError::ArchiveReplaced),
+            if status == 409 {
+                let error_limit = if analytics_read { 1024 } else { limit };
+                let raw = match read_response_body(response, error_limit, mutation) {
+                    Ok(raw) => raw,
+                    Err(error) if account_profile => return Err(error),
+                    Err(_) => return Err(RuntimeError::Conflict),
+                };
+                return match conflict_code(&raw.body) {
+                    ConflictCode::ArchiveReplaced => Err(RuntimeError::ArchiveReplaced),
+                    ConflictCode::AnalyticsCancelled if analytics_read => {
+                        Err(RuntimeError::AnalyticsCancelled)
+                    }
+                    ConflictCode::ProfileVersionConflict if account_profile && mutation => Ok(raw),
                     _ => Err(RuntimeError::Conflict),
                 };
             }
@@ -510,37 +505,24 @@ fn read_response_body(
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum ProfileConflictCode {
-    VersionConflict,
+enum ConflictCode {
+    ProfileVersionConflict,
     ArchiveReplaced,
+    AnalyticsCancelled,
     Other,
 }
 
-fn profile_conflict_code(body: &[u8]) -> ProfileConflictCode {
+fn conflict_code(body: &[u8]) -> ConflictCode {
     match serde_json::from_slice::<Value>(body)
         .ok()
         .and_then(|value| value["code"].as_str().map(str::to_owned))
         .as_deref()
     {
-        Some("PROFILE_VERSION_CONFLICT") => ProfileConflictCode::VersionConflict,
-        Some("ARCHIVE_REPLACED") => ProfileConflictCode::ArchiveReplaced,
-        _ => ProfileConflictCode::Other,
+        Some("PROFILE_VERSION_CONFLICT") => ConflictCode::ProfileVersionConflict,
+        Some("ARCHIVE_REPLACED") => ConflictCode::ArchiveReplaced,
+        Some("ANALYTICS_CANCELLED") => ConflictCode::AnalyticsCancelled,
+        _ => ConflictCode::Other,
     }
-}
-
-fn analytics_cancelled(response: reqwest::blocking::Response) -> bool {
-    let mut body = Zeroizing::new(Vec::new());
-    if response.take(1024).read_to_end(&mut body).is_err() {
-        return false;
-    }
-    serde_json::from_slice::<Value>(&body)
-        .ok()
-        .and_then(|value| {
-            value["code"]
-                .as_str()
-                .map(|code| code == "ANALYTICS_CANCELLED")
-        })
-        .unwrap_or(false)
 }
 
 fn classify_status(status: u16, mutation: bool) -> RuntimeError {
@@ -558,6 +540,176 @@ fn classify_status(status: u16, mutation: bool) -> RuntimeError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn synthetic_conflict(path: &[&str], mutation: bool, body: &str, framing: &str) -> Result<()> {
+        use std::{io::Write, net::TcpListener, thread};
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let client = RuntimeClient::new(RuntimeConfig {
+            base_url: format!("http://{}", listener.local_addr().unwrap()),
+            tls_pin_sha256: None,
+        })
+        .unwrap();
+        let response = format!("HTTP/1.1 409 Conflict\r\n{framing}Connection: close\r\n\r\n{body}");
+        let worker = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut headers = Vec::new();
+            let mut byte = [0];
+            while !headers.ends_with(b"\r\n\r\n") {
+                stream.read_exact(&mut byte).unwrap();
+                headers.push(byte[0]);
+                assert!(headers.len() < 8192);
+            }
+            let _ = stream.write_all(response.as_bytes());
+            listener
+        });
+        let result = client.raw(
+            if mutation { Method::PUT } else { Method::GET },
+            path,
+            &[],
+            None,
+            &PairingCredentials::new("synthetic-device", "x".repeat(64)).unwrap(),
+            Some(&"a".repeat(64)),
+            None,
+            mutation,
+            128,
+            Some("synthetic-generation"),
+        );
+        let listener = worker.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(
+            matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
+        );
+        result.map(|_| ())
+    }
+
+    #[test]
+    fn archive_replaced_is_recognized_on_every_route_and_method() {
+        for path in [
+            &["api", "v1", "network", "patients", "patient-a"][..],
+            crate::analytics::DEMOGRAPHICS_PATH,
+            crate::account_profile::ACCOUNT_PROFILE_PATH,
+        ] {
+            for mutation in [false, true] {
+                assert_eq!(
+                    synthetic_conflict(
+                        path,
+                        mutation,
+                        r#"{"code":"ARCHIVE_REPLACED","error":"private synthetic detail"}"#,
+                        ""
+                    ),
+                    Err(RuntimeError::ArchiveReplaced),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn other_conflict_codes_keep_their_route_and_mutation_semantics() {
+        for path in [
+            &["api", "v1", "network", "patients", "patient-a"][..],
+            crate::analytics::DEMOGRAPHICS_PATH,
+            crate::account_profile::ACCOUNT_PROFILE_PATH,
+        ] {
+            for mutation in [false, true] {
+                for code in [
+                    "VERSION_CONFLICT",
+                    "PROFILE_VERSION_CONFLICT",
+                    "ANALYTICS_CANCELLED",
+                ] {
+                    let expected = match code {
+                        "PROFILE_VERSION_CONFLICT"
+                            if mutation && path == crate::account_profile::ACCOUNT_PROFILE_PATH =>
+                        {
+                            Ok(())
+                        }
+                        "ANALYTICS_CANCELLED"
+                            if !mutation && path == crate::analytics::DEMOGRAPHICS_PATH =>
+                        {
+                            Err(RuntimeError::AnalyticsCancelled)
+                        }
+                        _ => Err(RuntimeError::Conflict),
+                    };
+                    assert_eq!(
+                        synthetic_conflict(path, mutation, &format!(r#"{{"code":"{code}"}}"#), ""),
+                        expected,
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn malformed_conflict_bodies_never_become_successes() {
+        for path in [
+            &["api", "v1", "network", "patients", "patient-a"][..],
+            crate::analytics::DEMOGRAPHICS_PATH,
+            crate::account_profile::ACCOUNT_PROFILE_PATH,
+        ] {
+            for mutation in [false, true] {
+                for body in [
+                    "",
+                    "not json",
+                    r#"{"code":"ARCHIVE_REPLACED""#,
+                    r#"{"code":null}"#,
+                    r#"{"error":"ARCHIVE_REPLACED"}"#,
+                ] {
+                    assert_eq!(
+                        synthetic_conflict(path, mutation, body, ""),
+                        Err(RuntimeError::Conflict)
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn unreadable_and_oversized_conflict_bodies_keep_the_existing_fallbacks() {
+        for path in [
+            &["api", "v1", "network", "patients", "patient-a"][..],
+            crate::analytics::DEMOGRAPHICS_PATH,
+            crate::account_profile::ACCOUNT_PROFILE_PATH,
+        ] {
+            for mutation in [false, true] {
+                for (body, framing, read_error) in [
+                    (
+                        r#"{"code":"ARCHIVE_REPLACED"}"#.to_owned(),
+                        "Content-Length: 100\r\n",
+                        RuntimeError::Transport,
+                    ),
+                    (
+                        String::new(),
+                        "Content-Length: 2048\r\n",
+                        RuntimeError::TooLarge,
+                    ),
+                    (
+                        format!(
+                            r#"{{"code":"ARCHIVE_REPLACED","error":"{}"}}"#,
+                            "x".repeat(2048)
+                        ),
+                        "",
+                        RuntimeError::TooLarge,
+                    ),
+                ] {
+                    let expected = if path == crate::account_profile::ACCOUNT_PROFILE_PATH {
+                        if mutation {
+                            RuntimeError::Indeterminate
+                        } else {
+                            read_error
+                        }
+                    } else {
+                        RuntimeError::Conflict
+                    };
+                    assert_eq!(
+                        synthetic_conflict(path, mutation, &body, framing),
+                        Err(expected)
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn only_explicit_loopback_may_use_http_and_credentials_are_origin_bound() {
         for origin in [
