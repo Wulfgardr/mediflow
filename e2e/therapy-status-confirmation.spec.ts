@@ -39,7 +39,7 @@ async function expectUncertainOutcome(page: Page) {
     });
     await expect(title).toHaveCSS('color', warningColor);
     await expect(region.locator('.lume-point')).toHaveCount(0);
-    await expect(region.getByText('La registrazione può essere avvenuta: rileggi prima di riprovare.', { exact: true })).toBeVisible();
+    await expect(region.getByText('La registrazione può essere ancora in corso. Il nuovo invio resta bloccato finché la rilettura non ne chiarisce l’esito.', { exact: true })).toBeVisible();
     await expect(region.getByText('Ramipril sintetico 5 mg · 1 cp al mattino', { exact: true })).toBeVisible();
     await expect(region.getByText(patientLabel(new Date()), { exact: true })).toBeVisible();
 }
@@ -190,7 +190,12 @@ for (const applied of [true, false]) {
         await expect(row(page).getByRole('button', { name: 'Sospendi', exact: true })).toBeDisabled();
         await expect(row(page, true).getByRole('button', { name: 'Concludi', exact: true })).toBeDisabled();
         await threshold(page).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
-        await expect(threshold(page).getByText(applied ? 'Registrata' : 'Terapia riletta', { exact: true })).toBeVisible();
+        if (applied) await expect(threshold(page).getByText('Terapia riletta', { exact: true })).toBeVisible();
+        else {
+            await expectUncertainOutcome(page);
+            await expect(row(page).getByRole('button', { name: 'Sospendi', exact: true })).toBeDisabled();
+        }
+        await expect(threshold(page).getByText('Registrata', { exact: true })).toHaveCount(0);
         await expect(confirm(page)).toHaveCount(0);
         expect(writes).toHaveLength(1);
         expect(await stored(page, data)).toMatchObject({ version: applied ? 2 : 1, status: applied ? 'suspended' : 'active' });
@@ -270,4 +275,98 @@ test('suspend, reactivate and complete each require their own confirmation and p
         if (transition.status === 'active') expect(item.endDate).toBeNull();
         await threshold(page).getByRole('button', { name: 'Torna alla scheda', exact: true }).click();
     }
+});
+
+
+test('an ambiguous write survives navigation and reload until an advanced version is read', async ({ page }) => {
+    const data = await fixture(page);
+    const other = await fixture(page);
+    await open(page, data);
+    const { writes } = network(page);
+    await page.route(`**/api/therapies/${data.therapyId}`, async route => {
+        if (route.request().method() !== 'PUT') return route.continue();
+        await route.abort('failed');
+    });
+    await row(page).getByRole('button', { name: 'Sospendi', exact: true }).click();
+    await confirm(page).click();
+    await expectUncertainOutcome(page);
+    await threshold(page).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
+    await expectUncertainOutcome(page);
+    expect(await stored(page, data)).toMatchObject({ version: 1, status: 'active' });
+    await page.getByRole('navigation', { name: 'Navigazione principale', exact: true }).getByRole('link', { name: 'Analisi', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Lasciare la compilazione?', exact: true })
+        .getByRole('button', { name: 'Esci senza salvare', exact: true }).click();
+    await expect(page).toHaveURL(/\/analytics$/);
+    await open(page, other);
+    await expect(threshold(page)).toHaveCount(0);
+    await open(page, data);
+    await expectUncertainOutcome(page);
+    await page.reload();
+    await openPatientSection(page, 'terapie');
+    await expectUncertainOutcome(page);
+    await expect(row(page).getByRole('button', { name: 'Sospendi', exact: true })).toBeDisabled();
+    await expect(row(page).getByRole('button', { name: 'Concludi', exact: true })).toBeDisabled();
+    await expect(row(page).getByRole('button', { name: 'Modifica', exact: true })).toBeDisabled();
+    await expect(confirm(page)).toHaveCount(0);
+    await threshold(page).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
+    await expectUncertainOutcome(page);
+    expect(writes).toHaveLength(1);
+    const archive = await (await page.request.get('/api/auth/check')).json();
+    const late = await page.request.put(`/api/therapies/${data.therapyId}`, {
+        headers: { 'x-mediflow-archive-generation': archive.archiveGeneration }, data: { version: 1, status: 'suspended' },
+    });
+    expect(late.status()).toBe(200);
+    await threshold(page).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
+    await expect(threshold(page).getByText('Terapia riletta', { exact: true })).toBeVisible();
+    await expect(threshold(page).getByText('Registrata', { exact: true })).toHaveCount(0);
+    await expect(threshold(page)).toContainText('Stato attuale: Sospesa');
+    await threshold(page).getByRole('button', { name: 'Torna alla scheda', exact: true }).click();
+    await page.unroute(`**/api/therapies/${data.therapyId}`);
+    await row(page).getByRole('button', { name: 'Riattiva', exact: true }).click();
+    await confirm(page).click();
+    await expect(threshold(page).getByText('Registrata', { exact: true })).toBeVisible();
+    expect(writes.map(write => write.body.version)).toEqual([1, 2]);
+});
+
+test('a second tab inherits the unresolved barrier and cannot confirm its older prompt', async ({ page }) => {
+    const data = await fixture(page);
+    await open(page, data);
+    const popup = page.waitForEvent('popup');
+    await page.evaluate(() => { window.open(location.href); });
+    const other = await popup;
+    await openPatientSection(other, 'terapie');
+    await row(other).getByRole('button', { name: 'Concludi', exact: true }).click();
+    const a = network(page);
+    const b = network(other);
+    await page.route(`**/api/therapies/${data.therapyId}`, route => route.request().method() === 'PUT' ? route.abort('failed') : route.continue());
+    await row(page).getByRole('button', { name: 'Sospendi', exact: true }).click();
+    await confirm(page).click();
+    await expectUncertainOutcome(page);
+    await expectUncertainOutcome(other);
+    await expect(confirm(other)).toHaveCount(0);
+    await other.reload();
+    await openPatientSection(other, 'terapie');
+    await expectUncertainOutcome(other);
+    await threshold(other).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
+    await expectUncertainOutcome(other);
+    expect(a.writes.length + b.writes.length).toBe(1);
+    expect(await stored(page, data)).toMatchObject({ version: 1, status: 'active' });
+    await other.close();
+});
+
+test('an authoritative HTTP rejection is distinct from a lost response', async ({ page }) => {
+    const data = await fixture(page);
+    await open(page, data);
+    const { writes } = network(page);
+    await page.route(`**/api/therapies/${data.therapyId}`, route => route.request().method() === 'PUT'
+        ? route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'Synthetic validation rejection' }) }) : route.continue());
+    await row(page).getByRole('button', { name: 'Sospendi', exact: true }).click();
+    await confirm(page).click();
+    await expect(threshold(page).getByText('Modifica non registrata', { exact: true })).toBeVisible();
+    await expect(threshold(page).getByText('Esito da verificare', { exact: true })).toHaveCount(0);
+    await expect(row(page).getByRole('button', { name: 'Concludi', exact: true })).toBeDisabled();
+    await threshold(page).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
+    await expect(threshold(page).getByText('Terapia riletta', { exact: true })).toBeVisible();
+    expect(writes).toHaveLength(1);
+    expect(await stored(page, data)).toMatchObject({ version: 1, status: 'active' });
 });

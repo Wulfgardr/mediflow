@@ -131,3 +131,5 @@ prima porzione di lavoro verificabile:
 - [0138-explicit-data-directory-bootstrap.md](./0138-explicit-data-directory-bootstrap.md): impedisce la copia legacy implicita nelle cartelle dati scelte, preservando la migrazione storica verso il default.
 
 - [0143-strong-unlock-credential.md](./0143-strong-unlock-credential.md): stabilisce passphrase di almeno 15 caratteri, verificatore che non espone il segreto al server, chiave solo in memoria, PIN di conferma separato e kit di recupero, con i tempi di derivazione misurati e l'ordine di consegna.
+
+- [0156-therapy-status-uncertain-client-write.md](./0156-therapy-status-uncertain-client-write.md): delimita il blocco Web dopo esito incerto, separando abort del client, vita del writer host e confronto tramite CAS.
