@@ -12,13 +12,14 @@ export type StatusConfirmation<T> = {
     current?: T;
     conflict: boolean;
     readFailed?: boolean;
+    writePending?: boolean;
 };
 type Ports<T> = {
     patientId: string;
     isCurrent: () => boolean;
     signal: () => AbortSignal;
     read: (signal: AbortSignal) => Promise<T[]>;
-    write: (item: T, target: Status) => Promise<unknown>;
+    write: (item: T, target: Status, signal: AbortSignal) => Promise<unknown>;
     isConflict: (error: unknown) => boolean;
     changed: (value: StatusConfirmation<T> | null) => void;
     refreshed: () => void;
@@ -37,7 +38,7 @@ export function createTherapyStatusConfirmation<T extends StatusTherapy>(ports: 
     const current = (token: number) => live && generation === token && ports.isCurrent();
     const blocked = () => !!state && !['confirm', 'reviewed', 'registered'].includes(state.phase);
     async function reread() {
-        if (!live || !ports.isCurrent() || !state || ['confirm', 'writing', 'reading'].includes(state.phase)) return;
+        if (!live || !ports.isCurrent() || !state || state.writePending || ['confirm', 'writing', 'reading'].includes(state.phase)) return;
         const context = state;
         const token = ++generation;
         publish({ ...context, phase: 'reading', readFailed: false });
@@ -85,18 +86,33 @@ export function createTherapyStatusConfirmation<T extends StatusTherapy>(ports: 
             if (!signal || signal.aborted) { publish(null); return; }
             const token = ++generation;
             reviewedSignal = undefined;
-            publish({ ...context, phase: 'writing' });
+            publish({ ...context, phase: 'writing', writePending: true });
+            const request = new AbortController();
+            let writePending = true;
+            let timedOut = false;
             let timer: ReturnType<typeof setTimeout> | undefined;
             try {
                 await Promise.race([
-                    ports.write(context.original, context.target),
-                    new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Unconfirmed write')), ports.timeoutMs ?? 15_000); }),
+                    (async () => {
+                        try {
+                            return await ports.write(context.original, context.target, request.signal);
+                        } finally {
+                            writePending = false;
+                            if (current(token) && state?.phase === 'uncertain') publish({ ...state, writePending: false });
+                        }
+                    })(),
+                    new Promise<never>((_, reject) => { timer = setTimeout(() => {
+                        timedOut = true;
+                        reject(new Error('Unconfirmed write'));
+                        request.abort();
+                    }, ports.timeoutMs ?? 15_000); }),
                 ]);
                 if (!current(token)) return;
                 publish({ ...context, phase: 'uncertain' });
                 if (!signal.aborted) await reread();
             } catch (error) {
-                if (current(token)) publish({ ...context, phase: ports.isConflict(error) ? 'conflict' : 'uncertain', conflict: ports.isConflict(error) });
+                const conflict = !timedOut && ports.isConflict(error);
+                if (current(token)) publish({ ...context, phase: conflict ? 'conflict' : 'uncertain', conflict, writePending });
             } finally {
                 clearTimeout(timer);
             }

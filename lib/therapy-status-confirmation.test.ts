@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createTherapyStatusConfirmation, type StatusTherapy } from './therapy-status-confirmation';
 
 const original: StatusTherapy = { id: 'therapy', patientId: 'patient', version: 1, drugName: 'Sintetico', dosage: '1 cp', status: 'active' };
-function harness(options: { write?: () => Promise<unknown>; timeoutMs?: number } = {}) {
+function harness(options: { write?: (signal: AbortSignal) => Promise<unknown>; timeoutMs?: number } = {}) {
     let items = [{ ...original }];
     const writes: Array<{ item: StatusTherapy; target: string }> = [];
     let reads = 0;
@@ -12,9 +12,9 @@ function harness(options: { write?: () => Promise<unknown>; timeoutMs?: number }
     const controller = createTherapyStatusConfirmation({
         patientId: 'patient', isCurrent: () => true, signal: () => session.signal,
         read: async () => { reads++; if (!readable) throw new Error('Unreadable'); return items; },
-        write: async (item, target) => {
+        write: async (item, target, signal) => {
             writes.push({ item, target });
-            if (options.write) return options.write();
+            if (options.write) return options.write(signal);
             items = [{ ...item, status: target, version: item.version! + 1 }];
         },
         isConflict: error => error === 'conflict', changed: () => {}, refreshed: () => {}, timeoutMs: options.timeoutMs,
@@ -53,20 +53,47 @@ test('conflict reread cannot register or resend even when the concurrent state m
     assert.equal(h.writes.length, 1);
 });
 
-test('timeout blocks cancellation and another therapy until verified; applied state becomes registered', async () => {
-    const h = harness({ write: () => new Promise(() => {}), timeoutMs: 1 });
+test('timeout aborts the write signal', async () => {
+    let signal!: AbortSignal;
+    const h = harness({ write: value => { signal = value; return new Promise(() => {}); }, timeoutMs: 1 });
     h.controller.begin(original, 'suspended', 'Sintetico');
     await h.controller.confirm();
+    assert.equal(signal.aborted, true);
     assert.equal(h.controller.snapshot?.phase, 'uncertain');
-    h.controller.cancel();
-    h.controller.begin({ ...original, id: 'other' }, 'completed', 'Sintetico');
-    await h.controller.confirm();
-    assert.equal(h.writes.length, 1);
-    assert.equal(h.controller.snapshot?.original.id, 'therapy');
-    h.setItems([{ ...original, status: 'suspended', version: 2 }]);
-    await h.controller.reread();
-    assert.equal(h.controller.snapshot?.phase, 'registered');
 });
+
+for (const outcome of ['resolved', 'rejected', 'aborted'] as const) {
+    test(`timeout blocks readback and another action until the write is ${outcome}`, async () => {
+        let resolve!: () => void;
+        let reject!: (reason: unknown) => void;
+        const h = harness({ write: () => new Promise<void>((done, fail) => { resolve = done; reject = fail; }), timeoutMs: 1 });
+        h.controller.begin(original, 'suspended', 'Sintetico');
+        await h.controller.confirm();
+        assert.equal(h.controller.snapshot?.phase, 'uncertain');
+        assert.equal(h.controller.snapshot?.writePending, true);
+        await h.controller.reread();
+        assert.equal(h.reads, 0);
+        h.controller.cancel();
+        h.controller.begin({ ...original, id: 'other' }, 'completed', 'Sintetico');
+        await h.controller.confirm();
+        assert.equal(h.controller.blocked, true);
+        assert.equal(h.writes.length, 1);
+        assert.equal(h.controller.snapshot?.original.id, 'therapy');
+        if (outcome === 'resolved') {
+            h.setItems([{ ...original, status: 'suspended', version: 2 }]);
+            resolve();
+        } else reject(outcome === 'aborted' ? new DOMException('Aborted', 'AbortError') : 'conflict');
+        await new Promise<void>(done => setImmediate(done));
+        assert.equal(h.controller.snapshot?.writePending, false);
+        assert.equal(h.controller.snapshot?.phase, 'uncertain');
+        assert.equal(h.controller.blocked, true);
+        assert.equal(h.reads, 0);
+        await h.controller.reread();
+        assert.equal(h.reads, 1);
+        assert.equal(h.controller.snapshot?.phase, outcome === 'resolved' ? 'registered' : 'reviewed');
+        assert.equal(h.writes.length, 1);
+    });
+}
 
 test('failed read, changed dose and unchanged version never claim registered', async () => {
     for (const kind of ['failed', 'dose', 'version', 'patient'] as const) {

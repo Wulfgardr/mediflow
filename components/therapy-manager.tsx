@@ -93,10 +93,10 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                 if (!parent || parent.id !== patientId) throw new Error('Patient unavailable');
                 return items;
             },
-            write: (therapy, status) => db.therapies.update(therapy.id, {
+            write: (therapy, status, signal) => db.therapies.update(therapy.id, {
                 version: therapy.version, status, updatedAt: new Date(),
                 ...(status === 'completed' ? { endDate: new Date() } : status === 'active' ? { endDate: null } : {}),
-            }, { suppressNotify: true }),
+            }, { suppressNotify: true, signal }),
             isConflict: (error) => error instanceof ApiConflictError,
             changed: (value) => setStatusState({ owner: controller, value }),
             refreshed: () => notifyDbChange('therapies'),
@@ -721,7 +721,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                     <div className={styles.statusActions}>
                         {['confirm', 'registered', 'reviewed'].includes(statusConfirmation.phase) && <button type="button" className="mf-btn-secondary" onClick={() => statusChange.cancel()}>Torna alla scheda</button>}
                         {statusConfirmation.phase === 'confirm' && <button type="button" className="ui-btn-primary" onClick={() => statusChange.confirm()}>Conferma e registra</button>}
-                        {['conflict', 'uncertain'].includes(statusConfirmation.phase) && <button type="button" className="ui-btn-primary" onClick={() => statusChange.reread()}>{statusConfirmation.conflict ? 'Rileggi la terapia' : 'Rileggi e verifica'}</button>}
+                        {['conflict', 'uncertain'].includes(statusConfirmation.phase) && <button type="button" className="ui-btn-primary" disabled={statusConfirmation.writePending} onClick={() => statusChange.reread()}>{statusConfirmation.conflict ? 'Rileggi la terapia' : 'Rileggi e verifica'}</button>}
                     </div>
                 </div>
             )}
