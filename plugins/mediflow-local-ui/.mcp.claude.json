@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mediflow-local-ui": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/src/launch.mjs"
+      ]
+    }
+  }
+}

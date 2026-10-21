@@ -1828,17 +1828,17 @@
       "file": "scripts/stage-headless-runtime.mjs",
       "kind": "require-base",
       "expression": "createRequire(path.join(layout.web, 'package.json'))",
-      "sourceSha256": "47a70e783aa54809e1d6d24a5646acc6e5623d3c0bf07080d156ef1e6626cfff",
+      "sourceSha256": "61bfc1298e7eadc129daeb9731034022e0597a307d76a02e11d9b5245657cee8",
       "count": 1,
-      "reason": "Existing staging verifier imports the generated launcher from its selected runtime payload. This exact source digest is required."
+      "reason": "Staging resolves only the shared better-sqlite3 dependency in the selected Web payload and enforces its physical package confinement. This exact source digest is required."
     },
     {
       "file": "scripts/stage-headless-runtime.mjs",
       "kind": "require-base",
       "expression": "createRequire(path.join(ROOT, 'package.json'))",
-      "sourceSha256": "47a70e783aa54809e1d6d24a5646acc6e5623d3c0bf07080d156ef1e6626cfff",
+      "sourceSha256": "61bfc1298e7eadc129daeb9731034022e0597a307d76a02e11d9b5245657cee8",
       "count": 1,
-      "reason": "Existing staging verifier imports the generated launcher from its selected runtime payload. This exact source digest is required."
+      "reason": "Build-only closure tracing resolves the installed Next tracer and TypeScript from the repository package root. This exact source digest is required."
     },
     {
       "file": "scripts/node-runtime-contract.mjs",
@@ -1852,7 +1852,7 @@
       "file": "scripts/source-runtime.mjs",
       "kind": "require-base",
       "expression": "createRequire(path.join(web, 'package.json'))",
-      "sourceSha256": "caf199e6664fa393e32cab70431fbf196ee723024bcec416461af43ae60d3d24",
+      "sourceSha256": "ece076532732853c1186e77d07ae70325f03464939caeb5f75e409e60a8cfc5e",
       "count": 1,
       "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
     },
@@ -1860,7 +1860,7 @@
       "file": "scripts/source-runtime.mjs",
       "kind": "require",
       "expression": "createRequire(path.join(web, 'package.json'))(path.join(web, 'server.js'))",
-      "sourceSha256": "caf199e6664fa393e32cab70431fbf196ee723024bcec416461af43ae60d3d24",
+      "sourceSha256": "ece076532732853c1186e77d07ae70325f03464939caeb5f75e409e60a8cfc5e",
       "count": 1,
       "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
     },
@@ -1868,7 +1868,7 @@
       "file": "scripts/stage-headless-runtime.mjs",
       "kind": "dynamic",
       "expression": "import(pathToFileURL(launcher).href)",
-      "sourceSha256": "47a70e783aa54809e1d6d24a5646acc6e5623d3c0bf07080d156ef1e6626cfff",
+      "sourceSha256": "61bfc1298e7eadc129daeb9731034022e0597a307d76a02e11d9b5245657cee8",
       "count": 1,
       "reason": "Existing staging verifier imports the generated launcher from its selected runtime payload. This exact source digest is required."
     },
@@ -1884,7 +1884,7 @@
       "file": "scripts/source-runtime.mjs",
       "kind": "dynamic",
       "expression": "import(pathToFileURL(path.join(web, 'scripts/mediflow-headless-supervisor.mjs')).href)",
-      "sourceSha256": "caf199e6664fa393e32cab70431fbf196ee723024bcec416461af43ae60d3d24",
+      "sourceSha256": "ece076532732853c1186e77d07ae70325f03464939caeb5f75e409e60a8cfc5e",
       "count": 1,
       "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
     },
@@ -1892,7 +1892,7 @@
       "file": "scripts/source-runtime.mjs",
       "kind": "dynamic",
       "expression": "import(pathToFileURL(path.join(web, 'scripts/register-strip-types-loader.mjs')).href)",
-      "sourceSha256": "caf199e6664fa393e32cab70431fbf196ee723024bcec416461af43ae60d3d24",
+      "sourceSha256": "ece076532732853c1186e77d07ae70325f03464939caeb5f75e409e60a8cfc5e",
       "count": 1,
       "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
     },

@@ -7,6 +7,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Accessibility, Activity, ChevronRight, FileText, Pill, Plus, ShieldCheck, Stethoscope } from 'lucide-react';
 
+import { PluginLocalUiNavigation, PluginPrescribingGuide } from '@/components/plugin-local-ui-navigation';
 import { PatientClinicalSupport } from '@/components/patient-clinical-support';
 import { AttentionGroup } from '@/components/attention-group';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
@@ -735,6 +736,8 @@ export default function PatientDetailPage() {
                     </div>
                 </section>
 
+                <PluginLocalUiNavigation key={id} patientId={id} patientVersion={patient.version} patientLabel={`${patient.firstName} ${patient.lastName}`} />
+                <PluginPrescribingGuide />
                 <PatientSynopticSheet
                     clinicalSupport={<PatientClinicalSupport patient={patient} stale={insightStale}
                         smartImport={smartImportSourceCount > 0 && smartImportFabricCaptureInput ? (
