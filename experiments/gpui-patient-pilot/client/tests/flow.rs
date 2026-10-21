@@ -375,3 +375,100 @@ fn worklist_search_is_unicode_aware_and_does_not_merge_distinct_ids() {
     assert!(!a.matches_query("non presente"));
     assert_ne!(a.id, b.id);
 }
+
+#[test]
+fn conflict_reread_preserves_draft_and_requires_confirmation_on_the_new_version() {
+    let mut w = opened();
+    w.edit_notes("B: bozza del medico".into()).unwrap();
+    w.review().unwrap();
+    let first = w.confirm().unwrap();
+    w.receive_update(&first, UpdateOutcome::Conflict);
+    let read = w.reread_preserving_draft().unwrap();
+    assert_eq!(w.phase(), Phase::Recovering);
+    assert_eq!(w.confirm(), Err(ClientError::WrongPhase));
+    let mut concurrent = profile("patient-a");
+    concurrent.version = 8;
+    concurrent.notes = Some("C: modifica concorrente".into());
+    assert!(w.receive_read(&read, Ok(concurrent)));
+    assert_eq!(
+        w.selected().unwrap().notes.as_deref(),
+        Some("C: modifica concorrente")
+    );
+    assert_eq!(w.draft_notes(), "B: bozza del medico");
+    assert!(w.has_notes_comparison());
+    assert_eq!(w.confirm(), Err(ClientError::WrongPhase));
+    w.review().unwrap();
+    let second = w.confirm().unwrap();
+    assert_eq!(second.expected_version, 8);
+    assert_eq!(second.notes, "B: bozza del medico");
+    let read = w
+        .receive_update(&second, UpdateOutcome::Acknowledged)
+        .unwrap();
+    assert!(w.receive_read(&read, Ok(committed(&second))));
+    assert_eq!(w.phase(), Phase::Saved);
+}
+
+#[test]
+fn lost_response_blocks_resend_and_reread_confirms_or_compares_without_a_write() {
+    for matches in [true, false] {
+        let mut w = opened();
+        let command = submitted(&mut w);
+        w.receive_update(&command, UpdateOutcome::Indeterminate);
+        assert_eq!(w.review(), Err(ClientError::WrongPhase));
+        assert_eq!(w.confirm(), Err(ClientError::WrongPhase));
+        let read = w.reread_preserving_draft().unwrap();
+        let mut fresh = committed(&command);
+        if !matches {
+            fresh.notes = Some("C: altro contenuto".into());
+        }
+        assert!(w.receive_read(&read, Ok(fresh)));
+        assert_eq!(w.draft_notes(), command.notes);
+        assert_eq!(
+            w.phase(),
+            if matches {
+                Phase::Saved
+            } else {
+                Phase::Editing
+            }
+        );
+        assert_eq!(w.has_notes_comparison(), !matches);
+        assert_eq!(w.confirm(), Err(ClientError::WrongPhase));
+    }
+}
+
+#[test]
+fn recovery_failure_keeps_draft_and_uncertainty_until_an_authoritative_read() {
+    let mut w = opened();
+    let command = submitted(&mut w);
+    let read = w
+        .receive_update(&command, UpdateOutcome::Acknowledged)
+        .unwrap();
+    assert!(!w.receive_read(&read, Err(ReadFailure::Unavailable)));
+    let read = w.reread_preserving_draft().unwrap();
+    assert!(!w.receive_read(&read, Err(ReadFailure::Invalid)));
+    assert_eq!(w.phase(), Phase::Indeterminate);
+    assert_eq!(w.draft_notes(), command.notes);
+    assert_eq!(w.confirm(), Err(ClientError::WrongPhase));
+    let read = w.reread_preserving_draft().unwrap();
+    assert!(w.receive_read(&read, Ok(committed(&command))));
+    assert_eq!(w.phase(), Phase::Saved);
+}
+
+#[test]
+fn recovery_cannot_transfer_draft_or_late_reply_to_another_patient_or_workspace() {
+    let mut w = opened();
+    let command = submitted(&mut w);
+    w.receive_update(&command, UpdateOutcome::Indeterminate);
+    let old = w.reread_preserving_draft().unwrap();
+    assert_eq!(w.select("patient-b"), Err(ClientError::UnsavedChanges));
+    w.lock();
+    assert!(!w.receive_read(&old, Ok(committed(&command))));
+    assert_eq!(w.draft_notes(), "");
+    assert_eq!(w.confirm(), Err(ClientError::WrongPhase));
+    let mut fresh = Workspace::default();
+    let read = fresh.select("patient-b").unwrap();
+    assert!(!fresh.receive_read(&old, Ok(committed(&command))));
+    assert!(fresh.receive_read(&read, Ok(profile("patient-b"))));
+    assert_eq!(fresh.draft_notes(), "Contatto di prova");
+    assert!(!fresh.has_notes_comparison());
+}
