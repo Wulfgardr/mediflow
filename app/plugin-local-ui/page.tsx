@@ -5,7 +5,7 @@ import { PluginLocalUiNavigation } from '@/components/plugin-local-ui-navigation
 
 export default function PluginLocalUiPage() {
   return <article className="mx-auto max-w-2xl space-y-6 p-6 py-12">
-    <h1 className="text-3xl">Continua in MediFlow</h1>
+    <h1 className="type-page-title">Continua in MediFlow</h1>
     <p>La cartella resta in questa interfaccia locale. Il plugin non riceve codice fiscale, storia clinica o esiti delle prescrizioni.</p>
     <PluginLocalUiNavigation />
     <Link className="mf-button-primary inline-block" href="/?area=incarico">Cerca e scegli il paziente</Link>
