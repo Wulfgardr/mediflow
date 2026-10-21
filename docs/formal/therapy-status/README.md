@@ -10,7 +10,7 @@ La [lettura interattiva offline](./traces.html) presenta pochi ordini di eventi,
 con parole del dominio, senza dati reali né dipendenze di rete. Il diagramma
 include anche comportamenti controllati dai test e non astratti nel modello.
 La decisione di prodotto rimane [ADR 0156](../../adr/0156-therapy-status-uncertain-client-write.md),
-ancora Proposed; questi artefatti non ne cambiano lo stato.
+Accepted dal 2026-10-21 dopo la review indipendente completa sulla PR #591 (revisione `399265ffa`).
 
 ## Eseguire
 
