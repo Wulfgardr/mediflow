@@ -434,3 +434,48 @@ test('P2 an uninspectable therapy marker is visible and recovery waits for its t
     assert.equal(phase(h), 'uncertain');
     assert.equal(h.writes.length, 0);
 });
+
+test('formal trace: a GET sampled before late host commit stays uncertain across two owners', async () => {
+    const shared = journal();
+    const first = harness({ journal: shared, timeoutMs: 1, write: signal => new Promise((_, reject) => {
+        signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+    }) });
+    first.controller.begin(original, 'suspended', 'Sintetico');
+    await first.controller.confirm();
+    await new Promise<void>(done => setImmediate(done));
+    first.controller.dispose();
+    let host = { ...original };
+    let release!: () => void;
+    let sampled!: () => void;
+    const held = new Promise<void>(done => { release = done; });
+    const sampleTaken = new Promise<void>(done => { sampled = done; });
+    let holdRead = true;
+    let writes = 0;
+    const second = createTherapyStatusConfirmation({
+        patientId: 'patient', journal: shared, isCurrent: () => true, signal: () => new AbortController().signal,
+        read: async () => {
+            const snapshot = { ...host };
+            if (holdRead) { sampled(); await held; }
+            return [snapshot];
+        },
+        write: async () => { writes++; }, isRejected: () => false, isConflict: () => false,
+        changed: () => {}, refreshed: () => {},
+    });
+    second.recover([original], 'Sintetico');
+    const reading = second.reread();
+    await sampleTaken;
+    host = { ...original, version: 2, status: 'suspended' };
+    release();
+    await reading;
+    assert.equal(second.snapshot?.phase, 'uncertain');
+    assert.equal(second.blocked, true);
+    second.begin(original, 'completed', 'Sintetico');
+    await second.confirm();
+    assert.equal(writes, 0);
+    holdRead = false;
+    await second.reread();
+    assert.equal(second.snapshot?.phase, 'reviewed');
+    assert.equal(second.blocked, false);
+    assert.equal(first.writes.length, 1);
+    assert.equal(writes, 0);
+});

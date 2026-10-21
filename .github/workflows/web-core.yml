@@ -44,6 +44,11 @@ jobs:
           execFileSync('git', ['fetch', '--no-tags', 'origin', ...commits], { stdio: 'inherit' });
           for (const commit of commits) execFileSync('git', ['cat-file', '-e', `${commit}^{commit}`]);
           NODE
+      - name: Therapy status finite model and controller traces
+        timeout-minutes: 10
+        env:
+          MEDIFLOW_FORMAL_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: npm run verify:therapy-status
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
