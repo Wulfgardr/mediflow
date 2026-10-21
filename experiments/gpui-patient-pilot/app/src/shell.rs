@@ -432,6 +432,46 @@ pub struct ClinicalApp {
     _subscriptions: Vec<Subscription>,
 }
 
+fn confirmation_heading(question: String, theme: Theme) -> Stateful<Div> {
+    let words: Vec<_> = question.split_inclusive(' ').map(str::to_owned).collect();
+    let last = words.len().saturating_sub(1);
+    div()
+        .id("clinical-workspace-confirm-question")
+        .debug_selector(|| "threshold-question".into())
+        .role(Role::Heading)
+        .aria_label(question)
+        .type_role(theme, TypeRole::Threshold)
+        .flex()
+        .flex_wrap()
+        .children(words.into_iter().enumerate().map(|(index, word)| {
+            let mut unit = div().max_w_full().flex_shrink_0();
+            if index == last && word.ends_with('?') {
+                let before_mark = &word[..word.len() - 1];
+                let ending_start = before_mark.char_indices().next_back().map_or(0, |(i, _)| i);
+                unit = unit
+                    .debug_selector(|| "threshold-question-last-word".into())
+                    .flex()
+                    .flex_wrap()
+                    .child(div().max_w_full().flex_shrink_0().child(
+                        text!(&word[..ending_start]).with_id("threshold-question-last-prefix"),
+                    ))
+                    .child(
+                        div()
+                            .whitespace_nowrap()
+                            .flex_shrink_0()
+                            .debug_selector(|| "threshold-question-ending".into())
+                            .child(
+                                text!(&word[ending_start..])
+                                    .with_id("threshold-question-last-ending"),
+                            ),
+                    );
+            } else {
+                unit = unit.child(text!(word).with_id(("threshold-question-word", index)));
+            }
+            unit
+        }))
+}
+
 impl ClinicalApp {
     pub fn new(server: String, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let dark = matches!(
@@ -4309,14 +4349,14 @@ impl ClinicalApp {
         subject
     }
 
-    fn threshold_detail(&self, _cx: &Context<Self>) -> gpui::AnyElement {
+    fn threshold_detail_text(&self, mode: ThresholdMode) -> String {
         let patient = self
             .patient
             .detail
             .ready()
             .map(PatientDetail::display_name)
             .unwrap_or_default();
-        let detail = if self.discard.is_some() {
+        if self.discard.is_some() {
             if self
                 .form
                 .as_ref()
@@ -4338,6 +4378,7 @@ impl ClinicalApp {
                 match form.state {
                 FormState::Draft => self.form_subject(form,&patient),
                 FormState::Review if form.kind == FormKind::Notes && self.core.has_notes_comparison() => self.form_subject(form,&patient),
+                FormState::Review if mode == ThresholdMode::FullPlane => "Per rivedere il contenuto torna alla bozza. La registrazione sarà confermata soltanto dopo la rilettura.".into(),
                 FormState::Review => "Controlla il contenuto qui sopra. La registrazione sarà confermata soltanto dopo la rilettura.".into(),
                 FormState::Saving => "La bozza resta visibile fino alla verifica. Non inviare di nuovo.".into(),
                 FormState::Conflict | FormState::Uncertain if form.kind == FormKind::Notes => {
@@ -4362,7 +4403,11 @@ impl ClinicalApp {
                     "Scheda letta dall'archivio · nessuna bozza aperta".into()
                 }
             })
-        };
+        }
+    }
+
+    fn threshold_detail(&self, mode: ThresholdMode, _cx: &Context<Self>) -> gpui::AnyElement {
+        let detail = self.threshold_detail_text(mode);
         div()
             .id("clinical-workspace-threshold-detail")
             .debug_selector(|| "threshold-detail".into())
@@ -4400,7 +4445,7 @@ impl ClinicalApp {
             .as_ref()
             .is_some_and(|form| form.state == FormState::Review)
             && self.discard.is_none();
-        let detail = self.threshold_detail(cx);
+        let detail = self.threshold_detail(ThresholdMode::Compact, cx);
         let content = content.into_any_element();
         let scroll = self.profile_scroll.clone();
         let mode = self.threshold_mode.clone();
@@ -4602,7 +4647,7 @@ impl ClinicalApp {
                         .role(Role::Status)
                         .child(text!("Preparazione della valutazione nell’archivio…")),
                 )
-                .when(!compact, |el| el.child(self.threshold_detail(cx)));
+                .when(!compact, |el| el.child(self.threshold_detail(mode, cx)));
         }
         let review_enabled = form.scale.as_ref().is_none_or(ScaleAssessment::can_prepare);
         let repeated_scale = form
@@ -4710,24 +4755,30 @@ impl ClinicalApp {
             FormState::Review => threshold
                 .bg(theme.threshold)
                 .text_color(theme.threshold_text)
-                .child(self.threshold_question.attach_enabled(div().id("clinical-workspace-confirm-question").debug_selector(|| "threshold-question".into()).role(Role::Heading).type_role(theme, TypeRole::Threshold).child(text!(
-                    if repeated_scale {
-                        format!("Ripetere l’invio della stessa valutazione per {patient_name}?")
-                    } else if form.kind == FormKind::PatientNew {
-                        format!("Creare la scheda di {patient_name} nell'ambulatorio selezionato?")
-                    } else {
-                        confirmation_question(
-                            1,
-                            if form.edit.is_some() {
-                                "modifica"
-                            } else {
-                                form.kind.noun()
-                            },
-                            &patient_name,
-                        )
-                    }
-                )), mode == ThresholdMode::FullPlane))
-                .when(!compact, |el| el.child(self.threshold_detail(cx)))
+                .child(self.threshold_question.attach_enabled(
+                    confirmation_heading(
+                        if repeated_scale {
+                            format!("Ripetere l’invio della stessa valutazione per {patient_name}?")
+                        } else if form.kind == FormKind::PatientNew {
+                            format!(
+                                "Creare la scheda di {patient_name} nell'ambulatorio selezionato?"
+                            )
+                        } else {
+                            confirmation_question(
+                                1,
+                                if form.edit.is_some() {
+                                    "modifica"
+                                } else {
+                                    form.kind.noun()
+                                },
+                                &patient_name,
+                            )
+                        },
+                        theme,
+                    ),
+                    mode == ThresholdMode::FullPlane,
+                ))
+                .when(!compact, |el| el.child(self.threshold_detail(mode, cx)))
                 .child(
                     div()
                         .flex()
@@ -4767,7 +4818,10 @@ impl ClinicalApp {
                                 )
                                 .on_click(cx.listener(|this, _, _, cx| this.confirm_form(cx))),
                         ),
-                ).when(mode == ThresholdMode::FullPlane, |el| el.child(self.threshold_detail(cx))),
+                )
+                .when(mode == ThresholdMode::FullPlane, |el| {
+                    el.child(self.threshold_detail(mode, cx))
+                }),
             FormState::Saving => threshold
                 .bg(theme.draft)
                 .child(
@@ -4786,7 +4840,7 @@ impl ClinicalApp {
                             "Registrazione e rilettura in corso…"
                         })),
                 )
-                .when(!compact, |el| el.child(self.threshold_detail(cx))),
+                .when(!compact, |el| el.child(self.threshold_detail(mode, cx))),
             FormState::Conflict | FormState::Uncertain | FormState::Rejected => {
                 if form.kind == FormKind::Notes
                     && form.state == FormState::Rejected
@@ -4814,15 +4868,47 @@ impl ClinicalApp {
                         ViewStateKind::EsitoDaVerificare
                     };
                     return threshold
-                        .when(compact, |el| el.child(div().id("clinical-notes-recovery-status").role(Role::Status).type_role(theme,TypeRole::Strong).child(text!(if form.state==FormState::Conflict {"Scheda cambiata"}else{"Esito da verificare"})))
-                            .child(self.form_actions[7].attach(button("clinical-notes-recovery-command",if form.state==FormState::Conflict {"Rileggi la scheda"}else{"Rileggi e verifica"},theme,false,true).debug_selector(||"clinical-notes-recovery-command".into()))
-                                .on_click(cx.listener(|this,_,_,cx|this.reread_notes(cx)))))
-                        .when(!compact,|el| el.child(ViewState::new(ReadObject::Scheda, kind).render(
-                            "clinical-notes-recovery",
-                            theme,
-                            &self.form_actions[7].focus,
-                            cx.listener(|this, _, _, cx| this.reread_notes(cx)),
-                        )))
+                        .when(compact, |el| {
+                            el.child(
+                                div()
+                                    .id("clinical-notes-recovery-status")
+                                    .role(Role::Status)
+                                    .type_role(theme, TypeRole::Strong)
+                                    .child(text!(if form.state == FormState::Conflict {
+                                        "Scheda cambiata"
+                                    } else {
+                                        "Esito da verificare"
+                                    })),
+                            )
+                            .child(
+                                self.form_actions[7]
+                                    .attach(
+                                        button(
+                                            "clinical-notes-recovery-command",
+                                            if form.state == FormState::Conflict {
+                                                "Rileggi la scheda"
+                                            } else {
+                                                "Rileggi e verifica"
+                                            },
+                                            theme,
+                                            false,
+                                            true,
+                                        )
+                                        .debug_selector(
+                                            || "clinical-notes-recovery-command".into(),
+                                        ),
+                                    )
+                                    .on_click(cx.listener(|this, _, _, cx| this.reread_notes(cx))),
+                            )
+                        })
+                        .when(!compact, |el| {
+                            el.child(ViewState::new(ReadObject::Scheda, kind).render(
+                                "clinical-notes-recovery",
+                                theme,
+                                &self.form_actions[7].focus,
+                                cx.listener(|this, _, _, cx| this.reread_notes(cx)),
+                            ))
+                        })
                         .child(
                             div()
                                 .flex()
@@ -4858,7 +4944,11 @@ impl ClinicalApp {
                         );
                 }
                 let label = if compact {
-                    match form.state {FormState::Conflict => "Scheda cambiata",FormState::Rejected=>"Non registrata",_=>"Esito da verificare"}
+                    match form.state {
+                        FormState::Conflict => "Scheda cambiata",
+                        FormState::Rejected => "Non registrata",
+                        _ => "Esito da verificare",
+                    }
                 } else if form.kind == FormKind::Scale && !repeated_scale {
                     "Valutazione da rivedere. Le risposte sono conservate."
                 } else {
@@ -4880,7 +4970,7 @@ impl ClinicalApp {
                             .aria_label(label)
                             .child(text!(label)),
                     )
-                    .when(!compact, |el| el.child(self.threshold_detail(cx)))
+                    .when(!compact, |el| el.child(self.threshold_detail(mode, cx)))
                     .child(
                         div()
                             .flex()
@@ -7621,6 +7711,106 @@ mod tests {
                     .child(app.profile_view(layout, cx))
             })
         }
+    }
+
+    struct ThresholdQuestionTest {
+        question: String,
+        ending: &'static str,
+        theme: Theme,
+    }
+
+    impl Render for ThresholdQuestionTest {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .size_full()
+                .flex()
+                .flex_col()
+                .px(px(12.))
+                .child(confirmation_heading(self.question.clone(), self.theme))
+                .child(
+                    div()
+                        .debug_selector(|| "expected-question-ending".into())
+                        .type_role(self.theme, TypeRole::Threshold)
+                        .whitespace_nowrap()
+                        .self_start()
+                        .child(text!(self.ending)),
+                )
+        }
+    }
+
+    #[gpui::test]
+    fn threshold_question_never_orphans_punctuation_at_390_and_400_percent(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) = cx.add_window_view(|_, _| ThresholdQuestionTest {
+            question: String::new(),
+            ending: "a?",
+            theme: Theme::for_dark(false).sized(4., false),
+        });
+        cx.simulate_resize(gpui::size(px(390.), px(700.)));
+        for dark in [false, true] {
+            for (question, ending) in [
+                (confirmation_question(1, "terapia", "Moretti Elena"), "a?"),
+                (confirmation_question(3, "terapia", "Moretti Elena"), "a?"),
+                (
+                    "Creare la scheda di Moretti Elena nell'ambulatorio selezionato?".into(),
+                    "o?",
+                ),
+                (
+                    confirmation_question(1, "valutazione", "Moretti Elena"),
+                    "a?",
+                ),
+                (
+                    "Ripetere l’invio della stessa valutazione per Moretti Elena?".into(),
+                    "a?",
+                ),
+            ] {
+                view.update(cx, |view, cx| {
+                    view.question = question.clone();
+                    view.ending = ending;
+                    view.theme = Theme::for_dark(dark).sized(4., false);
+                    cx.notify();
+                });
+                render_clinical_window(cx);
+                let actual = cx.debug_bounds("threshold-question-ending").unwrap();
+                let expected = cx.debug_bounds("expected-question-ending").unwrap();
+                let heading = cx.debug_bounds("threshold-question").unwrap();
+                assert_eq!(
+                    actual.size, expected.size,
+                    "indivisible final letter and punctuation: {question}"
+                );
+                let word = cx.debug_bounds("threshold-question-last-word").unwrap();
+                if ending == "a?" {
+                    assert_eq!(
+                        word.size.height, expected.size.height,
+                        "whole final word fits: {question}"
+                    );
+                }
+                assert_eq!(actual.bottom(), heading.bottom(), "final row: {question}");
+                assert!(word.right() <= px(390.), "final word fits: {question}");
+                assert!(actual.right() <= px(390.), "ending fits: {question}");
+            }
+        }
+    }
+
+    #[gpui::test]
+    fn threshold_full_plane_detail_returns_to_draft_instead_of_pointing_above(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            synthetic_notes_form(app, FormState::Review, cx);
+            for kind in [FormKind::Therapy, FormKind::PatientNew, FormKind::Scale] {
+                app.form.as_mut().unwrap().kind = kind;
+                let full = app.threshold_detail_text(ThresholdMode::FullPlane);
+                assert!(!full.contains("qui sopra"));
+                assert_eq!(full, "Per rivedere il contenuto torna alla bozza. La registrazione sarà confermata soltanto dopo la rilettura.");
+                for mode in [ThresholdMode::Complete, ThresholdMode::Compact] {
+                    assert_eq!(app.threshold_detail_text(mode), "Controlla il contenuto qui sopra. La registrazione sarà confermata soltanto dopo la rilettura.");
+                }
+            }
+        });
     }
 
     #[gpui::test]

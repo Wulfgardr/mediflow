@@ -310,7 +310,9 @@ La domanda di conferma è «Registrare N elementi nella scheda di Nome
 Cognome?». Per un solo elemento indica il tipo: «Registrare 1 terapia nella
 scheda di Moretti Elena?». Il titolo va a capo, di norma entro due righe;
 a 390 px con testo al 400% si conserva tutto il testo anche oltre due
-righe, senza troncare il destinatario né ridurre il carattere. I comandi
+righe, senza troncare il destinatario né ridurre il carattere. Il punto
+interrogativo resta unito all’ultima parola, anche nelle domande della
+nuova anagrafica e delle Scale. I comandi
 mantengono lo stesso ordine di lettura: «Torna alla bozza», poi «Conferma
 e registra». Se non entrano sulla stessa riga si impilano a tutta larghezza.
 Nessun comando essenziale richiede scorrimento orizzontale. Nella forma
@@ -333,6 +335,12 @@ di Tab e di lettura; Esc torna alla bozza da tutta la regione. Il nome
 accessibile del comando principale include il destinatario, ad esempio
 «Conferma e registra nella scheda di Moretti Elena»; l'etichetta visibile
 resta «Conferma e registra».
+
+Solo nel piano intero, dove il contenuto della scheda è nascosto, il
+dettaglio è «Per rivedere il contenuto torna alla bozza. La registrazione
+sarà confermata soltanto dopo la rilettura.» Nella forma completa e in
+quella compatta resta «Controlla il contenuto qui sopra. La registrazione
+sarà confermata soltanto dopo la rilettura.»
 
 La protezione consiste nel leggere prima la domanda con il destinatario
 e nel mantenere adiacenti i comandi, anche quando si scorre. Non richiede
