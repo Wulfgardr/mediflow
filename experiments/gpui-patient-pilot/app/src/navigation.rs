@@ -144,6 +144,56 @@ impl Layout {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ThresholdMode {
+    Complete,
+    Compact,
+    FullPlane,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ThresholdLayout {
+    pub mode: ThresholdMode,
+    pub scrolls_with_content: bool,
+}
+
+impl ThresholdLayout {
+    pub fn measured(
+        plane_height: f32,
+        complete_height: f32,
+        essential_height: f32,
+        confirming: bool,
+        _layout: Layout,
+    ) -> Self {
+        let mode = if complete_height <= plane_height / 3. {
+            ThresholdMode::Complete
+        } else if confirming && essential_height > plane_height {
+            ThresholdMode::FullPlane
+        } else {
+            ThresholdMode::Compact
+        };
+        Self {
+            mode,
+            scrolls_with_content: false,
+        }
+    }
+}
+
+pub fn confirmation_command_label(patient: &str) -> String {
+    format!("Conferma e registra nella scheda di {patient}")
+}
+
+pub const CONFIRMATION_COMMANDS: [&str; 2] = ["Torna alla bozza", "Conferma e registra"];
+
+pub fn confirmation_question(count: usize, single_kind: &str, patient: &str) -> String {
+    let items = if count == 1 {
+        format!("1 {single_kind}")
+    } else {
+        format!("{count} elementi")
+    };
+    format!("Registrare {items} nella scheda di {patient}?")
+}
+
 /// Move through the visible worklist without wrapping or using a hidden row.
 /// A focused row wins over a previous preview selection; no anchor starts at
 /// the first visible patient, in either direction.
@@ -173,6 +223,83 @@ pub fn adjacent_patient<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn threshold_is_anchored_at_every_width_and_text_scale() {
+        for width in [390., 768., 1440.] {
+            for scale in [1., 2., 4.] {
+                for height in [300., 700., 900.] {
+                    let decision = ThresholdLayout::measured(
+                        height,
+                        120. * scale,
+                        100.,
+                        false,
+                        Layout::for_window(width, scale),
+                    );
+                    assert!(!decision.scrolls_with_content, "{width}/{scale}/{height}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn threshold_compacts_strictly_above_one_third_of_its_plane() {
+        for width in [390., 768., 1440.] {
+            for scale in [1., 2., 4.] {
+                let layout = Layout::for_window(width, scale);
+                for height in [300., 600., 900.] {
+                    for (complete, expected) in [
+                        (height / 3. - 0.1, false),
+                        (height / 3., false),
+                        (height / 3. + 0.1, true),
+                    ] {
+                        assert_eq!(
+                            ThresholdLayout::measured(height, complete, 50., false, layout).mode
+                                == ThresholdMode::Compact,
+                            expected
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn threshold_uses_full_plane_only_when_confirmation_essentials_do_not_fit() {
+        let layout = Layout::for_window(390., 4.);
+        assert_eq!(
+            ThresholdLayout::measured(700., 1200., 700., true, layout).mode,
+            ThresholdMode::Compact
+        );
+        assert_eq!(
+            ThresholdLayout::measured(700., 1200., 700.1, true, layout).mode,
+            ThresholdMode::FullPlane
+        );
+        assert_eq!(
+            ThresholdLayout::measured(700., 1200., 1100., false, layout).mode,
+            ThresholdMode::Compact
+        );
+        assert_eq!(
+            confirmation_command_label("Moretti Elena"),
+            "Conferma e registra nella scheda di Moretti Elena"
+        );
+    }
+
+    #[test]
+    fn threshold_confirmation_preserves_command_order_and_recipient() {
+        assert_eq!(
+            CONFIRMATION_COMMANDS,
+            ["Torna alla bozza", "Conferma e registra"]
+        );
+        assert_eq!(
+            confirmation_question(1, "terapia", "Moretti Elena"),
+            "Registrare 1 terapia nella scheda di Moretti Elena?"
+        );
+        assert_eq!(
+            confirmation_question(3, "terapia", "Moretti Elena"),
+            "Registrare 3 elementi nella scheda di Moretti Elena?"
+        );
+    }
 
     #[test]
     fn worklist_navigation_uses_visible_order_and_focused_row_before_old_selection() {
