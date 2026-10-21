@@ -5472,8 +5472,8 @@ mod tests {
     }
 
     /// The ordinary scoped request negotiates identity first; only the second
-    /// request is the demographics read under test.
-    fn demographics_server(
+    /// request is the operation under test.
+    fn scoped_response_server(
         status: u16,
         body: &str,
     ) -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
@@ -5515,9 +5515,72 @@ mod tests {
         session
     }
 
+    fn assert_scoped_archive_conflict(
+        operation: fn(&RuntimeSession) -> Result<()>,
+        expected_request: &str,
+    ) {
+        for (code, expected) in [
+            ("ARCHIVE_REPLACED", RuntimeError::ArchiveReplaced),
+            ("VERSION_CONFLICT", RuntimeError::Conflict),
+        ] {
+            let body = json!({"code": code, "error": "synthetic private detail"}).to_string();
+            let (url, seen, worker) = scoped_response_server(409, &body);
+            let session = session_at(&url);
+            admit_fixture_read(&session);
+            let result = operation(&session);
+            let request = seen.recv_timeout(Duration::from_secs(5)).unwrap();
+            worker.join().unwrap();
+            assert!(request.starts_with(expected_request), "{request}");
+            assert!(request.contains("x-mediflow-archive-generation: synthetic-generation"));
+            assert_eq!(result, Err(expected), "{code}");
+        }
+    }
+
+    #[test]
+    fn archive_replaced_survives_patient_profile_read() {
+        assert_scoped_archive_conflict(
+            |session| {
+                session
+                    .read_patient_profile("scope-a", "patient-a", &session.profile_query_intent())
+                    .map(|_| ())
+            },
+            "POST /api/v1/network/patients/patient-a/profile-query ",
+        );
+    }
+
+    #[test]
+    fn archive_replaced_survives_patient_notes_update() {
+        assert_scoped_archive_conflict(
+            |session| session.update_patient_notes("scope-a", "patient-a", 1, "Synthetic notes"),
+            "PUT /api/v1/network/patients/patient-a ",
+        );
+    }
+
+    #[test]
+    fn archive_replaced_survives_entry_creation() {
+        assert_scoped_archive_conflict(
+            |session| {
+                session
+                    .create_entry(
+                        "scope-a",
+                        "patient-a",
+                        &EntryDraft {
+                            entry_type: "note".into(),
+                            title: "Synthetic entry".into(),
+                            content: "Synthetic content".into(),
+                            date: "2026-10-21".into(),
+                            setting: None,
+                        },
+                    )
+                    .map(|_| ())
+            },
+            "POST /api/v1/network/patients/patient-a/entries ",
+        );
+    }
+
     #[test]
     fn population_demographics_sends_exactly_three_parameters_and_both_scope_assertions() {
-        let (url, seen, worker) = demographics_server(200, &demographics_wire().to_string());
+        let (url, seen, worker) = scoped_response_server(200, &demographics_wire().to_string());
         let session = admitted_session(&url);
         let request = DemographicsRequest::new(80, 20, "Europe/Rome").unwrap();
         let result = session
@@ -5554,7 +5617,7 @@ mod tests {
             (
                 409,
                 r#"{"error":"archivio","code":"ARCHIVE_REPLACED"}"#,
-                RuntimeError::Conflict,
+                RuntimeError::ArchiveReplaced,
             ),
             (
                 413,
@@ -5563,7 +5626,7 @@ mod tests {
             ),
         ];
         for (status, body, expected) in cases {
-            let (url, seen, worker) = demographics_server(status, body);
+            let (url, seen, worker) = scoped_response_server(status, body);
             let session = admitted_session(&url);
             let result = session.read_population_demographics("scope-a", &request);
             seen.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -5576,7 +5639,7 @@ mod tests {
     fn population_demographics_rejects_an_echoed_range_that_was_not_requested() {
         let mut body = demographics_wire();
         body["ageRange"] = json!([0, 120]);
-        let (url, seen, worker) = demographics_server(200, &body.to_string());
+        let (url, seen, worker) = scoped_response_server(200, &body.to_string());
         let session = admitted_session(&url);
         let result = session.read_population_demographics(
             "scope-a",
