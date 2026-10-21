@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { validateTerritorialPackExamples, loadTerritorialPackSpec } from '../scripts/validate-territorial-openapi.mjs';
 import { parseTerritorialPackCommand, projectTerritorialPacks, TERRITORIAL_PACK_SCHEMA } from './territorial-packs';
 
 for (const preset of ['core', 'core+it', 'core+it+lom']) {
@@ -25,4 +26,14 @@ test('commands require an exact versioned explicit confirmation and revision', (
     for (const invalid of [{ ...command, confirmed: false }, { ...command, preset: 'core+lom' }, { ...command, channel: 'supervisor' }, { ...command, expectedRevision: -1 }, { ...command, schemaVersion: 'unknown' }]) {
         assert.throws(() => parseTerritorialPackCommand(invalid));
     }
+});
+
+test('OpenAPI validates normal and fail-closed runtime payloads using JSON Schema null semantics', () => {
+    const document = loadTerritorialPackSpec('docs/openapi/mediflow-v1.yaml');
+    const examples = [projectTerritorialPacks(undefined), projectTerritorialPacks('invalid')];
+    assert.doesNotThrow(() => validateTerritorialPackExamples(document, examples));
+    const mutant = structuredClone(document) as { components: { schemas: { TerritorialPackCapability: { properties: { revision: { type: unknown; nullable?: boolean } } } } } };
+    mutant.components.schemas.TerritorialPackCapability.properties.revision.type = 'integer';
+    mutant.components.schemas.TerritorialPackCapability.properties.revision.nullable = true;
+    assert.throws(() => validateTerritorialPackExamples(mutant, examples), /configuration_error/);
 });

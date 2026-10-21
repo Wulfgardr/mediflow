@@ -77,3 +77,26 @@ export function requireTerritorialPack(db: Database.Database, pack: 'it' | 'lom'
         throw new TerritorialPackError('pack_disabled');
     }
 }
+
+export function captureHostTerritorialPacks(db: Database.Database) {
+    if (!db.prepare("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='settings'").get()) return undefined;
+    const capability = readTerritorialPacks(db);
+    if (capability.status !== 'ready' || !initialized(setting(db, TERRITORIAL_PACK_INITIALIZATION_KEY))) {
+        throw new TerritorialPackError('configuration_error');
+    }
+    return { capability, marker: setting(db, TERRITORIAL_PACK_INITIALIZATION_KEY)! };
+}
+
+export function preserveHostTerritorialPacks(db: Database.Database,
+    host: NonNullable<ReturnType<typeof captureHostTerritorialPacks>>): void {
+    db.transaction(() => {
+        const revision = host.capability.revision! + 1;
+        if (!Number.isSafeInteger(revision)) throw new TerritorialPackError('configuration_error');
+        save(db, TERRITORIAL_PACK_SETTING_KEY, JSON.stringify({ schemaVersion: TERRITORIAL_PACK_SCHEMA,
+            revision, preset: host.capability.preset }));
+        save(db, TERRITORIAL_PACK_INITIALIZATION_KEY, host.marker);
+        audit(db, 'territorial.packs.preserved',
+            { actorType: 'system', actorRef: TERRITORIAL_PACK_OWNER, sourceSurface: 'job' },
+            host.capability.preset, host.capability.preset, `replacement:revision:${host.capability.revision}->${revision}`);
+    }).immediate();
+}

@@ -104,7 +104,7 @@ export async function runArchiveMaintenanceWebOwner(root: string): Promise<void>
             preparedRoot = fs.mkdtempSync(path.join(data, '.archive-replacement-'));
             preparedSource = path.join(preparedRoot, 'replacement.db');
             copySqliteDatabaseSync(source, preparedSource);
-            const prepared = openVersionedSqliteDatabase(preparedSource);
+            const prepared = openVersionedSqliteDatabase(preparedSource, undefined, { prepareReplacement: true });
             prepared.close();
         } catch {
             if (preparedRoot) { try { fs.rmSync(preparedRoot, { recursive: true, force: true }); } catch { /* Preserve rejected isolated copy; A is still available. */ } }
@@ -123,7 +123,7 @@ export async function runArchiveMaintenanceWebOwner(root: string): Promise<void>
                     await replaceSqliteDatabase({ sourcePath: preparedSource, destPath: target,
                         backupPath: `${target}.bak-${repairBackupTimestamp()}`, connection: current,
                         prepareReplacement: staging => {
-                            const replacement = openVersionedSqliteDatabase(staging);
+                            const replacement = openVersionedSqliteDatabase(staging, undefined, { prepareReplacement: true });
                             try { replacement.transaction(() => rotateSqliteArchiveGeneration(replacement)).immediate(); }
                             finally { replacement.close(); }
                         },

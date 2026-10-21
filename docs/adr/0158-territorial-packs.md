@@ -233,6 +233,22 @@ Il gestore host è `host-territorial-pack-manager`. Il contratto
 conserva schema, revisione monotona e assetto: riusa la configurazione
 esistente e permette di modificare stato e audit nella stessa transazione
 SQLite `IMMEDIATE`. Non è una preferenza del client o dell'account.
+L'assetto è una proprietà dell'host destinatario, anche quando le righe sono
+persistite nel database. Ogni sostituzione fisica ammessa cattura assetto e
+marker dalla snapshot originale dell'host sotto esclusione dei writer e li riapplica nello staging
+prima del commit durevole. La preparazione della sorgente non inizializza
+pacchetti territoriali. Il sostitutore comune incrementa la revisione
+dell'host e registra `territorial.packs.preserved` nella stessa transazione
+SQLite delle due impostazioni; l'evento contiene soltanto assetto e revisioni.
+Una configurazione host invalida blocca la sostituzione. Il rollback conserva
+l'originale; il recupero dopo commit conserva lo staging già corretto.
+La sorgente non può importare né ricreare autorità territoriale.
+
+Il recupero cifrato ammette anche una destinazione appena inizializzata solo
+quando contiene la generazione e le due righe esatte di bootstrap: marker
+`origin:new` ed evento `territorial.packs.initialized` atteso. Impostazioni,
+audit, dati o autorità aggiuntivi impediscono il recupero su quella destinazione.
+
 Entrambe le chiavi `territorial.packs` e `territorial.packs.initialization`
 sono negate dalla policy dei writer generici.
 
