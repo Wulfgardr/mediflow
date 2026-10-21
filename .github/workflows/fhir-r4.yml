@@ -35,9 +35,9 @@ jobs:
   fhir-r4-web:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      FHIR_REPORT_DIR: ${{ runner.temp }}/fhir-r4-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
+      - name: Select exclusive report directory for this run
+        run: echo "FHIR_REPORT_DIR=${RUNNER_TEMP}/fhir-r4-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           sparse-checkout-cone-mode: false
