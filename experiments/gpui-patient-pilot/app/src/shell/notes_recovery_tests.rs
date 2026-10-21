@@ -22,6 +22,7 @@ struct HostState {
     epoch: u64,
     outcome: u16,
     replaced: bool,
+    replace_after_successful_put: bool,
     archived: bool,
 }
 struct Host {
@@ -44,6 +45,7 @@ impl Host {
             epoch: 1,
             outcome: 200,
             replaced: false,
+            replace_after_successful_put: false,
             archived: false,
         }));
         let shared = state.clone();
@@ -73,7 +75,10 @@ impl Host {
                 "GET /api/v1/network/ambulatories" => json!([{"id":"scope-a", "name":"Ambulatorio sintetico", "isDefault":true, "version":1}]),
                 "GET /api/v1/network/identity" => json!({"scope":{"effectiveAmbulatoryId":"scope-a", "requestBinding":"expected-ambulatory-id-v1"},
                     "operator":{"userId":"synthetic-user", "authChannel":"native"}}),
-                "GET /api/v1/network/patient-profile/selection-epoch" => json!({"contractVersion":1,"selectionEpoch":state.epoch}),
+                "GET /api/v1/network/patient-profile/selection-epoch" => {
+                    if state.replaced { status = 409; json!({"code":"ARCHIVE_REPLACED"}) }
+                    else { json!({"contractVersion":1,"selectionEpoch":state.epoch}) }
+                }
                 value if value.starts_with("POST /api/v1/network/patients/") && value.ends_with("/profile-query") => {
                     if state.replaced { status = 409; json!({"code":"ARCHIVE_REPLACED"}) }
                     else {
@@ -98,8 +103,10 @@ impl Host {
                         state.version += 1;
                     }
                     if status == 0 { continue; }
-                    if state.replaced { json!({"code":"ARCHIVE_REPLACED"}) }
-                    else if status == 409 { json!({"code":"VERSION_CONFLICT"}) } else { json!({"success":true}) }
+                    let response = if state.replaced { json!({"code":"ARCHIVE_REPLACED"}) }
+                    else if status == 409 { json!({"code":"VERSION_CONFLICT"}) } else { json!({"success":true}) };
+                    if status == 200 && state.replace_after_successful_put { state.replaced = true; }
+                    response
                 }
                 "POST /api/auth/native/logout" => json!({"success":true}),
                 value if value.starts_with("GET /api/v1/network/patients/") => json!([]),
@@ -419,6 +426,53 @@ fn notes_archive_replacement_during_put_disconnects_without_resending_draft(
     let state = host.state.lock().unwrap();
     assert_eq!(state.notes, json!("A: note iniziali"));
     assert_eq!(state.version, 1);
+}
+
+#[gpui::test]
+fn notes_archive_replacement_during_automatic_readback_disconnects_without_further_reads_or_writes(
+    cx: &mut gpui::TestAppContext,
+) {
+    let host = Host::new();
+    let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+    open(&view, &host, cx);
+    let editor = view.read_with(cx, |app, _| {
+        app.form.as_ref().unwrap().fields[0].editor.clone()
+    });
+    host.state.lock().unwrap().replace_after_successful_put = true;
+    let requests_before = host.requests.lock().unwrap().len();
+    confirm(&view, cx);
+    {
+        let state = host.state.lock().unwrap();
+        assert_eq!(
+            state.version, 2,
+            "the PUT must succeed before the archive changes"
+        );
+        assert_eq!(state.notes, host.writes()[0]["notes"]);
+        assert!(state.replaced);
+    }
+    let routes: Vec<_> = host.requests.lock().unwrap()[requests_before..]
+        .iter()
+        .filter(|(route, _)| route != "POST /api/auth/native/logout")
+        .map(|(route, _)| route.clone())
+        .collect();
+    assert_eq!(
+        routes,
+        [
+            "GET /api/v1/network/identity",
+            PUT,
+            "GET /api/v1/network/identity",
+            "GET /api/v1/network/patient-profile/selection-epoch",
+        ],
+        "the automatic readback's 409 must stop profile and section reads"
+    );
+    assert_archive_disconnected(&view, &host, cx);
+    editor.read_with(cx, |input, _| assert!(input.value().is_empty()));
+    let requests_before = host.requests.lock().unwrap().len();
+    assert!(matches!(
+        host.session.list_entries("scope-a", "patient-a"),
+        Err(RuntimeError::Locked)
+    ));
+    assert_eq!(host.requests.lock().unwrap().len(), requests_before);
 }
 
 #[gpui::test]
