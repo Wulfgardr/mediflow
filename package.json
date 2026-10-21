@@ -234,7 +234,9 @@
     "test:apple-custodian": "node scripts/local-test-selection.mjs native/MediFlowMac/ExecutionCustodian/custodian.test.ts",
     "test:portable-local": "node scripts/run-portable-local-tests.mjs",
     "test:owned-http": "node scripts/run-owned-synthetic-http-suite.mjs",
-    "test:owned-http-standalone": "node scripts/run-owned-synthetic-http-suite.mjs --standalone"
+    "test:owned-http-standalone": "node scripts/run-owned-synthetic-http-suite.mjs --standalone",
+    "check:fhir-r4": "node scripts/validate-fhir-r4.mjs",
+    "test:fhir-r4": "node --test scripts/fhir-r4-gate.test.mjs scripts/verify-fhir-validator-cache.test.mjs && node scripts/run-strip-types.mjs --test scripts/fhir-r4-corpus.test.ts"
   },
   "dependencies": {
     "@date-fns/tz": "1.5.0",

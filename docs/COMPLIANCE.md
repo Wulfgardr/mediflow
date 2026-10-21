@@ -121,8 +121,12 @@ sistemi riconosciuti restano quelli legacy, compreso `icd-9`: l'URI
 `icd-9-cm` previsto dall'ADR 0081 resta da adottare nella migrazione condivisa.
 Questa slice WUL-457 non modifica il mapper Swift, che conserva ancora il
 fallback ICD-11, né dimostra parità per sistemi sconosciuti. DTO v2, warning
-con identificatori canonici, golden condiviso e gate ufficiale offline
-restano aperti.
+con identificatori canonici, golden condiviso e parità Apple
+restano aperti. Il [gate ufficiale offline Web](../scripts/README-fhir-r4.md)
+esegue ora il validatore fissato su 22 Bundle sintetici del mapper reale.
+Parte con una baseline congelata di 1 errore e 63 warning: blocca issue nuove
+e segnala le voci da rimuovere. Questo confronto non attribuisce al corpus
+con errori l’esito «validato contro FHIR R4 4.0.1 base, terminologia non verificata offline».
 
 I test verificano la mappatura su dati sintetici. Questo permette di controllare
 come i record selezionati vengano trasformati, ma non attesta la conformità
