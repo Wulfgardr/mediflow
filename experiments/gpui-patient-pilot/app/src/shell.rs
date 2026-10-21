@@ -50,7 +50,7 @@ use ai_status::AiRuntimeObservation;
 use analytics::AnalyticsArea;
 use scales::{ScaleArea, ScaleAssessment};
 use therapy_picker::TherapySelection;
-use view_state::{ReadLoad, ReadObject, ViewState};
+use view_state::{ReadLoad, ReadObject, ViewState, ViewStateKind};
 use who_lookup::WhoLookup;
 
 actions!(
@@ -1538,6 +1538,18 @@ impl ClinicalApp {
             self.reread_scale(cx);
             return;
         }
+        if action == Discard::Reload
+            && self.form.as_ref().is_some_and(|form| {
+                form.kind == FormKind::Notes
+                    && matches!(
+                        form.state,
+                        FormState::Conflict | FormState::Uncertain | FormState::Rejected
+                    )
+            })
+        {
+            self.reread_notes(cx);
+            return;
+        }
         if self
             .form
             .as_ref()
@@ -1565,6 +1577,77 @@ impl ClinicalApp {
         } else {
             self.finish_discard(action, cx);
         }
+        cx.notify();
+    }
+
+    fn reread_notes(&mut self, cx: &mut Context<Self>) {
+        let Some(form) = &self.form else {
+            return;
+        };
+        if form.kind != FormKind::Notes
+            || !matches!(
+                form.state,
+                FormState::Conflict | FormState::Uncertain | FormState::Rejected
+            )
+        {
+            return;
+        }
+        let previous = form.state;
+        let (Some(session), Some(scope)) = (self.session.clone(), self.scope.clone()) else {
+            return;
+        };
+        let Ok(request) = self.core.reread_preserving_draft() else {
+            return;
+        };
+        if self.selected_id.as_deref() != Some(&request.patient_id) {
+            self.disconnect(cx);
+            return;
+        }
+        self.next_epoch();
+        self.form.as_mut().expect("notes recovery").state = FormState::Saving;
+        self.message = None;
+        let intent = self.profile_intent(&session);
+        let id = request.patient_id.clone();
+        self.run(move || session.open_patient_profile(&scope, &id, &intent), move |this, result, cx| {
+            let patient = match result {
+                Ok(patient) if !patient.field_locked("notes") => patient,
+                Ok(_) => {
+                    this.core.receive_read(&request, Err(ReadFailure::Invalid));
+                    this.form.as_mut().expect("notes recovery").state = previous;
+                    this.message = Some((ui_error(RuntimeError::LockedField), true));
+                    return;
+                }
+                Err(RuntimeError::ArchiveReplaced) => {
+                    this.disconnect(cx);
+                    this.message = Some((ui_error(RuntimeError::ArchiveReplaced), true));
+                    return;
+                }
+                Err(error) => {
+                    this.core.receive_read(&request, Err(ReadFailure::Unavailable));
+                    this.form.as_mut().expect("notes recovery").state = previous;
+                    this.message = Some((ui_error(error), true));
+                    return;
+                }
+            };
+            if !this.core.receive_read(&request, Ok(profile_for_core(&patient))) {
+                this.form.as_mut().expect("notes recovery").state = previous;
+                this.message = Some((ui_error(RuntimeError::InvalidResponse), true));
+                return;
+            }
+            let writable = !patient.is_archived && patient.deleted_at.is_none();
+            this.patient.detail = ReadLoad::Ready(patient);
+            if this.core.phase() == mediflow_patient_client::Phase::Saved {
+                this.saved("Registrata · contenuto confermato dalla rilettura della scheda.", cx);
+            } else {
+                this.form.as_mut().expect("notes recovery").state = if writable { FormState::Draft } else { FormState::Rejected };
+                if !writable {
+                    this.core.lock();
+                    this.message = Some(("La scheda archiviata è in sola lettura. La bozza resta disponibile per la copia o lo scarto.".into(), true));
+                }
+                this.focus_after_render = true;
+                this.focus_first_field = writable;
+            }
+        }, cx);
         cx.notify();
     }
 
@@ -2066,7 +2149,7 @@ impl ClinicalApp {
                             }
                         }
                         if this.core.phase() == mediflow_patient_client::Phase::Saved {
-                            this.saved("Note registrate e rilette dalla scheda.", cx);
+                            this.saved("Registrata · note rilette dalla scheda.", cx);
                         } else { this.save_unconfirmed(false, readback_message, cx); }
                     }
                     Err(error) => {
@@ -2117,6 +2200,16 @@ impl ClinicalApp {
 
     fn save_error(&mut self, error: RuntimeError, cx: &mut Context<Self>) {
         self.focus_after_render = true;
+        if error == RuntimeError::ArchiveReplaced
+            && self
+                .form
+                .as_ref()
+                .is_some_and(|form| form.kind == FormKind::Notes)
+        {
+            self.disconnect(cx);
+            self.message = Some((ui_error(error), true));
+            return;
+        }
         let conflict = error.is_conflict();
         let message = ui_error(error);
         if error.is_indeterminate() || conflict {
@@ -4075,8 +4168,10 @@ impl ClinicalApp {
             return div();
         };
         let review = form.state != FormState::Draft;
-        div().flex().flex_col().gap(px(20.))
-            .child(div().flex().flex_col().gap(px(8.))
+        let comparison = form.kind == FormKind::Notes && self.core.has_notes_comparison();
+        div().min_w_0().max_w_full().flex().flex_col().gap(px(20.))
+            .when(comparison, |el| el.child(self.notes_comparison_view()))
+            .when(!comparison, |el| el.child(div().flex().flex_col().gap(px(8.))
                 .child(section("clinical-workspace-draft-heading", if review { "RIVEDI PRIMA DI REGISTRARE" } else { "BOZZA NON REGISTRATA" }, theme))
                 .child(div().type_role(theme, TypeRole::PageTitle).text_color(theme.fresh).child(text!(form.edit.as_ref().map_or(form.kind.title(), editing::Record::title))))
                 .child(div().text_color(theme.secondary).child(text!(match form.kind {
@@ -4090,7 +4185,7 @@ impl ClinicalApp {
                     FormKind::Checkup => "Data e ora sono nel fuso del computer. Se non le modifichi, l'orario registrato resta invariato.",
                     FormKind::PatientNew => "La scheda verrà creata nell'ambulatorio selezionato. I campi non compilati resteranno senza un valore riportato.",
                     FormKind::PatientProfile => "La conferma aggiorna soltanto i campi anagrafici che hai modificato. Le note e gli altri dati clinici restano fuori da questa modifica.",
-                }))))
+                })))))
             .when_some(form.upload.as_ref(), |el, upload| el.child(div().flex().flex_col().gap(px(12.))
                 .child(div().type_role(theme, TypeRole::Strong).child(text!(upload.name.clone())))
                 .child(div().type_role(theme, TypeRole::Meta).child(text!(upload.mime_type.clone())))
@@ -4102,6 +4197,60 @@ impl ClinicalApp {
                 .map(|(index, field)| self.field_view(field, format!("clinical-workspace-form-field-{index}"), cx)))
             .when(form.kind == FormKind::Entry && !review, |el| el.child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                 .child(text!("Il testo della nuova nota è semplice. Le voci già presenti conservano il loro formato originale nell'archivio."))))
+    }
+
+    fn notes_comparison_view(&self) -> Div {
+        let theme = self.theme;
+        let patient = self.patient.detail.ready();
+        div()
+            .min_w_0()
+            .max_w_full()
+            .flex()
+            .flex_col()
+            .gap(px(16.))
+            .child(
+                div()
+                    .id("clinical-notes-recorded")
+                    .debug_selector(|| "clinical-notes-recorded".into())
+                    .accessibility_id("clinical-notes-recorded")
+                    .role(Role::Group)
+                    .aria_label("Registrato ora")
+                    .min_w_0()
+                    .max_w_full()
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.))
+                    .child(
+                        div()
+                            .type_role(theme, TypeRole::Strong)
+                            .child(text!("Registrato ora")),
+                    )
+                    .when_some(
+                        patient.and_then(|row| row.updated_at.as_deref()),
+                        |el, time| {
+                            el.child(
+                                div()
+                                    .type_role(theme, TypeRole::Meta)
+                                    .text_color(theme.secondary)
+                                    .child(text!(display_appointment(time))),
+                            )
+                        },
+                    )
+                    .child(div().min_w_0().max_w_full().child(clinical_text::render(
+                        patient.and_then(|row| row.notes.as_deref()).unwrap_or(""),
+                        WritingInk::Dry,
+                        theme,
+                    ))),
+            )
+            .child(
+                div()
+                    .id("clinical-notes-your-draft")
+                    .debug_selector(|| "clinical-notes-your-draft".into())
+                    .accessibility_id("clinical-notes-your-draft")
+                    .type_role(theme, TypeRole::Strong)
+                    .text_color(theme.fresh)
+                    .child(text!("La tua bozza")),
+            )
     }
 
     fn threshold(&self, layout: Layout, cx: &Context<Self>) -> Stateful<Div> {
@@ -4213,11 +4362,12 @@ impl ClinicalApp {
         match form.state {
             FormState::Draft => threshold.bg(theme.draft).border_color(theme.draft_rule)
                 .child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
+                    .when(layout.compact && form.kind == FormKind::Notes, |el| el.flex_col().items_stretch())
                     .child(div().flex_1().min_w_0().flex().flex_col().gap(px(4.))
                         .child(writing_status("clinical-workspace-writing-status", WritingInk::Fresh, WritingSurface::Plane, theme))
                         .child(div().type_role(theme, TypeRole::Meta).child(text!(format!("{} · {}", patient_name, form.edit.as_ref().map_or(form.kind.title(), editing::Record::title))))))
                     .child(div().flex().flex_wrap().gap(px(8.))
-                        .child(self.form_actions[0].attach(button("clinical-workspace-cancel-form", "Scarta…", theme, false, true))
+                        .child(self.form_actions[0].attach(button("clinical-workspace-cancel-form", if form.kind == FormKind::Notes { "Scarta la bozza" } else { "Scarta…" }, theme, false, true))
                             .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Form, cx))))
                         .child(self.form_actions[1].attach_enabled(button("clinical-workspace-review-save", if form.kind == FormKind::Scale { "Prepara e rivedi" } else { "Registra 1 elemento" }, theme, true, review_enabled), review_enabled)
                             .when(review_enabled, |el| el.on_click(cx.listener(|this, _, window, cx| this.review_form(window, cx))))))),
@@ -4227,14 +4377,26 @@ impl ClinicalApp {
                 .child(div().flex().flex_wrap().gap(px(8.))
                     .child(self.form_actions[2].attach(button("clinical-workspace-cancel-review", if repeated_scale { "Continua la verifica" } else { "Torna alla bozza" }, theme, false, true))
                         .on_click(cx.listener(|this, _, window, cx| this.cancel_review(window, cx))))
-                    .child(self.form_actions[3].attach(button("clinical-workspace-confirm-save", "Conferma e registra", theme, true, true))
+                    .child(self.form_actions[3].attach(button("clinical-workspace-confirm-save", "Conferma e registra", theme, true, true).debug_selector(|| "clinical-workspace-confirm-save".into()))
                         .on_click(cx.listener(|this, _, _, cx| this.confirm_form(cx))))),
             FormState::Saving => threshold.bg(theme.draft)
                 .child(div().id("clinical-workspace-saving-status").accessibility_id("clinical-workspace-saving-status").role(Role::Status).aria_label("Registrazione e rilettura in corso")
-                    .child(text!(if form.scale.as_ref().is_some_and(ScaleAssessment::is_reading) { "Rilettura della voce e verifica del contesto in corso…" } else { "Registrazione e rilettura in corso…" })))
+                    .child(text!(if form.kind == FormKind::Notes && self.core.phase() == mediflow_patient_client::Phase::Recovering { "Rilettura della scheda… La bozza resta intatta." } else if form.scale.as_ref().is_some_and(ScaleAssessment::is_reading) { "Rilettura della voce e verifica del contesto in corso…" } else { "Registrazione e rilettura in corso…" })))
                 .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                     .child(text!("La bozza resta visibile fino alla verifica. Non inviare di nuovo."))),
             FormState::Conflict | FormState::Uncertain | FormState::Rejected => {
+                if form.kind == FormKind::Notes && form.state != FormState::Rejected {
+                    let kind = if form.state == FormState::Conflict { ViewStateKind::Conflitto } else { ViewStateKind::EsitoDaVerificare };
+                    return threshold.child(ViewState::new(ReadObject::Scheda, kind).render(
+                        "clinical-notes-recovery", theme, &self.form_actions[7].focus,
+                        cx.listener(|this, _, _, cx| this.reread_notes(cx)),
+                    ))
+                    .child(div().flex().flex_wrap().gap(px(8.))
+                        .child(self.form_actions[6].attach(button("clinical-workspace-copy-draft", "Copia bozza", theme, false, true))
+                            .on_click(cx.listener(|this, _, _, cx| this.copy_draft(cx))))
+                        .child(self.form_actions[0].attach(button("clinical-notes-discard", "Scarta la bozza", theme, false, true))
+                            .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Form, cx)))));
+                }
                 let label = if form.kind == FormKind::Scale && !repeated_scale { "Valutazione da rivedere. Le risposte sono conservate." } else { match form.state {
                     FormState::Conflict => "La scheda è cambiata. La bozza è conservata.",
                     FormState::Rejected => "La registrazione è stata rifiutata. La bozza è conservata.",
@@ -4882,7 +5044,16 @@ fn record_header(theme: Theme, leading: Div, trailing: Div) -> Div {
 impl Render for ClinicalApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if std::mem::take(&mut self.focus_after_render) {
-            window.focus(&self.focus, cx);
+            let focus = if self.discard.is_none()
+                && self.form.as_ref().is_some_and(|form| {
+                    form.kind == FormKind::Notes
+                        && matches!(form.state, FormState::Conflict | FormState::Uncertain)
+                }) {
+                &self.form_actions[7].focus
+            } else {
+                &self.focus
+            };
+            window.focus(focus, cx);
         }
         if std::mem::take(&mut self.focus_first_field)
             && let Some(form) = &mut self.form

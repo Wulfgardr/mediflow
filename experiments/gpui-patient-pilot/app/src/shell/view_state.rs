@@ -81,22 +81,11 @@ impl ReadObject {
 pub(super) enum ViewStateKind {
     Vuoto,
     Caricamento,
-    AttesaLunga {
-        fase: String,
-        elapsed: u64,
-    },
-    NonInLinea {
-        copia: Option<String>,
-    },
-    NonPiuAttuale {
-        ora: String,
-    },
+    AttesaLunga { fase: String, elapsed: u64 },
+    NonInLinea { copia: Option<String> },
+    NonPiuAttuale { ora: String },
     ArchivioSostituito,
     EsitoDaVerificare,
-    #[allow(
-        dead_code,
-        reason = "The shared taxonomy includes write conflicts; this adoption is read-only."
-    )]
     Conflitto,
     AccessoNegato,
     CampoIlleggibile,
@@ -241,8 +230,8 @@ impl ViewState {
                 Some("La modifica potrebbe essere già stata salvata. Rileggi e verifica prima di inviarne un'altra.".into()),
             ),
             ViewStateKind::Conflitto => (
-                "Non registrata. Nulla è stato scritto.".into(),
-                Some("La bozza è intatta.".into()),
+                "La scheda è stata modificata da un'altra postazione.".into(),
+                Some("La bozza è intatta: rileggi la scheda e riprova.".into()),
             ),
             ViewStateKind::AccessoNegato => (
                 format!("Questa postazione non può vedere {}.", self.object.name()),
@@ -671,8 +660,8 @@ mod tests {
             ),
             (
                 ViewStateKind::Conflitto,
-                "◆ Non registrata. Nulla è stato scritto.",
-                Some("La bozza è intatta."),
+                "◆ La scheda è stata modificata da un'altra postazione.",
+                Some("La bozza è intatta: rileggi la scheda e riprova."),
                 ViewTone::Critico,
                 Some("Rileggi la scheda"),
             ),
