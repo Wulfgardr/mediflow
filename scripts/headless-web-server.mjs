@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -31,6 +32,15 @@ try {
   if (!process.connected || !Number.isSafeInteger(port) || port < 1 || port > 65535
     || process.env.__NEXT_PRIVATE_ORIGIN !== `http://127.0.0.1:${port}`) {
     throw new Error('headless_web_address_invalid');
+  }
+  if (process.env.MEDIFLOW_PLUGIN_LOCAL_UI === '1') {
+    const { installLocalUiWebNavigation } = await import('./local-ui-web-navigation.mjs');
+    installLocalUiWebNavigation(process, process.env.__NEXT_PRIVATE_ORIGIN, (url) => {
+      const command = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'rundll32.exe' : 'xdg-open';
+      const args = process.platform === 'win32' ? ['url.dll,FileProtocolHandler', url] : [url];
+      const child = spawn(command, args, { shell: false, stdio: 'ignore', env: process.env });
+      child.on('error', () => {}); child.unref();
+    });
   }
   process.stderr.write(`MEDIFLOW_HEADLESS_WEB_READY ${JSON.stringify({ url: process.env.__NEXT_PRIVATE_ORIGIN })}\n`);
 } catch {
