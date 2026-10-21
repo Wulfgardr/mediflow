@@ -61,12 +61,14 @@ export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabe
       if (request.epoch !== null && await selectionEpoch(signal) !== request.epoch) throw new Error('context_changed');
       if (signal.aborted || request.generation !== generation.current || request.expiresAt <= Date.now() || document.visibilityState !== 'visible') return;
       if (request.intent === 'search' || !patientId) { window.location.assign('/?area=incarico'); return; }
+      const target = document.getElementById(anchors[request.intent]);
+      if (target instanceof HTMLDetailsElement) target.open = true;
       window.location.hash = anchors[request.intent];
-      document.getElementById(anchors[request.intent])?.scrollIntoView({ block: 'start' });
+      target?.scrollIntoView({ block: 'start' });
     } catch { setMessage('La selezione è cambiata o non è disponibile. Richiedi di nuovo il percorso.'); }
   };
-  if (isLocked || !isAuthenticated) return null;
-  return <aside aria-label="Richieste dal plugin" className="space-y-3" data-testid="plugin-local-ui-navigation">
+  if (isLocked || !isAuthenticated || (!pending && !message)) return null;
+  return <aside aria-label="Richieste dal plugin" className="col-span-full space-y-3" data-testid="plugin-local-ui-navigation">
     {pending ? <div role="status" className="rounded-xl border border-current/20 p-4">
       <p>{labels[pending.intent]}: {patientId ? `conferma sulla cartella aperta di ${patientLabel ?? 'questo paziente'}.` : 'cerca e scegli il paziente in MediFlow.'}</p>
       <button type="button" className="mf-button-primary mt-3" onClick={() => { void confirm(); }}>{patientId ? 'Apri sulla cartella aperta' : 'Vai alla ricerca locale'}</button>
@@ -77,8 +79,14 @@ export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabe
 }
 
 export function PluginPrescribingGuide() {
-  return <section id="plugin-prescribing" aria-labelledby="plugin-prescribing-title" className="space-y-3 rounded-xl border border-current/20 p-4 scroll-mt-28">
-    <h2 id="plugin-prescribing-title">Guida alla prescrizione</h2>
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const update = () => setOpen(window.location.hash === '#plugin-prescribing');
+    update(); window.addEventListener('hashchange', update);
+    return () => window.removeEventListener('hashchange', update);
+  }, []);
+  return <details open={open} onToggle={event => setOpen(event.currentTarget.open)} id="plugin-prescribing" aria-labelledby="plugin-prescribing-title" className="col-span-full space-y-3 rounded-xl border border-current/20 p-4 scroll-mt-28">
+    <summary className="cursor-pointer"><h2 id="plugin-prescribing-title" className="inline">Guida alla prescrizione</h2></summary>
     <p>Verifica paziente, indicazione e dati nella cartella. Scegli il percorso necessario; preparazione e revisione restano in MediFlow.</p>
     <nav aria-label="Tipo di prescrizione" className="flex flex-wrap gap-4">
       <a className="underline" href="#terapie">Farmaco: terapie farmacologiche</a>
@@ -86,5 +94,5 @@ export function PluginPrescribingGuide() {
       <a className="underline" href="#protesica">Protesica: ausili e prescrizioni</a>
     </nav>
     <p>Il medico decide la terapia e verifica eventuali conferma, firma e trasmissione nei percorsi previsti. Il plugin apre soltanto questa guida.</p>
-  </section>;
+  </details>;
 }
