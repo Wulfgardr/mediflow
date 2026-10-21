@@ -1,6 +1,6 @@
 # ADR 0158 — Pacchetti territoriali
 
-Data: 2026-10-21. Stato: Proposed.
+Data: 2026-10-21. Stato: Accepted (2026-10-21), dopo la [review indipendente e la verifica di chiusura sulla PR #595](https://github.com/Wulfgardr/mediflow/pull/595#pullrequestreview-5598098292), revisione `b8771913d`.
 Riferimenti: WUL-785, WUL-784, WUL-744, WUL-756, WUL-618;
 ADR 0006, 0065, 0081, 0114, 0117, 0151, 0155.
 
