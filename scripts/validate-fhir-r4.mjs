@@ -137,13 +137,15 @@ export async function runGate({ outputDirectory, falsify = false }) {
     const result = spawnSync(bin, args, { cwd: home, env: { ...env, HOME: home }, encoding: 'utf8', timeout: 600_000, maxBuffer: 32 * 1024 * 1024 });
     await writeFile(path.join(outputDirectory, 'validator.log'), (result.stdout ?? '') + (result.stderr ?? ''));
     report.timingsMs.validation = Math.round(performance.now() - validationStart);
-    report.jvmInvocations = 1;
-    report.validatedArtifactCount = artifacts.length;
+
     report.validatorExitCode = result.status;
     report.invocation = { executable: 'java', arguments: javaArgs.map(arg => arg.replaceAll(home, '<isolated-home>').replaceAll(outputDirectory, '<report-directory>')), sandbox: process.platform === 'darwin' ? 'sandbox-exec deny network*' : 'unshare --net; setpriv to original uid/gid' };
     if (result.error || result.signal || ![0, 1].includes(result.status)) throw new Error(`TOOL_VALIDATOR_FAILED:${result.error?.message ?? result.signal ?? result.status}`);
     report.network = await json(networkEvidence);
+    report.jvmInvocations = report.network.validatorStarted ? 1 : 0;
+    if (report.network.state !== 'PROCESS_NETWORK_DENIED') throw new Error(`TOOL_NETWORK_PREFLIGHT_FAILED:${JSON.stringify(report.network.probes)}`);
     const outcomes = readOutcomes(await json(outcomeFile), artifacts);
+    report.validatedArtifactCount = outcomes.size;
     if (result.status === 1 && ![...outcomes.values()].flat().some(issue => ['error', 'fatal'].includes(issue.severity))) throw new Error('TOOL_EXIT_WITHOUT_SEMANTIC_ERRORS');
     const warningBaseline = await json(new URL('../contracts/fhir/r4-warning-baseline.v1.json', import.meta.url));
     const errorBaseline = await json(new URL('../contracts/fhir/r4-error-baseline.v1.json', import.meta.url));

@@ -37,6 +37,8 @@ e l'autorizzazione già disponibile nel runner GitHub; nessuna modifica a
 firewall, DNS o rete host. Su piattaforme diverse il gate si arresta.
 Due tentativi TCP IPv4/IPv6 nello stesso isolamento della JVM devono ottenere
 un errore di accesso o di rete negata, non un timeout o connection refused.
+Nel namespace Linux privo di indirizzi IPv6 è ammesso `EADDRNOTAVAIL` solo
+per la prova IPv6; non è ammesso per IPv4 o nel sandbox macOS.
 `network-denial.json` conserva il risultato. Le dipendenze non fissate non
 possono essere acquisite durante questa fase.
 
