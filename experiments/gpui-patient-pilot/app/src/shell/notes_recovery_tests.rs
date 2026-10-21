@@ -689,3 +689,44 @@ fn notes_nonwritable_recovery_offers_copy_and_discard_and_releases_navigation(
         );
     }
 }
+
+#[gpui::test]
+fn confirmation_full_plane_preserves_keyboard_order_inside_the_complete_shell(
+    cx: &mut gpui::TestAppContext,
+) {
+    cx.update(bind_keys);
+    let host = Host::new();
+    let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+    open(&view, &host, cx);
+    cx.simulate_resize(gpui::size(px(390.), px(700.)));
+    cx.update_window_entity(&view, |app, window, cx| {
+        app.text_scale = 4.;
+        app.review_form(window, cx);
+    });
+    draw(cx);
+    view.read_with(cx, |app, _| {
+        assert_eq!(app.threshold_mode.get(), ThresholdMode::FullPlane)
+    });
+    let region = cx.debug_bounds("threshold-full-plane").unwrap();
+    assert!(region.size.height > px(0.) && region.bottom() <= px(700.));
+    cx.update(|window, cx| assert!(view.read(cx).threshold_question.focus.is_focused(window)));
+    cx.simulate_keystrokes("tab");
+    draw(cx);
+    cx.update(|window, cx| assert!(view.read(cx).form_actions[2].focus.is_focused(window)));
+    cx.simulate_keystrokes("tab");
+    draw(cx);
+    cx.update(|window, cx| assert!(view.read(cx).form_actions[3].focus.is_focused(window)));
+    let command = cx.debug_bounds("clinical-workspace-confirm-save").unwrap();
+    assert!(command.top() >= region.top() && command.bottom() <= region.bottom());
+    cx.simulate_keystrokes("escape");
+    draw(cx);
+    view.read_with(cx, |app, _| {
+        assert!(app.form.as_ref().unwrap().state == FormState::Draft)
+    });
+    let bar = cx.debug_bounds("threshold-bar").unwrap();
+    assert!(bar.top() >= region.top() && bar.bottom() <= region.bottom());
+    assert!(
+        host.writes().is_empty(),
+        "layout and keyboard navigation must not write"
+    );
+}

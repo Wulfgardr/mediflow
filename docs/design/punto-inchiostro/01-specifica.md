@@ -291,11 +291,67 @@ comandi.
 | Stato | Aspetto | Titolo | Dettaglio | Comandi |
 | --- | --- | --- | --- | --- |
 | Bozza | Fondo del piano | Bozza non registrata | N elementi pronti per la scheda di Nome. Se c'è una proposta: Una proposta a matita resta fuori finché non la accetti. | Registra N elementi |
-| Conferma | Soglia scura | Registrare nella scheda di Nome, età anni? | Conteggio per tipo. La scrittura è unica: o tutto o niente. | Torna alla bozza, Conferma e registra |
+| Conferma | Soglia scura | Registrare N elementi nella scheda di Nome Cognome? | Conteggio per tipo. La scrittura è unica: o tutto o niente. | Torna alla bozza, Conferma e registra |
 | In corso | Fondo del piano | Registrazione in corso | Attendi la conferma prima di chiudere. | Comando disattivato |
 | Registrata | Fondo del piano, punto che si posa | Registrata il giorno alle ora | N elementi scritti e tracciati a nome di Autore. | Torna alla scheda |
 | Non registrata | Fondo del piano, ✕ critico | Non registrata. Nulla è stato scritto. | La causa. La bozza è intatta: rileggi la scheda e riprova. | Rileggi la scheda, Riprova |
 | In ascolto | Fondo del piano, punto vuoto che respira | In ascolto mm:ss | Ferma l'ascolto prima di registrare. | Registra disattivato |
+
+#### Testo ingrandito e finestre basse
+
+La soglia resta ancorata in fondo al piano a ogni scala di testo: scorre
+soltanto il contenuto sopra di essa. Titolo (domanda o stato) e comandi
+restano visibili. Se l'altezza della soglia completa, misurata dal layout
+alla larghezza disponibile, supera **un terzo dell'altezza del piano**, si
+usa la **forma compatta**. Il valore esattamente pari a un terzo conserva
+la forma completa: non esiste una soglia fissa di zoom.
+
+La domanda di conferma è «Registrare N elementi nella scheda di Nome
+Cognome?». Per un solo elemento indica il tipo: «Registrare 1 terapia nella
+scheda di Moretti Elena?». Il titolo va a capo, di norma entro due righe;
+a 390 px con testo al 400% si conserva tutto il testo anche oltre due
+righe, senza troncare il destinatario né ridurre il carattere. I comandi
+mantengono lo stesso ordine di lettura: «Torna alla bozza», poi «Conferma
+e registra». Se non entrano sulla stessa riga si impilano a tutta larghezza.
+Nessun comando essenziale richiede scorrimento orizzontale. Nella forma
+compatta il dettaglio passa in coda al contenuto scorrevole, subito prima
+della barra; l'ordine di lettura e di Tab prosegue così nella soglia.
+
+Questa regola vale per Bozza, Conferma, In corso, Registrata, Non registrata
+e In ascolto: ogni stato conserva titolo e comandi. Durante la registrazione
+lo stato resta visibile. Un elemento del contenuto che riceve il fuoco viene
+portato nel viewport sopra la barra, senza sovrapposizioni.
+
+**Soglia a piano intero.** Durante la Conferma, se anche la domanda e i
+comandi della forma compatta superano l'altezza del piano, la soglia
+occupa l'intero piano in un'unica regione scorrevole. La scheda resta
+dietro e non è visibile né raggiungibile con Tab. L'ordine è **domanda
+completa → comandi → dettaglio**. Il dettaglio lungo non separa domanda
+e decisione. All'apertura il fuoco va alla domanda e lo scorrimento parte
+dall'alto. Seguono «Torna alla bozza» e «Conferma e registra» nell'ordine
+di Tab e di lettura; Esc torna alla bozza da tutta la regione. Il nome
+accessibile del comando principale include il destinatario, ad esempio
+«Conferma e registra nella scheda di Moretti Elena»; l'etichetta visibile
+resta «Conferma e registra».
+
+La protezione consiste nel leggere prima la domanda con il destinatario
+e nel mantenere adiacenti i comandi, anche quando si scorre. Non richiede
+visibilità simultanea della domanda e del comando, né disabilitazioni
+legate alla posizione di scorrimento. Questa eccezione riguarda solo la
+Conferma: gli altri stati mantengono la soglia compatta ancorata.
+
+Esempio: in un piano 390 × 700 con testo realmente al 400%, «Registrare
+1 terapia nella scheda di Moretti Elena?» apre la soglia a piano intero.
+Si legge la domanda, si raggiungono i due comandi e infine il dettaglio;
+Esc permette di ritornare alla terapia in bozza. In un piano più alto,
+se domanda e comandi entrano, resta invece la barra compatta ancorata.
+
+I **320 px sono un requisito del Web**. Il client nativo GPUI mantiene
+la larghezza minima della finestra a **390 px**. Il banco illustra gli
+stati del linguaggio; la sua simulazione non certifica il comportamento
+del Web o del client nativo. Il client GPUI corrente registra un solo
+elemento per operazione e non implementa l'ascolto; i conteggi multipli
+e In ascolto restano nel contratto comune senza introdurre nuove scritture.
 
 #### Conflitto: rileggere senza perdere la bozza
 
