@@ -27,8 +27,9 @@ function prepareDataDirectory() {
 }
 
 // trusted bundle composition supplies only its physical Web layout; no CLI/env override.
-export async function runHeadlessSupervisorV1(childOptions = {}) {
+export async function runHeadlessSupervisorV1(childOptions = {}, profile = 'clinical') {
   const args = process.argv.slice(2);
+  if (!['clinical', 'plugin_local_ui'].includes(profile) || (profile === 'plugin_local_ui' && args.length)) throw new Error('supervisor_arguments_invalid');
   if (args[0] !== '--territorial-packs' && args.length > 0 && !(args.length === 1 && ['--mini', '--maintenance-web'].includes(args[0]))) {
     throw new Error('supervisor_arguments_invalid');
   }
@@ -52,6 +53,16 @@ export async function runHeadlessSupervisorV1(childOptions = {}) {
   // Any parent-process diagnostics must share stderr; stdout belongs exclusively to the selected agent protocol.
   console.log = console.error.bind(console);
   console.info = console.error.bind(console);
+  if (profile === 'plugin_local_ui') {
+    const { createLocalUiSupervisorProduction } = await import('../lib/security/portable-supervisor-local-ui.ts');
+    const supervisor = createLocalUiSupervisorProduction(childOptions);
+    const onSignal = () => supervisor.terminate();
+    for (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM']) process.once(signal, onSignal);
+    try { await supervisor.closed; } finally {
+      for (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM']) process.off(signal, onSignal);
+    }
+    return;
+  }
   const { createPortableSupervisorProductionV1 } =
     await import('../lib/security/portable-supervisor-production.ts');
   const supervisor = createPortableSupervisorProductionV1(agentKind, childOptions);

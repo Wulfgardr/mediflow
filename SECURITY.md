@@ -531,3 +531,12 @@ I rapporti pubblici sanitizzati già coordinati sono elencati in
 [docs/security-audits/](./docs/security-audits/README.md). L’archivio non deve
 contenere materiale di riproduzione sensibile né anticipare la pubblicazione di
 una correzione non ancora distribuita.
+
+### Profilo plugin con sola navigazione
+
+Il candidato `plugin_local_ui` (ADR 0159, WUL-757) compone soltanto navigazione
+finita sul Web privato. Non compone owner/lease, servizi o porte cliniche;
+nomi tool nascosti e RPC dirette rimangono negati. Il modello riceve soltanto
+`continue_in_mediflow`, indipendente dal paziente. Dati e conferme restano
+nella UI locale. Readiness tecnica non è autorità clinica. Altri tool
+dell'host restano fuori dal confine; il plugin non promette isolamento OS.

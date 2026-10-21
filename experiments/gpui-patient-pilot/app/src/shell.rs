@@ -9,7 +9,7 @@ mod document_details;
 #[cfg(test)]
 mod notes_recovery_tests;
 #[cfg(test)]
-mod rendered_command;
+pub(crate) mod rendered_command;
 mod scales;
 mod therapy_picker;
 mod threshold_actions;
@@ -3599,30 +3599,44 @@ impl ClinicalApp {
                         "QUADRO",
                         theme,
                     ))
-                    .child(
-                        div()
-                            .type_role(theme, TypeRole::Strong)
-                            .child(text!("Problemi e contesto")),
-                    )
+                    .child(div().type_role(theme, TypeRole::Strong).child({
+                        let text = text!("Problemi e contesto");
+                        #[cfg(test)]
+                        let text = crate::shell::rendered_command::observe_text(text);
+                        text
+                    }))
                     .when(diagnoses.is_err(), |el| {
                         el.child(
                             self.unreadable_field("clinical-workspace-diagnoses-unavailable", cx),
                         )
                     })
                     .when(diagnoses.as_ref().is_ok_and(Vec::is_empty), |el| {
-                        el.child(
-                            div()
-                                .text_color(theme.secondary)
-                                .child(text!("Nessun problema riportato nella scheda.")),
-                        )
+                        el.child(div().text_color(theme.secondary).child({
+                            let text = text!("Nessun problema riportato nella scheda.");
+                            #[cfg(test)]
+                            let text = crate::shell::rendered_command::observe_text(text);
+                            text
+                        }))
                     })
-                    .children(diagnoses.unwrap_or_default().into_iter().map(|label| {
-                        div()
-                            .border_b_1()
-                            .border_color(theme.rule)
-                            .py(px(12.))
-                            .child(text!(label))
-                    })),
+                    .children(
+                        diagnoses
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(|(id, label)| {
+                                div()
+                                    .id(SharedString::from(id))
+                                    .border_b_1()
+                                    .border_color(theme.rule)
+                                    .py(px(12.))
+                                    .child({
+                                        let text = text!(label);
+                                        #[cfg(test)]
+                                        let text =
+                                            crate::shell::rendered_command::observe_text(text);
+                                        text
+                                    })
+                            }),
+                    ),
             )
             .child(
                 div()
@@ -3668,22 +3682,30 @@ impl ClinicalApp {
                             .filter(|row| row.status == "active" && row.deleted_at.is_none())
                             .map(|row| {
                                 div()
+                                    .id(SharedString::from(format!(
+                                        "clinical-overview-therapy-{}",
+                                        row.id
+                                    )))
                                     .border_b_1()
                                     .border_color(theme.rule)
                                     .py(px(12.))
                                     .flex()
                                     .flex_col()
                                     .gap(px(4.))
-                                    .child(
-                                        div()
-                                            .type_role(theme, TypeRole::Strong)
-                                            .child(text!(row.drug_name.clone())),
-                                    )
-                                    .child(
-                                        div()
-                                            .text_color(theme.secondary)
-                                            .child(text!(row.dosage.clone())),
-                                    )
+                                    .child(div().type_role(theme, TypeRole::Strong).child({
+                                        let text = text!(row.drug_name.clone());
+                                        #[cfg(test)]
+                                        let text =
+                                            crate::shell::rendered_command::observe_text(text);
+                                        text
+                                    }))
+                                    .child(div().text_color(theme.secondary).child({
+                                        let text = text!(row.dosage.clone());
+                                        #[cfg(test)]
+                                        let text =
+                                            crate::shell::rendered_command::observe_text(text);
+                                        text
+                                    }))
                             }),
                     ),
             )
@@ -3745,6 +3767,10 @@ impl ClinicalApp {
                             .filter(|row| row.status == "pending" && row.deleted_at.is_none())
                             .map(|row| {
                                 div()
+                                    .id(SharedString::from(format!(
+                                        "clinical-overview-checkup-{}",
+                                        row.id
+                                    )))
                                     .border_b_1()
                                     .border_color(theme.rule)
                                     .py(px(12.))
@@ -3755,9 +3781,23 @@ impl ClinicalApp {
                                         div()
                                             .type_role(theme, TypeRole::Meta)
                                             .text_color(theme.secondary)
-                                            .child(text!(display_date(Some(&row.date)))),
+                                            .child({
+                                                let text = text!(display_date(Some(&row.date)));
+                                                #[cfg(test)]
+                                                let text =
+                                                    crate::shell::rendered_command::observe_text(
+                                                        text,
+                                                    );
+                                                text
+                                            }),
                                     )
-                                    .child(text!(row.title.clone()))
+                                    .child({
+                                        let text = text!(row.title.clone());
+                                        #[cfg(test)]
+                                        let text =
+                                            crate::shell::rendered_command::observe_text(text);
+                                        text
+                                    })
                             }),
                     ),
             )
@@ -6843,35 +6883,64 @@ fn path_segment(value: &str) -> String {
     encoded
 }
 
-fn diagnosis_labels(value: Option<&str>) -> Result<Vec<String>, ()> {
+fn text_identity(value: &str) -> String {
+    let hash = value
+        .as_bytes()
+        .iter()
+        .fold(0xcbf29ce484222325_u64, |hash, byte| {
+            (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
+        });
+    format!("{hash:016x}")
+}
+
+fn diagnosis_labels(value: Option<&str>) -> Result<Vec<(String, String)>, ()> {
     let Some(value) = value.filter(|value| !value.trim().is_empty()) else {
         return Ok(vec![]);
     };
     let parsed: serde_json::Value = serde_json::from_str(value).map_err(|_| ())?;
     let rows = parsed.as_array().ok_or(())?;
+    let mut occurrences = HashMap::<String, usize>::new();
     rows.iter()
         .map(|row| {
-            if let Some(text) = row.as_str() {
-                return Ok(text.to_owned());
-            }
-            let object = row.as_object().ok_or(())?;
-            let code = object
-                .get("code")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default()
-                .trim();
-            let label = object
-                .get("description")
-                .or_else(|| object.get("name"))
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default()
-                .trim();
-            match (code.is_empty(), label.is_empty()) {
-                (false, false) => Ok(format!("{code} · {label}")),
-                (true, false) => Ok(label.into()),
-                (false, true) => Ok(code.into()),
-                (true, true) => Err(()),
-            }
+            let (identity, label) = if let Some(text) = row.as_str() {
+                (text_identity(text), text.to_owned())
+            } else {
+                let object = row.as_object().ok_or(())?;
+                let code = object
+                    .get("code")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_default()
+                    .trim();
+                let label = object
+                    .get("description")
+                    .or_else(|| object.get("name"))
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_default()
+                    .trim();
+                let identity = object
+                    .get("id")
+                    .and_then(serde_json::Value::as_str)
+                    .filter(|id| !id.is_empty())
+                    .unwrap_or(code);
+                let label = match (code.is_empty(), label.is_empty()) {
+                    (false, false) => Ok(format!("{code} · {label}")),
+                    (true, false) => Ok(label.into()),
+                    (false, true) => Ok(code.into()),
+                    (true, true) => Err(()),
+                }?;
+                (
+                    text_identity(if identity.is_empty() {
+                        &label
+                    } else {
+                        identity
+                    }),
+                    label,
+                )
+            };
+            let occurrence = occurrences.entry(identity.clone()).or_default();
+            let id = format!("clinical-overview-diagnosis-{identity}-{occurrence}");
+            *occurrence += 1;
+            Ok((id, label))
         })
         .collect()
 }
@@ -7165,6 +7234,51 @@ fn ui_error(error: impl std::fmt::Display) -> String {
 mod tests {
     use super::*;
     use gpui::Focusable;
+
+    fn overview_accessible_rows(cx: &mut gpui::TestAppContext, kind: u8) {
+        let mut app: Option<Entity<ClinicalApp>> = None;
+        rendered_command::assert_unique_texts(
+            cx,
+            move |window, cx| {
+                let app = app.get_or_insert_with(|| cx.new(|cx| {
+                let mut app = ClinicalApp::new(String::new(), window, cx);
+                let patient = serde_json::from_value(serde_json::json!({
+                    "id":"synthetic-patient", "firstName":"Synthetic", "lastName":"Fixture",
+                    "taxCode":"SYNTHETIC", "version":1,
+                    "diagnoses": if kind == 0 { Some("[\"Synthetic one\",\"Synthetic two\"]") } else { None }
+                })).unwrap();
+                app.install_patient(patient);
+                app.patient.therapies = ReadLoad::Ready(if kind == 1 { (0..2).map(|i|
+                    serde_json::from_value(serde_json::json!({"id":format!("therapy-{i}"),
+                        "patientId":"synthetic-patient", "drugName":"Synthetic drug", "dosage":"Synthetic dose",
+                        "status":"active", "startDate":"2026-10-21", "version":1})).unwrap()).collect() } else { vec![] });
+                app.patient.checkups = ReadLoad::Ready(if kind == 2 { (0..2).map(|i|
+                    serde_json::from_value(serde_json::json!({"id":format!("checkup-{i}"),
+                        "patientId":"synthetic-patient", "title":"Synthetic checkup", "date":"2026-10-21",
+                        "status":"pending", "version":1})).unwrap()).collect() } else { vec![] });
+                app
+            }));
+                app.update(cx, |app, cx| {
+                    app.overview(app.patient.detail.ready().unwrap(), cx)
+                        .into_any_element()
+                })
+            },
+            if kind == 0 { 3 } else { 6 },
+        );
+    }
+
+    #[gpui::test]
+    fn overview_diagnoses_accessible_ids(cx: &mut gpui::TestAppContext) {
+        overview_accessible_rows(cx, 0);
+    }
+    #[gpui::test]
+    fn overview_therapies_accessible_ids(cx: &mut gpui::TestAppContext) {
+        overview_accessible_rows(cx, 1);
+    }
+    #[gpui::test]
+    fn overview_checkups_accessible_ids(cx: &mut gpui::TestAppContext) {
+        overview_accessible_rows(cx, 2);
+    }
 
     fn bindings_for_key(key: &str, contexts: &[&str]) -> Vec<KeyBinding> {
         let contexts: Vec<_> = contexts
@@ -7501,6 +7615,45 @@ mod tests {
     }
 
     #[test]
+    fn diagnosis_row_ids_follow_technical_identity_and_hide_labels() {
+        let before = diagnosis_labels(Some(r#"[{"id":"synthetic-record","description":"Original synthetic label"},{"code":"SYN","description":"Other label"},"Free text"]"#)).unwrap();
+        let after = diagnosis_labels(Some(r#"["Free text",{"code":"SYN","description":"Changed label"},{"id":"synthetic-record","description":"Changed label"}]"#)).unwrap();
+        for (left, right) in before.iter().zip(after.iter().rev()) {
+            assert_eq!(
+                left.0, right.0,
+                "IDs follow data after reorder and label changes"
+            );
+            for forbidden in [
+                "Original",
+                "Changed",
+                "Free text",
+                "synthetic-record",
+                "SYN",
+            ] {
+                assert!(!left.0.contains(forbidden));
+            }
+        }
+    }
+
+    #[gpui::test]
+    fn overview_duplicate_diagnoses_accessible_ids(cx: &mut gpui::TestAppContext) {
+        let mut app: Option<Entity<ClinicalApp>> = None;
+        rendered_command::assert_unique_texts(
+            cx,
+            move |window, cx| {
+                let app = app.get_or_insert_with(|| {
+                    cx.new(|cx| ClinicalApp::new(String::new(), window, cx))
+                });
+                app.update(cx, |app, cx| {
+                let patient = serde_json::from_value(serde_json::json!({"id":"synthetic-patient", "firstName":"Synthetic", "lastName":"Fixture", "taxCode":"SYNTHETIC", "version":1, "diagnoses":"[\"Repeated label\",\"Repeated label\"]"})).unwrap();
+                app.overview(&patient, cx).into_any_element()
+            })
+            },
+            3,
+        );
+    }
+
+    #[test]
     fn unreadable_diagnoses_are_distinct_from_an_empty_problem_list() {
         assert_eq!(diagnosis_labels(None), Ok(vec![]));
         assert_eq!(diagnosis_labels(Some("[]")), Ok(vec![]));
@@ -7510,7 +7663,10 @@ mod tests {
             diagnosis_labels(Some(
                 "[{\"code\":\"I10\",\"description\":\"Test sintetico\"}]"
             )),
-            Ok(vec!["I10 · Test sintetico".into()])
+            Ok(vec![(
+                format!("clinical-overview-diagnosis-{}-0", text_identity("I10")),
+                "I10 · Test sintetico".into()
+            )])
         );
     }
 

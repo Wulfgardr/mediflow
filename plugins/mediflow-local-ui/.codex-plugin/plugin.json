@@ -1,0 +1,22 @@
+{
+  "name": "mediflow-local-ui",
+  "version": "0.1.0",
+  "description": "Apri MediFlow locale: ricerca, anagrafica, storia e guida prescrittiva nella UI fidata, senza dati del paziente nella chat.",
+  "author": {
+    "name": "MediFlow"
+  },
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.codex.json",
+  "interface": {
+    "displayName": "MediFlow locale",
+    "shortDescription": "Continua nella UI locale di MediFlow",
+    "developerName": "MediFlow",
+    "category": "Productivity",
+    "capabilities": [
+      "Read"
+    ],
+    "defaultPrompt": [
+      "Apri la ricerca locale di MediFlow."
+    ]
+  }
+}

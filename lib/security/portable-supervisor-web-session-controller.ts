@@ -1,4 +1,5 @@
 import 'server-only';
+import { resetLocalUiNavigation } from './plugin-local-ui-events';
 
 import { types } from 'node:util';
 
@@ -337,7 +338,10 @@ const productionController = createPortableSupervisorWebSessionControllerV1({
 });
 
 export const activatePortableSupervisorWebSessionV1 = productionController.activateCurrentSelection;
-export const retirePortableSupervisorWebSessionV1 = productionController.retire;
+export const retirePortableSupervisorWebSessionV1 = (reason: PortableSupervisorWebSessionRetirementReasonV1) => {
+    resetLocalUiNavigation();
+    return productionController.retire(reason);
+};
 /** Private operation-specific dependent surface; it cannot activate or revoke H1a. */
 export const portableSupervisorCheckupWebSessionPortV1 = productionCheckupPort.port;
 export function portableSupervisorPatientProfileQueryHostPortV1(): PatientProfileQueryHostPort | null {

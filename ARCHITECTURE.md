@@ -404,3 +404,20 @@ quando cambino percorsi, confini di fiducia o superfici API.
 
 Se cambia chi governa un tema o dove trovarne il contratto, riallinea
 [docs/README.md](./docs/README.md) e [docs/markdown-index.md](./docs/markdown-index.md).
+
+### Plugin locale con UI separata, candidato WUL-757
+
+[ADR 0159](docs/adr/0159-plugin-local-ui-navigation.md) aggiunge una composizione
+fissa `plugin_local_ui` sopra Supervisor, MCP e canale Web privato esistenti.
+Accetta solo quattro intenti di navigazione, anche prima del login; nessun
+owner, lease o servizio clinico viene composto nel parent del profilo. Il
+Web conferma la propria readiness tecnica prima dell'inoltro. Notifiche senza
+coda o replay raggiungono i documenti locali correnti; le viste richiedono
+conferma locale e verifica della validità del contesto. Senza un documento
+connesso viene aperta una pagina locale fissa, senza argomenti clinici.
+
+Codex locale e Claude Code hanno manifest sottili sullo stesso ingresso
+sorgente ammesso e versionato. Il pacchetto non è il prototipo sintetico,
+non incorpora la UI nell'host e non consegna dati paziente al modello. Le
+prove del codice candidato restano distinte da installazione, qualifica degli
+host e ammissione clinica.

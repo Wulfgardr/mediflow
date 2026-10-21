@@ -518,3 +518,9 @@ prove e limiti: non qualifica host reale, accesso clinico o distribuzione.
 La [verifica finita del cambio di stato terapia](./formal/therapy-status/README.md)
 collega statechart, modello TLA+/TLC e test del controller/HTTP al runtime
 indicato; ne dichiara assunzioni e limiti, senza qualificare l’intera applicazione.
+
+[ADR 0159](./adr/0159-plugin-local-ui-navigation.md) definisce il candidato
+WUL-757 con sola navigazione nella UI fidata separata. Il
+[pacchetto locale](../plugins/mediflow-local-ui/README.md) distingue template,
+build ammessa, configurazione dei client e prove ancora necessarie. Non
+amplia il grant profilo esistente né dichiara ammissione clinica o pubblicazione.

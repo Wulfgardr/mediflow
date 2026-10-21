@@ -473,3 +473,7 @@ di ciascuna proposta e il limite di autorità dell’host.
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [Cambio stato terapia](./formal/therapy-status/README.md) | Statechart, modello finito TLC, controesempi, comando e collegamento ai test reali. | Quando cambia il controller Web, il registro dei tentativi o la CAS terapia. |
+
+- `docs/adr/0159-plugin-local-ui-navigation.md`
+- `plugins/mediflow-local-ui/README.md`
+- `plugins/mediflow-local-ui/skills/local-ui/SKILL.md`
