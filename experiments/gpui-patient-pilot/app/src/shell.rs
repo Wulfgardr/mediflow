@@ -8,8 +8,10 @@ mod analytics;
 mod document_details;
 #[cfg(test)]
 mod notes_recovery_tests;
+mod rendered_command;
 mod scales;
 mod therapy_picker;
+mod threshold_actions;
 mod view_state;
 mod who_lookup;
 
@@ -419,6 +421,10 @@ pub struct ClinicalApp {
     focus: FocusHandle,
     review_focus: FocusHandle,
     threshold_question: ScrollTarget,
+    threshold_menu_open: std::rc::Rc<std::cell::Cell<bool>>,
+    threshold_menu_focus: FocusHandle,
+    threshold_menu_scroll: ScrollHandle,
+    threshold_menu_targets: [ScrollTarget; 3],
     threshold_mode: std::rc::Rc<std::cell::Cell<ThresholdMode>>,
     form_actions: [ScrollTarget; 8],
     focus_after_render: bool,
@@ -612,6 +618,7 @@ impl ClinicalApp {
                 this.who_query_changed();
                 cx.notify();
             });
+        let threshold_menu_scroll = ScrollHandle::new();
         let mut app = Self {
             session: None,
             pairing: None,
@@ -681,6 +688,12 @@ impl ClinicalApp {
             focus: cx.focus_handle(),
             review_focus,
             threshold_question: ScrollTarget::new(&profile_scroll, cx),
+            threshold_menu_open: std::rc::Rc::new(std::cell::Cell::new(false)),
+            threshold_menu_focus: cx.focus_handle().tab_stop(true),
+            threshold_menu_scroll: threshold_menu_scroll.clone(),
+            threshold_menu_targets: std::array::from_fn(|_| {
+                ScrollTarget::new(&threshold_menu_scroll, cx)
+            }),
             threshold_mode: std::rc::Rc::new(std::cell::Cell::new(ThresholdMode::Complete)),
             form_actions,
             focus_after_render: false,
@@ -1343,6 +1356,17 @@ impl ClinicalApp {
     }
 
     fn reveal_focused(&self, window: &mut Window, cx: &mut App) {
+        if self.threshold_menu_open.get() {
+            if let Some(index) = self
+                .threshold_menu_targets
+                .iter()
+                .position(|target| target.focus.is_focused(window))
+            {
+                self.threshold_menu_scroll.scroll_to_item(index);
+                window.refresh();
+            }
+            return;
+        }
         if self.threshold_mode.get() == ThresholdMode::FullPlane {
             if !self.threshold_question.reveal_if_focused(window, cx) {
                 self.form_actions
@@ -4377,8 +4401,13 @@ impl ClinicalApp {
             } else {
                 match form.state {
                 FormState::Draft => self.form_subject(form,&patient),
+                FormState::Review if mode == ThresholdMode::FullPlane => {
+                    let detail = "Per rivedere il contenuto torna alla bozza. La registrazione sarà confermata soltanto dopo la rilettura.";
+                    if form.kind == FormKind::Notes && self.core.has_notes_comparison() {
+                        format!("La tua bozza sostituirà il testo registrato ora. {detail}")
+                    } else { detail.into() }
+                }
                 FormState::Review if form.kind == FormKind::Notes && self.core.has_notes_comparison() => self.form_subject(form,&patient),
-                FormState::Review if mode == ThresholdMode::FullPlane => "Per rivedere il contenuto torna alla bozza. La registrazione sarà confermata soltanto dopo la rilettura.".into(),
                 FormState::Review => "Controlla il contenuto qui sopra. La registrazione sarà confermata soltanto dopo la rilettura.".into(),
                 FormState::Saving => "La bozza resta visibile fino alla verifica. Non inviare di nuovo.".into(),
                 FormState::Conflict | FormState::Uncertain if form.kind == FormKind::Notes => {
@@ -4446,9 +4475,11 @@ impl ClinicalApp {
             .is_some_and(|form| form.state == FormState::Review)
             && self.discard.is_none();
         let detail = self.threshold_detail(ThresholdMode::Compact, cx);
+        let limited = self.threshold_recovery(layout, cx);
         let content = content.into_any_element();
         let scroll = self.profile_scroll.clone();
         let mode = self.threshold_mode.clone();
+        let menu_open = self.threshold_menu_open.clone();
         let question_focus = self.threshold_question.focus.clone();
         let theme = self.theme;
         div()
@@ -4463,6 +4494,8 @@ impl ClinicalApp {
                     window.focus_next(cx);
                     this.reveal_focused(window, cx);
                     cx.stop_propagation();
+                } else {
+                    cx.propagate();
                 }
             }))
             .on_action(cx.listener(|this, _: &PreviousFocus, window, cx| {
@@ -4470,12 +4503,16 @@ impl ClinicalApp {
                     window.focus_prev(cx);
                     this.reveal_focused(window, cx);
                     cx.stop_propagation();
+                } else {
+                    cx.propagate();
                 }
             }))
             .on_action(cx.listener(|this, _: &Escape, window, cx| {
                 if this.threshold_mode.get() == ThresholdMode::FullPlane {
                     this.cancel_review(window, cx);
                     cx.stop_propagation();
+                } else {
+                    cx.propagate();
                 }
             }))
             .child(
@@ -4494,6 +4531,12 @@ impl ClinicalApp {
                             confirming,
                             layout,
                         );
+                        let overflow = decision.mode == ThresholdMode::Compact
+                            && !confirming
+                            && essential.height >= bounds.size.height;
+                        if !overflow {
+                            menu_open.set(false);
+                        }
                         if mode.replace(decision.mode) != decision.mode
                             && decision.mode == ThresholdMode::FullPlane
                         {
@@ -4512,7 +4555,11 @@ impl ClinicalApp {
                                 .into_any_element()
                         } else {
                             let threshold = if decision.mode == ThresholdMode::Compact {
-                                compact
+                                if overflow {
+                                    limited.unwrap_or(compact)
+                                } else {
+                                    compact
+                                }
                             } else {
                                 complete
                             };
@@ -4785,7 +4832,7 @@ impl ClinicalApp {
                         .flex_wrap()
                         .gap(px(8.))
                         .when(layout.compact, |el| el.w_full().flex_col().items_stretch())
-                        .child(
+                        .child(rendered_command::observe(
                             self.form_actions[2]
                                 .attach(button(
                                     "clinical-workspace-cancel-review",
@@ -4802,8 +4849,8 @@ impl ClinicalApp {
                                 .on_click(cx.listener(|this, _, window, cx| {
                                     this.cancel_review(window, cx)
                                 })),
-                        )
-                        .child(
+                        ))
+                        .child(rendered_command::observe(
                             self.form_actions[3]
                                 .attach(
                                     button(
@@ -4817,7 +4864,7 @@ impl ClinicalApp {
                                     .aria_label(confirmation_command_label(&patient_name)),
                                 )
                                 .on_click(cx.listener(|this, _, _, cx| this.confirm_form(cx))),
-                        ),
+                        )),
                 )
                 .when(mode == ThresholdMode::FullPlane, |el| {
                     el.child(self.threshold_detail(mode, cx))
@@ -5871,7 +5918,11 @@ impl Render for ClinicalApp {
             )
             .on_action(cx.listener(|this, _: &Review, window, cx| this.review_form(window, cx)))
             .on_action(cx.listener(|this, _: &Escape, window, cx| {
-                if this.discard.take().is_some() {
+                if this.threshold_menu_open.get() {
+                    this.threshold_menu_open.set(false);
+                    window.focus(&this.threshold_menu_focus, cx);
+                    cx.notify();
+                } else if this.discard.take().is_some() {
                     cx.notify();
                 } else if this.cancel_ai_preview(cx) {
                 } else if this.close_drug_search(cx) {
@@ -7849,7 +7900,11 @@ mod tests {
                     "question before commands {width}/{scale}"
                 );
                 assert!(
-                    back.top() <= confirm.top(),
+                    if Layout::for_window(width, scale).compact {
+                        back.bottom() <= confirm.top()
+                    } else {
+                        back.top() <= confirm.top()
+                    },
                     "stable command order {width}/{scale}"
                 );
                 let full = app.read_with(cx, |app, _| {

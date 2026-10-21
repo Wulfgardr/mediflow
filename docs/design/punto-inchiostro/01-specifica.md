@@ -324,6 +324,16 @@ e In ascolto: ogni stato conserva titolo e comandi. Durante la registrazione
 lo stato resta visibile. Un elemento del contenuto che riceve il fuoco viene
 portato nel viewport sopra la barra, senza sovrapposizioni.
 
+Negli stati non distruttivi, se i comandi della compatta non entrano nel
+piano, resta visibile il comando principale. Gli altri sono nel menu
+«Altre azioni», ancorato alla barra, raggiungibile con Tab e apribile con
+Invio o Spazio; Esc lo chiude e restituisce il fuoco al comando del menu.
+Titolo e stato restano visibili, i dettagli scorrono nel contenuto, che
+conserva un'altezza positiva. Nel recupero Scale il comando principale è
+«Rileggi e verifica»; «Copia bozza», «Chiudi bozza…» e, quando disponibile,
+«Rivedi lo stesso invio» sono nel menu. Il piano intero resta riservato
+alla Conferma.
+
 **Soglia a piano intero.** Durante la Conferma, se anche la domanda e i
 comandi della forma compatta superano l'altezza del piano, la soglia
 occupa l'intero piano in un'unica regione scorrevole. La scheda resta
@@ -338,7 +348,9 @@ resta «Conferma e registra».
 
 Solo nel piano intero, dove il contenuto della scheda è nascosto, il
 dettaglio è «Per rivedere il contenuto torna alla bozza. La registrazione
-sarà confermata soltanto dopo la rilettura.» Nella forma completa e in
+sarà confermata soltanto dopo la rilettura.» Nel confronto delle note
+lo precede l'avviso «La tua bozza sostituirà il testo registrato ora.»
+Nella forma completa e in
 quella compatta resta «Controlla il contenuto qui sopra. La registrazione
 sarà confermata soltanto dopo la rilettura.»
 

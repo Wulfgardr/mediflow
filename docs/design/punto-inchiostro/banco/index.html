@@ -393,7 +393,7 @@ function adaptThreshold(){
   if(total>actions.clientWidth)actions.classList.add('stacked');
   if(confirming&&foot.offsetHeight>plane.clientHeight){
    plane.classList.add('full-threshold');
-   if(detail)foot.append(detail);
+   if(detail){const warning=detail.textContent.includes('La tua bozza sostituirà il testo registrato ora.')?'La tua bozza sostituirà il testo registrato ora. ':'';detail.textContent=warning+'Per rivedere il contenuto torna alla bozza. La registrazione sarà confermata soltanto dopo la rilettura.';foot.append(detail)}
    if(question){question.tabIndex=0;question.focus({preventScroll:true})}
    foot.addEventListener('keydown',e=>{if(e.key==='Escape'){S.w='draft';go('scrittura')}});
   }

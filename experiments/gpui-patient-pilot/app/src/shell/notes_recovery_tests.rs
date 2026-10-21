@@ -730,3 +730,120 @@ fn confirmation_full_plane_preserves_keyboard_order_inside_the_complete_shell(
         "layout and keyboard navigation must not write"
     );
 }
+
+#[gpui::test]
+fn threshold_rendered_commands_bind_recipient_order_and_callbacks(cx: &mut gpui::TestAppContext) {
+    cx.update(bind_keys);
+    let host = Host::new();
+    let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+    open(&view, &host, cx);
+    cx.simulate_resize(gpui::size(px(390.), px(700.)));
+    cx.update_window_entity(&view, |app, window, cx| {
+        app.text_scale = 4.;
+        app.review_form(window, cx);
+    });
+    draw(cx);
+    for confirm_second in [false, true] {
+        cx.simulate_keystrokes("tab");
+        draw(cx);
+        cx.simulate_keystrokes("tab");
+        draw(cx);
+        let first = cx.debug_bounds("threshold-back").unwrap();
+        let second = cx.debug_bounds("clinical-workspace-confirm-save").unwrap();
+        assert!(
+            first.bottom() <= second.top(),
+            "rendered commands must not overlap"
+        );
+        for (id, label, bounds) in [
+            (
+                "clinical-workspace-cancel-review",
+                "Torna alla bozza",
+                first,
+            ),
+            (
+                "clinical-workspace-confirm-save",
+                "Conferma e registra nella scheda di Amina Sintetica",
+                second,
+            ),
+        ] {
+            let (node, rendered_bounds) = rendered_command::node(id);
+            assert_eq!(node.role(), Role::Button);
+            assert_eq!(
+                node.label(),
+                Some(label),
+                "accessible name on rendered {id}"
+            );
+            assert_eq!(
+                rendered_bounds, bounds,
+                "name and bounds belong to the same rendered element"
+            );
+        }
+        for (label, bounds) in [
+            ("control-label:Torna alla bozza", first),
+            ("control-label:Conferma e registra", second),
+        ] {
+            let text = cx
+                .debug_bounds(label)
+                .expect("actual visible command label");
+            assert!(
+                text.top() >= bounds.top()
+                    && text.bottom() <= bounds.bottom()
+                    && text.left() >= bounds.left()
+                    && text.right() <= bounds.right(),
+                "visible label inside its command"
+            );
+        }
+        cx.simulate_click(
+            if confirm_second {
+                second.center()
+            } else {
+                first.center()
+            },
+            gpui::Modifiers::default(),
+        );
+        cx.run_until_parked();
+        if confirm_second {
+            assert_eq!(host.writes().len(), 1);
+            view.read_with(cx, |app, _| assert!(app.form.is_none()));
+        } else {
+            assert!(host.writes().is_empty());
+            view.read_with(cx, |app, _| {
+                assert!(app.form.as_ref().unwrap().state == FormState::Draft)
+            });
+            cx.update_window_entity(&view, |app, window, cx| app.review_form(window, cx));
+            draw(cx);
+        }
+    }
+}
+
+#[gpui::test]
+fn threshold_notes_comparison_full_plane_keeps_warning_before_return_detail(
+    cx: &mut gpui::TestAppContext,
+) {
+    let host = Host::new();
+    let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+    open(&view, &host, cx);
+    {
+        let mut state = host.state.lock().unwrap();
+        state.version = 2;
+        state.notes = json!(CONCURRENT);
+        state.outcome = 409;
+    }
+    confirm(&view, cx);
+    reread(&view, cx);
+    cx.simulate_resize(gpui::size(px(390.), px(700.)));
+    cx.update_window_entity(&view, |app, window, cx| {
+        app.text_scale = 4.;
+        app.review_form(window, cx);
+    });
+    draw(cx);
+    view.read_with(cx,|app,_| {
+        assert_eq!(app.threshold_mode.get(),ThresholdMode::FullPlane);
+        assert!(app.core.has_notes_comparison());
+        assert_eq!(app.threshold_detail_text(ThresholdMode::FullPlane), "La tua bozza sostituirà il testo registrato ora. Per rivedere il contenuto torna alla bozza. La registrazione sarà confermata soltanto dopo la rilettura.");
+    });
+    let back = cx.debug_bounds("threshold-back").unwrap();
+    let confirm = cx.debug_bounds("clinical-workspace-confirm-save").unwrap();
+    let detail = cx.debug_bounds("threshold-detail").unwrap();
+    assert!(back.bottom() <= confirm.top() && confirm.bottom() <= detail.top());
+}
