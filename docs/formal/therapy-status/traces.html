@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cambio stato terapia · ordini degli eventi</title>
+<style>
+:root {color-scheme:light dark;font-family:var(--font-sans,system-ui,sans-serif);color:var(--foreground,#202c34);--line:var(--border,#a7b3b9);--panel:var(--card,#f2f5f5);--trace-accent:var(--accent,#167467)}
+body{margin:0;line-height:1.5}h1{font-size:1.45rem;line-height:1.2;margin:0 0 12px}p{margin:8px 0 16px}label{display:block;font-weight:650}select{box-sizing:border-box;width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:inherit;font:inherit;margin:6px 0 14px}.status{display:grid;grid-template-columns:1fr 1fr;gap:12px}.status article{background:var(--panel);padding:16px;border-radius:var(--radius,10px)}h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;margin:0 0 6px}.status p{margin:0;min-height:72px}nav{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:16px 0}button{font:inherit;color:inherit;background:transparent;border:1px solid var(--line);padding:7px 12px;border-radius:8px;cursor:pointer}button:disabled{opacity:.4;cursor:default}button:focus-visible,select:focus-visible{outline:3px solid var(--trace-accent);outline-offset:2px}ol{padding-left:30px;margin:10px 0 18px}li{padding:3px 0}li button{text-align:left;width:100%;border-color:transparent}li[aria-current="step"] button{border-color:var(--trace-accent);font-weight:650;background:var(--panel)}#meaning{border-left:3px solid var(--trace-accent);padding:4px 14px}.note{font-size:.86rem;color:var(--muted-foreground,#52616b)}@media(max-width:430px){.status{grid-template-columns:1fr}.status p{min-height:0}h1{font-size:1.25rem}}
+</style></head><body>
+<h1>Quando una modifica è davvero registrata</h1>
+<p>Il browser e il server procedono separatamente. Interrompere l’attesa nel browser può lasciare una modifica ancora in corso sul server.</p>
+<label for="trace">Segui un ordine degli eventi</label><select id="trace"></select>
+<div class="status" aria-live="polite"><article><h2>Ciò che vede il medico</h2><p id="client"></p></article><article><h2>Ciò che può fare il server</h2><p id="host"></p></article></div>
+<nav aria-label="Passi della traccia"><button id="previous">← Indietro</button><span id="position"></span><button id="next">Avanti →</button></nav>
+<ol id="events"></ol><p id="meaning" aria-live="polite"></p>
+<p class="note">Tracce semantiche sintetiche, curate dal modello TLC e dai test del controller/HTTP. Il caso difettoso è un controllo negativo, non il comportamento attuale. Limite: stesso profilo, origine e archivio con storage integro. Un esito ignoto può restare bloccato indefinitamente. Questa verifica finita non qualifica l’intera applicazione né l’uso clinico.</p>
+<script type="application/json" id="trace-data">
+[
+ {"title":"Risposta positiva e rilettura coerente","meaning":"«Registrata» compare solo dopo risposta positiva e GET coerente con versione avanzata.","steps":[
+ ["Scelgo Sospendi","Conferma: paziente, terapia e versione v1. Nessuna PUT.","Versione v1, terapia attiva."],
+ ["Confermo e registro","Attende l’ammissione e salva il marker del tentativo.","Nessuna PUT ancora ricevuta."],
+ ["Parte una PUT CAS v1","Registrazione in corso.","La richiesta può essere ammessa alla scrittura."],
+ ["Il server committa","Il browser non ha ancora prova del risultato.","CAS v1 riuscita: versione v2 e audit nella stessa transazione."],
+ ["Arriva risposta positiva","Conserva l’esito accepted sotto lock.","Commit concluso, versione v2."],
+ ["GET coerente v2 e rimozione del marker","Registrata. La conferma è ancora in memoria.","Versione v2 osservata dal client."]]},
+ {"title":"Abort, GET vecchia, commit tardivo: comportamento corrente","meaning":"La GET vecchia non autorizza una nuova azione. Dopo il commit, una GET avanzata apre il confronto senza attribuire chi abbia scritto.","steps":[
+ ["Conferma, marker e PUT CAS v1","Registrazione in corso.","PUT ammessa, CAS non ancora eseguita."],
+ ["Timeout e abort del fetch","Esito ignoto; il nuovo intento resta bloccato.","La richiesta ammessa può ancora committare."],
+ ["GET campionata a v1","La rilettura mostra ancora v1: esito ignoto.","La vecchia CAS v1 è ancora applicabile."],
+ ["Reload o seconda tab","Recupera il marker: nessuna nuova PUT.","La richiesta precedente resta indipendente dal browser."],
+ ["Commit tardivo della PUT v1","Nessuna attribuzione automatica del successo.","Scrive v2 e audit. Oppure riceve 409 se un altro writer ha già avanzato la versione."],
+ ["GET aggiornata con v2","Confronto: scegli e conferma nuovamente solo dopo aver letto i dati.","La vecchia CAS v1 non può più modificare v2."]]},
+ {"title":"Controllo negativo: sbloccare dopo GET vecchia","meaning":"TLC vieta questo ordine: il secondo intento si apre mentre la prima CAS può ancora scrivere. Il test sul controller mutato fallisce con reviewed invece di uncertain.","steps":[
+ ["Conferma e PUT CAS v1","Un solo intento confermato.","PUT ammessa ma ancora prima del commit."],
+ ["Abort e GET v1","Esito ignoto: manca una prova di rifiuto.","La vecchia CAS v1 resta applicabile."],
+ ["Il modello difettoso rimuove il marker","Sblocca erroneamente il nuovo intento.","Nessun fatto host autorizza lo sblocco."],
+ ["Una seconda tab apre una nuova conferma","VIOLAZIONE: nuovo intento durante vecchia CAS applicabile.","La prima richiesta può ancora committare dopo questa nuova scelta."]]},
+ {"title":"Ammissione fallita prima dell’invio","meaning":"«La nuova richiesta non è stata inviata» resta distinto da «esito ignoto». Il ricontrollo non ripete la PUT né ricostruisce il vecchio intento.","steps":[
+ ["Scelgo e confermo l’azione","Attende il registro sotto Web Lock.","Nessuna PUT."],
+ ["Claim fallita o storage non disponibile","Cambio di stato bloccato: richiesta nuova non inviata.","Nessuna PUT nuova; può esistere un tentativo precedente."],
+ ["Ricontrollo esplicito","Rimuove solo il proprio marker noto non inviato, poi ispeziona e rilegge.","Solo letture; nessun retry."],
+ ["Registro leggibile e senza marker","Torna alla scheda: serve una nuova scelta e conferma.","Nessuna PUT fino alla nuova conferma."],
+ ["Oppure esiste un marker precedente","Apre il recupero di quel tentativo e mantiene il blocco se necessario.","La GET vecchia non annulla una richiesta precedente."]]},
+ {"title":"Vecchio owner e marker sostitutivo","meaning":"Il lock serializza la rimozione, l’attemptID decide quale marker può essere rimosso. Un vecchio owner conserva il marker del nuovo tentativo.","steps":[
+ ["Un owner decide la rimozione del tentativo A","Ha una versione avanzata o un rifiuto autorevole.","La CAS di A non può più scrivere."],
+ ["Un’altra tab risolve A e ammette B","Il registro contiene ora il marker B.","B può essere ancora in corso."],
+ ["Riprende la rimozione tardiva di A","Sotto lock vede B: non lo elimina.","B resta protetto; non si apre un ulteriore intento."]]}
+]
+</script>
+<script>
+const traces=JSON.parse(document.getElementById('trace-data').textContent);
+const picker=document.getElementById('trace');let index=0;
+traces.forEach((t,i)=>{const o=document.createElement('option');o.value=i;o.textContent=t.title;picker.append(o)});
+function draw(){const t=traces[Number(picker.value)],step=t.steps[index];document.getElementById('client').textContent=step[1];document.getElementById('host').textContent=step[2];document.getElementById('position').textContent=`${index+1} / ${t.steps.length}`;document.getElementById('meaning').textContent=t.meaning;document.getElementById('previous').disabled=index===0;document.getElementById('next').disabled=index===t.steps.length-1;const list=document.getElementById('events');list.replaceChildren();t.steps.forEach((s,i)=>{const li=document.createElement('li'),b=document.createElement('button');b.textContent=s[0];b.addEventListener('click',()=>{index=i;draw()});if(i===index)li.setAttribute('aria-current','step');li.append(b);list.append(li)})}
+picker.addEventListener('change',()=>{index=0;draw()});document.getElementById('previous').addEventListener('click',()=>{if(index>0)index--;draw()});document.getElementById('next').addEventListener('click',()=>{if(index<traces[Number(picker.value)].steps.length-1)index++;draw()});draw();
+</script></body></html>

@@ -7,8 +7,9 @@ read_when:
 
 # Matrice dei dati a riposo
 
-**Versione 9.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
-criterio 1. Aggiornata il 13 ottobre 2026 per i permessi del database adottato dalla cartella
+**Versione 10.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
+criterio 1. Aggiornata il 21 ottobre 2026 per il marker Web di cambio stato
+terapia (ADR 0156); il 13 ottobre 2026 per i permessi del database adottato dalla cartella
 dell’applicazione; l’11 ottobre per credenziali v3 e generazione dell’archivio, recupero cifrato completo e permessi delle copie di riparazione; la prima classificazione era su `main` `bcb7af46a`.
 
 MediFlow cifra alcuni campi, non il database. Questa matrice dice, per ogni
@@ -304,6 +305,7 @@ dati nel restore. Conservare i backup come gli altri dati sensibili.
 | Export FHIR del paziente | Dove lo salva il browser. | La scheda decifrata; il nome del file contiene cognome e nome. | Nessuna. | `app/patients/[id]/edit/page.tsx` |
 | Moduli scaricati o condivisi | Dove li salva il browser. | Il modulo compilato, in chiaro. | Nessuna. | `app/patients/[id]/modules/page.tsx` |
 | `localStorage` del browser | Profilo del browser. | Salt, involucro della master key, preferenze dell'interfaccia. | V3: involucro derivato dalla passphrase; profilo transitorio: protezione del PIN. Non contiene la master key v3 in chiaro. | `lib/security/security.ts` |
+| Marker di cambio stato terapia nel `localStorage` | Stessa origine/profilo browser. | Generazione dell'archivio, riferimenti opachi di paziente e terapia, ID casuale del tentativo, versione attesa ed esito. Nessun nome, farmaco, dose, stato richiesto o credenziale. Rimosso dopo rilettura risolutiva; nessuna scadenza automatica. | Metadati in chiaro, senza cifratura; barriera client secondo ADR 0156, non ricevuta host. | `lib/therapy-status-confirmation.ts` |
 | `sessionStorage` del browser | Profilo del browser, per scheda. | Solo nel profilo PIN transitorio: master key in chiaro e dati dell'utente. Gli account v3 non li persistono e cancellano la precedente sessione. | Il profilo PIN non protegge questa copia; v3 conserva una chiave non estraibile solo in memoria e richiede sblocco dopo reload. | `lib/security/client-security-session.ts`, `components/security-provider.tsx` |
 | Token dell'API locale | `local-api-token` nella directory dati. | Il segreto dei client locali. | File `0600`. | `lib/security/local-api-token.ts` |
 | Testo estratto dai documenti | Memoria dei processi di estrazione. | I byte del documento arrivano ai processi figli sullo standard input; il risultato torna al browser, che lo cifra nelle colonne degli allegati. | Nessun file previsto. | `lib/domain/documents/anydoc-local-extraction-runner.ts`, `anydoc-pdf-child-process-owner.ts` |
