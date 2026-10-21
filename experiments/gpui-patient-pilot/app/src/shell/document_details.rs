@@ -131,24 +131,19 @@ fn visible_text(text: &str) -> (&str, bool) {
 
 #[derive(Debug, PartialEq)]
 enum DetailBlock {
-    Meta(String),
     Text {
         title: &'static str,
         content: String,
+        metadata: Vec<String>,
     },
-    Unreadable(&'static str),
+    Unreadable(&'static str, Vec<String>),
 }
 
 fn presentation(attachment: &Attachment) -> Vec<DetailBlock> {
     let saved_summary = summary(attachment);
     let saved_source = source(attachment);
-    let mut blocks = vec![
-        DetailBlock::Meta(if matches!(saved_summary, SavedText::Present(_)) {
-            "Sintesi salvata".into()
-        } else {
-            "Testo salvato".into()
-        }),
-        DetailBlock::Meta(match &saved_source {
+    let provenance = vec![
+        match &saved_source {
             Source::Present(saved)
                 if saved.attachment_id_present && !saved.file_name.trim().is_empty() =>
             {
@@ -156,32 +151,39 @@ fn presentation(attachment: &Attachment) -> Vec<DetailBlock> {
             }
             Source::DifferentAttachment => "Fonte di un altro allegato: non mostrata".into(),
             _ => "Origine non indicata".into(),
-        }),
-        DetailBlock::Meta("Corrispondenza con l'originale attuale non verificata".into()),
+        },
+        "Corrispondenza con l'originale attuale non verificata".into(),
     ];
+    let mut blocks = vec![];
     match saved_summary {
         SavedText::Present(text) => blocks.push(DetailBlock::Text {
             title: "SINTESI SALVATA",
             content: text.into(),
+            metadata: provenance,
         }),
         SavedText::Missing => blocks.push(DetailBlock::Text {
             title: "SINTESI SALVATA",
             content: "Nessuna sintesi salvata disponibile.".into(),
+            metadata: provenance,
         }),
-        SavedText::Unreadable => blocks.push(DetailBlock::Unreadable("SINTESI SALVATA")),
+        SavedText::Unreadable => {
+            blocks.push(DetailBlock::Unreadable("SINTESI SALVATA", provenance))
+        }
     }
     match saved_source {
         Source::Present(saved) if saved.attachment_id_present => blocks.push(DetailBlock::Text {
             title: "ESTRATTO SALVATO",
+            metadata: vec![],
             content: if saved.excerpt.trim().is_empty() {
                 "Nessun estratto salvato disponibile.".into()
             } else {
                 saved.excerpt
             },
         }),
-        Source::Unreadable => blocks.push(DetailBlock::Unreadable("FONTE SALVATA")),
+        Source::Unreadable => blocks.push(DetailBlock::Unreadable("FONTE SALVATA", vec![])),
         Source::Invalid | Source::Unsupported => blocks.push(DetailBlock::Text {
             title: "FONTE SALVATA",
+            metadata: vec![],
             content: "La fonte salvata non può essere interpretata. Consulta l'originale.".into(),
         }),
         _ => {}
@@ -210,6 +212,7 @@ fn presentation(attachment: &Attachment) -> Vec<DetailBlock> {
     blocks.push(DetailBlock::Text {
         title: "ELABORAZIONE PRECEDENTE",
         content: ocr,
+        metadata: vec![],
     });
     blocks
 }
@@ -278,55 +281,48 @@ impl ClinicalApp {
         cx: &Context<Self>,
     ) -> Vec<Stateful<Div>> {
         let theme = self.theme;
-        match block {
-            DetailBlock::Meta(content) => vec![meta_line(id.into(), content, theme)],
-            DetailBlock::Text { title, content } => {
-                let (visible, _) = visible_text(&content);
-                let mut elements = vec![
-                    section(SharedString::from(format!("{id}-heading")), title, theme),
-                    text_line(format!("{id}-text"), visible.into(), theme),
-                ];
-                if let Some(label) = shortening(&content, title == "ESTRATTO SALVATO") {
-                    elements.push(meta_line(format!("{id}-shortened"), label, theme));
-                }
-                elements
-            }
-            DetailBlock::Unreadable(title) => vec![
-                section(SharedString::from(format!("{id}-heading")), title, theme),
-                self.unreadable_field(
-                    if title == "SINTESI SALVATA" {
-                        "clinical-document-summary-unreadable"
-                    } else {
-                        "clinical-document-source-unreadable"
-                    },
-                    cx,
-                ),
-            ],
+        let (title, content, mut metadata) = match block {
+            DetailBlock::Text {
+                title,
+                content,
+                metadata,
+            } => (title, Some(content), metadata),
+            DetailBlock::Unreadable(title, metadata) => (title, None, metadata),
+        };
+        if let Some(content) = &content
+            && let Some(label) = shortening(content, title == "ESTRATTO SALVATO")
+        {
+            metadata.push(label);
         }
+        let mut elements = vec![section(
+            SharedString::from(format!("{id}-heading")),
+            title,
+            theme,
+        )];
+        elements.extend(
+            metadata
+                .into_iter()
+                .enumerate()
+                .map(|(index, label)| meta_line(format!("{id}-meta-{index}"), label, theme)),
+        );
+        elements.push(match content {
+            Some(content) => {
+                text_line(format!("{id}-text"), visible_text(&content).0.into(), theme)
+            }
+            None => self.unreadable_field(
+                if title == "SINTESI SALVATA" {
+                    "clinical-document-summary-unreadable"
+                } else {
+                    "clinical-document-source-unreadable"
+                },
+                cx,
+            ),
+        });
+        elements
     }
 
     pub(super) fn document_details_view(&self, attachment: &Attachment, cx: &Context<Self>) -> Div {
         let id = format!("clinical-workspace-document-source-{}", attachment.id);
-        let mut blocks = presentation(attachment).into_iter();
-        let header = div()
-            .min_w_0()
-            .max_w_full()
-            .flex()
-            .flex_col()
-            .gap(px(4.))
-            .children(
-                blocks
-                    .by_ref()
-                    .take(3)
-                    .enumerate()
-                    .flat_map(|(index, block)| {
-                        self.document_detail_elements(
-                            &format!("{id}-provenance-{index}"),
-                            block,
-                            cx,
-                        )
-                    }),
-            );
         div()
             .min_w_0()
             .max_w_full()
@@ -334,16 +330,24 @@ impl ClinicalApp {
             .flex_col()
             .gap(px(16.))
             .py(px(12.))
-            .child(header)
-            .children(blocks.enumerate().map(|(index, block)| {
-                div()
-                    .min_w_0()
-                    .max_w_full()
-                    .flex()
-                    .flex_col()
-                    .gap(px(8.))
-                    .children(self.document_detail_elements(&format!("{id}-{index}"), block, cx))
-            }))
+            .children(
+                presentation(attachment)
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, block)| {
+                        div()
+                            .min_w_0()
+                            .max_w_full()
+                            .flex()
+                            .flex_col()
+                            .gap(px(8.))
+                            .children(self.document_detail_elements(
+                                &format!("{id}-{index}"),
+                                block,
+                                cx,
+                            ))
+                    }),
+            )
     }
 }
 
@@ -461,31 +465,30 @@ mod tests {
         long.parse_evidence_artifact_snapshot = Some(long_source.to_string());
         vec![
             Fixture { attachment: coherent, expected: vec![
-                "Sintesi salvata".into(), "Fonte: Fonte città 🩺.txt".into(),
+                "SINTESI SALVATA".into(), "Fonte: Fonte città 🩺.txt".into(),
                 "Corrispondenza con l'originale attuale non verificata".into(),
-                "SINTESI SALVATA".into(), "Sintesi città 🩺".into(),
+                "Sintesi città 🩺".into(),
                 "ESTRATTO SALVATO".into(), "Estratto sintetico: valore <5; città 🩺".into(),
                 "ELABORAZIONE PRECEDENTE".into(),
                 "OCR completato\nAggiornamento registrato: Non disponibile\nTesto da OCR precedente".into(),
             ] },
             Fixture { attachment: absent, expected: vec![
-                "Sintesi salvata".into(), "Origine non indicata".into(),
+                "SINTESI SALVATA".into(), "Origine non indicata".into(),
                 "Corrispondenza con l'originale attuale non verificata".into(),
-                "SINTESI SALVATA".into(), "Sintesi città 🩺".into(),
+                "Sintesi città 🩺".into(),
                 "ELABORAZIONE PRECEDENTE".into(),
                 "Stato non disponibile\nAggiornamento registrato: Non disponibile".into(),
             ] },
             Fixture { attachment: other, expected: vec![
-                "Sintesi salvata".into(), "Fonte di un altro allegato: non mostrata".into(),
+                "SINTESI SALVATA".into(), "Fonte di un altro allegato: non mostrata".into(),
                 "Corrispondenza con l'originale attuale non verificata".into(),
-                "SINTESI SALVATA".into(), "Sintesi città 🩺".into(),
+                "Sintesi città 🩺".into(),
                 "ELABORAZIONE PRECEDENTE".into(),
                 "Stato non disponibile\nAggiornamento registrato: Non disponibile".into(),
             ] },
             Fixture { attachment: unreadable, expected: vec![
-                "Testo salvato".into(), "Origine non indicata".into(),
+                "SINTESI SALVATA".into(), "Origine non indicata".into(),
                 "Corrispondenza con l'originale attuale non verificata".into(),
-                "SINTESI SALVATA".into(),
                 "◆ Questo dato non si può leggere con la chiave attuale. Non è vuoto.".into(),
                 "FONTE SALVATA".into(),
                 "◆ Questo dato non si può leggere con la chiave attuale. Non è vuoto.".into(),
@@ -493,11 +496,11 @@ mod tests {
                 "Stato non disponibile\nAggiornamento registrato: Non disponibile".into(),
             ] },
             Fixture { attachment: long, expected: vec![
-                "Sintesi salvata".into(), "Fonte: Fonte città 🩺.txt".into(),
+                "SINTESI SALVATA".into(), "Fonte: Fonte città 🩺.txt".into(),
                 "Corrispondenza con l'originale attuale non verificata".into(),
-                "SINTESI SALVATA".into(), "Sintesi città 🩺".into(),
-                "ESTRATTO SALVATO".into(), "🩺".repeat(12_000),
-                "Estratto abbreviato: 12000 di 12001 caratteri".into(),
+                "Sintesi città 🩺".into(),
+                "ESTRATTO SALVATO".into(),
+                "Estratto abbreviato: 12000 di 12001 caratteri".into(), "🩺".repeat(12_000),
                 "ELABORAZIONE PRECEDENTE".into(),
                 "Stato non disponibile\nAggiornamento registrato: Non disponibile".into(),
             ] },
@@ -545,6 +548,10 @@ mod tests {
                             assert_ne!(element.text_style().color, Some(app.theme.pencil));
                         }
                     }
+                    assert!(!labels.iter().any(|label| matches!(
+                        label.as_str(),
+                        "Sintesi salvata" | "Testo salvato"
+                    ) || label.starts_with("Salvata il")));
                     assert_eq!(labels, expected);
                     assert!(app.form.is_none());
                     assert!(!app.document_busy);
@@ -578,7 +585,9 @@ mod tests {
             .remove("attachmentId");
         row.parse_evidence_artifact_snapshot = Some(legacy.to_string());
         let blocks = presentation(&row);
-        assert_eq!(blocks[1], DetailBlock::Meta("Origine non indicata".into()));
+        assert!(
+            matches!(&blocks[0], DetailBlock::Text { metadata, .. } if metadata[0] == "Origine non indicata")
+        );
         assert!(!blocks.iter().any(|block| matches!(
             block,
             DetailBlock::Text {

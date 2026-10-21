@@ -186,13 +186,15 @@ zoom al 200% e 400%, come chiede `DESIGN.md`.
 ### Provenienza di un documento
 
 Un artefatto conservato non è un fatto clinico accettato. Aprire il dettaglio
-non scrive nulla e non rende accettabile una proposta. L'intestazione compatta
-usa tre righe Meta, senza cornici, separate dai blocchi di contenuto Section:
+non scrive nulla e non rende accettabile una proposta. La provenienza è la
+carta d'identità della sintesi: nella stessa sezione, senza cornici, l'ordine è
+titolo «Sintesi salvata» → righe Meta di provenienza → testo della sintesi.
+Non ripetere il titolo in una riga Meta.
 
-- **Conservato:** «Testo salvato il <data>» o «Sintesi salvata il <data>» se
-  esiste la data di salvataggio di quel contenuto; altrimenti «Testo salvato»
-  o «Sintesi salvata». La data di caricamento dell'allegato e l'aggiornamento
-  della coda OCR non sono date di salvataggio della sintesi.
+- **Conservato:** «Salvata il <data>» apre la provenienza soltanto se esiste
+  la data di salvataggio della sintesi nel DTO; altrimenti ometti la riga.
+  La data di caricamento dell'allegato e l'aggiornamento della coda OCR non
+  sono date di salvataggio della sintesi.
 - **Fonte:** «Fonte: <nome allegato>» soltanto quando il collegamento identifica
   questo documento. Se manca, «Origine non indicata». Se identifica un altro
   allegato, «Fonte di un altro allegato: non mostrata»: nascondi anche il suo
@@ -204,7 +206,8 @@ usa tre righe Meta, senza cornici, separate dai blocchi di contenuto Section:
 Dichiara nel proprio blocco «Testo da OCR precedente» quando è attestata
 un'elaborazione OCR storica; questo stato non certifica la sintesi o l'estratto.
 Per un estratto accorciato nella vista dichiara «Estratto abbreviato: <n> di
-<m> caratteri», quando i conteggi sono disponibili. Un campo cifrato non
+<m> caratteri», quando i conteggi sono disponibili: la riga Meta sta sotto
+il titolo «Estratto salvato» e prima del testo. Un campo cifrato non
 leggibile usa lo stato «Campo illeggibile», mai lo stato vuoto.
 
 La matita e la parola «Proposta» richiedono che il DTO attesti un contenuto
