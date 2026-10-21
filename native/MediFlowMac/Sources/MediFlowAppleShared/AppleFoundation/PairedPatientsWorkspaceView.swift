@@ -291,7 +291,7 @@ struct PairedPatientsWorkspaceView: View {
             }
         } message: {
             if let validation = model.pendingFHIRWarningValidation {
-                Text("\(validation.totalWarningCount) avvisi FSE. Errori: \(validation.totalErrorCount). Controlla terapie e osservazioni prima di condividere se non sei sicuro.")
+                Text("\(validation.totalWarningCount) avvisi del controllo locale. Errori: \(validation.totalErrorCount). Controlla terapie e osservazioni prima di condividere se non sei sicuro.")
             }
         }
     }
