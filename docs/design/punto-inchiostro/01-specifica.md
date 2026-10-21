@@ -199,6 +199,12 @@ Non ripetere il titolo in una riga Meta.
   questo documento. Se manca, «Origine non indicata». Se identifica un altro
   allegato, «Fonte di un altro allegato: non mostrata»: nascondi anche il suo
   estratto. Senza un collegamento verificabile, non mostrare nome o estratto.
+  Una fonte salvata che esiste ma non si può ispezionare non è una fonte
+  assente: con la chiave attuale illeggibile → «Fonte salvata, non leggibile
+  con la chiave attuale»; malformata → «Fonte salvata, non leggibile»; in uno
+  schema più recente → «Fonte salvata in un formato più recente: non
+  verificabile». Distingui sempre illeggibile da assente: uno stato nuovo non
+  ricade in «Origine non indicata».
 - **Corrispondenza con l'originale:** «Corrisponde all'originale attuale» solo
   con una prova nel DTO; altrimenti «Corrispondenza con l'originale attuale non
   verificata». Un collegamento coerente da solo non prova la corrispondenza.

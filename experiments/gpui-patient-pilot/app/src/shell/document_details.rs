@@ -149,8 +149,13 @@ fn presentation(attachment: &Attachment) -> Vec<DetailBlock> {
             {
                 format!("Fonte: {}", saved.file_name)
             }
+            Source::Missing | Source::Present(_) => "Origine non indicata".into(),
+            Source::Unreadable => "Fonte salvata, non leggibile con la chiave attuale".into(),
+            Source::Invalid => "Fonte salvata, non leggibile".into(),
+            Source::Unsupported => {
+                "Fonte salvata in un formato più recente: non verificabile".into()
+            }
             Source::DifferentAttachment => "Fonte di un altro allegato: non mostrata".into(),
-            _ => "Origine non indicata".into(),
         },
         "Corrispondenza con l'originale attuale non verificata".into(),
     ];
@@ -463,6 +468,12 @@ mod tests {
         let mut long_source = saved_source();
         long_source["parseBundle"]["rawMarkdownExcerpt"] = json!("🩺".repeat(12_001));
         long.parse_evidence_artifact_snapshot = Some(long_source.to_string());
+        let mut invalid = attachment();
+        invalid.parse_evidence_artifact_snapshot = Some("{".into());
+        let mut unsupported = attachment();
+        let mut newer = saved_source();
+        newer["schemaVersion"] = json!("mediflow.document_parse_evidence_artifact.v2");
+        unsupported.parse_evidence_artifact_snapshot = Some(newer.to_string());
         vec![
             Fixture { attachment: coherent, expected: vec![
                 "SINTESI SALVATA".into(), "Fonte: Fonte città 🩺.txt".into(),
@@ -487,11 +498,31 @@ mod tests {
                 "Stato non disponibile\nAggiornamento registrato: Non disponibile".into(),
             ] },
             Fixture { attachment: unreadable, expected: vec![
-                "SINTESI SALVATA".into(), "Origine non indicata".into(),
+                "SINTESI SALVATA".into(),
+                "Fonte salvata, non leggibile con la chiave attuale".into(),
                 "Corrispondenza con l'originale attuale non verificata".into(),
                 "◆ Questo dato non si può leggere con la chiave attuale. Non è vuoto.".into(),
                 "FONTE SALVATA".into(),
                 "◆ Questo dato non si può leggere con la chiave attuale. Non è vuoto.".into(),
+                "ELABORAZIONE PRECEDENTE".into(),
+                "Stato non disponibile\nAggiornamento registrato: Non disponibile".into(),
+            ] },
+            Fixture { attachment: invalid, expected: vec![
+                "SINTESI SALVATA".into(), "Fonte salvata, non leggibile".into(),
+                "Corrispondenza con l'originale attuale non verificata".into(),
+                "Sintesi città 🩺".into(),
+                "FONTE SALVATA".into(),
+                "La fonte salvata non può essere interpretata. Consulta l'originale.".into(),
+                "ELABORAZIONE PRECEDENTE".into(),
+                "Stato non disponibile\nAggiornamento registrato: Non disponibile".into(),
+            ] },
+            Fixture { attachment: unsupported, expected: vec![
+                "SINTESI SALVATA".into(),
+                "Fonte salvata in un formato più recente: non verificabile".into(),
+                "Corrispondenza con l'originale attuale non verificata".into(),
+                "Sintesi città 🩺".into(),
+                "FONTE SALVATA".into(),
+                "La fonte salvata non può essere interpretata. Consulta l'originale.".into(),
                 "ELABORAZIONE PRECEDENTE".into(),
                 "Stato non disponibile\nAggiornamento registrato: Non disponibile".into(),
             ] },
@@ -508,7 +539,7 @@ mod tests {
     }
 
     #[gpui::test]
-    fn five_document_renderings_keep_provenance_separate_without_commands_or_requests(
+    fn seven_document_renderings_keep_provenance_separate_without_commands_or_requests(
         cx: &mut gpui::TestAppContext,
     ) {
         use std::net::TcpListener;
@@ -553,6 +584,16 @@ mod tests {
                         "Sintesi salvata" | "Testo salvato"
                     ) || label.starts_with("Salvata il")));
                     assert_eq!(labels, expected);
+                    if !matches!(
+                        source(&attachment),
+                        Source::Missing
+                            | Source::Present(SavedSource {
+                                attachment_id_present: false,
+                                ..
+                            })
+                    ) {
+                        assert!(!labels.iter().any(|label| label == "Origine non indicata"));
+                    }
                     assert!(app.form.is_none());
                     assert!(!app.document_busy);
                 });
