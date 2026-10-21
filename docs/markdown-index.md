@@ -465,3 +465,9 @@ di ciascuna proposta e il limite di autorità dell’host.
 | --- | --- | --- |
 | [TREATMENT-PORTABLE-ADR.md](../proposals/TREATMENT-PORTABLE-ADR.md) | Proposta tecnica recuperata della candidata 0.8.6; accettazione e qualifica restano distinte. | Riesame del relativo contributo. |
 | [docs/adr/0076-macos-ordinary-proposal-only-addendum.md](./adr/0076-macos-ordinary-proposal-only-addendum.md) | Deroga candidata Mac per quattro proposte ordinarie, senza apply o persistenza document-derived. | Per verificare l’eccezione Mac circoscritta, senza estenderla ai client mobili o alle scritture cliniche. |
+
+## Verifica formale circoscritta
+
+| File | Scopo | Quando consultarlo |
+| --- | --- | --- |
+| [Cambio stato terapia](./formal/therapy-status/README.md) | Statechart, modello finito TLC, controesempi, comando e collegamento ai test reali. | Quando cambia il controller Web, il registro dei tentativi o la CAS terapia. |

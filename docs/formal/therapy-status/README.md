@@ -1,0 +1,230 @@
+# Cambio di stato della terapia: modello e verifica finita
+
+Il primo gesto apre una conferma sul paziente, sulla terapia e sulla versione
+mostrati. Solo la conferma può iniziare una PUT CAS. Se il browser interrompe
+l'attesa, il server può ancora scrivere: una GET alla vecchia versione non
+basta per consentire un nuovo intento.
+
+Lo [statechart](./statechart.mmd) descrive il controller Web e l'host separati.
+La [lettura interattiva offline](./traces.html) presenta pochi ordini di eventi,
+con parole del dominio, senza dati reali né dipendenze di rete. Il diagramma
+include anche comportamenti controllati dai test e non astratti nel modello.
+La decisione di prodotto rimane [ADR 0156](../../adr/0156-therapy-status-uncertain-client-write.md),
+ancora Proposed; questi artefatti non ne cambiano lo stato.
+
+## Eseguire
+
+Servono Node 24, le dipendenze npm del progetto e Java già installato (provato
+con Temurin 25.0.2; Java 17 o superiore è il requisito di questo comando).
+
+```sh
+npm run verify:therapy-status
+```
+
+Il runner scarica soltanto l'artefatto ufficiale `tla2tools.jar`, release
+[v1.7.4](https://github.com/tlaplus/tlaplus/releases/tag/v1.7.4), e ne controlla
+SHA-256 `936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88`.
+Il digest è stato calcolato sul download HTTPS ufficiale: l'API della release
+non forniva un digest. Il record distingue la release Tools `1.7.4` dal verificatore incluso,
+`TLC 2.19` (build 2024-08-08, revisione `5a47802`): sono nomenclature diverse
+dello stesso artefatto. SHA-1 osservato:
+`bee4a54f3ee3d4afc347c3240ec2d9e93b075104`.
+Il JAR vive in `~/.cache/mediflow-formal/tla/v1.7.4`, fuori da Git; cache valida
+permette esecuzioni offline. `MEDIFLOW_TLA_CACHE` può scegliere un'altra cache.
+Non viene modificato Java di sistema.
+
+Ogni esecuzione conserva configurazioni, log, controesempi e `result.json` in
+una nuova directory temporanea esterna al checkout. Per conservarli altrove,
+impostare `MEDIFLOW_FORMAL_OUTPUT_DIR` su una directory nuova fuori da repository,
+Documents e Desktop. Il runner crea lì anche `MEDIFLOW_DATA_DIR` sintetica e
+imposta `MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1`. Non legge né copia il DB reale.
+I file di esecuzione non vengono cancellati automaticamente.
+
+Il comando verifica la copertura dichiarata, esegue TLC sul modello corrente,
+3 controlli negativi del modello e 6 testimoni di raggiungibilità; poi esegue
+i test reali del controller e della route HTTP autenticata/ApiTable, 2 mutazioni
+isolate del controller e il controller originale dopo le mutazioni. Un rosso
+atteso richiede l'invariante preciso e una traccia TLC, oppure un'asserzione
+comportamentale del test. Errori di parser, import, timeout o tool non valgono.
+Web Core esegue lo stesso comando prima della build, solo quando il diff CI
+tocca una superficie coperta o un input di verifica elencato nel record. Il range
+arriva tramite `MEDIFLOW_FORMAL_BASE_REF`; base mancante/non valida o diff non
+leggibile fanno eseguire il controllo completo. In locale senza quella variabile
+il controllo è sempre completo. Non si aggiunge un workflow separato. I test `.test.ts` restano nella selezione unit
+esistente; il runner non è un test scoperto tramite naming.
+
+## Proprietà e danno evitato
+
+| Invariante | Promessa e danno evitato |
+| --- | --- |
+| `NoWriteWithoutConfirmation` | Nessuna richiesta host generata dal controller senza conferma esplicita: evita una modifica clinica al primo gesto. |
+| `NoNewIntentWhileApplicable` | Non apre un nuovo intento quando una vecchia richiesta può ancora superare la CAS: evita che il medico agisca su un esito che crede annullato. |
+| `NoUnprovedRegistration` | `Registrata` richiede risposta positiva, conferma ancora in memoria, stato coerente e versione osservata avanzata: evita una falsa conferma di salvataggio. |
+| `AdmissionIsNotUncertain` | Il fallimento del nuovo claim prima dell'invio è `unavailable`: evita di far credere che sia partita una nuova PUT. Un marker recuperato può invece essere ignoto anche se il processo che sapeva di non aver inviato è scomparso. |
+| `OldOwnerPreservesMarker` | Una rimozione del vecchio owner non elimina il marker di un altro attemptID: evita uno sblocco mentre una richiesta diversa resta irrisolta. |
+
+Gli invarianti si applicano al modello finito, non direttamente al TypeScript.
+Il collegamento al codice è manuale e qualificato con test comportamentali,
+mutazioni reali isolate e controllo di deriva; non è una prova di raffinamento.
+
+## Limiti e ipotesi esplicite
+
+I limiti macchina sono in [coverage.json](./coverage.json): 2 client/tab nello
+stesso profilo e origine, 1 archivio, 1 paziente, 1 terapia, 2 tentativi totali
+(compresi i claim falliti), stato iniziale `active`, target `suspended` o
+`completed`. `active` come nuovo target è simmetrico per le proprietà scelte,
+ma non viene esplorato come gesto. Versioni positive monotone, al massimo 5;
+nessun riuso degli attemptID. Un writer esterno può incrementare la versione
+fino a 3, anche senza cambiare lo stato. I due tentativi possono incrementarla
+ancora. Un processo TLC usa un worker, heap di 512 MiB e timeout di 300 secondi;
+lo stato su disco è esterno a Git. La simmetria scambia soltanto i nomi dei due
+client e riduce gli stati duplicati; non identifica i tentativi o le versioni. Il timeout è un errore, mai un risultato verde. TLC usa fingerprint finiti: non è
+una dimostrazione matematica senza possibilità di collisioni.
+
+Web Locks rende atomici solo lettura/claim, settle e remove nel callback
+sincrono del registro; non l'intero controller. Il marker persiste fra remount,
+e storage illeggibile blocca. `StorageRestored` rappresenta il ritorno della
+leggibilità dello stesso contenuto, non cancellazione o riparazione inventata.
+Il modello assume integrità dello storage: manomissione, cancellazione,
+profili/origini diversi e perdita completa della cache non sono coperti.
+Il latch di generazione archivio e il contesto paziente/sessione validi sono
+precondizioni, protette anche da test; non si modellano più archivi/sessioni.
+
+L'host è autorevole: CAS e audit sono una transazione indivisibile, le versioni
+non tornano indietro, un rifiuto autorevole non committa quella richiesta. Un
+abort client non cambia `attempt.host`. La GET campiona la versione host in
+`GetStart` e può arrivare dopo un commit; non inventa versioni future.
+Lo stato osservato dal client resta distinto dalla verità host.
+
+La coerenza del modello riguarda lo stato della terapia. Nomi, dosi, cifratura,
+identità/autorizzazione, endDate e messaggi UI non sono domini TLC: i test reali
+coprono i controlli di dose/paziente/campi bloccati e i confini HTTP. `GetFailure`
+astrae lettura negata/non valida. Non si modellano tutte le eccezioni del lock
+alla risoluzione post-invio, ogni microtask del trasporto o tutte le risposte
+positive tardive dopo timeout: i test del controller le affiancano. Remount
+azzera l'intento; la richiesta host sopravvive. La rimozione già decisa può
+intercalarsi con una seconda tab e con un nuovo marker. Il rimontaggio TLC
+è esplorato dopo dispatch, su unavailable e su conferma/terminali; non esplora
+direttamente ogni rimontaggio fra claim e dispatch o callback di owner smontati
+a metà lettura. I test di generazione/sessione affiancano questo confine.
+
+Nessuna fairness o liveness è dichiarata. Esito ignoto e versione invariata
+possono rimanere bloccati indefinitamente. Non si dimostrano idempotenza
+universale, audit/cifratura completi, correttezza dell'app intera, qualificazione
+clinica o funzionamento su un'installazione reale.
+
+## Dal modello al codice
+
+Gli stati interni `claiming/admitted` corrispondono alla UI `writing` prima
+dell’invio; `get/removing/publishing` alle fasi della UI `reading`. Il modello
+unisce `conflict/rejected` nel rifiuto autorevole (entrambi impediscono
+l’attribuzione di `Registrata`) e i motivi di `unavailable` nel blocco di
+disponibilità. Non unisce la verità host al risultato del fetch.
+
+Commit di sincronizzazione del runtime:
+`dc9bcbf12cdd990b34676e3136be4cf412a3cd16`. Il file di copertura fissa gli hash
+completi delle superfici lette; il runtime non viene modificato da questo lavoro.
+
+| Azione TLC / confine | Implementazione letta |
+| --- | --- |
+| `Begin`, `Cancel`, `Confirm` | [controller](../../../lib/therapy-status-confirmation.ts), [`begin/cancel/confirm`](https://github.com/Wulfgardr/mediflow/blob/dc9bcbf12cdd990b34676e3136be4cf412a3cd16/lib/therapy-status-confirmation.ts#L219): copia contesto, guardie, generazione; nessun `write` in `begin`. |
+| `Claim`, `ClaimFailure`, `ClaimCompletionFailure`, `Dispatch` | [`await journal.claim`](https://github.com/Wulfgardr/mediflow/blob/dc9bcbf12cdd990b34676e3136be4cf412a3cd16/lib/therapy-status-confirmation.ts#L245), controllo corrente/segnale dopo l'attesa, quindi `ports.write`. Un errore anche dopo la persistenza può lasciare un marker certamente non inviato noto solo in memoria. |
+| `Receive`, `Settle`, `Deliver` | [Risposta `ports.write`, `await journal.settle`, continuazione di `Promise.race`](https://github.com/Wulfgardr/mediflow/blob/dc9bcbf12cdd990b34676e3136be4cf412a3cd16/lib/therapy-status-confirmation.ts#L267): sono passi separati; settle controlla l'identità del marker. |
+| `LoseResponse`, `Host`, `HostReject` | Abort/timeout client separato dalla [PUT Web](https://github.com/Wulfgardr/mediflow/blob/dc9bcbf12cdd990b34676e3136be4cf412a3cd16/app/api/therapies/%5Bid%5D/route.ts#L19) e da [updateTherapyOperation](https://github.com/Wulfgardr/mediflow/blob/dc9bcbf12cdd990b34676e3136be4cf412a3cd16/lib/therapy-write-operation.ts#L58): CAS, incremento e audit nella transazione IMMEDIATE. |
+| `GetStart`, `GetReturn`, `GetFailure` | [`reread`](https://github.com/Wulfgardr/mediflow/blob/dc9bcbf12cdd990b34676e3136be4cf412a3cd16/lib/therapy-status-confirmation.ts#L132): GET autorizzata; dopo `await read` controlla contesto e marker, confronta versione e rifiuto autorevole; nessun write. |
+| `Remove`, `Publish` | [`await journal.remove`](https://github.com/Wulfgardr/mediflow/blob/dc9bcbf12cdd990b34676e3136be4cf412a3cd16/lib/therapy-status-confirmation.ts#L155) sotto lock con attemptID, poi controlli corrente/segnale e pubblicazione `registered/reviewed`; i passi non sono atomici insieme. |
+| `Remount`, `Recover` | [`dispose`](https://github.com/Wulfgardr/mediflow/blob/dc9bcbf12cdd990b34676e3136be4cf412a3cd16/lib/therapy-status-confirmation.ts#L218), nuovo controller e `recover/restore`: perde intento e attribuzione; conserva il marker. |
+| `RecheckCleanup`, `RecheckInspect` | [`recheck`](https://github.com/Wulfgardr/mediflow/blob/dc9bcbf12cdd990b34676e3136be4cf412a3cd16/lib/therapy-status-confirmation.ts#L190): rimuove solo il proprio marker noto non inviato, attende inspect/lettura/inspect; senza marker torna alla scheda, altrimenti recupera senza retry. Le attese fra inspect sono astratte come possibili cambi del marker prima dell'inspect finale. |
+| `OtherWriter` | Writer esterno alla barriera browser; resta soggetto alla CAS host. Nessun nuovo endpoint. |
+
+[therapy-manager](https://github.com/Wulfgardr/mediflow/blob/dc9bcbf12cdd990b34676e3136be4cf412a3cd16/components/therapy-manager.tsx#L84) collega il controller
+all'UI e alle porte reali; [ApiTable.update](https://github.com/Wulfgardr/mediflow/blob/dc9bcbf12cdd990b34676e3136be4cf412a3cd16/lib/db.ts#L499) attende cifratura,
+fetch e parsing del rifiuto; il [fence del trasporto](https://github.com/Wulfgardr/mediflow/blob/dc9bcbf12cdd990b34676e3136be4cf412a3cd16/lib/security/client-auth-api.ts#L453)
+propaga segnali e generazione archivio. L'ammissione HTTP prima della CAS non
+rende annullabile la transazione se il client abortisce.
+
+## Controesempi e collegamento ai test
+
+`AbortUnlock=TRUE` risolve erroneamente una lettura alla stessa versione.
+TLC trova: `Begin → Confirm → Claim → Dispatch → LoseResponse → GetStart(v1)
+→ GetReturn → Remove → Begin` dell'altra tab, mentre la vecchia CAS v1 è ancora
+applicabile. Il server può committare dopo. Il modello corretto conserva il marker.
+Il runner muta lo stesso confronto nel controller (`>` diventa `>=`), e il test
+`client abort before server commit keeps same-version readback unresolved`
+fallisce con `reviewed` invece di `uncertain`. Il source reale non viene editato:
+si usa una copia temporanea, con il solo import della guardia puntato al file
+originale. Questo è un controllo semantico della regressione, non una ricostruzione
+byte per byte del controller storico.
+
+`AdmissionUncertain=TRUE` classifica un claim fallito come esito ignoto; TLC
+viola `AdmissionIsNotUncertain`. La mutazione corrispondente nel controller è
+rilevata dai test `P2 admission failure`: nessuna PUT, ma fase errata `uncertain`
+invece di `unavailable`. `OwnerBlindRemove=TRUE` rimuove il marker senza verificare
+attemptID: TLC trova la cancellazione di un marker differente. Il test reale
+`archive namespaces, stale owners and marker minimization` e i test P2 della
+rimozione conservativa esercitano il registro autentico.
+
+I 6 invarianti negati di raggiungibilità devono fallire con un testimone:
+`registered`, rifiuto autorevole, ammissione non inviata, GET stessa versione con
+CAS ancora pendente, recupero che porta al confronto e vecchia rimozione con un
+marker sostitutivo presente. Non si accetta una ricerca vuota o interrotta.
+
+Il test aggiunto `formal trace: a GET sampled before late host commit stays
+uncertain across two owners` esercita anche il ritorno tardivo di una GET vecchia:
+resta bloccato, quindi una nuova GET avanzata apre il confronto, senza attribuire
+il commit all'owner recuperato. I due test `HTTP abort settles the real client
+before the admitted host write; intervening no-op=…` usano ApiTable, HTTP loopback,
+route autenticata e CAS/audit reali su SQLite sintetico: tengono la route prima
+della CAS, interrompono il fetch, leggono la vecchia versione, verificano blocco
+e recupero, poi liberano il writer. Nel ramo no-op il writer tardivo riceve 409;
+nell'altro committa con un solo audit. Sono eseguiti dal comando corrente.
+
+La riproduzione storica sul controller `00673251bd40854b6a2832a964f842d9e30eabba`
+è evidenza precedente riusata: gli stessi due ordini HTTP avevano dato `reviewed`
+invece di `uncertain`, 2 asserzioni fallite. Anche i rossi P2 su `bbf3ebe…` sono
+precedenti, non nuovi run di questo contributo. Nessun nuovo difetto del prodotto
+è stato dedotto soltanto da un mutante.
+
+## Esito osservato (2026-10-21)
+
+Sul runtime sincronizzato a `dc9bcbf…`, il comando ha completato TLC con
+28.149.669 stati generati, 5.903.794 distinti, profondità 36 e coda finale vuota:
+i 5 invarianti non hanno violazioni nel limite dichiarato. Una prima esecuzione
+con polinomio fingerprint 0 e una seconda con 37 hanno gli stessi conteggi;
+la seconda è il default riproducibile. La prima stima basata sui fingerprint
+osservati era più pessimistica della stima teorica: il secondo run è un controllo
+aggiuntivo di quella specifica incertezza, non una prova illimitata.
+
+Il run finale corrente ha richiesto circa 107 secondi per TLC e 117 secondi
+complessivi dei processi del comando su macOS, Node 24.21.0 e Temurin 25.0.2.
+Heap TLC fissato a 512 MiB, un worker; il campione RSS osservato in un run era
+circa 563 MiB, non una misura del picco. I 3 mutanti del modello e i 6 testimoni
+hanno dato il rosso atteso (violazione identificata e controesempio); le
+2 mutazioni isolate del controller hanno fallito su asserzioni comportamentali.
+I test controller/HTTP sono 48 verdi, compresi i due casi HTTP; il controller
+originale dopo le mutazioni è 29/29 verde. Lint, typecheck, selezione dei test e
+claims guard sono verdi. Le 5 tracce HTML sono state percorse nei 24 passi e
+ispezionate a larghezza 728 e 390 px, senza richieste di rete.
+
+Non è emerso un nuovo bug riprodotto sul runtime corrente: sono stati riscoperti
+i controlli negativi delle regressioni note. Runtime e UI non sono cambiati.
+Non sono state ripetute le suite E2E complete; le evidenze precedenti restano
+limitate alle loro revisioni. Build di produzione, CI remota, installazione,
+review indipendente e accettazione non sono esiti di questo contributo.
+
+## Manutenzione
+
+Quando cambia una superficie coperta, il comando si ferma prima di TLC con
+`Formal coverage drift`. Confrontare il diff con il commit di sincronizzazione,
+comprese funzioni spostate e altri writer. Riesaminare transizioni, guardie,
+confini degli await e assunzioni; aggiornare modello, statechart e test pertinenti.
+Solo dopo una review esplicita della corrispondenza aggiornare manualmente gli
+hash e il commit in `coverage.json`, quindi rieseguire il comando completo.
+Non esiste un comando di auto-rehash: un hash aggiornato da solo non qualifica
+il collegamento. Se cambia una proprietà, documentare la modifica intenzionale
+del contratto. Conservare i difetti aperti e qualificare nuovamente le mutazioni.
+
+Le fonti di metodo sono [pstack, commit fissato](https://github.com/cursor/plugins/blob/7b353f78f6ec193bdbe48ed8059444eb09b6878e/pstack/skills/create-formal-verification-skill/SKILL.md),
+la [vista di TLA+](https://lamport.azurewebsites.net/tla/high-level-view.html) e
+la [descrizione degli strumenti](https://lamport.azurewebsites.net/tla/tools.html).
+Il modello è un'astrazione manuale sopra il codice, coerente con questo uso di TLC.
