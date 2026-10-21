@@ -183,6 +183,40 @@ zoom al 200% e 400%, come chiede `DESIGN.md`.
   ("Bozza non registrata", "Proposta da rivedere") e la legenda sotto la
   tabella.
 
+### Provenienza di un documento
+
+Un artefatto conservato non è un fatto clinico accettato. Aprire il dettaglio
+non scrive nulla e non rende accettabile una proposta. L'intestazione compatta
+usa tre righe Meta, senza cornici, separate dai blocchi di contenuto Section:
+
+- **Conservato:** «Testo salvato il <data>» o «Sintesi salvata il <data>» se
+  esiste la data di salvataggio di quel contenuto; altrimenti «Testo salvato»
+  o «Sintesi salvata». La data di caricamento dell'allegato e l'aggiornamento
+  della coda OCR non sono date di salvataggio della sintesi.
+- **Fonte:** «Fonte: <nome allegato>» soltanto quando il collegamento identifica
+  questo documento. Se manca, «Origine non indicata». Se identifica un altro
+  allegato, «Fonte di un altro allegato: non mostrata»: nascondi anche il suo
+  estratto. Senza un collegamento verificabile, non mostrare nome o estratto.
+- **Corrispondenza con l'originale:** «Corrisponde all'originale attuale» solo
+  con una prova nel DTO; altrimenti «Corrispondenza con l'originale attuale non
+  verificata». Un collegamento coerente da solo non prova la corrispondenza.
+
+Dichiara nel proprio blocco «Testo da OCR precedente» quando è attestata
+un'elaborazione OCR storica; questo stato non certifica la sintesi o l'estratto.
+Per un estratto accorciato nella vista dichiara «Estratto abbreviato: <n> di
+<m> caratteri», quando i conteggi sono disponibili. Un campo cifrato non
+leggibile usa lo stato «Campo illeggibile», mai lo stato vuoto.
+
+La matita e la parola «Proposta» richiedono che il DTO attesti un contenuto
+proposto da un modello o agente e la sua fonte. Un testo conservato di origine
+ignota usa il colore testo con la riga di provenienza, senza punto: non è
+né matita né «Registrata». Senza verifica attuale della fonte non offrire
+comandi che applichino il contenuto alla cartella.
+
+Il DTO GPUI attuale non attesta data di salvataggio della sintesi, autore
+modello/agente o corrispondenza con l'originale attuale: la vista dichiara
+questi limiti senza nuovi campi né endpoint.
+
 ## Componenti
 
 ### Navigazione
