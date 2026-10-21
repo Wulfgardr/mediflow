@@ -16,6 +16,7 @@ verifica dello stato successivo.
 
 - [0157-hl7-conformance-at-clinical-boundaries.md](./0157-hl7-conformance-at-clinical-boundaries.md): **Accepted (2026-10-21)**; WUL-784/785, conformità HL7 per scambi clinici interoperabili con corpus sintetico dei mapper reali e validatore ufficiale in CI; IPS separato, primo documento italiano CDA-PSS 1.5 e confini non HL7 dichiarati.
 
+- [0158-territorial-packs.md](./0158-territorial-packs.md): **Accepted (2026-10-21)**; WUL-785, nucleo internazionale per le nuove installazioni, Italia e Lombardia sotto capacità host versionata, migrazione conservativa e storico leggibile con pacchetto disattivo.
 - [0154-population-demographics-read-boundary.md](./0154-population-demographics-read-boundary.md): WUL-771; lettura demografica della popolazione paired, proiezione minima e calendario client esplicito nel calcolo TypeScript condiviso, senza diagnosi o autorità di audit.
 - [0155-account-profile-read-and-conditional-update.md](./0155-account-profile-read-and-conditional-update.md): WUL-771; lettura del profilo dell'account e aggiornamento condizionale con versione derivata dal contenuto, archivio e sessione verificati nel commit e audit nella stessa transazione.
 - [0153-paired-scale-preparation-and-diary-currentness.md](./0153-paired-scale-preparation-and-diary-currentness.md): WUL-771; catalogo e preparazione Scale TypeScript in sola lettura, selezione corrente e guard transazionale nel diario paired esistente, con garanzia keyless esplicita.
