@@ -127,6 +127,18 @@ impl TextInput {
         cx.notify();
     }
 
+    #[cfg(test)]
+    pub fn accessible_label(&self) -> &'static str {
+        self.label
+    }
+
+    pub fn set_label(&mut self, label: &'static str, cx: &mut Context<Self>) {
+        if self.label != label {
+            self.label = label;
+            cx.notify();
+        }
+    }
+
     pub fn set_writing_ink(&mut self, ink: WritingInk, cx: &mut Context<Self>) {
         if self.writing_ink != Some(ink) {
             self.writing_ink = Some(ink);
