@@ -77,6 +77,9 @@ pub(super) mod tests {
     }
     impl SyntheticHost {
         fn new() -> Self {
+            Self::with_catalog(catalog_wire())
+        }
+        fn with_catalog(catalog: Value) -> Self {
             let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
             let socket = listener.local_addr().unwrap();
             let requests = Arc::new(Mutex::new(Vec::new()));
@@ -143,7 +146,7 @@ pub(super) mod tests {
                         "GET /api/v1/network/ambulatories" => json!([{"id":"scope-a", "name":"Ambulatorio sintetico", "isDefault":true, "version":1}]),
                         "GET /api/v1/network/identity" => json!({"scope":{"effectiveAmbulatoryId":"scope-a", "requestBinding":"expected-ambulatory-id-v1"},
                             "operator":{"userId":"synthetic-user", "authChannel":"native"}}),
-                        "GET /api/v1/network/scales" => catalog_wire(),
+                        "GET /api/v1/network/scales" => catalog.clone(),
                         "GET /api/v1/network/patients" => json!([{"id":"patient-a", "firstName":"Amina", "lastName":"Sintetica", "taxCode":"SYNTHETIC", "version":7}]),
                         "GET /api/v1/network/patient-profile/selection-epoch" => json!({"contractVersion":1, "selectionEpoch":epoch}),
                         "POST /api/v1/network/patients/patient-a/profile-query" => {
@@ -153,7 +156,7 @@ pub(super) mod tests {
                         }
                         "POST /api/v1/network/patients/patient-a/scales/prepare" => {
                             assert_eq!(body.as_object().unwrap().len(), 6); assert_eq!(body["expectedSelectionEpoch"], epoch);
-                            json!({"contractVersion":1, "preparationVersion":"mediflow.scales.prepare.v1", "catalogRevision":catalog_wire()["catalogRevision"],
+                            json!({"contractVersion":1, "preparationVersion":"mediflow.scales.prepare.v1", "catalogRevision":catalog["catalogRevision"],
                                 "status":"draft", "context":{"patientId":"patient-a", "ambulatoryId":"scope-a", "patientVersion":7, "selectionEpoch":epoch},
                                 "submission":{"title":"Strumento sintetico adl", "content":"Contenuto canonico sintetico dall'host.",
                                     "metadata":{"title":"Strumento sintetico adl", "scaleId":"adl", "score":97, "interpretation":"Interpretazione sintetica dall'host.",
@@ -294,6 +297,50 @@ pub(super) mod tests {
             );
         }
         nodes.into_iter().map(|(id, _)| id).collect()
+    }
+
+    #[gpui::test]
+    fn scale_review_answers_accessible_ids(cx: &mut gpui::TestAppContext) {
+        let mut catalog = catalog_wire();
+        let questions = catalog["scales"][0]["questions"].as_array_mut().unwrap();
+        let mut second = questions[0].clone();
+        second["id"] = json!("synthetic-second");
+        questions.push(second);
+        let host = SyntheticHost::with_catalog(catalog);
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        enter_scales(&view, &host, cx);
+        view.update(cx, |app, cx| {
+            app.open_scale_form(ScaleId::Adl, cx);
+            app.choose_scale_answer(0, 1, cx);
+            app.move_scale_question(true, cx);
+            app.choose_scale_answer(1, 0, cx);
+            app.review_scale(cx);
+        });
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert!(app.form.as_ref().unwrap().state == FormState::Review);
+        });
+        rendered_command::take_text_nodes();
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        let nodes = rendered_command::take_text_nodes();
+        assert_eq!(
+            nodes.len(),
+            4,
+            "both questions and answers remain accessible"
+        );
+        let mut ids = HashSet::new();
+        for (id, node) in nodes {
+            assert_eq!(node.role(), Role::Label);
+            assert!(node.value().is_some_and(|value| !value.is_empty()));
+            assert!(
+                ids.insert(id.clone()),
+                "duplicate accessible text ID: {id:?}"
+            );
+        }
     }
 
     #[gpui::test]
@@ -1763,14 +1810,29 @@ impl ClinicalApp {
                         .map(|choice| choice.label.clone())
                         .unwrap_or_else(|| "Risposta non inserita".into());
                     div()
+                        .id(SharedString::from(format!(
+                            "clinical-scale-answer-{}-{}",
+                            scale.descriptor.id.as_str(),
+                            question.id
+                        )))
                         .border_b_1()
                         .border_color(theme.rule)
                         .pb(px(12.))
                         .flex()
                         .flex_col()
                         .gap(px(4.))
-                        .child(text!(question.text.clone()))
-                        .child(div().type_role(theme, TypeRole::Strong).child(text!(label)))
+                        .child({
+                            let text = text!(question.text.clone());
+                            #[cfg(test)]
+                            let text = crate::shell::rendered_command::observe_text(text);
+                            text
+                        })
+                        .child(div().type_role(theme, TypeRole::Strong).child({
+                            let text = text!(label);
+                            #[cfg(test)]
+                            let text = crate::shell::rendered_command::observe_text(text);
+                            text
+                        }))
                 }));
         }
         questions = questions
