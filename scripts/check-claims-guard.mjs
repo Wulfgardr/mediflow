@@ -31,6 +31,9 @@ const rules = [
   ['CLAIM-SISS-FSE-INTEGRATION', 'SISS/FSE',
     'Regional systems must not be described as integrated, synced, written back, or certified without qualification.',
     /\b(?:SISS|FSE)\b.{0,96}\b(?:integrat[aoie]|sync|sincronizzat[aoie]|writeback|scrittura ufficiale|invio ufficiale|accesso diretto|integrazione certificata|certificata)\b/iu],
+  ['CLAIM-FSE-VALIDATION', 'FSE / validation',
+    'Local payload checks must not be described as FSE or CDA validation, nor a document as FSE-valid.',
+    /(?:\bvalidazion\w*\s+(?:del\s+|della\s+)?(?:FSE|Fascicolo Sanitario)\b|\b(?:FSE|Fascicolo Sanitario)\s+valid[oaie]\b|\bvalid[oaie]\s+per\s+il\s+(?:FSE|Fascicolo Sanitario)\b)/iu],
   ['CLAIM-REGIONAL-PRESCRIPTION', 'prescribing / regional workflow',
     'MediFlow must not be described as issuing official regional prescriptions or NRE.',
     /\b(?:MediFlow|workbench|app)\b.{0,96}\b(?:emette|invia|genera|produce)\b.{0,96}\b(?:NRE|ricett[ae]|prescrizion[ei] regional[ei]|promemoria regional[ei])/iu],
@@ -122,6 +125,9 @@ function runSelfTest() {
     ['GDPR conformity claim', 'MediFlow e conforme al GDPR.', 'CLAIM-GDPR-GUARANTEE'],
     ['single device claim', 'I dati clinici non lasciano mai il dispositivo.', 'CLAIM-ONE-DEVICE-ABSOLUTE'],
     ['ICD guarantee claim', 'Ogni diagnosi ha un codice ICD-11 validato.', 'CLAIM-ICD-GUARANTEE'],
+    ['FSE validation claim', 'MediFlow esegue la validazione FSE del documento prima dell export.', 'CLAIM-FSE-VALIDATION'],
+    ['FSE valid document claim', 'Documento FSE valido per il profilo terapia.', 'CLAIM-FSE-VALIDATION'],
+    ['document valid for the FSE claim', 'Il documento e valido per il FSE.', 'CLAIM-FSE-VALIDATION'],
   ];
   const failures = [];
   for (const [name, line, expected] of required) {
@@ -139,6 +145,8 @@ function runSelfTest() {
     'Lo storage autorevole resta sul nodo home-base; client paired, cache ed export sono percorsi espliciti.',
     'Il resolver ICD-11 e opzionale e i problemi free-text restano reviewable.',
     'Niente telemetria, cloud o egress dati e attivo per default.',
+    'Il controllo locale non equivale alla validazione del Fascicolo Sanitario.',
+    'Il controllo locale superato non sostituisce la validazione FSE ufficiale.',
   ];
   for (const line of allowed) {
     const matched = findRuleMatches(line, 'self-test.md').map((item) => item.rule.id);
@@ -279,6 +287,10 @@ function isContextAllowed(ruleId, line, context) {
   if (ruleId === 'CLAIM-ONE-DEVICE-ABSOLUTE') {
     return /\bhome-base\b/u.test(boundaryText)
       && /\b(?:client paired|cache|export|backup)\b/u.test(boundaryText);
+  }
+  if (ruleId === 'CLAIM-FSE-VALIDATION') {
+    return /\bnon\s+(?:equivale|sostituisce|attesta|dichiara|rappresenta)\b.{0,96}\bvalidazion\w*\b/u.test(boundaryText)
+      || /\b(?:controllo locale|pre-?check locale)\b.{0,64}\bnon\s+(?:e|è|equivale|sostituisce)\b/u.test(boundaryText);
   }
   if (ruleId === 'CLAIM-ICD-GUARANTEE') {
     if (/\b(?:ogni|tutte le)\s+diagnos[ie]\b/u.test(line.toLocaleLowerCase('it-IT'))) return false;

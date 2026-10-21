@@ -73,13 +73,13 @@ export default function EditPatientPage() {
                 const validation = await validationResponse.json() as ValidatePatientExportResponse;
 
                 if (validation.hasErrors) {
-                    showToast({ tone: 'error', title: 'Esportazione bloccata', description: `Risolvi gli errori di validazione FSE prima del download. ${buildValidationMessage(validation)}` });
+                    showToast({ tone: 'error', title: 'Esportazione bloccata', description: `Correggi i dati segnalati dal controllo locale prima del download. ${buildValidationMessage(validation)}` });
                     return;
                 }
 
                 if (validation.hasWarnings) {
                     const { confirmed } = await confirm({
-                        title: 'Warning di validazione FSE',
+                        title: 'Controllo locale dell\'esportazione: avvisi',
                         message: `${buildValidationMessage(validation)}\n\nVuoi proseguire comunque con l'export?`,
                         confirmLabel: 'Prosegui',
                         cancelLabel: 'Annulla',

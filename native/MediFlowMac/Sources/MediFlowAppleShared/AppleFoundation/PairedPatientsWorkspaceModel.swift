@@ -3926,7 +3926,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             self.fseDocumentValidationResult = response
             self.fseDocumentValidationTargetLabel = label
             self.statusMessage = response.ok
-                ? "Documento FSE valido per il profilo \(response.profile)."
+                ? "Controllo locale superato (profilo \(response.profile)). Non equivale alla validazione del Fascicolo Sanitario."
                 : "Documento FSE non valido: \(response.errors.count) errori, \(response.warnings.count) avvisi."
         }
     }
