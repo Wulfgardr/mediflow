@@ -226,10 +226,10 @@ impl ClinicalApp {
         };
         let mut pane = div().min_w_0().max_w_full().flex().flex_col().gap(px(16.))
             .child(heading("clinical-workspace-who-heading", "ICD-11 WHO", theme))
-            .child(who_text("Repertorio in inglese · release 2026-01. Questo percorso consulta il servizio WHO locale sul computer che ospita l’archivio.", theme))
+            .child(who_text("clinical-who-introduction", "Repertorio in inglese · release 2026-01. Questo percorso consulta il servizio WHO locale sul computer che ospita l’archivio.", theme))
             .child(self.who.read.attach_enabled(button("clinical-workspace-who-readiness", "Leggi stato del servizio", theme, false, can_read), can_read)
                 .when(can_read, |el| el.on_click(cx.listener(|this, _, _, cx| this.request_who(false, cx)))))
-            .child(who_text("La lettura dello stato riporta l’ultima osservazione disponibile; non avvia una verifica del servizio.", theme));
+            .child(who_text("clinical-who-readiness-explanation", "La lettura dello stato riporta l’ultima osservazione disponibile; non avvia una verifica del servizio.", theme));
         pane = match &self.who.readiness {
             Load::Idle => pane.child(notice(
                 "clinical-workspace-who-state",
@@ -258,19 +258,21 @@ impl ClinicalApp {
                 ))
                 .when_some(readiness.last_live_observed_at.as_ref(), |el, date| {
                     el.child(who_text(
+                        "clinical-who-last-observed",
                         format!("Ultima risposta osservata: {}", display_appointment(date)),
                         theme,
                     ))
                 })
                 .when_some(readiness.last_result_source, |el, source| {
                     el.child(who_text(
+                        "clinical-who-last-source",
                         format!("Ultima origine riportata: {}", source_label(source)),
                         theme,
                     ))
                 }),
         };
         pane = pane
-            .child(who_text("Cerca un termine clinico in inglese o un codice. I titoli originali non vengono tradotti.", theme))
+            .child(who_text("clinical-who-search-help", "Cerca un termine clinico in inglese o un codice. I titoli originali non vengono tradotti.", theme))
             .child(div().min_w_0().flex().flex_wrap().gap(px(8.))
                 .when(self.text_scale >= 2.5, |el| el.flex_col().items_stretch())
                 .child(self.reference_search_target.attach_enabled(div().id("clinical-workspace-reference-search-anchor").flex_1().min_w(px(160.)).max_w_full().child(self.reference_search.clone()), false))
@@ -301,27 +303,27 @@ impl ClinicalApp {
             Load::Ready(rows) => {
                 let receipt = &rows.receipt;
                 pane = pane
-                    .child(who_text(format!("{} risultati per «{}»", rows.entries.len(), self.who.query.as_deref().unwrap_or_default()), theme))
-                    .child(who_text(format!("{} · Inglese · Release {}", source_label(receipt.source), receipt.release_id), theme))
-                    .child(who_text(format!("Acquisito: {} · Scadenza: {}", display_appointment(&receipt.fetched_at), display_appointment(&receipt.expires_at)), theme))
+                    .child(who_text("clinical-who-result-count", format!("{} risultati per «{}»", rows.entries.len(), self.who.query.as_deref().unwrap_or_default()), theme))
+                    .child(who_text("clinical-who-receipt-source", format!("{} · Inglese · Release {}", source_label(receipt.source), receipt.release_id), theme))
+                    .child(who_text("clinical-who-receipt-time", format!("Acquisito: {} · Scadenza: {}", display_appointment(&receipt.fetched_at), display_appointment(&receipt.expires_at)), theme))
                     .when(rows.partial, |el| el.child(notice("clinical-workspace-who-partial", "Risultati parziali. Affina la ricerca per trovare altri riferimenti; vengono mostrate al massimo 25 voci.", theme, false)))
                     .when(rows.entries.is_empty(), |el| el.child(notice("clinical-workspace-who-empty", "Nessun risultato per questa ricerca. Prova altri termini in inglese.", theme, false)))
                     .children(rows.entries.iter().enumerate().map(|(index, entry)| {
                         let token = token.clone();
-                        div().id(SharedString::from(format!("clinical-workspace-who-result-{index}")))
+                        div().id(SharedString::from(format!("clinical-workspace-who-result-{}", entry.code)))
                             .min_w_0().max_w_full().border_b_1().border_color(theme.rule).py(px(12.)).flex().flex_col().gap(px(8.))
-                            .child(who_text(format!("ICD-11 · {}", entry.code), theme))
+                            .child(who_text("clinical-who-result-code", format!("ICD-11 · {}", entry.code), theme))
                             .child(div().type_role(theme, TypeRole::Strong).child(text!(entry.description.clone())))
                             .child(self.who.results[index].attach_enabled(button(format!("clinical-workspace-who-copy-{index}"), format!("Copia riferimento {}", entry.code), theme, false, true), true)
                                 .on_click(cx.listener(move |this, _, _, cx| this.copy_who_reference(token.clone(), index, cx))))
                     }));
             }
         }
-        pane.child(who_text(WHO_ATTRIBUTION, theme))
-            .child(who_text("La copia conserva codice, titolo, riferimento e provenienza. Non modifica la scheda del paziente.", theme))
+        pane.child(who_text("clinical-who-attribution", WHO_ATTRIBUTION, theme))
+            .child(who_text("clinical-who-copy-help", "La copia conserva codice, titolo, riferimento e provenienza. Non modifica la scheda del paziente.", theme))
             .child(button("clinical-workspace-who-web", "Catalogo incorporato e controllo codice…", theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| this.open_current(Area::References.current_path(), cx))))
-            .child(who_text("Il catalogo incorporato e il controllo puntuale dei codici sono disponibili nell’interfaccia web. Non vengono usati automaticamente da questa ricerca.", theme))
+            .child(who_text("clinical-who-web-help", "Il catalogo incorporato e il controllo puntuale dei codici sono disponibili nell’interfaccia web. Non vengono usati automaticamente da questa ricerca.", theme))
     }
 }
 
@@ -362,20 +364,46 @@ fn readiness_label(readiness: &WhoReadiness) -> &'static str {
     }
 }
 
-fn who_text(label: impl Into<SharedString>, theme: Theme) -> Div {
+fn who_text(id: &'static str, label: impl Into<SharedString>, theme: Theme) -> Stateful<Div> {
     let label: SharedString = label.into();
     div()
+        .id(id)
         .min_w_0()
         .max_w_full()
         .whitespace_normal()
         .text_color(theme.secondary)
-        .child(text!(label))
+        .child({
+            let text = text!(label);
+            #[cfg(test)]
+            let text = crate::shell::rendered_command::observe_text(text);
+            text
+        })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[gpui::test]
+    fn who_text_accessible_ids(cx: &mut gpui::TestAppContext) {
+        let mut app: Option<Entity<ClinicalApp>> = None;
+        rendered_command::assert_unique_texts(
+            cx,
+            move |window, cx| {
+                let app = app.get_or_insert_with(|| {
+                    cx.new(|cx| {
+                        let mut app = ClinicalApp::new(String::new(), window, cx);
+                        let token = pending(&mut app, cx);
+                        assert!(app.receive_who(token, WhoResult::Search(Ok(response(false))), cx));
+                        app
+                    })
+                });
+                app.update(cx, |app, cx| app.who_view(cx).into_any_element())
+            },
+            10,
+        );
+    }
 
     fn response(empty: bool) -> WhoSearchResponse {
         serde_json::from_value(json!({

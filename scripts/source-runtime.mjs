@@ -164,8 +164,10 @@ export function verifySourceRuntime(root = ROOT) {
 }
 
 export async function startSourceRuntime(mode, root = ROOT) {
-  if (!['web', 'headless'].includes(mode)) throw new Error('Expected web or headless');
+  if (!['web', 'headless', 'local-ui'].includes(mode)) throw new Error('Expected web, headless or local-ui');
   const { web, identity } = verifySourceRuntime(root);
+  if (mode === 'local-ui' && process.env.MEDIFLOW_PLUGIN_EXPECTED_REVISION !== undefined
+    && process.env.MEDIFLOW_PLUGIN_EXPECTED_REVISION !== identity.revision) throw new Error('Plugin runtime revision mismatch');
   Object.assign(process.env, { NODE_ENV: 'production', HOSTNAME: '127.0.0.1',
     MEDIFLOW_APP_REVISION: identity.revision.slice(0, 12), MEDIFLOW_APP_BRANCH: identity.branch,
     MEDIFLOW_APP_WORKTREE_HASH: identity.worktreeHash,
@@ -176,17 +178,17 @@ export async function startSourceRuntime(mode, root = ROOT) {
   await import(pathToFileURL(path.join(web, 'scripts/register-strip-types-loader.mjs')).href);
   const { runHeadlessSupervisorV1 } = await import(pathToFileURL(path.join(web, 'scripts/mediflow-headless-supervisor.mjs')).href);
   process.argv = process.argv.slice(0, 2);
-  return runHeadlessSupervisorV1({ webDirectory: web, webTargetPath: path.join(web, 'server.js'), webBuildIdentity: identity });
+  return runHeadlessSupervisorV1({ webDirectory: web, webTargetPath: path.join(web, 'server.js'), webBuildIdentity: identity }, mode === 'local-ui' ? 'plugin_local_ui' : 'clinical');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const command = process.argv[2];
     if (command !== 'build' && process.argv.length !== 3) throw new Error('Source runtime arguments invalid');
-    if (['web', 'headless'].includes(command) && (process.execArgv.length
+    if (['web', 'headless', 'local-ui'].includes(command) && (process.execArgv.length
       || ['NODE_OPTIONS', 'NODE_PATH', 'LD_PRELOAD', 'LD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH']
         .some(key => process.env[key] !== undefined))) throw new Error('Source runtime invocation invalid');
-    if (['web', 'headless'].includes(command) && process.connected) {
+    if (['web', 'headless', 'local-ui'].includes(command) && process.connected) {
       process.on('message', message => {
         if (message?.type !== 'mediflow-launcher-stop') return;
         if (process.listenerCount('SIGTERM')) process.emit('SIGTERM');

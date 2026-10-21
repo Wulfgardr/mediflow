@@ -117,6 +117,25 @@ for (const channel of ['generic-settings', 'paired-client', 'client-declaration'
     });
 }
 
+test('plugin local-ui supervisor rejects maintenance arguments before runtime admission', async () => {
+    const before = readTerritorialPacks(db);
+    for (const args of [
+        ['--territorial-packs', 'core+it+lom', '--expected-revision', '0', '--confirm'],
+        ['--territorial-packs', 'core+it+lom', '--expected-revision', '0'],
+        ['--maintenance-web'],
+        ['--mini'],
+    ]) {
+        const probe = spawnSync(process.execPath, ['--import', './scripts/register-strip-types-loader.mjs', '--input-type=module', '--eval', `
+            import assert from 'node:assert/strict';
+            import { runHeadlessSupervisorV1 } from './scripts/mediflow-headless-supervisor.mjs';
+            process.argv = ['node', 'synthetic-plugin-supervisor', ...${JSON.stringify(args)}];
+            await assert.rejects(runHeadlessSupervisorV1({}, 'plugin_local_ui'), { message: 'supervisor_arguments_invalid' });
+        `], { cwd: process.cwd(), env: { ...process.env, MEDIFLOW_DATA_DIR: directory }, encoding: 'utf8', timeout: 20_000 });
+        assert.equal(probe.status, 0, probe.stderr + probe.stdout);
+        await assertDisabled(before);
+    }
+});
+
 test('both admitted channels transition and audit; cached pre-disable capabilities do not authorize a write', async () => {
     current = web;
     let response = await http(request(command()));

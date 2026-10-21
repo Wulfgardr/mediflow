@@ -102,7 +102,7 @@ impl gpui::Element for Observed {
     }
 }
 
-pub(super) fn observe_text(text: gpui::Text) -> gpui::AnyElement {
+pub(crate) fn observe_text(text: gpui::Text) -> gpui::AnyElement {
     ObservedText(text).into_any_element()
 }
 
@@ -184,5 +184,47 @@ impl gpui::Element for ObservedText {
     ) {
         self.0
             .paint(id, inspector, bounds, state, prepaint, window, cx)
+    }
+}
+
+pub(crate) fn assert_unique_texts(
+    cx: &mut gpui::TestAppContext,
+    render: impl FnMut(&mut Window, &mut App) -> gpui::AnyElement + 'static,
+    expected: usize,
+) {
+    struct Fixture<F>(F);
+    impl<F: FnMut(&mut Window, &mut App) -> gpui::AnyElement + 'static> gpui::Render for Fixture<F> {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            (self.0)(window, cx)
+        }
+    }
+    let (_, cx) = cx.add_window_view(|_, _| Fixture(render));
+    let mut previous = None;
+    for _ in 0..2 {
+        take_text_nodes();
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        let nodes = take_text_nodes();
+        assert_eq!(
+            nodes.len(),
+            expected,
+            "all expected texts remain accessible"
+        );
+        let mut ids = HashSet::new();
+        for (id, node) in &nodes {
+            assert_eq!(node.role(), Role::Label);
+            assert!(node.value().is_some_and(|value| !value.is_empty()));
+            assert!(
+                ids.insert(id.clone()),
+                "duplicate accessible text ID: {id:?}, {node:?}"
+            );
+        }
+        let current: Vec<_> = nodes.into_iter().map(|(id, _)| id).collect();
+        if let Some(previous) = previous {
+            assert_eq!(current, previous, "IDs survive redraw");
+        }
+        previous = Some(current);
     }
 }
