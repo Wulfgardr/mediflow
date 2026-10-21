@@ -708,6 +708,22 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
             {statusConfirmation && (
                 <div ref={statusRef} role="region" aria-label="Cambio di stato della terapia" aria-live="polite" tabIndex={-1}
                     className={`${styles.threshold} ${styles.statusThreshold}`} data-confirming={statusConfirmation.phase === 'confirm'}>
+                    {statusConfirmation.phase === 'unavailable' ? <>
+                        <div className={styles.statusSummary}>
+                            <h3 className="type-threshold">Cambio di stato bloccato</h3>
+                            <p className="type-body">{statusConfirmation.patientLabel}</p>
+                            {statusConfirmation.newAttemptNotSent && <p className="type-body">La nuova richiesta non è stata inviata.</p>}
+                            <p className="type-body">{statusConfirmation.reason === 'admission'
+                                ? 'Il controllo locale necessario prima dell’invio non è riuscito. Un eventuale tentativo precedente deve ancora essere verificato.'
+                                : statusConfirmation.reason === 'journal'
+                                    ? 'Il registro locale dei tentativi non è leggibile. Non è possibile escludere una registrazione precedente ancora in corso.'
+                                    : 'Non è possibile rileggere la terapia necessaria al recupero. Il nuovo invio resta bloccato.'}</p>
+                            <p className="type-body">Ricontrolla dopo il ripristino della disponibilità. Il controllo non invia richieste di modifica e non cancella tentativi precedenti. Se il registro resta illeggibile, serve assistenza per ripristinarlo: non cancellare i dati del browser.</p>
+                        </div>
+                        <div className={styles.statusActions}>
+                            <button type="button" className="ui-btn-primary" disabled={statusConfirmation.checking} onClick={() => statusChange.recheck()}>{statusConfirmation.checking ? 'Controllo in corso' : 'Ricontrolla disponibilità'}</button>
+                        </div>
+                    </> : <>
                     <div className={styles.statusSummary}>
                         {statusConfirmation.phase === 'confirm' ? <>
                             <h3 className="type-threshold">{`${statusConfirmation.target === 'suspended' ? 'Sospendere' : statusConfirmation.target === 'completed' ? 'Concludere' : 'Riattivare'} ${statusConfirmation.original.drugName}, ${statusConfirmation.original.dosage}?`}</h3>
@@ -741,6 +757,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                         {statusConfirmation.phase === 'confirm' && <button type="button" className="ui-btn-primary" onClick={() => statusChange.confirm()}>Conferma e registra</button>}
                         {['conflict', 'rejected', 'uncertain'].includes(statusConfirmation.phase) && <button type="button" className="ui-btn-primary" disabled={statusConfirmation.writePending} onClick={() => statusChange.reread()}>{statusConfirmation.conflict ? 'Rileggi la terapia' : 'Rileggi e verifica'}</button>}
                     </div>
+                    </>}
                 </div>
             )}
         </section>

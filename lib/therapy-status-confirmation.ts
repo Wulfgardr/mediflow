@@ -15,6 +15,15 @@ export type StatusConfirmation<T> = {
     writePending?: boolean;
     recovered?: boolean;
     command?: PendingStatusWrite;
+} | {
+    phase: 'unavailable';
+    patientLabel: string;
+    reason: 'admission' | 'journal' | 'therapy';
+    newAttemptNotSent: boolean;
+    checking?: boolean;
+    original?: never;
+    command?: never;
+    writePending?: never;
 };
 export type PendingStatusWrite = {
     id: string;
@@ -25,6 +34,7 @@ export type PendingStatusWrite = {
 };
 export type StatusWriteJournal = {
     get: (patientId: string) => PendingStatusWrite | null;
+    inspect: (patientId: string) => Promise<PendingStatusWrite | null>;
     claim: (value: PendingStatusWrite) => Promise<boolean>;
     settle: (value: PendingStatusWrite) => Promise<void>;
     remove: (value: PendingStatusWrite) => Promise<void>;
@@ -55,10 +65,15 @@ export function createTherapyStatusWriteJournal(environment: JournalEnvironment)
         return value;
     };
     const exclusive = async (patientId: string, action: () => void) => {
-        await environment.locks().request(key(patientId), () => { key(patientId); action(); });
+        await environment.locks().request(key(patientId), async () => { key(patientId); action(); });
     };
     return {
         get,
+        async inspect(patientId) {
+            let value: PendingStatusWrite | null = null;
+            await exclusive(patientId, () => { value = get(patientId); });
+            return value;
+        },
         async claim(value) {
             let claimed = false;
             await exclusive(value.patientId, () => {
@@ -103,6 +118,7 @@ export function createTherapyStatusConfirmation<T extends StatusTherapy>(ports: 
     let live = true;
     let generation = 0;
     let reviewedSignal: AbortSignal | undefined;
+    let unsubmitted: PendingStatusWrite | undefined;
     const publish = (value: StatusConfirmation<T> | null) => { state = value; ports.changed(value); };
     const valid = (item: T) => item.patientId === ports.patientId && Number.isSafeInteger(item.version)
         && (item.version ?? 0) > 0 && getLockedFields(item).length === 0
@@ -114,7 +130,7 @@ export function createTherapyStatusConfirmation<T extends StatusTherapy>(ports: 
         catch { return true; }
     };
     async function reread() {
-        if (!live || !ports.isCurrent() || !state || state.writePending || ['confirm', 'writing', 'reading'].includes(state.phase)) return;
+        if (!live || !ports.isCurrent() || !state || state.phase === 'unavailable' || state.writePending || ['confirm', 'writing', 'reading'].includes(state.phase)) return;
         const context = state;
         const token = ++generation;
         publish({ ...context, phase: 'reading', readFailed: false });
@@ -148,20 +164,56 @@ export function createTherapyStatusConfirmation<T extends StatusTherapy>(ports: 
             if (current(token)) publish({ ...context, phase: context.conflict ? 'conflict' : 'uncertain', readFailed: true });
         }
     }
+    function restore(command: PendingStatusWrite, items: T[], patientLabel: string) {
+        const item = items.find(item => item.id === command.therapyId);
+        if (!item || !valid(item)) {
+            publish({ phase: 'unavailable', reason: 'therapy', patientLabel, newAttemptNotSent: false });
+            return;
+        }
+        publish({ original: { ...item, version: command.version }, target: item.status, patientLabel,
+            phase: command.outcome === 'rejected' ? 'rejected' : 'uncertain', conflict: false, recovered: true, command });
+    }
     return {
         get blocked() { return blocked(); },
         get snapshot() { return state; },
         activate() { live = true; },
         recover(items: T[], patientLabel: string) {
-            if (!live || !ports.isCurrent()) return;
+            if (!live || !ports.isCurrent() || state?.phase === 'unavailable') return;
             try {
                 const command = pending();
                 if (!command || (state?.command?.id === command.id && !['confirm', 'reviewed', 'registered'].includes(state.phase))) return;
-                const item = items.find(item => item.id === command.therapyId);
-                if (!item || !valid(item)) return;
-                publish({ original: { ...item, version: command.version }, target: item.status, patientLabel,
-                    phase: command.outcome === 'rejected' ? 'rejected' : 'uncertain', conflict: false, recovered: true, command });
-            } catch { return; }
+                restore(command, items, patientLabel);
+            } catch {
+                publish({ phase: 'unavailable', reason: 'journal', patientLabel, newAttemptNotSent: false });
+            }
+        },
+        async recheck() {
+            if (!live || !ports.isCurrent() || state?.phase !== 'unavailable' || state.checking) return;
+            const context = state;
+            const token = ++generation;
+            publish({ ...context, checking: true });
+            let reason: typeof context.reason = context.reason;
+            try {
+                if (unsubmitted) {
+                    await ports.journal.remove(unsubmitted);
+                    unsubmitted = undefined;
+                }
+                await ports.journal.inspect(ports.patientId);
+                reason = 'therapy';
+                const signal = ports.signal();
+                signal.throwIfAborted();
+                const items = await ports.read(signal);
+                signal.throwIfAborted();
+                if (!current(token)) return;
+                reason = 'journal';
+                const command = await ports.journal.inspect(ports.patientId);
+                if (!current(token) || signal.aborted) return;
+                if (command) restore(command, items, context.patientLabel);
+                else publish(null);
+                ports.refreshed();
+            } catch {
+                if (current(token)) publish({ ...context, reason, checking: false });
+            }
         },
         dispose() { live = false; generation++; state = null; reviewedSignal = undefined; },
         cancel() {
@@ -179,7 +231,7 @@ export function createTherapyStatusConfirmation<T extends StatusTherapy>(ports: 
             publish({ original: { ...item }, target, patientLabel, phase: 'confirm', conflict: false });
         },
         async confirm() {
-            if (!state || state.phase !== 'confirm' || !live || !ports.isCurrent() || blocked()) return;
+            if (!state || state.phase !== 'confirm' || !live || !ports.isCurrent()) return;
             const context = state;
             const signal = reviewedSignal;
             if (!signal || signal.aborted) { publish(null); return; }
@@ -188,20 +240,24 @@ export function createTherapyStatusConfirmation<T extends StatusTherapy>(ports: 
             const token = ++generation;
             reviewedSignal = undefined;
             publish({ ...context, command, phase: 'writing', writePending: true });
+            unsubmitted = command;
             try {
                 if (!await ports.journal.claim(command)) {
-                    if (current(token)) { publish(null); ports.refreshed(); }
+                    unsubmitted = undefined;
+                    if (current(token)) publish({ phase: 'unavailable', reason: 'admission', patientLabel: context.patientLabel, newAttemptNotSent: true });
                     return;
                 }
                 if (!current(token) || signal.aborted) {
                     await ports.journal.remove(command);
+                    unsubmitted = undefined;
                     if (current(token)) publish(null);
                     return;
                 }
             } catch {
-                if (current(token)) publish({ ...context, command, phase: 'uncertain', readFailed: true });
+                if (current(token)) publish({ phase: 'unavailable', reason: 'admission', patientLabel: context.patientLabel, newAttemptNotSent: true });
                 return;
             }
+            unsubmitted = undefined;
             const attempted = { ...context, command };
             const request = new AbortController();
             let writePending = true;
