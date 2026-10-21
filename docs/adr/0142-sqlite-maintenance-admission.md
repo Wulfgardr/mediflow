@@ -43,6 +43,9 @@ monotona. La deadline limita l'attesa dei lease: zero lease osservati sotto
 gate dopo la pubblicazione dell'intent costituiscono un drain riuscito anche
 oltre la deadline. Timeout prima della callback non tocca il database e consente di
 annullare soltanto l'intent verificato di quella stessa invocazione.
+Il polling dei lease avviene senza acquisire il gate; una lettura apparentemente
+vuota richiede la verifica finale di layout, intent e lease sotto gate prima
+di autorizzare la manutenzione.
 
 L'intent resta per tutta la callback. Un errore o crash dopo il suo ingresso
 conserva l'intent, perché il modulo non conosce gli effetti del lavoro di
