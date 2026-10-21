@@ -63,6 +63,7 @@ pub enum Phase {
     Review,
     Submitting,
     Verifying,
+    Recovering,
     Saved,
     Conflict,
     Indeterminate,
@@ -154,6 +155,8 @@ pub struct Workspace {
     pending_read: Option<ReadRequest>,
     pending_update: Option<UpdateNotes>,
     verifying: Option<UpdateNotes>,
+    recovery: Option<Phase>,
+    comparison: bool,
 }
 
 impl Workspace {
@@ -168,6 +171,10 @@ impl Workspace {
     }
     pub fn phase(&self) -> Phase {
         self.phase
+    }
+
+    pub fn has_notes_comparison(&self) -> bool {
+        self.comparison
     }
 
     pub fn is_dirty(&self) -> bool {
@@ -229,23 +236,44 @@ impl Workspace {
     ) -> bool {
         if self.pending_read.as_ref() != Some(request)
             || self.selected_id.as_deref() != Some(&request.patient_id)
-            || !matches!(self.phase, Phase::Loading | Phase::Verifying)
+            || !matches!(
+                self.phase,
+                Phase::Loading | Phase::Verifying | Phase::Recovering
+            )
         {
             return false;
         }
         self.pending_read = None;
+        let recovery = self.recovery.take();
         let verification = self.verifying.take();
         let profile = match result {
             Ok(profile) if profile.id == request.patient_id && profile.valid() => profile,
             _ => {
-                self.phase = if verification.is_some() {
+                self.phase = recovery.unwrap_or(if verification.is_some() {
                     Phase::Indeterminate
                 } else {
                     Phase::Unavailable
-                };
+                });
+                self.verifying = verification;
                 return false;
             }
         };
+        if recovery.is_some() {
+            let confirmed = verification.as_ref().is_some_and(|command| {
+                profile.version > command.expected_version
+                    && profile.notes.as_deref() == Some(command.notes.as_str())
+            });
+            self.profile = Some(profile);
+            self.comparison = !confirmed;
+            self.phase = if confirmed {
+                Phase::Saved
+            } else if self.is_dirty() {
+                Phase::Editing
+            } else {
+                Phase::Ready
+            };
+            return true;
+        }
         if let Some(command) = verification {
             // A transport acknowledgement is insufficient. The fresh projection
             // must be exactly the expected revision and content. A later write,
@@ -257,6 +285,7 @@ impl Workspace {
                 return false;
             }
             self.phase = Phase::Saved;
+            self.comparison = false;
         } else {
             self.phase = Phase::Ready;
         }
@@ -339,7 +368,10 @@ impl Workspace {
         self.phase = match outcome {
             UpdateOutcome::Conflict => Phase::Conflict,
             UpdateOutcome::Rejected => Phase::Editing,
-            UpdateOutcome::Indeterminate => Phase::Indeterminate,
+            UpdateOutcome::Indeterminate => {
+                self.verifying = Some(command.clone());
+                Phase::Indeterminate
+            }
             UpdateOutcome::Acknowledged => {
                 let Ok(sequence) = self.next_sequence() else {
                     self.phase = Phase::Indeterminate;
@@ -359,12 +391,32 @@ impl Workspace {
         None
     }
 
+    /// Read the current notes without changing the draft or dispatching a write.
+    /// Only a matching fresh read can resolve an indeterminate submission.
+    pub fn reread_preserving_draft(&mut self) -> Result<ReadRequest, ClientError> {
+        if !matches!(
+            self.phase,
+            Phase::Conflict | Phase::Indeterminate | Phase::Editing
+        ) {
+            return Err(ClientError::WrongPhase);
+        }
+        let request = ReadRequest {
+            patient_id: self.selected_id.clone().ok_or(ClientError::WrongPhase)?,
+            sequence: self.next_sequence()?,
+            owner: self.owner.clone(),
+        };
+        self.recovery = Some(self.phase);
+        self.pending_read = Some(request.clone());
+        self.phase = Phase::Recovering;
+        Ok(request)
+    }
+
     /// Explicitly discard the draft and request the latest state. This does not
     /// retry a mutation or decide whether a previously uncertain write committed.
     pub fn discard_and_reload(&mut self) -> Option<ReadRequest> {
         if matches!(
             self.phase,
-            Phase::Submitting | Phase::Verifying | Phase::Locked
+            Phase::Submitting | Phase::Verifying | Phase::Recovering | Phase::Locked
         ) {
             return None;
         }
@@ -384,6 +436,8 @@ impl Workspace {
         self.pending_read = None;
         self.pending_update = None;
         self.verifying = None;
+        self.recovery = None;
+        self.comparison = false;
         // Logical invalidation only; this pilot does not claim RAM zeroization.
     }
 }
