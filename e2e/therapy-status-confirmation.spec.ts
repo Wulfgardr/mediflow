@@ -1,0 +1,225 @@
+import { expect, test, type Page } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow } from './utils';
+
+type Fixture = { patientId: string; therapyId: string; secondId: string };
+const threshold = (page: Page) => page.getByRole('region', { name: 'Cambio di stato della terapia', exact: true });
+const row = (page: Page, secondary = false) => page.locator('#terapie').getByRole('row').filter({ has: page.getByText(secondary ? 'Farmaco sintetico secondario' : 'Ramipril sintetico 5 mg', { exact: true }) });
+const confirm = (page: Page) => threshold(page).getByRole('button', { name: 'Conferma e registra', exact: true });
+
+async function fixture(page: Page): Promise<Fixture> {
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    return page.evaluate(async () => {
+        const marker = crypto.randomUUID();
+        for (const key of ['aiPatientInsightKillSwitch', 'aiSmartImportKillSwitch', 'aiDocumentSynthesisKillSwitch', 'aiTreatmentReasoningKillSwitch']) {
+            const response = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value: 'disabled' }) });
+            if (!response.ok) throw new Error('Synthetic setting failed');
+        }
+        const response = await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firstName: 'Ada', lastName: 'Sintetica', taxCode: `SYN${marker}`, birthDate: '1972-04-12T00:00:00.000Z' }) });
+        if (!response.ok) throw new Error('Synthetic patient failed');
+        const { id: patientId } = await response.json();
+        const therapyId = `therapy-${marker}`;
+        const secondId = `second-${marker}`;
+        for (const [id, drugName] of [[therapyId, 'Ramipril sintetico 5 mg'], [secondId, 'Farmaco sintetico secondario']]) {
+            const added = await fetch('/api/therapies', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, patientId, drugName, dosage: '1 cp al mattino', status: 'active', startDate: '2026-10-01T08:00:00.000Z' }) });
+            if (!added.ok) throw new Error('Synthetic therapy failed');
+        }
+        return { patientId, therapyId, secondId };
+    });
+}
+async function open(page: Page, data: Fixture) {
+    await page.goto(`/patients/${data.patientId}/modules`);
+    await openPatientSection(page, 'terapie');
+    await expect(row(page)).toBeVisible();
+}
+function network(page: Page) {
+    const writes: Array<{ id: string; body: { version: number; status: string } }> = [];
+    const events: string[] = [];
+    page.on('request', request => {
+        const path = new URL(request.url()).pathname;
+        if (['PUT', 'PATCH'].includes(request.method()) && path.startsWith('/api/therapies/')) {
+            writes.push({ id: path.split('/').pop()!, body: request.postDataJSON() });
+            events.push(request.method());
+        }
+        if (request.method() === 'GET' && path === '/api/therapies') events.push('GET');
+    });
+    return { writes, events };
+}
+async function stored(page: Page, data: Fixture) {
+    const response = await page.request.get(`/api/therapies?patientId=${data.patientId}`);
+    expect(response.status()).toBe(200);
+    return (await response.json() as Array<{ id: string; version: number; status: string }>).find(item => item.id === data.therapyId);
+}
+
+test('first gesture then return to record issues zero writes', async ({ page }) => {
+    const data = await fixture(page);
+    await open(page, data);
+    const { writes } = network(page);
+    await row(page).getByRole('button', { name: 'Sospendi', exact: true }).click();
+    await expect(threshold(page)).toContainText('Ada Sintetica');
+    await expect(threshold(page)).toContainText('Sospendere Ramipril sintetico 5 mg, 1 cp al mattino?');
+    await threshold(page).getByRole('button', { name: 'Torna alla scheda', exact: true }).click();
+    await expect(threshold(page)).toHaveCount(0);
+    const current = await stored(page, data);
+    expect(writes).toEqual([]);
+    expect(current).toMatchObject({ version: 1, status: 'active' });
+});
+
+test('second gesture writes once with the shown patient and version; registered waits for readback', async ({ page }) => {
+    const data = await fixture(page);
+    await open(page, data);
+    const { writes, events } = network(page);
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    let entered = false;
+    await page.route('**/api/therapies?*', async route => {
+        if (!writes.length) return route.continue();
+        const response = await route.fetch();
+        entered = true;
+        await gate;
+        await route.fulfill({ response });
+    });
+    try {
+        await row(page).getByRole('button', { name: 'Sospendi', exact: true }).click();
+        expect(writes).toHaveLength(0);
+        await confirm(page).click();
+        await expect.poll(() => entered).toBe(true);
+        await expect(threshold(page)).toContainText('Rilettura in corso');
+        await expect(threshold(page).getByText('Registrata', { exact: true })).toHaveCount(0);
+        expect(writes).toEqual([{ id: data.therapyId, body: expect.objectContaining({ version: 1, status: 'suspended' }) }]);
+        release();
+        await expect(threshold(page).getByText('Registrata', { exact: true })).toBeVisible();
+        expect(events.indexOf('GET')).toBeGreaterThan(events.indexOf('PUT'));
+        expect(await stored(page, data)).toMatchObject({ version: 2, status: 'suspended' });
+        expect(writes).toHaveLength(1);
+    } finally { release(); }
+});
+
+test('409 requires readback and a new first gesture and confirmation', async ({ page }) => {
+    const data = await fixture(page);
+    await open(page, data);
+    await row(page).getByRole('button', { name: 'Sospendi', exact: true }).click();
+    const concurrent = await page.evaluate(async id => {
+        const response = await fetch(`/api/therapies/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: 1, dosage: '2 cp alla sera' }) });
+        return response.status;
+    }, data.therapyId);
+    expect(concurrent).toBe(200);
+    const { writes } = network(page);
+    const rejected = page.waitForResponse(response => response.request().method() === 'PUT' && response.url().endsWith(data.therapyId));
+    await confirm(page).click();
+    expect((await rejected).status()).toBe(409);
+    await expect(threshold(page)).toContainText("La terapia è stata modificata da un'altra postazione. Nulla è stato scritto.");
+    await expect(confirm(page)).toHaveCount(0);
+    await threshold(page).getByRole('button', { name: 'Rileggi la terapia', exact: true }).click();
+    await expect(threshold(page)).toContainText('Stato attuale: Attiva');
+    await expect(threshold(page)).toContainText('2 cp alla sera');
+    await expect(confirm(page)).toHaveCount(0);
+    expect(writes).toHaveLength(1);
+    await threshold(page).getByRole('button', { name: 'Torna alla scheda', exact: true }).click();
+    await expect(row(page)).toContainText('2 cp alla sera');
+    await row(page).getByRole('button', { name: 'Sospendi', exact: true }).click();
+    await expect(threshold(page)).toContainText('Sospendere Ramipril sintetico 5 mg, 2 cp alla sera?');
+    expect(writes).toHaveLength(1);
+    await confirm(page).click();
+    await expect(threshold(page).getByText('Registrata', { exact: true })).toBeVisible();
+    expect(writes.map(write => write.body.version)).toEqual([1, 2]);
+    expect(await stored(page, data)).toMatchObject({ version: 3, status: 'suspended' });
+});
+
+for (const applied of [true, false]) {
+    test(`lost response blocks resend until readback; committed=${applied}`, async ({ page }) => {
+        const data = await fixture(page);
+        await open(page, data);
+        const { writes } = network(page);
+        await page.route(`**/api/therapies/${data.therapyId}`, async route => {
+            if (route.request().method() !== 'PUT') return route.continue();
+            if (applied) expect((await route.fetch()).status()).toBe(200);
+            await route.abort('failed');
+        });
+        await row(page).getByRole('button', { name: 'Sospendi', exact: true }).click();
+        await confirm(page).click();
+        await expect(threshold(page)).toContainText('La registrazione può essere avvenuta: rileggi prima di riprovare.');
+        await expect(confirm(page)).toHaveCount(0);
+        await expect(row(page).getByRole('button', { name: 'Sospendi', exact: true })).toBeDisabled();
+        await expect(row(page, true).getByRole('button', { name: 'Concludi', exact: true })).toBeDisabled();
+        await threshold(page).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
+        await expect(threshold(page).getByText(applied ? 'Registrata' : 'Terapia riletta', { exact: true })).toBeVisible();
+        await expect(confirm(page)).toHaveCount(0);
+        expect(writes).toHaveLength(1);
+        expect(await stored(page, data)).toMatchObject({ version: applied ? 2 : 1, status: applied ? 'suspended' : 'active' });
+    });
+}
+
+test('another therapy replaces confirmation; leaving the record retires the prompt', async ({ page }) => {
+    const data = await fixture(page);
+    const other = await fixture(page);
+    await open(page, data);
+    const { writes } = network(page);
+    await row(page).getByRole('button', { name: 'Sospendi', exact: true }).click();
+    await row(page, true).getByRole('button', { name: 'Concludi', exact: true }).click();
+    await expect(threshold(page)).toContainText('Concludere Farmaco sintetico secondario');
+    await confirm(page).click();
+    await expect(threshold(page).getByText('Registrata', { exact: true })).toBeVisible();
+    expect(writes.map(write => write.id)).toEqual([data.secondId]);
+    await row(page).getByRole('button', { name: 'Sospendi', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Navigazione principale', exact: true }).getByRole('link', { name: 'Analisi', exact: true }).click();
+    const discard = page.getByRole('dialog', { name: 'Lasciare la compilazione?', exact: true });
+    await discard.getByRole('button', { name: 'Esci senza salvare', exact: true }).click();
+    await expect(page).toHaveURL(/\/analytics$/);
+    await open(page, other);
+    await expect(threshold(page)).toHaveCount(0);
+    await row(page).getByRole('button', { name: 'Sospendi', exact: true }).click();
+    await threshold(page).getByRole('button', { name: 'Torna alla scheda', exact: true }).click();
+    expect(writes).toHaveLength(1);
+    expect(await stored(page, data)).toMatchObject({ version: 1, status: 'active' });
+});
+
+for (const theme of ['light', 'dark']) for (const width of [390, 1440]) {
+    test(`threshold and uncertain outcome render ${theme} ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 960 });
+        await page.addInitScript(value => localStorage.setItem('mediflow-theme', value), theme);
+        const data = await fixture(page);
+        await open(page, data);
+        const { writes } = network(page);
+        await page.route(`**/api/therapies/${data.therapyId}`, route => route.request().method() === 'PUT' ? route.abort('failed') : route.continue());
+        await row(page).getByRole('button', { name: 'Sospendi', exact: true }).click();
+        await expect(threshold(page)).toBeVisible();
+        await assertNoHorizontalOverflow(page, [{ label: 'threshold', selector: '[aria-label="Cambio di stato della terapia"]' }]);
+        const dir = process.env.THERAPY_SCREENSHOT_DIR || test.info().outputPath('captures');
+        await mkdir(dir, { recursive: true });
+        const themeName = theme === 'light' ? 'giorno' : 'grafite';
+        await page.screenshot({ path: `${dir}/soglia-${themeName}-${width}.png` });
+        await confirm(page).click();
+        await expect(threshold(page)).toContainText('La registrazione può essere avvenuta');
+        await page.screenshot({ path: `${dir}/esito-da-verificare-${themeName}-${width}.png` });
+        expect(writes).toHaveLength(1);
+        await assertNoHorizontalOverflow(page, [{ label: 'threshold', selector: '[aria-label="Cambio di stato della terapia"]' }]);
+    });
+}
+
+test('suspend, reactivate and complete each require their own confirmation and preserve endDate semantics', async ({ page }) => {
+    const data = await fixture(page);
+    await open(page, data);
+    const { writes } = network(page);
+    const transitions = [
+        { action: 'Sospendi', verb: 'Sospendere', status: 'suspended' },
+        { action: 'Riattiva', verb: 'Riattivare', status: 'active' },
+        { action: 'Concludi', verb: 'Concludere', status: 'completed' },
+        { action: 'Riattiva', verb: 'Riattivare', status: 'active' },
+    ];
+    for (const [index, transition] of transitions.entries()) {
+        await row(page).getByRole('button', { name: transition.action, exact: true }).click();
+        await expect(threshold(page)).toContainText(`${transition.verb} Ramipril sintetico 5 mg, 1 cp al mattino?`);
+        expect(writes).toHaveLength(index);
+        await confirm(page).click();
+        await expect(threshold(page).getByText('Registrata', { exact: true })).toBeVisible();
+        expect(writes).toHaveLength(index + 1);
+        expect(writes[index]).toMatchObject({ id: data.therapyId, body: { version: index + 1, status: transition.status } });
+        const response = await page.request.get(`/api/therapies?patientId=${data.patientId}`);
+        expect(response.status()).toBe(200);
+        const item = (await response.json() as Array<{ id: string; endDate: string | null }>).find(item => item.id === data.therapyId)!;
+        if (transition.status === 'completed') expect(Number.isFinite(Date.parse(item.endDate!))).toBe(true);
+        if (transition.status === 'active') expect(item.endDate).toBeNull();
+        await threshold(page).getByRole('button', { name: 'Torna alla scheda', exact: true }).click();
+    }
+});
