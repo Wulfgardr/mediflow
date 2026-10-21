@@ -1,22 +1,13 @@
 use super::*;
 
 pub(super) fn observe(element: Stateful<Div>) -> gpui::AnyElement {
-    #[cfg(test)]
-    {
-        Observed(element).into_any_element()
-    }
-    #[cfg(not(test))]
-    {
-        element.into_any_element()
-    }
+    Observed(element).into_any_element()
 }
 
-#[cfg(test)]
 thread_local! {
     static NODES: std::cell::RefCell<HashMap<String, (gpui::accesskit::Node, gpui::Bounds<gpui::Pixels>)>> = std::cell::RefCell::new(HashMap::new());
 }
 
-#[cfg(test)]
 pub(super) fn node(id: &str) -> (gpui::accesskit::Node, gpui::Bounds<gpui::Pixels>) {
     NODES.with(|nodes| {
         nodes
@@ -27,10 +18,8 @@ pub(super) fn node(id: &str) -> (gpui::accesskit::Node, gpui::Bounds<gpui::Pixel
     })
 }
 
-#[cfg(test)]
 struct Observed(Stateful<Div>);
 
-#[cfg(test)]
 impl gpui::IntoElement for Observed {
     type Element = Self;
     fn into_element(self) -> Self {
@@ -38,7 +27,6 @@ impl gpui::IntoElement for Observed {
     }
 }
 
-#[cfg(test)]
 impl gpui::Element for Observed {
     type RequestLayoutState = <Stateful<Div> as gpui::Element>::RequestLayoutState;
     type PrepaintState = <Stateful<Div> as gpui::Element>::PrepaintState;
