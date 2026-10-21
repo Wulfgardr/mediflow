@@ -297,6 +297,46 @@ comandi.
 | Non registrata | Fondo del piano, ✕ critico | Non registrata. Nulla è stato scritto. | La causa. La bozza è intatta: rileggi la scheda e riprova. | Rileggi la scheda, Riprova |
 | In ascolto | Fondo del piano, punto vuoto che respira | In ascolto mm:ss | Ferma l'ascolto prima di registrare. | Registra disattivato |
 
+#### Conflitto: rileggere senza perdere la bozza
+
+Dopo un 409: «La scheda è stata modificata da un'altra postazione alle ora.
+La bozza è intatta: rileggi la scheda e riprova.» Comando: «Rileggi la scheda».
+L'ora è riportata soltanto se restituita dalla fonte; altrimenti si omette
+«alle ora», senza usare l'orario della vecchia lettura.
+
+La rilettura conserva la bozza e non invia nulla. Mostra due blocchi impilati,
+sempre nello stesso ordine, anche nella finestra più larga:
+
+1. «Registrato ora», in inchiostro asciutto, con ora e autore soltanto se
+   restituiti dalla fonte.
+2. «La tua bozza», in inchiostro fresco, modificabile. Il campo non ripete
+   l'etichetta visibile «Note della scheda»; mantiene l'etichetta accessibile
+   «Note della scheda, la tua bozza». Fuori dal confronto l'etichetta visibile
+   resta «Note della scheda».
+
+Nel confronto, se la bozza è diversa dal testo registrato, la seconda riga
+della soglia riporta «Nome paziente · Note della scheda. La tua bozza sostituirà
+il testo registrato ora.» La frase di sostituzione resta visibile anche nella
+nuova conferma. Se la bozza coincide con il registrato, la frase non compare.
+
+Sotto resta la soglia normale: si registra soltanto con un nuovo
+«Conferma e registra», sulla nuova versione letta. Nessuna fusione automatica
+di testo clinico. «Scarta la bozza» resta un gesto separato ed esplicito,
+mai implicito nella rilettura.
+
+Se la risposta si perde o il trasporto si interrompe dopo l'invio, lo stato
+è «Esito da verificare», con comando «Rileggi e verifica». Il reinvio resta
+bloccato fino alla rilettura. Se questa trova il contenuto della bozza già
+registrato su una versione successiva a quella inviata, la voce diventa
+«Registrata», confermata dalla rilettura, senza un secondo invio. Altrimenti
+si torna al confronto fra registrato e bozza.
+
+Il recupero appartiene al paziente e all'archivio correnti. Una bozza aperta
+impedisce il cambio di paziente: occorre completarla o scartarla esplicitamente.
+Una selezione successiva invalida le risposte precedenti. La sostituzione
+dell'archivio interrompe il recupero e richiede di riaprire l'archivio;
+nessuna bozza né autorità di scrittura passa al nuovo paziente o archivio.
+
 #### Quando serve il secondo tempo
 
 La soglia è sempre presente e dice sempre a chi si sta scrivendo e che cosa.
