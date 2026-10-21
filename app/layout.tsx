@@ -1,6 +1,4 @@
 import type { Metadata } from 'next';
-import { connection } from 'next/server';
-import { isPluginLocalUiRuntime } from '@/lib/security/plugin-local-ui-runtime';
 import localFont from 'next/font/local';
 import Script from 'next/script';
 import './globals.css';
@@ -69,20 +67,18 @@ const uiStyleBootstrapScript = `
 })();
 `;
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await connection();
-  const pluginLocalUi = isPluginLocalUiRuntime();
   /* expose a stable revision fingerprint so stale browser tabs can self-heal after branch/server changes */
   const appFingerprint = getAppFingerprint();
   /* ADR 0123: the flag controls comparison chrome, not the official UI. */
   const runtimeTwin = process.env.MEDIFLOW_RUNTIME_TWIN === '1';
 
   return (
-    <html lang="it" className={`${voce.variable} ${registro.variable}`} data-ui-style="redesign" data-lume="true" data-plugin-local-ui={pluginLocalUi ? 'true' : undefined} data-runtime-twin={runtimeTwin ? 'true' : undefined} data-runtime-twin-design="proposal" data-twin-composition="stream" suppressHydrationWarning>
+    <html lang="it" className={`${voce.variable} ${registro.variable}`} data-ui-style="redesign" data-lume="true" data-runtime-twin={runtimeTwin ? 'true' : undefined} data-runtime-twin-design="proposal" data-twin-composition="stream" suppressHydrationWarning>
       {/* keep layout fully local/offline by avoiding remote Google Font fetches */}
       <head>
         <meta name="mediflow-app-fingerprint" content={appFingerprint} />

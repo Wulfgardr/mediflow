@@ -82,6 +82,7 @@ jobs:
           export MEDIFLOW_E2E_DATA_DIR="${E2E_BUILD_DATA}"
           export MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1 E2E_DISABLE_LEGACY_COPY=1
           npm run build
+          node scripts/check-static-routes.mjs
           E2E_AUTH_RUNTIME="$(mktemp -d "${RUNNER_TEMP}/mediflow-auth-runtime.XXXXXX")"
           cp -R "${MEDIFLOW_NEXT_DIST_DIR}/standalone/." "${E2E_AUTH_RUNTIME}/"
           mkdir -p "${E2E_AUTH_RUNTIME}/public" "${E2E_AUTH_RUNTIME}/${MEDIFLOW_NEXT_DIST_DIR}/static"

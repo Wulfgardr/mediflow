@@ -1,10 +1,16 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import PrivacyBlur from './privacy-blur';
 import { useSecurity } from './security-provider';
 import { db } from '@/lib/db';
 import { LOCAL_UI_INTENTS, type LocalUiIntent } from '@/packages/mcp/src/local-ui-contract';
+
+const PluginLocalUiRuntime = createContext(false);
+
+export function PluginLocalUiRuntimeProvider({ enabled, children }: Readonly<{ enabled: boolean; children: ReactNode }>) {
+  return <PluginLocalUiRuntime.Provider value={enabled}>{children}</PluginLocalUiRuntime.Provider>;
+}
 
 const labels: Record<LocalUiIntent, string> = { search: 'Ricerca locale', identity: 'Anagrafica',
   history: 'Storia clinica e fonti', prescribing: 'Guida alla prescrizione' };
@@ -21,6 +27,7 @@ type Pending = { intent: LocalUiIntent; epoch: number | null; expiresAt: number;
 export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabel }: Readonly<{
   patientId?: string; patientVersion?: number; patientLabel?: string;
 }>) {
+  const pluginLocalUi = useContext(PluginLocalUiRuntime);
   const { user, isLocked, isAuthenticated } = useSecurity();
   const [pending, setPending] = useState<Pending | null>(null);
   const [message, setMessage] = useState('');
@@ -31,7 +38,7 @@ export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabe
     return () => { generation.current++; };
   }, [patientId, patientVersion, user?.id, isAuthenticated, isLocked, signal]);
   useEffect(() => {
-    if (document.documentElement.dataset.pluginLocalUi !== 'true') return;
+    if (!pluginLocalUi) return;
     let current = true;
     const events = new EventSource('/api/plugin-local-ui/events');
     let expiry: ReturnType<typeof setTimeout> | undefined;
@@ -59,7 +66,7 @@ export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabe
     events.onerror = () => { clear(); events.close(); };
     signal.addEventListener('abort', clear, { once: true });
     return () => { current = false; clear(); events.close(); document.removeEventListener('visibilitychange', onVisibility); signal.removeEventListener('abort', clear); };
-  }, [patientId, patientVersion, user?.id, isAuthenticated, isLocked, signal]);
+  }, [pluginLocalUi, patientId, patientVersion, user?.id, isAuthenticated, isLocked, signal]);
   const confirm = async () => {
     const request = pending;
     if (!request || signal.aborted || isLocked || !isAuthenticated || request.expiresAt <= Date.now() || document.visibilityState !== 'visible') { setPending(null); return; }

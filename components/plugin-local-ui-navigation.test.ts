@@ -13,6 +13,8 @@ function fixture(pluginRuntime = true) {
   const session = new AbortController();
   const subscriptions: string[] = [];
   const hooks = {
+    createContext: (value: boolean) => ({ Provider: 'PluginLocalUiRuntimeProvider', defaultValue: value }),
+    useContext: () => pluginRuntime,
     useState(initial: unknown) {
       const key = index++;
       if (!(key in values)) values[key] = initial;
@@ -47,7 +49,7 @@ function fixture(pluginRuntime = true) {
   setTimeout(run: () => void, delay: number) { const timer = { at: now + delay, cancelled: false, run }; timers.push(timer); return timer; },
   clearTimeout(timer: typeof timers[number] | undefined) { if (timer) timer.cancelled = true; },
   EventSource: function (url: string) { subscriptions.push(url); events = { close() {} }; return events; },
-  document: { documentElement: { dataset: { pluginLocalUi: pluginRuntime ? 'true' : undefined } }, visibilityState: 'visible', addEventListener() {}, removeEventListener() {}, getElementById() { return null; } },
+  document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {}, getElementById() { return null; } },
   window: { location: { hash: '' } }, HTMLDetailsElement: class {},
   fetch(_url: string, options: { signal: AbortSignal }) { return new Promise(resolve => {
     reads.push({ signal: options.signal, release: () => resolve({ ok: true, json: async () => ({ contractVersion: 1, selectionEpoch: 1 }) }) });
