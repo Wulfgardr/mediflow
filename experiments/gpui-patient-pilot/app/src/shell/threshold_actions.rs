@@ -14,7 +14,7 @@ impl ClinicalApp {
         &self,
         layout: Layout,
         cx: &Context<Self>,
-    ) -> Option<gpui::AnyElement> {
+    ) -> Option<Stateful<Div>> {
         let form = self.form.as_ref()?;
         if self.discard.is_some()
             || !matches!(
@@ -108,6 +108,7 @@ impl ClinicalApp {
                 .role(Role::Region)
                 .aria_label("Stato della scrittura")
                 .flex_shrink_0()
+                .min_h_0()
                 .min_w_0()
                 .px(px(layout.margin))
                 .py(px(12.))
@@ -120,13 +121,26 @@ impl ClinicalApp {
                 .child(
                     div()
                         .id("threshold-recovery-status")
+                        .debug_selector(|| "threshold-recovery-status".into())
+                        .min_h_0()
+                        .overflow_y_scroll()
                         .role(Role::Status)
                         .type_role(theme, TypeRole::Section)
-                        .child(text!(format!("{title}\n{state}"))),
+                        .child(
+                            div()
+                                .debug_selector(|| "threshold-recovery-title".into())
+                                .child(text!(title)),
+                        )
+                        .child(
+                            div()
+                                .debug_selector(|| "threshold-recovery-state".into())
+                                .child(text!(state)),
+                        ),
                 )
                 .child(self.threshold_command(primary, None, cx))
                 .child(
                     div()
+                        .flex_shrink_0()
                         .relative()
                         .min_w_0()
                         .child(
@@ -156,8 +170,7 @@ impl ClinicalApp {
                         .when(self.threshold_menu_open.get(), |el| {
                             el.child(gpui::deferred(menu).priority(1))
                         }),
-                )
-                .into_any_element(),
+                ),
         )
     }
 

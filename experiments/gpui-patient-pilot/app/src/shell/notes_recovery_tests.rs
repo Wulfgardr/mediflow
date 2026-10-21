@@ -748,6 +748,10 @@ fn threshold_rendered_commands_bind_recipient_order_and_callbacks(cx: &mut gpui:
         draw(cx);
         cx.simulate_keystrokes("tab");
         draw(cx);
+        if !confirm_second {
+            cx.simulate_keystrokes("shift-tab");
+            draw(cx);
+        }
         let first = cx.debug_bounds("threshold-back").unwrap();
         let second = cx.debug_bounds("clinical-workspace-confirm-save").unwrap();
         assert!(
@@ -793,14 +797,13 @@ fn threshold_rendered_commands_bind_recipient_order_and_callbacks(cx: &mut gpui:
                 "visible label inside its command"
             );
         }
-        cx.simulate_click(
-            if confirm_second {
-                second.center()
-            } else {
-                first.center()
-            },
-            gpui::Modifiers::default(),
+        let target = if confirm_second { second } else { first };
+        let viewport = cx.debug_bounds("threshold-full-plane").unwrap();
+        assert!(
+            target.top() >= viewport.top() && target.bottom() <= viewport.bottom(),
+            "click target must be visible in the prepainted frame: {target:?} in {viewport:?}"
         );
+        cx.simulate_click(target.center(), gpui::Modifiers::default());
         cx.run_until_parked();
         if confirm_second {
             assert_eq!(host.writes().len(), 1);
