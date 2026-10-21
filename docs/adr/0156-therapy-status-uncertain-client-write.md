@@ -1,6 +1,6 @@
 # ADR 0156 — Cambio stato terapia: esito incerto nel client Web
 
-Data: 2026-10-21. Stato: Proposed, in attesa di review indipendente.
+Data: 2026-10-21. Stato: Accepted (2026-10-21), dopo la [review indipendente completa sulla PR #591](https://github.com/Wulfgardr/mediflow/pull/591#pullrequestreview-5597453745), revisione `399265ffa`.
 
 ## Problema e confine
 
