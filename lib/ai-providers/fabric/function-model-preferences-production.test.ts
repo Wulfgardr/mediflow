@@ -7,7 +7,6 @@ import test from 'node:test';
 import Database from 'better-sqlite3';
 import { createHostProviderLifecycleService } from './provider-lifecycle-service.ts';
 import { createFunctionModelDispatch, FUNCTION_MODEL_CHOICE_HEADER, functionModelBindingSettings } from './function-model-dispatch.ts';
-import { TERRITORIAL_PACK_SETTING_KEY, TERRITORIAL_PACK_INITIALIZATION_KEY } from '../../territorial-packs';
 import { FUNCTION_PREFERENCES_KEY } from './function-model-preferences.ts';
 
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-function-model-production-'));
@@ -35,10 +34,11 @@ const command = () => {
 };
 
 test('production settings owner persists only dedicated preferences and existing switch, and the real binding reader consumes the selection', async () => {
-    const before = disk.prepare('SELECT key,value FROM settings WHERE key NOT IN (?,?) ORDER BY key').all(TERRITORIAL_PACK_SETTING_KEY, TERRITORIAL_PACK_INITIALIZATION_KEY);
-    const initial = service.read(); const selected = command(); const saved = service.apply(selected);
+    const initial = service.read();
+    const before = disk.prepare('SELECT key,value FROM settings WHERE key <> ? ORDER BY key').all(FUNCTION_PREFERENCES_KEY);
+    const selected = command(); const saved = service.apply(selected);
     assert.deepEqual(service.read(), saved); assert.deepEqual(service.apply(selected), saved);
-    assert.deepEqual(disk.prepare('SELECT key,value FROM settings WHERE key NOT IN (?,?,?) ORDER BY key').all(FUNCTION_PREFERENCES_KEY, TERRITORIAL_PACK_SETTING_KEY, TERRITORIAL_PACK_INITIALIZATION_KEY), before);
+    assert.deepEqual(disk.prepare('SELECT key,value FROM settings WHERE key <> ? ORDER BY key').all(FUNCTION_PREFERENCES_KEY), before);
     const consume = createFunctionModelDispatch({ authenticate: async () => 'synthetic-session', readSources: readProductionFunctionModelSources })('patient_insight', async () => {
         const binding = await createHostLocalProviderBindingService().readClinical();
         assert.equal(binding.status, 'available');
