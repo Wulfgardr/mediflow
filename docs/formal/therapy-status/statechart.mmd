@@ -1,0 +1,40 @@
+stateDiagram-v2
+  state "Client Web — stessa origine e archivio" as Client {
+    [*] --> Scheda
+    Scheda --> Conferma: sospendi / riattiva / concludi\nvalida paziente, terapia e versione; zero PUT
+    Conferma --> Scheda: annulla
+    Conferma --> Ammissione: conferma esplicita\ncrea attemptID; attende claim sotto Web Lock
+    Ammissione --> NonDisponibile: claim negata o errore\nnuova richiesta non inviata
+    Ammissione --> Invio: marker proprio persistito e contesto valido\nuna PUT CAS
+    Ammissione --> Scheda: sessione scaduta prima della PUT\nrimuove solo marker proprio non inviato
+    Invio --> EsitoIgnoto: timeout / abort / rete\nil server può ancora committare
+    Invio --> Rifiutata: risposta di rifiuto autorevole
+    Invio --> Lettura: risposta positiva + settle marker
+    EsitoIgnoto --> Lettura: rileggi esplicito; attesa client terminata
+    Rifiutata --> Lettura: rileggi esplicito
+    Lettura --> EsitoIgnoto: versione uguale con esito unknown / errore
+    Lettura --> Confronto: versione avanzata, oppure rifiuto + stessa versione\nrimuove marker sotto lock e attemptID
+    Lettura --> Registrata: accepted + conferma in memoria + dati coerenti\nversione avanzata; rimozione marker riuscita
+    Registrata --> Scheda: torna alla scheda
+    Confronto --> Conferma: nuova scelta esplicita e nuova conferma
+    NonDisponibile --> Ricontrollo: ricontrolla disponibilità\nzero PUT
+    Ricontrollo --> Scheda: nessun marker; lettura autorizzata valida
+    Ricontrollo --> EsitoIgnoto: marker precedente recuperato
+    Ricontrollo --> Rifiutata: marker rejected recuperato
+    Ricontrollo --> NonDisponibile: storage / lock / terapia ancora indisponibili
+    Scheda --> EsitoIgnoto: reload / altra tab recupera marker unknown o accepted\nnon recupera intento clinico
+    Scheda --> NonDisponibile: marker illeggibile / terapia non ispezionabile
+  }
+  state "Host — indipendente dalla durata del fetch" as Host {
+    [*] --> Attesa
+    Attesa --> Ammessa: autenticazione e archivio ammessi\nPUT con expectedVersion
+    Ammessa --> Committata: transazione IMMEDIATE\nCAS riuscita + versione incrementata + audit
+    Ammessa --> Negata: rifiuto autorevole / CAS non coincidente
+    Committata --> Attesa: risposta positiva, persa o tardiva
+    Negata --> Attesa: risposta di rifiuto, persa o tardiva
+  }
+  note right of EsitoIgnoto
+    Una GET vecchia non esclude un commit futuro.
+    Nessun retry automatico, nessuno sblocco per età.
+    Il blocco può durare indefinitamente.
+  end note

@@ -60,6 +60,7 @@ versione o risalire alla provenienza di un’interfaccia.
 | [adr/0153-paired-scale-preparation-and-diary-currentness.md](./adr/0153-paired-scale-preparation-and-diary-currentness.md) | WUL-771: catalogo/preparazione Scale in TypeScript e guard corrente del diario paired. | Per verificare capacità, selezione, bozza keyless e delega al writer esistente. |
 | [adr/0154-population-demographics-read-boundary.md](./adr/0154-population-demographics-read-boundary.md) | WUL-771: proposta di lettura demografica della popolazione paired con TS canonico e calendario client esplicito. | Prima di collegare Analisi GPUI, per riesaminare ammissione, membership, cifratura e adattatore date-fns. |
 | [adr/0155-account-profile-read-and-conditional-update.md](./adr/0155-account-profile-read-and-conditional-update.md) | WUL-771: lettura del profilo dell'account e PUT condizionale con versione derivata dal contenuto. | Prima di collegare il profilo nel client GPUI o modificare i consumer Web/Apple e la compatibilità della PUT condizionale. |
+| [adr/0157-hl7-conformance-at-clinical-boundaries.md](./adr/0157-hl7-conformance-at-clinical-boundaries.md) | WUL-784: conformità HL7 ai confini clinici, profili e artefatti versionati. | Prima di implementare validazione HL7 o dichiarare conformità e accettazione FSE. |
 | [adr/0158-territorial-packs.md](./adr/0158-territorial-packs.md) | WUL-785: nucleo internazionale e pacchetti territoriali governati dall’host. | Prima di separare capacità Italia/Lombardia o modificare migrazione e conservazione dello storico. |
 | [start-here.md](./start-here.md) | Esigenza ambulatoriale, uso senza AI e tre livelli di approfondimento. | Primo accesso al progetto. |
 | [release-085-readiness.md](./release-085-readiness.md) | Evidenze runtime, gate aperti, account Apple e promozione. | Prima di presentare o distribuire la 0.8.5. |
@@ -466,3 +467,9 @@ di ciascuna proposta e il limite di autorità dell’host.
 | --- | --- | --- |
 | [TREATMENT-PORTABLE-ADR.md](../proposals/TREATMENT-PORTABLE-ADR.md) | Proposta tecnica recuperata della candidata 0.8.6; accettazione e qualifica restano distinte. | Riesame del relativo contributo. |
 | [docs/adr/0076-macos-ordinary-proposal-only-addendum.md](./adr/0076-macos-ordinary-proposal-only-addendum.md) | Deroga candidata Mac per quattro proposte ordinarie, senza apply o persistenza document-derived. | Per verificare l’eccezione Mac circoscritta, senza estenderla ai client mobili o alle scritture cliniche. |
+
+## Verifica formale circoscritta
+
+| File | Scopo | Quando consultarlo |
+| --- | --- | --- |
+| [Cambio stato terapia](./formal/therapy-status/README.md) | Statechart, modello finito TLC, controesempi, comando e collegamento ai test reali. | Quando cambia il controller Web, il registro dei tentativi o la CAS terapia. |

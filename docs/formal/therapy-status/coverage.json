@@ -1,0 +1,55 @@
+{
+  "syncCommit": "dc9bcbf12cdd990b34676e3136be4cf412a3cd16",
+  "tool": {
+    "release": "v1.7.4",
+    "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
+    "sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+    "verifier": {
+      "name": "TLC",
+      "version": "2.19",
+      "buildDate": "2024-08-08",
+      "revision": "5a47802"
+    },
+    "sha1": "bee4a54f3ee3d4afc347c3240ec2d9e93b075104"
+  },
+  "bounds": {
+    "clients": 2,
+    "attemptsTotalIncludingFailedAdmission": 2,
+    "therapy": 1,
+    "patient": 1,
+    "archive": 1,
+    "targets": [
+      "suspended",
+      "completed"
+    ],
+    "initialStatus": "active",
+    "serverVersionMax": 5,
+    "workers": 1,
+    "heapMiB": 512,
+    "timeoutSecondsPerProcess": 300,
+    "fingerprintPolynomialIndex": 37,
+    "clientSymmetry": true
+  },
+  "files": {
+    "lib/therapy-status-confirmation.ts": "33eebc3197e988f3f1c134f1ac8499da1de95171e21d0ac7e3396c2a202c6486",
+    "components/therapy-manager.tsx": "a3b09a4b79ff72a78169c4540b2ac122eca809123f0e6c8e3e4097f01db0f417",
+    "lib/db.ts": "8d04d071d6a7b41e35d71823f34409f83fb2657d0b13cad84700428535b68423",
+    "lib/security/client-auth-api.ts": "17ece5579f18496dc6dcbca8c7d4340441b453aa517e7250b169ae2d68aae2a0",
+    "lib/therapy-write-operation.ts": "51893e79ab167926bf286136779e4c94e587aedbc9dd04ce200152fcd19b5a00",
+    "app/api/therapies/[id]/route.ts": "3f4765cd55a13360965fae38bced33cec5cc69403dd0bbfd6d67417c5c40e4e2",
+    "app/api/therapies/route.ts": "e13c48abb76cb0461eb1a9c1f23cf8724ec9cf34d32a7bd54909e58d4e251dac",
+    "lib/locked-field-guard.ts": "8b5d037d1967e1c9ccb08d617fba9cdffa15eee0b9773ed048319b93bcd155a5"
+  },
+  "verificationInputs": [
+    "docs/formal/therapy-status/",
+    "scripts/verify-therapy-status.mjs",
+    "scripts/run-strip-types.mjs",
+    "scripts/register-strip-types-loader.mjs",
+    "lib/therapy-status-confirmation.test.ts",
+    "lib/therapy-required-audit.test.ts",
+    "package.json",
+    "package-lock.json",
+    ".nvmrc",
+    ".github/workflows/web-core.yml"
+  ]
+}
