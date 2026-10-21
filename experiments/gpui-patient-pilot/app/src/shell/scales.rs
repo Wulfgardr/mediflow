@@ -260,6 +260,158 @@ mod tests {
     }
 
     #[gpui::test]
+    fn threshold_scale_retry_commands_fit_and_menu_is_keyboard_operable(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        cx.update(bind_keys);
+        let host = SyntheticHost::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        enter_scales(&view, &host, cx);
+        prepare(&view, cx);
+        host.next_write.store(403, Ordering::Release);
+        view.update(cx, |app, cx| app.confirm_scale(cx));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| app.reread_scale(cx));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert!(
+                app.form
+                    .as_ref()
+                    .unwrap()
+                    .scale
+                    .as_ref()
+                    .unwrap()
+                    .retry_ready()
+            );
+            app.text_scale = 4.;
+            cx.notify();
+        });
+        cx.simulate_resize(gpui::size(px(390.), px(700.)));
+        for _ in 0..8 {
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+                window.simulate_next_frame(cx);
+            });
+            cx.run_until_parked();
+        }
+        let bar = cx.debug_bounds("threshold-bar").unwrap();
+        let content = cx.debug_bounds("threshold-scroll").unwrap();
+        assert!(
+            bar.top() >= px(0.) && bar.bottom() <= px(700.),
+            "bar={bar:?} content={content:?}"
+        );
+        assert!(content.size.height > px(0.) && content.bottom() <= bar.top());
+        for id in ["clinical-workspace-reconcile", "threshold-other-actions"] {
+            let command = cx.debug_bounds(id).expect("rendered command");
+            assert!(
+                command.top() >= bar.top()
+                    && command.bottom() <= bar.bottom()
+                    && command.left() >= px(0.)
+                    && command.right() <= px(390.)
+            );
+        }
+        view.read_with(cx, |app, _| {
+            assert_eq!(app.threshold_mode.get(), ThresholdMode::Compact)
+        });
+        assert!(
+            cx.debug_bounds("clinical-scale-review-retry").is_none(),
+            "secondary action only in menu"
+        );
+        cx.update(|window, cx| {
+            let focus = view.read(cx).form_actions[7].focus.clone();
+            window.focus(&focus, cx)
+        });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        cx.simulate_keystrokes("tab");
+        cx.update(|window, cx| {
+            assert!(
+                view.read(cx).threshold_menu_focus.is_focused(window),
+                "Tab reaches Altre azioni"
+            )
+        });
+        cx.simulate_keystrokes("enter");
+        cx.simulate_event(gpui::KeyUpEvent {
+            keystroke: gpui::Keystroke::parse("enter").unwrap(),
+        });
+        cx.run_until_parked();
+        for _ in 0..4 {
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+            cx.run_until_parked();
+        }
+        let menu = cx
+            .debug_bounds("threshold-other-actions-menu")
+            .expect("keyboard opens menu");
+        assert!(menu.top() >= px(0.) && menu.bottom() <= px(700.));
+        let minimum = view.read_with(cx, |app, _| {
+            px(app.theme.role(TypeRole::Strong).line_height + 16.)
+        });
+        for id in [
+            "clinical-workspace-copy-draft",
+            "clinical-scale-close-draft",
+            "clinical-scale-review-retry",
+        ] {
+            let item = cx.debug_bounds(id).expect("secondary command in menu");
+            assert!(
+                item.size.height >= minimum,
+                "menu must not shrink text into overlapping rows: {item:?}"
+            );
+        }
+        for _ in 0..2 {
+            cx.simulate_keystrokes("tab");
+            for _ in 0..4 {
+                cx.update(|window, cx| {
+                    window.refresh();
+                    window.draw(cx).clear(cx);
+                    window.simulate_next_frame(cx);
+                });
+                cx.run_until_parked();
+            }
+        }
+        cx.update(|window, cx| {
+            assert!(
+                view.read(cx).threshold_menu_targets[2]
+                    .focus
+                    .is_focused(window),
+                "Tab reaches retry"
+            )
+        });
+        let retry = cx.debug_bounds("clinical-scale-review-retry").unwrap();
+        assert!(
+            retry.top() >= menu.top() && retry.bottom() <= menu.bottom(),
+            "menu scroll reveals focused action: {retry:?} in {menu:?}"
+        );
+        cx.simulate_keystrokes("escape");
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            assert!(!view.read(cx).threshold_menu_open.get());
+            assert!(view.read(cx).threshold_menu_focus.is_focused(window));
+            {
+                let focus = view.read(cx).form_actions[7].focus.clone();
+                window.focus(&focus, cx)
+            };
+        });
+        let before = host.requests.lock().unwrap().len();
+        cx.simulate_keystrokes("enter");
+        cx.simulate_event(gpui::KeyUpEvent {
+            keystroke: gpui::Keystroke::parse("enter").unwrap(),
+        });
+        cx.run_until_parked();
+        assert!(
+            host.requests.lock().unwrap().len() > before,
+            "primary activation rereads"
+        );
+        assert_eq!(host.writes().len(), 1, "no second write");
+    }
+
+    #[gpui::test]
     fn scales_gpui_two_gestures_denial_reconcile_and_explicit_identical_retry_use_real_transport(
         cx: &mut gpui::TestAppContext,
     ) {
