@@ -106,6 +106,17 @@ pub fn tab(id: &'static str, label: &'static str, selected: bool, theme: Theme) 
 /// leaves a direct Text child at intrinsic width, clipping enlarged labels.
 fn control_label(label: SharedString) -> Div {
     div()
+        .map(|el| {
+            #[cfg(test)]
+            {
+                let label = label.clone();
+                el.debug_selector(move || format!("control-label:{label}"))
+            }
+            #[cfg(not(test))]
+            {
+                el
+            }
+        })
         .flex_auto()
         .min_w_0()
         .max_w_full()

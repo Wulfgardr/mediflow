@@ -291,11 +291,135 @@ comandi.
 | Stato | Aspetto | Titolo | Dettaglio | Comandi |
 | --- | --- | --- | --- | --- |
 | Bozza | Fondo del piano | Bozza non registrata | N elementi pronti per la scheda di Nome. Se c'è una proposta: Una proposta a matita resta fuori finché non la accetti. | Registra N elementi |
-| Conferma | Soglia scura | Registrare nella scheda di Nome, età anni? | Conteggio per tipo. La scrittura è unica: o tutto o niente. | Torna alla bozza, Conferma e registra |
+| Conferma | Soglia scura | Registrare N elementi nella scheda di Nome Cognome? | Conteggio per tipo. La scrittura è unica: o tutto o niente. | Torna alla bozza, Conferma e registra |
 | In corso | Fondo del piano | Registrazione in corso | Attendi la conferma prima di chiudere. | Comando disattivato |
 | Registrata | Fondo del piano, punto che si posa | Registrata il giorno alle ora | N elementi scritti e tracciati a nome di Autore. | Torna alla scheda |
 | Non registrata | Fondo del piano, ✕ critico | Non registrata. Nulla è stato scritto. | La causa. La bozza è intatta: rileggi la scheda e riprova. | Rileggi la scheda, Riprova |
 | In ascolto | Fondo del piano, punto vuoto che respira | In ascolto mm:ss | Ferma l'ascolto prima di registrare. | Registra disattivato |
+
+#### Testo ingrandito e finestre basse
+
+La soglia resta ancorata in fondo al piano a ogni scala di testo: scorre
+il contenuto sopra di essa. La domanda di Conferma conserva il proprio
+piano intero quando necessario; negli stati non distruttivi vale la
+priorità descritta sotto. Se l'altezza della soglia completa, misurata dal layout
+alla larghezza disponibile, supera **un terzo dell'altezza del piano**, si
+usa la **forma compatta**. Il valore esattamente pari a un terzo conserva
+la forma completa: non esiste una soglia fissa di zoom.
+
+La domanda di conferma è «Registrare N elementi nella scheda di Nome
+Cognome?». Per un solo elemento indica il tipo: «Registrare 1 terapia nella
+scheda di Moretti Elena?». Il titolo va a capo, di norma entro due righe;
+a 390 px con testo al 400% si conserva tutto il testo anche oltre due
+righe, senza troncare il destinatario né ridurre il carattere. Il punto
+interrogativo resta unito all’ultima parola, anche nelle domande della
+nuova anagrafica e delle Scale. I comandi
+mantengono lo stesso ordine di lettura: «Torna alla bozza», poi «Conferma
+e registra». Se non entrano sulla stessa riga si impilano a tutta larghezza.
+Nessun comando essenziale richiede scorrimento orizzontale. Nella forma
+compatta il dettaglio passa in coda al contenuto scorrevole, subito prima
+della barra; l'ordine di lettura e di Tab prosegue così nella soglia.
+
+Questa regola vale per Bozza, Conferma, In corso, Registrata, Non registrata
+e In ascolto: ogni stato conserva titolo e comandi. Durante la registrazione
+lo stato resta visibile. Un elemento del contenuto che riceve il fuoco viene
+portato nel viewport sopra la barra, senza sovrapposizioni.
+
+Negli stati non distruttivi, quando la compatta non entra, **solo il
+comando principale resta fisso in fondo**, senza compressione o troncamento.
+Il contenuto sopra conserva almeno una riga alla scala corrente, arrotondata
+per eccesso al pixel. La barra occupa al massimo lo spazio residuo. Tutto
+il resto è in **un'unica regione scorrevole sopra il principale**: titolo
+e stato, «Altre azioni» con il suo menu, poi il dettaglio. Il dettaglio non
+viene duplicato nel contenuto. Nella compatta ampia i comandi restano
+invece affiancati quando entrano.
+
+L'ordine di lettura e di Tab è **contenuto → regione (titolo e stato) →
+«Altre azioni» → principale**. La regione è un bersaglio di fuoco con
+nome accessibile formato da titolo e stato, per esempio «Scale, Incerta»;
+il nome resta disponibile anche quando il testo è fuori dal viewport.
+Con il fuoco sulla regione, le frecce scorrono di una riga, PagSu/PagGiù
+di un viewport, Home/Fine raggiungono gli estremi. `reveal_focused` porta
+«Altre azioni» in vista al passaggio del fuoco; se il comando supera il
+viewport della regione ne allinea l'inizio, lasciando il resto scorribile.
+Invio o Spazio aprono il menu, confinato ai bordi della finestra; Esc lo
+chiude, restituisce il fuoco a «Altre azioni» e la porta di nuovo in vista.
+Nel recupero Scale il principale è «Rileggi e verifica»; copia, chiusura e
+l'eventuale revisione dello stesso invio restano nel menu. Il piano intero
+resta riservato alla Conferma.
+
+**Vincolo sulle etichette del principale.** Il limite di **3 righe** è un
+vincolo di contenuto, verificato dal test
+`threshold_all_primary_labels_fit_three_lines_in_minimum_shell`. Il test
+enumera il catalogo `PRIMARY_LABELS` usato dalla produzione, senza ricopiare
+le etichette, e verifica nella shell il principale focalizzato, la riga di
+contenuto e il budget non negativo per la regione per tutti gli stati non
+distruttivi che usano quei comandi. Quando la regione è presente ne verifica
+anche la geometria effettiva. Una nuova etichetta entra automaticamente
+nella verifica. Se supera tre righe, **va accorciata**: il principale non si
+comprime, non si tronca e non scorre. Non è previsto un adattamento a runtime
+per etichette che violano questo vincolo.
+
+**Limite geometrico.** Alla finestra minima nativa **390×640**, fino al
+**400%**, con corpo base **14 px** (Linux/Windows) o **16 px** (macOS), il
+principale più lungo richiede al massimo **3 righe**: «Registra 1 elemento»
+e «Rileggi e verifica» raggiungono questo massimo a entrambe le metriche;
+«Rileggi la scheda» richiede due righe a corpo 14 px e tre a corpo 16 px.
+«Prepara e rivedi» e «Copia bozza» richiedono due righe.
+La larghezza del comando è 358 px, quella del testo almeno 330 px
+con bordo di fuoco. A corpo 16 px/400% l'interlinea è 96 px e il principale
+richiede al massimo **3 × 96 + 16 di padding + 4 di bordo = 308 px**.
+La navigazione lascia un piano di almeno **510 px**; una riga di contenuto
+richiede 96 px e la barra aggiunge 25 px di padding/bordo e 8 px di intervallo.
+Restano **510 − 96 − 308 − 25 − 8 = 73 px** per la regione, quindi nessuna
+uscita dalla finestra. A corpo 14 px il piano è 522 px e il residuo minimo
+è **522 − 84 − 272 − 25 − 8 = 133 px**. Senza bordo di fuoco i residui sono
+rispettivamente 75 e 135 px. Questo limite include tutte le etichette
+principali attuali e le metriche dichiarate; quattro righe al caso peggiore
+richiederebbero 533 px e supererebbero il piano di 23 px. Titolo, stato,
+menu e dettaglio non hanno un limite di righe: oltre lo spazio residuo
+scorrono nella regione, senza ampliare la barra né uscire dalla finestra.
+Le prove deterministiche sulla shell completa riproducono entrambe le
+metriche; non sostituiscono un'esecuzione nativa su Linux o Windows.
+
+**Soglia a piano intero.** Durante la Conferma, se anche la domanda e i
+comandi della forma compatta superano l'altezza del piano, la soglia
+occupa l'intero piano in un'unica regione scorrevole. La scheda resta
+dietro e non è visibile né raggiungibile con Tab. L'ordine è **domanda
+completa → comandi → dettaglio**. Il dettaglio lungo non separa domanda
+e decisione. All'apertura il fuoco va alla domanda e lo scorrimento parte
+dall'alto. Seguono «Torna alla bozza» e «Conferma e registra» nell'ordine
+di Tab e di lettura; Esc torna alla bozza da tutta la regione. Il nome
+accessibile del comando principale include il destinatario, ad esempio
+«Conferma e registra nella scheda di Moretti Elena»; l'etichetta visibile
+resta «Conferma e registra».
+
+Solo nel piano intero, dove il contenuto della scheda è nascosto, il
+dettaglio è «Per rivedere il contenuto torna alla bozza. La registrazione
+sarà confermata soltanto dopo la rilettura.» Nel confronto delle note
+lo precede l'avviso «La tua bozza sostituirà il testo registrato ora.»
+Nella forma completa e in
+quella compatta resta «Controlla il contenuto qui sopra. La registrazione
+sarà confermata soltanto dopo la rilettura.»
+
+La protezione consiste nel leggere prima la domanda con il destinatario
+e nel mantenere adiacenti i comandi, anche quando si scorre. Non richiede
+visibilità simultanea della domanda e del comando, né disabilitazioni
+legate alla posizione di scorrimento. Questa eccezione riguarda solo la
+Conferma: gli altri stati mantengono la soglia compatta ancorata.
+
+Esempio: in un piano 390 × 700 con testo realmente al 400%, «Registrare
+1 terapia nella scheda di Moretti Elena?» apre la soglia a piano intero.
+Si legge la domanda, si raggiungono i due comandi e infine il dettaglio;
+Esc permette di ritornare alla terapia in bozza. In un piano più alto,
+se domanda e comandi entrano, resta invece la barra compatta ancorata.
+
+I **320 px sono un requisito del Web**. Il client nativo GPUI mantiene
+la larghezza minima della finestra a **390 px**. Il banco illustra gli
+stati del linguaggio; la sua simulazione non certifica il comportamento
+del Web o del client nativo. Il client GPUI corrente registra un solo
+elemento per operazione e non implementa l'ascolto; i conteggi multipli
+e In ascolto restano nel contratto comune senza introdurre nuove scritture.
 
 #### Conflitto: rileggere senza perdere la bozza
 
