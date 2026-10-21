@@ -1,0 +1,79 @@
+name: FHIR R4 Web Gate
+
+on:
+  pull_request:
+    paths:
+      - 'lib/fhir/**'
+      - 'contracts/fhir/**'
+      - 'scripts/fhir-*'
+      - 'scripts/validate-fhir-r4.mjs'
+      - 'scripts/verify-fhir-validator-cache*'
+      - 'scripts/run-strip-types.mjs'
+      - 'scripts/register-strip-types-loader.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/fhir-r4.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/fhir/**'
+      - 'contracts/fhir/**'
+      - 'scripts/fhir-*'
+      - 'scripts/validate-fhir-r4.mjs'
+      - 'scripts/verify-fhir-validator-cache*'
+      - 'scripts/run-strip-types.mjs'
+      - 'scripts/register-strip-types-loader.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/fhir-r4.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fhir-r4-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/native/MediFlowMac/Tests/MediFlowCoreTests/Fixtures/medical_fixture.db
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/mediflow-fhir-validator/artifacts
+          key: ${{ runner.os }}-fhir-validator-${{ hashFiles('contracts/fhir/validator-lock.v1.json') }}
+      - run: npm ci
+      - name: Gate, outcome and mapper corpus tests
+        run: |
+          export MEDIFLOW_DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/fhir-test.XXXXXX")"
+          npm run test:fhir-r4
+      - name: Official offline validator and six required falsifications
+        run: npm run check:fhir-r4 -- --falsify
+      - name: Publish timing and semantic summary
+        if: always()
+        run: |
+          for report in tmp-fhir-r4-*/report.txt; do
+            if test -f "$report"; then
+              cat "$report" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+      - name: Retain synthetic corpus, OperationOutcomes, logs and reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: fhir-r4-web-${{ github.sha }}
+          path: tmp-fhir-r4-*/
+          if-no-files-found: error
+          retention-days: 14
