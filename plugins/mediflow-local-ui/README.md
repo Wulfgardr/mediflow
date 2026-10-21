@@ -87,3 +87,30 @@ non crea broker residente e termina soltanto i figli posseduti. Rimuovere questo
 pacchetto non elimina archivio o chiavi. Aggiornamento/rimozione e qualifica
 clinica completa restano risultati separati, WUL-758/WUL-738. Il prototipo
 `mediflow-synthetic` rimane indipendente e contiene soltanto esempi inventati.
+
+### Nomi tool nel client Claude Code
+
+Nel server MCP l'identità resta `mediflow.local_ui.navigate.v1`. Claude Code
+2.1.306 normalizza il nome esposto all'agente con underscore. In una
+configurazione MCP di sessione con server `mediflow-local-ui`, l'allowlist usa
+esattamente `mcp__mediflow-local-ui__mediflow_local_ui_navigate_v1`, non il
+nome con i punti. Il file di sessione deve usare Node e launcher assoluti,
+senza placeholder riservati al caricamento del plugin:
+
+```json
+{"mcpServers":{"mediflow-local-ui":{"type":"stdio","command":"/percorso/node24.21.0","args":["/percorso/plugin-pronto/src/launch.mjs"]}}}
+```
+
+```sh
+claude --print --no-session-persistence --setting-sources '' --tools '' \
+  --strict-mcp-config --mcp-config /percorso/sessione-mcp.json \
+  --allowedTools mcp__mediflow-local-ui__mediflow_local_ui_navigate_v1 \
+  'Chiama soltanto il tool MediFlow con intent search e riporta lo stato tecnico.'
+```
+
+Questo è uno smoke del raccordo MCP, distinto dal caricamento del plugin.
+La validazione del manifest non prova l'invocazione dell'agente. Un limite
+`429 usage_limit_reached` interrompe la qualifica: non autorizza cambi di
+account, overage, pagamenti o nuovi tentativi automatici. Lo stato locale del
+client può aggiornarsi anche con impostazioni caricate solo per la sessione;
+non ripristinare file globali sopra lavoro concorrente.
