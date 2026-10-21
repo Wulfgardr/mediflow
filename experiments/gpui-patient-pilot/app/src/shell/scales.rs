@@ -1581,21 +1581,13 @@ impl ClinicalApp {
                 .child(text!(format!("Lingua: {} · Traduzione: {}", scale.descriptor.use_contract.language, scale.descriptor.use_contract.translation)))
                 .child(text!(format!("Limiti di revisione indicati dall’host: {}", scale.descriptor.use_contract.review_gap))))
             .when(!self.can_write(FormKind::Scale), |el| el.child(notice("clinical-scale-write-capability", "Per registrare la valutazione serve l’abilitazione alla scrittura del Diario sull’host.", theme, false)));
-        div()
+        let content = div()
             .id("clinical-scale-workspace")
             .w_full()
-            .flex_1()
-            .min_h_0()
             .min_w_0()
             .flex()
             .flex_col()
             .bg(theme.paper)
-            // With magnified text the message and threshold may together be
-            // taller than the viewport. Keep them in the same scroll/focus
-            // context as the questions, rather than reserving fixed height.
-            .when(layout.magnified, |el| {
-                el.track_scroll(&self.profile_scroll).overflow_y_scroll()
-            })
             .when(layout.magnified && self.message.is_some(), |el| {
                 let (message, error) = self.message.clone().unwrap_or_default();
                 el.child(
@@ -1606,13 +1598,6 @@ impl ClinicalApp {
                 div()
                     .id("clinical-scale-workspace-scroll")
                     .min_w_0()
-                    .when(!layout.magnified, |el| {
-                        el.track_scroll(&self.profile_scroll)
-                            .flex_1()
-                            .min_h_0()
-                            .overflow_y_scroll()
-                    })
-                    .when(layout.magnified, |el| el.flex_shrink_0())
                     .p(px(layout.margin))
                     .child(
                         div()
@@ -1631,7 +1616,7 @@ impl ClinicalApp {
                                     .child(result),
                             ),
                     ),
-            )
-            .child(self.threshold(layout, cx))
+            );
+        self.confirmation_plane("clinical-scale-plane", content, layout, cx)
     }
 }

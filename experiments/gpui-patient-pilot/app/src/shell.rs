@@ -40,7 +40,10 @@ use crate::components::{
 use crate::documents::{self, Upload};
 use crate::editing;
 use crate::icons::{Icon, icon};
-use crate::navigation::{Area, Layout, PatientSection, adjacent_patient};
+use crate::navigation::{
+    Area, CONFIRMATION_COMMANDS, Layout, PatientSection, ThresholdLayout, ThresholdMode,
+    adjacent_patient, confirmation_command_label, confirmation_question,
+};
 use crate::patient_forms;
 use crate::references::{ReferenceKind, ReferenceRows};
 use crate::text_input::{InputChanged, TextInput};
@@ -271,15 +274,15 @@ impl FormKind {
     }
     fn noun(self) -> &'static str {
         match self {
-            Self::Notes => "le note",
-            Self::Entry => "una voce di diario",
-            Self::Scale => "la valutazione",
-            Self::Therapy => "una terapia",
-            Self::Observation => "un parametro",
-            Self::Document => "un documento",
-            Self::Checkup => "un controllo",
-            Self::PatientNew => "una nuova scheda",
-            Self::PatientProfile => "l'anagrafica",
+            Self::Notes => "nota",
+            Self::Entry => "voce di diario",
+            Self::Scale => "valutazione",
+            Self::Therapy => "terapia",
+            Self::Observation => "parametro",
+            Self::Document => "documento",
+            Self::Checkup => "controllo",
+            Self::PatientNew => "nuova scheda",
+            Self::PatientProfile => "anagrafica",
         }
     }
 }
@@ -415,6 +418,8 @@ pub struct ClinicalApp {
     theme: Theme,
     focus: FocusHandle,
     review_focus: FocusHandle,
+    threshold_question: ScrollTarget,
+    threshold_mode: std::rc::Rc<std::cell::Cell<ThresholdMode>>,
     form_actions: [ScrollTarget; 8],
     focus_after_render: bool,
     focus_search_after_render: bool,
@@ -635,6 +640,8 @@ impl ClinicalApp {
             theme,
             focus: cx.focus_handle(),
             review_focus,
+            threshold_question: ScrollTarget::new(&profile_scroll, cx),
+            threshold_mode: std::rc::Rc::new(std::cell::Cell::new(ThresholdMode::Complete)),
             form_actions,
             focus_after_render: false,
             focus_search_after_render: false,
@@ -1296,6 +1303,14 @@ impl ClinicalApp {
     }
 
     fn reveal_focused(&self, window: &mut Window, cx: &mut App) {
+        if self.threshold_mode.get() == ThresholdMode::FullPlane {
+            if !self.threshold_question.reveal_if_focused(window, cx) {
+                self.form_actions
+                    .iter()
+                    .any(|target| target.reveal_if_focused(window, cx));
+            }
+            return;
+        }
         let reveal_fields = |fields: &[Field], window: &mut Window, cx: &mut App| {
             fields
                 .iter()
@@ -2004,9 +2019,7 @@ impl ClinicalApp {
         self.close_drug_search(cx);
         self.form.as_mut().expect("reviewed form").state = FormState::Review;
         self.message = None;
-        if Layout::for_window(f32::from(window.viewport_size().width), self.text_scale).magnified {
-            self.profile_scroll.scroll_to_bottom();
-        }
+        self.threshold_mode.set(ThresholdMode::Complete);
         window.focus(&self.review_focus, cx);
         cx.notify();
     }
@@ -2667,6 +2680,7 @@ impl ClinicalApp {
             .child(
                 div()
                     .id(SharedString::from(format!("{id}-scroll-target")))
+                    .debug_selector(move || format!("{id}-scroll-target"))
                     .when_some(field.scroll_target.as_ref(), |el, target| {
                         el.anchor_scroll(Some(target.anchor.clone()))
                     })
@@ -3208,17 +3222,11 @@ impl ClinicalApp {
         let theme = self.theme;
         let mut pane = div()
             .id("clinical-workspace-profile-page")
-            .flex_1()
-            .min_h_0()
             .min_w_0()
             .flex()
             .flex_col()
             .bg(theme.paper)
-            .rounded(px(theme.paper_radius))
-            .when(!layout.magnified, |el| el.overflow_hidden())
-            .when(layout.magnified, |el| {
-                el.track_scroll(&self.profile_scroll).overflow_y_scroll()
-            });
+            .rounded(px(theme.paper_radius));
         let Some(patient) = self.patient.detail.ready() else {
             return pane.child(
                 div()
@@ -3454,13 +3462,6 @@ impl ClinicalApp {
         let mut content = div()
             .id("clinical-workspace-profile-scroll")
             .min_w_0()
-            .when(!layout.magnified, |el| {
-                el.track_scroll(&self.profile_scroll)
-                    .flex_1()
-                    .min_h_0()
-                    .overflow_y_scroll()
-            })
-            .when(layout.magnified, |el| el.flex_shrink_0())
             .p(px(layout.margin));
         if self.form.is_some() {
             content = content.child(
@@ -3490,7 +3491,12 @@ impl ClinicalApp {
                 PatientSection::Checkups => content.child(self.checkups_view(cx)),
             };
         }
-        pane.child(content).child(self.threshold(layout, cx))
+        self.confirmation_plane(
+            "clinical-workspace-profile-plane",
+            pane.child(content),
+            layout,
+            cx,
+        )
     }
 
     fn overview(&self, patient: &PatientDetail, cx: &Context<Self>) -> Div {
@@ -4303,10 +4309,212 @@ impl ClinicalApp {
         subject
     }
 
-    fn threshold(&self, layout: Layout, cx: &Context<Self>) -> Stateful<Div> {
+    fn threshold_detail(&self, _cx: &Context<Self>) -> gpui::AnyElement {
+        let patient = self
+            .patient
+            .detail
+            .ready()
+            .map(PatientDetail::display_name)
+            .unwrap_or_default();
+        let detail = if self.discard.is_some() {
+            if self
+                .form
+                .as_ref()
+                .and_then(|form| form.scale.as_ref())
+                .is_some_and(ScaleAssessment::has_attempt)
+            {
+                "Un invio potrebbe essere già registrato. La chiusura non annulla una voce nel Diario; copia la bozza e verifica il suo identificativo prima di un nuovo inserimento.".into()
+            } else {
+                "Il testo non registrato verrà eliminato da questa finestra.".into()
+            }
+        } else if let Some(form) = &self.form {
+            if form
+                .scale
+                .as_ref()
+                .is_some_and(ScaleAssessment::is_preparing)
+            {
+                "Le risposte restano una bozza. Nessuna registrazione è in corso.".into()
+            } else {
+                match form.state {
+                FormState::Draft => self.form_subject(form,&patient),
+                FormState::Review if form.kind == FormKind::Notes && self.core.has_notes_comparison() => self.form_subject(form,&patient),
+                FormState::Review => "Controlla il contenuto qui sopra. La registrazione sarà confermata soltanto dopo la rilettura.".into(),
+                FormState::Saving => "La bozza resta visibile fino alla verifica. Non inviare di nuovo.".into(),
+                FormState::Conflict | FormState::Uncertain if form.kind == FormKind::Notes => {
+                    let state=ViewState::new(ReadObject::Scheda,if form.state==FormState::Conflict {ViewStateKind::Conflitto}else{ViewStateKind::EsitoDaVerificare});
+                    let (first,second)=state.lines();
+                    format!("{first} {}",second.unwrap_or_default())
+                }
+                _ if form.kind == FormKind::Scale => "La rilettura non invia la valutazione. Le risposte restano in questa finestra fino alla verifica o alla chiusura esplicita.".into(),
+                _ => "La bozza è conservata. Copia il testo se vuoi conservarlo, poi rileggi la scheda prima di una nuova modifica.".into(),
+            }
+            }
+        } else {
+            self.verified.clone().unwrap_or_else(|| {
+                if self
+                    .patient
+                    .detail
+                    .ready()
+                    .is_some_and(|patient| patient.is_archived)
+                {
+                    "Scheda archiviata · sola lettura".into()
+                } else {
+                    "Scheda letta dall'archivio · nessuna bozza aperta".into()
+                }
+            })
+        };
+        div()
+            .id("clinical-workspace-threshold-detail")
+            .debug_selector(|| "threshold-detail".into())
+            .min_w_0()
+            .type_role(self.theme, TypeRole::Meta)
+            .child(text!(detail))
+            .into_any_element()
+    }
+
+    fn confirmation_plane(
+        &self,
+        id: &'static str,
+        content: impl IntoElement,
+        layout: Layout,
+        cx: &Context<Self>,
+    ) -> Stateful<Div> {
+        use gpui::{AvailableSpace, canvas, size};
+        let mut measure = self
+            .threshold(layout, ThresholdMode::Complete, cx)
+            .into_any_element();
+        let mut measure_essential = self
+            .threshold(layout, ThresholdMode::Compact, cx)
+            .into_any_element();
+        let complete = self
+            .threshold(layout, ThresholdMode::Complete, cx)
+            .into_any_element();
+        let compact = self
+            .threshold(layout, ThresholdMode::Compact, cx)
+            .into_any_element();
+        let full_plane = self
+            .threshold(layout, ThresholdMode::FullPlane, cx)
+            .into_any_element();
+        let confirming = self
+            .form
+            .as_ref()
+            .is_some_and(|form| form.state == FormState::Review)
+            && self.discard.is_none();
+        let detail = self.threshold_detail(cx);
+        let content = content.into_any_element();
+        let scroll = self.profile_scroll.clone();
+        let mode = self.threshold_mode.clone();
+        let question_focus = self.threshold_question.focus.clone();
         let theme = self.theme;
+        div()
+            .id(id)
+            .flex_1()
+            .min_h_0()
+            .min_w_0()
+            .bg(theme.paper)
+            .overflow_hidden()
+            .on_action(cx.listener(|this, _: &NextFocus, window, cx| {
+                if this.threshold_mode.get() == ThresholdMode::FullPlane {
+                    window.focus_next(cx);
+                    this.reveal_focused(window, cx);
+                    cx.stop_propagation();
+                }
+            }))
+            .on_action(cx.listener(|this, _: &PreviousFocus, window, cx| {
+                if this.threshold_mode.get() == ThresholdMode::FullPlane {
+                    window.focus_prev(cx);
+                    this.reveal_focused(window, cx);
+                    cx.stop_propagation();
+                }
+            }))
+            .on_action(cx.listener(|this, _: &Escape, window, cx| {
+                if this.threshold_mode.get() == ThresholdMode::FullPlane {
+                    this.cancel_review(window, cx);
+                    cx.stop_propagation();
+                }
+            }))
+            .child(
+                canvas(
+                    move |bounds, window, cx| {
+                        let available = size(
+                            AvailableSpace::Definite(bounds.size.width),
+                            AvailableSpace::MaxContent,
+                        );
+                        let measured = measure.layout_as_root(available, window, cx);
+                        let essential = measure_essential.layout_as_root(available, window, cx);
+                        let decision = ThresholdLayout::measured(
+                            f32::from(bounds.size.height),
+                            f32::from(measured.height),
+                            f32::from(essential.height),
+                            confirming,
+                            layout,
+                        );
+                        if mode.replace(decision.mode) != decision.mode
+                            && decision.mode == ThresholdMode::FullPlane
+                        {
+                            scroll.set_offset(gpui::point(px(0.), px(0.)));
+                            window.focus(&question_focus, cx);
+                        }
+                        let mut plane = if decision.mode == ThresholdMode::FullPlane {
+                            div()
+                                .id("clinical-workspace-plane-scroll")
+                                .debug_selector(|| "threshold-full-plane".into())
+                                .size_full()
+                                .min_w_0()
+                                .track_scroll(&scroll)
+                                .overflow_y_scroll()
+                                .child(full_plane)
+                                .into_any_element()
+                        } else {
+                            let threshold = if decision.mode == ThresholdMode::Compact {
+                                compact
+                            } else {
+                                complete
+                            };
+                            let mut scrolling = div()
+                                .id("clinical-workspace-plane-scroll")
+                                .debug_selector(|| "threshold-scroll".into())
+                                .track_scroll(&scroll)
+                                .flex_1()
+                                .min_h_0()
+                                .min_w_0()
+                                .overflow_y_scroll()
+                                .child(content)
+                                .when(decision.mode == ThresholdMode::Compact, |el| {
+                                    el.child(div().p(px(layout.margin)).child(detail))
+                                });
+                            let mut plane = div().size_full().flex().flex_col().min_w_0();
+                            if decision.scrolls_with_content {
+                                scrolling = scrolling.child(threshold);
+                                plane = plane.child(scrolling);
+                            } else {
+                                plane = plane.child(scrolling).child(threshold);
+                            }
+                            plane.into_any_element()
+                        };
+                        plane.layout_as_root(
+                            size(
+                                AvailableSpace::Definite(bounds.size.width),
+                                AvailableSpace::Definite(bounds.size.height),
+                            ),
+                            window,
+                            cx,
+                        );
+                        plane.prepaint_at(bounds.origin, window, cx);
+                        plane
+                    },
+                    |_, mut plane, window, cx| plane.paint(window, cx),
+                )
+                .size_full(),
+            )
+    }
+
+    fn threshold(&self, layout: Layout, mode: ThresholdMode, cx: &Context<Self>) -> Stateful<Div> {
+        let theme = self.theme;
+        let compact = mode != ThresholdMode::Complete;
         let mut threshold = div()
             .id("clinical-workspace-save-threshold")
+            .debug_selector(|| "threshold-bar".into())
             .accessibility_id("clinical-workspace-save-threshold")
             .role(Role::Region)
             .aria_label("Stato della scrittura")
@@ -4324,10 +4532,10 @@ impl ClinicalApp {
         if let Some(action) = self.discard {
             return threshold.bg(theme.draft)
                 .child(div().id("clinical-workspace-discard-question").accessibility_id("clinical-workspace-discard-question").role(Role::AlertDialog).aria_label("Scartare la bozza?")
-                    .child(text!(if self.form.as_ref().and_then(|form| form.scale.as_ref()).is_some_and(ScaleAssessment::has_attempt) {
+                    .child(text!(if compact { "Scartare la bozza?" } else if self.form.as_ref().and_then(|form| form.scale.as_ref()).is_some_and(ScaleAssessment::has_attempt) {
                         "Chiudere la bozza? Un invio potrebbe essere già registrato. La chiusura non annulla una voce nel Diario; copia la bozza e verifica il suo identificativo prima di un nuovo inserimento."
                     } else { "Scartare la bozza? Il testo non registrato verrà eliminato da questa finestra." })))
-                .child(div().flex().flex_wrap().gap(px(8.))
+                .child(div().flex().flex_wrap().gap(px(8.)).when(layout.compact, |el| el.w_full().flex_col().items_stretch())
                     .child(self.form_actions[4].attach(button("clinical-workspace-keep-draft", "Conserva la bozza", theme, true, true))
                         .on_click(cx.listener(|this, _, _, cx| { this.discard = None; cx.notify(); })))
                     .child(self.form_actions[5].attach(button("clinical-workspace-discard-draft", "Scarta e rileggi", theme, false, true))
@@ -4348,18 +4556,26 @@ impl ClinicalApp {
                             .min_w_0()
                             .type_role(theme, TypeRole::Meta)
                             .text_color(theme.secondary)
-                            .child(text!(self.verified.clone().unwrap_or_else(|| {
-                                if self
-                                    .patient
-                                    .detail
-                                    .ready()
-                                    .is_some_and(|patient| patient.is_archived)
-                                {
-                                    "Scheda archiviata · sola lettura".into()
+                            .child(text!(if compact {
+                                if self.verified.is_some() {
+                                    "Registrata".into()
                                 } else {
-                                    "Scheda letta dall'archivio · nessuna bozza aperta".into()
+                                    "Scheda letta".into()
                                 }
-                            }))),
+                            } else {
+                                self.verified.clone().unwrap_or_else(|| {
+                                    if self
+                                        .patient
+                                        .detail
+                                        .ready()
+                                        .is_some_and(|patient| patient.is_archived)
+                                    {
+                                        "Scheda archiviata · sola lettura".into()
+                                    } else {
+                                        "Scheda letta dall'archivio · nessuna bozza aperta".into()
+                                    }
+                                })
+                            })),
                     )
                     .when(layout.compact, |el| {
                         el.child(
@@ -4386,9 +4602,7 @@ impl ClinicalApp {
                         .role(Role::Status)
                         .child(text!("Preparazione della valutazione nell’archivio…")),
                 )
-                .child(text!(
-                    "Le risposte restano una bozza. Nessuna registrazione è in corso."
-                ));
+                .when(!compact, |el| el.child(self.threshold_detail(cx)));
         }
         let review_enabled = form.scale.as_ref().is_none_or(ScaleAssessment::can_prepare);
         let repeated_scale = form
@@ -4409,77 +4623,337 @@ impl ClinicalApp {
                 .map(PatientDetail::display_name)
                 .unwrap_or_default()
         };
-        let comparison = form.kind == FormKind::Notes && self.core.has_notes_comparison();
         let subject = self.form_subject(form, &patient_name);
         match form.state {
-            FormState::Draft => threshold.bg(theme.draft).border_color(theme.draft_rule)
-                .child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
-                    .when(layout.compact && form.kind == FormKind::Notes, |el| el.flex_col().items_stretch())
-                    .child(div().flex_1().min_w_0().flex().flex_col().gap(px(4.))
-                        .child(writing_status("clinical-workspace-writing-status", WritingInk::Fresh, WritingSurface::Plane, theme))
-                        .child(div().type_role(theme, TypeRole::Meta).child(text!(subject))))
-                    .child(div().flex().flex_wrap().gap(px(8.))
-                        .child(self.form_actions[0].attach(button("clinical-workspace-cancel-form", if form.kind == FormKind::Notes { "Scarta la bozza" } else { "Scarta…" }, theme, false, true))
-                            .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Form, cx))))
-                        .child(self.form_actions[1].attach_enabled(button("clinical-workspace-review-save", if form.kind == FormKind::Scale { "Prepara e rivedi" } else { "Registra 1 elemento" }, theme, true, review_enabled), review_enabled)
-                            .when(review_enabled, |el| el.on_click(cx.listener(|this, _, window, cx| this.review_form(window, cx))))))),
-            FormState::Review => threshold.bg(theme.threshold).text_color(theme.threshold_text)
-                .child(div().type_role(theme, TypeRole::Threshold).child(text!(if repeated_scale { format!("Ripetere l’invio della stessa valutazione per {patient_name}?") } else if form.kind == FormKind::PatientNew { format!("Creare la scheda di {patient_name} nell'ambulatorio selezionato?") } else { format!("Registrare {} nella scheda di {}?", if form.edit.is_some() { "le modifiche" } else { form.kind.noun() }, patient_name) })))
-                .child(div().type_role(theme, TypeRole::Meta).child(text!(if comparison { subject } else { "Controlla il contenuto qui sopra. La registrazione sarà confermata soltanto dopo la rilettura.".into() })))
-                .child(div().flex().flex_wrap().gap(px(8.))
-                    .child(self.form_actions[2].attach(button("clinical-workspace-cancel-review", if repeated_scale { "Continua la verifica" } else { "Torna alla bozza" }, theme, false, true))
-                        .on_click(cx.listener(|this, _, window, cx| this.cancel_review(window, cx))))
-                    .child(self.form_actions[3].attach(button("clinical-workspace-confirm-save", "Conferma e registra", theme, true, true).debug_selector(|| "clinical-workspace-confirm-save".into()))
-                        .on_click(cx.listener(|this, _, _, cx| this.confirm_form(cx))))),
-            FormState::Saving => threshold.bg(theme.draft)
-                .child(div().id("clinical-workspace-saving-status").accessibility_id("clinical-workspace-saving-status").role(Role::Status).aria_label("Registrazione e rilettura in corso")
-                    .child(text!(if form.kind == FormKind::Notes && self.core.phase() == mediflow_patient_client::Phase::Recovering { "Rilettura della scheda… La bozza resta intatta." } else if form.scale.as_ref().is_some_and(ScaleAssessment::is_reading) { "Rilettura della voce e verifica del contesto in corso…" } else { "Registrazione e rilettura in corso…" })))
-                .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
-                    .child(text!("La bozza resta visibile fino alla verifica. Non inviare di nuovo."))),
+            FormState::Draft => threshold
+                .bg(theme.draft)
+                .border_color(theme.draft_rule)
+                .child(
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .items_center()
+                        .justify_between()
+                        .gap(px(12.))
+                        .when(layout.compact && form.kind == FormKind::Notes, |el| {
+                            el.flex_col().items_stretch()
+                        })
+                        .when(compact, |el| el.flex_col().items_stretch())
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .flex()
+                                .flex_col()
+                                .gap(px(4.))
+                                .child(writing_status(
+                                    "clinical-workspace-writing-status",
+                                    WritingInk::Fresh,
+                                    WritingSurface::Plane,
+                                    theme,
+                                ))
+                                .when(!compact, |el| {
+                                    el.child(
+                                        div()
+                                            .type_role(theme, TypeRole::Meta)
+                                            .child(text!(subject)),
+                                    )
+                                }),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .flex_wrap()
+                                .gap(px(8.))
+                                .when(layout.compact, |el| el.w_full().flex_col().items_stretch())
+                                .child(
+                                    self.form_actions[0]
+                                        .attach(button(
+                                            "clinical-workspace-cancel-form",
+                                            if form.kind == FormKind::Notes {
+                                                "Scarta la bozza"
+                                            } else {
+                                                "Scarta…"
+                                            },
+                                            theme,
+                                            false,
+                                            true,
+                                        ))
+                                        .on_click(cx.listener(|this, _, _, cx| {
+                                            this.request_discard(Discard::Form, cx)
+                                        })),
+                                )
+                                .child(
+                                    self.form_actions[1]
+                                        .attach_enabled(
+                                            button(
+                                                "clinical-workspace-review-save",
+                                                if form.kind == FormKind::Scale {
+                                                    "Prepara e rivedi"
+                                                } else {
+                                                    "Registra 1 elemento"
+                                                },
+                                                theme,
+                                                true,
+                                                review_enabled,
+                                            ),
+                                            review_enabled,
+                                        )
+                                        .when(review_enabled, |el| {
+                                            el.on_click(cx.listener(|this, _, window, cx| {
+                                                this.review_form(window, cx)
+                                            }))
+                                        }),
+                                ),
+                        ),
+                ),
+            FormState::Review => threshold
+                .bg(theme.threshold)
+                .text_color(theme.threshold_text)
+                .child(self.threshold_question.attach_enabled(div().id("clinical-workspace-confirm-question").debug_selector(|| "threshold-question".into()).role(Role::Heading).type_role(theme, TypeRole::Threshold).child(text!(
+                    if repeated_scale {
+                        format!("Ripetere l’invio della stessa valutazione per {patient_name}?")
+                    } else if form.kind == FormKind::PatientNew {
+                        format!("Creare la scheda di {patient_name} nell'ambulatorio selezionato?")
+                    } else {
+                        confirmation_question(
+                            1,
+                            if form.edit.is_some() {
+                                "modifica"
+                            } else {
+                                form.kind.noun()
+                            },
+                            &patient_name,
+                        )
+                    }
+                )), mode == ThresholdMode::FullPlane))
+                .when(!compact, |el| el.child(self.threshold_detail(cx)))
+                .child(
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .gap(px(8.))
+                        .when(layout.compact, |el| el.w_full().flex_col().items_stretch())
+                        .child(
+                            self.form_actions[2]
+                                .attach(button(
+                                    "clinical-workspace-cancel-review",
+                                    if repeated_scale {
+                                        "Continua la verifica"
+                                    } else {
+                                        CONFIRMATION_COMMANDS[0]
+                                    },
+                                    theme,
+                                    false,
+                                    true,
+                                ))
+                                .debug_selector(|| "threshold-back".into())
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.cancel_review(window, cx)
+                                })),
+                        )
+                        .child(
+                            self.form_actions[3]
+                                .attach(
+                                    button(
+                                        "clinical-workspace-confirm-save",
+                                        CONFIRMATION_COMMANDS[1],
+                                        theme,
+                                        true,
+                                        true,
+                                    )
+                                    .debug_selector(|| "clinical-workspace-confirm-save".into())
+                                    .aria_label(confirmation_command_label(&patient_name)),
+                                )
+                                .on_click(cx.listener(|this, _, _, cx| this.confirm_form(cx))),
+                        ),
+                ).when(mode == ThresholdMode::FullPlane, |el| el.child(self.threshold_detail(cx))),
+            FormState::Saving => threshold
+                .bg(theme.draft)
+                .child(
+                    div()
+                        .id("clinical-workspace-saving-status")
+                        .accessibility_id("clinical-workspace-saving-status")
+                        .role(Role::Status)
+                        .aria_label("Registrazione e rilettura in corso")
+                        .child(text!(if form.kind == FormKind::Notes
+                            && self.core.phase() == mediflow_patient_client::Phase::Recovering
+                        {
+                            "Rilettura della scheda… La bozza resta intatta."
+                        } else if form.scale.as_ref().is_some_and(ScaleAssessment::is_reading) {
+                            "Rilettura della voce e verifica del contesto in corso…"
+                        } else {
+                            "Registrazione e rilettura in corso…"
+                        })),
+                )
+                .when(!compact, |el| el.child(self.threshold_detail(cx))),
             FormState::Conflict | FormState::Uncertain | FormState::Rejected => {
-                if form.kind == FormKind::Notes && form.state == FormState::Rejected
+                if form.kind == FormKind::Notes
+                    && form.state == FormState::Rejected
                     && self.core.phase() == mediflow_patient_client::Phase::Locked
-                    && self.patient.detail.ready().is_some_and(|patient| patient.is_archived || patient.deleted_at.is_some())
+                    && self
+                        .patient
+                        .detail
+                        .ready()
+                        .is_some_and(|patient| patient.is_archived || patient.deleted_at.is_some())
                 {
                     let copy_label = "Copia la bozza";
                     let discard_label = "Scarta la bozza";
                     return threshold.bg(theme.draft)
-                        .child(notice("clinical-notes-readonly", "La scheda non è più modificabile. La bozza resta disponibile per la copia o lo scarto.", theme, true))
-                        .child(div().flex().flex_wrap().gap(px(8.))
+                        .child(notice("clinical-notes-readonly", if compact { "Scheda non modificabile" } else { "La scheda non è più modificabile. La bozza resta disponibile per la copia o lo scarto." }, theme, true))
+                        .child(div().flex().flex_wrap().gap(px(8.)).when(layout.compact, |el| el.w_full().flex_col().items_stretch())
                             .child(self.form_actions[6].attach(button("clinical-workspace-copy-draft", copy_label, theme, false, true).debug_selector(|| copy_label.into()))
                                 .on_click(cx.listener(|this, _, _, cx| this.copy_draft(cx))))
                             .child(self.form_actions[0].attach(button("clinical-notes-discard", discard_label, theme, false, true).debug_selector(|| discard_label.into()))
                                 .on_click(cx.listener(|this, _, _, cx| this.finish_discard(Discard::Form, cx)))));
                 }
                 if form.kind == FormKind::Notes && form.state != FormState::Rejected {
-                    let kind = if form.state == FormState::Conflict { ViewStateKind::Conflitto } else { ViewStateKind::EsitoDaVerificare };
-                    return threshold.child(ViewState::new(ReadObject::Scheda, kind).render(
-                        "clinical-notes-recovery", theme, &self.form_actions[7].focus,
-                        cx.listener(|this, _, _, cx| this.reread_notes(cx)),
-                    ))
-                    .child(div().flex().flex_wrap().gap(px(8.))
-                        .child(self.form_actions[6].attach(button("clinical-workspace-copy-draft", "Copia bozza", theme, false, true))
-                            .on_click(cx.listener(|this, _, _, cx| this.copy_draft(cx))))
-                        .child(self.form_actions[0].attach(button("clinical-notes-discard", "Scarta la bozza", theme, false, true))
-                            .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Form, cx)))));
+                    let kind = if form.state == FormState::Conflict {
+                        ViewStateKind::Conflitto
+                    } else {
+                        ViewStateKind::EsitoDaVerificare
+                    };
+                    return threshold
+                        .when(compact, |el| el.child(div().id("clinical-notes-recovery-status").role(Role::Status).type_role(theme,TypeRole::Strong).child(text!(if form.state==FormState::Conflict {"Scheda cambiata"}else{"Esito da verificare"})))
+                            .child(self.form_actions[7].attach(button("clinical-notes-recovery-command",if form.state==FormState::Conflict {"Rileggi la scheda"}else{"Rileggi e verifica"},theme,false,true).debug_selector(||"clinical-notes-recovery-command".into()))
+                                .on_click(cx.listener(|this,_,_,cx|this.reread_notes(cx)))))
+                        .when(!compact,|el| el.child(ViewState::new(ReadObject::Scheda, kind).render(
+                            "clinical-notes-recovery",
+                            theme,
+                            &self.form_actions[7].focus,
+                            cx.listener(|this, _, _, cx| this.reread_notes(cx)),
+                        )))
+                        .child(
+                            div()
+                                .flex()
+                                .flex_wrap()
+                                .gap(px(8.))
+                                .when(layout.compact, |el| el.w_full().flex_col().items_stretch())
+                                .child(
+                                    self.form_actions[6]
+                                        .attach(button(
+                                            "clinical-workspace-copy-draft",
+                                            "Copia bozza",
+                                            theme,
+                                            false,
+                                            true,
+                                        ))
+                                        .on_click(
+                                            cx.listener(|this, _, _, cx| this.copy_draft(cx)),
+                                        ),
+                                )
+                                .child(
+                                    self.form_actions[0]
+                                        .attach(button(
+                                            "clinical-notes-discard",
+                                            "Scarta la bozza",
+                                            theme,
+                                            false,
+                                            true,
+                                        ))
+                                        .on_click(cx.listener(|this, _, _, cx| {
+                                            this.request_discard(Discard::Form, cx)
+                                        })),
+                                ),
+                        );
                 }
-                let label = if form.kind == FormKind::Scale && !repeated_scale { "Valutazione da rivedere. Le risposte sono conservate." } else { match form.state {
-                    FormState::Conflict => "La scheda è cambiata. La bozza è conservata.",
-                    FormState::Rejected => "La registrazione è stata rifiutata. La bozza è conservata.",
-                    _ => "Esito da verificare. La bozza è conservata.",
-                }};
-                threshold.bg(theme.draft).child(div().id("clinical-workspace-save-uncertain").accessibility_id("clinical-workspace-save-uncertain").role(Role::Alert).aria_label(label).child(text!(label)))
-                    .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
-                        .child(text!(if form.kind == FormKind::Scale { "La rilettura non invia la valutazione. Le risposte restano in questa finestra fino alla verifica o alla chiusura esplicita." } else { "Copia il testo se vuoi conservarlo, poi rileggi la scheda prima di una nuova modifica." })))
-                    .child(div().flex().flex_wrap().gap(px(8.))
-                        .child(self.form_actions[6].attach(button("clinical-workspace-copy-draft", "Copia bozza", theme, false, true))
-                            .on_click(cx.listener(|this, _, _, cx| this.copy_draft(cx))))
-                        .child(self.form_actions[7].attach(button("clinical-workspace-reconcile", if form.kind == FormKind::Scale { "Rileggi e verifica" } else { "Rileggi scheda…" }, theme, true, true).debug_selector(|| "clinical-workspace-reconcile".into()))
-                            .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Reload, cx))))
-                        .when(form.kind == FormKind::Scale, |el| el.child(self.form_actions[0].attach(button("clinical-scale-close-draft", "Chiudi bozza…", theme, false, true))
-                            .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Form, cx)))))
-                        .when(form.scale.as_ref().is_some_and(ScaleAssessment::retry_ready), |el| el.child(self.form_actions[1].attach(button("clinical-scale-review-retry", "Rivedi lo stesso invio", theme, false, true))
-                            .on_click(cx.listener(|this, _, _, cx| this.review_scale_retry(cx))))))
+                let label = if compact {
+                    match form.state {FormState::Conflict => "Scheda cambiata",FormState::Rejected=>"Non registrata",_=>"Esito da verificare"}
+                } else if form.kind == FormKind::Scale && !repeated_scale {
+                    "Valutazione da rivedere. Le risposte sono conservate."
+                } else {
+                    match form.state {
+                        FormState::Conflict => "La scheda è cambiata. La bozza è conservata.",
+                        FormState::Rejected => {
+                            "La registrazione è stata rifiutata. La bozza è conservata."
+                        }
+                        _ => "Esito da verificare. La bozza è conservata.",
+                    }
+                };
+                threshold
+                    .bg(theme.draft)
+                    .child(
+                        div()
+                            .id("clinical-workspace-save-uncertain")
+                            .accessibility_id("clinical-workspace-save-uncertain")
+                            .role(Role::Alert)
+                            .aria_label(label)
+                            .child(text!(label)),
+                    )
+                    .when(!compact, |el| el.child(self.threshold_detail(cx)))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_wrap()
+                            .gap(px(8.))
+                            .when(layout.compact, |el| el.w_full().flex_col().items_stretch())
+                            .child(
+                                self.form_actions[6]
+                                    .attach(button(
+                                        "clinical-workspace-copy-draft",
+                                        "Copia bozza",
+                                        theme,
+                                        false,
+                                        true,
+                                    ))
+                                    .on_click(cx.listener(|this, _, _, cx| this.copy_draft(cx))),
+                            )
+                            .child(
+                                self.form_actions[7]
+                                    .attach(
+                                        button(
+                                            "clinical-workspace-reconcile",
+                                            if form.kind == FormKind::Scale {
+                                                "Rileggi e verifica"
+                                            } else {
+                                                "Rileggi scheda…"
+                                            },
+                                            theme,
+                                            true,
+                                            true,
+                                        )
+                                        .debug_selector(|| "clinical-workspace-reconcile".into()),
+                                    )
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.request_discard(Discard::Reload, cx)
+                                    })),
+                            )
+                            .when(form.kind == FormKind::Scale, |el| {
+                                el.child(
+                                    self.form_actions[0]
+                                        .attach(button(
+                                            "clinical-scale-close-draft",
+                                            "Chiudi bozza…",
+                                            theme,
+                                            false,
+                                            true,
+                                        ))
+                                        .on_click(cx.listener(|this, _, _, cx| {
+                                            this.request_discard(Discard::Form, cx)
+                                        })),
+                                )
+                            })
+                            .when(
+                                form.scale
+                                    .as_ref()
+                                    .is_some_and(ScaleAssessment::retry_ready),
+                                |el| {
+                                    el.child(
+                                        self.form_actions[1]
+                                            .attach(button(
+                                                "clinical-scale-review-retry",
+                                                "Rivedi lo stesso invio",
+                                                theme,
+                                                false,
+                                                true,
+                                            ))
+                                            .on_click(cx.listener(|this, _, _, cx| {
+                                                this.review_scale_retry(cx)
+                                            })),
+                                    )
+                                },
+                            ),
+                    )
             }
         }
     }
@@ -5566,19 +6040,13 @@ impl ClinicalApp {
             .find(|row| self.scope.as_deref() == Some(&row.id))
             .map(|row| row.name.clone())
             .unwrap_or_else(|| "Ambulatorio non disponibile".into());
-        div()
+        let content = div()
             .id("clinical-workspace-new-patient-page")
             .min_w_0()
-            .min_h_0()
-            .flex_1()
             .flex()
             .flex_col()
             .bg(theme.paper)
             .rounded(px(theme.paper_radius))
-            .when(layout.magnified, |el| {
-                el.track_scroll(&self.profile_scroll).overflow_y_scroll()
-            })
-            .when(!layout.magnified, |el| el.overflow_hidden())
             .child(
                 div()
                     .flex_shrink_0()
@@ -5604,16 +6072,9 @@ impl ClinicalApp {
                     .id("clinical-workspace-new-patient-scroll")
                     .min_w_0()
                     .p(px(layout.margin))
-                    .when(!layout.magnified, |el| {
-                        el.track_scroll(&self.profile_scroll)
-                            .flex_1()
-                            .min_h_0()
-                            .overflow_y_scroll()
-                    })
-                    .when(layout.magnified, |el| el.flex_shrink_0())
                     .child(div().max_w(px(760.)).child(self.form_view(cx))),
-            )
-            .child(self.threshold(layout, cx))
+            );
+        self.confirmation_plane("clinical-workspace-new-patient-plane", content, layout, cx)
     }
 }
 
@@ -7142,5 +7603,239 @@ mod tests {
             // The recovery subscription has no animation/frame polling work.
             assert_eq!(window.simulate_next_frame(cx), 0);
         });
+    }
+    struct ThresholdTestPlane {
+        app: Entity<ClinicalApp>,
+    }
+    impl Render for ThresholdTestPlane {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            self.app.update(cx, |app, cx| {
+                let layout =
+                    Layout::for_window(f32::from(window.viewport_size().width), app.text_scale);
+                div()
+                    .size_full()
+                    .flex()
+                    .flex_col()
+                    .type_role(app.theme, TypeRole::Body)
+                    .text_color(app.theme.ink)
+                    .child(app.profile_view(layout, cx))
+            })
+        }
+    }
+
+    #[gpui::test]
+    fn threshold_render_keeps_question_commands_and_focused_content_in_their_regions(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        cx.update(bind_keys);
+        let (root, cx) = cx.add_window_view(|window, cx| {
+            let app = cx.new(|cx| ClinicalApp::new(String::new(), window, cx));
+            app.update(cx, |app, cx| {
+                let patient = serde_json::from_value(serde_json::json!({"id":"synthetic", "firstName":"Moretti", "lastName":"Elena", "taxCode":"SYNTHETIC", "notes":"", "version":1})).unwrap();
+                app.install_patient(patient);
+                let field = Field::new("threshold-fixture-notes", "Note", &"Testo sintetico lungo. ".repeat(180), true, false, app.theme, cx);
+                app.form = Some(Form {kind:FormKind::Notes, fields:vec![field], upload:None, edit:None, patient_original:None, created_id:None, therapy:None, scale:None, state:FormState::Review, _subscriptions:vec![]});
+            });
+            ThresholdTestPlane { app }
+        });
+        let app = root.read_with(cx, |root, _| root.app.clone());
+        for width in [390., 768., 1440.] {
+            for scale in [1., 2., 4.] {
+                cx.simulate_resize(gpui::size(px(width), px(700.)));
+                app.update(cx, |app, cx| {
+                    app.threshold_mode.set(ThresholdMode::Complete);
+                    app.text_scale = scale;
+                    app.theme = Theme::for_dark(false).sized(scale, false);
+                    app.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
+                    cx.notify();
+                });
+                render_clinical_window(cx);
+                let bar = cx.debug_bounds("threshold-bar").unwrap();
+                let confirm = cx.debug_bounds("clinical-workspace-confirm-save").unwrap();
+                let question = cx.debug_bounds("threshold-question").unwrap();
+                let back = cx.debug_bounds("threshold-back").unwrap();
+                assert!(
+                    question.bottom() <= back.top(),
+                    "question before commands {width}/{scale}"
+                );
+                assert!(
+                    back.top() <= confirm.top(),
+                    "stable command order {width}/{scale}"
+                );
+                let full = app.read_with(cx, |app, _| {
+                    app.threshold_mode.get() == ThresholdMode::FullPlane
+                });
+                if full {
+                    assert_eq!(
+                        cx.debug_bounds("threshold-full-plane").unwrap().size.height,
+                        px(700.)
+                    );
+                    assert!(
+                        cx.debug_bounds("threshold-scroll").is_none(),
+                        "patient content hidden"
+                    );
+                    let detail = cx.debug_bounds("threshold-detail").unwrap();
+                    assert!(
+                        confirm.bottom() <= detail.top(),
+                        "commands before detail {width}/{scale}"
+                    );
+                    cx.update(|window, cx| {
+                        assert!(
+                            app.read(cx).threshold_question.focus.is_focused(window),
+                            "initial focus on question {width}/{scale}"
+                        )
+                    });
+                    cx.simulate_keystrokes("tab");
+                    render_clinical_window(cx);
+                    cx.update(|window, cx| {
+                        assert!(
+                            app.read(cx).form_actions[2].focus.is_focused(window),
+                            "question -> back"
+                        )
+                    });
+                    cx.simulate_keystrokes("tab");
+                    render_clinical_window(cx);
+                    cx.update(|window, cx| {
+                        assert!(
+                            app.read(cx).form_actions[3].focus.is_focused(window),
+                            "back -> confirm"
+                        )
+                    });
+                    let reached = cx.debug_bounds("clinical-workspace-confirm-save").unwrap();
+                    assert!(
+                        reached.top() >= px(0.) && reached.bottom() <= px(700.1),
+                        "confirm reached by Tab: {reached:?}"
+                    );
+                } else {
+                    let scroll = cx.debug_bounds("threshold-scroll").unwrap();
+                    assert_eq!(bar.bottom(), px(700.));
+                    assert!(scroll.size.height > px(0.));
+                    assert!(
+                        bar.bottom() <= px(700.1) && bar.top() >= px(0.),
+                        "anchored bar {width}/{scale}: {bar:?}"
+                    );
+                    assert!(scroll.bottom() <= bar.top(), "no overlap {width}/{scale}");
+                    assert!(
+                        confirm.bottom() <= px(700.1) && confirm.right() <= px(width + 0.1),
+                        "command visible {width}/{scale}"
+                    );
+                    app.read_with(cx, |app, _| {
+                        app.profile_scroll
+                            .set_offset(gpui::point(px(0.), px(-100000.)))
+                    });
+                    render_clinical_window(cx);
+                    assert_eq!(
+                        cx.debug_bounds("threshold-bar").unwrap(),
+                        bar,
+                        "bar must not scroll {width}/{scale}"
+                    );
+                }
+            }
+        }
+        cx.simulate_resize(gpui::size(px(390.), px(700.)));
+        app.update(cx, |app, cx| {
+            app.text_scale = 4.;
+            app.theme = Theme::for_dark(false).sized(4., false);
+            cx.notify();
+        });
+        render_clinical_window(cx);
+        cx.simulate_keystrokes("escape");
+        render_clinical_window(cx);
+        app.read_with(cx, |app, _| {
+            assert!(
+                app.form.as_ref().unwrap().state == FormState::Draft,
+                "Esc returns to draft"
+            )
+        });
+        let scroll = cx.debug_bounds("threshold-scroll").unwrap();
+        let bar = cx.debug_bounds("threshold-bar").unwrap();
+        assert!(
+            scroll.bottom() <= bar.top(),
+            "draft content viewport excludes bar"
+        );
+    }
+    #[gpui::test]
+    fn threshold_non_destructive_states_keep_their_bar_above_the_fold(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (root,cx)=cx.add_window_view(|window,cx| {
+            let app=cx.new(|cx|ClinicalApp::new(String::new(),window,cx));
+            app.update(cx,|app,cx| {
+                app.install_patient(serde_json::from_value(serde_json::json!({"id":"synthetic","firstName":"Moretti","lastName":"Elena","taxCode":"SYNTHETIC","version":1})).unwrap());
+                let field=Field::new("state-fixture","Posologia","Una compressa al mattino",false,false,app.theme,cx).with_scroll(&app.profile_scroll,cx);
+                app.form=Some(Form{kind:FormKind::Therapy,fields:vec![field],upload:None,edit:None,patient_original:None,created_id:None,therapy:None,scale:None,state:FormState::Draft,_subscriptions:vec![]});
+            });
+            ThresholdTestPlane{app}
+        });
+        let app = root.read_with(cx, |root, _| root.app.clone());
+        for dark in [false, true] {
+            for (width, scale) in [(390., 4.), (768., 2.), (1440., 1.)] {
+                cx.simulate_resize(gpui::size(px(width), px(700.)));
+                for state in [
+                    FormState::Draft,
+                    FormState::Saving,
+                    FormState::Rejected,
+                    FormState::Conflict,
+                    FormState::Uncertain,
+                ] {
+                    app.update(cx, |app, cx| {
+                        app.form.as_mut().unwrap().state = state;
+                        app.text_scale = scale;
+                        app.theme = Theme::for_dark(dark).sized(scale, false);
+                        cx.notify();
+                    });
+                    render_clinical_window(cx);
+                    let bar = cx.debug_bounds("threshold-bar").unwrap();
+                    let scroll = cx.debug_bounds("threshold-scroll").unwrap();
+                    assert_eq!(bar.bottom(), px(700.));
+                    assert!(bar.top() >= px(0.) && scroll.bottom() <= bar.top());
+                    assert!(scroll.size.height > px(0.));
+                    app.read_with(cx, |app, _| {
+                        app.profile_scroll
+                            .set_offset(gpui::point(px(0.), px(-100000.)))
+                    });
+                    render_clinical_window(cx);
+                    assert_eq!(cx.debug_bounds("threshold-bar").unwrap(), bar);
+                }
+            }
+        }
+        app.update(cx, |app, cx| {
+            app.form.as_mut().unwrap().state = FormState::Draft;
+            app.text_scale = 4.;
+            app.theme = Theme::for_dark(false).sized(4., false);
+            app.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
+            cx.notify();
+        });
+        cx.simulate_resize(gpui::size(px(390.), px(700.)));
+        render_clinical_window(cx);
+        let (editor, anchor) = app.read_with(cx, |app, _| {
+            let field = &app.form.as_ref().unwrap().fields[0];
+            (
+                field.editor.clone(),
+                field.scroll_target.as_ref().unwrap().anchor.clone(),
+            )
+        });
+        cx.update_window_entity(&editor, |input, window, cx| input.focus(window, cx));
+        cx.update(|window, cx| anchor.scroll_to(window, cx));
+        render_clinical_window(cx);
+        let input = cx
+            .debug_bounds("clinical-workspace-form-field-0-scroll-target")
+            .unwrap();
+        let bar = cx.debug_bounds("threshold-bar").unwrap();
+        assert!(
+            input.top() >= px(0.) && input.bottom() <= bar.top(),
+            "focused input above bar: {input:?}, {bar:?}"
+        );
+        app.update(cx, |app, cx| {
+            app.form = None;
+            app.verified = Some("Registrazione verificata nell’archivio sintetico.".into());
+            app.text_scale = 4.;
+            app.theme = Theme::for_dark(false).sized(4., false);
+            cx.notify();
+        });
+        cx.simulate_resize(gpui::size(px(390.), px(700.)));
+        render_clinical_window(cx);
+        let bar = cx.debug_bounds("threshold-bar").unwrap();
+        assert!(bar.top() >= px(0.) && bar.bottom() == px(700.));
     }
 }
