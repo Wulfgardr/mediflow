@@ -315,19 +315,10 @@ impl ClinicalApp {
         let [min_age, max_age] = demographics.age_range;
         pane = pane
             .child(section("clinical-analytics-population", "POPOLAZIONE", theme))
-            .child(div().flex().flex_col().gap(px(6.)).child(
-                div()
-                    .font_family(VOICE)
-                    .text_size(px(theme.size(40.)))
-                    .child(text!(stats.total_in_range.to_string())),
+            .child(crate::components::number_line(
+                "clinical-analytics-population-summary", "", stats.total_in_range.to_string(),
+                &format!(" schede attive tra {min_age} e {max_age} anni"), theme,
             ))
-            .child(
-                div()
-                    .text_size(px(theme.size(18.)))
-                    .child(text!(format!(
-                        "Schede attive tra {min_age} e {max_age} anni"
-                    ))),
-            )
             .child(div().text_color(theme.secondary).child(text!(format!(
                 "{} con una data di nascita e {} senza, sull’intera popolazione attiva. Le schede senza data restano fuori dal filtro.",
                 schede(stats.with_birth_date),
@@ -710,6 +701,18 @@ mod tests {
         assert!(request.contains("\r\nx-mediflow-expected-ambulatory-id: scope-a\r\n"));
         assert!(request.contains("\r\nx-mediflow-archive-generation: synthetic-generation\r\n"));
         render_window(cx);
+        let row = cx
+            .debug_bounds("clinical-analytics-population-summary")
+            .unwrap();
+        let number = cx
+            .debug_bounds("clinical-analytics-population-summary-number")
+            .unwrap();
+        let meaning = cx
+            .debug_bounds("clinical-analytics-population-summary-meaning")
+            .unwrap();
+        assert!(number.right() <= meaning.left());
+        assert!(number.top() < meaning.bottom() && meaning.top() < number.bottom());
+        assert!(row.top() <= number.top() && row.bottom() >= meaning.bottom());
 
         host.mode.store(RESPONSE_EMPTY, Ordering::Release);
         view.update(cx, |app, cx| app.load_analytics(cx));
