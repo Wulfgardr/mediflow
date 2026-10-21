@@ -304,7 +304,15 @@ const R={
  misure(){const pa=[138,141,136,144,139,148,142];return frame(hd(`<button class="btn p">Nuova misura</button>`)+secs('misure')+`<div class="scroll"><div class="body"><div><h3>Ultime misure <span>4 tipi</span></h3><table><thead><tr><th>Misura</th><th class="r">Valore</th><th>Data</th><th class="hide2">Variazione</th></tr></thead><tbody>${P.meas.map((m,i)=>`<tr class="${i===0?'sel':''}"><td>${m[0]}</td><td class="v r num">${m[1]} <span class="c">${m[2]}</span></td><td class="c">${m[3]}</td><td class="c hide2">${stl(m[4],m[5])}</td></tr>`).join('')}</tbody></table></div>
   <div><h3>Pressione sistolica <span>ultime 7, mmHg</span></h3><div class="bars" style="margin-top:14px" role="img" aria-label="Pressione sistolica, ultime 7 misure: da 138 a 142 mmHg, massimo 148 il 6 ottobre">${pa.map((v,i)=>`<i class="${i===6?'hi':''}" style="height:${(v-120)*3}px" title="${v}"></i>`).join('')}</div><div class="c" style="display:flex;justify-content:space-between;margin-top:4px"><span>20/05</span><span>09/10</span></div><div class="kp"><div><b>142</b><span>ultima</span></div><div><b>148</b><span>massima, 06/10</span></div><div><b>135</b><span>obiettivo</span></div></div></div></div></div>`)},
  documenti(){return frame(hd(`<button class="btn p">Aggiungi documento</button>`)+secs('documenti')+`<div class="scroll"><div class="body"><div><h3>Documenti <span>3</span></h3><table><tbody>${[['Referto Holter ECG 24 h','08/10/2026','1 proposta da rivedere','pen'],['Esami ematochimici','22/09/2026','letto',''],['Lettera di dimissione, cardiologia','12/06/2026','letto','']].map((d,i)=>`<tr class="${i===0?'sel':''}"><td><button class="rowb">${d[3]?'<i class="dot pen"></i>':'<i class="nod"></i>'}${d[0]}</button></td><td class="c">${d[1]}</td><td class="hide2 ${d[3]?'pencil':''}" style="color:var(--sec)">${d[2]}</td></tr>`).join('')}</tbody></table>
-  <h3>Dal documento <span>proposte</span></h3><ul class="it" style="border-color:var(--filetto)"><li style="border-color:var(--filetto)"><i class="dot pen"></i><span class="k">Misura</span><span class="pencil">Frequenza cardiaca media 74 bpm</span><span class="mini"><button class="btn">Scarta</button><button class="btn">Porta in una voce</button></span></li></ul></div>
+  <div aria-label="Provenienza di un documento" style="margin-top:16px">
+  <div class="c" style="white-space:normal">Sintesi salvata</div>
+  <div class="c" style="white-space:normal">Fonte: Referto Holter ECG 24 h.pdf</div>
+  <div class="c" style="white-space:normal">Corrispondenza con l'originale attuale non verificata</div>
+  <h3>Sintesi salvata</h3><p>Frequenza cardiaca media 74 bpm.</p>
+  <h3>Elaborazione precedente</h3><p class="c" style="white-space:normal">Testo da OCR precedente</p>
+  <h3>Origine assente</h3><div class="c" style="white-space:normal">Testo salvato<br>Origine non indicata<br>Corrispondenza con l'originale attuale non verificata</div>
+  <h3>Fonte di altro allegato</h3><div class="c" style="white-space:normal">Testo salvato<br>Fonte di un altro allegato: non mostrata<br>Corrispondenza con l'originale attuale non verificata</div>
+  </div></div>
   <div><h3>Originale <span>pagina 1 di 2</span></h3><div class="doc" style="margin-top:12px">REFERTO HOLTER ECG 24 ORE (documento sintetico)
 Paziente: MORETTI ELENA        Data: 08/10/2026
 
