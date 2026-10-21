@@ -1,0 +1,575 @@
+{
+  "schemaVersion": 1,
+  "sourceRevision": "034aad5b9d44a5e7797f73f30754e203c3196ec8",
+  "validatorVersion": "6.9.12",
+  "review": "Proposed explicit exceptions for coordinator PR review; no automatic baseline updates",
+  "entries": [
+    {
+      "artifact": "patient-minimal",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "patient-full",
+      "severity": "warning",
+      "identifier": "Terminology_TX_Code_ValueSet_Ext",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient-3748e308*/.contact[0].relationship[0]",
+      "message": "No code provided, and a code should be provided from the value set 'Patient Contact Relationship ' (http://hl7.org/fhir/ValueSet/patient-contactrelationship|4.0.1)",
+      "count": 1,
+      "reason": "Current Web mapper preserves contact relationship or scale interpretation as text only; no equivalent code is inferred."
+    },
+    {
+      "artifact": "patient-full",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient-3748e308*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "patient-archived",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/patient-1d37d324*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "diagnosis-icd-9",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "diagnosis-icd-9",
+      "severity": "warning",
+      "identifier": "UNKNOWN_CODESYSTEM",
+      "path": "Bundle.entry[1].resource/*Condition/condition-b26e2a93-1*/.code.coding[0].system",
+      "message": "A definition for CodeSystem 'http://hl7.org/fhir/sid/icd-9' could not be found, so the code cannot be validated",
+      "count": 1,
+      "reason": "Locked offline packages cannot resolve this diagnostic code system; code validity remains unverified. Legacy ICD-9 URI correction is outside this gate."
+    },
+    {
+      "artifact": "diagnosis-icd-9",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*Condition/condition-b26e2a93-1*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "diagnosis-icd-10",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "diagnosis-icd-10",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*Condition/condition-b8fe5da0-1*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "diagnosis-icd-11",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "diagnosis-icd-11",
+      "severity": "warning",
+      "identifier": "UNKNOWN_CODESYSTEM",
+      "path": "Bundle.entry[1].resource/*Condition/condition-69da7674-1*/.code.coding[0].system",
+      "message": "A definition for CodeSystem 'http://id.who.int/icd/release/11/mms' could not be found, so the code cannot be validated",
+      "count": 1,
+      "reason": "Locked offline packages cannot resolve this diagnostic code system; code validity remains unverified. Legacy ICD-9 URI correction is outside this gate."
+    },
+    {
+      "artifact": "diagnosis-icd-11",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*Condition/condition-69da7674-1*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "diagnosis-unknown",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "diagnosis-unknown",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*Condition/condition-f051ceab-1*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "diagnosis-id",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "diagnosis-id",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*Condition/syntheticsyntheticsyntheticsyntheticsyntheticsynthetics-ab6e7f99*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "encounters",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "encounters",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*Encounter/visit-0*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "encounters",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[2].resource/*Encounter/visit-1*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "encounters",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[3].resource/*Encounter/visit-2*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-zero",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-zero",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*Encounter/scale*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-zero",
+      "severity": "warning",
+      "identifier": "All_observations_should_have_a_performer",
+      "path": "Bundle.entry[2].resource/*Observation/obs-scale*/",
+      "message": "Best Practice Recommendation: In general, all observations should have a performer",
+      "count": 1,
+      "reason": "Current Web mapper has no performer input or output for observations. No performer is invented by this gate."
+    },
+    {
+      "artifact": "scale-zero",
+      "severity": "warning",
+      "identifier": "Terminology_TX_Code_ValueSet_Ext",
+      "path": "Bundle.entry[2].resource/*Observation/obs-scale*/.interpretation[0]",
+      "message": "No code provided, and a code should be provided from the value set 'Observation Interpretation Codes' (http://hl7.org/fhir/ValueSet/observation-interpretation|4.0.1)",
+      "count": 1,
+      "reason": "Current Web mapper preserves contact relationship or scale interpretation as text only; no equivalent code is inferred."
+    },
+    {
+      "artifact": "scale-zero",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[2].resource/*Observation/obs-scale*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-integer",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-integer",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*Encounter/scale*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-integer",
+      "severity": "warning",
+      "identifier": "All_observations_should_have_a_performer",
+      "path": "Bundle.entry[2].resource/*Observation/obs-scale*/",
+      "message": "Best Practice Recommendation: In general, all observations should have a performer",
+      "count": 1,
+      "reason": "Current Web mapper has no performer input or output for observations. No performer is invented by this gate."
+    },
+    {
+      "artifact": "scale-integer",
+      "severity": "warning",
+      "identifier": "Terminology_TX_Code_ValueSet_Ext",
+      "path": "Bundle.entry[2].resource/*Observation/obs-scale*/.interpretation[0]",
+      "message": "No code provided, and a code should be provided from the value set 'Observation Interpretation Codes' (http://hl7.org/fhir/ValueSet/observation-interpretation|4.0.1)",
+      "count": 1,
+      "reason": "Current Web mapper preserves contact relationship or scale interpretation as text only; no equivalent code is inferred."
+    },
+    {
+      "artifact": "scale-integer",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[2].resource/*Observation/obs-scale*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-numeric",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-numeric",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*Encounter/scale*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-numeric",
+      "severity": "warning",
+      "identifier": "All_observations_should_have_a_performer",
+      "path": "Bundle.entry[2].resource/*Observation/obs-scale*/",
+      "message": "Best Practice Recommendation: In general, all observations should have a performer",
+      "count": 1,
+      "reason": "Current Web mapper has no performer input or output for observations. No performer is invented by this gate."
+    },
+    {
+      "artifact": "scale-numeric",
+      "severity": "warning",
+      "identifier": "Terminology_TX_Code_ValueSet_Ext",
+      "path": "Bundle.entry[2].resource/*Observation/obs-scale*/.interpretation[0]",
+      "message": "No code provided, and a code should be provided from the value set 'Observation Interpretation Codes' (http://hl7.org/fhir/ValueSet/observation-interpretation|4.0.1)",
+      "count": 1,
+      "reason": "Current Web mapper preserves contact relationship or scale interpretation as text only; no equivalent code is inferred."
+    },
+    {
+      "artifact": "scale-numeric",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[2].resource/*Observation/obs-scale*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-fraction",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-fraction",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*Encounter/scale*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-fraction",
+      "severity": "warning",
+      "identifier": "All_observations_should_have_a_performer",
+      "path": "Bundle.entry[2].resource/*Observation/obs-scale*/",
+      "message": "Best Practice Recommendation: In general, all observations should have a performer",
+      "count": 1,
+      "reason": "Current Web mapper has no performer input or output for observations. No performer is invented by this gate."
+    },
+    {
+      "artifact": "scale-fraction",
+      "severity": "warning",
+      "identifier": "Terminology_TX_Code_ValueSet_Ext",
+      "path": "Bundle.entry[2].resource/*Observation/obs-scale*/.interpretation[0]",
+      "message": "No code provided, and a code should be provided from the value set 'Observation Interpretation Codes' (http://hl7.org/fhir/ValueSet/observation-interpretation|4.0.1)",
+      "count": 1,
+      "reason": "Current Web mapper preserves contact relationship or scale interpretation as text only; no equivalent code is inferred."
+    },
+    {
+      "artifact": "scale-fraction",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[2].resource/*Observation/obs-scale*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-empty",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-empty",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*Encounter/scale*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-invalid",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-invalid",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*Encounter/scale*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-nonfinite",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "scale-nonfinite",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*Encounter/scale*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "therapy-active",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "therapy-active",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*MedicationStatement/therapy*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "therapy-suspended",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "therapy-suspended",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*MedicationStatement/therapy*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "therapy-completed",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "therapy-completed",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*MedicationStatement/therapy*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "observation-numeric",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "observation-numeric",
+      "severity": "warning",
+      "identifier": "All_observations_should_have_a_performer",
+      "path": "Bundle.entry[1].resource/*Observation/obs-structured-observation*/",
+      "message": "Best Practice Recommendation: In general, all observations should have a performer",
+      "count": 1,
+      "reason": "Current Web mapper has no performer input or output for observations. No performer is invented by this gate."
+    },
+    {
+      "artifact": "observation-numeric",
+      "severity": "warning",
+      "identifier": "Error_validating_code_running_without_terminology_services",
+      "path": "Bundle.entry[1].resource/*Observation/obs-structured-observation*/.value.ofType(Quantity)",
+      "message": "Unable to validate code '%' in system 'http://unitsofmeasure.org' because the validator is running without terminology services",
+      "count": 1,
+      "reason": "UCUM check cannot run with terminology services disabled. Unit validity is not established offline."
+    },
+    {
+      "artifact": "observation-numeric",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*Observation/obs-structured-observation*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "observation-text",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "observation-text",
+      "severity": "warning",
+      "identifier": "All_observations_should_have_a_performer",
+      "path": "Bundle.entry[1].resource/*Observation/obs-structured-observation*/",
+      "message": "Best Practice Recommendation: In general, all observations should have a performer",
+      "count": 1,
+      "reason": "Current Web mapper has no performer input or output for observations. No performer is invented by this gate."
+    },
+    {
+      "artifact": "observation-text",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*Observation/obs-structured-observation*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "observation-zero",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[0].resource/*Patient/synthetic-patient*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    },
+    {
+      "artifact": "observation-zero",
+      "severity": "warning",
+      "identifier": "All_observations_should_have_a_performer",
+      "path": "Bundle.entry[1].resource/*Observation/obs-structured-observation*/",
+      "message": "Best Practice Recommendation: In general, all observations should have a performer",
+      "count": 1,
+      "reason": "Current Web mapper has no performer input or output for observations. No performer is invented by this gate."
+    },
+    {
+      "artifact": "observation-zero",
+      "severity": "warning",
+      "identifier": "Error_validating_code_running_without_terminology_services",
+      "path": "Bundle.entry[1].resource/*Observation/obs-structured-observation*/.value.ofType(Quantity)",
+      "message": "Unable to validate code '%' in system 'http://unitsofmeasure.org' because the validator is running without terminology services",
+      "count": 1,
+      "reason": "UCUM check cannot run with terminology services disabled. Unit validity is not established offline."
+    },
+    {
+      "artifact": "observation-zero",
+      "severity": "warning",
+      "identifier": "http://hl7.org/fhir/StructureDefinition/DomainResource#dom-6",
+      "path": "Bundle.entry[1].resource/*Observation/obs-structured-observation*/",
+      "message": "Constraint failed: dom-6: 'A resource should have narrative for robust management' (defined in http://hl7.org/fhir/StructureDefinition/DomainResource) (Best Practice Recommendation)",
+      "count": 1,
+      "reason": "Current Web mapper emits no resource narrative. Frozen for the mapper correction unit; this is not a waiver for other artifacts or paths."
+    }
+  ]
+}
