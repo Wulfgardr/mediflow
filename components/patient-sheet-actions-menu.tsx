@@ -39,13 +39,28 @@ export function PatientSheetActionsMenu({ editHref, canShareFhirFile, onExportFh
     useEffect(() => {
         if (!isOpen) return;
         const candidates = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+        const position = () => {
+            const menu = menuRef.current, trigger = triggerRef.current;
+            if (!menu || !trigger) return;
+            const anchor = trigger.getBoundingClientRect();
+            const viewportWidth = document.documentElement.clientWidth;
+            menu.style.left = `${Math.max(8, Math.min(anchor.right - menu.offsetWidth, viewportWidth - menu.offsetWidth - 8))}px`;
+            menu.style.top = `${Math.max(8, Math.min(anchor.bottom + 6, window.innerHeight - menu.offsetHeight - 8))}px`;
+        };
+        position();
         (initialFocus.current === 'last' ? candidates.at(-1) : candidates[0])?.focus();
+        window.addEventListener('resize', position);
+        window.addEventListener('scroll', position, true);
         const closeOutside = (event: PointerEvent) => {
             if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
         };
         document.addEventListener('pointerdown', closeOutside);
-        return () => document.removeEventListener('pointerdown', closeOutside);
-    }, [isOpen]);
+        return () => {
+            document.removeEventListener('pointerdown', closeOutside);
+            window.removeEventListener('resize', position);
+            window.removeEventListener('scroll', position, true);
+        };
+    }, [isOpen, triggerRef]);
     const run = (action: () => void) => { close(); action(); };
     const itemClass = 'mf-popover-row';
     return <div ref={rootRef} className={styles.actionsMenu} onBlur={event => {

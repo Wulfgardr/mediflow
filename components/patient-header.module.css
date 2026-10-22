@@ -4,14 +4,13 @@
 .allergies { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 8px 0 0; list-style: none; }
 .allergy { padding: 4px 10px; border: 1px solid var(--lume-signal-warning); border-radius: 999px; color: var(--lume-ink); font: 400 0.8125rem/1.5 var(--lume-font-sans); }
 .actionsMenu { position: relative; }
-.menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; width: 240px; max-width: calc(100vw - 32px); max-height: min(440px, 70dvh); overflow-y: auto; box-sizing: border-box; }
+.menu { position: fixed; z-index: 40; width: 240px; max-width: calc(100vw - 32px); max-height: min(440px, 70dvh); overflow-y: auto; box-sizing: border-box; }
 .menu > :is(a, button) { display: flex; gap: 8px; width: 100%; min-height: 44px; text-align: left; white-space: normal; overflow-wrap: anywhere; }
 .panels { position: relative; }
 .panel { position: absolute; top: 6px; right: 0; z-index: 41; width: 352px; max-width: calc(100vw - 32px); max-height: 75dvh; overflow-y: auto; box-sizing: border-box; padding: 16px; }
 .panel[hidden] { display: none; }
 .panelTitle { margin: 0 0 12px; font: 600 0.9375rem/1.5 var(--lume-font-sans); }
 @media (max-width: 750px) {
-    .menu { right: auto; left: 0; }
     .panel { position: fixed; top: 80px; left: 16px; right: 16px; width: auto; max-height: calc(100dvh - 96px); }
     .identity h1 { font: var(--type-person-compact); }
 }
