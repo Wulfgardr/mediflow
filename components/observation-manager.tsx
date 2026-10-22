@@ -530,7 +530,7 @@ export default function ObservationManager({
                                     </tr>;
                                 })}</tbody></table>
                                 <div className={`${styles.controls} mt-3`}><button type="button" onClick={() => prefillGroup(group.code, group.unitCode)}>Registra nuova misura</button>{group.items.length > 5 && <button type="button" onClick={() => toggleFull(group.code)}>{isFull ? 'Ultime 5' : `Tutte (${group.items.length})`}</button>}</div>
-                           </>}
+                            </>}
                         </section>;
                     })}
                 </aside>

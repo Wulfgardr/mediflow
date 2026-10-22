@@ -685,7 +685,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                 {(t.motivation || t.diagnosisCode || t.atc || t.aic || t.startDate) && <Disclosure className={styles.recordDetails} title="Dettagli terapia">
                                     {t.startDate && <p>Dal {format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</p>}
                                     {t.motivation && <p>{t.motivation}</p>}{t.diagnosisCode && <p><span className="lume-code">{t.diagnosisCode}</span> {t.diagnosisName}</p>}
-                                    {(t.atc || t.aic) && <p className="lume-code">{t.atc && <>ATC {t.atc}</>}{t.aic && <>AIC {t.aic}</>}</p>}
+                                    {(t.atc || t.aic) && <p className="lume-code">{t.atc && <>ATC {t.atc} </>}{t.aic && <>AIC {t.aic}</>}</p>}
                                 </Disclosure>}
                             </td>
                             <td className="lume-registro">{t.dosage}</td>
@@ -705,7 +705,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                         </tr>)}
                     </tbody></table>
                 </section>)}
-           </>}
+            </>}
             {statusConfirmation && (
                 <div ref={statusRef} role="region" aria-label="Cambio di stato della terapia" aria-live="polite" tabIndex={-1}
                     className={`${styles.threshold} ${styles.statusThreshold}`} data-confirming={statusConfirmation.phase === 'confirm'}>
@@ -745,7 +745,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                             </InkState>
                             <p className="type-strong">{statusConfirmation.patientLabel}</p>
                             <p className="type-body">{statusConfirmation.original.drugName} · {statusConfirmation.original.dosage}</p>
-                       </>}
+                        </>}
                         {statusConfirmation.phase === 'conflict' && <p className="type-body">La terapia è stata modificata da un&apos;altra postazione. Nulla è stato scritto.</p>}
                         {statusConfirmation.phase === 'rejected' && <p className="type-body">La richiesta è stata rifiutata. Rileggi la terapia prima di scegliere una nuova azione.</p>}
                         {statusConfirmation.readFailed && <p className="type-body">Rilettura non riuscita. Il nuovo invio resta bloccato.</p>}
@@ -758,7 +758,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                         {statusConfirmation.phase === 'confirm' && <button type="button" className="ui-btn-primary" onClick={() => statusChange.confirm()}>Conferma e registra</button>}
                         {['conflict', 'rejected', 'uncertain'].includes(statusConfirmation.phase) && <button type="button" className="ui-btn-primary" disabled={statusConfirmation.writePending} onClick={() => statusChange.reread()}>{statusConfirmation.conflict ? 'Rileggi la terapia' : 'Rileggi e verifica'}</button>}
                     </div>
-                   </>}
+                    </>}
                 </div>
             )}
         </section>

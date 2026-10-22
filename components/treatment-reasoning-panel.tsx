@@ -307,7 +307,7 @@ export default function TreatmentReasoningPanel({
                     {publication.value.summary !== publication.value.data.recommendation && <>
                         <p className={design.pencil}><PrivacyBlur intensity="sm">{publication.value.summary}</PrivacyBlur></p>
                         {sourceReferences((publication.sourceBindings.find(binding => binding.claimPath === 'summary')?.evidenceRefs ?? []))}
-                   </>}
+                    </>}
                 </div>
 
                 {(publication.value.data.caveats.length > 0 || publication.value.data.safetyFlags.length > 0) && <section className={design.group}>

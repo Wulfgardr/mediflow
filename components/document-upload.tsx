@@ -302,7 +302,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                             <ul>{uploadResult.unconfirmed.map((name, index) => <li key={`${index}-${name}`}><PrivacyBlur>{name}</PrivacyBlur></li>)}</ul>
                             <p>Rileggi l’elenco prima di caricare di nuovo: un file potrebbe essere già stato salvato.</p>
                             <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={refreshAttachments} disabled={listLoading}>Rileggi elenco</button>
-                       </>}
+                        </>}
                     </div>
                 )}
                 {fileRejections.length > 0 && (
@@ -398,7 +398,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                             attachmentName={selectedAttachment.name}
                             enabled={documentSynthesisEnabled && deletingId !== selectedAttachment.id}
                         />}
-                   </>}
+                    </>}
                     {children}
                 </section>
             ) : null}

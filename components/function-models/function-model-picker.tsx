@@ -73,18 +73,18 @@ function OrdinaryFunctionControls({ client, view }: { client: ReturnType<typeof 
             {view.settings && <label><input type="checkbox" disabled={view.loading} checked={view.settings.enabled} onChange={e => void client.remote.policy(e.target.checked)} /> Consenti OpenAI su questo host (disattivato per default)</label>}
             <button type="button" disabled={view.loading} onClick={() => void client.remote.read()}>Rileggi configurazione OpenAI</button>
             {view.settings?.enabled && <p>Usa l’azione di proposta della funzione per preparare questo contesto. Nessun accesso o invio automatico.</p>}
-       </>}
+        </>}
         {phase === 'needs_consent' && view.disclosure && <>
             <p>Contesto preparato e redatto: {view.disclosure.payloadBytes} byte. Questa proposta non modifica la cartella.</p>
             <Disclosure title="Identità del contesto preparato"><code style={{ overflowWrap: 'anywhere' }}>{view.disclosure.payloadSha256}</code></Disclosure>
             <button type="button" disabled={view.loading} onClick={() => void client.remote.action('consent')}>Consenti per questo contesto</button>
-       </>}
+        </>}
         {phase === 'consented' && <button type="button" disabled={view.loading} onClick={() => void client.remote.action('login/start')}>Avvia accesso dedicato ChatGPT</button>}
         {phase === 'awaiting_login' && view.challenge && <>
             <p>Completa l’accesso sulla pagina ufficiale con il codice <strong>{view.challenge.userCode}</strong>.</p>
             <a href={view.challenge.verificationUrl} target="_blank" rel="noopener noreferrer">Apri accesso ufficiale</a>
             <button type="button" disabled={view.loading} onClick={() => void client.remote.action('login/complete')}>Ho completato: verifica accesso</button>
-       </>}
+        </>}
         {phase === 'connected' && <button type="button" disabled={view.loading} onClick={() => void client.remote.action('models')}>Leggi catalogo di questo processo</button>}
         {phase === 'ready' && view.catalog && <>
             <select disabled={view.loading} aria-label="Modello e ragionamento correnti" value={view.choice} onChange={e => client.remote.choose(e.target.value)}>
@@ -94,7 +94,7 @@ function OrdinaryFunctionControls({ client, view }: { client: ReturnType<typeof 
             <button type="button" disabled={view.loading || !view.choice} onClick={() => void client.remote.action('generate')}>Genera questa proposta</button>
             <button type="button" disabled={view.loading || !view.choice} onClick={() => void client.remote.action('preference')}>Salva modello ed effort preferiti</button>
             <p>La preferenza non conserva accesso, consenso o disponibilità del modello.</p>
-       </>}
+        </>}
         {(view.state || view.loading) && <button type="button" onClick={() => client.cancel()}>Annulla e chiudi preparazione</button>}
         {view.completed && <p>Risultato restituito alla funzione. Il processo è chiuso: una nuova proposta richiede nuova preparazione.</p>}
         {view.error && <p role="alert">{view.error}</p>}
