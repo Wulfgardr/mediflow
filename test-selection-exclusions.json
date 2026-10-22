@@ -30,6 +30,11 @@
     "owner": "@Wulfgardr"
   },
   {
+    "path": "e2e/fixtures/browser-zoom.ts",
+    "reason": "Isolated Chromium zoom helper consumed by e2e/choice-field.spec.ts; no standalone test registration.",
+    "owner": "@Wulfgardr"
+  },
+  {
     "path": "e2e/fixtures/isolated-runtime.ts",
     "reason": "WUL-729: Playwright fixture/test extension consumed by the route spec, no standalone spec.",
     "owner": "@Wulfgardr"

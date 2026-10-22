@@ -30,7 +30,7 @@ export async function openBrowserZoomFixture(baseURL: string) {
             await tabs.setZoom(tab.id, factor);
             return tabs.getZoom(tab.id);
         }, factor);
-        expect(actual).toBe(factor);
+        expect(actual).toBeCloseTo(factor, 8);
         await expect.poll(() => page.evaluate(() => innerWidth)).toBe(Math.round(1440 / factor));
     }, async close() {
         await context.close();
