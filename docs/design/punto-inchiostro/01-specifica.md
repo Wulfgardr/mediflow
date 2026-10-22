@@ -12,6 +12,8 @@ I valori sono quelli di
 Dove qui compare un numero, è lo stesso del file dei token. Le misure sono in
 px sul web e nei punti equivalenti sulle piattaforme native.
 
+Per la composizione delle viste, vedi l'[addendum compositivo](./02-addendum-composizione.md).
+
 ## Colore
 
 Due registri: Giorno (chiaro) e Grafite (scuro). Segue il sistema, salvo
