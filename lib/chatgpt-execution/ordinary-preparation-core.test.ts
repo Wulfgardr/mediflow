@@ -5,8 +5,8 @@ import { mockOrdinaryModule } from './ordinary-module.test-support.ts';
 import { profiles, configuration } from './ordinary-content.test-support.ts';
 let attempts = 0;
 mockOrdinaryModule(import.meta.url, '../ai-preparation/preparation-core', { namedExports: {
-    createContentPreparation() { attempts++; throw new Error('synthetic core refusal'); },
-    readPreparedContent() { throw new Error('synthetic core refusal'); },
+    createContentPreparation() { attempts++; throw new Error('ai_preparation_invalid'); },
+    readPreparedContent() { throw new Error('ai_preparation_invalid'); },
     isPreparedContentCurrent() { return false; },
 } });
 const { createOrdinaryPreparation } = await import('./ordinary-preparation');
