@@ -134,11 +134,13 @@ try {
     const shareMs = performance.now() - shareStart;
     const usefulMs = readyMs + shareMs;
     assert.match(await frame.locator('#status').innerText(), /condivisa/);
-    const actual = responses.find(frame => frame.result?.structuredContent)?.result.structuredContent;
+    const delivered = responses.find(frame => frame.result?.structuredContent)?.result;
+    const actual = delivered?.structuredContent;
+    assert.deepEqual(await page.evaluate(() => window['cardContexts']), [{ content: [{ type: 'text', text: delivered._meta.approvedPayload }] }], 'accepted context retains the exact broker serialization');
     assert.ok(actual, 'capture real broker result across MCP HTTP');
     assert.equal(JSON.stringify(responses).includes('IDENTIFYING_SENTINEL'), false);
     const rendered = await frame.locator('#card').textContent();
-    for (const value of [actual.pseudonym, ...actual.therapies.flatMap(t => [t.medicine, t.dose, t.frequency]), ...actual.history.flatMap(h => [h.condition, h.note, h.relativeTime, h.sourceRef]), ...actual.measures.flatMap(m => [m.kind, m.value, m.unit])]) assert.ok(rendered.includes(value), value);
+    for (const value of [actual.pseudonym, ...actual.therapies.flatMap(t => [t.medicine, t.dose, t.frequency]), ...actual.history.flatMap(h => [h.condition, h.note, h.relativeTime, h.sourceRef]), ...actual.measures.flatMap(m => [m.kind, m.value, m.unit])]) assert.ok(rendered.includes(String(value).replace(/\{\{MF_PII_[^{}]+\}\}/gu, '[omesso]')), value);
     const before = await page.evaluate(() => ({ y: scrollY, sizes: window['cardSizes'].length }));
     const detailMs = await latency(frame, page, () => frame.locator('summary').first().click());
     const themes = [];

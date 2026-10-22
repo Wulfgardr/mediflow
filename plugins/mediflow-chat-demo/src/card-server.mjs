@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { CallToolRequestSchema, ReadResourceRequestSchema, McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
@@ -6,13 +6,14 @@ import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from '@model
 import { OpenAIExtensions } from '@openai/mcp-extensions/server';
 import { z } from 'zod';
 
+export const CARD_OPEN_TOOL = 'mediflow_synthetic_card_open';
 export const CARD_TOOL = 'mediflow_synthetic_card';
 export const CARD_URI = 'ui://mediflow-synthetic-card/reader';
 export const CARD_DENIED = 'Scheda non disponibile. Apri una nuova vista e riprova.';
 /** @returns {import('@modelcontextprotocol/sdk/types.js').CallToolResult} */
 const fixed = text => ({ content: [{ type: 'text', text }] });
 const denied = () => ({ ...fixed(CARD_DENIED), isError: true });
-const argsSchema = z.object({ operation: z.enum(['prepare', 'share', 'revoke']), view: z.string().uuid(), nonce: z.string().regex(/^[a-f0-9]{64}$/).optional(), gestureProof: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict();
+const argsSchema = z.object({ operation: z.enum(['prepare', 'share', 'revoke', 'deliver']), view: z.string().uuid(), attemptId: z.string().regex(/^[a-f0-9]{64}$/).optional(), nonce: z.string().regex(/^[a-f0-9]{64}$/).optional(), gestureProof: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict();
 
 export async function createCardServer(owner) {
   const server = new McpServer({ name: 'mediflow-synthetic-card', version: '0.1.0' });
@@ -23,13 +24,24 @@ export async function createCardServer(owner) {
   const resource = () => {
     if (issued) throw new McpError(ErrorCode.InvalidParams, CARD_DENIED);
     issued = true;
-    const instanceHtml = html.replace('__CARD_VIEW__', binding.view).replace('__CARD_KEY__', binding.gestureKey);
+    const boundHtml = html.replace('__CARD_VIEW__', binding.view).replace('__CARD_KEY__', binding.gestureKey);
+    const hashes = tag => [...boundHtml.matchAll(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'g'))]
+      .map(match => `'sha256-${createHash('sha256').update(match[1]).digest('base64')}'`).join(' ');
+    const policy = `default-src 'none'; script-src ${hashes('script')}; style-src ${hashes('style')}; style-src-attr 'unsafe-inline'; font-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
+    const instanceHtml = boundHtml.replace('<head>', `<head><meta http-equiv="Content-Security-Policy" content="${policy}">`);
     return { contents: [{ uri: CARD_URI, mimeType: RESOURCE_MIME_TYPE, text: instanceHtml,
     _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] } },
       'openai/ui': { preferredDisplayMode: 'inline', availableDisplayModes: ['inline'] },
       'openai/widgetDescription': 'Scheda sintetica in sola lettura. La condivisione richiede un gesto nella vista.' } }] };
   };
   registerAppResource(server, 'synthetic-card', CARD_URI, {}, resource);
+  registerAppTool(server, CARD_OPEN_TOOL, {
+    title: 'MediFlow — apri la scheda sintetica',
+    description: 'Open the inline synthetic card consent view. Returns only constant text, with no card data. Sharing requires a trusted gesture inside the view.',
+    inputSchema: z.object({}).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    _meta: { ui: { resourceUri: CARD_URI, visibility: ['model'] } },
+  }, async () => denied());
   registerAppTool(server, CARD_TOOL, {
     title: 'MediFlow — scheda sintetica',
     description: 'Synthetic read-only card. Available only to the interactive view; never an approval command for the model.',
@@ -38,23 +50,25 @@ export async function createCardServer(owner) {
     _meta: { ui: { resourceUri: CARD_URI, visibility: ['app'] }, 'openai/ui': { entrypoints: [{ type: 'thread' }] } },
   }, async () => denied());
   server.server.setRequestHandler(CallToolRequestSchema, async request => {
-    if (request.params.name !== CARD_TOOL) return denied();
+    if (![CARD_TOOL, CARD_OPEN_TOOL].includes(request.params.name)) return denied();
     const args = request.params.arguments;
     if (args === undefined || (args && Object.keys(args).length === 0)) {
       await owner.close();
       return fixed('Apri la vista per scegliere se condividere la scheda sintetica.');
     }
+    if (request.params.name === CARD_OPEN_TOOL) return denied();
     const parsed = argsSchema.safeParse(args);
     if (!parsed.success) return denied();
     try {
-      const { operation, view, nonce, gestureProof } = parsed.data;
+      const { operation, view, nonce, gestureProof, attemptId } = parsed.data;
       if (!issued || view !== binding.view) return denied();
       if (operation === 'prepare') { const consentNonce = await owner.prepare(view); return { ...fixed('Scheda sintetica pronta per la tua scelta.'), _meta: { consentNonce } }; }
       if (operation === 'revoke') { await owner.revoke(view); return fixed('Condivisione terminata.'); }
+      if (operation === 'deliver') return { ...fixed('Consegna autorizzata.'), _meta: { attemptId: owner.deliver(view, attemptId) } };
       const expectedProof = createHmac('sha256', Buffer.from(binding.gestureKey, 'hex')).update(nonce ?? '').digest();
       if (!gestureProof || !timingSafeEqual(Buffer.from(gestureProof, 'hex'), expectedProof)) return denied();
-      const payload = owner.share(view, nonce);
-      return { ...fixed('Scheda sintetica condivisa nella vista.'), structuredContent: JSON.parse(payload) };
+      const { payload, attemptId: sharedAttempt } = owner.share(view, nonce);
+      return { ...fixed('Scheda sintetica condivisa nella vista.'), structuredContent: JSON.parse(payload), _meta: { approvedPayload: payload, attemptId: sharedAttempt } };
     } catch { return denied(); }
   });
   server.server.setRequestHandler(ReadResourceRequestSchema, async request => {

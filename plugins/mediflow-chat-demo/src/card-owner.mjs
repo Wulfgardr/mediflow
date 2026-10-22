@@ -18,7 +18,7 @@ export function createCardOwner(installation) {
     async prepare(view) {
       const retired = retire();
       const epoch = generation;
-      const attempt = { view, epoch, broker: undefined, token: undefined, digest: undefined, nonce: undefined, expires: 0, used: false };
+      const attempt = { view, epoch, broker: undefined, token: undefined, digest: undefined, nonce: undefined, expires: 0, used: false, attemptId: undefined, delivered: false };
       active = attempt;
       try {
         await retired;
@@ -42,7 +42,14 @@ export function createCardOwner(installation) {
       const consent = attempt.broker.owner.approve(attempt.token, attempt.digest);
       const payload = attempt.broker.reader.takeApprovedBytes(attempt.token, consent);
       if (active !== attempt || attempt.epoch !== generation) return fail();
-      return payload;
+      attempt.attemptId = randomBytes(32).toString('hex');
+      return { payload, attemptId: attempt.attemptId };
+    },
+    deliver(view, attemptId) {
+      const attempt = active;
+      if (!attempt || attempt.view !== view || !attemptId || attempt.attemptId !== attemptId || attempt.epoch !== generation || !attempt.used || attempt.delivered || Date.now() >= attempt.expires) return fail();
+      attempt.delivered = true;
+      return attemptId;
     },
     async revoke(view) {
       await retire();

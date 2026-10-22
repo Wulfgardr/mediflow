@@ -53,6 +53,8 @@ jobs:
       - run: npm run prepare:reference
       - run: npm run test:reference
       - run: npm run test:performance-negative
+      - run: npm run test:card-desktop
+      - run: npm run test:card-desktop-negative
       - run: npm run test:card-reference
       - run: npm run test:card-performance-negative
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

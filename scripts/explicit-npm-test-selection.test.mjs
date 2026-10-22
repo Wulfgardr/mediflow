@@ -84,6 +84,8 @@ test('chat demo selects each CI suite, including card references and the extende
     assert.ok(selection.files.length, id);
   }
   assert.ok(selections['npm:chat-demo:test'].files.includes('plugins/mediflow-chat-demo/test/card-extended-load.test.mjs'));
+  assert.deepEqual(selections['npm:chat-demo:test:card-desktop'].files, ['plugins/mediflow-chat-demo/test/card-desktop-regressions.mjs']);
+  assert.deepEqual(selections['npm:chat-demo:test:card-desktop-negative'].files, ['plugins/mediflow-chat-demo/scripts/falsify-card-desktop.mjs']);
   assert.deepEqual(selections['npm:chat-demo:test:card-reference'].files, ['plugins/mediflow-chat-demo/test/card-reference.mjs']);
   assert.deepEqual(selections['npm:chat-demo:test:card-performance-negative'].files, ['plugins/mediflow-chat-demo/scripts/falsify-card-performance.mjs']);
 });
@@ -93,7 +95,7 @@ test('chat demo rejects changed triggers, npm commands and missing card CI calls
   const packageFile = 'plugins/mediflow-chat-demo/package.json';
   const mutations = [
     { file: workflowFile, mutate: workflow => { workflow.on.pull_request.paths.pop(); }, script: 'test', error: /Required CI triggers changed/ },
-    ...['test:card-reference', 'test:card-performance-negative'].flatMap(script => [
+    ...['test:card-reference', 'test:card-performance-negative', 'test:card-desktop', 'test:card-desktop-negative'].flatMap(script => [
       { file: workflowFile, mutate: workflow => { workflow.jobs['chat-demo'].steps = workflow.jobs['chat-demo'].steps.filter(step => step.run !== `npm run ${script}`); },
         script, error: /exactly one literal CI call/ },
       { file: packageFile, mutate: pkg => { pkg.scripts[script] += ' || true'; }, script, error: /Required npm command changed/ },

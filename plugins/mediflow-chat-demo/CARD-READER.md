@@ -1,4 +1,4 @@
-# Scheda sintetica nella chat — ADR 0160, unità 2c
+# Scheda sintetica nella chat — ADR 0160, unità 2c–2d
 
 Questo entrypoint aggiuntivo usa esclusivamente `createSyntheticCardBroker`.
 Il demo originale (`src/stdio.mjs`), il suo manifest e le configurazioni esistenti
@@ -8,9 +8,12 @@ Il telecomando `mediflow-local-ui` non è coinvolto.
 
 ## Flusso e confine
 
-Un solo tool, `mediflow_synthetic_card`, con visibilità **app-only** e risorsa
-`ui://mediflow-synthetic-card/reader`. L'host deve aprire esplicitamente la vista:
-il modello non dispone di un comando di approvazione. La visibilità MCP è una
+`mediflow_synthetic_card_open` è visibile al modello e collega la risorsa
+`ui://mediflow-synthetic-card/reader` con `_meta.ui.resourceUri`: apre la carta
+inline e restituisce soltanto la frase costante «Apri la vista per scegliere se
+condividere la scheda sintetica.», senza dati. `mediflow_synthetic_card` rimane
+**app-only** per preparazione, condivisione, conferma di consegna e revoca, con ingresso app/thread
+aggiuntivo. Il modello non dispone di un comando di approvazione. La visibilità MCP è una
 funzione dell'host, non autenticazione del medico o protezione da un host ostile.
 Questa composizione sintetica non concede alcuna autorità clinica.
 
@@ -20,15 +23,59 @@ mapping, fonti locali o configurazione del runner. La preparazione restituisce
 testo fisso e una challenge casuale in `_meta`, valida 30 secondi. Dopo il clic autentico su «Condividi questa scheda con la chat»,
 l'owner approva quell'hash e consuma una sola volta l'uscita del reader del broker.
 Il risultato contiene una ricevuta testuale breve e, in `structuredContent`,
-la sola scheda approvata. Nessun dato clinico in `_meta`.
+la sola scheda approvata. `_meta.approvedPayload` conserva la stringa esatta del
+broker, senza riserializzarla; non contiene fonti originali, mapping o hash.
+`_meta.attemptId` identifica il tentativo approvato. Subito prima dell'invio
+la vista chiama `deliver`: l'owner verifica vista, tentativo corrente,
+generazione, scadenza e consumo monouso senza attese intermedie.
+Solo dopo questa conferma e il controllo dell'epoca la vista invia la stringa come
+un unico blocco `content: [{ type: 'text', text: approvedPayload }]` tramite
+`App.updateModelContext`, cioè `ui/update-model-context`. La resa `[omesso]`
+non viene applicata ai byte consegnati.
+
+La [specifica MCP Apps 2026-01-26](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx)
+e la [guida OpenAI](https://developers.openai.com/plugins/build/chatgpt-ui)
+indicano questo canale per il contesto dei turni successivi. Il
+[riferimento OpenAI](https://developers.openai.com/plugins/reference) separa
+risultati e metadati per la vista. La capability `updateModelContext.text`
+deve essere presente; un canale assente o rifiutato lascia la vista vuota con
+un messaggio fisso. Non vengono usati widget state, log, messaggi sostitutivi
+o un tool visibile al modello per aggirare un diniego. Una risposta positiva
+del bridge prova l'accettazione dell'host, non una richiesta al provider o la
+retention. Il basic-host ufficiale conserva il contesto ma non esegue un modello:
+il suo esito non dimostra ricezione da parte del modello desktop.
 
 Nessun consenso al caricamento, al focus, all'apertura di un dettaglio o tramite
 clic JavaScript. Il gesto è legato alla preparazione corrente e alla vista;
 il modello non può chiamare il tool negli host che rispettano app-only.
-Il diniego, la scadenza di 30 secondi, una nuova vista o una revoca durante la
-preparazione non rilasciano la scheda. Un nuovo turno invalida il tentativo;
-una risposta tardiva non ripopola una vista chiusa. La chiusura non cancella i
-byte già consegnati alla chat. Non si dichiara revoca retroattiva o retention.
+Il diniego, la scadenza di 30 secondi senza scelta, una nuova vista o una revoca
+durante la preparazione non rilasciano la scheda. La finestra di 30 secondi
+serve solo a decidere; il clic autentico ferma il timer della vista, mentre
+l'owner conserva il proprio controllo di validità. Una carta già condivisa
+rimane visibile fino alla chiusura o all'invalidazione. Un nuovo input/risultato
+dell'host invalida anche la carta condivisa: gli involucri iniziali vuoti sono
+ignorati solo durante l'inizializzazione, mai dopo la preparazione. Cancellazione
+e teardown invalidano lo stesso stato. Una risposta `share` trattenuta oltre
+una chiusura autorevole, revoca o nuova preparazione non può ottenere `deliver`:
+la vista resta vuota e non aggiorna il contesto.
+
+**Limite della consegna:** l'autorizzazione si linearizza al consumo di
+`deliver` sul server. Una chiusura successiva, durante il ritorno della
+conferma o prima dell'invio al bridge, non può ritirare quell'autorizzazione.
+Un'altra conferma sposterebbe la stessa finestra distribuita. Per eliminare
+la finestra serve il consumo del tentativo nell'host insieme all'accettazione
+del contesto. Il prototipo resta soltanto sintetico; il limite completo è in
+[ADR 0160](../../docs/adr/0160-mediflow-in-desktop-chat.md).
+
+**Limite del turno:** la specifica e l'SDK fissati non espongono un evento
+universale di inizio turno. Il test invia vere notifiche di input/risultato del
+bridge ufficiale; non dimostra che un desktop le invii quando l'utente scrive
+un messaggio senza tool. Se l'host non notifica né rimuove la vista, il plugin
+non può osservare quel turno. La prova desktop precedente ha osservato proprio
+questo mancato ritiro; la qualifica completa del punto richiede una nuova prova
+nel desktop e, se il comportamento persiste, supporto dell'host.
+
+La chiusura non cancella i byte già consegnati alla chat. Non si dichiara revoca retroattiva o retention.
 
 La risorsa non contiene dati clinici: usa asset statici, token Lume e Newsreader,
 con una chiave casuale per questa sessione. Il server la emette una sola volta
@@ -43,15 +90,33 @@ server e il nonce consumato dall’owner prima dell’uscita del broker; la chia
 Dopo la prima lettura, la risorsa non viene emessa di nuovo nella stessa sessione:
 per riaprire la vista occorre una nuova sessione MCP (su stdio, riconnettere il
 plugin). Questo costo di riapertura è esplicito e resta da qualificare sui desktop.
-La chiave protegge il percorso di messaggi dal frame già avviato; non attesta
-un renderer ostile. L’host che controlla caricamento e renderer può leggerla
+La chiave protegge soltanto il tool `share` dai messaggi forgiati dopo il
+bootstrap fidato; non attesta codice arbitrario nel frame o un renderer ostile. L’host che controlla caricamento e renderer può leggerla
 e resta fuori da questo confine, come previsto dall’ADR.
 
-La vista Usa Punto d'inchiostro, altezza interna stabile,
+Il canale `ui/update-model-context` è fidato quanto il frame. Il bridge non
+verifica firma, nonce o consenso e accetta byte arbitrari dal frame; HMAC
+non protegge questo canale. La garanzia del broker è non consegnare al frame
+dati MediFlow non approvati: nessun payload in `prepare`, diniego o revoca,
+nessuna fonte/mappe fra le risorse leggibili e soltanto l'artefatto approvato
+in `share`. Un frame compromesso può inviare byte propri o già approvati;
+la revoca non può cancellare byte già ricevuti. I test intercettano anche
+`_meta`, `structuredContent` e le risorse, non soltanto il testo del tool.
+
+La CSP della risorsa usa l'hash per istanza del bundle incorporato, senza
+script remoti, eval o script inline aggiunti. Il solo codice di dipendenze
+è incluso nel bundle locale (SDK MCP); nessun codice di terzi viene caricato
+in rete dalla risorsa `ui://`. Stili dinamici dell'host e font incorporato
+sono necessari alla resa; connessioni e altre risorse sono negate.
+
+La vista usa Punto d'inchiostro, altezza interna stabile,
 nessun ridimensionamento al clic e nessuna fascia laterale. Le liste sono paginate
 in gruppi di dieci, senza dipendere dai limiti attuali del broker. Tutti i valori
 clinici, gli pseudonimi e i riferimenti opachi sono conservati dal risultato;
-nessuna ricomposizione. Non usa storage, fetch clinici, Touch ID o writer.
+i token `{{MF_PII_…}}` sono presentati come `[omesso]` nei due temi, senza
+ricomposizione o modifica del payload. La carta segue `hostContext.theme`:
+i token Giorno/Grafite governano i suoi colori, anche dopo una scelta manuale,
+così variabili scure dell'host non possono lasciare scuro il tema Giorno. Non usa storage, fetch clinici, Touch ID o writer.
 Gli errori applicativi e di protocollo usano testo fisso e nessun `error.data`.
 
 ## Avvio e prove
@@ -66,6 +131,8 @@ npm --prefix plugins/mediflow-chat-demo run build
 npm --prefix plugins/mediflow-chat-demo test
 npm --prefix plugins/mediflow-chat-demo run typecheck
 npm --prefix plugins/mediflow-chat-demo run prepare:reference
+npm --prefix plugins/mediflow-chat-demo run test:card-desktop
+npm --prefix plugins/mediflow-chat-demo run test:card-desktop-negative
 npm --prefix plugins/mediflow-chat-demo run test:card-reference
 npm --prefix plugins/mediflow-chat-demo run test:card-performance-negative
 ```
@@ -73,8 +140,10 @@ npm --prefix plugins/mediflow-chat-demo run test:card-performance-negative
 Le prove di riferimento e quelle del demo usano le medesime porte 8080, 8081 e
 3017: eseguirle in sequenza. La preparazione scarica la revisione ext-apps fissata
 nel pacchetto. L'ingresso aggiuntivo usa **senza modifiche** le funzioni di bridge,
-caricamento risorsa e sandbox del basic-host; apre direttamente la risorsa
-app-only, che il selettore dei tool destinati al modello filtra correttamente.
+caricamento risorsa e sandbox del basic-host; prova l'ingresso app-only e quello
+inline visibile al modello. I callback del contesto registrano i byte accettati
+dall'host ufficiale; i casi negativi simulano un suo diniego e l'ingresso da
+pannello senza involucro iniziale.
 Non modifica visibilità, CSP o validatori per forzare il rendering.
 
 Il test stdio avvia un processo vero e intercetta frame in entrambe le direzioni,
@@ -104,14 +173,20 @@ checkout di questo branch:
 
 Impostare `MEDIFLOW_DATA_DIR` su una nuova directory temporanea sintetica.
 Questo entrypoint di prova usa il runner simulato: non prova GLiNER reale.
-Aprire la vista dall'ingresso app/thread dell'host, non chiedere al modello di
-approvare un tool nascosto. Se il client non offre l'ingresso app-only, registrare
-il limite del client: non rendere il comando disponibile al modello per aggirarlo.
+Chiedere al modello di chiamare `mediflow_synthetic_card_open` con `{}` e aprire
+la sua vista inline. L'ingresso app/thread resta disponibile. Non chiedere al
+modello di approvare il tool app-only. Se il client non rende la risorsa,
+registrare il limite senza spostare dati nel tool di apertura.
 
 Prima del clic la scheda deve essere vuota. Provare diniego e riapertura
 riconnettendo il plugin per ottenere una nuova sessione MCP; poi
 condividere con tastiera, espandere storia/terapie/misure, cambiare Giorno/Grafite,
-chiudere e inviare un turno successivo. Verificare assenza di salto della chat,
+verificare che la carta resti visibile oltre 30 secondi dalla scelta e inviare
+un turno successivo mentre è ancora aperta. In una sessione distinta chiudere
+la carta e verificare che nessuna risposta tardiva la ripopoli. Nel turno
+successivo chiedere i soli riferimenti già consegnati, senza strumenti, letture
+visive o riferimenti nel prompt, per distinguere l'accettazione del bridge
+dalla ricezione effettiva nel contesto del modello. Verificare assenza di salto della chat,
 resize al clic, fasce laterali e JSON nella ricevuta. Controllare separatamente
 `tools/call` e `resources/read` del client. **R su Codex e Claude Desktop non è
 qualificata da questa PR**, né lo è L. L'esito del reference host non li sostituisce.
@@ -155,3 +230,13 @@ aggiunti alla risposta reale `share`: il ritardo di consegna deve fallire il bud
 della vista utile dopo tutte le 30 aperture fredde e 30 calde. La suite reference
 include messaggi forgiati con challenge nota e nuovi turni/tool call mentre
 la risposta di preparazione è trattenuta.
+
+
+`test:card-desktop` copre ingresso inline, byte approvati e accettati dal bridge,
+`isTrusted`, revoca, colori calcolati con host scuro, segnaposto nei due temi,
+timer prima/dopo consenso e notifiche dopo la condivisione. Le regressioni sono
+state osservate sulla base #613 prima delle correzioni. `test:card-desktop-negative`
+rimuove separatamente le sette correzioni (i due involucri del punto 6 sono
+separati), verifica il fallimento pertinente e ripristina il codice; al termine
+ripete le regressioni con le correzioni. La CI esegue entrambi, oltre alla suite
+unit completa nel Web Core; questi test mirati non la sostituiscono.

@@ -88,7 +88,7 @@ sui desktop. La risorsa contiene asset statici e la chiave, mai dati clinici.
 
 **L’host che controlla caricamento e renderer resta fuori dal confine**, come
 da ADR 0160: può osservare la chiave e i byte. Questa prova copre messaggi
-forgiati dal frame dopo il bootstrap fidato; non attesta il gesto contro un
+forgiati verso il tool `share` dopo il bootstrap fidato; non attesta il gesto contro un
 host ostile, non autentica il medico e non qualifica la retention. Nessun
 archivio reale, identificativo reale, Touch ID o writer è stato coinvolto.
 
@@ -110,3 +110,44 @@ La PR non chiude WUL-788 e non viene unita.
 Report numerico: [card-reference-summary.json](card-reference-summary.json).
 I report completi e le catture sono negli artifact CI `dist/card-evidence`.
 Istruzioni: [CARD-READER.md](../CARD-READER.md).
+
+
+### Confine del contesto dopo review #615
+
+HMAC e nonce proteggono `share`, non `ui/update-model-context`. Il bridge
+accetta messaggi arbitrari dal frame; codice che lo controlla può inviare
+byte propri o già approvati. Il broker non espone dati non approvati in
+risorse, risultati, `structuredContent` o `_meta`. La CSP della risorsa
+ammette soltanto il bundle locale con hash per istanza, gli stili necessari
+e il font incorporato; non script remoti, eval o script inline aggiunti.
+
+La consegna ora richiede `deliver` monouso sul tentativo corrente. Una
+risposta `share` trattenuta oltre chiusura, revoca o nuova preparazione
+fallisce chiusa. La finestra fra consumo di `deliver` e accettazione del
+contesto da parte dell'host resta distribuita: una chiusura successiva al
+consumo non può annullarlo. ADR 0160 descrive il limite; non è una prova
+di invio a un LLM desktop né di ammissione clinica.
+
+
+Prova della correzione: Node 24.21.0, directory dati temporanee sintetiche.
+La regressione derivata dalla riproduzione indipendente della review
+[5618565317](https://github.com/Wulfgardr/mediflow/pull/615#pullrequestreview-5618565317)
+è rossa su `2906f0271`: `no late context after owner invalidation`, con un
+update inatteso. Mancano inoltre `attemptId` e CSP. Dopo il fix passano le
+20 regressioni del reference e gli 11 test di protocollo (compresi nei
+20 pass + 1 TODO preesistente del plugin); broker 116/116, selezione completa
+e 47 test delle guardie di selezione, build e typecheck plugin, lint e guardie
+never-regress/claims. La falsificazione rimuove il controllo di `deliver`,
+rimuove la CSP e introduce dati non approvati in `_meta` di `prepare`:
+tutti e tre i mutanti rendono rosse le rispettive regressioni; i sorgenti
+ripristinati sono verdi. Lo script mantiene anche i controlli negativi precedenti.
+
+Budget e soglie sono invariati. Su 30 avvii freddi e 30 caldi del reference,
+p95 vista utile 273,1/268,5 ms, feedback 30,3 ms, interazioni 15,1 ms,
+preparazione con runner simulato 0,96 ms, gzip 162.121 byte e zero long task
+attribuiti alla vista oltre 50 ms. Sono prove sul reference fissato, non su
+un LLM o un desktop qualificato; il carico esteso dell'ADR resta distinto.
+
+Anche i tre controlli negativi di prestazione sono rilevati: long task >50 ms,
+feedback del clic e ritardo di consegna che supera il p95 caldo di 2 s.
+Nessuna soglia è stata allargata.

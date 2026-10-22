@@ -286,3 +286,11 @@ details[open] > :not(summary) {
     animation: none;
   }
 }
+
+:root[data-card] {
+  --paper: var(--lume-surface-field);
+  --ink: var(--lume-ink-primary);
+  --muted: var(--lume-ink-secondary);
+  --rule: var(--lume-rule-default);
+  --focus: var(--lume-ink-fresh);
+}
