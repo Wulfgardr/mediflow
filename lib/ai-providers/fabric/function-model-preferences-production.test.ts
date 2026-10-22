@@ -34,10 +34,11 @@ const command = () => {
 };
 
 test('production settings owner persists only dedicated preferences and existing switch, and the real binding reader consumes the selection', async () => {
-    const before = disk.prepare('SELECT key,value FROM settings ORDER BY key').all();
-    const initial = service.read(); const selected = command(); const saved = service.apply(selected);
+    const initial = service.read();
+    const before = disk.prepare('SELECT key,value FROM settings WHERE key <> ? ORDER BY key').all(FUNCTION_PREFERENCES_KEY);
+    const selected = command(); const saved = service.apply(selected);
     assert.deepEqual(service.read(), saved); assert.deepEqual(service.apply(selected), saved);
-    assert.deepEqual(disk.prepare('SELECT key,value FROM settings WHERE key != ? ORDER BY key').all(FUNCTION_PREFERENCES_KEY), before);
+    assert.deepEqual(disk.prepare('SELECT key,value FROM settings WHERE key <> ? ORDER BY key').all(FUNCTION_PREFERENCES_KEY), before);
     const consume = createFunctionModelDispatch({ authenticate: async () => 'synthetic-session', readSources: readProductionFunctionModelSources })('patient_insight', async () => {
         const binding = await createHostLocalProviderBindingService().readClinical();
         assert.equal(binding.status, 'available');

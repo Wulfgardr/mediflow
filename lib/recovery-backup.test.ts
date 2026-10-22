@@ -8,6 +8,8 @@ import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
 import { openVersionedSqliteDatabase, CURRENT_SQLITE_SCHEMA_VERSION } from './sqlite-schema-open';
+import { readTerritorialPacks, requireTerritorialPack, commitTerritorialPackTransition } from './territorial-pack-store';
+import { TERRITORIAL_PACK_SCHEMA } from './territorial-packs';
 import { readSqliteArchiveGeneration } from './archive-generation';
 import { openAdmittedSqlite } from './sqlite-maintenance-admission.mjs';
 import { createRecoverySnapshot, restoreRecoveryBackup } from './recovery-backup-server';
@@ -114,7 +116,15 @@ test('complete encrypted snapshot recovers keys, all tables and replay history i
         assert.notEqual(result.archiveGeneration, generation);
         const restored = openVersionedSqliteDatabase(f.destination);
         try {
-            assert.deepEqual(contents(restored), original, 'every source table, including ledger, audit and unknown tables, survives unchanged');
+            const actual = contents(restored);
+            const settings = actual.settings as { key: string; value: string }[];
+            assert.deepEqual(settings.filter(row => row.key !== 'territorial.packs'), original.settings);
+            assert.deepEqual(readTerritorialPacks(restored), { schemaVersion: TERRITORIAL_PACK_SCHEMA, preset: 'core', revision: 1, status: 'ready' });
+            const audits = actual.audit_events as Record<string, unknown>[];
+            assert.deepEqual(audits.slice(0, -1), original.audit_events, 'all source audit rows survive byte for byte');
+            assert.equal(audits.at(-1)!.event_type, 'territorial.packs.preserved');
+            assert.deepEqual({ ...actual, settings: original.settings, audit_events: original.audit_events }, original,
+                'every other source table, including ledger and unknown tables, survives unchanged');
             assert.deepEqual(restored.prepare('SELECT * FROM archive_session_generations').all(), []);
             const recovered = await openRecoveryWrapping(f.kit.wrappedMasterKey, f.kit.salt, f.recoveryKey);
             const encrypted = restored.prepare('SELECT notes FROM patients').pluck().get() as string;
@@ -122,6 +132,8 @@ test('complete encrypted snapshot recovers keys, all tables and replay history i
             assert.equal(await decryptData(ciphertext, iv, recovered.masterKey), 'nota clinica sintetica recuperabile');
             assert.throws(() => restored.prepare('DELETE FROM audit_events').run(), /append-only/u);
         } finally { restored.close(); }
+        const admitted = new Database(f.destination, { readonly: true });
+        const installedContents = contents(admitted); admitted.close();
         // Real post-restart command service: replay returns its receipt without consuming a gesture or emitting audit.
         const output = execFileSync(process.execPath, ['--import', pathToFileURL(path.resolve('scripts/register-strip-types-loader.mjs')).href, '--input-type=module', '--eval', `
             import { createPhysicianReviewCommandService } from './lib/ai-providers/fabric/physician-review-command.ts';
@@ -133,7 +145,7 @@ test('complete encrypted snapshot recovers keys, all tables and replay history i
         `], { cwd: process.cwd(), env: { ...process.env, MEDIFLOW_DATA_DIR: f.targetDir }, encoding: 'utf8' });
         assert.deepEqual(JSON.parse(output.trim()), { result: outcome, oldSession: false, pairedClients: 0 });
         const check = new Database(f.destination, { readonly: true });
-        try { assert.deepEqual(contents(check), original, 'replay did not add data or audit'); } finally { check.close(); }
+        try { assert.deepEqual(contents(check), installedContents, 'replay did not add data or audit'); } finally { check.close(); }
     } finally { f.cleanup(); }
 });
 
@@ -184,5 +196,43 @@ test('nonempty destination and a live local participant cannot be replaced', asy
         const occupied = new Database(f.destination); occupied.prepare("INSERT INTO settings VALUES ('synthetic-data','keep')").run(); occupied.close();
         const nonempty = digest(fs.readFileSync(f.destination));
         await assert.rejects(f.restore()); assert.equal(digest(fs.readFileSync(f.destination)), nonempty);
+    } finally { f.cleanup(); }
+});
+
+test('initialized empty destination accepts encrypted recovery while preserving host core', async () => {
+    const f = await fixture();
+    try {
+        openVersionedSqliteDatabase(f.destination).close();
+        commitTerritorialPackTransition(f.db, { schemaVersion: TERRITORIAL_PACK_SCHEMA, preset: 'core+it+lom',
+            expectedRevision: 0, confirmed: true }, { actorType: 'system', actorRef: 'synthetic-source', sourceSurface: 'job' }, () => {});
+        const artifact = await encryptRecoveryBackup(createRecoverySnapshot(f.db, actor), f.key);
+        await f.restore({ artifact });
+        const installed = openVersionedSqliteDatabase(f.destination);
+        try {
+            assert.equal(readTerritorialPacks(installed).preset, 'core');
+            assert.equal(readTerritorialPacks(installed).revision, 1);
+            assert.throws(() => installed.transaction(() => requireTerritorialPack(installed, 'lom')).immediate(), /pack_disabled/);
+            assert.equal(installed.prepare("SELECT count(*) FROM audit_events WHERE event_type='territorial.packs.preserved'").pluck().get(), 1);
+        } finally { installed.close(); }
+    } finally { f.cleanup(); }
+});
+
+for (const mutation of ['extra-setting', 'changed-marker', 'extra-audit', 'changed-audit', 'authority', 'clinical', 'unknown-table'])
+test(`initialized destination rejects ${mutation} without changing any bytes`, async () => {
+    const f = await fixture();
+    try {
+        const target = openVersionedSqliteDatabase(f.destination);
+        if (mutation === 'extra-setting') target.exec("INSERT INTO settings VALUES ('synthetic-extra','keep')");
+        if (mutation === 'changed-marker') target.exec("UPDATE settings SET value='{}'");
+        if (mutation === 'extra-audit') target.exec("INSERT INTO audit_events SELECT '11111111-1111-4111-8111-111111111111',schema_version,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,subject_ref,source_surface,request_id,redacted_metadata,created_at FROM audit_events");
+        if (mutation === 'changed-audit') { target.exec('DROP TRIGGER audit_events_no_update'); target.exec("UPDATE audit_events SET actor_ref='synthetic-other'"); }
+        if (mutation === 'authority') commitTerritorialPackTransition(target, { schemaVersion: TERRITORIAL_PACK_SCHEMA,
+            preset: 'core+it', expectedRevision: 0, confirmed: true }, { actorType: 'system', actorRef: 'synthetic', sourceSurface: 'job' }, () => {});
+        if (mutation === 'clinical') target.exec("INSERT INTO patients(id,first_name,last_name,tax_code) VALUES ('synthetic','Synthetic','Patient','SYNTHETIC')");
+        if (mutation === 'unknown-table') target.exec("CREATE TABLE synthetic_extra(value TEXT); INSERT INTO synthetic_extra VALUES ('keep')");
+        target.close();
+        const before = digest(fs.readFileSync(f.destination));
+        await assert.rejects(f.restore(), /RECOVERY_BACKUP_PREFLIGHT_FAILED/);
+        assert.equal(digest(fs.readFileSync(f.destination)), before);
     } finally { f.cleanup(); }
 });

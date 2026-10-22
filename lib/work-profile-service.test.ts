@@ -20,8 +20,6 @@ seed.prepare('INSERT INTO users (id, username, role, password_hash, encrypted_ma
 for (const [key, value] of [['network.mode', 'local-only'], ['aiPatientInsightKillSwitch', 'enabled'], ['clinicName', 'Synthetic clinic']]) {
     seed.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run(key, value);
 }
-const baselineUsers = seed.prepare('SELECT * FROM users').all();
-const baselineSettings = seed.prepare('SELECT * FROM settings ORDER BY key').all();
 seed.close();
 const { readWorkProfile, updateWorkProfile } = await import('./work-profile-service.ts');
 test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
@@ -31,6 +29,11 @@ function command(action: WorkProfileCommand['action'], draft?: WorkProfileComman
 }
 
 test('SQLite persists a resumable draft across a new process, confirms once and rolls back without changing setup', () => {
+    readWorkProfile();
+    const baseline = new Database(databasePath, { readonly: true });
+    const baselineUsers = baseline.prepare('SELECT * FROM users').all();
+    const baselineSettings = baseline.prepare('SELECT * FROM settings WHERE key <> ? ORDER BY key').all(WORK_PROFILE_SETTING_KEY);
+    baseline.close();
     const draft = { source: 'guided' as const, profile: 'interactive' as const, step: 1,
         answers: { activity: 'records' as const, interaction: null, platform: null } };
     const saved = updateWorkProfile(command('save-draft', draft));
@@ -54,7 +57,7 @@ test('SQLite persists a resumable draft across a new process, confirms once and 
     try {
         assert.deepEqual(JSON.parse((disk.prepare('SELECT value FROM settings WHERE key = ?').get(WORK_PROFILE_SETTING_KEY) as { value: string }).value), readWorkProfile());
         assert.deepEqual(disk.prepare('SELECT * FROM users').all(), baselineUsers);
-        assert.deepEqual(disk.prepare('SELECT * FROM settings WHERE key != ? ORDER BY key').all(WORK_PROFILE_SETTING_KEY), baselineSettings);
+        assert.deepEqual(disk.prepare('SELECT * FROM settings WHERE key <> ? ORDER BY key').all(WORK_PROFILE_SETTING_KEY), baselineSettings);
     } finally { disk.close(); }
 });
 

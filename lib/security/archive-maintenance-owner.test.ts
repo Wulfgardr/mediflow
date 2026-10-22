@@ -7,8 +7,11 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
+import { initializeSqliteSchema } from '../sqlite-schema';
 import { openVersionedSqliteDatabase } from '../sqlite-schema-open';
 import { readSqliteArchiveGeneration } from '../archive-generation';
+import { commitTerritorialPackTransition, readTerritorialPacks, requireTerritorialPack } from '../territorial-pack-store';
+import { TERRITORIAL_PACK_SCHEMA } from '../territorial-packs';
 import { retirePinEraResidues } from './pin-era-residues';
 
 const repo = path.resolve('.');
@@ -18,30 +21,42 @@ async function until<T>(read: () => T | undefined): Promise<T> {
     throw new Error('Synthetic owner did not reach the expected state.');
 }
 
-for (const sourceCase of ['canonical', 'tracked-baseline', 'incompatible', 'weakened-trigger', 'audit-index-failure', 'quoted-type', 'extra-trigger', 'post-stop-io-failure', 'backup-collision'])
+for (const sourceCase of ['canonical', 'tracked-baseline', 'territorial-active', 'territorial-legacy', 'territorial-inverse', 'incompatible', 'weakened-trigger', 'audit-index-failure', 'quoted-type', 'extra-trigger', 'post-stop-io-failure', 'backup-collision'])
 test(`owned Web repair ${sourceCase}: close, validate, commit or preserve A without restart`, async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-managed-web-synthetic-'));
     const data = path.join(root, 'data');
     fs.mkdirSync(data);
     fs.mkdirSync(path.join(root, '.next', 'standalone'), { recursive: true });
     const seed = (file: string, firstName: string) => {
+        if (territorial && firstName === 'Archive A') {
+            const legacy = new Database(file); initializeSqliteSchema(legacy); legacy.pragma('user_version = 4'); legacy.close();
+        }
         const db = openVersionedSqliteDatabase(file);
         try { db.prepare('INSERT INTO patients (id, first_name, last_name, tax_code) VALUES (?, ?, ?, ?)')
             .run('synthetic-same-id', firstName, 'Synthetic', 'SYNTHETIC'); return readSqliteArchiveGeneration(db); }
         finally { db.close(); }
     };
+    const territorial = sourceCase.startsWith('territorial-');
+    const admitted = ['canonical', 'tracked-baseline', 'territorial-active', 'territorial-legacy', 'territorial-inverse'].includes(sourceCase);
     const before = seed(path.join(data, 'medical.db'), 'Archive A');
     const account = 'synthetic-repair-account';
     const wrapping = sourceCase === 'tracked-baseline' ? 'v3:synthetic-passphrase' : 'v2:synthetic-pin';
     const prior = new Database(path.join(data, 'medical.db'));
     prior.prepare('INSERT INTO users (id, username, password_hash, encrypted_master_key, salt) VALUES (?, ?, ?, ?, ?)')
         .run(account, account, 'synthetic-hash', wrapping, 'synthetic-salt');
+    if (territorial) {
+        const change = (preset: string, expectedRevision: number) => commitTerritorialPackTransition(prior,
+            { schemaVersion: TERRITORIAL_PACK_SCHEMA, preset, expectedRevision, confirmed: true },
+            { actorType: 'system', actorRef: 'synthetic-owner', sourceSurface: 'job' }, () => {});
+        if (sourceCase !== 'territorial-inverse') change('core', 1);
+    }
+    const hostMarker = prior.prepare("SELECT value FROM settings WHERE key='territorial.packs.initialization'").pluck().get();
     prior.close();
     const collision = path.join(data, 'medical.db.bak-20261011-101500123');
     if (sourceCase === 'backup-collision') fs.writeFileSync(collision, 'existing recovery copy');
     let sourceGeneration: string | undefined;
     const sourceFile = path.join(root, 'medical.db');
-    if (sourceCase === 'tracked-baseline') {
+    if (['tracked-baseline', 'territorial-legacy'].includes(sourceCase)) {
         const legacy = new Database(sourceFile);
         for (const file of fs.readdirSync(path.join(repo, 'drizzle')).filter(file => file.endsWith('.sql')).sort())
             legacy.exec(fs.readFileSync(path.join(repo, 'drizzle', file), 'utf8').replace(/^-->\s+statement-breakpoint\s*$/gmu, ''));
@@ -51,6 +66,9 @@ test(`owned Web repair ${sourceCase}: close, validate, commit or preserve A with
     } else {
         sourceGeneration = seed(sourceFile, 'Archive B');
         const source = new Database(sourceFile);
+        if (sourceCase === 'territorial-active') commitTerritorialPackTransition(source,
+            { schemaVersion: TERRITORIAL_PACK_SCHEMA, preset: 'core+it+lom', expectedRevision: 0, confirmed: true },
+            { actorType: 'system', actorRef: 'synthetic-source', sourceSurface: 'job' }, () => {});
         if (sourceCase === 'incompatible') source.pragma('user_version = 999');
         if (sourceCase === 'weakened-trigger') source.exec('DROP TRIGGER audit_events_no_update; CREATE TRIGGER audit_events_no_update BEFORE UPDATE ON audit_events BEGIN SELECT 1; END');
         if (sourceCase === 'audit-index-failure') source.exec('DROP INDEX audit_events_actor_idx; CREATE TABLE audit_events_actor_idx (id INTEGER)');
@@ -118,7 +136,7 @@ process.on('SIGTERM', () => { server.close(); setTimeout(() => {
             if (sourceCase === 'backup-collision') assert.equal(fs.readFileSync(collision, 'utf8'), 'existing recovery copy');
             return;
         }
-        if (!['canonical', 'tracked-baseline'].includes(sourceCase)) {
+        if (!admitted) {
             let rejection: { status?: string } | undefined;
             for (let i = 0; i < 200 && !rejection; i++) {
                 const reply = await fetch(`http://127.0.0.1:${ready.port}/status`).then(value => value.json());
@@ -151,6 +169,21 @@ process.on('SIGTERM', () => { server.close(); setTimeout(() => {
         const installed = openVersionedSqliteDatabase(path.join(data, 'medical.db'));
         try {
             assert.equal(readSqliteArchiveGeneration(installed), status.archiveGeneration);
+            if (territorial) {
+                const capability = readTerritorialPacks(installed);
+                const active = sourceCase === 'territorial-inverse';
+                assert.equal(capability.preset, active ? 'core+it+lom' : 'core');
+                assert.equal(capability.revision, active ? 2 : 3);
+                assert.equal(installed.prepare("SELECT value FROM settings WHERE key='territorial.packs.initialization'").pluck().get(), hostMarker);
+                if (active) installed.transaction(() => requireTerritorialPack(installed, 'lom')).immediate();
+                else assert.throws(() => installed.transaction(() => requireTerritorialPack(installed, 'lom')).immediate(), /pack_disabled/);
+                const audit = installed.prepare("SELECT redacted_metadata FROM audit_events WHERE event_type='territorial.packs.preserved'").all() as { redacted_metadata: string }[];
+                assert.equal(audit.length, 1);
+                assert.deepEqual(JSON.parse(audit[0].redacted_metadata).flags, active
+                    ? ['before:core+it+lom', 'after:core+it+lom', 'origin:replacement:revision:1->2']
+                    : ['before:core', 'after:core', 'origin:replacement:revision:2->3']);
+                assert.equal(installed.prepare("SELECT count(*) FROM audit_events WHERE event_type='territorial.packs.migrated'").pluck().get(), 0);
+            }
             assert.equal((installed.prepare('SELECT first_name FROM patients').get() as { first_name: string }).first_name, 'Archive B');
         } finally { installed.close(); }
         assert.deepEqual(fs.readFileSync(sourceFile), sourceBytes);
@@ -169,10 +202,10 @@ process.on('SIGTERM', () => { server.close(); setTimeout(() => {
             upgraded.prepare('INSERT INTO users (id, username, password_hash, encrypted_master_key, salt) VALUES (?, ?, ?, ?, ?)')
                 .run(account, account, 'synthetic-hash', 'v3:synthetic-passphrase', 'synthetic-new-salt');
             const retired = retirePinEraResidues(account, drizzle(upgraded), path.join(data, 'medical.db'));
-            assert.deepEqual(retired.removed, sourceCase === 'canonical' ? backups : []);
-            assert.deepEqual(retired.kept, sourceCase === 'canonical' ? [] : backups);
-            assert.equal(retired.complete, sourceCase === 'canonical', 'a v3 repair copy remains pending: live rows do not certify its obsolete cells');
-            assert.equal(fs.existsSync(path.join(data, backups[0])), sourceCase !== 'canonical');
+            assert.deepEqual(retired.removed, sourceCase !== 'tracked-baseline' ? backups : []);
+            assert.deepEqual(retired.kept, sourceCase !== 'tracked-baseline' ? [] : backups);
+            assert.equal(retired.complete, sourceCase !== 'tracked-baseline', 'a v3 repair copy remains pending: live rows do not certify its obsolete cells');
+            assert.equal(fs.existsSync(path.join(data, backups[0])), sourceCase === 'tracked-baseline');
         } finally { upgraded.close(); }
     } finally {
         if (owner.exitCode === null && owner.signalCode === null) { owner.kill('SIGTERM'); await closed; }

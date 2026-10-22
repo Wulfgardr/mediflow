@@ -30,13 +30,20 @@ function prepareDataDirectory() {
 export async function runHeadlessSupervisorV1(childOptions = {}, profile = 'clinical') {
   const args = process.argv.slice(2);
   if (!['clinical', 'plugin_local_ui'].includes(profile) || (profile === 'plugin_local_ui' && args.length)) throw new Error('supervisor_arguments_invalid');
-  if (args.length > 0 && !(args.length === 1 && ['--mini', '--maintenance-web'].includes(args[0]))) {
+  if (args[0] !== '--territorial-packs' && args.length > 0 && !(args.length === 1 && ['--mini', '--maintenance-web'].includes(args[0]))) {
     throw new Error('supervisor_arguments_invalid');
   }
   const agentKind = args[0] === '--mini' ? 'mini' : 'mcp';
   assertNodeRuntime(readNodeContract(root));
   verifyNativeBinding(childOptions.webDirectory ?? root);
   prepareDataDirectory();
+
+  if (args[0] === '--territorial-packs') {
+    const { runTerritorialPackMaintenance } = await import('../lib/security/territorial-pack-maintenance.ts');
+    const capability = runTerritorialPackMaintenance(args, process.env.MEDIFLOW_DATA_DIR);
+    process.stdout.write(`${JSON.stringify(capability)}\n`);
+    return;
+  }
 
   if (args[0] === '--maintenance-web') {
     const { runArchiveMaintenanceWebOwner } = await import('../lib/security/archive-maintenance-owner.ts');

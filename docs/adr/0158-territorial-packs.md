@@ -225,6 +225,80 @@ Non occorre separare subito tutte le tabelle; occorre dimostrare che lettura
 e ripristino non dipendono dall'operatività del pacchetto. Queste sono prove
 di accettazione future, non verifiche eseguite da questo ADR.
 
+## Contratto host della prima PR
+
+Il gestore host è `host-territorial-pack-manager`. Il contratto
+`mediflow.territorial-packs.v1` ammette soltanto `core`, `core+it` e
+`core+it+lom`. `territorial.packs` nelle impostazioni dell'archivio host
+conserva schema, revisione monotona e assetto: riusa la configurazione
+esistente e permette di modificare stato e audit nella stessa transazione
+SQLite `IMMEDIATE`. Non è una preferenza del client o dell'account.
+L'assetto è una proprietà dell'host destinatario, anche quando le righe sono
+persistite nel database. Ogni sostituzione fisica ammessa cattura assetto e
+marker dalla snapshot originale dell'host sotto esclusione dei writer e li riapplica nello staging
+prima del commit durevole. La preparazione della sorgente non inizializza
+pacchetti territoriali. Il sostitutore comune incrementa la revisione
+dell'host e registra `territorial.packs.preserved` nella stessa transazione
+SQLite delle due impostazioni; l'evento contiene soltanto assetto e revisioni.
+Una configurazione host invalida blocca la sostituzione. Il rollback conserva
+l'originale; il recupero dopo commit conserva lo staging già corretto.
+La sorgente non può importare né ricreare autorità territoriale.
+
+Il recupero cifrato ammette anche una destinazione appena inizializzata solo
+quando contiene la generazione e le due righe esatte di bootstrap: marker
+`origin:new` ed evento `territorial.packs.initialized` atteso. Impostazioni,
+audit, dati o autorità aggiuntivi impediscono il recupero su quella destinazione.
+
+Entrambe le chiavi `territorial.packs` e `territorial.packs.initialization`
+sono negate dalla policy dei writer generici.
+
+L'origine viene dalla procedura di ammissione `openVersionedSqliteDatabase`,
+prima di consumare la prenotazione iniziale o aggiornare la versione:
+
+- nuovo: file creato in esclusiva oppure prenotazione nativa valida
+  (`application_id=1296451154`, `user_version=0`, nessun oggetto applicativo);
+- esistente: archivio preesistente ammesso dai controlli dello schema,
+  versionato oppure legacy. File vuoti senza prenotazione, versioni future e
+  schemi non ammessi restano rifiutati dalla procedura esistente.
+
+Il percorso distinto `initializeTerritorialPacks` riceve soltanto questa
+origine host. Sul nuovo registra il marker e lascia assente la capacità
+(`core`, revisione 0); sull'esistente registra `core+it+lom`, revisione 1.
+Marker, eventuale capacità e audit iniziale sono atomici. La classificazione
+non consulta record, quantità o attributi dei pazienti. La presenza del marker
+impedisce di ripetere la migrazione anche dopo la rimozione della capacità.
+Valori malformati o sconosciuti restano conservati e proiettano
+`configuration_error`, revisione nulla, capacità effettiva `core`; non vengono
+riparati abilitando pacchetti.
+
+La route trusted `GET/PUT /api/system/territorial-packs` usa la sessione Web
+corrente. La PUT richiede `schemaVersion`, `expectedRevision`, `preset` e
+`confirmed: true`, senza altri campi; richiede anche il binding corrente
+dell'archivio e l'header `x-mediflow-archive-generation`. Le sessioni native,
+system, assenti o scadute non sono ammesse. Errori di canale, input e conflitto
+restituiscono rispettivamente 403, 400 e 409; le risposte non sono memorizzabili.
+L'altro ingresso è il comando locale del supervisore:
+
+```sh
+node scripts/run-strip-types.mjs scripts/mediflow-headless-supervisor.mjs \
+  --territorial-packs core+it+lom --expected-revision 0 --confirm
+```
+
+Le transizioni verificano la revisione sotto lock, registrano precedente e
+nuovo assetto e non avviano chiamate esterne. Una richiesta con stesso assetto
+e revisione corrente è un no-op. La capacità è letta anche da
+`/api/v1/network/capabilities` dal protocollo 1.14.0: il campo additivo
+`territorialPacks` è opzionale nel contratto per compatibilità con host
+precedenti, ma è sempre emesso dall'host aggiornato. La sua assenza non concede
+capacità territoriali.
+
+Il checkpoint `requireTerritorialPack` legge lo stato corrente nella
+transazione del writer. Questa PR lo applica ai cinque ingressi di mutazione
+del servizio protesica condiviso, compresi quelli paired. Gli altri writer,
+la UI completa, i client Apple/GPUI e la sequenza completa di conservazione e
+restore restano alle PR successive: questo collegamento non ne attesta la
+copertura.
+
 ## Fonti e data delle evidenze
 
 Le decisioni sono nei commenti «Ricognizione completata … e decisioni» del

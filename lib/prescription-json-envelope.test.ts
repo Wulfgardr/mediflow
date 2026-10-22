@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import Database from 'better-sqlite3';
+import { commitTerritorialPackTransition } from './territorial-pack-store';
+import { TERRITORIAL_PACK_SCHEMA } from './territorial-packs';
 
 // Real adapters, core and SQLite; replace only authenticated admission.
 const load = createRequire(import.meta.url);
@@ -113,6 +115,9 @@ test('shared parser rejects malformed/nonobject, byte overflow and unreadable in
     if (!result.ok) assert.equal(result.response.status, 400);
 });
 test('valid paired create, Web update and Web delete preserve rows, versions and audit', async () => {
+    commitTerritorialPackTransition(openDbServer(), { schemaVersion: TERRITORIAL_PACK_SCHEMA, preset: 'core+it+lom',
+        expectedRevision: 0, confirmed: true }, { actorType: 'system', actorRef: 'synthetic-envelope-fixture', sourceSurface: 'job' }, () => {});
+    const auditBefore = sql.prepare('SELECT * FROM audit_events ORDER BY rowid').all();
     const created = await network.POST(request(JSON.stringify({ id: 'synthetic-service', patientId: 'synthetic-patient', prescribedAt: '2026-01-01', serviceName: 'ENC:synthetic:service' })));
     assert.equal(created.status, 201);
     assert.deepEqual(await created.json(), { id: 'synthetic-service', version: 1 });
@@ -120,5 +125,7 @@ test('valid paired create, Web update and Web delete preserve rows, versions and
     assert.deepEqual(sql.prepare('SELECT version, notes FROM prosthetic_prescriptions WHERE id=?').get('synthetic-prosthetic'), { version: 2, notes: null });
     assert.equal((await web.DELETE(request(JSON.stringify({ version: 2 }), 'DELETE'), context)).status, 200);
     assert.equal(sql.prepare('SELECT id FROM prosthetic_prescriptions WHERE id=?').get('synthetic-prosthetic'), undefined);
-    assert.deepEqual(sql.prepare('SELECT count(*) AS n FROM audit_events').get(), { n: 3 });
+    const auditAfter = sql.prepare('SELECT * FROM audit_events ORDER BY rowid').all();
+    assert.deepEqual(auditAfter.slice(0, auditBefore.length), auditBefore);
+    assert.equal(auditAfter.length, auditBefore.length + 3);
 });

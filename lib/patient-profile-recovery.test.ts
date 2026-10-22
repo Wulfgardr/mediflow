@@ -22,6 +22,7 @@ import { decryptData, encryptData, generateMasterKey } from './security/security
 import { createRecoveryWrapping, createUnlockWrapping, hashAccessVerifier, openRecoveryWrapping } from './security/unlock-credential';
 import { encryptRecoveryBackup, type RecoveryKit } from './recovery-backup';
 import { createRecoverySnapshot, restoreRecoveryBackup } from './recovery-backup-server';
+import { TERRITORIAL_PACK_SCHEMA, TERRITORIAL_PACK_SETTING_KEY } from './territorial-packs';
 import { openVersionedSqliteDatabase } from './sqlite-schema-open';
 
 const load = createRequire(import.meta.url);
@@ -154,6 +155,7 @@ test('complete pilot recovery preserves all snapshots and the committed receipt 
     delete process.env.MEDIFLOW_LOCAL_API_TOKEN;
     try {
         let afterDirectory = '';
+        let afterInstalled: ReturnType<typeof readTarget> | undefined;
         for (const [stage, artifact, expected, version, notes, isArchived] of [
             ['before', beforeArtifact, before, 4, initialNotes, false],
             ['archived', archivedArtifact, archivedState, 6, committedNotes, true],
@@ -163,7 +165,20 @@ test('complete pilot recovery preserves all snapshots and the committed receipt 
             const directory = target(stage); if (stage === 'after') afterDirectory = directory;
             const restored = await restoreRecoveryBackup({ artifact, kit, recoveryKey: recovery.recoveryKey, destination: join(directory, 'medical.db') });
             assert.notEqual(restored.archiveGeneration, generation);
-            assert.deepEqual(readTarget(directory), expected, 'all durable tables and ciphertext survive unchanged');
+            const installed = readTarget(directory);
+            const settings = installed.settings as { key: string; value: string }[];
+            assert.deepEqual(settings.filter(row => row.key !== TERRITORIAL_PACK_SETTING_KEY), expected.settings);
+            assert.equal(settings.find(row => row.key === TERRITORIAL_PACK_SETTING_KEY)?.value,
+                JSON.stringify({ schemaVersion: TERRITORIAL_PACK_SCHEMA, revision: 1, preset: 'core' }));
+            assert.deepEqual(installed.audit_events.slice(0, -1), expected.audit_events, 'all original audit fields survive unchanged');
+            assert.equal(installed.audit_events.length, expected.audit_events.length + 1);
+            const preservation = installed.audit_events.at(-1) as { event_type: string; redacted_metadata: string };
+            assert.equal(preservation.event_type, 'territorial.packs.preserved');
+            assert.deepEqual(JSON.parse(preservation.redacted_metadata).flags,
+                ['before:core', 'after:core', 'origin:replacement:revision:0->1']);
+            assert.deepEqual({ ...installed, settings: expected.settings, audit_events: expected.audit_events }, expected,
+                'all other durable tables and ciphertext survive unchanged');
+            if (stage === 'after') afterInstalled = installed;
             const database = new Database(join(directory, 'medical.db'), { readonly: true });
             try { assert.deepEqual(database.prepare('SELECT * FROM archive_session_generations').all(), []); }
             finally { database.close(); }
@@ -194,7 +209,7 @@ test('complete pilot recovery preserves all snapshots and the committed receipt 
                     }
                 } finally { connection.close(); }
             } else { assert.equal(result.receipt.body.code, 'receipt_unavailable'); assert.equal(result.replay.status, 409); }
-            assert.deepEqual(readTarget(directory), expected, 'readback and denied/replayed commands do not mutate durable state');
+            assert.deepEqual(readTarget(directory), installed, 'readback and denied/replayed commands do not mutate durable state');
             const recovered = await openRecoveryWrapping(kit.wrappedMasterKey, kit.salt, recovery.recoveryKey);
             const [, iv, ciphertext] = notes.split(':');
             assert.equal(await decryptData(ciphertext, iv, recovered.masterKey), stage === 'before'
@@ -218,7 +233,8 @@ test('complete pilot recovery preserves all snapshots and the committed receipt 
         assert.equal((legacy.scoped.body.currentness as Record<string, unknown>).revision, 8);
         assert.deepEqual(legacy.receipt.body, receipt, 'legacy edits do not rewrite the historical pilot receipt');
         const final = readTarget(afterDirectory);
-        assert.equal(final.audit_events.length, after.audit_events.length + 1);
+        assert.deepEqual(final.audit_events.slice(0, -1), afterInstalled!.audit_events);
+        assert.equal(final.audit_events.length, afterInstalled!.audit_events.length + 1);
         assert.deepEqual(final.entries, after.entries); assert.deepEqual(final.patients_to_ambulatories, after.patients_to_ambulatories);
     } finally {
         if (previousToken === undefined) delete process.env.MEDIFLOW_LOCAL_API_TOKEN;
