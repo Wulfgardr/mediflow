@@ -56,6 +56,13 @@ il corpus ammesso è quello incorporato, con digest esatto. Non esiste report
 positivo predefinito né un flag per disattivare la valutazione. Un report di
 un altro corpus o con un falso negativo viene negato dal valutatore esistente.
 
+Dopo la validazione, ogni uscita ricontrolla sessione e tentativo correnti;
+preparazione, revisione, approvazione e consegna verificano anche la scadenza
+delle evidenze. Immediatamente prima di consegnare i byte, un unico istante
+serve a verificare sessione, evidenze e consenso, insieme a revoca, paziente,
+generazione, tentativo e handle ancora presenti. Controllo, consumo del consenso
+e ritorno della stringa sono sincroni, senza `await` intermedi.
+
 Il controllo finale del testo libero accetta soltanto la forma sintetica
 fissata dal codice, con token autenticati dalla sessione di redazione. Ogni
 residuo o forma diversa blocca; non viene ripulito in uscita. I dati clinici

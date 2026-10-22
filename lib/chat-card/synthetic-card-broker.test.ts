@@ -46,6 +46,16 @@ mockOrdinaryModule(import.meta.url, '../gliner-redaction-runner', { namedExports
     }),
 } });
 const realCore = await import('../ai-preparation/preparation-core');
+const realEvidence = await import('../ai-redaction-evidence');
+let afterEvidenceValidation: (() => void) | undefined;
+mockOrdinaryModule(import.meta.url, '../ai-redaction-evidence', { namedExports: {
+    ...realEvidence,
+    evaluateRedactionRuntimeEvidence(input: Parameters<typeof realEvidence.evaluateRedactionRuntimeEvidence>[0]) {
+        const evaluated = realEvidence.evaluateRedactionRuntimeEvidence(input);
+        afterEvidenceValidation?.();
+        return evaluated;
+    },
+} });
 let mutation: ((card: Card) => unknown) | undefined;
 let lastRead: ReturnType<typeof realCore.readPreparedContent> | undefined;
 let observationAtBoundary: ReturnType<typeof realCore.readPreparedContent>['redactionIdentity'] | undefined;
@@ -97,11 +107,13 @@ async function ready(b = broker(), patient = 'basic', selection = all) {
     return { b, token, review, consent };
 }
 beforeEach(() => {
+    afterEvidenceValidation = undefined;
     observed = identity; omitted = new Set(); overRedact = false; mutation = undefined; lastRead = undefined; observationAtBoundary = undefined;
     hold = undefined; extracted = 0; closed = 0; clock = Date.parse('2026-10-22T12:00:00Z');
     mock.method(Date, 'now', () => clock);
 });
 afterEach(async () => {
+    afterEvidenceValidation = undefined;
     mutation = undefined; hold = undefined;
     await Promise.all(brokers.splice(0).map(b => b.owner.close()));
     mock.restoreAll();
@@ -263,6 +275,66 @@ for (const action of ['revoke', 'close', 'consent-expiry', 'session-expiry', 'cl
     else if (action === 'clock-rollback') clock--;
     else clock += action === 'consent-expiry' ? 120_000 : 600_000;
     assert.throws(() => b.reader.takeApprovedBytes(token, consent), denied);
+});
+test('consent expires during final validation', async () => {
+    const { b, token, consent } = await ready();
+    clock += 119_999;
+    let reads = 0;
+    mock.method(Date, 'now', () => {
+        if (++reads === 3) clock += 1;
+        return clock;
+    });
+    assert.throws(() => b.reader.takeApprovedBytes(token, consent), denied);
+});
+test('consent expires after evidence validation before byte delivery', async () => {
+    const { b, token, consent } = await ready();
+    clock += 119_999;
+    afterEvidenceValidation = () => { clock++; };
+    assert.throws(() => b.reader.takeApprovedBytes(token, consent), denied);
+});
+test('unexpired consent can deliver at the last valid millisecond', async () => {
+    const { b, token, consent, review } = await ready();
+    clock += 119_999;
+    assert.equal(b.reader.takeApprovedBytes(token, consent), review.payload);
+});
+for (const operation of ['prepare', 'review', 'approve', 'takeApprovedBytes'] as const) {
+    for (const invalidation of ['session-expiry', 'evidence-expiry', 'clock-rollback', 'revoke', 'patient-switch', 'patient-reselection'] as const) {
+        test(`${operation} denies ${invalidation} during final validation`, async () => {
+            const { b, token, consent, review } = await ready(broker(installation(invalidation === 'evidence-expiry' ? 1 / 86400 : 30)));
+            afterEvidenceValidation = () => {
+                if (invalidation === 'session-expiry') clock += 600_000;
+                else if (invalidation === 'evidence-expiry') clock += 900;
+                else if (invalidation === 'clock-rollback') clock--;
+                else if (invalidation === 'revoke') void b.owner.revoke();
+                else void b.owner.selectPatient(invalidation === 'patient-switch' ? 'unicode' : 'basic');
+            };
+            if (operation === 'prepare') await assert.rejects(b.owner.prepare(all), denied);
+            else if (operation === 'review') assert.throws(() => b.owner.review(token), denied);
+            else if (operation === 'approve') assert.throws(() => b.owner.approve(token, review.payloadSha256), denied);
+            else assert.throws(() => b.reader.takeApprovedBytes(token, consent), denied);
+        });
+    }
+}
+test('consent consumed during validation cannot deliver the bytes twice', async () => {
+    const { b, token, consent, review } = await ready();
+    let delivered: string | undefined;
+    afterEvidenceValidation = () => {
+        afterEvidenceValidation = undefined;
+        delivered = b.reader.takeApprovedBytes(token, consent);
+    };
+    assert.throws(() => b.reader.takeApprovedBytes(token, consent), denied);
+    assert.equal(delivered, review.payload);
+});
+test('source mapping cannot leave a session that expires during lookup', async () => {
+    const { b, token, review } = await ready();
+    const ref = JSON.parse(review.payload).history[0].sourceRef;
+    clock += 599_999;
+    let reads = 0;
+    mock.method(Date, 'now', () => {
+        if (++reads === 2) clock++;
+        return clock;
+    });
+    assert.throws(() => b.owner.resolveSource(token, ref), denied);
 });
 test('handles, payload digest and grants cannot be forged or exchanged across sessions/attempts', async () => {
     const a = await ready(), b = await ready();

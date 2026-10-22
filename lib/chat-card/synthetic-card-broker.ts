@@ -64,11 +64,13 @@ export function createSyntheticCardBroker(input: SyntheticCardInstallation) {
         if (!value || typeof value !== 'object' || types.isProxy(value)) return fail();
         return value;
     }
-    function current(attempt: Attempt): void {
-        now();
-        if (active !== attempt || attempt.consumed || attempt.generation !== generation || attempt.patient !== patient || attempt.controller.signal.aborted) return fail();
+    function current(attempt: Attempt, evidenceExpiresAt = expires): number {
+        const time = now();
+        if (time >= evidenceExpiresAt || active !== attempt || attempt.consumed || attempt.generation !== generation
+            || attempt.patient !== patient || attempt.controller.signal.aborted) return fail();
+        return time;
     }
-    function boundary(attempt: Attempt): PreparedContentRead {
+    function boundary(attempt: Attempt): { read: PreparedContentRead; evidenceExpiresAt: number } {
         current(attempt);
         if (!attempt.core) return fail();
         const read = readPreparedContent(attempt.core);
@@ -76,8 +78,8 @@ export function createSyntheticCardBroker(input: SyntheticCardInstallation) {
         if (evidenceHash(read.payload) !== read.payloadSha256 || Buffer.byteLength(read.payload, 'utf8') !== read.payloadBytes) return fail();
         const evaluated = evaluateRedactionRuntimeEvidence({ validation, validationSha256, corpus, corpusSha256, rollout,
             observed: read.redactionIdentity, now: now() });
-        if (evaluated.status !== 'valid') return fail();
-        return read;
+        if (evaluated.status !== 'valid' || evaluated.expiresAt === null) return fail();
+        return { read, evidenceExpiresAt: evaluated.expiresAt };
     }
     function retire(): Promise<void> {
         const previous = active;
@@ -112,8 +114,9 @@ export function createSyntheticCardBroker(input: SyntheticCardInstallation) {
                 try {
                     await previousCleanup;
                     attempt.core = await job.ready;
-                    const read = boundary(attempt);
+                    const { read, evidenceExpiresAt } = boundary(attempt);
                     attempt.payloadSha256 = read.payloadSha256; attempt.payload = read.payload;
+                    current(attempt, evidenceExpiresAt);
                     prepared.set(token, attempt);
                     return token;
                 } catch {
@@ -124,19 +127,24 @@ export function createSyntheticCardBroker(input: SyntheticCardInstallation) {
         },
         review(token: PreparedSyntheticCard) {
             try {
-                const attempt = prepared.get(handle(token)) ?? fail(), read = boundary(attempt);
+                const attempt = prepared.get(handle(token)) ?? fail();
+                const { read, evidenceExpiresAt } = boundary(attempt);
                 if (read.payload !== attempt.payload || read.payloadSha256 !== attempt.payloadSha256) return fail();
-                return Object.freeze({ patient: attempt.patient, selection: attempt.selection, session, attempt: attempt.id,
+                const review = Object.freeze({ patient: attempt.patient, selection: attempt.selection, session, attempt: attempt.id,
                     payload: read.payload, payloadSha256: read.payloadSha256, payloadBytes: read.payloadBytes });
+                current(attempt, evidenceExpiresAt);
+                return review;
             } catch { return fail(); }
         },
         approve(token: PreparedSyntheticCard, reviewedPayloadSha256: string): SyntheticCardConsent {
             try {
-                const attempt = prepared.get(handle(token)) ?? fail(), read = boundary(attempt);
+                const attempt = prepared.get(handle(token)) ?? fail();
+                const { read, evidenceExpiresAt } = boundary(attempt);
                 if (typeof reviewedPayloadSha256 !== 'string' || read.payload !== attempt.payload
                     || read.payloadSha256 !== attempt.payloadSha256 || reviewedPayloadSha256 !== read.payloadSha256) return fail();
                 const consent = opaque();
-                consents.set(consent, { attempt, digest: read.payloadSha256, expires: Math.min(now() + CONSENT_MS, expires) });
+                const time = current(attempt, evidenceExpiresAt);
+                consents.set(consent, { attempt, digest: read.payloadSha256, expires: Math.min(time + CONSENT_MS, expires) });
                 return consent;
             } catch { return fail(); }
         },
@@ -144,8 +152,9 @@ export function createSyntheticCardBroker(input: SyntheticCardInstallation) {
             const attempt = prepared.get(handle(token)) ?? fail();
             current(attempt);
             if (reference !== attempt.sourceRef) return fail();
-            const source = syntheticCardFixture(attempt.patient).localSource;
-            return Object.freeze({ ...source });
+            const source = Object.freeze({ ...syntheticCardFixture(attempt.patient).localSource });
+            current(attempt);
+            return source;
         },
         revoke(): Promise<void> { revoked = true; generation++; patient = undefined; clearTimeout(timer); return retire(); },
         close(): Promise<void> { return owner.revoke(); },
@@ -155,8 +164,11 @@ export function createSyntheticCardBroker(input: SyntheticCardInstallation) {
             try {
                 const attempt = prepared.get(handle(token)) ?? fail(), consent = consents.get(handle(consentToken)) ?? fail();
                 if (consent.attempt !== attempt || now() >= consent.expires) return fail();
-                const read = boundary(attempt);
+                const { read, evidenceExpiresAt } = boundary(attempt);
                 if (read.payloadSha256 !== consent.digest || read.payload !== attempt.payload || read.payloadSha256 !== attempt.payloadSha256) return fail();
+                const time = current(attempt, evidenceExpiresAt);
+                if (time >= consent.expires || consents.get(consentToken) !== consent || consent.attempt !== attempt
+                    || prepared.get(token) !== attempt) return fail();
                 attempt.consumed = true; consents.delete(consentToken);
                 return read.payload;
             } catch { return fail(); }
