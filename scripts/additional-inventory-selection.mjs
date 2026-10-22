@@ -52,7 +52,7 @@ export function collectAdditionalInventorySelections(root) {
     '? runNodeWithQuarantine(command, options)', ': spawnSync(process.execPath, command, options)',
   ]);
   add('chatgpt:browser', 'ordinary', 'scripts/chatgpt-product-focused-tests.mjs', () => {
-    chatgpt(); return { files: collectChatgptFocusedTests(root, { browserOnly: true }), binding: collectLiteralCiBinding(root, { workflow: '.github/workflows/e2e.yml', job: 'e2e', ciCall: browserCall }) };
+    chatgpt(); return { files: collectChatgptFocusedTests(root, { browserOnly: true }), binding: collectLiteralCiBinding(root, { workflow: '.github/workflows/e2e.yml', job: 'e2e-shard', ciCall: browserCall }) };
   });
   add('chatgpt:local', 'local', 'scripts/chatgpt-product-focused-tests.mjs', () => {
     chatgpt(); return { files: collectChatgptFocusedTests(root), binding: { command: 'node scripts/chatgpt-product-focused-tests.mjs', prerequisites: 'Explicit fresh synthetic data, exact installed owner; no live provider or OS qualification.' } };

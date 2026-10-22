@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { collectExplicitNpmNodeTests, collectExplicitNpmSelections, collectNpmScriptBinding, collectClaimsSelfTestSelection, collectGuardSelfTestSelections, GUARD_SELF_TEST_SUITES, EXPLICIT_NPM_SUITES } from './explicit-npm-test-selection.mjs';
+import { collectShardedPlaywrightBinding, collectExplicitNpmNodeTests, collectExplicitNpmSelections, collectNpmScriptBinding, collectClaimsSelfTestSelection, collectGuardSelfTestSelections, GUARD_SELF_TEST_SUITES, EXPLICIT_NPM_SUITES } from './explicit-npm-test-selection.mjs';
+import { load } from 'js-yaml';
 import { collectUnitTestFiles } from './unit-test-selection.mjs';
 import { checkTestSelection } from './check-test-selection.mjs';
 
@@ -16,6 +17,39 @@ const workflowPath = '.github/workflows/cross-platform.yml';
 const claimsFile = 'scripts/check-claims-guard.mjs';
 const claimsWorkflow = '.github/workflows/openapi-contract-guard.yml';
 const claimsCall = 'npm run check:claims -- --self-test';
+
+test('Playwright CI requires complete shards and a fail-closed aggregate', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-shard-selection-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const workflowPath = '.github/workflows/e2e.yml';
+  const original = load(fs.readFileSync(path.join(sourceRoot, workflowPath), 'utf8'));
+  write(root, 'package.json', fs.readFileSync(path.join(sourceRoot, 'package.json'), 'utf8'));
+  write(root, workflowPath, original);
+  assert.deepEqual(collectShardedPlaywrightBinding(root).matrix, { shard: [1, 2] });
+  const gate = original.jobs.e2e.steps[0];
+  for (const result of ['success', 'failure', 'cancelled', 'skipped', '']) {
+    const run = spawnSync('bash', ['-e', '-c', gate.run], { env: { ...process.env, SHARD_RESULT: result } });
+    assert.equal(run.status === 0, result === 'success', result);
+  }
+  for (const mutate of [
+    w => { w.jobs['e2e-shard'].strategy.matrix.shard = [1]; },
+    w => { w.jobs['e2e-shard'].strategy.matrix.shard = [1, 1]; },
+    w => { w.jobs['e2e-shard'].strategy['fail-fast'] = true; },
+    w => { w.jobs['e2e-shard'].if = false; },
+    w => { w.jobs['e2e-shard']['continue-on-error'] = true; },
+    w => { w.jobs['e2e-shard'].steps.find(s => s.name === 'Run Playwright suite').if = false; },
+    w => { w.jobs['e2e-shard'].steps.find(s => s.name === 'Run Playwright suite')['continue-on-error'] = true; },
+    w => { w.jobs['e2e-shard'].steps.find(s => s.name === 'Run Playwright suite').run += ' --grep smoke'; },
+    w => { delete w.jobs.e2e.if; },
+    w => { w.jobs.e2e.needs = []; },
+    w => { w.jobs.e2e.steps[0].run = 'true'; },
+    w => { w.jobs.e2e['continue-on-error'] = true; },
+  ]) {
+    const changed = structuredClone(original);
+    mutate(changed); write(root, workflowPath, changed);
+    assert.throws(() => collectShardedPlaywrightBinding(root));
+  }
+});
 
 function write(root, file, value) {
   fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
