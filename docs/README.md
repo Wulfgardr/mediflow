@@ -526,6 +526,9 @@ build ammessa, configurazione dei client e prove ancora necessarie. Non
 amplia il grant profilo esistente né dichiara ammissione clinica o pubblicazione.
 
 [ADR 0160](./adr/0160-mediflow-in-desktop-chat.md) propone il nuovo client nelle
-chat desktop: contesto pseudonimizzato, ricomposizione locale e accesso nativo
-da qualificare. Resta Proposed; il pilota sintetico R/L e l’ammissione di dati
-reali sono passaggi distinti. Il telecomando di ADR 0159 conserva il suo confine.
+chat desktop: contesto pseudonimizzato, ricomposizione nativa raccomandata,
+Touch ID/PIN nativi e mapping solo di sessione. Il secondo round integra
+esiti R/L per host, importazione documentale, Fabric, catalogo delle viste,
+budget di prestazione e pubblicazione. Resta Proposed; qualifica sintetica,
+approvazione delle directory e ammissione clinica sono passaggi distinti.
+Il telecomando di ADR 0159 conserva il suo confine.
