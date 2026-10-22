@@ -524,3 +524,8 @@ WUL-757 con sola navigazione nella UI fidata separata. Il
 [pacchetto locale](../plugins/mediflow-local-ui/README.md) distingue template,
 build ammessa, configurazione dei client e prove ancora necessarie. Non
 amplia il grant profilo esistente né dichiara ammissione clinica o pubblicazione.
+
+[ADR 0160](./adr/0160-mediflow-in-desktop-chat.md) propone il nuovo client nelle
+chat desktop: contesto pseudonimizzato, ricomposizione locale e accesso nativo
+da qualificare. Resta Proposed; il pilota sintetico R/L e l’ammissione di dati
+reali sono passaggi distinti. Il telecomando di ADR 0159 conserva il suo confine.

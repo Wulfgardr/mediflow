@@ -14,6 +14,8 @@ verifica dello stato successivo.
 
 ## Decisioni richiamate
 
+- [0160-mediflow-in-desktop-chat.md](./0160-mediflow-in-desktop-chat.md): **Proposed (2026-10-22)**; WUL-788, viste desktop con contesto pseudonimizzato, ricomposizione locale e proposta di autorità nativa; prove R/L e ammissione reale restano distinte.
+
 - [0157-hl7-conformance-at-clinical-boundaries.md](./0157-hl7-conformance-at-clinical-boundaries.md): **Accepted (2026-10-21)**; WUL-784/785, conformità HL7 per scambi clinici interoperabili con corpus sintetico dei mapper reali e validatore ufficiale in CI; IPS separato, primo documento italiano CDA-PSS 1.5 e confini non HL7 dichiarati.
 
 - [0158-territorial-packs.md](./0158-territorial-packs.md): **Accepted (2026-10-21)**; WUL-785, nucleo internazionale per le nuove installazioni, Italia e Lombardia sotto capacità host versionata, migrazione conservativa e storico leggibile con pacchetto disattivo.
