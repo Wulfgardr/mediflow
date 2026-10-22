@@ -9,34 +9,35 @@
   "scope": "Current broker card only. Simulated neural runner. Extended ADR workload and desktop R NOT QUALIFIED.",
   "gzipBytes": 161817,
   "preparation": {
-    "p50": 0.6503330000014103,
-    "p95": 1.0454580000000533,
-    "max": 4.215333000000101
+    "p50": 0.6526249999988067,
+    "p95": 0.8824999999999363,
+    "max": 4.525125000000116
   },
   "summaries": {
     "cold": {
-      "p50": 228.76783400000022,
-      "p95": 238.22933399999965,
-      "max": 244.89116599999943
+      "p50": 302.9270839999999,
+      "p95": 328.7034580000018,
+      "max": 405.5885419999977
     },
     "warm": {
-      "p50": 224.53737600000022,
-      "p95": 233.6080409999995,
-      "max": 248.1314999999995
+      "p50": 294.2442500000034,
+      "p95": 317.87616699999853,
+      "max": 325.1343749999942
     }
   },
   "feedback": {
-    "p50": 38.70000000298023,
-    "p95": 46.3999999910593,
-    "max": 55.900000005960464
+    "p50": 41.70000000298023,
+    "p95": 48.79999999701977,
+    "max": 54.29999999701977
   },
   "interaction": {
-    "p50": 14.099999994039536,
-    "p95": 15.200000002980232,
-    "max": 15.400000005960464
+    "p50": 14.100000008940697,
+    "p95": 15.299999997019768,
+    "max": 17.5
   },
+  "browserChannel": "chromium",
   "measurement": "Useful view = opening to choice + click to visible card after two animation frames; human wait excluded. Gates use usefulMs, not readyMs.",
-  "runCount": 60,
+  "runCount": 180,
   "adversarialScenarios": [
     "same-frame forged prepare/share with known challenge",
     "new turn during held preparation",
@@ -44,62 +45,253 @@
     "late share after close"
   ],
   "acceptance": {
-    "passed": false,
-    "failedGate": "no attributable widget long task >50ms",
-    "longTasks": [
-      {
-        "start": 83.40000000596046,
-        "duration": 53,
-        "name": "self",
-        "attribution": [
-          {
-            "name": "unknown",
-            "type": "iframe",
-            "src": ""
-          }
-        ]
+    "passed": true,
+    "consecutiveFullBudgets": 3,
+    "runsPerBudget": 60,
+    "longTaskThresholdMs": 50,
+    "longTasksAboveThreshold": 0
+  },
+  "consecutiveBudgets": [
+    {
+      "sequence": 1,
+      "runs": 60,
+      "usefulView": {
+        "cold": {
+          "p50": 302.9599999999955,
+          "p95": 331.25545799999963,
+          "max": 333.7986669999991
+        },
+        "warm": {
+          "p50": 297.86366700000144,
+          "p95": 322.7084160000013,
+          "max": 323.37445899999875
+        }
+      },
+      "feedback": {
+        "p50": 42.400000005960464,
+        "p95": 47.3999999910593,
+        "max": 52.79999999701977
+      },
+      "interaction": {
+        "p50": 14.100000008940697,
+        "p95": 14.900000005960464,
+        "max": 17.5
+      },
+      "preparation": {
+        "p50": 0.6526249999988067,
+        "p95": 0.8486249999996289,
+        "max": 4.525125000000116
+      },
+      "observedLongTasks": [
+        {
+          "start": 77.79999999701977,
+          "duration": 50,
+          "name": "self",
+          "attribution": [
+            {
+              "name": "unknown",
+              "type": "iframe",
+              "src": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sequence": 2,
+      "runs": 60,
+      "usefulView": {
+        "cold": {
+          "p50": 300.0382499999978,
+          "p95": 316.1392500000011,
+          "max": 317.4544159999996
+        },
+        "warm": {
+          "p50": 293.6808319999982,
+          "p95": 318.16133300000365,
+          "max": 325.1343749999942
+        }
+      },
+      "feedback": {
+        "p50": 40.19999998807907,
+        "p95": 48,
+        "max": 54.29999999701977
+      },
+      "interaction": {
+        "p50": 14.100000008940697,
+        "p95": 14.900000005960464,
+        "max": 16
+      },
+      "preparation": {
+        "p50": 0.6428340000002208,
+        "p95": 0.9142080000001442,
+        "max": 3.7617079999999987
+      },
+      "observedLongTasks": []
+    },
+    {
+      "sequence": 3,
+      "runs": 60,
+      "usefulView": {
+        "cold": {
+          "p50": 302.97687600000063,
+          "p95": 330.95533400000204,
+          "max": 405.5885419999977
+        },
+        "warm": {
+          "p50": 291.7275000000009,
+          "p95": 301.8465410000026,
+          "max": 302.69712399999844
+        }
+      },
+      "feedback": {
+        "p50": 41.70000000298023,
+        "p95": 48.8999999910593,
+        "max": 50.29999999701977
+      },
+      "interaction": {
+        "p50": 14.099999994039536,
+        "p95": 15.700000002980232,
+        "max": 16.69999998807907
+      },
+      "preparation": {
+        "p50": 0.663750000001528,
+        "p95": 0.8473329999997077,
+        "max": 4.138582999999926
+      },
+      "observedLongTasks": []
+    }
+  ],
+  "before": {
+    "node": "v24.21.0",
+    "browser": "145.0.7632.6",
+    "hardware": {
+      "cpu": "Apple M4 Max",
+      "ram": 38654705664,
+      "os": "27.2.0"
+    },
+    "scope": "Current broker card only. Simulated neural runner. Extended ADR workload and desktop R NOT QUALIFIED.",
+    "gzipBytes": 161817,
+    "preparation": {
+      "p50": 0.6503330000014103,
+      "p95": 1.0454580000000533,
+      "max": 4.215333000000101
+    },
+    "summaries": {
+      "cold": {
+        "p50": 228.76783400000022,
+        "p95": 238.22933399999965,
+        "max": 244.89116599999943
+      },
+      "warm": {
+        "p50": 224.53737600000022,
+        "p95": 233.6080409999995,
+        "max": 248.1314999999995
       }
-    ]
+    },
+    "feedback": {
+      "p50": 38.70000000298023,
+      "p95": 46.3999999910593,
+      "max": 55.900000005960464
+    },
+    "interaction": {
+      "p50": 14.099999994039536,
+      "p95": 15.200000002980232,
+      "max": 15.400000005960464
+    },
+    "measurement": "Useful view = opening to choice + click to visible card after two animation frames; human wait excluded. Gates use usefulMs, not readyMs.",
+    "runCount": 60,
+    "adversarialScenarios": [
+      "same-frame forged prepare/share with known challenge",
+      "new turn during held preparation",
+      "new tool call during held preparation",
+      "late share after close"
+    ],
+    "acceptance": {
+      "passed": false,
+      "failedGate": "no attributable widget long task >50ms",
+      "longTasks": [
+        {
+          "start": 83.40000000596046,
+          "duration": 53,
+          "name": "self",
+          "attribution": [
+            {
+              "name": "unknown",
+              "type": "iframe",
+              "src": ""
+            }
+          ]
+        }
+      ]
+    },
+    "negativeDelivery": {
+      "injectedDelayMs": 2200,
+      "runs": 60,
+      "summaries": {
+        "cold": {
+          "p50": 2516.7599160000027,
+          "p95": 2565.420416000008,
+          "max": 2579.6172490000026
+        },
+        "warm": {
+          "p50": 2519.8117089999723,
+          "p95": 2592.725456999993,
+          "max": 2734.4041260000085
+        }
+      },
+      "rejectedBy": "warm useful view <=2s p95"
+    },
+    "choice": {
+      "cold": {
+        "p50": 137.95645799999875,
+        "p95": 139.5374579999998,
+        "max": 139.58141699999942
+      },
+      "warm": {
+        "p50": 135.7440000000006,
+        "p95": 140.6233749999992,
+        "max": 141.75004199999967
+      }
+    },
+    "delivery": {
+      "cold": {
+        "p50": 91.14758400000028,
+        "p95": 100.9233750000003,
+        "max": 106.93470800000068
+      },
+      "warm": {
+        "p50": 88.42912500000239,
+        "p95": 99.49625000000015,
+        "max": 106.38145799999984
+      }
+    }
+  },
+  "negativeLongTask": {
+    "injectedSynchronousWorkMs": 75,
+    "runs": 60,
+    "rejectedBy": "no attributable widget long task >50ms"
+  },
+  "negativeFeedback": {
+    "injectedSynchronousWorkMs": 150,
+    "rejectedBy": "click feedback budget mutation"
   },
   "negativeDelivery": {
     "injectedDelayMs": 2200,
     "runs": 60,
+    "browserChannel": "chromium",
     "summaries": {
       "cold": {
-        "p50": 2516.7599160000027,
-        "p95": 2565.420416000008,
-        "max": 2579.6172490000026
+        "p50": 2633.0690840000025,
+        "p95": 2675.1256250000006,
+        "max": 2686.0934579999885
       },
       "warm": {
-        "p50": 2519.8117089999723,
-        "p95": 2592.725456999993,
-        "max": 2734.4041260000085
+        "p50": 2566.35216699999,
+        "p95": 2599.8442080000095,
+        "max": 2603.517749000006
       }
     },
     "rejectedBy": "warm useful view <=2s p95"
-  },
-  "choice": {
-    "cold": {
-      "p50": 137.95645799999875,
-      "p95": 139.5374579999998,
-      "max": 139.58141699999942
-    },
-    "warm": {
-      "p50": 135.7440000000006,
-      "p95": 140.6233749999992,
-      "max": 141.75004199999967
-    }
-  },
-  "delivery": {
-    "cold": {
-      "p50": 91.14758400000028,
-      "p95": 100.9233750000003,
-      "max": 106.93470800000068
-    },
-    "warm": {
-      "p50": 88.42912500000239,
-      "p95": 99.49625000000015,
-      "max": 106.38145799999984
-    }
   }
 }
