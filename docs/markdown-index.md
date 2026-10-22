@@ -446,6 +446,8 @@ un’autorizzazione aggiuntiva né un’attestazione di runtime.
 | [ADR 0140](./adr/0140-synthetic-plugin-feasibility.md) | WUL-756: plugin isolato con fixture inventate, contesto esplicito e gate clinici/distribuzione distinti. |
 | [Plugin sintetico](../plugins/mediflow-synthetic/README.md) | Setup Node 24, dipendenze fissate, prove MCP/DOM/browser simulato e limiti di installazione. |
 | [Skill synthetic-review](../plugins/mediflow-synthetic/skills/synthetic-review/SKILL.md) | Workflow medico limitato a esempi inventati, senza accesso a cartelle cliniche o applicazione. |
+| [Lettore inline sintetico](../plugins/mediflow-chat-demo/README.md) | Pacchetto WUL-788, confini, prova R/L e configurazione locale reversibile. |
+| [Esiti del lettore inline sintetico, 22 ottobre 2026](../plugins/mediflow-chat-demo/evidence/2026-10-22.md) | Host di riferimento riuscito e client reale bloccato dalla quota; limiti e prove. |
 
 Il confronto con `rg --files -g '*.md' | sort` permette di verificare
 l’inventario. Ogni file deve comparire con una descrizione, la data «Ultimo

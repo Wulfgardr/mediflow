@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "mediflow-chat-demo": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${PLUGIN_ROOT}/src/stdio.mjs"
+      ],
+      "cwd": "${PLUGIN_ROOT}"
+    }
+  }
+}
