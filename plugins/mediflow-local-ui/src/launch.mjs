@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 try {
-  if (process.argv.length !== 2 || process.execArgv.length || process.version !== 'v24.21.0') throw new Error('unavailable');
+  if (process.argv.length !== 2 || process.execArgv.length || Number(process.versions.node.split('.')[0]) !== 24) throw new Error('unavailable');
   const root = fileURLToPath(new URL('..', import.meta.url));
   const config = JSON.parse(fs.readFileSync(path.join(root, 'runtime.json'), 'utf8'));
   if (Object.keys(config).sort().join(',') !== 'dataDir,nodePath,revision,schemaVersion,sourceRoot'
