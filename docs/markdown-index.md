@@ -15,7 +15,8 @@ soltanto alcuni degli ingressi; qui sono censiti i `.md` tracciati, con una
 breve indicazione d’uso.
 
 La mappa precedente era aggiornata al 2026-09-08. Revisione editoriale:
-2026-10-17. I verbali di luglio e le proposte superate rimossi dall’albero
+2026-10-17; aggiunta ADR 0160: 2026-10-22. I verbali di luglio e le proposte
+superate rimossi dall’albero
 restano consultabili nell’[indice del tag v0.9.0](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/docs/markdown-index.md).
 Le voci storiche conservano date, conteggi, revisioni e limiti:
 la data di questo indice non rinnova le prove cui rimandano.
@@ -62,6 +63,7 @@ versione o risalire alla provenienza di un’interfaccia.
 | [adr/0155-account-profile-read-and-conditional-update.md](./adr/0155-account-profile-read-and-conditional-update.md) | WUL-771: lettura del profilo dell'account e PUT condizionale con versione derivata dal contenuto. | Prima di collegare il profilo nel client GPUI o modificare i consumer Web/Apple e la compatibilità della PUT condizionale. |
 | [adr/0157-hl7-conformance-at-clinical-boundaries.md](./adr/0157-hl7-conformance-at-clinical-boundaries.md) | WUL-784: conformità HL7 ai confini clinici, profili e artefatti versionati. | Prima di implementare validazione HL7 o dichiarare conformità e accettazione FSE. |
 | [adr/0158-territorial-packs.md](./adr/0158-territorial-packs.md) | WUL-785: nucleo internazionale e pacchetti territoriali governati dall’host. | Prima di separare capacità Italia/Lombardia o modificare migrazione e conservazione dello storico. |
+| [adr/0160-mediflow-in-desktop-chat.md](./adr/0160-mediflow-in-desktop-chat.md) | WUL-788: secondo round Proposed; canali per host, importazione, Fabric, viste, budget e pubblicazione. | Prima di implementare broker, accesso, scritture o distribuzione; non attesta ammissione clinica. |
 | [start-here.md](./start-here.md) | Esigenza ambulatoriale, uso senza AI e tre livelli di approfondimento. | Primo accesso al progetto. |
 | [release-085-readiness.md](./release-085-readiness.md) | Evidenze runtime, gate aperti, account Apple e promozione. | Prima di presentare o distribuire la 0.8.5. |
 | [getmediflow-editorial-proposal.md](./getmediflow-editorial-proposal.md) | Ragioni del racconto pubblico e rapporto tra sito, documentazione e runtime. | Revisione del racconto pubblico. |
