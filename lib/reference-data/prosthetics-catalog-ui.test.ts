@@ -28,7 +28,7 @@ test('real component and routes: preview, acceptance, invalid rows, CAS, lost re
     const bundle = await build({ stdin: {
         contents: "import React from 'react'; import {createRoot} from 'react-dom/client'; import Manager from './components/prosthetics-catalog-manager'; createRoot(document.getElementById('root')).render(React.createElement(Manager));",
         resolveDir: process.cwd(), loader: 'tsx',
-    }, bundle: true, write: false, platform: 'browser', format: 'iife', define: { 'process.env.NODE_ENV': '"production"' } });
+    }, bundle: true, write: false, outfile: 'prosthetics-ui.js', platform: 'browser', format: 'iife', define: { 'process.env.NODE_ENV': '"production"' } });
     const browser = await chromium.launch({ headless: true });
     try {
         const context = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['clipboard-read', 'clipboard-write'] });
@@ -38,8 +38,9 @@ test('real component and routes: preview, acceptance, invalid rows, CAS, lost re
         await page.route('**/*', async route => {
             const req = route.request(), url = new URL(req.url());
             if (url.origin !== 'http://127.0.0.1:48973') { await route.abort(); return; }
-            if (url.pathname === '/') { await route.fulfill({ contentType: 'text/html', body: '<html lang="it"><body><div id="root"></div><script src="/bundle.js"></script></body></html>' }); return; }
-            if (url.pathname === '/bundle.js') { await route.fulfill({ contentType: 'text/javascript', body: bundle.outputFiles[0].text }); return; }
+            if (url.pathname === '/') { await route.fulfill({ contentType: 'text/html', body: '<html lang="it"><head><link rel="stylesheet" href="/bundle.css"></head><body><div id="root"></div><script src="/bundle.js"></script></body></html>' }); return; }
+            if (url.pathname === '/bundle.js') { await route.fulfill({ contentType: 'text/javascript', body: bundle.outputFiles.find(file => file.path.endsWith('.js'))!.text }); return; }
+            if (url.pathname === '/bundle.css') { await route.fulfill({ contentType: 'text/css', body: bundle.outputFiles.find(file => file.path.endsWith('.css'))!.text }); return; }
             const action = url.pathname.split('/').at(-1);
             if (!['preview', 'commit', 'status', 'search', 'template', 'sources', 'documents'].includes(action!)) { await route.abort(); return; }
             const request = new Request(req.url(), { method: req.method(), headers: req.headers(), body: req.method() === 'POST' ? req.postData() : undefined });

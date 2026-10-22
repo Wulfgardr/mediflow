@@ -295,12 +295,12 @@ for (const schedaCase of CASES) {
     // the hash precedes the asynchronous folder visibility update.
     await expect(page).toHaveURL(new URL(`/patients/${patient.id}/modules#quadro`, page.url()).href);
     await expectCurrentSection(page, 'quadro');
-    const note = page.getByText('Leggi la nota completa', { exact: true });
+    const note = page.getByRole('button', { name: 'Leggi la nota completa', exact: true });
     await expect(note).toBeVisible();
     await note.focus();
     await expect(note).toBeFocused();
     await note.press('Space');
-    await expect(note.locator('..')).toHaveAttribute('open', '');
+    await expect(note).toHaveAttribute('aria-expanded', 'true');
     // Scroll the actual overflowing ancestor, not the former inert Scheda wrapper.
     const scrollEvidence = await surface.evaluate(element => {
       let owner = element.parentElement;
@@ -352,7 +352,7 @@ for (const schedaCase of CASES) {
       expect(geometry.left).toBe(geometry.right);
       expect(geometry.pill).toBe(false);
     }
-    const statusLabels = surface.locator('[data-testid^="review-queue-row-"] summary > span:nth-child(2):visible');
+    const statusLabels = surface.locator('[data-testid^="review-queue-row-"] [data-disclosure-control] > span > span:nth-child(2):visible');
     expect(await statusLabels.count()).toBeGreaterThan(0);
     for (const status of await statusLabels.all()) {
       await expect(status).toHaveText(/Bloccato|Da rivedere|Serve testo/);

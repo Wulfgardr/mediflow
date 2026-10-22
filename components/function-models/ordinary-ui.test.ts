@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
+import { mountContract } from '../settings/settings-presentation.test-support.ts';
 
 type Node = { type: string | ((props: Record<string, unknown>) => unknown); props: Record<string, unknown> };
 const jsx = (type: Node['type'], props: Node['props']) => ({ type, props });
@@ -13,6 +14,7 @@ function loadComponent(file: string, exportName: string, state: unknown[] = []) 
     let index = 0; const never = () => { throw new Error('outside synthetic component projection'); };
     const exports: { TestComponent?: (props: Record<string, unknown>) => Node } = {};
     const scopedRequire = (id: string): unknown => {
+        if (id === '@/components/disclosure') return { Disclosure: (props: Record<string, unknown>) => mountContract('components/disclosure.tsx', 'Disclosure', { props }).render() };
         if (id === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'fragment' };
         if (id === 'react') return { useState: (initial: unknown) => [index < state.length ? state[index++] : initial, never] };
         if (id === '@/lib/ai-lane-kill-switch') return { isAiLaneEnabledValue: (v: unknown) => v === 'enabled' };
@@ -57,7 +59,7 @@ test('digest disclosure is identity + bytes + proposal-only, never raw prepared 
     assert.doesNotMatch(content, /Verifica contenuto preparato|PRIVATE_PROVIDER_SENTINEL/u);
     assert.match(content, /100 byte/u); assert.match(content, /Questa proposta non modifica la cartella/u);
     assert.ok(content.includes('c'.repeat(64))); assert.equal(rawReads, 0);
-    assert.equal(nodes(tree).find(n => n.type === 'summary')!.props.children, 'Identità del contesto preparato');
+    assert.equal(text(nodes(tree).find(n => n.type === 'button' && n.props['data-disclosure-control'])!.props.children), 'Identità del contesto preparato');
 });
 
 test('explicit OpenAI configuration previews only the shared switch with unavailable ATHENA', () => {

@@ -1,4 +1,5 @@
 'use client';
+import { Disclosure } from '@/components/disclosure';
 import { isAiLaneEnabledValue } from '@/lib/ai-lane-kill-switch';
 import type { OrdinaryBrowserView } from '@/lib/function-models/ordinary-browser';
 import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react';
@@ -45,15 +46,14 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
             {selected && <span className={styles.pickerProvider}>{providerName(selected.provider)}<small>{view.choice ? 'Solo questa proposta' : 'Predefinito'}</small></span>}
             {needsRefresh && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading} onClick={() => void client.read()}>Rileggi modelli</button>}
             {confirmDefault && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading} onClick={() => client.choose('')}>Riusa predefinito</button>}
-            <details className={styles.pickerDetails}>
-            <summary aria-label="Dettagli modello">Dettagli</summary>
+            <Disclosure label="Dettagli modello" className={styles.pickerDetails} title="Dettagli">
             <div className={styles.pickerDetailBody}>
                 <p>{selected ? `${selected.label} · ${providerName(selected.provider)}` : 'Il modello viene risolto dalle impostazioni correnti.'}</p>
                 <p>{view.choice ? 'Scelta per una sola proposta; non salvata.' : 'Usa il modello predefinito delle impostazioni.'} {view.consumed ? 'Per ripetere, scegli nuovamente o riusa il predefinito.' : ''}</p>
                 <p>La configurazione non prova la disponibilità del modello: viene verificata alla richiesta.</p>
                 {!needsRefresh && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading} onClick={() => void client.read()}>Rileggi modelli</button>}
             </div>
-            </details>
+            </Disclosure>
         </div>
         {blockingStatus && <p role="status" className={styles.hint}>{blockingStatus}</p>}
         {view.remote && <OrdinaryFunctionControls client={client} view={view.remote} />}
@@ -76,7 +76,7 @@ function OrdinaryFunctionControls({ client, view }: { client: ReturnType<typeof 
         </>}
         {phase === 'needs_consent' && view.disclosure && <>
             <p>Contesto preparato e redatto: {view.disclosure.payloadBytes} byte. Questa proposta non modifica la cartella.</p>
-            <details><summary>Identità del contesto preparato</summary><code style={{ overflowWrap: 'anywhere' }}>{view.disclosure.payloadSha256}</code></details>
+            <Disclosure title="Identità del contesto preparato"><code style={{ overflowWrap: 'anywhere' }}>{view.disclosure.payloadSha256}</code></Disclosure>
             <button type="button" disabled={view.loading} onClick={() => void client.remote.action('consent')}>Consenti per questo contesto</button>
         </>}
         {phase === 'consented' && <button type="button" disabled={view.loading} onClick={() => void client.remote.action('login/start')}>Avvia accesso dedicato ChatGPT</button>}

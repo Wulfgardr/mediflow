@@ -1,5 +1,6 @@
 'use client';
 
+import { Disclosure } from '@/components/disclosure';
 import { formatCountLabel } from '@/lib/format-count';
 import styles from './clinical-register.module.css';
 import { type FormEvent, useMemo, useState } from 'react';
@@ -686,7 +687,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                         const childItems = itemsByPrescription.get(item.id) ?? [];
                         return <tr key={item.id}>
                             <td><strong>{item.serviceName}</strong><small>{categoryLabel(item.category)}{childItems.length > 0 ? ` · ${formatCountLabel(childItems.length, 'voce', 'voci')}` : ''}</small>
-                                <details className={styles.recordDetails}><summary>Dettagli, referti e documenti</summary>
+                                <Disclosure className={styles.recordDetails} title="Dettagli, referti e documenti">
                                     <p>Prescritta il {formatDate(item.prescribedAt) ?? '–'}</p>
                                         <div className="mt-2 grid gap-2 text-sm text-[color:var(--lume-ink-muted)] md:grid-cols-2">
                                             {item.serviceCode && (
@@ -778,7 +779,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                             <p className="mt-3 text-sm leading-6 text-[color:var(--lume-ink-muted)]">{item.notes}</p>
                                         )}
 
-                                </details>
+                                </Disclosure>
                             </td>
                             <td className={`${styles.secondaryColumn} lume-registro`}>{formatDate(item.prescribedAt) ?? '–'}</td>
                             <td><Badge tone={serviceStatusSignal(item.status)} size="xs" className={styles.status}>{statusLabel(item.status)}</Badge>

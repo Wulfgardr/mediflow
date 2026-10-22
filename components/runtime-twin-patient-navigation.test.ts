@@ -1,3 +1,5 @@
+// Real React navigation and its CSS in Chromium; fixture controls replace only
+// the asynchronous count producer. No app server, clinical data or API writes.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { chromium, expect } from '@playwright/test';

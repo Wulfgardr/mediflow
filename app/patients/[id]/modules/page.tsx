@@ -1,5 +1,6 @@
 'use client';
 
+import { Disclosure } from '@/components/disclosure';
 import { formatCountLabel } from '@/lib/format-count';
 import Link from 'next/link';
 import { differenceInYears } from 'date-fns';
@@ -737,7 +738,6 @@ export default function PatientDetailPage() {
                 </section>
 
                 <PluginLocalUiNavigation key={id} patientId={id} patientVersion={patient.version} patientLabel={`${patient.firstName} ${patient.lastName}`} />
-                <PluginPrescribingGuide />
                 <PatientSynopticSheet
                     clinicalSupport={<PatientClinicalSupport patient={patient} stale={insightStale}
                         smartImport={smartImportSourceCount > 0 && smartImportFabricCaptureInput ? (
@@ -802,6 +802,7 @@ export default function PatientDetailPage() {
                         keepMounted
                     >
                         <div className="space-y-4">
+                            <PluginPrescribingGuide />
                             <TherapyManager patientId={id} embedded />
                             <TreatmentReasoningPanel
                                 patient={patient}
@@ -890,10 +891,9 @@ export default function PatientDetailPage() {
                     {/* WUL-678: upload, source list, then review; no duplicated evidence tiles. */}
                     <DocumentUpload patientId={id}>
                         {documentInsights.length > 0 ? (
-                            <details id="document-insights" className={disclosure.disclosure}>
-                                <summary>Sintesi archiviate · {documentInsights.length}</summary>
+                            <Disclosure id="document-insights" className={disclosure.disclosure} title={<>Sintesi archiviate · {documentInsights.length}</>}>
                                 <DocumentInsightsPanel patient={patient} />
-                            </details>
+                            </Disclosure>
                         ) : null}
                     </DocumentUpload>
                 </CollapsibleSection>

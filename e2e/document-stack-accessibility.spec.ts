@@ -100,7 +100,7 @@ test('Evidence Stack web: fixture popolata, curation, empty ed errore restano ve
 
   await openDocumentSection(page, patientId);
   const summaries = page.locator('#document-insights');
-  await summaries.locator('summary').click();
+  await summaries.locator(':scope > div > [data-disclosure-control]').click();
   const stack = page.getByTestId('document-insights-archive');
   await expect(stack.getByText(insights[0].fileName, { exact: true })).toBeVisible();
   await expect(stack.getByText(insights[1].fileName, { exact: true })).toBeVisible();
@@ -115,8 +115,9 @@ test('Evidence Stack web: fixture popolata, curation, empty ed errore restano ve
   await firstDocumentButton.click();
   await expect(firstDocumentButton).toHaveAttribute('aria-expanded', 'true');
   await expect(archive.getByText(insights[0].summary, { exact: true })).toBeVisible();
-  await archive.getByText('Testo sorgente archiviato', { exact: true }).click();
-  await expect(archive.getByText(insights[0].rawMarkdown, { exact: true })).toBeVisible();
+  const selectedContent = page.locator(`[id="${await firstDocumentButton.getAttribute('aria-controls')}"]`);
+  await selectedContent.getByRole('button', { name: 'Testo sorgente archiviato', exact: true }).click();
+  await expect(selectedContent.getByText(insights[0].rawMarkdown, { exact: true })).toBeVisible();
   const removeFirst = archive.getByRole('button', { name: `Rimuovi ${insights[0].fileName} dall'archivio intelligente` });
   await assertKeyboardFocusProgresses(page, removeFirst, 'rimozione singolo documento Evidence Stack');
   await removeFirst.click();
@@ -142,7 +143,7 @@ test('Evidence Stack web: fixture popolata, curation, empty ed errore restano ve
     }
     await route.continue();
   });
-  await page.locator('#document-insights > summary').click();
+  await page.locator('#document-insights > div > [data-disclosure-control]').click();
   const errorArchive = page.getByTestId('document-insights-archive');
   await errorArchive.getByRole('button', { name: `Rimuovi ${errorInsights[0].fileName} dall'archivio intelligente` }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Rimuovi', exact: true }).click();
@@ -168,4 +169,46 @@ test('Evidence Stack web: loading ed empty hanno segnali distinti', async ({ pag
   await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
   await expect(page.getByTestId('patient-documents').getByText('Nessun documento caricato. Aggiungi un file per consultarlo e, separatamente, richiedere una sintesi.', { exact: true })).toBeVisible();
   await expect(page.getByTestId('document-insights-archive')).toHaveCount(0);
+});
+
+
+test('le sintesi archiviate chiuse non montano markdown e testo sorgente', async ({ page }) => {
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const marker = `${Date.now()}`.slice(-8);
+  const patientId = await createSyntheticPatient(page, marker);
+  const insights = Array.from({ length: 12 }, (_, index) => ({
+    ...buildSyntheticInsights(marker)[0],
+    id: `lazy-${marker}-${index}`,
+    fileName: `Documento sintetico lazy ${index}.pdf`,
+    summary: `## Sintesi lazy ${index}\n\nContenuto sintetico univoco ${index}.`,
+    rawMarkdown: `Sorgente sintetica univoca ${index}.`,
+  }));
+  await seedSyntheticInsights(page, patientId, insights);
+  await openDocumentSection(page, patientId);
+  await page.locator('#document-insights > div > [data-disclosure-control]').click();
+  const archive = page.getByTestId('document-insights-archive');
+  await expect(archive.locator('article')).toHaveCount(insights.length);
+
+  async function assertMounted(selected: number | null) {
+    // Count DOM nodes, including hidden ones: visibility alone misses eager mounting.
+    await expect(archive.locator('h2')).toHaveCount(selected === null ? 0 : 1);
+    await expect(archive.locator('pre')).toHaveCount(selected === null ? 0 : 1);
+    for (const [index, insight] of insights.entries()) {
+      await expect(archive.getByRole('heading', { name: `Sintesi lazy ${index}`, exact: true, includeHidden: true }))
+        .toHaveCount(index === selected ? 1 : 0);
+      await expect(archive.getByText(insight.rawMarkdown, { exact: true }))
+        .toHaveCount(index === selected ? 1 : 0);
+    }
+  }
+  const rowControl = (index: number) => archive.getByRole('button').filter({ hasText: insights[index].fileName });
+  await assertMounted(null);
+  await rowControl(3).click();
+  await assertMounted(3);
+  await expect(archive.getByRole('heading', { name: 'Sintesi lazy 3', exact: true })).toBeVisible();
+  await archive.getByRole('button', { name: 'Testo sorgente archiviato', exact: true }).click();
+  await expect(archive.getByText(insights[3].rawMarkdown, { exact: true })).toBeVisible();
+  await rowControl(8).click();
+  await assertMounted(8);
+  await rowControl(8).click();
+  await assertMounted(null);
 });

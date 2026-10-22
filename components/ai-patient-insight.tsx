@@ -1,5 +1,6 @@
 'use client';
 
+import { Disclosure } from '@/components/disclosure';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -205,8 +206,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
                             <Link href={`/patients/${patient.id}/modules#diario`} className="ui-btn-secondary" style={actionStyle}>Diario</Link>
                         </nav>
                     </div>
-                    <details className={disclosure.disclosure}>
-                        <summary>Dettagli di verifica</summary>
+                    <Disclosure className={disclosure.disclosure} title="Dettagli di verifica">
                         <div className="space-y-3 pb-4 text-sm text-[color:var(--lume-ink-muted)]">
                             <p className="flex items-center gap-2 font-semibold"><ShieldCheck className="h-4 w-4" aria-hidden="true" />Receipt, provenance e currentness</p>
                             <p>0 scritture · Applicazione non consentita</p>
@@ -217,7 +217,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
                                 <div><dt>Cattura / verifica</dt><dd className="text-[color:var(--lume-ink)]">{new Date(preview.proposal.currentness.capturedAt).toLocaleString('it-IT')} · {new Date(preview.proposal.currentness.verifiedAt).toLocaleString('it-IT')}</dd></div>
                             </dl>
                         </div>
-                    </details>
+                    </Disclosure>
                 </section>
             )}
 

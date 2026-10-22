@@ -129,7 +129,7 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
       } else {
         expect(result).toMatchObject({ status: 'extracted', candidateUse: 'review_only' });
         await expect(preview).toBeVisible();
-        await preview.locator('summary').click();
+        await preview.getByRole('button', { name: /Testo (?:estratto localmente|OCR locale)/ }).click();
         await expect(preview.locator('pre')).toHaveText(result.markdown);
         // AnyDoc normalizes whitespace around punctuation; preserve words and order.
         if (scenario !== 'scan') await expect(preview).toContainText(/PRIMA PAGINA TESTUALE\s*-\s*DOCUMENTO SINTETICO/);

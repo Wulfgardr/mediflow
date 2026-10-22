@@ -1,5 +1,7 @@
 'use client';
 
+import { Disclosure } from '@/components/disclosure';
+
 import styles from './clinical-register.module.css';
 import { type FormEvent, useMemo, useState } from 'react';
 import { Accessibility, CheckCircle2, LoaderCircle, Plus, Trash2 } from 'lucide-react';
@@ -245,16 +247,13 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
             )}
 
             {isFormOpen && (
-                <details className="mb-4 rounded-xl border border-[color:var(--lume-border-color)] px-4">
-                    <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold">
-                        Cerca un ausilio nel repertorio
-                    </summary>
+                <Disclosure className="mb-4" title="Cerca un ausilio nel repertorio">
                     <div className="pb-4">
                         <ProstheticsCatalogLookup onSelect={(entry, revision) => setForm(current => ({ ...current, description: entry.description,
                             catalogSelection: { entryId: entry.id, revision }, catalogLabel: `${entry.source} · ${entry.version} · ${entry.codeSystem} ${entry.code}` }))} />
                         {form.catalogLabel && <p className="text-sm">Fonte scelta: {form.catalogLabel}</p>}
                     </div>
-                </details>
+                </Disclosure>
             )}
 
             {isFormOpen && (
@@ -351,11 +350,11 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                                 {item.catalogSnapshot && <div className="space-y-2 text-sm">
                                     <p>{item.catalogSnapshot.codeSystem} · {item.catalogSnapshot.code}</p>
                                     <p>Fonte: {item.catalogSnapshot.source.name} · {item.catalogSnapshot.source.version}</p>
-                                    <details><summary>Provenienza registrata</summary><p className="break-all">SHA-256: {item.catalogSnapshot.source.sha256}</p><p>{item.catalogSnapshot.description}</p></details>
+                                    <Disclosure title="Provenienza registrata"><p className="break-all">SHA-256: {item.catalogSnapshot.source.sha256}</p><p>{item.catalogSnapshot.description}</p></Disclosure>
                                     <ProstheticsOriginalLinks documents={item.catalogSnapshot.documents} />
                                 </div>}
                                 {item.source === 'document_review' && <small>Da documento</small>}
-                                <details className={styles.recordDetails}><summary>Misure, collaudo e documenti</summary>
+                                <Disclosure className={styles.recordDetails} title="Misure, collaudo e documenti">
                                     <p>Prescritta il {new Date(item.prescribedAt).toLocaleDateString('it-IT')}</p>
                                         <div className="mt-2 grid gap-2 text-sm text-[color:var(--lume-ink-muted)] md:grid-cols-2">
                                             {item.isoCode && <p><span className="font-semibold text-[color:var(--lume-ink)]">ISO:</span> <span className="lume-code">{item.isoCode}</span></p>}
@@ -369,7 +368,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                                         <DocumentReferenceChip references={refs} />
                                         {item.notes && <p className="mt-3 text-sm leading-6 text-[color:var(--lume-ink-muted)]">{item.notes}</p>}
 
-                                </details>
+                                </Disclosure>
                             </td>
                             <td className={`${styles.secondaryColumn} lume-registro`}>{new Date(item.prescribedAt).toLocaleDateString('it-IT')}</td>
                             <td><Badge tone={prostheticStatusSignal(item.status)} size="xs" className={styles.status}>{statusLabel(item.status)}</Badge></td>

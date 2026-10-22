@@ -19,11 +19,11 @@ export function TreatmentReasoningPortableSetup({ option }: { option: PortableOp
     const state = option.provisioningState ?? 'NEEDS_CONTEXT';
     return <section aria-label="Preparazione Treatment Reasoning portabile" data-testid="treatment-portable-setup">
         <p role="status">{messages[state] ?? 'Stato non confermato: esecuzione bloccata.'}</p>
-        <details><summary>Preparazione locale e limiti</summary>
+        <Disclosure title="Preparazione locale e limiti">
             <p>ATHENA Transformers · CPU locale. L’operatore importa un pacchetto offline con manifest, pesi, runtime e licenze verificati; conferma poi separatamente l’ammissione. Nessun download viene avviato da questa schermata.</p>
             <p>L’ammissione non attiva il ragionamento terapeutico. L’interruttore della funzione e la scelta del modello restano decisioni separate.</p>
             <p>La configurazione non dimostra la qualità clinica o le prestazioni. Ogni risultato richiede revisione: nessuna scrittura clinica e nessun fallback implicito.</p>
             {!!option.prerequisites?.length && <p>Prerequisiti segnalati dall’host: {option.prerequisites.join(' · ')}</p>}
-        </details>
+        </Disclosure>
     </section>;
-}
+}import { Disclosure } from '@/components/disclosure';

@@ -22,12 +22,10 @@
 /* one compact selector; recovery is visible only when needed. */
 .pickerRow { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
 .pickerRow select { flex:1 1 180px; max-width:100%; font-size:0.8125rem; text-overflow:ellipsis; }
-.pickerDetails summary { min-height:var(--lume-control-height,44px); align-content:center; cursor:pointer; color:var(--lume-ink-muted); }
 .pickerDetailBody { display:grid; gap:8px; padding-bottom:8px; }
-.pickerDetails summary:focus-visible { outline:2px solid var(--lume-accent); outline-offset:3px; }
 
 .pickerDetails { flex:0 0 auto; }
-.pickerDetails[open] { flex:1 0 100%; }
+.pickerDetails[data-expanded="true"] { flex:1 0 100%; }
 
 .pickerProvider { display:grid; gap:2px; font-size:0.8125rem; color:var(--lume-ink-muted); white-space:nowrap; }
 

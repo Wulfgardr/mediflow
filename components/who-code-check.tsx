@@ -1,5 +1,6 @@
 'use client';
 
+import { Disclosure } from '@/components/disclosure';
 import { useEffect, useRef, useState } from 'react';
 import { checkWhoCode, whoCodeCheckErrorMessage } from '@/lib/icd-code-check-client';
 import { isWhoCheckCode, type WhoCodeCheckResult } from '@/lib/reference-data/icd11-who-code-check-contract';
@@ -32,12 +33,11 @@ export function WhoCodeCheck({ code, release = '2026-01' }: { code: string; rele
             {state.result.entry && <p>{/[&/]/u.test(code) ? 'Codice base: ' : ''}{state.result.entry.stemTitle}
                 {/[&/]/u.test(code) ? ` (${state.result.entry.stemCode}). Il titolo si riferisce al codice base.` : ''}</p>}
             <p className="text-[color:var(--lume-ink-muted)]">Verifica della codifica in inglese, senza modifiche alla cartella.</p>
-            <details className="pt-1 text-sm">
-                <summary className="cursor-pointer">Fonte e data della verifica</summary>
+            <Disclosure className="pt-1 text-sm" title="Fonte e data della verifica">
                 <p>{state.result.receipt.source === 'embedded' ? 'Catalogo WHO incorporato, release 2026-01' : 'Servizio WHO locale'} · {new Date(state.result.receipt.checkedAt).toLocaleString('it-IT')}</p>
                 {state.result.entry && <p className="break-all">{state.result.entry.canonicalUri}</p>}
                 <p className="break-all">Dataset: {state.result.receipt.datasetSnapshotId}</p>
-            </details>
+            </Disclosure>
         </div>}
     </div>;
 }

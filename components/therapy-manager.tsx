@@ -1,5 +1,6 @@
 'use client';
 
+import { Disclosure } from '@/components/disclosure';
 import styles from './clinical-register.module.css';
 import { clientArchiveGeneration } from '@/lib/security/client-auth-api';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -681,11 +682,11 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                     <table className={`${styles.table} ${styles.therapyTable}`}><thead><tr><th>Farmaco</th><th>Posologia</th><th className={styles.secondaryColumn}>Periodo</th><th className={styles.secondaryColumn}>Codici</th><th>Azioni</th></tr></thead><tbody>
                         {group.rows.map(t => <tr key={t.id}>
                             <td><strong>{t.drugName}</strong>{t.activePrinciple && <small>{t.activePrinciple}</small>}
-                                {(t.motivation || t.diagnosisCode || t.atc || t.aic || t.startDate) && <details className={styles.recordDetails}><summary>Dettagli terapia</summary>
+                                {(t.motivation || t.diagnosisCode || t.atc || t.aic || t.startDate) && <Disclosure className={styles.recordDetails} title="Dettagli terapia">
                                     {t.startDate && <p>Dal {format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</p>}
                                     {t.motivation && <p>{t.motivation}</p>}{t.diagnosisCode && <p><span className="lume-code">{t.diagnosisCode}</span> {t.diagnosisName}</p>}
                                     {(t.atc || t.aic) && <p className="lume-code">{t.atc && <>ATC {t.atc} </>}{t.aic && <>AIC {t.aic}</>}</p>}
-                                </details>}
+                                </Disclosure>}
                             </td>
                             <td className="lume-registro">{t.dosage}</td>
                             <td className={`${styles.secondaryColumn} ${styles.muted}`}>{group.status === 'completed' ? <>Conclusa il {format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</> : t.startDate ? <>Dal {format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</> : '—'}</td>

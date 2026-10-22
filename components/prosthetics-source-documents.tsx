@@ -1,5 +1,6 @@
 'use client';
 
+import { Disclosure } from '@/components/disclosure';
 import { useEffect, useState } from 'react';
 import { prostheticsRequest } from '@/lib/reference-data/prosthetics-catalog-client';
 import type { ProstheticsDocument, ProstheticsSourceRecord } from '@/lib/reference-data/prosthetics-catalog-contract';
@@ -10,7 +11,7 @@ export function ProstheticsOriginalLinks({ documents }: { documents: Prosthetics
         <a className="inline-flex min-h-11 items-center underline" href={`/api/prosthetics/catalog/documents?id=${encodeURIComponent(doc.id)}&sha256=${doc.sha256}`}>
             {doc.name}{doc.page ? ` · pagina ${doc.page}` : ''}
         </a>
-        <details><summary>Integrità originale</summary><p className="break-all">SHA-256: {doc.sha256}</p><p>{doc.size.toLocaleString('it-IT')} byte</p></details>
+        <Disclosure title="Integrità originale"><p className="break-all">SHA-256: {doc.sha256}</p><p>{doc.size.toLocaleString('it-IT')} byte</p></Disclosure>
     </li>)}</ul> : <p>Nessun originale allegato.</p>;
 }
 function SourceDocuments({ source, revision, refresh }: { source: SourceWithDocuments; revision: string; refresh: () => Promise<void> }) {
@@ -31,19 +32,18 @@ function SourceDocuments({ source, revision, refresh }: { source: SourceWithDocu
         } catch (error) { setMessage(error instanceof Error ? error.message : 'Allegato non registrato. Rileggi le fonti prima di riprovare.'); }
         finally { setBusy(false); }
     }
-    return <details className="border-t py-3">
-        <summary className="min-h-11 cursor-pointer font-semibold">{source.name} · {source.version}</summary>
+    return <Disclosure className="py-3" title={<>{source.name} · {source.version}</>}>
         <div className="space-y-3 py-3">
             <p>Ente: {source.authority} · Ambito: {source.scope} · Data: {source.date ?? 'non indicata'}</p>
             {source.notes && <p>{source.notes}</p>}
-            <details><summary>Identità e file importato</summary><p className="break-all">Fonte: {source.id}</p><p className="break-all">SHA-256: {source.sha256}</p></details>
+            <Disclosure title="Identità e file importato"><p className="break-all">Fonte: {source.id}</p><p className="break-all">SHA-256: {source.sha256}</p></Disclosure>
             <ProstheticsOriginalLinks documents={source.documents} />
             <label className="block">Originale per {source.name}<input className="block min-h-11 w-full" type="file" disabled={busy} onChange={e => setFile(e.target.files?.[0] ?? null)} /></label>
             <label className="block">Pagina o sezione (facoltativa)<input className="input-field" maxLength={100} value={page} disabled={busy} onChange={e => setPage(e.target.value)} /></label>
             <button type="button" style={{ minHeight: 'var(--lume-control-height, 44px)' }} className="ui-btn-secondary" disabled={!file || busy} onClick={() => void attach()}>Allega originale</button>
             <p role="status">{busy ? 'Registrazione originale…' : message}</p>
         </div>
-    </details>;
+    </Disclosure>;
 }
 export function ProstheticsSourcesPanel() {
     const [data, setData] = useState<{ sources: SourceWithDocuments[]; revision: string } | null>(null);

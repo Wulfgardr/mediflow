@@ -1,6 +1,7 @@
 
 'use client';
 
+import { Disclosure } from '@/components/disclosure';
 import styles from './clinical-register.module.css';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useDropzone, type FileRejection } from 'react-dropzone';
@@ -355,15 +356,14 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                             <button type="button" onClick={interruptLocalExtraction} className={disclosure.documentAction} data-lume-action="quiet">Interrompi attesa</button>
                         </div>}
                         {localExtraction?.attachmentId === file.id && localExtraction.status === 'available' && (
-                            <details className={disclosure.disclosure} data-testid="anydoc-local-extraction-preview">
-                                <summary>{localExtraction.ocr ? 'Testo OCR locale · da rivedere' : 'Testo estratto localmente · da rivedere'}</summary>
+                            <Disclosure className={disclosure.disclosure} data-testid="anydoc-local-extraction-preview" title={<>{localExtraction.ocr ? 'Testo OCR locale · da rivedere' : 'Testo estratto localmente · da rivedere'}</>}>
                                 {localExtraction.ocr && <p className={disclosure.hint}>OCR: {localExtraction.ocr.ocrPageCount} pagine su {localExtraction.ocr.pageCount}. Rivedi il testo prima di usarlo.</p>}
                                 <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap break-words text-sm"><PrivacyBlur>{localExtraction.markdown}</PrivacyBlur></pre>
-                            </details>
+                            </Disclosure>
                         )}
                         {localExtraction?.attachmentId === file.id && localExtraction.status !== 'available' && <div className="mt-3" role="status">
                             <p>{localExtraction.status === 'interrupted' ? 'Attesa interrotta. Puoi riprovare con “Estrai testo”.' : 'Testo locale non disponibile. Apri il documento per la revisione manuale o riprova con “Estrai testo”.'}</p>
-                            {localExtraction.status === 'review_required' && <details className={disclosure.disclosure}><summary>Dettagli estrazione</summary><p>review_required · esito non confermato</p><p>Un errore di rete o di sessione non dimostra unsupported_local_extraction.</p></details>}
+                            {localExtraction.status === 'review_required' && <Disclosure className={disclosure.disclosure} title="Dettagli estrazione"><p>review_required · esito non confermato</p><p>Un errore di rete o di sessione non dimostra unsupported_local_extraction.</p></Disclosure>}
                         </div>}
 
                     </td></tr>}

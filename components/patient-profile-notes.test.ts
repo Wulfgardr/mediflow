@@ -12,7 +12,7 @@ test('presentation distinguishes pending, unavailable and confirmed empty notes,
     assert.match(text(render({ state: 'available', notes: null })), /Nessuna nota generale registrata/u);
     const notes = 'Sintetico '.repeat(60), valid = render({ state: 'available', notes });
     assert.match(text(valid), /Leggi la nota completa/u);
-    assert.equal(text(find(valid, node => node.type === 'details')).includes(notes), true);
+    assert.equal(text(find(valid, node => node.props['data-disclosure'] === true)).includes(notes), true);
     const preview = find(valid, node => node.type === 'p'); assert.ok(text(preview).length <= 321);
 });
 test('patient synopsis passes scoped notes instead of the legacy snapshot and keeps grant out of clinical content', () => {

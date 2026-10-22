@@ -102,7 +102,7 @@ test('[E2E fixture] smart import kill switch disables analysis on patient detail
     const reviewRow = page.getByTestId('review-queue-row-smart-import');
     await expect(reviewRow).toBeVisible();
     await expect(reviewRow).toContainText('Bloccato');
-    await reviewRow.locator('summary').click();
+    await reviewRow.locator('[data-disclosure-control]').click();
     await expect(reviewRow.getByText('Smart Import è disattivato localmente', { exact: false })).toBeVisible();
 
     await openPatientSection(page, 'quadro');
