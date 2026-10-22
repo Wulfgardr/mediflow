@@ -11,7 +11,7 @@ const choose = async (name: string) => page.getByTestId('runtime-twin-toolbar').
 const section = async (id: string) => {
   const nav = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
   const link = nav.locator(`a[href="#${id}"]`);
-  if (!await link.isVisible()) await nav.locator('summary').click();
+  if (!await link.isVisible()) await nav.getByRole('button', { name: 'Altro', exact: true }).click();
   await link.click();
   await expect(page.locator(`#${id}`)).toBeVisible();
 };
