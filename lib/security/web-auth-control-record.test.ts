@@ -90,10 +90,6 @@ const REVIEWED_UNRELATED_LOADER_DIAGNOSTICS = new Map([
         sha256: 'cbe65438d981b996a3b4c600266957b4bee0bc721fb1e4c78265f1ab13be9fa8',
         diagnostics: ['reserved-loader-identity:*', 'protected-loader-unsupported:*'],
     }],
-    ['e2e/chatgpt-synthesis-product.spec.ts', {
-        sha256: '0e6becbbbb03ab64cce0c64f22805b8e99014c5082d9dd6f6583c00a3b53d706',
-        diagnostics: ['reserved-loader-identity:*'],
-    }],
     ['components/function-models/ordinary-ui.test.ts', {
         sha256: 'dcb891eacfe0c40f23bbcd1455f214efe93e5c1b5436c662d1e1a38af3b68be6',
         diagnostics: ['reserved-loader-identity:*'],
@@ -990,6 +986,20 @@ test('denies stale, expired, wrapped, restarted, and hostile tickets without obs
 
 test('keeps the ticket module private to its dormant historical owner and exact test seam', () => {
     assert.deepEqual(repositoryControlImportErrors(), []);
+});
+
+test('rejects historical imports and reserved loaders added to the product UI fixture', () => {
+    const file = 'e2e/chatgpt-synthesis-product.spec.ts';
+    const source = repositoryTypeScript()[file]; assert.ok(source);
+    assert.deepEqual(validateControlImports({ [file]: source }).errors, []);
+    const historicalImport = "import { createWebAuthControlRecord } from '../lib/security/web-auth-control-record';";
+    assert.deepEqual(validateControlImports({ [file]: `${source}\n${historicalImport}` }).errors,
+        [`${file}:named:createWebAuthControlRecord`]);
+    assert.deepEqual(validateControlImports({ [file]: `${source}\nconst leakedLoader = eval;` }).errors,
+        [`${file}:reserved-loader-identity:*`]);
+    const requireLoader = "import { createRequire } from 'node:module';\nconst packageRequire = createRequire(join(root, 'package.json'));";
+    assert.deepEqual(validateControlImports({ [file]: `${source}\n${requireLoader}` }).errors,
+        [`${file}:reserved-loader-identity:*`]);
 });
 
 test('entropy collision and same-record reentry deny before ticket publication and permit a clean retry', async () => {
