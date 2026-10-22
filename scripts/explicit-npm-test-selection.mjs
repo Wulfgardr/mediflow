@@ -9,7 +9,7 @@ export const EXPLICIT_NPM_SUITES = Object.freeze([
   { script: 'test:usage-dashboard', workflow: '.github/workflows/openapi-contract-guard.yml', job: 'repository-guards' },
   { script: 'test:database-import-boundary', workflow: '.github/workflows/openapi-contract-guard.yml', job: 'repository-guards' },
   { script: 'test:fabric-generative-runtime-crosswalk', workflow: '.github/workflows/openapi-contract-guard.yml', job: 'repository-guards' },
-  { script: 'test:anydoc-diagnostics', workflow: '.github/workflows/e2e.yml', job: 'e2e' },
+  { script: 'test:anydoc-diagnostics', workflow: '.github/workflows/e2e.yml', job: 'e2e-shard' },
   { script: 'test:lume-tokens', workflow: '.github/workflows/web-core.yml', job: 'web-core' },
 ].map(suite => Object.freeze({ ...suite, id: `npm:${suite.script}` })));
 
@@ -165,6 +165,25 @@ export function collectNpmScriptBinding(root, suite, expectedCommand) {
     throw new Error(`Required npm command changed or missing: ${suite.script}`);
   }
   return ciBinding(root, suite);
+}
+
+export function collectShardedPlaywrightBinding(root) {
+  const workflowPath = '.github/workflows/e2e.yml';
+  const binding = collectNpmScriptBinding(root, {
+    script: 'test:e2e', workflow: workflowPath, job: 'e2e-shard',
+    ciCall: 'npm run test:e2e -- --shard=${{ matrix.shard }}/2',
+  }, 'playwright test --workers=1');
+  const workflow = load(readText(root, workflowPath), { schema: JSON_SCHEMA });
+  const shard = workflow.jobs['e2e-shard'];
+  const gate = workflow.jobs.e2e;
+  if (!isDeepStrictEqual(shard.strategy, { 'fail-fast': false, matrix: { shard: [1, 2] } })
+    || binding.jobIf !== null || binding.stepIf !== null) throw new Error('Incomplete Playwright shard matrix');
+  if (!isDeepStrictEqual(gate, {
+    if: 'always()', needs: ['e2e-shard'], 'runs-on': 'ubuntu-latest', 'timeout-minutes': 2,
+    steps: [{ name: 'Require every shard to succeed',
+      env: { SHARD_RESULT: '${{ needs.e2e-shard.result }}' }, run: 'test "$SHARD_RESULT" = success' }],
+  })) throw new Error('E2E aggregate must require success from every shard');
+  return binding;
 }
 
 /** Only stat the guard and inspect its npm/CI binding; never import its source. */
