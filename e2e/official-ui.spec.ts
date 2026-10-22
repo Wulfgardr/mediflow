@@ -25,7 +25,7 @@ const nav = () => page.getByRole('navigation', { name: 'Navigazione principale',
 const section = async (id: string) => {
   const sections = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
   const link = sections.locator(`a[href="#${id}"]`);
-  if (!await link.isVisible()) await sections.locator('summary').click();
+  if (!await link.isVisible()) await sections.getByRole('button', { name: 'Altro', exact: true }).click();
   await link.click();
   await expect(page.locator(`#${id}`)).toBeVisible();
 };

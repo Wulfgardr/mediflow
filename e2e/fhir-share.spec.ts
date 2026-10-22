@@ -71,6 +71,7 @@ for (const outcome of ['success', 'abort', 'failure'] as const) {
     await expect(share).toBeVisible();
     await share.click();
     await expect(actionsMenu).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Azioni', exact: true })).toBeFocused();
 
     if (outcome === 'failure') {
       await expect.poll(async () => page.evaluate(() =>
