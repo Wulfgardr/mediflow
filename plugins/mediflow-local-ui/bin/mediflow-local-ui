@@ -1,0 +1,12 @@
+#!/bin/sh
+unavailable() {
+  printf '%s\n' 'MediFlow navigation unavailable.' >&2
+  exit 1
+}
+pluginRoot=$(CDPATH= cd -P "${0%/*}/.." 2>/dev/null && pwd) || unavailable
+nodePath=$(/usr/bin/sed -n 's/.*"nodePath"[[:space:]]*:[[:space:]]*"\([^"\\]*\)".*/\1/p' "$pluginRoot/runtime.json" 2>/dev/null) || unavailable
+case "$nodePath" in
+  /*) [ -f "$nodePath" ] && [ -x "$nodePath" ] || unavailable ;;
+  *) unavailable ;;
+esac
+exec "$nodePath" "$pluginRoot/src/launch.mjs" "$@"
