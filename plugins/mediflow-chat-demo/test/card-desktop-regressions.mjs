@@ -1,6 +1,7 @@
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
 
 const browser = await chromium.launch({ headless: true, channel: 'chromium' });
 const outcomes = [];
@@ -122,21 +123,54 @@ try {
     assert.equal(await frame.locator('#card').isHidden(), true);
   });
   await check('frame-csp', '', async ({ page, frame }) => {
-    await frame.evaluate(() => {
-      const button = document.createElement('button'); button.id = 'csp-probe'; button.textContent = 'CSP probe';
-      button.addEventListener('click', async () => {
-        window['__inlineProbe'] = false;
-        const script = document.createElement('script'); script.textContent = "window['__inlineProbe'] = true"; document.head.append(script);
-        let evalBlocked = false; try { window.eval('1 + 1'); } catch { evalBlocked = true; }
-        const external = document.createElement('script'); external.src = 'https://untrusted.invalid/card.js';
-        const externalBlocked = await new Promise(resolve => { external.onload = () => resolve(false); external.onerror = () => resolve(true); document.head.append(external); });
-        window['__cspResult'] = { inlineBlocked: !window['__inlineProbe'], evalBlocked, externalBlocked };
-      });
-      document.querySelector('main').append(button);
+    const requests = [];
+    const server = createServer((request, response) => {
+      requests.push(request.url);
+      response.writeHead(200, { 'Content-Type': 'application/javascript' });
+      response.end("window['__externalProbe'] = true");
     });
-    await frame.locator('#csp-probe').click();
-    await frame.waitForFunction(() => window['__cspResult']);
-    assert.deepEqual(await frame.evaluate(() => window['__cspResult']), { inlineBlocked: true, evalBlocked: true, externalBlocked: true });
+    await new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', () => resolve(undefined));
+    });
+    const address = server.address();
+    assert.ok(address && typeof address !== 'string');
+    const externalUrl = `http://127.0.0.1:${address.port}/card.js`;
+    try {
+      assert.equal((await fetch(externalUrl)).status, 200, 'probe destination must respond');
+      assert.deepEqual(requests, ['/card.js']);
+      requests.length = 0;
+      await frame.evaluate(externalUrl => {
+        window['__cspViolations'] = [];
+        document.addEventListener('securitypolicyviolation', event => {
+          window['__cspViolations'].push({ violatedDirective: event.violatedDirective,
+            effectiveDirective: event.effectiveDirective, blockedURI: event.blockedURI });
+        });
+        const button = document.createElement('button'); button.id = 'csp-probe'; button.textContent = 'CSP probe';
+        button.addEventListener('click', async () => {
+          window['__inlineProbe'] = false;
+          window['__externalProbe'] = false;
+          const script = document.createElement('script'); script.textContent = "window['__inlineProbe'] = true"; document.head.append(script);
+          let evalBlocked = false; try { window.eval('1 + 1'); } catch { evalBlocked = true; }
+          const external = document.createElement('script'); external.src = externalUrl;
+          await new Promise(resolve => { external.onload = external.onerror = resolve; document.head.append(external); });
+          window['__cspResult'] = { inlineBlocked: !window['__inlineProbe'], evalBlocked };
+        });
+        document.querySelector('main').append(button);
+      }, externalUrl);
+      await frame.locator('#csp-probe').click();
+      await frame.waitForFunction(() => window['__cspResult']);
+      assert.deepEqual(await frame.evaluate(() => window['__cspResult']), { inlineBlocked: true, evalBlocked: true });
+      await frame.waitForFunction(url => window['__cspViolations'].some(event =>
+        event.violatedDirective === 'script-src-elem' && event.effectiveDirective === 'script-src-elem' && event.blockedURI === url),
+      externalUrl, { timeout: 2000 }).catch(error => {
+        assert.fail(`external script must trigger script-src-elem CSP violation: ${error.message}`);
+      });
+      assert.equal(await frame.evaluate(() => window['__externalProbe']), false, 'external script must not execute');
+      assert.deepEqual(requests, [], 'CSP must prevent any request to the responding probe destination');
+    } finally {
+      await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
     await share(frame);
     assert.equal((await page.evaluate(() => window['cardContexts'])).length, 1, 'hashed bundle remains functional');
   });
