@@ -6,6 +6,7 @@ import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from '@model
 import { OpenAIExtensions } from '@openai/mcp-extensions/server';
 import { z } from 'zod';
 
+export const CARD_OPEN_TOOL = 'mediflow_synthetic_card_open';
 export const CARD_TOOL = 'mediflow_synthetic_card';
 export const CARD_URI = 'ui://mediflow-synthetic-card/reader';
 export const CARD_DENIED = 'Scheda non disponibile. Apri una nuova vista e riprova.';
@@ -30,6 +31,13 @@ export async function createCardServer(owner) {
       'openai/widgetDescription': 'Scheda sintetica in sola lettura. La condivisione richiede un gesto nella vista.' } }] };
   };
   registerAppResource(server, 'synthetic-card', CARD_URI, {}, resource);
+  registerAppTool(server, CARD_OPEN_TOOL, {
+    title: 'MediFlow — apri la scheda sintetica',
+    description: 'Open the inline synthetic card consent view. Returns only constant text, with no card data. Sharing requires a trusted gesture inside the view.',
+    inputSchema: z.object({}).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    _meta: { ui: { resourceUri: CARD_URI, visibility: ['model'] } },
+  }, async () => denied());
   registerAppTool(server, CARD_TOOL, {
     title: 'MediFlow — scheda sintetica',
     description: 'Synthetic read-only card. Available only to the interactive view; never an approval command for the model.',
@@ -38,12 +46,13 @@ export async function createCardServer(owner) {
     _meta: { ui: { resourceUri: CARD_URI, visibility: ['app'] }, 'openai/ui': { entrypoints: [{ type: 'thread' }] } },
   }, async () => denied());
   server.server.setRequestHandler(CallToolRequestSchema, async request => {
-    if (request.params.name !== CARD_TOOL) return denied();
+    if (![CARD_TOOL, CARD_OPEN_TOOL].includes(request.params.name)) return denied();
     const args = request.params.arguments;
     if (args === undefined || (args && Object.keys(args).length === 0)) {
       await owner.close();
       return fixed('Apri la vista per scegliere se condividere la scheda sintetica.');
     }
+    if (request.params.name === CARD_OPEN_TOOL) return denied();
     const parsed = argsSchema.safeParse(args);
     if (!parsed.success) return denied();
     try {
@@ -54,7 +63,7 @@ export async function createCardServer(owner) {
       const expectedProof = createHmac('sha256', Buffer.from(binding.gestureKey, 'hex')).update(nonce ?? '').digest();
       if (!gestureProof || !timingSafeEqual(Buffer.from(gestureProof, 'hex'), expectedProof)) return denied();
       const payload = owner.share(view, nonce);
-      return { ...fixed('Scheda sintetica condivisa nella vista.'), structuredContent: JSON.parse(payload) };
+      return { ...fixed('Scheda sintetica condivisa nella vista.'), structuredContent: JSON.parse(payload), _meta: { approvedPayload: payload } };
     } catch { return denied(); }
   });
   server.server.setRequestHandler(ReadResourceRequestSchema, async request => {

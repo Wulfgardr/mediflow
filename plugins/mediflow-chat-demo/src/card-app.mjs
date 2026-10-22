@@ -7,17 +7,19 @@ async function mount() {
   await new Promise(resolve => setTimeout(resolve, 0));
   const app = new App({ name: 'mediflow-synthetic-card', version: '0.1.0' }, {}, { autoResize: false });
   const el = id => document.getElementById(id);
-  let epoch = 0, ready = false, expiry, initialResultSeen = false, initialInputSeen = false, nonce;
+  let epoch = 0, ready = false, expiry, initialResultSeen = false, initialInputSeen = false, nonce, initializing = true;
+  let delivery;
   const call = (operation, confirmation = {}) => app.callServerTool({ name: 'mediflow_synthetic_card', arguments: { operation, view, ...confirmation } });
   function status(text) { el('status').textContent = text; }
   function clear(text) {
     epoch++; ready = false; nonce = undefined; clearTimeout(expiry);
+    delivery?.abort();
     el('card').replaceChildren(); el('card').hidden = true;
     for (const id of ['share', 'deny', 'revoke']) el(id).setAttribute('disabled', '');
     status(text);
   }
   async function revoke(text) { clear(text); try { await call('revoke'); } catch {} }
-  function node(tag, text) { const result = document.createElement(tag); result.textContent = text; return result; }
+  function node(tag, text) { const result = document.createElement(tag); result.textContent = String(text).replace(/\{\{MF_PII_[^{}]+\}\}/gu, '[omesso]'); return result; }
   function render(card) {
     const section = el('card'); section.replaceChildren();
     const reference = node('p', card.pseudonym); reference.className = 'meta'; section.append(reference);
@@ -54,6 +56,7 @@ async function mount() {
   }
   el('share').addEventListener('click', async event => {
     if (!event.isTrusted || !ready) return;
+    clearTimeout(expiry);
     ready = false; el('share').setAttribute('disabled', ''); el('deny').setAttribute('disabled', '');
     el('revoke').removeAttribute('disabled');
     const current = epoch;
@@ -65,7 +68,14 @@ async function mount() {
       const gestureProof = Array.from(new Uint8Array(signature), byte => byte.toString(16).padStart(2, '0')).join('');
       const result = await call('share', { nonce: consentNonce, gestureProof });
       if (current !== epoch) return;
-      if (result.isError || !result.structuredContent) throw new Error();
+      if (result.isError || !result.structuredContent || typeof result._meta?.approvedPayload !== 'string') throw new Error();
+      if (!app.getHostCapabilities()?.updateModelContext?.text) {
+        await revoke('Questo host non supporta la consegna alla chat. Nessun contenuto inviato al modello.');
+        return;
+      }
+      delivery = new AbortController();
+      await app.updateModelContext({ content: [{ type: 'text', text: result._meta.approvedPayload }] }, { signal: delivery.signal });
+      if (current !== epoch) return;
       render(result.structuredContent); status('Scheda sintetica condivisa.');
     } catch { if (current === epoch) await revoke('Scheda non disponibile. Apri una nuova vista e riprova.'); }
   });
@@ -83,14 +93,15 @@ async function mount() {
   }
   app.onhostcontextchanged = host;
   app.ontoolresult = result => {
-    if (!initialResultSeen && result.content?.length === 1 && result.content[0].type === 'text'
+    if (initializing && !initialResultSeen && result.content?.length === 1 && result.content[0].type === 'text'
         && result.content[0].text === 'Apri la vista per scegliere se condividere la scheda sintetica.') { initialResultSeen = true; return; }
     void revoke('Nuovo turno. Apri una nuova vista per condividere.');
   };
   app.ontoolinput = input => {
-    if (!initialInputSeen && Object.keys(input.arguments ?? {}).length === 0) { initialInputSeen = true; return; }
+    if (initializing && !initialInputSeen && Object.keys(input.arguments ?? {}).length === 0) { initialInputSeen = true; return; }
     void revoke('Nuovo turno. Apri una nuova vista per condividere.');
   };
+  app.ontoolcancelled = () => { void revoke('Turno interrotto. Apri una nuova vista per condividere.'); };
   app.onteardown = async () => { await revoke('Vista chiusa.'); return {}; };
   app.onclose = () => clear('Collegamento interrotto.');
   app.onerror = () => clear('Collegamento non verificato.');
@@ -104,6 +115,7 @@ async function mount() {
       const result = await call('prepare');
       if (current === epoch && !result.isError && typeof result._meta?.consentNonce === 'string') {
         nonce = result._meta.consentNonce;
+        initializing = false;
         ready = true; el('share').removeAttribute('disabled'); el('deny').removeAttribute('disabled');
         status('Scegli se condividere questa scheda sintetica.');
         expiry = setTimeout(() => { void revoke('Scelta scaduta. Nessun nuovo contenuto condiviso.'); }, 30_000);
