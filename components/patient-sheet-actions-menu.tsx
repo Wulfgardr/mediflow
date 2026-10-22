@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Archive, Download, FileText, MoreHorizontal, Pencil, Share2 } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import styles from './patient-header.module.css';
@@ -88,11 +88,11 @@ export function PatientSheetActionsMenu({ editHref, canShareFhirFile, onExportFh
             }}>
             {leadingActions.map(action => <button key={action.label} type="button" role="menuitem" tabIndex={-1}
                 className={itemClass} onClick={() => run(action.onSelect)}>{action.label}</button>)}
-            <Link href={editHref} role="menuitem" tabIndex={-1} className={itemClass} onClick={() => close(false)}><Pencil size={14} aria-hidden />Modifica</Link>
-            <button type="button" role="menuitem" tabIndex={-1} className={itemClass} onClick={() => run(onExportFhir)}><Download size={14} aria-hidden />Esporta FHIR</button>
-            {canShareFhirFile ? <button type="button" role="menuitem" tabIndex={-1} className={itemClass} onClick={() => run(onShareFhir)}><Share2 size={14} aria-hidden />Condividi FHIR</button> : null}
-            <button type="button" role="menuitem" tabIndex={-1} className={itemClass} onClick={() => run(onReportPdf)}><FileText size={14} aria-hidden />Report PDF</button>
-            <Link href={editHref} role="menuitem" tabIndex={-1} className={itemClass} onClick={() => close(false)}><Archive size={14} aria-hidden />Archivia</Link>
+            <Link href={editHref} role="menuitem" tabIndex={-1} className={itemClass} onClick={() => close(false)}>Modifica</Link>
+            <button type="button" role="menuitem" tabIndex={-1} className={itemClass} onClick={() => run(onExportFhir)}>Esporta FHIR</button>
+            {canShareFhirFile ? <button type="button" role="menuitem" tabIndex={-1} className={itemClass} onClick={() => run(onShareFhir)}>Condividi FHIR</button> : null}
+            <button type="button" role="menuitem" tabIndex={-1} className={itemClass} onClick={() => run(onReportPdf)}>Report PDF</button>
+            <Link href={editHref} role="menuitem" tabIndex={-1} className={itemClass} onClick={() => close(false)}>Archivia</Link>
         </div> : null}
     </div>;
 }

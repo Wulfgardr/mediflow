@@ -29,6 +29,7 @@ test('header actions are an accessible ordered menu with unchanged links and cal
  await expect(menu).toBeVisible({timeout:1000});
  const names=['Accesso assistente','Gestisci checkup','Modifica','Esporta FHIR','Condividi FHIR','Report PDF','Archivia'];
  await expect(menu.getByRole('menuitem')).toHaveText(names);
+ await expect(menu.locator('svg, img, [role="img"]')).toHaveCount(0, {timeout:1000});
  const bounds=await menu.boundingBox();assert.ok(bounds && bounds.x>=0 && bounds.x+bounds.width<=320);
  await expect(menu.getByRole('menuitem').first()).toBeFocused();
  await page.keyboard.press('ArrowUp');await expect(menu.getByRole('menuitem').last()).toBeFocused();

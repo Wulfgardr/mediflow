@@ -18,6 +18,7 @@ test('patient header keeps two entrances, fixed menu destinations and hands prio
  await expect(menu).toBeVisible();
  const names=['Accesso assistente','Gestisci checkup','Modifica','Esporta FHIR','Report PDF','Archivia'];
  await expect(menu.getByRole('menuitem')).toHaveText(names);
+ await expect(menu.locator('svg, img, [role="img"]')).toHaveCount(0);
  await expect(menu.getByRole('menuitem',{name:'Accesso assistente',exact:true})).toBeFocused();
  await page.keyboard.press('ArrowUp');await expect(menu.getByRole('menuitem',{name:'Archivia',exact:true})).toBeFocused();
  await page.keyboard.press('Home');await page.keyboard.press('ArrowDown');
