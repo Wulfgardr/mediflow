@@ -1,0 +1,27 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "mediflow-chat-demo",
+  "version": "0.1.0",
+  "description": "Lettore inline sperimentale su dati inventati, separato dal runtime clinico.",
+  "repository": "https://github.com/Wulfgardr/mediflow",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "MediFlow — ambiente dimostrativo",
+        "shortDescription": "Leggi un esempio inventato nella chat",
+        "developerName": "MediFlow",
+        "category": "Productivity",
+        "defaultPrompt": [
+          "Apri la vista inline dimostrativa di MediFlow."
+        ],
+        "longDescription": "Vista dimostrativa in sola lettura con persona, cronologia e terapie inventate. Nessun accesso a cartelle cliniche. Il caricamento loopback richiede una prova di origine e una sessione esclusivamente sintetica.",
+        "capabilities": [
+          "Read"
+        ]
+      }
+    }
+  },
+  "author": {
+    "name": "MediFlow"
+  }
+}

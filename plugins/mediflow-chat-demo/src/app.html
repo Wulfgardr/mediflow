@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="it" data-theme="giorno">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>MediFlow — ambiente dimostrativo</title><!-- STYLE --></head>
+<body>
+<main>
+  <header class="brandbar"><span class="brand">MediFlow</span><label>Tema <select id="theme"><option value="giorno">Giorno</option><option value="grafite">Grafite</option></select></label></header>
+  <p class="eyebrow">Ambiente dimostrativo · sola lettura</p>
+  <h1>MediFlow — ambiente dimostrativo</h1>
+  <p class="intro">Persone, fonti e terapie sono inventate. Questa vista serve a provare la lettura nella chat.</p>
+  <section aria-labelledby="patient" class="identity">
+    <h2 id="patient">Elena Vela</h2>
+    <p class="meta">Persona inventata · 48 anni · nata il 12 aprile 1978</p>
+    <p class="meta">Esempio fisso incluso nel pacchetto. Nessuna cartella clinica collegata.</p>
+  </section>
+  <section aria-labelledby="timeline-title">
+    <div class="section-heading"><h2 id="timeline-title">Cronologia inventata</h2><span>3 voci</span></div>
+    <article class="entry"><time datetime="2026-10-20">20 ott 2026</time><div><details open><summary>Visita dimostrativa</summary><p class="prose">Elena racconta di avere ripreso le passeggiate. Nel racconto inventato non sono indicate nuove difficoltà.</p><p class="meta">Fonte inventata: nota ambulatoriale «Passeggiate», autrice Ada Esempio.</p></details></div></article>
+    <article class="entry"><time datetime="2026-10-09">09 ott 2026</time><div><details><summary>Controllo dimostrativo</summary><p class="prose">Colloquio di esempio sul ritmo delle giornate. Il testo serve soltanto a mostrare una voce e la sua fonte.</p><p class="meta">Fonte inventata: lettera «Controllo di ottobre», autore Nino Esempio.</p></details></div></article>
+    <article class="entry"><time datetime="2026-09-24">24 set 2026</time><div><details><summary>Promemoria dimostrativo</summary><p class="prose">Prima voce del percorso inventato. Aprire e chiudere questo dettaglio non cambia alcun dato.</p><p class="meta">Fonte inventata: diario «Prima lettura», autrice Ada Esempio.</p></details></div></article>
+  </section>
+  <section aria-labelledby="therapies-title">
+    <div class="section-heading"><h2 id="therapies-title">Terapie dell’esempio</h2><span>2 righe</span></div>
+    <p class="meta">Nomi e dosi fittizi, senza indicazione terapeutica.</p>
+    <table><caption class="sr-only">Riepilogo di terapie inventate in sola lettura</caption><thead><tr><th scope="col">Nome inventato</th><th scope="col">Schema inventato</th></tr></thead><tbody>
+      <tr><th scope="row">Preparato Alfa · 1 unità demo</th><td>Una volta al mattino</td></tr>
+      <tr><th scope="row">Preparato Beta · 2 unità demo</th><td>Una volta alla sera</td></tr>
+    </tbody></table>
+  </section>
+  <section aria-labelledby="connection-title" class="connection">
+    <div class="section-heading"><h2 id="connection-title">Prova del collegamento</h2></div>
+    <ul id="proofs" aria-live="polite"><li id="connected" hidden>✓ Vista collegata</li><li id="reachable" hidden>✓ Servizio sintetico raggiungibile</li><li id="authorized" hidden>✓ Sessione dimostrativa autorizzata</li></ul>
+    <p id="status" role="status">Collegamento alla chat in attesa. L’esempio resta leggibile.</p>
+    <div class="actions"><button id="check" disabled>Verifica il servizio sintetico</button><button id="admit" disabled>Autorizza questa dimostrazione</button><button id="lock" disabled>Blocca la dimostrazione</button></div>
+    <p id="local-data" class="prose" hidden></p>
+    <details class="diagnostics"><summary>Dettagli della prova</summary><p class="meta">Origine effettiva della vista: <span id="origin"></span></p><p class="meta">Il contenuto caricato per questa prova resta nel renderer dell’app che ospita la chat. Questa prova non certifica la riservatezza dell’host.</p></details>
+  </section>
+  <footer>Tutto il contenuto è sintetico. Nessuna scrittura o decisione clinica.</footer>
+</main>
+<script id="demo-connection" type="application/json">"__DEMO_CONNECTION__"</script>
+<!-- SCRIPT -->
+</body></html>

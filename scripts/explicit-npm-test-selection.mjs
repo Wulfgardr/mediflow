@@ -201,19 +201,13 @@ export function collectExplicitNpmSelections(root) {
 }
 
 
-/** Closed model for the existing, path-conditional synthetic plugin workflow. */
-export function collectSyntheticPluginSelections(root) {
-  const directory = 'plugins/mediflow-synthetic';
-  const workflow = '.github/workflows/synthetic-plugin.yml';
-  const paths = [`${directory}/**`, 'packages/mcp/src/contracts.ts', workflow];
-  const common = { workflow, job: 'synthetic-plugin', workingDirectory: directory,
+/** Closed bindings for the path-conditional synthetic plugin workflows. */
+function collectPluginSelections(root, directory, workflow, job, paths, scripts) {
+  const common = { workflow, job, workingDirectory: directory,
     packageFile: `${directory}/package.json`,
     triggers: { pull_request: { paths }, push: { branches: ['main'], paths } } };
-  return Object.fromEntries([
-    { script: 'test', ciCall: 'npm test', command: 'node --test test/*.test.mjs' },
-    { script: 'test:browser', ciCall: 'npm run test:browser', command: 'node scripts/browser-smoke.mjs' },
-  ].map(suite => {
-    const id = `npm:synthetic-plugin:${suite.script}`;
+  return Object.fromEntries(scripts.map(suite => {
+    const id = `npm:${job}:${suite.script}`;
     try {
       const binding = collectNpmScriptBinding(root, { ...common, ...suite }, suite.command);
       let files;
@@ -226,11 +220,27 @@ export function collectSyntheticPluginSelections(root) {
         files = fs.readdirSync(path.join(root, group)).filter(name => !name.startsWith('.') && name.endsWith('.test.mjs'))
           .sort().map(name => `${group}/${name}`);
         if (!files.length) throw new Error('Required synthetic plugin test group is empty');
-      } else files = [`${directory}/scripts/browser-smoke.mjs`];
+      } else files = [`${directory}/scripts/${suite.script === 'test:falsification' ? 'falsify' : 'browser-smoke'}.mjs`];
       for (const file of files) regularFile(root, file);
       return [id, { files, errors: [], binding, conditional: true }];
     } catch (error) {
       return [id, { files: [], errors: [error.message], binding: null, conditional: true }];
     }
   }));
+}
+
+export function collectSyntheticPluginSelections(root) {
+  const workflow = '.github/workflows/synthetic-plugin.yml';
+  const directory = 'plugins/mediflow-synthetic';
+  const scripts = [
+    { script: 'test', ciCall: 'npm test', command: 'node --test test/*.test.mjs' },
+    { script: 'test:browser', ciCall: 'npm run test:browser', command: 'node scripts/browser-smoke.mjs' },
+  ];
+  return {
+    ...collectPluginSelections(root, directory, workflow, 'synthetic-plugin',
+      [`${directory}/**`, 'packages/mcp/src/contracts.ts', workflow], scripts),
+    ...collectPluginSelections(root, 'plugins/mediflow-chat-demo', '.github/workflows/chat-demo.yml', 'chat-demo',
+      ['plugins/mediflow-chat-demo/**', 'app/fonts/Newsreader*', 'docs/design/lume/tokens/lume.tokens.json', '.github/workflows/chat-demo.yml'],
+      [...scripts, { script: 'test:falsification', ciCall: 'npm run test:falsification', command: 'node scripts/falsify.mjs' }]),
+  };
 }
