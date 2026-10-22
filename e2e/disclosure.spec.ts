@@ -94,7 +94,8 @@ test('la scheda usa la disclosure comune per i contenuti nel flusso', async ({ p
       await expect(content).toHaveCount(1);
       await expect(control.locator('svg.lucide-chevron-right')).toHaveCount(1);
       for (const side of ['top', 'right', 'bottom', 'left']) await expect(control).toHaveCSS(`border-${side}-width`, '0px');
-      expect(await control.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+      await expect(control).toHaveCSS('min-height', '44px');
+      expect(await control.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44 - 0.5);
     }
   }
 });
