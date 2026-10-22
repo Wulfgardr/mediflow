@@ -8,7 +8,7 @@ import { z } from 'zod';
 export const TOOL = 'mediflow_chat_demo_open';
 export const URI = 'ui://mediflow-chat-demo/reader';
 /** @returns {import('@modelcontextprotocol/sdk/types.js').CallToolResult} */
-export const receipt = () => ({ content: [{ type: 'text', text: '{"status":"demo_view_ready"}' }] });
+export const receipt = () => ({ content: [{ type: 'text', text: 'Dimostrazione MediFlow disponibile nella vista interattiva. Richiede un host MCP Apps; nessuna cartella clinica collegata.' }] });
 const denied = () => ({ isError: true, content: [{ type: 'text', text: 'Demo request rejected. Only empty arguments are accepted.' }] });
 
 export async function createDemoServer({ endpoint, serviceId }) {
@@ -18,12 +18,13 @@ export async function createDemoServer({ endpoint, serviceId }) {
   const html = template.replace('"__DEMO_CONNECTION__"', JSON.stringify({ endpoint, serviceId }));
   const resource = () => ({ contents: [{ uri: URI, mimeType: RESOURCE_MIME_TYPE, text: html,
     _meta: { ui: { csp: { connectDomains: [endpoint], resourceDomains: [] } },
-      'openai/ui': { preferredDisplayMode: 'inline', availableDisplayModes: ['inline'] } },
+      'openai/ui': { preferredDisplayMode: 'inline', availableDisplayModes: ['inline'] },
+      'openai/widgetDescription': 'Lettore dimostrativo MediFlow interattivo con contenuti inventati. La vista contiene già la spiegazione; non occorre ripeterla nella chat.' },
   }] });
   registerAppResource(server, 'demo-reader', URI, {}, resource);
   registerAppTool(server, TOOL, {
     title: 'MediFlow — ambiente dimostrativo',
-    description: 'Open the inline read-only MediFlow demo with invented examples. No identifiers, patient access or clinical actions. Returns only a constant technical status.',
+    description: 'Open the inline read-only MediFlow demo with invented examples. No identifiers, patient access or clinical actions. Returns only a constant text fallback; the view explains the demo.',
     inputSchema: z.object({}).strict(),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _meta: { ui: { resourceUri: URI, visibility: ['model'] }, 'openai/ui': { entrypoints: [{ type: 'thread' }] } },

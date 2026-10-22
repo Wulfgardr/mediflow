@@ -1,4 +1,4 @@
-import { App } from '@modelcontextprotocol/ext-apps';
+import { App, applyHostStyleVariables } from '@modelcontextprotocol/ext-apps';
 
 const app = new App({ name: 'mediflow-chat-demo', version: '0.1.0' });
 const element = id => document.getElementById(id);
@@ -82,6 +82,11 @@ element('lock').addEventListener('click', () => clearSession('Dimostrazione bloc
 element('theme').addEventListener('change', event => { document.documentElement.dataset.theme = /** @type {HTMLSelectElement} */ (event.target).value; });
 element('origin').textContent = window.origin;
 function hostTheme(context) {
+  if (context?.styles?.variables) applyHostStyleVariables(context.styles.variables);
+  const maxHeight = context?.containerDimensions?.maxHeight;
+  if (Number.isFinite(maxHeight) && maxHeight > 0) {
+    document.documentElement.style.setProperty('--view-height', `${Math.min(720, maxHeight)}px`);
+  }
   if (context?.theme) {
     const theme = context.theme === 'dark' ? 'grafite' : 'giorno';
     document.documentElement.dataset.theme = theme;
