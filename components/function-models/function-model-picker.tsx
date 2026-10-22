@@ -1,7 +1,6 @@
 'use client';
 import { Disclosure } from '@/components/disclosure';
 import { ChoiceField } from '@/components/choice-field';
-import Link from 'next/link';
 import { isAiLaneEnabledValue } from '@/lib/ai-lane-kill-switch';
 import type { OrdinaryBrowserView } from '@/lib/function-models/ordinary-browser';
 import { useEffect, useId, useLayoutEffect, useState, useSyncExternalStore } from 'react';
@@ -38,7 +37,7 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
     const confirmDefault = (view.blocked || view.consumed) && !!f?.enabled && f.bindingState === 'current' && defaultModel?.state === 'available_unqualified';
     const needsRefresh = !!view.error || (active && !!blockingStatus) || (view.blocked && !confirmDefault);
     if (f && !f.enabled && !view.remote) return <div className={styles.picker} data-testid={`model-picker-${functionId}`}>
-        <p role="status">Esperienza spenta nelle impostazioni. <Link href="/settings/ai/funzioni">Apri le funzioni cliniche</Link></p>
+        <p role="status">Esperienza spenta nelle impostazioni. <a href="/settings/ai/funzioni">Apri le funzioni cliniche</a></p>
     </div>;
     return <div className={styles.picker} data-testid={`model-picker-${functionId}`}>
         <div className={styles.summary}>
@@ -56,7 +55,7 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
                 aria-describedby={[blockingStatus && `${fieldId}-status`, view.error && `${fieldId}-error`].filter(Boolean).join(' ') || undefined}
                 onFocus={() => { if (!view.remote && !f && !view.loading && !view.error) void client.read(); }}
                 onChange={e => e.target.value === 'chatgpt_subscription' ? client.chooseRemote() : client.choose(e.target.value)}>
-                <option value="">{view.loading ? 'Lettura modelli…' : defaultModel ? `Predefinito · ${defaultModel.label}` : f ? 'Predefinito non disponibile' : 'Modello predefinito · scegli'}</option>
+                <option value="">{view.loading ? 'Lettura modelli…' : defaultModel ? `Predefinito · ${defaultModel.label}${defaultModel.state === 'unavailable' ? ' · non disponibile' : ''}` : f ? 'Predefinito non disponibile' : 'Modello predefinito · scegli'}</option>
                 <option value="chatgpt_subscription">OpenAI · abbonamento ChatGPT · prepara</option>
                 {f?.options.map(o => <option key={o.modelOptionId} value={o.modelOptionId} disabled={o.state !== 'available_unqualified'}>{o.label}{o.modelOptionId !== view.choice?.modelOptionId ? ` · ${providerName(o.provider)}` : ''}{o.state === 'unavailable' ? ' · non disponibile' : ''}</option>)}
             </ChoiceField>

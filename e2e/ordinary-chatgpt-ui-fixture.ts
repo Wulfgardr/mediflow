@@ -95,8 +95,10 @@ export async function installOrdinaryChatGptTransport(page: Page, id: OrdinaryFu
 export async function selectOrdinaryChatGpt(scope: Locator) {
   await scope.getByRole('button', { name: 'Cambia', exact: true }).click();
   await scope.getByRole('combobox', { name: 'Modello per questa proposta' }).selectOption('chatgpt_subscription');
+  await scope.getByRole('button', { name: 'Cambia', exact: true }).click();
   const controls = scope.getByRole('group', { name: 'OpenAI per questa proposta' });
   await expect(controls.getByRole('checkbox', { name: /Consenti OpenAI/u })).toBeVisible();
+  await expect(controls.getByRole('checkbox', { name: /Consenti OpenAI/u })).not.toBeChecked();
   await controls.getByRole('checkbox', { name: /Consenti OpenAI/u }).click();
   await expect(controls.getByRole('checkbox', { name: /Consenti OpenAI/u })).toBeChecked();
   await expect(controls).toContainText('Usa l’azione di proposta della funzione');
