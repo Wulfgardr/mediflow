@@ -1,0 +1,37 @@
+name: Synthetic inline chat demo
+on:
+  pull_request:
+    paths:
+      - 'plugins/mediflow-chat-demo/**'
+      - 'app/fonts/Newsreader*'
+      - 'docs/design/lume/tokens/lume.tokens.json'
+      - '.github/workflows/chat-demo.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/mediflow-chat-demo/**'
+      - 'app/fonts/Newsreader*'
+      - 'docs/design/lume/tokens/lume.tokens.json'
+      - '.github/workflows/chat-demo.yml'
+permissions:
+  contents: read
+jobs:
+  chat-demo:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins/mediflow-chat-demo
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: plugins/mediflow-chat-demo/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:falsification
+      - run: npx --no-install playwright install --with-deps chromium
+      - run: npm run test:browser
