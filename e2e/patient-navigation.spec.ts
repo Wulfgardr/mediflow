@@ -30,6 +30,44 @@ async function seed(page: Page, count: number) {
     return id;
 }
 
+test('Azioni restituisce il fuoco dopo Report PDF e lo cede ai dialoghi', async ({ page }) => {
+    await seed(page, 0);
+    const trigger = page.getByRole('button', { name: 'Azioni', exact: true });
+    const menu = page.getByRole('menu', { name: 'Azioni scheda', exact: true });
+    await trigger.click();
+    const download = page.waitForEvent('download');
+    await menu.getByRole('menuitem', { name: 'Report PDF', exact: true }).click();
+    await expect(menu).toBeHidden();
+    await expect(trigger).toBeFocused();
+    await download;
+    await expect(trigger).toBeFocused();
+    for (const [action, title] of [
+        ['Accesso assistente', 'Accesso assistente'],
+        ['Gestisci checkup', 'Gestisci checkup'],
+        ['Esporta FHIR', 'Esporta FHIR con controllo FSE'],
+    ]) {
+        await trigger.click();
+        await menu.getByRole('menuitem', { name: action, exact: true }).click();
+        const dialog = page.getByRole('dialog', { name: title, exact: true });
+        await expect(menu).toBeHidden();
+        await expect(dialog).toBeVisible();
+        await expect.poll(() => dialog.evaluate(element => element.contains(document.activeElement))).toBe(true);
+        await expect(trigger).not.toBeFocused();
+        await page.keyboard.press('Escape');
+        await expect(dialog).toBeHidden();
+        await expect(trigger).toBeFocused();
+    }
+    await trigger.click();
+    await menu.getByRole('menuitem', { name: 'Archivia', exact: true }).click();
+    await expect(page).toHaveURL(/\/edit$/);
+    await page.getByRole('button', { name: 'Archivia', exact: true }).click();
+    const archive = page.getByRole('dialog', { name: 'Archivia scheda', exact: true });
+    await expect(archive).toBeVisible();
+    await expect.poll(() => archive.evaluate(element => element.contains(document.activeElement))).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(archive).toBeHidden();
+});
+
 for (const count of [0, 1, 12]) test(`segmenti stabili con ${count} record sintetici e quindici destinazioni`, async ({ page }) => {
     await seed(page, count);
     const nav = navigation(page);

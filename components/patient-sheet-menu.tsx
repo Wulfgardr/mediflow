@@ -69,7 +69,7 @@ export function PatientSheetMenu({ label, trigger, children, triggerRef: supplie
         {isOpen ? <div id={menuId} ref={menuRef} role="menu" aria-label={label}
             className={`mf-popover ${styles.menu}`} onClick={event => {
                 const item = event.target instanceof Element ? event.target.closest('[role="menuitem"]') : null;
-                if (item) close(false);
+                if (item) close(item instanceof HTMLButtonElement && event.currentTarget.contains(document.activeElement));
             }} onKeyDown={event => {
                 const candidates = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
                 const index = candidates.indexOf(document.activeElement as HTMLElement);
