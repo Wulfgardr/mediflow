@@ -85,14 +85,14 @@ test('la scheda usa la disclosure comune per i contenuti nel flusso', async ({ p
   await fixture(page);
   const surface = page.getByTestId('lume-scheda-surface');
   await expect(surface.locator('details')).toHaveCount(0);
-  for (const section of ['quadro', 'terapie', 'parametri', 'documenti', 'attenzione']) {
+  for (const section of ['quadro', 'terapie', 'parametri', 'documenti', 'attenzione', 'protesica', 'siss']) {
     await openPatientSection(page, section);
     for (const control of await surface.locator('[data-disclosure-control]:visible').all()) {
       await expect(control).toHaveAccessibleName(/.+/);
       await expect(control).toHaveAttribute('aria-expanded', /true|false/);
       const content = page.locator(`[id="${await control.getAttribute('aria-controls')}"]`);
       await expect(content).toHaveCount(1);
-      await expect(control.locator('svg')).toHaveCount(1);
+      await expect(control.locator('svg.lucide-chevron-right')).toHaveCount(1);
       for (const side of ['top', 'right', 'bottom', 'left']) await expect(control).toHaveCSS(`border-${side}-width`, '0px');
       expect(await control.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
     }

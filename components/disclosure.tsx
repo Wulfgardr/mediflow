@@ -22,6 +22,11 @@ export function Disclosure({ title, children, id, contentId, className = '', def
     open, onOpenChange, headingLevel, label, 'data-testid': testId }: DisclosureProps) {
     const generatedId = useId();
     const [localOpen, setLocalOpen] = useState(defaultOpen);
+    const [previousDefaultOpen, setPreviousDefaultOpen] = useState(defaultOpen);
+    if (defaultOpen !== previousDefaultOpen) {
+        setPreviousDefaultOpen(defaultOpen);
+        if (defaultOpen) setLocalOpen(true);
+    }
     const expanded = open ?? localOpen;
     const regionId = contentId ?? `${generatedId}-content`;
     const control = <DisclosureControl expanded={expanded} controls={regionId} label={label}

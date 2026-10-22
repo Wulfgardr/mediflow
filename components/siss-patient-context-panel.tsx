@@ -1,8 +1,10 @@
 'use client';
 
+import { Disclosure } from '@/components/disclosure';
+
 import { useEffect, useState } from 'react';
 import styles from './siss-workspace.module.css';
-import { Accessibility, BadgePercent, ChevronDown, Copy, ExternalLink, FolderOpen, IdCard, ListChecks, LoaderCircle, Pill, RefreshCcw, Search, ShieldAlert, ShieldCheck, SquareMenu, Stethoscope } from 'lucide-react';
+import { Accessibility, BadgePercent, Copy, ExternalLink, FolderOpen, IdCard, ListChecks, LoaderCircle, Pill, RefreshCcw, Search, ShieldAlert, ShieldCheck, SquareMenu, Stethoscope } from 'lucide-react';
 import { completeSissPortalHandoff, prepareSissPortalWindow } from '@/lib/siss';
 import { copyToClipboard } from '@/lib/clipboard';
 import { buildSissPatientContextSummary, type SissPatientContextAction, type SissPatientContextTransportMode } from '@/lib/siss-patient-context-shared';
@@ -581,18 +583,16 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                         <div className="min-w-0 space-y-1">
                             <p className="break-words">{feedback.message}</p>
                             {feedback.correlationId && (
-                                <details className="text-xs opacity-70">
-                                    <summary className="cursor-pointer select-none">Dettagli tecnici</summary>
+                                <Disclosure className="text-xs opacity-70" title="Dettagli tecnici">
                                     <p className="mt-1 break-all">Riferimento: <span className="type-code">{feedback.correlationId}</span></p>
-                                </details>
+                                </Disclosure>
                             )}
                         </div>
                     </div>
                 </div>
             )}
             {/* checks are separate from commands and exposed on warnings/errors. */}
-            <details className={styles.disclosure} open={Boolean(validation?.hasErrors || validation?.hasWarnings || fseReadiness.error) || undefined}>
-                <summary>Requisiti e controllo locale dei dati</summary>
+            <Disclosure className={styles.disclosure} defaultOpen={Boolean(validation?.hasErrors || validation?.hasWarnings || fseReadiness.error)} title="Requisiti e controllo locale dei dati">
             <div className={styles.support}>
                 <div className="graphite-block">
                     <div className="flex items-center justify-between gap-2">
@@ -745,9 +745,8 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                 </div>
             </div>
 
-            </details>
-            <details className={styles.disclosure}>
-                <summary>Dati da consultare o copiare nel portale</summary>
+            </Disclosure>
+            <Disclosure className={styles.disclosure} title="Dati da consultare o copiare nel portale">
                 <h3 className="text-xs font-semibold uppercase tracking-[0.06em] text-[color:var(--lume-ink-muted)]">
                     Contesto prescrittivo
                 </h3>
@@ -950,17 +949,13 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                         )}
                     </div>
                 </div>
-            </details>
+            </Disclosure>
 
-            <details className="group mt-4">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-[10px] border border-[color:rgba(112,106,100,0.12)] bg-[color:rgba(255,252,247,0.78)] px-3 py-2 text-sm font-semibold text-[color:var(--lume-ink)] transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-accent)_26%,transparent)] dark:border-[color:rgba(255,247,240,0.08)] dark:bg-white/4">
-                    <span className="flex items-center gap-2">
+            <Disclosure className="group mt-4" title={<><span className="flex items-center gap-2">
                         <ShieldAlert className="h-4 w-4 text-[color:var(--lume-signal-warning)]" />
                         Funzioni non automatiche
                         <span className="graphite-chip graphite-chip-tone-muted">{BLOCKED_CAPABILITIES.length}</span>
-                    </span>
-                    <ChevronDown className="h-4 w-4 text-[color:var(--lume-ink-muted)] transition-transform group-open:rotate-180" />
-                </summary>
+                    </span></>}>
                 <div className="mt-2 siss-blocked-list">
                     {BLOCKED_CAPABILITIES.map((item) => (
                         <div key={item.label} className="siss-blocked-item">
@@ -973,7 +968,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                 <p className="mt-2 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
                     Queste operazioni restano da svolgere nel portale ufficiale: il percorso regionale certificato non e ancora disponibile in app.
                 </p>
-            </details>
+            </Disclosure>
 
 
         </section>

@@ -117,7 +117,7 @@ test('Evidence Stack web: fixture popolata, curation, empty ed errore restano ve
   await expect(archive.getByText(insights[0].summary, { exact: true })).toBeVisible();
   const selectedContent = page.locator(`[id="${await firstDocumentButton.getAttribute('aria-controls')}"]`);
   await selectedContent.getByRole('button', { name: 'Testo sorgente archiviato', exact: true }).click();
-  await expect(archive.getByText(insights[0].rawMarkdown, { exact: true })).toBeVisible();
+  await expect(selectedContent.getByText(insights[0].rawMarkdown, { exact: true })).toBeVisible();
   const removeFirst = archive.getByRole('button', { name: `Rimuovi ${insights[0].fileName} dall'archivio intelligente` });
   await assertKeyboardFocusProgresses(page, removeFirst, 'rimozione singolo documento Evidence Stack');
   await removeFirst.click();
