@@ -20,8 +20,13 @@ node scripts/package-local-ui-plugin.mjs /percorso/assoluto/plugin-pronto "$MEDI
 ```
 
 Il preparatore verifica il ledger esistente prima di creare il pacchetto,
-fissa eseguibile Node, revisione e archivio in `runtime.json` e rende assoluto
-il comando nei manifest. Il launcher richiede il Node fissato e l'ingresso
+fissa eseguibile Node, revisione e archivio in `runtime.json`. I manifest
+portabile e Codex avviano `./bin/mediflow-local-ui`: il launcher POSIX legge il
+Node fissato e avvia `src/launch.mjs`, indipendentemente dal PATH del client.
+Il percorso Node deve essere assoluto, eseguibile e rappresentabile in JSON
+senza escape (niente virgolette, backslash o caratteri di controllo); gli spazi
+sono ammessi. Un percorso mancante o non eseguibile produce soltanto
+`MediFlow navigation unavailable.` su stderr. L'ingresso successivo è
 `source-runtime.mjs local-ui`, che verifica nuovamente il payload e la revisione
 prima del Supervisor. File o ledger alterati, runtime assente e input extra
 falliscono con errore fisso. Non avvia MCP bare e non aggiunge un HTTP generico.
@@ -33,10 +38,12 @@ richiede una build pulita ammessa. Non modifica le impostazioni globali dei clie
 ## Configurazioni dei client
 
 `plugin.json`/`mcp.json` sono il formato portabile Agent Plugins 1.0.0.
-`.codex-plugin/plugin.json` usa `.mcp.codex.json` e `${PLUGIN_ROOT}`.
+`.codex-plugin/plugin.json` usa `.mcp.codex.json` con lo stesso launcher relativo.
 `.claude-plugin/plugin.json` usa `.mcp.claude.json` e `${CLAUDE_PLUGIN_ROOT}`.
-Identità, versione, istruzioni e launcher sono gli stessi; il placeholder
-Claude non è quello Codex. Per Claude Code, caricamento temporaneo:
+Identità, versione e istruzioni sono gli stessi. Il manifest Claude mantiene
+il comando Node assoluto e il placeholder nativo già qualificati; il nuovo
+launcher POSIX riguarda soltanto i manifest portabile e Codex. Per Claude Code,
+caricamento temporaneo:
 
 ```sh
 claude --plugin-dir /percorso/assoluto/plugin-pronto
@@ -44,8 +51,8 @@ claude --plugin-dir /percorso/assoluto/plugin-pronto
 
 Codex richiede il proprio caricamento locale del plugin; l'installazione
 persistente va approvata separatamente. Per uno smoke con sola configurazione
-MCP di sessione, usa il comando Node assoluto generato in `.mcp.codex.json`
-e l'argomento `src/launch.mjs`: questo prova il raccordo MCP, non il caricamento
+MCP di sessione, usa il Node assoluto di `runtime.json` e il percorso assoluto
+del file `src/launch.mjs`: questo prova il raccordo MCP, non il caricamento
 del plugin o la UI nativa dell'app Codex. CLI, app Codex, Claude Chat/Cowork e
 Desktop sono superfici distinte. Nessuna directory submission o ammissione
 clinica è inclusa; WUL-759 riserva il contatto a Leonardo.
