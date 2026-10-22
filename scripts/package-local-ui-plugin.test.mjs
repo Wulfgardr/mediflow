@@ -174,13 +174,15 @@ test('the runtime launcher rejects extra arguments, Node flags and noncanonical 
   const config = JSON.parse(fs.readFileSync(configFile));
   const alias = path.join(f.destination, 'node-alias');
   fs.symlinkSync(process.execPath, alias);
+  const otherNode = path.join(f.destination, 'other-node');
+  fs.copyFileSync(process.execPath, otherNode); fs.chmodSync(otherNode, 0o755);
   const denied = result => {
     assert.equal(result.status, 1); assert.equal(result.stdout, '');
     assert.equal(result.stderr, 'MediFlow navigation unavailable.\n');
     assert.equal(fs.existsSync(f.marker), false);
   };
   denied(f.run([], ['unexpected'])); denied(f.run(['--trace-warnings']));
-  for (const nodePath of ['node', alias, path.join(f.web, 'server.js')]) {
+  for (const nodePath of ['node', alias, otherNode]) {
     fs.writeFileSync(configFile, JSON.stringify({ ...config, nodePath }));
     denied(f.run());
   }
