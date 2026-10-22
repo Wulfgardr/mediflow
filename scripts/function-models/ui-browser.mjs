@@ -1,7 +1,7 @@
 /* isolated React fixture and synthetic HTTP; no product server or real models. */
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 import postcss from 'postcss';
 import tailwind from '@tailwindcss/postcss';
 import { createServer } from 'node:http';
@@ -64,15 +64,39 @@ try {
  assert.ok(state.functions.every(f=>!f.enabled));
  await page.getByRole('button',{name:'Ripristina predefiniti'}).click();await proposal.waitFor();conflict=true;await page.getByRole('button',{name:'Applica alle impostazioni'}).click();await page.getByRole('alert').filter({hasText:/decidi di nuovo/}).waitFor();assert.equal(await page.getByText('Impostazioni salvate e rilette. Nessuna modifica clinica.').count(),0);conflict=false;
  state=initial();await page.goto(origin);const picker=page.locator('#preview');assert.equal(await picker.locator('select').count(),1);await picker.getByRole('button',{name:'Cambia',exact:true}).click();await picker.getByLabel('Modello per questa proposta',{exact:true}).focus();await picker.locator('option').filter({hasText:'synthetic-local:large'}).waitFor({state:'attached',timeout:3000}).catch(async error=>{console.log(await picker.innerText());console.log(errors);throw error});await picker.getByLabel('Modello per questa proposta',{exact:true}).selectOption(o('b'));assert.equal(await picker.getByRole('button',{name:'Rileggi modelli'}).count(),0);await picker.getByRole('button',{name:'Cambia',exact:true}).click();for(const width of [390,965,1440]) {await page.setViewportSize({width,height:1000});const compact=await picker.getByTestId('model-picker-patient_insight').evaluate(el=>({height:el.getBoundingClientRect().height,overflow:document.documentElement.scrollWidth>innerWidth,paragraphs:[...el.querySelectorAll('p')].filter(p=>p.checkVisibility()).length,controls:[...el.querySelectorAll('select,button,summary')].filter(e=>e.checkVisibility()).map(e=>e.getBoundingClientRect().height)}));assert.equal(compact.overflow,false);assert.equal(compact.paragraphs,0);assert.ok(compact.height<=104);assert.ok(compact.controls.every(h=>h>=(width<=700?44:40)));results.push({width,compact});await picker.screenshot({path:join(output,`picker-${width}.png`)});}await picker.getByRole('button',{name:'Genera fixture'}).click();await picker.getByText('Proposta sintetica ricevuta').waitFor();
- const preview=calls.filter(c=>c.path==='/api/ai/patient-insight/preview').at(-1);assert.deepEqual(JSON.parse(preview.headers['x-mediflow-function-model']),{modelOptionId:o('b'),expectedCatalogRevision:r('b')});assert.equal(await picker.getByRole('button',{name:'Genera fixture'}).isDisabled(),true);
+ async function recovery(name, actionName, explanation) {
+  const button=picker.getByRole('button',{name:actionName,exact:true});
+  await expect(picker.getByRole('combobox',{name:'Modello per questa proposta',exact:true})).toBeHidden();
+  await expect(button).toBeVisible();await expect(button).toBeEnabled();await expect(button).toHaveAccessibleDescription(explanation);
+  await picker.screenshot({path:join(output,`recovery-${name}.png`)});
+  await picker.getByRole('button',{name:'Cambia',exact:true}).click();
+  await picker.getByRole('button',{name:'Dettagli modello',exact:true}).click();
+  await expect(button).toHaveCount(1);await expect(button).toBeVisible();
+  await picker.getByRole('button',{name:'Dettagli modello',exact:true}).click();
+  await picker.getByRole('button',{name:'Cambia',exact:true}).click();
+ }
+ await expect(picker.getByRole('button',{name:'Genera fixture'})).toBeDisabled();
+ await recovery('consumed','Riusa predefinito',/Proposta già preparata/);
+ await picker.getByRole('button',{name:'Riusa predefinito',exact:true}).click();
+ await expect(picker.getByRole('button',{name:'Genera fixture'})).toBeEnabled();
+ const preview=calls.filter(c=>c.path==='/api/ai/patient-insight/preview').at(-1);assert.deepEqual(JSON.parse(preview.headers['x-mediflow-function-model']),{modelOptionId:o('b'),expectedCatalogRevision:r('b')});
  await page.locator('#context').click();assert.equal(await picker.locator('select').inputValue(),'');await picker.getByRole('button',{name:'Cambia',exact:true}).click();
- await picker.getByLabel('Modello per questa proposta',{exact:true}).focus();await picker.locator('option').filter({hasText:'synthetic-local:large'}).waitFor({state:'attached',timeout:3000}).catch(async error=>{console.log(await picker.innerText());console.log(errors);throw error});await picker.getByLabel('Modello per questa proposta',{exact:true}).selectOption(o('b'));state.catalogRevision=r('e');await picker.getByRole('button',{name:'Genera fixture'}).click();await picker.getByRole('alert').filter({hasText:/nessun modello alternativo/}).waitFor();
+ await picker.getByLabel('Modello per questa proposta',{exact:true}).focus();await picker.locator('option').filter({hasText:'synthetic-local:large'}).waitFor({state:'attached',timeout:3000}).catch(async error=>{console.log(await picker.innerText());console.log(errors);throw error});await picker.getByLabel('Modello per questa proposta',{exact:true}).selectOption(o('b'));state.catalogRevision=r('e');await picker.getByRole('button',{name:'Cambia',exact:true}).click();await picker.getByRole('button',{name:'Genera fixture'}).click();await picker.getByRole('alert').filter({hasText:/nessun modello alternativo/}).waitFor();
+ await recovery('blocked','Riusa predefinito',/nessun modello alternativo/);
+ await expect(picker.getByRole('button',{name:'Rileggi modelli',exact:true})).toBeVisible();
  assert.equal(calls.filter(c=>c.path==='/api/ai/patient-insight/preview').length,1);
  await picker.getByRole('button',{name:'Rileggi modelli'}).click();await picker.getByRole('button',{name:'Riusa predefinito'}).waitFor();assert.equal(await picker.getByRole('button',{name:'Genera fixture'}).isDisabled(),true);await picker.getByRole('button',{name:'Riusa predefinito'}).click();assert.equal(await picker.getByRole('button',{name:'Genera fixture'}).isDisabled(),false);
+ unavailable=true;await picker.getByRole('button',{name:'Dettagli modello',exact:true}).click();
+ await picker.getByRole('button',{name:'Rileggi modelli',exact:true}).click();
+ await recovery('error','Rileggi modelli',/Impossibile confermare le impostazioni/);
+ unavailable=false;await picker.getByRole('button',{name:'Rileggi modelli',exact:true}).click();
+ await expect(picker.getByRole('button',{name:'Riusa predefinito',exact:true})).toBeVisible();
+ await picker.getByRole('button',{name:'Riusa predefinito',exact:true}).click();
+ await expect(picker.getByRole('button',{name:'Genera fixture'})).toBeEnabled();
  unavailable=true;await page.getByRole('button',{name:'Rileggi impostazioni',exact:true}).click();await page.locator('[data-testid="function-preferences"]').getByRole('alert').waitFor();unavailable=false;
  state=initial();state.functions[0].options=[];state.functions[0].bindingState='unsupported';state.functions[1].options.forEach(o=>o.state='unavailable');await page.goto(origin);await page.getByText('Predefinito non disponibile.',{exact:true}).waitFor();await page.screenshot({path:join(output,'unavailable.png'),fullPage:true});
  await page.locator('#lock').click();await page.getByText('Sblocca MediFlow per gestire le preferenze.').waitFor();assert.equal(await page.locator('[data-testid="function-preferences"] article').count(),0);
  assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);
- await writeFile(join(output,'browser-results.json'),JSON.stringify({geometries:results,states:['presets','preview','cancel','apply_reread','CAS409','connected_unqualified','empty','unavailable','override','single_use','context_reset','stale_selection','locked'],externalRequests:0,pageErrors:errors},null,2));
+ await writeFile(join(output,'browser-results.json'),JSON.stringify({geometries:results,states:['presets','preview','cancel','apply_reread','CAS409','connected_unqualified','empty','unavailable','override','single_use','recovery_closed_consumed','recovery_closed_blocked','recovery_closed_error','context_reset','stale_selection','locked'],externalRequests:0,pageErrors:errors},null,2));
  console.log('PASS: stable onRead with unstable callback; compact picker; 3 widths, keyboard, 40px pointer targets, flat settings surface, preview/apply/CAS, picker header/currentness/lock; synthetic only.');
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

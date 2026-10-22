@@ -36,6 +36,7 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
         : f && selected?.state !== 'available_unqualified' ? 'Modello locale non disponibile.' : null;
     const confirmDefault = (view.blocked || view.consumed) && !!f?.enabled && f.bindingState === 'current' && defaultModel?.state === 'available_unqualified';
     const needsRefresh = !!view.error || (active && !!blockingStatus) || (view.blocked && !confirmDefault);
+    const recoveryStatus = blockingStatus ?? (needsRefresh && !view.error ? 'Rileggi i modelli prima di preparare la proposta.' : null);
     if (f && !f.enabled && !view.remote) return <div className={styles.picker} data-testid={`model-picker-${functionId}`}>
         <p role="status">Esperienza spenta nelle impostazioni. <a href="/settings/ai/funzioni">Apri le funzioni cliniche</a></p>
     </div>;
@@ -60,10 +61,19 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
                 {f?.options.map(o => <option key={o.modelOptionId} value={o.modelOptionId} disabled={o.state !== 'available_unqualified'}>{o.label}{o.modelOptionId !== view.choice?.modelOptionId ? ` · ${providerName(o.provider)}` : ''}{o.state === 'unavailable' ? ' · non disponibile' : ''}</option>)}
             </ChoiceField>
             {selected && <span className={styles.pickerProvider}>{providerName(selected.provider)}<small>{view.choice ? 'Solo questa proposta' : 'Predefinito'}</small></span>}
-            {needsRefresh && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading} onClick={() => void client.read()}>Rileggi modelli</button>}
-            {confirmDefault && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading} onClick={() => client.choose('')}>Riusa predefinito</button>}
         </div>
         </div>
+        {(recoveryStatus || view.error || confirmDefault) && <div className={styles.pickerRow}>
+            {recoveryStatus && <p id={`${fieldId}-status`} role="status" className={styles.hint}>{recoveryStatus}</p>}
+            {view.error && <p id={`${fieldId}-error`} role="alert" className={styles.error}>{view.error}</p>}
+            {confirmDefault && !view.error && <p id={`${fieldId}-recovery`} role="status" className={styles.hint}>
+                {view.consumed ? 'Proposta già preparata. Per ripetere, scegli nuovamente o riusa il predefinito.' : 'Conferma nuovamente il modello prima di preparare la proposta.'}
+            </p>}
+            {needsRefresh && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading}
+                aria-describedby={`${fieldId}-${view.error ? 'error' : 'status'}`} onClick={() => void client.read()}>Rileggi modelli</button>}
+            {confirmDefault && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading}
+                aria-describedby={`${fieldId}-${view.error ? 'error' : 'recovery'}`} onClick={() => client.choose('')}>Riusa predefinito</button>}
+        </div>}
             <Disclosure label="Dettagli modello" className={styles.pickerDetails} title="Dettagli">
             <div className={styles.pickerDetailBody}>
                 <p>{selected ? `${selected.label} · ${providerName(selected.provider)}` : 'Il modello viene risolto dalle impostazioni correnti.'}</p>
@@ -72,10 +82,8 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
                 {!needsRefresh && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading} onClick={() => void client.read()}>Rileggi modelli</button>}
             </div>
             </Disclosure>
-        {blockingStatus && <p id={`${fieldId}-status`} role="status" className={styles.hint}>{blockingStatus}</p>}
         {view.remote && <OrdinaryFunctionControls client={client} view={view.remote} />}
         {!view.remote && functionId === 'treatment_reasoning' && <TreatmentReasoningPortableSetup option={selected?.provider === 'athena_transformers' ? selected : f?.options.find(o => o.provider === 'athena_transformers')} />}
-        {view.error && <p id={`${fieldId}-error`} role="alert" className={styles.error}>{view.error}</p>}
 
     </div>;
 }
