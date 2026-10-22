@@ -344,7 +344,13 @@ test('real synthetic product UI/HTTP acceptance, no automatic inference or clini
     // product requests still use real server owner 0.8.7 in createProductFixture.
     const hook = join(fixture, 'unused-security-hook.ts');
     await writeFile(hook, `export function useSecurity(): never { throw new Error('This fixture mounts the real Card, not its outer Panel'); }`);
-    await writeFile(join(fixture, 'next.config.mjs'), `export default { experimental: {externalDir:true}, devIndicators:false, webpack(config) { config.resolve.alias['@/components/security-provider$']=${JSON.stringify(hook)}; config.resolve.alias['@']=${JSON.stringify(root)}; return config; } };`);
+    // Next 16 webpack startup awaits npm version metadata. A stalled fetch must
+    // not hold this UI-only child; application requests use the browser gateway.
+    await writeFile(join(fixture, 'server-fetch-probe.cjs'), `globalThis.fetch = () => { process.stderr.write('UI_FIXTURE_UNGUARDED_FETCH\\n'); return new Promise(() => {}); };
+process.stderr.write('UI_FIXTURE_FETCH_PROBE_READY\\n');`);
+    await writeFile(join(fixture, 'next.config.mjs'), `import './server-fetch-probe.cjs';
+globalThis.fetch = async () => { throw new Error('UI_FIXTURE_SERVER_FETCH_DENIED'); };
+export default { experimental: {externalDir:true}, devIndicators:false, webpack(config) { config.resolve.alias['@/components/security-provider$']=${JSON.stringify(hook)}; config.resolve.alias['@']=${JSON.stringify(root)}; return config; } };`);
     await writeFile(join(fixture, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2017', lib: ['dom', 'dom.iterable', 'esnext'], strict: true, noEmit: true,
         esModuleInterop: true, module: 'esnext', moduleResolution: 'bundler', jsx: 'react-jsx', resolveJsonModule: true, skipLibCheck: true, baseUrl: root, paths: { '@/*': [resolve(root, '*')] } } }));
     await writeFile(join(fixture, 'app/layout.tsx'), `import type {ReactNode} from 'react'; export const metadata={title:'MediFlow synthetic product fixture'}; export default function Layout({children}:{children:ReactNode}) { return <html lang="it"><head><link rel="icon" href="data:,"/></head><body>{children}</body></html>; }`);
@@ -367,11 +373,14 @@ export default function Page(){const [active,setActive]=useState(true);return <m
     for (;;) {
         if (spawnError) throw spawnError;
         assert.equal(logOverflow, false, 'UI_FIXTURE_LOG_LIMIT');
+        assert.doesNotMatch(logs.join(''), /UI_FIXTURE_UNGUARDED_FETCH/);
         assert.equal(child.exitCode, null, logs.join(''));
         try { if ((await fetch(nextBase, { redirect: 'error', signal: AbortSignal.timeout(1000) })).ok) break; } catch { /* local test server startup only */ }
         assert.ok(Date.now() < deadline, `Isolated fixture startup failed: ${logs.join('')}`);
         await new Promise(done => setTimeout(done, 250));
     }
+    assert.match(logs.join(''), /UI_FIXTURE_FETCH_PROBE_READY/);
+    assert.doesNotMatch(logs.join(''), /UI_FIXTURE_UNGUARDED_FETCH/);
     const browser = await chromium.launch({ headless: true }); resources.browser = browser;
     const oracles = new WeakMap<Page, BrowserResponseOracle>();
     async function scenario(name: string, run: (page: Page, f: ReturnType<typeof createProductFixture>) => Promise<void>, width = 1280, held = false) {
