@@ -1,5 +1,6 @@
 'use client';
 
+import { Disclosure } from '@/components/disclosure';
 import { formatCountLabel } from '@/lib/format-count';
 import design from './treatment-reasoning.module.css';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
@@ -109,7 +110,7 @@ export default function TreatmentReasoningPanel({
         [patient, entries, therapies, observations, attachments],
     );
     const publication = picker.active && publicationState?.contextRevision === contextRevision ? publicationState.value : null;
-    const sourceDetails = useRef<HTMLDetailsElement>(null);
+    const [sourcesOpen, setSourcesOpen] = useState(false);
     const sourceDetailsId = useId();
     const proposalSources = useMemo(() => indexTreatmentReasoningSources(publication ? [
         ...publication.sourceBindings.map(binding => binding.evidenceRefs),
@@ -120,7 +121,7 @@ export default function TreatmentReasoningPanel({
     const sourceReferences = (references: readonly string[]) => references.length > 0 && <div className={design.sources}>
         {references.map(reference => <button key={reference} type="button" aria-controls={sourceDetailsId}
             aria-label={`${proposalSources.find(source => source.reference === reference)?.label ?? 'Riferimento'}: espandi le fonti della proposta`}
-            onClick={() => { if (sourceDetails.current) sourceDetails.current.open = true; }}>
+            onClick={() => { setSourcesOpen(true); }}>
             {proposalSources.find(source => source.reference === reference)?.label ?? 'Riferimento'}
         </button>)}
     </div>;
@@ -343,12 +344,10 @@ export default function TreatmentReasoningPanel({
                     </section>}
                 </div>
 
-                {publication.value.data.reasoning.length > 0 && <details className={design.details}>
-                    <summary>Come è stata formulata</summary>
+                {publication.value.data.reasoning.length > 0 && <Disclosure className={design.details} title="Come è stata formulata">
                     <ol>{publication.value.data.reasoning.map((item, index) => <li key={`${index}-${item}`} className={design.pencil}><PrivacyBlur intensity="sm">{item}</PrivacyBlur></li>)}</ol>
-                </details>}
-                <details className={design.details} ref={sourceDetails} id={sourceDetailsId}>
-                    <summary>Fonti della proposta</summary>
+                </Disclosure>}
+                <Disclosure className={design.details} open={sourcesOpen} onOpenChange={setSourcesOpen} contentId={sourceDetailsId} title="Fonti della proposta">
                     <dl className={design.sourceIndex}>{proposalSources.map(source => <div key={source.reference}>
                         <dt>{source.label}</dt><dd><code>{source.reference}</code></dd>
                     </div>)}</dl>
@@ -357,9 +356,8 @@ export default function TreatmentReasoningPanel({
                         <p className={design.pencil}><PrivacyBlur intensity="sm">{binding.claim}</PrivacyBlur></p>
                         {sourceReferences(binding.evidenceRefs)}
                     </div>)}</div>
-                </details>
-                <details className={design.details}>
-                    <summary>Origine e dettagli della generazione</summary>
+                </Disclosure>
+                <Disclosure className={design.details} title="Origine e dettagli della generazione">
                     <p className={design.meta}>Receipt, provenienza e currentness</p>
                     <dl className={design.origin}>
                         <div><dt>Servizio utilizzato</dt><dd>{publication.attestation.provider === 'chatgpt_subscription' ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : publication.attestation.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : 'ATHENA Transformers · CPU locale'}</dd></div>
@@ -372,7 +370,7 @@ export default function TreatmentReasoningPanel({
                         <div><dt>Identificativo della ricevuta</dt><dd><code>{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.outputSha256 : publication.attestation.receiptRef}</code></dd></div>
                         <div><dt>Identificativo della provenienza</dt><dd><code>{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.sourceSha256 : publication.attestation.provenanceRef}</code></dd></div>
                     </dl>
-                </details>
+                </Disclosure>
             </article>}
         </section>
     );

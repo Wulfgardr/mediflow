@@ -89,6 +89,14 @@ async function assertType(page: Page, label: string, info: TestInfo, minimum = 1
 }
 
 async function expandDetails(page: Page) {
+  const controls = page.getByRole('button', { includeHidden: true }).and(page.locator('[data-disclosure-control]'));
+  for (const control of await controls.all()) {
+    if (!await control.isVisible() || await control.getAttribute('aria-expanded') !== 'false') continue;
+    await expect(control).toHaveAttribute('aria-expanded', 'false');
+    await control.focus();
+    await control.press('Enter');
+    await expect(control).toHaveAttribute('aria-expanded', 'true');
+  }
   for (const detail of await page.locator('main details:not(nav details):not(header details), [data-testid="settings-subroute-content"] details:not(nav details):not(header details)').all()) {
     if (await detail.isVisible() && await detail.getAttribute('open') === null) await detail.locator('summary').first().click();
   }

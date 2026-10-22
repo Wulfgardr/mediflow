@@ -21,6 +21,10 @@ export function text(tree: unknown, includeDiagnostics = true): string {
     if (tree === null || tree === undefined || typeof tree === 'boolean') return '';
     if (typeof tree !== 'object') return String(tree);
     const node = tree as TestNode;
+    if (!includeDiagnostics && node.props['data-disclosure']) {
+        const children = node.props.children as unknown[];
+        return text(children[0], false);
+    }
     if (!includeDiagnostics && node.type === 'details') {
         const children = Array.isArray(node.props.children) ? node.props.children : [node.props.children];
         return children.filter((child: unknown) => typeof child === 'object' && child !== null && (child as TestNode).type === 'summary')
@@ -71,6 +75,10 @@ export function mountContract(file: string, name: string, options: {
     } });
     assert.equal(compiled.diagnostics?.length ?? 0, 0);
     const requireDouble = (specifier: string): unknown => {
+        if (specifier === '@/components/disclosure') return { __esModule: true,
+            Disclosure: (props: Record<string, unknown>) => mountContract('components/disclosure.tsx', 'Disclosure', { props }).render(),
+            DisclosureControl: (props: Record<string, unknown>) => mountContract('components/disclosure.tsx', 'DisclosureControl', { props }).render(),
+        };
         if (specifier === 'react') return react;
         if (specifier === 'react/jsx-runtime') return { jsx: element, jsxs: element, Fragment: Symbol.for('test-fragment') };
         if (Object.hasOwn(imports, specifier)) return { __esModule: true, ...(imports[specifier] as object) };

@@ -1,5 +1,6 @@
 'use client';
 
+import { Disclosure } from '@/components/disclosure';
 import { useEffect, useRef, useState } from 'react';
 import { useSecurity } from './security-provider';
 import { db } from '@/lib/db';
@@ -22,7 +23,7 @@ export function PatientProfileNotesView({ value }: Readonly<{ value: NotesState 
             : value.state === 'unavailable' ? <p role="alert">{value.message}</p>
                 : !value.notes?.trim() ? <p>Nessuna nota generale registrata.</p>
                     : <><p className="whitespace-pre-wrap">{value.notes.length > 320 ? `${value.notes.slice(0, 320).trimEnd()}…` : value.notes}</p>
-                        {value.notes.length > 320 ? <details><summary>Leggi la nota completa</summary><p className="whitespace-pre-wrap">{value.notes}</p></details> : null}</>}
+                        {value.notes.length > 320 ? <Disclosure title="Leggi la nota completa"><p className="whitespace-pre-wrap">{value.notes}</p></Disclosure> : null}</>}
     </>;
 }
 export function PatientProfileNotes({ patientId, patientVersion }: Readonly<{ patientId: string; patientVersion: number | undefined }>) {

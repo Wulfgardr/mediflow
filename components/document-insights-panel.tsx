@@ -1,8 +1,9 @@
 'use client';
 
+import { Disclosure, DisclosureControl } from '@/components/disclosure';
 import styles from './clinical-register.module.css';
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, Trash2, Loader2 } from 'lucide-react';
+import { AlertTriangle, Trash2, Loader2 } from 'lucide-react';
 import { ApiConflictError, db, DocumentInsight, Patient } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
@@ -131,13 +132,8 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
             {insights.map((insight) => (
                 <article key={insight.id} className={styles.documentRow} data-expanded={expandedId === insight.id}>
                     <div className={disclosure.archiveHead}>
-                        <button
-                            type="button"
-                            onClick={() => setExpandedId(expandedId === insight.id ? null : insight.id)}
-                            className={disclosure.archiveToggle}
-                            aria-expanded={expandedId === insight.id}
-                            aria-controls={`document-insight-${insight.id}`}
-                        >
+                        <DisclosureControl expanded={expandedId === insight.id} controls={`document-insight-${insight.id}`}
+                            onToggle={() => setExpandedId(expandedId === insight.id ? null : insight.id)}>
                             <span className={disclosure.archiveLabel}>
                                 <span className={styles.documentName}>{insight.fileName}</span>
                                 <span className={disclosure.hint}>Archiviata il {formatDate(insight.date)}</span>
@@ -155,8 +151,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                                     )}
                                 </span>
                             </span>
-                            {expandedId === insight.id ? <ChevronUp className="h-4 w-4 shrink-0" aria-hidden="true" /> : <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />}
-                        </button>
+                        </DisclosureControl>
                         <button
                             type="button"
                             onClick={() => void handleRemoveInsight(insight.id, insight.fileName)}
@@ -196,11 +191,10 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                                     <PrivacyBlur><ReactMarkdown>{insight.summary}</ReactMarkdown></PrivacyBlur>
                                 </div>
                                 {insight.rawMarkdown?.trim() && (
-                                    <details className={disclosure.disclosure}>
-                                        <summary>Testo sorgente archiviato</summary>
+                                    <Disclosure className={disclosure.disclosure} title="Testo sorgente archiviato">
                                         <p className={disclosure.hint}>Testo conservato con questa sintesi. Confrontalo con il documento originale.</p>
                                         <pre className={disclosure.archivedSource}><PrivacyBlur>{insight.rawMarkdown}</PrivacyBlur></pre>
-                                    </details>
+                                    </Disclosure>
                                 )}
                             </div>
                         )}

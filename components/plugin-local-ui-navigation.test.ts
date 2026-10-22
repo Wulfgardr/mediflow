@@ -40,6 +40,7 @@ function fixture(pluginRuntime = true) {
   } };
   vm.runInNewContext(compile('./privacy-blur.tsx'), privacyModule, { timeout: 2_000 });
   const environment: any = { exports: {}, require(name: string) {
+    if (name === './disclosure') return { Disclosure: ({ children }: { children: unknown }) => jsx('div', { children }) };
     if (name === './security-provider') return { useSecurity: () => ({ user: { id: 'synthetic-user' }, isLocked: false, isAuthenticated: true }) };
     if (name === './privacy-blur' || name === '@/components/privacy-blur') return privacyModule.exports;
     if (name === '@/lib/db') return { db: { getSessionReadSignal: () => session.signal } };

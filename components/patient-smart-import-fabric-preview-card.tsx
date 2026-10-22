@@ -1,5 +1,6 @@
 'use client';
 
+import { Disclosure } from '@/components/disclosure';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import PrivacyBlur from '@/components/privacy-blur';
@@ -71,7 +72,7 @@ export function PatientSmartImportFabricPreviewCard({ patientId, captureInput, e
                                     <p>{preview.proposal.diagnoses.length} diagnosi · {preview.proposal.therapies.length} terapie · {preview.proposal.servicePrescriptions.length} prestazioni</p>
                                 </div>
                                 <p>Modello usato: {preview.receipt.provider} · {preview.receipt.model}</p>
-                                <details className={disclosure.disclosure}><summary>Dettagli di verifica</summary>
+                                <Disclosure className={disclosure.disclosure} title="Dettagli di verifica">
                                 <dl className="grid gap-x-3 gap-y-1 text-sm sm:grid-cols-[auto_1fr]" data-testid="smart-import-fabric-disclosure">
                                     <dt>Esecuzione</dt>
                                     <dd>{preview.receipt.provider} · {preview.receipt.model} · {preview.receipt.venue}</dd>
@@ -82,7 +83,7 @@ export function PatientSmartImportFabricPreviewCard({ patientId, captureInput, e
                                     <dt>Review</dt>
                                     <dd className="break-all type-code">{preview.reviewRef}</dd>
                                 </dl>
-                                </details>
+                                </Disclosure>
                             </>
                         )}
                         {preview && preview.status !== 'available' && <p>Anteprima non disponibile come proposta utilizzabile.</p>}

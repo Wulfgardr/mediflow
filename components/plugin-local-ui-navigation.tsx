@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Disclosure } from './disclosure';
 import PrivacyBlur from './privacy-blur';
 import { useSecurity } from './security-provider';
 import { db } from '@/lib/db';
@@ -76,7 +77,7 @@ export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabe
       if (signal.aborted || request.generation !== generation.current || request.expiresAt <= Date.now() || document.visibilityState !== 'visible') return;
       if (request.intent === 'search' || !patientId) { window.location.assign('/?area=incarico'); return; }
       const target = document.getElementById(anchors[request.intent]);
-      if (target instanceof HTMLDetailsElement) target.open = true;
+      target?.querySelector<HTMLButtonElement>('[data-disclosure-control][aria-expanded="false"]')?.click();
       window.location.hash = anchors[request.intent];
       target?.scrollIntoView({ block: 'start' });
     } catch { setMessage('La selezione è cambiata o non è disponibile. Richiedi di nuovo il percorso.'); }
@@ -99,8 +100,7 @@ export function PluginPrescribingGuide() {
     update(); window.addEventListener('hashchange', update);
     return () => window.removeEventListener('hashchange', update);
   }, []);
-  return <details open={open} onToggle={event => setOpen(event.currentTarget.open)} id="plugin-prescribing" aria-labelledby="plugin-prescribing-title" className="col-span-full space-y-3 rounded-xl border border-current/20 p-4 scroll-mt-28">
-    <summary className="cursor-pointer"><h2 id="plugin-prescribing-title" className="inline">Guida alla prescrizione</h2></summary>
+  return <Disclosure open={open} onOpenChange={setOpen} id="plugin-prescribing" headingLevel={3} title="Guida alla prescrizione" className="space-y-3 scroll-mt-28">
     <p>Verifica paziente, indicazione e dati nella cartella. Scegli il percorso necessario; preparazione e revisione restano in MediFlow.</p>
     <nav aria-label="Tipo di prescrizione" className="flex flex-wrap gap-4">
       <a className="underline" href="#terapie">Farmaco: terapie farmacologiche</a>
@@ -108,5 +108,5 @@ export function PluginPrescribingGuide() {
       <a className="underline" href="#protesica">Protesica: ausili e prescrizioni</a>
     </nav>
     <p>Il medico decide la terapia e verifica eventuali conferma, firma e trasmissione nei percorsi previsti. Il plugin apre soltanto questa guida.</p>
-  </details>;
+  </Disclosure>;
 }

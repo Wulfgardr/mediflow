@@ -132,8 +132,8 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules#quadro$`));
   await openPatientSection(page, 'quadro');
   const insightDisclosure = page.locator('#patient-insight');
-  await insightDisclosure.locator(':scope > summary').click();
-  await expect(insightDisclosure).toHaveAttribute('open', '');
+  await insightDisclosure.locator(':scope > div > [data-disclosure-control]').click();
+  await expect(insightDisclosure.locator(':scope > div > [data-disclosure-control]')).toHaveAttribute('aria-expanded', 'true');
   // this spec already owns a synthetic preview transport; make its local
   // catalog prerequisite explicit without claiming a real provider invocation.
   const modelPicker = page.getByRole('combobox', { name: 'Modello per questa proposta' });

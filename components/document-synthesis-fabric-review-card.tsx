@@ -1,6 +1,7 @@
 
 'use client';
 
+import { Disclosure } from '@/components/disclosure';
 import styles from './clinical-register.module.css';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { FileSearch, Loader2, RotateCcw, ShieldCheck } from 'lucide-react';
@@ -215,10 +216,9 @@ function DocumentSynthesisFabricReviewCardSession({
                             ? 'Testo locale non disponibile. È necessaria la revisione manuale del documento.'
                             : 'Sintesi non disponibile. La cartella rimane invariata.'}
                     </p>
-                    <details className={disclosure.disclosure}>
-                        <summary>Dettagli dell’esito</summary>
+                    <Disclosure className={disclosure.disclosure} title="Dettagli dell’esito">
                         <p>{error}</p>
-                    </details>
+                    </Disclosure>
                 </div>
             )}
 
@@ -242,8 +242,7 @@ function DocumentSynthesisFabricReviewCardSession({
                         <p className="mt-3 text-[color:var(--lume-ink-muted)]">{providerBindingReceipt.provider === 'chatgpt_subscription' ? 'Contenuto redatto inviato con consenso esplicito. Condizioni e conservazione del servizio ChatGPT applicabili. Nessun fallback.' : 'Nessun invio a provider esterni e nessun passaggio a un altro modello.'}</p>
                     </div>
 
-                    <details className={disclosure.disclosure}>
-                        <summary>Citazioni dal documento <span className={disclosure.count}>{publication.citations.length}</span></summary>
+                    <Disclosure className={disclosure.disclosure} title={<>Citazioni dal documento <span className={disclosure.count}>{publication.citations.length}</span></>}>
                         <p className="mt-1 text-[color:var(--lume-ink-muted)]">I passaggi citati sono stati riscontrati nel testo estratto. Confrontali con il riepilogo.</p>
                         <ol className="mt-3 grid gap-3">
                             {publication.citations.map((citation) => (
@@ -256,10 +255,9 @@ function DocumentSynthesisFabricReviewCardSession({
                                 </li>
                             ))}
                         </ol>
-                    </details>
+                    </Disclosure>
 
-                    <details className={disclosure.disclosure}>
-                        <summary>Dettagli di verifica</summary>
+                    <Disclosure className={disclosure.disclosure} title="Dettagli di verifica">
                         <div className="grid min-w-0 gap-3 pb-4 text-sm leading-relaxed text-[color:var(--lume-ink-muted)]">
                             <p>0 scritture · applicazione non consentita</p>
                             <p>Qualità dichiarata dal modello: {publication.output.qualityLevel}. È una sua valutazione, non una verifica clinica indipendente.</p>
@@ -272,7 +270,7 @@ function DocumentSynthesisFabricReviewCardSession({
                                 <dt>Causalità del modello</dt><dd>{modelCausality}</dd>
                             </dl>
                         </div>
-                    </details>
+                    </Disclosure>
                 </div>
             )}
         </section>

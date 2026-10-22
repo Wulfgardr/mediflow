@@ -1,6 +1,7 @@
 'use client';
 
 
+import { Disclosure } from '@/components/disclosure';
 import { Clipboard, ShieldCheck } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react';
 
@@ -198,10 +199,9 @@ export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups
               {committed ? 'Rileggi conferma con PIN' : 'Conferma modifica con PIN'}
             </button>
           </div> : null}
-          <details className="border-t pt-3">
-            <summary className="min-h-11 cursor-pointer content-center font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Dettagli per l’assistenza</summary>
+          <Disclosure className="pt-3" title="Dettagli per l’assistenza">
             <p>Il servizio tecnico è Intelligent Host. Il codice del checkup è un riferimento opaco per l’anteprima MCP; il codice della proposta proviene dallo stesso percorso. La ricevuta conferma una modifica già eseguita: rileggerla non esegue una seconda scrittura. Chiudere l’operazione non revoca la gestione; la revoca definitiva è un’azione distinta.</p>
-          </details>
+          </Disclosure>
         </div>
       ) : null}
     </div>

@@ -19,8 +19,7 @@
 .services :global(button) { justify-content: space-between; width: 100%; }
 .services :global(button span) { flex: 1; min-width: 0; }
 .services :global(svg), .actions :global(svg) { flex-shrink: 0; }
-.disclosure { min-width: 0; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent); }
-.disclosure > summary, .workspace :global(details > summary) { min-height: 44px; padding: 10px 0; color: var(--lume-ink); font-size: 0.9375rem; line-height: 1.5; cursor: pointer; }
+.disclosure { min-width: 0; }
 .support { display: grid; gap: 20px; padding-block: 12px; }
 .panel :global(.graphite-block), .panel :global(.siss-blocked-item) { padding: 0; border: 0; background: transparent; box-shadow: none; border-radius: 0; }
 .panel :global(.graphite-row) { display: flex; flex-wrap: wrap; gap: 12px; padding: 12px 0; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); background: transparent; box-shadow: none; border-radius: 0; }
@@ -32,8 +31,6 @@
 /* expanded support remains readable, on the same surface. */
 .panel :global(.graphite-block h3), .panel :global(.graphite-block h4) { font-size: 0.9375rem; text-transform: none; letter-spacing: normal; }
 .panel :global(.graphite-block > p), .panel :global(.graphite-row p), .panel :global(.graphite-row dt), .panel :global(.graphite-row dd) { font-size: 0.9375rem; line-height: 1.6; }
-.panel > details > summary { border: 0; border-radius: 12px; background: transparent; box-shadow: none; }
-.disclosure > summary { border-radius: 12px; }
 /* prevent legacy portal tiles from stacking their icon and action. */
 .services :global(button) { flex-direction: row; }
 .workspace :global(button), .panel :global(button) { flex-shrink: 0; overflow-wrap: normal; }

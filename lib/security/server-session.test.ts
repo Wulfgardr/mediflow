@@ -99,7 +99,7 @@ const sourceSha256 = (source: string) => crypto.createHash('sha256').update(sour
 // only scanner diagnostics are pinned so any change returns to the fail-closed inventory.
 const REVIEWED_TEST_SUPPORT_DIAGNOSTICS = new Map([
     ['components/settings/settings-presentation.test-support.ts', {
-        sha256: '24f3aa0bd5cbe3acc809c4000e9b1af7e97a23fd56cbffd6a633e745f5027454',
+        sha256: 'db8d98eb45b0225139a7d97eee50c2138f604280a43552ff166e1449d11e11d1',
         diagnostics: ['session-loader', 'historical-owner-reachable', 'historical-owner-reachable'],
     }],
 ] as const);

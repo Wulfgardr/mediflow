@@ -5,6 +5,7 @@
    existing panel (or states explicitly why the panel is not visible) without
    duplicating panel content. */
 
+import { Disclosure } from '@/components/disclosure';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { ListChecks } from 'lucide-react';
 
@@ -38,12 +39,11 @@ function ReviewQueueRow({ row }: { row: PatientReviewQueueRow }) {
     /* one line per state; the full reason stays one disclosure away. */
     const { proposal } = useRuntimeTwinDesign();
     if (proposal) return <li className="border-b border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] py-2" data-testid={`review-queue-row-${row.id}`}>
-        <details>
-            <summary className="cursor-pointer py-2 text-sm"><span className="font-medium">{row.panelLabel}</span><span className="ml-3 text-xs text-[color:var(--lume-ink-muted)]">{row.stateLabel}</span></summary>
+        <Disclosure title={<><span className="font-medium">{row.panelLabel}</span><span className="ml-3 text-xs text-[color:var(--lume-ink-muted)]">{row.stateLabel}</span></>}>
             <div className="pb-3 pl-4 text-xs leading-6 text-[color:var(--lume-ink-muted)]"><p>{row.detail}</p>{row.blockedReason ? <p>{row.blockedReason}</p> : null}
               {row.anchor ? <a className="underline underline-offset-4" href={row.anchor}>{row.actionLabel}</a> : <span>{row.actionLabel}</span>}
             </div>
-        </details>
+        </Disclosure>
     </li>;
     return (
         <li

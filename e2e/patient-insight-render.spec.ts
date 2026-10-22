@@ -94,8 +94,8 @@ test('patient insight renders stored markdown as read-only history without fallb
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
   await openPatientSection(page, 'quadro');
   const insightDisclosure = page.locator('#patient-insight');
-  await insightDisclosure.locator(':scope > summary').click();
-  await expect(insightDisclosure).toHaveAttribute('open', '');
+  await insightDisclosure.locator(':scope > div > [data-disclosure-control]').click();
+  await expect(insightDisclosure.locator(':scope > div > [data-disclosure-control]')).toHaveAttribute('aria-expanded', 'true');
 
   // Saved summaries are historical Markdown in read-only mode. New structured
   // proposals have their own review-only surface and are covered separately.

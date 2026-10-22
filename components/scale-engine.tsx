@@ -1,6 +1,7 @@
 'use client';
 
 /* native exclusive choices preserve the canonical answer values. */
+import { Disclosure } from '@/components/disclosure';
 import { useState, useRef, useEffect, useId } from 'react';
 import styles from '@/components/scales/scale-workspace.module.css';
 /* keep answered scales within the prototype navigation guard. */
@@ -161,7 +162,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
                 <h3>Risultato in bozza</h3>
                 <p className={styles.draftState}>● Fresco · non registrato</p>
                 {draftResult ? <><p className={styles.score}>{draftResult.score}</p><p>{draftResult.interpretation}</p></> : <p>{answeredQuestions.length} risposte su {scale.questions.length}. Il punteggio sarà disponibile a compilazione completa.</p>}
-                <details className={styles.answerDetails}><summary>Risposte compilate · {answeredQuestions.length}</summary><dl>{answeredQuestions.map(question => <div key={question.id}><dt>{question.text}</dt><dd>{question.options?.find(option => option.value === answers[question.id])?.label ?? String(answers[question.id])}</dd></div>)}</dl></details>
+                <Disclosure className={styles.answerDetails} title={<>Risposte compilate · {answeredQuestions.length}</>}><dl>{answeredQuestions.map(question => <div key={question.id}><dt>{question.text}</dt><dd>{question.options?.find(option => option.value === answers[question.id])?.label ?? String(answers[question.id])}</dd></div>)}</dl></Disclosure>
                 {scale.instrument && <p className={styles.source}>Fonte: {scale.instrument.sourceId} · {scale.instrument.instrumentVersion}</p>}
             </aside>
             </div>

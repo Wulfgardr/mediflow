@@ -142,6 +142,7 @@ export function Kree8WorkspaceShell({
         toggle?.click();
         for (let node: HTMLElement | null = target; node && node !== root; node = node.parentElement) {
           if (node instanceof HTMLDetailsElement) node.open = true;
+          if (node.matches('[data-disclosure]')) node.querySelector<HTMLButtonElement>(':scope > div > [data-disclosure-control][aria-expanded="false"], :scope > div > h3 > [data-disclosure-control][aria-expanded="false"]')?.click();
         }
         frame = requestAnimationFrame(() => {
           if (!target.isConnected) return;
@@ -155,7 +156,9 @@ export function Kree8WorkspaceShell({
             target.scrollIntoView({ block: 'nearest' });
             return;
           }
-          const control = target instanceof HTMLDetailsElement
+          const control = target.matches('[data-disclosure]')
+            ? target.querySelector<HTMLElement>('[data-disclosure-control]')
+            : target instanceof HTMLDetailsElement
             ? target.querySelector<HTMLElement>('button:not([disabled]), a[href], input:not([disabled])') ?? target.querySelector<HTMLElement>('summary')
             : target.querySelector<HTMLElement>('h2, h3');
           const focusTarget = control ?? target;

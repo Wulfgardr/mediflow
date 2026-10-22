@@ -67,8 +67,8 @@ test('patient insight kill switch disables generation on patient detail', async 
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
   await openPatientSection(page, 'quadro');
   const insightDisclosure = page.locator('#patient-insight');
-  await insightDisclosure.locator(':scope > summary').click();
-  await expect(insightDisclosure).toHaveAttribute('open', '');
+  await insightDisclosure.locator(':scope > div > [data-disclosure-control]').click();
+  await expect(insightDisclosure.locator(':scope > div > [data-disclosure-control]')).toHaveAttribute('aria-expanded', 'true');
 
   const disabledCard = page.getByTestId('patient-insight-disabled-card');
   await expect(disabledCard).toBeVisible();

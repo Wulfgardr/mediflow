@@ -15,7 +15,7 @@
 .value { font-weight: 600; text-align: right; }
 .selected { background: var(--lume-surface-selected); }
 .rowButton { display: block; width: 100%; min-height: 40px; padding: 8px 4px; text-align: left; font-weight: 600; }
-.rowButton:focus-visible, .formDisclosure > summary:focus-visible, .recordDetails > summary:focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: 3px; }
+.rowButton:focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: 3px; }
 .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .controls > :is(button,a), .control { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--lume-control-height, 40px); padding: 8px 14px; border: 1px solid var(--lume-rule-strong); border-radius: var(--lume-control-radius, 10px); background: transparent; font: 600 0.875rem/1.5 var(--lume-font-sans); }
 .controls [aria-pressed='true'] { color: var(--lume-ink-fresh); background: var(--lume-surface-selected); }
@@ -32,7 +32,6 @@
 .loading { display: grid; gap: 0; }
 .loading > div { height: 44px; border-bottom: 1px solid var(--lume-rule); border-radius: 0; }
 .formDisclosure { margin-bottom: 24px; }
-.formDisclosure > summary { width: fit-content; min-height: 40px; margin-left: auto; padding: 8px 12px; border: 1px solid var(--lume-rule-strong); border-radius: 10px; color: var(--lume-ink-fresh); cursor: pointer; font-weight: 600; }
 .form { min-width: 0; padding: 20px 0; border-block: 1px solid var(--lume-rule-strong); border-inline: 0; border-radius: 0; background: transparent; box-shadow: none; margin-block: 16px 28px; }
 .register pre { font-family: var(--lume-font-sans); line-height: 1.5; }
 .review input:global(.lume-code), .form input:global(.lume-code) { font: var(--type-code); }
@@ -41,7 +40,6 @@
 .form label { min-width: 0; font-size: 0.8125rem; }
 .form fieldset { min-width: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .recordDetails { margin-top: 6px; color: var(--lume-ink-muted); }
-.recordDetails > summary { min-height: 40px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.8125rem; }
 .recordDetails p, .recordDetails dl { margin-block: 8px; }
 .recordDetails dt { font-size: 0.75rem; color: var(--lume-ink-muted); }
 .recordDetails dd { margin: 0 0 8px; color: var(--lume-ink); }
@@ -116,7 +114,7 @@
  .therapyTable tr { padding-block: 12px; border-bottom: 1px solid var(--lume-rule); }
  .therapyTable td { padding: 4px 0; border: 0; }
  .therapyTable .secondaryColumn { display: none; }
- .controls > :is(button,a), .control, .rowButton, .formDisclosure > summary { min-height: 44px; }
+ .controls > :is(button,a), .control, .rowButton { min-height: 44px; }
  .form :is(input:not([type='checkbox']):not([type='radio']),select,textarea) { min-height: 44px; }
 }
 

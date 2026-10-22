@@ -235,8 +235,8 @@ test('AnyDoc: il browser usa la route autenticata e mostra solo l’anteprima lo
   // the receipt is reachable only after the client strictly validates the acquired grant,
   // current canonical source, response provenance/digest and review-only contract (client lines 233-247).
   // CDP response-body retrieval is unavailable in both CI and the packaged runtime.
-  await preview.locator('summary').click();
-  await expect(preview.locator('summary')).toHaveText('Testo estratto localmente · da rivedere');
+  await preview.getByRole('button', { name: /Testo .*localmente/ }).click();
+  await expect(preview.getByRole('button', { name: /Testo .*localmente/ })).toHaveText('Testo estratto localmente · da rivedere');
   await expect(preview.locator('pre')).toBeVisible();
   await expect(preview).toContainText(SYNTHETIC_RTF_TEXT);
   await expect(page.getByText('review_required · unsupported_local_extraction', { exact: false })).toHaveCount(0);

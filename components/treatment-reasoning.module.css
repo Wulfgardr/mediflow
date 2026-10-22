@@ -48,9 +48,8 @@
 .information { color: var(--lume-ink-muted); }
 .reviewColumns { display: grid; grid-template-columns: minmax(0,1fr); }
 .proposalRow { display: grid; gap: 8px; min-width: 0; padding-block: 16px; border-bottom: 1px solid var(--lume-rule); }
-.details { border-bottom: 1px solid var(--lume-rule); margin-top: 16px; min-width: 0; }
-.details > summary { cursor: pointer; min-height: 44px; padding-block: 12px; font: var(--type-strong); }
-.details > :not(summary) { margin-bottom: 16px; }
+.details { margin-top: 16px; min-width: 0; }
+.details > div:last-child { margin-bottom: 16px; }
 .details ol { padding-left: 24px; display: grid; gap: 12px; }
 .origin { display: grid; gap: 16px 28px; padding-top: 12px; }
 .origin > div { display: grid; gap: 4px; min-width: 0; }
