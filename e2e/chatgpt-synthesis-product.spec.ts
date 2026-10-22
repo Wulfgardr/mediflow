@@ -8,13 +8,12 @@ import { test } from 'node:test';
 import { mkdtemp, mkdir, writeFile, symlink, rm } from 'node:fs/promises';
 import { isAbsolute, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
 import { createServer as createTcpServer, connect as connectTcp } from 'node:net';
 import { createServer as createHttpServer, request as httpRequest, type IncomingMessage, type ServerResponse, type ClientRequest } from 'node:http';
 import { Transform, type Duplex } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { spawn, type ChildProcess } from 'node:child_process';
-import type { Browser, BrowserContext, Page } from '@playwright/test';
+import { chromium, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { createBrowserResponseOracle, type BrowserResponseOracle, type SameResponseTicket } from './chatgpt-browser-response.ts';
 import { checkBrowserResponseContract } from './chatgpt-browser-response.contract.ts';
 import type { ProductOperation } from '../lib/chatgpt-product/product-contract';
@@ -22,8 +21,6 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const dataDir = process.env.MEDIFLOW_DATA_DIR;
 assert.ok(dataDir && isAbsolute(dataDir), 'Absolute run-owned synthetic directory required');
 assert.equal(Number(process.versions.node.split('.')[0]), 24, 'Node 24 required; never skip or replace runtime');
-// Use an ESM-local resolver; the frozen loader must not classify this spec as CJS.
-const packageRequire = createRequire(join(root, 'package.json'));
 const { createProductFixture, deferred, tick } = await import('../lib/chatgpt-product/product-production.test.ts');
 const { PRODUCT_NAMESPACE, PRODUCT_MUTATIONS } = await import('../lib/chatgpt-product/product-contract.ts');
 async function freePort() {
@@ -299,8 +296,7 @@ type WireGateway = Awaited<ReturnType<typeof startWireGateway>>;
 
 test('real synthetic product UI/HTTP acceptance, no automatic inference or clinical writes', { timeout: 180000 }, async t => {
     // Resolve first. Missing dependencies/browser fail rather than mocking React.
-    const { chromium, expect } = packageRequire('@playwright/test') as typeof import('@playwright/test');
-    const next = packageRequire.resolve('next/dist/bin/next');
+    const next = fileURLToPath(import.meta.resolve('next/dist/bin/next'));
     // Exercise reporting without a browser/provider fake: no failure, either
     // phase alone, and both failures. These assertions run only in the Node24 suite.
     for (const workFails of [false, true]) for (const cleanupFails of [false, true]) {
@@ -344,7 +340,13 @@ test('real synthetic product UI/HTTP acceptance, no automatic inference or clini
     // product requests still use real server owner 0.8.7 in createProductFixture.
     const hook = join(fixture, 'unused-security-hook.ts');
     await writeFile(hook, `export function useSecurity(): never { throw new Error('This fixture mounts the real Card, not its outer Panel'); }`);
-    await writeFile(join(fixture, 'next.config.mjs'), `export default { experimental: {externalDir:true}, devIndicators:false, webpack(config) { config.resolve.alias['@/components/security-provider$']=${JSON.stringify(hook)}; config.resolve.alias['@']=${JSON.stringify(root)}; return config; } };`);
+    // Next 16 webpack startup awaits npm version metadata. A stalled fetch must
+    // not hold this UI-only child; application requests use the browser gateway.
+    await writeFile(join(fixture, 'server-fetch-probe.cjs'), `globalThis.fetch = () => { process.stderr.write('UI_FIXTURE_UNGUARDED_FETCH\\n'); return new Promise(() => {}); };
+process.stderr.write('UI_FIXTURE_FETCH_PROBE_READY\\n');`);
+    await writeFile(join(fixture, 'next.config.mjs'), `import './server-fetch-probe.cjs';
+globalThis.fetch = async () => { throw new Error('UI_FIXTURE_SERVER_FETCH_DENIED'); };
+export default { experimental: {externalDir:true}, devIndicators:false, webpack(config) { config.resolve.alias['@/components/security-provider$']=${JSON.stringify(hook)}; config.resolve.alias['@']=${JSON.stringify(root)}; return config; } };`);
     await writeFile(join(fixture, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2017', lib: ['dom', 'dom.iterable', 'esnext'], strict: true, noEmit: true,
         esModuleInterop: true, module: 'esnext', moduleResolution: 'bundler', jsx: 'react-jsx', resolveJsonModule: true, skipLibCheck: true, baseUrl: root, paths: { '@/*': [resolve(root, '*')] } } }));
     await writeFile(join(fixture, 'app/layout.tsx'), `import type {ReactNode} from 'react'; export const metadata={title:'MediFlow synthetic product fixture'}; export default function Layout({children}:{children:ReactNode}) { return <html lang="it"><head><link rel="icon" href="data:,"/></head><body>{children}</body></html>; }`);
@@ -367,11 +369,14 @@ export default function Page(){const [active,setActive]=useState(true);return <m
     for (;;) {
         if (spawnError) throw spawnError;
         assert.equal(logOverflow, false, 'UI_FIXTURE_LOG_LIMIT');
+        assert.doesNotMatch(logs.join(''), /UI_FIXTURE_UNGUARDED_FETCH/);
         assert.equal(child.exitCode, null, logs.join(''));
         try { if ((await fetch(nextBase, { redirect: 'error', signal: AbortSignal.timeout(1000) })).ok) break; } catch { /* local test server startup only */ }
         assert.ok(Date.now() < deadline, `Isolated fixture startup failed: ${logs.join('')}`);
         await new Promise(done => setTimeout(done, 250));
     }
+    assert.match(logs.join(''), /UI_FIXTURE_FETCH_PROBE_READY/);
+    assert.doesNotMatch(logs.join(''), /UI_FIXTURE_UNGUARDED_FETCH/);
     const browser = await chromium.launch({ headless: true }); resources.browser = browser;
     const oracles = new WeakMap<Page, BrowserResponseOracle>();
     async function scenario(name: string, run: (page: Page, f: ReturnType<typeof createProductFixture>) => Promise<void>, width = 1280, held = false) {
