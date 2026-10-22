@@ -3,6 +3,12 @@ on:
   pull_request:
     paths:
       - 'plugins/mediflow-chat-demo/**'
+      - 'lib/chat-card/**'
+      - 'lib/ai-preparation/**'
+      - 'scripts/fixtures/chat-card-corpus.json'
+      - 'scripts/register-strip-types-loader.mjs'
+      - 'package.json'
+      - 'package-lock.json'
       - 'app/fonts/Newsreader*'
       - 'docs/design/lume/tokens/lume.tokens.json'
       - '.github/workflows/chat-demo.yml'
@@ -10,6 +16,12 @@ on:
     branches: [main]
     paths:
       - 'plugins/mediflow-chat-demo/**'
+      - 'lib/chat-card/**'
+      - 'lib/ai-preparation/**'
+      - 'scripts/fixtures/chat-card-corpus.json'
+      - 'scripts/register-strip-types-loader.mjs'
+      - 'package.json'
+      - 'package-lock.json'
       - 'app/fonts/Newsreader*'
       - 'docs/design/lume/tokens/lume.tokens.json'
       - '.github/workflows/chat-demo.yml'
@@ -28,6 +40,9 @@ jobs:
           node-version: 24.21.0
           cache: npm
           cache-dependency-path: plugins/mediflow-chat-demo/package-lock.json
+      - run: echo "MEDIFLOW_DATA_DIR=$(mktemp -d)" >> "$GITHUB_ENV"
+      - run: npm ci --no-audit --no-fund
+        working-directory: .
       - run: npm ci --no-audit --no-fund
       - run: npm run build
       - run: npm run typecheck
@@ -38,9 +53,13 @@ jobs:
       - run: npm run prepare:reference
       - run: npm run test:reference
       - run: npm run test:performance-negative
+      - run: npm run test:card-reference
+      - run: npm run test:card-performance-negative
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: chat-demo-reference-performance
-          path: plugins/mediflow-chat-demo/dist/evidence/
+          path: |
+            plugins/mediflow-chat-demo/dist/evidence/
+            plugins/mediflow-chat-demo/dist/card-evidence/
           if-no-files-found: warn

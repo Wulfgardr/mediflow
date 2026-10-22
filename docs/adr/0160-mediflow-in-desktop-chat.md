@@ -769,6 +769,21 @@ restano nello stesso posto e non sono dichiarate consegnate da questo ADR.
    osservabili, incluso turno successivo. Terzi, CF OCR, luoghi, nascita,
    filename, campi sconosciuti, runner/report invalidi e cambio paziente devono
    bloccare l'uscita. Un falso negativo del corpus blocca la promozione.
+   Per il solo prototipo sintetico 2c, la risorsa senza dati clinici consegna
+   una volta per sessione MCP una chiave casuale alla closure del controllo;
+   il bundle rimuove subito il proprio script dal DOM. Ogni preparazione emette
+   una challenge distinta, monouso e valida 30 secondi, legata al tentativo e
+   al digest conservato dall’owner. La conferma richiede challenge e firma HMAC-SHA-256,
+   generata soltanto dal listener `isTrusted` del controllo dedicato. La
+   chiave non attraversa i tool; una firma osservata non vale per un altro nonce. La sola
+   challenge disponibile nei messaggi non concede il consenso; la risorsa
+   non è rileggibile nella stessa sessione. La riapertura richiede pertanto
+   una nuova sessione MCP, da qualificare sui desktop. Il confine copre i
+   messaggi forgiati dal frame dopo il bootstrap fidato, non l’host che può
+   controllare renderer o caricamento: non è autenticazione clinica né una
+   prova crittografica di gesto verso un host ostile. Revoca e nuovi tentativi
+   invalidano sincronicamente l’epoca; l’owner ricontrolla l’epoca subito
+   prima dell’uscita, senza attese intermedie.
 3. **Canale per host e ricomposizione nativa.** Implementare il percorso
    raccomandato; provare app-only su dati pseudonimizzati dove R è disponibile.
    **Prova:** tool non disponibile al modello, risultati non reinseriti nel

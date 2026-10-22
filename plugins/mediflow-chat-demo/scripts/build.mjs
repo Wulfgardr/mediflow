@@ -19,3 +19,10 @@ const html = source.replace('<!-- STYLE -->', () => `<style>@font-face{font-fami
 await mkdir(new URL('dist/', root), { recursive: true });
 await writeFile(new URL('dist/app.html', root), html);
 await writeFile(new URL('dist/Newsreader-OFL.txt', root), await readFile(new URL('../../app/fonts/Newsreader-OFL.txt', root)));
+
+const cardScript = await build({ entryPoints: [new URL('src/card-app.mjs', root).pathname], bundle: true,
+  write: false, format: 'iife', platform: 'browser', target: 'es2022', minify: true });
+const cardSource = await readFile(new URL('src/card.html', root), 'utf8');
+const cardHtml = cardSource.replace('<!-- STYLE -->', () => `<style>@font-face{font-family:Newsreader;src:url(data:font/ttf;base64,${font.toString('base64')}) format('truetype');font-weight:400;font-display:swap}${themes}\n${css}</style>`)
+  .replace('<!-- SCRIPT -->', () => `<script>${cardScript.outputFiles[0].text.replace(/<\/script/giu, '<\\/script')}</script>`);
+await writeFile(new URL('dist/card.html', root), cardHtml);
