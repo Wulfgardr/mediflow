@@ -2,7 +2,7 @@
 
 import { Disclosure, DisclosureControl } from '@/components/disclosure';
 import styles from './clinical-register.module.css';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from '@/lib/live-query';
 import { v4 as uuidv4 } from 'uuid';
 import { Minus, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
@@ -103,7 +103,11 @@ export default function ObservationManager({
     const initialObservedAt = useRef(observedAt);
     const codeSelectRef = useRef<HTMLSelectElement>(null);
     const [formOpen, setFormOpen] = useState(false);
-    const valueInputRef = useRef<HTMLInputElement>(null);
+    const [formFocusRequest, setFormFocusRequest] = useState(0);
+    // Il comando richiede il focus dopo che React ha rimosso hidden dal form.
+    useLayoutEffect(() => {
+        if (formFocusRequest > 0) codeSelectRef.current?.focus();
+    }, [formFocusRequest]);
     /* WUL-UIUX: piu analiti possono restare aperti insieme (confronto tra
        parametri in polifarmaco); "full" espande l'intera storia oltre le ultime 5. */
     const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
@@ -137,10 +141,8 @@ export default function ObservationManager({
         setUnitCode(applied.unitCode);
         setServicePrescriptionItemId(applied.servicePrescriptionItemId);
         setServicePrescriptionItem(applied.servicePrescriptionItem);
-        requestAnimationFrame(() => {
-            setFormOpen(true);
-            valueInputRef.current?.focus();
-        });
+        setFormOpen(true);
+        setFormFocusRequest(request => request + 1);
     }, [loincOptions, prefill]);
 
     const toggleGroup = (analyteCode: string) =>
@@ -157,12 +159,12 @@ export default function ObservationManager({
             else next.add(analyteCode);
             return next;
         });
-    /* Precompila il form con questo analita e porta il focus sul valore. */
+    /* Precompila il form con questo analita e porta il focus al primo campo. */
     const prefillGroup = (analyteCode: string, unit: string) => {
         setCode(analyteCode);
         if (unit) setUnitCode(unit);
         setFormOpen(true);
-        valueInputRef.current?.focus();
+        setFormFocusRequest(request => request + 1);
     };
 
     /* Etichetta italiana per un analita, con fallback al display grezzo
@@ -395,7 +397,6 @@ export default function ObservationManager({
                 <label className="space-y-1">
                     <span className="section-kicker">Valore</span>
                     <input
-                        ref={valueInputRef}
                         value={value}
                         onChange={(e) => {
                             setValue(e.target.value);

@@ -125,6 +125,15 @@ Commit di sincronizzazione del runtime:
 `dc9bcbf12cdd990b34676e3136be4cf412a3cd16`. Il file di copertura fissa gli hash
 completi delle superfici lette; il runtime non viene modificato da questo lavoro.
 
+Il 22 ottobre 2026, PR #617 (`9ff52b5f822a24c2996ab11b1e5d84ed1c51dbc8`),
+è stato riesaminato e aggiornato soltanto l'hash di `components/therapy-manager.tsx`.
+Rispetto al commit di sincronizzazione cambia solo la presentazione dei dettagli
+di riga (`details` → `Disclosure`, con lo stesso contenuto già montato). Non
+cambiano comandi, conferma, CAS, recupero, audit, transizioni o assunzioni del
+modello. Prima dell'aggiornamento sono passati TLC sul modello corrente
+(5.903.794 stati distinti, coda vuota) e i 48 test del controller e della route.
+Il gate completo conserva invarianti, limiti, testimoni e controlli negativi.
+
 | Azione TLC / confine | Implementazione letta |
 | --- | --- |
 | `Begin`, `Cancel`, `Confirm` | [controller](../../../lib/therapy-status-confirmation.ts), [`begin/cancel/confirm`](https://github.com/Wulfgardr/mediflow/blob/dc9bcbf12cdd990b34676e3136be4cf412a3cd16/lib/therapy-status-confirmation.ts#L219): copia contesto, guardie, generazione; nessun `write` in `begin`. |

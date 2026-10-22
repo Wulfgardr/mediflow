@@ -11,6 +11,7 @@ async function fixture(page: Page) {
   });
   await page.goto(`/patients/${id}/modules`);
   await expect(page.getByTestId('lume-scheda-header')).toBeVisible();
+  return id;
 }
 
 test('la guida appartiene solo a Terapie', async ({ page }) => {
@@ -123,5 +124,37 @@ for (const theme of ['giorno', 'grafite']) for (const width of [1440, 768, 390, 
     await test.info().attach('disclosure', { path: screenshot, contentType: 'image/png' });
     await assertNotClippedInViewport(trigger, 'Guida alla prescrizione');
     await assertNoHorizontalOverflow(page, [{ label: 'documento', selector: 'document' }]);
+  });
+}
+
+
+for (const command of ['storia', 'attenzione']) {
+  test(`il comando misura da ${command} focalizza il form dopo l'apertura`, async ({ page }) => {
+    const patientId = await fixture(page);
+    await page.evaluate(async id => {
+      for (const day of ['01', '08', '15']) {
+        const response = await fetch('/api/observations', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ patientId: id, codeSystem: 'LOINC', code: '8480-6',
+            display: 'Pressione sistolica', unitSystem: 'UCUM', unitCode: 'mm[Hg]',
+            value: 120, observedAt: `2026-01-${day}T08:00:00.000Z`, source: 'manual' }),
+        });
+        if (!response.ok) throw new Error(`Misura sintetica: ${response.status}`);
+      }
+    }, patientId);
+    await page.reload();
+    await openPatientSection(page, 'parametri');
+    const control = page.getByRole('button', { name: 'Nuova misura', exact: true });
+    const content = page.locator(`[id="${await control.getAttribute('aria-controls')}"]`);
+    await expect(control).toHaveAttribute('aria-expanded', 'false');
+    if (command === 'storia') {
+      await page.getByRole('button', { name: 'Registra nuova misura', exact: true }).click();
+    } else {
+      await openPatientSection(page, 'attenzione');
+      await page.getByRole('button', { name: /inserisci misura/ }).click();
+    }
+    await expect(control).toHaveAttribute('aria-expanded', 'true');
+    await expect(content.locator('select').first()).toBeFocused();
+    await expect(content.getByPlaceholder('Es. 120')).toHaveValue('');
   });
 }

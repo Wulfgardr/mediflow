@@ -165,7 +165,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                     </div>
 
                     <div id={`document-insight-${insight.id}`} hidden={expandedId !== insight.id}>
-                        {(
+                        {expandedId === insight.id && (
                             <div className={styles.proposalRow}>
                                 {Array.isArray(insight.extractedData?.diagnoses) && insight.extractedData.diagnoses.length > 0 && (
                                     <div className="flex flex-wrap gap-2">
