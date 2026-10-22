@@ -114,7 +114,9 @@ test('checkup host creates the fresh selection once and revokes A before selecti
 
     await page.goto(`/patients/${fixture.patientId}/modules`);
     const action = page.getByTestId('intelligent-host-checkup-action');
-    const open = action.getByRole('button', { name: 'Gestisci checkup' });
+    const menuTrigger = page.getByRole('button', { name: 'Azioni', exact: true });
+    await menuTrigger.click();
+    const open = page.getByRole('menuitem', { name: 'Gestisci checkup', exact: true });
     await expect(open).toBeEnabled();
     const target = await open.boundingBox();
     expect(Math.min(target?.width ?? 0, target?.height ?? 0)).toBeGreaterThanOrEqual(44);

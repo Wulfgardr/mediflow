@@ -30,7 +30,9 @@ test('real patient page retains the governed checkup entrypoint', {
     skip: !existsSync(pageUrl) ? 'NOT_RUN: caller page is outside the supplied source slice; re-run in the complete checkout.' : false,
 }, () => {
     const page = readFileSync(pageUrl, 'utf8');
-    assert.match(page, /<IntelligentHostCheckupAction patientId=\{patient\.id\}[\s\S]{0,120}ambulatoryId=\{patient\.ambulatoryId \?\? null\}/u);
+    assert.match(page, /<PatientHeaderActions[\s\S]{0,180}patientId=\{patient\.id\} ambulatoryId=\{patient\.ambulatoryId \?\? null\}/u);
+    const header = readFileSync(new URL('./patient-header-actions.tsx', import.meta.url), 'utf8');
+    assert.match(header, /<IntelligentHostCheckupAction patientId=\{patientId\} ambulatoryId=\{ambulatoryId\} checkups=\{checkups\} embedded/u);
     assert.doesNotMatch(page, /<IntelligentHostPatientAction/u);
 });
 
