@@ -7,20 +7,24 @@ Riferimenti: [WUL-788](https://linear.app/wulfgardr/issue/WUL-788),
 
 Questo ADR propone il contratto del nuovo client. Non modifica il prodotto,
 non ammette dati reali e non attesta funzionamento, anonimato o conformità.
-Il pilota R/L procede separatamente su dati sintetici: alla stesura non sono
-disponibili esiti conclusivi da cui far dipendere la decisione.
+Secondo round del 22 ottobre: recepisce le decisioni e le prove sintetiche
+riportate sotto. Queste prove non qualificano dati reali o nuove scritture.
 
 ## Problema e contesto
 
-La vista deve consentire al medico di consultare scheda, storia e terapie e,
-in incrementi successivi, confermare scritture e gestire visita a voce e
-ambulatorio direttamente nella chat. Il telecomando di ADR 0159 apre invece
+L'obiettivo è l'uso completo di MediFlow dal plugin: consultazione, creazione
+del paziente da documenti, tutte le funzioni dell'Intelligence Fabric,
+scritture, visita a voce e ambulatorio. La domanda sceglie una vista pertinente,
+senza caricare sempre l'intera scheda. La completezza funzionale è un criterio
+di arrivo, non una capacità già consegnata né un'autorizzazione generica.
+Il telecomando di ADR 0159 apre invece
 la UI MediFlow separata e restituisce solo `continue_in_mediflow`.
 
 Le fonti di decisione sono la ricognizione «MediFlow nella chat — WUL-788» del
 22 ottobre 2026 e il commento «Decisioni di Leonardo (22 ottobre)» su WUL-788
-(ID `b9addde9-5ff1-49ec-b237-9d5fe59df695`). La precisazione successiva del
-coordinamento, verificata sulla risposta originale di Leonardo, distingue:
+(ID `b9addde9-5ff1-49ec-b237-9d5fe59df695`), le decisioni successive
+(`eafa63a9-4caa-4d2e-96b1-5a4f5bc6475a`) e i nuovi requisiti di prodotto
+(`15fa0a62-9fad-4856-b4f9-da99a651c9af`), tutti nella stessa issue:
 
 - **Scelto:** Claude Desktop e Codex nell'app ChatGPT desktop per le viste
   ricche; Codex CLI e Claude Code restano telecomandi.
@@ -32,8 +36,14 @@ coordinamento, verificata sulla risposta originale di Leonardo, distingue:
   che diventa un nuovo client fidato.
 - **Proposto come perimetro iniziale:** solo Mac. Non costituisce una scelta
   definitiva sulle altre piattaforme né una qualifica di tutti i Mac.
-- **Proposto dal coordinatore, da confermare:** autenticazione e conferma
-  tramite componente nativo MediFlow e Touch ID, senza digitare PIN nel renderer.
+- **Scelto:** accesso con Touch ID nella finestra nativa aperta dalla vista;
+  ripiego con PIN nella stessa finestra. Mai PIN o passphrase nella chat.
+- **Scelto:** prima scrittura limitata al cambio di stato di una terapia,
+  con anteprima, conferma nella vista e verifica nativa.
+- **Scelto:** corrispondenze pseudonimo → nome soltanto per la sessione;
+  vecchie chat e riavvii restano a pseudonimi. Nessuna persistenza del mapping.
+- **Richiesto:** importazione da documenti, Fabric completo, catalogo di viste,
+  opzione di chat temporanea, prestazioni con budget e pubblicazione per terzi.
 
 Il testo pubblico di [Get MediFlow](https://getmediflow.dev), verificato nel
 sorgente `app/mediflow-copy.ts` alle righe 469–474 di `origin/HEAD`
@@ -82,27 +92,54 @@ Qui «host della chat» indica l'app del fornitore; «host MediFlow» indica il
 runtime che possiede sessioni, autorizzazioni e servizi. Non sono la stessa
 parte fidata.
 
-## Opzioni e compromessi
+## Esiti R/L e scelta del canale per host
 
-1. **Vista con lettura locale diretta e contesto pseudonimizzato separato.**
-   È la proposta principale, condizionata a L: la vista può mostrare identità
-   reali; i tool rivolti al modello espongono soltanto la proiezione ammessa.
-2. **Solo contenuto pseudonimizzato nei risultati MCP e nella vista.**
-   Funziona senza canale di ricomposizione inline, ma non mostra i nomi reali.
-   Può essere un incremento utile, dichiaratamente incompleto.
-3. **Canale riservato alla vista attraverso il bridge dell'host.** `_meta`
-   o tool app-only possono essere candidati se L fallisce. Richiedono prova
-   per ogni client e decisione esplicita sul transito nell'host; non equivalgono
-   a una lettura diretta dal Mac e non sono un fallback automatico.
-4. **Telecomando e finestra MediFlow affiancata.** Conserva l'esperienza
-   esistente e offre un ripiego concreto; non soddisfa la richiesta inline.
-5. **Identificativi nei risultati ordinari o iframe dell'intera Web UI.**
-   Esclusi: i primi violano la direzione scelta; il secondo incontra difese
-   anti-iframe, cookie e controlli di origine che non vanno rimossi.
+R misura la vista inline nel client reale; L la lettura diretta da loopback.
+I rapporti del 22 ottobre riguardano il demo sintetico alla revisione
+`328a0df5833ecaa4563193a772c524fad6c04727`, non il broker proposto qui.
 
-La proposta combina 1 con una superficie minima di 2; tiene 3 e 4 come
-alternative esplicite. Le unità restano sintetiche finché l'ADR non è accettato;
-l'accettazione non sostituisce l'ammissione del deployment concreto.
+| Superficie provata | Esito | Conseguenza per il disegno |
+| --- | --- | --- |
+| Codex nell'app ChatGPT desktop 26.1016.61520 (21421) | R PASS con difetti, checklist completata manualmente da Leonardo; L FAIL | Origine `codex-sandbox://`: il percorso diretto con il validatore corrente è impraticabile. Vista pseudonimizzata via canale host da qualificare; ricomposizione nativa. |
+| Codex CLI 0.163.0 | PASS, una chiamata demo e ricevuta, exit 0 | Prova del telecomando testuale, non di R o L. |
+| Claude Desktop 3.1623.1 | R FAIL; L non verificato | Demo e controllo ufficiale `@modelcontextprotocol/server-map@2.0.3` eseguono il tool ma producono zero `resources/read`. Limite del percorso host osservato; resta la UI nativa. |
+
+Su Claude la prova A/B non distingue build, account e bridge locale; non
+dimostra un difetto del solo HTML MediFlow. Su Codex non sono qualificati
+CSP/CORS/LNA effettivi né la causa di rete precisa. Non si estende il verdetto
+a tutte le versioni future e non si allenta il validatore per ottenere L.
+I difetti R residui sono salto della chat in fondo al clic, ricevuta JSON
+visibile, fasce grigie laterali e fluidità da misurare. R PASS non chiude tali
+difetti e non prova la revoca di una sessione clinica, assente nel demo.
+
+**Raccomandazione:** ricomporre identità e documenti soltanto nella UI nativa;
+nei desktop capaci di R, usare viste pseudonimizzate e risposte in chat
+alimentate dal broker. È un percorso dal plugin con passaggi nativi espliciti,
+ancora incompleto rispetto a nomi e operazioni interamente inline. Su Claude
+il telecomando rimane il ripiego finché una nuova prova reale non supera R.
+
+L'alternativa per i nomi inline è un tool con `_meta.ui.visibility: ["app"]`
+e risultato riservato alla vista, attraverso l'host. La
+[specifica MCP Apps, draft consultato](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx)
+definisce questa visibilità e il bridge; il
+[riferimento OpenAI](https://developers.openai.com/plugins/reference)
+distingue inoltre `_meta` dai campi del risultato visibili al modello.
+Sono due controlli diversi: visibilità del tool e destinazione del risultato.
+Per MediFlow vanno provati entrambi, incluso il turno successivo, gli errori,
+lo stato widget, notifiche, screenshot e aggiornamenti del contesto.
+
+App-only evita una nuova dipendenza da loopback e può ridurre i turni modello
+nelle interazioni, ma l'host trasporta comunque i byte e può vedere renderer
+e risultato. Non è cifratura verso l'host né una qualifica di retention; il
+solo flag non autorizza letture o scritture. La raccomandazione consente di
+sperimentarlo per viste **pseudonimizzate**, mai come ripiego implicito per
+identificativi. I nomi via bridge richiederebbero una decisione di trattamento
+e una qualifica aggiuntive. Nessun esito del bridge vale come L positivo.
+
+La lettura diretta resta un'opzione futura per host che superino L, con gli
+stessi rischi del renderer. Identificativi nei tool ordinari e iframe
+dell'intera Web UI rimangono esclusi. Le unità restano sintetiche finché
+l'ADR non è accettato; l'accettazione non ammette il deployment concreto.
 
 ## Confine dei dati
 
@@ -207,22 +244,83 @@ automatico del contenuto ricomposto. Il testo digitato direttamente nella
 chat dell'host è fuori dal controllo MediFlow; questa limitazione deve essere
 visibile prima dell'uso reale e non aggirata promettendo un filtro universale.
 
+### Documenti in entrata: prima del broker conta dove si carica
+
+**Un documento trascinato nel compositore della chat arriva in chiaro all'host
+e può entrare nel modello prima di qualsiasi chiamata MediFlow.** «In chiaro»
+qui significa accessibile al destinatario, anche se il trasporto usa TLS.
+Il broker non può filtrare retroattivamente quel trasferimento. File, immagini,
+nomi file, metadati e audio seguono lo stesso limite; una chat temporanea non
+lo cambia. Gli helper di upload dell'host non sono un caricamento locale.
+
+Percorso raccomandato, avviabile dal plugin:
+
+1. «Aggiungi paziente da documenti» apre la finestra nativa MediFlow autenticata.
+   Il medico trascina i documenti lì o usa il selettore file nativo. La vista
+   in chat riceve solo una ricevuta opaca, senza percorso, filename o anteprima.
+2. Il broker **locale posseduto da MediFlow**, distinto dall'adapter MCP, vede
+   i byte originali, metadati, testo estratto e candidati anagrafici necessari.
+   Verifica tipo/dimensione, origine, scope di creazione, duplicati e integrità;
+   i file restano in un'area locale di preparazione con durata limitata alla
+   lavorazione. Nessun URL arbitrario o file ID dell'host viene scaricato
+   automaticamente. Parser e istruzioni nel documento non concedono autorità.
+3. AnyDoc e l'OCR locale ammesso preparano evidenze per pagina; Smart Import
+   produce candidati, con errori e provenienza, senza inserire record. Prima
+   di un eventuale invio a un provider Fabric o al modello della chat, lo
+   stesso broker riduce, pseudonimizza, controlla i byte finali e ottiene il
+   consenso per la destinazione esatta. I due destinatari non si autorizzano
+   reciprocamente. Un percorso interamente locale non richiede tale uscita.
+4. Il medico rivede nella UI nativa identità, ambiguità, possibili duplicati,
+   dati clinici e fonti. «Nuovo paziente» è uno scope proprio, non il paziente
+   attualmente selezionato. Conferma nativa e writer applicativo comune
+   inseriscono soltanto i campi approvati; merge con un paziente esistente
+   richiede una scelta distinta. Terapie estratte non diventano prescrizioni.
+5. Il broker controlla anche ciò che ritorna dal modello: schema, token della
+   sessione, riferimenti alle fonti, revisione e dati estranei. Ricompone solo
+   localmente; un output non valido resta una proposta rifiutata. Alla chat
+   escono solo esito minimale e contenuto pseudonimizzato ammesso; originali
+   e allegati accettati seguono la conservazione clinica locale, mentre lo
+   staging rifiutato/scaduto viene ritirato secondo la policy documentata.
+
+Un futuro drop **dentro la vista MediFlow incorporata** sarebbe distinto dal
+compositore, ma il renderer dell'host vedrebbe comunque il file prima del
+broker. È escluso dal percorso iniziale raccomandato. Per abilitarlo servono
+R, canale di upload autenticato qualificato e decisione esplicita su quel
+trattamento; L fallito impedisce di assumere un upload diretto. Un ponte
+app-only farebbe transitare anche l'originale nell'host, non risolverebbe il
+confine. Il tasto della vista può invece aprire il selettore nativo senza
+ricevere i byte del file.
+
+Prima dell'uso, vicino all'azione di importazione, mostrare:
+«Carica i documenti nella finestra MediFlow. Se li alleghi a questa chat,
+li condividi direttamente con il suo fornitore prima della protezione MediFlow.»
+Se l'host segnala un allegato nel compositore, interrompere il percorso di
+importazione del plugin e avvisare senza citare il contenuto:
+«Questo file è stato allegato alla chat e può essere già stato acquisito dal
+suo fornitore. MediFlow non può annullare quell'invio. Rimuovilo dagli allegati
+e dalle copie salvate dall'host, se disponibili, e caricalo dalla finestra
+MediFlow. La rimozione non garantisce la cancellazione immediata delle copie.»
+Non promettere intercettazione se l'host non espone l'evento; l'avviso
+preventivo resta necessario. Non scaricare né ripetere il file per “ripulirlo”.
+Un'esposizione reale segue la procedura del titolare, senza dichiarare
+automaticamente né escludere una violazione dei dati.
+
 ## Ricomposizione locale
 
 ### Custodia: chiave hardware e mapping sono oggetti diversi
 
-Si propone che un componente nativo MediFlow possieda la ricomposizione sul
-Mac. Per la prima unità il mapping dura quanto il tentativo autorizzato e vive
-soltanto nella sua RAM; se serve persisterlo, vive in un archivio locale cifrato
-separato, con durata minima esplicita e senza sincronizzazione iCloud. Non
-viene salvato nel renderer, nella cronologia o nel processo MCP. La persistenza
-è una decisione aggiuntiva, non un effetto implicito del login.
+Un componente nativo MediFlow possiede la ricomposizione sul Mac. Per decisione
+di Leonardo il mapping vive soltanto in RAM per la sessione autorizzata, con
+sottoambiti per paziente, tentativo e payload. Non viene persistito, cifrato
+su disco, sincronizzato o salvato nel renderer, nella cronologia o nel processo
+MCP. Una nuova sessione crea nuove corrispondenze; non ricostruisce le vecchie
+mappe tramite identificatori stabili. Questo non cancella le fonti cliniche.
 
 Una chiave privata generata nel Secure Enclave può proteggere l'accesso al
-materiale crittografico del mapping. Il Keychain custodisce riferimenti e
+materiale crittografico della sessione. Il Keychain custodisce riferimenti e
 materiale avvolto con policy legata al dispositivo; **il Secure Enclave non
 è il contenitore della tabella di corrispondenza**. La chiave hardware non è
-esportata; il mapping decifrato deve comunque apparire nella RAM del componente
+esportata; il mapping deve comunque apparire nella RAM del componente
 nativo durante l'uso. Il disegno crittografico preciso richiede review e prove.
 Non si deriva una chiave dal numero di serie del Mac.
 
@@ -247,16 +345,17 @@ non si dichiara il nuovo contratto già implementato.
 La mappa è legata ad archivio/generazione, sessione, selezione, tentativo e
 versione del payload. Token sconosciuti, di un altro paziente o di una
 sessione revocata non vengono ricomposti. Al lock si ritirano concessioni e
-mappe in memoria; un eventuale contenitore persistente torna inaccessibile.
-Una copia su un altro Mac non deve riaprire la mappa. Si propone, per la prima
-unità, di perdere la ricomposizione delle vecchie chat dopo riavvio/perdita
-del Mac e rigenerare il contesto dalle fonti locali. Non si cambia il recupero
+mappe in memoria; anche crash, logout, scadenza e riavvio terminano la sessione.
+Una copia su un altro Mac non deve riaprire la mappa. Le vecchie chat restano
+a pseudonimi; un nuovo contesto può essere generato dalle fonti locali solo
+con nuova autorizzazione. Non si cambia il recupero
 della cartella previsto da ADR 0143, né si elimina lo storico clinico.
 
-### Percorso verso la vista e dipendenza dall'esito L
+### Percorso verso la vista e qualificazione del canale
 
-Se L passa sul client/build scelto, la vista richiede una proiezione già
-ricomposta al componente locale autorizzato. La mappa e le chiavi non le
+Solo in una futura configurazione ammessa con L positivo la vista può
+richiedere una proiezione già ricomposta al componente locale autorizzato.
+La mappa e le chiavi non le
 vengono consegnate. Il modello riceve separatamente solo la proiezione
 pseudonimizzata; il nome reale viene inserito nella vista dopo la lettura
 locale, senza tornare attraverso risultati tool o aggiornamenti del contesto.
@@ -268,9 +367,9 @@ non sono da soli credenziali. Un'origine opaca o `null` non giustifica una
 allowlist generica. Non si rimuovono i controlli della Web UI, non si aprono
 porte LAN/tunnel e non si introduce un proxy generico verso il runtime.
 
-Se L fallisce o non è qualificato, la vista conserva soltanto pseudonimi e
+Nel percorso raccomandato attuale la vista conserva soltanto pseudonimi e
 la ricomposizione si mostra nella finestra MediFlow locale: alternativa
-utilizzabile ma incompleta rispetto a WUL-788. Per recuperare i nomi inline
+da implementare e provare, incompleta rispetto a WUL-788. Per recuperare i nomi inline
 si può valutare un bridge app-only con consegna riservata alla vista, provando
 il percorso reale su ogni host. In ChatGPT `_meta` è documentato come nascosto
 al modello, ma visibile all'host; app-only limita la disponibilità del tool,
@@ -285,7 +384,7 @@ nomi dal modello, la ricomposizione inline rimane disabilitata.
 La vista è un client con concessione propria dell'owner MediFlow, non una
 sessione copiata dal browser o derivata dal login Claude/ChatGPT. Si propone:
 
-1. Il pacchetto privato apre una vista statica senza autorità. Un gesto umano
+1. Il pacchetto installato apre una vista statica senza autorità. Un gesto umano
    avvia una richiesta di associazione monouso verso il componente nativo.
 2. Il componente autentica il canale/istanza e identifica installazione,
    archivio e account MediFlow. Il medico vede quale app chiede accesso e
@@ -314,12 +413,13 @@ Durate e rinnovo sono da fissare; nessun rinnovo implicito prolunga la
 sessione MediFlow. I marker di scritture già partite sopravvivono al ritiro
 come metadati di recupero, senza concedere nuove autorizzazioni.
 
-### Touch ID: proposta da confermare, non attestazione clinica
+### Touch ID e PIN nativi: decisione acquisita, non attestazione clinica
 
-La proposta preferita mantiene il comando «Accedi» o «Conferma e registra»
+La scelta di Leonardo mantiene il comando «Accedi» o «Conferma e registra»
 nella vista, ma demanda il gesto biometrico alle API native MediFlow. Touch ID
 non «fornisce il PIN»: autorizza un'operazione protetta del componente nativo.
-Né PIN, né passphrase, né verificatore riutilizzabile attraversano il renderer.
+Il ripiego scelto è il PIN nella stessa finestra nativa. Né PIN, né passphrase,
+né verificatore riutilizzabile attraversano il renderer.
 Il protocollo deve verificare una challenge legata alla sessione e, per la
 scrittura, al comando esatto; un booleano `authenticated` dalla vista non vale.
 
@@ -328,9 +428,9 @@ OS, non l'identità del paziente, il ruolo medico, il contenuto approvato o la
 CAS. Un renderer ostile può mostrare una cosa e richiederne un'altra. Si
 raccomanda perciò un riepilogo nativo autenticato di paziente e operazione,
 ricavato dall'owner, prima del gesto finale. Il flusso nasce e si conclude
-nella chat, ma il riepilogo e il prompt OS non sono HTML dell'host. Leonardo
-deve confermare che questa interpretazione soddisfi la richiesta inline.
-Senza riepilogo nativo rimane un rischio esplicito di sostituzione del comando.
+nella chat, ma il riepilogo e il prompt OS non sono HTML dell'host. Il contratto
+proposto richiede questo riepilogo per impedire una conferma cieca; il solo
+messaggio del renderer non attesta il comando approvato.
 
 ADR 0143 non viene cancellato. Per il primo incremento si propone Touch ID
 per associare la vista a una sessione nativa già sbloccata e per il successivo
@@ -341,23 +441,17 @@ la passphrase o il PIN nel Keychain soltanto per simulare l'accesso esistente.
 Anche sostituire il PIN di conferma con una prova nativa richiede un'estensione
 esplicita dell'ammissione del writer, mantenendo ruolo e verifiche comuni.
 
-Alternative da valutare:
+Il PIN di conferma non sblocca la master key v3: il fallback scelto opera su
+una sessione già sbloccata e ammessa. Dopo riavvio o perdita della chiave serve
+prima la passphrase nella UI nativa. Lo sblocco rapido a freddo resta un lavoro
+distinto, senza reinterpretare il PIN come credenziale v3. PIN nel renderer
+è escluso; password OS e WebAuthn non sostituiscono tacitamente il ripiego scelto.
 
-- **Passphrase/PIN nella superficie nativa**, aperta dalla vista: riusa meglio
-  ADR 0143 e serve se biometria o hardware non sono disponibili; richiede
-  accettare il passaggio alla superficie di sistema, senza downgrade nascosto.
-- **Touch ID soltanto su sessione già sbloccata:** riduce la nuova custodia di
-  segreti, ma dopo riavvio/lock che distrugge la chiave serve sblocco nativo.
-- **PIN nel renderer:** rispetta letteralmente il form inline, ma espone il
-  segreto a host, DOM e cattura dei tasti. Sconsigliato; non autorizzato dalla
-  sola scelta di una vista fidata e comunque insufficiente a sbloccare v3.
-- **WebAuthn/PRF:** possibile percorso futuro, con supporto e binding origin da
-  qualificare; non è equivalente al Keychain né un fallback già disponibile.
-
-Mac senza sensore, rifiuto, lockout, variazione biometrica e componente nativo
-assente devono produrre un esito esplicito. La policy biometrica e l'eventuale
-uso della password OS come fallback vanno scelti e provati; non si deducono
-dal nome Touch ID o dall'esistenza del Secure Enclave.
+Rifiuto, lockout o variazione biometrica portano a un esito esplicito e, quando
+ammesso, alla scelta visibile del PIN nativo, con limiti tentativi e verifica
+di ruolo/sessione. App nativa assente o hardware non supportato impediscono
+l'associazione. Il fallback non amplia automaticamente i requisiti del primo
+pacchetto a Mac senza Touch ID.
 
 ### Scritture, CAS ed esito incerto
 
@@ -370,8 +464,8 @@ La vista non può firmare autonomamente un consenso del medico.
 
 Si chiamano **lo stesso writer e gli stessi controlli** delle altre UI:
 ammissione, versione/CAS, transazione, audit e ricevuta applicabili. Nessun
-writer del plugin o accesso diretto al database. Per la prima scrittura si
-propone un solo cambio stato terapia, attraverso
+writer del plugin o accesso diretto al database. La prima scrittura scelta è
+un solo cambio stato terapia, attraverso
 [`therapy-write-operation.ts`](../../lib/therapy-write-operation.ts), senza
 estenderlo a prescrizioni o applicazione automatica di proposte AI.
 
@@ -397,14 +491,15 @@ condividere un nome di chiave localStorage o ipotizzare la stessa origine.
 
 ## Cosa vede comunque l'host e rischio residuo
 
-L'app della chat ospita DOM, memoria e pixel dei nomi e dati ricomposti.
-Può accedervi tramite renderer, strumenti di sviluppo, accessibilità, crash
+L'app della chat ospita DOM, memoria e pixel della vista pseudonimizzata.
+Se in futuro si ammettessero nomi inline, ospiterebbe anche quelli. Può
+accedere a quanto mostrato tramite renderer, strumenti di sviluppo, accessibilità, crash
 report, telemetria o screenshot. La lettura loopback evita il normale risultato
 MCP, non questo trattamento. Cifratura del canale e Touch ID non lo eliminano.
 Non è accertata qui la retention effettiva di ogni build/account, né si
 attribuiscono acquisizioni automatiche non documentate ai fornitori.
 
-La scelta della vista fidata comporta accettare, a livello architetturale,
+Qualunque scelta di vista fidata comporta accettare, a livello architetturale,
 che il renderer dell'host possa leggere il dato mostrato. **Non comporta**
 un'accettazione già ottenuta di upload, retention indefinita o inserimento
 dei nomi nel modello. Questi aspetti restano decisioni del deployment concreto.
@@ -421,106 +516,343 @@ condizioni contrattuali; il solo esito negativo di una ricerca nei log non
 certifica assenza di altre copie. Dati già inviati al modello non diventano
 revocabili cancellando la mappa locale.
 
-## Client e distribuzione
+## Catalogo delle viste e Intelligence Fabric
 
-Per questo incremento si propone soltanto Mac con componente nativo e
-**installazione privata**. Ogni app desktop va qualificata separatamente;
-prove del CLI, del simulatore o di Claude Desktop non qualificano Codex desktop.
-Web, Windows e Linux richiedono decisioni e prove ulteriori.
+Il plugin è un client dei servizi applicativi, non un secondo gestionale.
+«Uso completo» richiede una matrice funzione → servizio → vista/azione →
+permesso → prova, versionata con il prodotto: nessuna funzione può sparire
+perché manca una carta. Le funzioni non ancora ammesse restano visibili come
+indisponibili o apribili nella UI nativa, senza dichiarare completata la parità.
+Il modello può suggerire una vista; selezione, dati e comandi disponibili
+sono decisi dall'owner sulla sessione corrente.
 
-Nessuna pubblicazione in directory è autorizzata. Le
-[Plugin Guidelines OpenAI](https://developers.openai.com/plugins/plugin-guidelines)
-vietano raccolta o trattamento di PHI tra i dati soggetti a restrizioni;
-non vi è una deroga dimostrata per iframe, loopback o pseudonimizzazione.
-PHI e dato sanitario GDPR non sono categorie automaticamente equivalenti.
-La [submission Claude](https://claude.com/docs/connectors/building/submission)
-richiede un server HTTPS remoto per il listing connector e indirizza server
-locali verso plugin: non dimostra un'ammissione sanitaria di MediFlow.
-La distribuzione pubblica resta una decisione separata, coordinata con WUL-759;
-l'installazione privata non sostituisce governance e verifica del trattamento.
+| Domanda o compito | Vista e risposta | Vincolo operativo |
+| --- | --- | --- |
+| «Apri la scheda completa» | Scheda navigabile con storia, fonti e sezioni caricate su richiesta | Completa per consultazione autorizzata, non invio dell'intera cartella al modello; nomi nella UI nativa. |
+| «Mostra le terapie / i farmaci» | Vista mirata, filtri, stato e comandi dinamici | Comandi tipizzati dal catalogo host secondo ruolo, versione e capacità; niente codice o URL prodotti dal modello. Primo write: cambio stato. |
+| «Mostra gli ausili» | Vista di protesica con richieste, dispositivi, stato e fonti | Capacità territoriali e workflow reali, senza implicare invii regionali. |
+| «Riassumi il paziente» | Risposta breve pseudonimizzata in chat; carta MediFlow opzionale con fonti e approfondimento | Il risultato Fabric viene nuovamente controllato prima di uscire; nomi solo nella ricomposizione nativa. |
+| «Che cosa è cambiato?» / esito di un comando | Aggiornamento di stato compatto nella grafica MediFlow | «Registrato» soltanto con ricevuta autorevole; distinguere proposta, rifiuto, attesa ed esito ignoto. |
+| «Crea un paziente da questi documenti» | Apertura del caricamento nativo, revisione dei candidati e conferma | Percorso in entrata descritto sopra, nessun allegato nel compositore; niente inserimento al solo drop. |
+| «Registra la visita» / «Gestisci l'ambulatorio» | Cattura nativa, bozza rivista e viste operative pertinenti | Audio locale, selezione e scope specifici, scritture confermate separatamente. |
+
+Grafica, temi, accessibilità e linguaggio seguono [DESIGN.md](../../DESIGN.md)
+e Lume. Espansioni, filtri e cambio tema aggiornano la carta senza un turno
+modello o un rimontaggio globale; preservano focus, posizione della chat e
+lettura. Ricevute tecniche non sono testo ordinario dell'interfaccia. Dati
+vuoti, revocati, obsoleti o in caricamento devono essere distinguibili.
+
+Il perimetro comprende **tutte le funzioni Fabric disponibili nel deployment**:
+Patient Insight, Smart Import, Document Synthesis e Treatment Reasoning,
+oltre alle capability del catalogo e alle operazioni future quando ammesse.
+Per ciascuna serve un percorso verificato, non un tool generico che esegua
+qualunque richiesta. Il catalogo dichiara disponibilità e limiti: AnyDoc è
+estrazione locale separata, `ocr=unavailable` non diventa disponibile grazie
+al plugin. Nessuna abilitazione implicita di modelli o provider mancanti.
+
+Il broker è indipendente dal modello della chat. L'host MediFlow continua a
+scegliere esecutore, modello e policy Fabric secondo i contratti vigenti;
+il modello della chat non imposta endpoint, provider, prompt privilegiati o
+ripieghi. Una chiamata Fabric locale può produrre un risultato che poi esce
+nella chat: l'uscita richiede comunque controllo e consenso. Viceversa, usare
+un provider remoto Fabric non autorizza a copiare il suo input o output
+nell'host chat. Fonti, ricevuta, validità e natura di proposta accompagnano
+il risultato; la chat non si attribuisce l'esecuzione di una funzione non
+chiamata. Ogni applicazione clinica resta una scrittura distinta e confermata.
+
+## Prestazioni obbligatorie
+
+I seguenti sono **budget proposti di accettazione**, non misure già ottenute.
+Valgono per ogni host dichiarato supportato; non si compensa un host lento
+con la media di un altro. Prima di implementare si fissa una fixture sintetica
+ripetibile: 100 eventi, 30 terapie, 10 documenti; payload da redigere di 10.000
+caratteri e PDF di 10 pagine/10 MiB per la prova import, inclusa una variante
+scansionata. Una matrice di carichi maggiori prova paginazione e limiti.
+
+| Operazione e misura | Budget p95 |
+| --- | --- |
+| Input → feedback visibile di clic, focus o avvio comando | ≤ 100 ms |
+| Input → filtro/espansione/tema aggiornato, senza modello | ≤ 200 ms |
+| Apertura → vista utile con dati già autorizzati, runtime caldo | ≤ 2 s |
+| Apertura → vista utile a freddo, dipendenze già installate | ≤ 5 s |
+| Broker: preparazione e controllo dei 10.000 caratteri, runner caldo | ≤ 2 s |
+| Fine conferma umana → ricevuta della transizione terapia | ≤ 2 s; oltre il limite si mostra attesa/esito ignoto, mai successo presunto |
+| Import: caricamento nativo → candidati pronti per revisione, PDF fixture | ≤ 30 s, avanzamento almeno ogni 1 s |
+| Riassunto Fabric fixture → risposta verificata pronta alla visualizzazione | ≤ 30 s, stato visibile entro 1 s; niente streaming di output non ancora controllato |
+
+La baseline proposta è Mac Apple Silicon M2, 16 GiB, macOS compatibile con
+l'app; è un profilo di benchmark da confermare con l'hardware supportato,
+non una nuova dichiarazione di compatibilità. Registrare chip, RAM, OS,
+build host, versioni app/plugin/runner/modello, rete e dimensioni reali.
+Almeno 30 esecuzioni per scenario caldo/freddo, p50/p95/massimo, errori e
+confronto con la UI nativa; niente sole medie o esclusione dei timeout.
+Separare tempi di modello/rete, host, broker e rendering, ma riportare anche
+il totale percepito. Il tempo umano di consenso/Touch ID è separato, non
+sottratto nascostamente; anche l'attesa di quota resta un esito riportato.
+
+Animazioni brevi (120–200 ms), rispetto di Reduce Motion, nessun salto di
+scroll e nessun blocco del thread UI oltre 50 ms attribuibile al widget nel
+percorso misurato. Il superamento dei budget impedisce la qualifica della
+funzione su quell'host: si ottimizza o si propone esplicitamente un budget
+rivisto prima dell'accettazione. Non si tagliano redazione, audit, controlli
+o conferme per guadagnare tempo. Cache di asset statici e proiezioni in RAM
+restano legate a sessione/revisione; nessun prefetch clinico fuori scope.
+
+## Chat temporanee e retention
+
+L'opzione «Usa una chat temporanea» va proposta prima del primo invio, solo
+se la modalità esiste e funziona con il plugin nel client scelto. Se il plugin
+non può aprirla o rilevarla, guida l'utente e indica che lo stato non è
+verificato; non converte silenziosamente la conversazione in uso.
+
+Le fonti ufficiali del 22 ottobre distinguono:
+
+- [ChatGPT Temporary chat](https://help.openai.com/en/articles/8914046-temporary-chat-in-chatgpt):
+  può conservare una copia fino a 30 giorni per sicurezza; salvarla la rende
+  ordinaria. La modalità senza personalizzazione esclude i plugin, quella
+  personalizzata può usare memorie e plugin: la compatibilità effettiva con
+  Codex desktop e questo pacchetto va provata, non dedotta dal nome.
+- [Claude Incognito](https://support.claude.com/en/articles/12260368-use-incognito-chats):
+  assenza dallo storico e dal training non significa assenza di conservazione;
+  la documentazione indica 30 giorni, o più secondo la policy Enterprise,
+  e possibili export/compliance organizzativi. La modalità è fuori dai progetti.
+- [Retention ChatGPT di chat e file](https://help.openai.com/en/articles/8983778-chat-and-file-retention-in-chatgpt):
+  le copie nella Library possono sopravvivere alla cancellazione della chat.
+  [Anthropic consumer](https://privacy.claude.com/en/articles/10023548-how-long-do-you-store-my-data)
+  e [commerciale](https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data)
+  hanno condizioni distinte per cronologia, training, cancellazione ed
+  eccezioni di sicurezza/legge; le condizioni API non si trasferiscono alle chat.
+
+Per ogni deployment registrare account/workspace, piano, regione contrattuale,
+training, memoria, file, export amministrativi, diagnostica, tempi e deroghe
+di conservazione, cancellazione e subfornitori. Nessun generico «zero retention»
+è ammesso senza un accordo applicabile a **quel prodotto e quel canale**.
+La modalità temporanea è facoltativa e non sostituisce questi controlli,
+la pseudonimizzazione, il caricamento nativo o l'audit clinico locale.
+Terminare la chat ritira la sessione quando osservabile; la lease locale
+scade comunque. Non ripristina mappe e non annulla scritture già registrate.
+
+## Pubblicazione per terzi
+
+La pubblicazione richiesta è parte del perimetro, coordinata con WUL-759.
+Questo round prepara il contratto; non esegue submission o distribuzione.
+Si distinguono tre risultati: pacchetto distribuibile, approvazione dello
+store/directory, ammissione clinica del deployment. Nessuno prova gli altri.
+
+### Pacchetto e installazione
+
+Il pacchetto pubblico contiene manifest, adapter MCP, viste statiche, skill,
+launcher, dipendenze necessarie, licenze e istruzioni. **Nessun dato paziente,
+nessuna chiave, credenziale, mapping, configurazione personale o archivio.**
+Esempi e account di review usano soltanto fixture sintetiche isolate e
+identificate; non si incorporano sessioni o credenziali dei revisori nel ZIP.
+Anche screenshot, log di supporto e nomi dei file pubblicati sono sintetici.
+
+Restano locali: archivio e allegati, estrazione/OCR, broker, mapping in RAM,
+chiavi e credenziali nel loro confine nativo, writer, audit e ricevute durevoli.
+Possono uscire solo le proiezioni esplicitamente ammesse ai destinatari
+scelti; installare un pacchetto locale non rende locale il modello host.
+Il publisher non riceve cartelle, backup o telemetria clinica per installazione.
+
+Il primo profilo proposto richiede **Mac, app MediFlow compatibile installata,
+Touch ID configurato e componente nativo qualificato**; PIN nativo come
+ripiego sulla sessione già sbloccata. La scheda pubblica deve indicare versioni
+minime effettivamente provate, requisiti dei runner opzionali e account host
+ammessi. Installazione pulita, avvio, aggiornamento e disinstallazione vanno
+provati senza l'ambiente dello sviluppatore. L'assenza di app/hardware/versione
+non abilita un accesso più debole. Non si pubblicizza supporto Windows, Linux,
+web o di tutti i Mac senza prove; CLI e desktop hanno capacità distinte.
+
+### Regole ufficiali delle directory
+
+- **OpenAI:** le [Plugin Guidelines](https://developers.openai.com/plugins/plugin-guidelines)
+  vietano raccolta, richiesta o trattamento di PHI e altri dati riservati;
+  chiedono inoltre disclosure e privacy policy. Dato sanitario GDPR e PHI
+  non sono categorie equivalenti: la pseudonimizzazione non prova una deroga.
+  La candidatura sanitaria va valutata rispetto alle regole effettive, senza
+  nasconderne l'uso sotto un pacchetto vuoto o sintetico.
+  Il percorso [desktop-only](https://developers.openai.com/plugins/deploy/desktop-only)
+  ammette MCP locali soltanto per partner approvati, con organizzazione in
+  allowlist, test di installazione e review. Non è dimostrata qui l'idoneità
+  di MediFlow a quel programma. Non si crea un tunnel/HTTPS remoto per
+  aggirare il vincolo. La [submission](https://developers.openai.com/plugins/deploy/submission)
+  richiede materiali di review, casi positivi/negativi, dimostrazione e
+  credenziali di test separate; approvazione e pubblicazione sono passaggi distinti.
+- **Anthropic:** la [submission connector](https://claude.com/docs/connectors/building/submission)
+  richiede un server remoto HTTPS; un server locale va incluso in un plugin.
+  Per questo disegno si valuta quindi il percorso
+  [Submit your plugin](https://claude.com/docs/plugins/submit): repository e
+  manifest, domande sul trattamento, scansioni per versione e review prima
+  della pubblicazione secondo lo stato assegnato. Un connector remoto sarebbe
+  un'altra architettura, non una riconfezione equivalente. R FAIL nella build
+  osservata impedisce di dichiarare le viste inline qualificate per Claude.
+- **MCP:** la [specifica Apps](https://modelcontextprotocol.io/extensions/apps/overview)
+  descrive il protocollo e la sandbox dell'host. Compatibilità MCP, presenza
+  in un registry e successo di un tool non sono approvazioni delle directory
+  OpenAI/Anthropic né certificazioni per trattare dati sanitari.
+
+Prima della submission servono privacy policy e termini corrispondenti ai
+flussi effettivi, contatto di supporto/sicurezza, istruzioni d'installazione,
+matrice di compatibilità e prove sintetiche riproducibili per i revisori.
+Se il percorso di review non consente Touch ID e setup locale, si concorda
+una modalità di prova sintetica col reviewer: nessun bypass in produzione.
+Se una directory non ammette il trattamento, si sospende quella candidatura;
+una distribuzione esterna resta soggetta ai termini applicabili, non li elude.
+
+### Ruoli e responsabilità
+
+Il deployment deve identificare chi determina finalità e mezzi e chi tratta
+per suo conto: ente sanitario, professionista, gestore dell'installazione,
+publisher e provider non hanno un ruolo deducibile dal nome del software.
+La sola pubblicazione del pacchetto non assegna al publisher il ruolo di
+responsabile dei dati clinici; supporto con accesso ai dati, servizi remoti o
+telemetria richiedono una valutazione distinta. Per i provider host vanno
+verificati ruoli e accordi effettivi per ciascuna finalità, non presunta una
+relazione di responsabile per qualsiasi account consumer.
+
+Il responsabile del deployment documenta base giuridica e condizione per i
+dati sanitari, informativa, autorizzazioni degli operatori, eventuali accordi
+di trattamento, trasferimenti, conservazione, diritti, risposta agli incidenti
+e necessità di una valutazione d'impatto. Il consenso nel widget è un controllo
+operativo; non sostituisce tale valutazione. Il riferimento è il
+[GDPR e le responsabilità applicabili](https://commission.europa.eu/law/law-topic/data-protection/information-business-and-organisations/application-gdpr_en),
+non una dichiarazione legale di conformità del plugin.
+
+Sono vietati claim di anonimato, invisibilità dei dati all'host, assenza
+assoluta di retention, conformità GDPR/HIPAA automatica, approvazione clinica
+implicita nello store, filtro preventivo dei file nel compositore o parità
+funzionale già raggiunta. Sono vietate anche promesse di compatibilità con
+ogni host, cifratura totale o autonomia clinica senza le prove e i limiti
+previsti dai contratti MediFlow. La documentazione deve distinguere feature
+proposta, implementata, provata, distribuita e ammessa all'uso concreto.
+
+### Versioni, aggiornamenti e revoca
+
+Versionare pacchetto, protocollo broker, schemi dei tool e delle viste,
+manifest delle capacità e combinazioni app/host qualificate. Un cambiamento
+incompatibile richiede nuova versione maggiore e URI della risorsa UI nuovo;
+nuove destinazioni, dati o permessi richiedono nuova revisione e consenso.
+L'owner nega combinazioni non ammesse, senza fidarsi solo della versione
+presentata dal renderer; il bootstrap locale verifica identità e integrità
+del pacchetto. Gli aggiornamenti non ampliano scope delle sessioni attive.
+
+Revoca locale: disabilitare il plugin ritira grant, mapping e richieste non
+ancora ammesse; i comandi già inviati si riconciliano tramite ricevuta, senza
+cancellare audit o record. Il publisher può ritirare una versione/listing e
+pubblicare un avviso; ciò non elimina copie già installate o dati nell'host.
+Il deployment deve poter negare versioni vulnerabili mediante policy locale
+aggiornabile, preservando il recupero dei dati. Qualunque feed di aggiornamento
+ha autenticità, frequenza e validità esplicite e non invia dati clinici; offline
+non si promette una revoca remota istantanea. Per usare dati reali serve una
+policy non scaduta, oltre all'ammissione clinica e contrattuale separata.
 
 ## Sequenza di unità e verifica attesa
 
-Ogni unità produce evidenza sintetica legata a commit, pacchetto e build del
-client. I criteri sotto sono **prove future**, non test eseguiti da questo ADR.
-Le unità 2–3 possono precedere Touch ID soltanto con autorità di prova su
-fixture; non aprono un accesso clinico temporaneamente privo di autenticazione.
+Ogni unità produce evidenza sintetica legata a commit, pacchetto, host/build,
+account di prova e carico. Quanto segue è **prova futura**, salvo gli esiti
+R/L registrati sopra. I numeri 1–5 conservano i riferimenti del primo round;
+la vecchia unità 6 viene distinta in 6–10. Le sotto-unità 2a–2c già avviate
+restano nello stesso posto e non sono dichiarate consegnate da questo ADR.
 
-1. **Pilota R/L, già in corso.** R: vista inline, navigazione, tastiera e
-   ridimensionamento nel client reale. L: sentinella letta da loopback, assente
-   da bundle, risultati tool e canali del modello osservabili. Registrare
-   separatamente esiti, origine, CSP/CORS/LNA e limiti d'osservazione.
-   **Falsificazioni:** solo risposta testuale non passa R; sentinella nel tool
-   non passa L; servizio spento, porta errata, consenso rete negato o risposta
-   tardiva dopo revoca non devono apparire come successo. R su un client non
-   chiude la qualifica nei due desktop richiesta da WUL-788.
-2. **Lettura pseudonimizzata.** Una sola scheda e una selezione limitata di
-   storia/terapie, con consenso sul payload finale, provenienza locale e
-   confronto semantico di farmaci, condizioni e misure. Ispezionare tool,
-   transcript, metadati, errori e turno successivo; dichiarare ciò che il
-   trasporto del provider non permette di osservare.
-   **Falsificazioni:** nome di un terzo nel testo libero, CF OCR, luogo, nascita,
-   filename identificante, campo sconosciuto, report redaction scaduto, runner
-   discordante e cambio paziente tra preparazione e invio devono fermare l'uscita.
-   Un falso negativo sul corpus blocca la promozione, non si nasconde nella media.
-3. **Ricomposizione locale.** Se L è positivo, nomi sintetici reali nella vista
-   e soli pseudonimi nel modello; mapping confinato al componente nativo,
-   ritiro e riapertura verificati. Se L non passa, provare il ripiego locale
-   dichiarandolo incompleto; l'eventuale bridge riservato richiede una prova
-   distinta e una decisione prima del collegamento.
-   **Falsificazioni:** token estraneo, mappa di altra sessione, copia del materiale
-   cifrato su altro Mac, lock durante risposta, refresh e screenshot inoltrato
-   al modello non devono produrre ricomposizione non autorizzata o fuga silenziosa.
-4. **Accesso con Touch ID.** Associazione da gesto nella vista, challenge nativa,
-   grant limitato e ritiro sul Mac reale. Provare primo accesso, sessione già
-   sbloccata, riavvio, scadenza, revoca e il fallback eventualmente approvato.
-   **Falsificazioni:** rifiuto/lockout, hardware assente, replay, app diversa,
-   istanza duplicata, booleano forgiato e cambio archivio devono negare accesso;
-   nessun segreto nei tool, renderer, URL o log. La prova biometrica non sostituisce
-   la verifica di scope e ruolo, né dimostra una scrittura.
-5. **Una prima scrittura confermata.** Solo il cambio stato terapia concordato,
-   con anteprima, gesto inline, step-up nativo, writer comune, CAS e audit.
-   Prima qualificare comando/ricevuta durevoli e coordinamento fra client.
-   **Falsificazioni:** paziente o versione cambiati, payload modificato dopo
-   conferma, doppio clic, replay, crash prima/dopo commit, risposta persa,
-   reload e concorrenza Web/Claude/Codex. Verificare un solo effetto auditato,
-   nessun successo falso e mantenimento dell'esito ignoto senza retry automatici.
-6. **Visita a voce, terapie, ambulatorio, in incrementi distinti.** Per la voce
-   riusare la cattura/trascrizione Apple locale e la revisione del transcript;
-   audio e testo grezzo non entrano nel modello. Per terapie estendere una
-   operazione alla volta; per ambulatorio provare scope e capacità territoriali.
-   Riusare gli stessi servizi e la grafica MediFlow, senza nuovo dominio nel plugin.
-   **Falsificazioni:** permesso microfono negato, cambio paziente durante la
-   registrazione, identificativi pronunciati, bozza non rivista, terapia stale,
-   altro ambulatorio e pacchetto territoriale disattivo. Nessuna scrittura o
-   chiamata esterna fuori scope. Non confondere agenda interna, candidati da
-   calendari esterni e prenotazione realmente confermata.
+1. **R/L e rifinitura.** Riutilizzare gli esiti ottenuti; su Codex correggere
+   scroll, ricevuta visibile e fasce laterali e misurare i budget. Su Claude
+   riprovare dopo un cambiamento identificato del percorso host, con controllo
+   ufficiale, senza qualificare il desktop tramite CLI/reference host.
+   **Prova:** navigazione, tastiera, temi, due larghezze, riapertura e profiling;
+   risposta testuale non passa R. Tenere L FAIL separato: niente wildcard,
+   modifica del validatore o sentinella nel risultato tool per farlo passare.
+2. **Broker e lettura pseudonimizzata.** 2a: nucleo di preparazione indipendente
+   dal provider, senza cambiare i quattro adapter esistenti. 2b: profilo chiuso
+   scheda, owner sintetico, consenso sui byte finali, corpus annotato. 2c: tool
+   read-only e vista statica alimentata soltanto dall'uscita approvata.
+   **Prova:** equivalenza del contenuto clinico, provenienza e tutti i canali
+   osservabili, incluso turno successivo. Terzi, CF OCR, luoghi, nascita,
+   filename, campi sconosciuti, runner/report invalidi e cambio paziente devono
+   bloccare l'uscita. Un falso negativo del corpus blocca la promozione.
+3. **Canale per host e ricomposizione nativa.** Implementare il percorso
+   raccomandato; provare app-only su dati pseudonimizzati dove R è disponibile.
+   **Prova:** tool non disponibile al modello, risultati non reinseriti nel
+   suo contesto, errori/notifiche/state controllati, sole mappe RAM. Token
+   estraneo, altra sessione, lock, refresh e riavvio negano ricomposizione;
+   vecchie chat restano a pseudonimi. Nessun nome nel bridge. Su Claude senza R
+   verificare il ripiego nativo, dichiarando il requisito inline ancora aperto.
+4. **Accesso nativo.** Touch ID e ripiego PIN scelti, riepilogo autenticato,
+   challenge e grant limitato. Le unità 2–3 precedono questa solo su fixture.
+   **Prova su Mac reale:** primo sblocco v3, sessione calda, rifiuto/lockout,
+   assenza hardware/app, revoca e chiusura. Replay, istanza diversa, booleano
+   forgiato e cambio archivio negati; nessun segreto in chat, tool, URL o log.
+5. **Prima scrittura: stato terapia.** Prima implementare comando/ricevuta
+   durevoli e coordinamento fra client; poi anteprima, conferma, step-up,
+   writer comune, CAS, transazione e audit.
+   **Prova:** paziente/versione/payload cambiati, doppio clic, replay, crash
+   prima/dopo commit, risposta persa, reload e concorrenza Web/Claude/Codex.
+   Un solo effetto auditato; esito ignoto resta tale, senza retry automatico.
+6. **Paziente da documenti.** Dopo broker, accesso e contratto comune di scrittura:
+   caricamento nativo, estrazione, Smart Import, revisione e creazione.
+   **Prova:** PDF testuale/scansionato, documento misto con più identità,
+   duplicato, campo incerto, istruzioni ostili, errore OCR, annullamento e
+   crash. Nessun record parziale dichiarato riuscito, nessun merge implicito;
+   allegato nel compositore produce l'avviso senza download/ripetizione.
+   Ispezionare separatamente byte in entrata, uscita provider e ritorno in chat.
+7. **Fabric completo e risposte.** Patient Insight, Document Synthesis,
+   Treatment Reasoning e percorso Smart Import già introdotto, più ogni
+   capability ammessa nel catalogo. Una prova per funzione e venue supportata.
+   **Prova:** riassunto in chat con fonti, controllo di uscita anche sui risultati
+   locali, provider indisponibile, output malformato/token estraneo, contesto
+   scaduto, revoca durante generazione. Nessun ripiego o applicazione silenziosa;
+   tempi end-to-end e costo del controllo nei budget.
+8. **Catalogo interattivo e parità.** Scheda completa, terapie/farmaci,
+   protesica, riassunto e stato nella grafica MediFlow; ampliare i comandi
+   soltanto dopo le prove del relativo writer.
+   **Prova:** matrice delle funzioni senza omissioni, filtri e comandi dinamici
+   coerenti con ruolo/versione/capacità, fonti accessibili, confronto con UI
+   nativa, stati vuoti/stale/revocati, tastiera e budget su ogni host supportato.
+9. **Voce e ambulatorio.** Incrementi distinti sui servizi comuni: cattura e
+   trascrizione Apple locali, revisione, poi scritture e workflow operativi.
+   **Prova:** microfono negato, cambio paziente, identificativi pronunciati,
+   bozza non rivista, altra selezione, capacità territoriale disattiva. Audio
+   grezzo fuori dal modello; niente azioni esterne non ammesse. Agenda interna,
+   candidati da calendari e prenotazione confermata rimangono stati distinti.
+10. **Chat temporanea e distribuzione.** La valutazione delle policy/directory
+    precede ogni uscita reale e può procedere durante le unità sintetiche;
+    questa unità chiude packaging, onboarding, compatibilità e review.
+    **Prova:** modalità temporanea disponibile/non disponibile e retention
+    dichiarata correttamente, installazione pulita senza dati/chiavi, versioni
+    incompatibili negate, upgrade e revoca senza perdita di audit, materiali
+    sintetici per store e verifica dei budget. Pubblicare solo le capacità
+    provate; nessun listing dichiara superata R su Claude senza nuova evidenza.
+
+La parità completa e la qualifica di entrambi i desktop restano obiettivi:
+la consegna di un sottoinsieme non chiude WUL-788. Accettazione dell'ADR,
+review del codice futuro, pubblicazione e ammissione clinica restano separate.
 
 ## Decisioni ancora aperte per Leonardo
 
-1. Confermare **Mac come perimetro iniziale** e i requisiti minimi di hardware,
-   senza dedurre disponibilità di Touch ID da «Mac».
-2. Confermare la proposta Touch ID con riepilogo nativo autenticato e chiarire
-   se soddisfa «dentro la chat»; in alternativa accettare esplicitamente il
-   rischio del renderer quale unica sede del riepilogo. Scegliere il fallback
-   nativo e decidere se rinviare lo sblocco rapido a freddo.
-3. Scegliere fasce d'età e criteri per età/date cliniche precise, con i limiti
-   di utilità e riconoscibilità del testo libero rimasti dopo la redazione.
-4. Confermare mapping effimero e perdita della ricomposizione delle vecchie
-   chat al riavvio; se serve continuità, decidere durata e recupero del mapping
-   cifrato hardware-bound senza cambiare implicitamente il recupero clinico.
-5. Dopo R/L, scegliere per ciascun host il canale di ricomposizione: diretto
-   qualificato, bridge riservato da valutare oppure nomi nella UI nativa.
-   Nessuna decisione è basata su un L positivo ancora non ottenuto.
-6. Nominare account/workspace ammessi e rischio residuo accettabile per renderer,
-   screenshot e retention prima di qualsiasi dato reale. Resta necessaria
-   l'ammissione del deployment, distinta dall'accettazione di questo ADR.
-7. Confermare cambio stato terapia come prima scrittura e il prerequisito
-   comando/ricevuta host per l'esito incerto; fino ad allora sola lettura nella
-   chat. Durate delle concessioni e rinnovo vanno fissati nel contratto attuativo.
+Le scelte Touch ID/PIN **nativi**, prima scrittura **stato terapia** e mapping
+**solo di sessione** sono chiuse; non si richiedono nuovamente. Restano:
+
+1. Fissare versioni minime OS/app/host e hardware compatibile, nel profilo Mac
+   con Touch ID previsto; lo sblocco rapido a freddo resta escluso dal primo incremento.
+2. Scegliere fasce d'età e criteri per età/date precise, con limiti di utilità
+   e riconoscibilità; nominare account/workspace e trattamenti ammessi prima
+   di dati reali, compresi screenshot, strumenti host, memoria e retention.
+3. Accettare la raccomandazione di ricomposizione soltanto nativa. Un eventuale
+   futuro bridge di nomi richiede una decisione separata sul trattamento da
+   parte dell'host e relative prove; non è il ripiego già autorizzato.
+4. Approvare nel contratto attuativo durate/rinnovo delle concessioni e i
+   budget proposti dopo la baseline. La sessione effimera non è in discussione.
+5. Scegliere, dopo la verifica di idoneità, i canali pubblici e il perimetro
+   dichiarabile; il responsabile del deployment decide l'ammissione clinica
+   e contrattuale. Il desiderio di pubblicare non prova l'approvazione store.
 
 ## Fonti e limiti della ricognizione
 
+- Rapporti locali `wul788-codex-rl-20261022.md` e
+  `wul788-desktop-rl-20261022.md`: esiti sintetizzati nella matrice R/L.
+  Prevalgono gli addendum successivi: CLI autorizzata PASS e checklist manuale
+  R PASS. Diagnosi Claude A/B e commenti Linear collegano le evidenze; log,
+  screenshot grezzi e configurazioni restano privati. Nessuna nuova prova
+  desktop è stata eseguita durante questo secondo round documentale.
 - Ricognizione locale del 22/10/2026, `recon-mediflow-in-chat-20261022.md`,
   §§1–6; il commento «Ricognizione completata» in WUL-788 ne riporta la sintesi.
   Il rapporto resta fuori dalla repository; qui sono riportati confini e fonti
@@ -535,11 +867,15 @@ fixture; non aprono un accesso clinico temporaneamente privo di autenticazione.
   (contenuto Markdown ufficiale) e
   [Apple Platform Security — Secure Enclave](https://support.apple.com/guide/security/the-secure-enclave-sec59b0b31ff/web).
   Documentano capacità e limiti hardware/API, non il futuro protocollo MediFlow.
-- Plugin Guidelines OpenAI, submission Claude e fonte della Commissione europea
-  collegate sopra: consultate il 22/10/2026. Nessuna deduzione di ammissione
-  clinica o pubblicazione dalla sola disponibilità tecnica.
+- Specifica MCP Apps draft, riferimenti OpenAI UI/visibility, linee guida e
+  submission OpenAI (incluso desktop-only), submission Claude connector/plugin,
+  pagine di retention/chat temporanee e fonte della Commissione europea
+  collegate sopra: ricontrollate il 22/10/2026 per questo round. Le condizioni
+  vanno ricontrollate alla submission e all'ammissione del deployment.
+  Nessuna deduzione di ammissione clinica o pubblicazione dalla sola tecnica.
 
 Autoria dell'ADR e della ricognizione: **GPT-6-Astra, High, via Codex/T3**,
 senza delega. Brief iniziale del coordinatore Opus; coordinamento corrente
 Astra. La revisione del coordinamento resta distinta dalla stesura: lo stato
-rimane Proposed. Nessun esito del pilota parallelo è attribuito a questo lavoro.
+rimane Proposed. Il secondo round integra gli esiti riferiti dal pilota e da Leonardo, senza
+attribuirsi la loro esecuzione. Nessuna modifica di codice o ammissione clinica.
