@@ -139,8 +139,19 @@ gzip sotto 250 kB, nessun resize o salto al clic. Non misura l'avvio a freddo de
 processo server o del modello neurale e non li dichiara qualificati.
 Gli asset e il report completo sono in `dist/card-evidence/` e negli artifact CI.
 
-Il controllo negativo verifica sia 150 ms di blocco del clic sia 2200 ms
-aggiunti alla risposta reale `share`: il secondo deve fallire il budget caldo
+Il reference usa il Chromium completo fornito da Playwright, in modalità
+headless nuova (`channel: 'chromium'`), con la versione fissata dal lockfile.
+Su macOS il precedente `headless-shell` inizializzava sincronicamente
+WindowServer/TCC al primo ricalcolo dell’hover: la profilazione ha individuato
+una pausa di 51.6 ms nel renderer, con 1.9 ms di CPU. Non era lavoro HMAC,
+parsing o rendering della scheda. Il cambio di browser non cambia host,
+sandbox, osservatore o budget. Diagnosi e tre budget consecutivi sono in
+[`evidence/card-performance-profile.json`](evidence/card-performance-profile.json)
+e [`evidence/card-reference-summary.json`](evidence/card-reference-summary.json).
+
+Il controllo negativo verifica 75 ms di lavoro sincrono al clic, che devono
+fallire il gate dei long task oltre 50 ms, oltre a 150 ms di blocco del clic e 2200 ms
+aggiunti alla risposta reale `share`: il ritardo di consegna deve fallire il budget caldo
 della vista utile dopo tutte le 30 aperture fredde e 30 calde. La suite reference
 include messaggi forgiati con challenge nota e nuovi turni/tool call mentre
 la risposta di preparazione è trattenuta.

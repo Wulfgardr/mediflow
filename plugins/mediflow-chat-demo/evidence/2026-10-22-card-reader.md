@@ -5,6 +5,8 @@ in risposta alla [review Astra](https://github.com/Wulfgardr/mediflow/pull/613#p
 ancorata a `d634853ef`. Base broker: `46f4c1789` (#611). Part of WUL-788.
 Implementazione GPT-6.1 Sol, High; nessuna ulteriore delega, nessun merge.
 La review indipendente del nuovo diff resta distinta da questi risultati.
+La correzione successiva del budget parte dalla head `d3d0c2c4b` ed è stata
+eseguita con GPT-6.1 Sol, effort Medium; nessun merge.
 
 ## Riproduzioni, correzioni e falsificazioni
 
@@ -36,19 +38,32 @@ prima della consegna. Quello delle prestazioni è permanente in
   trattenuta e risposta di condivisione tardiva dopo chiusura. Giorno/Grafite a
   **390/768/1440 px effettivi**, tastiera, Reduce Motion, valori approvati
   invariati, niente resize/scroll al clic.
-- p95 della **vista utile completa**: **238.2 ms fredda / 233.6 ms calda**;
-  feedback **46.4 ms**, interazioni **15.2 ms**, preparazione del broker con
-  runner simulato **1.05 ms**. Bundle gzip **161817 byte**.
-- **Il gate reference complessivo finale NON è verde:** un long task attribuito
-  al widget di **53 ms** viola la soglia invariata di 50 ms. Tutte le 60 aperture
-  e le asserzioni funzionali sono completate; i budget di vista utile, feedback,
-  interazioni, preparazione e bundle sono rispettati. La causa del long task
-  non è stabilita: non viene escluso come rumore né cancellato dal report.
-- Due run intermedi avevano rilevato 1 e 3 long task da 55–59 ms. Dopo la
-  separazione dell’avvio SDK e del montaggio UI, un run aveva zero long task;
-  il successivo run sulla versione finale HMAC ne rileva uno da 53 ms.
-  Il risultato finale resta quello non verde; non si dichiara la qualifica.
-- Controlli negativi: blocco UI reale da 150 ms rilevato dal budget feedback;
+- **Tre budget completi consecutivi verdi**, 30 aperture fredde e 30 calde
+  ciascuno: **180 aperture senza task oltre 50 ms**. È conservato anche il
+  task di esattamente 50 ms osservato nel primo budget. Le soglie, l’osservatore
+  e gli scenari avversariali sono invariati.
+- p95 della **vista utile completa**, nei tre budget: **331.3/322.7 ms**,
+  **316.1/318.2 ms**, **331.0/301.8 ms** (fredda/calda). Feedback p95 massimo
+  **48.9 ms**, interazioni **15.7 ms**, preparazione simulata **0.92 ms**.
+  Bundle gzip invariato: **161817 byte**.
+- Il precedente esito rosso, con un long task di **53 ms**, rimane nel campo
+  `before` del report numerico. La profilazione di un nuovo superamento ha
+  individuato **51.6 ms** nel task del renderer, ma solo **1.9 ms di CPU**:
+  circa **50.3 ms** prima del ricalcolo sintetico dell’hover. Il campionamento
+  nativo del renderer con il codice applicativo originario mostra
+  `GetCurrentKeyModifiers → SkyLight → WindowServer/TCC`, con inizializzazione
+  e IPC sincroni. Nel trace HMAC occupa **0.005 ms**, parsing al massimo
+  **13.0 ms**, layout **2.0 ms**. La causa osservata è nel browser headless
+  macOS, non nella verifica del nonce o nel rendering dei dati.
+- L’harness usa ora il Chromium completo fornito da Playwright in modalità
+  headless nuova (`channel: 'chromium'`), stessa versione **145.0.7632.6**.
+  [Playwright documenta la distinzione dal precedente headless-shell](https://playwright.dev/docs/browsers#chromium-new-headless-mode).
+  Host ext-apps, sandbox, CSP e codice applicativo sono invariati. I tentativi
+  di differire SDK e firma non risolvevano la pausa nativa e sono stati
+  ripristinati. Questo risultato qualifica il reference con il browser
+  dichiarato; non dimostra la correzione di headless-shell su ogni macOS.
+- Controlli negativi: lavoro sincrono da **75 ms** rilevato dal gate long task
+  **>50 ms**; blocco UI reale da 150 ms rilevato dal budget feedback;
   consegna reale rallentata di 2200 ms rilevata dal budget della vista utile.
 - Selezione test **140/140**, inventario **COMPLETE**. Lint e typecheck
   root/plugin passati; verifica mirata finale dei file modificati passata.
@@ -79,8 +94,7 @@ archivio reale, identificativo reale, Touch ID o writer è stato coinvolto.
 
 ## Limiti di integrazione e di qualifica
 
-Oltre al gate long task della scheda sopra riportato, la build Web è stata
-rieseguita e resta bloccata dalla guardia preliminare:
+La precedente build Web resta bloccata dalla guardia preliminare:
 `Build input metadata: private file is reachable`. Non si dichiara verde.
 La suite unitaria root completa non è stata ripetuta senza un motivo nuovo:
 l’esecuzione precedente documentata sulla PR resta **7708 pass, 29 fail,

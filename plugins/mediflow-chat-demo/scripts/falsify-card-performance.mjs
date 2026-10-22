@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 for (const [flag, reason] of [
+  ['--negative-longtask', 'no attributable widget long task >50ms'],
   ['--negative-feedback', 'click feedback budget mutation'],
   ['--negative-delivery', 'warm useful view <=2s p95'],
 ]) {

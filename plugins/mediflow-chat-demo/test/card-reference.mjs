@@ -6,13 +6,14 @@ import os from 'node:os';
 const scenario = process.argv.find(arg => arg.startsWith('--scenario='))?.split('=')[1];
 const deliveryDelay = process.argv.includes('--negative-delivery');
 const negative = process.argv.includes('--negative-feedback');
+const synchronousWork = process.argv.includes('--negative-longtask');
 const count = Number(process.argv.find(arg => arg.startsWith('--runs='))?.split('=')[1] ?? 30);
 assert.ok(Number.isInteger(count) && count >= 30);
 const output = new URL('../dist/card-evidence/', import.meta.url);
 await mkdir(output, { recursive: true });
 const html = await readFile(new URL('../dist/card.html', import.meta.url));
 assert.ok(gzipSync(html).byteLength < 250_000, 'bundle gzip <250000 bytes');
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, channel: 'chromium' });
 const runs = [];
 async function mounted(page) {
   await page.waitForFunction(() => document.querySelector('iframe'));
@@ -121,6 +122,10 @@ try {
     assert.equal(await frame.locator('#card').isHidden(), true, 'programmatic click cannot consent');
     assert.equal(responses.some(frame => frame.result?.structuredContent), false);
     if (negative) await frame.evaluate(() => document.querySelector('#share').addEventListener('click', () => { const end = performance.now() + 150; while (performance.now() < end) {} }, { capture: true }));
+    if (synchronousWork) await frame.evaluate(() => document.querySelector('#share').addEventListener('click', () => {
+      const end = performance.now() + 75;
+      while (performance.now() < end) {}
+    }, { capture: true }));
     const shareStart = performance.now();
     const feedbackMs = await latency(frame, page, () => frame.locator('#share').click());
     if (negative) assert.ok(feedbackMs <= 100, 'click feedback budget mutation');
@@ -202,7 +207,7 @@ const summary = values => { const sorted = values.toSorted((a,b) => a-b); return
 const serverLog = await readFile(new URL('../.local/reference-server.log', import.meta.url), 'utf8');
 const preparationMs = [...serverLog.matchAll(/^REFERENCE_PREPARATION_MS ([0-9.]+)$/gm)].map(match => Number(match[1]));
 assert.equal(preparationMs.length, count * 2 + 5, 'every broker preparation, including adversarial and late-response scenarios, must be measured');
-const report = { node: process.version, browser: browser.version(), hardware: { cpu: os.cpus()[0].model, ram: os.totalmem(), os: os.release() },
+const report = { node: process.version, browser: browser.version(), browserChannel: 'chromium', hardware: { cpu: os.cpus()[0].model, ram: os.totalmem(), os: os.release() },
   scope: 'Current broker card only. Simulated neural runner. Extended ADR workload and desktop R NOT QUALIFIED.',
   gzipBytes: gzipSync(html).byteLength, preparationMs, preparation: summary(preparationMs), runs, summaries: Object.fromEntries(['cold','warm'].map(t => [t, summary(runs.filter(r => r.temperature === t).map(r => r.usefulMs))])),
   feedback: summary(runs.map(r => r.feedbackMs)), interaction: summary(runs.flatMap(r => [r.detailMs, ...r.themes])) };
