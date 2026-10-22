@@ -7,7 +7,7 @@ non permette al modello di ragionare su dati che non riceve.
 
 ## Preparazione locale
 
-Node **24.21.0**, dipendenze locali dal lockfile e build sorgente ammessa sono
+Node **24.x**, secondo `.nvmrc` e `engines >=24 <25`, dipendenze locali dal lockfile e build sorgente ammessa sono
 prerequisiti. Non usa `npx` né scarica runtime al primo utilizzo. Da una
 checkout sintetica pulita e ammessa:
 
@@ -30,6 +30,11 @@ sono ammessi. Un percorso mancante o non eseguibile produce soltanto
 `source-runtime.mjs local-ui`, che verifica nuovamente il payload e la revisione
 prima del Supervisor. File o ledger alterati, runtime assente e input extra
 falliscono con errore fisso. Non avvia MCP bare e non aggiunge un HTTP generico.
+
+La compatibilità delle patch **24.21.0** e **24.22.0** è verificata con fixture
+sintetiche di packaging e avvio. Il verificatore canonico conserva i controlli
+su major, ABI, piattaforma, architettura, ledger, identità e SQLite `:memory:`;
+il pacchetto continua a richiedere il percorso fisico Node fissato alla preparazione.
 
 Il pacchetto sorgente senza `runtime.json` è una template, non un'installazione
 operativa. Una build bloccata dal controllo dati non va aggirata: la preparazione
@@ -105,7 +110,7 @@ nome con i punti. Il file di sessione deve usare Node e launcher assoluti,
 senza placeholder riservati al caricamento del plugin:
 
 ```json
-{"mcpServers":{"mediflow-local-ui":{"type":"stdio","command":"/percorso/node24.21.0","args":["/percorso/plugin-pronto/src/launch.mjs"]}}}
+{"mcpServers":{"mediflow-local-ui":{"type":"stdio","command":"/percorso/node24","args":["/percorso/plugin-pronto/src/launch.mjs"]}}}
 ```
 
 ```sh
