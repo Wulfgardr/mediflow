@@ -12,6 +12,7 @@ mockOrdinaryModule(import.meta.url, '../gliner-redaction-runner', { namedExports
     }),
 } });
 const { createContentPreparation, readPreparedContent, isPreparedContentCurrent, closePreparedContent } = await import('./preparation-core');
+const { readPreparedOrdinaryProfile, isPreparedOrdinaryProfileCurrent } = await import('../chatgpt-execution/ordinary-preparation');
 const configuration = { pythonExecutable: '/synthetic/python', workerPath: '/synthetic/worker', modelDirectory: '/synthetic/model' };
 for (const retirement of ['close', 'abort'] as const) test(`core freezes a provider-independent envelope and rejects foreign/retired handles on ${retirement}`, async () => {
     const controller = new AbortController();
@@ -20,6 +21,8 @@ for (const retirement of ['close', 'abort'] as const) test(`core freezes a provi
     const handle = await job.ready;
     try {
         const read = readPreparedContent(handle);
+        assert.throws(() => readPreparedOrdinaryProfile(handle), /ordinary_preparation_invalid/);
+        assert.equal(isPreparedOrdinaryProfileCurrent(handle), false);
         const text = read.content.text as string;
         assert.equal(read.restoreText(text), 'Bea Riva');
         assert.equal(read.payloadSha256, createHash('sha256').update(read.payload).digest('hex'));
