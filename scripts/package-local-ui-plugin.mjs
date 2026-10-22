@@ -9,16 +9,16 @@ export function packageLocalUiPlugin(destination, dataDir, sourceRoot = root) {
     || fs.realpathSync(dataDir) !== dataDir || !fs.statSync(dataDir).isDirectory()) throw new Error('Package paths unavailable');
   const { identity } = verifySourceRuntime(sourceRoot);
   if (process.version !== 'v24.21.0') throw new Error('Node 24.21.0 required');
+  const nodePath = fs.realpathSync(process.execPath);
+  if (/["\\\x00-\x1f]/u.test(nodePath)) throw new Error('Node path cannot be represented by the POSIX launcher');
   const source = path.join(root, 'plugins/mediflow-local-ui');
   fs.cpSync(source, destination, { recursive: true, errorOnExist: true, force: false, filter: file => !file.endsWith('/runtime.json') });
-  const nodePath = fs.realpathSync(process.execPath);
   fs.writeFileSync(path.join(destination, 'runtime.json'), JSON.stringify({ schemaVersion: 1,
     nodePath, sourceRoot: fs.realpathSync(sourceRoot), revision: identity.revision, dataDir }) + '\n', { flag: 'wx' });
-  for (const manifest of ['mcp.json', '.mcp.codex.json', '.mcp.claude.json']) {
-    const file = path.join(destination, manifest), value = JSON.parse(fs.readFileSync(file, 'utf8'));
-    value.mcpServers['mediflow-local-ui'].command = nodePath;
-    fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
-  }
+  const claudeFile = path.join(destination, '.mcp.claude.json');
+  const claude = JSON.parse(fs.readFileSync(claudeFile, 'utf8'));
+  claude.mcpServers['mediflow-local-ui'].command = nodePath;
+  fs.writeFileSync(claudeFile, JSON.stringify(claude, null, 2) + '\n');
   return { revision: identity.revision, destination };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
