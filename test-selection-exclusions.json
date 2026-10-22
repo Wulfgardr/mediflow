@@ -143,5 +143,15 @@
     "path": "tests/ui06/browser-harness.mjs",
     "reason": "WUL-729: Browser lifecycle/React fixture helper imported by the local component suite.",
     "owner": "@Wulfgardr"
+  },
+  {
+    "path": "docs/analysis/2026-10-22-command-roles/real-capture.spec.ts.txt",
+    "reason": "WUL-787: Historical manual reproduction source archived as text; not an ordinary suite entrypoint. Current regression coverage is selected from e2e/command-roles-real.spec.ts.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "docs/analysis/2026-10-22-command-roles/real-probe.spec.ts.txt",
+    "reason": "WUL-787: Historical manual reproduction source archived as text; not an ordinary suite entrypoint. Current regression coverage is selected from e2e/command-roles-real.spec.ts.",
+    "owner": "@Wulfgardr"
   }
 ]
