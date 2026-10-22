@@ -115,8 +115,11 @@ for (const theme of ['giorno', 'grafite']) for (const width of [1440, 768, 390, 
     if (width === 720) await page.evaluate(() => { document.documentElement.style.zoom = '2'; });
     await openPatientSection(page, 'terapie');
     const guide = page.locator('#plugin-prescribing');
-    const trigger = guide.locator(':scope > summary, :scope > div > h3 > button');
-    await trigger.click();
+    const trigger = guide.getByRole('button', { name: 'Guida alla prescrizione', exact: true });
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await trigger.focus();
+    await trigger.press('Enter');
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
     await guide.scrollIntoViewIfNeeded();
     await expect(guide.getByRole('navigation', { name: 'Tipo di prescrizione' })).toBeVisible();
     const screenshot = test.info().outputPath('disclosure.png');
