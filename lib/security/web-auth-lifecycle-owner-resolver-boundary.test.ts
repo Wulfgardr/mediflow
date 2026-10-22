@@ -247,6 +247,8 @@ test('allows only the reviewed synthetic, chat-demo and profile packages alongsi
                 'plugins/mediflow-synthetic/owner-shim/package.json', 'packages/mediflow-synthetic/package.json',
                 'plugins/mediflow-chat-demo-copy/package.json', 'plugins/mediflow-chat-demo/src/package.json',
                 'plugins/mediflow-chat-demo/owner-shim/package.json', 'packages/mediflow-chat-demo/package.json',
+                'plugins/mediflow-chat-demo/test/reference-host/package.json',
+                'tmp-chat-reference/package.json',
                 'plugins/mediflow-chat-demo/.local/package.json',
                 'plugins/mediflow-chat-demo/.local/owner-shim/package.json',
                 'packages/patient-profile-contracts-copy/package.json', 'packages/patient-profile-contracts/src/package.json',

@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 const mutation = new URL('../src/.falsified.mjs', import.meta.url);
 try {
   const source = await readFile(new URL('../src/server.mjs', import.meta.url), 'utf8');
-  const changed = source.replace('{"status":"demo_view_ready"}', '{"status":"demo_view_ready","injected":"SYNTHETIC_L_11111111-2222-3333-4444-555555555555"}');
+  const changed = source.replace('Dimostrazione MediFlow disponibile nella vista interattiva.', 'SYNTHETIC_L_11111111-2222-3333-4444-555555555555');
   assert.notEqual(changed, source, 'Mutation not applied');
   await writeFile(mutation, changed);
   const result = spawnSync(process.execPath, ['--test', '--test-name-pattern=MCP boundary', 'test/protocol.test.mjs'], {

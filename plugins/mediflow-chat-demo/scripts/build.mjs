@@ -8,13 +8,13 @@ function declarations(value, prefix = '--lume') {
     ? [`${prefix}-${key}:${item.$value};`] : declarations(item, `${prefix}-${key}`)).join('');
 }
 const themes = ['giorno', 'grafite'].map(theme => `[data-theme="${theme}"]{${declarations(tokens.register[theme])}}`).join('\n');
-const font = await readFile(new URL('../../app/fonts/Newsreader-Variable.ttf', root));
+const font = await readFile(new URL('../../app/fonts/Newsreader-Native-Regular.ttf', root));
 const result = await build({ entryPoints: [new URL('src/app.mjs', root).pathname], bundle: true,
   write: false, format: 'iife', platform: 'browser', target: 'es2022', minify: true });
 const script = result.outputFiles[0].text.replace(/<\/script/giu, '<\\/script');
 const source = await readFile(new URL('src/app.html', root), 'utf8');
 const css = await readFile(new URL('src/app.css', root), 'utf8');
-const html = source.replace('<!-- STYLE -->', () => `<style>@font-face{font-family:Newsreader;src:url(data:font/ttf;base64,${font.toString('base64')}) format('truetype');font-weight:200 800;font-display:swap}${themes}\n${css}</style>`)
+const html = source.replace('<!-- STYLE -->', () => `<style>@font-face{font-family:Newsreader;src:url(data:font/ttf;base64,${font.toString('base64')}) format('truetype');font-weight:400;font-display:swap}${themes}\n${css}</style>`)
   .replace('<!-- SCRIPT -->', () => `<script>${script}</script>`);
 await mkdir(new URL('dist/', root), { recursive: true });
 await writeFile(new URL('dist/app.html', root), html);

@@ -25,13 +25,22 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 24
+          node-version: 24.21.0
           cache: npm
           cache-dependency-path: plugins/mediflow-chat-demo/package-lock.json
-      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm run build
       - run: npm run typecheck
       - run: npm test
       - run: npm run test:falsification
       - run: npx --no-install playwright install --with-deps chromium
       - run: npm run test:browser
+      - run: npm run prepare:reference
+      - run: npm run test:reference
+      - run: npm run test:performance-negative
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: chat-demo-reference-performance
+          path: plugins/mediflow-chat-demo/dist/evidence/
+          if-no-files-found: warn
