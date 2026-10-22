@@ -778,12 +778,45 @@ restano nello stesso posto e non sono dichiarate consegnate da questo ADR.
    chiave non attraversa i tool; una firma osservata non vale per un altro nonce. La sola
    challenge disponibile nei messaggi non concede il consenso; la risorsa
    non è rileggibile nella stessa sessione. La riapertura richiede pertanto
-   una nuova sessione MCP, da qualificare sui desktop. Il confine copre i
-   messaggi forgiati dal frame dopo il bootstrap fidato, non l’host che può
-   controllare renderer o caricamento: non è autenticazione clinica né una
+   una nuova sessione MCP, da qualificare sui desktop. Il confine del tool `share` copre i
+   messaggi forgiati dopo il bootstrap fidato, non codice arbitrario nel frame
+   né l’host che può controllare renderer o caricamento: non è autenticazione clinica né una
    prova crittografica di gesto verso un host ostile. Revoca e nuovi tentativi
    invalidano sincronicamente l’epoca; l’owner ricontrolla l’epoca subito
    prima dell’uscita, senza attese intermedie.
+
+   Il canale `ui/update-model-context` è fidato quanto il frame: il bridge MCP
+   Apps non verifica HMAC, nonce o consenso del broker e accetta anche byte
+   arbitrari inviati da codice che controlla il frame. Questi meccanismi
+   proteggono soltanto l'accesso a `share`, non il canale di contesto.
+   La garanzia è che il frame non riceve dati MediFlow non approvati:
+   risorsa UI senza dati, `prepare` con sola challenge, errori e revoche fissi,
+   nessuna risorsa di fonti o mappe. Dopo una revoca non si possono ritirare
+   byte già approvati e ricevuti. Un frame compromesso può inviare byte propri
+   o già approvati; questo non dimostra un'esfiltrazione dal broker.
+   La risorsa contiene solo il bundle locale (SDK incluso), senza script remoti;
+   una CSP con hash del bundle per istanza vieta script aggiunti ed eval,
+   connessioni e risorse esterne. Gli stili dinamici dell'host restano ammessi.
+
+   Ogni `share` restituisce byte approvati e un identificatore casuale del
+   tentativo. Prima di aggiornare il contesto, la vista chiama `deliver`:
+   l'owner verifica vista, tentativo corrente, generazione, scadenza e stato
+   approvato, e consuma l'autorizzazione sincronicamente. Chiusura, revoca e
+   nuova preparazione invalidano il tentativo prima di qualsiasi attesa.
+   Una risposta `share` trattenuta e rilasciata dopo una chiusura completata
+   non autorizza quindi un invio; errore, conferma mancante o discordante
+   chiudono la vista senza aggiornare il contesto.
+
+   Resta una finestra distribuita fra il consumo atomico di `deliver` sul
+   server e l'invio al bridge: una chiusura che avviene in quella finestra
+   (anche mentre la risposta `deliver` è trattenuta) non è osservabile senza
+   una nuova comunicazione. Aggiungere altre conferme sposta la finestra,
+   non la elimina. L'autorizzazione si linearizza al consumo server; una
+   consegna già autorizzata lì può arrivare dopo una chiusura successiva.
+   Solo un host che verifica e consuma il tentativo insieme all'accettazione
+   del contesto può garantire un ordine globale rispetto alla chiusura.
+   Questo limite resta esplicito nel prototipo sintetico e non qualifica
+   l'uso clinico o l'invio a un LLM desktop.
 3. **Canale per host e ricomposizione nativa.** Implementare il percorso
    raccomandato; provare app-only su dati pseudonimizzati dove R è disponibile.
    **Prova:** tool non disponibile al modello, risultati non reinseriti nel

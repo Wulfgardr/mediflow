@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createHmac, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { EmptyResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import corpus from '../../../scripts/fixtures/chat-card-corpus.json' with { type: 'json' };
-import { CARD_TOOL, CARD_URI, CARD_DENIED } from '../src/card-server.mjs';
+import { createCardServer, CARD_TOOL, CARD_URI, CARD_DENIED } from '../src/card-server.mjs';
 const SENTINEL = 'IDENTIFYING_SENTINEL_Serena_Falsa_17_04_1972';
 async function protocol(flags, run) {
   const transport = new StdioClientTransport({ command: process.execPath,
@@ -48,15 +49,22 @@ async function call(client, operation, view) {
   if (operation === 'prepare') nonces.set(view, result._meta?.consentNonce);
   return result;
 }
-test('real stdio: one app-only tool; data-free resource; only approved broker bytes; following turn', async () => {
+test('real stdio: model-visible opener and app-only sharing; data-free resource; only approved broker bytes; following turn', async () => {
   let pseudonym;
   await protocol([], async client => {
     const tools = await client.listTools();
-    assert.equal(tools.tools.length, 1);
-    assert.deepEqual(tools.tools[0]._meta.ui.visibility, ['app']);
+    assert.equal(tools.tools.length, 2);
+    const opener = tools.tools.find(tool => tool.name === 'mediflow_synthetic_card_open');
+    assert.deepEqual(opener._meta.ui.visibility, ['model']);
+    assert.equal(opener._meta.ui.resourceUri, CARD_URI);
+    assert.deepEqual(tools.tools.find(tool => tool.name === CARD_TOOL)._meta.ui.visibility, ['app']);
+    const opened = await client.callTool({ name: opener.name, arguments: {} });
+    assert.deepEqual(opened, { content: [{ type: 'text', text: 'Apri la vista per scegliere se condividere la scheda sintetica.' }] });
+    assert.equal((await client.callTool({ name: opener.name, arguments: { operation: 'share' } })).isError, true);
     const { resource, view } = await open(client);
     const html = resource.contents[0].text;
-    for (const value of ['Elena', 'Serena', 'metformina', 'card_', 'src_', 'MF_PII_', '__DEMO_CONNECTION__']) assert.equal(html.includes(value), false, value);
+    for (const value of ['Elena', 'Serena', 'metformina', 'card_', 'src_', '__DEMO_CONNECTION__']) assert.equal(html.includes(value), false, value);
+    assert.doesNotMatch(html, /\{\{MF_PII_[a-f0-9]{32}_\d+\}\}/);
     assert.deepEqual(resource.contents[0]._meta.ui.csp.connectDomains, []);
     assert.equal((await call(client, 'share', view)).isError, true);
     assert.equal((await call(client, 'prepare', view)).structuredContent, undefined);
@@ -67,7 +75,8 @@ test('real stdio: one app-only tool; data-free resource; only approved broker by
     pseudonym = card.pseudonym;
     assert.equal(result.content[0].text, 'Scheda sintetica condivisa nella vista.');
     assert.deepEqual(result.structuredContent, card);
-    assert.deepEqual(Object.keys(result).sort(), ['content', 'structuredContent']);
+    assert.equal(result._meta.approvedPayload, JSON.stringify(card), 'the broker serialization is retained verbatim for context delivery');
+    assert.deepEqual(Object.keys(result).sort(), ['_meta', 'content', 'structuredContent']);
     assert.equal(card.history[0].condition, 'diabete mellito tipo 2');
     assert.deepEqual(card.therapies.map(t => [t.medicine, t.dose]), [['metformina', '500 mg'], ['paracetamolo', '1000 mg']]);
     assert.match(card.pseudonym, /^card_[a-f0-9]{32}$/);
@@ -152,4 +161,82 @@ test('nonce is short-lived, bound to the current attempt and consumed once; mess
   assert.equal((await forged({ nonce: third._meta.consentNonce, gestureProof: observedProof })).isError, true, 'an observed signature cannot approve a later preparation');
   assert.equal((await call(client, 'share', view)).isError, undefined);
   await assert.rejects(client.readResource({ uri: CARD_URI }));
+}));
+
+test('adapter preserves approved serialization bytes, including whitespace and Unicode, for model context', async () => {
+  const payload = '{ "pseudonym": "synthetic", "note": "è già approvato" }\n';
+  const nonce = 'a'.repeat(64);
+  const owner = { async close() {}, async revoke() {}, async prepare() { return nonce; }, share() { return { payload, attemptId: 'b'.repeat(64) }; }, deliver(view, attemptId) { return attemptId; } };
+  const { server } = await createCardServer(owner);
+  const client = new Client({ name: 'exact-serialization-test', version: '1' });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  try {
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    const { view } = await open(client);
+    await call(client, 'prepare', view);
+    const result = await call(client, 'share', view);
+    assert.equal(result._meta.approvedPayload, payload);
+    assert.deepEqual(result.structuredContent, JSON.parse(payload));
+    assert.notEqual(result._meta.approvedPayload, JSON.stringify(result.structuredContent));
+  } finally { await client.close(); await server.close(); }
+});
+
+
+test('delivery authorization is current-attempt bound, one-shot and retired by owner transitions', async () => protocol([], async client => {
+  const { view } = await open(client);
+  const deliver = attemptId => client.callTool({ name: CARD_TOOL, arguments: { operation: 'deliver', view, attemptId } });
+  for (const transition of ['open', 'prepare', 'revoke', 'none']) {
+    await call(client, 'prepare', view);
+    const result = await call(client, 'share', view);
+    assert.match(result._meta.attemptId, /^[a-f0-9]{64}$/);
+    assert.equal((await deliver('0'.repeat(64))).isError, true, 'wrong attempt cannot consume authorization');
+    if (transition === 'open') await client.callTool({ name: 'mediflow_synthetic_card_open', arguments: {} });
+    if (transition === 'prepare' || transition === 'revoke') await call(client, transition, view);
+    const authorization = await deliver(result._meta.attemptId);
+    if (transition === 'none') {
+      assert.deepEqual(authorization, { content: [{ type: 'text', text: 'Consegna autorizzata.' }], _meta: { attemptId: result._meta.attemptId } });
+    } else assert.equal(authorization.isError, true);
+    assert.equal((await deliver(result._meta.attemptId)).isError, true);
+  }
+}));
+
+test('unapproved frame sees no MediFlow data in any result, metadata or readable resource', async () => protocol([], async (client, frames) => {
+  const { view, resource } = await open(client);
+  const clinical = /metformina|diabete mellito|paracetamolo|MF_PII_[a-f0-9]{32}_|card_[a-f0-9]{32}|src_[a-f0-9]{32}/;
+  const empty = result => {
+    assert.equal(result.structuredContent, undefined);
+    assert.equal(result._meta?.approvedPayload, undefined);
+    assert.doesNotMatch(JSON.stringify(result), clinical);
+  };
+  empty(resource);
+  for (const phase of ['before', 'denied', 'revoked']) {
+    empty(await call(client, 'prepare', view));
+    if (phase !== 'before') empty(await call(client, 'revoke', view));
+    for (const args of [
+      { operation: 'share', view },
+      { operation: 'share', view, nonce: nonces.get(view), gestureProof: '0'.repeat(64) },
+      { operation: 'deliver', view, attemptId: '0'.repeat(64) },
+      { operation: 'share', view, patient: 'basic', source: 'raw' },
+    ]) empty(await client.callTool({ name: CARD_TOOL, arguments: args }));
+    await assert.rejects(client.readResource({ uri: CARD_URI }));
+    await assert.rejects(client.readResource({ uri: 'ui://mediflow-synthetic-card/source' }));
+    assert.deepEqual((await client.listResources()).resources.map(r => r.uri), [CARD_URI]);
+    assert.deepEqual((await client.listResourceTemplates()).resourceTemplates, []);
+  }
+  assert.doesNotMatch(JSON.stringify(frames), clinical, 'inspect all wire frames, not only text content');
+}));
+
+test('ui resource uses only hashed bundled scripts with no external code or eval', async () => protocol([], async client => {
+  const { resource } = await open(client);
+  const html = resource.contents[0].text;
+  assert.ok(/http-equiv="Content-Security-Policy"/.test(html), 'resource must enforce its own CSP');
+  assert.match(html, /default-src 'none'/);
+  assert.match(html, /script-src 'sha256-[A-Za-z0-9+/=]+'/);
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+  assert.equal(scripts.length, 1);
+  const markup = html.replace(/<script>[\s\S]*?<\/script>/g, '<script></script>');
+  assert.doesNotMatch(markup, /<script[^>]+src=|\son(?:click|load|error)=|unsafe-eval|script-src[^;]*unsafe-inline/i);
+  assert.ok(html.includes(`script-src 'sha256-${createHash('sha256').update(scripts[0][1]).digest('base64')}'`));
+  assert.deepEqual(resource.contents[0]._meta.ui.csp, { connectDomains: [], resourceDomains: [] });
 }));

@@ -72,6 +72,13 @@ try {
     const firstPaint = await appFrame.evaluate(() => performance.timeOrigin + performance.getEntriesByName('first-contentful-paint')[0].startTime);
     const toolStart = await page.evaluate(() => window['metrics'].toolStart);
     assert.ok(toolStart > 0 && firstPaint > toolStart, 'measure from actual tools/call to card FCP');
+    const requests = (await page.requests()).flatMap(request => {
+      const url = new URL(request.url());
+      if (url.pathname !== '/mcp' && url.pathname !== '/sandbox.html') return [];
+      return [{ path: `${url.origin}${url.pathname}`, method: request.method(),
+        rpcMethod: request.method() === 'POST' ? request.postDataJSON()?.method : undefined,
+        timing: request.timing() }];
+    });
     const summary = appFrame.getByText('Promemoria dimostrativo', { exact: true });
     await summary.scrollIntoViewIfNeeded();
     await page.evaluate(() => window.scrollTo(0, 300));
@@ -115,7 +122,10 @@ try {
         left: rect.left, right: innerWidth - rect.right, background: getComputedStyle(document.body).backgroundColor,
         scroll: document.scrollingElement.scrollTop, active: document.activeElement.tagName };
     });
-    const measured = { toolToCardFcpMs: firstPaint - toolStart, interactionsMs: interactions, themeMs: themeLatencies,
+    const measured = { toolToCardFcpMs: firstPaint - toolStart,
+      startup: { toolStart, firstPaint, requests, frameTimeOrigin: await appFrame.evaluate(() => performance.timeOrigin),
+        paints: await appFrame.evaluate(() => performance.getEntriesByType('paint').map(entry => entry.toJSON())) },
+      interactionsMs: interactions, themeMs: themeLatencies,
       resizeMessages: host.sizes.length - sizesBefore, scrollBefore, scrollAfter: host.scroll,
       app: { sameMain: app.sameMain, sameSummary: app.sameSummary, focusCalls: app.focusCalls, scrollCalls: app.scrollCalls,
         left: app.left, right: app.right, scrollBefore: nodesBefore.scroll, scrollAfter: app.scroll, active: app.active },

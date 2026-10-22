@@ -11,7 +11,7 @@ const mutations = [
   { name: 'paint', before: '<title>', after: '<script>const until=performance.now()+400;while(performance.now()<until){}</script><title>', expected: 'tool-to-card FCP budget' },
   { name: 'interaction', before: '</body>', after: '<script>document.addEventListener("click",()=>{const until=performance.now()+100;while(performance.now()<until){}},true)</script></body>', expected: 'interaction presentation upper bound' },
   { name: 'animation', before: 'animation: reveal 120ms', after: 'animation: reveal 400ms', expected: 'animation duration budget' },
-  { name: 'jank', before: '</body>', after: '<script>document.addEventListener("animationstart",()=>setTimeout(()=>{const until=performance.now()+100;while(performance.now()<until){}},50))</script></body>', expected: 'animation frame gap budget' },
+  { name: 'jank', before: '</body>', after: '<script>document.addEventListener("animationstart",()=>setTimeout(()=>{const until=performance.now()+100;while(performance.now()<until){}},50))</script></body>', expected: /animation (?:frame gap|completion) budget/ },
 ];
 try {
   for (const mutation of mutations) {
@@ -21,7 +21,7 @@ try {
       cwd: new URL('../', import.meta.url), encoding: 'utf8', timeout: 45_000 });
     await writeFile(new URL(`../.local/performance-negative-${mutation.name}.log`, import.meta.url), result.stdout + result.stderr);
     assert.equal(result.status, 1, `${mutation.name}: mutation must fail`);
-    assert.ok(result.stderr.includes(mutation.expected), `${mutation.name}: must fail the targeted budget`);
+    assert.ok(typeof mutation.expected === 'string' ? result.stderr.includes(mutation.expected) : mutation.expected.test(result.stderr), `${mutation.name}: must fail the targeted budget`);
     console.log(`PASS negative control: ${mutation.name}`);
   }
 } finally { await writeFile(file, original); }

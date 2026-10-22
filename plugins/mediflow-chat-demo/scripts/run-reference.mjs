@@ -27,7 +27,7 @@ try {
   }
   await start(path.join(referenceDirectory, 'serve.ts'), 'Sandbox server:', 'reference-host');
   await start(card ? 'test/card-reference-server.mjs' : 'scripts/reference-server.mjs', 'Reference-only MCP endpoint:', 'reference-server');
-  const child = spawn(process.execPath, [card ? 'test/card-reference.mjs' : process.argv.includes('--falsify') ? 'scripts/falsify-performance.mjs' : 'scripts/reference-performance.mjs',
+  const child = spawn(process.execPath, [card ? (process.argv.includes('--desktop-regressions') ? 'test/card-desktop-regressions.mjs' : 'test/card-reference.mjs') : process.argv.includes('--falsify') ? 'scripts/falsify-performance.mjs' : 'scripts/reference-performance.mjs',
     ...process.argv.slice(2).filter(arg => arg !== '--falsify' && arg !== '--card')], { cwd: new URL('../', import.meta.url), stdio: 'inherit' });
   children.push(child);
   const code = await new Promise(resolve => child.once('exit', resolve));

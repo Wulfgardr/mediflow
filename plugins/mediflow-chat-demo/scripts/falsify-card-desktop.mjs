@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+
+const root = new URL('../', import.meta.url);
+const run = args => spawnSync(process.execPath, args, { cwd: root, encoding: 'utf8', timeout: 60_000 });
+/** @type {Array<[string, string, string, string, string, [string, string]?]>} */
+const mutations = [
+  ['inline', 'src/card-server.mjs', "export const CARD_OPEN_TOOL = 'mediflow_synthetic_card_open'", "export const CARD_OPEN_TOOL = 'disabled_synthetic_card_open'", 'reference host did not mount'],
+  ['delivery', 'src/card-app.mjs', "await app.updateModelContext({ content: [{ type: 'text', text: result._meta.approvedPayload }] }, { signal: delivery.signal });", 'await Promise.resolve();', 'consent sends exactly one context update'],
+  ['late-share-open', 'src/card-owner.mjs', 'deliver(view, attemptId) {', 'deliver(view, attemptId) { return attemptId;', 'no late context after owner invalidation'],
+  ['frame-csp', 'src/card-server.mjs', 'text: instanceHtml,', 'text: boundHtml,', 'inlineBlocked'],
+  ['frame-csp', 'src/card-server.mjs', "script-src ${hashes('script')};", "script-src ${hashes('script')} http://127.0.0.1:*;", 'external script must trigger script-src-elem CSP violation',
+    ["resourceDomains: []", "resourceDomains: ['http://127.0.0.1:*']"]],
+  ['theme', 'src/app.css', ':root[data-card]', ':root[data-disabled-card]', 'Giorno uses its Lume field'],
+  ['placeholders', 'src/card-app.mjs', "String(text).replace(/\\{\\{MF_PII_[^{}]+\\}\\}/gu, '[omesso]')", 'String(text)', 'MF_PII_'],
+  ['expiry', 'src/card-app.mjs', 'if (!event.isTrusted || !ready) return;\n    clearTimeout(expiry);', 'if (!event.isTrusted || !ready) return;', 'shared card survives the decision deadline'],
+  ['turn-input', 'src/card-app.mjs', 'initializing && !initialInputSeen', '!initialInputSeen', 'Timeout 1500ms'],
+  ['turn-result', 'src/card-app.mjs', 'initializing && !initialResultSeen', '!initialResultSeen', 'Timeout 1500ms'],
+];
+for (const [name, file, before, after, failure, extra] of mutations) {
+  const target = new URL(file, root);
+  const source = await readFile(target, 'utf8');
+  assert.ok(source.includes(before), `${name}: mutation must apply`);
+  try {
+    let mutated = source.replace(before, after);
+    if (extra) {
+      assert.ok(mutated.includes(extra[0]), `${name}: host policy mutation must apply`);
+      mutated = mutated.replace(extra[0], extra[1]);
+    }
+    await writeFile(target, mutated);
+    assert.equal(run(['scripts/build.mjs']).status, 0, `${name}: mutated build`);
+    const result = run(['scripts/run-reference.mjs', '--card', '--desktop-regressions', `--case=${name}`]);
+    assert.equal(result.status, 1, `${name}: removal of fix must fail`);
+    assert.ok(result.stdout.includes(failure), `${name}: must fail for the original defect`);
+    console.log(`PASS: ${extra ? 'external CSP origin admission' : name} regression rejects removal of its fix.`);
+  } finally { await writeFile(target, source); }
+}
+const serverFile = new URL('src/card-server.mjs', root);
+const serverSource = await readFile(serverFile, 'utf8');
+const before = '_meta: { consentNonce }';
+assert.ok(serverSource.includes(before), 'unapproved-data: mutation must apply');
+try {
+  await writeFile(serverFile, serverSource.replace(before, "_meta: { consentNonce, approvedPayload: 'metformina UNAPPROVED_SYNTHETIC_DATA' }"));
+  const result = run(['--test', '--test-name-pattern=unapproved frame', 'test/card-protocol.test.mjs']);
+  assert.equal(result.status, 1, 'unapproved-data: leaking prepare metadata must fail');
+  assert.ok(result.stdout.includes('unapproved frame sees no MediFlow data'), 'unapproved-data: boundary test must fail');
+  console.log('PASS: unapproved-data regression rejects broker metadata leakage.');
+} finally { await writeFile(serverFile, serverSource); }
+assert.equal(run(['scripts/build.mjs']).status, 0, 'restore original bundle');
+const restored = run(['scripts/run-reference.mjs', '--card', '--desktop-regressions']);
+assert.equal(restored.status, 0, `restored fixes must pass: ${restored.stdout}\n${restored.stderr}`);
+console.log('PASS: restored desktop regressions.');

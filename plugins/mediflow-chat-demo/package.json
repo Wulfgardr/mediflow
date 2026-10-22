@@ -19,7 +19,9 @@
     "start:card": "node src/card-stdio.mjs",
     "test:card-reference": "node scripts/run-reference.mjs --card",
     "start:card-fixture": "node --import ../../../scripts/register-strip-types-loader.mjs test/card-stdio-fixture.mjs",
-    "test:card-performance-negative": "node scripts/falsify-card-performance.mjs"
+    "test:card-performance-negative": "node scripts/falsify-card-performance.mjs",
+    "test:card-desktop": "node scripts/run-reference.mjs --card --desktop-regressions",
+    "test:card-desktop-negative": "node scripts/falsify-card-desktop.mjs"
   },
   "dependencies": {
     "@openai/mcp-extensions": "0.1.0",
