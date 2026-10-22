@@ -12,7 +12,10 @@
     "start": "node src/stdio.mjs",
     "test:browser": "node scripts/browser-smoke.mjs",
     "typecheck": "tsc -p tsconfig.json",
-    "test:falsification": "node scripts/falsify.mjs"
+    "test:falsification": "node scripts/falsify.mjs",
+    "prepare:reference": "node scripts/prepare-reference.mjs",
+    "test:reference": "node scripts/run-reference.mjs",
+    "test:performance-negative": "node scripts/run-reference.mjs --falsify"
   },
   "dependencies": {
     "@openai/mcp-extensions": "0.1.0",

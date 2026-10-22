@@ -220,7 +220,8 @@ function collectPluginSelections(root, directory, workflow, job, paths, scripts)
         files = fs.readdirSync(path.join(root, group)).filter(name => !name.startsWith('.') && name.endsWith('.test.mjs'))
           .sort().map(name => `${group}/${name}`);
         if (!files.length) throw new Error('Required synthetic plugin test group is empty');
-      } else files = [`${directory}/scripts/${suite.script === 'test:falsification' ? 'falsify' : 'browser-smoke'}.mjs`];
+      } else files = suite.files?.map(file => `${directory}/${file}`)
+        ?? [`${directory}/scripts/${suite.script === 'test:falsification' ? 'falsify' : 'browser-smoke'}.mjs`];
       for (const file of files) regularFile(root, file);
       return [id, { files, errors: [], binding, conditional: true }];
     } catch (error) {
@@ -241,6 +242,10 @@ export function collectSyntheticPluginSelections(root) {
       [`${directory}/**`, 'packages/mcp/src/contracts.ts', workflow], scripts),
     ...collectPluginSelections(root, 'plugins/mediflow-chat-demo', '.github/workflows/chat-demo.yml', 'chat-demo',
       ['plugins/mediflow-chat-demo/**', 'app/fonts/Newsreader*', 'docs/design/lume/tokens/lume.tokens.json', '.github/workflows/chat-demo.yml'],
-      [...scripts, { script: 'test:falsification', ciCall: 'npm run test:falsification', command: 'node scripts/falsify.mjs' }]),
+      [...scripts, { script: 'test:falsification', ciCall: 'npm run test:falsification', command: 'node scripts/falsify.mjs' },
+        { script: 'test:reference', ciCall: 'npm run test:reference', command: 'node scripts/run-reference.mjs',
+          files: ['scripts/reference-performance.mjs'] },
+        { script: 'test:performance-negative', ciCall: 'npm run test:performance-negative', command: 'node scripts/run-reference.mjs --falsify',
+          files: ['scripts/falsify-performance.mjs'] }]),
   };
 }
