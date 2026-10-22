@@ -47,7 +47,7 @@ test('canonical prebuild reaches the real metadata CLI and denies a synthetic pr
 });
 
 test('production sparse checkouts omit one exact file while retaining committed identity and other test sources', t => {
-  const checkouts = [['web-core.yml', 'web-core'], ['e2e.yml', 'e2e'], ['cross-platform.yml', 'build-start']].map(([file, job]) => {
+  const checkouts = [['web-core.yml', 'web-core'], ['e2e.yml', 'e2e-shard'], ['cross-platform.yml', 'build-start']].map(([file, job]) => {
     const workflow = loadYaml(fs.readFileSync(path.join(root, '.github/workflows', file), 'utf8'));
     const steps = workflow.jobs[job].steps;
     const checkout = steps.filter(step => step.uses?.startsWith('actions/checkout@'));
