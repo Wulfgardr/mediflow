@@ -11,7 +11,7 @@ import { localTestCommands } from './local-test-selection.mjs';
 
 const custodian = 'native/MediFlowMac/ExecutionCustodian/custodian.test.ts';
 const hooks = [
-  ['headless-browser', 'test:inventory-browser', 'e2e', 'e2e'],
+  ['headless-browser', 'test:inventory-browser', 'e2e', 'e2e-shard'],
   ['fixture-generators', 'test:fixture-generators', 'web-core', 'web-core'],
   ['research-toolchain', 'test:research-boundary', 'web-core', 'web-core'],
 ];

@@ -181,7 +181,7 @@ test('real preload and exporter write only metadata to the exact uploaded file, 
       'scripts/anydoc-diagnostic-correlation.test.mjs',
     ];
     const binding = collectNpmScriptBinding(root, {
-      script: 'test:anydoc-diagnostics', workflow: '.github/workflows/e2e.yml', job: 'e2e',
+      script: 'test:anydoc-diagnostics', workflow: '.github/workflows/e2e.yml', job: 'e2e-shard',
     }, `node --test ${diagnosticFiles.join(' ')}`);
     assert.equal(binding.run, 'npm run test:anydoc-diagnostics');
     assert.equal(binding.stepName, 'Test AnyDoc diagnostic artifact boundary');
