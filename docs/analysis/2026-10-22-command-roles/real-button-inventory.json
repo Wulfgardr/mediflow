@@ -1,0 +1,1084 @@
+[
+  {
+    "file": "components/ai-patient-insight.tsx",
+    "line": 146,
+    "tag": "Link",
+    "attributes": "href=\"/settings/ai/funzioni\" className=\"ui-btn-secondary\" style={actionStyle}",
+    "children": []
+  },
+  {
+    "file": "components/ai-patient-insight.tsx",
+    "line": 159,
+    "tag": "button",
+    "attributes": "type=\"button\" onClick={generateInsight} disabled={!picker.canGenerate} className=\"ui-btn-primary\" style={actionStyle}",
+    "children": [
+      {
+        "tag": "Sparkles",
+        "attributes": "className=\"h-4 w-4\" aria-hidden=\"true\""
+      }
+    ]
+  },
+  {
+    "file": "components/ai-patient-insight.tsx",
+    "line": 175,
+    "tag": "button",
+    "attributes": "type=\"button\" onClick={generateInsight} disabled={isGenerating || !enabled || !picker.canGenerate} className=\"ui-btn-secondary\" style={actionStyle}",
+    "children": [
+      {
+        "tag": "RefreshCw",
+        "attributes": "className=\"h-4 w-4\" aria-hidden=\"true\""
+      }
+    ]
+  },
+  {
+    "file": "components/ai-patient-insight.tsx",
+    "line": 183,
+    "tag": "button",
+    "attributes": "type=\"button\" onClick={stopGeneration} className=\"ui-btn-secondary\" style={actionStyle}",
+    "children": []
+  },
+  {
+    "file": "components/ai-patient-insight.tsx",
+    "line": 203,
+    "tag": "Link",
+    "attributes": "href={`/patients/${patient.id}/modules#quadro`} className=\"ui-btn-secondary\" style={actionStyle}",
+    "children": []
+  },
+  {
+    "file": "components/ai-patient-insight.tsx",
+    "line": 204,
+    "tag": "Link",
+    "attributes": "href={`/patients/${patient.id}/modules#terapie`} className=\"ui-btn-secondary\" style={actionStyle}",
+    "children": []
+  },
+  {
+    "file": "components/ai-patient-insight.tsx",
+    "line": 205,
+    "tag": "Link",
+    "attributes": "href={`/patients/${patient.id}/modules#diario`} className=\"ui-btn-secondary\" style={actionStyle}",
+    "children": []
+  },
+  {
+    "file": "components/app-startup-screen.tsx",
+    "line": 32,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-secondary mt-5 min-h-11 px-4 py-2 text-sm\"\n                        onClick={() => window.location.reload()}",
+    "children": []
+  },
+  {
+    "file": "components/auth-health-screen.tsx",
+    "line": 94,
+    "tag": "button",
+    "attributes": "type=\"button\" onClick={onRetry} className=\"ui-btn-primary lume-press px-4 py-2\"",
+    "children": [
+      {
+        "tag": "RefreshCw",
+        "attributes": "aria-hidden=\"true\" className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/auth-health-screen.tsx",
+    "line": 99,
+    "tag": "button",
+    "attributes": "type=\"button\" onClick={onRepair} disabled={isRepairing}\n                            className=\"mf-btn-secondary lume-press px-4 py-2 disabled:opacity-60\"",
+    "children": []
+  },
+  {
+    "file": "components/backup-restore-ui.tsx",
+    "line": 174,
+    "tag": "button",
+    "attributes": "onClick={handleExport}\n                    disabled={isLoading}\n                    className=\"ui-btn-primary lume-press px-5 py-2.5 disabled:cursor-not-allowed disabled:opacity-50\"",
+    "children": [
+      {
+        "tag": "RefreshCw",
+        "attributes": "className=\"w-4 h-4\""
+      },
+      {
+        "tag": "Download",
+        "attributes": "className=\"w-4 h-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/backup-restore-ui.tsx",
+    "line": 182,
+    "tag": "label",
+    "attributes": "className=\"mf-btn-secondary lume-press ml-2 w-fit cursor-pointer\"",
+    "children": [
+      {
+        "tag": "ShieldCheck",
+        "attributes": "className=\"w-4 h-4\""
+      },
+      {
+        "tag": "input",
+        "attributes": "type=\"file\"\n                        accept=\".mediflow,.json\"\n                        onChange={handleVerifyFileSelected}\n                        disabled={isLoading}\n                        data-testid=\"backup-verify-input\"\n                        className=\"hidden\""
+      }
+    ]
+  },
+  {
+    "file": "components/backup-restore-ui.tsx",
+    "line": 215,
+    "tag": "label",
+    "attributes": "className=\"mf-btn-secondary lume-press w-fit cursor-pointer\"",
+    "children": [
+      {
+        "tag": "RefreshCw",
+        "attributes": "className=\"w-4 h-4\""
+      },
+      {
+        "tag": "Upload",
+        "attributes": "className=\"w-4 h-4\""
+      },
+      {
+        "tag": "input",
+        "attributes": "type=\"file\"\n                        accept=\".mediflow,.json\"\n                        onChange={handleRestoreFileSelected}\n                        disabled={isLoading || pendingRestoreFile !== null}\n                        className=\"hidden\""
+      }
+    ]
+  },
+  {
+    "file": "components/backup-restore-ui.tsx",
+    "line": 259,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                                onClick={confirmRestore}\n                                disabled={!restoreConfirmed || isLoading}\n                                data-testid=\"restore-confirmation-submit\"\n                                className=\"ui-btn-primary mf-tone-critical inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50\"",
+    "children": [
+      {
+        "tag": "RefreshCw",
+        "attributes": "className=\"w-3.5 h-3.5\""
+      },
+      {
+        "tag": "Upload",
+        "attributes": "className=\"w-3.5 h-3.5\""
+      }
+    ]
+  },
+  {
+    "file": "components/backup-restore-ui.tsx",
+    "line": 269,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                                onClick={cancelRestore}\n                                disabled={isLoading}\n                                className=\"mf-btn-secondary inline-flex items-center px-4 py-2 text-xs font-semibold disabled:opacity-50\"",
+    "children": []
+  },
+  {
+    "file": "components/data-seeder.tsx",
+    "line": 239,
+    "tag": "button",
+    "attributes": "onClick={handleSeed}\n                disabled={loading || nuking}\n                className=\"ui-btn-primary lume-press flex w-full justify-center px-4 py-3 text-sm disabled:opacity-50\"",
+    "children": [
+      {
+        "tag": "Plus",
+        "attributes": "className=\"w-5 h-5\""
+      }
+    ]
+  },
+  {
+    "file": "components/diagnostic-hub.tsx",
+    "line": 124,
+    "tag": "button",
+    "attributes": "onClick={runAll}\n                    disabled={isRunningAll}\n                    className=\"ui-btn-primary lume-press px-5 py-2.5 disabled:cursor-not-allowed disabled:opacity-50\"",
+    "children": [
+      {
+        "tag": "Loader2",
+        "attributes": "className=\"w-4 h-4\""
+      },
+      {
+        "tag": "Play",
+        "attributes": "className=\"w-4 h-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/document-synthesis-fabric-review-card.tsx",
+    "line": 139,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                        onClick={load}\n                        disabled={!enabled || !picker.active}\n                        className=\"ui-btn-primary\"\n                        data-lume-action=\"primary\"",
+    "children": [
+      {
+        "tag": "FileSearch",
+        "attributes": "className=\"h-3.5 w-3.5\""
+      }
+    ]
+  },
+  {
+    "file": "components/document-synthesis-fabric-review-card.tsx",
+    "line": 155,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-secondary\" data-lume-action=\"quiet\" onClick={cancelPreview}",
+    "children": []
+  },
+  {
+    "file": "components/document-synthesis-fabric-review-card.tsx",
+    "line": 158,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                        onClick={cancelPreview}\n                        className=\"ui-btn-secondary\"\n                        data-lume-action=\"quiet\"",
+    "children": [
+      {
+        "tag": "RotateCcw",
+        "attributes": "className=\"h-3.5 w-3.5\""
+      }
+    ]
+  },
+  {
+    "file": "components/document-synthesis-fabric-review-card.tsx",
+    "line": 199,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-primary\" data-lume-action=\"primary\" disabled={!enabled || !confirmed || !ambulatory || !picker.canGenerate} onClick={run}",
+    "children": []
+  },
+  {
+    "file": "components/document-synthesis-fabric-review-card.tsx",
+    "line": 200,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-secondary\" data-lume-action=\"quiet\" onClick={cancelPreview}",
+    "children": []
+  },
+  {
+    "file": "components/document-viewer-canvas.tsx",
+    "line": 76,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"mf-btn-secondary\" disabled={status !== 'ready' || page <= 1}\n                    onClick={() => setPage((value) => value - 1)}",
+    "children": []
+  },
+  {
+    "file": "components/document-viewer-canvas.tsx",
+    "line": 79,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"mf-btn-secondary\" disabled={status !== 'ready' || !count || page >= count}\n                    onClick={() => setPage((value) => value + 1)}",
+    "children": []
+  },
+  {
+    "file": "components/document-viewer-canvas.tsx",
+    "line": 84,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"mf-btn-secondary mt-2\" onClick={cancel}",
+    "children": []
+  },
+  {
+    "file": "components/document-viewer-canvas.tsx",
+    "line": 88,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"mf-btn-secondary mt-3\" onClick={() => setAttempt((value) => value + 1)}",
+    "children": []
+  },
+  {
+    "file": "components/document-viewer.tsx",
+    "line": 23,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"mf-btn-secondary\" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}",
+    "children": []
+  },
+  {
+    "file": "components/document-viewer.tsx",
+    "line": 25,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"mf-btn-secondary\" disabled={page >= window.count} onClick={() => setPage((value) => value + 1)}",
+    "children": []
+  },
+  {
+    "file": "components/document-viewer.tsx",
+    "line": 72,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"mf-btn-secondary mt-3\" onClick={() => setAttempt((value) => value + 1)}",
+    "children": []
+  },
+  {
+    "file": "components/headless-soap-approval-dialog.tsx",
+    "line": 37,
+    "tag": "Button",
+    "attributes": "type=\"button\"\n                    disabled={status !== 'ready'}\n                    onClick={onExplicitGesture}",
+    "children": []
+  },
+  {
+    "file": "components/observation-manager.tsx",
+    "line": 467,
+    "tag": "button",
+    "attributes": "type=\"submit\"\n                        disabled={isSaving || value.trim().length === 0 || !code || !unitCode}\n                        className=\"ui-btn-primary inline-flex h-10 items-center gap-1.5 px-4 text-sm font-semibold disabled:opacity-50\"",
+    "children": [
+      {
+        "tag": "Plus",
+        "attributes": "className=\"w-4 h-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/patient-action-modal.tsx",
+    "line": 156,
+    "tag": "Button",
+    "attributes": "variant=\"secondary\" onClick={onClose}",
+    "children": []
+  },
+  {
+    "file": "components/patient-action-modal.tsx",
+    "line": 159,
+    "tag": "Button",
+    "attributes": "type=\"submit\"\n                        disabled={isSubmitting}\n                        className=\"inline-flex items-center gap-2\"\n                        style={{ background: accentVar }}",
+    "children": [
+      {
+        "tag": "Trash2",
+        "attributes": "className=\"w-4 h-4\""
+      },
+      {
+        "tag": "Check",
+        "attributes": "className=\"w-4 h-4\""
+      },
+      {
+        "tag": "Archive",
+        "attributes": "className=\"w-4 h-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/patient-document-import-review.tsx",
+    "line": 535,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                    onClick={() => onApply(applyPatientDocumentReview(localDraft))}\n                    className=\"ui-btn-primary\"",
+    "children": [
+      {
+        "tag": "CheckCircle2",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/patient-edit-form.tsx",
+    "line": 121,
+    "tag": "button",
+    "attributes": "type=\"button\" onClick={() => void save()} disabled={busy} className=\"mf-btn-secondary\"",
+    "children": []
+  },
+  {
+    "file": "components/patient-edit-form.tsx",
+    "line": 126,
+    "tag": "button",
+    "attributes": "type=\"button\" onClick={() => void reload()} disabled={busy} className=\"mf-btn-secondary\"",
+    "children": []
+  },
+  {
+    "file": "components/patient-form.tsx",
+    "line": 55,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                            onClick={() => remove(index)}\n                            className=\"absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity mf-btn-secondary p-2 z-10\"\n                            aria-label=\"Rimuovi diagnosi\"",
+    "children": [
+      {
+        "tag": "Trash2",
+        "attributes": "className=\"w-4 h-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/patient-form.tsx",
+    "line": 142,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                onClick={() => append({ code: '', description: '', system: 'ICD-11', date: new Date() })}\n                className=\"mf-btn-secondary w-full md:w-auto\"",
+    "children": [
+      {
+        "tag": "Plus",
+        "attributes": "className=\"w-4 h-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/patient-form.tsx",
+    "line": 175,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                            onClick={() => removeField(index)}\n                            className=\"absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity mf-btn-secondary p-2 z-10\"\n                            aria-label=\"Rimuovi pianificazione\"",
+    "children": [
+      {
+        "tag": "Trash2",
+        "attributes": "className=\"w-4 h-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/patient-form.tsx",
+    "line": 225,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                onClick={() => append({ date: new Date(), title: '', notes: '', status: 'pending', source: 'manual' })}\n                className=\"mf-btn-secondary w-full md:w-auto\"",
+    "children": [
+      {
+        "tag": "Plus",
+        "attributes": "className=\"w-4 h-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/patient-form.tsx",
+    "line": 538,
+    "tag": "button",
+    "attributes": "type=\"submit\"\n                    disabled={disabled || submitting}\n                    className=\"ui-btn-primary w-full md:w-auto px-8 py-3.5 disabled:cursor-not-allowed disabled:opacity-50\"",
+    "children": [
+      {
+        "tag": "Save",
+        "attributes": "className=\"w-5 h-5\""
+      }
+    ]
+  },
+  {
+    "file": "components/patient-profile-review-pilot.tsx",
+    "line": 200,
+    "tag": "Button",
+    "attributes": "onClick={() => void recover(value.expected)}",
+    "children": []
+  },
+  {
+    "file": "components/patient-profile-review-pilot.tsx",
+    "line": 220,
+    "tag": "Button",
+    "attributes": "onClick={() => void prepare(value.draft)}",
+    "children": []
+  },
+  {
+    "file": "components/patient-profile-review-pilot.tsx",
+    "line": 234,
+    "tag": "Button",
+    "attributes": "disabled={!pin} onClick={() => void confirm(value.view)}",
+    "children": []
+  },
+  {
+    "file": "components/patient-profile-review-pilot.tsx",
+    "line": 235,
+    "tag": "Button",
+    "attributes": "variant=\"secondary\" onClick={() => { retire(); setValue(unavailable); }}",
+    "children": []
+  },
+  {
+    "file": "components/patient-profile-review-pilot.tsx",
+    "line": 239,
+    "tag": "Button",
+    "attributes": "variant=\"secondary\" onClick={() => { retire(); setAttempt(value => value + 1); }}",
+    "children": []
+  },
+  {
+    "file": "components/patient-smart-import-fabric-preview-card.tsx",
+    "line": 42,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-secondary\" disabled={!enabled || !picker.active} onClick={load}",
+    "children": []
+  },
+  {
+    "file": "components/patient-smart-import-fabric-preview-card.tsx",
+    "line": 58,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-primary\" disabled={!enabled || !ambulatory || !confirmed || !picker.canGenerate} onClick={run}",
+    "children": []
+  },
+  {
+    "file": "components/patient-smart-import-fabric-preview-card.tsx",
+    "line": 59,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-secondary\" onClick={reset}",
+    "children": []
+  },
+  {
+    "file": "components/patient-smart-import-fabric-preview-card.tsx",
+    "line": 91,
+    "tag": "button",
+    "attributes": "className=\"ui-btn-secondary mt-2\" type=\"button\" onClick={() => { picker.client.reset(picker.active); reset(); }}",
+    "children": []
+  },
+  {
+    "file": "components/prosthetic-prescription-manager.tsx",
+    "line": 216,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                onClick={() => setIsFormOpen((value) => !value)}\n                className=\"ui-btn-primary h-10 px-4 text-sm font-semibold\"",
+    "children": [
+      {
+        "tag": "Plus",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/prosthetic-prescription-manager.tsx",
+    "line": 329,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-secondary h-10 px-4 text-sm\" onClick={() => setIsFormOpen(false)}",
+    "children": []
+  },
+  {
+    "file": "components/prosthetic-prescription-manager.tsx",
+    "line": 330,
+    "tag": "button",
+    "attributes": "type=\"submit\" className=\"ui-btn-primary h-10 px-4 text-sm\" disabled={isSaving}",
+    "children": [
+      {
+        "tag": "LoaderCircle",
+        "attributes": "className=\"h-4 w-4 animate-spin\""
+      },
+      {
+        "tag": "Plus",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/prosthetic-prescription-manager.tsx",
+    "line": 379,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-secondary h-9 px-3 text-xs\" onClick={() => void markTested(item)}",
+    "children": [
+      {
+        "tag": "CheckCircle2",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/prosthetic-prescription-manager.tsx",
+    "line": 384,
+    "tag": "button",
+    "attributes": "type=\"button\" aria-label={`Elimina ${item.description}`} className=\"ui-btn-secondary h-9 px-3 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]\" onClick={() => void deleteItem(item)}",
+    "children": [
+      {
+        "tag": "Trash2",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/prosthetics-source-documents.tsx",
+    "line": 43,
+    "tag": "button",
+    "attributes": "type=\"button\" style={{ minHeight: 'var(--lume-control-height, 44px)' }} className=\"ui-btn-secondary\" disabled={!file || busy} onClick={() => void attach()}",
+    "children": []
+  },
+  {
+    "file": "components/prosthetics-source-documents.tsx",
+    "line": 61,
+    "tag": "button",
+    "attributes": "type=\"button\" style={{ minHeight: 'var(--lume-control-height, 44px)' }} className=\"ui-btn-secondary\" onClick={() => void refresh().catch(() => setMessage('Fonti non leggibili. Riprova.'))}",
+    "children": []
+  },
+  {
+    "file": "components/recovery-backup-ui.tsx",
+    "line": 16,
+    "tag": "button",
+    "attributes": "className=\"ui-btn-primary\" disabled={!allowed || busy} onClick={async () => {\n                setBusy(true); setMessage('Creazione in corso…');\n                try {\n                    const bytes = await recoveryBackup();\n                    if (!bytes) throw new Error();\n                    const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' }));\n                    const link = document.createElement('a'); link.href = url;\n                    link.download = `mediflow-recovery-${new Date().toISOString().slice(0, 10)}.mediflow-recovery`; link.click();\n                    URL.revokeObjectURL(url);\n                    setMessage('Backup creato. Seleziona il file per verificarne la cifratura e conserva una copia fuori da questo computer, con il kit corrispondente. Non è ancora stato provato un ripristino.');\n                } catch { setMessage('Backup non creato. Rinnova l’accesso e verifica che archivio e kit siano disponibili.'); }\n                finally { setBusy(false); }\n            }}",
+    "children": []
+  },
+  {
+    "file": "components/recovery-backup-ui.tsx",
+    "line": 29,
+    "tag": "label",
+    "attributes": "className=\"mf-btn-secondary\"",
+    "children": [
+      {
+        "tag": "input",
+        "attributes": "type=\"file\" accept=\".mediflow-recovery\" disabled={!allowed || busy} data-testid=\"recovery-backup-verify\" className=\"sr-only\" onChange={async event => {\n                    const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (!file || busy) return;\n                    setBusy(true); setMessage('Verifica in corso…');\n                    try {\n                        if (file.size > MAX_RECOVERY_BACKUP_BYTES) throw new Error();\n                        await recoveryBackup(new Uint8Array(await file.arrayBuffer()));\n                        setMessage('Cifratura e integrità del file verificate con la chiave sbloccata. Il ripristino non è ancora provato: serve una prova su un archivio vuoto, con kit e chiave cartacea.');\n                    } catch { setMessage('File non verificato: è incompleto, alterato o appartiene a un’altra chiave. Non usarlo per recuperare l’archivio.'); }\n                    finally { setBusy(false); }\n                }}"
+      }
+    ]
+  },
+  {
+    "file": "components/service-prescription-manager.tsx",
+    "line": 416,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                onClick={() => setIsFormOpen((value) => !value)}\n                className=\"ui-btn-primary h-10 px-4 text-sm font-semibold\"",
+    "children": [
+      {
+        "tag": "Plus",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/service-prescription-manager.tsx",
+    "line": 649,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                            className=\"ui-btn-secondary h-10 px-4 text-sm\"\n                            onClick={() => setIsFormOpen(false)}",
+    "children": []
+  },
+  {
+    "file": "components/service-prescription-manager.tsx",
+    "line": 656,
+    "tag": "button",
+    "attributes": "type=\"submit\"\n                            className=\"ui-btn-primary h-10 px-4 text-sm\"\n                            disabled={isSaving}",
+    "children": [
+      {
+        "tag": "LoaderCircle",
+        "attributes": "className=\"h-4 w-4 animate-spin\""
+      },
+      {
+        "tag": "Plus",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/service-prescription-manager.tsx",
+    "line": 791,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                                                className=\"ui-btn-secondary h-9 px-3 text-xs\"\n                                                onClick={() => void markBooked(item)}",
+    "children": [
+      {
+        "tag": "CalendarClock",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/service-prescription-manager.tsx",
+    "line": 801,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                                                className=\"ui-btn-secondary h-9 px-3 text-xs\"\n                                                onClick={() => void markPerformed(item)}",
+    "children": [
+      {
+        "tag": "CalendarCheck",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/service-prescription-manager.tsx",
+    "line": 811,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                                                className=\"ui-btn-secondary h-9 px-3 text-xs\"\n                                                onClick={() => void markReportReceived(item)}",
+    "children": [
+      {
+        "tag": "CheckCircle2",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/service-prescription-manager.tsx",
+    "line": 821,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                                                className=\"ui-btn-secondary h-9 px-3 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]\"\n                                                onClick={() => void cancelItem(item)}",
+    "children": [
+      {
+        "tag": "XCircle",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/service-prescription-manager.tsx",
+    "line": 831,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                                                className=\"ui-btn-secondary h-9 px-3 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]\"\n                                                onClick={() => void deleteItem(item)}\n                                                aria-label=\"Elimina voce\"",
+    "children": [
+      {
+        "tag": "Trash2",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/settings/aifa-catalog-manager.tsx",
+    "line": 109,
+    "tag": "Button",
+    "attributes": "onClick={() => void update()} disabled={writeDisabled || !remote.status?.networkAllowed}\n                        className=\"w-full\" style={AIFA_COMMAND_STYLE}",
+    "children": []
+  },
+  {
+    "file": "components/settings/aifa-catalog-manager.tsx",
+    "line": 127,
+    "tag": "Button",
+    "attributes": "variant=\"secondary\" style={AIFA_COMMAND_STYLE} disabled={state.phase === 'cancelling'} onClick={() => guide.current?.cancel()}",
+    "children": []
+  },
+  {
+    "file": "components/settings/aifa-catalog-manager.tsx",
+    "line": 128,
+    "tag": "Button",
+    "attributes": "variant=\"secondary\" style={AIFA_COMMAND_STYLE} disabled={busy} onClick={() => void guide.current?.refresh()}",
+    "children": []
+  },
+  {
+    "file": "components/settings/aifa-catalog-manager.tsx",
+    "line": 229,
+    "tag": "Button",
+    "attributes": "variant=\"secondary\" style={AIFA_COMMAND_STYLE}\n                        onClick={handleClearDrugs}\n                        disabled={writeDisabled}\n                        className=\"text-[color:var(--lume-signal-critical)]\"",
+    "children": [
+      {
+        "tag": "AlertTriangle",
+        "attributes": "className=\"w-3 h-3\""
+      }
+    ]
+  },
+  {
+    "file": "components/settings/aifa-catalog-quick-update.tsx",
+    "line": 23,
+    "tag": "Button",
+    "attributes": "variant=\"secondary\" className=\"type-strong\"\n            disabled={busy || remote.checking || state.reconciliationRequired}\n            onClick={() => void guide.current?.update(async message => (await confirm({\n                title: 'Confermare la riduzione del catalogo?', message,\n                confirmLabel: 'Conferma riduzione', tone: 'danger',\n            })).confirmed)}",
+    "children": []
+  },
+  {
+    "file": "components/settings/aifa-catalog-quick-update.tsx",
+    "line": 30,
+    "tag": "Button",
+    "attributes": "variant=\"secondary\" disabled={busy} onClick={() => void guide.current?.refresh()}",
+    "children": []
+  },
+  {
+    "file": "components/settings/exemption-db-manager.tsx",
+    "line": 127,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-primary min-h-11\" disabled={busy || !accepted} onClick={() => void run(commit)}",
+    "children": []
+  },
+  {
+    "file": "components/settings/exemption-db-manager.tsx",
+    "line": 141,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-secondary min-h-11\" disabled={busy} onClick={() => void run(() => makePreview(source))}",
+    "children": []
+  },
+  {
+    "file": "components/settings/exemption-db-manager.tsx",
+    "line": 142,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-secondary min-h-11\" disabled={busy} onClick={() => void run(() => reread())}",
+    "children": []
+  },
+  {
+    "file": "components/settings/update-awareness-panel.tsx",
+    "line": 100,
+    "tag": "a",
+    "attributes": "href={status.updateUrl} target=\"_blank\" rel=\"noreferrer\" className=\"ui-btn-primary lume-press px-3 py-2 text-xs\"",
+    "children": [
+      {
+        "tag": "ExternalLink",
+        "attributes": "className=\"h-3.5 w-3.5\""
+      }
+    ]
+  },
+  {
+    "file": "components/settings/update-awareness-panel.tsx",
+    "line": 105,
+    "tag": "button",
+    "attributes": "onClick={dismiss} className=\"mf-btn-secondary lume-press border-amber-200 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/20 dark:text-amber-200\"",
+    "children": []
+  },
+  {
+    "file": "components/siss-handoff-diary.tsx",
+    "line": 195,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                onClick={() => setIsFormOpen((value) => !value)}\n                className=\"ui-btn-primary h-10 px-4 text-sm font-semibold\"",
+    "children": [
+      {
+        "tag": "Plus",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/siss-handoff-diary.tsx",
+    "line": 303,
+    "tag": "button",
+    "attributes": "type=\"submit\" disabled={isSaving} className=\"ui-btn-primary h-10 px-4 text-sm font-semibold\"",
+    "children": [
+      {
+        "tag": "LoaderCircle",
+        "attributes": "className=\"h-4 w-4 animate-spin\""
+      },
+      {
+        "tag": "Plus",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/therapy-manager.tsx",
+    "line": 408,
+    "tag": "button",
+    "attributes": "onClick={startAdding}\n            disabled={!!deleteRecovery || statusChange.blocked}\n            className=\"ui-btn-primary\"",
+    "children": [
+      {
+        "tag": "Plus",
+        "attributes": "className=\"w-4 h-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/therapy-manager.tsx",
+    "line": 665,
+    "tag": "button",
+    "attributes": "type=\"submit\" disabled={isSaving || !!recovery || draft?.patientId !== patientId} className=\"ui-btn-primary inline-flex h-10 items-center gap-1.5 px-4 text-sm font-semibold disabled:opacity-50\"",
+    "children": []
+  },
+  {
+    "file": "components/therapy-manager.tsx",
+    "line": 724,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-primary\" disabled={statusConfirmation.checking} onClick={() => statusChange.recheck()}",
+    "children": []
+  },
+  {
+    "file": "components/therapy-manager.tsx",
+    "line": 756,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"mf-btn-secondary\" onClick={() => statusChange.cancel()}",
+    "children": []
+  },
+  {
+    "file": "components/therapy-manager.tsx",
+    "line": 757,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-primary\" onClick={() => statusChange.confirm()}",
+    "children": []
+  },
+  {
+    "file": "components/therapy-manager.tsx",
+    "line": 758,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-primary\" disabled={statusConfirmation.writePending} onClick={() => statusChange.reread()}",
+    "children": []
+  },
+  {
+    "file": "components/timeline-entry-card.tsx",
+    "line": 183,
+    "tag": "button",
+    "attributes": "onClick={() => onRestore(entry)}\n                                    className=\"mf-btn-secondary !p-1.5 !text-[color:var(--lume-signal-success)]\"\n                                    title=\"Ripristina\"\n                                    aria-label=\"Ripristina voce clinica\"",
+    "children": [
+      {
+        "tag": "Undo",
+        "attributes": "className=\"w-4 h-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/timeline-entry-card.tsx",
+    "line": 194,
+    "tag": "button",
+    "attributes": "onClick={() => onDelete(entry)}\n                                    className=\"mf-btn-secondary !border-transparent !bg-transparent !p-1.5 !text-[color:var(--lume-ink-muted)] hover:!text-[color:var(--lume-signal-critical)]\"\n                                    title=\"Elimina con motivazione\"\n                                    aria-label=\"Elimina voce clinica con motivazione\"",
+    "children": [
+      {
+        "tag": "Trash2",
+        "attributes": "className=\"w-4 h-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/ui/confirm-dialog.tsx",
+    "line": 100,
+    "tag": "button",
+    "attributes": "onClick={() => close({ confirmed: false })} className=\"mf-btn-secondary !p-2 !rounded-full\" aria-label=\"Chiudi\"",
+    "children": [
+      {
+        "tag": "X",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/ui/confirm-dialog.tsx",
+    "line": 127,
+    "tag": "button",
+    "attributes": "type=\"button\" onClick={() => close({ confirmed: false })} className=\"mf-btn-secondary\"",
+    "children": []
+  },
+  {
+    "file": "components/ui/confirm-dialog.tsx",
+    "line": 130,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                                    disabled={reasonMissing}\n                                    onClick={() => close({ confirmed: true, reason: options.requireReason ? reason.trim() : undefined })}\n                                    className=\"ui-btn-primary px-5 py-2.5 disabled:opacity-50\"\n                                    style={isDanger ? { background: 'var(--lume-signal-critical)' } : undefined}",
+    "children": []
+  },
+  {
+    "file": "components/ui/modal.tsx",
+    "line": 108,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                            onClick={onClose}\n                            className=\"mf-btn-secondary !rounded-full !p-2\"\n                            aria-label=\"Chiudi\"\n                            title=\"Chiudi\"",
+    "children": [
+      {
+        "tag": "X",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "components/who-code-check.tsx",
+    "line": 24,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-secondary min-h-11\" disabled={!isWhoCheckCode(code) || state.kind === 'running'} onClick={() => void verify()}",
+    "children": []
+  },
+  {
+    "file": "app/mockups/commands/page.tsx",
+    "line": 11,
+    "tag": "Button",
+    "attributes": "variant=\"icon\" aria-label={disabled ? 'Apri altre azioni (non disponibile)' : 'Apri altre azioni'} disabled={disabled} onClick={onClick}",
+    "children": [
+      {
+        "tag": "span",
+        "attributes": "aria-hidden=\"true\""
+      }
+    ]
+  },
+  {
+    "file": "app/mockups/commands/page.tsx",
+    "line": 12,
+    "tag": "Button",
+    "attributes": "variant={role} disabled={disabled} onClick={onClick}",
+    "children": []
+  },
+  {
+    "file": "app/mockups/commands/page.tsx",
+    "line": 35,
+    "tag": "Button",
+    "attributes": "variant=\"destructive\" confirmation data-testid=\"command-confirmation\" onClick={activate}",
+    "children": []
+  },
+  {
+    "file": "app/mockups/commands/page.tsx",
+    "line": 40,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-primary\" onClick={activate}",
+    "children": []
+  },
+  {
+    "file": "app/mockups/commands/page.tsx",
+    "line": 41,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"mf-btn-secondary\" onClick={activate}",
+    "children": []
+  },
+  {
+    "file": "app/mockups/commands/page.tsx",
+    "line": 42,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-secondary\" onClick={activate}",
+    "children": []
+  },
+  {
+    "file": "app/mockups/commands/page.tsx",
+    "line": 43,
+    "tag": "Button",
+    "attributes": "variant=\"ghost\" onClick={activate}",
+    "children": []
+  },
+  {
+    "file": "app/mockups/commands/page.tsx",
+    "line": 44,
+    "tag": "button",
+    "attributes": "type=\"button\" className=\"ui-btn-primary mf-tone-critical\" data-testid=\"command-legacy-critical\" onClick={activate}",
+    "children": []
+  },
+  {
+    "file": "app/mockups/scheda/page.tsx",
+    "line": 96,
+    "tag": "button",
+    "attributes": "className=\"ui-btn-primary flex h-11 w-full items-center justify-center gap-2 px-4 text-sm font-semibold\"",
+    "children": [
+      {
+        "tag": "Plus",
+        "attributes": "className=\"h-4 w-4\""
+      }
+    ]
+  },
+  {
+    "file": "app/patients/[id]/edit/page.tsx",
+    "line": 232,
+    "tag": "button",
+    "attributes": "onClick={handleRestore}\n                                className=\"mf-btn-secondary mt-4 !text-[color:var(--lume-signal-warning)]\"",
+    "children": [
+      {
+        "tag": "RotateCcw",
+        "attributes": "className=\"w-3.5 h-3.5\""
+      }
+    ]
+  },
+  {
+    "file": "app/patients/[id]/edit/page.tsx",
+    "line": 267,
+    "tag": "button",
+    "attributes": "type=\"button\"\n                                onClick={() => {\n                                    setActionType('export');\n                                    setIsActionModalOpen(true);\n                                }}\n                                className=\"mf-btn-secondary flex-1 lg:flex-none\"",
+    "children": [
+      {
+        "tag": "Download",
+        "attributes": "className=\"w-4 h-4\""
+      }
+    ]
+  },
+  {
+    "file": "app/patients/[id]/edit/page.tsx",
+    "line": 280,
+    "tag": "button",
+    "attributes": "onClick={() => {\n                                        setActionType('archive');\n                                        setIsActionModalOpen(true);\n                                    }}\n                                    className=\"mf-btn-secondary flex-1 !text-[color:var(--lume-signal-warning)] lg:flex-none\"",
+    "children": [
+      {
+        "tag": "Archive",
+        "attributes": "className=\"w-4 h-4\""
+      }
+    ]
+  },
+  {
+    "file": "app/patients/[id]/edit/page.tsx",
+    "line": 291,
+    "tag": "button",
+    "attributes": "onClick={handleRestore}\n                                    className=\"mf-btn-secondary flex-1 !text-[color:var(--lume-signal-success)] lg:flex-none\"",
+    "children": [
+      {
+        "tag": "RotateCcw",
+        "attributes": "className=\"w-4 h-4\""
+      }
+    ]
+  },
+  {
+    "file": "app/patients/[id]/edit/page.tsx",
+    "line": 299,
+    "tag": "button",
+    "attributes": "onClick={() => {\n                                    setActionType('delete');\n                                    setIsActionModalOpen(true);\n                                }}\n                                className=\"ui-btn-primary mf-tone-critical flex-1 px-6 py-3 lg:flex-none\"",
+    "children": [
+      {
+        "tag": "Trash2",
+        "attributes": "className=\"w-4 h-4\""
+      }
+    ]
+  },
+  {
+    "file": "app/patients/[id]/entries/new/page.tsx",
+    "line": 880,
+    "tag": "button",
+    "attributes": "type=\"submit\"\n                        disabled={isSubmitting}\n                        data-lume-primary=\"true\"\n                        className={cn(\"ui-btn-primary px-8 py-3 disabled:cursor-not-allowed disabled:opacity-50\", proposal && composerStyles.saveButton)}",
+    "children": [
+      {
+        "tag": "Loader2",
+        "attributes": "className=\"h-5 w-5 animate-spin\""
+      },
+      {
+        "tag": "span",
+        "attributes": ""
+      },
+      {
+        "tag": "Save",
+        "attributes": "className=\"h-5 w-5\""
+      },
+      {
+        "tag": "span",
+        "attributes": ""
+      }
+    ]
+  },
+  {
+    "file": "app/scales/page.tsx",
+    "line": 134,
+    "tag": "span",
+    "attributes": "className={proposal ? styles.catalogCount : 'lume-registro mf-btn-secondary w-fit'}",
+    "children": []
+  },
+  {
+    "file": "app/settings/ambulatories/page.tsx",
+    "line": 250,
+    "tag": "button",
+    "attributes": "onClick={handleCreate}\n                            disabled={!newName || isCreating}\n                            className=\"ui-btn-primary flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 text-sm whitespace-nowrap min-w-[120px] justify-center\"",
+    "children": [
+      {
+        "tag": "Loader2",
+        "attributes": "className=\"w-4 h-4\""
+      },
+      {
+        "tag": "Plus",
+        "attributes": "className=\"w-4 h-4 mr-2\""
+      }
+    ]
+  },
+  {
+    "file": "app/settings/sviluppo/page.tsx",
+    "line": 53,
+    "tag": "button",
+    "attributes": "onClick={openNativeApp}\n                            disabled={nativeLaunchState === 'loading'}\n                            className=\"mf-btn-secondary lume-press disabled:text-[color:var(--lume-ink-muted)]\"",
+    "children": []
+  }
+]

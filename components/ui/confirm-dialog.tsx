@@ -131,8 +131,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                                     type="button"
                                     disabled={reasonMissing}
                                     onClick={() => close({ confirmed: true, reason: options.requireReason ? reason.trim() : undefined })}
-                                    className="ui-btn-primary px-5 py-2.5 disabled:opacity-50"
-                                    style={isDanger ? { background: 'var(--lume-signal-critical)' } : undefined}
+                                    className={isDanger ? "mf-button-destructive px-5 py-2.5" : "ui-btn-primary px-5 py-2.5 disabled:opacity-50"}
+                                    data-command-confirmation={isDanger ? 'true' : undefined}
                                 >
                                     {options.confirmLabel ?? 'Conferma'}
                                 </button>

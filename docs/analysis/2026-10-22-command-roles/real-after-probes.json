@@ -1,0 +1,82 @@
+[
+  {
+    "theme": "giorno",
+    "width": 1440,
+    "position": {
+      "position": "relative",
+      "padding": "8px 16px",
+      "width": 50,
+      "height": 40,
+      "offsetX": 24,
+      "offsetY": 6.390625
+    },
+    "disabled": {
+      "color": "rgb(85, 94, 107)",
+      "background": "rgb(163, 58, 47)",
+      "opacity": "0.55"
+    },
+    "file": "real-after-rimozione-diagnosi-giorno-1440.png"
+  },
+  {
+    "theme": "grafite",
+    "width": 1440,
+    "position": {
+      "position": "relative",
+      "padding": "8px 16px",
+      "width": 50,
+      "height": 40,
+      "offsetX": 24,
+      "offsetY": 6.390625
+    },
+    "disabled": {
+      "color": "rgb(163, 172, 184)",
+      "background": "rgb(240, 138, 125)",
+      "opacity": "0.55"
+    },
+    "file": "real-after-rimozione-diagnosi-grafite-1440.png"
+  },
+  {
+    "theme": "giorno",
+    "width": 768,
+    "position": {
+      "position": "relative",
+      "padding": "8px 16px",
+      "width": 50,
+      "height": 40,
+      "offsetX": 24,
+      "offsetY": 6.390625
+    },
+    "disabled": {
+      "color": "rgb(85, 94, 107)",
+      "background": "rgb(163, 58, 47)",
+      "opacity": "0.55"
+    },
+    "file": "real-after-rimozione-diagnosi-giorno-768.png"
+  },
+  {
+    "theme": "grafite",
+    "width": 768,
+    "position": {
+      "position": "relative",
+      "padding": "8px 16px",
+      "width": 50,
+      "height": 40,
+      "offsetX": 24,
+      "offsetY": 6.390625
+    },
+    "disabled": {
+      "color": "rgb(163, 172, 184)",
+      "background": "rgb(240, 138, 125)",
+      "opacity": "0.55"
+    },
+    "file": "real-after-rimozione-diagnosi-grafite-768.png"
+  },
+  {
+    "ring": {
+      "position": "absolute",
+      "pointerEvents": "none",
+      "parentOverflow": "hidden",
+      "ariaHidden": "true"
+    }
+  }
+]

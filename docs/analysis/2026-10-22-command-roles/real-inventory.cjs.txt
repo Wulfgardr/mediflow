@@ -1,0 +1,6 @@
+const ts=require('typescript'),fs=require('fs'),path=require('path');
+function files(d){return fs.readdirSync(d,{withFileTypes:true}).flatMap(e=>e.isDirectory()?files(path.join(d,e.name)):e.name.endsWith('.tsx')?[path.join(d,e.name)]:[])}
+let result=[];
+for(const f of [...files('components'),...files('app')]){const s=fs.readFileSync(f,'utf8'),ast=ts.createSourceFile(f,s,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);function walk(n){if(ts.isJsxElement(n)||ts.isJsxSelfClosingElement(n)){const o=ts.isJsxElement(n)?n.openingElement:n,tag=o.tagName.getText(ast),attrs=o.attributes.getText(ast);if(tag==='Button'||(/\b(ui-btn-primary|mf-btn-secondary|ui-btn-secondary)\b/.test(attrs))){let children=[];function child(c){if(c!==n&&(ts.isJsxElement(c)||ts.isJsxSelfClosingElement(c))){const o=ts.isJsxElement(c)?c.openingElement:c;children.push({tag:o.tagName.getText(ast),attributes:o.attributes.getText(ast)})}ts.forEachChild(c,child)}child(n);result.push({file:f,line:ast.getLineAndCharacterOfPosition(n.getStart(ast)).line+1,tag,attributes:attrs,children});}}ts.forEachChild(n,walk)}walk(ast)}
+fs.writeFileSync('docs/analysis/2026-10-22-command-roles/real-button-inventory.json',JSON.stringify(result,null,2)+'\n');
+console.log('sites',result.length,'child component tags',[...new Set(result.flatMap(r=>r.children.map(c=>c.tag)))].sort());
