@@ -1,0 +1,34 @@
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+import { bootstrapUnlockedSession, openPatientSection } from '../e2e/utils';
+import { seedDemoData } from './seed';
+const out=process.env.REAL_COMMAND_OUT!,phase=process.env.REAL_COMMAND_PHASE!;
+test('verifica mirata regressioni e figli assoluti', async ({page})=>{
+ test.setTimeout(150_000);
+ await bootstrapUnlockedSession(page,'1234');await seedDemoData(page);
+ const rows:any[]=[];
+ for(const width of [1440,768])for(const theme of ['giorno','grafite']){
+  await page.setViewportSize({width,height:1800});await page.emulateMedia({colorScheme:theme==='giorno'?'light':'dark',reducedMotion:'reduce'});
+  await page.goto('/patients/readme-shots-giulia-fervi/edit');await page.waitForLoadState('networkidle');
+  await page.evaluate(theme=>{document.documentElement.classList.remove('light','dark');document.documentElement.classList.add(theme==='giorno'?'light':'dark');localStorage.setItem('mediflow-theme',theme==='giorno'?'light':'dark')},theme);
+  const remove=page.getByRole('button',{name:'Rimuovi diagnosi',exact:true}).first();await expect(remove).toBeAttached();await remove.focus();
+  const position=await remove.evaluate(e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect(),p=e.parentElement!.getBoundingClientRect();return{position:s.position,padding:s.padding,width:r.width,height:r.height,offsetX:r.x-p.x,offsetY:r.y-p.y}});
+  const file=`real-${phase}-rimozione-diagnosi-${theme}-${width}.png`;await page.screenshot({path:path.join(out,file),fullPage:true,animations:'disabled'});
+  await page.goto('/patients/readme-shots-giulia-fervi/modules');await page.waitForLoadState('networkidle');await openPatientSection(page,'terapie');
+  await page.getByRole('button',{name:'Elimina Ramipril solo se inserito per errore',exact:true}).click();
+  const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();const confirm=dialog.getByRole('button',{name:'Elimina',exact:true});await expect(confirm).toBeDisabled();
+  const disabled=await confirm.evaluate(e=>{const s=getComputedStyle(e);return{color:s.color,background:s.backgroundColor,opacity:s.opacity}});
+  rows.push({theme,width,position,disabled,file});
+  await dialog.getByRole('button',{name:'Annulla',exact:true}).click();
+ }
+ if(phase==='after'){
+  await page.goto('/mockups/commands');await expect(page.getByTestId('command-roles')).toBeVisible();
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  const button=page.locator('[data-command-role="primary"] button').first();
+  await button.dispatchEvent('pointerdown', {clientX:3,clientY:3});
+  const ring=button.locator('.lume-anello');await expect(ring).toBeAttached();
+  rows.push({ring:await ring.evaluate(e=>{const s=getComputedStyle(e),b=getComputedStyle(e.parentElement!);return{position:s.position,pointerEvents:s.pointerEvents,parentOverflow:b.overflow,ariaHidden:e.getAttribute('aria-hidden')}})});
+ }
+ fs.writeFileSync(path.join(out,`real-${phase}-probes.json`),JSON.stringify(rows,null,2)+'\n');
+});

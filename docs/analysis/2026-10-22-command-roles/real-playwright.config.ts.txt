@@ -1,0 +1,3 @@
+import { defineConfig } from '@playwright/test';
+import { trustedWebRequestHeaders } from '../e2e/fixtures/trusted-web-request';
+export default defineConfig({testDir:'.',testMatch: process.env.REAL_COMMAND_PROBE ? 'probe.spec.ts' : 'capture.spec.ts',workers:1,retries:0,reporter:'list',use:{baseURL:process.env.E2E_BASE_URL,extraHTTPHeaders:trustedWebRequestHeaders(process.env.E2E_BASE_URL),headless:true,screenshot:'only-on-failure'}});
