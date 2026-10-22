@@ -1,4 +1,6 @@
 import { spawn } from 'node:child_process';
+import path from 'node:path';
+import { referenceDirectory } from './reference-location.mjs';
 import { createWriteStream } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 
@@ -18,7 +20,7 @@ async function start(file, ready, name) {
   });
 }
 try {
-  await start('../../tmp-chat-reference/serve.ts', 'Sandbox server:', 'reference-host');
+  await start(path.join(referenceDirectory, 'serve.ts'), 'Sandbox server:', 'reference-host');
   await start('scripts/reference-server.mjs', 'Reference-only MCP endpoint:', 'reference-server');
   const child = spawn(process.execPath, [process.argv.includes('--falsify') ? 'scripts/falsify-performance.mjs' : 'scripts/reference-performance.mjs',
     ...process.argv.slice(2).filter(arg => arg !== '--falsify')], { cwd: new URL('../', import.meta.url), stdio: 'inherit' });

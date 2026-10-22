@@ -53,11 +53,15 @@ auto-resize per l’avvio e i cambiamenti del contenitore. Le sole animazioni
 della vista sono dissolvenze di 120 ms, disattivate con reduced motion.
 
 `prepare:reference` scarica il basic-host ufficiale ext-apps al commit
-`92f46a574568a3ddac7600343b7d3c4c4ed7b588` in `tmp-chat-reference` alla
-radice della checkout; esegue `npm ci` dal lockfile di prova e la build
+`92f46a574568a3ddac7600343b7d3c4c4ed7b588` in una directory temporanea esterna alla
+checkout, distinta per checkout; esegue `npm ci` dal lockfile di prova e la build
 ufficiale, senza modificare sorgenti, sandbox o CSP dell’host. Il manifest
+e il lockfile sono fixture JSON senza ruolo di package nella checkout e
+vengono copiati nella directory temporanea con i nomi npm. Il manifest
 di prova aggiunge solo `cross-env` e i tipi CORS necessari alla build fuori
 dal monorepo upstream. Servono rete e porte locali 8080, 8081 e 3017 libere.
+Se una checkout contiene ancora la vecchia directory generata
+`tmp-chat-reference`, spostarla fuori dalla checkout prima dei test della guardia.
 Le due prove avviano e chiudono i propri server. Budget, metodo, compromessi
 e [misure prima/dopo](./evidence/2026-10-22-polish.md) sono riproducibili;
 non attestano prestazioni di ogni desktop o provider.
