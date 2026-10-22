@@ -21,7 +21,7 @@ on:
       - main
 
 concurrency:
-  group: e2e-${{ github.ref }}
+  group: e2e-falsification-${{ github.ref }}
   cancel-in-progress: true
 
 defaults:
