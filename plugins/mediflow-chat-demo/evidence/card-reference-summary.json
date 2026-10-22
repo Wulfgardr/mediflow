@@ -7,32 +7,99 @@
     "os": "27.2.0"
   },
   "scope": "Current broker card only. Simulated neural runner. Extended ADR workload and desktop R NOT QUALIFIED.",
-  "gzipBytes": 161386,
+  "gzipBytes": 161817,
   "preparation": {
-    "p50": 0.6374589999995806,
-    "p95": 0.8809169999994992,
-    "max": 4.970458000000008
+    "p50": 0.6503330000014103,
+    "p95": 1.0454580000000533,
+    "max": 4.215333000000101
   },
   "summaries": {
     "cold": {
-      "p50": 130.361625,
-      "p95": 141.66104200000018,
-      "max": 200.3192919999999
+      "p50": 228.76783400000022,
+      "p95": 238.22933399999965,
+      "max": 244.89116599999943
     },
     "warm": {
-      "p50": 122.53216699999939,
-      "p95": 145.8479580000021,
-      "max": 146.74991599999885
+      "p50": 224.53737600000022,
+      "p95": 233.6080409999995,
+      "max": 248.1314999999995
     }
   },
   "feedback": {
-    "p50": 22.700000002980232,
-    "p95": 27.700000002980232,
-    "max": 38.79999999701977
+    "p50": 38.70000000298023,
+    "p95": 46.3999999910593,
+    "max": 55.900000005960464
   },
   "interaction": {
-    "p50": 14.5,
+    "p50": 14.099999994039536,
     "p95": 15.200000002980232,
     "max": 15.400000005960464
+  },
+  "measurement": "Useful view = opening to choice + click to visible card after two animation frames; human wait excluded. Gates use usefulMs, not readyMs.",
+  "runCount": 60,
+  "adversarialScenarios": [
+    "same-frame forged prepare/share with known challenge",
+    "new turn during held preparation",
+    "new tool call during held preparation",
+    "late share after close"
+  ],
+  "acceptance": {
+    "passed": false,
+    "failedGate": "no attributable widget long task >50ms",
+    "longTasks": [
+      {
+        "start": 83.40000000596046,
+        "duration": 53,
+        "name": "self",
+        "attribution": [
+          {
+            "name": "unknown",
+            "type": "iframe",
+            "src": ""
+          }
+        ]
+      }
+    ]
+  },
+  "negativeDelivery": {
+    "injectedDelayMs": 2200,
+    "runs": 60,
+    "summaries": {
+      "cold": {
+        "p50": 2516.7599160000027,
+        "p95": 2565.420416000008,
+        "max": 2579.6172490000026
+      },
+      "warm": {
+        "p50": 2519.8117089999723,
+        "p95": 2592.725456999993,
+        "max": 2734.4041260000085
+      }
+    },
+    "rejectedBy": "warm useful view <=2s p95"
+  },
+  "choice": {
+    "cold": {
+      "p50": 137.95645799999875,
+      "p95": 139.5374579999998,
+      "max": 139.58141699999942
+    },
+    "warm": {
+      "p50": 135.7440000000006,
+      "p95": 140.6233749999992,
+      "max": 141.75004199999967
+    }
+  },
+  "delivery": {
+    "cold": {
+      "p50": 91.14758400000028,
+      "p95": 100.9233750000003,
+      "max": 106.93470800000068
+    },
+    "warm": {
+      "p50": 88.42912500000239,
+      "p95": 99.49625000000015,
+      "max": 106.38145799999984
+    }
   }
 }

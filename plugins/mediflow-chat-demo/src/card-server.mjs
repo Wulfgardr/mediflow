@@ -1,3 +1,4 @@
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { CallToolRequestSchema, ReadResourceRequestSchema, McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
@@ -11,16 +12,23 @@ export const CARD_DENIED = 'Scheda non disponibile. Apri una nuova vista e ripro
 /** @returns {import('@modelcontextprotocol/sdk/types.js').CallToolResult} */
 const fixed = text => ({ content: [{ type: 'text', text }] });
 const denied = () => ({ ...fixed(CARD_DENIED), isError: true });
-const argsSchema = z.object({ operation: z.enum(['prepare', 'share', 'revoke']), view: z.string().uuid() }).strict();
+const argsSchema = z.object({ operation: z.enum(['prepare', 'share', 'revoke']), view: z.string().uuid(), nonce: z.string().regex(/^[a-f0-9]{64}$/).optional(), gestureProof: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict();
 
 export async function createCardServer(owner) {
   const server = new McpServer({ name: 'mediflow-synthetic-card', version: '0.1.0' });
   const extensions = new OpenAIExtensions(server);
   const html = await readFile(new URL('../dist/card.html', import.meta.url), 'utf8');
-  const resource = () => ({ contents: [{ uri: CARD_URI, mimeType: RESOURCE_MIME_TYPE, text: html,
+  const binding = { view: randomUUID(), gestureKey: randomBytes(32).toString('hex') };
+  let issued = false;
+  const resource = () => {
+    if (issued) throw new McpError(ErrorCode.InvalidParams, CARD_DENIED);
+    issued = true;
+    const instanceHtml = html.replace('__CARD_VIEW__', binding.view).replace('__CARD_KEY__', binding.gestureKey);
+    return { contents: [{ uri: CARD_URI, mimeType: RESOURCE_MIME_TYPE, text: instanceHtml,
     _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] } },
       'openai/ui': { preferredDisplayMode: 'inline', availableDisplayModes: ['inline'] },
-      'openai/widgetDescription': 'Scheda sintetica in sola lettura. La condivisione richiede un gesto nella vista.' } }] });
+      'openai/widgetDescription': 'Scheda sintetica in sola lettura. La condivisione richiede un gesto nella vista.' } }] };
+  };
   registerAppResource(server, 'synthetic-card', CARD_URI, {}, resource);
   registerAppTool(server, CARD_TOOL, {
     title: 'MediFlow — scheda sintetica',
@@ -39,10 +47,13 @@ export async function createCardServer(owner) {
     const parsed = argsSchema.safeParse(args);
     if (!parsed.success) return denied();
     try {
-      const { operation, view } = parsed.data;
-      if (operation === 'prepare') { await owner.prepare(view); return fixed('Scheda sintetica pronta per la tua scelta.'); }
+      const { operation, view, nonce, gestureProof } = parsed.data;
+      if (!issued || view !== binding.view) return denied();
+      if (operation === 'prepare') { const consentNonce = await owner.prepare(view); return { ...fixed('Scheda sintetica pronta per la tua scelta.'), _meta: { consentNonce } }; }
       if (operation === 'revoke') { await owner.revoke(view); return fixed('Condivisione terminata.'); }
-      const payload = owner.share(view);
+      const expectedProof = createHmac('sha256', Buffer.from(binding.gestureKey, 'hex')).update(nonce ?? '').digest();
+      if (!gestureProof || !timingSafeEqual(Buffer.from(gestureProof, 'hex'), expectedProof)) return denied();
+      const payload = owner.share(view, nonce);
       return { ...fixed('Scheda sintetica condivisa nella vista.'), structuredContent: JSON.parse(payload) };
     } catch { return denied(); }
   });

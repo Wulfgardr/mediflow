@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { createSyntheticCardBroker } from '../../../lib/chat-card/synthetic-card-broker.ts';
 
 const fail = () => { throw new Error('synthetic_card_denied'); };
@@ -11,34 +12,40 @@ export function createCardOwner(installation) {
     generation++;
     const previous = active;
     active = undefined;
-    await previous?.broker.owner.close();
+    await previous?.broker?.owner.close();
   }
   return Object.freeze({
     async prepare(view) {
       const retired = retire();
       const epoch = generation;
-      await retired;
-      if (epoch !== generation) return fail();
-      const broker = createSyntheticCardBroker(installation);
-      const attempt = { view, broker, token: undefined, digest: undefined, expires: Date.now() + 120_000, used: false };
+      const attempt = { view, epoch, broker: undefined, token: undefined, digest: undefined, nonce: undefined, expires: 0, used: false };
       active = attempt;
       try {
+        await retired;
+        if (active !== attempt || epoch !== generation) return fail();
+        const broker = createSyntheticCardBroker(installation);
+        attempt.broker = broker;
         await broker.owner.selectPatient('basic');
         const token = await broker.owner.prepare(selection);
         const review = broker.owner.review(token);
-        if (active !== attempt || epoch !== generation || Date.now() >= attempt.expires) return fail();
+        if (active !== attempt || epoch !== generation) return fail();
         attempt.token = token; attempt.digest = review.payloadSha256;
-      } catch { await broker.owner.close(); if (active === attempt) active = undefined; return fail(); }
+        attempt.nonce = randomBytes(32).toString('hex');
+        attempt.expires = Date.now() + 30_000;
+        return attempt.nonce;
+      } catch { await attempt.broker?.owner.close(); if (active === attempt) active = undefined; return fail(); }
     },
-    share(view) {
+    share(view, nonce) {
       const attempt = active;
-      if (!attempt || attempt.view !== view || !attempt.token || !attempt.digest || attempt.used || Date.now() >= attempt.expires) return fail();
+      if (!attempt || attempt.view !== view || !attempt.token || !attempt.digest || !nonce || nonce !== attempt.nonce || attempt.epoch !== generation || attempt.used || Date.now() >= attempt.expires) return fail();
       attempt.used = true;
       const consent = attempt.broker.owner.approve(attempt.token, attempt.digest);
-      return attempt.broker.reader.takeApprovedBytes(attempt.token, consent);
+      const payload = attempt.broker.reader.takeApprovedBytes(attempt.token, consent);
+      if (active !== attempt || attempt.epoch !== generation) return fail();
+      return payload;
     },
     async revoke(view) {
-      if (active?.view === view) await retire();
+      await retire();
     },
     close: retire,
   });
