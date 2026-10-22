@@ -1,10 +1,11 @@
 'use client';
 
+import { Disclosure, DisclosureControl } from '@/components/disclosure';
 import styles from './clinical-register.module.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from '@/lib/live-query';
 import { v4 as uuidv4 } from 'uuid';
-import { ChevronDown, Minus, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { Minus, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import { ApiConflictError, db } from '@/lib/db';
 import { notifyDbChange } from '@/lib/live-query';
 import { searchStaticTerminology } from '@/lib/terminology';
@@ -101,7 +102,7 @@ export default function ObservationManager({
     const [valueError, setValueError] = useState<string | null>(null);
     const initialObservedAt = useRef(observedAt);
     const codeSelectRef = useRef<HTMLSelectElement>(null);
-    const formDisclosureRef = useRef<HTMLDetailsElement>(null);
+    const [formOpen, setFormOpen] = useState(false);
     const valueInputRef = useRef<HTMLInputElement>(null);
     /* WUL-UIUX: piu analiti possono restare aperti insieme (confronto tra
        parametri in polifarmaco); "full" espande l'intera storia oltre le ultime 5. */
@@ -137,7 +138,7 @@ export default function ObservationManager({
         setServicePrescriptionItemId(applied.servicePrescriptionItemId);
         setServicePrescriptionItem(applied.servicePrescriptionItem);
         requestAnimationFrame(() => {
-            if (formDisclosureRef.current) formDisclosureRef.current.open = true;
+            setFormOpen(true);
             valueInputRef.current?.focus();
         });
     }, [loincOptions, prefill]);
@@ -160,7 +161,7 @@ export default function ObservationManager({
     const prefillGroup = (analyteCode: string, unit: string) => {
         setCode(analyteCode);
         if (unit) setUnitCode(unit);
-        if (formDisclosureRef.current) formDisclosureRef.current.open = true;
+        setFormOpen(true);
         valueInputRef.current?.focus();
     };
 
@@ -333,8 +334,7 @@ export default function ObservationManager({
     return (
         <div className={styles.register} data-clinical-register="observations">
             {!embedded && <header className={styles.toolbar}><h2>Parametri clinici</h2></header>}
-            <details ref={formDisclosureRef} className={styles.formDisclosure}>
-                <summary>Nuova misura</summary>
+            <Disclosure open={formOpen} onOpenChange={setFormOpen} className={styles.formDisclosure} title="Nuova misura">
             <form onSubmit={saveObservation} className={styles.form + " grid grid-cols-1 gap-3 md:grid-cols-2"}>
                 {servicePrescriptionItemId && servicePrescriptionItem ? (
                     <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3.5 py-2.5">
@@ -474,7 +474,7 @@ export default function ObservationManager({
                     </button>
                 </div>
             </form>
-            </details>
+            </Disclosure>
             <div className={styles.toolbar}>
                 <h2>Ultime misure <span className={styles.muted}>{groups?.length ?? ''}</span></h2>
                 {groups && groups.length > 0 && <div role="group" aria-label="Vista parametri" className={styles.controls}>
@@ -501,9 +501,9 @@ export default function ObservationManager({
                         const delta = latestNum !== null && previousNum !== null ? latestNum - previousNum : null;
                         const flag = classifyObservationRange(latest.value, latest.refLow, latest.refHigh);
                         return <tr key={group.code} className={openGroups.has(group.code) ? styles.selected : undefined}>
-                            <td><button type="button" onClick={() => toggleGroup(group.code)} aria-expanded={openGroups.has(group.code)} aria-controls={`param-region-${group.code}`} className={styles.rowButton}>
-                                {italianLoincLabel(group.code, group.display)} <ChevronDown size={14} aria-hidden className="inline" />
-                            </button></td>
+                            <td><DisclosureControl onToggle={() => toggleGroup(group.code)} expanded={openGroups.has(group.code)} controls={`param-region-${group.code}`}>
+                                {italianLoincLabel(group.code, group.display)}
+                            </DisclosureControl></td>
                             <td className={`${styles.value} ${flag ? styles.critical : ''}`}>{latest.value} <span className={styles.muted}>{group.unitCode}</span>{flag && <small>{flag === 'alto' ? '▲ Alto' : '▼ Basso'}</small>}</td>
                             <td className={styles.muted}><time>{new Date(latest.observedAt).toLocaleDateString('it-IT')}</time></td>
                             <td className={styles.secondaryColumn}>{delta === null ? '—' : <span className="inline-flex items-center gap-1">{delta > 0 ? <TrendingUp size={14} aria-label="in aumento" /> : delta < 0 ? <TrendingDown size={14} aria-label="in calo" /> : <Minus size={14} aria-label="stabile" />}{delta > 0 ? '+' : ''}{delta.toLocaleString('it-IT')}</span>}</td>
@@ -530,7 +530,7 @@ export default function ObservationManager({
                                     </tr>;
                                 })}</tbody></table>
                                 <div className={`${styles.controls} mt-3`}><button type="button" onClick={() => prefillGroup(group.code, group.unitCode)}>Registra nuova misura</button>{group.items.length > 5 && <button type="button" onClick={() => toggleFull(group.code)}>{isFull ? 'Ultime 5' : `Tutte (${group.items.length})`}</button>}</div>
-                            </>}
+                           </>}
                         </section>;
                     })}
                 </aside>

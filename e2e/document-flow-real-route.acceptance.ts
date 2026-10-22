@@ -173,14 +173,18 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
             await expect(result).toContainText(wire.publication.output.summary);
             await expect(result.locator('dt', { hasText: 'Modello usato' }).locator('xpath=following-sibling::dd[1]')).toHaveText(scenario.expectedExecutedModel);
             await expect(card.getByTestId('model-picker-document_synthesis')).toHaveCount(0);
-            const citations = result.locator('details').filter({ has: page.locator('summary', { hasText: 'Citazioni dal documento' }) });
-            expect(await citations.getAttribute('open')).toBeNull();
-            await citations.locator('summary').click();
+            const citations = result.locator('[data-disclosure]').filter({ has: page.getByRole('button', { name: 'Citazioni dal documento' }) });
+            await expect(citations.locator(':scope > div > [data-disclosure-control]')).toHaveAttribute('aria-expanded', 'false');
+            await citations.locator(':scope > div > [data-disclosure-control]').click();
+            await expect(citations.locator(':scope > div > [data-disclosure-control]')).toHaveAttribute('aria-expanded', 'true');
+            await expect(citations.locator(':scope > div[id]')).toBeVisible();
             await expect(citations.locator('blockquote')).toHaveCount(wire.publication.citations.length);
             for (let index = 0; index < wire.publication.citations.length; index += 1) await expect(citations.locator('blockquote').nth(index)).toHaveText(wire.publication.citations[index].quote);
-            const verification = result.locator('details').filter({ has: page.locator('summary', { hasText: 'Dettagli di verifica' }) });
-            expect(await verification.getAttribute('open')).toBeNull();
-            await verification.locator('summary').click();
+            const verification = result.locator('[data-disclosure]').filter({ has: page.getByRole('button', { name: 'Dettagli di verifica' }) });
+            await expect(verification.locator(':scope > div > [data-disclosure-control]')).toHaveAttribute('aria-expanded', 'false');
+            await verification.locator(':scope > div > [data-disclosure-control]').click();
+            await expect(verification.locator(':scope > div > [data-disclosure-control]')).toHaveAttribute('aria-expanded', 'true');
+            await expect(verification.locator(':scope > div[id]')).toBeVisible();
             await expect(verification).toContainText(wire.publication.receipt.outputSha256);
             await expect(verification).toContainText('0 scritture');
             expect(synthesisCalls().map(({ path, bodyKeys }) => ({ path, bodyKeys }))).toEqual([

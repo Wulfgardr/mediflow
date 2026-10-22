@@ -100,7 +100,7 @@ test('Evidence Stack web: fixture popolata, curation, empty ed errore restano ve
 
   await openDocumentSection(page, patientId);
   const summaries = page.locator('#document-insights');
-  await summaries.locator('summary').click();
+  await summaries.locator(':scope > div > [data-disclosure-control]').click();
   const stack = page.getByTestId('document-insights-archive');
   await expect(stack.getByText(insights[0].fileName, { exact: true })).toBeVisible();
   await expect(stack.getByText(insights[1].fileName, { exact: true })).toBeVisible();
@@ -115,7 +115,8 @@ test('Evidence Stack web: fixture popolata, curation, empty ed errore restano ve
   await firstDocumentButton.click();
   await expect(firstDocumentButton).toHaveAttribute('aria-expanded', 'true');
   await expect(archive.getByText(insights[0].summary, { exact: true })).toBeVisible();
-  await archive.getByText('Testo sorgente archiviato', { exact: true }).click();
+  const selectedContent = page.locator(`[id="${await firstDocumentButton.getAttribute('aria-controls')}"]`);
+  await selectedContent.getByRole('button', { name: 'Testo sorgente archiviato', exact: true }).click();
   await expect(archive.getByText(insights[0].rawMarkdown, { exact: true })).toBeVisible();
   const removeFirst = archive.getByRole('button', { name: `Rimuovi ${insights[0].fileName} dall'archivio intelligente` });
   await assertKeyboardFocusProgresses(page, removeFirst, 'rimozione singolo documento Evidence Stack');
@@ -142,7 +143,7 @@ test('Evidence Stack web: fixture popolata, curation, empty ed errore restano ve
     }
     await route.continue();
   });
-  await page.locator('#document-insights > summary').click();
+  await page.locator('#document-insights > div > [data-disclosure-control]').click();
   const errorArchive = page.getByTestId('document-insights-archive');
   await errorArchive.getByRole('button', { name: `Rimuovi ${errorInsights[0].fileName} dall'archivio intelligente` }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Rimuovi', exact: true }).click();

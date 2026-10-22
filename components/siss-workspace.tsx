@@ -1,6 +1,7 @@
 'use client';
 
 /* presentation only; export/share retain the chart's existing gates. */
+import { Disclosure } from '@/components/disclosure';
 import { Download, Share2 } from 'lucide-react';
 import SissPatientContextPanel from '@/components/siss-patient-context-panel';
 import SissHandoffDiary from '@/components/siss-handoff-diary';
@@ -32,11 +33,10 @@ export default function SissWorkspace({ patientId, patientTaxCode, canShareFhirF
                 </div>
             </section>
             <SissPatientContextPanel patientId={patientId} patientTaxCode={patientTaxCode} embedded />
-            <details className={styles.disclosure}>
-                <summary>Diario dei passaggi</summary>
+            <Disclosure className={styles.disclosure} title="Diario dei passaggi">
                 <p className={styles.caption}>Registro locale: l’atto regionale si svolge nel portale ufficiale.</p>
                 <div className={styles.diary}><SissHandoffDiary patientId={patientId} embedded /></div>
-            </details>
+            </Disclosure>
         </div>
     );
 }

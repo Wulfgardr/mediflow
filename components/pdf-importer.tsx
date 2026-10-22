@@ -1,5 +1,6 @@
 'use client';
 
+import { Disclosure } from '@/components/disclosure';
 import type { ComponentType } from 'react';
 import { FileText } from 'lucide-react';
 import type { ExtractedPatientData } from '@/lib/pdf-service';
@@ -23,11 +24,10 @@ function PdfImporterUnavailable() {
                 potrai poi aprire gli allegati, estrarre il testo localmente e richiedere una sintesi con conferma esplicita.
             </p>
             <p className={disclosure.hint}>Qui non viene selezionato, conservato o elaborato alcun file.</p>
-            <details className={disclosure.disclosure}>
-                <summary>Perché il caricamento avviene nella scheda</summary>
+            <Disclosure className={disclosure.disclosure} title="Perché il caricamento avviene nella scheda">
                 <p className={disclosure.hint}>Anche un PDF con testo nativo deve essere salvato come allegato prima dell’estrazione. Immagini e scansioni restano soggette a revisione manuale.</p>
                 <p className={disclosure.hint}>review_required · unsupported_local_extraction: nessuna fonte persistita è disponibile in questo passaggio.</p>
-            </details>
+            </Disclosure>
         </aside>
     );
 }

@@ -48,7 +48,7 @@ test('Patient Insight ordinary ChatGPT: consent, catalog, review-only source pro
   await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
   const patientId = await createPatient(page, 'Insight');
   await page.goto(`/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'quadro');
-  const disclosure = page.locator('#patient-insight'); await disclosure.locator(':scope > summary').click();
+  const disclosure = page.locator('#patient-insight'); await disclosure.locator(':scope > div > [data-disclosure-control]').click();
   const controls = await selectOrdinaryChatGpt(disclosure);
   remote.arm(); await disclosure.getByRole('button', { name: 'Avvia supporto' }).click();
   await expect(controls).toContainText('Contesto preparato e redatto: 100 byte.');
@@ -207,7 +207,7 @@ test('ordinary ChatGPT preparation closes on patient-context navigation before c
   await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
   const patientId = await createPatient(page, 'Cancel');
   await page.goto(`/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'quadro');
-  const disclosure = page.locator('#patient-insight'); await disclosure.locator(':scope > summary').click();
+  const disclosure = page.locator('#patient-insight'); await disclosure.locator(':scope > div > [data-disclosure-control]').click();
   const controls = await selectOrdinaryChatGpt(disclosure);
   remote.arm(); await disclosure.getByRole('button', { name: 'Avvia supporto' }).click();
   await expect(controls).toContainText('Contesto preparato e redatto: 100 byte.');

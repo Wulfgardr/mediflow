@@ -1,12 +1,8 @@
 'use client';
 
-/* WUL-UIUX: progressive disclosure per la Scheda. I gestori operativi
-   pesanti si aprono su richiesta, cosi su pazienti complessi la pagina si apre
-   corta e prioritizzata invece di una catena di pannelli sempre espansi.
-   Stile invariato (superficie, radius, colori): cambia solo la disposizione. */
-
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import { ChevronDown, type LucideIcon } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { DisclosureControl } from '@/components/disclosure';
 import { useRuntimeTwinFolder } from '@/components/runtime-twin-design';
 
 interface CollapsibleSectionProps {
@@ -14,19 +10,10 @@ interface CollapsibleSectionProps {
     kicker?: string;
     title: string;
     icon?: LucideIcon;
-    /* Conteggio mostrato nel chip a destra (es. "3 attive"). */
     count?: string | number;
-    /* Riga di sintesi mostrata quando la sezione e chiusa: deve essere onesta e
-       utile (cosa c'e dentro), non meta-testo. */
     summary?: string;
     defaultOpen?: boolean;
-    /* WUL-UIUX: mantiene i figli montati anche da chiusi (solo nascosti).
-       Va usato per i gestori con form, cosi una compilazione a meta non si perde
-       quando la sezione viene collassata. Per default i figli si smontano da
-       chiusi (lazy mount) per tenere la pagina leggera. */
     keepMounted?: boolean;
-    /* Classe della superficie Lume, cosi la sezione si allinea alla colonna in
-       cui vive (es. patient-detail-side-section nella colonna stretta). */
     surfaceClassName?: string;
     children: ReactNode;
 }
@@ -40,7 +27,7 @@ export function CollapsibleSection({
     summary,
     defaultOpen = false,
     keepMounted = false,
-    surfaceClassName = 'patient-detail-section border',
+    surfaceClassName = 'patient-detail-section',
     children,
 }: CollapsibleSectionProps) {
     const [open, setOpen] = useState(defaultOpen);
@@ -49,23 +36,15 @@ export function CollapsibleSection({
     const folderSection = useRuntimeTwinFolder();
     const folderActive = folderSection === id || (folderSection === 'quadro' && id === 'diario');
     const expanded = open || folderActive;
-    // A visited proposal pane retains its form even when navigating elsewhere.
     const [visited, setVisited] = useState(false);
-    if (folderActive && !visited) setVisited(true);
+    if (expanded && !visited) setVisited(true);
 
-    /* WUL-UIUX: defaultOpen puo diventare true dopo il caricamento dati
-       (es. attentionCount 0 -> N): useState lo legge solo al mount. Apriamo sul
-       fronte false->true col pattern React "adjust state during render" (niente
-       effetto), senza richiudere cio che l'utente ha aperto ne riaprire cio che
-       ha chiuso a mano. */
     const [prevDefaultOpen, setPrevDefaultOpen] = useState(defaultOpen);
     if (defaultOpen !== prevDefaultOpen) {
         setPrevDefaultOpen(defaultOpen);
         if (defaultOpen) setOpen(true);
     }
 
-    /* Se si naviga verso l'ancora della sezione, la si apre per non lasciare
-       l'utente davanti a un contenitore vuoto. */
     useEffect(() => {
         if (!id) return;
         const openIfTargeted = () => {
@@ -78,38 +57,16 @@ export function CollapsibleSection({
         return () => window.removeEventListener('hashchange', openIfTargeted);
     }, [id]);
 
-    const HeadingControl = folderActive ? 'div' : 'button';
     return (
-        <section id={id} data-folder-pane={id} data-folder-active={folderActive} className={`${surfaceClassName} scroll-mt-28`}>
-            {/* WUL-UIUX: il titolo è un heading che contiene il controllo
-                di disclosure — pattern W3C APG. Gli screen reader possono saltare
-                di sezione in sezione per livello, non solo per anchor. */}
-            <h3 className="m-0">
-                <HeadingControl
-                    type={folderActive ? undefined : "button"}
-                    onClick={folderActive ? undefined : () => setOpen((value) => !value)}
-                    aria-expanded={folderActive ? undefined : expanded}
-                    aria-controls={folderActive ? undefined : regionId}
-                    className="flex w-full items-center gap-3 rounded-[inherit] p-5 text-left md:p-6"
-                >
-                    <span className="min-w-0 flex-1">
+        <section id={id} data-folder-pane={id} data-folder-active={folderActive} className={`${surfaceClassName} scroll-mt-28 border-0 shadow-none`}>
+            <h3 className="m-0 px-5 md:px-6">
+                {folderActive ? <div className="flex items-center gap-3 py-5 md:py-6"><span className="mt-1 flex min-w-0 flex-1 items-center gap-2 text-lg font-semibold text-ink">{Icon ? <Icon className="h-5 w-5 text-muted" aria-hidden="true" /> : null}{title}</span>{count !== undefined && count !== '' ? <span className="ml-3 apple-chip">{count}</span> : null}</div>
+                    : <DisclosureControl expanded={expanded} controls={regionId} onToggle={() => setOpen(value => !value)}>
                         {kicker && !folderSection ? <span className="section-kicker">{kicker}</span> : null}
-                        <span className="mt-1 flex items-center gap-2 text-lg font-semibold text-ink">
-                            {Icon ? <Icon className="h-5 w-5 text-muted" /> : null}
-                            {title}
-                        </span>
-                        {!expanded && summary ? (
-                            <span className="mt-1 block truncate text-sm text-muted">{summary}</span>
-                        ) : null}
-                    </span>
-                    {count !== undefined && count !== '' ? (
-                        <span className="apple-chip shrink-0">{count}</span>
-                    ) : null}
-                    {!folderActive ? <ChevronDown
-                        className={`h-5 w-5 shrink-0 text-muted transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
-                        aria-hidden
-                    /> : null}
-                </HeadingControl>
+                        <span className="flex items-center gap-2">{Icon ? <Icon size={20} aria-hidden="true" /> : null}{title}
+                            {count !== undefined && count !== '' ? <span className="apple-chip">{count}</span> : null}</span>
+                        {!expanded && summary ? <span className="block text-sm text-muted">{summary}</span> : null}
+                    </DisclosureControl>}
             </h3>
             <div id={regionId} hidden={!expanded} className="px-5 pb-5 md:px-6 md:pb-6">
                 {keepMounted || expanded || visited ? children : null}
