@@ -334,6 +334,8 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         });
         assert.equal(remoteProstheticDelete.response.status, 405);
 
+        await assertTerritorialChannelBoundaries(writerClient, sessionHeaders, patientId);
+
         scenarioResults.push({
             name: 'paired prescriptions and prosthetics write',
             ambulatoryId,
@@ -627,4 +629,71 @@ function resolveReportPath() {
     }
 
     return path.join(process.cwd(), 'tmp-network-home-base-prescriptions-write-report.json');
+}
+
+async function assertTerritorialChannelBoundaries(client, webHeaders, patientId) {
+    const route = '/api/system/territorial-packs';
+    const original = await request('GET', route, { headers: webHeaders });
+    assert.equal(original.response.status, 200);
+    const changed = await request('PUT', route, { headers: webHeaders, body: {
+        schemaVersion: 'mediflow.territorial-packs.v1', preset: 'core', expectedRevision: original.json.revision, confirmed: true,
+    } });
+    assert.equal(changed.response.status, 200, changed.text);
+    const before = changed.json;
+    assert.equal(before.preset, 'core');
+    const db = openTestDb();
+    const snapshot = () => ({
+        settings: db.prepare("SELECT * FROM settings WHERE key IN ('territorial.packs','territorial.packs.initialization') ORDER BY key").all(),
+        writer: db.prepare('SELECT * FROM prosthetic_prescriptions ORDER BY id').all(),
+        audit: db.prepare('SELECT * FROM audit_events ORDER BY rowid').all(),
+    });
+    const initial = snapshot();
+    const egressReports = () => Object.fromEntries(fs.readdirSync(process.env.MEDIFLOW_TEST_EGRESS_REPORT_DIR)
+        .filter(name => name.startsWith('egress-')).map(name => [name,
+            JSON.parse(fs.readFileSync(path.join(process.env.MEDIFLOW_TEST_EGRESS_REPORT_DIR, name), 'utf8'))]));
+    const egressBefore = egressReports();
+    const activate = { schemaVersion: 'mediflow.territorial-packs.v1', expectedRevision: before.revision,
+        preset: 'core+it+lom', confirmed: true };
+    const unchangedAndDenied = async () => {
+        const capability = await request('GET', route, { headers: webHeaders });
+        assert.deepEqual(capability.json, before);
+        const denied = await request('POST', '/api/v1/network/prosthetic-prescriptions', {
+            headers: { ...pairedHeaders(client), ...webHeaders }, body: prostheticPrescriptionPayload(patientId),
+        });
+        assert.equal(denied.response.status, 403, denied.text);
+        assert.equal(denied.json.code, 'TERRITORIAL_PACK_DISABLED');
+        assert.deepEqual(snapshot(), initial);
+        const reports = egressReports();
+        assert.ok(Object.keys(reports).length >= 2, 'network runner and actual server must both have egress probes');
+        for (const [name, attempts] of Object.entries(reports)) assert.deepEqual(attempts, egressBefore[name] ?? [],
+            'no egress attempt during a denied channel or writer call');
+    };
+    try {
+        for (const headers of [webHeaders, localApiHeaders()]) for (const key of ['territorial.packs', 'territorial.packs.initialization']) {
+            const post = await request('POST', '/api/settings', { headers, body: { key, value: activate } });
+            assert.equal(post.response.status, 403, post.text);
+            assert.match(post.json.error, new RegExp(`non puo scrivere la chiave ${key.replaceAll('.', '\\.')}$`));
+            await unchangedAndDenied();
+            const put = await request('PUT', `/api/settings/${key}`, { headers, body: { value: activate } });
+            assert.equal(put.response.status, 403, put.text);
+            assert.match(put.json.error, /non puo scrivere la chiave/);
+            await unchangedAndDenied();
+        }
+        const paired = await request('GET', `/api/v1/network/prosthetic-prescriptions?patientId=${patientId}`, {
+            headers: { ...pairedHeaders(client), ...webHeaders },
+        });
+        assert.equal(paired.response.status, 200, paired.text);
+        for (const headers of [pairedHeaders(client), { ...pairedHeaders(client), ...localApiHeaders() }]) {
+            const denied = await request('PUT', route, { headers, body: activate });
+            assert.equal(denied.response.status, 403, denied.text);
+            assert.equal(denied.json.code, 'channel_denied');
+            await unchangedAndDenied();
+        }
+    } finally {
+        db.close();
+        const restored = await request('PUT', route, { headers: webHeaders, body: {
+            ...activate, preset: original.json.preset,
+        } });
+        assert.equal(restored.response.status, 200, restored.text);
+    }
 }

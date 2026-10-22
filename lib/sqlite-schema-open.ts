@@ -8,6 +8,7 @@ import { createVerifiedSqliteSnapshotSync } from './sqlite-repair';
 import { initSqlitePragmas } from './sqlite-pragmas';
 import { upgradeObservationTimestampDefault, upgradeReviewPatientReferenceDefault } from './sqlite-observation-schema-upgrade';
 import { readSqliteArchiveGeneration } from './archive-generation';
+import { initializeTerritorialPacks } from './territorial-pack-store';
 
 // 1: the first versioned schema (C09). 2: ADR 0143 credentials. 3: archive generation (ADR 0144).
 // 4: fonti protesica, originali e snapshot di provenienza.
@@ -70,7 +71,8 @@ function assertCanonical(connection: Database.Database, canonical: Database.Data
 }
 
 /** Open is the only authority to create or migrate; importing this module is inert. */
-export function openVersionedSqliteDatabase(databasePath: string, openConnection = (file: string) => new Database(file, { fileMustExist: true })): Database.Database {
+export function openVersionedSqliteDatabase(databasePath: string, openConnection = (file: string) => new Database(file, { fileMustExist: true }),
+    options: { prepareReplacement?: boolean } = {}): Database.Database {
     let created = false;
     let before: fs.Stats;
     try { before = fs.lstatSync(databasePath); }
@@ -137,6 +139,7 @@ export function openVersionedSqliteDatabase(databasePath: string, openConnection
                     assertCanonical(connection, canonical);
                     // Clinical orphans are tolerated; a role attestation without its actor never is.
                     if (!checkHasCanonicalHeadlessSoapActiveRoleAttestationSchema(connection)) deny('role attestation without its actor');
+                    if (!options.prepareReplacement) initializeTerritorialPacks(connection, 'existing');
                     return;
                 }
                 if (!fresh) {
@@ -152,6 +155,7 @@ export function openVersionedSqliteDatabase(databasePath: string, openConnection
                 assertCanonical(connection, canonical);
                 assertIntegrity(connection);
                 if (foreignKeyViolations(connection) !== violationsBefore) deny('migration changed foreign key violations');
+                if (!options.prepareReplacement) initializeTerritorialPacks(connection, fresh ? 'new' : 'existing');
                 // The native reservation is consumed atomically with the schema.
                 connection.pragma('application_id = 0');
                 connection.pragma(`user_version = ${CURRENT_SQLITE_SCHEMA_VERSION}`);

@@ -22,7 +22,7 @@ test('buildNetworkNodeSummary falls back to clinic or host name and keeps local-
     assert.equal(summary.displayName, 'MediFlow Studio');
     assert.equal(summary.operatingMode, 'local-only');
     assert.equal(summary.transport.localTlsPort, 3443);
-    assert.equal(summary.protocolVersion, '1.13.0');
+    assert.equal(summary.protocolVersion, '1.14.0');
 });
 
 test('buildNetworkSessionSummary exposes network-unpaired when home-base mode is enabled', () => {
@@ -291,4 +291,11 @@ test('createPairingIntentDraft emits a PHI-safe pending bootstrap when home-base
     assert.deepEqual(result.value.requestedCapabilities, ['network.replica.readonly-patients']);
     assert.equal(result.value.requestedAt, '2026-04-03T12:00:00.000Z');
     assert.equal(result.value.expiresAt, '2026-04-03T12:10:00.000Z');
+});
+
+test('network capability projection carries the versioned host territorial state', () => {
+    const territorialPacks = { schemaVersion: 'mediflow.territorial-packs.v1', revision: 7, preset: 'core', status: 'ready' } as const;
+    const response = buildNetworkCapabilitiesResponse({ nodeId: 'synthetic-node', snapshot: {}, platform: 'darwin', territorialPacks });
+    assert.deepEqual(response.territorialPacks, territorialPacks);
+    assert.equal(response.protocolVersion, '1.14.0');
 });

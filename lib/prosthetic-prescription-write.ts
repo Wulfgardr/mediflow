@@ -8,7 +8,9 @@ import {
     type ProstheticPrescriptionCreatePayload,
     type ProstheticPrescriptionUpdatePayload,
 } from './api-schemas/prescriptions';
-import { dbServer } from './db-server';
+import { dbServer, openDbServer } from './db-server';
+import { requireTerritorialPack } from './territorial-pack-store';
+import { TerritorialPackError } from './territorial-packs';
 import { activePatients } from './patient-lifecycle';
 import type { NetworkWriteContext } from './network-write-context';
 import { buildPrescriptionVersionConflictPayload, parsePrescriptionExpectedVersion } from './prescription-concurrency';
@@ -54,6 +56,14 @@ type NetworkPatientContext = NetworkWriteContext & {
 type NetworkPrescriptionContext = NetworkWriteContext & {
     prescriptionId: string;
 };
+
+function territorialWriteDenial(): MutationResponse | null {
+    try { requireTerritorialPack(openDbServer(), 'lom'); return null; }
+    catch (error) {
+        if (error instanceof TerritorialPackError) return { status: 403, value: { code: 'TERRITORIAL_PACK_DISABLED', error: 'Pacchetto Lombardia non attivo' } };
+        throw error;
+    }
+}
 
 function hasOwn(input: Record<string, unknown>, key: string): boolean {
     return Object.prototype.hasOwnProperty.call(input, key);
@@ -235,6 +245,8 @@ export async function createHostProstheticPrescription(context: HostContext, raw
     if (!normalized.ok) return badRequest(normalized.error);
 
     return dbServer.transaction((tx): MutationResponse => {
+        const territorialDenial = territorialWriteDenial();
+        if (territorialDenial) return territorialDenial;
         if (!activeParentExists(tx, normalized.values.patientId)) return { status: 404, value: { error: 'Patient not found' } };
         if (tx.select({ id: prostheticPrescriptions.id }).from(prostheticPrescriptions)
             .where(eq(prostheticPrescriptions.id, normalized.values.id)).get()) {
@@ -270,6 +282,8 @@ async function updateProstheticPrescription(
     if (!normalized.ok) return badRequest(normalized.error);
 
     const commit = dbServer.transaction((tx): MutationResponse => {
+        const territorialDenial = territorialWriteDenial();
+        if (territorialDenial) return territorialDenial;
         const existing = surface === 'network'
             ? tx.select({ item: prostheticPrescriptions }).from(prostheticPrescriptions)
                 .innerJoin(patientsToAmbulatories, eq(prostheticPrescriptions.patientId, patientsToAmbulatories.patientId))
@@ -298,6 +312,8 @@ async function updateProstheticPrescription(
 
 export async function deleteHostProstheticPrescription(context: HostContext & { id: string }, expectedVersion: number): Promise<MutationResponse> {
     const commit = dbServer.transaction((tx): MutationResponse => {
+        const territorialDenial = territorialWriteDenial();
+        if (territorialDenial) return territorialDenial;
         const existing = selectConflictSnapshot(tx, context.id);
         if (!existing) return { status: 404, value: { error: 'Prosthetic prescription not found' } };
         if (!activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
@@ -321,6 +337,8 @@ export async function createNetworkScopedProstheticPrescription(context: Network
     if (!normalized.ok) return badRequest(normalized.error);
 
     const commit = dbServer.transaction((tx): MutationResponse => {
+        const territorialDenial = territorialWriteDenial();
+        if (territorialDenial) return territorialDenial;
         if (!activeParentExists(tx, context.patientId) || !patientIsInScope(tx, context.patientId, context.scopeAmbulatoryId)) return { status: 404, value: { error: 'Not found' } };
         if (tx.select({ id: prostheticPrescriptions.id }).from(prostheticPrescriptions)
             .where(eq(prostheticPrescriptions.id, normalized.values.id)).get()) {

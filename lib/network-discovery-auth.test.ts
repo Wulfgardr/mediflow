@@ -21,6 +21,7 @@ function createPairedClient(): StoredNetworkPairedClient {
 }
 
 const capabilitiesResponse: NetworkCapabilitiesResponse = {
+    territorialPacks: { schemaVersion: 'mediflow.territorial-packs.v1', revision: 0, preset: 'core', status: 'ready' },
     nodeId: 'node-1',
     operatingMode: 'network-home-base',
     protocolVersion: '1.11.0',

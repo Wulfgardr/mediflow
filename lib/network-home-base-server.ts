@@ -1,7 +1,8 @@
+import { readTerritorialPacks } from './territorial-pack-store';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { and, eq, inArray } from 'drizzle-orm';
-import { dbServer, runDbServerImmediateTransaction } from '@/lib/db-server';
+import { dbServer, openDbServer, runDbServerImmediateTransaction } from '@/lib/db-server';
 import { assertArchiveGeneration } from './archive-generation';
 import { currentArchiveGeneration } from './security/archive-session-generation';
 import { settings } from '@/lib/schema';
@@ -117,6 +118,7 @@ export async function getNetworkCapabilities(): Promise<NetworkCapabilitiesRespo
         snapshot,
         platform: process.platform,
         aiCentralRuntimeStatus: aiRuntime.centralRuntime.capabilityStatus,
+        territorialPacks: readTerritorialPacks(openDbServer()),
     });
 }
 

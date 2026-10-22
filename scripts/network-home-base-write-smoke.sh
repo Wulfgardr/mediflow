@@ -67,6 +67,15 @@ EOF
 
 prepare_workspace
 
+if [[ "$TEST_SCRIPT_BASENAME" == "network-home-base-prescriptions-write.test.mjs" ]]; then
+  export MEDIFLOW_TEST_EGRESS_REPORT_DIR="$DATA_DIR/egress"
+  mkdir -p "$MEDIFLOW_TEST_EGRESS_REPORT_DIR"
+  export MEDIFLOW_TEST_EGRESS_ALLOW_LOOPBACK=1
+  export NEXT_TELEMETRY_DISABLED=1
+  EGRESS_PROBE_URL="$(node -e 'console.log(require("node:url").pathToFileURL(process.argv[1]).href)' "$ROOT_DIR/scripts/fixtures/territorial-egress-probe.mjs")"
+  export NODE_OPTIONS="${NODE_OPTIONS:-} --import=$EGRESS_PROBE_URL"
+fi
+
 (
   cd "$WORKSPACE_DIR"
   node "$ROOT_DIR/scripts/prepare-e2e-db.mjs"

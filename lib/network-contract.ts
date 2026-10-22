@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createDefaultTerritorialPackCapability, type TerritorialPackCapability } from './territorial-pack-contract';
 import type {
     NetworkCapabilitiesResponse,
     NetworkCapability,
@@ -13,7 +14,7 @@ import type {
     NetworkSessionSummary,
 } from './api/v1/types';
 
-export const NETWORK_PROTOCOL_VERSION = '1.13.0';
+export const NETWORK_PROTOCOL_VERSION = '1.14.0';
 export const NETWORK_NODE_ID_KEY = 'network.nodeId';
 export const NETWORK_MODE_KEY = 'network.mode';
 export const NETWORK_SETTINGS_KEYS = [
@@ -259,6 +260,7 @@ export function buildNetworkCapabilitiesResponse(input: {
     snapshot: NetworkSettingsSnapshot;
     platform: string;
     aiCentralRuntimeStatus?: NetworkCapabilityStatus;
+    territorialPacks?: TerritorialPackCapability;
 }): NetworkCapabilitiesResponse {
     const operatingMode = normalizeNetworkOperatingMode(input.snapshot[NETWORK_MODE_KEY]);
     const pairingBootstrapStatus = operatingMode === 'network-home-base' ? 'available' : 'disabled';
@@ -270,6 +272,7 @@ export function buildNetworkCapabilitiesResponse(input: {
         nodeId: input.nodeId,
         operatingMode,
         protocolVersion: NETWORK_PROTOCOL_VERSION,
+        territorialPacks: input.territorialPacks ?? createDefaultTerritorialPackCapability(),
         capabilities: [
             capability(
                 'network.pairing.bootstrap',

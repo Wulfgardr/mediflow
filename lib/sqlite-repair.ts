@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { captureHostTerritorialPacks, preserveHostTerritorialPacks } from './territorial-pack-store';
 import fs from 'fs';
 import path from 'path';
 import { createHash, randomUUID } from 'node:crypto';
@@ -393,8 +394,17 @@ export async function replaceSqliteDatabase(options: ReplaceSqliteDatabaseOption
             if (fs.realpathSync(sourcePath) === target) throw new SqliteSwapRecoveryRequiredError();
             for (const file of [target, sourcePath]) for (const suffix of SIDECAR_SUFFIXES) regularFile(file + suffix);
             await backupSqliteDatabase(target, original);
+            const hostSnapshot = new Database(original, { readonly: true, fileMustExist: true });
+            let hostTerritorialPacks: ReturnType<typeof captureHostTerritorialPacks>;
+            try { hostTerritorialPacks = captureHostTerritorialPacks(hostSnapshot); }
+            finally { hostSnapshot.close(); }
             await backupSqliteDatabase(sourcePath, staging);
             options.prepareReplacement?.(staging);
+            if (hostTerritorialPacks) {
+                const replacement = new Database(staging, { fileMustExist: true });
+                try { preserveHostTerritorialPacks(replacement, hostTerritorialPacks); }
+                finally { replacement.close(); }
+            }
             sealSnapshot(original);
             sealSnapshot(staging);
             if (backupPath) {

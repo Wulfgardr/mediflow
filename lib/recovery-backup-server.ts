@@ -8,19 +8,20 @@ import { runWithSqliteMaintenance } from './sqlite-maintenance-admission.mjs';
 import { assertRecoveryDatabaseBytes, decryptRecoveryBackup, MAX_RECOVERY_DATABASE_BYTES, type RecoveryKit } from './recovery-backup';
 import { hashAccessVerifier, openRecoveryWrapping } from './security/unlock-credential';
 import { validateRecoveryAuditSchema } from './sqlite-schema';
+import { TERRITORIAL_PACK_INITIALIZATION_KEY, TERRITORIAL_PACK_OWNER } from './territorial-packs';
 
 function fail(): never { throw new Error('RECOVERY_BACKUP_PREFLIGHT_FAILED'); }
 function quote(identifier: string): string { return '"' + identifier.replaceAll('"', '""') + '"'; }
 
 /** Validate only an isolated candidate; missing tables must never be rebuilt by a migration. */
-function validateCandidate(file: string): Database.Database {
+function validateCandidate(file: string, prepareReplacement = false): Database.Database {
     const probe = new Database(file, { readonly: true, fileMustExist: true });
     try {
         if (probe.pragma('user_version', { simple: true }) !== CURRENT_SQLITE_SCHEMA_VERSION
             || probe.pragma('integrity_check', { simple: true }) !== 'ok'
             || (probe.pragma('foreign_key_check') as unknown[]).length !== 0) fail();
     } finally { probe.close(); }
-    const candidate = openVersionedSqliteDatabase(file);
+    const candidate = openVersionedSqliteDatabase(file, undefined, { prepareReplacement });
     try { validateRecoveryAuditSchema(candidate); return candidate; }
     catch (error) { candidate.close(); throw error; }
 }
@@ -49,7 +50,22 @@ export function createRecoverySnapshot(connection: Database.Database, actorId: s
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
 }
 
-/** A blank canonical archive may contain its generation, and nothing else. No whitelist of clinical tables. */
+function isHostBootstrap(destination: Database.Database): boolean {
+    const rows = destination.prepare('SELECT key,value FROM settings').all() as { key: string; value: string }[];
+    const events = destination.prepare('SELECT * FROM audit_events').all() as Record<string, unknown>[];
+    if (rows.length !== 1 || rows[0].key !== TERRITORIAL_PACK_INITIALIZATION_KEY
+        || rows[0].value !== JSON.stringify({ schemaVersion: 'mediflow.territorial-packs.initialization.v1', origin: 'new' })
+        || events.length !== 1) return false;
+    const { event_id, occurred_at, created_at, ...event } = events[0];
+    return typeof event_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(event_id)
+        && Number.isSafeInteger(occurred_at) && (occurred_at as number) > 0 && created_at === occurred_at
+        && JSON.stringify(event) === JSON.stringify({ schema_version: 1, event_type: 'territorial.packs.initialized',
+            outcome: 'success', actor_type: 'system', actor_ref: TERRITORIAL_PACK_OWNER, subject_type: 'settings',
+            subject_ref: 'territorial.packs', source_surface: 'job', request_id: null,
+            redacted_metadata: JSON.stringify({ flags: ['before:core', 'after:core', 'origin:new'] }) });
+}
+
+/** Only the exact host bootstrap is exempt from the otherwise empty destination requirement. */
 function assertEmptyDestination(file: string): void {
     // A pre-existing native administrative bearer is authority, even without account rows.
     if (process.env.MEDIFLOW_LOCAL_API_TOKEN || fs.existsSync(path.join(path.dirname(file), 'local-api-token'))) fail();
@@ -66,7 +82,9 @@ function assertEmptyDestination(file: string): void {
             || destination.pragma('integrity_check', { simple: true }) !== 'ok') fail();
         readSqliteArchiveGeneration(destination);
         const tables = destination.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT GLOB 'sqlite_*'").all() as { name: string }[];
+        if (!isHostBootstrap(destination)) fail();
         for (const { name } of tables) {
+            if (name === 'settings' || name === 'audit_events') continue;
             if (name !== 'archive_generation' && destination.prepare(`SELECT 1 FROM ${quote(name)} LIMIT 1`).get()) fail();
         }
     } finally { destination.close(); }
@@ -89,7 +107,7 @@ export async function restoreRecoveryBackup(options: {
         fs.writeFileSync(source, bytes, { flag: 'wx', mode: 0o600 });
         bytes.fill(0);
         const verifierHash = await hashAccessVerifier(recovered.verifier);
-        const candidate = validateCandidate(source);
+        const candidate = validateCandidate(source, true);
         try {
             const account = candidate.prepare(`SELECT recovery_wrapped_master_key, recovery_salt, recovery_verifier_hash
                 FROM users WHERE username = ? AND role = 'admin' AND encrypted_master_key LIKE 'v3:%'`).get(options.kit.username) as Record<string, unknown> | undefined;
@@ -113,7 +131,7 @@ export async function restoreRecoveryBackup(options: {
             try {
                 await replaceSqliteDatabase({ sourcePath: source, destPath: destination, connection: current,
                     prepareReplacement: staging => {
-                        const replacement = validateCandidate(staging);
+                        const replacement = validateCandidate(staging, true);
                         try { replacement.transaction(() => {
                             archiveGeneration = rotateSqliteArchiveGeneration(replacement);
                             replacement.prepare('DELETE FROM archive_session_generations').run();

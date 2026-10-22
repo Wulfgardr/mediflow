@@ -4,6 +4,7 @@ import path from 'node:path';
 import process from 'node:process';
 import yaml from 'js-yaml';
 import ts from 'typescript';
+import { validateTerritorialPackExamples } from './validate-territorial-openapi.mjs';
 
 const ROOT = process.cwd();
 const SPEC_PATH = 'docs/openapi/mediflow-v1.yaml';
@@ -643,6 +644,12 @@ function main() {
     const documentedOperations = normalizeSpec(currentSpec);
     const { undocumented, overrides } = expandPolicy(policy);
     const errors = [];
+    try {
+        validateTerritorialPackExamples(currentSpec, [
+            { schemaVersion: 'mediflow.territorial-packs.v1', revision: 0, preset: 'core', status: 'ready' },
+            { schemaVersion: 'mediflow.territorial-packs.v1', revision: null, preset: 'core', status: 'configuration_error' },
+        ]);
+    } catch (error) { errors.push(error.message); }
     const notes = [];
 
     for (const operationKey of currentRoutes.routes.keys()) {
