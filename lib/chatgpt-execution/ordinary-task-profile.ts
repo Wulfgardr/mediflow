@@ -3,7 +3,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 import { scanJsonObject } from '../ai-json-lexical';
-import { emissionPlan, emissionUnit, renderEmissionPlan, type EmissionPart, type EmissionPlan } from './ordinary-emission-plan';
+import { emissionPlan, emissionUnit, renderEmissionPlan, type EmissionPart, type EmissionPlan } from '../ai-preparation/emission-plan';
 import { buildPatientInsightExtractionPlan } from '../ai-task-contract-prompts';
 
 import {

@@ -1,5 +1,5 @@
 import 'server-only';
-import { emissionPlan, emissionUnit, utf8Length, renderEmissionPlan, type EmissionPart, type EmissionPlan } from '../../chatgpt-execution/ordinary-emission-plan';
+import { emissionPlan, emissionUnit, utf8Length, renderEmissionPlan, type EmissionPart, type EmissionPlan } from '../../ai-preparation/emission-plan';
 
 import { types } from 'node:util';
 

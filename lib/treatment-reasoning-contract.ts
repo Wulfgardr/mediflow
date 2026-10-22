@@ -1,4 +1,4 @@
-import { emissionPlan, emissionUnit, renderEmissionPlan, type EmissionPart, type EmissionPlan } from './chatgpt-execution/ordinary-emission-plan';
+import { emissionPlan, emissionUnit, renderEmissionPlan, type EmissionPart, type EmissionPlan } from './ai-preparation/emission-plan';
 export const TREATMENT_REASONING_SCHEMA_VERSION = 'mediflow.treatment_reasoning.v1';
 
 export type TreatmentReasoningTaskKind = 'treatment_reasoning';
