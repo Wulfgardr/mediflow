@@ -16,6 +16,14 @@ const runs = [];
 try {
   for (let run = 0; run < count; run++) {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'no-preference' });
+    const requests = [];
+    page.on('requestfinished', request => {
+      const url = new URL(request.url());
+      if (url.pathname !== '/mcp' && url.pathname !== '/sandbox.html') return;
+      requests.push({ path: `${url.origin}${url.pathname}`, method: request.method(),
+        rpcMethod: request.method() === 'POST' ? request.postDataJSON()?.method : undefined,
+        timing: request.timing() });
+    });
     await page.addInitScript(() => {
       const metrics = window['metrics'] = { sizes: [], toolStart: 0, scrollCalls: 0, focusCalls: 0, animations: [], frames: [], reveals: [], animationGaps: [], followResize: false };
       const fetchOriginal = window.fetch;
@@ -115,7 +123,10 @@ try {
         left: rect.left, right: innerWidth - rect.right, background: getComputedStyle(document.body).backgroundColor,
         scroll: document.scrollingElement.scrollTop, active: document.activeElement.tagName };
     });
-    const measured = { toolToCardFcpMs: firstPaint - toolStart, interactionsMs: interactions, themeMs: themeLatencies,
+    const measured = { toolToCardFcpMs: firstPaint - toolStart,
+      startup: { toolStart, firstPaint, requests, frameTimeOrigin: await appFrame.evaluate(() => performance.timeOrigin),
+        paints: await appFrame.evaluate(() => performance.getEntriesByType('paint').map(entry => entry.toJSON())) },
+      interactionsMs: interactions, themeMs: themeLatencies,
       resizeMessages: host.sizes.length - sizesBefore, scrollBefore, scrollAfter: host.scroll,
       app: { sameMain: app.sameMain, sameSummary: app.sameSummary, focusCalls: app.focusCalls, scrollCalls: app.scrollCalls,
         left: app.left, right: app.right, scrollBefore: nodesBefore.scroll, scrollAfter: app.scroll, active: app.active },
