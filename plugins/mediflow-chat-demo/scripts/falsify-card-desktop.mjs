@@ -7,6 +7,8 @@ const run = args => spawnSync(process.execPath, args, { cwd: root, encoding: 'ut
 const mutations = [
   ['inline', 'src/card-server.mjs', "export const CARD_OPEN_TOOL = 'mediflow_synthetic_card_open'", "export const CARD_OPEN_TOOL = 'disabled_synthetic_card_open'", 'reference host did not mount'],
   ['delivery', 'src/card-app.mjs', "await app.updateModelContext({ content: [{ type: 'text', text: result._meta.approvedPayload }] }, { signal: delivery.signal });", 'await Promise.resolve();', 'consent sends exactly one context update'],
+  ['late-share-open', 'src/card-owner.mjs', 'deliver(view, attemptId) {', 'deliver(view, attemptId) { return attemptId;', 'no late context after owner invalidation'],
+  ['frame-csp', 'src/card-server.mjs', 'text: instanceHtml,', 'text: boundHtml,', 'inlineBlocked'],
   ['theme', 'src/app.css', ':root[data-card]', ':root[data-disabled-card]', 'Giorno uses its Lume field'],
   ['placeholders', 'src/card-app.mjs', "String(text).replace(/\\{\\{MF_PII_[^{}]+\\}\\}/gu, '[omesso]')", 'String(text)', 'MF_PII_'],
   ['expiry', 'src/card-app.mjs', 'if (!event.isTrusted || !ready) return;\n    clearTimeout(expiry);', 'if (!event.isTrusted || !ready) return;', 'shared card survives the decision deadline'],
@@ -26,6 +28,17 @@ for (const [name, file, before, after, failure] of mutations) {
     console.log(`PASS: ${name} regression rejects removal of its fix.`);
   } finally { await writeFile(target, source); }
 }
+const serverFile = new URL('src/card-server.mjs', root);
+const serverSource = await readFile(serverFile, 'utf8');
+const before = '_meta: { consentNonce }';
+assert.ok(serverSource.includes(before), 'unapproved-data: mutation must apply');
+try {
+  await writeFile(serverFile, serverSource.replace(before, "_meta: { consentNonce, approvedPayload: 'metformina UNAPPROVED_SYNTHETIC_DATA' }"));
+  const result = run(['--test', '--test-name-pattern=unapproved frame', 'test/card-protocol.test.mjs']);
+  assert.equal(result.status, 1, 'unapproved-data: leaking prepare metadata must fail');
+  assert.ok(result.stdout.includes('unapproved frame sees no MediFlow data'), 'unapproved-data: boundary test must fail');
+  console.log('PASS: unapproved-data regression rejects broker metadata leakage.');
+} finally { await writeFile(serverFile, serverSource); }
 assert.equal(run(['scripts/build.mjs']).status, 0, 'restore original bundle');
 const restored = run(['scripts/run-reference.mjs', '--card', '--desktop-regressions']);
 assert.equal(restored.status, 0, `restored fixes must pass: ${restored.stdout}\n${restored.stderr}`);

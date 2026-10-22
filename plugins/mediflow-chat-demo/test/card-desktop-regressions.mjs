@@ -11,7 +11,12 @@ async function check(name, query, run) {
   const responses = [];
   page.on('response', async response => {
     if (response.url().endsWith('/mcp') && response.headers()['content-type']?.includes('application/json')) {
-      try { responses.push(await response.json()); } catch {}
+      try {
+        const body = await response.json(); responses.push(body);
+        const html = body.result?.contents?.[0]?.text;
+        const binding = html?.match(/\{"view":"([^"]+)","gestureKey":/);
+        if (binding) await page.evaluate(view => { window['cardViewForTest'] = view; }, binding[1]);
+      } catch {}
     }
   });
   await page.addInitScript(() => {
@@ -60,6 +65,100 @@ try {
     await frame.locator('#revoke').click();
     await frame.locator('#share').evaluate(button => button.click());
     assert.equal((await page.evaluate(() => window['contextRequests'])).length, 1, 'revocation cannot deliver again');
+  });
+  for (const operation of ['open', 'revoke', 'prepare']) await check(`late-share-${operation}`, '', async ({ page, frame }) => {
+    let release = () => {}, seen = () => {}, session;
+    const held = new Promise(resolve => { release = () => resolve(undefined); });
+    const intercepted = new Promise(resolve => { seen = () => resolve(undefined); });
+    await page.route('**/mcp', async route => {
+      const request = route.request();
+      const body = request.method() === 'POST' ? request.postDataJSON() : undefined;
+      if (body?.params?.arguments?.operation !== 'share') return route.continue();
+      session = request.headers()['mcp-session-id'];
+      const response = await route.fetch();
+      assert.equal((await response.json()).result.isError, undefined);
+      seen(); await held; await route.fulfill({ response });
+    });
+    await frame.locator('#share').click(); await intercepted;
+    try {
+      const result = await page.evaluate(async ({ session, operation }) => {
+        const response = await fetch('http://localhost:3017/mcp', { method: 'POST', headers: {
+          'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', 'MCP-Session-Id': session,
+        }, body: JSON.stringify({ jsonrpc: '2.0', id: 9100, method: 'tools/call', params: {
+          name: operation === 'open' ? 'mediflow_synthetic_card_open' : 'mediflow_synthetic_card',
+          arguments: operation === 'open' ? {} : { operation, view: window['cardViewForTest'] },
+        } }) });
+        return response.json();
+      }, { session, operation });
+      assert.equal(result.result.isError, undefined, 'authoritative owner transition completed');
+    } finally { release(); }
+    await frame.waitForFunction(() => !document.querySelector('#status').textContent.includes('in corso'));
+    assert.deepEqual(await page.evaluate(() => window['contextRequests']), [], 'no late context after owner invalidation');
+    assert.deepEqual(await page.evaluate(() => window['cardContexts']), []);
+    assert.equal(await frame.locator('#card').isHidden(), true);
+    assert.equal(await frame.locator('#card').textContent(), '');
+  });
+  for (const phase of ['before', 'denied', 'revoked']) await check(`frame-boundary-${phase}`, '', async ({ page, frame, responses }) => {
+    if (phase === 'denied') {
+      await frame.locator('#deny').click();
+      await frame.waitForFunction(() => document.querySelector('#status').textContent === 'Nessun contenuto condiviso.');
+    }
+    if (phase === 'revoked') {
+      await share(frame); await frame.locator('#revoke').click();
+      await frame.waitForFunction(() => document.querySelector('#status').textContent === 'Scheda chiusa.');
+    }
+    const baseline = await page.evaluate(() => window['cardContexts']);
+    const chosen = `ATTACKER_CHOSEN_SYNTHETIC_BYTES_${phase}`;
+    const reply = await frame.evaluate(text => new Promise(resolve => {
+      const listen = event => { if (event.data?.id === 8101) { window.removeEventListener('message', listen); resolve(event.data); } };
+      window.addEventListener('message', listen);
+      window.parent.postMessage({ jsonrpc: '2.0', id: 8101, method: 'ui/update-model-context', params: { content: [{ type: 'text', text }] } }, '*');
+    }), chosen);
+    assert.deepEqual(reply.result, {}, 'bridge trusts the frame, not broker HMAC');
+    assert.deepEqual(await page.evaluate(() => window['cardContexts']), [...baseline, { content: [{ type: 'text', text: chosen }] }]);
+    const approved = responses.filter(r => r.result?._meta?.approvedPayload);
+    assert.equal(approved.length, phase === 'revoked' ? 1 : 0);
+    assert.equal(await frame.locator('#card').textContent(), '');
+    assert.equal(await frame.locator('#card').isHidden(), true);
+  });
+  await check('frame-csp', '', async ({ page, frame }) => {
+    await frame.evaluate(() => {
+      const button = document.createElement('button'); button.id = 'csp-probe'; button.textContent = 'CSP probe';
+      button.addEventListener('click', async () => {
+        window['__inlineProbe'] = false;
+        const script = document.createElement('script'); script.textContent = "window['__inlineProbe'] = true"; document.head.append(script);
+        let evalBlocked = false; try { window.eval('1 + 1'); } catch { evalBlocked = true; }
+        const external = document.createElement('script'); external.src = 'https://untrusted.invalid/card.js';
+        const externalBlocked = await new Promise(resolve => { external.onload = () => resolve(false); external.onerror = () => resolve(true); document.head.append(external); });
+        window['__cspResult'] = { inlineBlocked: !window['__inlineProbe'], evalBlocked, externalBlocked };
+      });
+      document.querySelector('main').append(button);
+    });
+    await frame.locator('#csp-probe').click();
+    await frame.waitForFunction(() => window['__cspResult']);
+    assert.deepEqual(await frame.evaluate(() => window['__cspResult']), { inlineBlocked: true, evalBlocked: true, externalBlocked: true });
+    await share(frame);
+    assert.equal((await page.evaluate(() => window['cardContexts'])).length, 1, 'hashed bundle remains functional');
+  });
+  for (const failure of ['missing-attempt', 'denied', 'missing-receipt', 'wrong-attempt']) await check(`delivery-${failure}`, '', async ({ page, frame }) => {
+    await page.route('**/mcp', async route => {
+      const request = route.request();
+      const body = request.method() === 'POST' ? request.postDataJSON() : undefined;
+      const operation = body?.params?.arguments?.operation;
+      if (operation !== 'deliver' && !(failure === 'missing-attempt' && operation === 'share')) return route.continue();
+      const response = await route.fetch(); const data = await response.json();
+      if (failure === 'missing-attempt') delete data.result._meta.attemptId;
+      if (failure === 'denied') data.result = { isError: true, content: [{ type: 'text', text: 'denied' }] };
+      if (failure === 'missing-receipt') delete data.result._meta;
+      if (failure === 'wrong-attempt') data.result._meta.attemptId = '0'.repeat(64);
+      await route.fulfill({ response, json: data });
+    });
+    await frame.locator('#share').click();
+    await frame.waitForFunction(() => document.querySelector('#status').textContent.includes('non disponibile'));
+    assert.deepEqual(await page.evaluate(() => window['contextRequests']), []);
+    assert.deepEqual(await page.evaluate(() => window['cardContexts']), []);
+    assert.equal(await frame.locator('#card').textContent(), '');
+    assert.equal(await frame.locator('#card').isHidden(), true);
   });
   await check('theme', '', async ({ page, frame }) => {
     await page.evaluate(() => window['cardBridge'].sendHostContextChange({ theme: 'dark', styles: { variables: { '--color-background-primary': '#101216', '--color-text-primary': '#e9ecef' } } }));

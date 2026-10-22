@@ -12,7 +12,7 @@ Il telecomando `mediflow-local-ui` non è coinvolto.
 `ui://mediflow-synthetic-card/reader` con `_meta.ui.resourceUri`: apre la carta
 inline e restituisce soltanto la frase costante «Apri la vista per scegliere se
 condividere la scheda sintetica.», senza dati. `mediflow_synthetic_card` rimane
-**app-only** per preparazione, condivisione e revoca, con ingresso app/thread
+**app-only** per preparazione, condivisione, conferma di consegna e revoca, con ingresso app/thread
 aggiuntivo. Il modello non dispone di un comando di approvazione. La visibilità MCP è una
 funzione dell'host, non autenticazione del medico o protezione da un host ostile.
 Questa composizione sintetica non concede alcuna autorità clinica.
@@ -25,7 +25,10 @@ l'owner approva quell'hash e consuma una sola volta l'uscita del reader del brok
 Il risultato contiene una ricevuta testuale breve e, in `structuredContent`,
 la sola scheda approvata. `_meta.approvedPayload` conserva la stringa esatta del
 broker, senza riserializzarla; non contiene fonti originali, mapping o hash.
-Solo dopo consenso e controllo dell'epoca la vista invia quella stringa come
+`_meta.attemptId` identifica il tentativo approvato. Subito prima dell'invio
+la vista chiama `deliver`: l'owner verifica vista, tentativo corrente,
+generazione, scadenza e consumo monouso senza attese intermedie.
+Solo dopo questa conferma e il controllo dell'epoca la vista invia la stringa come
 un unico blocco `content: [{ type: 'text', text: approvedPayload }]` tramite
 `App.updateModelContext`, cioè `ui/update-model-context`. La resa `[omesso]`
 non viene applicata ai byte consegnati.
@@ -52,8 +55,17 @@ l'owner conserva il proprio controllo di validità. Una carta già condivisa
 rimane visibile fino alla chiusura o all'invalidazione. Un nuovo input/risultato
 dell'host invalida anche la carta condivisa: gli involucri iniziali vuoti sono
 ignorati solo durante l'inizializzazione, mai dopo la preparazione. Cancellazione
-e teardown invalidano lo stesso stato; una risposta tardiva non ripopola una
-vista chiusa e non genera un nuovo aggiornamento del contesto.
+e teardown invalidano lo stesso stato. Una risposta `share` trattenuta oltre
+una chiusura autorevole, revoca o nuova preparazione non può ottenere `deliver`:
+la vista resta vuota e non aggiorna il contesto.
+
+**Limite della consegna:** l'autorizzazione si linearizza al consumo di
+`deliver` sul server. Una chiusura successiva, durante il ritorno della
+conferma o prima dell'invio al bridge, non può ritirare quell'autorizzazione.
+Un'altra conferma sposterebbe la stessa finestra distribuita. Per eliminare
+la finestra serve il consumo del tentativo nell'host insieme all'accettazione
+del contesto. Il prototipo resta soltanto sintetico; il limite completo è in
+[ADR 0160](../../docs/adr/0160-mediflow-in-desktop-chat.md).
 
 **Limite del turno:** la specifica e l'SDK fissati non espongono un evento
 universale di inizio turno. Il test invia vere notifiche di input/risultato del
@@ -78,9 +90,24 @@ server e il nonce consumato dall’owner prima dell’uscita del broker; la chia
 Dopo la prima lettura, la risorsa non viene emessa di nuovo nella stessa sessione:
 per riaprire la vista occorre una nuova sessione MCP (su stdio, riconnettere il
 plugin). Questo costo di riapertura è esplicito e resta da qualificare sui desktop.
-La chiave protegge il percorso di messaggi dal frame già avviato; non attesta
-un renderer ostile. L’host che controlla caricamento e renderer può leggerla
+La chiave protegge soltanto il tool `share` dai messaggi forgiati dopo il
+bootstrap fidato; non attesta codice arbitrario nel frame o un renderer ostile. L’host che controlla caricamento e renderer può leggerla
 e resta fuori da questo confine, come previsto dall’ADR.
+
+Il canale `ui/update-model-context` è fidato quanto il frame. Il bridge non
+verifica firma, nonce o consenso e accetta byte arbitrari dal frame; HMAC
+non protegge questo canale. La garanzia del broker è non consegnare al frame
+dati MediFlow non approvati: nessun payload in `prepare`, diniego o revoca,
+nessuna fonte/mappe fra le risorse leggibili e soltanto l'artefatto approvato
+in `share`. Un frame compromesso può inviare byte propri o già approvati;
+la revoca non può cancellare byte già ricevuti. I test intercettano anche
+`_meta`, `structuredContent` e le risorse, non soltanto il testo del tool.
+
+La CSP della risorsa usa l'hash per istanza del bundle incorporato, senza
+script remoti, eval o script inline aggiunti. Il solo codice di dipendenze
+è incluso nel bundle locale (SDK MCP); nessun codice di terzi viene caricato
+in rete dalla risorsa `ui://`. Stili dinamici dell'host e font incorporato
+sono necessari alla resa; connessioni e altre risorse sono negate.
 
 La vista usa Punto d'inchiostro, altezza interna stabile,
 nessun ridimensionamento al clic e nessuna fascia laterale. Le liste sono paginate

@@ -73,6 +73,11 @@ async function mount() {
         await revoke('Questo host non supporta la consegna alla chat. Nessun contenuto inviato al modello.');
         return;
       }
+      const attemptId = result._meta.attemptId;
+      if (typeof attemptId !== 'string') throw new Error();
+      const authorization = await call('deliver', { attemptId });
+      if (current !== epoch) return;
+      if (authorization.isError || authorization._meta?.attemptId !== attemptId) throw new Error();
       delivery = new AbortController();
       await app.updateModelContext({ content: [{ type: 'text', text: result._meta.approvedPayload }] }, { signal: delivery.signal });
       if (current !== epoch) return;

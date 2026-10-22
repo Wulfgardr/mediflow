@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { CallToolRequestSchema, ReadResourceRequestSchema, McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
@@ -13,7 +13,7 @@ export const CARD_DENIED = 'Scheda non disponibile. Apri una nuova vista e ripro
 /** @returns {import('@modelcontextprotocol/sdk/types.js').CallToolResult} */
 const fixed = text => ({ content: [{ type: 'text', text }] });
 const denied = () => ({ ...fixed(CARD_DENIED), isError: true });
-const argsSchema = z.object({ operation: z.enum(['prepare', 'share', 'revoke']), view: z.string().uuid(), nonce: z.string().regex(/^[a-f0-9]{64}$/).optional(), gestureProof: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict();
+const argsSchema = z.object({ operation: z.enum(['prepare', 'share', 'revoke', 'deliver']), view: z.string().uuid(), attemptId: z.string().regex(/^[a-f0-9]{64}$/).optional(), nonce: z.string().regex(/^[a-f0-9]{64}$/).optional(), gestureProof: z.string().regex(/^[a-f0-9]{64}$/).optional() }).strict();
 
 export async function createCardServer(owner) {
   const server = new McpServer({ name: 'mediflow-synthetic-card', version: '0.1.0' });
@@ -24,7 +24,11 @@ export async function createCardServer(owner) {
   const resource = () => {
     if (issued) throw new McpError(ErrorCode.InvalidParams, CARD_DENIED);
     issued = true;
-    const instanceHtml = html.replace('__CARD_VIEW__', binding.view).replace('__CARD_KEY__', binding.gestureKey);
+    const boundHtml = html.replace('__CARD_VIEW__', binding.view).replace('__CARD_KEY__', binding.gestureKey);
+    const hashes = tag => [...boundHtml.matchAll(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'g'))]
+      .map(match => `'sha256-${createHash('sha256').update(match[1]).digest('base64')}'`).join(' ');
+    const policy = `default-src 'none'; script-src ${hashes('script')}; style-src ${hashes('style')}; style-src-attr 'unsafe-inline'; font-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`;
+    const instanceHtml = boundHtml.replace('<head>', `<head><meta http-equiv="Content-Security-Policy" content="${policy}">`);
     return { contents: [{ uri: CARD_URI, mimeType: RESOURCE_MIME_TYPE, text: instanceHtml,
     _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] } },
       'openai/ui': { preferredDisplayMode: 'inline', availableDisplayModes: ['inline'] },
@@ -56,14 +60,15 @@ export async function createCardServer(owner) {
     const parsed = argsSchema.safeParse(args);
     if (!parsed.success) return denied();
     try {
-      const { operation, view, nonce, gestureProof } = parsed.data;
+      const { operation, view, nonce, gestureProof, attemptId } = parsed.data;
       if (!issued || view !== binding.view) return denied();
       if (operation === 'prepare') { const consentNonce = await owner.prepare(view); return { ...fixed('Scheda sintetica pronta per la tua scelta.'), _meta: { consentNonce } }; }
       if (operation === 'revoke') { await owner.revoke(view); return fixed('Condivisione terminata.'); }
+      if (operation === 'deliver') return { ...fixed('Consegna autorizzata.'), _meta: { attemptId: owner.deliver(view, attemptId) } };
       const expectedProof = createHmac('sha256', Buffer.from(binding.gestureKey, 'hex')).update(nonce ?? '').digest();
       if (!gestureProof || !timingSafeEqual(Buffer.from(gestureProof, 'hex'), expectedProof)) return denied();
-      const payload = owner.share(view, nonce);
-      return { ...fixed('Scheda sintetica condivisa nella vista.'), structuredContent: JSON.parse(payload), _meta: { approvedPayload: payload } };
+      const { payload, attemptId: sharedAttempt } = owner.share(view, nonce);
+      return { ...fixed('Scheda sintetica condivisa nella vista.'), structuredContent: JSON.parse(payload), _meta: { approvedPayload: payload, attemptId: sharedAttempt } };
     } catch { return denied(); }
   });
   server.server.setRequestHandler(ReadResourceRequestSchema, async request => {
