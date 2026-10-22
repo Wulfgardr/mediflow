@@ -1,0 +1,602 @@
+[
+  {
+    "id": "basic",
+    "inputText": "diabete mellito tipo 2. Familiare: Marta Valli. Luogo: Pieve Inventata. Nascita: 17/04/1972. File: referto_Marta_Valli.pdf. OCR: VLLMRT72D57F205Z.",
+    "gold": {
+      "redactedText": "diabete mellito tipo 2. Familiare: [PERSON]. Luogo: [ADDRESS]. Nascita: [DATE]. File: [IDENTIFIER]. OCR: [TAX_ID].",
+      "entities": [
+        {
+          "type": "person",
+          "text": "Marta Valli",
+          "critical": true
+        },
+        {
+          "type": "address",
+          "text": "Pieve Inventata",
+          "critical": true
+        },
+        {
+          "type": "date",
+          "text": "17/04/1972",
+          "critical": true
+        },
+        {
+          "type": "identifier",
+          "text": "referto_Marta_Valli.pdf",
+          "critical": true
+        },
+        {
+          "type": "tax_id",
+          "text": "VLLMRT72D57F205Z",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "Marta Valli",
+        "Pieve Inventata",
+        "17/04/1972",
+        "referto_Marta_Valli.pdf",
+        "VLLMRT72D57F205Z"
+      ]
+    },
+    "clinical": {
+      "conditions": [
+        "diabete mellito tipo 2"
+      ],
+      "medicines": [
+        {
+          "name": "metformina",
+          "dose": "500 mg",
+          "frequency": "due volte al giorno"
+        },
+        {
+          "name": "paracetamolo",
+          "dose": "1000 mg",
+          "frequency": "al bisogno"
+        }
+      ],
+      "measures": [
+        {
+          "kind": "pressione arteriosa",
+          "value": "128/76",
+          "unit": "mmHg"
+        },
+        {
+          "kind": "peso",
+          "value": "72.5",
+          "unit": "kg"
+        }
+      ]
+    },
+    "localSource": {
+      "id": "synthetic-document-basic",
+      "revision": 1,
+      "filename": "referto_Marta_Valli.pdf"
+    }
+  },
+  {
+    "id": "unicode",
+    "inputText": "diabete mellito tipo 2. Familiare: Elísa D’Amico. Luogo: Città Fittizia. Nascita: aprile 1972. File: Elísa_D’Amico_1972.PDF. OCR: DMCLSE72D57F205A.",
+    "gold": {
+      "redactedText": "diabete mellito tipo 2. Familiare: [PERSON]. Luogo: [ADDRESS]. Nascita: [DATE]. File: [IDENTIFIER]. OCR: [TAX_ID].",
+      "entities": [
+        {
+          "type": "person",
+          "text": "Elísa D’Amico",
+          "critical": true
+        },
+        {
+          "type": "address",
+          "text": "Città Fittizia",
+          "critical": true
+        },
+        {
+          "type": "date",
+          "text": "aprile 1972",
+          "critical": true
+        },
+        {
+          "type": "identifier",
+          "text": "Elísa_D’Amico_1972.PDF",
+          "critical": true
+        },
+        {
+          "type": "tax_id",
+          "text": "DMCLSE72D57F205A",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "Elísa D’Amico",
+        "Città Fittizia",
+        "aprile 1972",
+        "Elísa_D’Amico_1972.PDF",
+        "DMCLSE72D57F205A"
+      ]
+    },
+    "clinical": {
+      "conditions": [
+        "diabete mellito tipo 2"
+      ],
+      "medicines": [
+        {
+          "name": "metformina",
+          "dose": "500 mg",
+          "frequency": "due volte al giorno"
+        },
+        {
+          "name": "paracetamolo",
+          "dose": "1000 mg",
+          "frequency": "al bisogno"
+        }
+      ],
+      "measures": [
+        {
+          "kind": "pressione arteriosa",
+          "value": "128/76",
+          "unit": "mmHg"
+        },
+        {
+          "kind": "peso",
+          "value": "72.5",
+          "unit": "kg"
+        }
+      ]
+    },
+    "localSource": {
+      "id": "synthetic-document-unicode",
+      "revision": 1,
+      "filename": "Elísa_D’Amico_1972.PDF"
+    }
+  },
+  {
+    "id": "ocr",
+    "inputText": "diabete mellito tipo 2. Familiare: G1ulia Ferri. Luogo: Borgo Immaginario. Nascita: 04/1972. File: scan_G1ulia_Ferri.png. OCR: FRRGLI72D57F205X.",
+    "gold": {
+      "redactedText": "diabete mellito tipo 2. Familiare: [PERSON]. Luogo: [ADDRESS]. Nascita: [DATE]. File: [IDENTIFIER]. OCR: [TAX_ID].",
+      "entities": [
+        {
+          "type": "person",
+          "text": "G1ulia Ferri",
+          "critical": true
+        },
+        {
+          "type": "address",
+          "text": "Borgo Immaginario",
+          "critical": true
+        },
+        {
+          "type": "date",
+          "text": "04/1972",
+          "critical": true
+        },
+        {
+          "type": "identifier",
+          "text": "scan_G1ulia_Ferri.png",
+          "critical": true
+        },
+        {
+          "type": "tax_id",
+          "text": "FRRGLI72D57F205X",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "G1ulia Ferri",
+        "Borgo Immaginario",
+        "04/1972",
+        "scan_G1ulia_Ferri.png",
+        "FRRGLI72D57F205X"
+      ]
+    },
+    "clinical": {
+      "conditions": [
+        "diabete mellito tipo 2"
+      ],
+      "medicines": [
+        {
+          "name": "metformina",
+          "dose": "500 mg",
+          "frequency": "due volte al giorno"
+        },
+        {
+          "name": "paracetamolo",
+          "dose": "1000 mg",
+          "frequency": "al bisogno"
+        }
+      ],
+      "measures": [
+        {
+          "kind": "pressione arteriosa",
+          "value": "128/76",
+          "unit": "mmHg"
+        },
+        {
+          "kind": "peso",
+          "value": "72.5",
+          "unit": "kg"
+        }
+      ]
+    },
+    "localSource": {
+      "id": "synthetic-document-ocr",
+      "revision": 1,
+      "filename": "scan_G1ulia_Ferri.png"
+    }
+  },
+  {
+    "id": "initials",
+    "inputText": "diabete mellito tipo 2. Familiare: G. Neri. Luogo: Valle Sintetica. Nascita: 1972. File: G_Neri_cartella.docx. OCR: NREGNN72D57F205Q.",
+    "gold": {
+      "redactedText": "diabete mellito tipo 2. Familiare: [PERSON]. Luogo: [ADDRESS]. Nascita: [DATE]. File: [IDENTIFIER]. OCR: [TAX_ID].",
+      "entities": [
+        {
+          "type": "person",
+          "text": "G. Neri",
+          "critical": true
+        },
+        {
+          "type": "address",
+          "text": "Valle Sintetica",
+          "critical": true
+        },
+        {
+          "type": "date",
+          "text": "1972",
+          "critical": true
+        },
+        {
+          "type": "identifier",
+          "text": "G_Neri_cartella.docx",
+          "critical": true
+        },
+        {
+          "type": "tax_id",
+          "text": "NREGNN72D57F205Q",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "G. Neri",
+        "Valle Sintetica",
+        "1972",
+        "G_Neri_cartella.docx",
+        "NREGNN72D57F205Q"
+      ]
+    },
+    "clinical": {
+      "conditions": [
+        "diabete mellito tipo 2"
+      ],
+      "medicines": [
+        {
+          "name": "metformina",
+          "dose": "500 mg",
+          "frequency": "due volte al giorno"
+        },
+        {
+          "name": "paracetamolo",
+          "dose": "1000 mg",
+          "frequency": "al bisogno"
+        }
+      ],
+      "measures": [
+        {
+          "kind": "pressione arteriosa",
+          "value": "128/76",
+          "unit": "mmHg"
+        },
+        {
+          "kind": "peso",
+          "value": "72.5",
+          "unit": "kg"
+        }
+      ]
+    },
+    "localSource": {
+      "id": "synthetic-document-initials",
+      "revision": 1,
+      "filename": "G_Neri_cartella.docx"
+    }
+  },
+  {
+    "id": "ambiguous",
+    "inputText": "diabete mellito tipo 2. Familiare: Ada Lattesi. Luogo: Porto di Prova. Nascita: 04/05/1972. File: Ada_Lattesi_04-05-1972.pdf. OCR: LTTDAA72E44F205B.",
+    "gold": {
+      "redactedText": "diabete mellito tipo 2. Familiare: [PERSON]. Luogo: [ADDRESS]. Nascita: [DATE]. File: [IDENTIFIER]. OCR: [TAX_ID].",
+      "entities": [
+        {
+          "type": "person",
+          "text": "Ada Lattesi",
+          "critical": true
+        },
+        {
+          "type": "address",
+          "text": "Porto di Prova",
+          "critical": true
+        },
+        {
+          "type": "date",
+          "text": "04/05/1972",
+          "critical": true
+        },
+        {
+          "type": "identifier",
+          "text": "Ada_Lattesi_04-05-1972.pdf",
+          "critical": true
+        },
+        {
+          "type": "tax_id",
+          "text": "LTTDAA72E44F205B",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "Ada Lattesi",
+        "Porto di Prova",
+        "04/05/1972",
+        "Ada_Lattesi_04-05-1972.pdf",
+        "LTTDAA72E44F205B"
+      ]
+    },
+    "clinical": {
+      "conditions": [
+        "diabete mellito tipo 2"
+      ],
+      "medicines": [
+        {
+          "name": "metformina",
+          "dose": "500 mg",
+          "frequency": "due volte al giorno"
+        },
+        {
+          "name": "paracetamolo",
+          "dose": "1000 mg",
+          "frequency": "al bisogno"
+        }
+      ],
+      "measures": [
+        {
+          "kind": "pressione arteriosa",
+          "value": "128/76",
+          "unit": "mmHg"
+        },
+        {
+          "kind": "peso",
+          "value": "72.5",
+          "unit": "kg"
+        }
+      ]
+    },
+    "localSource": {
+      "id": "synthetic-document-ambiguous",
+      "revision": 1,
+      "filename": "Ada_Lattesi_04-05-1972.pdf"
+    }
+  },
+  {
+    "id": "case",
+    "inputText": "diabete mellito tipo 2. Familiare: luca ROVI. Luogo: MONTE FITTIZIO. Nascita: maggio 1972. File: LUCA_ROVI_referto.pdf. OCR: RVOLCU72E04F205C.",
+    "gold": {
+      "redactedText": "diabete mellito tipo 2. Familiare: [PERSON]. Luogo: [ADDRESS]. Nascita: [DATE]. File: [IDENTIFIER]. OCR: [TAX_ID].",
+      "entities": [
+        {
+          "type": "person",
+          "text": "luca ROVI",
+          "critical": true
+        },
+        {
+          "type": "address",
+          "text": "MONTE FITTIZIO",
+          "critical": true
+        },
+        {
+          "type": "date",
+          "text": "maggio 1972",
+          "critical": true
+        },
+        {
+          "type": "identifier",
+          "text": "LUCA_ROVI_referto.pdf",
+          "critical": true
+        },
+        {
+          "type": "tax_id",
+          "text": "RVOLCU72E04F205C",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "luca ROVI",
+        "MONTE FITTIZIO",
+        "maggio 1972",
+        "LUCA_ROVI_referto.pdf",
+        "RVOLCU72E04F205C"
+      ]
+    },
+    "clinical": {
+      "conditions": [
+        "diabete mellito tipo 2"
+      ],
+      "medicines": [
+        {
+          "name": "metformina",
+          "dose": "500 mg",
+          "frequency": "due volte al giorno"
+        },
+        {
+          "name": "paracetamolo",
+          "dose": "1000 mg",
+          "frequency": "al bisogno"
+        }
+      ],
+      "measures": [
+        {
+          "kind": "pressione arteriosa",
+          "value": "128/76",
+          "unit": "mmHg"
+        },
+        {
+          "kind": "peso",
+          "value": "72.5",
+          "unit": "kg"
+        }
+      ]
+    },
+    "localSource": {
+      "id": "synthetic-document-case",
+      "revision": 1,
+      "filename": "LUCA_ROVI_referto.pdf"
+    }
+  },
+  {
+    "id": "homonym",
+    "inputText": "malattia di Parkinson. Familiare: Paolo Parkinson. Luogo: San Luogo Inventato. Nascita: 4 maggio. File: Paolo_Parkinson.pdf. OCR: PRKPLA72E04F205D.",
+    "gold": {
+      "redactedText": "malattia di Parkinson. Familiare: [PERSON]. Luogo: [ADDRESS]. Nascita: [DATE]. File: [IDENTIFIER]. OCR: [TAX_ID].",
+      "entities": [
+        {
+          "type": "person",
+          "text": "Paolo Parkinson",
+          "critical": true
+        },
+        {
+          "type": "address",
+          "text": "San Luogo Inventato",
+          "critical": true
+        },
+        {
+          "type": "date",
+          "text": "4 maggio",
+          "critical": true
+        },
+        {
+          "type": "identifier",
+          "text": "Paolo_Parkinson.pdf",
+          "critical": true
+        },
+        {
+          "type": "tax_id",
+          "text": "PRKPLA72E04F205D",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "Paolo Parkinson",
+        "San Luogo Inventato",
+        "4 maggio",
+        "Paolo_Parkinson.pdf",
+        "PRKPLA72E04F205D"
+      ]
+    },
+    "clinical": {
+      "conditions": [
+        "malattia di Parkinson"
+      ],
+      "medicines": [
+        {
+          "name": "levodopa/carbidopa",
+          "dose": "100/25 mg",
+          "frequency": "due volte al giorno"
+        },
+        {
+          "name": "paracetamolo",
+          "dose": "1000 mg",
+          "frequency": "al bisogno"
+        }
+      ],
+      "measures": [
+        {
+          "kind": "pressione arteriosa",
+          "value": "128/76",
+          "unit": "mmHg"
+        },
+        {
+          "kind": "peso",
+          "value": "72.5",
+          "unit": "kg"
+        }
+      ]
+    },
+    "localSource": {
+      "id": "synthetic-document-homonym",
+      "revision": 1,
+      "filename": "Paolo_Parkinson.pdf"
+    }
+  },
+  {
+    "id": "month-only",
+    "inputText": "diabete mellito tipo 2. Familiare: Nora Blu. Luogo: Villa di Prova. Nascita: maggio. File: Nora_Blu.pdf. OCR: BLUNRO72E44F205E.",
+    "gold": {
+      "redactedText": "diabete mellito tipo 2. Familiare: [PERSON]. Luogo: [ADDRESS]. Nascita: [DATE]. File: [IDENTIFIER]. OCR: [TAX_ID].",
+      "entities": [
+        {
+          "type": "person",
+          "text": "Nora Blu",
+          "critical": true
+        },
+        {
+          "type": "address",
+          "text": "Villa di Prova",
+          "critical": true
+        },
+        {
+          "type": "date",
+          "text": "maggio",
+          "critical": true
+        },
+        {
+          "type": "identifier",
+          "text": "Nora_Blu.pdf",
+          "critical": true
+        },
+        {
+          "type": "tax_id",
+          "text": "BLUNRO72E44F205E",
+          "critical": true
+        }
+      ],
+      "forbiddenTokens": [
+        "Nora Blu",
+        "Villa di Prova",
+        "maggio",
+        "Nora_Blu.pdf",
+        "BLUNRO72E44F205E"
+      ]
+    },
+    "clinical": {
+      "conditions": [
+        "diabete mellito tipo 2"
+      ],
+      "medicines": [
+        {
+          "name": "metformina",
+          "dose": "500 mg",
+          "frequency": "due volte al giorno"
+        },
+        {
+          "name": "paracetamolo",
+          "dose": "1000 mg",
+          "frequency": "al bisogno"
+        }
+      ],
+      "measures": [
+        {
+          "kind": "pressione arteriosa",
+          "value": "128/76",
+          "unit": "mmHg"
+        },
+        {
+          "kind": "peso",
+          "value": "72.5",
+          "unit": "kg"
+        }
+      ]
+    },
+    "localSource": {
+      "id": "synthetic-document-month-only",
+      "revision": 1,
+      "filename": "Nora_Blu.pdf"
+    }
+  }
+]
