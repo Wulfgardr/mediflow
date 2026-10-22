@@ -7,14 +7,16 @@
     "moduleResolution": "Bundler",
     "target": "ES2022",
     "lib": [
-      "ES2022",
+      "ES2024",
       "DOM"
     ],
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true
   },
   "include": [
     "src/**/*.mjs",
     "scripts/**/*.mjs",
-    "test/**/*.mjs"
+    "test/**/*.mjs",
+    "test/**/*.d.ts"
   ]
 }
