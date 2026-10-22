@@ -1,9 +1,3 @@
-/* WUL-UIUX (STREAM E): bottone condiviso sopra le classi css esistenti
-   (.ui-btn-primary, .mf-btn-secondary) piu i toni ghost/destructive derivati dai
-   pattern ricorrenti. Non ridisegna: la resa e quella gia in uso. Le CTA primarie
-   nel codice usano `ui-btn-primary px-5 py-2.5`; qui il padding di default e
-   incapsulato. */
-
 'use client';
 
 import { forwardRef, type ButtonHTMLAttributes, type PointerEvent, type ReactNode } from 'react';
@@ -11,32 +5,30 @@ import { forwardRef, type ButtonHTMLAttributes, type PointerEvent, type ReactNod
 import { useLumeAnello } from '@/hooks/use-lume-anello';
 import { cn } from '@/lib/utils';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'destructive';
+export type ButtonVariant = 'primary' | 'secondary' | 'text' | 'destructive' | 'icon' | 'ghost';
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
-    /* La CTA primaria usa l'accento minerale e il gesto condiviso. */
-    primary: 'ui-btn-primary px-5 py-2.5 disabled:opacity-50',
-    /* Compagna quieta, in penombra opaca. */
-    secondary: 'mf-btn-secondary disabled:opacity-50',
-    ghost:
-        'inline-flex items-center justify-center gap-2 rounded-full border border-transparent px-3 py-2 text-base font-semibold text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,transparent)] hover:text-[color:var(--lume-ink)] disabled:opacity-50',
-    destructive:
-        'inline-flex items-center justify-center gap-2 rounded-[18px] px-5 py-2.5 text-base font-semibold text-white transition-transform active:scale-[0.98] disabled:opacity-50',
+    primary: 'mf-button-primary',
+    secondary: 'mf-button-secondary',
+    text: 'mf-button-text',
+    ghost: 'mf-button-text',
+    destructive: 'mf-button-destructive',
+    icon: 'mf-button-icon',
 };
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-    variant?: ButtonVariant;
-    children: ReactNode;
-}
+type CommonProps = ButtonHTMLAttributes<HTMLButtonElement> & { children: ReactNode };
+
+export type ButtonProps = CommonProps & (
+    | { variant: 'icon'; 'aria-label': string; confirmation?: never }
+    | { variant: 'destructive'; confirmation?: boolean }
+    | { variant?: Exclude<ButtonVariant, 'icon' | 'destructive'>; confirmation?: never }
+);
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-    { variant = 'primary', className, children, type = 'button', style, onPointerDown, ...rest },
+    { variant = 'primary', confirmation, className, children, type = 'button', onPointerDown, ...rest },
     ref,
 ) {
-    // the anello is only a transient response to the direct gesture.
     const { anello, onLumePointerDown } = useLumeAnello();
-    const destructiveStyle =
-        variant === 'destructive' ? { background: 'var(--lume-signal-critical)', ...style } : style;
 
     const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
         onLumePointerDown(event);
@@ -45,12 +37,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 
     return (
         <button
+            {...rest}
             ref={ref}
             type={type}
-            className={cn(VARIANT_CLASSES[variant], 'lume-press mf-action', className)}
-            style={destructiveStyle}
+            className={cn(VARIANT_CLASSES[variant], className)}
+            data-command-confirmation={variant === 'destructive' && confirmation ? 'true' : undefined}
             onPointerDown={handlePointerDown}
-            {...rest}
         >
             {children}
             {anello ? (

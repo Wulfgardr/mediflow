@@ -551,28 +551,6 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
     color: var(--lume-ink-muted);
   }
 
-  .ui-btn-primary {
-    @apply inline-flex items-center justify-center gap-2 text-base font-semibold;
-    border-radius: var(--lume-radius-control);
-    background: var(--lume-accent);
-    color: var(--lume-surface-focal);
-    box-shadow: none;
-    transition-property: opacity, background-color;
-    transition-duration: var(--lume-dur-riga);
-    transition-timing-function: var(--lume-ease);
-  }
-
-  .ui-btn-primary:hover {
-    background-color: color-mix(in srgb, var(--lume-accent) 90%, var(--lume-ink));
-  }
-
-  /* WUL-UIUX: la CTA primaria piu usata non aveva alcun anello di focus. */
-  .ui-btn-primary:focus-visible {
-    outline: none;
-    box-shadow:
-      0 0 0 2px var(--lume-surface-canvas),
-      0 0 0 4px var(--lume-accent);
-  }
   .clinical-rich-text,
   .clinical-rich-editor {
     font: var(--type-prose);
@@ -1197,68 +1175,109 @@ textarea.input-field {
   background-color: var(--lume-surface-focal);
 }
 
-/* Secondary button: calm chrome companion to .ui-btn-primary */
-/* WUL-UIUX: '.ui-btn-secondary' era usata in service-/prosthetic-
-   prescription-manager ma non definita (bottoni nativi non stilizzati). Stesso
-   approccio di '.input-field': la si allinea a '.mf-btn-secondary'. */
-.mf-btn-secondary,
-.ui-btn-secondary {
+html:root[data-lume] :is(.mf-button-primary, .ui-btn-primary, .mf-button-secondary, .mf-btn-secondary, .ui-btn-secondary, .mf-button-text, .mf-button-destructive, .mf-button-icon) {
+  box-sizing: border-box;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.45rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
-  background-color: var(--lume-surface-field);
-  color: var(--lume-ink);
-  padding: 0.55rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: 0;
+  gap: 8px;
+  min-height: 40px;
+  min-width: 40px;
+  max-width: 100%;
+  height: auto;
+  padding: 8px 16px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: var(--lume-radius-control);
+  font: var(--type-strong);
+  letter-spacing: normal;
+  text-align: center;
+  text-decoration: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
   box-shadow: none;
-  transition: background-color var(--lume-dur-riga) var(--lume-ease), border-color var(--lume-dur-riga) var(--lume-ease), color var(--lume-dur-riga) var(--lume-ease);
   cursor: pointer;
+  transition: background-color var(--lume-dur-riga) var(--lume-ease), color var(--lume-dur-riga) var(--lume-ease), border-color var(--lume-dur-riga) var(--lume-ease);
 }
 
-.mf-btn-secondary:hover:not(:disabled),
-.ui-btn-secondary:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--lume-ink) 22%, transparent);
+:where(.mf-button-primary, .ui-btn-primary, .mf-button-secondary, .mf-btn-secondary, .ui-btn-secondary, .mf-button-text, .mf-button-destructive, .mf-button-icon) {
+  border-color: transparent;
+  background-color: transparent;
   color: var(--lume-ink);
-  background-color: color-mix(in srgb, var(--lume-ink) 5%, var(--lume-surface-field));
 }
 
-.mf-btn-secondary:active:not(:disabled),
-.ui-btn-secondary:active:not(:disabled) {
-  transform: none;
+:is(.mf-button-primary, .ui-btn-primary) {
+  background-color: var(--lume-accent);
+  color: var(--lume-surface-focal);
 }
 
-.mf-btn-secondary:focus-visible,
-.ui-btn-secondary:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 2px var(--lume-surface-canvas),
-    0 0 0 4px var(--lume-accent);
+:is(.mf-button-primary, .ui-btn-primary):where(:hover):where(:not(:disabled)) {
+  background-color: color-mix(in srgb, var(--lume-accent) 90%, var(--lume-ink));
 }
 
-.mf-btn-secondary:disabled,
-.ui-btn-secondary:disabled {
+:is(.mf-button-secondary, .mf-btn-secondary, .ui-btn-secondary) {
+  border-color: var(--lume-rule-strong);
+  background-color: var(--lume-surface-field);
+}
+
+:is(.mf-button-secondary, .mf-btn-secondary, .ui-btn-secondary, .mf-button-text, .mf-button-icon):where(:hover):where(:not(:disabled)) {
+  background-color: var(--lume-surface-hover);
+}
+
+.mf-button-text {
+  color: var(--lume-accent);
+}
+
+.mf-button-destructive {
+  color: var(--lume-signal-critical);
+}
+
+.mf-button-destructive:where(:hover):where(:not(:disabled)) {
+  background-color: color-mix(in srgb, var(--lume-signal-critical) 10%, var(--lume-surface-field));
+}
+
+.mf-button-destructive[data-command-confirmation='true'] {
+  background-color: var(--lume-signal-critical);
+  border-color: var(--lume-signal-critical);
+  color: var(--lume-surface-focal);
+}
+
+.mf-button-destructive[data-command-confirmation='true']:where(:hover):where(:not(:disabled)) {
+  background-color: color-mix(in srgb, var(--lume-signal-critical) 90%, var(--lume-ink));
+}
+
+html:root[data-lume] .mf-button-icon {
+  padding: 8px;
+  width: 40px;
+  flex-shrink: 0;
+}
+
+html:root[data-lume] :is(.mf-button-primary, .ui-btn-primary, .mf-button-secondary, .mf-btn-secondary, .ui-btn-secondary, .mf-button-text, .mf-button-destructive, .mf-button-icon):focus-visible {
+  outline: 2px solid var(--lume-accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--lume-surface-canvas);
+}
+
+html:root[data-lume] :is(.mf-button-primary, .ui-btn-primary, .mf-button-secondary, .mf-btn-secondary, .ui-btn-secondary, .mf-button-text, .mf-button-destructive, .mf-button-icon):disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-:root.dark .mf-btn-secondary,
-:root.dark .ui-btn-secondary {
-  border-color: color-mix(in srgb, var(--lume-ink) 14%, transparent);
+html:root[data-lume] :is(.mf-button-primary, .ui-btn-primary, .mf-button-destructive[data-command-confirmation='true']):disabled {
   background-color: var(--lume-surface-field);
-  color: var(--lume-ink);
-  box-shadow: none;
+  border-color: var(--lume-rule-strong);
+  color: var(--lume-ink-muted);
 }
 
-:root.dark .mf-btn-secondary:hover:not(:disabled),
-:root.dark .ui-btn-secondary:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--lume-ink) 22%, transparent);
-  color: var(--lume-ink);
-  background-color: color-mix(in srgb, var(--lume-ink) 5%, var(--lume-surface-field));
+@media (pointer: coarse), (max-width: 700px) {
+  html:root[data-lume] :is(.mf-button-primary, .ui-btn-primary, .mf-button-secondary, .mf-btn-secondary, .ui-btn-secondary, .mf-button-text, .mf-button-destructive, .mf-button-icon) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  html:root[data-lume] .mf-button-icon { width: 44px; }
 }
 
 /* Penombra opaca per i blocchi di lavoro. */
