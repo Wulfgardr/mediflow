@@ -1,4 +1,4 @@
-import { jsonEmissionPlan, type EmissionPlan } from '../../chatgpt-execution/ordinary-emission-plan';
+import { jsonEmissionPlan, type EmissionPlan } from '../../ai-preparation/emission-plan';
 import { buildSmartImportExtractionPlan } from '../../ai-task-contract-prompts';
 import type { SmartImportProjection } from '../../smart-import-projection';
 import {

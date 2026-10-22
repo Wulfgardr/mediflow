@@ -1,4 +1,4 @@
-import { emissionPlan, emissionUnit, renderEmissionPlan, type EmissionPlan } from './chatgpt-execution/ordinary-emission-plan';
+import { emissionPlan, emissionUnit, renderEmissionPlan, type EmissionPlan } from './ai-preparation/emission-plan';
 export const AI_TASK_EXTRACTION_SCHEMA_VERSION = 'mediflow.ai.extract.v1';
 
 type PromptTaskKind = 'patient_insight' | 'smart_import' | 'document_synthesis';

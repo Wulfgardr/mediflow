@@ -13,6 +13,7 @@ if (browserOnly) {
             tests.push(`${folder}/${entry}`);
         }
     }
+    tests.push('lib/ai-preparation/preparation-core.test.ts');
     tests.push('lib/security/native-inference.test.cjs', 'lib/security/native-ordinary-content.test.cjs', 'lib/security/native-ordinary-host-sources.test.cjs');
     tests.push('lib/ai-providers/fabric/chatgpt-synthetic-synthesis-binding.test.ts', 'components/settings/chatgpt-synthesis-panel.test.ts');
     if (browser) tests.push('e2e/chatgpt-synthesis-product.spec.ts', 'lib/chatgpt-account/account-product.browser.test.mjs');
