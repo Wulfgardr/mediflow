@@ -1,0 +1,29 @@
+{
+  "browser": "145.0.7632.6",
+  "os": "27.2.0",
+  "method": "CDP timeline on a failing reference-host run; corroborating native renderer samples on original d3d0c2c4b application code. Raw traces and native samples kept local; no production data.",
+  "trace": {
+    "runTaskWallMs": 51.582,
+    "runTaskCpuMs": 1.922,
+    "beginMainFrameWallMs": 50.486,
+    "gapBeforeSyntheticMouseMoveMs": 50.29,
+    "maxParseHtmlMs": 12.985,
+    "maxEvaluateScriptMs": 10.409,
+    "maxEventDispatchMs": 0.322,
+    "maxLayoutMs": 1.975,
+    "hmacSignMs": 0.005,
+    "hmacSignReplyMs": 0.003
+  },
+  "nativeStack": [
+    "GetCurrentKeyModifiers (HIToolbox)",
+    "SLSInputModifierKeyState (SkyLight)",
+    "CGSScoreboard",
+    "SLSServerPort",
+    "__SLSInitialize_block_invoke",
+    "CGSDisplayInitialize / initDisplayMappings / initDisplayState",
+    "SLSTCCService::TCCAccessCheck / TCCAccessRequest",
+    "xpc_connection_send_message_with_reply_sync / mach_msg2_trap"
+  ],
+  "conclusion": "Lazy native macOS input/display initialization during Chromium headless-shell hover recomputation; application changes to SDK startup and yielding before signing did not remove the failures and were reverted. Use the full bundled Chromium in new headless mode for the reference harness. No threshold, observer, host source, consent, epoch or nonce changes.",
+  "reference": "https://playwright.dev/docs/browsers#chromium-new-headless-mode"
+}

@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { collectExplicitNpmNodeTests, collectExplicitNpmSelections, collectNpmScriptBinding, collectClaimsSelfTestSelection, collectGuardSelfTestSelections, GUARD_SELF_TEST_SUITES, EXPLICIT_NPM_SUITES } from './explicit-npm-test-selection.mjs';
+import { load, JSON_SCHEMA } from 'js-yaml';
+import { collectShardedPlaywrightBinding, collectSyntheticPluginSelections, collectExplicitNpmNodeTests, collectExplicitNpmSelections, collectNpmScriptBinding, collectClaimsSelfTestSelection, collectGuardSelfTestSelections, GUARD_SELF_TEST_SUITES, EXPLICIT_NPM_SUITES } from './explicit-npm-test-selection.mjs';
 import { collectUnitTestFiles } from './unit-test-selection.mjs';
 import { checkTestSelection } from './check-test-selection.mjs';
 
@@ -16,6 +17,39 @@ const workflowPath = '.github/workflows/cross-platform.yml';
 const claimsFile = 'scripts/check-claims-guard.mjs';
 const claimsWorkflow = '.github/workflows/openapi-contract-guard.yml';
 const claimsCall = 'npm run check:claims -- --self-test';
+
+test('Playwright CI requires complete shards and a fail-closed aggregate', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-shard-selection-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const workflowPath = '.github/workflows/e2e.yml';
+  const original = load(fs.readFileSync(path.join(sourceRoot, workflowPath), 'utf8'));
+  write(root, 'package.json', fs.readFileSync(path.join(sourceRoot, 'package.json'), 'utf8'));
+  write(root, workflowPath, original);
+  assert.deepEqual(collectShardedPlaywrightBinding(root).matrix, { shard: [1, 2] });
+  const gate = original.jobs.e2e.steps[0];
+  for (const result of ['success', 'failure', 'cancelled', 'skipped', '']) {
+    const run = spawnSync('bash', ['-e', '-c', gate.run], { env: { ...process.env, SHARD_RESULT: result } });
+    assert.equal(run.status === 0, result === 'success', result);
+  }
+  for (const mutate of [
+    w => { w.jobs['e2e-shard'].strategy.matrix.shard = [1]; },
+    w => { w.jobs['e2e-shard'].strategy.matrix.shard = [1, 1]; },
+    w => { w.jobs['e2e-shard'].strategy['fail-fast'] = true; },
+    w => { w.jobs['e2e-shard'].if = false; },
+    w => { w.jobs['e2e-shard']['continue-on-error'] = true; },
+    w => { w.jobs['e2e-shard'].steps.find(s => s.name === 'Run Playwright suite').if = false; },
+    w => { w.jobs['e2e-shard'].steps.find(s => s.name === 'Run Playwright suite')['continue-on-error'] = true; },
+    w => { w.jobs['e2e-shard'].steps.find(s => s.name === 'Run Playwright suite').run += ' --grep smoke'; },
+    w => { delete w.jobs.e2e.if; },
+    w => { w.jobs.e2e.needs = []; },
+    w => { w.jobs.e2e.steps[0].run = 'true'; },
+    w => { w.jobs.e2e['continue-on-error'] = true; },
+  ]) {
+    const changed = structuredClone(original);
+    mutate(changed); write(root, workflowPath, changed);
+    assert.throws(() => collectShardedPlaywrightBinding(root));
+  }
+});
 
 function write(root, file, value) {
   fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
@@ -42,6 +76,43 @@ function change(root, file, mutate) {
   const value = JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
   mutate(value); write(root, file, value);
 }
+
+test('chat demo selects each CI suite, including card references and the extended-load TODO', () => {
+  const selections = collectSyntheticPluginSelections(sourceRoot);
+  for (const [id, selection] of Object.entries(selections)) {
+    assert.deepEqual(selection.errors, [], id);
+    assert.ok(selection.files.length, id);
+  }
+  assert.ok(selections['npm:chat-demo:test'].files.includes('plugins/mediflow-chat-demo/test/card-extended-load.test.mjs'));
+  assert.deepEqual(selections['npm:chat-demo:test:card-reference'].files, ['plugins/mediflow-chat-demo/test/card-reference.mjs']);
+  assert.deepEqual(selections['npm:chat-demo:test:card-performance-negative'].files, ['plugins/mediflow-chat-demo/scripts/falsify-card-performance.mjs']);
+});
+
+test('chat demo rejects changed triggers, npm commands and missing card CI calls', t => {
+  const workflowFile = '.github/workflows/chat-demo.yml';
+  const packageFile = 'plugins/mediflow-chat-demo/package.json';
+  const mutations = [
+    { file: workflowFile, mutate: workflow => { workflow.on.pull_request.paths.pop(); }, script: 'test', error: /Required CI triggers changed/ },
+    ...['test:card-reference', 'test:card-performance-negative'].flatMap(script => [
+      { file: workflowFile, mutate: workflow => { workflow.jobs['chat-demo'].steps = workflow.jobs['chat-demo'].steps.filter(step => step.run !== `npm run ${script}`); },
+        script, error: /exactly one literal CI call/ },
+      { file: packageFile, mutate: pkg => { pkg.scripts[script] += ' || true'; }, script, error: /Required npm command changed/ },
+    ]),
+  ];
+  for (const mutation of mutations) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'chat-demo-selector-'));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    for (const file of [workflowFile, packageFile]) {
+      const value = load(fs.readFileSync(path.join(sourceRoot, file), 'utf8'), { schema: JSON_SCHEMA });
+      if (file === mutation.file) mutation.mutate(value);
+      write(root, file, value);
+    }
+    const selection = collectSyntheticPluginSelections(root)[`npm:chat-demo:${mutation.script}`];
+    assert.deepEqual(selection.files, []);
+    assert.equal(selection.binding, null);
+    assert.match(selection.errors.join('\n'), mutation.error);
+  }
+});
 function bindingChange(root, mutate) {
   change(root, workflowPath, workflow => mutate(workflow, workflow.jobs['headless-contracts'], workflow.jobs['headless-contracts'].steps[0]));
 }

@@ -12,7 +12,14 @@
     "start": "node src/stdio.mjs",
     "test:browser": "node scripts/browser-smoke.mjs",
     "typecheck": "tsc -p tsconfig.json",
-    "test:falsification": "node scripts/falsify.mjs"
+    "test:falsification": "node scripts/falsify.mjs",
+    "prepare:reference": "node scripts/prepare-reference.mjs",
+    "test:reference": "node scripts/run-reference.mjs",
+    "test:performance-negative": "node scripts/run-reference.mjs --falsify",
+    "start:card": "node src/card-stdio.mjs",
+    "test:card-reference": "node scripts/run-reference.mjs --card",
+    "start:card-fixture": "node --import ../../../scripts/register-strip-types-loader.mjs test/card-stdio-fixture.mjs",
+    "test:card-performance-negative": "node scripts/falsify-card-performance.mjs"
   },
   "dependencies": {
     "@openai/mcp-extensions": "0.1.0",

@@ -524,3 +524,13 @@ WUL-757 con sola navigazione nella UI fidata separata. Il
 [pacchetto locale](../plugins/mediflow-local-ui/README.md) distingue template,
 build ammessa, configurazione dei client e prove ancora necessarie. Non
 amplia il grant profilo esistente né dichiara ammissione clinica o pubblicazione.
+
+[Il broker sintetico della scheda](./chat-card-broker.md) documenta il profilo
+chiuso e il consenso sui byte finali dell'unità 2b, con prove limitate alle fixture.
+[ADR 0160](./adr/0160-mediflow-in-desktop-chat.md) propone il nuovo client nelle
+chat desktop: contesto pseudonimizzato, ricomposizione nativa raccomandata,
+Touch ID/PIN nativi e mapping solo di sessione. Il secondo round integra
+esiti R/L per host, importazione documentale, Fabric, catalogo delle viste,
+budget di prestazione e pubblicazione. Resta Proposed; qualifica sintetica,
+approvazione delle directory e ammissione clinica sono passaggi distinti.
+Il telecomando di ADR 0159 conserva il suo confine.

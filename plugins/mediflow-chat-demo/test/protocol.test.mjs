@@ -37,7 +37,7 @@ test('MCP boundary: strict empty tool, constant receipt, MIME, no data in observ
     noSentinel(args);
     const result = await client.callTool({ name: TOOL, arguments: args });
     noSentinel(result);
-    assert.deepEqual(result, { content: [{ type: 'text', text: '{"status":"demo_view_ready"}' }] });
+    assert.deepEqual(result, { content: [{ type: 'text', text: 'Dimostrazione MediFlow disponibile nella vista interattiva. Richiede un host MCP Apps; nessuna cartella clinica collegata.' }] });
     assert.deepEqual(await client.callTool({ name: TOOL, arguments: {} }), result);
     for (const name of [TOOL, 'write_patient', sentinel]) {
       const rejected = await client.callTool({ name, arguments: { patientId: sentinel, url: sentinel, text: sentinel } });

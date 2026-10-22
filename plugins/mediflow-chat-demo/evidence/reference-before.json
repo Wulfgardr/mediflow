@@ -1,0 +1,234 @@
+{
+  "label": "before",
+  "node": "v24.21.0",
+  "browser": "145.0.7632.6",
+  "htmlBytes": 1008829,
+  "gzipBytes": 404586,
+  "runs": [
+    {
+      "toolToCardFcpMs": 80.7998046875,
+      "interactionsMs": [
+        44.099999994039536,
+        11.700000002980232,
+        12.299999997019768,
+        12.699999988079071,
+        13,
+        13.200000002980232
+      ],
+      "themeMs": [
+        11.700000002980232,
+        14.5
+      ],
+      "resizeMessages": 6,
+      "scrollBefore": 300,
+      "scrollAfter": 300,
+      "app": {
+        "sameMain": true,
+        "sameSummary": true,
+        "focusCalls": 0,
+        "scrollCalls": 0,
+        "left": 220,
+        "right": 220,
+        "scrollBefore": 0,
+        "scrollAfter": 0,
+        "active": "SUMMARY"
+      },
+      "hostAnimationDurationsMs": [
+        300,
+        300,
+        300,
+        300,
+        300,
+        300
+      ],
+      "animationDurationsMs": [],
+      "animationFrameGapsMs": [],
+      "maxFrameGapMs": 34.700000000000045,
+      "jankFrames": 0,
+      "resizeFollowPolicy": {
+        "before": 300,
+        "after": 965
+      }
+    },
+    {
+      "toolToCardFcpMs": 97.800048828125,
+      "interactionsMs": [
+        33.20000000298023,
+        13.100000008940697,
+        9.699999988079071,
+        13.099999994039536,
+        9.799999997019768,
+        13.200000002980232
+      ],
+      "themeMs": [
+        11.799999997019768,
+        14.700000002980232
+      ],
+      "resizeMessages": 6,
+      "scrollBefore": 300,
+      "scrollAfter": 300,
+      "app": {
+        "sameMain": true,
+        "sameSummary": true,
+        "focusCalls": 0,
+        "scrollCalls": 0,
+        "left": 220,
+        "right": 220,
+        "scrollBefore": 0,
+        "scrollAfter": 0,
+        "active": "SUMMARY"
+      },
+      "hostAnimationDurationsMs": [
+        300,
+        300,
+        300,
+        300,
+        300,
+        300
+      ],
+      "animationDurationsMs": [],
+      "animationFrameGapsMs": [],
+      "maxFrameGapMs": 26.59999999999991,
+      "jankFrames": 0,
+      "resizeFollowPolicy": {
+        "before": 300,
+        "after": 965
+      }
+    },
+    {
+      "toolToCardFcpMs": 88.900146484375,
+      "interactionsMs": [
+        38.29999999701977,
+        12.400000005960464,
+        12.5,
+        12.800000011920929,
+        12.900000005960464,
+        12.299999997019768
+      ],
+      "themeMs": [
+        13,
+        14.100000008940697
+      ],
+      "resizeMessages": 6,
+      "scrollBefore": 300,
+      "scrollAfter": 300,
+      "app": {
+        "sameMain": true,
+        "sameSummary": true,
+        "focusCalls": 0,
+        "scrollCalls": 0,
+        "left": 220,
+        "right": 220,
+        "scrollBefore": 0,
+        "scrollAfter": 0,
+        "active": "SUMMARY"
+      },
+      "hostAnimationDurationsMs": [
+        300,
+        300,
+        300,
+        300,
+        300,
+        300
+      ],
+      "animationDurationsMs": [],
+      "animationFrameGapsMs": [],
+      "maxFrameGapMs": 33.30000000000007,
+      "jankFrames": 0,
+      "resizeFollowPolicy": {
+        "before": 300,
+        "after": 965
+      }
+    },
+    {
+      "toolToCardFcpMs": 93,
+      "interactionsMs": [
+        34.900000005960464,
+        11.299999997019768,
+        12.300000011920929,
+        11.299999997019768,
+        12.900000005960464,
+        13.099999994039536
+      ],
+      "themeMs": [
+        11.900000005960464,
+        14.699999988079071
+      ],
+      "resizeMessages": 6,
+      "scrollBefore": 300,
+      "scrollAfter": 300,
+      "app": {
+        "sameMain": true,
+        "sameSummary": true,
+        "focusCalls": 0,
+        "scrollCalls": 0,
+        "left": 220,
+        "right": 220,
+        "scrollBefore": 0,
+        "scrollAfter": 0,
+        "active": "SUMMARY"
+      },
+      "hostAnimationDurationsMs": [
+        300,
+        300,
+        300,
+        300,
+        300,
+        300
+      ],
+      "animationDurationsMs": [],
+      "animationFrameGapsMs": [],
+      "maxFrameGapMs": 25.200000000000045,
+      "jankFrames": 0,
+      "resizeFollowPolicy": {
+        "before": 300,
+        "after": 965
+      }
+    },
+    {
+      "toolToCardFcpMs": 83.699951171875,
+      "interactionsMs": [
+        41.80000001192093,
+        12.700000002980232,
+        12.199999988079071,
+        12.099999994039536,
+        12.400000005960464,
+        12.699999988079071
+      ],
+      "themeMs": [
+        11.5,
+        15
+      ],
+      "resizeMessages": 6,
+      "scrollBefore": 300,
+      "scrollAfter": 300,
+      "app": {
+        "sameMain": true,
+        "sameSummary": true,
+        "focusCalls": 0,
+        "scrollCalls": 0,
+        "left": 220,
+        "right": 220,
+        "scrollBefore": 0,
+        "scrollAfter": 0,
+        "active": "SUMMARY"
+      },
+      "hostAnimationDurationsMs": [
+        300,
+        300,
+        300,
+        300,
+        300,
+        300
+      ],
+      "animationDurationsMs": [],
+      "animationFrameGapsMs": [],
+      "maxFrameGapMs": 34.69999999999993,
+      "jankFrames": 0,
+      "resizeFollowPolicy": {
+        "before": 300,
+        "after": 965
+      }
+    }
+  ]
+}

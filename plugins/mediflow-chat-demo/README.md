@@ -6,10 +6,11 @@ Un lettore MCP Apps inline mostra una persona, tre voci con fonti e due terapie
 agli archivi, alle chiavi o ai servizi di MediFlow. Nessuna scrittura clinica.
 
 Il tool `mediflow_chat_demo_open` accetta solo `{}` e restituisce sempre
-`{"status":"demo_view_ready"}` come testo. La risorsa
+una frase costante di fallback, senza contenuti della vista. La risorsa
 `ui://mediflow-chat-demo/reader` usa `text/html;profile=mcp-app`. HTML, CSS,
 JavaScript e Newsreader sono incorporati nella build; nessuna CDN. La build
-ricava i colori dai token Lume attivi e incorpora il font locale con licenza
+ricava i colori dai token Lume attivi, applica le variabili di tema dell’host
+quando disponibili e incorpora Newsreader Regular locale con licenza
 OFL. Testata e prosa seguono [Punto d’inchiostro](../../docs/design/punto-inchiostro/01-specifica.md).
 
 Il server è separato da `mediflow-synthetic` (ADR 0140) e dal telecomando
@@ -25,12 +26,15 @@ app non invoca.
 Dalla radice del pacchetto, con Node 24:
 
 ```sh
-npm ci --ignore-scripts --no-audit --no-fund
+npm ci --no-audit --no-fund
 npm run build
 npm run typecheck
 npm test
 npm run test:falsification
 npm run test:browser
+npm run prepare:reference
+npm run test:reference
+npm run test:performance-negative
 ```
 
 La prova browser richiede il Chromium di Playwright 1.58.2; se manca:
@@ -39,6 +43,28 @@ l’avvio del pacchetto. `npm start` è un MCP stdio, non una pagina Web.
 Per costruire dai sorgenti servono anche i token e il font della repository;
 il server avviato legge soltanto il proprio `dist/app.html` e la propria
 configurazione dimostrativa `.local/`.
+
+La vista occupa tutta la larghezza del frame e riserva 720 px di altezza,
+ridotti se l’host comunica un `maxHeight` inferiore. Il contenuto scorre
+all’interno del lettore, raggiungibile anche da tastiera. Aprire i dettagli
+o cambiare tema non ridimensiona il frame: evita di innescare lo scroll
+della conversazione negli host che seguono i resize. L’SDK conserva il suo
+auto-resize per l’avvio e i cambiamenti del contenitore. Le sole animazioni
+della vista sono dissolvenze di 120 ms, disattivate con reduced motion.
+
+`prepare:reference` scarica il basic-host ufficiale ext-apps al commit
+`92f46a574568a3ddac7600343b7d3c4c4ed7b588` in una directory temporanea esterna alla
+checkout, distinta per checkout; esegue `npm ci` dal lockfile di prova e la build
+ufficiale, senza modificare sorgenti, sandbox o CSP dell’host. Il manifest
+e il lockfile sono fixture JSON senza ruolo di package nella checkout e
+vengono copiati nella directory temporanea con i nomi npm. Il manifest
+di prova aggiunge solo `cross-env` e i tipi CORS necessari alla build fuori
+dal monorepo upstream. Servono rete e porte locali 8080, 8081 e 3017 libere.
+Se una checkout contiene ancora la vecchia directory generata
+`tmp-chat-reference`, spostarla fuori dalla checkout prima dei test della guardia.
+Le due prove avviano e chiudono i propri server. Budget, metodo, compromessi
+e [misure prima/dopo](./evidence/2026-10-22-polish.md) sono riproducibili;
+non attestano prestazioni di ogni desktop o provider.
 
 ## Due esiti diversi
 
@@ -158,3 +184,9 @@ fornitore, né l’esclusione assoluta dalla richiesta al provider. Non ha
 osservato i payload interni del provider. Nessun dato reale è ammesso. Un
 futuro client clinico richiede l’ADR e prove distinti; pubblicazione nelle
 directory, login, consenso clinico, voce e scritture sono fuori da questa unità.
+
+## Scheda pseudonimizzata sintetica
+
+L’entrypoint aggiuntivo, il consenso nella vista e i limiti di qualifica sono
+documentati in [CARD-READER.md](CARD-READER.md). Il demo descritto sopra conserva
+il suo entrypoint e la sua configurazione.

@@ -12,7 +12,7 @@ import { collectLocalTestSelections } from './local-test-selection.mjs';
 import { collectAdditionalInventorySelections } from './additional-inventory-selection.mjs';
 import { collectPlaywrightTestFiles } from './playwright-test-selection.mjs';
 import { collectUnitTestFiles } from './unit-test-selection.mjs';
-import { collectExplicitNpmSelections, collectNpmScriptBinding, collectGuardSelfTestSelections, collectSyntheticPluginSelections } from './explicit-npm-test-selection.mjs';
+import { collectShardedPlaywrightBinding, collectExplicitNpmSelections, collectNpmScriptBinding, collectGuardSelfTestSelections, collectSyntheticPluginSelections } from './explicit-npm-test-selection.mjs';
 import { collectHeadlessPortableTests } from './run-headless-portable-tests.mjs';
 import { collectSwiftInventorySelection, SWIFT_SUITE_ID } from './swift-test-selection.mjs';
 
@@ -96,7 +96,7 @@ async function collectSelections(root) {
     ...collectSyntheticPluginSelections(root),
     [SWIFT_SUITE_ID]: collectSwiftInventorySelection(root),
     'npm:test:e2e': suite(() => {
-      collectNpmScriptBinding(root, { script: 'test:e2e', workflow: '.github/workflows/e2e.yml', job: 'e2e' }, 'playwright test --workers=1');
+      collectShardedPlaywrightBinding(root);
       return collectPlaywrightTestFiles(root);
     }),
     ...collectCiDispositionSelections(root),
