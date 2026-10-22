@@ -8,7 +8,7 @@ export function packageLocalUiPlugin(destination, dataDir, sourceRoot = root) {
   if (!path.isAbsolute(destination) || fs.existsSync(destination) || !path.isAbsolute(dataDir)
     || fs.realpathSync(dataDir) !== dataDir || !fs.statSync(dataDir).isDirectory()) throw new Error('Package paths unavailable');
   const { identity } = verifySourceRuntime(sourceRoot);
-  if (process.version !== 'v24.21.0') throw new Error('Node 24.21.0 required');
+  if (Number(process.versions.node.split('.')[0]) !== 24) throw new Error('Node 24.x required');
   const nodePath = fs.realpathSync(process.execPath);
   if (/["\\\x00-\x1f]/u.test(nodePath)) throw new Error('Node path cannot be represented by the POSIX launcher');
   const source = path.join(root, 'plugins/mediflow-local-ui');
