@@ -47,7 +47,6 @@ export function createSyntheticCardBroker(input: SyntheticCardInstallation) {
     let pseudonym = random('card_');
     let lastTime = started, generation = 0, patient: string | undefined, revoked = false, active: Attempt | undefined;
     let cleanup = Promise.resolve();
-    let timer: ReturnType<typeof setTimeout> | undefined;
     const prepared = new WeakMap<object, Attempt>();
     const consents = new WeakMap<object, { attempt: Attempt; digest: string; expires: number }>();
     function now(): number {
@@ -163,7 +162,7 @@ export function createSyntheticCardBroker(input: SyntheticCardInstallation) {
             } catch { return fail(); }
         },
     });
-    timer = setTimeout(() => { void owner.revoke().catch(() => {}); }, SESSION_MS);
+    const timer = setTimeout(() => { void owner.revoke().catch(() => {}); }, SESSION_MS);
     timer.unref();
     return Object.freeze({ owner, reader });
 }
