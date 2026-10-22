@@ -16,14 +16,6 @@ const runs = [];
 try {
   for (let run = 0; run < count; run++) {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'no-preference' });
-    const requests = [];
-    page.on('requestfinished', request => {
-      const url = new URL(request.url());
-      if (url.pathname !== '/mcp' && url.pathname !== '/sandbox.html') return;
-      requests.push({ path: `${url.origin}${url.pathname}`, method: request.method(),
-        rpcMethod: request.method() === 'POST' ? request.postDataJSON()?.method : undefined,
-        timing: request.timing() });
-    });
     await page.addInitScript(() => {
       const metrics = window['metrics'] = { sizes: [], toolStart: 0, scrollCalls: 0, focusCalls: 0, animations: [], frames: [], reveals: [], animationGaps: [], followResize: false };
       const fetchOriginal = window.fetch;
@@ -80,6 +72,13 @@ try {
     const firstPaint = await appFrame.evaluate(() => performance.timeOrigin + performance.getEntriesByName('first-contentful-paint')[0].startTime);
     const toolStart = await page.evaluate(() => window['metrics'].toolStart);
     assert.ok(toolStart > 0 && firstPaint > toolStart, 'measure from actual tools/call to card FCP');
+    const requests = (await page.requests()).flatMap(request => {
+      const url = new URL(request.url());
+      if (url.pathname !== '/mcp' && url.pathname !== '/sandbox.html') return [];
+      return [{ path: `${url.origin}${url.pathname}`, method: request.method(),
+        rpcMethod: request.method() === 'POST' ? request.postDataJSON()?.method : undefined,
+        timing: request.timing() }];
+    });
     const summary = appFrame.getByText('Promemoria dimostrativo', { exact: true });
     await summary.scrollIntoViewIfNeeded();
     await page.evaluate(() => window.scrollTo(0, 300));

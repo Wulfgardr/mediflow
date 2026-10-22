@@ -51,12 +51,7 @@ jobs:
       - run: npx --no-install playwright install --with-deps chromium
       - run: npm run test:browser
       - run: npm run prepare:reference
-      - name: Measure demo in reference host
-        run: |
-          mkdir -p dist/evidence
-          ps -eo pid,ppid,comm,pcpu --sort=-pcpu > dist/evidence/reference-processes.txt
-          ss -ltnp > dist/evidence/reference-listeners.txt
-          npm run test:reference
+      - run: npm run test:reference
       - run: npm run test:performance-negative
       - run: npm run test:card-desktop
       - run: npm run test:card-desktop-negative
