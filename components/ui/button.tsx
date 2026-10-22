@@ -40,7 +40,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
             {...rest}
             ref={ref}
             type={type}
-            className={cn(VARIANT_CLASSES[variant], className)}
+            className={cn('relative', VARIANT_CLASSES[variant], className)}
             data-command-confirmation={variant === 'destructive' && confirmation ? 'true' : undefined}
             onPointerDown={handlePointerDown}
         >

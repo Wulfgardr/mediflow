@@ -43,6 +43,7 @@ for (const theme of ['giorno', 'grafite']) test(`stesso ruolo stessa geometria e
   for (const role of roles) {
     const buttons = page.locator(`[data-command-role="${role}"] button`);
     const enabled = buttons.first();
+    await expect(enabled, `${role}: anello nel wrapper`).toHaveCSS('position', 'relative');
     const expected = await geometry(enabled);
     expect(await geometry(buttons.nth(1)), `${role}: classe e wrapper`).toEqual(expected);
     expect(await geometry(buttons.last()), `${role}: disabled`).toEqual(expected);

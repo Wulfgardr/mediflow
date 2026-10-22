@@ -1177,7 +1177,6 @@ textarea.input-field {
 
 html:root[data-lume] :is(.mf-button-primary, .ui-btn-primary, .mf-button-secondary, .mf-btn-secondary, .ui-btn-secondary, .mf-button-text, .mf-button-destructive, .mf-button-icon) {
   box-sizing: border-box;
-  position: relative;
   isolation: isolate;
   overflow: hidden;
   display: inline-flex;
@@ -1270,6 +1269,10 @@ html:root[data-lume] :is(.mf-button-primary, .ui-btn-primary, .mf-button-destruc
   background-color: var(--lume-surface-field);
   border-color: var(--lume-rule-strong);
   color: var(--lume-ink-muted);
+}
+
+html:root[data-lume] .mf-button-destructive[data-command-confirmation='true']:disabled {
+  opacity: 1;
 }
 
 @media (pointer: coarse), (max-width: 700px) {

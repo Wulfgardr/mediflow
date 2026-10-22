@@ -53,28 +53,60 @@
       "sha256": "4ecf1116a02a70b779350b8883dbf5c6762019ef96753088c975c18a368cf61a"
     },
     {
+      "file": "real-after-conferma-attiva-giorno-1440.png",
+      "width": 1440,
+      "height": 960,
+      "sha256": "228877068ba42e621fa7ecbe1346c4ef74040fa84082702aa56d1dd347040f65",
+      "qualification": "regression-fix"
+    },
+    {
+      "file": "real-after-conferma-attiva-giorno-768.png",
+      "width": 768,
+      "height": 960,
+      "sha256": "8f034ada02817ffabbcc3ca1f7fee1a52899bc9e6e286c20314264cd10da9038",
+      "qualification": "regression-fix"
+    },
+    {
+      "file": "real-after-conferma-attiva-grafite-1440.png",
+      "width": 1440,
+      "height": 960,
+      "sha256": "4c2284e74c5fd44c294db641a7a96a540c1e43d954f8759490e17a302155e49f",
+      "qualification": "regression-fix"
+    },
+    {
+      "file": "real-after-conferma-attiva-grafite-768.png",
+      "width": 768,
+      "height": 960,
+      "sha256": "6f176a927d01e75b6a4edd4bcb6a30c78e67b7ca440ebb7316ae7f60c10eda91",
+      "qualification": "regression-fix"
+    },
+    {
       "file": "real-after-conferma-elimina-terapia-giorno-1440.png",
       "width": 1440,
       "height": 960,
-      "sha256": "4276f0da1de59b5efd1617ce9414dfb7071d9dc5f73451ad4a584e1c9c338e0e"
+      "sha256": "0e2253206cfcf521918d4884dfb30cafebd042f29d209d011e39409d93872b35",
+      "qualification": "regression-fix"
     },
     {
       "file": "real-after-conferma-elimina-terapia-giorno-768.png",
       "width": 768,
       "height": 960,
-      "sha256": "afb847e4fdd00b966dde1daba7b9e995c4045677be9d885b2e6cd6ba9801aeb7"
+      "sha256": "666bf9a7b963c165442b15a1bf0e225a20ee873dabaa8cd93d512efc7ff7ea46",
+      "qualification": "regression-fix"
     },
     {
       "file": "real-after-conferma-elimina-terapia-grafite-1440.png",
       "width": 1440,
       "height": 960,
-      "sha256": "2c799d0dd74027989fb05a67e698469a6f92575bd295457e99e28424ed0beeca"
+      "sha256": "9c43b9228eef0b1eedb8634a0821db067aeac6a78849851543f1294249b8f854",
+      "qualification": "regression-fix"
     },
     {
       "file": "real-after-conferma-elimina-terapia-grafite-768.png",
       "width": 768,
       "height": 960,
-      "sha256": "c258398528dc777c44ace36b21bbb685f35bc77055937fd649f75e711f127ce8"
+      "sha256": "a6a855830196a3380a7088635f30e78028d38bdc3c052dd0adae53df2420bc8b",
+      "qualification": "regression-fix"
     },
     {
       "file": "real-after-impostazioni-indice-giorno-1440.png",
@@ -128,25 +160,57 @@
       "file": "real-after-rimozione-diagnosi-giorno-1440.png",
       "width": 1440,
       "height": 1800,
-      "sha256": "892effce5a191e839401d1d0ecf569db217d35ca370cf01f6d61c94b0ef34523"
+      "sha256": "85b6e31c912fafc6779fef1ce992e0304f157ae79042016f6eea73005e4113a7",
+      "qualification": "regression-fix"
     },
     {
       "file": "real-after-rimozione-diagnosi-giorno-768.png",
       "width": 768,
       "height": 1800,
-      "sha256": "a034af73e83a68f87de7e2b5c93ddcc7bfb5c550cacffb526b3a87c5cc0ceab2"
+      "sha256": "ebacfb031d3db8a5b5c4cebf96075fe98e32333a29caeb5b66dbc4a5d6015375",
+      "qualification": "regression-fix"
     },
     {
       "file": "real-after-rimozione-diagnosi-grafite-1440.png",
       "width": 1440,
       "height": 1800,
-      "sha256": "831f6c846b65044fe5f531ceaf0c6ec48bb9c58a86c1a910c9847ce323840ef0"
+      "sha256": "8f9cb69b3688dbf66c606cdc20c50a16554702a071bf57e1056798ab2fa87db8",
+      "qualification": "regression-fix"
     },
     {
       "file": "real-after-rimozione-diagnosi-grafite-768.png",
       "width": 768,
       "height": 1800,
-      "sha256": "7e6564ca086114534395406230e11d2809bc32bdd5d0e9b02b8b8039dfc346de"
+      "sha256": "512ee199f2359c5aa151c988a7796565fb7583c95e6dac3c333947305eac1ae0",
+      "qualification": "regression-fix"
+    },
+    {
+      "file": "real-after-rimozione-pianificazione-giorno-1440.png",
+      "width": 1440,
+      "height": 1800,
+      "sha256": "5af4ebecb932abdf5556056c4aa73745d682f83121f4b8c33ba3dc1bfc0d1b2a",
+      "qualification": "regression-fix"
+    },
+    {
+      "file": "real-after-rimozione-pianificazione-giorno-768.png",
+      "width": 768,
+      "height": 1800,
+      "sha256": "ef21e8805ed32bebda137d8e7457df99c7d851abf97f567c0ca9d96d479cbd84",
+      "qualification": "regression-fix"
+    },
+    {
+      "file": "real-after-rimozione-pianificazione-grafite-1440.png",
+      "width": 1440,
+      "height": 1800,
+      "sha256": "5e71a37313b42bee3de59f344ef03590a9d20a7aa80c3f81178975e3687828a8",
+      "qualification": "regression-fix"
+    },
+    {
+      "file": "real-after-rimozione-pianificazione-grafite-768.png",
+      "width": 768,
+      "height": 1800,
+      "sha256": "c51d707e6b3a54d72f45b6bbf56e816eb96c55c54f8db39e23988e3e813ad7b3",
+      "qualification": "regression-fix"
     },
     {
       "file": "real-before-011-riepilogo-giorno-1440.png",
@@ -292,5 +356,7 @@
       "height": 1800,
       "sha256": "c55166611040069fcdcd920d12ba92fbf328cf6842c1d38b99d1d7cd039fa790"
     }
-  ]
+  ],
+  "regressionFixBase": "b57b4240b9b1fa85569b4c85d4541af7636917fb",
+  "regressionFixRevision": "commit containing this manifest; runtime sources pinned by regression-qualification.json"
 }

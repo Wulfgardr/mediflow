@@ -1,0 +1,537 @@
+{
+  "base": "b57b4240b9b1fa85569b4c85d4541af7636917fb",
+  "red": {
+    "rimozione-diagnosi-grafite-1440": {
+      "position": "relative",
+      "top": 6.390625,
+      "right": 618.953125,
+      "cardBorderTop": 0,
+      "cardBorderRight": 0,
+      "width": 50,
+      "height": 40
+    },
+    "rimozione-pianificazione-grafite-1440": {
+      "position": "relative",
+      "top": 6.390625,
+      "right": 618.953125,
+      "cardBorderTop": 0,
+      "cardBorderRight": 0,
+      "width": 50,
+      "height": 40
+    },
+    "rimozione-pianificazione-giorno-768": {
+      "position": "relative",
+      "top": 6.390625,
+      "right": 458,
+      "cardBorderTop": 0,
+      "cardBorderRight": 0,
+      "width": 50,
+      "height": 40
+    },
+    "rimozione-diagnosi-giorno-768": {
+      "position": "relative",
+      "top": 6.390625,
+      "right": 458,
+      "cardBorderTop": 0,
+      "cardBorderRight": 0,
+      "width": 50,
+      "height": 40
+    },
+    "conferma-elimina-terapia-giorno-768": {
+      "ratio": 1.062665434131984,
+      "color": "rgb(85, 94, 107)",
+      "backgroundColor": "rgb(163, 58, 47)",
+      "opacity": 0.55,
+      "foreground": [
+        161.5,
+        166.45,
+        173.6
+      ],
+      "background": [
+        204.39999999999998,
+        146.64999999999998,
+        140.6
+      ],
+      "cursor": "not-allowed"
+    },
+    "conferma-elimina-terapia-grafite-1440": {
+      "ratio": 1.055214518145237,
+      "color": "rgb(163, 172, 184)",
+      "backgroundColor": "rgb(240, 138, 125)",
+      "opacity": 0.55,
+      "foreground": [
+        101.35000000000001,
+        107.65,
+        116.5
+      ],
+      "background": [
+        143.7,
+        88.95,
+        84.05
+      ],
+      "cursor": "not-allowed"
+    },
+    "conferma-elimina-terapia-giorno-1440": {
+      "ratio": 1.062665434131984,
+      "color": "rgb(85, 94, 107)",
+      "backgroundColor": "rgb(163, 58, 47)",
+      "opacity": 0.55,
+      "foreground": [
+        161.5,
+        166.45,
+        173.6
+      ],
+      "background": [
+        204.39999999999998,
+        146.64999999999998,
+        140.6
+      ],
+      "cursor": "not-allowed"
+    },
+    "rimozione-pianificazione-grafite-768": {
+      "position": "relative",
+      "top": 6.390625,
+      "right": 458,
+      "cardBorderTop": 0,
+      "cardBorderRight": 0,
+      "width": 50,
+      "height": 40
+    },
+    "rimozione-diagnosi-grafite-768": {
+      "position": "relative",
+      "top": 6.390625,
+      "right": 458,
+      "cardBorderTop": 0,
+      "cardBorderRight": 0,
+      "width": 50,
+      "height": 40
+    },
+    "conferma-elimina-terapia-grafite-768": {
+      "ratio": 1.055214518145237,
+      "color": "rgb(163, 172, 184)",
+      "backgroundColor": "rgb(240, 138, 125)",
+      "opacity": 0.55,
+      "foreground": [
+        101.35000000000001,
+        107.65,
+        116.5
+      ],
+      "background": [
+        143.7,
+        88.95,
+        84.05
+      ],
+      "cursor": "not-allowed"
+    },
+    "rimozione-pianificazione-giorno-1440": {
+      "position": "relative",
+      "top": 6.390625,
+      "right": 618.953125,
+      "cardBorderTop": 0,
+      "cardBorderRight": 0,
+      "width": 50,
+      "height": 40
+    },
+    "rimozione-diagnosi-giorno-1440": {
+      "position": "relative",
+      "top": 6.390625,
+      "right": 618.953125,
+      "cardBorderTop": 0,
+      "cardBorderRight": 0,
+      "width": 50,
+      "height": 40
+    }
+  },
+  "falsificationConfirmation": {
+    "expectedExit": 1,
+    "failed": 4,
+    "passed": 0,
+    "measurements": {
+      "real-after-conferma-elimina-terapia-giorno-768.json": {
+        "ratio": 1.062665434131984,
+        "color": "rgb(85, 94, 107)",
+        "backgroundColor": "rgb(163, 58, 47)",
+        "opacity": 0.55,
+        "foreground": [
+          161.5,
+          166.45,
+          173.6
+        ],
+        "background": [
+          204.39999999999998,
+          146.64999999999998,
+          140.6
+        ],
+        "cursor": "not-allowed"
+      },
+      "real-after-conferma-elimina-terapia-grafite-1440.json": {
+        "ratio": 1.055214518145237,
+        "color": "rgb(163, 172, 184)",
+        "backgroundColor": "rgb(240, 138, 125)",
+        "opacity": 0.55,
+        "foreground": [
+          101.35000000000001,
+          107.65,
+          116.5
+        ],
+        "background": [
+          143.7,
+          88.95,
+          84.05
+        ],
+        "cursor": "not-allowed"
+      },
+      "real-after-conferma-elimina-terapia-giorno-1440.json": {
+        "ratio": 1.062665434131984,
+        "color": "rgb(85, 94, 107)",
+        "backgroundColor": "rgb(163, 58, 47)",
+        "opacity": 0.55,
+        "foreground": [
+          161.5,
+          166.45,
+          173.6
+        ],
+        "background": [
+          204.39999999999998,
+          146.64999999999998,
+          140.6
+        ],
+        "cursor": "not-allowed"
+      },
+      "real-after-conferma-elimina-terapia-grafite-768.json": {
+        "ratio": 1.055214518145237,
+        "color": "rgb(163, 172, 184)",
+        "backgroundColor": "rgb(240, 138, 125)",
+        "opacity": 0.55,
+        "foreground": [
+          101.35000000000001,
+          107.65,
+          116.5
+        ],
+        "background": [
+          143.7,
+          88.95,
+          84.05
+        ],
+        "cursor": "not-allowed"
+      }
+    }
+  },
+  "environment": {
+    "node": "24.21.0",
+    "install": "npm ci",
+    "data": "fresh mktemp -d per run; synthetic only; legacy copy disabled",
+    "runner": "scripts/e2e-smoke.sh; Chromium; Turbopack; retries=0"
+  },
+  "falsificationPosition": {
+    "expectedExit": 1,
+    "failed": 4,
+    "passed": 0,
+    "measurements": {
+      "real-after-rimozione-diagnosi-grafite-1440.json": {
+        "position": "relative",
+        "top": 6.390625,
+        "right": 618.953125,
+        "cardBorderTop": 0,
+        "cardBorderRight": 0,
+        "width": 50,
+        "height": 40
+      },
+      "real-after-rimozione-pianificazione-grafite-1440.json": {
+        "position": "relative",
+        "top": 6.390625,
+        "right": 618.953125,
+        "cardBorderTop": 0,
+        "cardBorderRight": 0,
+        "width": 50,
+        "height": 40
+      },
+      "real-after-rimozione-pianificazione-giorno-768.json": {
+        "position": "relative",
+        "top": 6.390625,
+        "right": 458,
+        "cardBorderTop": 0,
+        "cardBorderRight": 0,
+        "width": 50,
+        "height": 40
+      },
+      "real-after-rimozione-diagnosi-giorno-768.json": {
+        "position": "relative",
+        "top": 6.390625,
+        "right": 458,
+        "cardBorderTop": 0,
+        "cardBorderRight": 0,
+        "width": 50,
+        "height": 40
+      },
+      "real-after-rimozione-pianificazione-grafite-768.json": {
+        "position": "relative",
+        "top": 6.390625,
+        "right": 458,
+        "cardBorderTop": 0,
+        "cardBorderRight": 0,
+        "width": 50,
+        "height": 40
+      },
+      "real-after-rimozione-diagnosi-grafite-768.json": {
+        "position": "relative",
+        "top": 6.390625,
+        "right": 458,
+        "cardBorderTop": 0,
+        "cardBorderRight": 0,
+        "width": 50,
+        "height": 40
+      },
+      "real-after-rimozione-pianificazione-giorno-1440.json": {
+        "position": "relative",
+        "top": 6.390625,
+        "right": 618.953125,
+        "cardBorderTop": 0,
+        "cardBorderRight": 0,
+        "width": 50,
+        "height": 40
+      },
+      "real-after-rimozione-diagnosi-giorno-1440.json": {
+        "position": "relative",
+        "top": 6.390625,
+        "right": 618.953125,
+        "cardBorderTop": 0,
+        "cardBorderRight": 0,
+        "width": 50,
+        "height": 40
+      }
+    }
+  },
+  "green": {
+    "conferma-attiva-grafite-1440": {
+      "ratio": 6.949475123267081,
+      "color": "rgb(26, 29, 34)",
+      "backgroundColor": "rgb(240, 138, 125)",
+      "opacity": 1,
+      "foreground": [
+        26,
+        29,
+        34
+      ],
+      "background": [
+        240,
+        138,
+        125
+      ],
+      "cursor": "pointer"
+    },
+    "conferma-attiva-giorno-768": {
+      "ratio": 6.555175298230184,
+      "color": "rgb(255, 255, 255)",
+      "backgroundColor": "rgb(163, 58, 47)",
+      "opacity": 1,
+      "foreground": [
+        255,
+        255,
+        255
+      ],
+      "background": [
+        163,
+        58,
+        47
+      ],
+      "cursor": "pointer"
+    },
+    "conferma-elimina-terapia-giorno-768": {
+      "ratio": 6.563222412755792,
+      "color": "rgb(85, 94, 107)",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "foreground": [
+        85,
+        94,
+        107
+      ],
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "cursor": "not-allowed"
+    },
+    "conferma-elimina-terapia-grafite-1440": {
+      "ratio": 7.362968309871438,
+      "color": "rgb(163, 172, 184)",
+      "backgroundColor": "rgb(26, 29, 34)",
+      "opacity": 1,
+      "foreground": [
+        163,
+        172,
+        184
+      ],
+      "background": [
+        26,
+        29,
+        34
+      ],
+      "cursor": "not-allowed"
+    },
+    "conferma-elimina-terapia-giorno-1440": {
+      "ratio": 6.563222412755792,
+      "color": "rgb(85, 94, 107)",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "foreground": [
+        85,
+        94,
+        107
+      ],
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "cursor": "not-allowed"
+    },
+    "conferma-attiva-giorno-1440": {
+      "ratio": 6.555175298230184,
+      "color": "rgb(255, 255, 255)",
+      "backgroundColor": "rgb(163, 58, 47)",
+      "opacity": 1,
+      "foreground": [
+        255,
+        255,
+        255
+      ],
+      "background": [
+        163,
+        58,
+        47
+      ],
+      "cursor": "pointer"
+    },
+    "conferma-elimina-terapia-grafite-768": {
+      "ratio": 7.362968309871438,
+      "color": "rgb(163, 172, 184)",
+      "backgroundColor": "rgb(26, 29, 34)",
+      "opacity": 1,
+      "foreground": [
+        163,
+        172,
+        184
+      ],
+      "background": [
+        26,
+        29,
+        34
+      ],
+      "cursor": "not-allowed"
+    },
+    "conferma-attiva-grafite-768": {
+      "ratio": 6.949475123267081,
+      "color": "rgb(26, 29, 34)",
+      "backgroundColor": "rgb(240, 138, 125)",
+      "opacity": 1,
+      "foreground": [
+        26,
+        29,
+        34
+      ],
+      "background": [
+        240,
+        138,
+        125
+      ],
+      "cursor": "pointer"
+    },
+    "rimozione-diagnosi-grafite-1440": {
+      "position": "absolute",
+      "top": -8,
+      "right": -8,
+      "cardBorderTop": 0,
+      "cardBorderRight": 0,
+      "width": 50,
+      "height": 40
+    },
+    "rimozione-pianificazione-giorno-768": {
+      "position": "absolute",
+      "top": -8,
+      "right": -8,
+      "cardBorderTop": 0,
+      "cardBorderRight": 0,
+      "width": 50,
+      "height": 40
+    },
+    "rimozione-pianificazione-grafite-768": {
+      "position": "absolute",
+      "top": -8,
+      "right": -8,
+      "cardBorderTop": 0,
+      "cardBorderRight": 0,
+      "width": 50,
+      "height": 40
+    },
+    "rimozione-pianificazione-giorno-1440": {
+      "position": "absolute",
+      "top": -8,
+      "right": -8,
+      "cardBorderTop": 0,
+      "cardBorderRight": 0,
+      "width": 50,
+      "height": 40
+    },
+    "rimozione-diagnosi-giorno-768": {
+      "position": "absolute",
+      "top": -8,
+      "right": -8,
+      "cardBorderTop": 0,
+      "cardBorderRight": 0,
+      "width": 50,
+      "height": 40
+    },
+    "rimozione-pianificazione-grafite-1440": {
+      "position": "absolute",
+      "top": -8,
+      "right": -8,
+      "cardBorderTop": 0,
+      "cardBorderRight": 0,
+      "width": 50,
+      "height": 40
+    },
+    "rimozione-diagnosi-grafite-768": {
+      "position": "absolute",
+      "top": -8,
+      "right": -8,
+      "cardBorderTop": 0,
+      "cardBorderRight": 0,
+      "width": 50,
+      "height": 40
+    },
+    "rimozione-diagnosi-giorno-1440": {
+      "position": "absolute",
+      "top": -8,
+      "right": -8,
+      "cardBorderTop": 0,
+      "cardBorderRight": 0,
+      "width": 50,
+      "height": 40
+    }
+  },
+  "tests": {
+    "baseline": {
+      "failed": 8,
+      "passed": 0
+    },
+    "finalBrowser": {
+      "passed": 21,
+      "failed": 0,
+      "evidence": "11 unchanged tests passed in initial full run; final 10/10 run covers 8 real cases and 2 wrapper/class geometry cases"
+    },
+    "selectedUnit": 2,
+    "lume": 34,
+    "selection": 138
+  },
+  "sourceSha256": {
+    "app/globals.css": "453e958c08d339d198f98257dac655b44f64370abce454d3aa5dec613f4a68c5",
+    "components/ui/button.tsx": "1558f3caf4d9e0316b6ba3400cc360e6d5a76b6876788c2fcb6013d9a761d89d",
+    "components/ui/confirm-dialog.tsx": "a32e352d81789758088d6cd79df8a049d19e985529a38431e0d9f306cd080062",
+    "components/patient-form.tsx": "619020af8ac0f0b5b6ff98f97eb94641a84b8ac229e2a5573e2232c3c9d8b5d8",
+    "e2e/command-roles-real.spec.ts": "2d558fb028a56942c404037d0e3885c46ee47b34bd8356d80271ca10be9746a9",
+    "e2e/command-roles.spec.ts": "6f393b1bcb17d496d600bd75010cabbdd421dde6fa43537e63753d7eef17444d"
+  }
+}
