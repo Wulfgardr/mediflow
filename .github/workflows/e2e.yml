@@ -68,8 +68,38 @@ jobs:
       - name: Test AnyDoc diagnostic artifact boundary
         run: npm run test:anydoc-diagnostics
 
+      - name: Read locked Playwright version
+        id: playwright_version
+        run: node -e 'const fs = require("node:fs"); const version = require("./package-lock.json").packages["node_modules/@playwright/test"].version; if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error("Invalid locked Playwright version"); fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);'
+
+      - name: Cache Playwright browsers
+        id: playwright_cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright_version.outputs.version }}
+
+      - name: Install Playwright system dependencies
+        run: npx --no-install playwright install-deps chromium
+
       - name: Install Playwright chromium
-        run: npx playwright install --with-deps chromium
+        if: steps.playwright_cache.outputs.cache-hit != 'true'
+        run: npx --no-install playwright install chromium
+
+      - name: Verify locked Chromium identity
+        run: |
+          node --input-type=module <<'NODE'
+          import { createRequire } from 'node:module';
+          import { chromium } from '@playwright/test';
+          const require = createRequire(import.meta.url);
+          const expected = require(require.resolve('playwright-core/package.json').replace(/package\.json$/, 'browsers.json')).browsers.find(browser => browser.name === 'chromium').browserVersion;
+          const browser = await chromium.launch();
+          try {
+            const actual = browser.version();
+            console.log(JSON.stringify({ playwright: require('@playwright/test/package.json').version, executable: chromium.executablePath(), expected, actual }));
+            if (actual !== expected) throw new Error('Chromium version differs from locked Playwright');
+          } finally { await browser.close(); }
+          NODE
 
       # @Codex: build once, then keep an immutable copy outside the dev dist directory.
       # The reset test must never reset the suite's shared account or database.
@@ -252,6 +282,58 @@ jobs:
           path: ${{ runner.temp }}/anydoc-http-diagnostic.jsonl
           if-no-files-found: error
           retention-days: 7
+
+  playwright-cache-version-falsification:
+    needs: [e2e-shard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Create isolated older Playwright lockfile
+        id: probe_version
+        run: |
+          mkdir -p "$RUNNER_TEMP/playwright-version-probe"
+          cd "$RUNNER_TEMP/playwright-version-probe"
+          npm init -y
+          npm install --ignore-scripts --save-exact @playwright/test@1.57.0
+          node -e 'const fs = require("node:fs"); const version = require("./package-lock.json").packages["node_modules/@playwright/test"].version; fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);'
+      - name: Probe different exact version cache key
+        id: probe_cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.probe_version.outputs.version }}
+      - name: Require miss despite populated current-version cache
+        env:
+          CACHE_HIT: ${{ steps.probe_cache.outputs.cache-hit }}
+        run: |
+          test "$CACHE_HIT" != true
+          test ! -d "$HOME/.cache/ms-playwright"
+      - name: Install older version browser after miss
+        run: |
+          cd "$RUNNER_TEMP/playwright-version-probe"
+          npx --no-install playwright install --with-deps chromium
+      - name: Verify older browser identity and reject current browser
+        run: |
+          cd "$RUNNER_TEMP/playwright-version-probe"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import { createRequire } from 'node:module';
+          import { chromium } from '@playwright/test';
+          const require = createRequire(import.meta.url);
+          const expected = require(require.resolve('playwright-core/package.json').replace(/package\.json$/, 'browsers.json')).browsers.find(browser => browser.name === 'chromium').browserVersion;
+          const browser = await chromium.launch();
+          try {
+            assert.equal(require('@playwright/test/package.json').version, '1.57.0');
+            assert.equal(browser.version(), expected);
+            assert.notEqual(browser.version(), '145.0.7632.6');
+            assert.equal(fs.readdirSync(process.env.HOME + '/.cache/ms-playwright').some(name => name.includes('1208')), false);
+            console.log(JSON.stringify({ playwright: '1.57.0', executable: chromium.executablePath(), expected, actual: browser.version() }));
+          } finally { await browser.close(); }
+          NODE
 
   e2e:
     if: always()
