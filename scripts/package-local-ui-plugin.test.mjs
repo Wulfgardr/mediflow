@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { packageLocalUiPlugin } from './package-local-ui-plugin.mjs';
+import { generatePayloadLedger } from './generate-runtime-payload-ledger.mjs';
 
 const root = path.resolve('plugins/mediflow-local-ui');
 const json = file => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
@@ -105,3 +106,101 @@ test('POSIX launcher uses the pinned Node independently of cwd and PATH, preserv
   assert.equal(missing.stdout, '');
   assert.equal(missing.stderr, 'MediFlow navigation unavailable.\n');
 });
+
+function admittedPackage(t) {
+  const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-plugin-runtime-')));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const source = path.join(directory, 'source'), web = path.join(source, '.next/standalone');
+  const data = path.join(directory, 'data'), destination = path.join(directory, 'plugin');
+  const marker = path.join(directory, 'supervisor.json');
+  fs.mkdirSync(data);
+  const project = path.resolve('.');
+  const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: project, encoding: 'utf8' }).trim();
+  const put = (base, name, value) => {
+    const file = path.join(base, name); fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value));
+  };
+  put(source, '.nvmrc', '24\n');
+  put(source, 'package.json', { engines: { node: '>=24 <25' } });
+  put(source, 'scripts/source-runtime.mjs', `
+    import { startSourceRuntime } from ${JSON.stringify(new URL('./source-runtime.mjs', import.meta.url).href)};
+    await startSourceRuntime(process.argv[2], ${JSON.stringify(source)});`);
+  put(web, 'package.json', { name: 'synthetic-plugin-runtime', version: '0.0.0' });
+  put(web, 'server.js', 'throw new Error("Unexpected Web startup in synthetic fixture");');
+  put(web, '.next/BUILD_ID', 'synthetic-plugin-build');
+  put(web, 'mediflow-runtime-contract.json', { schemaVersion: 1,
+    node: { major: 24, version: '24.21.0', moduleVersion: process.versions.modules },
+    platform: process.platform, arch: process.arch });
+  put(web, 'mediflow-build-identity.json', { schemaVersion: 1, revision,
+    buildId: 'synthetic-plugin-build', branch: 'synthetic', sourceFingerprint: 'synthetic' });
+  put(web, 'scripts/register-strip-types-loader.mjs', '');
+  put(web, 'scripts/mediflow-headless-supervisor.mjs', `
+    import fs from 'node:fs';
+    export function runHeadlessSupervisorV1(options, profile) {
+      fs.writeFileSync(${JSON.stringify(marker)}, JSON.stringify({
+        nodePath: fs.realpathSync(process.execPath), profile, dataDir: process.env.MEDIFLOW_DATA_DIR,
+        revision: process.env.MEDIFLOW_PLUGIN_EXPECTED_REVISION,
+        legacyCopy: process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY,
+        unexpectedEnvironment: process.env.MEDIFLOW_PLUGIN_TEST_SECRET ?? null }));
+    }`);
+  put(web, 'node_modules/better-sqlite3/package.json', { name: 'better-sqlite3', version: 'synthetic', main: 'index.js' });
+  put(web, 'node_modules/better-sqlite3/index.js', `module.exports = class {
+    constructor(name) { if (name !== ':memory:') throw new Error('Non-synthetic database'); }
+    prepare() { return { get: () => ({ value: 1 }) }; } close() {} };`);
+  const ledger = path.join(source, '.next/runtime-payload-ledger.json');
+  put(source, '.next/runtime-payload-ledger.json', generatePayloadLedger({ sourceRoot: project,
+    payloadRoot: web, profile: 'standalone', expectedRuntime: { nodeVersion: '24.21.0',
+      nodeAbi: process.versions.modules, platform: process.platform, arch: process.arch } }));
+  packageLocalUiPlugin(destination, data, source);
+  const launch = path.join(destination, 'src/launch.mjs');
+  const run = (nodeArgs = [], args = []) => spawnSync(process.execPath, [...nodeArgs, launch, ...args], {
+    encoding: 'utf8', timeout: 10_000, env: { MEDIFLOW_PLUGIN_TEST_SECRET: 'synthetic-not-forwarded' },
+  });
+  return { destination, marker, revision, data, web, ledger, run };
+}
+
+test('Node 24 packages and launches a sealed synthetic 24.21 payload with the pinned physical runtime', t => {
+  const f = admittedPackage(t);
+  const result = f.run();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, ''); assert.equal(result.stderr, '');
+  assert.deepEqual(JSON.parse(fs.readFileSync(f.marker)), { nodePath: fs.realpathSync(process.execPath),
+    profile: 'plugin_local_ui', dataDir: f.data, revision: f.revision,
+    legacyCopy: '1', unexpectedEnvironment: null });
+});
+
+test('the runtime launcher rejects extra arguments, Node flags and noncanonical or mismatched nodePath', t => {
+  const f = admittedPackage(t), configFile = path.join(f.destination, 'runtime.json');
+  const config = JSON.parse(fs.readFileSync(configFile));
+  const alias = path.join(f.destination, 'node-alias');
+  fs.symlinkSync(process.execPath, alias);
+  const otherNode = path.join(f.destination, 'other-node');
+  fs.copyFileSync(process.execPath, otherNode); fs.chmodSync(otherNode, 0o755);
+  const denied = result => {
+    assert.equal(result.status, 1); assert.equal(result.stdout, '');
+    assert.equal(result.stderr, 'MediFlow navigation unavailable.\n');
+    assert.equal(fs.existsSync(f.marker), false);
+  };
+  denied(f.run([], ['unexpected'])); denied(f.run(['--trace-warnings']));
+  for (const nodePath of ['node', alias, otherNode]) {
+    fs.writeFileSync(configFile, JSON.stringify({ ...config, nodePath }));
+    denied(f.run());
+  }
+});
+
+for (const mutation of ['revision', 'ledger', 'payload']) {
+  test(`the packaged launcher rejects changed ${mutation} before the synthetic Supervisor`, t => {
+    const f = admittedPackage(t);
+    if (mutation === 'revision') {
+      const file = path.join(f.destination, 'runtime.json'), config = JSON.parse(fs.readFileSync(file));
+      fs.writeFileSync(file, JSON.stringify({ ...config, revision: 'b'.repeat(40) }));
+    } else if (mutation === 'ledger') {
+      const ledger = JSON.parse(fs.readFileSync(f.ledger)); ledger.payload.contentSha256 = '0'.repeat(64);
+      fs.writeFileSync(f.ledger, JSON.stringify(ledger));
+    } else fs.appendFileSync(path.join(f.web, 'server.js'), '// altered');
+    const result = f.run();
+    assert.equal(result.status, 1); assert.equal(result.stdout, '');
+    assert.equal(result.stderr, 'MediFlow navigation unavailable.\n');
+    assert.equal(fs.existsSync(f.marker), false);
+  });
+}

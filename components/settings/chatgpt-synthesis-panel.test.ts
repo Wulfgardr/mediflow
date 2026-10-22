@@ -27,7 +27,9 @@ test('browser spec stays ESM under the unchanged Node24 loader classification', 
     const usesCommonJs = /\brequire\s*\(/u.test(spec) || /\bmodule\.exports\b/u.test(spec);
     const usesEsm = /\bimport\.meta\b/u.test(spec);
     assert.equal(usesCommonJs, false); assert.equal(usesEsm, true);
-    assert.match(spec, /packageRequire\('@playwright\/test'\)/u);
+    assert.match(spec, /\bimport\s*\{\s*chromium\s*,\s*expect\s*(?:,[^}]+)?\}\s*from\s*['"]@playwright\/test['"]/u);
+    assert.match(spec, /\bimport\.meta\.resolve\(['"]next\/dist\/bin\/next['"]\)/u);
+    assert.doesNotMatch(spec, /\b(?:createRequire|packageRequire)\b/u);
     assert.match(spec, /409 pending challenge survives local polls/u);
     assert.match(spec, /\[1280, 390\]/u);
 });

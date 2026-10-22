@@ -1,0 +1,8 @@
+{
+  "name": "mediflow-chat-demo",
+  "version": "0.1.0",
+  "description": "Lettore inline sperimentale su dati inventati, separato dal runtime clinico.",
+  "author": {
+    "name": "MediFlow"
+  }
+}
