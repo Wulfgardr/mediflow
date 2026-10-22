@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
 import os from 'node:os';
+const scenario = process.argv.find(arg => arg.startsWith('--scenario='))?.split('=')[1];
+const deliveryDelay = process.argv.includes('--negative-delivery');
 const negative = process.argv.includes('--negative-feedback');
 const count = Number(process.argv.find(arg => arg.startsWith('--runs='))?.split('=')[1] ?? 30);
 assert.ok(Number.isInteger(count) && count >= 30);
@@ -33,9 +35,61 @@ async function latency(frame, page, action, event = 'click') {
 }
 const warmContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 try {
-  for (const temperature of ['cold', 'warm']) for (let run = 0; run < count; run++) {
+  for (const activeScenario of scenario ? [scenario] : ['forgery', 'turn', 'tool-call']) {
+    const page = await warmContext.newPage();
+    const calls = [];
+    page.on('request', request => { if (request.method() === 'POST' && request.url().endsWith('/mcp')) calls.push(request.postDataJSON()); });
+    let release = () => {}, received = () => {};
+    const held = new Promise(resolve => { release = () => resolve(undefined); });
+    const seen = new Promise(resolve => { received = () => resolve(undefined); });
+    if (activeScenario === 'turn' || activeScenario === 'tool-call') await page.route('**/mcp', async route => {
+      const request = route.request();
+      const body = request.method() === 'POST' ? request.postDataJSON() : undefined;
+      if (body?.params?.arguments?.operation === 'prepare') {
+        const response = await route.fetch(); received(); await held; await route.fulfill({ response });
+      } else await route.continue();
+    });
+    await page.goto('http://localhost:8080/card.html');
+    const frame = await mounted(page);
+    if (activeScenario === 'turn' || activeScenario === 'tool-call') {
+      await seen;
+      if (activeScenario === 'tool-call') await page.evaluate(() => window['cardBridge'].sendToolInput({ arguments: { operation: 'prepare' } }));
+      else await page.evaluate(() => window['cardBridge'].sendToolResult({ content: [{ type: 'text', text: 'Nuovo turno.' }] }));
+      await page.waitForTimeout(50); release();
+      await page.waitForTimeout(150);
+      assert.equal(await frame.locator('#share').isDisabled(), true, 'Astra P2: held preparation cannot revive the previous turn');
+      assert.match(await frame.locator('#status').innerText(), /Nuovo turno/);
+      assert.equal(await frame.locator('#card').isHidden(), true);
+    } else {
+      await frame.waitForFunction(() => !document.querySelector('#share').hasAttribute('disabled'));
+      assert.equal(await frame.locator('script').count(), 0, 'bootstrap key is absent from the readable DOM');
+      const view = calls.find(call => call.params?.arguments?.operation === 'prepare').params.arguments.view;
+      const result = await frame.evaluate(async view => {
+        let next = 8000;
+        const forge = args => new Promise(resolve => {
+          const id = next++;
+          const listener = event => { if (event.data?.id === id) { window.removeEventListener('message', listener); resolve(event.data.result); } };
+          window.addEventListener('message', listener);
+          window.parent.postMessage({ jsonrpc: '2.0', id, method: 'tools/call', params: { name: 'mediflow_synthetic_card', arguments: args } }, '*');
+        });
+        const prepared = await forge({ operation: 'prepare', view });
+        const nonce = prepared?._meta?.consentNonce;
+        return forge({ operation: 'share', view, ...(nonce ? { nonce } : {}) });
+      }, view);
+      assert.equal(result?.structuredContent, undefined, 'Astra P2: forged frame messages cannot mint consent, even with the attempt nonce');
+      assert.equal(result?.isError, true);
+      assert.equal(await frame.locator('#card').isHidden(), true);
+    }
+    await page.close();
+  }
+  for (const temperature of ['cold', 'warm']) for (let run = 0; run < (scenario ? 0 : count); run++) {
     const context = temperature === 'cold' ? await browser.newContext({ viewport: { width: 1440, height: 1000 } }) : undefined;
     const page = await (context ?? warmContext).newPage();
+    if (deliveryDelay) await page.route('**/mcp', async route => {
+      const body = route.request().method() === 'POST' ? route.request().postDataJSON() : undefined;
+      if (body?.params?.arguments?.operation === 'share') { const response = await route.fetch(); await new Promise(resolve => setTimeout(resolve, 2200)); await route.fulfill({ response }); }
+      else await route.continue();
+    });
     page.on('pageerror', error => console.log('REFERENCE_PAGE_ERROR', error.message));
     await page.addInitScript(() => {
       window['metrics'] = { sizes: 0, frames: [], results: [], tasks: [] };
@@ -71,7 +125,9 @@ try {
     const feedbackMs = await latency(frame, page, () => frame.locator('#share').click());
     if (negative) assert.ok(feedbackMs <= 100, 'click feedback budget mutation');
     await frame.locator('#card').waitFor({ state: 'visible' });
+    await frame.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const shareMs = performance.now() - shareStart;
+    const usefulMs = readyMs + shareMs;
     assert.match(await frame.locator('#status').innerText(), /condivisa/);
     const actual = responses.find(frame => frame.result?.structuredContent)?.result.structuredContent;
     assert.ok(actual, 'capture real broker result across MCP HTTP');
@@ -91,7 +147,7 @@ try {
     assert.deepEqual(rect, { left: 0, right: 0 });
     const tasks = await frame.evaluate(() => window['widgetTasks']);
     if (tasks.some(task => task.duration > 50)) console.log('LONGTASK', JSON.stringify(tasks));
-    runs.push({ temperature, readyMs, shareMs, feedbackMs, detailMs, themes, tasks });
+    runs.push({ temperature, readyMs, shareMs, usefulMs, feedbackMs, detailMs, themes, tasks });
     if (run === 0 && temperature === 'warm') {
       for (const width of [390, 768, 1440]) for (const theme of ['giorno', 'grafite']) {
         await page.setViewportSize({ width, height: 1000 });
@@ -116,6 +172,7 @@ try {
     }
     await page.close(); await context?.close();
   }
+  if (!scenario) {
   const latePage = await warmContext.newPage();
   let release = () => {}, received = () => {};
   const held = new Promise(resolve => { release = () => resolve(undefined); });
@@ -138,14 +195,16 @@ try {
   assert.equal(await lateFrame.locator('#card').isHidden(), true, 'a late approved response cannot repopulate a closed view');
   assert.equal(await lateFrame.locator('#status').innerText(), 'Scheda chiusa.');
   await latePage.close();
+  }
 } finally { await browser.close(); }
+if (scenario) { console.log(`PASS: Astra ${scenario} scenario`); process.exit(0); }
 const summary = values => { const sorted = values.toSorted((a,b) => a-b); return { p50: sorted[Math.ceil(sorted.length * .5)-1], p95: sorted[Math.ceil(sorted.length * .95)-1], max: sorted.at(-1) }; };
 const serverLog = await readFile(new URL('../.local/reference-server.log', import.meta.url), 'utf8');
 const preparationMs = [...serverLog.matchAll(/^REFERENCE_PREPARATION_MS ([0-9.]+)$/gm)].map(match => Number(match[1]));
-assert.equal(preparationMs.length, count * 2 + 1, 'every broker preparation, including the late-response scenario, must be measured');
+assert.equal(preparationMs.length, count * 2 + 5, 'every broker preparation, including adversarial and late-response scenarios, must be measured');
 const report = { node: process.version, browser: browser.version(), hardware: { cpu: os.cpus()[0].model, ram: os.totalmem(), os: os.release() },
   scope: 'Current broker card only. Simulated neural runner. Extended ADR workload and desktop R NOT QUALIFIED.',
-  gzipBytes: gzipSync(html).byteLength, preparationMs, preparation: summary(preparationMs), runs, summaries: Object.fromEntries(['cold','warm'].map(t => [t, summary(runs.filter(r => r.temperature === t).map(r => r.readyMs))])),
+  gzipBytes: gzipSync(html).byteLength, preparationMs, preparation: summary(preparationMs), runs, summaries: Object.fromEntries(['cold','warm'].map(t => [t, summary(runs.filter(r => r.temperature === t).map(r => r.usefulMs))])),
   feedback: summary(runs.map(r => r.feedbackMs)), interaction: summary(runs.flatMap(r => [r.detailMs, ...r.themes])) };
 await writeFile(new URL('reference.json', output), JSON.stringify(report, null, 2) + '\n');
 assert.ok(report.summaries.cold.p95 <= 5_000, 'cold useful view <=5s p95');

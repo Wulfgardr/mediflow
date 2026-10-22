@@ -1,69 +1,98 @@
 # ADR 0160 — unità 2c, scheda sintetica
 
-Base: `46f4c1789` (#611). Implementazione GPT-6.1 Sol, High, senza ulteriore
-delega; review indipendente richiesta sulla PR. Part of WUL-788.
+Revisione correttiva della head `3e4e0d7344fa3dd461c173412e2227de217dd2c9`,
+in risposta alla [review Astra](https://github.com/Wulfgardr/mediflow/pull/613#pullrequestreview-5615652483)
+ancorata a `d634853ef`. Base broker: `46f4c1789` (#611). Part of WUL-788.
+Implementazione GPT-6.1 Sol, High; nessuna ulteriore delega, nessun merge.
+La review indipendente del nuovo diff resta distinta da questi risultati.
 
-## Risultato verificato
+## Riproduzioni, correzioni e falsificazioni
 
-Adapter separato dal telecomando, un tool app-only, consenso esplicito nella
-vista e payload dal reader monouso del broker. Risorsa statica senza fixture,
-nessun dato clinico in metadati/errori, errori fissi anche a livello protocollo.
-Liste paginate senza cardinalità fissate nella vista. Il demo già configurato
-conserva entrypoint e manifest. Nessuna modifica all'archivio reale.
+Le prove sono state introdotte ed eseguite prima delle correzioni, con Node
+**24.21.0**, `npm ci` reale nei due package root e `MEDIFLOW_DATA_DIR` sintetico
+creato con `mktemp -d`. Runner neurale e osservazione dell’installazione sono
+simulati soltanto nei test; broker e preparazione sono quelli reali.
 
-- `npm ci` reale su entrambi i package root, Node 24.21.0; directory dati
-  sintetiche create con `mktemp -d`.
-- Plugin: **14 pass, 0 fail, 1 TODO** (carico esteso non ammesso). MCP stdio
-  reale e tutti i frame intercettati; fixture con sentinella rifiutata e
-  assenza nei canali, consenso mancante/scaduto/negato, revoca, risposta tardiva
-  e turno successivo. Errori e stderr controllati; nessuna evidenza simulata
-  attivata nell'entrypoint ordinario.
-- Reference ext-apps: **30 renderer freddi + 30 caldi**, server già avviato;
-  runner neurale simulato, broker/preparazione reali. Giorno/Grafite a
-  **390/768/1440 px effettivi**, tastiera, Reduce Motion, payload invariato,
-  niente resize/scroll al clic, risposta trattenuta e poi ignorata dopo chiusura.
-- p95 vista fredda **141.7 ms**, calda
-  **145.8 ms**, feedback **27.7 ms**,
-  interazione **15.2 ms**, preparazione della scheda con
-  runner simulato **0.9 ms**; nessun long task attribuito
-  al widget oltre 50 ms. Bundle gzip **161386 byte**.
-- Controllo negativo: 150 ms di blocco nel vero handler UI fa fallire il budget
-  di feedback. Demo originale: browser smoke, falsificazione tool e sei
-  controlli negativi delle prestazioni passati, oltre ai suoi test di protocollo.
-- Lint e typecheck root/plugin passati. Guardie never-regress, claims e import
-  headless passate. Headless **292/292**, intelligent-host MCP **34/34**,
-  Mini **21/21**.
+| Rilievo | Prova rossa iniziale | Correzione e prova successiva |
+| --- | --- | --- |
+| P1 revoca | Due frame NDJSON `prepare`/`revoke` nello stesso `stdin.write`; la preparazione riusciva dopo la conferma di revoca. | Tentativo registrato prima dell’attesa; ogni revoca incrementa subito l’epoca. Ricontrollo sincrono dell’epoca subito prima dei byte, senza `await`. Test stdio verde, inclusa revoca durante runner lento. Ripristinare l’owner precedente fa fallire l’asserzione sul tentativo revocato. |
+| P2 gesto forgiato | `prepare` e `share` inviati via `window.parent.postMessage` dal frame consegnavano la scheda senza clic. | Challenge distinta per tentativo, 30 s, monouso, e chiave della vista emessa una sola volta al bootstrap. Solo il listener `isTrusted` del controllo firma la challenge con HMAC-SHA-256; il tool riceve challenge e firma, mai la chiave. Messaggi forgiati anche con challenge nota, firma errata, nonce vecchio/scaduto, replay anche su una nuova preparazione e rilettura della risorsa sono negati. Rimuovere la verifica della firma fa fallire la prova reference. |
+| P2 nuovo turno | Trattenere la risposta HTTP di `prepare`, notificare un nuovo turno e rilasciare la risposta riabilitava la vecchia vista. | Bootstrap riconosciuto separatamente; nuovo risultato o tool input invalida subito l’epoca. Risposta tardiva inerte, scheda nascosta e stato del nuovo turno. Prove reference verdi per entrambe le notifiche; ignorarle fa fallire entrambi i mutanti. |
+| P2 budget | Aggiungere 2200 ms alle sole risposte `share` lasciava verdi **60/60** esecuzioni: `shareMs` 2336–2860 ms, mentre i gate misuravano soltanto la scelta. | `usefulMs = readyMs + shareMs`; la consegna include visibilità e due frame di rendering. Il tempo umano tra scelta e clic è escluso. Lo stesso ritardo fa fallire il gate caldo `warm useful view <=2s p95` dopo 30 aperture fredde + 30 calde. Il mutante è nel controllo negativo, insieme al blocco UI da 150 ms. |
 
-## Suite unitaria e limite di integrazione
+Le prove di sicurezza vivono in `test/card-protocol.test.mjs` e
+`test/card-reference.mjs`; quest’ultimo esegue gli scenari avversariali anche
+nel comando ordinario. I mutanti temporanei di sicurezza sono stati ripristinati
+prima della consegna. Quello delle prestazioni è permanente in
+`scripts/falsify-card-performance.mjs`, selezionato dalla CI esistente.
 
-Eseguito `npm run test:unit` completo come comando. Il primo gruppo termina
-con **7.708 pass, 29 fail, 14 skip** su 7.751 test: 25 fallimenti di Treatment
-Portable (`artifact_tampered`), tre prerequisiti delle sorgenti Mac non presenti
-nell'ambiente, un timeout di `run-native-probe` SIGINT. I due gruppi successivi,
-non raggiunti dal runner dopo il fallimento, sono stati eseguiti separatamente:
-**61/61** e **66/66**. Non si dichiara verde la suite complessiva.
+## Risultati della revisione
 
-I 25 fallimenti Portable restano riproducibili nel controllo mirato con una
-directory temporanea canonica; il probe nativo passa isolato. I file interessati
-sono fuori dal diff. Nessuna protezione viene modificata per farli passare.
-`npm run build` Web si arresta nel controllo preliminare con
-`Build input metadata: private file is reachable`; nessuna build Web dichiarata
-riuscita. La build del plugin passa. CI e review della PR restano prove distinte.
+- Broker **116/116**. Plugin **16 pass, 0 fail, 1 TODO** (carico esteso).
+  Stdio reale, frame in entrambe le direzioni, errori e stderr controllati;
+  la fixture con sentinella identificativa continua a essere bloccata.
+- Reference originale ext-apps, bridge e sandbox invariati: **30 renderer
+  freddi + 30 caldi**, più messaggi forgiati, nuovo turno/tool call con risposta
+  trattenuta e risposta di condivisione tardiva dopo chiusura. Giorno/Grafite a
+  **390/768/1440 px effettivi**, tastiera, Reduce Motion, valori approvati
+  invariati, niente resize/scroll al clic.
+- p95 della **vista utile completa**: **238.2 ms fredda / 233.6 ms calda**;
+  feedback **46.4 ms**, interazioni **15.2 ms**, preparazione del broker con
+  runner simulato **1.05 ms**. Bundle gzip **161817 byte**.
+- **Il gate reference complessivo finale NON è verde:** un long task attribuito
+  al widget di **53 ms** viola la soglia invariata di 50 ms. Tutte le 60 aperture
+  e le asserzioni funzionali sono completate; i budget di vista utile, feedback,
+  interazioni, preparazione e bundle sono rispettati. La causa del long task
+  non è stabilita: non viene escluso come rumore né cancellato dal report.
+- Due run intermedi avevano rilevato 1 e 3 long task da 55–59 ms. Dopo la
+  separazione dell’avvio SDK e del montaggio UI, un run aveva zero long task;
+  il successivo run sulla versione finale HMAC ne rileva uno da 53 ms.
+  Il risultato finale resta quello non verde; non si dichiara la qualifica.
+- Controlli negativi: blocco UI reale da 150 ms rilevato dal budget feedback;
+  consegna reale rallentata di 2200 ms rilevata dal budget della vista utile.
+- Selezione test **140/140**, inventario **COMPLETE**. Lint e typecheck
+  root/plugin passati; verifica mirata finale dei file modificati passata.
+  Never-regress, claims e import headless passati. Headless **292/292**,
+  intelligent-host MCP **34/34**, Mini **21/21**.
+- Build plugin, browser smoke del demo originale e sua falsificazione del
+  tool-result passati. Reference/prestazioni del demo originale e i suoi **sei controlli negativi**
+  passati, distinti dai budget della scheda.
 
-## Qualifica esclusa
+## Confine e riapertura
 
-**Il carico esteso ADR (100 eventi, 30 terapie, 10 documenti) NON è qualificato.**
-Il broker #611 ammette 1 evento, 2 terapie e 2 misure. Per decisione del
-coordinatore i budget sono vincolanti su questa scheda; fixture estesa e TODO
-sono pronti per l'unità separata del broker. Non viene iniettato un risultato
-esteso al posto dell'uscita approvata.
+Un nonce restituito in `prepare` da solo non prova il gesto: il frame può
+leggerlo. La chiave del bootstrap rimane nella closure del controllo come
+chiave HMAC non estraibile e il bundle rimuove subito il proprio script dal
+DOM. Il listener usa il metodo di firma nativo acquisito al bootstrap, genera
+la firma soltanto dopo `isTrusted` e ricontrolla l’epoca dopo la firma asincrona.
+La chiave non viene restituita da `prepare` né inviata ai tool; una firma
+osservata non approva il nonce di una preparazione successiva. Il server rifiuta una seconda lettura della risorsa nella stessa
+sessione MCP. Per riaprire serve una nuova sessione (su stdio, riconnettere il
+plugin). Questo costo di riapertura è esplicito e non è ancora qualificato
+sui desktop. La risorsa contiene asset statici e la chiave, mai dati clinici.
 
-Non sono qualificati GLiNER reale, il carico da 10.000 caratteri, avvio freddo
-del processo/modello, confronto nativo, import, scritture, Touch ID o
-ricomposizione. **R/L su Codex e Claude Desktop non eseguite qui**: il reference
-usa l'ingresso esplicito app-only e bridge/sandbox originali, non la selezione
-modello del basic-host. Non estende il verdetto ai desktop.
+**L’host che controlla caricamento e renderer resta fuori dal confine**, come
+da ADR 0160: può osservare la chiave e i byte. Questa prova copre messaggi
+forgiati dal frame dopo il bootstrap fidato; non attesta il gesto contro un
+host ostile, non autentica il medico e non qualifica la retention. Nessun
+archivio reale, identificativo reale, Touch ID o writer è stato coinvolto.
 
-Report numerico sintetico: [card-reference-summary.json](card-reference-summary.json).
-I report completi e le sei catture sono negli artifact CI `dist/card-evidence`.
+## Limiti di integrazione e di qualifica
+
+Oltre al gate long task della scheda sopra riportato, la build Web è stata
+rieseguita e resta bloccata dalla guardia preliminare:
+`Build input metadata: private file is reachable`. Non si dichiara verde.
+La suite unitaria root completa non è stata ripetuta senza un motivo nuovo:
+l’esecuzione precedente documentata sulla PR resta **7708 pass, 29 fail,
+14 skip**, con gruppi successivi **61/61** e **66/66** eseguiti separatamente.
+I fallimenti Treatment Portable e prerequisiti Mac restano fuori dal diff.
+
+**Carico esteso (100 eventi, 30 terapie, 10 documenti), GLiNER reale,
+10.000 caratteri, avvio freddo server/modello, confronto nativo, import,
+scritture, ricomposizione e ammissione clinica NON qualificati.** R/L su Codex
+e Claude Desktop non sono eseguiti qui: il reference host non li sostituisce.
+La PR non chiude WUL-788 e non viene unita.
+
+Report numerico: [card-reference-summary.json](card-reference-summary.json).
+I report completi e le catture sono negli artifact CI `dist/card-evidence`.
 Istruzioni: [CARD-READER.md](../CARD-READER.md).

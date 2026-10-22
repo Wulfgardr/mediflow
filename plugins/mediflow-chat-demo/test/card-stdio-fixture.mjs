@@ -6,7 +6,7 @@ const owner = createCardOwner(testInstallation());
 const clock = Date.now;
 let offset = 0;
 if (process.argv.includes('--expired')) Date.now = () => clock() + offset;
-const adapterOwner = { ...owner, async prepare(view) { await owner.prepare(view); if (process.argv.includes('--expired')) offset = 120_000; } };
+const adapterOwner = { ...owner, async prepare(view) { const nonce = await owner.prepare(view); if (process.argv.includes('--expired')) offset = 30_000; return nonce; } };
 const { server } = await createCardServer(adapterOwner);
 await server.connect(fixedCardErrors(new StdioServerTransport()));
 let closing = false;

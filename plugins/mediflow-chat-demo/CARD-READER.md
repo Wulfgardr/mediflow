@@ -17,7 +17,7 @@ Questa composizione sintetica non concede alcuna autorità clinica.
 La vista prepara una selezione fissa della fixture `basic`. L'owner locale
 conserva handle e hash dei byte finali in RAM; l'adapter non riceve review,
 mapping, fonti locali o configurazione del runner. La preparazione restituisce
-solo testo fisso. Dopo il clic autentico su «Condividi questa scheda con la chat»,
+testo fisso e una challenge casuale in `_meta`, valida 30 secondi. Dopo il clic autentico su «Condividi questa scheda con la chat»,
 l'owner approva quell'hash e consuma una sola volta l'uscita del reader del broker.
 Il risultato contiene una ricevuta testuale breve e, in `structuredContent`,
 la sola scheda approvata. Nessun dato clinico in `_meta`.
@@ -25,13 +25,29 @@ la sola scheda approvata. Nessun dato clinico in `_meta`.
 Nessun consenso al caricamento, al focus, all'apertura di un dettaglio o tramite
 clic JavaScript. Il gesto è legato alla preparazione corrente e alla vista;
 il modello non può chiamare il tool negli host che rispettano app-only.
-Il diniego, la scadenza di due minuti, una nuova vista o una revoca durante la
+Il diniego, la scadenza di 30 secondi, una nuova vista o una revoca durante la
 preparazione non rilasciano la scheda. Un nuovo turno invalida il tentativo;
 una risposta tardiva non ripopola una vista chiusa. La chiusura non cancella i
 byte già consegnati alla chat. Non si dichiara revoca retroattiva o retention.
 
-La risorsa HTML/JS/CSS è identica per tutte le chiamate e contiene soltanto asset
-statici, token Lume e Newsreader. Usa Punto d'inchiostro, altezza interna stabile,
+La risorsa non contiene dati clinici: usa asset statici, token Lume e Newsreader,
+con una chiave casuale per questa sessione. Il server la emette una sola volta
+nel caricamento della risorsa; il bundle importa una chiave HMAC non estraibile
+nella closure del controllo e rimuove subito il proprio script dal DOM. Le
+risposte `prepare` contengono solo la challenge del tentativo, mai la chiave.
+Solo il listener `isTrusted` del pulsante firma la challenge con HMAC-SHA-256
+e invia challenge e firma. Un messaggio forgiato dal frame, anche conoscendo
+la challenge o una firma precedente, non può approvare un altro tentativo
+o rileggere la chiave tramite `resources/read`. La firma è verificata dal
+server e il nonce consumato dall’owner prima dell’uscita del broker; la chiave non attraversa i tool.
+Dopo la prima lettura, la risorsa non viene emessa di nuovo nella stessa sessione:
+per riaprire la vista occorre una nuova sessione MCP (su stdio, riconnettere il
+plugin). Questo costo di riapertura è esplicito e resta da qualificare sui desktop.
+La chiave protegge il percorso di messaggi dal frame già avviato; non attesta
+un renderer ostile. L’host che controlla caricamento e renderer può leggerla
+e resta fuori da questo confine, come previsto dall’ADR.
+
+La vista Usa Punto d'inchiostro, altezza interna stabile,
 nessun ridimensionamento al clic e nessuna fascia laterale. Le liste sono paginate
 in gruppi di dieci, senza dipendere dai limiti attuali del broker. Tutti i valori
 clinici, gli pseudonimi e i riferimenti opachi sono conservati dal risultato;
@@ -92,7 +108,8 @@ Aprire la vista dall'ingresso app/thread dell'host, non chiedere al modello di
 approvare un tool nascosto. Se il client non offre l'ingresso app-only, registrare
 il limite del client: non rendere il comando disponibile al modello per aggirarlo.
 
-Prima del clic la scheda deve essere vuota. Provare diniego e riapertura; poi
+Prima del clic la scheda deve essere vuota. Provare diniego e riapertura
+riconnettendo il plugin per ottenere una nuova sessione MCP; poi
 condividere con tastiera, espandere storia/terapie/misure, cambiare Giorno/Grafite,
 chiudere e inviare un turno successivo. Verificare assenza di salto della chat,
 resize al clic, fasce laterali e JSON nella ricevuta. Controllare separatamente
@@ -113,8 +130,17 @@ broker, si potrà usare lo stesso harness e gli stessi budget.
 `test:card-reference` esegue 30 aperture con cache renderer fredda e 30 con cache
 calda, con runtime server già avviato. Registra p50/p95/massimo, preparazione del
 broker simulato, feedback, espansione/tema e blocchi UI attribuiti al widget.
+La vista utile è apertura→scelta più clic→scheda visibile e dipinta (due frame),
+escludendo l’attesa umana tra scelta e clic. Registra separatamente `readyMs`,
+`shareMs` e il totale `usefulMs`; il gate usa quest’ultimo.
 Impone p95 5 s/2 s per vista fredda/calda, 2 s per preparazione della scheda,
 100 ms per feedback e 200 ms per interazione; nessun blocco widget oltre 50 ms,
 gzip sotto 250 kB, nessun resize o salto al clic. Non misura l'avvio a freddo del
 processo server o del modello neurale e non li dichiara qualificati.
 Gli asset e il report completo sono in `dist/card-evidence/` e negli artifact CI.
+
+Il controllo negativo verifica sia 150 ms di blocco del clic sia 2200 ms
+aggiunti alla risposta reale `share`: il secondo deve fallire il budget caldo
+della vista utile dopo tutte le 30 aperture fredde e 30 calde. La suite reference
+include messaggi forgiati con challenge nota e nuovi turni/tool call mentre
+la risposta di preparazione è trattenuta.
