@@ -18,16 +18,16 @@ export type ReflowProxyViewport = (typeof REFLOW_PROXY_VIEWPORTS)[number];
 type OverflowTarget = { label: string; selector: string };
 
 /* ADR 0123: reach a clinical pane through the ordinary section menu,
-   including sections disclosed under "Altre sezioni". */
+   including sections disclosed under "Altro". */
 export async function openPatientSection(page: Page, id: string): Promise<void> {
   const navigation = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
   const link = navigation.locator(`a[href="#${id}"]`);
   await expect(navigation).toBeVisible();
+  if (!(await link.isVisible())) await navigation.getByRole('button', { name: 'Altro', exact: true }).click();
   await expect(link).toHaveCount(1);
-  if (!(await link.isVisible())) await navigation.locator('summary').click();
   await expect(link).toBeVisible();
   await link.click();
-  await expect(link).toHaveAttribute('aria-current', 'location');
+  await expect(navigation.locator('[aria-current="location"]:visible')).toHaveCount(1);
   // ordinary sections use navigation state and visibility; the twin-only
   // data-folder-active attribute is not part of their contract.
   const pane = page.locator(`#${id}`);

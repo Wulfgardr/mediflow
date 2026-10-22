@@ -203,7 +203,7 @@ for (const quadroCase of QUADRO_CASES) {
     await expect(page.locator('#terapie')).toContainText('Ramipril sintetico');
     if (quadroCase.width === 320) {
       const sectionNavigation = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
-      const moreSections = sectionNavigation.locator('summary');
+      const moreSections = sectionNavigation.getByRole('button', { name: 'Altro', exact: true });
       await moreSections.focus();
       await page.keyboard.press('Enter');
       await expect(sectionNavigation.locator('a[href="#follow-up"]')).toBeVisible();

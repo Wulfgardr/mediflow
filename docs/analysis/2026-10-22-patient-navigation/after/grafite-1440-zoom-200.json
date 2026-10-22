@@ -1,0 +1,20 @@
+{
+  "sha": "9d748026ba871d546b560e210b0b1089fa606ae9",
+  "theme": "grafite",
+  "zoom": 2,
+  "before": {
+    "width": 1440,
+    "ratio": 1
+  },
+  "after": {
+    "width": 720,
+    "height": 480,
+    "ratio": 2
+  },
+  "menu": {
+    "x": 401.296875,
+    "y": 136,
+    "width": 240,
+    "height": 336
+  }
+}

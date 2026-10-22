@@ -1,0 +1,68 @@
+[
+  {
+    "sha": "cb389bcf3b9878787f0adcb1be89a2754f46cdb2",
+    "theme": "giorno",
+    "width": 1440,
+    "menu": {
+      "x": 538.828125,
+      "y": 201.796875,
+      "width": 258,
+      "height": 412
+    }
+  },
+  {
+    "sha": "cb389bcf3b9878787f0adcb1be89a2754f46cdb2",
+    "theme": "giorno",
+    "width": 768,
+    "menu": {
+      "x": 49.5625,
+      "y": 323.09375,
+      "width": 258,
+      "height": 412
+    }
+  },
+  {
+    "sha": "cb389bcf3b9878787f0adcb1be89a2754f46cdb2",
+    "theme": "giorno",
+    "width": 390,
+    "menu": {
+      "x": 14,
+      "y": 536,
+      "width": 362,
+      "height": 412
+    }
+  },
+  {
+    "sha": "cb389bcf3b9878787f0adcb1be89a2754f46cdb2",
+    "theme": "grafite",
+    "width": 1440,
+    "menu": {
+      "x": 538.828125,
+      "y": 201.796875,
+      "width": 258,
+      "height": 412
+    }
+  },
+  {
+    "sha": "cb389bcf3b9878787f0adcb1be89a2754f46cdb2",
+    "theme": "grafite",
+    "width": 768,
+    "menu": {
+      "x": 49.5625,
+      "y": 323.09375,
+      "width": 258,
+      "height": 412
+    }
+  },
+  {
+    "sha": "cb389bcf3b9878787f0adcb1be89a2754f46cdb2",
+    "theme": "grafite",
+    "width": 390,
+    "menu": {
+      "x": 14,
+      "y": 536,
+      "width": 362,
+      "height": 412
+    }
+  }
+]

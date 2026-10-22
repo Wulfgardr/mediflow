@@ -9,7 +9,7 @@ import {PatientSheetActionsMenu} from './components/patient-sheet-actions-menu';
 window.calls=[];
 createRoot(document.getElementById('root')).render(<PatientSheetActionsMenu editHref="/patients/synthetic/edit" canShareFhirFile={true}
  onExportFhir={()=>window.calls.push('export')} onShareFhir={()=>window.calls.push('share')} onReportPdf={()=>window.calls.push('pdf')}
- leadingActions={[{label:'Accesso assistente',onSelect:()=>window.calls.push('assistant')},{label:'Gestisci checkup',onSelect:()=>window.calls.push('checkup')}]}/>);`;
+ leadingActions={[{label:'Accesso assistente',onSelect:()=>{window.calls.push('assistant');const dialog=document.getElementById('dialog');dialog.hidden=false;dialog.focus();}},{label:'Gestisci checkup',onSelect:()=>window.calls.push('checkup')}]}/>);`;
 
 test('header actions are an accessible ordered menu with unchanged links and callbacks', {timeout:30000},async t=>{
  assert.ok(process.env.MEDIFLOW_DATA_DIR?.trim());
@@ -18,7 +18,7 @@ test('header actions are an accessible ordered menu with unchanged links and cal
  const page=await browser.newPage({viewport:{width:320,height:720}});
  await page.route('**/*',async route=>{
   const path=new URL(route.request().url()).pathname;
-  if(path==='/')await route.fulfill({contentType:'text/html',body:'<!doctype html><html lang="it"><body><div id="root"></div><button id="outside">Fuori</button><script src="/bundle.js"></script></body></html>'});
+  if(path==='/')await route.fulfill({contentType:'text/html',body:'<!doctype html><html lang="it"><body><div id="root"></div><button id="outside">Fuori</button><div id="dialog" role="dialog" aria-label="Destinazione sincrona" tabindex="-1" hidden>Dialogo</div><script src="/bundle.js"></script></body></html>'});
   else if(path==='/bundle.js')await route.fulfill({contentType:'text/javascript',body:bundle.outputFiles.find(f=>f.path.endsWith('.js'))!.text});
   else await route.abort();
  });
@@ -37,9 +37,13 @@ test('header actions are an accessible ordered menu with unchanged links and cal
  await page.keyboard.press('End');await expect(menu.getByRole('menuitem').last()).toBeFocused();
  for(const label of ['Modifica','Archivia'])await expect(menu.getByRole('menuitem',{name:label,exact:true})).toHaveAttribute('href','/patients/synthetic/edit');
  await page.keyboard.press('Escape');await expect(menu).toBeHidden();await expect(trigger).toBeFocused();
- for(const [label,call] of [['Accesso assistente','assistant'],['Gestisci checkup','checkup'],['Esporta FHIR','export'],['Condividi FHIR','share'],['Report PDF','pdf']]){
+ for(const [label,call] of [['Report PDF','pdf'],['Esporta FHIR','export'],['Condividi FHIR','share'],['Accesso assistente','assistant'],['Gestisci checkup','checkup']]){
   await trigger.click();await menu.getByRole('menuitem',{name:label,exact:true}).click();await expect(menu).toBeHidden();
   assert.equal(await page.evaluate(()=> (window as unknown as {calls:string[]}).calls.at(-1)),call);
+  if(call==='assistant'){
+   await expect(page.getByRole('dialog',{name:'Destinazione sincrona'})).toBeFocused();
+   await page.locator('#dialog').evaluate((element:HTMLElement)=>{element.hidden=true;});
+  }else await expect(trigger).toBeFocused({timeout:1000});
  }
  await trigger.focus();await page.keyboard.press('ArrowUp');await expect(menu.getByRole('menuitem').last()).toBeFocused();
  await page.keyboard.press('Tab');await expect(menu).toBeHidden();

@@ -1,0 +1,22 @@
+{
+  "after/giorno-1440-zoom-200.json": "784b89584c4d5856c636bf2ee7641960e41eb47f96b3734f5af7aa6e80add67f",
+  "after/giorno-1440-zoom-200.png": "fca399d546800cac22e153a84d03bdad0c9d5074f37657602e472cdb7fbfde37",
+  "after/giorno-1440.png": "ffc263e00c0bc0b0196de82c77127043d56571118ff7612358e88f6549585306",
+  "after/giorno-390.png": "4d718f361fa001fa9e7513d4f265bf65aa352f500c62ab811919a9bab81f7e7a",
+  "after/giorno-768.png": "36d908c713426f1a29bc3a68261376199f4c0ce5acd0fcefc360658edabdf2de",
+  "after/grafite-1440-zoom-200.json": "c18034f8cf77cac34b361466219408168593459d8fc5b6bb88ffc62c54ef4ee6",
+  "after/grafite-1440-zoom-200.png": "95973c51fb22d71086d5f90c280fcfcce8e1c71f8204a7216467793ab31f4213",
+  "after/grafite-1440.png": "f468edf0273c3f41042cfd0b36d44454192b757cfd9c4c0c9ca892084a2d26c7",
+  "after/grafite-390.png": "ed7680cae307cab679884342135c19df41964d13f7ed5be7ce83794c1b32092b",
+  "after/grafite-768.png": "186f20ae9eb3c0794f2d7e6ebb887eed22b67c01a95f52dcf4c2c193daacd056",
+  "after/measurements.json": "cae748af1581c8b32c0e618f4bd6d37ecbb95d789c4829d5cb0fb468f2a7e8eb",
+  "before/giorno-1440-zoom-200.png": "282cc2360b6ffdd84768c07c7e19d7732544a6a33e68bf986f15475ec04031a1",
+  "before/giorno-1440.png": "84f7c316fb79c1a9a75db04810494736cba73632841ef0bd225bac69f5eab6e9",
+  "before/giorno-390.png": "d11ddf2ed7d40f7905551eca7f2d5578c12c5101e1f4977c7a05fad55a963cf0",
+  "before/giorno-768.png": "fc39b2642c997753ede37fbe475eddc8607b5aa1cbcd20ceb01e84951fcfcc07",
+  "before/grafite-1440-zoom-200.png": "7bb1de26747a8c6bc4455df17ad7b5dfa161d9feffa62ff4ac3098676d37c3b6",
+  "before/grafite-1440.png": "28874d0a8c54b240b8e4a7781ade9fd350794341d18e010d1eee4da9a26ac422",
+  "before/grafite-390.png": "3b43d467c6b8c7de521c2b951d5bb6ae1961e803852e002d3ac88af908b3955a",
+  "before/grafite-768.png": "f02c8fdda91a15afb291d18cecea36bef42f53ab21774aa7cd2e6a35eac57572",
+  "before/measurements.json": "0b3578f6b4306b6df3f03b2a36432fc4f619096e7ae685c608139604cc6883c8"
+}

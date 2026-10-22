@@ -1,25 +1,24 @@
-// Real React navigation and its CSS in Chromium; fixture controls replace only
-// the asynchronous count producer. No app server, clinical data or API writes.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { chromium, expect } from '@playwright/test';
 import { build } from 'esbuild';
 
 const origin = 'http://127.0.0.1:48975';
-const entry = `import React, {useState} from 'react';
+const entry = `import React, {useState, useEffect} from 'react';
 import {createRoot} from 'react-dom/client';
 import {RuntimeTwinPatientNavigation} from './components/runtime-twin-workspace';
 function Fixture() {
   const [count, setCount] = useState(undefined);
+  useEffect(() => { const update = () => setCount('12'); window.addEventListener('synthetic-counts', update); return () => window.removeEventListener('synthetic-counts', update); }, []);
   const items = [
-    {href:'#quadro',label:'Quadro'}, {href:'#diario',label:'Diario'},
+    {href:'#quadro',label:'Quadro'},
     {href:'#attenzione',label:'Attenzione'}, {href:'#identita',label:'Anagrafica'},
     {href:'#clinica',label:'Diagnosi'}, {href:'#amministrazione',label:'Amministrazione'},
     {href:'#parametri',label:'Parametri',meta:'0'},
     {href:'#terapie',label:'Terapie',meta:count},
     {href:'#prestazioni',label:'Prestazioni'}, {href:'#protesica',label:'Protesica'},
     {href:'#scale',label:'Scale'}, {href:'#documenti',label:'Documenti',meta:'0'},
-    {href:'#siss',label:'SISS/FSE'}, {href:'#timeline',label:'Timeline'},
+    {href:'#siss',label:'SISS/FSE'}, {href:'#timeline',label:'Timeline'}, {href:'#diario',label:'Diario'},
     {href:'#follow-up',label:'Follow-up'}
   ];
   return <>
@@ -74,7 +73,7 @@ test('patient section menu closes when navigation selects a primary or secondary
             await context.close();
             throw new Error(`navigation fixture failed to render: ${errors.join('; ')}`, { cause: error });
         }
-        const menu = navigation.locator('details'), summary = navigation.locator('summary');
+        const menu = navigation.getByRole('menu'), summary = navigation.getByRole('button', {name:'Altro',exact:true});
         return { page, navigation, menu, summary, close: async () => {
             try { assert.deepEqual(errors, []); assert.deepEqual(unexpected, []); }
             finally { await context.close(); }
@@ -82,19 +81,21 @@ test('patient section menu closes when navigation selects a primary or secondary
     }
 
     for (const width of [1280, 390]) {
-        await t.test(`a count update promotes therapy while the open menu still closes on its click at ${width}px`, async () => {
+        await t.test(`asynchronous counts preserve destinations, menu and focus at ${width}px`, async () => {
             const f = await fixture(width);
             try {
+                const primary = f.navigation.locator(':scope > a');
+                await expect(primary).toHaveText(['Riepilogo', 'Terapie', 'Misure', 'Documenti']);
                 await f.summary.click();
-                await expect(f.menu).toHaveJSProperty('open', true);
-                await expect(f.menu.locator('a[href="#terapie"]')).toBeVisible();
-                await f.page.getByRole('button', { name: 'Carica conteggi sintetici', exact: true }).click();
-                const therapy = f.navigation.locator(':scope > a[href="#terapie"]');
-                await expect(therapy).toBeVisible();
-                await expect(f.menu).toHaveJSProperty('open', true);
-                await therapy.click();
-                await expect(f.page).toHaveURL(/#terapie$/);
-                await expect(f.menu).toHaveJSProperty('open', false, { timeout: 500 });
+                await expect(f.menu).toBeVisible();
+                const current = f.menu.getByRole('menuitem').nth(3);
+                await current.focus();
+                await f.page.evaluate(() => window.dispatchEvent(new Event('synthetic-counts')));
+                await expect(primary).toHaveText(['Riepilogo', 'Terapie12', 'Misure', 'Documenti']);
+                await expect(f.menu).toBeVisible();
+                await expect(current).toBeFocused();
+                await f.navigation.locator(':scope > a[href="#terapie"]').click();
+                await expect(f.menu).toBeHidden();
                 await f.page.getByText('Farmaco manuale o galenico', { exact: true }).click();
                 await expect(f.page.getByRole('checkbox')).toBeChecked();
             } finally { await f.close(); }
@@ -104,33 +105,33 @@ test('patient section menu closes when navigation selects a primary or secondary
             const f = await fixture(width);
             try {
                 await f.summary.click();
-                await expect(f.menu).toHaveJSProperty('open', true);
+                await expect(f.menu).toBeVisible();
                 await f.navigation.locator(':scope > a[href="#quadro"]').focus();
                 await f.page.keyboard.press('Enter');
                 await expect(f.page).toHaveURL(/#quadro$/);
-                await expect(f.menu).toHaveJSProperty('open', false, { timeout: 500 });
+                await expect(f.menu).toBeHidden({ timeout: 500 });
             } finally { await f.close(); }
         });
 
-        await t.test(`secondary selection, summary toggle and Escape focus remain native at ${width}px`, async () => {
+        await t.test(`secondary selection, trigger toggle and Escape restore focus at ${width}px`, async () => {
             const f = await fixture(width);
             try {
                 await f.summary.click();
-                await expect(f.menu).toHaveJSProperty('open', true);
+                await expect(f.menu).toBeVisible();
                 await f.menu.locator('a[href="#protesica"]').click();
                 await expect(f.page).toHaveURL(/#protesica$/);
-                await expect(f.menu).toHaveJSProperty('open', false);
+                await expect(f.menu).toBeHidden();
                 await f.summary.click();
-                await expect(f.menu).toHaveJSProperty('open', true);
+                await expect(f.menu).toBeVisible();
                 await f.summary.click();
-                await expect(f.menu).toHaveJSProperty('open', false);
+                await expect(f.menu).toBeHidden();
                 await f.summary.click();
-                await expect(f.menu).toHaveJSProperty('open', true);
+                await expect(f.menu).toBeVisible();
                 await f.page.keyboard.press('Escape');
-                await expect(f.menu).toHaveJSProperty('open', false);
+                await expect(f.menu).toBeHidden();
                 await expect(f.summary).toBeFocused();
                 await f.summary.click();
-                await expect(f.menu).toHaveJSProperty('open', true);
+                await expect(f.menu).toBeVisible();
             } finally { await f.close(); }
         });
     }

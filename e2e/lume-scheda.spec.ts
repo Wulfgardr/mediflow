@@ -161,9 +161,11 @@ async function expectPatientHeaderCommands(page: Page, header: Locator, patientI
 async function expectCurrentSection(page: Page, id: string): Promise<void> {
   const nav = page.getByRole('navigation', { name: 'Sezioni della vista' });
   const link = nav.locator(`a[href="#${id}"]`);
-  await expect(link).toHaveAttribute('aria-current', 'location');
-  await expect(nav.locator('a[aria-current="location"]')).toHaveCount(1);
-  // A closed disclosure carries the location marker of its hidden active link.
+  if (['quadro', 'terapie', 'parametri', 'documenti'].includes(id)) {
+    await expect(link).toHaveAttribute('aria-current', 'location');
+  } else {
+    await expect(nav.getByRole('button', { name: 'Altro', exact: true })).toHaveAttribute('aria-current', 'location');
+  }
   await expect(nav.locator('[aria-current="location"]:visible')).toHaveCount(1);
   await expect(page.locator(`#${id}`)).toBeVisible();
 }
@@ -201,17 +203,19 @@ test('le quindici sezioni restano raggiungibili con una sola destinazione corren
   const nav = page.getByRole('navigation', { name: 'Sezioni della vista' });
   const sections = ['quadro', 'attenzione', 'identita', 'clinica', 'amministrazione', 'parametri', 'terapie', 'prestazioni',
     'protesica', 'scale', 'documenti', 'siss', 'timeline', 'diario', 'follow-up'];
+  await nav.getByRole('button', { name: 'Altro', exact: true }).click();
   await expect(nav.locator('a')).toHaveCount(sections.length);
   expect((await nav.locator('a').evaluateAll(links => links.map(link => link.getAttribute('href')))).sort())
     .toEqual(sections.map(id => `#${id}`).sort());
   await expectCurrentSection(page, 'quadro');
-  const disclosure = nav.locator('summary');
-  const details = nav.locator('details');
+  const disclosure = nav.getByRole('button', { name: 'Altro', exact: true });
+  const details = nav.getByRole('menu');
+  await page.keyboard.press('Escape');
   await disclosure.focus();
   await disclosure.press('Space');
-  await expect(details).toHaveAttribute('open', '');
+  await expect(details).toBeVisible();
   await disclosure.press('Enter');
-  await expect(details).not.toHaveAttribute('open');
+  await expect(details).toBeHidden();
   await expectCurrentSection(page, 'quadro');
   for (const id of sections) {
     const link = nav.locator(`a[href="#${id}"]`);
@@ -333,7 +337,7 @@ for (const schedaCase of CASES) {
     await openPatientSection(page, 'terapie');
     await expect(page.locator('#terapie')).toContainText('5 mg');
 
-    await nav.locator('summary').click();
+    await nav.getByRole('button', { name: 'Altro', exact: true }).click();
     await nav.locator('a[href="#attenzione"]').click();
     await expectCurrentSection(page, 'attenzione');
     const states = surface.locator('[data-lume-clinical-state]:visible');
