@@ -2,6 +2,7 @@
 
 import { Disclosure } from '@/components/disclosure';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { ChoiceField } from '@/components/choice-field';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import PrivacyBlur from '@/components/privacy-blur';
 import { createSmartImportReviewBrowserController } from '@/lib/security/smart-import-review-browser-controller';
@@ -45,13 +46,11 @@ export function PatientSmartImportFabricPreviewCard({ patientId, captureInput, e
             {phase === 'confirm' && proposal && (
                 <div className="mt-2 space-y-2">
                     <p><PrivacyBlur>Paziente: {proposal.patientName}</PrivacyBlur></p>
-                    <label className="grid gap-2 font-medium">Ambulatorio per questa proposta
-                        <select className="min-h-11 min-w-0 w-full rounded-xl border px-3 py-2 bg-[color:var(--lume-surface-field)]" value={ambulatory?.ambulatoryId ?? ''}
+                    <ChoiceField label="Ambulatorio per questa proposta" value={ambulatory?.ambulatoryId ?? ''}
                             onChange={event => { setAmbulatory(proposal.ambulatories.find(row => row.ambulatoryId === event.target.value) ?? null); setConfirmed(false); }}>
                             <option value="">Scegli l’ambulatorio</option>
                             {proposal.ambulatories.map(row => <option key={row.ambulatoryId} value={row.ambulatoryId}>{row.name}{row.address ? ` · ${row.address}` : ''}</option>)}
-                        </select>
-                    </label>
+                        </ChoiceField>
                     <label className="flex min-h-11 items-start gap-3 py-2">
                         <input className="mt-1 h-4 w-4" type="checkbox" disabled={!ambulatory} checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
                         Confermo paziente e ambulatorio per una proposta da rivedere. La cartella resta invariata.

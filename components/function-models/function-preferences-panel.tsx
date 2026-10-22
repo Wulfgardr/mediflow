@@ -8,6 +8,7 @@ import { parseAccountBrowserStatus } from '@/lib/chatgpt-account/account-browser
 import type { AccountStatus } from '@/lib/chatgpt-account/account-contract';
 import { SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 import styles from './model-picker.module.css';
+import { ChoiceField } from '@/components/choice-field';
 import { TreatmentReasoningPortableSetup } from '../treatment-reasoning-portable-setup';
 type FunctionRow = FunctionModelPreferences['functions'][number];
 function Description({ row }: { row: FunctionRow }) {
@@ -26,22 +27,18 @@ function PreferenceCard({ row, disabled, account, activationSupported, preview }
     const warning = model === null && row.defaultSource !== 'host_configuration' ? 'Il modello del computer sarà indicato nell’anteprima.' : row.bindingState === 'stale' ? 'Scelta salvata scaduta: serve una nuova decisione.' : row.bindingState === 'unsupported' ? 'Predefinito non disponibile.' : selected?.state === 'available_unqualified' ? '' : 'Provider locale non disponibile';
     return <article className={styles.card}>
         <div className={styles.row}><h3>{names[row.id]}</h3><span>{row.enabled ? 'Attivo' : 'Spento'}</span></div>
-        {activationSupported && <label>Canale per questa modifica
-            <select aria-label={`Canale per questa modifica · ${names[row.id]}`} value={channel} disabled={disabled}
+        {activationSupported && <ChoiceField label="Canale per questa modifica" aria-label={`Canale per questa modifica · ${names[row.id]}`} value={channel} disabled={disabled} disabledReason="Attendi il completamento della modifica in corso."
                 onChange={e => setChannel(e.target.value === 'chatgpt_subscription' ? 'chatgpt_subscription' : 'local')}>
                 <option value="local">Provider locale · modello predefinito</option>
                 <option value="chatgpt_subscription">OpenAI · abbonamento ChatGPT</option>
-            </select>
-        </label>}
+        </ChoiceField>}
         {remote && <p className={styles.hint}>Questa modifica riguarda solo l’interruttore condiviso della funzione; non seleziona né ammette un modello locale. La preferenza locale resta invariata. Per ogni proposta scegli OpenAI nella funzione: restano necessari opt-in dell’host, contesto corrente, consenso, accesso dedicato e catalogo del tentativo.</p>}
         {!remote && warning && <p className={styles.hint}>{warning}</p>}
-        {!remote && <label>Modello locale predefinito
-            <select aria-label={`Modello predefinito · ${names[row.id]}`} value={model ?? ''} disabled={disabled} onChange={e => setModel(e.target.value || null)}>
+        {!remote && <ChoiceField label="Modello locale predefinito" aria-label={`Modello predefinito · ${names[row.id]}`} value={model ?? ''} disabled={disabled} disabledReason="Attendi il completamento della modifica in corso." onChange={e => setModel(e.target.value || null)}>
                 <option value="">{computerDefault ? `${computerDefault.label} · ${providerName(computerDefault.provider)} · predefinito` : 'Predefinito del computer'}</option>
                 {row.defaultSource === 'saved_preference' && !row.options.some(o => o.modelOptionId === model) && model && <option value={model} disabled>Preferenza non più disponibile</option>}
                 {row.options.map(o => <option key={o.modelOptionId} value={o.modelOptionId} disabled={enabled && o.state === 'unavailable'}>{o.label} · {providerName(o.provider)}{o.state === 'unavailable' ? ' · non disponibile' : ''}</option>)}
-            </select>
-        </label>}
+        </ChoiceField>}
         {!remote && row.id === 'treatment_reasoning' && <TreatmentReasoningPortableSetup option={row.options.find(o => o.provider === 'athena_transformers')} />}
         {!remote && !selected && model !== null && <p>Nessun modello selezionabile</p>}
         <div className={styles.actions}><button type="button" role="switch" aria-checked={enabled} aria-label={`${names[row.id]} nella proposta`} className={`${SETTINGS_SECONDARY_BUTTON_CLASS} ${styles.switch}`} disabled={disabled} onClick={() => setEnabled(!enabled)}>{enabled ? 'Spegni' : 'Attiva'}</button>

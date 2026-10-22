@@ -174,6 +174,7 @@ test('[E2E fixture] Smart Import exposes only the Fabric review preview and neve
   await card.getByRole('button', { name: 'Prepara proposta' }).click();
   await expect(card.getByRole('checkbox')).toBeDisabled();
   await card.getByRole('combobox', { name: 'Ambulatorio per questa proposta' }).selectOption('ambulatory.synthetic');
+  await card.getByTestId('model-picker-smart_import').getByRole('button', { name: 'Cambia', exact: true }).click();
   const modelPicker = card.getByRole('combobox', { name: 'Modello per questa proposta' });
   await modelPicker.focus();
   await expect(modelPicker.locator('option')).toHaveText([
