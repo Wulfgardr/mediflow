@@ -12,6 +12,7 @@ const PACKAGE = `@mediflow/${OWNER_STEM}`;
 const PACKAGE_SOURCE_MANIFEST = `packages/${OWNER_STEM}/package.json`;
 const PROFILE_CONTRACTS_MANIFEST = 'packages/patient-profile-contracts/package.json';
 const SYNTHETIC_PLUGIN_MANIFEST = 'plugins/mediflow-synthetic/package.json';
+const CHAT_DEMO_PLUGIN_MANIFEST = 'plugins/mediflow-chat-demo/package.json';
 const D1A = `lib/security/${OWNER_STEM}-boundary.test.ts`;
 const D1B = `lib/security/${OWNER_STEM}-resolver-boundary.test.ts`;
 const PRODUCER = 'lib/security/web-auth-next-producer-boundary.test.ts';
@@ -159,7 +160,8 @@ const inventoryErrors = (files: readonly string[]): string[] => {
         ['package.json', PACKAGE_SOURCE_MANIFEST],
         ['package.json', SYNTHETIC_PLUGIN_MANIFEST],
         ['package.json', PACKAGE_SOURCE_MANIFEST, SYNTHETIC_PLUGIN_MANIFEST],
-    ].flatMap((inventory) => [inventory, [...inventory, PROFILE_CONTRACTS_MANIFEST]]);
+    ].flatMap((inventory) => [inventory, [...inventory, PROFILE_CONTRACTS_MANIFEST]])
+        .flatMap((inventory) => [inventory, [...inventory, CHAT_DEMO_PLUGIN_MANIFEST]]);
     if (!reviewedPackages.map((inventory) => canonical(inventory.sort())).includes(canonical(packages)))
         errors.push('inventory:package');
     if (alternates.length > 0) errors.push('inventory:alternate-resolver');
@@ -233,27 +235,33 @@ test('denies alternate resolver files, nested packages, and loss of the combined
         [GUARD_SCRIPT]: `node scripts/run-strip-types.mjs --test ${D1A}` } }), []);
 });
 
-test('allows only the reviewed synthetic and profile packages alongside either owner-package inventory', () => {
+test('allows only the reviewed synthetic, chat-demo and profile packages alongside either owner-package inventory', () => {
     for (const ownerFiles of [[], [PACKAGE_SOURCE_MANIFEST], [PROFILE_CONTRACTS_MANIFEST],
         [PACKAGE_SOURCE_MANIFEST, PROFILE_CONTRACTS_MANIFEST]]) {
-        const baseline = ['next.config.ts', 'package.json', ...ownerFiles];
-        assert.deepEqual(inventoryErrors(baseline), []);
-        assert.deepEqual(inventoryErrors([...baseline, SYNTHETIC_PLUGIN_MANIFEST]), []);
-        for (const file of ['plugins/package.json', 'plugins/mediflow/package.json',
-            'plugins/mediflow-synthetic-copy/package.json', 'plugins/mediflow-synthetic/src/package.json',
-            'plugins/mediflow-synthetic/owner-shim/package.json', 'packages/mediflow-synthetic/package.json',
-            'packages/patient-profile-contracts-copy/package.json', 'packages/patient-profile-contracts/src/package.json',
-            'packages/patient-profile-contracts/owner-shim/package.json',
-            'lib/security/package.json']) {
-            assert.deepEqual(inventoryErrors([...baseline, file]), ['inventory:package'], file);
-            assert.deepEqual(inventoryErrors([...baseline, SYNTHETIC_PLUGIN_MANIFEST, file]),
-                ['inventory:package'], file);
-        }
-        for (const file of ['plugins/mediflow-synthetic/next.config.ts',
-            'plugins/mediflow-synthetic/jsconfig.json', 'plugins/mediflow-synthetic/.babelrc',
-            'packages/patient-profile-contracts/next.config.ts', 'packages/patient-profile-contracts/jsconfig.json',
-            'packages/patient-profile-contracts/.babelrc']) {
-            assert.notDeepEqual(inventoryErrors([...baseline, SYNTHETIC_PLUGIN_MANIFEST, file]), [], file);
+        for (const pluginFiles of [[], [SYNTHETIC_PLUGIN_MANIFEST], [CHAT_DEMO_PLUGIN_MANIFEST],
+            [SYNTHETIC_PLUGIN_MANIFEST, CHAT_DEMO_PLUGIN_MANIFEST]]) {
+            const baseline = ['next.config.ts', 'package.json', ...ownerFiles, ...pluginFiles];
+            assert.deepEqual(inventoryErrors(baseline), [], baseline.join(', '));
+            for (const file of ['plugins/package.json', 'plugins/mediflow/package.json',
+                'plugins/mediflow-synthetic-copy/package.json', 'plugins/mediflow-synthetic/src/package.json',
+                'plugins/mediflow-synthetic/owner-shim/package.json', 'packages/mediflow-synthetic/package.json',
+                'plugins/mediflow-chat-demo-copy/package.json', 'plugins/mediflow-chat-demo/src/package.json',
+                'plugins/mediflow-chat-demo/owner-shim/package.json', 'packages/mediflow-chat-demo/package.json',
+                'plugins/mediflow-chat-demo/.local/package.json',
+                'plugins/mediflow-chat-demo/.local/owner-shim/package.json',
+                'packages/patient-profile-contracts-copy/package.json', 'packages/patient-profile-contracts/src/package.json',
+                'packages/patient-profile-contracts/owner-shim/package.json', 'lib/security/package.json']) {
+                assert.deepEqual(inventoryErrors([...baseline, file]), ['inventory:package'], file);
+            }
+            for (const directory of ['plugins/mediflow-synthetic', 'plugins/mediflow-chat-demo',
+                'packages/patient-profile-contracts']) {
+                for (const name of ['next.config.ts', 'next.config.js', 'next.config.mjs',
+                    'jsconfig.json', 'jsconfig.owner.json', 'babel.config.cjs', '.babelrc', '.babelrc.json']) {
+                    const error = name.startsWith('next.config.') ? 'inventory:next-config' : 'inventory:alternate-resolver';
+                    const file = `${directory}/${name}`;
+                    assert.deepEqual(inventoryErrors([...baseline, file]), [error], file);
+                }
+            }
         }
     }
 });
