@@ -14,6 +14,7 @@ import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import styles from './runtime-twin-workspace.module.css';
+import { PatientSheetMenu } from './patient-sheet-menu';
 
 const destinations = [
   { href: '/?area=incarico', label: 'Pazienti', icon: Users },
@@ -158,22 +159,17 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   );
 }
 
-/* this menu reorganizes the existing canonical anchors, never drops a
-   capability or treats an unloaded count as an empty record. */
+const patientPrimaryDestinations = ['#quadro', '#terapie', '#parametri', '#documenti'];
+
 export function RuntimeTwinPatientNavigation({ items, active }: { items: readonly { href: string; label: string; meta?: string }[]; active: string }) {
-  const menu = useRef<HTMLDetailsElement>(null);
-  const primary = items.filter(item => ['#quadro', '#diario'].includes(item.href)
-    || (['#terapie', '#documenti', '#parametri'].includes(item.href) && item.meta !== undefined && Number(item.meta) > 0));
-  const secondary = items.filter(item => !primary.includes(item));
-  return <nav className={styles.patientNavigation} aria-label="Sezioni della vista" onClick={event => {
-    if (event.target instanceof Element && event.target.closest('a[href]') && menu.current) menu.current.open = false;
-  }}>
-    {primary.map(item => <a key={item.href} href={item.href} aria-current={active === item.href.slice(1) ? 'location' : undefined}>{item.href === '#quadro' ? 'Riepilogo' : item.label}{item.meta && Number(item.meta) > 0 ? <span>{item.meta}</span> : null}</a>)}
-    <details ref={menu} className={styles.moreSections} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
-      <summary aria-current={secondary.some(item => item.href === `#${active}`) ? 'location' : undefined}>Altre sezioni <ChevronDown size={14} aria-hidden /></summary>
-      <div className={styles.sectionMenu}>
-        {secondary.map(item => <a key={item.href} href={item.href} aria-current={active === item.href.slice(1) ? 'location' : undefined}><span>{item.label}</span><small>{item.meta === '0' ? 'Nessun dato' : item.meta}</small></a>)}
-      </div>
-    </details>
+  const primary = patientPrimaryDestinations.flatMap(href => items.filter(item => item.href === href));
+  const secondary = items.filter(item => !patientPrimaryDestinations.includes(item.href));
+  return <nav className={styles.patientNavigation} aria-label="Sezioni della vista">
+    {primary.map(item => <a key={item.href} href={item.href} aria-current={active === item.href.slice(1) ? 'location' : undefined}>{item.href === '#quadro' ? 'Riepilogo' : item.href === '#parametri' ? 'Misure' : item.label}{item.meta && Number(item.meta) > 0 ? <span>{item.meta}</span> : null}</a>)}
+    <PatientSheetMenu label="Altre sezioni della cartella" className={styles.moreSections}
+      trigger={props => <button {...props} aria-current={secondary.some(item => item.href === `#${active}`) ? 'location' : undefined}>Altro <ChevronDown size={14} aria-hidden /></button>}>
+      {secondary.map(item => <a key={item.href} href={item.href} role="menuitem" tabIndex={-1} className="mf-popover-row"
+        aria-current={active === item.href.slice(1) ? 'location' : undefined}><span>{item.label}</span><small>{item.meta === '0' ? 'Nessun dato' : item.meta}</small></a>)}
+    </PatientSheetMenu>
   </nav>;
 }

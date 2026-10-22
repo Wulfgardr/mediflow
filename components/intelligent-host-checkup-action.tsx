@@ -33,8 +33,8 @@ function target(value: Proposal['targetStatus']): string {
 }
 
 /** Trusted UI for explicit enrollment, opaque selection, proposal review, and one-click PIN confirmation. */
-export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups }: Readonly<{
-  patientId: string; ambulatoryId: string | null; checkups: readonly Checkup[];
+export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups, embedded = false }: Readonly<{
+  patientId: string; ambulatoryId: string | null; checkups: readonly Checkup[]; embedded?: boolean;
 }>) {
   const [client] = useState(() => createIntelligentHostCheckupBrowserAdapter());
   const pendingCheckups = useMemo(() => checkups.filter((item) => item.status === 'pending'), [checkups]);
@@ -148,13 +148,13 @@ export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups
 
   return (
     <div className={workspaceStyles.headerActionsMenu} data-testid="intelligent-host-checkup-action">
-      <button ref={actionButtonRef} type="button" className={actionClass} data-lume-action="quiet" aria-expanded={open}
+      {!embedded ? <button ref={actionButtonRef} type="button" className={actionClass} data-lume-action="quiet" aria-expanded={open}
         aria-controls={statusId} aria-label="Gestisci checkup" title="Gestisci checkup: rivedi una proposta di completamento o annullamento e conferma con il PIN"
         onClick={() => setOpen((value) => !value)}>
         <ShieldCheck size={14} aria-hidden="true" /><span className="hidden sm:inline">Gestisci checkup</span>
-      </button>
-      {open ? (
-        <div id={statusId} style={popoverStyle} className={`mf-popover ${popoverStyles.popover} space-y-3 text-sm max-h-[calc(100dvh_-_var(--checkup-popover-top,0.5rem)_-_0.5rem)] overflow-y-auto overscroll-contain [overflow-wrap:anywhere] [&_button]:max-w-full [&_button]:whitespace-normal [&_button]:text-left [&_button]:h-auto`}>
+      </button> : null}
+      {embedded || open ? (
+        <div id={statusId} style={popoverStyle} className={`${embedded ? '' : `mf-popover ${popoverStyles.popover}`} space-y-3 text-sm max-h-[calc(100dvh_-_var(--checkup-popover-top,0.5rem)_-_0.5rem)] overflow-y-auto overscroll-contain [overflow-wrap:anywhere] [&_button]:max-w-full [&_button]:whitespace-normal [&_button]:text-left [&_button]:h-auto`}>
           <p className="font-semibold">Completa o annulla un checkup</p>
           <p>Rivedi la proposta dell’assistente prima di confermare: la conferma con il PIN modifica lo stato del checkup. Non è un controllo del computer.</p>
           <p role="status" aria-live="polite" aria-atomic="true">{message}</p>

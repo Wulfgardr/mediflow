@@ -10,7 +10,7 @@ const CASES: SchedaCase[] = [
   { register: 'grafite', viewport: 'narrow', width: 390, height: 844 },
 ];
 
-async function createFixture(page: Page): Promise<{ id: string; name: string }> {
+async function createFixture(page: Page): Promise<{ id: string; name: string; taxCode: string }> {
   const marker = `${Date.now()}`.slice(-8) + Math.random().toString(36).slice(2, 7).toUpperCase();
   return page.evaluate(async (suffix) => {
     const firstName = `Scheda${suffix.slice(0, 5)}`;
@@ -33,7 +33,7 @@ async function createFixture(page: Page): Promise<{ id: string; name: string }> 
       body: JSON.stringify({ patientId: id, drugName: 'Ramipril sintetico', activePrinciple: 'Ramipril', dosage: '5 mg · 1-0-0', status: 'active', startDate: '2026-07-01T08:00:00.000Z' }),
     });
     if (!therapyResponse.ok) throw new Error(`Fixture terapia: HTTP ${therapyResponse.status}`);
-    return { id, name: `${lastName} ${firstName}` };
+    return { id, name: `${lastName} ${firstName}`, taxCode: `SCH${suffix}` };
   }, marker);
 }
 
@@ -117,12 +117,55 @@ async function expectSurfaceHierarchyAndNeutralChrome(page: Page, header: Locato
   }
 }
 
+async function expectPatientIdentityPrivate(header: Locator, patient: { name: string; taxCode: string }): Promise<void> {
+  for (const value of [patient.name, patient.taxCode, /^Nascita /, /^\d+ anni$/]) {
+    await expect(header.getByText(value, { exact: true })).toHaveClass(/liquid-blur/);
+  }
+}
+
+async function expectPatientHeaderCommands(page: Page, header: Locator, patientId: string): Promise<void> {
+  const primary = header.getByRole('link', { name: 'Nuova voce', exact: true });
+  const actions = header.getByRole('button', { name: 'Azioni', exact: true });
+  await expect(header.locator('.mf-button-primary')).toHaveCount(1);
+  await expect(primary).toHaveClass(/mf-button-primary/);
+  await expect(primary).toHaveAttribute('href', `/patients/${patientId}/entries/new`);
+  await expect(actions).toHaveClass(/mf-button-secondary/);
+  await expect(actions).toHaveAttribute('aria-haspopup', 'menu');
+  await expect(actions).toHaveAttribute('aria-expanded', 'false');
+  await expect(header.getByRole('link')).toHaveCount(1);
+  await expect(header.getByRole('button')).toHaveCount(1);
+  for (const [control, background] of [[primary, '--lume-accent'], [actions, '--lume-surface-field']] as const) {
+    const material = await control.evaluate((element, variable) => {
+      const probe = document.createElement('span');
+      probe.style.backgroundColor = `var(${variable})`;
+      probe.style.borderRadius = 'var(--lume-radius-control)';
+      element.append(probe);
+      const style = getComputedStyle(probe);
+      const result = { background: style.backgroundColor, radius: style.borderRadius };
+      probe.remove();
+      return result;
+    }, background);
+    await expect(control).toHaveCSS('background-color', material.background);
+    await expect(control).toHaveCSS('border-radius', material.radius);
+    await expect(control).toHaveCSS('box-shadow', 'none');
+  }
+  await actions.click();
+  const menu = page.getByRole('menu', { name: 'Azioni scheda', exact: true });
+  await expect(menu).toBeVisible();
+  await expect(actions).toHaveAttribute('aria-controls', await menu.getAttribute('id') as string);
+  await expect(actions).toHaveAttribute('aria-expanded', 'true');
+  await menu.press('Escape');
+  await expect(menu).toBeHidden();
+}
+
 async function expectCurrentSection(page: Page, id: string): Promise<void> {
   const nav = page.getByRole('navigation', { name: 'Sezioni della vista' });
   const link = nav.locator(`a[href="#${id}"]`);
-  await expect(link).toHaveAttribute('aria-current', 'location');
-  await expect(nav.locator('a[aria-current="location"]')).toHaveCount(1);
-  // A closed disclosure carries the location marker of its hidden active link.
+  if (['quadro', 'terapie', 'parametri', 'documenti'].includes(id)) {
+    await expect(link).toHaveAttribute('aria-current', 'location');
+  } else {
+    await expect(nav.getByRole('button', { name: 'Altro', exact: true })).toHaveAttribute('aria-current', 'location');
+  }
   await expect(nav.locator('[aria-current="location"]:visible')).toHaveCount(1);
   await expect(page.locator(`#${id}`)).toBeVisible();
 }
@@ -160,17 +203,19 @@ test('le quindici sezioni restano raggiungibili con una sola destinazione corren
   const nav = page.getByRole('navigation', { name: 'Sezioni della vista' });
   const sections = ['quadro', 'attenzione', 'identita', 'clinica', 'amministrazione', 'parametri', 'terapie', 'prestazioni',
     'protesica', 'scale', 'documenti', 'siss', 'timeline', 'diario', 'follow-up'];
+  await nav.getByRole('button', { name: 'Altro', exact: true }).click();
   await expect(nav.locator('a')).toHaveCount(sections.length);
   expect((await nav.locator('a').evaluateAll(links => links.map(link => link.getAttribute('href')))).sort())
     .toEqual(sections.map(id => `#${id}`).sort());
   await expectCurrentSection(page, 'quadro');
-  const disclosure = nav.locator('summary');
-  const details = nav.locator('details');
+  const disclosure = nav.getByRole('button', { name: 'Altro', exact: true });
+  const details = nav.getByRole('menu');
+  await page.keyboard.press('Escape');
   await disclosure.focus();
   await disclosure.press('Space');
-  await expect(details).toHaveAttribute('open', '');
+  await expect(details).toBeVisible();
   await disclosure.press('Enter');
-  await expect(details).not.toHaveAttribute('open');
+  await expect(details).toBeHidden();
   await expectCurrentSection(page, 'quadro');
   for (const id of sections) {
     const link = nav.locator(`a[href="#${id}"]`);
@@ -244,6 +289,7 @@ for (const schedaCase of CASES) {
     await expect(page.locator('#documenti')).toBeHidden();
     await expectSurfaceHierarchyAndNeutralChrome(page, header, schedaCase.viewport === 'narrow' ? 44 : 28);
     await expectInViewport(header);
+    await expectPatientHeaderCommands(page, header, patient.id);
 
     await page.getByRole('navigation', { name: 'Sezioni della vista' }).getByRole('link', { name: 'Riepilogo', exact: true }).click();
     // the hash precedes the asynchronous folder visibility update.
@@ -269,14 +315,14 @@ for (const schedaCase of CASES) {
     const records = page.getByRole('navigation', { name: 'Cartelle aperte' });
     await expectInViewport(records.getByRole('link', { name: patient.name, exact: true }));
     await page.getByTestId('privacy-mode-header-toggle').click();
-    await expect(header.locator('.liquid-blur')).toHaveCount(3);
+    await expectPatientIdentityPrivate(header, patient);
     await expect(records.getByRole('link', { name: patient.name, exact: true }).locator('.liquid-blur')).toHaveCount(1);
     await page.goto(`/patients/${patient.id}/entries/new`);
     const label = page.getByTestId('progressive-entry-composer').locator('header p');
     await expect(label).toContainText(patient.name);
     await expect(label.locator('.liquid-blur')).toHaveCount(1);
     await page.goto(`/patients/${patient.id}/modules`);
-    await expect(header.locator('.liquid-blur')).toHaveCount(3);
+    await expectPatientIdentityPrivate(header, patient);
 
     const nav = page.getByRole('navigation', { name: 'Sezioni della vista' });
     const therapies = nav.locator('a[href="#terapie"]');
@@ -291,7 +337,7 @@ for (const schedaCase of CASES) {
     await openPatientSection(page, 'terapie');
     await expect(page.locator('#terapie')).toContainText('5 mg');
 
-    await nav.locator('summary').click();
+    await nav.getByRole('button', { name: 'Altro', exact: true }).click();
     await nav.locator('a[href="#attenzione"]').click();
     await expectCurrentSection(page, 'attenzione');
     const states = surface.locator('[data-lume-clinical-state]:visible');

@@ -36,9 +36,10 @@ async function installShareCapability(page: Page, outcome: ShareOutcome): Promis
     Object.defineProperty(navigator, 'share', {
       configurable: true,
       value: async (data: ShareData) => {
-        (window as Window & { __fhirShare?: { fileName: string; title?: string } }).__fhirShare = {
+        (window as Window & { __fhirShare?: { fileName: string; title?: string; userActivation: boolean } }).__fhirShare = {
           fileName: data.files?.[0]?.name ?? '',
           title: data.title,
+          userActivation: navigator.userActivation.isActive,
         };
         if (selectedOutcome === 'abort') throw new DOMException('System share dismissed', 'AbortError');
         if (selectedOutcome === 'failure') throw new DOMException('System share unavailable', 'NotAllowedError');
@@ -64,28 +65,32 @@ for (const outcome of ['success', 'abort', 'failure'] as const) {
     await page.goto(`/patients/${patient.id}/modules`);
 
     await page.getByRole('button', { name: 'Azioni', exact: true }).click();
-    const actionsMenu = page.getByRole('group', { name: 'Azioni scheda', exact: true });
+    const actionsMenu = page.getByRole('menu', { name: 'Azioni scheda', exact: true });
     await expect(actionsMenu).toBeVisible();
-    const share = actionsMenu.getByRole('button', { name: 'Condividi FHIR', exact: true });
+    const share = actionsMenu.getByRole('menuitem', { name: 'Condividi FHIR', exact: true });
     await expect(share).toBeVisible();
     await share.click();
+    await expect(actionsMenu).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Azioni', exact: true })).toBeFocused();
 
     if (outcome === 'failure') {
       await expect.poll(async () => page.evaluate(() =>
-        (window as Window & { __fhirShare?: { fileName: string; title?: string } }).__fhirShare,
+        (window as Window & { __fhirShare?: { fileName: string; title?: string; userActivation: boolean } }).__fhirShare,
       )).toMatchObject({
         fileName: `patient-${patient.name.replace(' ', '-')}-fhir.json`,
         title: `FHIR ${patient.name}`,
+        userActivation: true,
       });
       await expect(page.getByText('Errore durante la condivisione.', { exact: true })).toBeVisible();
       return;
     }
 
     await expect.poll(async () => page.evaluate(() =>
-      (window as Window & { __fhirShare?: { fileName: string; title?: string } }).__fhirShare,
+      (window as Window & { __fhirShare?: { fileName: string; title?: string; userActivation: boolean } }).__fhirShare,
     )).toMatchObject({
       fileName: `patient-${patient.name.replace(' ', '-')}-fhir.json`,
       title: `FHIR ${patient.name}`,
+      userActivation: true,
     });
     await expect(page.getByText('Errore durante la condivisione.', { exact: true })).toHaveCount(0);
   });
@@ -98,7 +103,7 @@ test('Condividi FHIR resta assente quando il browser non accetta file', async ({
   await page.goto(`/patients/${patient.id}/modules`);
 
   await page.getByRole('button', { name: 'Azioni', exact: true }).click();
-  const actionsMenu = page.getByRole('group', { name: 'Azioni scheda', exact: true });
+  const actionsMenu = page.getByRole('menu', { name: 'Azioni scheda', exact: true });
   await expect(actionsMenu).toBeVisible();
-  await expect(actionsMenu.getByRole('button', { name: 'Condividi FHIR', exact: true })).toHaveCount(0);
+  await expect(actionsMenu.getByRole('menuitem', { name: 'Condividi FHIR', exact: true })).toHaveCount(0);
 });

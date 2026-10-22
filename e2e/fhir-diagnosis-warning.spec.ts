@@ -58,7 +58,8 @@ async function fixture(page: Page, entry: EntryPoint) {
   } else {
     await expect(page.getByRole('heading', { name: 'Sintetico Diagnosi', exact: true, level: 1 })).toBeVisible();
     await page.getByRole('button', { name: 'Azioni', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Condividi FHIR', exact: true })).toBeVisible();
+    await expect(page.getByRole('menu', { name: 'Azioni scheda', exact: true })
+      .getByRole('menuitem', { name: 'Condividi FHIR', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Azioni', exact: true }).click();
   }
   // Install after the modules capability probe, so unrelated startup File creation is excluded.
@@ -96,8 +97,13 @@ async function effects(page: Page): Promise<Effects> {
 }
 
 async function openWarning(page: Page, entry: EntryPoint) {
-  if (entry !== 'edit-download') await page.getByRole('button', { name: 'Azioni', exact: true }).click();
-  await page.getByRole('button', { name: entry === 'modules-share' ? 'Condividi FHIR' : 'Esporta FHIR', exact: true }).click();
+  if (entry === 'edit-download') {
+    await page.getByRole('button', { name: 'Esporta FHIR', exact: true }).click();
+  } else {
+    await page.getByRole('button', { name: 'Azioni', exact: true }).click();
+    await page.getByRole('menu', { name: 'Azioni scheda', exact: true })
+      .getByRole('menuitem', { name: entry === 'modules-share' ? 'Condividi FHIR' : 'Esporta FHIR', exact: true }).click();
+  }
   if (entry !== 'modules-share') {
     await page.getByRole('dialog', { name: 'Esporta FHIR con controllo FSE', exact: true })
       .getByRole('button', { name: 'Scarica FHIR JSON', exact: true }).click();

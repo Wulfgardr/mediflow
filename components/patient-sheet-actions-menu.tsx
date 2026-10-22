@@ -1,11 +1,10 @@
 'use client';
 
-
 import Link from 'next/link';
-import { Download, FileText, MoreHorizontal, Pencil, Share2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-
-import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
+import { MoreHorizontal } from 'lucide-react';
+import type { RefObject } from 'react';
+import { PatientSheetMenu } from './patient-sheet-menu';
+import { Button } from '@/components/ui/button';
 
 type PatientSheetActionsMenuProps = {
     editHref: string;
@@ -13,79 +12,21 @@ type PatientSheetActionsMenuProps = {
     onExportFhir: () => void;
     onShareFhir: () => void;
     onReportPdf: () => void;
+    leadingActions?: readonly { label: string; onSelect: () => void }[];
+    triggerRef?: RefObject<HTMLButtonElement | null>;
+    onOpen?: () => void;
 };
 
-export function PatientSheetActionsMenu({
-    editHref,
-    canShareFhirFile,
-    onExportFhir,
-    onShareFhir,
-    onReportPdf,
-}: PatientSheetActionsMenuProps) {
-    const [isOpen, setIsOpen] = useState(false);
-    const rootRef = useRef<HTMLDivElement>(null);
-    const triggerRef = useRef<HTMLButtonElement>(null);
-
-    useEffect(() => {
-        if (!isOpen) return;
-        const closeOutside = (event: MouseEvent) => {
-            if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
-        };
-        const closeOnEscape = (event: KeyboardEvent) => {
-            if (event.key !== 'Escape') return;
-            setIsOpen(false);
-            triggerRef.current?.focus();
-        };
-        document.addEventListener('mousedown', closeOutside);
-        document.addEventListener('keydown', closeOnEscape);
-        return () => {
-            document.removeEventListener('mousedown', closeOutside);
-            document.removeEventListener('keydown', closeOnEscape);
-        };
-    }, [isOpen]);
-
-    const runAndClose = (action: () => void) => {
-        setIsOpen(false);
-        action();
-    };
-
-    return (
-        <div ref={rootRef} className={workspaceStyles.headerActionsMenu}>
-            <button
-                ref={triggerRef}
-                type="button"
-                className={workspaceStyles.headerActionButton}
-                aria-expanded={isOpen}
-                aria-haspopup="true"
-                aria-controls="patient-sheet-actions"
-                onClick={() => setIsOpen((current) => !current)}
-            >
-                <MoreHorizontal size={14} aria-hidden="true" />
-                Azioni
-            </button>
-            {isOpen ? (
-                <div
-                    id="patient-sheet-actions"
-                    className={`mf-popover ${workspaceStyles.headerActionsPopover}`}
-                    role="group"
-                    aria-label="Azioni scheda"
-                >
-                    <Link href={editHref} className="mf-popover-row" onClick={() => setIsOpen(false)}>
-                        <Pencil size={14} aria-hidden="true" /> Modifica
-                    </Link>
-                    <button type="button" className="mf-popover-row w-full text-left" onClick={() => runAndClose(onExportFhir)}>
-                        <Download size={14} aria-hidden="true" /> Esporta FHIR
-                    </button>
-                    {canShareFhirFile ? (
-                        <button type="button" className="mf-popover-row w-full text-left" onClick={() => runAndClose(onShareFhir)}>
-                            <Share2 size={14} aria-hidden="true" /> Condividi FHIR
-                        </button>
-                    ) : null}
-                    <button type="button" className="mf-popover-row w-full text-left" onClick={() => runAndClose(onReportPdf)}>
-                        <FileText size={14} aria-hidden="true" /> Report PDF
-                    </button>
-                </div>
-            ) : null}
-        </div>
-    );
+export function PatientSheetActionsMenu({ editHref, canShareFhirFile, onExportFhir, onShareFhir,
+    onReportPdf, leadingActions = [], triggerRef: suppliedRef, onOpen }: PatientSheetActionsMenuProps) {
+    return <PatientSheetMenu label="Azioni scheda" triggerRef={suppliedRef} onOpen={onOpen}
+        trigger={props => <Button {...props} variant="secondary"><MoreHorizontal size={16} aria-hidden="true" />Azioni</Button>}>
+        {leadingActions.map(action => <button key={action.label} type="button" role="menuitem" tabIndex={-1}
+                className="mf-popover-row" onClick={action.onSelect}>{action.label}</button>)}
+        <Link href={editHref} role="menuitem" tabIndex={-1} className="mf-popover-row">Modifica</Link>
+        <button type="button" role="menuitem" tabIndex={-1} className="mf-popover-row" onClick={onExportFhir}>Esporta FHIR</button>
+        {canShareFhirFile ? <button type="button" role="menuitem" tabIndex={-1} className="mf-popover-row" onClick={onShareFhir}>Condividi FHIR</button> : null}
+        <button type="button" role="menuitem" tabIndex={-1} className="mf-popover-row" onClick={onReportPdf}>Report PDF</button>
+        <Link href={editHref} role="menuitem" tabIndex={-1} className="mf-popover-row">Archivia</Link>
+    </PatientSheetMenu>;
 }
