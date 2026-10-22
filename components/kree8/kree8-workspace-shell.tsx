@@ -13,6 +13,7 @@ import { RuntimeTwinFolderContext, useRuntimeTwinDesign } from '@/components/run
 import styles from './kree8-workspace-shell.module.css';
 import { RuntimeTwinPatientNavigation } from '@/components/runtime-twin-workspace';
 import twin from './twin-patient-shell.module.css';
+import { PatientHeaderIdentity, type PatientHeaderDetails } from '@/components/patient-header-identity';
 
 export type Kree8WorkspaceNavItem = {
   href: string;
@@ -46,6 +47,7 @@ type Kree8WorkspaceShellProps = {
   backLabel: string;
   patientLabel?: string;
   patientAtoms?: string[];
+  patientDetails?: PatientHeaderDetails;
   statusLabel?: string;
   navItems?: Kree8WorkspaceNavItem[];
   navGroups?: Kree8WorkspaceNavGroups;
@@ -63,6 +65,7 @@ export function Kree8WorkspaceShell({
   backLabel,
   patientLabel,
   patientAtoms = [],
+  patientDetails,
   statusLabel,
   navItems = [],
   navGroups,
@@ -89,7 +92,7 @@ export function Kree8WorkspaceShell({
   const renderedNavItems = navGroups ? navGroups.flatMap((group) => group.items) : navItems;
   const navKey = renderedNavItems.map((item) => item.href).join('|');
   const PrimaryActionIcon = primaryAction?.icon;
-  const { proposal, composition } = useRuntimeTwinDesign();
+  const { proposal, composition, pendingForms } = useRuntimeTwinDesign();
   /* analysis/catalog navigation tracks position without reshaping data. */
   const overviewMode = variant === 'overview' && proposal;
   const [folderSection, setFolderSection] = useState('quadro');
@@ -338,12 +341,12 @@ export function Kree8WorkspaceShell({
           data-testid={isClinical ? 'lume-scheda-header' : undefined}
         >
           {folderMode ? <>
-            <div className={twin.identity}>
+            {patientDetails ? <PatientHeaderIdentity name={title} details={patientDetails} titleRef={patientTitleRef} /> : <div className={twin.identity}>
               <h1 ref={patientTitleRef} tabIndex={-1} className="type-person"><PrivacyBlur>{title}</PrivacyBlur></h1>
               <p>{patientAtoms.slice(0, 2).map((atom, index) => <span key={atom}>{index > 0 ? ' · ' : ''}<PrivacyBlur>{atom}</PrivacyBlur></span>)}</p>
-            </div>
+            </div>}
             <div className={twin.actions}>
-              {primaryAction && PrimaryActionIcon ? <Link href={primaryAction.href} className={twin.primary}><PrimaryActionIcon size={16} aria-hidden />{primaryAction.label}</Link> : null}
+              {primaryAction && PrimaryActionIcon ? <Link href={primaryAction.href} className={pendingForms ? 'mf-button-secondary' : 'mf-button-primary'}><PrimaryActionIcon size={16} aria-hidden />{primaryAction.label}</Link> : null}
               {headerActions}
             </div>
           </> : <>
@@ -356,7 +359,7 @@ export function Kree8WorkspaceShell({
               {/* WUL-297: persistent privacy affordance in the app header */}
               {!proposal ? <PrivacyModeToggle showLabel /> : null}
               {primaryAction && PrimaryActionIcon ? (
-                <Link href={primaryAction.href} className={styles.headerPrimaryAction}>
+                <Link href={primaryAction.href} className={isClinical ? (pendingForms ? 'mf-button-secondary' : 'mf-button-primary') : styles.headerPrimaryAction}>
                   <PrimaryActionIcon size={14} aria-hidden="true" />
                   {primaryAction.label}
                 </Link>

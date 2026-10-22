@@ -2,6 +2,7 @@
 
 import { formatCountLabel } from '@/lib/format-count';
 import Link from 'next/link';
+import { differenceInYears } from 'date-fns';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -19,11 +20,9 @@ import disclosure from '@/components/patient-disclosure.module.css';
 import ObservationManager from '@/components/observation-manager';
 import type { ObservationPrefill } from '@/lib/observation-prefill';
 import PatientActionModal from '@/components/patient-action-modal';
-import { IntelligentHostCheckupAction } from '@/components/intelligent-host-checkup-action';
 import { PatientProfileNotes } from '@/components/patient-profile-notes';
-import { PatientProfileAccessAction } from '@/components/patient-profile-access-action';
 import { PatientIdentityLens } from '@/components/patient-identity-lens';
-import { PatientSheetActionsMenu } from '@/components/patient-sheet-actions-menu';
+import { PatientHeaderActions } from '@/components/patient-header-actions';
 import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-summary';
 import { PatientSmartImportFabricPreviewCard } from '@/components/patient-smart-import-fabric-preview-card';
 import ProstheticPrescriptionManager from '@/components/prosthetic-prescription-manager';
@@ -659,21 +658,22 @@ export default function PatientDetailPage() {
                 ageLabel,
                 `Aggiornato ${updatedLabel}`,
             ]}
+            patientDetails={{
+                birthDateLabel: patient.birthDate ? birthDateLabel : undefined,
+                ageLabel: patient.birthDate ? `${differenceInYears(new Date(currentTimestampMs), new Date(patient.birthDate))} anni` : undefined,
+                taxCode: patient.taxCode || undefined,
+            }}
             navGroups={workspaceNavGroups}
             primaryAction={{ href: `/patients/${id}/entries/new`, label: 'Nuova voce', icon: Plus }}
             headerActions={(
-                <>
-                    <PatientProfileAccessAction key={`${patient.id}:${patient.ambulatoryId ?? ''}`} patientId={patient.id} ambulatoryId={patient.ambulatoryId ?? null} />
-                    <IntelligentHostCheckupAction patientId={patient.id}
-                        ambulatoryId={patient.ambulatoryId ?? null} checkups={checkups ?? []} />
-                    <PatientSheetActionsMenu
-                        editHref={`/patients/${id}/edit`}
-                        canShareFhirFile={canShareFhirFile}
-                        onExportFhir={() => setIsExportModalOpen(true)}
-                        onShareFhir={handleShareFhir}
-                        onReportPdf={handleReportPdf}
-                    />
-                </>
+                <PatientHeaderActions key={`${patient.id}:${patient.ambulatoryId ?? ''}`}
+                    patientId={patient.id} ambulatoryId={patient.ambulatoryId ?? null} checkups={checkups ?? []}
+                    editHref={`/patients/${id}/edit`}
+                    canShareFhirFile={canShareFhirFile}
+                    onExportFhir={() => setIsExportModalOpen(true)}
+                    onShareFhir={handleShareFhir}
+                    onReportPdf={handleReportPdf}
+                />
             )}
         >
             <div className={workspaceStyles.clinicalStack}>
