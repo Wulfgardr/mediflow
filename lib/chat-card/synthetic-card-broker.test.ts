@@ -9,6 +9,7 @@ import { REDACTION_RUNTIME_ADAPTER, REDACTION_RUNTIME_FILES, REDACTION_RUNTIME_M
     REDACTION_RUNTIME_REVISION, REDACTION_RUNTIME_SCHEMA, REDACTION_WORKER_SHA256 } from '../redaction-runtime-identity';
 import type { NeuralRedactionSpan } from '../gliner-redaction-runner';
 import { assertCardSerializedBoundary, CARD_FIELD_CLASSIFICATION, cardSchema, type Card } from './card-profile';
+import { SYNTHETIC_CARD_CORPUS_JSON } from './synthetic-fixtures';
 
 const identity = Object.freeze({ schema: REDACTION_RUNTIME_SCHEMA, adapter: REDACTION_RUNTIME_ADAPTER, model: REDACTION_RUNTIME_MODEL,
     revision: REDACTION_RUNTIME_REVISION, workerSha256: REDACTION_WORKER_SHA256, pythonSha256: 'a'.repeat(64),
@@ -76,7 +77,8 @@ function installation(maxAgeDays = 30) {
             forbiddenLeakCount: 0, leakedForbiddenTokens: [], missingEntities: [] })) };
     const validation = { schemaVersion: 'mediflow.redaction-runtime-validation.v1', generatedAt, adapterModule: REDACTION_RUNTIME_ADAPTER,
         shadowReady: true, failures: [], benchmark,
-        runtimeBinding: { identity, corpusSha256: evidenceHash(JSON.stringify(corpus)), benchmarkSha256: evidenceHash(JSON.stringify(benchmark)) } };
+        runtimeBinding: { identity, corpusSha256: evidenceHash(readFileSync(new URL('../../scripts/fixtures/chat-card-corpus.json', import.meta.url), 'utf8')),
+            benchmarkSha256: evidenceHash(JSON.stringify(benchmark)) } };
     const validationJson = JSON.stringify(validation);
     const rollout = { generatedAt, lane: 'redaction', status: 'shadow-ready', currentState: 'shadow-ready', selectedModel: REDACTION_RUNTIME_MODEL,
         blockers: [], evidence: { fallbackWritten: true, licenseClear: true, owner: 'synthetic-test-only', maxAgeDays, reportGeneratedAt: generatedAt },
@@ -162,6 +164,9 @@ const attacks: [string, (card: Card) => unknown][] = [
 ];
 test('OCR tax-code falsification really has an invalid checksum', () => {
     assert.equal(isValidItalianTaxCodeChecksum('VLLMRT72D57F205Z'), false);
+});
+test('embedded corpus digest binds the exact file bytes consumed by the existing benchmark tooling', () => {
+    assert.equal(SYNTHETIC_CARD_CORPUS_JSON, readFileSync(new URL('../../scripts/fixtures/chat-card-corpus.json', import.meta.url), 'utf8'));
 });
 for (const [name, attack] of attacks) test(`serialized boundary blocks ${name}`, async () => {
     const { b, token, consent, review } = await ready();
