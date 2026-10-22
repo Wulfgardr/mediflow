@@ -4,6 +4,7 @@ import test from 'node:test';
 import path from 'node:path';
 import { portableLocalTestCommands } from './portable-local-test-selection.mjs';
 import { runPortableLocalCommands } from './run-portable-local-tests.mjs';
+import { collectChatgptFocusedTests } from './additional-test-selection.mjs';
 const root = path.resolve(import.meta.dirname, '..');
 test('profile consumes existing recipes and selectors without duplicate wrappers/children', () => {
   const commands = portableLocalTestCommands(root);
@@ -16,6 +17,20 @@ test('profile consumes existing recipes and selectors without duplicate wrappers
   assert.ok(soft.files.includes('scripts/patient-cascade.test.mjs'));
   assert.ok(!commands.some(command => command.id === 'soft-delete:local' || command.id === 'local:test:patient-cascade'));
   assert.ok(commands.every(command => !command.args.includes('--browser') && !command.args.includes('--browser-only')));
+});
+test('preparation regressions run once in the portable ChatGPT recipe and stay out of browser-only selection', () => {
+  const commands = portableLocalTestCommands(root);
+  const focused = collectChatgptFocusedTests(root);
+  const browser = collectChatgptFocusedTests(root, { browserOnly: true });
+  for (const file of [
+    'lib/ai-preparation/preparation-core.test.ts',
+    'lib/chatgpt-execution/ordinary-preparation-core.test.ts',
+    'lib/chatgpt-execution/ordinary-preparation-golden.test.ts',
+  ]) {
+    assert.deepEqual(commands.filter(command => command.files.includes(file)).map(command => command.id), ['chatgpt:local']);
+    assert.equal(focused.filter(selected => selected === file).length, 1);
+    assert.equal(browser.includes(file), false);
+  }
 });
 test('runner preserves argv, isolates/bootstrap fixtures, reports failures and cleans after all children', () => {
   const directories = [];

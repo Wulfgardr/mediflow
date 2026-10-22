@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { createPatientInsightOrdinaryTaskProfile, createSmartImportOrdinaryTaskProfile, createDocumentSynthesisOrdinaryTaskProfile,
     createTreatmentReasoningOrdinaryTaskProfile, readOrdinaryTaskProfile } from './ordinary-task-profile';
 import { captureDocumentSynthesisSourceSet } from '../ai-providers/fabric/document-synthesis-source-set-contract';
-import { renderEmissionPlan } from './ordinary-emission-plan';
+import { renderEmissionPlan } from '../ai-preparation/emission-plan';
 import { buildPatientInsightExtractionPrompt } from '../ai-task-contracts';
 import { buildPatientSmartImportCapabilityPrompt } from '../domain/documents/patient-smart-import-capability-contract';
 import { buildChatGptTreatmentReasoningPrompt, buildTreatmentReasoningPrompt, type TreatmentReasoningPromptInput } from '../treatment-reasoning-contract';
