@@ -8,13 +8,12 @@ import { test } from 'node:test';
 import { mkdtemp, mkdir, writeFile, symlink, rm } from 'node:fs/promises';
 import { isAbsolute, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
 import { createServer as createTcpServer, connect as connectTcp } from 'node:net';
 import { createServer as createHttpServer, request as httpRequest, type IncomingMessage, type ServerResponse, type ClientRequest } from 'node:http';
 import { Transform, type Duplex } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { spawn, type ChildProcess } from 'node:child_process';
-import type { Browser, BrowserContext, Page } from '@playwright/test';
+import { chromium, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { createBrowserResponseOracle, type BrowserResponseOracle, type SameResponseTicket } from './chatgpt-browser-response.ts';
 import { checkBrowserResponseContract } from './chatgpt-browser-response.contract.ts';
 import type { ProductOperation } from '../lib/chatgpt-product/product-contract';
@@ -22,8 +21,6 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const dataDir = process.env.MEDIFLOW_DATA_DIR;
 assert.ok(dataDir && isAbsolute(dataDir), 'Absolute run-owned synthetic directory required');
 assert.equal(Number(process.versions.node.split('.')[0]), 24, 'Node 24 required; never skip or replace runtime');
-// Use an ESM-local resolver; the frozen loader must not classify this spec as CJS.
-const packageRequire = createRequire(join(root, 'package.json'));
 const { createProductFixture, deferred, tick } = await import('../lib/chatgpt-product/product-production.test.ts');
 const { PRODUCT_NAMESPACE, PRODUCT_MUTATIONS } = await import('../lib/chatgpt-product/product-contract.ts');
 async function freePort() {
@@ -299,8 +296,7 @@ type WireGateway = Awaited<ReturnType<typeof startWireGateway>>;
 
 test('real synthetic product UI/HTTP acceptance, no automatic inference or clinical writes', { timeout: 180000 }, async t => {
     // Resolve first. Missing dependencies/browser fail rather than mocking React.
-    const { chromium, expect } = packageRequire('@playwright/test') as typeof import('@playwright/test');
-    const next = packageRequire.resolve('next/dist/bin/next');
+    const next = fileURLToPath(import.meta.resolve('next/dist/bin/next'));
     // Exercise reporting without a browser/provider fake: no failure, either
     // phase alone, and both failures. These assertions run only in the Node24 suite.
     for (const workFails of [false, true]) for (const cleanupFails of [false, true]) {
