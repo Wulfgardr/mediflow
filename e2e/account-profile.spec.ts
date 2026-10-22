@@ -111,7 +111,3 @@ test('same-account login in another tab preserves draft and requires an explicit
         expect(writes).toBe(1);
     } finally { await other.close(); }
 });
-
-test('CI_SHARD_FALSIFICATION_RED', () => {
-    throw new Error('CI_SHARD_FALSIFICATION_RED');
-});
