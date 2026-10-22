@@ -42,7 +42,10 @@ export function createOrdinaryPreparation(profile: OrdinaryTaskProfile, configur
             input: Object.freeze([Object.freeze({ type: 'text' as const, text, text_elements: Object.freeze([]) as readonly [] })]),
             outputSchema: expandSchema(profile, read.outputSchema, expansion),
         }), signal, knownIdentifiers);
-    } catch { return fail(); }
+    } catch (error) {
+        if (error instanceof Error && error.message === 'ai_preparation_invalid') return fail();
+        throw error;
+    }
     const token = Object.freeze(Object.create(null));
     let closing: Promise<void> | undefined;
     const close = (): Promise<void> => {
