@@ -1,0 +1,12 @@
+import { connectToServer, callTool, loadSandboxProxy, initializeApp, newAppBridge } from 'ext-apps-reference-implementation';
+const server = await connectToServer(new URL('http://localhost:3017/mcp'));
+const info = callTool(server, 'mediflow_synthetic_card', {});
+const resource = await info.appResourcePromise;
+const iframe = document.querySelector('iframe');
+await loadSandboxProxy(iframe, resource.csp, resource.permissions);
+const bridge = newAppBridge(server, iframe, {}, { containerDimensions: { maxHeight: 720 } });
+window['cardBridge'] = bridge;
+window['cardSizes'] = [];
+const resize = bridge.onsizechange;
+bridge.onsizechange = params => { window['cardSizes'].push(params); return resize(params); };
+await initializeApp(iframe, bridge, info);

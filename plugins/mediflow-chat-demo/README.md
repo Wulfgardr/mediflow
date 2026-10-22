@@ -184,3 +184,9 @@ fornitore, né l’esclusione assoluta dalla richiesta al provider. Non ha
 osservato i payload interni del provider. Nessun dato reale è ammesso. Un
 futuro client clinico richiede l’ADR e prove distinti; pubblicazione nelle
 directory, login, consenso clinico, voce e scritture sono fuori da questa unità.
+
+## Scheda pseudonimizzata sintetica
+
+L’entrypoint aggiuntivo, il consenso nella vista e i limiti di qualifica sono
+documentati in [CARD-READER.md](CARD-READER.md). Il demo descritto sopra conserva
+il suo entrypoint e la sua configurazione.
