@@ -1,6 +1,6 @@
 {
-  "revision": "b10f4d2567e19169ad332af445a1abb08be0b844",
-  "source": "https://github.com/Wulfgardr/mediflow/actions/runs/39645303044",
+  "revision": "26ca8e66fb782ef9eb1966904fb7557359961c50",
+  "source": "Local production build of https://github.com/Wulfgardr/mediflow/tree/26ca8e66fb782ef9eb1966904fb7557359961c50",
   "staticRoutes": [
     "/",
     "/_not-found",
@@ -9,6 +9,7 @@
     "/diary",
     "/icon.svg",
     "/manifest.webmanifest",
+    "/mockups/commands",
     "/mockups/kree8",
     "/mockups/scheda",
     "/patients/new",

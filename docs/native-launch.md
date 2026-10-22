@@ -144,3 +144,49 @@ La firma locale non equivale a notarizzazione o distribuzione pubblica.
 ./scripts/build-apple-macos-app.sh
 open "$(node scripts/build-input-metadata.mjs --derived "$PWD")/Build/Products/Debug/MediFlow.app"
 ```
+
+## Aggiornare la baseline delle route statiche
+
+`scripts/check-static-routes.mjs` confronta il manifest di produzione con
+`scripts/static-routes-baseline.json`. Anche `/mockups/*` appartiene alla
+baseline: una nuova pagina statica richiede una revisione esplicita.
+Non aggiungere eccezioni al guard per accettarla.
+
+Dopo `npm ci` e `npm run build` nella sorgente sparse pulita descritta sopra,
+eseguire il comando seguente nella stessa sorgente. Il comando registra lo
+SHA effettivamente costruito e la provenienza locale; non usare l'URL di una
+run CI riferita a un'altra revisione. Conservare il log della build.
+
+```bash
+node --input-type=module <<'NODE'
+import { readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { checkStaticRoutes } from './scripts/check-static-routes.mjs';
+
+if (execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim()) {
+  throw new Error('Regenerate only from the clean source just built');
+}
+const revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+const manifest = JSON.parse(readFileSync(`${process.env.MEDIFLOW_NEXT_DIST_DIR || '.next'}/prerender-manifest.json`, 'utf8'));
+if (manifest.version !== 4 || !manifest.routes || !manifest.dynamicRoutes) throw new Error('Unsupported prerender manifest');
+try { console.log(checkStaticRoutes(manifest)); } catch (error) { console.log(error.message); }
+const staticRoutes = Object.entries(manifest.routes)
+  .filter(([, value]) => value.initialRevalidateSeconds === false)
+  .map(([route]) => route)
+  .filter(route => !['/_global-error', '/favicon.ico', '/plugin-local-ui'].includes(route))
+  .sort();
+writeFileSync('scripts/static-routes-baseline.json', `${JSON.stringify({
+  revision,
+  source: `Local production build of https://github.com/Wulfgardr/mediflow/tree/${revision}`,
+  staticRoutes,
+}, null, 2)}\n`);
+NODE
+node scripts/check-static-routes.mjs
+node --test scripts/check-static-routes.test.mjs
+```
+
+Rivedere il diff della baseline: deve contenere soltanto le variazioni di
+prerendering volute e i riferimenti della nuova build. I test verificano anche
+che una route inattesa e la perdita di prerendering continuino a fallire.
+Riportare la baseline nella checkout di lavoro e committarla con la modifica
+che ne giustifica l'aggiornamento.
