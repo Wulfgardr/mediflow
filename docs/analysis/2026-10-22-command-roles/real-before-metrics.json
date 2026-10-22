@@ -1,0 +1,714 @@
+[
+  {
+    "state": "011-riepilogo",
+    "theme": "giorno",
+    "width": 1440,
+    "height": 1425,
+    "file": "real-before-011-riepilogo-giorno-1440.png",
+    "url": "/patients/readme-shots-giulia-fervi/modules",
+    "metrics": [
+      {
+        "text": null,
+        "x": 328,
+        "y": 897.046875,
+        "width": 165.484375,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": null,
+        "x": 328,
+        "y": 1002.796875,
+        "width": 147.109375,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Elimina voce clinica con motivazione",
+        "x": 1248,
+        "y": 492.796875,
+        "width": 44,
+        "height": 40,
+        "padding": "6px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Elimina voce clinica con motivazione",
+        "x": 1248,
+        "y": 660.421875,
+        "width": 44,
+        "height": 40,
+        "padding": "6px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Elimina voce clinica con motivazione",
+        "x": 1248,
+        "y": 855.671875,
+        "width": 44,
+        "height": 40,
+        "padding": "6px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      }
+    ]
+  },
+  {
+    "state": "011-riepilogo",
+    "theme": "grafite",
+    "width": 1440,
+    "height": 1425,
+    "file": "real-before-011-riepilogo-grafite-1440.png",
+    "url": "/patients/readme-shots-giulia-fervi/modules",
+    "metrics": [
+      {
+        "text": null,
+        "x": 328,
+        "y": 897.046875,
+        "width": 165.484375,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": null,
+        "x": 328,
+        "y": 1002.796875,
+        "width": 147.109375,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Elimina voce clinica con motivazione",
+        "x": 1248,
+        "y": 492.796875,
+        "width": 44,
+        "height": 40,
+        "padding": "6px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Elimina voce clinica con motivazione",
+        "x": 1248,
+        "y": 660.421875,
+        "width": 44,
+        "height": 40,
+        "padding": "6px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Elimina voce clinica con motivazione",
+        "x": 1248,
+        "y": 855.671875,
+        "width": 44,
+        "height": 40,
+        "padding": "6px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      }
+    ]
+  },
+  {
+    "state": "011-riepilogo",
+    "theme": "giorno",
+    "width": 768,
+    "height": 2241,
+    "file": "real-before-011-riepilogo-giorno-768.png",
+    "url": "/patients/readme-shots-giulia-fervi/modules",
+    "metrics": [
+      {
+        "text": null,
+        "x": 188,
+        "y": 927.921875,
+        "width": 165.484375,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": null,
+        "x": 188,
+        "y": 1054.796875,
+        "width": 147.109375,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Elimina voce clinica con motivazione",
+        "x": 684,
+        "y": 1349.484375,
+        "width": 44,
+        "height": 40,
+        "padding": "6px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Elimina voce clinica con motivazione",
+        "x": 684,
+        "y": 1517.109375,
+        "width": 44,
+        "height": 40,
+        "padding": "6px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Elimina voce clinica con motivazione",
+        "x": 684,
+        "y": 1712.359375,
+        "width": 44,
+        "height": 40,
+        "padding": "6px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      }
+    ]
+  },
+  {
+    "state": "011-riepilogo",
+    "theme": "grafite",
+    "width": 768,
+    "height": 2241,
+    "file": "real-before-011-riepilogo-grafite-768.png",
+    "url": "/patients/readme-shots-giulia-fervi/modules",
+    "metrics": [
+      {
+        "text": null,
+        "x": 188,
+        "y": 927.921875,
+        "width": 165.484375,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": null,
+        "x": 188,
+        "y": 1054.796875,
+        "width": 147.109375,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Elimina voce clinica con motivazione",
+        "x": 684,
+        "y": 1349.484375,
+        "width": 44,
+        "height": 40,
+        "padding": "6px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Elimina voce clinica con motivazione",
+        "x": 684,
+        "y": 1517.109375,
+        "width": 44,
+        "height": 40,
+        "padding": "6px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Elimina voce clinica con motivazione",
+        "x": 684,
+        "y": 1712.359375,
+        "width": 44,
+        "height": 40,
+        "padding": "6px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      }
+    ]
+  },
+  {
+    "state": "054-nuova-terapia",
+    "theme": "giorno",
+    "width": 1440,
+    "height": 2060,
+    "file": "real-before-054-nuova-terapia-giorno-1440.png",
+    "url": "/patients/readme-shots-giulia-fervi/modules#terapie",
+    "metrics": [
+      {
+        "text": "Salva terapia",
+        "x": 1176.828125,
+        "y": 1010.296875,
+        "width": 115.171875,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      }
+    ]
+  },
+  {
+    "state": "054-nuova-terapia",
+    "theme": "grafite",
+    "width": 1440,
+    "height": 2060,
+    "file": "real-before-054-nuova-terapia-grafite-1440.png",
+    "url": "/patients/readme-shots-giulia-fervi/modules#terapie",
+    "metrics": [
+      {
+        "text": "Salva terapia",
+        "x": 1176.828125,
+        "y": 1010.296875,
+        "width": 115.171875,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      }
+    ]
+  },
+  {
+    "state": "054-nuova-terapia",
+    "theme": "giorno",
+    "width": 768,
+    "height": 2230,
+    "file": "real-before-054-nuova-terapia-giorno-768.png",
+    "url": "/patients/readme-shots-giulia-fervi/modules#terapie",
+    "metrics": [
+      {
+        "text": "Salva terapia",
+        "x": 612.828125,
+        "y": 1139.796875,
+        "width": 115.171875,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      }
+    ]
+  },
+  {
+    "state": "054-nuova-terapia",
+    "theme": "grafite",
+    "width": 768,
+    "height": 2230,
+    "file": "real-before-054-nuova-terapia-grafite-768.png",
+    "url": "/patients/readme-shots-giulia-fervi/modules#terapie",
+    "metrics": [
+      {
+        "text": "Salva terapia",
+        "x": 612.828125,
+        "y": 1139.796875,
+        "width": 115.171875,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      }
+    ]
+  },
+  {
+    "state": "impostazioni-indice",
+    "theme": "giorno",
+    "width": 1440,
+    "height": 1100,
+    "file": "real-before-impostazioni-indice-giorno-1440.png",
+    "url": "/settings",
+    "metrics": []
+  },
+  {
+    "state": "impostazioni-indice",
+    "theme": "grafite",
+    "width": 1440,
+    "height": 1100,
+    "file": "real-before-impostazioni-indice-grafite-1440.png",
+    "url": "/settings",
+    "metrics": []
+  },
+  {
+    "state": "impostazioni-indice",
+    "theme": "giorno",
+    "width": 768,
+    "height": 1600,
+    "file": "real-before-impostazioni-indice-giorno-768.png",
+    "url": "/settings",
+    "metrics": []
+  },
+  {
+    "state": "impostazioni-indice",
+    "theme": "grafite",
+    "width": 768,
+    "height": 1600,
+    "file": "real-before-impostazioni-indice-grafite-768.png",
+    "url": "/settings",
+    "metrics": []
+  },
+  {
+    "state": "conferma-elimina-terapia",
+    "theme": "giorno",
+    "width": 1440,
+    "height": 960,
+    "file": "real-before-conferma-elimina-terapia-giorno-1440.png",
+    "url": "/patients/readme-shots-giulia-fervi/modules#terapie",
+    "metrics": [
+      {
+        "text": "Nuova terapia",
+        "x": 1146.609375,
+        "y": 426.796875,
+        "width": 145.390625,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Chiudi",
+        "x": 879,
+        "y": 331.015625,
+        "width": 40,
+        "height": 40,
+        "padding": "8px",
+        "radius": "3.35544e+07px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Annulla",
+        "x": 749.828125,
+        "y": 594.984375,
+        "width": 80.609375,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Elimina",
+        "x": 842.4375,
+        "y": 594.984375,
+        "width": 76.5625,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      }
+    ]
+  },
+  {
+    "state": "conferma-elimina-terapia",
+    "theme": "grafite",
+    "width": 1440,
+    "height": 960,
+    "file": "real-before-conferma-elimina-terapia-grafite-1440.png",
+    "url": "/patients/readme-shots-giulia-fervi/modules#terapie",
+    "metrics": [
+      {
+        "text": "Nuova terapia",
+        "x": 1146.609375,
+        "y": 426.796875,
+        "width": 145.390625,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Chiudi",
+        "x": 879,
+        "y": 331.015625,
+        "width": 40,
+        "height": 40,
+        "padding": "8px",
+        "radius": "3.35544e+07px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Annulla",
+        "x": 749.828125,
+        "y": 594.984375,
+        "width": 80.609375,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Elimina",
+        "x": 842.4375,
+        "y": 594.984375,
+        "width": 76.5625,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      }
+    ]
+  },
+  {
+    "state": "conferma-elimina-terapia",
+    "theme": "giorno",
+    "width": 768,
+    "height": 960,
+    "file": "real-before-conferma-elimina-terapia-giorno-768.png",
+    "url": "/patients/readme-shots-giulia-fervi/modules#terapie",
+    "metrics": [
+      {
+        "text": "Nuova terapia",
+        "x": 582.609375,
+        "y": 516.296875,
+        "width": 145.390625,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Chiudi",
+        "x": 543,
+        "y": 331.015625,
+        "width": 40,
+        "height": 40,
+        "padding": "8px",
+        "radius": "3.35544e+07px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Annulla",
+        "x": 413.828125,
+        "y": 594.984375,
+        "width": 80.609375,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Elimina",
+        "x": 506.4375,
+        "y": 594.984375,
+        "width": 76.5625,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      }
+    ]
+  },
+  {
+    "state": "conferma-elimina-terapia",
+    "theme": "grafite",
+    "width": 768,
+    "height": 960,
+    "file": "real-before-conferma-elimina-terapia-grafite-768.png",
+    "url": "/patients/readme-shots-giulia-fervi/modules#terapie",
+    "metrics": [
+      {
+        "text": "Nuova terapia",
+        "x": 582.609375,
+        "y": 516.296875,
+        "width": 145.390625,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Chiudi",
+        "x": 543,
+        "y": 331.015625,
+        "width": 40,
+        "height": 40,
+        "padding": "8px",
+        "radius": "3.35544e+07px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Annulla",
+        "x": 413.828125,
+        "y": 594.984375,
+        "width": 80.609375,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      },
+      {
+        "text": "Elimina",
+        "x": 506.4375,
+        "y": 594.984375,
+        "width": 76.5625,
+        "height": 40,
+        "padding": "8px 14px",
+        "radius": "10px",
+        "position": "static",
+        "overflow": "visible",
+        "whiteSpace": "normal",
+        "absoluteChildren": []
+      }
+    ]
+  },
+  {
+    "state": "onboarding-proteggi-accesso",
+    "theme": "giorno",
+    "width": 1440,
+    "height": 960,
+    "file": "real-before-onboarding-proteggi-accesso-giorno-1440.png",
+    "url": "/",
+    "metrics": []
+  },
+  {
+    "state": "onboarding-proteggi-accesso",
+    "theme": "grafite",
+    "width": 1440,
+    "height": 960,
+    "file": "real-before-onboarding-proteggi-accesso-grafite-1440.png",
+    "url": "/",
+    "metrics": []
+  },
+  {
+    "state": "onboarding-proteggi-accesso",
+    "theme": "giorno",
+    "width": 768,
+    "height": 960,
+    "file": "real-before-onboarding-proteggi-accesso-giorno-768.png",
+    "url": "/",
+    "metrics": []
+  },
+  {
+    "state": "onboarding-proteggi-accesso",
+    "theme": "grafite",
+    "width": 768,
+    "height": 960,
+    "file": "real-before-onboarding-proteggi-accesso-grafite-768.png",
+    "url": "/",
+    "metrics": []
+  }
+]

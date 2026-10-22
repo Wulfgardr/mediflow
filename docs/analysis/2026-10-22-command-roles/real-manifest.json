@@ -1,0 +1,296 @@
+{
+  "before": "e076ea44af9db4352211496c7d2db9e054068529",
+  "after": "a75724bc977f156273ab4f6f676fcbb4cc97eeb4",
+  "node": "24.21.0",
+  "seedSha256": "675846f5968e1458ca6689939040256d7aacb045dd8c902153908c775e914f0a",
+  "screenshots": [
+    {
+      "file": "real-after-011-riepilogo-giorno-1440.png",
+      "width": 1440,
+      "height": 1425,
+      "sha256": "2f3e36bc521d79b703ad63a8ebfb802215644234d22835a18b88b2da913561b7"
+    },
+    {
+      "file": "real-after-011-riepilogo-giorno-768.png",
+      "width": 768,
+      "height": 2241,
+      "sha256": "7329d1c9d37b532b55ea11ec8c88f74f697f172d7995ed9138d1af9dc4fff49d"
+    },
+    {
+      "file": "real-after-011-riepilogo-grafite-1440.png",
+      "width": 1440,
+      "height": 1425,
+      "sha256": "71594e094125f6636f0917d9eb7b891fa9f7baaa8be0c8485000d4bbe2a6c43c"
+    },
+    {
+      "file": "real-after-011-riepilogo-grafite-768.png",
+      "width": 768,
+      "height": 2241,
+      "sha256": "8046154d2ab8a582f3d5fa334a3d0e4e880c27ca5b98a33d62be25e293645205"
+    },
+    {
+      "file": "real-after-054-nuova-terapia-giorno-1440.png",
+      "width": 1440,
+      "height": 2060,
+      "sha256": "9940b2381d9e058d425f2da21139756e5626cf8d165170ce9a948460d173583d"
+    },
+    {
+      "file": "real-after-054-nuova-terapia-giorno-768.png",
+      "width": 768,
+      "height": 2230,
+      "sha256": "37156ed5cde878ce3fe53d89507654dcf8cafc9a0d1cc8da85d06dae862bb690"
+    },
+    {
+      "file": "real-after-054-nuova-terapia-grafite-1440.png",
+      "width": 1440,
+      "height": 2060,
+      "sha256": "e7339e59f7c716c98128cbbe9793cb14c46cd4182af1d4f25ccadeab15a5e35f"
+    },
+    {
+      "file": "real-after-054-nuova-terapia-grafite-768.png",
+      "width": 768,
+      "height": 2230,
+      "sha256": "4ecf1116a02a70b779350b8883dbf5c6762019ef96753088c975c18a368cf61a"
+    },
+    {
+      "file": "real-after-conferma-elimina-terapia-giorno-1440.png",
+      "width": 1440,
+      "height": 960,
+      "sha256": "4276f0da1de59b5efd1617ce9414dfb7071d9dc5f73451ad4a584e1c9c338e0e"
+    },
+    {
+      "file": "real-after-conferma-elimina-terapia-giorno-768.png",
+      "width": 768,
+      "height": 960,
+      "sha256": "afb847e4fdd00b966dde1daba7b9e995c4045677be9d885b2e6cd6ba9801aeb7"
+    },
+    {
+      "file": "real-after-conferma-elimina-terapia-grafite-1440.png",
+      "width": 1440,
+      "height": 960,
+      "sha256": "2c799d0dd74027989fb05a67e698469a6f92575bd295457e99e28424ed0beeca"
+    },
+    {
+      "file": "real-after-conferma-elimina-terapia-grafite-768.png",
+      "width": 768,
+      "height": 960,
+      "sha256": "c258398528dc777c44ace36b21bbb685f35bc77055937fd649f75e711f127ce8"
+    },
+    {
+      "file": "real-after-impostazioni-indice-giorno-1440.png",
+      "width": 1440,
+      "height": 1100,
+      "sha256": "53eea8bad4148eeae38f5ed8513c5c18fb53e47dccedbfd2034a80e3ffb71188"
+    },
+    {
+      "file": "real-after-impostazioni-indice-giorno-768.png",
+      "width": 768,
+      "height": 1600,
+      "sha256": "e6851d905017f2705da9165bc15099640e99f5c0435a2c27cddfcd4daea9a41b"
+    },
+    {
+      "file": "real-after-impostazioni-indice-grafite-1440.png",
+      "width": 1440,
+      "height": 1100,
+      "sha256": "960104bed27928c8459d94ad54e8508201b1cf72857124e42d11315501d744e2"
+    },
+    {
+      "file": "real-after-impostazioni-indice-grafite-768.png",
+      "width": 768,
+      "height": 1600,
+      "sha256": "6dc2a0132f82618452e7e911c40f8b9252bb9cdc77cac951a9b6a2e598423747"
+    },
+    {
+      "file": "real-after-onboarding-proteggi-accesso-giorno-1440.png",
+      "width": 1440,
+      "height": 960,
+      "sha256": "fcd53a0d070d164631795e35a4f67c7505b95fef5b00eac84d3e4ece6e7862b7"
+    },
+    {
+      "file": "real-after-onboarding-proteggi-accesso-giorno-768.png",
+      "width": 768,
+      "height": 960,
+      "sha256": "7ce81d9dbade905d45626bee34ced82f617bf5b5bc2d2bf57eaebe62080eb4e6"
+    },
+    {
+      "file": "real-after-onboarding-proteggi-accesso-grafite-1440.png",
+      "width": 1440,
+      "height": 960,
+      "sha256": "d606354afff78dd04dee5d4c8772dd0814cddaa5d5a360c25b0160b484e0ba38"
+    },
+    {
+      "file": "real-after-onboarding-proteggi-accesso-grafite-768.png",
+      "width": 768,
+      "height": 960,
+      "sha256": "b14e90cd752e8e30631f69870ea3a5f54da851e185fe63914da505cf6a7b4813"
+    },
+    {
+      "file": "real-after-rimozione-diagnosi-giorno-1440.png",
+      "width": 1440,
+      "height": 1800,
+      "sha256": "892effce5a191e839401d1d0ecf569db217d35ca370cf01f6d61c94b0ef34523"
+    },
+    {
+      "file": "real-after-rimozione-diagnosi-giorno-768.png",
+      "width": 768,
+      "height": 1800,
+      "sha256": "a034af73e83a68f87de7e2b5c93ddcc7bfb5c550cacffb526b3a87c5cc0ceab2"
+    },
+    {
+      "file": "real-after-rimozione-diagnosi-grafite-1440.png",
+      "width": 1440,
+      "height": 1800,
+      "sha256": "831f6c846b65044fe5f531ceaf0c6ec48bb9c58a86c1a910c9847ce323840ef0"
+    },
+    {
+      "file": "real-after-rimozione-diagnosi-grafite-768.png",
+      "width": 768,
+      "height": 1800,
+      "sha256": "7e6564ca086114534395406230e11d2809bc32bdd5d0e9b02b8b8039dfc346de"
+    },
+    {
+      "file": "real-before-011-riepilogo-giorno-1440.png",
+      "width": 1440,
+      "height": 1425,
+      "sha256": "02443032fae34180d3e40a0a46dd4e3a885b466743eb1cab4615e2354c23d75b"
+    },
+    {
+      "file": "real-before-011-riepilogo-giorno-768.png",
+      "width": 768,
+      "height": 2241,
+      "sha256": "7329d1c9d37b532b55ea11ec8c88f74f697f172d7995ed9138d1af9dc4fff49d"
+    },
+    {
+      "file": "real-before-011-riepilogo-grafite-1440.png",
+      "width": 1440,
+      "height": 1425,
+      "sha256": "ace702056e21b0451508ae3500671ada10dc81d2d61abc5ce6942e5163595c26"
+    },
+    {
+      "file": "real-before-011-riepilogo-grafite-768.png",
+      "width": 768,
+      "height": 2241,
+      "sha256": "06ab3ef2c614d39abe85ba5da837da0b0689a2eccdd8139f57fc3a0a90b8936b"
+    },
+    {
+      "file": "real-before-054-nuova-terapia-giorno-1440.png",
+      "width": 1440,
+      "height": 2060,
+      "sha256": "028636aa4eb11a5282cb6ea12bdf705d975a46d2a0fcb79a7f259934d9fca953"
+    },
+    {
+      "file": "real-before-054-nuova-terapia-giorno-768.png",
+      "width": 768,
+      "height": 2230,
+      "sha256": "71d8760d6829d14c128bb99b27c7b3cb54baa9b61790b8aad5f628260d3937aa"
+    },
+    {
+      "file": "real-before-054-nuova-terapia-grafite-1440.png",
+      "width": 1440,
+      "height": 2060,
+      "sha256": "8ed892a86eaa51b080de4db64c16a24a09905a5186db02475f8c0b0158a5d45f"
+    },
+    {
+      "file": "real-before-054-nuova-terapia-grafite-768.png",
+      "width": 768,
+      "height": 2230,
+      "sha256": "82b4a4aeb7a926a3fd6c1bc275c950c39bea53f151e7362f1c3e70339312f176"
+    },
+    {
+      "file": "real-before-conferma-elimina-terapia-giorno-1440.png",
+      "width": 1440,
+      "height": 960,
+      "sha256": "acb795553c6e859381accfffea7363d06d4cd28475aba832205f0a3338b349f7"
+    },
+    {
+      "file": "real-before-conferma-elimina-terapia-giorno-768.png",
+      "width": 768,
+      "height": 960,
+      "sha256": "572e04a2f6dcb0e5b01afa72229e66e5af1a21cac9bccc846491b16c8d2075c1"
+    },
+    {
+      "file": "real-before-conferma-elimina-terapia-grafite-1440.png",
+      "width": 1440,
+      "height": 960,
+      "sha256": "5c80ad14c91a650b755d5f367bb59f936fe271c62dfc2206af33123cffc1d0ec"
+    },
+    {
+      "file": "real-before-conferma-elimina-terapia-grafite-768.png",
+      "width": 768,
+      "height": 960,
+      "sha256": "6a8a77c0e2c7c0dddb6292399c346bf53183e458cd75b3315a24ca7564811080"
+    },
+    {
+      "file": "real-before-impostazioni-indice-giorno-1440.png",
+      "width": 1440,
+      "height": 1100,
+      "sha256": "53eea8bad4148eeae38f5ed8513c5c18fb53e47dccedbfd2034a80e3ffb71188"
+    },
+    {
+      "file": "real-before-impostazioni-indice-giorno-768.png",
+      "width": 768,
+      "height": 1600,
+      "sha256": "a8f3de0e554557f4b35513c16db913a7ddbb0e09e250801dd107139a701c8d0b"
+    },
+    {
+      "file": "real-before-impostazioni-indice-grafite-1440.png",
+      "width": 1440,
+      "height": 1100,
+      "sha256": "960104bed27928c8459d94ad54e8508201b1cf72857124e42d11315501d744e2"
+    },
+    {
+      "file": "real-before-impostazioni-indice-grafite-768.png",
+      "width": 768,
+      "height": 1600,
+      "sha256": "6dc2a0132f82618452e7e911c40f8b9252bb9cdc77cac951a9b6a2e598423747"
+    },
+    {
+      "file": "real-before-onboarding-proteggi-accesso-giorno-1440.png",
+      "width": 1440,
+      "height": 960,
+      "sha256": "fcd53a0d070d164631795e35a4f67c7505b95fef5b00eac84d3e4ece6e7862b7"
+    },
+    {
+      "file": "real-before-onboarding-proteggi-accesso-giorno-768.png",
+      "width": 768,
+      "height": 960,
+      "sha256": "7ce81d9dbade905d45626bee34ced82f617bf5b5bc2d2bf57eaebe62080eb4e6"
+    },
+    {
+      "file": "real-before-onboarding-proteggi-accesso-grafite-1440.png",
+      "width": 1440,
+      "height": 960,
+      "sha256": "d606354afff78dd04dee5d4c8772dd0814cddaa5d5a360c25b0160b484e0ba38"
+    },
+    {
+      "file": "real-before-onboarding-proteggi-accesso-grafite-768.png",
+      "width": 768,
+      "height": 960,
+      "sha256": "b14e90cd752e8e30631f69870ea3a5f54da851e185fe63914da505cf6a7b4813"
+    },
+    {
+      "file": "real-before-rimozione-diagnosi-giorno-1440.png",
+      "width": 1440,
+      "height": 1800,
+      "sha256": "a03138e51893506a0ff4450432a047a6c33a5371ebb788a6b28b3c6df46cac7c"
+    },
+    {
+      "file": "real-before-rimozione-diagnosi-giorno-768.png",
+      "width": 768,
+      "height": 1800,
+      "sha256": "d3ff51d9c769588420adf6edf84e0212acd3ba6e6b7816a9cefede5bc984276a"
+    },
+    {
+      "file": "real-before-rimozione-diagnosi-grafite-1440.png",
+      "width": 1440,
+      "height": 1800,
+      "sha256": "5a1f1d925a32758b79429956194bd74b69eb9b6bd90829b53b09d3383f254e98"
+    },
+    {
+      "file": "real-before-rimozione-diagnosi-grafite-768.png",
+      "width": 768,
+      "height": 1800,
+      "sha256": "c55166611040069fcdcd920d12ba92fbf328cf6842c1d38b99d1d7cd039fa790"
+    }
+  ]
+}
