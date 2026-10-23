@@ -1,6 +1,6 @@
 {
   "baseCommit": "17af7eae8c9f55ccd43e670d80a9cb00ec6cdf2d",
-  "scope": "R1 marker and dispatch are separate model actions; R2 immutable identity and R3 archive/connection/key origin are runtime regressions, outside TLA. Hashes identify the reviewed mapping, not equivalence.",
+  "scope": "R1 marker and dispatch remain separate model actions. R2 immutable identity, R3 archive/connection/key origin and R5 original approval expiry at HTTP dispatch are runtime regressions, outside TLA. adapter.act may await between marker and dispatch. Hashes identify the reviewed mapping, not equivalence.",
   "tool": {
     "release": "v1.7.4",
     "verifier": "TLC 2.19",
@@ -17,7 +17,7 @@
   },
   "files": {
     "lib/local-operation/contract.ts": "19a58c9bcfa00b02da15cfc3c1c7c00d653d1dbb05057d80e846f64fd6cf1457",
-    "lib/local-operation/service.ts": "4f0c3e3ddb4b2ddeb2ad75d60beef97bcb761f02cdfbba8e4dd32ff8cf80c634",
+    "lib/local-operation/service.ts": "265984c916f54a6ec3f74d9b3d9254c7d18c492d6ebd221ca94ea5d6625bf4a2",
     "lib/local-operation/sqlite-journal.ts": "27b252ff36a37e9bc1d499c0b83a7833ef260c869c38835f3cac1c687d536566",
     "lib/local-operation/host.ts": "fd67b633fa3b5db7e1b6d7f93cba96efec2ea26f92d681e99f3abb9279d9e3f7",
     "lib/local-operation/journal-cipher.ts": "44001319c6928cf124b2102fe999a30622e134204c662ce689134a6895768f8e",
@@ -39,11 +39,12 @@
     "package.json",
     "package-lock.json",
     ".nvmrc",
-    "lib/local-operation/review-regressions.test.ts"
+    "lib/local-operation/review-regressions.test.ts",
+    "lib/local-operation/approval-expiry.test.ts"
   ],
   "reviewBaseCommit": "c8beebe1d561c75b45e3902100a7da39529cda8c",
   "lastRun": {
-    "at": "2026-10-23T13:11:53.419Z",
+    "at": "2026-10-23T13:44:32.615Z",
     "generatedStates": 171,
     "distinctStates": 73,
     "automaticUnreachableRejected": true,
@@ -94,6 +95,11 @@
         "expectedExitCode": 1
       },
       {
+        "label": "runtime-approval-expiry-mutant",
+        "exitCode": 1,
+        "expectedExitCode": 1
+      },
+      {
         "label": "runtime-recovery-mutant",
         "exitCode": 1,
         "expectedExitCode": 1
@@ -120,6 +126,7 @@
       }
     ]
   },
-  "mappedCodeCommit": "38478857757348f9c158aa7f13c535c9234ad009",
-  "integrationBaseCommit": "f9cac0bdf2f85f7fe04bdf0e5545868413324529"
+  "mappedCodeCommit": "e0d591af536068fb5911d64506badf980536df53",
+  "integrationBaseCommit": "a12cd01b01cccfe2ab45b590a86dab27ddf46a66",
+  "approvalExpiryReviewBaseCommit": "cec371630c72ff56d5b57c540575d50217a7ceac"
 }
