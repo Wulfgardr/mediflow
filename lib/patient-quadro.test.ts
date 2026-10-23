@@ -19,8 +19,8 @@ test('una riga per parametro: ultimo valore, data e delta con storico lungo e no
         ...history.toReversed(),
         observation('glucose-old', { code: 'GLU', unitCode: 'mg/dL', value: 90, observedAt: new Date('2026-09-01') }),
         observation('grams-old', { unitCode: 'g', value: 70000, observedAt: new Date('2026-09-01') }),
-        observation('other-code-system', { codeSystem: 'LOCAL', value: 1 }),
-        observation('other-unit-system', { unitSystem: 'LOCAL', value: 2 }),
+        observation('other-code-system', { codeSystem: 'LOCAL' as Observation['codeSystem'], value: 1 }),
+        observation('other-unit-system', { unitSystem: 'LOCAL' as Observation['unitSystem'], value: 2 }),
         observation('grams-latest', { unitCode: 'g', value: 71000 }),
         observation('glucose-latest', { code: 'GLU', unitCode: 'mg/dL', value: 95 }),
         observation('deleted-only', { code: 'DELETED', deletedAt: new Date() }),
@@ -74,7 +74,7 @@ test('trova il precedente strettamente più vecchio in ogni ordine, escludendo p
 });
 test('non confonde tuple contenenti separatori', () => {
     assert.equal(projectQuadroMeasures([
-        observation('a', { codeSystem: 'A|B', code: 'C' }),
-        observation('b', { codeSystem: 'A', code: 'B|C' }),
+        observation('a', { codeSystem: 'A|B' as Observation['codeSystem'], code: 'C' }),
+        observation('b', { codeSystem: 'A' as Observation['codeSystem'], code: 'B|C' }),
     ]).length, 2);
 });

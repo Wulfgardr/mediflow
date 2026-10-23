@@ -67,7 +67,6 @@ test('Misure recenti conta i parametri e conserva lo storico completo in Misure'
     await openPatientSection(page, 'misure');
     const history = page.getByRole('complementary', { name: 'Andamento e storia delle misure' });
     await expect(history).toBeVisible();
-    await page.locator('#misure').getByRole('button', { name: 'Peso sintetico', exact: true }).click();
     await history.getByRole('button', { name: 'Tutte (24)', exact: true }).click();
     await expect(history.locator('tbody tr')).toHaveCount(24);
     await expect(history.getByRole('cell', { name: '70', exact: true })).toBeVisible();
