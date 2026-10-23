@@ -148,7 +148,9 @@ localmente prima di avviare una nuova sessione plugin. È un limite esplicito
 rispetto al precedente riuso per discovery, comprese le riconnessioni dopo
 la chiusura dell'host. Non modifica l'archivio o le preferenze ordinarie.
 
-Le risposte IPC sono correlate all'ID della richiesta. Annullamento e
+Il navigator attende l’handshake del processo figlio prima della prima
+richiesta: il solo evento OS `spawn` precede l’installazione dei gestori IPC
+e non è readiness. Le risposte IPC sono correlate all’ID della richiesta. Annullamento e
 handoff rifiutato revocano soltanto quell'ID. La disconnessione revoca gli
 handoff ancora pendenti, senza arrestare il launcher o il Web autonomi.
 `--riusa` conserva inizializzazione e servizi facoltativi ordinari, incluso

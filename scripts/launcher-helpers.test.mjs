@@ -480,7 +480,7 @@ test('cold plugin startup forwards ordinary launcher environment and preserves t
         const launcherState = ${JSON.stringify(new URL('./launcher-state.mjs', import.meta.url).href)};
         globalThis.captureSpawn = (_exe, args, options) => {
             process.stdout.write(JSON.stringify({ args, env: options.env }));
-            const child = new EventEmitter();
+            const child = new EventEmitter(); child.unref = () => {};
             queueMicrotask(() => child.emit('error', new Error('synthetic-stop')));
             return child;
         };
@@ -496,7 +496,7 @@ test('cold plugin startup forwards ordinary launcher environment and preserves t
         const { createLocalUiRuntimeNavigator } = await import(${JSON.stringify(new URL('./local-ui-runtime.mjs', import.meta.url).href)});
         const navigate = createLocalUiRuntimeNavigator({ sourceRoot: ${JSON.stringify(source)}, dataDir: ${JSON.stringify(data)}, revision: 'a'.repeat(40) });
         try { await navigate('history', new AbortController().signal); } catch (error) {
-            if (error.message !== 'synthetic-stop') throw error;
+            if (error.message !== 'navigation_unavailable') throw error;
         }
     `], { encoding: 'utf8', env: { ...process.env,
         HOME: directory, LANG: 'it_IT.UTF-8', TMPDIR: directory, XDG_CONFIG_HOME: path.join(directory, 'config'),
@@ -734,6 +734,10 @@ test('plugin refuses forged receipts, replacement ports and lock directory alias
                 choiceUrl: `http://127.0.0.1:${foreign.address().port}/${'a'.repeat(48)}/` });
             await deny();
         }
+        const reusedPort = foreign.address().port;
+        await new Promise(resolve => foreign.close(resolve));
+        await new Promise(resolve => foreign.listen(reusedPort, '127.0.0.1', resolve));
+        await deny();
         const lock = f.stateFiles.lockDirectory, moved = lock + '.synthetic';
         renameSync(lock, moved); symlinkSync(moved, lock, 'dir');
         try { await deny(); } finally { rmSync(lock); renameSync(moved, lock); }
@@ -786,4 +790,35 @@ test('the inherited peer must retain the expected archive and source generation'
         await assert.rejects(navigateOwnedLocalUiRuntime(f.child, 'history', AbortSignal.timeout(2000), Date.now() + 5000, expected));
     }
     assert.doesNotMatch(f.output(), /FIXTURE_NAVIGATION/);
+});
+
+
+test('cold navigator waits for the inherited peer handshake before its first request', t => {
+    const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-ipc-handshake-')));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    const source = path.join(directory, 'source'), data = path.join(directory, 'data');
+    mkdirSync(path.join(source, 'scripts'), { recursive: true }); mkdirSync(data);
+    writeFileSync(path.join(source, 'scripts/mediflow.mjs'), `
+        process.on('message', () => {});
+        process.once('disconnect', () => process.exit(0));
+        setTimeout(() => {
+            process.on('message', frame => {
+                if (frame.type === 'mediflow-local-ui-navigate') process.send({type:'mediflow-local-ui-result',requestId:frame.requestId,status:'accepted'});
+            });
+            process.send({type:'mediflow-local-ui-connected',dataDir:process.env.MEDIFLOW_DATA_DIR,sourceFingerprint:'synthetic'});
+        }, 100);`);
+    const script = `
+        import { registerHooks } from 'node:module';
+        registerHooks({ load(url, context, next) {
+            if (url === ${JSON.stringify(new URL('./launcher-helpers.mjs', import.meta.url).href)}) return { format: 'module', shortCircuit: true,
+                source: 'export const readProductIdentity = () => ({ worktreeHash: "clean", revision: "aaaaaaaaaaaa", sourceFingerprint:"synthetic" });' };
+            return next(url, context);
+        } });
+        const { createLocalUiRuntimeNavigator } = await import(${JSON.stringify(new URL('./local-ui-runtime.mjs', import.meta.url).href)});
+        const keepAlive = setInterval(() => {}, 1000);
+        try { await createLocalUiRuntimeNavigator({sourceRoot:${JSON.stringify(source)}, dataDir:${JSON.stringify(data)}, revision:'a'.repeat(40)})('history',AbortSignal.timeout(1500)); }
+        finally {clearInterval(keepAlive);}
+    `;
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], { timeout: 4000, encoding:'utf8' });
+    assert.equal(result.status, 0, result.stderr);
 });
