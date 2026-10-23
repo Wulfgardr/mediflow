@@ -5,6 +5,8 @@ import { deny, LocalOperationError, planDigest, planSchema, receiptSchema, terri
 export type LocalCapability = Readonly<{ kind: 'local_operation' }>;
 type Binding = { operationId: string; digest: string; context: string; territoryRevision: number;
     expiresAt: number; generation: number; origin: ArchiveAuthority };
+type DispatchPermit = Readonly<{ marker: LocalOperationRecord; approvalExpiresAt: number }>;
+type PhaseContext = (...args: [phase: 'prepare' | 'reconcile'] | [phase: 'act', permit: DispatchPermit]) => AdapterContext;
 const contextKey = (context: LiveContext) => JSON.stringify(context);
 function freeze<T>(value: T): Readonly<T> {
     if (value && typeof value === 'object') { for (const item of Object.values(value)) freeze(item); Object.freeze(value); }
@@ -98,14 +100,14 @@ export function createLocalOperationService(ports: LocalOperationPorts) {
             || value.uiVersion !== plan.uiVersion || value.humanRevision !== context.humanRevision
             || value.unclassifiedFields.length || (requireContent && value.planDigest !== planDigest(plan))) deny();
     }
-    async function run<T>(capability: LocalCapability, action: (observe: AdapterContext,
-        phaseContext: (phase: 'prepare' | 'act' | 'reconcile', marker?: LocalOperationRecord) => AdapterContext) => Promise<T>): Promise<T> {
+    async function run<T>(capability: LocalCapability, action: (observe: AdapterContext, phaseContext: PhaseContext) => Promise<T>): Promise<T> {
         const { binding, plan, current } = check(capability);
         if (running.size) throw new LocalOperationError('conflict');
         const controller = new AbortController(); running.set(binding.operationId, controller);
         let actDispatched = false;
         const assertCurrent = () => { if (controller.signal.aborted || running.get(binding.operationId) !== controller) deny(); check(capability); };
-        function context(phase: 'observe' | 'prepare' | 'act' | 'reconcile', marker = current): AdapterContext {
+        function context(phase: 'observe' | 'prepare' | 'act' | 'reconcile', permit?: DispatchPermit): AdapterContext {
+            const marker = permit?.marker ?? current;
             assertCurrent();
             if (phase === 'act') {
                 const live = check(capability).current;
@@ -120,7 +122,7 @@ export function createLocalOperationService(ports: LocalOperationPorts) {
                         || !plan.destinations.some(allowed => JSON.stringify(allowed) === JSON.stringify(destination))) deny();
                     if (destination.purpose === 'act') {
                         const live = check(capability).current;
-                        if (actDispatched || live.state !== 'attempt_started' || !live.effectPossible
+                        if (!permit || permit.approvalExpiresAt <= ports.now() || actDispatched || live.state !== 'attempt_started' || !live.effectPossible
                             || live.revision !== marker.revision || live.attempt !== marker.attempt) deny();
                         actDispatched = true;
                     }
@@ -225,7 +227,8 @@ export function createLocalOperationService(ports: LocalOperationPorts) {
                 if (approvals.get(current.operationId) !== approval || approval.expiresAt <= ports.now()) deny();
                 const marker = save(current, { state: 'attempt_started', attempt: current.attempt + 1, effectPossible: true }, () => check(capability));
                 approvals.delete(current.operationId);
-                const receipt = await ports.adapter.act(phaseContext('act', marker), plan);
+                const permit = Object.freeze({ marker, approvalExpiresAt: approval.expiresAt });
+                const receipt = await ports.adapter.act(phaseContext('act', permit), plan);
                 return acceptReceipt(capability, ctx, receipt);
             });
         },
