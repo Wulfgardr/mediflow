@@ -292,7 +292,7 @@ export function claimLauncher(directory, identity, { reuseLive = false } = {}) {
 const terminalOwnedGroups = new WeakSet();
 const confirmedWindowsStops = new WeakSet();
 
-export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = false } = {}) {
+export async function stopOwnedChild(child, graceMs = 8000) {
   const posix = process.platform !== 'win32';
   if (!child?.pid) return;
   if (!posix && (child.exitCode !== null || child.signalCode !== null)) {
@@ -301,6 +301,7 @@ export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = fal
   }
   await new Promise((resolve, reject) => {
     let forceTimer, timer, signalImmediate, groupAbsent = terminalOwnedGroups.has(child), settled = false;
+    let windowsTreeStopped = false, originalExitObserved = false;
     const finish = cause => {
       if (settled) return;
       settled = true;
@@ -332,7 +333,12 @@ export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = fal
         else if (leaderTerminal()) { finish(); return; }
       } catch (error) { finish(error); }
     };
-    const exited = () => posix ? observe() : finish();
+    const exited = () => {
+      if (posix) { observe(); return; }
+      originalExitObserved = true;
+      if (Date.now() >= deadline) expired();
+      else if (windowsTreeStopped) finish();
+    };
     const deadline = Date.now() + graceMs;
     const expired = () => finish(new Error(posix ? 'Exit del processo posseduto o scomparsa del gruppo non osservato.' : 'Exit del processo posseduto non osservato.'));
     const signalGroup = signal => {
@@ -352,9 +358,14 @@ export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = fal
       if (settled) return;
       try {
         if (process.platform === 'win32') {
+          if (Date.now() >= deadline) { expired(); return; }
+          if (leaderTerminal()) throw new Error('Albero del processo già terminale non verificato.');
           const result = spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'],
             { stdio: 'ignore', timeout: Math.max(1, deadline - Date.now()), windowsHide: true });
           if (result.error || result.status !== 0) throw result.error || new Error(`taskkill: ${result.status}`);
+          if (Date.now() >= deadline) { expired(); return; }
+          windowsTreeStopped = true;
+          if (originalExitObserved) finish();
         } else signalGroup('SIGKILL');
       } catch (error) { if (posix && error.code === 'ESRCH') observe(); else finish(error); }
     };
@@ -365,9 +376,6 @@ export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = fal
         if (leaderTerminal() || groupAbsent) { observe(); return; }
         forceTimer = setTimeout(force, Math.floor(graceMs / 2));
         signalGroup('SIGTERM');
-      } else if (child.connected && allowIpcStop) {
-        forceTimer = setTimeout(force, Math.floor(graceMs / 2));
-        child.send({ type: 'mediflow-launcher-stop' }, error => { if (error) finish(error); });
       } else force();
     } catch (error) { if (posix && error.code === 'ESRCH') observe(); else finish(error); }
   });
@@ -423,7 +431,7 @@ export async function main(args = process.argv.slice(2)) {
   let terminal = null, useTerminal = false, webSecret = null, instance = null;
   const pairRequests = new Map();
   const ipcStopChildren = new WeakSet();
-  const stopChild = () => stopOwnedChild(child, 8000, { allowIpcStop: ipcStopChildren.has(child) });
+  const stopChild = () => stopOwnedChild(child, 8000);
   let pairingPoll = null;
   let shutdownTask = null, shutdownComplete = false, ownershipHold = null;
   const question = async prompt => {

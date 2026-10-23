@@ -37,10 +37,19 @@ export function collectAdditionalInventorySelections(root) {
     try { const value = collect(); out[id] = { ...value, files: filesExist(root, value.files), errors: [], mode, conditional: mode === 'conditional' }; }
     catch (error) { out[id] = { files: [], errors: [error.message], mode }; }
   }
-  add('ci:unified-launcher', 'ordinary', 'scripts/ci-start-smoke.mjs', () => ({
-    files: ['scripts/ci-start-smoke.mjs'],
-    binding: collectLiteralCiBinding(root, { workflow: '.github/workflows/cross-platform.yml', job: 'build-start', ciCall: 'node scripts/ci-start-smoke.mjs' }),
-  }));
+  add('ci:unified-launcher', 'ordinary', 'scripts/ci-start-smoke.mjs', () => {
+    source(root, 'scripts/ci-start-smoke.mjs', [
+      "const integrity = windows ? await import('./windows-stop-integrity-smoke.mjs') : null;",
+      'token = crypto.randomUUID(); integrity.committedArchiveProbe(data, token, true);',
+      'integrity.committedArchiveProbe(data, token); launch(); await ready();',
+      "assert.equal(health.status, 200); assert.equal((await health.json()).db.state, 'ready'); integrity.committedArchiveProbe(data, token);",
+      'await integrity.windowsTransactionTreeProbe(fixture);',
+    ]);
+    return {
+      files: ['scripts/ci-start-smoke.mjs', 'scripts/windows-stop-integrity-smoke.mjs'],
+      binding: collectLiteralCiBinding(root, { workflow: '.github/workflows/cross-platform.yml', job: 'build-start', ciCall: 'node scripts/ci-start-smoke.mjs' }),
+    };
+  });
   add('npm:test:clinical-http', 'ordinary', 'scripts/run-clinical-http-suite.mjs', () => ({
     files: CLINICAL_HTTP_TEST_FILES,
     binding: collectNpmScriptBinding(root, { script: 'test:clinical-http', workflow: '.github/workflows/web-core.yml', job: 'web-core' }, 'node scripts/run-clinical-http-suite.mjs'),
