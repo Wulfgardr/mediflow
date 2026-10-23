@@ -31,6 +31,7 @@ la data di questo indice non rinnova le prove cui rimandano.
 | [Contratti CU](./analysis/2026-10-23-computer-use-procedure-contracts.md) | Specialistica, farmaceutica, protesica, esenzioni e introduttivo INPS. | Per implementare simulatori e adapter senza dedurre atti o campi non autorizzati. |
 | [Fonti CU](./analysis/2026-10-23-computer-use-sources.md) | Fonti privacy, client e procedure, con data/versione/stato e limiti. | Per distinguere normativa, consultazioni, conoscenza procedurale e prove runtime. |
 | [ADR 0162](./adr/0162-local-computer-use-executor.md) | Proposed: esecutore locale, capability, uscite, intervento medico e riconciliazione. | Prima di sviluppare CU; non attesta un runtime o una qualifica istituzionale. |
+| [Nucleo CU-1a](./local-operation-core.md) | Protocollo chiuso, composizione host, autorità, journal e recupero con adapter simulato. | Per integrare CU-1b senza estendere il claim al client o ai servizi reali. |
 | [Censimento GPUI G-0](./analysis/2026-10-23-gpui-census.md) | Matrice di 66 funzioni, 36 route Web, 17 route Impostazioni e crosswalk CSV delle 205 righe della specifica; 40 unità PR proposte sotto G-1–9. | Per assegnare residui e prove, verificare writer e porte host, distinguere sorgente e pilota installato e chiudere i gate immediati. |
 | [Tranche indipendente 0.9.x](./analysis/2026-09-26-09x-independent-development.md) | Codice sintetico, demo, prove e prerequisiti delle patch successive. | Per riprodurre e riesaminare i candidati senza confonderli con il core 0.9.0. |
 | [Delta regolatorio futuro](./analysis/2026-09-26-09x-regulatory-delta.md) | Matrice candidata, fonti datate e responsabilità aperte WUL-738. | Prima di ampliare finalità, distribuzione o trattamento; non qualifica un deployment. |
@@ -485,6 +486,7 @@ di ciascuna proposta e il limite di autorità dell’host.
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [Cambio stato terapia](./formal/therapy-status/README.md) | Statechart, modello finito TLC, controesempi, comando e collegamento ai test reali. | Quando cambia il controller Web, il registro dei tentativi o la CAS terapia. |
+| [Stati dell'operazione locale](./formal/local-operation/README.md) | Modello finito TLC del recupero CU, mappa al codice, witness e falsificazioni runtime. | Quando cambiano tentativo, riconciliazione, disattivazione o guard di preparazione. |
 
 - `docs/adr/0159-plugin-local-ui-navigation.md`
 - `plugins/mediflow-local-ui/README.md`
