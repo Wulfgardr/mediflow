@@ -308,6 +308,52 @@ test('launcher ownership refuses a live owner and recovers only a dead receipt',
     assert.equal(JSON.parse(readFileSync(path.join(lock, 'instance.json'), 'utf8')).pid, process.pid);
 });
 
+test('launcher ownership recovers a recycled PID but preserves an unverifiable live owner', t => {
+    const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-launcher-recycled-')));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const lock = path.join(root, 'lock');
+    claimLauncher(lock, cleanIdentity);
+    const receiptFile = path.join(lock, 'instance.json');
+    const receipt = JSON.parse(readFileSync(receiptFile));
+    assert.equal(typeof receipt.processIdentity, 'string');
+    atomicJson(receiptFile, { ...receipt, processIdentity: 'previous-process-generation' });
+    claimLauncher(lock, cleanIdentity);
+    assert.deepEqual(JSON.parse(readFileSync(receiptFile)), receipt);
+    atomicJson(receiptFile, { pid: process.pid, checkoutPath: repoRoot });
+    assert.throws(() => claimLauncher(lock, cleanIdentity), /già in corso/u);
+    assert.deepEqual(JSON.parse(readFileSync(receiptFile)), { pid: process.pid, checkoutPath: repoRoot });
+});
+
+test('concurrent launcher acquisition retains a single live writer', async t => {
+    const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-launcher-contenders-')));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const lock = path.join(root, 'lock');
+    mkdirSync(lock);
+    atomicJson(path.join(lock, 'instance.json'), { pid: 2147483647, checkoutPath: repoRoot });
+    const children = [];
+    t.after(async () => {
+        await Promise.all(children.map(async child => {
+            if (child.exitCode !== null || child.signalCode !== null) return;
+            const closed = once(child, 'close'); child.kill(); await closed;
+        }));
+    });
+    const results = await Promise.all(Array.from({ length: 6 }, async () => {
+        const child = spawn(process.execPath, ['--input-type=module', '-e', `
+            const { claimLauncher } = await import(${JSON.stringify(new URL('./mediflow.mjs', import.meta.url).href)});
+            const keepAlive = setInterval(() => {}, 1000);
+            try { process.send(claimLauncher(${JSON.stringify(lock)}, ${JSON.stringify(cleanIdentity)}, { reuseLive: true })); }
+            catch (error) { process.send({ error: error.message }); }
+            process.once('disconnect', () => clearInterval(keepAlive));
+        `], { stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
+        children.push(child);
+        const [result] = await once(child, 'message');
+        return { ...result, pid: child.pid };
+    }));
+    const winners = results.filter(result => result.claimed);
+    assert.equal(winners.length, 1, JSON.stringify(results));
+    assert.equal(JSON.parse(readFileSync(path.join(lock, 'instance.json'))).pid, winners[0].pid);
+});
+
 async function fakeRuntime(t, fingerprint = cleanIdentity.sourceFingerprint) {
     const server = http.createServer((_req, res) => {
         res.setHeader('Content-Type', 'application/json');
@@ -360,8 +406,38 @@ test('shutdown asks an owned runtime to stop and waits for its exit', async () =
     const child = spawn(process.execPath, ['-e', "process.on('SIGTERM', () => process.exit(0)); process.on('message', m => { if(m.type === 'mediflow-launcher-stop') process.exit(0); }); process.send('ready');"],
         { stdio: ['ignore', 'ignore', 'ignore', 'ipc'], detached: process.platform !== 'win32' });
     await once(child, 'message');
-    await stopOwnedChild(child, 3000);
+    await stopOwnedChild(child, 3000, { allowIpcStop: true });
     assert.equal(child.exitCode, 0);
+});
+
+test('Windows shutdown sends no IPC frame without explicit permission', () => {
+    const result = spawnSync(process.execPath, ['--input-type=module', '--eval', `
+        import assert from 'node:assert/strict';
+        import childProcess from 'node:child_process';
+        import { EventEmitter } from 'node:events';
+        import { syncBuiltinESMExports } from 'node:module';
+        const { stopOwnedChild } = await import(${JSON.stringify(new URL('./mediflow.mjs', import.meta.url).href)});
+        Object.defineProperty(process, 'platform', { value: 'win32' });
+        const frames = [], terminations = [];
+        let child;
+        childProcess.spawnSync = (command, args) => {
+            terminations.push([command, args]);
+            queueMicrotask(() => { child.exitCode = 1; child.emit('exit', 1); });
+            return { status: 0 };
+        };
+        syncBuiltinESMExports();
+        for (const allowIpcStop of [false, true]) {
+            child = new EventEmitter();
+            Object.assign(child, { pid: 424242, connected: true, exitCode: null, signalCode: null,
+                send(frame, done) { frames.push(frame); done(); queueMicrotask(() => { child.exitCode = 0; child.emit('exit', 0); }); } });
+            if (allowIpcStop) await stopOwnedChild(child, 1000, { allowIpcStop });
+            else await stopOwnedChild(child, 1000);
+            assert.equal(child.exitCode, allowIpcStop ? 0 : 1);
+            assert.deepEqual(frames, allowIpcStop ? [{ type: 'mediflow-launcher-stop' }] : []);
+            assert.deepEqual(terminations, [['taskkill', ['/pid', '424242', '/T', '/F']]]);
+        }
+    `], { encoding: 'utf8', timeout: 5000 });
+    assert.equal(result.status, 0, result.stderr);
 });
 
 
@@ -523,7 +599,7 @@ test('cold plugin startup forwards ordinary launcher environment and preserves t
     assert.deepEqual(args.slice(1), ['--riusa']);
 });
 
-async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, webIdentity = true, overrides = {}) {
+async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, webIdentity = true, overrides = {}, initialOwner = null) {
     const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-ordinary-launcher-')));
     const source = path.join(directory, 'source'), home = path.join(directory, 'home'), data = path.join(directory, 'data');
     mkdirSync(path.join(source, 'scripts'), { recursive: true }); mkdirSync(home); mkdirSync(data);
@@ -561,10 +637,10 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 if (_req.url === '/fixture-env') { res.end(JSON.stringify(process.env)); return; }
                 if (${JSON.stringify(webIdentity)} && _req.url === '/api/plugin-local-ui/identity') {
                     let challenge = ''; for await (const part of _req) challenge += part;
-                    const proof = webIdentityProof(process.env.MEDIFLOW_LOCAL_UI_WEB_SECRET, challenge);
+                    const proof = ${JSON.stringify(webIdentity)} === 'invalid-delayed' ? '0'.repeat(64) : webIdentityProof(process.env.MEDIFLOW_LOCAL_UI_WEB_SECRET, challenge);
                     process.stderr.write('FIXTURE_IDENTITY_PROOF\\n');
                     res.setHeader('Content-Length', '64');
-                    if (${JSON.stringify(webIdentity)} === 'delayed') setTimeout(() => res.end(proof), 100); else res.end(proof); return;
+                    if (${JSON.stringify(webIdentity)}.toString().endsWith('delayed')) setTimeout(() => res.end(proof), 100); else res.end(proof); return;
                 }
                 res.setHeader('Content-Type', 'application/json');
                 res.end(JSON.stringify({ ...${JSON.stringify(identity)}, fingerprint: 'synthetic' })); });
@@ -582,12 +658,17 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     assert.equal(setup.status, 0, setup.stderr);
     const stateFiles = JSON.parse(setup.stdout);
     atomicJson(stateFiles.preferencesFile, { schemaVersion: 1, choice: remembered });
+    if (initialOwner) {
+        mkdirSync(stateFiles.lockDirectory);
+        atomicJson(path.join(stateFiles.lockDirectory, 'instance.json'), { checkoutPath: identity.checkoutPath, ...initialOwner });
+    }
     let output = '';
     const socket = createHttpServer();
     await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
     const port = socket.address().port; await new Promise(resolve => socket.close(resolve));
     const child = spawn(process.execPath, [path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), '--senza-browser', ...args], {
         env: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home, PORT: String(port) }, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
+    const closed = once(child, 'close');
     t.after(async () => {
         if (child.exitCode === null && child.signalCode === null) { const exited = once(child, 'exit'); child.kill('SIGTERM'); await exited; }
         rmSync(directory, { recursive: true, force: true });
@@ -601,7 +682,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
             await new Promise(resolve => setTimeout(resolve, 10));
         }
     };
-    return { source, data, stateFiles, child, until, environment: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home }, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
+    return { source, data, stateFiles, child, closed, until, environment: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home }, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
 }
 
 test('headless ordinary runtime cannot acknowledge plugin navigation', async t => {
@@ -615,6 +696,22 @@ test('headless ordinary runtime cannot acknowledge plugin navigation', async t =
     assert.doesNotMatch(f.output(), /FIXTURE_NAVIGATION/);
     await assert.rejects(navigateOwnedLocalUiRuntime(f.child, 'history', new AbortController().signal, Date.now() + 5000, f.expected));
     assert.equal(JSON.parse(readFileSync(f.stateFiles.preferencesFile)).choice, 'agenti');
+});
+
+test('ordinary and plugin startup recover a stale owner before choosing pairing', async t => {
+    for (const reuse of [false, true]) {
+        for (const owner of [{ pid: 2147483647 }, { pid: process.pid, processIdentity: 'previous-process-generation' }]) {
+            const f = await ordinaryLauncherFixture(t, 'web', ['--scelta', 'web'], reuse, true, {}, owner);
+            await f.until(() => f.output().includes('Pronto:'));
+            const receipt = JSON.parse(readFileSync(path.join(f.stateFiles.lockDirectory, 'instance.json')));
+            assert.equal(receipt.pid, f.child.pid);
+            assert.equal(typeof receipt.processIdentity, 'string');
+            const state = await (await fetch(new URL('state', receipt.choiceUrl))).json();
+            assert.equal(state.navigationReady, true);
+            if (reuse) assert.equal(await navigateOwnedLocalUiRuntime(f.child, 'history', AbortSignal.timeout(2000), Date.now() + 1500, f.expected), true);
+            if (reuse) assert.equal(JSON.parse(readFileSync(f.stateFiles.preferencesFile)).choice, 'web');
+        }
+    }
 });
 
 test('cancelled navigation is bound to its request and cannot dispatch after a delayed handoff', async () => {
@@ -856,6 +953,18 @@ test('a public revision response cannot establish owned Web identity', async t =
     const f = await ordinaryLauncherFixture(t, 'web', ['--scelta', 'web'], true, false);
     await f.until(() => f.output().includes('Pronto:') || f.output().includes('identità Web'));
     await assert.rejects(navigateOwnedLocalUiRuntime(f.child, 'history', AbortSignal.timeout(2000), Date.now() + 1500, f.expected));
+    await f.closed;
+    assert.equal(f.child.exitCode, 1);
+    assert.equal(existsSync(f.stateFiles.lockDirectory), false);
+    assert.doesNotMatch(f.output(), /FIXTURE_NAVIGATION/);
+});
+
+test('cancellation during an unverified Web startup sends no navigation frame', async t => {
+    const f = await ordinaryLauncherFixture(t, 'web', ['--scelta', 'web'], true, 'invalid-delayed');
+    await f.until(() => f.output().includes('FIXTURE_IDENTITY_PROOF'));
+    f.child.send({ type: 'mediflow-local-ui-cancel', requestId: crypto.randomUUID() });
+    await f.closed;
+    assert.equal(f.child.exitCode, 1);
     assert.doesNotMatch(f.output(), /FIXTURE_NAVIGATION/);
 });
 

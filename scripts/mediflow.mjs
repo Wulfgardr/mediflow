@@ -117,25 +117,74 @@ export async function requireFreePort(port) {
   });
 }
 
-export function claimLauncher(directory, identity, recover = true) {
-  try { fs.mkdirSync(directory, { mode: 0o700 }); }
-  catch (error) {
-    if (error.code !== 'EEXIST' || !recover) throw error;
-    const recovery = `${directory}.recovery`;
-    try { fs.mkdirSync(recovery, { mode: 0o700 }); }
-    catch { throw new Error('Un altro lanciatore sta recuperando lo stato di avvio. Riprova tra poco.'); }
-    try {
-      const receipt = readJson(path.join(directory, 'instance.json'));
-      if (!receipt || alive(receipt.pid)) throw new Error('Un avvio di questa cartella è già in corso. Controlla il terminale e riprova.');
-      fs.unlinkSync(path.join(directory, 'instance.json'));
-      fs.rmdirSync(directory);
-      fs.mkdirSync(directory, { mode: 0o700 });
-    } finally { fs.rmdirSync(recovery); }
-  }
-  atomicJson(path.join(directory, 'instance.json'), { pid: process.pid, checkoutPath: identity.checkoutPath });
+function launcherProcessIdentity(pid) {
+  try {
+    let value;
+    if (process.platform === 'linux') {
+      const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+      value = fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim()
+        + ':' + stat.slice(stat.lastIndexOf(')') + 2).trim().split(/\s+/u)[19];
+    } else {
+      const result = process.platform === 'win32'
+        ? spawnSync(path.win32.join(process.env.SystemRoot || process.env.WINDIR || 'C:\\Windows',
+          'System32/WindowsPowerShell/v1.0/powershell.exe'), ['-NoProfile', '-NonInteractive', '-Command',
+          `$ErrorActionPreference='Stop'; (Get-Process -Id ${pid}).StartTime.ToUniversalTime().Ticks.ToString()`],
+        { encoding: 'utf8', timeout: 3000, windowsHide: true })
+        : spawnSync('/bin/ps', ['-p', String(pid), '-o', 'lstart=', '-o', 'comm='],
+          { encoding: 'utf8', timeout: 3000, env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' } });
+      if (result.status !== 0 || !result.stdout.trim()) return null;
+      value = result.stdout.trim();
+    }
+    return crypto.createHash('sha256').update(value).digest('hex');
+  } catch { return null; }
 }
 
-export async function stopOwnedChild(child, graceMs = 8000) {
+function readLauncherReceipt(directory) {
+  const stat = fs.lstatSync(directory);
+  if (!stat.isDirectory() || stat.isSymbolicLink() || (process.getuid && stat.uid !== process.getuid())) {
+    throw new Error('Stato di avvio non valido.');
+  }
+  const file = path.join(directory, 'instance.json');
+  const leaf = fs.lstatSync(file);
+  if (!leaf.isFile() || leaf.isSymbolicLink()) throw new Error('Stato di avvio non valido.');
+  const fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+  try {
+    const receiptStat = fs.fstatSync(fd);
+    if (!receiptStat.isFile() || receiptStat.dev !== leaf.dev || receiptStat.ino !== leaf.ino
+      || receiptStat.nlink !== 1 || receiptStat.size > 4096
+      || (process.getuid && receiptStat.uid !== process.getuid())) throw new Error('Stato di avvio non valido.');
+    const receipt = JSON.parse(fs.readFileSync(fd, 'utf8'));
+    if (!Number.isSafeInteger(receipt.pid) || receipt.pid < 1) throw new Error('Stato di avvio non valido.');
+    return receipt;
+  } finally { fs.closeSync(fd); }
+}
+
+export function claimLauncher(directory, identity, { reuseLive = false } = {}) {
+  const processIdentity = launcherProcessIdentity(process.pid);
+  if (!processIdentity) throw new Error('Impossibile verificare l’identità del processo lanciatore.');
+  const recovery = `${directory}.recovery`;
+  try { fs.mkdirSync(recovery, { mode: 0o700 }); }
+  catch { throw new Error('Un altro lanciatore sta recuperando lo stato di avvio. Riprova tra poco.'); }
+  try {
+    try { fs.mkdirSync(directory, { mode: 0o700 }); }
+    catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      const receipt = readLauncherReceipt(directory);
+      const currentIdentity = alive(receipt.pid) ? launcherProcessIdentity(receipt.pid) : null;
+      const stale = !alive(receipt.pid) || (typeof receipt.processIdentity === 'string'
+        && currentIdentity !== null && currentIdentity !== receipt.processIdentity);
+      if (!stale) {
+        if (reuseLive) return { claimed: false, receipt };
+        throw new Error('Un avvio di questa cartella è già in corso. Controlla il terminale e riprova.');
+      }
+    }
+    const receipt = { pid: process.pid, processIdentity, checkoutPath: identity.checkoutPath };
+    atomicJson(path.join(directory, 'instance.json'), receipt);
+    return { claimed: true, receipt };
+  } finally { fs.rmdirSync(recovery); }
+}
+
+export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = false } = {}) {
   if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
   await new Promise(resolve => {
     const finish = () => { clearTimeout(timer); resolve(); };
@@ -147,7 +196,7 @@ export async function stopOwnedChild(child, graceMs = 8000) {
     }, graceMs);
     if (process.platform !== 'win32') {
       try { process.kill(-child.pid, 'SIGTERM'); } catch { finish(); }
-    } else if (child.connected) child.send({ type: 'mediflow-launcher-stop' }, () => {});
+    } else if (child.connected && allowIpcStop) child.send({ type: 'mediflow-launcher-stop' }, () => {});
     else spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
   });
 }
@@ -180,7 +229,8 @@ export async function main(args = process.argv.slice(2)) {
   const dataDir = fs.existsSync(configuredDataDir) ? fs.realpathSync(configuredDataDir) : path.resolve(configuredDataDir);
   const { preferencesFile, lockDirectory } = prepareLauncherState(ROOT);
   const pluginChannel = options.reuseOnly && process.connected;
-  const existing = pluginChannel ? null : await findExistingInstance(readJson(path.join(lockDirectory, 'instance.json')), identity);
+  const ownership = claimLauncher(lockDirectory, identity, { reuseLive: true });
+  const existing = pluginChannel || ownership.claimed ? null : await findExistingInstance(ownership.receipt, identity);
   if (existing) {
     const url = options.choose ? `${existing.choiceUrl}?scegli=1` : existing.url;
     log(`MediFlow è già attivo da questa cartella: ${url}`);
@@ -188,19 +238,19 @@ export async function main(args = process.argv.slice(2)) {
     return;
   }
   const requestsDirectory = pairingDirectory(lockDirectory);
-  if (pluginChannel && fs.existsSync(lockDirectory)) {
-    const stat = fs.lstatSync(lockDirectory);
-    if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('navigation_unavailable');
+  if (pluginChannel && !ownership.claimed) {
     await bridgeExistingLocalUi(requestsDirectory, { dataDir, sourceFingerprint: identity.sourceFingerprint });
     return;
   }
-  claimLauncher(lockDirectory, identity, !pluginChannel);
+  if (!ownership.claimed) throw new Error('Un avvio di questa cartella è già in corso. Controlla il terminale e riprova.');
   const native = nativeApplication(ROOT);
   const dirty = identity.worktreeHash !== 'clean';
   let state = { busy: false, ready: false, url: null, message: 'Scegli come aprire MediFlow.', needsInstall: false };
   let child = null, chooser = null, closing = false, installApproval = null, failedBuild = null, generation = 0;
   let terminal = null, useTerminal = false, webSecret = null, instance = null;
   const pairRequests = new Map();
+  const ipcStopChildren = new WeakSet();
+  const stopChild = () => stopOwnedChild(child, 8000, { allowIpcStop: ipcStopChildren.has(child) });
   let pairingPoll = null;
   const question = async prompt => {
     if (!process.stdin.isTTY) throw new Error('Serve una scelta esplicita. Usa --scelta web --senza-browser, oppure --scelta sviluppo per sviluppo.');
@@ -234,7 +284,7 @@ export async function main(args = process.argv.slice(2)) {
     pairRequests.clear();
     installApproval?.(false);
     terminal?.close();
-    await stopOwnedChild(child);
+    await stopChild();
     await chooser?.close();
     fs.rmSync(path.join(lockDirectory, 'instance.json'), { force: true });
     fs.rmdirSync(lockDirectory);
@@ -255,12 +305,16 @@ export async function main(args = process.argv.slice(2)) {
   };
   const cancelNavigation = requestId => {
     navigationControllers.get(requestId)?.abort();
-    if (child?.connected) child.send(JSON.stringify({ schemaVersion: 'mediflow.local-ui.cancel.v1', requestId }), () => {});
+    if (state.navigationReady && child?.connected && ipcStopChildren.has(child)) child.send(JSON.stringify({ schemaVersion: 'mediflow.local-ui.cancel.v1', requestId }), () => {});
   };
   const navigate = async (intent, request, pair = null) => {
     request.signal.throwIfAborted();
     if (!state.navigationReady || !state.ready || !state.url || !child?.connected || child.exitCode !== null || child.signalCode !== null) throw new Error('Navigazione non disponibile.');
-    if (!await verifyOwnedWeb(state.url, webSecret)) throw new Error('identità Web non verificata.');
+    if (!await verifyOwnedWeb(state.url, webSecret)) {
+      ipcStopChildren.delete(child);
+      throw new Error('identità Web non verificata.');
+    }
+    ipcStopChildren.add(child);
     request.signal.throwIfAborted();
     const navigation = JSON.stringify({ schemaVersion: 'mediflow.local-ui.navigation.v1', intent, requestId: request.requestId, expiresAt: request.expiresAt });
     if (pair) {
@@ -328,7 +382,7 @@ export async function main(args = process.argv.slice(2)) {
   const start = async (choice, remember) => {
     const attempt = ++generation;
     update({ busy: true, ready: false, navigationReady: false, url: null, step: 'dipendenze', message: 'Controllo delle dipendenze.' });
-    await stopOwnedChild(child);
+    await stopChild();
     if (closing) return;
     if (!fs.existsSync(path.join(ROOT, 'node_modules/next/package.json')) || !fs.existsSync(path.join(ROOT, 'node_modules/better-sqlite3/package.json'))) {
       update({ needsInstall: true, message: 'Mancano le dipendenze. Conferma l’installazione con npm ci.' });
@@ -443,6 +497,7 @@ export async function main(args = process.argv.slice(2)) {
       if (choice === 'web' && !await verifyOwnedWeb(target, webSecret)) throw new Error('L’identità Web non è verificata.');
       if (!ready.ok) throw new Error('MediFlow non risponde con l’identità attesa. Controlla il terminale.');
       if (owned.exitCode !== null || owned.signalCode !== null) throw new Error('Il processo MediFlow si è arrestato durante l’avvio.');
+      ipcStopChildren.add(owned);
     }
     if (closing) return;
     child.once('exit', () => {
@@ -457,7 +512,7 @@ export async function main(args = process.argv.slice(2)) {
     selectChoice({ explicit: choice, nativeAvailable: !!native, dirty });
     if (!CHOICES.includes(choice) || state.busy || closing) throw new Error('Attendi il completamento dell’avvio prima di cambiare scelta.');
     void start(choice, remember).catch(async error => {
-      await stopOwnedChild(child);
+      await stopChild();
       update({ busy: false, ready: false, url: null, needsInstall: false, step: 'errore', message: error.message });
       if (options.choice && options.noBrowser) { process.exitCode = 1; await shutdown(); }
       else if (useTerminal && !closing) {
@@ -478,7 +533,7 @@ export async function main(args = process.argv.slice(2)) {
       install: () => installApproval?.(true), stop: shutdown, nativeAvailable: !!native, development: dirty,
       version: identity.version, folder: path.basename(ROOT) });
     if (closing) { await chooser.close(); return; }
-    atomicJson(path.join(lockDirectory, 'instance.json'), { pid: process.pid, checkoutPath: identity.checkoutPath, dataDir, choiceUrl: chooser.url });
+    atomicJson(path.join(lockDirectory, 'instance.json'), { ...ownership.receipt, dataDir, choiceUrl: chooser.url });
     pairingPoll = setInterval(() => {
       if (!state.ready || !state.navigationReady || closing || !child?.connected) return;
       try {
