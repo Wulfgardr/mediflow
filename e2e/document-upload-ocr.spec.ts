@@ -127,7 +127,8 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
         await expect(preview).toHaveCount(0);
         await expect(page.getByText(/Revisione manuale necessaria/i).first()).toBeVisible();
       } else {
-        expect(result).toMatchObject({ status: 'extracted', candidateUse: 'review_only' });
+        expect(result, `AnyDoc ${scenario}: ${result.status}/${result.detail ?? 'no detail'}`)
+          .toMatchObject({ status: 'extracted', candidateUse: 'review_only' });
         await expect(preview).toBeVisible();
         await preview.getByRole('button', { name: /Testo (?:estratto localmente|OCR locale)/ }).click();
         await expect(preview.locator('pre')).toHaveText(result.markdown);
