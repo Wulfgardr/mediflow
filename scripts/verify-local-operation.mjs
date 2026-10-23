@@ -86,6 +86,9 @@ try {
     mutation('runtime-origin-mutant', 'lib/local-operation/host.ts',
         'return Object.freeze({ assertCurrent() {', 'return Object.freeze({ assertCurrent() { return;',
         'CU R3:', 'lib/local-operation/review-regressions.test.ts');
+    mutation('runtime-approval-expiry-mutant', 'lib/local-operation/service.ts',
+        'permit.approvalExpiresAt <= ports.now() || ', '',
+        'CU R5:', 'lib/local-operation/approval-expiry.test.ts');
     mutation('runtime-recovery-mutant', 'lib/local-operation/service.ts',
         "if (current.effectPossible) throw new LocalOperationError('reconciliation_required');", 'if (false) throw new Error();',
         'risposta persa, riavvio', 'lib/local-operation/service.test.ts');
@@ -97,7 +100,8 @@ try {
         'metadati, errori', 'lib/local-operation/wire.test.ts');
     run('runtime-restored', process.execPath, ['scripts/run-strip-types.mjs', '--test',
         'lib/local-operation/local-operation.test.ts', 'lib/local-operation/service.test.ts', 'lib/local-operation/wire.test.ts',
-        'lib/local-operation/host.test.ts', 'lib/local-operation/review-regressions.test.ts'], 0, /fail 0/);
+        'lib/local-operation/host.test.ts', 'lib/local-operation/review-regressions.test.ts',
+        'lib/local-operation/approval-expiry.test.ts'], 0, /fail 0/);
     model('model-restored', config);
     for (const [file, digest] of originalHashes) assert.equal(hash(fs.readFileSync(path.join(root, file))), digest, `Original changed during verification: ${file}`);
     if (outputDirectory) {

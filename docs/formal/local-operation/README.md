@@ -11,7 +11,7 @@ La proprietà da proteggere è: **dopo un possibile effetto esterno si riconcili
 | `Init`, `Prepare` | `service.ts`: `create`, `prepare`, `observation` | Contesto e guard controllati prima/dopo `observe` e `prepare`; questi `await` consentono invalidazioni. Il writer del journal applica CAS. |
 | `Approve` | `service.ts`: `approve` | La conferma fidata è asincrona; contesto e revisione sono riletti dopo la conferma. L'approvazione è locale e monouso. |
 | `Begin` | `service.ts`: `execute`; `sqlite-journal.ts`: `mutate` | Solo il commit `IMMEDIATE` con audit di `attempt_started`, tentativo ed `effectPossible`. Non concede ancora dispatch. Un fallimento prima del commit non abilita l'atto. |
-| `Dispatch` | `run`: `context('act', marker)`, `authorizeRequest` | Dopo il commit il servizio ricontrolla autorità, stato, tentativo e revisione. La singola autorizzazione consuma il dispatch prima dell'effetto esterno. `observe` riceve un contesto distinto che non autorizza l'atto. Un arresto fra `Begin` e `Dispatch` conserva incertezza anche senza invio. |
+| `Dispatch` | `run`: `context('act', permit)`, `authorizeRequest` | Dopo il commit il servizio ricontrolla autorità, stato, tentativo e revisione. Il permesso porta anche la scadenza originale dell'approvazione consumata, verificata al dispatch; questo vincolo temporale è provato a runtime e non è modellato da TLC. La singola autorizzazione consuma il dispatch prima dell'effetto esterno. `observe` riceve un contesto distinto che non autorizza l'atto. Un arresto fra `Begin` e `Dispatch` conserva incertezza anche senza invio. |
 | `ExternalEffect`, `Reply`, `LostReply` | `execute`, `acceptReceipt`, `run` | L'effetto esterno non fa parte della transazione SQLite. Può arrivare dopo la perdita della risposta. Il modello lo ammette anche dopo timeout/disattivazione. Le risposte della vecchia autorità non producono conferma. |
 | `Handoff`, `ManualEffect` | `prepare`, `reviewManualContent`, `reconcile` | La consegna al medico conserva l'effetto possibile, arresta l'adapter e non invia l'atto. L'intervento manuale è esterno al servizio. |
 | `Reconcile`, `Record` | `reconcile`, `correlate`, `registerOutcome` | Riconciliazione distinta dal reinvio. Ricevuta verificata e correlata prima di `confirmed_pending_recording`; conferma e audit in transazione separata. Un writer fallito non ripete l'atto. |
@@ -35,6 +35,8 @@ Bound: un'operazione, un esecutore, un medico/gestore, due cambi di assetto terr
 
 La verifica riguarda safety nello spazio finito, non liveness: nessuna fairness presume che un medico, portale o writer completino il lavoro. Un'operazione può restare incerta indefinitamente; il nucleo non reinvia per risolvere questa attesa. La risposta dopo disattivazione non viene trattata come annullamento dell'effetto.
 
+`approval-expiry.test.ts` sospende deterministicamente `adapter.act` dopo il marker e prima del guard HTTP. Verifica invio a 119.999 ms, diniego da 120.000 ms anche con capability ancora valida, termine originale dopo un avvio ritardato, nessuna proroga con una nuova capability e nessun reinvio dopo errore/ripresa/riavvio. L'intero `adapter.act` può cedere il controllo: non è una regione atomica. Il mutante che rimuove il solo controllo della scadenza deve riaprire i POST indebiti; questa è una prova del codice con journal e HTTP sintetici, senza attribuire copertura temporale al modello.
+
 ## Riproduzione e falsificazione
 
 Richiede Node 24, `npm ci`, Java e il jar locale della release TLA+ **v1.7.4**, verificatore **TLC 2.19**, SHA-256 `936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88`. Nessun download automatico o servizio remoto.
@@ -52,7 +54,8 @@ Il comando esegue baseline, mutanti semantici `UnsafePreparation` e `UnsafeDispa
 3. rimuove la validazione dell'intero risultato MCP: metadati contaminati devono far fallire la prova dell'allowlist;
 4. rimuove il guard delle richieste: l'osservazione invia un POST di atto prima del marker e la cattura lo rileva;
 5. rimuove il confronto dell'identità immutabile: revisioni ordinarie e manuali devono fallire;
-6. rimuove la verifica dell'origine nell'host: la promessa di A può mutare B e il confronto integrale di journal/audit deve fallire.
+6. rimuove la verifica dell'origine nell'host: la promessa di A può mutare B e il confronto integrale di journal/audit deve fallire;
+7. rimuove il controllo della scadenza originale nel guard di dispatch: l'atto dopo scadenza dell'approvazione deve far fallire la regressione runtime.
 
 Le uscite negative devono contenere la violazione semantica attesa, non un errore di parsing. Seguono test sul codice originale e modello ripristinato. Il mutante di preparazione e quello TLA rappresentano lo stesso indebito passaggio; gli altri qualificano i controlli runtime di sessione, uscita, autorità, identità e origine, senza attribuirli al modello TLA. Non si alterano gli originali per costruire i mutanti.
 
