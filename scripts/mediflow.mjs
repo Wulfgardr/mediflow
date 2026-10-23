@@ -295,11 +295,12 @@ export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = fal
   const posix = process.platform !== 'win32';
   if (!child?.pid || (!posix && (child.exitCode !== null || child.signalCode !== null))) return;
   await new Promise((resolve, reject) => {
-    let forceTimer, timer, observationTimer, groupAbsent = terminalOwnedGroups.has(child), settled = false;
+    let forceTimer, timer, observationTimer, signalImmediate, groupAbsent = terminalOwnedGroups.has(child), settled = false;
     const finish = cause => {
       if (settled) return;
       settled = true;
       clearTimeout(forceTimer); clearTimeout(timer); clearTimeout(observationTimer); child.off('exit', exited);
+      clearImmediate(signalImmediate);
       if (cause) reject(Object.assign(new Error('Arresto del processo posseduto non verificato.', { cause }), { code: 'MEDIFLOW_OWNED_STOP_UNCONFIRMED' }));
       else resolve();
     };
@@ -311,19 +312,39 @@ export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = fal
         groupAbsent = true;
         terminalOwnedGroups.add(child);
         clearTimeout(forceTimer);
+        clearImmediate(signalImmediate);
         return false;
       }
+    };
+    const leaderTerminal = () => child.exitCode !== null || child.signalCode !== null;
+    const requireOwnedLeader = () => {
+      if (leaderTerminal()) throw new Error('Continuità del gruppo posseduto non verificabile dopo la fine del capogruppo.');
     };
     const observe = () => {
       if (settled) return;
       clearTimeout(observationTimer);
       try {
-        if (!groupExists() && (child.exitCode !== null || child.signalCode !== null)) { finish(); return; }
+        if (groupExists()) requireOwnedLeader();
+        else if (leaderTerminal()) { finish(); return; }
         observationTimer = setTimeout(observe, 10);
       } catch (error) { finish(error); }
     };
     const exited = () => posix ? observe() : finish();
     const deadline = Date.now() + graceMs;
+    const expired = () => finish(new Error(posix ? 'Exit del processo posseduto o scomparsa del gruppo non osservato.' : 'Exit del processo posseduto non osservato.'));
+    const signalGroup = signal => {
+      clearImmediate(signalImmediate);
+      signalImmediate = setImmediate(() => {
+        signalImmediate = null;
+        if (settled) return;
+        if (Date.now() >= deadline) { expired(); return; }
+        try {
+          if (!groupExists()) { observe(); return; }
+          requireOwnedLeader();
+          process.kill(-child.pid, signal);
+        } catch (error) { if (error.code === 'ESRCH') observe(); else finish(error); }
+      });
+    };
     const force = () => {
       if (settled) return;
       try {
@@ -331,17 +352,17 @@ export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = fal
           const result = spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'],
             { stdio: 'ignore', timeout: Math.max(1, deadline - Date.now()), windowsHide: true });
           if (result.error || result.status !== 0) throw result.error || new Error(`taskkill: ${result.status}`);
-        } else if (groupExists()) process.kill(-child.pid, 'SIGKILL');
+        } else signalGroup('SIGKILL');
       } catch (error) { if (posix && error.code === 'ESRCH') observe(); else finish(error); }
     };
     child.once('exit', exited);
-    timer = setTimeout(() => finish(new Error(posix ? 'Exit del processo posseduto o scomparsa del gruppo non osservato.' : 'Exit del processo posseduto non osservato.')), graceMs);
+    timer = setTimeout(expired, graceMs);
     try {
       if (posix) {
         observe();
         if (settled || groupAbsent) return;
         forceTimer = setTimeout(force, Math.floor(graceMs / 2));
-        if (groupExists()) process.kill(-child.pid, 'SIGTERM');
+        signalGroup('SIGTERM');
       } else if (child.connected && allowIpcStop) {
         forceTimer = setTimeout(force, Math.floor(graceMs / 2));
         child.send({ type: 'mediflow-launcher-stop' }, error => { if (error) finish(error); });

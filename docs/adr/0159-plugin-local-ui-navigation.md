@@ -72,6 +72,18 @@ Lo stop via IPC richiede un figlio ammesso dopo la readiness e, per il Web,
 dopo la prova HMAC. Su Windows un figlio non ancora verificato viene arrestato
 tramite il suo albero di processi posseduto, senza inviare frame sul canale IPC.
 
+Su POSIX il numero del gruppo non ne prova la continuità dopo la fine del
+capogruppo. Il launcher rinvia i segnali a una nuova fase del ciclo Node,
+lascia completare i callback di raccolta dei figli e ricontrolla il leader
+subito prima del segnale, senza ulteriori attese nella sezione sincrona.
+Se il leader è terminale e il gruppo risulta presente o non verificabile,
+lo stop resta non confermato: launcher e generazione rimangono posseduti,
+senza ulteriori segnali a quel gruppo. Un nuovo gesto Arresta non supera
+questa incertezza. Soltanto ESRCH osservato e memorizzato prova l'assenza;
+dopo una quiescenza verificata il gesto può concludere lo stop. Questo
+comportamento riguarda il lifecycle Node/libuv verificato, non costituisce
+una garanzia universale su reaper esterni o implementazioni POSIX diverse.
+
 Il pacchetto e il navigator applicano la stessa allowlist esplicita in
 `plugins/mediflow-local-ui/src/runtime-environment.mjs`. HOME e le variabili
 profilo Windows conservano la sede utente; APPDATA, LOCALAPPDATA e XDG conservano
