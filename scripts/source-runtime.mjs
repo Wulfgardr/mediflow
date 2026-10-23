@@ -186,7 +186,7 @@ export async function startSourceRuntime(mode, root = ROOT) {
   const { runHeadlessSupervisorV1 } = await import(pathToFileURL(path.join(web, 'scripts/mediflow-headless-supervisor.mjs')).href);
   process.argv = process.argv.slice(0, 2);
   return runHeadlessSupervisorV1({ webDirectory: web, webTargetPath: path.join(web, 'server.js'), webBuildIdentity: identity,
-    ...(mode === 'local-ui' ? { sourceRoot: root } : {}) }, mode === 'local-ui' ? 'plugin_local_ui' : 'clinical');
+    ...(mode === 'local-ui' ? { sourceRoot: path.resolve(root) } : {}) }, mode === 'local-ui' ? 'plugin_local_ui' : 'clinical');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

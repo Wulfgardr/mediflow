@@ -228,6 +228,7 @@ test('runtime navigation checks archive, source identity and cancellation before
     const receipt = { pid: process.pid, checkoutPath: repoRoot, dataDir: '/synthetic-only', choiceUrl: page.url };
     const expected = { sourceRoot: repoRoot, dataDir: '/synthetic-only', sourceFingerprint };
     try {
+        assert.equal(await navigateExistingLocalUiRuntime({ pid: process.pid, checkoutPath: repoRoot }, expected, 'history', new AbortController().signal), false);
         assert.equal(await navigateExistingLocalUiRuntime(receipt, expected, 'history', new AbortController().signal), true);
         await assert.rejects(navigateExistingLocalUiRuntime({ ...receipt, dataDir: '/different-archive' }, expected, 'identity', new AbortController().signal));
         await assert.rejects(navigateExistingLocalUiRuntime(receipt, { ...expected, sourceFingerprint: 'changed' }, 'identity', new AbortController().signal));
