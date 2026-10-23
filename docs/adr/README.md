@@ -14,6 +14,8 @@ verifica dello stato successivo.
 
 ## Decisioni richiamate
 
+- [0162-local-computer-use-executor.md](./0162-local-computer-use-executor.md): **Proposed (2026-10-23)**; filone CU, esecutore locale, confini privacy per client, autorità dell’atto e riconciliazione senza duplicati; solo documentazione, nessuna ammissione clinica.
+
 - [0160-mediflow-in-desktop-chat.md](./0160-mediflow-in-desktop-chat.md): **Proposed (2026-10-22, secondo round)**; WUL-788, canali per host dopo R/L, Touch ID/PIN nativi, mapping di sessione, importazione, Fabric, viste, prestazioni e pubblicazione; ammissione clinica distinta.
 
 - [0157-hl7-conformance-at-clinical-boundaries.md](./0157-hl7-conformance-at-clinical-boundaries.md): **Accepted (2026-10-21)**; WUL-784/785, conformità HL7 per scambi clinici interoperabili con corpus sintetico dei mapper reali e validatore ufficiale in CI; IPS separato, primo documento italiano CDA-PSS 1.5 e confini non HL7 dichiarati.
