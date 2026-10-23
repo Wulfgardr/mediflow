@@ -147,6 +147,36 @@
   ],
   "breakingOverrides": [
     {
+      "change": "GET /api/v1/network/capabilities response 200.hostPorts became required",
+      "trackingIssue": "WUL-771",
+      "reason": "PR 624 review correction: protocol 1.14 hosts must advertise the versioned host-port roster already required by the GPUI client. The producer always emits hostPorts; OpenAPI and TypeScript now require it too. Older consumers may ignore the added response field; a response omitting it is invalid and the GPUI client rejects it."
+    },
+    {
+      "change": "GET /api/v1/network/capabilities response 200.hostPorts.ports[].authority was removed",
+      "trackingIssue": "WUL-771",
+      "reason": "PR 624 roster correction, OpenAPI 1.44.0, network protocol 1.14.0: authority remains required inside every closed oneOf descriptor. The structural guard reports the move from shared properties as removal. This intentionally narrows the published schema to exactly eight unique canonical port combinations already emitted by the host and negotiated by GPUI; no runtime field or authority is removed or added."
+    },
+    {
+      "change": "GET /api/v1/network/capabilities response 200.hostPorts.ports[].id was removed",
+      "trackingIssue": "WUL-771",
+      "reason": "PR 624 roster correction, OpenAPI 1.44.0, network protocol 1.14.0: id remains required inside every closed oneOf descriptor. The structural guard reports the move from shared properties as removal. This intentionally narrows the published schema to exactly eight unique canonical port combinations already emitted by the host and negotiated by GPUI; no runtime field or authority is removed or added."
+    },
+    {
+      "change": "GET /api/v1/network/capabilities response 200.hostPorts.ports[].revision was removed",
+      "trackingIssue": "WUL-771",
+      "reason": "PR 624 roster correction, OpenAPI 1.44.0, network protocol 1.14.0: revision remains required inside every closed oneOf descriptor. The structural guard reports the move from shared properties as removal. This intentionally narrows the published schema to exactly eight unique canonical port combinations already emitted by the host and negotiated by GPUI; no runtime field or authority is removed or added."
+    },
+    {
+      "change": "GET /api/v1/network/capabilities response 200.hostPorts.ports[].scope was removed",
+      "trackingIssue": "WUL-771",
+      "reason": "PR 624 roster correction, OpenAPI 1.44.0, network protocol 1.14.0: scope remains required inside every closed oneOf descriptor. The structural guard reports the move from shared properties as removal. This intentionally narrows the published schema to exactly eight unique canonical port combinations already emitted by the host and negotiated by GPUI; no runtime field or authority is removed or added."
+    },
+    {
+      "change": "GET /api/v1/network/capabilities response 200.hostPorts.ports[].state was removed",
+      "trackingIssue": "WUL-771",
+      "reason": "PR 624 roster correction, OpenAPI 1.44.0, network protocol 1.14.0: state remains required inside every closed oneOf descriptor. The structural guard reports the move from shared properties as removal. This intentionally narrows the published schema to exactly eight unique canonical port combinations already emitted by the host and negotiated by GPUI; no runtime field or authority is removed or added."
+    },
+    {
       "change": "GET /api/v1/network/ambulatories response 200 changed",
       "trackingIssue": "WUL-194",
       "reason": "Wave 4 adds version, parentId, and description to the paired ambulatory summary. These are additive fields required for the newly versioned write boundary; existing read clients can ignore them."

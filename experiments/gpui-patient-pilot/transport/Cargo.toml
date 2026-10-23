@@ -18,7 +18,7 @@ serde.workspace = true
 serde_json.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 chrono-tz = "0.10"
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 aes-gcm = { version = "0.10", features = ["zeroize"] }
 base64 = "0.22"
@@ -29,3 +29,6 @@ sha2 = "0.10"
 subtle = "2.6"
 unicode-normalization = "0.1"
 zeroize = { version = "1.8", features = ["derive"] }
+
+futures-util = "0.3"
+tokio = { version = "1.53", features = ["rt-multi-thread", "sync", "time"] }

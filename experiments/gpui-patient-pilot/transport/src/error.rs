@@ -37,6 +37,9 @@ impl RuntimeError {
     pub fn is_auth_failure(&self) -> bool {
         matches!(self, Self::Authentication | Self::Locked)
     }
+    pub fn retires_session(&self) -> bool {
+        self.is_auth_failure() || *self == Self::ArchiveReplaced
+    }
     pub fn status_code(&self) -> Option<u16> {
         match self {
             Self::Authentication => Some(401),
