@@ -857,7 +857,7 @@ mod tests {
                     } else if route.starts_with("GET /api/v1/network/capabilities ") {
                         (
                             200,
-                            serde_json::json!({"protocolVersion":"1.13.0",
+                            serde_json::json!({"protocolVersion":"1.14.0", "hostPorts": serde_json::from_str::<serde_json::Value>(include_str!("../../../transport/tests/fixtures/host-ports.json")).unwrap(),
                                 "operatingMode":"network-home-base",
                                 "capabilities":[{"key":"network.replica.write-clinical-diary",
                                     "requiresPairing":true, "status":"available"}]}),

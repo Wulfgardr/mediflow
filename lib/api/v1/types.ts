@@ -580,6 +580,7 @@ export type NetworkCapability = {
 
 /* @Codex */
 export type NetworkCapabilitiesResponse = {
+    hostPorts?: import('../../network-host-ports').HostPortsContract;
     territorialPacks?: TerritorialPackCapability;
     nodeId: string;
     operatingMode: NetworkOperatingMode;
