@@ -13,7 +13,9 @@ const alive = pid => {
 
 export async function navigateExistingLocalUiRuntime(receipt, expected, intent, signal) {
   signal.throwIfAborted();
-  if (!receipt || receipt.checkoutPath !== expected.sourceRoot || receipt.dataDir !== expected.dataDir || !alive(receipt.pid)
+  if (!receipt || receipt.checkoutPath !== expected.sourceRoot || !alive(receipt.pid)) return unavailable();
+  if (receipt.choiceUrl === undefined) return false;
+  if (receipt.dataDir !== expected.dataDir
     || !/^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}\/[a-f0-9]{48}\/$/u.test(receipt.choiceUrl)) return unavailable();
   const status = await fetch(new URL('state', receipt.choiceUrl), { signal });
   if (!status.ok) return unavailable();
