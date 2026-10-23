@@ -6364,6 +6364,7 @@ components:
         - operatingMode
         - protocolVersion
         - capabilities
+        - hostPorts
       properties:
         nodeId:
           type: string

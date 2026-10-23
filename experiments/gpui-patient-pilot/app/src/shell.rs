@@ -7727,7 +7727,7 @@ mod tests {
         panic!("workspace rendering did not return to an idle frame");
     }
 
-    fn synthetic_notes_form(
+    pub(super) fn synthetic_notes_form(
         app: &mut ClinicalApp,
         state: FormState,
         cx: &mut Context<ClinicalApp>,
