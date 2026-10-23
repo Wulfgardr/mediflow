@@ -291,18 +291,38 @@ export function claimLauncher(directory, identity, { reuseLive = false } = {}) {
 
 export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = false } = {}) {
   if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
-  await new Promise(resolve => {
-    const finish = () => { clearTimeout(timer); resolve(); };
-    child.once('exit', finish);
-    const timer = setTimeout(() => {
-      if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
-      else { try { process.kill(-child.pid, 'SIGKILL'); } catch { /* Owned group already exited. */ } }
-      finish();
-    }, graceMs);
-    if (process.platform !== 'win32') {
-      try { process.kill(-child.pid, 'SIGTERM'); } catch { finish(); }
-    } else if (child.connected && allowIpcStop) child.send({ type: 'mediflow-launcher-stop' }, () => {});
-    else spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+  await new Promise((resolve, reject) => {
+    let forceTimer, timer, settled = false;
+    const finish = cause => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(forceTimer); clearTimeout(timer); child.off('exit', exited);
+      if (cause) reject(Object.assign(new Error('Arresto del processo posseduto non verificato.', { cause }), { code: 'MEDIFLOW_OWNED_STOP_UNCONFIRMED' }));
+      else resolve();
+    };
+    const exited = () => finish();
+    const deadline = Date.now() + graceMs;
+    const force = () => {
+      if (settled) return;
+      try {
+        if (process.platform === 'win32') {
+          const result = spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'],
+            { stdio: 'ignore', timeout: Math.max(1, deadline - Date.now()), windowsHide: true });
+          if (result.error || result.status !== 0) throw result.error || new Error(`taskkill: ${result.status}`);
+        } else process.kill(-child.pid, 'SIGKILL');
+      } catch (error) { finish(error); }
+    };
+    child.once('exit', exited);
+    timer = setTimeout(() => finish(new Error('Exit del processo posseduto non osservato.')), graceMs);
+    try {
+      if (process.platform !== 'win32') {
+        process.kill(-child.pid, 'SIGTERM');
+        forceTimer = setTimeout(force, Math.floor(graceMs / 2));
+      } else if (child.connected && allowIpcStop) {
+        forceTimer = setTimeout(force, Math.floor(graceMs / 2));
+        child.send({ type: 'mediflow-launcher-stop' }, error => { if (error) finish(error); });
+      } else force();
+    } catch (error) { finish(error); }
   });
 }
 
@@ -357,6 +377,7 @@ export async function main(args = process.argv.slice(2)) {
   const ipcStopChildren = new WeakSet();
   const stopChild = () => stopOwnedChild(child, 8000, { allowIpcStop: ipcStopChildren.has(child) });
   let pairingPoll = null;
+  let shutdownTask = null, shutdownComplete = false, ownershipHold = null;
   const question = async prompt => {
     if (!process.stdin.isTTY) throw new Error('Serve una scelta esplicita. Usa --scelta web --senza-browser, oppure --scelta sviluppo per sviluppo.');
     terminal ||= createInterface({ input: process.stdin, output: process.stderr });
@@ -380,23 +401,38 @@ export async function main(args = process.argv.slice(2)) {
     });
     if (closing) throw new Error('Avvio interrotto.');
   };
-  const shutdown = async () => {
-    if (closing) return;
+  const shutdown = (stopError = null) => {
+    if (shutdownComplete) return Promise.resolve(true);
+    if (shutdownTask) return shutdownTask;
     closing = true;
-    update({ ready: false, url: null, message: 'Arresto in corso.' });
+    update({ ready: false, navigationReady: false, url: null, message: 'Arresto in corso.' });
     clearInterval(pairingPoll);
     for (const pair of pairRequests.values()) pair.socket?.destroy();
     pairRequests.clear();
     installApproval?.(false);
     terminal?.close();
-    await stopChild();
-    await chooser?.close();
-    releaseLauncher(ownership);
-    for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.off(signal, onSignal);
-    process.off('message', onParentMessage);
-    process.off('disconnect', onDisconnect);
-    if (process.connected) process.disconnect();
-    log('MediFlow arrestato.');
+    shutdownTask = Promise.resolve().then(async () => {
+      try {
+        if (stopError) throw stopError;
+        await stopChild();
+        await chooser?.close();
+        releaseLauncher(ownership);
+        clearInterval(ownershipHold); ownershipHold = null;
+        shutdownComplete = true;
+        for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.off(signal, onSignal);
+        process.off('message', onParentMessage);
+        process.off('disconnect', onDisconnect);
+        if (process.connected) process.disconnect();
+        log('MediFlow arrestato.');
+        return true;
+      } catch (error) {
+        ownershipHold ||= setInterval(() => {}, 1000);
+        process.exitCode = 1;
+        update({ busy: false, step: 'errore', message: `Arresto non verificato. Proprietà conservata; riprova Arresta dopo aver controllato il processo. ${error.message}` });
+        return false;
+      } finally { shutdownTask = null; }
+    });
+    return shutdownTask;
   };
   const onSignal = () => { void shutdown(); };
   const pendingNavigation = new Set();
@@ -616,7 +652,8 @@ export async function main(args = process.argv.slice(2)) {
     selectChoice({ explicit: choice, nativeAvailable: !!native, dirty });
     if (!CHOICES.includes(choice) || state.busy || closing) throw new Error('Attendi il completamento dell’avvio prima di cambiare scelta.');
     void start(choice, remember).catch(async error => {
-      await stopChild();
+      if (error.code === 'MEDIFLOW_OWNED_STOP_UNCONFIRMED') { await shutdown(error); return; }
+      try { await stopChild(); } catch (stopError) { await shutdown(stopError); return; }
       update({ busy: false, ready: false, url: null, needsInstall: false, step: 'errore', message: error.message });
       if (options.choice && options.noBrowser) { process.exitCode = 1; await shutdown(); }
       else if (useTerminal && !closing) {

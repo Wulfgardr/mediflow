@@ -5,7 +5,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { readProductIdentity, probeRunningInstance } from './launcher-helpers.mjs';
-import { stopOwnedChild } from './mediflow.mjs';
 
 const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-launcher-smoke-'));
 const identity = readProductIdentity();
@@ -16,6 +15,26 @@ const child = spawn(process.execPath, ['scripts/mediflow.mjs', '--scelta', 'web'
   stdio: ['ignore', 'inherit', 'pipe', 'ipc'], detached: process.platform !== 'win32',
 });
 let diagnostic = '', choiceUrl, launchError;
+const exited = new Promise(resolve => child.once('exit', resolve));
+let stopAttempt = null;
+const requestStop = timeoutMs => {
+  stopAttempt ||= (async () => {
+    if (!choiceUrl) throw new Error('Sede di arresto del launcher posseduto non disponibile.');
+    const controller = new AbortController();
+    let timer;
+    try {
+      await Promise.race([(async () => {
+        const response = await fetch(new URL('stop', choiceUrl), { method: 'POST',
+          headers: { Origin: new URL(choiceUrl).origin, 'Content-Type': 'application/json' }, body: '{}', signal: controller.signal });
+        assert.equal(response.status, 200);
+        await exited;
+      })(), new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Arresto del launcher non verificato entro ${timeoutMs} ms.`)), timeoutMs);
+      })]);
+    } finally { clearTimeout(timer); controller.abort(); }
+  })();
+  return stopAttempt;
+};
 child.stderr.on('data', chunk => {
   process.stderr.write(chunk);
   diagnostic = (diagnostic + chunk).slice(-32768);
@@ -47,18 +66,17 @@ try {
   const reused = await new Promise((resolve, reject) => { second.once('error', reject); second.once('exit', resolve); });
   assert.equal(reused, 0, reuse);
   assert.match(reuse, /già attivo/u);
-  const exited = new Promise(resolve => child.once('exit', resolve));
-  const stop = await fetch(new URL('stop', choiceUrl), { method: 'POST',
-    headers: { Origin: new URL(choiceUrl).origin, 'Content-Type': 'application/json' }, body: '{}' });
-  assert.equal(stop.status, 200);
-  const timer = setTimeout(() => { void stopOwnedChild(child, 1000); }, 15000);
-  await exited;
-  clearTimeout(timer);
+  await requestStop(15000);
   assert.equal(child.exitCode, 0);
   assert.equal((await probeRunningInstance(url, identity.sourceFingerprint)).ok, false, 'Owned web server must stop');
   stopped = true;
   console.log('[smoke] PASS: unified launcher, verified fingerprint, redirect, same-folder reuse and shutdown.');
 } finally {
-  if (!stopped) await stopOwnedChild(child, 1000);
-  fs.rmSync(fixture, { recursive: true, force: true });
+  if (stopped) fs.rmSync(fixture, { recursive: true, force: true });
+  else {
+    if (!stopAttempt && child.exitCode === null && child.signalCode === null) {
+      try { await requestStop(1000); } catch (error) { console.error(`[smoke] ${error.message}`); }
+    }
+    console.error(`[smoke] FAIL: fixture conservata per verifica: ${fixture}`);
+  }
 }
