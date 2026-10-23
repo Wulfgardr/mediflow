@@ -1,0 +1,630 @@
+{
+  "surface": "Chromium E2E harness, synthetic data only",
+  "states": [
+    "spenta",
+    "pronta",
+    "in-corso",
+    "proposta",
+    "errore"
+  ],
+  "themes": [
+    "giorno",
+    "grafite"
+  ],
+  "widths": [
+    1440,
+    768,
+    390,
+    320
+  ],
+  "browserZoom": [
+    2,
+    4
+  ],
+  "zoomPhysicalViewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "captures": [
+    {
+      "file": "captures/prima-giorno-1440-errore.png",
+      "sha256": "44d42c925fc225b3626d145f2771e887ca0a33b7e1853dd1afcdbea860e42089",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-1440-in-corso.png",
+      "sha256": "74df3e9291ec73adb844c6bfa5adc7c9006821d7bda938e1fd0112dd3b5220a0",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-1440-pronta.png",
+      "sha256": "f6f690b4910bd46ffc3e09f9b39fd9583cf2b72a30473d60ffe84a1e78b683e7",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-1440-proposta.png",
+      "sha256": "be4bbdcd4147a8351d48ad068ed0877af471d725b38bbbbdbf4869e77825ddfd",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-1440-spenta.png",
+      "sha256": "b40d1fa3d2074febceece09e63d57917bc7648e574b1d3a4979970b57bb09ad9",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-320-errore.png",
+      "sha256": "9025289258f1d4c90ec0287c51cbba0374ee5e87fbffff1cfbce58ee14272e36",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-320-in-corso.png",
+      "sha256": "ec79cc23fe7ec623df309bd80cb50198abe7a727d37d5ff61d87a88fb5ab3ff0",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-320-pronta.png",
+      "sha256": "0a3aac86e725405014964a4dbf7f3e31b7670453768e781971462a5aa7700657",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-320-proposta.png",
+      "sha256": "20746c197d6d63e997b4e2d4ca13a8934a334737908415b82b1a395ebd7751b8",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-320-spenta.png",
+      "sha256": "b4ac345ffc4efc196cc792fe4dd2e554d2347883f1093dc17a6faa45c18b61fe",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-390-errore.png",
+      "sha256": "42e2e974a5af9bafec3e38d0549687c98ec26fb471d7c688c410da7b88c38888",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-390-in-corso.png",
+      "sha256": "3bf83fa332149b2f8541ff99d0c6ddce5039146726bbbcb376cd9673d44deced",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-390-pronta.png",
+      "sha256": "be6767ba02808f948d1751dd8aac36ca9b6980a93047fd875777af56b25a112d",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-390-proposta.png",
+      "sha256": "d642f4280fd4d5e0377d91143d19ac5cd3c7c910fff44fee0c42ea1903928fd5",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-390-spenta.png",
+      "sha256": "c40862a71c2e28ed67431ebf694c80e370c8b9be131c84a05a21f313f47ec402",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-768-errore.png",
+      "sha256": "f8429f7e9107870cc65b41a15a5dff0166c0dc0ff05bf40db2d8a0358a7316b9",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-768-in-corso.png",
+      "sha256": "4027661a922b9ecd9a4c42f02aacb63f15d5ba2cf74db2f870cd20d67d08f486",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-768-pronta.png",
+      "sha256": "4552f75ee7e5a011f387599490035494801fef36ff81eabc0224f1ff71392224",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-768-proposta.png",
+      "sha256": "c3eed30eceebeac670ab0503728a7cb67abd6119136c8c5724528d2887ab30fc",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-768-spenta.png",
+      "sha256": "9688f52bb4a8288c46d78b6002cb82fa70f2a9218db32f37df87895a8b880c10",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-zoom-200-errore.png",
+      "sha256": "b09414907dc87e862fc0064eaf61d458e95f793aa9aa90d10e8e2d50772fb859",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-zoom-200-in-corso.png",
+      "sha256": "6245fc0afa3f34c715abe7f49f27e8ecc52840b5dc99eb825a9776d1c1480a2b",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-zoom-200-pronta.png",
+      "sha256": "ef1eb34b6aa74aa461fb30b7457634cc5a9725c8163a6c0f9ca56fc64ab0bf53",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-zoom-200-proposta.png",
+      "sha256": "13a633c8a40e7b2b31671383d67accbca61d6fd8529728247feab7553281d595",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-zoom-200-spenta.png",
+      "sha256": "9a1cbc804ea087828f8a31e93c3ea390dfc30fd0cc2e28cac36cdac6c1e1b626",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-zoom-400-errore.png",
+      "sha256": "8dcab55927a9f448d8937a89ff6f9631a639013fd68c9b837d01a2020c5c13d0",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-zoom-400-in-corso.png",
+      "sha256": "1f4ea9af4d1fa6ddc99621b3fb8c64d09a94bff38f9cdbd5553d09708fe27cb6",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-zoom-400-pronta.png",
+      "sha256": "bc356be5e81ae8bec37bafa8b7d3ffbfb9861d439cf0eeffd45f33d43a87a357",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-zoom-400-proposta.png",
+      "sha256": "c6b524f22a43439210b49db7581e49e657c160aed195cc9a05bef48f7f75c0ba",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-giorno-zoom-400-spenta.png",
+      "sha256": "04c002d8bc6cab4d7f0e08efd7529768c7d38cf5f67d52f7350d76466fe40470",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-1440-errore.png",
+      "sha256": "be55de1d6840dbca000295522018601e0e194c6adbcc23ba26adf05767447663",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-1440-in-corso.png",
+      "sha256": "e3752ed8a8584c95631d10675ab367e294add6cd4c2a82c040072f166567dd51",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-1440-pronta.png",
+      "sha256": "3d3c0ee8cff6c4d603aa6b9ebc9179ac1cc85758ddd5ae7489391bc06713248d",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-1440-proposta.png",
+      "sha256": "876fbcc3f05bb002e662df66d6a9d9e3957c97a2e746d2cd18008453789b408c",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-1440-spenta.png",
+      "sha256": "ad8611fc91ffb0e93004aa70ae6664426b29a5b6eb6737584711580c54eb7c78",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-320-errore.png",
+      "sha256": "2d070556b036207a680b1b4720a203ee9246579b3179b13e7f1b6f11ed2abe94",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-320-in-corso.png",
+      "sha256": "150602df1a8a685e1b7fd5bd81704d7c215c7f873076b5a3e29cc81a04857627",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-320-pronta.png",
+      "sha256": "07899f394f4579b51a7ee7ea992f57810474af178fff03562b6cc2be8ae2fe81",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-320-proposta.png",
+      "sha256": "87edf98d67e936d84d663ec709b26b8e8e46e7263eaf45c0ee37b0bec5733dc6",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-320-spenta.png",
+      "sha256": "55e2f1c2531608220c0ec31a1c7a0e0cff673cc4c2310714a269b7abb3a2de04",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-390-errore.png",
+      "sha256": "e687df2a7901777471a009331655f867667282c60fb1a5852d2ff3528b446ce3",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-390-in-corso.png",
+      "sha256": "b5d53d4a1afdb891e8fa519277fbf6683e0b9f73465c7dcb6e8f498423c5f2ac",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-390-pronta.png",
+      "sha256": "471dbb6c19e1ffdc333ca384bc15d96b85300ec885e8d3108f8b3491bc441f60",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-390-proposta.png",
+      "sha256": "6eee7699d91ccd87b61efdeecfc35be7c66dfab073f30175073a9eef126fc0ff",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-390-spenta.png",
+      "sha256": "9abcba57fa6e73f36f06321e5d4173e90efca85c1b825ad2c7bd734e60c2fb70",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-768-errore.png",
+      "sha256": "63f10348a211bfd408c2e2b8256727fc00821c6b1f80d8a2ddd075254852f722",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-768-in-corso.png",
+      "sha256": "d4ce241cc5e62008572326e37763b48687b2602d3bb64f7b8c5f47ec39be4143",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-768-pronta.png",
+      "sha256": "a8e19e960eb328228e4ac1b6f4f8a3cbfcf60f44b3c523a602dcf40d7c5bf8d4",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-768-proposta.png",
+      "sha256": "b43652c005c2c0f961083d402115b0227e8251d1f74c9036d9dbe95ccc8b81be",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-768-spenta.png",
+      "sha256": "5ab6eee32c5b3325be2d149ef0f875bf7421a42c6809e163b24b9a394ec91142",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-zoom-200-errore.png",
+      "sha256": "fe2e37922a8d910f840f5bb8c79ff77ba3554f35b360bd2460656901d76979aa",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-zoom-200-in-corso.png",
+      "sha256": "39660762ebf433365be74779e9dd35fbda294fc20b2b866b03a860d25d78a14b",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-zoom-200-pronta.png",
+      "sha256": "873f969725b02a83b5eeb3c39ca71578106f9e9ae833be0eca43aad1bb035c26",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-zoom-200-proposta.png",
+      "sha256": "4217e3fd3fad9557c790c8d603bf865334f57322d29aad1c6934cda3843d5a03",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-zoom-200-spenta.png",
+      "sha256": "f7597d9e5e885fb8266686df5ecd4105d4fa935efcf074af1d36bf56af0a0dce",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-zoom-400-errore.png",
+      "sha256": "3cfc65b8094c701e4b7a74cf0f79be9f8afe3e25a236b6d38855aeedb39bcbc1",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-zoom-400-in-corso.png",
+      "sha256": "87c2598f407bf16136a6312c53c8e1c077ec4bf22fa69ebef8d3ccffd72ec745",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-zoom-400-pronta.png",
+      "sha256": "ed97c31489d6458bea8c884d4ea3ea900ac64f9c5c41960376cdaa32811eec5f",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-zoom-400-proposta.png",
+      "sha256": "b2974781d9d2d36e4351ba74b095851679161256aadf8af6fdb157aa2ce0ff82",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/prima-grafite-zoom-400-spenta.png",
+      "sha256": "ff1323b10d34f34e8d276b2bbaae841f797690ae8a351b5f7ba24077daff704a",
+      "sourceRevision": "0a1980f323d62b4a7c2e1f01e0950a3ac5da218f"
+    },
+    {
+      "file": "captures/dopo-giorno-1440-errore.png",
+      "sha256": "383fd178eb9325f345f8589ccb42bcab85f8e108f302416be3cba25b02a3798d",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-1440-in-corso.png",
+      "sha256": "65f66d07f290d1153d03607246c164622d52d282566670df90265c076635785d",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-1440-pronta.png",
+      "sha256": "c963de150aee2b2e138d89858cbb4509376046cfaafe7790ced8eaa3fe0316f8",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-1440-proposta.png",
+      "sha256": "3c2755fd1bfee0041229f3e21d697ecd8f3eabcd24fe4d0d74e2397c610a5fc9",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-1440-spenta.png",
+      "sha256": "04ce968ade0d0259f04122ea437bebd3b278b40576f0ac8dff6743c9f6f529db",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-320-errore.png",
+      "sha256": "19c84d9b37f6d0b8b1067e49b45cf4de0629e1e97f3aafb9f57dbbbaab263a42",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-320-in-corso.png",
+      "sha256": "3899799d22849af4b72c214ae7b2f88520e41841be168691e14d3f7a9433120a",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-320-pronta.png",
+      "sha256": "7c8c4660090adc0244b4be86996013cfe16bf16a4cb19182befc12b952ae48d3",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-320-proposta.png",
+      "sha256": "0fc2694cbfee210c928491cfdd61a816a7cc9425ed1d0a631ef2c25c15982611",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-320-spenta.png",
+      "sha256": "efb48da87250626e0dc4a3102a3f0b995dec57268191a4b0a0f553919227bdfc",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-390-errore.png",
+      "sha256": "351c1145b36b2cf7c5a4c4a4d58d664c82db4c25fd02b267ed0602a618da8605",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-390-in-corso.png",
+      "sha256": "ee1e93427a62b42685fe8452b3af36764558a88492ec9feadb849274fd76aa6b",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-390-pronta.png",
+      "sha256": "89265d1fb37f8cf7f98fee2b1048c2cd8fcbd2acbf5f22f1253e92cbe32861e9",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-390-proposta.png",
+      "sha256": "9313ca01d407842c22d55e31bc8bfa6f3cbde477888fbe9ba2ebf15c9517d1e9",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-390-spenta.png",
+      "sha256": "be79754b4b3409f6ba0eef1c9856c693a049db640d28d2b43d7472616205d115",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-768-errore.png",
+      "sha256": "0d4fa42b169af08178cb3782643133e460f099c8d40dabc990f06c33b9f9759d",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-768-in-corso.png",
+      "sha256": "61098b32a2d345de855660d241d682ede678cf83387b7a438aab3f1a4eb8c640",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-768-pronta.png",
+      "sha256": "9adfb85b2cc3cbca407710a85847f0039898cb6e6586e0c8a70362cdca49bbe3",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-768-proposta.png",
+      "sha256": "8c415ca89f7cd11ddb0e0144a5e1f09e0c24c0766cc8508d09255bc6208e3e64",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-768-spenta.png",
+      "sha256": "4b192624e49c0f795e8a12fe1636805b9edaccf7fec2af60408625853b02085a",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-zoom-200-errore.png",
+      "sha256": "9180661ec3354575eb4320ef1f399c5589d2fd890deceaac8a21f3296d9aed60",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-zoom-200-in-corso.png",
+      "sha256": "1e357ecc7b53f0cb83d4a874e6406c375913e7abe737c24603ef863a0b7df546",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-zoom-200-pronta.png",
+      "sha256": "92c13f81764ee55a1babff9f5e2f758f43d03620577f3fc542a9ed5a2defab48",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-zoom-200-proposta.png",
+      "sha256": "34cca702023a1757030a8bb10f84b1b4ab769240a0c278ab6b4a3de7bb9736d5",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-zoom-200-spenta.png",
+      "sha256": "13403038dfe1257904a2afa84ef052522cad63403fb8777242df5494ba4e27c4",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-zoom-400-errore.png",
+      "sha256": "3c54011151c6855c4242b1de11263ce69d7aa8d9032a60bea4c33d63c65fa166",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-zoom-400-in-corso.png",
+      "sha256": "1bd130c18a76eab919809d7639d79f66296df439360f0fe1ef7666132707f333",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-zoom-400-pronta.png",
+      "sha256": "f27d67b8974afb43ee47a6f0bdfef77cf7a9f707583c2424915a8a232dd2ba11",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-zoom-400-proposta.png",
+      "sha256": "628513c46d158ada59a71089d321574d6efa3ddd97b3331b0b28a423b92ecc1e",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-giorno-zoom-400-spenta.png",
+      "sha256": "54570c5be162f4bbaecac43f206a922aaba6aed06a0e6da8be2dd296500a07a4",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-1440-errore.png",
+      "sha256": "0576fc2583abfd10d828f49f21a53ec89fdc2a77bb5c2853ad5e0634997dcb26",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-1440-in-corso.png",
+      "sha256": "3b18aa0aefd53843560568896990fb14c4bfb8f434901a2fa8fd5a46d018ebc3",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-1440-pronta.png",
+      "sha256": "1884f66a5254ed9b015d81575c0842d86b80e178d102854bb0df786df6ec5068",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-1440-proposta.png",
+      "sha256": "a55e7f36b6781e9ef86b54581eb638966b733eeb8e301320d80fd9d3d4c746d1",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-1440-spenta.png",
+      "sha256": "351ba9e790efeff737fdb445ae0fb713a7c0d7dd8d742a3420c140d9a3c4b37c",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-320-errore.png",
+      "sha256": "118b42903c9bbcec5907af941b6eca0da0f282a33a2e162804be6ded93fd65f9",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-320-in-corso.png",
+      "sha256": "166ea295eb2e980976de6515b440c5d77f87fc1a81542153bdfc52c7d7135200",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-320-pronta.png",
+      "sha256": "cee0f50a0b61b54d8b1c16cef9d03969ff8ea52a5fcea5296dc00527af839752",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-320-proposta.png",
+      "sha256": "97616d3c1265ff1d474f724b95dc46bae33ba7cd2a24da333097e687432f182a",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-320-spenta.png",
+      "sha256": "42576b7d0774fc873f88923feaa6f71fb18128de0cd518dece80c0c3c1f125dc",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-390-errore.png",
+      "sha256": "dd00b968de047a16613adb6c30f17a6dd3e54665bf08be4330888817e7851764",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-390-in-corso.png",
+      "sha256": "ad1f759da43fef517893534d6d04c89c7d9ed9fe017bd306454ae89f02b257b9",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-390-pronta.png",
+      "sha256": "1df1a5dc6fc519d6ca6ff7a4bf1b5326e699a38d940805a06e6237888a821813",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-390-proposta.png",
+      "sha256": "6107a2c64bceaf116b6857b37c62ccabf9b13efdede4729aa96b44b083958ab2",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-390-spenta.png",
+      "sha256": "326d1d2084e0a4cf7b190b4ec85d40a1d1ae9e743f99c8b5652813c983f5d7d3",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-768-errore.png",
+      "sha256": "434d5643d5fe9bec61765e67896ddc0c4cc2ef0189d34176ba316da3402734da",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-768-in-corso.png",
+      "sha256": "c4d1710dd3900c909a160601550aacf5fb4ed95894ca6a916de2791f9e4f1c62",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-768-pronta.png",
+      "sha256": "59815ba0e052fcc9e3fab49328c003e18d0a71548119ad0e6845408f66600647",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-768-proposta.png",
+      "sha256": "d6af210b9e7470dcf9a6e561840b7a4f2abaa8e285cdc9be7a0bf3c82e7f3627",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-768-spenta.png",
+      "sha256": "bb8e15ec946bfd3f167973f7741ae0f6ddebde4c5a980dadea44e762904cf634",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-zoom-200-errore.png",
+      "sha256": "44f2555d44f0a3c188f44672a5f5db8ab8aff78c525a8152c4f3221ef2d37eed",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-zoom-200-in-corso.png",
+      "sha256": "010b3d73c434f9f0852d18b1385d6d7b8dc581ed12b3e473a0ea69ad05fa80a5",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-zoom-200-pronta.png",
+      "sha256": "eebddb4b30efe56fafb802c3e0ef2876ea549dce9d5df7799e2f379b8274f913",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-zoom-200-proposta.png",
+      "sha256": "4f2e31e69122394de81fb5831abb75eef0006c83364d67fff21867a4e4714254",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-zoom-200-spenta.png",
+      "sha256": "9e7f0d28f8122fc9d2569569a5d331fbd7d301c80fed64dfe48a4e3c35984f02",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-zoom-400-errore.png",
+      "sha256": "0de085cdbec5262c363ebd07fb006144785be5116e1a0c56ba158ea4eb81e77f",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-zoom-400-in-corso.png",
+      "sha256": "723945a4f20f7e701506126815a1e9923e0c9d00fdacca9a921714e085343556",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-zoom-400-pronta.png",
+      "sha256": "414c67e351b098f5d1b580d1020ba9a0ff027da83459cca44aacea68e28e1a69",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-zoom-400-proposta.png",
+      "sha256": "9151b4210909b698715a66e9da10a4bbe1d906bc31616c4f76614f79b4e8bcc4",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    },
+    {
+      "file": "captures/dopo-grafite-zoom-400-spenta.png",
+      "sha256": "70944b101baa18729d4cacf8c2170e8031c85f634da5af31b10f5e86744c3688",
+      "sourceRevision": "be6ab1d43ad59c1ff06667ce6621ac7d2d58f2e2"
+    }
+  ]
+}
