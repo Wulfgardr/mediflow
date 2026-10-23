@@ -23,17 +23,18 @@ function run(label, executable, args, expected, pattern) {
     assert.match(output, pattern, `${label}: semantic result missing`);
     evidence.push({ label, exitCode: result.status, expectedExitCode: expected, output });
     console.log(`${label}: PASS (exit ${result.status} expected)`);
+    return output;
 }
 function model(label, config, expected = 0, pattern = /No error has been found/) {
     const directory = path.join(owned, label); fs.mkdirSync(directory);
     fs.copyFileSync(path.join(root, 'docs/formal/local-operation/LocalOperation.tla'), path.join(directory, 'LocalOperation.tla'));
     fs.writeFileSync(path.join(directory, 'MC.cfg'), config);
-    run(label, 'java', ['-Xmx512m', '-XX:+UseParallelGC', '-cp', jar, 'tlc2.TLC', '-workers', '1', '-metadir', path.join(directory, 'states'),
+    return run(label, 'java', ['-Xmx512m', '-XX:+UseParallelGC', '-cp', jar, 'tlc2.TLC', '-workers', '1', '-metadir', path.join(directory, 'states'),
         '-config', path.join(directory, 'MC.cfg'), path.join(directory, 'LocalOperation.tla')], expected, pattern);
 }
 function copyCode(name) {
     const directory = path.join(owned, name); fs.mkdirSync(directory);
-    for (const relative of ['lib/local-operation', 'lib/territorial-pack-contract.ts', 'lib/territorial-pack-store.ts', 'lib/territorial-packs.ts',
+    for (const relative of ['lib/local-operation', 'lib/archive-generation.ts', 'lib/territorial-pack-contract.ts', 'lib/territorial-pack-store.ts', 'lib/territorial-packs.ts',
         'packages/mcp/src/local-operation-contract.ts', 'packages/mcp/src/local-operation-server.ts', 'packages/aip/src']) {
         const destination = path.join(directory, relative); fs.mkdirSync(path.dirname(destination), { recursive: true });
         fs.cpSync(path.join(root, relative), destination, { recursive: true });
@@ -46,20 +47,45 @@ function mutation(label, relative, before, after, pattern, suite) {
     assert.equal(source.split(before).length, 2, `${label}: mutation location drift`);
     fs.writeFileSync(target, source.replace(before, after));
     run(label, process.execPath, ['scripts/run-strip-types.mjs', '--test', `--test-name-pattern=${pattern}`, path.join(directory, suite)],
-        1, /Missing expected rejection|Expected values to be strictly deep-equal|Expected values to be strictly equal/);
+        1, /Missing expected rejection|Expected values to be strictly deep-equal|Expected values to be strictly equal|observe must emit zero act POSTs|late promise\/invalidation must never read-write B/);
 }
 try {
     fs.mkdirSync(path.join(owned, 'data'));
     const config = fs.readFileSync(path.join(root, 'docs/formal/local-operation/MC.cfg'), 'utf8');
+    const originalHashes = new Map();
     const coveragePath = path.join(root, 'docs/formal/local-operation/coverage.json');
     if (fs.existsSync(coveragePath)) {
         const coverage = JSON.parse(fs.readFileSync(coveragePath, 'utf8'));
         for (const [file, digest] of Object.entries(coverage.files)) assert.equal(hash(fs.readFileSync(path.join(root, file))), digest, `Review model mapping before advancing ${file}`);
+        for (const file of [...Object.keys(coverage.files), ...coverage.verificationInputs]) originalHashes.set(file, hash(fs.readFileSync(path.join(root, file))));
     }
     model('baseline', config);
     model('model-mutant', config.replace('UnsafePreparation = FALSE', 'UnsafePreparation = TRUE'), 12, /Invariant NoUnreconciledPreparation is violated/);
-    model('completion-witness', config.replace('NoRepeatedAct NoUnreconciledPreparation ConfirmedHasReceipt', 'NoWitness'), 12, /Invariant NoWitness is violated/);
-    model('manual-witness', config.replace('NoRepeatedAct NoUnreconciledPreparation ConfirmedHasReceipt', 'NoManualWitness'), 12, /Invariant NoManualWitness is violated/);
+    const invariants = 'NoRepeatedAct NoUnreconciledPreparation ConfirmedHasReceipt NoEffectBeforeDispatch NoDispatchBeforeMarker';
+    const automaticConfig = config.replace(invariants, 'NoAutomaticWitness');
+    function assertAutomaticTrace(output) {
+        const states = output.match(/State \d+:[\s\S]*?(?=\nState \d+:|$)/g) ?? [];
+        assert.ok(states.some(state => /recorded = TRUE/.test(state) && /manual = FALSE/.test(state)
+            && /actCount = 1/.test(state)), 'automatic trace missing');
+        assert.match(output, /<Dispatch /, 'automatic trace must dispatch after Begin');
+    }
+    assertAutomaticTrace(model('automatic-witness', automaticConfig, 12, /Invariant NoAutomaticWitness is violated/));
+    const manualTrace = model('manual-witness', config.replace(invariants, 'NoManualWitness'), 12, /Invariant NoManualWitness is violated/);
+    assert.match(manualTrace, /manual = TRUE/);
+    const unreachable = model('automatic-unreachable', automaticConfig.replace('AutomaticEnabled = TRUE', 'AutomaticEnabled = FALSE'));
+    assert.throws(() => assertAutomaticTrace(unreachable), /automatic trace missing/);
+    console.log('automatic-unreachable: witness validator rejects the unreachable automatic branch');
+    model('dispatch-before-marker-mutant', config.replace('UnsafeDispatch = FALSE', 'UnsafeDispatch = TRUE'), 12, /Invariant NoDispatchBeforeMarker is violated/);
+    mutation('runtime-request-authority-mutant', 'lib/local-operation/service.ts',
+        'authorizeRequest(destination) {', 'authorizeRequest(destination) { return;',
+        'CU R1: observe', 'lib/local-operation/review-regressions.test.ts');
+    mutation('runtime-identity-mutant', 'lib/local-operation/service.ts',
+        "function assertIdentity(current: LocalOperationRecord, plan: Readonly<LocalOperationPlan>) {",
+        "function assertIdentity(current: LocalOperationRecord, plan: Readonly<LocalOperationPlan>) { return;",
+        'CU R2: identità immutabile', 'lib/local-operation/review-regressions.test.ts');
+    mutation('runtime-origin-mutant', 'lib/local-operation/host.ts',
+        'return Object.freeze({ assertCurrent() {', 'return Object.freeze({ assertCurrent() { return;',
+        'CU R3:', 'lib/local-operation/review-regressions.test.ts');
     mutation('runtime-recovery-mutant', 'lib/local-operation/service.ts',
         "if (current.effectPossible) throw new LocalOperationError('reconciliation_required');", 'if (false) throw new Error();',
         'risposta persa, riavvio', 'lib/local-operation/service.test.ts');
@@ -71,11 +97,12 @@ try {
         'metadati, errori', 'lib/local-operation/wire.test.ts');
     run('runtime-restored', process.execPath, ['scripts/run-strip-types.mjs', '--test',
         'lib/local-operation/local-operation.test.ts', 'lib/local-operation/service.test.ts', 'lib/local-operation/wire.test.ts',
-        'lib/local-operation/host.test.ts'], 0, /fail 0/);
+        'lib/local-operation/host.test.ts', 'lib/local-operation/review-regressions.test.ts'], 0, /fail 0/);
     model('model-restored', config);
+    for (const [file, digest] of originalHashes) assert.equal(hash(fs.readFileSync(path.join(root, file))), digest, `Original changed during verification: ${file}`);
     if (outputDirectory) {
         fs.mkdirSync(outputDirectory, { recursive: true });
         fs.writeFileSync(path.join(outputDirectory, 'result.json'), JSON.stringify({ tool: 'TLC 2.19 (v1.7.4)', jarSha256: expectedJar,
-            at: new Date().toISOString(), results: evidence }, null, 2));
+            at: new Date().toISOString(), restoredHashes: Object.fromEntries(originalHashes), automaticUnreachableRejected: true, results: evidence }, null, 2));
     }
 } finally { fs.rmSync(owned, { recursive: true, force: true }); }

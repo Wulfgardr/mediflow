@@ -1,6 +1,6 @@
 -------------------------- MODULE LocalOperation --------------------------
 EXTENDS Naturals, TLC
-CONSTANT UnsafePreparation
+CONSTANTS UnsafePreparation, AutomaticEnabled, UnsafeDispatch
 VARIABLES state, pack, authority, possible, flight, effects, receipt, recorded,
           badPreparation, actCount, changes, manual
 vars == <<state, pack, authority, possible, flight, effects, receipt, recorded,
@@ -21,11 +21,15 @@ Approve == /\ state = "saved" /\ pack /\ authority /\ ~possible
            /\ UNCHANGED <<pack, authority, possible, flight, effects, receipt,
                           recorded, badPreparation, actCount, changes, manual>>
 Begin == /\ state = "authorized" /\ pack /\ authority /\ ~possible
-         /\ state' = "attempt_started" /\ possible' = TRUE /\ flight' = TRUE
-         /\ actCount' = actCount + 1
-         /\ UNCHANGED <<pack, authority, effects, receipt, recorded,
+         /\ state' = "attempt_started" /\ possible' = TRUE
+         /\ UNCHANGED <<pack, authority, flight, actCount, effects, receipt, recorded,
                         badPreparation, changes, manual>>
-ExternalEffect == /\ possible /\ ~manual /\ effects = 0 /\ effects' = 1
+Dispatch == /\ AutomaticEnabled /\ (state = "attempt_started" \/ (UnsafeDispatch /\ state = "authorized")) /\ pack /\ authority
+            /\ (possible \/ UnsafeDispatch) /\ ~manual /\ actCount = 0
+            /\ flight' = TRUE /\ actCount' = 1
+            /\ UNCHANGED <<state, pack, authority, possible, effects, receipt, recorded,
+                           badPreparation, changes, manual>>
+ExternalEffect == /\ possible /\ ~manual /\ actCount = 1 /\ effects = 0 /\ effects' = 1
                   /\ UNCHANGED <<state, pack, authority, possible, flight,
                                  receipt, recorded, badPreparation, actCount, changes, manual>>
 Reply == /\ flight /\ effects = 1 /\ ~manual
@@ -68,12 +72,14 @@ Resume == /\ pack /\ ~authority /\ state # "confirmed"
           /\ authority' = TRUE /\ state' = IF possible THEN "uncertain" ELSE "prepared"
           /\ UNCHANGED <<pack, possible, flight, effects, receipt, recorded,
                          badPreparation, actCount, changes, manual>>
-Next == Prepare \/ Approve \/ Begin \/ ExternalEffect \/ Reply \/ LostReply \/ Handoff
+Next == Prepare \/ Approve \/ Begin \/ Dispatch \/ ExternalEffect \/ Reply \/ LostReply \/ Handoff
         \/ ManualEffect \/ Reconcile \/ Record \/ Disable \/ Enable \/ SuspendOrCrash \/ Resume
 Spec == Init /\ [][Next]_vars
 NoRepeatedAct == actCount <= 1
 NoUnreconciledPreparation == ~badPreparation
 ConfirmedHasReceipt == recorded => (receipt /\ effects = 1 /\ state = "confirmed")
-NoWitness == ~recorded
+NoDispatchBeforeMarker == actCount > 0 => possible
+NoEffectBeforeDispatch == (~manual /\ effects > 0) => (possible /\ actCount = 1)
+NoAutomaticWitness == ~(recorded /\ ~manual /\ actCount = 1)
 NoManualWitness == ~(recorded /\ manual)
 =============================================================================
