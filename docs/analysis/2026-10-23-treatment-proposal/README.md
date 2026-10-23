@@ -166,3 +166,107 @@ scala tipografica, token Lume e movimento.
 
 Sviluppo assistito: GPT 6.1 Sol, effort Medium. Rilavorazione: estensione della
 selezione E2E al consumatore ChatGPT omesso e verifica di `aria-expanded`.
+
+## Timeout CI delle catture del selettore — 23 ottobre 2026
+
+Il [job cancellato al limite di 35 minuti](https://github.com/Wulfgardr/mediflow/actions/runs/39918541045/job/120298054848)
+eseguiva la head PR `a7b585b952553beb1dbb30ff6fcc9e57549937d2` tramite il merge
+di prova `30b908c041b7`. I dodici casi di cattura di `choice-field.spec.ts`
+fallivano anche al retry: 24 tentativi, 1.134,5 secondi complessivi di test
+falliti, escluso il riavvio dei worker. Non erano limitati ai quattro viewport
+Giorno: comprendevano anche Grafite e i due zoom reali.
+
+La causa appartiene a #622: lo spec entrava in Terapie e cercava `Cambia`
+nel selettore terapeutico senza aprire la nuova disclosure `Proposte`,
+inizialmente chiusa. L'attesa fallisce in `chooseLongName`, non nella gerarchia
+dei titoli. `choice-field.spec.ts` era identico su main e sulla PR.
+
+Confronto locale con dati inventati e copia legacy disabilitata:
+
+- Main `18c0a179b`: spec completo, 15/15 verdi in sviluppo (1,6 minuti).
+  Anche il successivo controllo sul bundle standalone production passa 15/15.
+- PR originale `a7b585b95`: tre timeout anche in sviluppo prima
+  dell'interruzione del primo run; run completo in produzione: 12 falliti,
+  3 passati, 9,7 minuti senza retry. Tutti i rossi attendono il pulsante
+  `Cambia` nascosto, con il timeout ordinario di 45 secondi.
+- Correzione: verifica `aria-expanded=false`, apre `Proposte` dentro
+  `#terapie`, verifica `aria-expanded=true`, poi esercita il selettore
+  esistente. Nessuna modifica ai componenti, ai timeout o alla quarantena.
+- Spec corretto sullo stesso bundle production: 15/15 verdi, 1,5 minuti.
+  La shard completa esercita nuovamente tutti i quindici casi dopo il
+  ripristino della falsificazione.
+- Falsificazione: togliendo soltanto il click la nuova asserzione osserva
+  `aria-expanded=false`. Rimuovendo poi tutte le quattro righe del fix,
+  il caso Giorno 1440 riproduce il timeout originale sul pulsante `Cambia`.
+  Ripristino completo: lo stesso caso passa in 5,6 secondi.
+
+Le build production isolate partono da sorgenti pulite, con la sola
+esclusione della fixture SQLite Swift prevista dalla CI. Node 24.21.0,
+ABI 137, Playwright 1.58.2 e Chromium bloccato 145.0.7632.6, verificato dal
+browser avviato. Il bundle PR resta attribuito ad `a7b585b95`: il nuovo diff
+contiene soltanto il percorso E2E e questo verbale.
+
+Consumatori cercati con `grep -rl` per `TreatmentReasoningPanel`,
+`treatment-reasoning-panel` e il modulo CSS, poi seguendo la composizione in
+Terapie. Sono verdi tutti i sette spec pertinenti: `choice-field`,
+`treatment-proposal-composition`, `treatment-reasoning-fabric-review`,
+`treatment-reasoning-kill-switch`, `ordinary-chatgpt-four-functions`,
+`therapy-composition` e `disclosure`: **83 casi distinti**, senza retry.
+I due test unitari consumatori diretti passano 7/7.
+
+Prima del push: inventario browser con tutte le quattro ricette, lint,
+typecheck e guard di repository verdi, inclusi selezione test, claims e
+self-test, dashboard, schema writer, scritture AI, confine DB, error leak,
+never-regress, crosswalk Fabric, Apple QA, MLX, OpenAPI, schema drift e audit.
+Verdi anche scala tipografica, token Lume, movimento, function-models e
+treatment-reasoning. Accettazione UI production 6/6, harness browser ChatGPT
+e smoke del catalogo home-base verdi.
+
+Il caso del profilo account `account-profile.spec.ts:80` fallisce in production
+su entrambe le revisioni con `Network.getResponseBody: No resource with given
+identifier found` durante `response.json()` di `/api/auth/check`. Su main in
+sviluppo passa 3/3; su main in production il controllo combinato termina con
+17 passati e questo solo fallimento. Il caso passa nel vecchio job Ubuntu:
+la riproduzione locale non prova un difetto Linux. È separato dal timeout
+delle scelte e tracciato in [issue #625](https://github.com/Wulfgardr/mediflow/issues/625).
+
+### Shard completa e budget
+
+`npm run test:e2e -- --shard=1/2`, un worker e retry ordinario invariato:
+207 casi selezionati, **16 minuti e 40 secondi** misurati con orologio monotono.
+Esito originale conservato: 192 passati, 3 falliti, 3 instabili, 9 saltati;
+exit code 1. Tutti i quindici casi `choice-field` sono verdi. Non si dichiara
+verde l'intera shard.
+
+Rossi e recuperi osservati:
+
+- `account-profile.spec.ts:80`: errore Chromium sul corpo di `auth/check`,
+  riprodotto anche al retry e su main production; issue #625.
+- `function-status.spec.ts:93` e `:169`: il preflight richiede una directory
+  dentro `os.tmpdir()`, diversa da `/private/tmp` su questo Mac. Il primo run
+  non ha eseguito i corpi dei due test. Una nuova fixture sintetica nel percorso
+  richiesto supera lo spec completo 4/4, senza retry. Nessun guard modificato.
+- `account-profile.spec.ts:54`: `route.fetch` con `ETIMEDOUT` sul loopback,
+  verde al retry.
+- `disclosure.spec.ts:105`, Giorno 390: `page.goto` con
+  `ERR_CONNECTION_TIMED_OUT` sul loopback, verde al retry e nel run consumatori.
+- `document-upload-ocr.spec.ts:83`, mixed: `AnyDoc same-response observation`
+  con `net::ERR_ABORTED`; classificato instabile dal report. Il test e la
+  quarantena restano invariati. I casi protected/corrupt che erano falliti
+  nella vecchia CI passano in questo run locale.
+
+I nove skip derivano dai vincoli già presenti: clinical scales, i due casi
+di riavvio delle preferenze e i sei casi official UI; questi ultimi sono
+eseguiti nel loro passaggio production esplicito, 6/6 verdi.
+
+Sommando le durate misurate di installazione/build, shard, accettazione UI,
+inventario browser, harness ChatGPT, catalogo home-base e intero recupero WHO,
+il costo locale è **19 minuti e 48 secondi**, con oltre 15 minuti rispetto al
+limite di 35. È una somma conservativa di passaggi svolti anche in parallelo,
+non un nuovo timeout. Non comprende provisioning del runner Linux e upload
+artefatti: il budget della nuova CI deve ancora essere confermato sul nuovo
+commit. Nessun merge eseguito.
+
+Sviluppo assistito: GPT 6.1 Sol, effort High. Rilavorazioni: ripresa dei run
+interrotti, isolamento dei database dei run concorrenti, porta dell'accettazione
+UI adeguata al suo contratto. Consumi non attribuibili al singolo contributo.
