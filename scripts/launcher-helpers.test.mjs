@@ -812,6 +812,108 @@ test('POSIX terminal group proof is retained across delayed child exit and repea
     assert.equal(result.status,0,result.stderr);
 });
 
+test('POSIX stop drains the native reaped-child batch before signalling a group', {skip:process.platform === 'win32'}, t => {
+    const result = spawnSync(process.execPath,['--input-type=module','-e',`
+        import assert from 'node:assert/strict';import {spawn} from 'node:child_process';import {once} from 'node:events';
+        import {stopOwnedChild} from ${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)};
+        const kill=process.kill.bind(process), children=[0,1].map(()=>spawn(process.execPath,['-e',"process.on('message',()=>process.exit(0));process.send('ready')"],{detached:true,stdio:['ignore','ignore','ignore','ipc']}));
+        const closed=children.map(child=>once(child,'exit'));
+        let pending,observed=null;const calls=[];
+        try {
+            await Promise.all(children.map(child=>new Promise((resolve,reject)=>{
+                const timer=setTimeout(()=>reject(new Error('Owned child readiness timeout')),2000);
+                child.once('message',()=>{clearTimeout(timer);resolve();});
+                child.once('error',error=>{clearTimeout(timer);reject(error);});
+            })));
+            for(const child of children) child.once('exit',()=>{
+                const other=children.find(value=>value!==child);
+                if(pending || other.exitCode !== null || other.signalCode !== null) return;
+                let absent=false;try{kill(other.pid,0);}catch(error){if(error.code !== 'ESRCH') throw error;absent=true;}
+                if(!absent) return;
+                observed={callbackPid:child.pid,reapedPid:other.pid,exitCode:other.exitCode,signalCode:other.signalCode};
+                process.kill=(pid,signal)=>{
+                    assert.equal(pid,-other.pid);calls.push({pid,signal});return true;
+                };
+                pending=stopOwnedChild(other,100);pending.catch(()=>{});
+            });
+            for(const child of children) child.send('exit');
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,100);
+            await Promise.all(closed);
+            assert.ok(observed,'Native pending exit window was not reached');
+            await assert.rejects(pending,error=>error.code === 'MEDIFLOW_OWNED_STOP_UNCONFIRMED');
+            assert.deepEqual(calls.filter(call=>call.signal !== 0),[],'A reaped leader with a pending Node callback authorised a signal');
+            const count=calls.length;
+            await new Promise(resolve=>setTimeout(resolve,120));assert.equal(calls.length,count);
+            assert.equal(children.reduce((total,child)=>total+child.listenerCount('exit'),0),0);
+            console.log(JSON.stringify({node:process.version,uv:process.versions.uv,observed,calls,cleanupConfirmed:true}));
+        } finally {
+            process.kill=kill;
+            for(const child of children) if(child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+            await Promise.all(closed);
+        }
+    `],{encoding:'utf8',timeout:5000});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+        t.diagnostic(result.stdout.trim());
+});
+
+for (const scenario of ['terminal-first','signal-terminal-first','retry-after-failure','before-term','pending-exit-callback','after-term','before-kill','owned-leader-alive']) {
+    test(`POSIX ambiguous group never receives an unowned signal: ${scenario}`, t => {
+        const result = spawnSync(process.execPath,['--input-type=module','-e',`
+            import assert from 'node:assert/strict'; import {EventEmitter} from 'node:events';
+            import {stopOwnedChild} from ${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)};
+            Object.defineProperty(process,'platform',{value:'linux'});
+            const scenario=${JSON.stringify(scenario)}, child=new EventEmitter(), calls=[];
+            Object.assign(child,{pid:424245,exitCode:scenario === 'terminal-first' ? 0 : null,signalCode:scenario === 'signal-terminal-first' ? 'SIGTERM' : null});
+            let probes=0,absent=false,escalationDue=false;
+            const timers=new Set(),immediates=new Set(),later=setTimeout,clearLater=clearTimeout,immediate=setImmediate,clearNow=clearImmediate;
+            globalThis.setTimeout=(fn,ms,...args)=>{const handle=later((...values)=>{timers.delete(handle);if(ms === 12) escalationDue=true;fn(...values);},ms,...args);timers.add(handle);return handle;};
+            globalThis.clearTimeout=handle=>{timers.delete(handle);clearLater(handle);};
+            globalThis.setImmediate=(fn,...args)=>{const handle=immediate((...values)=>{immediates.delete(handle);fn(...values);},...args);immediates.add(handle);return handle;};
+            globalThis.clearImmediate=handle=>{immediates.delete(handle);clearNow(handle);};
+            process.kill=(pid,signal)=>{
+                assert.equal(pid,-child.pid);calls.push({signal,terminal:child.exitCode !== null || child.signalCode !== null});
+                if(signal === 0) {
+                    if(absent) throw Object.assign(new Error('original group absent'),{code:'ESRCH'});
+                    probes++;
+                    if(scenario === 'before-term' && probes >= 2) child.exitCode=0;
+                    if(scenario === 'before-kill' && escalationDue) child.exitCode=0;
+                    return true;
+                }
+                if(signal === 'SIGTERM') {
+                    if(scenario === 'retry-after-failure') {child.exitCode=0;throw Object.assign(new Error('owned command failed'),{code:'EPERM'});}
+                    if(scenario === 'after-term') setTimeout(()=>{child.exitCode=0;},2);
+                }
+                if(signal === 'SIGKILL' && scenario === 'owned-leader-alive') {
+                    absent=true;child.signalCode='SIGKILL';child.emit('exit',null,'SIGKILL');
+                }
+                return true;
+            };
+            if(scenario === 'pending-exit-callback') queueMicrotask(()=>{child.exitCode=0;child.emit('exit',0);});
+            if(scenario === 'owned-leader-alive') await stopOwnedChild(child,25);
+            else await assert.rejects(stopOwnedChild(child,25),error=>error.code === 'MEDIFLOW_OWNED_STOP_UNCONFIRMED');
+            assert.equal(timers.size,0);assert.equal(immediates.size,0);
+            const signals=calls.filter(call=>call.signal !== 0);
+            assert.deepEqual(signals.map(call=>call.signal),scenario === 'owned-leader-alive' ? ['SIGTERM','SIGKILL'] : ['retry-after-failure','after-term','before-kill'].includes(scenario) ? ['SIGTERM'] : []);
+            assert.ok(signals.every(call=>!call.terminal),'A non-null signal was sent after the leader became terminal');
+            assert.equal(child.listenerCount('exit'),0);
+            if(scenario !== 'owned-leader-alive') {
+                child.exitCode=0;
+                const count=calls.length;
+                await assert.rejects(stopOwnedChild(child,25),error=>error.code === 'MEDIFLOW_OWNED_STOP_UNCONFIRMED');
+                assert.equal(calls.slice(count).filter(call=>call.signal !== 0).length,0,'Explicit retry signalled an ambiguous successor');
+                assert.equal(timers.size,0);assert.equal(immediates.size,0);
+            }
+            const count=calls.length;
+            await new Promise(resolve=>setTimeout(resolve,40));
+            assert.equal(calls.length,count,'A late timer observed or signalled a successor');
+            assert.equal(child.listenerCount('exit'),0);
+            console.log(JSON.stringify({scenario,signals,probes,lateCalls:false,timers:timers.size,immediates:immediates.size}));
+        `],{encoding:'utf8',timeout:2000});
+        assert.equal(result.status,0,result.stdout+result.stderr);
+        t.diagnostic(result.stdout.trim());
+    });
+}
+
 import { launcherConfigDirectory, prepareLauncherState } from './launcher-state.mjs';
 
 test('launcher configuration follows the operating system, independently of the archive', () => {
@@ -995,12 +1097,13 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     const source = path.join(directory, 'source'), home = path.join(directory, 'home'), data = path.join(directory, 'data');
     mkdirSync(path.join(source, 'scripts'), { recursive: true }); mkdirSync(home); mkdirSync(data);
     const stopControl = path.join(directory, 'stop.json'), runtimePid = path.join(directory, 'runtime-pid.json');
-    const groupHistory = path.join(directory,'owned-groups.ndjson');
+    const groupHistory = path.join(directory,'owned-groups.ndjson'), groupCleanup = path.join(directory,'owned-group-cleanup');
     const stopTrace = path.join(directory, 'stop-trace.ndjson'), stopLoader = path.join(directory, 'stop-loader.mjs');
     if (lifecycle) {
         atomicJson(stopControl, lifecycle);
         if (lifecycle.group) writeFileSync(path.join(source, 'scripts/group-descendant.mjs'), `
-            import http from 'node:http';
+            import http from 'node:http'; import fs from 'node:fs';
+            setInterval(() => { if(fs.existsSync(${JSON.stringify(groupCleanup)})) process.exit(0); },10);
             process.on('SIGTERM', () => {});
             const server = http.createServer((_request,response) => response.end('owned-descendant-alive'));
             server.listen(0, '127.0.0.1', () => process.send({pid:process.pid,port:server.address().port}));
@@ -1059,12 +1162,13 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 return result;
             }});`);
         t.after(async () => {
-            if (!existsSync(runtimePid)) return;
+            if (!existsSync(lifecycle.group ? groupHistory : runtimePid)) return;
             const ownedGroups = lifecycle.group
                 ? readFileSync(groupHistory,'utf8').trim().split('\n').map(line => JSON.parse(line))
                 : [JSON.parse(readFileSync(runtimePid))];
-            for (const {pid} of ownedGroups) {
-                try { process.kill(lifecycle.group ? -pid : pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+            if (lifecycle.group) writeFileSync(groupCleanup,'owned fixture cleanup');
+            else for (const {pid} of ownedGroups) {
+                try { process.kill(pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
             }
             const deadline = Date.now() + 2000;
             for (const {pid,descendantPid} of ownedGroups) for (const owned of [pid,descendantPid].filter(Boolean)) for (;;) {
@@ -1101,6 +1205,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         export const verifySourceRuntime = () => ({ identity: ${JSON.stringify(identity)} });
         if (process.argv[1].endsWith('source-runtime.mjs')) {
             ${lifecycle?.group ? `
+                setInterval(() => { if(fs.existsSync(${JSON.stringify(groupCleanup)})) process.exit(0); },10);
                 const descendant = spawn(process.execPath,[new URL('./group-descendant.mjs',import.meta.url).pathname],{stdio:['ignore','ignore','ignore','ipc']});
                 fs.appendFileSync(${JSON.stringify(groupHistory)},JSON.stringify({pid:process.pid,descendantPid:descendant.pid})+'\\n');
                 const info = await new Promise((resolve,reject) => {
@@ -1168,7 +1273,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
             await new Promise(resolve => setTimeout(resolve, 10));
         }
     };
-    return { source, data, stateFiles, child, closed, until, stopControl, stopTrace, runtimePid, environment: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home }, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
+    return { source, data, stateFiles, child, closed, until, stopControl, stopTrace, runtimePid, requestGroupCleanup: () => writeFileSync(groupCleanup,'owned fixture cleanup'), environment: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home }, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
 }
 
 
@@ -1206,37 +1311,32 @@ for (const scenario of ['signal','chooser','error','switch','probe-EPERM','probe
             assert.doesNotMatch(f.output(),/unhandled|MediFlow arrestato\./iu);
         };
         assertHeld();
-        let finalAttemptErrors = 1;
-        if (failure) {
-            await f.until(() => f.output().includes('Arresto non verificato'));
-            assertHeld();
+        await f.until(() => f.output().includes('Arresto non verificato'));
+        assertHeld();
+        const trace = readFileSync(f.stopTrace,'utf8');
+        assert.deepEqual(trace.trim().split('\n').map(line => JSON.parse(line)).filter(entry => entry.signal !== 0).map(entry => entry.signal),['SIGTERM']);
+        const retryAndAssertHeld = async () => {
             const errors = f.output().split('Arresto non verificato').length;
             await stop();
             await f.until(() => f.output().split('Arresto non verificato').length > errors);
             assertHeld(); process.kill(descendantPid,0);
-            atomicJson(f.stopControl,{platform:process.platform,group:true,failure:null});
-            finalAttemptErrors = f.output().split('Arresto non verificato').length;
-            await stop();
+            assert.equal(readFileSync(f.stopTrace,'utf8'),trace,'An explicit retry signalled the ambiguous group');
+        };
+        await retryAndAssertHeld();
+        atomicJson(f.stopControl,{platform:process.platform,group:true,failure:null});
+        await retryAndAssertHeld();
+        assert.match(f.output().split('FIXTURE_STOP_CAUSE ').at(-1),/^undefined Continuità/u);
+        assert.equal(await (await fetch('http://127.0.0.1:'+port,{signal:AbortSignal.timeout(1000)})).text(),'owned-descendant-alive');
+        f.requestGroupCleanup();
+        const deadline = Date.now() + 2000;
+        for (const target of [descendantPid,-pid]) for (;;) {
+            try { process.kill(target,0); }
+            catch(error) { if(error.code === 'ESRCH') break; if(error.code !== 'EPERM') throw error; }
+            assert.ok(Date.now() < deadline,'Owned fixture quiescence was not confirmed');
+            await new Promise(resolve => setTimeout(resolve,10));
         }
-        {
-            await f.until(() => f.output().includes('MediFlow arrestato.') || f.output().split('Arresto non verificato').length > finalAttemptErrors);
-            if (!f.output().includes('MediFlow arrestato.')) {
-                assertHeld();
-                assert.match(f.output().split('FIXTURE_STOP_CAUSE ').at(-1),/^EPERM kill EPERM/u);
-                assert.match(readFileSync(f.stopTrace,'utf8'), /"signal":0,"error":"EPERM"/u);
-                const deadline = Date.now() + 2000;
-                for (;;) {
-                    try { process.kill(-pid,0); }
-                    catch(error) { if(error.code === 'ESRCH') break; if(error.code !== 'EPERM') throw error; }
-                    assert.ok(Date.now() < deadline,'Owned group absence was not confirmed');
-                    await new Promise(resolve => setTimeout(resolve,10));
-                }
-                t.diagnostic('Real POSIX group probe returned EPERM after SIGKILL; owner retained, explicit stop after ESRCH.');
-                await stop();
-            }
-        }
-        try { await waitForFixtureClose(f.closed); }
-        catch(error) { t.diagnostic(f.output()); t.diagnostic(readFileSync(f.stopTrace,'utf8')); throw error; }
+        assertHeld();
+        await stop(); await waitForFixtureClose(f.closed);
         assert.throws(() => process.kill(-pid,0),{code:'ESRCH'});
         assert.throws(() => process.kill(descendantPid,0),{code:'ESRCH'});
         await assert.rejects(fetch('http://127.0.0.1:'+port,{signal:AbortSignal.timeout(1000)}));
@@ -1244,10 +1344,10 @@ for (const scenario of ['signal','chooser','error','switch','probe-EPERM','probe
         const successor = claimLauncher(f.stateFiles.lockDirectory,{checkoutPath:f.source+path.sep});
         try {
             assert.equal(successor.claimed,true);
-            const trace = readFileSync(f.stopTrace,'utf8');
-            assert.match(trace,/SIGKILL/u);
+            const finalTrace = readFileSync(f.stopTrace,'utf8');
+            assert.deepEqual(finalTrace.trim().split('\n').map(line => JSON.parse(line)).filter(entry => entry.signal !== 0).map(entry => entry.signal),['SIGTERM']);
             await new Promise(resolve => setTimeout(resolve,650));
-            assert.equal(readFileSync(f.stopTrace,'utf8'),trace,'A late timer signalled the retired group');
+            assert.equal(readFileSync(f.stopTrace,'utf8'),finalTrace,'A late timer observed or signalled the retired group');
             assert.equal(JSON.parse(readFileSync(successor.receiptFile)).pid,process.pid);
             process.kill(process.pid,0);
             t.diagnostic(JSON.stringify({scenario,leader:pid,descendant:descendantPid,groupAbsent:true,successor:process.pid,lateSignals:false}));
