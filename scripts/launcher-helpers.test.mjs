@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -211,32 +211,17 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { atomicJson, buildDecision, claimLauncher, findExistingInstance, needsTextMenu, parseArguments, requireFreePort, selectChoice, stopOwnedChild, textualChoice } from './mediflow.mjs';
 import { createChoiceServer } from './mediflow-launcher-page.mjs';
-import { navigateExistingLocalUiRuntime } from './local-ui-runtime.mjs';
+import { navigateOwnedLocalUiRuntime } from './local-ui-runtime.mjs';
 import { createServer as createHttpServer } from 'node:http';
 
-test('runtime navigation checks archive, source identity and cancellation before sending an intent', async () => {
-    const sourceFingerprint = 'synthetic@0123456789ab:clean';
-    const revision = createHttpServer((_request, response) => {
-        response.setHeader('Content-Type', 'application/json');
-        response.end(JSON.stringify({ revision: '0123456789ab', sourceFingerprint, fingerprint: 'synthetic' }));
-    });
-    await new Promise(resolve => revision.listen(0, '127.0.0.1', resolve));
-    const origin = `http://127.0.0.1:${revision.address().port}`;
-    const received = [];
-    const page = await createChoiceServer({ root: repoRoot, state: () => ({ ready: true, navigationReady: true, url: origin }),
-        choose() {}, install() {}, stop() {}, navigate(intent) { received.push(intent); } });
-    const receipt = { pid: process.pid, checkoutPath: repoRoot, dataDir: '/synthetic-only', choiceUrl: page.url };
-    const expected = { sourceRoot: repoRoot, dataDir: '/synthetic-only', sourceFingerprint };
-    try {
-        assert.equal(await navigateExistingLocalUiRuntime({ pid: process.pid, checkoutPath: repoRoot }, expected, 'history', new AbortController().signal), false);
-        assert.equal(await navigateExistingLocalUiRuntime(receipt, expected, 'history', new AbortController().signal), true);
-        await assert.rejects(navigateExistingLocalUiRuntime({ ...receipt, dataDir: '/different-archive' }, expected, 'identity', new AbortController().signal));
-        await assert.rejects(navigateExistingLocalUiRuntime(receipt, { ...expected, sourceFingerprint: 'changed' }, 'identity', new AbortController().signal));
-        const cancelled = new AbortController(); cancelled.abort();
-        await assert.rejects(navigateExistingLocalUiRuntime(receipt, expected, 'identity', cancelled.signal));
-        await assert.rejects(navigateExistingLocalUiRuntime(receipt, expected, 'SYNTHETIC_SENTINEL', new AbortController().signal));
-        assert.deepEqual(received, ['history']);
-    } finally { await page.close(); await new Promise(resolve => revision.close(resolve)); }
+test('IPC navigation rejects a disconnected generation and an already cancelled request', async t => {
+    const f = await ordinaryLauncherFixture(t, 'web');
+    await f.until(() => f.output().includes('Pronto:'));
+    const cancelled = new AbortController(); cancelled.abort();
+    await assert.rejects(navigateOwnedLocalUiRuntime(f.child, 'identity', cancelled.signal));
+    assert.doesNotMatch(f.output(), /FIXTURE_NAVIGATION/);
+    await assert.rejects(navigateOwnedLocalUiRuntime(f.child, 'SYNTHETIC_SENTINEL', AbortSignal.timeout(2000)));
+    assert.doesNotMatch(f.output(), /FIXTURE_NAVIGATION/);
 });
 
 test('ordinary launcher forwards only closed navigation intents without giving the caller runtime shutdown ownership', async () => {
@@ -529,12 +514,13 @@ test('cold plugin startup forwards ordinary launcher environment and preserves t
     assert.deepEqual(args.slice(1), ['--riusa']);
 });
 
-async function ordinaryLauncherFixture(t, remembered, args = []) {
+async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true) {
     const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-ordinary-launcher-')));
     const source = path.join(directory, 'source'), home = path.join(directory, 'home'), data = path.join(directory, 'data');
     mkdirSync(path.join(source, 'scripts'), { recursive: true }); mkdirSync(home); mkdirSync(data);
     for (const name of ['mediflow.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs']) {
-        writeFileSync(path.join(source, 'scripts', name), readFileSync(path.join(repoRoot, 'scripts', name)));
+        const bytes = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
+        writeFileSync(path.join(source, 'scripts', name), name === 'mediflow.mjs' ? bytes.replace('const startOptionalOllama = () => {', 'const startOptionalOllama = () => { process.stderr.write(\"FIXTURE_OLLAMA_START\\n\"); return;') : bytes);
     }
     mkdirSync(path.join(source, 'node_modules/next'), { recursive: true });
     mkdirSync(path.join(source, 'node_modules/better-sqlite3'), { recursive: true });
@@ -545,6 +531,7 @@ async function ordinaryLauncherFixture(t, remembered, args = []) {
         export * from ${JSON.stringify(new URL('./launcher-helpers.mjs', import.meta.url).href)};
         export const checkNode = () => ({ ok: true });
         export const knownMainUpdates = () => 0;
+        export const openUrl = () => 0;
         export const readProductIdentity = () => (${JSON.stringify(identity)});`);
     writeFileSync(path.join(source, 'scripts/build-input-metadata.mjs'), 'export const macDerivedDataDirectory = () => "/synthetic-no-native";');
     writeFileSync(path.join(source, 'scripts/source-runtime.mjs'), `
@@ -571,10 +558,10 @@ async function ordinaryLauncherFixture(t, remembered, args = []) {
     const socket = createHttpServer();
     await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
     const port = socket.address().port; await new Promise(resolve => socket.close(resolve));
-    const child = spawn(process.execPath, [path.join(source, 'scripts/mediflow.mjs'), '--riusa', '--senza-browser', ...args], {
-        env: { ...process.env, ...options.env, HOME: home, USERPROFILE: home, PORT: String(port) }, stdio: ['ignore', 'ignore', 'pipe'] });
+    const child = spawn(process.execPath, [path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), '--senza-browser', ...args], {
+        env: { ...process.env, ...options.env, HOME: home, USERPROFILE: home, PORT: String(port) }, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
     t.after(async () => {
-        if (child.exitCode === null && child.signalCode === null) { child.kill('SIGTERM'); await once(child, 'close'); }
+        if (child.exitCode === null && child.signalCode === null) { const exited = once(child, 'exit'); child.kill('SIGTERM'); await exited; }
         rmSync(directory, { recursive: true, force: true });
     });
     child.stderr.on('data', chunk => { output += chunk; });
@@ -598,8 +585,7 @@ test('headless ordinary runtime cannot acknowledge plugin navigation', async t =
         body: JSON.stringify({ intent: 'history', requestId: crypto.randomUUID(), expiresAt: Date.now() + 5000 }) });
     assert.notEqual(response.status, 202);
     assert.doesNotMatch(f.output(), /FIXTURE_NAVIGATION/);
-    await assert.rejects(navigateExistingLocalUiRuntime({ ...receipt, checkoutPath: f.source },
-        { sourceRoot: f.source, dataDir: f.data, sourceFingerprint: 'synthetic@aaaaaaaaaaaa:clean' }, 'history', new AbortController().signal));
+    await assert.rejects(navigateOwnedLocalUiRuntime(f.child, 'history', new AbortController().signal));
     assert.equal(JSON.parse(readFileSync(f.stateFiles.preferencesFile)).choice, 'agenti');
 });
 
@@ -638,44 +624,26 @@ test('internal reuse startup never overwrites ordinary preferences', async t => 
 test('ordinary web runtime accepts navigation and keeps remembered preferences', async t => {
     const f = await ordinaryLauncherFixture(t, 'web');
     await f.until(() => f.output().includes('Pronto:'));
-    const receipt = JSON.parse(readFileSync(path.join(f.stateFiles.lockDirectory, 'instance.json')));
-    assert.equal(await navigateExistingLocalUiRuntime({ ...receipt, checkoutPath: f.source },
-        { sourceRoot: f.source, dataDir: f.data, sourceFingerprint: 'synthetic@aaaaaaaaaaaa:clean' }, 'history', new AbortController().signal), true);
+    assert.equal(await navigateOwnedLocalUiRuntime(f.child, 'history', new AbortController().signal), true);
     await f.until(() => f.output().includes('FIXTURE_NAVIGATION'));
     assert.equal(JSON.parse(readFileSync(f.stateFiles.preferencesFile)).choice, 'web');
 });
 
 
-test('runtime cancellation during the POST revokes only that request before delayed dispatch', async () => {
-    const sourceFingerprint = 'synthetic@0123456789ab:clean';
-    const revision = createHttpServer((_request, response) => {
-        response.setHeader('Content-Type', 'application/json');
-        response.end(JSON.stringify({ revision: '0123456789ab', sourceFingerprint, fingerprint: 'synthetic' }));
-    });
-    await new Promise(resolve => revision.listen(0, '127.0.0.1', resolve));
-    const origin = `http://127.0.0.1:${revision.address().port}`;
-    let entered, release;
-    const waiting = new Promise(resolve => { entered = resolve; });
-    const gate = new Promise(resolve => { release = resolve; });
-    const intents = [], cancellations = [];
-    const page = await createChoiceServer({ root: repoRoot,
-        state: () => ({ ready: true, navigationReady: true, url: origin }), choose() {}, install() {}, stop() {},
-        async navigate(intent, request) { entered(); await gate; request.signal.throwIfAborted(); intents.push(intent); },
-        cancelNavigation(requestId) { cancellations.push(requestId); },
-    });
-    const receipt = { pid: process.pid, checkoutPath: repoRoot, dataDir: '/synthetic-only', choiceUrl: page.url };
-    const expected = { sourceRoot: repoRoot, dataDir: '/synthetic-only', sourceFingerprint };
+test('IPC cancellation revokes exactly its request before a delayed acknowledgement', async () => {
+    const { EventEmitter } = await import('node:events');
+    const child = new EventEmitter();
+    Object.assign(child, { connected: true, exitCode: null, signalCode: null });
+    const frames = [];
+    child.send = (frame, done) => { frames.push(frame); done(); };
     const controller = new AbortController();
-    try {
-        const pending = navigateExistingLocalUiRuntime(receipt, expected, 'history', controller.signal);
-        await waiting; controller.abort(); await assert.rejects(pending);
-        release(); await new Promise(resolve => setTimeout(resolve, 20));
-        assert.deepEqual(intents, []);
-        assert.ok(cancellations.length > 0);
-        assert.equal(new Set(cancellations).size, 1);
-        await assert.rejects(navigateExistingLocalUiRuntime(receipt, expected, 'history', new AbortController().signal, Date.now() - 1));
-        assert.deepEqual(intents, []);
-    } finally { release(); await page.close(); await new Promise(resolve => revision.close(resolve)); }
+    const pending = navigateOwnedLocalUiRuntime(child, 'history', controller.signal);
+    controller.abort(); await assert.rejects(pending);
+    assert.equal(frames.length, 2);
+    assert.equal(frames[1].type, 'mediflow-local-ui-cancel');
+    assert.equal(frames[1].requestId, frames[0].requestId);
+    child.emit('message', { type: 'mediflow-local-ui-result', requestId: frames[0].requestId, status: 'accepted' });
+    assert.equal(child.listenerCount('message'), 0);
 });
 
 test('a rejected navigation handoff revokes its request before returning an error', async () => {
@@ -690,4 +658,121 @@ test('a rejected navigation handoff revokes its request before returning an erro
             body: JSON.stringify({ intent: 'history', requestId, expiresAt: Date.now() + 5000 }) });
         assert.notEqual(response.status, 202); assert.deepEqual(revoked, [requestId]);
     } finally { await page.close(); }
+});
+
+
+test('reuse-only startup retains ordinary optional service initialization', async t => {
+    for (const reuse of [false, true]) {
+        const f = await ordinaryLauncherFixture(t, 'web', [], reuse);
+        await f.until(() => f.output().includes('Pronto:'));
+        assert.equal(f.output().split('FIXTURE_OLLAMA_START').length - 1, 1, `reuse=${reuse}`);
+    }
+});
+
+test('a public fingerprint and forged live PID cannot authorize a foreign listener', async () => {
+    const sourceFingerprint = 'synthetic@0123456789ab:clean';
+    const received = [];
+    const server = createHttpServer((request, response) => {
+        received.push(request.url);
+        response.setHeader('Content-Type', 'application/json');
+        if (request.url.endsWith('/state')) response.end(JSON.stringify({ ready: true, navigationReady: true, url: origin }));
+        else if (request.url.endsWith('/navigate')) { response.statusCode = 202; response.end(); }
+        else response.end(JSON.stringify({ revision: '0123456789ab', sourceFingerprint, fingerprint: 'public' }));
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const origin = `http://127.0.0.1:${server.address().port}`;
+    try {
+        for (const pid of [process.pid, 1]) await assert.rejects(navigateOwnedLocalUiRuntime({ pid, checkoutPath: repoRoot,
+            dataDir: '/synthetic-only', choiceUrl: origin + '/' + 'a'.repeat(48) + '/' },
+            'history', new AbortController().signal), /navigation_unavailable/);
+        assert.deepEqual(received, []);
+    } finally { await new Promise(resolve => server.close(resolve)); }
+});
+
+test('README reproduces the preference-preserving reuse-only invocation', () => {
+    const readme = readFileSync(path.join(repoRoot, 'plugins/mediflow-local-ui/README.md'), 'utf8');
+    assert.match(readme, /node scripts\/mediflow\.mjs --riusa/);
+    assert.doesNotMatch(readme, /--scelta web --senza-browser --riusa/);
+});
+
+
+test('plugin refuses forged receipts, replacement ports and lock directory aliases at the real entry', async t => {
+    const f = await ordinaryLauncherFixture(t, 'web');
+    await f.until(() => f.output().includes('Pronto:'));
+    const requests = [];
+    const foreign = createHttpServer((request, response) => { requests.push(request.url); response.end('{}'); });
+    await new Promise(resolve => foreign.listen(0, '127.0.0.1', resolve));
+    t.after(() => new Promise(resolve => foreign.close(resolve)));
+    const receiptFile = path.join(f.stateFiles.lockDirectory, 'instance.json');
+    const original = readFileSync(receiptFile);
+    const script = `
+        import { registerHooks } from 'node:module';
+        registerHooks({ load(url, context, next) {
+            if (url === ${JSON.stringify(new URL('./launcher-helpers.mjs', import.meta.url).href)}) return { format: 'module', shortCircuit: true,
+                source: 'export const readProductIdentity = () => ({ worktreeHash: "clean", revision: "aaaaaaaaaaaa" });' };
+            return next(url, context);
+        } });
+        const { createLocalUiRuntimeNavigator } = await import(${JSON.stringify(new URL('./local-ui-runtime.mjs', import.meta.url).href)});
+        const navigate = createLocalUiRuntimeNavigator({ sourceRoot: ${JSON.stringify(f.source)}, dataDir: ${JSON.stringify(f.data)}, revision: 'a'.repeat(40) });
+        const keepAlive = setInterval(() => {}, 1000);
+        try { await navigate('history', AbortSignal.timeout(3000)); process.exitCode = 7; }
+        catch (error) { if (error.message !== 'navigation_unavailable') throw error; }
+        finally { clearInterval(keepAlive); }
+    `;
+    const deny = async () => {
+        const processUnderTest = spawn(process.execPath, ['--input-type=module', '-e', script], { stdio: ['ignore', 'ignore', 'pipe'],
+            env: { ...process.env, HOME: path.dirname(f.source) + '/home', USERPROFILE: path.dirname(f.source) + '/home',
+                XDG_CONFIG_HOME: path.dirname(f.source) + '/home/config', APPDATA: path.dirname(f.source) + '/home/Roaming' } });
+        let stderr = ''; processUnderTest.stderr.on('data', chunk => { stderr += chunk; });
+        const timer = setTimeout(() => processUnderTest.kill('SIGKILL'), 5000);
+        try { const [status] = await once(processUnderTest, 'exit'); assert.equal(status, 0, stderr); }
+        finally { clearTimeout(timer); }
+    };
+    try {
+        for (const pid of [process.pid, 1]) {
+            atomicJson(receiptFile, { pid, checkoutPath: f.source + path.sep, dataDir: f.data,
+                choiceUrl: `http://127.0.0.1:${foreign.address().port}/${'a'.repeat(48)}/` });
+            await deny();
+        }
+        const lock = f.stateFiles.lockDirectory, moved = lock + '.synthetic';
+        renameSync(lock, moved); symlinkSync(moved, lock, 'dir');
+        try { await deny(); } finally { rmSync(lock); renameSync(moved, lock); }
+        rmSync(receiptFile); symlinkSync(f.stateFiles.preferencesFile, receiptFile);
+        try { await deny(); } finally { rmSync(receiptFile); }
+        assert.deepEqual(requests, []);
+    } finally { writeFileSync(receiptFile, original, { mode: 0o600 }); }
+});
+
+test('disconnecting the plugin leaves its ordinary runtime alive and usable', { timeout: 12000 }, async t => {
+    const f = await ordinaryLauncherFixture(t, 'web');
+    await f.until(() => f.output().includes('Pronto:'));
+    assert.equal(await navigateOwnedLocalUiRuntime(f.child, 'history', new AbortController().signal), true);
+    f.child.disconnect();
+    const receipt = JSON.parse(readFileSync(path.join(f.stateFiles.lockDirectory, 'instance.json')));
+    const state = await (await fetch(new URL('state', receipt.choiceUrl), { signal: AbortSignal.timeout(3000) })).json();
+    assert.equal(state.ready, true);
+    assert.equal((await fetch(state.url, { signal: AbortSignal.timeout(3000) })).status, 200);
+    assert.equal(f.child.exitCode, null);
+    await assert.rejects(navigateOwnedLocalUiRuntime(f.child, 'search', new AbortController().signal), /navigation_unavailable/);
+});
+
+
+test('IPC rejects replay, expiry, revoked IDs and extra fields without new navigation', async t => {
+    const f = await ordinaryLauncherFixture(t, 'web');
+    await f.until(() => f.output().includes('Pronto:'));
+    const send = frame => new Promise(resolve => {
+        const receive = result => { if (result.requestId === frame.requestId) { f.child.off('message', receive); resolve(result.status); } };
+        f.child.on('message', receive); f.child.send(frame);
+    });
+    const request = { type: 'mediflow-local-ui-navigate', requestId: crypto.randomUUID(), intent: 'identity', expiresAt: Date.now() + 5000 };
+    assert.equal(await send(request), 'accepted');
+    assert.equal(await send(request), 'denied');
+    for (const frame of [{ ...request, requestId: crypto.randomUUID(), expiresAt: Date.now() - 1 },
+        { ...request, requestId: crypto.randomUUID(), patientId: 'SYNTHETIC_SENTINEL' }]) assert.equal(await send(frame), 'denied');
+    const revoked = { ...request, requestId: crypto.randomUUID() };
+    f.child.send({ type: 'mediflow-local-ui-cancel', requestId: revoked.requestId });
+    assert.equal(await send(revoked), 'denied');
+    await f.until(() => f.output().includes('FIXTURE_NAVIGATION'));
+    const navigation = f.output().split('\n').filter(line => line.includes('mediflow.local-ui.navigation.v1'));
+    assert.equal(navigation.length, 1);
 });

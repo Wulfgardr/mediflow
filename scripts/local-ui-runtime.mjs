@@ -4,46 +4,39 @@ import path from 'node:path';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { ordinaryLauncherEnvironment } from '../plugins/mediflow-local-ui/src/runtime-environment.mjs';
-import { prepareLauncherState } from './launcher-state.mjs';
-import { probeRunningInstance, readProductIdentity } from './launcher-helpers.mjs';
+import { readProductIdentity } from './launcher-helpers.mjs';
 
 const unavailable = () => { throw new Error('navigation_unavailable'); };
-const alive = pid => {
-  if (!Number.isSafeInteger(pid) || pid <= 0) return false;
-  try { process.kill(pid, 0); return true; } catch (error) { return error.code !== 'ESRCH'; }
-};
-
-export async function navigateExistingLocalUiRuntime(receipt, expected, intent, signal, expiresAt = Date.now() + 8000) {
+export async function navigateOwnedLocalUiRuntime(child, intent, signal, expiresAt = Date.now() + 8000) {
   signal.throwIfAborted();
-  if (!receipt || receipt.checkoutPath !== expected.sourceRoot || !alive(receipt.pid)) return unavailable();
-  if (receipt.choiceUrl === undefined) return false;
-  if (receipt.dataDir !== expected.dataDir
-    || !/^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}\/[a-f0-9]{48}\/$/u.test(receipt.choiceUrl)) return unavailable();
-  const status = await fetch(new URL('state', receipt.choiceUrl), { signal });
-  if (!status.ok) return unavailable();
-  const state = await status.json();
-  if (!state.ready) return false;
-  if (state.navigationReady !== true) return unavailable();
-  if (!/^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}$/u.test(state.url)
-    || !(await probeRunningInstance(state.url, expected.sourceFingerprint)).ok) return unavailable();
+  if (!child?.connected || typeof child.send !== 'function' || child.exitCode !== null || child.signalCode !== null) return unavailable();
   const requestId = crypto.randomUUID();
-  const headers = { Origin: new URL(receipt.choiceUrl).origin, 'Content-Type': 'application/json' };
-  let revocation;
-  const cancel = () => revocation ??= (async () => {
-    try { await fetch(new URL('cancel-navigation', receipt.choiceUrl), { method: 'POST', headers,
-      body: JSON.stringify({ requestId }), signal: AbortSignal.timeout(1000) }); } catch { /* Best-effort revocation; the handoff also expires. */ }
-  })();
-  const abort = () => { void cancel(); };
-  signal.addEventListener('abort', abort, { once: true });
-  try {
-    signal.throwIfAborted();
-    const response = await fetch(new URL('navigate', receipt.choiceUrl), { method: 'POST', signal, headers,
-      body: JSON.stringify({ intent, requestId, expiresAt }) });
-    signal.throwIfAborted();
-    if (response.status !== 202) return unavailable();
-  } catch (error) { await cancel(); throw error; }
-  finally { signal.removeEventListener('abort', abort); }
-  return true;
+  return new Promise((resolve, reject) => {
+    const cancel = () => {
+      if (child.connected) child.send({ type: 'mediflow-local-ui-cancel', requestId }, () => {});
+    };
+    let settled = false;
+    const finish = (error, ready) => {
+      if (settled) return;
+      settled = true;
+      child.off('message', message); child.off('exit', exited); child.off('disconnect', exited);
+      signal.removeEventListener('abort', abort);
+      if (error) { cancel(); reject(error); } else resolve(ready);
+    };
+    const abort = () => finish(signal.reason);
+    const exited = () => finish(new Error('navigation_unavailable'));
+    const message = frame => {
+      if (frame?.type !== 'mediflow-local-ui-result' || frame.requestId !== requestId) return;
+      if (signal.aborted) return abort();
+      if (frame.status === 'waiting') finish(null, false);
+      else if (frame.status === 'accepted') finish(null, true);
+      else finish(new Error('navigation_unavailable'));
+    };
+    child.on('message', message); child.once('exit', exited); child.once('disconnect', exited);
+    signal.addEventListener('abort', abort, { once: true });
+    if (signal.aborted) return abort();
+    child.send({ type: 'mediflow-local-ui-navigate', requestId, intent, expiresAt }, error => { if (error) finish(error); });
+  });
 }
 
 export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision }) {
@@ -51,39 +44,29 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
     || !path.isAbsolute(dataDir) || fs.realpathSync(dataDir) !== dataDir) return unavailable();
   const identity = readProductIdentity(sourceRoot);
   if (identity.worktreeHash !== 'clean' || identity.revision !== revision.slice(0, 12)) return unavailable();
-  const expected = { sourceRoot, dataDir, sourceFingerprint: identity.sourceFingerprint };
-  const receiptFile = path.join(prepareLauncherState(sourceRoot).lockDirectory, 'instance.json');
-  const read = () => {
-    try {
-      const stat = fs.lstatSync(receiptFile);
-      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1
-        || (process.getuid && stat.uid !== process.getuid())) return unavailable();
-      return JSON.parse(fs.readFileSync(receiptFile, 'utf8'));
-    } catch (error) { if (error.code === 'ENOENT') return null; throw error; }
-  };
-  let starting = null;
+  let starting = null, launcher = null;
   const start = async () => {
     const port = await new Promise((resolve, reject) => {
       const server = net.createServer(); server.once('error', reject);
       server.listen(0, '127.0.0.1', () => { const port = server.address().port; server.close(error => error ? reject(error) : resolve(port)); });
     });
     const child = spawn(process.execPath, [path.join(sourceRoot, 'scripts/mediflow.mjs'), '--riusa'], {
-      cwd: sourceRoot, detached: true, stdio: 'ignore', shell: false,
+      cwd: sourceRoot, detached: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'], shell: false,
       env: { ...ordinaryLauncherEnvironment(dataDir), PORT: String(port) },
     });
     await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
     child.unref();
+    child.channel.unref();
+    launcher = child;
   };
   return async (intent, signal) => {
     const expiresAt = Date.now() + 8000;
     const deadline = AbortSignal.any([signal, AbortSignal.timeout(8000)]);
     deadline.throwIfAborted();
-    const first = read();
-    if (!first || !alive(first.pid)) { starting ??= start().finally(() => { starting = null; }); await starting; }
+    if (!launcher) { starting ??= start().finally(() => { starting = null; }); await starting; }
     for (;;) {
       deadline.throwIfAborted();
-      const receipt = read();
-      if (receipt && alive(receipt.pid) && await navigateExistingLocalUiRuntime(receipt, expected, intent, deadline, expiresAt)) return;
+      if (await navigateOwnedLocalUiRuntime(launcher, intent, deadline, expiresAt)) return;
       await new Promise(resolve => { const timer = setTimeout(resolve, 100); timer.unref(); });
     }
   };
