@@ -732,6 +732,54 @@ test('Windows shutdown sends no IPC frame without explicit permission', () => {
 });
 
 
+test('owned shutdown requires an observed exit and rejects failed OS termination', () => {
+    const result = spawnSync(process.execPath, ['--input-type=module','-e', `
+        import assert from 'node:assert/strict'; import cp from 'node:child_process';
+        import { EventEmitter } from 'node:events'; import { syncBuiltinESMExports } from 'node:module';
+        const { stopOwnedChild } = await import(${JSON.stringify(new URL('./mediflow.mjs', import.meta.url).href)});
+        let child, outcome, calls, frames;
+        const terminate = () => {
+            calls++;
+            if (outcome === 'error') throw Object.assign(new Error('synthetic EPERM'),{code:'EPERM'});
+            if (outcome === 'status') return {status:1};
+            if (outcome === 'exit') setTimeout(()=>{child.exitCode=0;child.emit('exit',0);},2);
+            return {status:0};
+        };
+        cp.spawnSync = (command,args,options) => {
+            assert.equal(command,'taskkill'); assert.deepEqual(args,['/pid','424242','/T','/F']);
+            assert.ok(options.timeout > 0 && options.timeout <= 25);
+            try { return terminate(); } catch(error) {return {status:null,error};}
+        };
+        process.kill = (pid,signal) => {
+            assert.equal(pid,-424242); assert.ok(['SIGTERM','SIGKILL'].includes(signal));
+            const result = terminate();
+            if(result.status !== 0) throw Object.assign(new Error('synthetic EPERM'),{code:'EPERM'});
+            return true;
+        };
+        syncBuiltinESMExports();
+        for (const platform of ['win32','linux']) for (outcome of ['error','status','no-exit','exit','ipc-exit','ipc-error']) {
+            for (const allowIpcStop of platform === 'win32' ? [false,true] : [false]) {
+                if (outcome.startsWith('ipc-') && !allowIpcStop) continue;
+                Object.defineProperty(process,'platform',{value:platform,configurable:true});
+                calls=0;frames=[];child=new EventEmitter();
+                Object.assign(child,{pid:424242,connected:true,exitCode:null,signalCode:null,
+                    send(frame,done){frames.push(frame);done(outcome === 'ipc-error' ? Object.assign(new Error('synthetic IPC EPERM'),{code:'EPERM'}) : null);if(outcome === 'ipc-exit') queueMicrotask(()=>{child.exitCode=0;child.emit('exit',0);});}});
+                const pending=stopOwnedChild(child,25,{allowIpcStop});
+                if (outcome === 'exit' || outcome === 'ipc-exit') await pending;
+                else await assert.rejects(pending,error=>error.code === 'MEDIFLOW_OWNED_STOP_UNCONFIRMED'
+                    && (outcome === 'no-exit' ? /Exit.*non osservato/u.test(error.cause?.message)
+                        : outcome === 'status' && platform === 'win32' ? /taskkill: 1/u.test(error.cause?.message) : error.cause?.code === 'EPERM'));
+                assert.equal(child.listenerCount('exit'),0);
+                assert.deepEqual(frames,platform === 'win32' && allowIpcStop ? [{type:'mediflow-launcher-stop'}] : []);
+                const count=calls;child.emit('exit',0);
+                await new Promise(resolve=>setTimeout(resolve,30));assert.equal(calls,count);
+                console.log(JSON.stringify({platform,outcome,allowIpcStop,calls,exit:child.exitCode}));
+            }
+        }
+    `],{encoding:'utf8',timeout:5000});
+    assert.equal(result.status,0,result.stderr);
+});
+
 import { launcherConfigDirectory, prepareLauncherState } from './launcher-state.mjs';
 
 test('launcher configuration follows the operating system, independently of the archive', () => {
@@ -910,10 +958,63 @@ async function stopFixtureChild(child, closed) {
     await waitForFixtureClose(closed);
 }
 
-async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, webIdentity = true, overrides = {}, initialOwner = null) {
+async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, webIdentity = true, overrides = {}, initialOwner = null, lifecycle = null) {
     const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-ordinary-launcher-')));
     const source = path.join(directory, 'source'), home = path.join(directory, 'home'), data = path.join(directory, 'data');
     mkdirSync(path.join(source, 'scripts'), { recursive: true }); mkdirSync(home); mkdirSync(data);
+    const stopControl = path.join(directory, 'stop.json'), runtimePid = path.join(directory, 'runtime-pid.json');
+    const stopTrace = path.join(directory, 'stop-trace.ndjson'), stopLoader = path.join(directory, 'stop-loader.mjs');
+    if (lifecycle) {
+        atomicJson(stopControl, lifecycle);
+        writeFileSync(stopLoader, `
+            import fs from 'node:fs'; import cp from 'node:child_process';
+            import { registerHooks, syncBuiltinESMExports } from 'node:module';
+            const run = cp.spawnSync, kill = process.kill.bind(process);
+            const stop = (pid, signal) => {
+                const owned = JSON.parse(fs.readFileSync(${JSON.stringify(runtimePid)})).pid;
+                if (pid !== owned) throw new Error('FIXTURE_FOREIGN_PID_DENIED');
+                fs.appendFileSync(${JSON.stringify(stopTrace)}, JSON.stringify({pid,signal}) + '\\n');
+                const { failure } = JSON.parse(fs.readFileSync(${JSON.stringify(stopControl)}));
+                if (failure === 'error') throw Object.assign(new Error('SYNTHETIC_STOP_EPERM'), {code:'EPERM'});
+                if (failure === 'status') return {status:1};
+                if (failure === 'no-exit') return {status:0};
+                kill(pid, 'SIGTERM'); return {status:0};
+            };
+            cp.spawnSync = (command,args,...rest) => {
+                if (command !== 'taskkill') return run(command,args,...rest);
+                if (args.length !== 4 || args[0] !== '/pid' || args[2] !== '/T' || args[3] !== '/F') throw new Error('FIXTURE_STOP_SCOPE_DENIED');
+                try { return stop(Number(args[1]), 'taskkill'); } catch(error) { return {status:null,error}; }
+            };
+            process.kill = (pid,signal) => pid < 0 && signal !== 0 ? (() => {
+                const result = stop(-pid,signal);
+                if (result.status !== 0) throw Object.assign(new Error('SYNTHETIC_STOP_EPERM'),{code:'EPERM'});
+                return true;
+            })() : kill(pid,signal);
+            syncBuiltinESMExports();
+            process.on('message', frame => { if (frame?.type === 'fixture-signal') process.emit('SIGTERM'); });
+            registerHooks({load(url,context,next) {
+                const result = next(url,context);
+                if (url === ${JSON.stringify(new URL('scripts/mediflow.mjs', 'file://' + source + '/').href)}) {
+                    let text = String(result.source);
+                    const from = text.indexOf('export async function stopOwnedChild'), to = text.indexOf('export function installDesktopEntry',from);
+                    text = text.slice(0,from) + text.slice(from,to).replaceAll('process.platform', ${JSON.stringify(JSON.stringify(lifecycle.platform))}) + text.slice(to);
+                    result.source = text.replace('stopOwnedChild(child, 8000,', 'stopOwnedChild(child, 60,');
+                }
+                return result;
+            }});`);
+        t.after(async () => {
+            if (!existsSync(runtimePid)) return;
+            const { pid } = JSON.parse(readFileSync(runtimePid));
+            try { process.kill(pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+            const deadline = Date.now() + 2000;
+            for (;;) {
+                try { process.kill(pid, 0); } catch (error) { if (error.code === 'ESRCH') break; throw error; }
+                assert.ok(Date.now() < deadline, 'Owned synthetic runtime did not exit');
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+            if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+        });
+    }
     for (const name of ['mediflow.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs']) {
         const bytes = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
         writeFileSync(path.join(source, 'scripts', name), name === 'mediflow.mjs' ? bytes.replace('const startOptionalOllama = () => {', 'const startOptionalOllama = () => { process.stderr.write(\"FIXTURE_OLLAMA_START\\n\"); return;') : bytes);
@@ -932,10 +1033,12 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     writeFileSync(path.join(source, 'scripts/build-input-metadata.mjs'), 'export const macDerivedDataDirectory = () => "/synthetic-no-native";');
     writeFileSync(path.join(source, 'scripts/source-runtime.mjs'), `
         import http from 'node:http';
+        import fs from 'node:fs';
         import { webIdentityProof } from ${JSON.stringify(new URL('./local-ui-web-identity.mjs', import.meta.url).href)};
         import { installLocalUiWebNavigation } from ${JSON.stringify(new URL('./local-ui-web-navigation.mjs', import.meta.url).href)};
         export const verifySourceRuntime = () => ({ identity: ${JSON.stringify(identity)} });
         if (process.argv[1].endsWith('source-runtime.mjs')) {
+            ${lifecycle ? `fs.writeFileSync(${JSON.stringify(runtimePid)}, JSON.stringify({pid:process.pid}));` : ''}
             let live = true;
             const pairing = () => globalThis[Symbol.for('mediflow.local-ui.pairing.v1')];
             installLocalUiWebNavigation(process, 'http://127.0.0.1:' + process.env.PORT, () => {});
@@ -977,7 +1080,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     const socket = createHttpServer();
     await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
     const port = socket.address().port; await new Promise(resolve => socket.close(resolve));
-    const child = spawn(process.execPath, [path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), '--senza-browser', ...args], {
+    const child = spawn(process.execPath, [...(lifecycle ? ['--import', stopLoader] : []), path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), '--senza-browser', ...args], {
         env: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home, PORT: String(port) }, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
     const closed = Promise.all([once(child, 'exit'), once(child.stderr, 'close')]).then(([exit]) => exit);
     t.after(async () => {
@@ -993,8 +1096,115 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
             await new Promise(resolve => setTimeout(resolve, 10));
         }
     };
-    return { source, data, stateFiles, child, closed, until, environment: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home }, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
+    return { source, data, stateFiles, child, closed, until, stopControl, stopTrace, runtimePid, environment: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home }, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
 }
+
+for (const platform of ['win32', 'linux']) for (const failure of platform === 'win32' ? ['error', 'status', 'no-exit'] : ['error', 'no-exit']) {
+    for (const trigger of ['signal', 'chooser', 'error', 'switch']) test(`unconfirmed ${platform} ${failure} stop via ${trigger} retains the live owner`, { timeout: 15000 }, async t => {
+        const f = await ordinaryLauncherFixture(t, 'web', ['--scelta', 'web'], true, trigger !== 'error', {}, null, {platform,failure});
+        if (trigger !== 'error') await f.until(() => f.output().includes('Pronto:'));
+        else await f.until(() => existsSync(f.stopTrace));
+        const file = launcherReceiptFile(f.stateFiles.lockDirectory), receipt = JSON.parse(readFileSync(file));
+        const stop = async () => {
+            const endpoint = new URL('stop', receipt.choiceUrl);
+            const response = await fetch(endpoint, {method:'POST',headers:{Origin:endpoint.origin,'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(1000)});
+            assert.equal(response.status,200); await response.text();
+        };
+        if (trigger === 'signal') {
+            if (process.platform === 'win32') f.child.send({type:'fixture-signal'});
+            else f.child.kill('SIGTERM');
+        } else if (trigger === 'chooser') await stop();
+        else if (trigger === 'switch') {
+            const endpoint = new URL('choose',receipt.choiceUrl);
+            const response = await fetch(endpoint,{method:'POST',headers:{Origin:endpoint.origin,'Content-Type':'application/json'},body:JSON.stringify({choice:'agenti'}),signal:AbortSignal.timeout(1000)});
+            assert.equal(response.status,202); await response.text();
+        }
+        await f.until(() => existsSync(f.stopTrace));
+        await new Promise(resolve=>setTimeout(resolve,150));
+        const pid = JSON.parse(readFileSync(f.runtimePid)).pid;
+        process.kill(pid,0);
+        const current = claimLauncher(f.stateFiles.lockDirectory,{checkoutPath:f.source+path.sep},{reuseLive:true});
+        t.diagnostic(JSON.stringify({platform,failure,trigger,runtimeAlive:pid,launcher:f.child.pid,claimed:current.claimed}));
+        try { assert.equal(current.claimed,false,'A second writer acquired while the owned runtime is alive'); }
+        finally { if (current.claimed) releaseLauncher(current); }
+        assert.equal(current.receipt.pid,f.child.pid);
+        await f.until(() => f.output().includes('Arresto non verificato'));
+        assert.equal(f.child.exitCode,null,f.output()); assert.equal(f.child.signalCode,null,f.output());
+        assert.equal(JSON.parse(readFileSync(file)).pid,f.child.pid);
+        assert.doesNotMatch(f.output(),/unhandled|MediFlow arrestato\./iu);
+        const frames = f.output().split('\n').filter(line=>line.includes('mediflow-launcher-stop'));
+        assert.equal(frames.length,platform === 'win32' && trigger !== 'error' ? 1 : 0,f.output());
+        for (const entry of readFileSync(f.stopTrace,'utf8').trim().split('\n').map(line=>JSON.parse(line))) assert.equal(entry.pid,pid);
+        atomicJson(f.stopControl,{platform,failure:null});
+        await stop(); await waitForFixtureClose(f.closed);
+        assert.equal(existsSync(path.join(f.stateFiles.lockDirectory,'active')),false);
+        const successor = claimLauncher(f.stateFiles.lockDirectory,{checkoutPath:f.source+path.sep});
+        try {
+            assert.equal(successor.claimed,true);
+            await new Promise(resolve=>setTimeout(resolve,100));
+            assert.equal(JSON.parse(readFileSync(successor.receiptFile)).pid,process.pid);
+        } finally { releaseLauncher(successor); }
+    });
+}
+
+for (const scenario of ['stop-timeout','readiness-error','exit']) test(`CI smoke preserves an unconfirmed runtime and its fixture: ${scenario}`, t => {
+    const directory = realpathSync(mkdtempSync(path.join(tmpdir(),'mediflow-smoke-stop-contract-')));
+    t.after(()=>rmSync(directory,{recursive:true,force:true}));
+    const fixture = path.join(directory,'fixture'), trace = path.join(directory,'result.json'); mkdirSync(fixture);
+    const result = spawnSync(process.execPath,['--input-type=module','-e',`
+        import fs from 'node:fs'; import {EventEmitter} from 'node:events';
+        import {registerHooks,syncBuiltinESMExports} from 'node:module';
+        const events={forced:0,removed:0,unhandled:[],error:null};let live=true,spawns=0;
+        const primary=new EventEmitter();Object.assign(primary,{pid:424242,exitCode:null,signalCode:null,stderr:new EventEmitter()});
+        globalThis[Symbol.for('smoke-owned-fixture')]=primary;
+        const remove=fs.rmSync;fs.mkdtempSync=()=>${JSON.stringify(fixture)};
+        fs.rmSync=(file,...args)=>{if(file===${JSON.stringify(fixture)}){events.removed++;return;}return remove(file,...args);};
+        syncBuiltinESMExports();
+        process.on('unhandledRejection',error=>events.unhandled.push(error.message));
+        globalThis.fetch=async url=>{
+            const pathname=new URL(url).pathname;
+            if(pathname.endsWith('/state'))return {json:async()=>({ready:true})};
+            if(pathname.endsWith('/go'))return {status:303,headers:{get:()=> 'http://127.0.0.1:3000'}};
+            if(pathname.endsWith('/stop')){
+                if(${JSON.stringify(scenario)}==='exit')queueMicrotask(()=>{live=false;primary.exitCode=0;primary.emit('exit',0);});
+                return {status:200,text:async()=> 'stopping'};
+            }
+            throw new Error('Unexpected fixture request');
+        };
+        globalThis[Symbol.for('smoke-probe')]=async()=>{
+            if(${JSON.stringify(scenario)}==='readiness-error')throw new Error('SYNTHETIC_READINESS_FAILURE');
+            return {ok:live};
+        };
+        globalThis[Symbol.for('smoke-spawn')]=()=>{
+            if(spawns++===0){queueMicrotask(()=>primary.stderr.emit('data','Avvio: http://127.0.0.1:3001/'+ 'a'.repeat(48) +'/'));return primary;}
+            const second=new EventEmitter();second.stderr=new EventEmitter();
+            queueMicrotask(()=>{second.stderr.emit('data','già attivo');second.emit('exit',0);});return second;
+        };
+        globalThis[Symbol.for('smoke-force')]=async()=>{events.forced++;if(${JSON.stringify(scenario)}==='stop-timeout')throw new Error('SYNTHETIC_FORCED_STOP_FAILURE');};
+        registerHooks({load(url,context,next){
+            if(url==='node:child_process')return {format:'module',shortCircuit:true,source:'export const spawn=globalThis[Symbol.for("smoke-spawn")];'};
+            if(url===${JSON.stringify(new URL('./launcher-helpers.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const readProductIdentity=()=>({sourceFingerprint:"synthetic"});export const probeRunningInstance=globalThis[Symbol.for("smoke-probe")];'};
+            if(url===${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const stopOwnedChild=globalThis[Symbol.for("smoke-force")];'};
+            const result=next(url,context);
+            if(url===${JSON.stringify(new URL('./ci-start-smoke.mjs',import.meta.url).href)})result.source=String(result.source).replaceAll('15000','60').replaceAll('1000','60');
+            return result;
+        }});
+        const hold=setInterval(()=>{},1000);
+        const save=()=>fs.writeFileSync(${JSON.stringify(trace)},JSON.stringify({...events,live}));
+        const watchdog=setTimeout(()=>{save();process.exit(42);},500);
+        try{await import(${JSON.stringify(new URL('./ci-start-smoke.mjs',import.meta.url).href)});}
+        catch(error){events.error=error.message;process.exitCode=1;}
+        finally{clearTimeout(watchdog);clearInterval(hold);save();}
+    `],{env:{...process.env,PORT:'3000'},encoding:'utf8',timeout:2000});
+    const observed = JSON.parse(readFileSync(trace));
+    t.diagnostic(JSON.stringify({scenario,...observed}));
+    assert.equal(result.status,scenario === 'exit' ? 0 : 1,result.stderr);
+    assert.deepEqual(observed.unhandled,[]); assert.equal(observed.forced,0);
+    assert.equal(observed.removed,scenario === 'exit' ? 1 : 0);
+    assert.equal(observed.live,scenario !== 'exit');
+    if (scenario === 'readiness-error') assert.equal(observed.error,'SYNTHETIC_READINESS_FAILURE');
+    if (scenario === 'stop-timeout') assert.match(observed.error,/arresto.*non verificato/iu);
+});
 
 test('headless ordinary runtime cannot acknowledge plugin navigation', async t => {
     const f = await ordinaryLauncherFixture(t, 'agenti');
