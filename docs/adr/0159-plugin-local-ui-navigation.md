@@ -3,6 +3,26 @@
 Data: 2026-10-21. Stato: Proposed; implementazione candidata WUL-757.
 Riferimenti: WUL-756, ADR 0114, 0117, 0140 e 0146.
 
+## Rettifica del lifecycle — 23 ottobre 2026
+
+La qualifica sintetica dei client ha dimostrato che la chiusura dell'host
+arrestava anche il Web posseduto dal plugin. Il successivo controllo di sicurezza
+smontava l'editor e perdeva la bozza non registrata, pur conservando i record salvati.
+La decisione di coordinamento sostituisce la proprietà del Web descritta sotto:
+il plugin è un telecomando e non possiede il runtime clinico.
+
+Il raccordo riusa l'istanza del launcher ordinario della medesima sorgente e del
+medesimo archivio. Se manca, avvia il launcher ordinario come processo indipendente,
+staccato, con build già ammessa e decisione `reuse`. Non adotta listener arbitrari,
+non avvia build o installazioni implicite e non registra il launcher o il Web fra
+i figli posseduti. La chiusura dell'host termina soltanto il raccordo MCP.
+
+La navigazione attraversa il controllo locale già posseduto dal launcher e il suo
+IPC Web: soltanto i quattro intenti chiusi, dopo verifica di identità e archivio.
+La risposta al modello resta fissa. Non cambiano sessione clinica, single-writer,
+conferma locale, epoch, scadenza o revoca. Nessuna porta clinica viene composta dal
+raccordo. Il recupero cifrato delle bozze dopo riavvio resta una proposta separata.
+
 ## Decisione
 
 Codex locale e Claude Code usano pacchetti sottili sopra lo stesso MCP e
@@ -15,9 +35,11 @@ chiamate dirette alle operazioni degli altri profili. Gli ingressi esistenti,
 Mini e il grant opzionale profilo conservano i propri contratti; il grant
 `none` non significa local-only.
 
-La navigazione usa il canale privato Web ereditato già esistente. Funziona
-prima di login e selezione senza costruire una sessione clinica. La readiness tecnica privata del Web viene attesa con timeout, senza
-conservare intenti oltre la richiesta in corso. Un messaggio finito viene inoltrato, senza attenderne lookup o rendering. Il risultato
+La navigazione usa il controllo privato del launcher ordinario e il suo IPC Web.
+Funziona prima di login e selezione senza costruire una sessione clinica.
+Prima dell'inoltro verifica sorgente, archivio e readiness tecnica, entro il timeout
+della richiesta; non conserva intenti per una riconnessione. Il messaggio finito
+non attende lookup o rendering. Il risultato
 pubblico è sempre `continue_in_mediflow`; non prova apertura, caricamento,
 presenza del paziente o esecuzione di atti. Errori pubblici e diagnostica sono
 fissi, anche per la validazione MCP prima dell'handler. Non esistono resource,
@@ -56,7 +78,9 @@ nessun tool decide terapia, conferma, firma o trasmette prescrizioni.
 L'ingresso del pacchetto verifica il payload sorgente versionato tramite il
 ledger e il runtime Node locali esistenti prima di eseguire il Supervisor.
 Niente MCP bare, HTTP generico, download impliciti, broker residente, nuovo
-writer, adattatore SQLite o cloud. La closure di staging comprende i nuovi
+writer, adattatore SQLite o cloud. Il controllo locale esistente del launcher
+ammette soltanto l'enum nel comando nominato `navigate`, protetto dal suo token
+locale e dall'origine; non espone un inoltro HTTP arbitrario. La closure di staging comprende i nuovi
 ingressi. Il plugin sintetico storico rimane distinto. Rimozione del pacchetto
 non modifica archivio o chiavi; il Supervisor arresta solo i propri figli.
 

@@ -18,11 +18,12 @@ const CHOICES = ['web', 'mac', 'agenti', 'sviluppo'];
 const log = message => process.stderr.write(`${message}\n`);
 
 export function parseArguments(args) {
-  const options = { choose: false, noBrowser: false, choice: null, desktop: false };
+  const options = { choose: false, noBrowser: false, choice: null, desktop: false, reuseOnly: false };
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
     if (arg === '--scegli') options.choose = true;
     else if (arg === '--senza-browser') options.noBrowser = true;
+    else if (arg === '--riusa') options.reuseOnly = true;
     else if (arg === 'install-desktop-entry') options.desktop = true;
     else if (arg === '--scelta' && CHOICES.includes(args[index + 1])) options.choice = args[++index];
     else throw new Error(`Argomento non valido: ${arg}. Usa --scegli, --scelta web|mac|agenti|sviluppo o --senza-browser.`);
@@ -172,6 +173,9 @@ export async function main(args = process.argv.slice(2)) {
   if (options.desktop) { log(`Collegamento creato: ${installDesktopEntry()}`); return; }
   if (knownMainUpdates(ROOT)) throw new Error('Questa copia non contiene aggiornamenti già noti a Git. Esegui git pull --ff-only e riapri MediFlow.');
   const identity = readProductIdentity(ROOT);
+  const configuredDataDir = process.env.MEDIFLOW_DATA_DIR || (process.platform === 'darwin'
+    ? path.join(os.homedir(), 'Library/Application Support/MediFlow') : path.join(os.homedir(), '.mediflow'));
+  const dataDir = fs.existsSync(configuredDataDir) ? fs.realpathSync(configuredDataDir) : path.resolve(configuredDataDir);
   const { preferencesFile, lockDirectory } = prepareLauncherState(ROOT);
   const existing = await findExistingInstance(readJson(path.join(lockDirectory, 'instance.json')), identity);
   if (existing) {
@@ -269,6 +273,7 @@ export async function main(args = process.argv.slice(2)) {
       let verified;
       try { verified = verifySourceRuntime(ROOT); } catch { /* Missing or obsolete build requires preparation. */ }
       const decision = buildDecision(current, verified);
+      if (options.reuseOnly && decision !== 'reuse') throw new Error('La build ammessa non è disponibile per il riuso.');
       if (decision === 'development-only') throw new Error('Questa cartella contiene modifiche non committate. Scegli Apri per sviluppo oppure usa una copia Git pulita.');
       if (decision === 'build') {
         if (failedBuild === current.sourceFingerprint) throw new Error('La build di questa revisione è già fallita. Controlla i log, correggi la causa e riapri il lanciatore.');
@@ -281,7 +286,7 @@ export async function main(args = process.argv.slice(2)) {
       }
     }
     if (closing) return;
-    startOptionalOllama();
+    if (!options.reuseOnly) startOptionalOllama();
     update({ step: 'avvio', message: choice === 'agenti' ? 'Avvio dell’accesso per agenti. Collega un client al protocollo del terminale.' : 'Avvio di MediFlow.' });
     let target = null;
     if (choice === 'mac') {
@@ -295,6 +300,7 @@ export async function main(args = process.argv.slice(2)) {
       if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT deve essere un numero tra 1 e 65535.');
       if (choice !== 'agenti') await requireFreePort(port);
       const env = { ...process.env, HOSTNAME: '127.0.0.1', PORT: String(port),
+        ...(choice === 'web' ? { MEDIFLOW_PLUGIN_LOCAL_UI: '1' } : {}),
         MEDIFLOW_APP_REVISION: current.revision, MEDIFLOW_APP_BRANCH: current.branch,
         MEDIFLOW_APP_WORKTREE_HASH: current.worktreeHash, MEDIFLOW_APP_SOURCE_FINGERPRINT: current.sourceFingerprint,
         MEDIFLOW_APP_FINGERPRINT: current.sourceFingerprint };
@@ -359,10 +365,14 @@ export async function main(args = process.argv.slice(2)) {
   };
   try {
     chooser = await createChoiceServer({ root: ROOT, state: () => ({ ...state }), choose,
+      navigate: async intent => {
+        if (!state.ready || !state.url || !child?.connected || child.exitCode !== null || child.signalCode !== null) throw new Error('Navigazione non disponibile.');
+        await new Promise((resolve, reject) => child.send(JSON.stringify({ schemaVersion: 'mediflow.local-ui.navigation.v1', intent }), error => error ? reject(new Error('Navigazione non disponibile.')) : resolve()));
+      },
       install: () => installApproval?.(true), stop: shutdown, nativeAvailable: !!native, development: dirty,
       version: identity.version, folder: path.basename(ROOT) });
     if (closing) { await chooser.close(); return; }
-    atomicJson(path.join(lockDirectory, 'instance.json'), { pid: process.pid, checkoutPath: identity.checkoutPath, choiceUrl: chooser.url });
+    atomicJson(path.join(lockDirectory, 'instance.json'), { pid: process.pid, checkoutPath: identity.checkoutPath, dataDir, choiceUrl: chooser.url });
     log(`MediFlow ${identity.version}\nCartella: ${ROOT}\nAvvio: ${chooser.url}\nCtrl+C per arrestare.`);
     const preference = readJson(preferencesFile);
     const selected = selectChoice({ explicit: options.choice, remembered: preference?.schemaVersion === 1 ? preference.choice : null,

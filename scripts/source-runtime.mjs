@@ -174,11 +174,19 @@ export async function startSourceRuntime(mode, root = ROOT) {
     MEDIFLOW_APP_SOURCE_FINGERPRINT: identity.sourceFingerprint,
     MEDIFLOW_APP_FINGERPRINT: identity.sourceFingerprint });
   process.chdir(web);
-  if (mode === 'web') return createRequire(path.join(web, 'package.json'))(path.join(web, 'server.js'));
+  if (mode === 'web') {
+    if (process.connected && process.env.MEDIFLOW_PLUGIN_LOCAL_UI === '1') {
+      const { installLocalUiWebNavigation } = await import('./local-ui-web-navigation.mjs');
+      const { openUrl } = await import('./launcher-helpers.mjs');
+      installLocalUiWebNavigation(process, `http://127.0.0.1:${process.env.PORT}`, openUrl);
+    }
+    return createRequire(path.join(web, 'package.json'))(path.join(web, 'server.js'));
+  }
   await import(pathToFileURL(path.join(web, 'scripts/register-strip-types-loader.mjs')).href);
   const { runHeadlessSupervisorV1 } = await import(pathToFileURL(path.join(web, 'scripts/mediflow-headless-supervisor.mjs')).href);
   process.argv = process.argv.slice(0, 2);
-  return runHeadlessSupervisorV1({ webDirectory: web, webTargetPath: path.join(web, 'server.js'), webBuildIdentity: identity }, mode === 'local-ui' ? 'plugin_local_ui' : 'clinical');
+  return runHeadlessSupervisorV1({ webDirectory: web, webTargetPath: path.join(web, 'server.js'), webBuildIdentity: identity,
+    ...(mode === 'local-ui' ? { sourceRoot: root } : {}) }, mode === 'local-ui' ? 'plugin_local_ui' : 'clinical');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

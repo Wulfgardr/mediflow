@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 
+const navigationIntents = new Set(['search', 'identity', 'history', 'prescribing']);
+
 const escape = value => String(value).replace(/[&<>"']/gu, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 export function launcherPage(base, nonce, { nativeAvailable, development, version = '', folder = '' }) {
@@ -91,7 +93,7 @@ async function poll(){if(stopped)return;try{const r=await fetch(base+'/state');i
 </script></main></body></html>`;
 }
 
-export async function createChoiceServer({ root, state, choose, install, stop, nativeAvailable = false, development = false, version = '', folder = '' }) {
+export async function createChoiceServer({ root, state, choose, install, stop, navigate = undefined, nativeAvailable = false, development = false, version = '', folder = '' }) {
   const token = crypto.randomBytes(24).toString('hex');
   const nonce = crypto.randomBytes(18).toString('base64');
   const base = `/${token}`;
@@ -124,7 +126,12 @@ export async function createChoiceServer({ root, state, choose, install, stop, n
         if (body.length > 2048) return respond(413, 'Richiesta troppo grande.');
       }
       const data = JSON.parse(body);
-      if (route === `${base}/choose`) choose(data.choice, data.remember === true);
+      if (route === `${base}/navigate`) {
+        if (!data || Object.keys(data).join(',') !== 'intent' || !navigationIntents.has(data.intent)
+          || !state().ready || typeof navigate !== 'function') return respond(400, 'Navigazione non disponibile.');
+        await navigate(data.intent);
+      }
+      else if (route === `${base}/choose`) choose(data.choice, data.remember === true);
       else if (route === `${base}/install`) install();
       else if (route === `${base}/stop`) {
         respond(200, 'Arresto in corso.'); void stop(); return;
