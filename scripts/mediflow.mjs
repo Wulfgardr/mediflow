@@ -521,7 +521,7 @@ export async function main(args = process.argv.slice(2)) {
   };
   const handleNavigation = async (message, reply, isConnected, pair = null) => {
     if (message?.type === 'mediflow-launcher-stop') { if (!pair && !pluginChannel) onSignal(); return; }
-    if ((!pluginChannel && !pair) || typeof message?.requestId !== 'string' || !/^[a-f0-9-]{36}$/u.test(message.requestId)) return;
+    if ((!pluginChannel && !pair) || typeof message?.requestId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/u.test(message.requestId)) return;
     const { requestId } = message;
     if (message.type === 'mediflow-local-ui-cancel') {
       if (Object.keys(message).sort().join(',') !== 'requestId,type') return;
@@ -534,9 +534,10 @@ export async function main(args = process.argv.slice(2)) {
       && message.dataDir === dataDir && message.sourceFingerprint === identity.sourceFingerprint
       && !pendingNavigation.has(requestId)
       && ['search', 'identity', 'history', 'prescribing'].includes(message.intent)
-      && Number.isSafeInteger(message.expiresAt) && message.expiresAt > Date.now() && message.expiresAt <= Date.now() + 8000) {
+      && Number.isSafeInteger(message.expiresAt) && message.expiresAt > Date.now() && message.expiresAt <= Date.now() + 8000
+      && rememberNavigation(requestId)) {
       if (!state.ready && !closing && state.step !== 'errore') status = 'waiting';
-      else if (rememberNavigation(requestId)) {
+      else {
         const controller = new AbortController(); navigationControllers.set(requestId, controller);
         try {
           await navigate(message.intent, { requestId, expiresAt: message.expiresAt, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(message.expiresAt - Date.now())]) }, pair);

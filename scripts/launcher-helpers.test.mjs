@@ -1316,6 +1316,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     const stopControl = path.join(directory, 'stop.json'), runtimePid = path.join(directory, 'runtime-pid.json');
     const groupHistory = path.join(directory,'owned-groups.ndjson'), groupCleanup = path.join(directory,'owned-group-cleanup');
     const stopTrace = path.join(directory, 'stop-trace.ndjson'), stopLoader = path.join(directory, 'stop-loader.mjs');
+    const startupGate = path.join(directory, 'startup.release');
     const observationFile = path.join(directory, 'stop-observation.ndjson'), ownerLoader = path.join(directory, 'owner-loader.mjs');
     const controlRequest = path.join(directory, 'drain-request.json'), controlReply = path.join(directory, 'drain-reply.json');
     const fixtureGeneration = crypto.randomUUID();
@@ -1375,8 +1376,9 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     record({ type: 'hook-active', url, node: process.version, execPath: process.execPath, uv: process.versions.uv });
                     const text = String(result.source), from = text.indexOf('export async function stopOwnedChild'), to = text.indexOf('export function installDesktopEntry', from);
                     if (from < 0 || to < from) throw new Error('FIXTURE_STOP_HELPER_NOT_FOUND');
-                    const helper = text.slice(from, to).replace('if (settled) return;',
+                    let helper = text.slice(from, to).replace('if (settled) return;',
                         'if (settled) return; globalThis[Symbol.for("mediflow.fixture.stop-observation")]({type:"stop-result",pid:child.pid,allowIpcStop,groupAbsent,exitCode:child.exitCode,signalCode:child.signalCode,cause:cause ? {code:cause.code,message:cause.message} : null});');
+                    if (${process.env.MEDIFLOW_FIXTURE_STOP_DENY_PLATFORM === 'win32'}) helper = helper.replaceAll('process.platform', '"win32"');
                     result.source = text.slice(0, from) + helper + text.slice(to);
                 }
                 return result;
@@ -1425,7 +1427,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     if (${JSON.stringify(process.env.MEDIFLOW_FIXTURE_CONTROL_FAULT)} === 'reply-error') throw Object.assign(new Error('SYNTHETIC_FIXTURE_CONTROL_DELIVERY'), { code: 'SYNTHETIC_FIXTURE_CONTROL_DELIVERY' });
                     if (${JSON.stringify(process.env.MEDIFLOW_FIXTURE_CONTROL_FAULT)} === 'terminal-before-reply') {
                         record({ type: 'control-terminal-before-reply', requestId: request.requestId });
-                        process.emit('SIGTERM'); return;
+                        process.exit(1);
                     }
                     reply(request);
                 }).catch(error => { record({ type: 'control-error', code: error.code, message: error.message }); reply(request, error); })
@@ -1570,6 +1572,10 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 }
                 res.setHeader('Content-Type', 'application/json');
                 res.end(JSON.stringify({ ...${JSON.stringify(identity)}, fingerprint: 'synthetic' })); });
+            if (${JSON.stringify(webIdentity)} === 'startup-gated') {
+                process.stderr.write('FIXTURE_STARTUP_WAITING\\n');
+                await new Promise(resolve => { const timer = setInterval(() => { if (fs.existsSync(${JSON.stringify(startupGate)})) { clearInterval(timer); resolve(); } }, 10); });
+            }
             server.listen(Number(process.env.PORT), '127.0.0.1', () => {
                 process.stderr.write('MEDIFLOW_HEADLESS_WEB_READY ' + JSON.stringify({ url: 'http://127.0.0.1:' + server.address().port }) + '\\n');
             });
@@ -1702,7 +1708,16 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         }
         try {
             attestQuiescence();
-            if (child.exitCode === null && child.signalCode === null) await postStop('cleanup');
+            const stopFailures = output.split('Arresto non verificato').length;
+            if (child.exitCode === null && child.signalCode === null) {
+                await postStop('cleanup');
+                if (terminalFailureObserved && (process.platform === 'win32' || process.env.MEDIFLOW_FIXTURE_STOP_DENY_PLATFORM === 'win32')) {
+                    await until(() => output.split('Arresto non verificato').length > stopFailures);
+                    failures.push(new Error('Fixture launcher cleanup required termination after unconfirmed Windows shutdown.'));
+                    recordLauncher('fixture-owner-stop', { productStopConfirmed: false });
+                    child.kill('SIGKILL');
+                }
+            }
             await waitForFixtureClose(closed);
             attestQuiescence();
         } catch (error) {
@@ -1727,7 +1742,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
             await new Promise(resolve => setTimeout(resolve, 10));
         }
     };
-    return { source, data, stateFiles, child, closed, until, waitForTerminal, observations, cleanup, stopControl, stopTrace, runtimePid, requestGroupCleanup: () => writeFileSync(groupCleanup,'owned fixture cleanup'), environment: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home }, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
+    return { source, data, stateFiles, child, closed, until, waitForTerminal, observations, cleanup, stopControl, stopTrace, runtimePid, releaseStartup: () => writeFileSync(startupGate,'owned fixture startup'), requestGroupCleanup: () => writeFileSync(groupCleanup,'owned fixture cleanup'), environment: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home }, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
 }
 
 
@@ -2226,6 +2241,44 @@ test('disconnecting the plugin leaves its ordinary runtime alive and usable', { 
 });
 
 
+for (const saturated of [false,true]) test(`IPC consumes waiting IDs before readiness${saturated ? ' at capacity' : ''}`, async t => {
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, 'startup-gated');
+    await f.until(() => f.output().includes('FIXTURE_STARTUP_WAITING'));
+    const send = frame => new Promise((resolve,reject) => {
+        const timer=setTimeout(()=>{f.child.off('message',receive);reject(new Error('Fixture result missing'));},2000);
+        const receive = result => { if (result.requestId === frame.requestId) { clearTimeout(timer);f.child.off('message',receive);resolve(result.status); } };
+        f.child.on('message',receive);f.child.send(frame,error=>{if(error){clearTimeout(timer);f.child.off('message',receive);reject(error);}});
+    });
+    const request = () => ({type:'mediflow-local-ui-navigate',requestId:crypto.randomUUID(),intent:'history',expiresAt:Date.now()+7000,...f.expected});
+    const first=request(),revoked=request();
+    try {
+        assert.equal(await send(first),'waiting');
+        assert.equal(await send(revoked),'waiting');
+        f.child.send({type:'mediflow-local-ui-cancel',requestId:revoked.requestId});
+        if(saturated) for(let i=2;i<256;i++) assert.equal(await send(request()),'waiting');
+        else for(const frame of [{...request(),patientId:'SYNTHETIC_SENTINEL'},{...request(),dataDir:'/synthetic/other'},
+            {...request(),sourceFingerprint:'other-source'},{...request(),expiresAt:Date.now()-1},{...request(),expiresAt:Date.now()+9000}]) assert.equal(await send(frame),'denied');
+    } finally { f.releaseStartup(); }
+    await f.until(()=>f.output().includes('Pronto:'));
+    assert.equal(await send(first),'denied');
+    assert.equal(await send(revoked),'denied');
+    assert.doesNotMatch(f.output(),/mediflow\.local-ui\.navigation\.v1/u);
+    const next=request();assert.equal(await send(next),saturated?'denied':'accepted');
+    assert.equal(await send(next),'denied');
+    if(!saturated) {
+        const reflected=[],receive=frame=>{if(frame.type==='mediflow-local-ui-result')reflected.push(frame);};
+        f.child.on('message',receive);
+        try {
+            for(const requestId of ['not-a-uuid','-'.repeat(36),{}]) f.child.send({...request(),requestId});
+            await new Promise(resolve=>setTimeout(resolve,20));
+            assert.deepEqual(reflected,[],'Malformed IDs were reflected');
+        } finally {f.child.off('message',receive);}
+    }
+    await new Promise(resolve=>setTimeout(resolve,30));
+    assert.equal(f.output().split('\n').filter(line=>line.includes('mediflow.local-ui.navigation.v1')).length,saturated?0:1);
+    t.diagnostic(JSON.stringify({saturated,waitingConsumed:true,cancelMonotonic:true,noQueue:true}));
+});
+
 test('IPC rejects replay, expiry, revoked IDs and extra fields without new navigation', async t => {
     const f = await ordinaryLauncherFixture(t, 'web');
     await f.until(() => f.output().includes('Pronto:'));
@@ -2333,10 +2386,11 @@ for (const [name, count, controlFault] of [
     ['disconnecting the plugin leaves its ordinary runtime alive and usable', 1],
     ['ordinary and plugin startup recover a stale owner before choosing pairing', 4, 'reply-error'],
     ['disconnecting the plugin leaves its ordinary runtime alive and usable', 1, 'terminal-before-reply'],
+    ['cancellation during an unverified Web startup sends no navigation frame', 1, 'windows-terminal'],
 ]) test(`unverified stop fails visibly and drains all owned fixtures: ${name}${controlFault ? " (" + controlFault + ")" : ""}`, { timeout: 30000 }, async t => {
     const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-stop-audit-~')));
     const audit = path.join(directory, 'cleanup.ndjson');
-    const env = { ...process.env, MEDIFLOW_FIXTURE_STOP_DENY: '1', MEDIFLOW_FIXTURE_CONTROL_FAULT: controlFault || '', MEDIFLOW_FIXTURE_OBSERVATION_AUDIT: audit };
+    const env = { ...process.env, MEDIFLOW_FIXTURE_STOP_DENY: '1', MEDIFLOW_FIXTURE_CONTROL_FAULT: controlFault || '', MEDIFLOW_FIXTURE_STOP_DENY_PLATFORM: controlFault === 'windows-terminal' ? 'win32' : '', MEDIFLOW_FIXTURE_OBSERVATION_AUDIT: audit };
     delete env.NODE_TEST_CONTEXT;
     const child = spawn(process.execPath, ['--test', '--test-isolation=none', '--test-reporter=tap',
         '--test-name-pattern=^' + name + '$', fileURLToPath(import.meta.url)], { env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -2379,6 +2433,7 @@ for (const [name, count, controlFault] of [
             assert.equal(events.filter(event => event.type === 'control-acknowledged').length, 0);
         } else assert.equal(events.filter(event => event.type === 'control-replied' && event.requestId === requests[0].requestId).length, 1);
         if (controlFault === 'reply-error') assert.ok(events.some(event => event.type === 'control-failed' && event.code === 'SYNTHETIC_FIXTURE_CONTROL_DELIVERY'));
+        if (controlFault === 'windows-terminal') assert.ok(events.some(event => event.type === 'fixture-owner-stop' && event.productStopConfirmed === false));
 
     }
     t.diagnostic(JSON.stringify({ expectedFailure: true, exit: code, failureType: output.match(/failureType: '([^']+)'/u)?.[1], receipts }));
