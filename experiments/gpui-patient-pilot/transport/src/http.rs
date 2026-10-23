@@ -1,15 +1,14 @@
 use crate::{
-    Result, RuntimeError, RuntimeSession, RuntimeUser, crypto, tls, validate_id,
+    RequestContext, Result, RuntimeError, RuntimeSession, RuntimeUser, crypto, tls, validate_id,
     validate_pairing_id, validate_scope_id,
 };
 use reqwest::{
-    Method, Url,
-    blocking::Client,
+    Client, Method, Url,
     header::{COOKIE, HeaderMap, HeaderValue, SET_COOKIE},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{io::Read, net::IpAddr, time::Duration};
+use std::{net::IpAddr, sync::OnceLock, time::Duration};
 use zeroize::Zeroizing;
 
 pub(crate) const JSON_LIMIT: usize = 8 * 1024 * 1024;
@@ -48,6 +47,7 @@ impl PairingCredentials {
 #[derive(Clone)]
 pub struct RuntimeClient {
     http: Client,
+    context: RequestContext,
     origin: Url,
     base_url: String,
 }
@@ -79,7 +79,19 @@ impl RuntimeClient {
             base_url: origin.as_str().trim_end_matches('/').to_owned(),
             origin,
             http,
+            context: RequestContext::default(),
         })
+    }
+
+    pub(crate) fn request_context(&self) -> RequestContext {
+        self.context.clone()
+    }
+
+    pub fn with_request_context(&self, context: RequestContext) -> Self {
+        Self {
+            context,
+            ..self.clone()
+        }
     }
 
     pub fn base_url(&self) -> &str {
@@ -275,79 +287,87 @@ impl RuntimeClient {
         limit: usize,
         archive_generation: Option<&str>,
     ) -> Result<RawResponse> {
-        // Only this exact existing read-only contract delivers typed readiness
-        // with 503. Keep every other route's HTTP failure semantics unchanged.
-        let who_readiness =
-            !mutation && method == Method::GET && path == crate::who::READINESS_PATH;
-        let analytics_read =
-            !mutation && method == Method::GET && path == crate::analytics::DEMOGRAPHICS_PATH;
-        let url = self.endpoint(path, query)?;
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            "x-mediflow-paired-client-id",
-            sensitive_header(&pairing.id)?,
-        );
-        headers.insert(
-            "x-mediflow-paired-client-token",
-            sensitive_header(&pairing.token)?,
-        );
-        headers.insert(
-            "x-mediflow-source-surface",
-            HeaderValue::from_static("native"),
-        );
-        if let Some(generation) = archive_generation {
-            validate_id(generation)?;
-            headers.insert(
-                "x-mediflow-archive-generation",
-                sensitive_header(generation)?,
-            );
-        }
-        headers.insert("cache-control", HeaderValue::from_static("no-store"));
-        headers.insert("accept", HeaderValue::from_static("application/json"));
-        if let Some(scope) = scope {
-            validate_scope_id(scope)?;
-            headers.insert(
-                "x-mediflow-expected-ambulatory-id",
-                sensitive_header(&encode_cookie_value(scope))?,
-            );
-        }
-        if let Some(cookie) = cookie {
-            let cookie = cookie_header(cookie, scope)?;
-            headers.insert(COOKIE, sensitive_header(&cookie)?);
-        }
-        let mut request = self.http.request(method, url).headers(headers);
-        if let Some(body) = body {
-            request = request
-                .header("content-type", "application/json")
-                .body(body.to_owned());
-        }
-        let response = request.send().map_err(|_| uncertain(mutation))?;
-        let status = response.status().as_u16();
-        let account_profile = path == crate::account_profile::ACCOUNT_PROFILE_PATH;
-        if !(200..300).contains(&status) && !(who_readiness && status == 503) {
-            if status == 409 {
-                let error_limit = if analytics_read { 1024 } else { limit };
-                let raw = match read_response_body(response, error_limit, mutation) {
-                    Ok(raw) => raw,
-                    Err(error) if account_profile => return Err(error),
-                    Err(_) => return Err(RuntimeError::Conflict),
-                };
-                return match conflict_code(&raw.body) {
-                    ConflictCode::ArchiveReplaced => Err(RuntimeError::ArchiveReplaced),
-                    ConflictCode::AnalyticsCancelled if analytics_read => {
-                        Err(RuntimeError::AnalyticsCancelled)
+        http_runtime().block_on(self.context.run(
+            async {
+                // Only this exact existing read-only contract delivers typed readiness
+                // with 503. Keep every other route's HTTP failure semantics unchanged.
+                let who_readiness =
+                    !mutation && method == Method::GET && path == crate::who::READINESS_PATH;
+                let analytics_read = !mutation
+                    && method == Method::GET
+                    && path == crate::analytics::DEMOGRAPHICS_PATH;
+                let url = self.endpoint(path, query)?;
+                let mut headers = HeaderMap::new();
+                headers.insert(
+                    "x-mediflow-paired-client-id",
+                    sensitive_header(&pairing.id)?,
+                );
+                headers.insert(
+                    "x-mediflow-paired-client-token",
+                    sensitive_header(&pairing.token)?,
+                );
+                headers.insert(
+                    "x-mediflow-source-surface",
+                    HeaderValue::from_static("native"),
+                );
+                if let Some(generation) = archive_generation {
+                    validate_id(generation)?;
+                    headers.insert(
+                        "x-mediflow-archive-generation",
+                        sensitive_header(generation)?,
+                    );
+                }
+                headers.insert("cache-control", HeaderValue::from_static("no-store"));
+                headers.insert("accept", HeaderValue::from_static("application/json"));
+                if let Some(scope) = scope {
+                    validate_scope_id(scope)?;
+                    headers.insert(
+                        "x-mediflow-expected-ambulatory-id",
+                        sensitive_header(&encode_cookie_value(scope))?,
+                    );
+                }
+                if let Some(cookie) = cookie {
+                    let cookie = cookie_header(cookie, scope)?;
+                    headers.insert(COOKIE, sensitive_header(&cookie)?);
+                }
+                let mut request = self.http.request(method, url).headers(headers);
+                if let Some(body) = body {
+                    request = request
+                        .header("content-type", "application/json")
+                        .body(body.to_owned());
+                }
+                let response = request.send().await.map_err(|_| uncertain(mutation))?;
+                let status = response.status().as_u16();
+                let account_profile = path == crate::account_profile::ACCOUNT_PROFILE_PATH;
+                if !(200..300).contains(&status) && !(who_readiness && status == 503) {
+                    if status == 409 {
+                        let error_limit = if analytics_read { 1024 } else { limit };
+                        let raw = match read_response_body(response, error_limit, mutation).await {
+                            Ok(raw) => raw,
+                            Err(error) if account_profile => return Err(error),
+                            Err(_) => return Err(RuntimeError::Conflict),
+                        };
+                        return match conflict_code(&raw.body) {
+                            ConflictCode::ArchiveReplaced => Err(RuntimeError::ArchiveReplaced),
+                            ConflictCode::AnalyticsCancelled if analytics_read => {
+                                Err(RuntimeError::AnalyticsCancelled)
+                            }
+                            ConflictCode::ProfileVersionConflict if account_profile && mutation => {
+                                Ok(raw)
+                            }
+                            _ => Err(RuntimeError::Conflict),
+                        };
                     }
-                    ConflictCode::ProfileVersionConflict if account_profile && mutation => Ok(raw),
-                    _ => Err(RuntimeError::Conflict),
-                };
-            }
-            return Err(classify_status(status, mutation));
-        }
-        let raw = read_response_body(response, limit, mutation)?;
-        if who_readiness {
-            crate::who::validate_readiness_http(status, &raw.body)?;
-        }
-        Ok(raw)
+                    return Err(classify_status(status, mutation));
+                }
+                let raw = read_response_body(response, limit, mutation).await?;
+                if who_readiness {
+                    crate::who::validate_readiness_http(status, &raw.body)?;
+                }
+                Ok(raw)
+            },
+            mutation,
+        ))
     }
 
     fn endpoint(&self, path: &[&str], query: &[(&str, &str)]) -> Result<Url> {
@@ -364,6 +384,17 @@ impl RuntimeClient {
         }
         Ok(url)
     }
+}
+
+fn http_runtime() -> &'static tokio::runtime::Runtime {
+    static RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
+    RUNTIME.get_or_init(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .expect("HTTP runtime")
+    })
 }
 
 fn sensitive_header(value: &str) -> Result<HeaderValue> {
@@ -468,8 +499,8 @@ fn uncertain(mutation: bool) -> RuntimeError {
     }
 }
 
-fn read_response_body(
-    response: reqwest::blocking::Response,
+async fn read_response_body(
+    mut response: reqwest::Response,
     limit: usize,
     mutation: bool,
 ) -> Result<RawResponse> {
@@ -486,10 +517,16 @@ fn read_response_body(
     }
     let headers = response.headers().clone();
     let mut body = Zeroizing::new(Vec::new());
-    response
-        .take(limit as u64 + 1)
-        .read_to_end(&mut body)
-        .map_err(|_| uncertain(mutation))?;
+    while let Some(chunk) = response.chunk().await.map_err(|_| uncertain(mutation))? {
+        if chunk.len() > limit.saturating_sub(body.len()) {
+            return Err(if mutation {
+                RuntimeError::Indeterminate
+            } else {
+                RuntimeError::TooLarge
+            });
+        }
+        body.extend_from_slice(&chunk);
+    }
     if body.len() > limit {
         return Err(if mutation {
             RuntimeError::Indeterminate
@@ -540,6 +577,7 @@ fn classify_status(status: u16, mutation: bool) -> RuntimeError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Read;
     fn synthetic_conflict(path: &[&str], mutation: bool, body: &str, framing: &str) -> Result<()> {
         use std::{io::Write, net::TcpListener, thread};
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();

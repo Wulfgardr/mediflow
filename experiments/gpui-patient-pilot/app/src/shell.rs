@@ -27,8 +27,9 @@ use mediflow_patient_client::{PatientProfile, ReadFailure, UpdateOutcome, Worksp
 use mediflow_runtime_client::{
     AgendaFilter, Ambulatory, Attachment, Checkup, CheckupDraft, DrugCatalogItem, Entry,
     EntryDraft, GlobalEntryFilter, Observation, ObservationDraft, PairingCredentials,
-    PatientDetail, PatientSummary, ProfileQueryIntent, RuntimeClient, RuntimeConfig, RuntimeError,
-    RuntimeSession, TerminologyRegistryEntry, TerminologyRegistryStatus, Therapy, TherapyDraft,
+    PatientDetail, PatientSummary, ProfileQueryIntent, RequestContext, RuntimeClient,
+    RuntimeConfig, RuntimeError, RuntimeSession, TerminologyRegistryEntry,
+    TerminologyRegistryStatus, Therapy, TherapyDraft,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -355,6 +356,7 @@ struct StoredPairing {
 
 pub struct ClinicalApp {
     session: Option<RuntimeSession>,
+    request_context: RequestContext,
     pairing: Option<StoredPairing>,
     show_tls_pin: bool,
     login_scroll: gpui::ScrollHandle,
@@ -627,6 +629,7 @@ impl ClinicalApp {
         let threshold_region_scroll = ScrollHandle::new();
         let mut app = Self {
             session: None,
+            request_context: RequestContext::default(),
             pairing: None,
             show_tls_pin: false,
             login_actions: std::array::from_fn(|_| ScrollTarget::new(&login_scroll, cx)),
@@ -717,6 +720,7 @@ impl ClinicalApp {
             _subscriptions: vec![subscription, global_subscription, reference_subscription],
         };
         let quit = cx.on_app_quit(|this, cx| {
+            this.request_context.cancel();
             this.retire_form(cx);
             this.pairing.take();
             let session = this.session.take();
@@ -734,6 +738,7 @@ impl ClinicalApp {
         });
         app._subscriptions.push(quit);
         let release = cx.on_release(|this, cx| {
+            this.request_context.cancel();
             this.retire_form(cx);
             this.pairing.take();
             if let Some(session) = this.session.take() {
@@ -789,6 +794,15 @@ impl ClinicalApp {
     }
 
     fn next_epoch(&mut self) {
+        self.request_context.cancel();
+        self.request_context = RequestContext::default();
+        if let Some(session) = &mut self.session {
+            session.renew_requests();
+        }
+        self.next_presentation_epoch();
+    }
+
+    fn next_presentation_epoch(&mut self) {
         self.read_timer = None;
         self.read_state_commands.clear();
         self.ai_preferences.reset();
@@ -817,11 +831,21 @@ impl ClinicalApp {
         cx.spawn(async move |this, cx| {
             let result = task.await;
             let _ = this.update(cx, |this, cx| {
-                if this.epoch != epoch {
+                if this.epoch != epoch
+                    && !this.session.as_ref().is_some_and(RuntimeSession::is_locked)
+                {
                     return;
                 }
-                if let Err(error) = &result
-                    && error.is_auth_failure()
+                if let Some(error) = result
+                    .as_ref()
+                    .err()
+                    .copied()
+                    .filter(RuntimeError::retires_session)
+                    .or_else(|| {
+                        this.session
+                            .as_ref()
+                            .and_then(RuntimeSession::retirement_error)
+                    })
                 {
                     let message = if this.ai_preferences.is_saving() {
                         format!(
@@ -939,6 +963,7 @@ impl ClinicalApp {
         self.login_fields[5]
             .editor
             .update(cx, |input, cx| input.set_content("", cx));
+        let client = client.with_request_context(self.request_context.clone());
         let task = cx.background_executor().spawn(async move {
             let pairing = PairingCredentials::new(id, token.to_string())?;
             client.login(pairing, &username, &passphrase)
@@ -975,6 +1000,7 @@ impl ClinicalApp {
     }
 
     fn disconnect(&mut self, cx: &mut Context<Self>) {
+        self.analytics.reset(cx);
         self.scales.reset(cx);
         self.account_profile.reset(cx);
         self.focus_after_render = true;
@@ -1101,10 +1127,11 @@ impl ClinicalApp {
     }
 
     fn load_patients(&mut self, cx: &mut Context<Self>) {
-        let (Some(session), Some(scope)) = (self.session.clone(), self.scope.clone()) else {
+        let (Some(_), Some(scope)) = (&self.session, self.scope.clone()) else {
             return;
         };
         self.next_epoch();
+        let session = self.session.as_ref().expect("active session").clone();
         self.patients = Load::Loading;
         let archived = self.archived;
         self.run(
@@ -1123,13 +1150,15 @@ impl ClinicalApp {
             cx.notify();
             return;
         }
-        let (Some(session), Some(scope)) = (self.session.clone(), self.scope.clone()) else {
+        let (Some(_), Some(scope)) = (&self.session, self.scope.clone()) else {
             return;
         };
         let request = match self.core.select(id) {
             Ok(request) => request,
             Err(_) => return,
         };
+        self.next_epoch();
+        let session = self.session.as_ref().expect("active session").clone();
         if let Err(error) = session.select_profile_patient(&scope, id) {
             self.core
                 .receive_read(&request, Err(ReadFailure::Unavailable));
@@ -1137,7 +1166,6 @@ impl ClinicalApp {
             cx.notify();
             return;
         }
-        self.next_epoch();
         self.focus_after_render = open;
         self.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
         self.selected_id = Some(id.to_owned());
@@ -1279,10 +1307,11 @@ impl ClinicalApp {
     }
 
     fn load_global_area(&mut self, cx: &mut Context<Self>) {
-        let (Some(session), Some(scope)) = (self.session.clone(), self.scope.clone()) else {
+        let (Some(_), Some(scope)) = (&self.session, self.scope.clone()) else {
             return;
         };
         self.next_epoch();
+        let session = self.session.as_ref().expect("active session").clone();
         self.global_patients = Load::Loading;
         let s = session.clone();
         let a = scope.clone();
@@ -1689,7 +1718,7 @@ impl ClinicalApp {
             return;
         }
         let previous = form.state;
-        let (Some(session), Some(scope)) = (self.session.clone(), self.scope.clone()) else {
+        let (Some(_), Some(scope)) = (&self.session, self.scope.clone()) else {
             return;
         };
         let Ok(request) = self.core.reread_preserving_draft() else {
@@ -1700,6 +1729,7 @@ impl ClinicalApp {
             return;
         }
         self.next_epoch();
+        let session = self.session.as_ref().expect("active session").clone();
         self.form.as_mut().expect("notes recovery").state = FormState::Saving;
         self.message = None;
         let intent = self.profile_intent(&session);
@@ -2150,7 +2180,7 @@ impl ClinicalApp {
             return;
         }
         let kind = form.kind;
-        let (Some(session), Some(scope)) = (self.session.clone(), self.scope.clone()) else {
+        let (Some(_), Some(scope)) = (&self.session, self.scope.clone()) else {
             return;
         };
         let id = self.selected_id.clone().unwrap_or_default();
@@ -2172,6 +2202,7 @@ impl ClinicalApp {
         // Supersede pending reads before writing: an older list cannot replace
         // the authoritative reread after an acknowledged mutation.
         self.next_epoch();
+        let session = self.session.as_ref().expect("active session").clone();
         let intent = self.profile_intent(&session);
         if kind == FormKind::PatientNew {
             self.run(move || patient_forms::create(&session, &scope, &values, &intent), |this, result, cx| {
@@ -6647,13 +6678,14 @@ impl ClinicalApp {
                         let (Some(session), Some(scope), Some(patient_id)) = (this.session.clone(), this.scope.clone(), this.selected_id.clone()) else { return; };
                         this.message = Some(("Lettura, verifica e salvataggio della copia…".into(), false));
                         this.run(move || {
-                            if session.is_locked() { return Err(RuntimeError::Locked); }
+                            let context = session.request_context();
+                            context.check()?;
                             let attachment = session.read_attachment(&scope, &patient_id, &id)?;
                             let bytes = match documents::decode_attachment(&attachment) {
                                 Ok(bytes) => bytes,
                                 Err(error) => return Ok(Err(error)),
                             };
-                            if session.is_locked() { return Err(RuntimeError::Locked); }
+                            context.check()?;
                             Ok(documents::write_download(&path, &bytes))
                         }, |this, result, _| {
                             this.document_busy = false;
@@ -6679,10 +6711,11 @@ impl ClinicalApp {
 
 impl ClinicalApp {
     fn load_references(&mut self, cx: &mut Context<Self>) {
-        let (Some(session), Some(scope)) = (self.session.clone(), self.scope.clone()) else {
+        let (Some(_), Some(scope)) = (&self.session, self.scope.clone()) else {
             return;
         };
         self.next_epoch();
+        let session = self.session.as_ref().expect("active session").clone();
         if self.reference_kind == ReferenceKind::Who {
             // Opening/navigating never submits a WHO query or probes a service.
             self.reference_rows = Load::Idle;

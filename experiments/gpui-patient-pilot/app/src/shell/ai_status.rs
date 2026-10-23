@@ -11,10 +11,10 @@ pub(super) struct AiRuntimeObservation {
 
 impl ClinicalApp {
     pub(super) fn load_ai_status(&mut self, cx: &mut Context<Self>) {
+        self.next_epoch();
         let Some(session) = self.session.clone() else {
             return;
         };
-        self.next_epoch();
         self.ai_status = Load::Loading;
         self.run(
             move || session.read_ai_runtime_status(),
