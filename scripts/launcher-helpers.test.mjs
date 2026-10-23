@@ -1124,7 +1124,7 @@ async function stopFixtureChild(child, closed) {
 }
 
 async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, webIdentity = true, overrides = {}, initialOwner = null, lifecycle = null) {
-    const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-ordinary-launcher-')));
+    const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-ordinary-launcher-~')));
     const source = path.join(directory, 'source'), home = path.join(directory, 'home'), data = path.join(directory, 'data');
     mkdirSync(path.join(source, 'scripts'), { recursive: true }); mkdirSync(home); mkdirSync(data);
     const stopControl = path.join(directory, 'stop.json'), runtimePid = path.join(directory, 'runtime-pid.json');
@@ -1142,12 +1142,16 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         writeFileSync(stopLoader, `
             import fs from 'node:fs'; import cp from 'node:child_process';
             import { registerHooks, syncBuiltinESMExports } from 'node:module';
-            const run = cp.spawnSync, kill = process.kill.bind(process);
+            const run = cp.spawnSync, nativeKill = process.kill.bind(process);
+            const kill = (pid,signal) => {
+                if (pid < 0 && !${Boolean(lifecycle.group)}) throw new Error('FIXTURE_NATIVE_GROUP_DENIED');
+                return nativeKill(pid,signal);
+            };
             const stop = (pid, signal) => {
                 const owned = JSON.parse(fs.readFileSync(${JSON.stringify(runtimePid)})).pid;
                 if (pid !== owned) throw new Error('FIXTURE_FOREIGN_PID_DENIED');
-                fs.appendFileSync(${JSON.stringify(stopTrace)}, JSON.stringify({pid,signal}) + '\\n');
                 const { failure } = JSON.parse(fs.readFileSync(${JSON.stringify(stopControl)}));
+                fs.appendFileSync(${JSON.stringify(stopTrace)}, JSON.stringify({pid,signal,failure}) + '\\n');
                 if (failure === 'error') throw Object.assign(new Error('SYNTHETIC_STOP_EPERM'), {code:'EPERM'});
                 if (failure === 'status') return {status:1};
                 if (failure === 'no-exit') return {status:0};
@@ -1174,8 +1178,11 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     if(signal === 0) fs.appendFileSync(${JSON.stringify(stopTrace)},JSON.stringify({pid:owned,signal,error:error.code})+'\\n');
                     throw error;
                 }
-            })() : pid < 0 && signal !== 0 ? (() => {
-                const result = stop(-pid,signal);
+            })() : pid < 0 ? (() => {
+                const owned = JSON.parse(fs.readFileSync(${JSON.stringify(runtimePid)})).pid;
+                if (pid !== -owned) throw new Error('FIXTURE_FOREIGN_GROUP_DENIED');
+                if (signal === 0) return kill(owned,0);
+                const result = stop(owned,signal);
                 if (result.status !== 0) throw Object.assign(new Error('SYNTHETIC_STOP_EPERM'),{code:'EPERM'});
                 return true;
             })() : kill(pid,signal);
@@ -1183,9 +1190,11 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
             process.on('message', frame => { if (frame?.type === 'fixture-signal') process.emit('SIGTERM'); });
             registerHooks({load(url,context,next) {
                 const result = next(url,context);
-                if (url === ${JSON.stringify(new URL('scripts/mediflow.mjs', 'file://' + source + '/').href)}) {
+                if (url === ${JSON.stringify(pathToFileURL(path.join(source, 'scripts/mediflow.mjs')).href)}) {
+                    process.stderr.write('FIXTURE_STOP_PLATFORM ' + JSON.stringify({actualOS:process.platform,simulatedStopPlatform:${JSON.stringify(lifecycle.platform)},url}) + '\\n');
                     let text = String(result.source);
                     const from = text.indexOf('export async function stopOwnedChild'), to = text.indexOf('export function installDesktopEntry',from);
+                    if (from < 0 || to < from) throw new Error('FIXTURE_STOP_HELPER_NOT_FOUND');
                     text = text.slice(0,from) + text.slice(from,to).replaceAll('process.platform', ${JSON.stringify(JSON.stringify(lifecycle.platform))}) + text.slice(to);
                     result.source = text.replace('stopOwnedChild(child, 8000,', 'stopOwnedChild(child, ${lifecycle.group ? 600 : 60},')
                         .replace('const finish = cause => {', 'const finish = cause => { if(cause) process.stderr.write("FIXTURE_STOP_CAUSE " + cause.code + " " + cause.message + String.fromCharCode(10));');
@@ -1237,7 +1246,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         if (process.argv[1].endsWith('source-runtime.mjs')) {
             ${lifecycle?.group ? `
                 setInterval(() => { if(fs.existsSync(${JSON.stringify(groupCleanup)})) process.exit(0); },10);
-                const descendant = spawn(process.execPath,[new URL('./group-descendant.mjs',import.meta.url).pathname],{stdio:['ignore','ignore','ignore','ipc']});
+                const descendant = spawn(process.execPath,[${JSON.stringify(path.join(source,'scripts/group-descendant.mjs'))}],{stdio:['ignore','ignore','ignore','ipc']});
                 fs.appendFileSync(${JSON.stringify(groupHistory)},JSON.stringify({pid:process.pid,descendantPid:descendant.pid})+'\\n');
                 const info = await new Promise((resolve,reject) => {
                     const timer = setTimeout(() => reject(new Error('Owned descendant readiness timeout')),2000);
@@ -1386,9 +1395,10 @@ for (const scenario of ['signal','chooser','error','switch','probe-EPERM','probe
     });
 }
 
-for (const platform of ['win32', 'linux']) for (const failure of platform === 'win32' ? ['error', 'status', 'no-exit'] : ['error', 'no-exit']) {
-    for (const trigger of ['signal', 'chooser', 'error', 'switch']) test(`unconfirmed ${platform} ${failure} stop via ${trigger} retains the live owner`, { timeout: 15000 }, async t => {
-        const f = await ordinaryLauncherFixture(t, 'web', ['--scelta', 'web'], true, trigger !== 'error', {}, null, {platform,failure});
+for (const simulatedStopPlatform of ['win32', 'linux']) for (const failure of simulatedStopPlatform === 'win32' ? ['error', 'status', 'no-exit'] : ['error', 'no-exit']) {
+    for (const trigger of ['signal', 'chooser', 'error', 'switch']) test(`unconfirmed ${simulatedStopPlatform} ${failure} stop via ${trigger} retains the live owner`, { timeout: 15000 }, async t => {
+        const actualOS = process.platform;
+        const f = await ordinaryLauncherFixture(t, 'web', ['--scelta', 'web'], true, trigger !== 'error', {}, null, {platform:simulatedStopPlatform,failure});
         if (trigger !== 'error') await f.until(() => f.output().includes('Pronto:'));
         else await f.until(() => existsSync(f.stopTrace));
         const file = launcherReceiptFile(f.stateFiles.lockDirectory), receipt = JSON.parse(readFileSync(file));
@@ -1398,7 +1408,7 @@ for (const platform of ['win32', 'linux']) for (const failure of platform === 'w
             assert.equal(response.status,200); await response.text();
         };
         if (trigger === 'signal') {
-            if (process.platform === 'win32') f.child.send({type:'fixture-signal'});
+            if (actualOS === 'win32') f.child.send({type:'fixture-signal'});
             else f.child.kill('SIGTERM');
         } else if (trigger === 'chooser') await stop();
         else if (trigger === 'switch') {
@@ -1411,7 +1421,7 @@ for (const platform of ['win32', 'linux']) for (const failure of platform === 'w
         const pid = JSON.parse(readFileSync(f.runtimePid)).pid;
         process.kill(pid,0);
         const current = claimLauncher(f.stateFiles.lockDirectory,{checkoutPath:f.source+path.sep},{reuseLive:true});
-        t.diagnostic(JSON.stringify({platform,failure,trigger,runtimeAlive:pid,launcher:f.child.pid,claimed:current.claimed}));
+        t.diagnostic(JSON.stringify({actualOS,simulatedStopPlatform,failure,trigger,runtimeAlive:pid,launcher:f.child.pid,claimed:current.claimed}));
         try { assert.equal(current.claimed,false,'A second writer acquired while the owned runtime is alive'); }
         finally { if (current.claimed) releaseLauncher(current); }
         assert.equal(current.receipt.pid,f.child.pid);
@@ -1419,16 +1429,31 @@ for (const platform of ['win32', 'linux']) for (const failure of platform === 'w
         assert.equal(f.child.exitCode,null,f.output()); assert.equal(f.child.signalCode,null,f.output());
         assert.equal(JSON.parse(readFileSync(file)).pid,f.child.pid);
         assert.doesNotMatch(f.output(),/unhandled|MediFlow arrestato\./iu);
-        const frames = f.output().split('\n').filter(line=>line.includes('mediflow-launcher-stop'));
-        assert.equal(frames.length,platform === 'win32' && trigger !== 'error' ? 1 : 0,f.output());
-        for (const entry of readFileSync(f.stopTrace,'utf8').trim().split('\n').map(line=>JSON.parse(line))) assert.equal(entry.pid,pid);
-        atomicJson(f.stopControl,{platform,failure:null});
+        const activations = f.output().split('\n').filter(line=>line.startsWith('FIXTURE_STOP_PLATFORM '))
+            .map(line=>JSON.parse(line.slice('FIXTURE_STOP_PLATFORM '.length)));
+        assert.deepEqual(activations,[{actualOS,simulatedStopPlatform,url:pathToFileURL(path.join(f.source,'scripts/mediflow.mjs')).href}],f.output());
+        const frames = f.output().split('\n').filter(line=>line.startsWith('FIXTURE_NAVIGATION '))
+            .map(line=>JSON.parse(line.slice('FIXTURE_NAVIGATION '.length)));
+        assert.deepEqual(frames,simulatedStopPlatform === 'win32' && trigger !== 'error' ? [{type:'mediflow-launcher-stop'}] : [],f.output());
+        const trace = readFileSync(f.stopTrace,'utf8').trim().split('\n').map(line=>JSON.parse(line));
+        assert.deepEqual(trace.map(({signal})=>signal),simulatedStopPlatform === 'win32' ? ['taskkill'] : failure === 'error' ? ['SIGTERM'] : ['SIGTERM','SIGKILL']);
+        for (const entry of trace) { assert.equal(entry.pid,pid); assert.equal(entry.failure,failure); }
+        const causes = f.output().split('\n').filter(line=>line.startsWith('FIXTURE_STOP_CAUSE '));
+        const expectedCause = failure === 'error' ? 'EPERM SYNTHETIC_STOP_EPERM'
+            : failure === 'status' ? 'undefined taskkill: 1'
+                : simulatedStopPlatform === 'win32' ? 'undefined Exit del processo posseduto non osservato.'
+                    : 'undefined Exit del processo posseduto o scomparsa del gruppo non osservato.';
+        assert.deepEqual(causes,['FIXTURE_STOP_CAUSE '+expectedCause],f.output());
+        t.diagnostic(JSON.stringify({actualOS,simulatedStopPlatform,failure,trigger,activations,frames,trace,causes}));
+        atomicJson(f.stopControl,{platform:simulatedStopPlatform,failure:null});
         await stop(); await waitForFixtureClose(f.closed);
         assert.equal(existsSync(path.join(f.stateFiles.lockDirectory,'active')),false);
         const successor = claimLauncher(f.stateFiles.lockDirectory,{checkoutPath:f.source+path.sep});
         try {
             assert.equal(successor.claimed,true);
+            const finalTrace = readFileSync(f.stopTrace);
             await new Promise(resolve=>setTimeout(resolve,100));
+            assert.deepEqual(readFileSync(f.stopTrace),finalTrace,'A late timer signalled the retired runtime');
             assert.equal(JSON.parse(readFileSync(successor.receiptFile)).pid,process.pid);
         } finally { releaseLauncher(successor); }
     });
