@@ -902,36 +902,51 @@ test('Windows unconfirmed terminal child retains the original launcher claim', t
     t.diagnostic(result.stdout.trim());
 });
 
-test('Windows shutdown sends no IPC frame without explicit permission', () => {
-    const result = spawnSync(process.execPath, ['--input-type=module', '--eval', `
-        import assert from 'node:assert/strict';
-        import childProcess from 'node:child_process';
-        import { EventEmitter } from 'node:events';
-        import { syncBuiltinESMExports } from 'node:module';
-        const { stopOwnedChild } = await import(${JSON.stringify(new URL('./mediflow.mjs', import.meta.url).href)});
-        Object.defineProperty(process, 'platform', { value: 'win32' });
-        const frames = [], terminations = [];
-        let child;
-        childProcess.spawnSync = (command, args) => {
-            terminations.push([command, args]);
-            queueMicrotask(() => { child.exitCode = 1; child.emit('exit', 1); });
-            return { status: 0 };
-        };
-        syncBuiltinESMExports();
-        for (const allowIpcStop of [false, true]) {
-            child = new EventEmitter();
-            Object.assign(child, { pid: 424242, connected: true, exitCode: null, signalCode: null,
-                send(frame, done) { frames.push(frame); done(); queueMicrotask(() => { child.exitCode = 0; child.emit('exit', 0); }); } });
-            if (allowIpcStop) await stopOwnedChild(child, 1000, { allowIpcStop });
-            else await stopOwnedChild(child, 1000);
-            assert.equal(child.exitCode, allowIpcStop ? 0 : 1);
-            assert.deepEqual(frames, allowIpcStop ? [{ type: 'mediflow-launcher-stop' }] : []);
-            assert.deepEqual(terminations, [['taskkill', ['/pid', '424242', '/T', '/F']]]);
+test('Windows tree stop requires OS success and original exit even after IPC admission', t => {
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+        import assert from 'node:assert/strict'; import cp from 'node:child_process';
+        import {EventEmitter} from 'node:events'; import {syncBuiltinESMExports} from 'node:module';
+        import {stopOwnedChild} from ${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)};
+        Object.defineProperty(process,'platform',{value:'win32'});
+        let child, calls, frames, descendantAlive, outcome;
+        const exit=()=>{child.exitCode=0;child.emit('exit',0);};
+        cp.spawnSync=(command,args,options)=>{
+            calls++;assert.equal(command,'taskkill');assert.deepEqual(args,['/pid','424250','/T','/F']);
+            assert.deepEqual({stdio:options.stdio,windowsHide:options.windowsHide},{stdio:'ignore',windowsHide:true});
+            assert.ok(options.timeout>0&&options.timeout<=40);
+            if(outcome.endsWith('-sync'))exit();
+            else if(outcome==='terminal-without-event')child.exitCode=0;
+            else if(outcome!=='no-exit')queueMicrotask(exit);
+            if(outcome==='over-budget-sync')Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,45);
+            if(outcome.startsWith('error'))return {status:null,error:Object.assign(new Error('sentinel command denied'),{code:'EPERM'})};
+            if(outcome.startsWith('timeout'))return {status:null,error:Object.assign(new Error('sentinel command timeout'),{code:'ETIMEDOUT'})};
+            if(outcome.startsWith('status'))return {status:1};
+            descendantAlive=false;return {status:0};
+        };syncBuiltinESMExports();
+        for(outcome of ['status-sync','status-async','error-sync','timeout-sync','no-exit','terminal-without-event','over-budget-sync','success-sync','success-async','terminal-before-command']){
+            calls=0;frames=[];descendantAlive=true;child=Object.assign(new EventEmitter(),{pid:424250,exitCode:null,signalCode:null,connected:true,
+                send(frame,done){frames.push(frame);done();queueMicrotask(exit);}});
+            if(outcome==='terminal-before-command'){
+                const once=child.once;child.once=function(...args){const result=once.apply(this,args);this.exitCode=0;return result;};
+            }
+            const pending=stopOwnedChild(child,40,{allowIpcStop:true});
+            if(outcome.startsWith('success')){await pending;assert.equal(descendantAlive,false);await stopOwnedChild(child,40);}
+            else {
+                await assert.rejects(pending,error=>error.code==='MEDIFLOW_OWNED_STOP_UNCONFIRMED',outcome+' accepted leader-only proof');
+                if(child.exitCode===null)exit();
+                await assert.rejects(stopOwnedChild(child,40),error=>error.code==='MEDIFLOW_OWNED_STOP_UNCONFIRMED',outcome+' contaminated the handle receipt');
+            }
+            assert.deepEqual(frames,[],outcome+' sent IPC instead of stopping the tree');
+            assert.equal(calls,outcome==='terminal-before-command'?0:1,outcome);
+            assert.equal(child.listenerCount('exit'),0);
+            const before=calls;child.emit('exit',0);await new Promise(resolve=>setTimeout(resolve,45));assert.equal(calls,before);
+            const distinct=Object.assign(new EventEmitter(),{pid:child.pid,exitCode:0,signalCode:null,connected:true,send(){assert.fail('reused PID IPC');}});
+            await assert.rejects(stopOwnedChild(distinct,40),error=>error.code==='MEDIFLOW_OWNED_STOP_UNCONFIRMED');
+            console.log(JSON.stringify({simulatedWindows:true,outcome,calls,frames,descendantAlive,originalExit:child.exitCode,lateActions:false}));
         }
-    `], { encoding: 'utf8', timeout: 5000 });
-    assert.equal(result.status, 0, result.stderr);
+    `],{encoding:'utf8',timeout:3000});
+    assert.equal(result.status,0,result.stdout+result.stderr);t.diagnostic(result.stdout.trim());
 });
-
 
 test('owned shutdown requires an observed exit and rejects failed OS termination', () => {
     const result = spawnSync(process.execPath, ['--input-type=module','-e', `
@@ -960,7 +975,7 @@ test('owned shutdown requires an observed exit and rejects failed OS termination
             return true;
         };
         syncBuiltinESMExports();
-        for (const platform of ['win32','linux']) for (outcome of ['error','status','no-exit','exit','ipc-exit','ipc-error']) {
+        for (const platform of ['win32','linux']) for (outcome of ['error','status','no-exit','exit']) {
             for (const allowIpcStop of platform === 'win32' ? [false,true] : [false]) {
                 if (outcome.startsWith('ipc-') && !allowIpcStop) continue;
                 Object.defineProperty(process,'platform',{value:platform,configurable:true});
@@ -973,7 +988,7 @@ test('owned shutdown requires an observed exit and rejects failed OS termination
                     && (outcome === 'no-exit' ? /Exit.*non osservato/u.test(error.cause?.message)
                         : outcome === 'status' && platform === 'win32' ? /taskkill: 1/u.test(error.cause?.message) : error.cause?.code === 'EPERM'));
                 assert.equal(child.listenerCount('exit'),0);
-                assert.deepEqual(frames,platform === 'win32' && allowIpcStop ? [{type:'mediflow-launcher-stop'}] : []);
+                assert.deepEqual(frames,[]);
                 const count=calls;child.emit('exit',0);
                 await new Promise(resolve=>setTimeout(resolve,30));assert.equal(calls,count);
                 console.log(JSON.stringify({platform,outcome,allowIpcStop,calls,exit:child.exitCode}));
@@ -1344,7 +1359,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 }
             };
             cp.spawn = (executable, argv, options) => {
-                if (executable !== process.execPath || argv[0] !== ${JSON.stringify(path.join(source, 'scripts/source-runtime.mjs'))}) throw new Error('FIXTURE_FOREIGN_CHILD_DENIED');
+                if (executable !== process.execPath || ![${JSON.stringify(path.join(source, 'scripts/source-runtime.mjs'))}, ${JSON.stringify(path.join(source, 'node_modules/next/dist/bin/next'))}].includes(argv[0])) throw new Error('FIXTURE_FOREIGN_CHILD_DENIED');
                 const inheritedStderr = options.stdio[2] === 2;
                 const child = spawn(executable, argv, inheritedStderr ? { ...options, stdio: [options.stdio[0], options.stdio[1], 'pipe'] } : options);
                 if (inheritedStderr) child.stderr.on('data', bytes => process.stderr.write(bytes));
@@ -1377,7 +1392,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     const text = String(result.source), from = text.indexOf('export async function stopOwnedChild'), to = text.indexOf('export function installDesktopEntry', from);
                     if (from < 0 || to < from) throw new Error('FIXTURE_STOP_HELPER_NOT_FOUND');
                     let helper = text.slice(from, to).replace('if (settled) return;',
-                        'if (settled) return; globalThis[Symbol.for("mediflow.fixture.stop-observation")]({type:"stop-result",pid:child.pid,allowIpcStop,groupAbsent,exitCode:child.exitCode,signalCode:child.signalCode,cause:cause ? {code:cause.code,message:cause.message} : null});');
+                        'if (settled) return; globalThis[Symbol.for("mediflow.fixture.stop-observation")]({type:"stop-result",pid:child.pid,windowsTreeStopped,originalExitObserved,groupAbsent,exitCode:child.exitCode,signalCode:child.signalCode,cause:cause ? {code:cause.code,message:cause.message} : null});');
                     if (${process.env.MEDIFLOW_FIXTURE_STOP_DENY_PLATFORM === 'win32'}) helper = helper.replaceAll('process.platform', '"win32"');
                     result.source = text.slice(0, from) + helper + text.slice(to);
                 }
@@ -1461,6 +1476,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 fs.appendFileSync(${JSON.stringify(stopTrace)}, JSON.stringify({pid,signal,failure}) + '\\n');
                 if (failure === 'error') throw Object.assign(new Error('SYNTHETIC_STOP_EPERM'), {code:'EPERM'});
                 if (failure === 'status') return {status:1};
+                if (failure === 'status-exit') { kill(pid, 'SIGTERM'); return {status:1}; }
                 if (failure === 'no-exit') return {status:0};
                 kill(pid, 'SIGTERM'); return {status:0};
             };
@@ -1503,7 +1519,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     const from = text.indexOf('export async function stopOwnedChild'), to = text.indexOf('export function installDesktopEntry',from);
                     if (from < 0 || to < from) throw new Error('FIXTURE_STOP_HELPER_NOT_FOUND');
                     text = text.slice(0,from) + text.slice(from,to).replaceAll('process.platform', ${JSON.stringify(JSON.stringify(lifecycle.platform))}) + text.slice(to);
-                    result.source = text.replace('stopOwnedChild(child, 8000,', 'stopOwnedChild(child, ${lifecycle.group ? 600 : 60},')
+                    result.source = text.replace('stopOwnedChild(child, 8000)', 'stopOwnedChild(child, ${lifecycle.group ? 600 : 60})')
                         .replace('const finish = cause => {', 'const finish = cause => { if(cause) process.stderr.write("FIXTURE_STOP_CAUSE " + cause.code + " " + cause.message + String.fromCharCode(10));');
                 }
                 return result;
@@ -1517,7 +1533,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     mkdirSync(path.join(source, 'node_modules/better-sqlite3'), { recursive: true });
     writeFileSync(path.join(source, 'node_modules/next/package.json'), '{}');
     writeFileSync(path.join(source, 'node_modules/better-sqlite3/package.json'), '{}');
-    const identity = { checkoutPath: source + path.sep, revision: 'aaaaaaaaaaaa', worktreeHash: 'clean', sourceFingerprint: 'synthetic@aaaaaaaaaaaa:clean' };
+    const identity = { checkoutPath: source + path.sep, revision: 'aaaaaaaaaaaa', worktreeHash: remembered === 'sviluppo' ? 'fixture-dirty' : 'clean', sourceFingerprint: remembered === 'sviluppo' ? 'synthetic@aaaaaaaaaaaa:fixture-dirty' : 'synthetic@aaaaaaaaaaaa:clean' };
     writeFileSync(path.join(source, 'scripts/launcher-helpers.mjs'), `
         export * from ${JSON.stringify(new URL('./launcher-helpers.mjs', import.meta.url).href)};
         export const checkNode = () => ({ ok: true });
@@ -1582,6 +1598,8 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
             process.on('message', frame => process.stderr.write('FIXTURE_NAVIGATION ' + JSON.stringify(frame) + '\\n'));
             process.on('SIGTERM', () => { server.close(); process.disconnect?.(); });
         }`);
+    mkdirSync(path.join(source, 'node_modules/next/dist/bin'), { recursive: true });
+    writeFileSync(path.join(source, 'node_modules/next/dist/bin/next'), readFileSync(path.join(source, 'scripts/source-runtime.mjs'), 'utf8').replace("endsWith('source-runtime.mjs')", "endsWith('next')"));
     const options = { home, env: { MEDIFLOW_DATA_DIR: data, XDG_CONFIG_HOME: path.join(home, 'config'), APPDATA: path.join(home, 'Roaming') } };
     const launcherStateSource = new URL('./launcher-state.mjs', import.meta.url).href;
     const setup = spawnSync(process.execPath, ['--input-type=module', '-e', `
@@ -1711,7 +1729,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
             const stopFailures = output.split('Arresto non verificato').length;
             if (child.exitCode === null && child.signalCode === null) {
                 await postStop('cleanup');
-                if (terminalFailureObserved && (process.platform === 'win32' || process.env.MEDIFLOW_FIXTURE_STOP_DENY_PLATFORM === 'win32')) {
+                if (terminalFailureObserved && (process.platform === 'win32' || process.env.MEDIFLOW_FIXTURE_STOP_DENY_PLATFORM === 'win32' || lifecycle?.platform === 'win32')) {
                     await until(() => output.split('Arresto non verificato').length > stopFailures);
                     failures.push(new Error('Fixture launcher cleanup required termination after unconfirmed Windows shutdown.'));
                     recordLauncher('fixture-owner-stop', { productStopConfirmed: false });
@@ -1863,7 +1881,7 @@ for (const simulatedStopPlatform of ['win32', 'linux']) for (const failure of si
         assert.deepEqual(activations,[{actualOS,simulatedStopPlatform,url:pathToFileURL(path.join(f.source,'scripts/mediflow.mjs')).href}],f.output());
         const frames = f.output().split('\n').filter(line=>line.startsWith('FIXTURE_NAVIGATION '))
             .map(line=>JSON.parse(line.slice('FIXTURE_NAVIGATION '.length)));
-        assert.deepEqual(frames,simulatedStopPlatform === 'win32' && trigger !== 'error' ? [{type:'mediflow-launcher-stop'}] : [],f.output());
+        assert.deepEqual(frames,[],f.output());
         const trace = readFileSync(f.stopTrace,'utf8').trim().split('\n').map(line=>JSON.parse(line));
         assert.deepEqual(trace.map(({signal})=>signal),simulatedStopPlatform === 'win32' ? ['taskkill'] : failure === 'error' ? ['SIGTERM'] : ['SIGTERM','SIGKILL']);
         for (const entry of trace) { assert.equal(entry.pid,pid); assert.equal(entry.failure,failure); }
@@ -1888,6 +1906,47 @@ for (const simulatedStopPlatform of ['win32', 'linux']) for (const failure of si
     });
 }
 
+for (const profile of ['web', 'agenti', 'sviluppo']) test(`Windows OS tree stop closes the original ${profile} generation`, async t => {
+    const f = await ordinaryLauncherFixture(t, profile, ['--scelta', profile], true, true, {}, null, {platform:'win32',failure:null});
+    await f.until(() => f.output().includes('Pronto:'));
+    const receiptFile = launcherReceiptFile(f.stateFiles.lockDirectory), receipt = JSON.parse(readFileSync(receiptFile));
+    const endpoint = new URL('stop', receipt.choiceUrl);
+    const response = await fetch(endpoint,{method:'POST',headers:{Origin:endpoint.origin,'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(1000)});
+    assert.equal(response.status,200);await response.text();
+    await f.waitForTerminal();assert.equal(f.child.exitCode,0,f.output());
+    assert.equal(existsSync(receiptFile),false,'The stopped generation was not retired');
+    assert.doesNotMatch(f.output(),/FIXTURE_NAVIGATION/u);
+    const created=f.observations().filter(event=>event.type==='child-created');assert.equal(created.length,1);
+    const trace=readFileSync(f.stopTrace,'utf8').trim().split('\n').map(JSON.parse);
+    assert.deepEqual(trace,[{pid:created[0].pid,signal:'taskkill',failure:null}]);
+    const successor=claimLauncher(f.stateFiles.lockDirectory,{checkoutPath:f.source+path.sep});
+    try {assert.equal(successor.claimed,true);await new Promise(resolve=>setTimeout(resolve,100));assert.equal(JSON.parse(readFileSync(successor.receiptFile)).pid,process.pid);assert.equal(readFileSync(f.stopTrace,'utf8').trim().split('\n').length,1);}
+    finally {releaseLauncher(successor);}
+    t.diagnostic(JSON.stringify({profile,actualOS:process.platform,simulatedStopPlatform:'win32',trace,generationRetired:true,newClaim:true}));
+});
+
+test('Windows failed tree command cannot release owner after independent original exit', async t => {
+    const teardown=[];
+    const context={after:cleanup=>teardown.push(cleanup),diagnostic:value=>t.diagnostic(value)};
+    const f=await ordinaryLauncherFixture(context,'web',['--scelta','web'],true,true,{},null,{platform:'win32',failure:'status-exit'});
+    t.after(async()=>{
+        await assert.rejects(teardown[0](),/Fixture launcher cleanup required termination after unconfirmed Windows shutdown/u);
+        assert.equal(f.child.signalCode,'SIGKILL','The controlled negative did not drain its original launcher');
+    });
+    await f.until(()=>f.output().includes('Pronto:'));
+    const file=launcherReceiptFile(f.stateFiles.lockDirectory),receipt=JSON.parse(readFileSync(file));
+    const endpoint=new URL('stop',receipt.choiceUrl);
+    const response=await fetch(endpoint,{method:'POST',headers:{Origin:endpoint.origin,'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(1000)});
+    assert.equal(response.status,200);await response.text();
+    await assert.rejects(f.waitForTerminal(),error=>error.code==='MEDIFLOW_FIXTURE_TERMINAL_UNCONFIRMED');
+    await f.until(()=>f.observations().some(event=>event.type==='child-exit'));
+    const held=claimLauncher(f.stateFiles.lockDirectory,{checkoutPath:f.source+path.sep},{reuseLive:true});
+    try {assert.equal(held.claimed,false);assert.deepEqual(JSON.parse(readFileSync(file)),receipt);}
+    finally {if(held.claimed)releaseLauncher(held);}
+    const trace=readFileSync(f.stopTrace,'utf8');await new Promise(resolve=>setTimeout(resolve,100));assert.equal(readFileSync(f.stopTrace,'utf8'),trace);
+    assert.doesNotMatch(f.output(),/FIXTURE_NAVIGATION/u);
+});
+
 for (const scenario of ['stop-timeout','readiness-error','exit']) test(`CI smoke preserves an unconfirmed runtime and its fixture: ${scenario}`, t => {
     const directory = realpathSync(mkdtempSync(path.join(tmpdir(),'mediflow-smoke-stop-contract-')));
     t.after(()=>rmSync(directory,{recursive:true,force:true}));
@@ -1907,7 +1966,7 @@ for (const scenario of ['stop-timeout','readiness-error','exit']) test(`CI smoke
             if(pathname.endsWith('/state'))return {json:async()=>({ready:true})};
             if(pathname.endsWith('/go'))return {status:303,headers:{get:()=> 'http://127.0.0.1:3000'}};
             if(pathname.endsWith('/stop')){
-                if(${JSON.stringify(scenario)}==='exit')queueMicrotask(()=>{live=false;primary.exitCode=0;primary.emit('exit',0);});
+                if(${JSON.stringify(scenario)}==='exit')queueMicrotask(()=>{live=false;primary.exitCode=0;primary.emit('exit',0);primary.stderr.emit('close');});
                 return {status:200,text:async()=> 'stopping'};
             }
             throw new Error('Unexpected fixture request');
@@ -1919,7 +1978,7 @@ for (const scenario of ['stop-timeout','readiness-error','exit']) test(`CI smoke
         globalThis[Symbol.for('smoke-spawn')]=()=>{
             if(spawns++===0){queueMicrotask(()=>primary.stderr.emit('data','Avvio: http://127.0.0.1:3001/'+ 'a'.repeat(48) +'/'));return primary;}
             const second=new EventEmitter();second.stderr=new EventEmitter();
-            queueMicrotask(()=>{second.stderr.emit('data','già attivo');second.emit('exit',0);});return second;
+            queueMicrotask(()=>{second.stderr.emit('data','già attivo');second.emit('exit',0);second.stderr.emit('close');});return second;
         };
         globalThis[Symbol.for('smoke-force')]=async()=>{events.forced++;if(${JSON.stringify(scenario)}==='stop-timeout')throw new Error('SYNTHETIC_FORCED_STOP_FAILURE');};
         registerHooks({load(url,context,next){
@@ -1945,6 +2004,100 @@ for (const scenario of ['stop-timeout','readiness-error','exit']) test(`CI smoke
     assert.equal(observed.live,scenario !== 'exit');
     if (scenario === 'readiness-error') assert.equal(observed.error,'SYNTHETIC_READINESS_FAILURE');
     if (scenario === 'stop-timeout') assert.match(observed.error,/arresto.*non verificato/iu);
+});
+
+for (const outcome of ['success', 'stop-unconfirmed']) test(`Windows CI smoke requires restart and split archive evidence: ${outcome}`, t => {
+    const directory=realpathSync(mkdtempSync(path.join(tmpdir(),'mf-win-smoke-~')));
+    t.after(()=>rmSync(directory,{recursive:true,force:true}));
+    const result=spawnSync(process.execPath,['--input-type=module','-e',`
+        import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import {EventEmitter} from 'node:events';
+        import {registerHooks,syncBuiltinESMExports} from 'node:module';
+        const root=${JSON.stringify(directory)},fixture=path.join(root,'fixture'),lock=path.join(root,'lock');fs.mkdirSync(fixture);fs.mkdirSync(path.join(lock,'active'),{recursive:true});
+        const events=[];let primary,live=false,starts=0,committed=null,removed=0;
+        const remove=fs.rmSync;fs.mkdtempSync=()=>fixture;
+        fs.rmSync=(file,...args)=>{if(file===fixture){removed++;return;}return remove(file,...args);};syncBuiltinESMExports();
+        Object.defineProperty(process,'platform',{value:'win32'});
+        globalThis[Symbol.for('win-smoke-spawn')]=(_executable,argv,options)=>{
+            assert.equal(options.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY,'1');assert.equal(options.env.MEDIFLOW_DATA_DIR,path.join(fixture,'archive'));
+            if(options.stdio==='pipe'){
+                const reuse=new EventEmitter();reuse.stderr=new EventEmitter();queueMicrotask(()=>{reuse.stderr.emit('data','già attivo');reuse.emit('exit',0);reuse.stderr.emit('close');});return reuse;
+            }
+            starts++;live=true;primary=Object.assign(new EventEmitter(),{pid:424260+starts,exitCode:null,signalCode:null,stderr:new EventEmitter()});
+            const generation='owner-'+String(starts).padStart(32,'0');const target=path.join(lock,'active',generation);fs.mkdirSync(target);
+            fs.writeFileSync(path.join(target,'instance.json'),JSON.stringify({pid:primary.pid}));primary.generation=target;
+            queueMicrotask(()=>primary.stderr.emit('data','Avvio: http://127.0.0.1:3001/'+ 'a'.repeat(48) +'/'));events.push('start-'+starts);return primary;
+        };
+        globalThis[Symbol.for('win-smoke-probe')]=async()=>({ok:live});
+        globalThis[Symbol.for('win-smoke-archive')]=(data,token,write)=>{
+            assert.equal(data,path.join(fixture,'archive'));if(write){assert.equal(committed,null);committed=token;events.push('commit');}
+            else {assert.equal(token,committed);events.push('integrity-'+starts);}
+        };
+        globalThis[Symbol.for('win-smoke-tree')]=async()=>{assert.equal(live,false);events.push('separate-tree-rollback');};
+        globalThis.fetch=async url=>{
+            const endpoint=new URL(url);
+            if(endpoint.pathname==='/'){if(live)return {status:200};throw new TypeError('synthetic web offline');}
+            if(endpoint.pathname.endsWith('/state'))return {json:async()=>({ready:true})};
+            if(endpoint.pathname.endsWith('/go'))return {status:303,headers:{get:()=> 'http://127.0.0.1:3000'}};
+            if(endpoint.pathname==='/api/auth/check')return {status:200,json:async()=>({db:{state:'ready'}})};
+            if(endpoint.pathname.endsWith('/stop')){
+                events.push('stop-'+starts);
+                if(${JSON.stringify(outcome)}==='success')queueMicrotask(()=>{live=false;remove(primary.generation,{recursive:true});primary.exitCode=0;primary.emit('exit',0);primary.stderr.emit('close');});
+                return {status:200};
+            }
+            throw new Error('unexpected smoke endpoint');
+        };
+        registerHooks({load(url,context,next){
+            if(url==='node:child_process')return {format:'module',shortCircuit:true,source:'export const spawn=globalThis[Symbol.for("win-smoke-spawn")];'};
+            if(url===${JSON.stringify(new URL('./launcher-helpers.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const readProductIdentity=()=>({sourceFingerprint:"synthetic"});export const probeRunningInstance=globalThis[Symbol.for("win-smoke-probe")];'};
+            if(url===${JSON.stringify(new URL('./launcher-state.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const prepareLauncherState=()=>({lockDirectory:'+JSON.stringify(lock)+'});'};
+            if(url===${JSON.stringify(new URL('./windows-stop-integrity-smoke.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const committedArchiveProbe=globalThis[Symbol.for("win-smoke-archive")];export const windowsTransactionTreeProbe=globalThis[Symbol.for("win-smoke-tree")];'};
+            const result=next(url,context);if(url===${JSON.stringify(new URL('./ci-start-smoke.mjs',import.meta.url).href)})result.source=String(result.source).replaceAll('8000','60');return result;
+        }});
+        const late=[];process.on('unhandledRejection',error=>late.push(error.message));
+        let error;try {await import(${JSON.stringify(new URL('./ci-start-smoke.mjs',import.meta.url).href)});}catch(value){error=value;}
+        if(${JSON.stringify(outcome)}==='success'){
+            assert.equal(error,undefined);assert.equal(starts,2);assert.equal(removed,1);
+            assert.deepEqual(events,['start-1','commit','stop-1','integrity-1','start-2','integrity-2','stop-2','separate-tree-rollback']);
+        }else{assert.match(error.message,/Arresto.*non verificato/u);assert.equal(starts,1);assert.equal(removed,0);assert.equal(live,true);assert.equal(fs.readdirSync(path.join(lock,'active')).length,1);}
+        await new Promise(resolve=>setTimeout(resolve,70));assert.deepEqual(late,[]);
+        console.log(JSON.stringify({outcome:${JSON.stringify(outcome)},simulatedWindows:true,events,starts,removed,ownerPreserved:live,late}));
+    `],{encoding:'utf8',timeout:3000,env:{...process.env,PORT:'3000'}});
+    assert.equal(result.status,0,result.stdout+result.stderr);t.diagnostic(result.stdout.trim());
+});
+
+test('synthetic archive smoke verifies committed content and rejects absent or changed data', async t => {
+    const { openAdmittedSqlite } = await import('../lib/sqlite-maintenance-admission.mjs');
+    const { committedArchiveProbe } = await import('./windows-stop-integrity-smoke.mjs');
+    const directory=realpathSync(mkdtempSync(path.join(tmpdir(),'mf-archive-smoke-~')));
+    t.after(()=>rmSync(directory,{recursive:true,force:true}));
+    const token=crypto.randomUUID();
+    assert.throws(()=>committedArchiveProbe(directory,token),{code:'ENOENT'});
+    const initial=openAdmittedSqlite(path.join(directory,'medical.db'),{role:'synthetic-smoke-initializer'});initial.closeSync();
+    committedArchiveProbe(directory,token,true);committedArchiveProbe(directory,token);
+    assert.throws(()=>committedArchiveProbe(directory,crypto.randomUUID()),{code:'ERR_ASSERTION'});
+});
+
+test('synthetic incomplete transaction rolls back after original writer termination', async t => {
+    const { openAdmittedSqlite } = await import('../lib/sqlite-maintenance-admission.mjs');
+    const directory=realpathSync(mkdtempSync(path.join(tmpdir(),'mf-rollback-smoke-~'))),generation=crypto.randomUUID();
+    const child=spawn(process.execPath,[fileURLToPath(new URL('./windows-stop-integrity-smoke.mjs',import.meta.url)),'--transaction-writer',directory,generation],{
+        env:{...process.env,MEDIFLOW_DATA_DIR:directory,MEDIFLOW_E2E_DISABLE_LEGACY_COPY:'1'},detached:process.platform!=='win32',stdio:['ignore','ignore','pipe','ipc']});
+    const events=[],terminal=Promise.all([once(child,'exit').then(value=>events.push({type:'exit',value})),once(child.stderr,'close').then(()=>events.push({type:'stderr-close'}))]);
+    child.stderr.resume();
+    t.after(async()=>{
+        if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');
+        await waitForFixtureClose(terminal,5000);
+        assert.throws(()=>process.kill(process.platform==='win32'?child.pid:-child.pid,0),{code:'ESRCH'});
+        rmSync(directory,{recursive:true,force:true});
+    });
+    const [frame]=await waitForFixtureClose(once(child,'message'),8000);
+    assert.equal(frame.generation,generation);assert.equal(frame.writer,child.pid);assert.equal(frame.openRows,128);assert.ok(frame.walBytes>0);
+    assert.equal(await fetch('http://127.0.0.1:'+frame.port,{signal:AbortSignal.timeout(1000)}).then(response=>response.text()),generation);
+    child.kill('SIGKILL');await waitForFixtureClose(terminal,5000);
+    const lease=openAdmittedSqlite(path.join(directory,'synthetic.db'),{role:'synthetic-rollback-check',sqliteOptions:{fileMustExist:true}});
+    try {assert.equal(lease.database.pragma('integrity_check',{simple:true}),'ok');assert.deepEqual(lease.database.prepare('SELECT id,value FROM synthetic_stop_rows').all(),[{id:'committed',value:generation}]);}
+    finally {lease.closeSync();}
+    t.diagnostic(JSON.stringify({actualOS:process.platform,windowsTreeQualified:false,originalPid:child.pid,generation,pgid:process.platform==='win32'?null:child.pid,frame,events}));
 });
 
 test('headless ordinary runtime cannot acknowledge plugin navigation', async t => {
@@ -2366,7 +2519,7 @@ test('cancellation during an unverified Web startup sends no navigation frame', 
     assert.equal(created[0].pgid, process.platform === 'win32' ? null : created[0].pid);
     const stopped = events.filter(event => event.type === 'stop-result');
     assert.ok(stopped.length > 0);
-    for (const event of stopped) { assert.equal(event.cause, null); assert.equal(event.allowIpcStop, false); }
+    for (const event of stopped) { assert.equal(event.cause, null); assert.equal(event.windowsTreeStopped, process.platform === 'win32'); }
     if (process.platform !== 'win32') {
         const calls = events.filter(event => event.type === 'owned-os-call');
         assert.deepEqual(calls.map(event => event.signal), [0, 'SIGTERM', 0]);

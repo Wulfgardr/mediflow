@@ -68,9 +68,35 @@ di alimentazione o alla corruzione del filesystem. Preparazioni e generazioni
 ritirate lasciate da un crash non conferiscono proprietà e non bloccano nuovi
 ingressi. La proprietà del launcher non concede navigazione.
 
-Lo stop via IPC richiede un figlio ammesso dopo la readiness e, per il Web,
-dopo la prova HMAC. Su Windows un figlio non ancora verificato viene arrestato
-tramite il suo albero di processi posseduto, senza inviare frame sul canale IPC.
+Su Windows lo Stop di Web, sviluppo e agenti esegue subito una sola
+`taskkill /pid <pid-originale> /T /F`, senza frame IPC di arresto. Listener e
+deadline sono installati prima del comando; subito prima dell'invocazione
+sincrona il launcher verifica ancora che il ChildProcess originale sia vivo.
+Entro un unico budget di 8 secondi servono entrambe le prove: comando senza
+errore o timeout e con status 0, ed evento `exit` dell'originale ChildProcess.
+L'ordine dei due eventi non cambia il criterio. Solo questa congiunzione
+registra una ricevuta idempotente sullo stesso handle, mai sul solo PID.
+Un leader già terminale senza tale ricevuta, un errore del comando o un exit
+mancante conservano owner e generazione e negano il nuovo claim. Nessun retry
+automatico; un errore non viene sanato da un exit successivo.
+
+`/T` riguarda l'albero e `/F` rende lo Stop forzato
+([Microsoft taskkill](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/taskkill)).
+Può saltare la chiusura applicativa e interrompere lavoro in corso: non è
+semanticamente equivalente allo stop cooperativo. La terminazione Win32 può
+essere asincrona
+([Microsoft TerminateProcess](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess));
+lo status del comando da solo non sostituisce l'attesa dell'originale.
+Prima dell'integrazione è obbligatorio il gate Windows reale con archivio
+sintetico: Stop dalla superficie ordinaria, Web non raggiungibile, generazione
+ritirata, riavvio sulla stessa cartella, integrità SQLite, conservazione della
+scrittura committata e rollback della transazione incompleta. Se il gate
+separa Web e albero sintetico con transazione, le due coperture e il limite
+della composizione devono essere dichiarati. La preparazione del gate e i
+driver Windows simulati non ne attestano il passaggio. La prova sintetica non
+garantisce innocuità universale o ammissione all'uso clinico.
+L'ammissione IPC dopo readiness e prova HMAC resta necessaria soltanto per
+navigazione e cancel.
 
 Su POSIX il numero del gruppo non ne prova la continuità dopo la fine del
 capogruppo. Il launcher rinvia i segnali a una nuova fase del ciclo Node,
