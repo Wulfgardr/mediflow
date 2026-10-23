@@ -110,7 +110,34 @@ function stop(child: ChildProcess): void {
   try { if (!hasExited() && !child.killed) child.kill(); } catch { /* terminal */ }
 }
 
-/** Creates both production children; no existing process or public listener is adopted. */
+function localUiMcpProcesses(mcp: ChildProcess): PortableSupervisorProductionChildProcessesV1 {
+  let stopped = false, ended = false;
+  const listeners = new Set<TerminalListener>();
+  const terminal = () => {
+    if (ended) return;
+    ended = true;
+    for (const listener of [...listeners]) listener('mcp_disconnect');
+  };
+  mcp.once('error', terminal); mcp.once('exit', terminal); mcp.once('disconnect', terminal);
+  const terminate = () => { if (stopped) return; stopped = true; stop(mcp); };
+  return Object.freeze({
+    mcpPort: Object.freeze({
+      connection: Object.freeze(Object.create(null)) as object,
+      subscribe(listener: (frame: unknown) => void) { mcp.on('message', listener); return () => { mcp.off('message', listener); }; },
+      publish(frame: string) { if (stopped || !mcp.connected) throw new Error('mcp_disconnected'); mcp.send(frame, error => { if (error) terminal(); }); },
+      onClose(listener: () => void) { const notify = () => listener(); listeners.add(notify); return () => { listeners.delete(notify); }; },
+      terminate,
+    }),
+    subscribeWeb() { return () => {}; },
+    sendWeb(_frame: string, complete: (error: Error | null) => void) { complete(new Error('web_not_owned')); },
+    onTerminal(listener: TerminalListener) { if (ended) listener('mcp_disconnect'); else listeners.add(listener); return () => { listeners.delete(listener); }; },
+    terminateMcp: terminate,
+    terminateWeb() {},
+    terminateAll: terminate,
+  });
+}
+
+/** Clinical profiles own Web and agent; the local-UI profile owns only its MCP child. */
 export function createPortableSupervisorProductionChildProcessesV1(
   options: PortableSupervisorChildProcessesOptionsV1,
 ): PortableSupervisorProductionChildProcessesV1 {
@@ -162,6 +189,8 @@ export function createPortableSupervisorProductionChildProcessesV1(
       });
   } catch { throw new Error('mcp_spawn_failed'); }
 
+  if (agentKind === 'plugin_local_ui') return localUiMcpProcesses(mcp);
+
   let web: ChildProcess;
   try {
     web = spawnChild(nodePath, [webBootstrap, webTargetPath], {
@@ -169,7 +198,7 @@ export function createPortableSupervisorProductionChildProcessesV1(
       env: webEnvironment,
       shell: false,
       // Descriptor 2 is the Supervisor's stderr. Its stdout remains reserved for the MCP child.
-      stdio: agentKind === 'plugin_local_ui' ? ['ignore', 'ignore', 'ignore', 'ipc'] : ['ignore', 2, 2, 'ipc'],
+      stdio: ['ignore', 2, 2, 'ipc'],
     });
   } catch { stop(mcp); throw new Error('web_spawn_failed'); }
 

@@ -1888,7 +1888,7 @@
       "file": "scripts/source-runtime.mjs",
       "kind": "require-base",
       "expression": "createRequire(path.join(web, 'package.json'))",
-      "sourceSha256": "ece076532732853c1186e77d07ae70325f03464939caeb5f75e409e60a8cfc5e",
+      "sourceSha256": "ba94ca3a84d6a0cb9558313d9aac0274ff5ebef1e8314a43dd2e566935745fe3",
       "count": 1,
       "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
     },
@@ -1896,7 +1896,7 @@
       "file": "scripts/source-runtime.mjs",
       "kind": "require",
       "expression": "createRequire(path.join(web, 'package.json'))(path.join(web, 'server.js'))",
-      "sourceSha256": "ece076532732853c1186e77d07ae70325f03464939caeb5f75e409e60a8cfc5e",
+      "sourceSha256": "ba94ca3a84d6a0cb9558313d9aac0274ff5ebef1e8314a43dd2e566935745fe3",
       "count": 1,
       "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
     },
@@ -1920,7 +1920,7 @@
       "file": "scripts/source-runtime.mjs",
       "kind": "dynamic",
       "expression": "import(pathToFileURL(path.join(web, 'scripts/mediflow-headless-supervisor.mjs')).href)",
-      "sourceSha256": "ece076532732853c1186e77d07ae70325f03464939caeb5f75e409e60a8cfc5e",
+      "sourceSha256": "ba94ca3a84d6a0cb9558313d9aac0274ff5ebef1e8314a43dd2e566935745fe3",
       "count": 1,
       "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
     },
@@ -1928,7 +1928,7 @@
       "file": "scripts/source-runtime.mjs",
       "kind": "dynamic",
       "expression": "import(pathToFileURL(path.join(web, 'scripts/register-strip-types-loader.mjs')).href)",
-      "sourceSha256": "ece076532732853c1186e77d07ae70325f03464939caeb5f75e409e60a8cfc5e",
+      "sourceSha256": "ba94ca3a84d6a0cb9558313d9aac0274ff5ebef1e8314a43dd2e566935745fe3",
       "count": 1,
       "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
     },

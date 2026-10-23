@@ -1,6 +1,6 @@
 # MediFlow locale — pacchetto privato 0.1.0
 
-Target: Codex CLI 0.163.0 e Claude Code 2.1.306. Un solo server MCP e
+Target qualificati nel dossier U1: Codex CLI 0.163.0-alpha.11.1 e Claude Code 2.1.308. Un solo server MCP e
 Supervisor, profilo fisso `plugin_local_ui`. Il pacchetto apre la UI separata;
 non incorpora una cartella nell'host, non restituisce CF/storia alla chat e
 non permette al modello di ragionare su dati che non riceve.
@@ -67,8 +67,11 @@ clinica è inclusa; WUL-759 riserva il contatto a Leonardo.
 Chiedi “Apri la ricerca locale di MediFlow”. Il tool accetta soltanto un
 intento fra `search`, `identity`, `history`, `prescribing` e torna sempre
 `continue_in_mediflow`. La ricevuta non attesta apertura o un esito clinico.
-Il primo comando attende soltanto la readiness tecnica privata del Web, con
-timeout; non attende lookup o rendering di un paziente.
+Il primo comando riusa il runtime del launcher ordinario con identità e archivio
+corrispondenti. Se manca, avvia `scripts/mediflow.mjs` (lo stesso ingresso di
+`MediFlow.command`) staccato, con `--scelta web --senza-browser --riusa`.
+`reuse` è obbligatorio: nessuna build, installazione o avvio facoltativo di Ollama.
+Attende soltanto la readiness tecnica, entro il timeout; non attende lookup o rendering di un paziente.
 
 Prima del login, o senza un documento connesso, si apre l'URL locale fisso
 `/plugin-local-ui`, senza query o frammenti. Login/PIN, ricerca anche per CF e
@@ -94,9 +97,11 @@ Altri strumenti dell'host possono accedere a file, browser o screenshot se
 hanno autorità propria: il plugin non isola il Mac e non garantisce anonimato.
 Non usarli come ripiego a un tool negato.
 
-Ogni istanza possiede i propri figli Web/MCP: non adotta processi preesistenti,
-non crea broker residente e termina soltanto i figli posseduti. Rimuovere questo
-pacchetto non elimina archivio o chiavi. Aggiornamento/rimozione e qualifica
+Il raccordo possiede soltanto il figlio MCP. Il launcher ordinario possiede il Web:
+chiudere l'host o rimuovere il plugin non arresta quel runtime né il lavoro aperto.
+Il raccordo non adotta listener arbitrari: controlla ricevuta del launcher, sorgente
+e archivio prima di inviare un intento. Il runtime si arresta dal proprio launcher.
+Rimuovere questo pacchetto non elimina archivio o chiavi. Aggiornamento/rimozione e qualifica
 clinica completa restano risultati separati, WUL-758/WUL-738. Il prototipo
 `mediflow-synthetic` rimane indipendente e contiene soltanto esempi inventati.
 
@@ -126,3 +131,11 @@ La validazione del manifest non prova l'invocazione dell'agente. Un limite
 account, overage, pagamenti o nuovi tentativi automatici. Lo stato locale del
 client può aggiornarsi anche con impostazioni caricate solo per la sessione;
 non ripristinare file globali sopra lavoro concorrente.
+
+Per qualificare il caricamento effettivo del plugin Claude Code, usare
+`--plugin-dir` e l'allowlist `mcp__plugin_mediflow-local-ui_mediflow-local-ui__mediflow_local_ui_navigate_v1`.
+`--strict-mcp-config` esclude anche i server forniti dal plugin: non usarlo per
+questa prova. Per escludere i connettori dell'account nella sola sessione usare
+`ENABLE_CLAUDEAI_MCP_SERVERS=false` e `--setting-sources ''`.
+Un server ancora `pending` non prova disponibilità del tool: attendere la
+connessione e richiedere esplicitamente un nuovo intento, senza riprendere il precedente.

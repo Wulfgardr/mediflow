@@ -92,6 +92,19 @@ test('spawns one marker-only MCP child with a file URL loader and one direct loo
   current.processes.terminateAll();
 });
 
+test('local-UI ownership stops at MCP and never creates or terminates a clinical Web child', () => {
+  const mcp = new SyntheticChild(), independentWeb = new SyntheticChild();
+  const calls: string[] = [];
+  const processes = createPortableSupervisorProductionChildProcessesV1({ dataDir, ...paths, agentKind: 'plugin_local_ui',
+    spawnChild: (_command, args) => { calls.push(args.join(' ')); return mcp as unknown as ChildProcess; } });
+  assert.equal(calls.length, 1);
+  assert.match(calls[0]!, /local-ui-mcp-stdio\.mjs$/u);
+  assert.doesNotMatch(calls[0]!, /headless-web-server/u);
+  processes.terminateAll();
+  assert.equal(mcp.killed, true);
+  assert.equal(independentWeb.killed, false);
+});
+
 test('routes only the exact spawned children and reports unexpected lifecycle loss once', () => {
   const current = setup();
   const webFrames: unknown[] = [], terminal: string[] = [];

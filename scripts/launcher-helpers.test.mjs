@@ -211,6 +211,58 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { atomicJson, buildDecision, claimLauncher, findExistingInstance, needsTextMenu, parseArguments, requireFreePort, selectChoice, stopOwnedChild, textualChoice } from './mediflow.mjs';
 import { createChoiceServer } from './mediflow-launcher-page.mjs';
+import { navigateExistingLocalUiRuntime } from './local-ui-runtime.mjs';
+import { createServer as createHttpServer } from 'node:http';
+
+test('runtime navigation checks archive, source identity and cancellation before sending an intent', async () => {
+    const sourceFingerprint = 'synthetic@0123456789ab:clean';
+    const revision = createHttpServer((_request, response) => {
+        response.setHeader('Content-Type', 'application/json');
+        response.end(JSON.stringify({ revision: '0123456789ab', sourceFingerprint, fingerprint: 'synthetic' }));
+    });
+    await new Promise(resolve => revision.listen(0, '127.0.0.1', resolve));
+    const origin = `http://127.0.0.1:${revision.address().port}`;
+    const received = [];
+    const page = await createChoiceServer({ root: repoRoot, state: () => ({ ready: true, url: origin }),
+        choose() {}, install() {}, stop() {}, navigate(intent) { received.push(intent); } });
+    const receipt = { pid: process.pid, checkoutPath: repoRoot, dataDir: '/synthetic-only', choiceUrl: page.url };
+    const expected = { sourceRoot: repoRoot, dataDir: '/synthetic-only', sourceFingerprint };
+    try {
+        assert.equal(await navigateExistingLocalUiRuntime(receipt, expected, 'history', new AbortController().signal), true);
+        await assert.rejects(navigateExistingLocalUiRuntime({ ...receipt, dataDir: '/different-archive' }, expected, 'identity', new AbortController().signal));
+        await assert.rejects(navigateExistingLocalUiRuntime(receipt, { ...expected, sourceFingerprint: 'changed' }, 'identity', new AbortController().signal));
+        const cancelled = new AbortController(); cancelled.abort();
+        await assert.rejects(navigateExistingLocalUiRuntime(receipt, expected, 'identity', cancelled.signal));
+        await assert.rejects(navigateExistingLocalUiRuntime(receipt, expected, 'SYNTHETIC_SENTINEL', new AbortController().signal));
+        assert.deepEqual(received, ['history']);
+    } finally { await page.close(); await new Promise(resolve => revision.close(resolve)); }
+});
+
+test('ordinary launcher forwards only closed navigation intents without giving the caller runtime shutdown ownership', async () => {
+    const intents = [];
+    let stopped = false;
+    const page = await createChoiceServer({ root: repoRoot,
+        state: () => ({ ready: true, url: 'http://127.0.0.1:32123' }),
+        choose() {}, install() {}, stop() { stopped = true; },
+        navigate(intent) { intents.push(intent); },
+    });
+    try {
+        const endpoint = new URL('navigate', page.url);
+        const post = body => fetch(endpoint, { method: 'POST',
+            headers: { Origin: endpoint.origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        assert.equal((await post({ intent: 'history' })).status, 202);
+        assert.deepEqual(intents, ['history']);
+        for (const body of [{ intent: 'history', patientId: 'SYNTHETIC_SENTINEL' },
+            { intent: 'clinical' }, { profile: 'clinical' }, { intent: 'history', stop: true }]) {
+            assert.equal((await post(body)).status, 400);
+        }
+        assert.equal((await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: '{"intent":"search"}' })).status, 403);
+        assert.deepEqual(intents, ['history']);
+        assert.equal(stopped, false);
+        assert.equal((await fetch(new URL('state', page.url))).status, 200);
+    } finally { await page.close(); }
+});
 
 const cleanIdentity = { checkoutPath: repoRoot, revision: 'abc123456789', worktreeHash: 'clean', sourceFingerprint: 'main@abc123456789:clean' };
 
