@@ -85,13 +85,13 @@ impl RequestContext {
                 .chain(std::iter::once(&self.session))
                 .map(|cancel| Box::pin(cancel.cancelled())),
         );
-        match select(Box::pin(cancelled), Box::pin(operation)).await {
-            Either::Left(_) => Err(if mutation {
+        match select(Box::pin(operation), Box::pin(cancelled)).await {
+            Either::Right(_) => Err(if mutation {
                 RuntimeError::Indeterminate
             } else {
                 self.check().err().unwrap_or(RuntimeError::ReadRequired)
             }),
-            Either::Right((result, _)) => {
+            Either::Left((result, _)) => {
                 // A host retirement signal must survive a simultaneous local cancellation.
                 if result.as_ref().is_err_and(|error| error.retires_session()) {
                     return result;
@@ -109,6 +109,71 @@ impl RequestContext {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn simultaneous_completion(result: Result<()>, mutation: bool, revoke: bool) -> Result<()> {
+        let context = RequestContext::default();
+        let (send, receive) = tokio::sync::oneshot::channel();
+        let mut request = Box::pin(context.run(async { receive.await.unwrap() }, mutation));
+        let mut task = std::task::Context::from_waker(futures_util::task::noop_waker_ref());
+        assert!(request.as_mut().poll(&mut task).is_pending());
+        send.send(result).unwrap();
+        if revoke {
+            context.revoke();
+        } else {
+            context.cancel();
+        }
+        match request.as_mut().poll(&mut task) {
+            std::task::Poll::Ready(result) => result,
+            std::task::Poll::Pending => {
+                panic!("completed response and cancellation were both ready")
+            }
+        }
+    }
+
+    #[test]
+    fn completed_retirement_wins_simultaneous_cancellation_stress() {
+        for _ in 0..1_000 {
+            for mutation in [false, true] {
+                for revoke in [false, true] {
+                    for error in [
+                        RuntimeError::Authentication,
+                        RuntimeError::ArchiveReplaced,
+                        RuntimeError::Locked,
+                    ] {
+                        assert_eq!(
+                            simultaneous_completion(Err(error), mutation, revoke),
+                            Err(error),
+                            "mutation={mutation} session_cancellation={revoke}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn completed_non_retirement_still_obeys_simultaneous_cancellation() {
+        for mutation in [false, true] {
+            for revoke in [false, true] {
+                for result in [
+                    Ok(()),
+                    Err(RuntimeError::Forbidden),
+                    Err(RuntimeError::Transport),
+                ] {
+                    assert_eq!(
+                        simultaneous_completion(result, mutation, revoke),
+                        Err(if mutation {
+                            RuntimeError::Indeterminate
+                        } else if revoke {
+                            RuntimeError::Locked
+                        } else {
+                            RuntimeError::ReadRequired
+                        })
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn selection_cancellation_is_per_generation_and_session_revocation_is_universal() {
