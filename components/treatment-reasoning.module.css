@@ -1,6 +1,6 @@
 .panel { container-type: inline-size; min-width: 0; color: var(--lume-ink); font: var(--type-body); }
-.panel :is(p,h3,h4,dl,dd) { margin: 0; }
-.panel :is(h3,h4) { font: var(--type-strong); }
+.panel :is(p,h4,h5,dl,dd) { margin: 0; }
+.panel :is(h4,h5) { font: var(--type-strong); }
 .header { display: grid; gap: 8px; }
 .groupLabel { font: var(--type-section); color: var(--lume-ink-muted); }
 .meta { color: var(--lume-ink-muted); font: var(--type-meta); overflow-wrap: anywhere; }
@@ -29,11 +29,11 @@
 .error { color: var(--lume-signal-critical); padding-block: 16px; }
 .proposal { min-width: 0; margin-top: 28px; }
 .proposalHeader { display: grid; gap: 8px; padding-block: 16px; border-block: 1px solid var(--lume-rule-strong); }
-.proposalHeader h4 { display: flex; align-items: center; gap: 8px; color: var(--lume-ink-pencil); }
+.proposalHeader h5 { display: flex; align-items: center; gap: 8px; color: var(--lume-ink-pencil); }
 .recommendation { display: grid; gap: 12px; margin-top: 28px; }
 .pencil { color: var(--lume-ink-pencil); text-decoration: underline dashed; text-decoration-thickness: 1px; text-underline-offset: 4px; font: var(--type-prose); max-width: 64ch; overflow-wrap: anywhere; }
 .group { min-width: 0; margin-top: 28px; }
-.group > h4 { margin-bottom: 12px; }
+.group > h5 { margin-bottom: 12px; }
 .signal { padding-block: 12px; border-bottom: 1px solid var(--lume-rule); }
 .signal > div { display: grid; gap: 8px; min-width: 0; }
 .signal > span { flex: none; }

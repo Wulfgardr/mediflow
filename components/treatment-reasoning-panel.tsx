@@ -235,7 +235,7 @@ export default function TreatmentReasoningPanel({
                 <Link href="/settings/ai/funzioni">Apri le funzioni cliniche</Link>
             </div> : <>
             <header className={design.header}>
-                <h3>Ragionamento terapeutico</h3>
+                <h4>Ragionamento terapeutico</h4>
                 <p className={design.meta}>Supporto alle terapie · solo revisione. Nessuna modifica alla cartella.</p>
             </header>
 
@@ -255,7 +255,7 @@ export default function TreatmentReasoningPanel({
 
             {proposal && !isGenerating ? (
                 <div className={design.preparation}>
-                    <h4>Conferma il contesto</h4>
+                    <h5>Conferma il contesto</h5>
                     <p><PrivacyBlur>Paziente: {proposal.patientName}</PrivacyBlur></p>
                     <ChoiceField label="Ambulatorio per questa proposta" value={ambulatory?.ambulatoryId ?? ''}
                             onChange={(event) => { setAmbulatory(proposal.ambulatories.find((row) => row.ambulatoryId === event.target.value) ?? null); setConfirmed(false); }}>
@@ -302,7 +302,7 @@ export default function TreatmentReasoningPanel({
 
             {publication && !isGenerating && <article className={design.proposal} data-testid="treatment-reasoning-proposal" data-ink-state="proposal">
                 <header className={design.proposalHeader}>
-                    <h4><Pencil size={14} aria-hidden="true" />Proposta</h4>
+                    <h5><Pencil size={14} aria-hidden="true" />Proposta</h5>
                     <p className={design.meta}>Da verificare sulle fonti · {formatDateTime(publication.capturedAt)}</p>
                     <p className={design.meta}>Supporto alla revisione: non è una prescrizione, esegue 0 scritture e non applica modifiche.</p>
                 </header>
@@ -317,7 +317,7 @@ export default function TreatmentReasoningPanel({
                 </div>
 
                 {(publication.value.data.caveats.length > 0 || publication.value.data.safetyFlags.length > 0) && <section className={design.group}>
-                    <h4>Cautele e informazioni mancanti</h4>
+                    <h5>Cautele e informazioni mancanti</h5>
                     {publication.value.data.safetyFlags.map(flag => <div key={flag.id} className={`${design.signal} ${severityClasses(flag.severity)}`}>
                         <span aria-hidden="true">{flag.severity === 'urgent_review' ? '◆' : flag.severity === 'caution' ? '▲' : 'ℹ'}</span>
                         <div><p className={design.strong}>{flag.severity === 'urgent_review' ? 'Revisione urgente' : flag.severity === 'caution' ? 'Cautela' : 'Informazione'} · <PrivacyBlur intensity="sm">{flag.label}</PrivacyBlur></p>
@@ -332,7 +332,7 @@ export default function TreatmentReasoningPanel({
 
                 <div className={design.reviewColumns}>
                     <section className={design.group}>
-                        <h4>Elementi a sostegno</h4>
+                        <h5>Elementi a sostegno</h5>
                         {publication.value.data.keyEvidence.length === 0 ? <p className={design.meta}>Nessuna evidenza chiave strutturata.</p>
                             : publication.value.data.keyEvidence.map(evidence => <div key={evidence.id} className={design.proposalRow}>
                                 <p className={design.pencil}><PrivacyBlur intensity="sm">{evidence.statement}</PrivacyBlur></p>
@@ -340,7 +340,7 @@ export default function TreatmentReasoningPanel({
                             </div>)}
                     </section>
                     {publication.value.data.suggestedActions.length > 0 && <section className={design.group}>
-                        <h4>Azioni da valutare</h4>
+                        <h5>Azioni da valutare</h5>
                         {publication.value.data.suggestedActions.map(action => <div key={action.id} className={design.proposalRow}>
                             <p className={design.strong}><PrivacyBlur intensity="sm">{action.label}</PrivacyBlur></p>
                             <p className={design.pencil}><PrivacyBlur intensity="sm">{action.rationale}</PrivacyBlur></p>

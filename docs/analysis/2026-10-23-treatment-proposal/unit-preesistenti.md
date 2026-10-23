@@ -44,3 +44,20 @@ le funzionalità che restano rosse.
 - `lib/chatgpt-execution/execution-mac.test.ts:23:1` — pinned complete source, receipts and 24 C1 comparisons validate only the fixed projection.
 - `lib/chatgpt-execution/execution-mac.test.ts:33:1` — source truncation, wrong receipt and unknown or invalid typed inputs are rejected.
 - `lib/chatgpt-execution/execution-mac.test.ts:50:1` — native source pin is over the complete delivered C bytes, never a caller helper digest.
+
+## Verifica della correzione P2
+
+Nuovo run completo con Node 24.21.0: 7.765 test nel primo gruppo,
+7.748 passati, **3 falliti**, 14 saltati. I due gruppi seriali sono verdi:
+61/61 e 66/66. Restano soltanto i tre casi di
+`lib/chatgpt-execution/execution-mac.test.ts` elencati sopra, riprodotti
+anche nella checkout separata di `origin/main` a
+`0a1980f323d62b4a7c2e1f01e0950a3ac5da218f`.
+
+I 25 errori portabili del run storico si riproducono usando `/tmp` come
+directory dati: su macOS è un alias simbolico di `/private/tmp`, rifiutato
+dai controlli di integrità dei percorsi. Ripetendo le due suite portabili
+su main con `/private/tmp` esplicito: **33/33 verdi**. Anche nella suite unit
+completa del fix i casi portabili passano, usando la directory sintetica
+canonica gestita dal runner. Non sono nuovi errori del fix né errori ancora
+presenti nel run completo corrente.

@@ -70,6 +70,32 @@ async function reach(page: Page, state: State) {
     return run;
 }
 
+test('gerarchia completa dei titoli della scheda Terapie', async ({ page }) => {
+    await fixture(page);
+    const therapies = page.locator('#terapie');
+    await expect(therapies.getByRole('heading', { level: 3 })).toHaveText([/^Terapie farmacologiche\s*1 attiva$/, 'Guida alla prescrizione', 'Attive', 'Proposte']);
+    await expect(therapies.getByRole('heading')).toHaveCount(4);
+    await open(page);
+    await expect(therapies.getByRole('heading', { level: 4 })).toHaveText('Ragionamento terapeutico');
+    await prepare(page);
+    await expect(therapies.getByRole('heading', { level: 5 })).toHaveText('Conferma il contesto');
+    await expect(therapies.getByRole('heading')).toHaveCount(6);
+    await panel(page).getByRole('button', { name: 'Annulla', exact: true }).click();
+    await generate(page);
+    await expect(panel(page).getByTestId('treatment-reasoning-proposal')).toBeVisible();
+    const proposalHeadings = ['Proposta', 'Cautele e informazioni mancanti', 'Elementi a sostegno', 'Azioni da valutare'];
+    await expect(therapies.getByRole('heading', { level: 3 })).toHaveText([/^Terapie farmacologiche\s*1 attiva$/, 'Guida alla prescrizione', 'Attive', 'Proposte']);
+    await expect(therapies.getByRole('heading', { level: 4 })).toHaveText('Ragionamento terapeutico');
+    await expect(therapies.getByRole('heading', { level: 5 })).toHaveText(proposalHeadings);
+    await expect(therapies.getByRole('heading')).toHaveText([
+        /^Terapie farmacologiche\s*1 attiva$/, 'Guida alla prescrizione', 'Attive', 'Proposte', 'Ragionamento terapeutico', ...proposalHeadings,
+    ]);
+    for (const title of ['Come è stata formulata', 'Fonti della proposta', 'Origine e dettagli della generazione']) {
+        await panel(page).getByRole('button', { name: title, exact: true }).click();
+    }
+    await expect(therapies.getByRole('heading')).toHaveCount(9);
+});
+
 test('difetto D6: Proposte chiusa sotto il registro, senza generazione all’apertura', async ({ page }) => {
     const { generations } = await fixture(page);
     await expect(disclosure(page)).toHaveAttribute('aria-expanded', 'false');

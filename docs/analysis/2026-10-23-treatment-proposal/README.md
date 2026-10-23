@@ -106,3 +106,27 @@ Sviluppo assistito: GPT 6.1 Sol, effort High. Rilavorazioni: data della fixture
 incompatibile con il controllo di attualità, alias del tipo estratto, attesa
 desktop precedente alla ricetta comune e registrazione della fixture di supporto.
 Non sono disponibili consumi attribuibili al solo contributo.
+
+## Correzione review P2: gerarchia dei titoli
+
+La disclosure «Proposte» resta h3; «Ragionamento terapeutico» diventa h4,
+conferma del contesto e quattro sottotitoli della proposta diventano h5.
+I selettori CSS seguono i nuovi livelli, conservando tipografia e spaziature.
+
+Il test E2E della gerarchia completa usa `getByRole('heading', { level })`:
+rosso su `2b387c2fa`, verde con il fix, rosso reintroducendo temporaneamente
+h3 sul pannello. Dopo il ripristino, tutti i 23 casi dei tre file E2E interessati
+sono verdi, incluse 60 catture sintetiche, tastiera, touch e zoom reale.
+
+Verifiche locali con Node 24.21.0: inventario browser, lint, typecheck,
+guard di selezione, claims, dashboard, schema writer, scritture AI, confine DB,
+error leak, never-regress, crosswalk Fabric, Apple QA, MLX, OpenAPI, schema drift,
+audit, Lume, scala tipografica e movimento. Crosswalk Fabric, Treatment Reasoning
+e function-models verdi anche nei rispettivi test.
+La suite unit completa ha 7.765 casi nel primo gruppo: 7.748 passati,
+3 falliti, 14 saltati. Gruppi seriali residui: 61/61 e 66/66 verdi.
+I tre errori macOS e il confronto aggiornato con main sono riportati
+[separatamente](./unit-preesistenti.md#verifica-della-correzione-p2).
+
+Sviluppo assistito: GPT 6.1 Sol, effort Medium. Rilavorazione: adeguamento
+dei livelli semantici e dei selettori CSS; nessun cambiamento al contratto clinico.
