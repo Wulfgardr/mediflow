@@ -11,8 +11,8 @@ smontava l'editor e perdeva la bozza non registrata, pur conservando i record sa
 La decisione di coordinamento sostituisce la proprietà del Web descritta sotto:
 il plugin è un telecomando e non possiede il runtime clinico.
 
-Il raccordo riusa l'istanza del launcher ordinario della medesima sorgente e del
-medesimo archivio. Se manca, avvia il launcher ordinario come processo indipendente,
+Il raccordo avvia il launcher ordinario della medesima sorgente e del
+medesimo archivio come processo indipendente,
 staccato, con build già ammessa e decisione `reuse`. Non adotta listener arbitrari,
 non avvia build o installazioni implicite e non registra il launcher o il Web fra
 i figli posseduti. La chiusura dell'host termina soltanto il raccordo MCP.
@@ -130,3 +130,25 @@ client reali separati dalla validazione dei manifest e dall'installazione.
 
 Reversione senza migrazione: rimuovere pacchetti e ingresso ristretto. Non
 esistono dati clinici, autorizzazioni o richieste persistenti da convertire.
+
+
+### Emendamento 23 ottobre: identità del canale di navigazione
+
+La ricevuta su disco e il fingerprint pubblico non autenticano un listener.
+Il navigator non legge `instance.json` e non invia più HTTP al controllo scoperto.
+Avvia il launcher ordinario con il solo `--riusa` su IPC ereditato e inoltra
+soltanto enum, ID casuale e scadenza sul medesimo canale di processo.
+Il launcher avviato così reclama esclusivamente una directory lock nuova:
+nessuna adozione o recupero di ricevute, PID o porte, inclusi alias della lock.
+Il Web è quello avviato direttamente da quel launcher, sul proprio IPC.
+Se esiste un launcher separato la navigazione fallisce chiusa; va arrestato
+localmente prima di avviare una nuova sessione plugin. È un limite esplicito
+rispetto al precedente riuso per discovery, comprese le riconnessioni dopo
+la chiusura dell'host. Non modifica l'archivio o le preferenze ordinarie.
+
+Le risposte IPC sono correlate all'ID della richiesta. Annullamento e
+handoff rifiutato revocano soltanto quell'ID. La disconnessione revoca gli
+handoff ancora pendenti, senza arrestare il launcher o il Web autonomi.
+`--riusa` conserva inizializzazione e servizi facoltativi ordinari, incluso
+Ollama, e limita il riuso alla build già ammessa e alla conservazione delle
+preferenze. Il selettore ordinario e le scelte ricordate restano efficaci.

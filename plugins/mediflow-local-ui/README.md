@@ -70,10 +70,20 @@ clinica è inclusa; WUL-759 riserva il contatto a Leonardo.
 Chiedi “Apri la ricerca locale di MediFlow”. Il tool accetta soltanto un
 intento fra `search`, `identity`, `history`, `prescribing` e torna sempre
 `continue_in_mediflow`. La ricevuta non attesta apertura o un esito clinico.
-Il primo comando riusa il runtime del launcher ordinario con identità e archivio
-corrispondenti. Se manca, avvia `scripts/mediflow.mjs` (lo stesso ingresso di
-`MediFlow.command`) staccato, con `--scelta web --senza-browser --riusa`.
-`reuse` è obbligatorio: nessuna build, installazione o avvio facoltativo di Ollama.
+Il primo comando avvia il launcher ordinario staccato, con lo stesso ingresso di
+`MediFlow.command`. L'invocazione effettiva è:
+
+```sh
+node scripts/mediflow.mjs --riusa
+```
+
+Conserva preferenza e selettore ordinari, senza riscrivere le preferenze.
+Una scelta Mac o agenti può rendere la navigazione indisponibile: non viene
+sostituita con Web. `reuse` richiede una build già ammessa e conserva l'avvio
+ordinario dei servizi facoltativi, incluso Ollama se installato ma fermo.
+La navigazione usa solo l'IPC ereditato dal launcher avviato in questa sessione.
+Un runtime già aperto separatamente, o sopravvissuto a un precedente host, viene
+rifiutato: arrestarlo dal suo launcher prima di una nuova sessione plugin.
 Attende soltanto la readiness tecnica, entro il timeout; non attende lookup o rendering di un paziente.
 
 Prima del login, o senza un documento connesso, si apre l'URL locale fisso
@@ -102,8 +112,9 @@ Non usarli come ripiego a un tool negato.
 
 Il raccordo possiede soltanto il figlio MCP. Il launcher ordinario possiede il Web:
 chiudere l'host o rimuovere il plugin non arresta quel runtime né il lavoro aperto.
-Il raccordo non adotta listener arbitrari: controlla ricevuta del launcher, sorgente
-e archivio prima di inviare un intento. Il runtime si arresta dal proprio launcher.
+Il raccordo non adotta listener da `instance.json`: PID, porta e fingerprint
+pubblico non sono credenziali. Il canale ereditato collega direttamente il
+processo avviato alla sessione, senza discovery o POST di navigazione HTTP. Il runtime si arresta dal proprio launcher.
 Rimuovere questo pacchetto non elimina archivio o chiavi. Aggiornamento/rimozione e qualifica
 clinica completa restano risultati separati, WUL-758/WUL-738. Il prototipo
 `mediflow-synthetic` rimane indipendente e contiene soltanto esempi inventati.
