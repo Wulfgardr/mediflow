@@ -724,12 +724,15 @@ test('same-folder receipt reuses an exact running instance and refuses changed s
     assert.equal((await probeRunningInstance(target, cleanIdentity.sourceFingerprint)).ok, true);
 });
 
-test('shutdown asks an owned runtime to stop and waits for its exit', async () => {
+test('shutdown confirms its owned runtime tree and waits for the original exit', async () => {
+    const {initializeWindowsSystemCommand}=await import('./windows-system-command.mjs');
+    initializeWindowsSystemCommand();
     const child = spawn(process.execPath, ['-e', "process.on('SIGTERM', () => process.exit(0)); process.on('message', m => { if(m.type === 'mediflow-launcher-stop') process.exit(0); }); process.send('ready');"],
         { stdio: ['ignore', 'ignore', 'ignore', 'ipc'], detached: process.platform !== 'win32' });
     await once(child, 'message');
     await stopOwnedChild(child, 3000, { allowIpcStop: true });
-    assert.equal(child.exitCode, 0);
+    if(process.platform === 'win32') assert.notEqual(child.exitCode,null,'Forced Windows stop must observe the original exit');
+    else assert.equal(child.exitCode, 0);
 });
 
 test('POSIX stop observes the original exit without polling its live group', t => {
@@ -838,14 +841,147 @@ test('POSIX absent group still requires the original exit before its deadline', 
     t.diagnostic(result.stdout.trim());
 });
 
+function windowsBootstrapFixture(sourceRoot = repoRoot) {
+    const resolver = pathToFileURL(path.join(sourceRoot, 'scripts/windows-system-command.mjs')).href;
+    const binding = pathToFileURL(path.join(sourceRoot, 'scripts/windows-launcher-bootstrap/index.mjs')).href;
+    return `
+        import fsBootstrap from 'node:fs';
+        import {registerHooks as bootstrapHooks} from 'node:module';
+        const fixtureSystemDirectory = 'C:' + String.fromCharCode(92) + 'MediFlow OS' + String.fromCharCode(92) + 'System32';
+        const fixtureTaskkill = fixtureSystemDirectory + String.fromCharCode(92) + 'taskkill.exe';
+        const bootstrapStat = fsBootstrap.lstatSync, bootstrapRealpath = fsBootstrap.realpathSync.native;
+        fsBootstrap.lstatSync = (file,...rest) => file === fixtureSystemDirectory || file === fixtureTaskkill
+            ? {isFile:()=>file === fixtureTaskkill,isDirectory:()=>file === fixtureSystemDirectory,isSymbolicLink:()=>false}
+            : bootstrapStat(file,...rest);
+        fsBootstrap.realpathSync.native = (file,...rest) => file === fixtureSystemDirectory || file === fixtureTaskkill ? file : bootstrapRealpath(file,...rest);
+        bootstrapHooks({load(url,context,next) {
+            if(url === ${JSON.stringify(binding)}) return {format:'module',shortCircuit:true,
+                source:'export const loadSystemDirectoryBinding = () => ({getSystemDirectory:()=>'+JSON.stringify(fixtureSystemDirectory)+'});'};
+            return next(url,context);
+        }});
+        const bootstrapHost = process.platform;
+        Object.defineProperty(process,'platform',{value:'win32',configurable:true});
+        const {initializeWindowsSystemCommand: fixtureBootstrap} = await import(${JSON.stringify(resolver)});
+        fixtureBootstrap();
+        Object.defineProperty(process,'platform',{value:bootstrapHost,configurable:true});
+    `;
+}
+
+test('Windows unattributed system stop cannot use a cwd or PATH impostor to release ownership', t => {
+    const directory=realpathSync(mkdtempSync(path.join(tmpdir(),'mf-taskkill-shadow-~')));
+    t.after(()=>rmSync(directory,{recursive:true,force:true}));
+    const result=spawnSync(process.execPath,['--input-type=module','-e',`
+        import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import cp from 'node:child_process';
+        import {EventEmitter} from 'node:events';import {syncBuiltinESMExports} from 'node:module';
+        import {stopOwnedChild,claimLauncher,releaseLauncher} from ${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)};
+        const root=${JSON.stringify(directory)},shadow=path.join(root,'shadow'),marker=path.join(root,'impostor-invoked');fs.mkdirSync(shadow);
+        const program=path.join(shadow,'taskkill');
+        fs.writeFileSync(program,'import fs from "node:fs";fs.writeFileSync('+JSON.stringify(marker)+',"only leader");');
+        const native=cp.spawnSync,host=process.platform,originalPath=process.env.PATH;
+        const lock=path.join(root,'lock'),identity={checkoutPath:root+path.sep};
+        const owner=claimLauncher(lock,identity);assert.equal(owner.claimed,true);
+        const child=Object.assign(new EventEmitter(),{pid:424251,exitCode:null,signalCode:null,connected:true,send(){assert.fail('stop IPC');}});
+        let descendantAlive=true,resolutions=0,failure,successor;
+        const commands=[];
+        cp.spawnSync=(command,args)=>{
+            commands.push(command);
+            if(command==='taskkill'||command==='taskkill.exe'){
+                const chosen=fs.existsSync(path.join(process.cwd(),'taskkill'))?path.join(process.cwd(),'taskkill'):path.join(shadow,'taskkill');
+                assert.equal(chosen,program,'The Windows lookup model escaped the owned shadow');
+                const result=native(process.execPath,['--input-type=module','--eval',fs.readFileSync(chosen,'utf8')],{encoding:'utf8',timeout:1000});
+                assert.equal(result.status,0,result.stderr);
+                child.exitCode=0;child.emit('exit',0);return {status:0};
+            }
+            throw Object.assign(new Error('UNATTRIBUTED_SYSTEM_COMMAND_DENIED'),{code:'EACCES'});
+        };
+        process.report.getReport=()=>({sharedObjects:[]});syncBuiltinESMExports();
+        process.chdir(shadow);process.env.PATH=shadow+path.delimiter+originalPath;
+        process.env.SystemRoot=String.raw\`C:\Users\synthetic\Windows\`;process.env.WINDIR=process.env.SystemRoot;
+        Object.defineProperty(process,'platform',{value:'win32',configurable:true});
+        try {
+            try {await stopOwnedChild(child,80);resolutions++;await stopOwnedChild(child,80);resolutions++;}
+            catch(error){failure={code:error.code,cause:error.cause?.message};}
+        } finally {Object.defineProperty(process,'platform',{value:host,configurable:true});cp.spawnSync=native;syncBuiltinESMExports();}
+        try {
+            if(resolutions)releaseLauncher(owner);
+            successor=claimLauncher(lock,identity,{reuseLive:true});
+            const observed={node:process.version,execPath:process.execPath,uv:process.versions.uv,actualOS:host,simulatedWindows:true,
+                realCounterfeitProgram:fs.existsSync(marker),realProductChild:false,exitOfLeaderSimulated:child.exitCode!==null,
+                descendantAlive,resolutions,commands,failure,ownerHeld:!successor.claimed,newClaimDenied:!successor.claimed,
+                ownerGeneration:owner.generation,lateSignals:false};
+            console.log(JSON.stringify(observed));
+            assert.equal(fs.existsSync(marker),false,'cwd/PATH impostor was invoked as an OS tree-stop receipt');
+            assert.equal(successor.claimed,false,'An unattributed command released the owned generation');
+            assert.equal(resolutions,0,'A leader-only stop contaminated the same-handle receipt');
+            assert.equal(failure?.code,'MEDIFLOW_OWNED_STOP_UNCONFIRMED');
+            assert.deepEqual(commands,[],'Unattributed system command must not execute or fall back');
+            assert.equal(child.listenerCount('exit'),0);
+            await new Promise(resolve=>setTimeout(resolve,100));assert.deepEqual(commands,[]);
+        } finally {if(successor?.claimed)releaseLauncher(successor);else releaseLauncher(owner);}
+    `],{encoding:'utf8',timeout:3000});
+    assert.equal(result.status,0,result.stdout+result.stderr);t.diagnostic(result.stdout.trim());
+});
+
+test('Windows native bootstrap selects the OS command despite hostile cwd PATH and root variables', t => {
+    const directory=realpathSync(mkdtempSync(path.join(tmpdir(),'mf-native-command-~')));
+    t.after(()=>rmSync(directory,{recursive:true,force:true}));
+    const result=spawnSync(process.execPath,['--input-type=module','-e',`
+        ${windowsBootstrapFixture()}
+        import assert from 'node:assert/strict';import fs from 'node:fs';import cp from 'node:child_process';
+        import {EventEmitter} from 'node:events';import {syncBuiltinESMExports} from 'node:module';
+        const {stopOwnedChild,claimLauncher,releaseLauncher}=await import(${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)});
+        const root=${JSON.stringify(directory)},lock=root+'/lock',initialCwd=process.cwd(),nativeSpawn=cp.spawnSync;
+        const saved=Object.fromEntries(['SystemRoot','WINDIR','Path','PATH'].map(key=>[key,process.env[key]]));process.chdir(root);
+        fs.writeFileSync(root+'/taskkill.exe','synthetic counterfeit, must never execute');
+        process.env.SystemRoot='C:'+String.fromCharCode(92)+'Users'+String.fromCharCode(92)+'Windows';
+        process.env.WINDIR=process.env.SystemRoot;process.env.Path=root;process.env.PATH=root;
+        process.report.getReport=()=>assert.fail('Diagnostic report used');
+        const identity={checkoutPath:root+'/'},owner=claimLauncher(lock,identity);assert.equal(owner.claimed,true);
+        const child=Object.assign(new EventEmitter(),{pid:424252,exitCode:null,signalCode:null,send(){assert.fail('Stop IPC');}});
+        const commands=[];let descendantAlive=true;
+        cp.spawnSync=(command,args)=>{
+            commands.push(command);assert.equal(command,fixtureTaskkill,'Untrusted command selected');
+            assert.deepEqual(args,['/pid','424252','/T','/F']);
+            descendantAlive=false;child.exitCode=1;child.emit('exit',1);return {status:0};
+        };syncBuiltinESMExports();
+        const host=process.platform;Object.defineProperty(process,'platform',{value:'win32',configurable:true});
+        try {await stopOwnedChild(child,80);await stopOwnedChild(child,80);}
+        finally {Object.defineProperty(process,'platform',{value:host,configurable:true});cp.spawnSync=nativeSpawn;syncBuiltinESMExports();process.chdir(initialCwd);for(const [key,value] of Object.entries(saved))if(value===undefined)delete process.env[key];else process.env[key]=value;}
+        let successor,released=false;try {
+            releaseLauncher(owner);released=true;successor=claimLauncher(lock,identity);assert.equal(successor.claimed,true);
+            assert.equal(descendantAlive,false);assert.deepEqual(commands,[fixtureTaskkill]);assert.equal(child.listenerCount('exit'),0);
+            await new Promise(resolve=>setTimeout(resolve,100));assert.equal(commands.length,1);
+            console.log(JSON.stringify({actualOS:host,simulatedWindows:true,nativeBindingSimulated:true,commands,descendantAlive,newClaim:true,lateActions:false}));
+        }finally{if(successor?.claimed)releaseLauncher(successor);else if(!released)releaseLauncher(owner);}
+    `],{encoding:'utf8',timeout:3000});
+    assert.equal(result.status,0,result.stdout+result.stderr);t.diagnostic(result.stdout.trim());
+});
+
+test('Windows missing bootstrap fails before launcher state or owner publication', t => {
+    const result=spawnSync(process.execPath,['--input-type=module','-e',`
+        import assert from 'node:assert/strict';import {registerHooks} from 'node:module';
+        registerHooks({load(url,context,next){
+            if(url===${JSON.stringify(new URL('./windows-launcher-bootstrap/index.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const loadSystemDirectoryBinding=()=>{throw new Error("BINDING_MISSING");};'};
+            if(url===${JSON.stringify(new URL('./launcher-state.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const prepareLauncherState=()=>{throw new Error("OWNER_STATE_REACHED");};'};
+            return next(url,context);
+        }});
+        const {main}=await import(${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)});
+        Object.defineProperty(process,'platform',{value:'win32'});
+        await assert.rejects(main(['--scelta','web','--senza-browser']),error=>error.code==='MEDIFLOW_OWNED_STOP_UNCONFIRMED'&&error.cause.message==='BINDING_MISSING');
+        console.log(JSON.stringify({simulatedWindows:true,bootstrapMissing:true,ownerStateReached:false}));
+    `],{encoding:'utf8',timeout:3000});
+    assert.equal(result.status,0,result.stdout+result.stderr);t.diagnostic(result.stdout.trim());
+});
+
 test('Windows terminal entry requires a confirmed stop on the same original handle', t => {
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+        ${windowsBootstrapFixture()}
         import assert from 'node:assert/strict'; import cp from 'node:child_process';
         import {EventEmitter} from 'node:events'; import {syncBuiltinESMExports} from 'node:module';
-        import {stopOwnedChild} from ${JSON.stringify(new URL('./mediflow.mjs', import.meta.url).href)};
+        const {stopOwnedChild} = await import(${JSON.stringify(new URL('./mediflow.mjs', import.meta.url).href)});
         Object.defineProperty(process,'platform',{value:'win32'});
         let child, calls=0, frames=0, fail=false;
-        cp.spawnSync=(command,args)=>{assert.equal(command,'taskkill');assert.deepEqual(args,['/pid','424249','/T','/F']);calls++;
+        cp.spawnSync=(command,args)=>{assert.equal(command,fixtureTaskkill);assert.deepEqual(args,['/pid','424249','/T','/F']);calls++;
             if(fail) return {status:1};queueMicrotask(()=>{child.exitCode=0;child.emit('exit',0);});return {status:0};};
         syncBuiltinESMExports();
         const make=(exitCode=null,signalCode=null)=>Object.assign(new EventEmitter(),{pid:424249,exitCode,signalCode,connected:true,send(){frames++;throw new Error('Terminal IPC denied');}});
@@ -904,14 +1040,15 @@ test('Windows unconfirmed terminal child retains the original launcher claim', t
 
 test('Windows tree stop requires OS success and original exit even after IPC admission', t => {
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+        ${windowsBootstrapFixture()}
         import assert from 'node:assert/strict'; import cp from 'node:child_process';
         import {EventEmitter} from 'node:events'; import {syncBuiltinESMExports} from 'node:module';
-        import {stopOwnedChild} from ${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)};
+        const {stopOwnedChild} = await import(${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)});
         Object.defineProperty(process,'platform',{value:'win32'});
         let child, calls, frames, descendantAlive, outcome;
         const exit=()=>{child.exitCode=0;child.emit('exit',0);};
         cp.spawnSync=(command,args,options)=>{
-            calls++;assert.equal(command,'taskkill');assert.deepEqual(args,['/pid','424250','/T','/F']);
+            calls++;assert.equal(command,fixtureTaskkill);assert.deepEqual(args,['/pid','424250','/T','/F']);
             assert.deepEqual({stdio:options.stdio,windowsHide:options.windowsHide},{stdio:'ignore',windowsHide:true});
             assert.ok(options.timeout>0&&options.timeout<=40);
             if(outcome.endsWith('-sync'))exit();
@@ -950,6 +1087,7 @@ test('Windows tree stop requires OS success and original exit even after IPC adm
 
 test('owned shutdown requires an observed exit and rejects failed OS termination', () => {
     const result = spawnSync(process.execPath, ['--input-type=module','-e', `
+        ${windowsBootstrapFixture()}
         import assert from 'node:assert/strict'; import cp from 'node:child_process';
         import { EventEmitter } from 'node:events'; import { syncBuiltinESMExports } from 'node:module';
         const { stopOwnedChild } = await import(${JSON.stringify(new URL('./mediflow.mjs', import.meta.url).href)});
@@ -962,7 +1100,7 @@ test('owned shutdown requires an observed exit and rejects failed OS termination
             return {status:0};
         };
         cp.spawnSync = (command,args,options) => {
-            assert.equal(command,'taskkill'); assert.deepEqual(args,['/pid','424242','/T','/F']);
+            assert.equal(command,fixtureTaskkill); assert.deepEqual(args,['/pid','424242','/T','/F']);
             assert.ok(options.timeout > 0 && options.timeout <= 25);
             try { return terminate(); } catch(error) {return {status:null,error};}
         };
@@ -1335,9 +1473,13 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     const observationFile = path.join(directory, 'stop-observation.ndjson'), ownerLoader = path.join(directory, 'owner-loader.mjs');
     const controlRequest = path.join(directory, 'drain-request.json'), controlReply = path.join(directory, 'drain-reply.json');
     const fixtureGeneration = crypto.randomUUID();
+    const simulatedWindowsBootstrap = lifecycle?.platform === 'win32' || process.env.MEDIFLOW_FIXTURE_STOP_DENY_PLATFORM === 'win32';
     writeFileSync(ownerLoader, String.raw`
+            ${simulatedWindowsBootstrap ? windowsBootstrapFixture(source) : ''}
             import fs from 'node:fs'; import cp from 'node:child_process'; import crypto from 'node:crypto';
             import { registerHooks, syncBuiltinESMExports } from 'node:module';
+            const {initializeWindowsSystemCommand: initializeFixtureSystemCommand} = await import(${JSON.stringify(pathToFileURL(path.join(source, 'scripts/windows-system-command.mjs')).href)});
+            const fixtureSystemStop = ${simulatedWindowsBootstrap} ? fixtureTaskkill : initializeFixtureSystemCommand();
             const owned = new Map(), spawn = cp.spawn, run = cp.spawnSync, kill = process.kill.bind(process);
             const record = value => {
                 const event = { actualOS: process.platform, ...owned.get(value.pid)?.identity, ...value, at: Date.now(), monotonicNs: process.hrtime.bigint().toString() };
@@ -1379,7 +1521,8 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     return kill(pid, signal);
                 };
                 cp.spawnSync = (executable, argv, ...rest) => {
-                    if (executable !== 'taskkill') return run(executable, argv, ...rest);
+                    if (argv?.[0] !== '/pid') return run(executable, argv, ...rest);
+                    if (executable !== fixtureSystemStop) throw new Error('FIXTURE_UNADMITTED_STOP_COMMAND');
                     if (!owned.has(Number(argv[1]))) throw new Error('FIXTURE_FOREIGN_CHILD_DENIED');
                     return { status: null, error: Object.assign(new Error('SYNTHETIC_OBSERVED_STOP_EPERM'), { code: 'EPERM' }) };
                 };
@@ -1481,7 +1624,8 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 kill(pid, 'SIGTERM'); return {status:0};
             };
             cp.spawnSync = (command,args,...rest) => {
-                if (command !== 'taskkill') return run(command,args,...rest);
+                if (args?.[0] !== '/pid') return run(command,args,...rest);
+                if (command !== ${JSON.stringify(String.raw`C:\MediFlow OS\System32\taskkill.exe`)}) throw new Error('FIXTURE_UNADMITTED_STOP_COMMAND');
                 if (args.length !== 4 || args[0] !== '/pid' || args[2] !== '/T' || args[3] !== '/F') throw new Error('FIXTURE_STOP_SCOPE_DENIED');
                 try { return stop(Number(args[1]), 'taskkill'); } catch(error) { return {status:null,error}; }
             };
@@ -1525,10 +1669,13 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 return result;
             }});`);
     }
-    for (const name of ['mediflow.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs']) {
+    for (const name of ['mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs']) {
         const bytes = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
         writeFileSync(path.join(source, 'scripts', name), name === 'mediflow.mjs' ? bytes.replace('const startOptionalOllama = () => {', 'const startOptionalOllama = () => { process.stderr.write(\"FIXTURE_OLLAMA_START\\n\"); return;') : bytes);
     }
+    mkdirSync(path.join(source, 'scripts/windows-launcher-bootstrap'), { recursive: true });
+    writeFileSync(path.join(source, 'scripts/windows-launcher-bootstrap/index.mjs'),
+        'export {loadSystemDirectoryBinding} from ' + JSON.stringify(new URL('./windows-launcher-bootstrap/index.mjs',import.meta.url).href) + ';');
     mkdirSync(path.join(source, 'node_modules/next'), { recursive: true });
     mkdirSync(path.join(source, 'node_modules/better-sqlite3'), { recursive: true });
     writeFileSync(path.join(source, 'node_modules/next/package.json'), '{}');
@@ -2050,6 +2197,8 @@ for (const outcome of ['success', 'stop-unconfirmed']) test(`Windows CI smoke re
             if(url==='node:child_process')return {format:'module',shortCircuit:true,source:'export const spawn=globalThis[Symbol.for("win-smoke-spawn")];'};
             if(url===${JSON.stringify(new URL('./launcher-helpers.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const readProductIdentity=()=>({sourceFingerprint:"synthetic"});export const probeRunningInstance=globalThis[Symbol.for("win-smoke-probe")];'};
             if(url===${JSON.stringify(new URL('./launcher-state.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const prepareLauncherState=()=>({lockDirectory:'+JSON.stringify(lock)+'});'};
+            if(url===${JSON.stringify(new URL('./windows-system-command.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const initializeWindowsSystemCommand=()=>"C:\\\\MediFlow OS\\\\System32\\\\taskkill.exe";'};
+            if(url===${JSON.stringify(new URL('./windows-launcher-bootstrap/observe-command.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export {};'};
             if(url===${JSON.stringify(new URL('./windows-stop-integrity-smoke.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const committedArchiveProbe=globalThis[Symbol.for("win-smoke-archive")];export const windowsTransactionTreeProbe=globalThis[Symbol.for("win-smoke-tree")];'};
             const result=next(url,context);if(url===${JSON.stringify(new URL('./ci-start-smoke.mjs',import.meta.url).href)})result.source=String(result.source).replaceAll('8000','60');return result;
         }});

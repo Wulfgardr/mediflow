@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { openAdmittedSqlite } from '../lib/sqlite-maintenance-admission.mjs';
 import { stopOwnedChild } from './mediflow.mjs';
+import { initializeWindowsSystemCommand } from './windows-system-command.mjs';
 
 const script = fileURLToPath(import.meta.url);
 const record = event => console.error('[windows-stop-integrity] ' + JSON.stringify({ ...event,
@@ -36,6 +37,7 @@ export function committedArchiveProbe(directory, token, write = false) {
 
 export async function windowsTransactionTreeProbe(directory) {
   assert.equal(process.platform, 'win32', 'The tree/rollback gate requires real Windows');
+  initializeWindowsSystemCommand();
   const fixture = fs.mkdtempSync(path.join(directory, 'forced-tree-'));
   const generation = crypto.randomUUID(), database = path.join(fixture, 'synthetic.db');
   const child = spawn(process.execPath, [script, '--tree-leader', fixture, generation], {
@@ -70,7 +72,19 @@ export async function windowsTransactionTreeProbe(directory) {
     assert.equal(await fetch(url, { signal: AbortSignal.timeout(1000) }).then(response => response.text()), generation);
     record({ type: 'transaction-open', ...frame, database });
     stopAttempted = true;
-    await stopOwnedChild(child, 8000);
+    const cwd = process.cwd(), shadow = path.join(fixture, 'shadow');
+    fs.mkdirSync(shadow);
+    fs.writeFileSync(path.join(shadow, 'taskkill.exe'), 'synthetic non-executable shadow');
+    const saved = Object.fromEntries(['PATH', 'Path', 'SystemRoot', 'WINDIR'].map(key => [key, process.env[key]]));
+    try {
+      process.chdir(shadow);
+      process.env.PATH = shadow; process.env.Path = shadow;
+      process.env.SystemRoot = shadow; process.env.WINDIR = shadow;
+      await stopOwnedChild(child, 8000);
+    } finally {
+      process.chdir(cwd);
+      for (const [key, value] of Object.entries(saved)) if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
     await bounded(Promise.all([exit, stderrClosed]), 5000);
     await assert.rejects(fetch(url, { signal: AbortSignal.timeout(1000) }), 'The transaction descendant must no longer serve HTTP');
     const lease = openAdmittedSqlite(database, { role: 'synthetic-stop-check', sqliteOptions: { fileMustExist: true } });

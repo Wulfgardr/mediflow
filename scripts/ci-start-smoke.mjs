@@ -5,10 +5,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
+import { initializeWindowsSystemCommand } from './windows-system-command.mjs';
 import { readProductIdentity, probeRunningInstance } from './launcher-helpers.mjs';
 
-const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-launcher-smoke-'));
 const windows = process.platform === 'win32';
+if (windows) {
+  initializeWindowsSystemCommand();
+  await import('./windows-launcher-bootstrap/observe-command.mjs');
+}
+const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-launcher-smoke-'));
 const integrity = windows ? await import('./windows-stop-integrity-smoke.mjs') : null;
 const data = path.join(fixture, 'archive');
 fs.mkdirSync(data);
@@ -20,7 +25,7 @@ const port = Number(process.env.PORT || 3000);
 const url = `http://127.0.0.1:${port}`;
 let child, reuseChild, diagnostic, choiceUrl, launchError, exited, stopAttempt;
 const launch = () => {
-  child = spawn(process.execPath, ['scripts/mediflow.mjs', '--scelta', 'web', '--senza-browser'], {
+  child = spawn(process.execPath, [...(windows ? ['--import', new URL('./windows-launcher-bootstrap/observe-command.mjs', import.meta.url).href] : []), 'scripts/mediflow.mjs', '--scelta', 'web', '--senza-browser'], {
     env,
     stdio: ['ignore', 'inherit', 'pipe', 'ipc'], detached: process.platform !== 'win32',
   });
@@ -87,7 +92,7 @@ try {
   const go = await fetch(new URL('go', choiceUrl), { redirect: 'manual' });
   assert.equal(go.status, 303);
   assert.equal(go.headers.get('location'), url);
-  const second = spawn(process.execPath, ['scripts/mediflow.mjs', '--scelta', 'web', '--senza-browser'], {
+  const second = spawn(process.execPath, [...(windows ? ['--import', new URL('./windows-launcher-bootstrap/observe-command.mjs', import.meta.url).href] : []), 'scripts/mediflow.mjs', '--scelta', 'web', '--senza-browser'], {
     env, stdio: 'pipe',
   });
   reuseChild = second;

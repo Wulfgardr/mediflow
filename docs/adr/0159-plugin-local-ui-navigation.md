@@ -68,8 +68,43 @@ di alimentazione o alla corruzione del filesystem. Preparazioni e generazioni
 ritirate lasciate da un crash non conferiscono proprietà e non bloccano nuovi
 ingressi. La proprietà del launcher non concede navigazione.
 
+Prima di acquisire o pubblicare owner e generazione su Windows, il bootstrap
+carica un piccolo binding C Node-API precompilato per `process.arch` (x64 o
+ARM64). La sola funzione espone `GetSystemDirectoryW`, con buffer Unicode
+ridimensionato e diniego su errore o troncamento. Il binding appartiene al
+launcher: non entra nella closure Headless, che continua a negare `.node` e
+DLL. Non usa report, DbgHelp, FFI, ambiente o processi ausiliari.
+
+Il loader verifica architettura PE, digest, provenienza del sorgente e della
+ricetta dell'artefatto locale. Digest e ledger identificano i byte: non provano
+l'equivalenza fra sorgente e binario. Sorgente, ricetta e artefatti ammessi
+sono distribuiti insieme; non servono `node_modules`, download o compilazione
+per arrivare alla scelta ordinaria prima di un eventuale `npm ci` confermato.
+Un'architettura senza artefatto verificato è negata; ia32/WOW64 non è ammessa.
+Windows ARM con Node x64 emulato usa l'artefatto x64: il gate nativo ARM64
+non qualifica automaticamente l'intera applicazione ARM64.
+
+La fonte OS determina esclusivamente `<systemDirectory>/taskkill.exe`.
+Directory e candidato devono essere percorsi locali assoluti; `lstat` deve
+osservare directory/file regolari senza link riconosciuti e `realpath.native`
+deve conservare il parent canonico, con confronto Windows case-insensitive.
+Non sono ammessi fallback da PATH, cwd, SystemRoot, WINDIR o root costanti.
+Il percorso positivo è acquisito una volta prima del claim, mai scoperto
+lazy durante lo stop. In caso di errore il bootstrap non crea owner; un
+helper senza bootstrap valido nega lo stop e conserva l'owner già presente.
+
+Si assumono integri Windows, Node e il package di bootstrap distribuito.
+I controlli non firmano taskkill, non escludono ogni reparse tag né eliminano
+il TOCTOU contro un amministratore che modifica la directory OS.
+La fonte è [GetSystemDirectoryW](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getsystemdirectoryw),
+non una variabile del chiamante. Le build di sviluppo/CI native x64 e ARM64
+verificano toolchain, dipendenze e avvio senza node_modules; gli artefatti
+prodotti devono essere ammessi e versionati prima della consegna source-first.
+La preparazione della CI non attesta artefatti ancora mancanti.
+
 Su Windows lo Stop di Web, sviluppo e agenti esegue subito una sola
-`taskkill /pid <pid-originale> /T /F`, senza frame IPC di arresto. Listener e
+invocazione assoluta del `taskkill.exe` acquisito, con
+`/pid <pid-originale> /T /F`, senza frame IPC di arresto. Listener e
 deadline sono installati prima del comando; subito prima dell'invocazione
 sincrona il launcher verifica ancora che il ChildProcess originale sia vivo.
 Entro un unico budget di 8 secondi servono entrambe le prove: comando senza
