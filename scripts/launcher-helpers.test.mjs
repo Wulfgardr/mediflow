@@ -1123,13 +1123,100 @@ async function stopFixtureChild(child, closed) {
     await waitForFixtureClose(closed);
 }
 
-async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, webIdentity = true, overrides = {}, initialOwner = null, lifecycle = null) {
+const observedFixtureCleanups = new WeakMap();
+
+function registerObservedFixtureCleanup(t, cleanup) {
+    let cleanups = observedFixtureCleanups.get(t);
+    if (!cleanups) {
+        cleanups = [];
+        observedFixtureCleanups.set(t, cleanups);
+        t.after(async () => {
+            const errors = [];
+            for (const close of cleanups) try { await close(); } catch (error) { errors.push(error); }
+            if (errors.length) throw new AggregateError(errors, errors.map(error => error.message).join('\n'));
+        });
+    }
+    cleanups.push(cleanup);
+}
+
+async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, webIdentity = true, overrides = {}, initialOwner = null, lifecycle = null, observeStop = false) {
     const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-ordinary-launcher-~')));
     const source = path.join(directory, 'source'), home = path.join(directory, 'home'), data = path.join(directory, 'data');
     mkdirSync(path.join(source, 'scripts'), { recursive: true }); mkdirSync(home); mkdirSync(data);
     const stopControl = path.join(directory, 'stop.json'), runtimePid = path.join(directory, 'runtime-pid.json');
     const groupHistory = path.join(directory,'owned-groups.ndjson'), groupCleanup = path.join(directory,'owned-group-cleanup');
     const stopTrace = path.join(directory, 'stop-trace.ndjson'), stopLoader = path.join(directory, 'stop-loader.mjs');
+    const observationFile = path.join(directory, 'stop-observation.ndjson');
+    if (observeStop) {
+        assert.equal(lifecycle, null);
+        writeFileSync(stopLoader, String.raw`
+            import fs from 'node:fs'; import cp from 'node:child_process'; import crypto from 'node:crypto';
+            import { registerHooks, syncBuiltinESMExports } from 'node:module';
+            const owned = new Map(), spawn = cp.spawn, run = cp.spawnSync, kill = process.kill.bind(process);
+            const record = value => {
+                const event = { ...owned.get(value.pid)?.identity, ...value, at: Date.now() };
+                fs.appendFileSync(${JSON.stringify(observationFile)}, JSON.stringify(event) + '\n');
+                process.stderr.write('FIXTURE_STOP_OBSERVATION ' + JSON.stringify(event) + '\n');
+            };
+            globalThis[Symbol.for('mediflow.fixture.stop-observation')] = record;
+            cp.spawn = (executable, argv, options) => {
+                if (executable !== process.execPath || argv[0] !== ${JSON.stringify(path.join(source, 'scripts/source-runtime.mjs'))}) throw new Error('FIXTURE_FOREIGN_CHILD_DENIED');
+                const child = spawn(executable, argv, options);
+                const identity = { pid: child.pid, generation: crypto.randomUUID(), parentPid: process.pid, executable, argv,
+                    pgid: process.platform !== 'win32' && options.detached ? child.pid : null, detached: options.detached };
+                const exited = new Promise(resolve => child.once('exit', (code, signal) => { record({ type: 'child-exit', pid: child.pid, code, signal }); resolve(); }));
+                const stderrClosed = new Promise(resolve => child.stderr.once('close', () => { record({ type: 'child-stderr-close', pid: child.pid }); resolve(); }));
+                owned.set(child.pid, { child, identity, terminal: Promise.all([exited, stderrClosed]) });
+                record({ type: 'child-created', pid: child.pid });
+                return child;
+            };
+            if (${Boolean(typeof observeStop === 'object' ? observeStop.denyStop : process.env.MEDIFLOW_FIXTURE_STOP_DENY === '1')}) {
+                process.kill = (pid, signal) => {
+                    if (signal !== 0 && [...owned.values()].some(({identity}) => pid === identity.pid || pid === -identity.pgid)) {
+                        throw Object.assign(new Error('SYNTHETIC_OBSERVED_STOP_EPERM'), { code: 'EPERM' });
+                    }
+                    return kill(pid, signal);
+                };
+                cp.spawnSync = (executable, argv, ...rest) => {
+                    if (executable !== 'taskkill') return run(executable, argv, ...rest);
+                    if (!owned.has(Number(argv[1]))) throw new Error('FIXTURE_FOREIGN_CHILD_DENIED');
+                    return { status: null, error: Object.assign(new Error('SYNTHETIC_OBSERVED_STOP_EPERM'), { code: 'EPERM' }) };
+                };
+            }
+            syncBuiltinESMExports();
+            registerHooks({ load(url, context, next) {
+                const result = next(url, context);
+                if (url === ${JSON.stringify(pathToFileURL(path.join(source, 'scripts/mediflow.mjs')).href)}) {
+                    record({ type: 'hook-active', url, node: process.version, execPath: process.execPath, uv: process.versions.uv });
+                    const text = String(result.source), from = text.indexOf('export async function stopOwnedChild'), to = text.indexOf('export function installDesktopEntry', from);
+                    if (from < 0 || to < from) throw new Error('FIXTURE_STOP_HELPER_NOT_FOUND');
+                    const helper = text.slice(from, to).replace('if (settled) return;',
+                        'if (settled) return; globalThis[Symbol.for("mediflow.fixture.stop-observation")]({type:"stop-result",pid:child.pid,allowIpcStop,groupAbsent,exitCode:child.exitCode,signalCode:child.signalCode,cause:cause ? {code:cause.code,message:cause.message} : null});');
+                    result.source = text.slice(0, from) + helper + text.slice(to);
+                }
+                return result;
+            }});
+            process.on('message', async frame => {
+                if (frame?.type === 'fixture-shutdown') { process.emit('SIGTERM'); return; }
+                if (frame?.type !== 'fixture-cleanup') return;
+                record({ type: 'cleanup-start' });
+                try {
+                    for (const {child} of owned.values()) if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+                    await Promise.all([...owned.values()].map(({terminal}) => terminal));
+                    for (const {identity} of owned.values()) if (identity.pgid !== null) {
+                        try { kill(-identity.pgid, 0); }
+                        catch (error) {
+                            if (error.code !== 'ESRCH') throw error;
+                            record({ type: 'cleanup-group-absent', pid: identity.pid }); continue;
+                        }
+                        throw new Error('FIXTURE_OWNED_GROUP_STILL_PRESENT');
+                    }
+                    record({ type: 'cleanup-children-terminal' });
+                    process.send({ type: 'fixture-cleanup-done' });
+                } catch (error) { record({ type: 'cleanup-error', message: error.message }); }
+            });
+        `);
+    }
     if (lifecycle) {
         atomicJson(stopControl, lifecycle);
         if (lifecycle.group) writeFileSync(path.join(source, 'scripts/group-descendant.mjs'), `
@@ -1244,6 +1331,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         import { installLocalUiWebNavigation } from ${JSON.stringify(new URL('./local-ui-web-navigation.mjs', import.meta.url).href)};
         export const verifySourceRuntime = () => ({ identity: ${JSON.stringify(identity)} });
         if (process.argv[1].endsWith('source-runtime.mjs')) {
+            ${observeStop ? `fs.appendFileSync(${JSON.stringify(observationFile)}, JSON.stringify({type:'child-runtime',pid:process.pid,node:process.version,execPath:process.execPath,at:Date.now()})+'\\n');` : ''}
             ${lifecycle?.group ? `
                 setInterval(() => { if(fs.existsSync(${JSON.stringify(groupCleanup)})) process.exit(0); },10);
                 const descendant = spawn(process.execPath,[${JSON.stringify(path.join(source,'scripts/group-descendant.mjs'))}],{stdio:['ignore','ignore','ignore','ipc']});
@@ -1297,14 +1385,89 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     const socket = createHttpServer();
     await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
     const port = socket.address().port; await new Promise(resolve => socket.close(resolve));
-    const child = spawn(process.execPath, [...(lifecycle ? fixtureImportArguments(stopLoader) : []), path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), '--senza-browser', ...args], {
+    const child = spawn(process.execPath, [...(lifecycle || observeStop ? fixtureImportArguments(stopLoader) : []), path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), '--senza-browser', ...args], {
         env: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home, PORT: String(port) }, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
     const closed = Promise.all([once(child, 'exit'), once(child.stderr, 'close')]).then(([exit]) => exit);
-    t.after(async () => {
+    let resolveTerminal, terminalFailureObserved = false, cleanupTask = null, ownerRecorded = false;
+    const terminal = new Promise(resolve => { resolveTerminal = resolve; });
+    const observations = () => existsSync(observationFile) ? readFileSync(observationFile, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)) : [];
+    const recordLauncher = (type, fields = {}) => appendFileSync(observationFile, JSON.stringify({ type, pid: child.pid, at: Date.now(), ...fields }) + '\n');
+    if (observeStop) {
+        child.once('exit', (code, signal) => recordLauncher('launcher-exit', { code, signal }));
+        child.stderr.once('close', () => recordLauncher('launcher-stderr-close'));
+        closed.then(exit => resolveTerminal({ type: 'closed', exit }));
+    }
+    child.stderr.on('data', chunk => {
+        output += chunk;
+        if (observeStop && !ownerRecorded && output.includes('Avvio:')) {
+            const file = launcherReceiptFile(stateFiles.lockDirectory);
+            recordLauncher('launcher-owner', { receipt: JSON.parse(readFileSync(file)), generation: path.basename(path.dirname(file)) });
+            ownerRecorded = true;
+        }
+        if (observeStop && output.includes('Arresto non verificato. Proprietà conservata')) resolveTerminal({ type: 'stop-unconfirmed' });
+    });
+    const waitForTerminal = async () => {
+        let result;
+        try { result = await waitForFixtureClose(terminal, 10_000); }
+        catch (error) { result = { type: 'terminal-deadline', message: error.message }; }
+        const hooks = observations().filter(event => event.type === 'hook-active');
+        assert.deepEqual(hooks.map(({ url, node, execPath }) => ({ url, node, execPath })),
+            [{ url: pathToFileURL(path.join(source, 'scripts/mediflow.mjs')).href, node: process.version, execPath: process.execPath }], output);
+        if (result.type === 'closed') return result.exit;
+        terminalFailureObserved = true;
+        assert.equal(child.exitCode, null, output); assert.equal(child.signalCode, null, output);
+        const current = claimLauncher(stateFiles.lockDirectory, { checkoutPath: source + path.sep }, { reuseLive: true });
+        try { assert.equal(current.claimed, false); assert.equal(current.receipt.pid, child.pid); }
+        finally { if (current.claimed) releaseLauncher(current); }
+        recordLauncher('owner-preserved', { ownerHeld: true, newClaimDenied: true });
+        const diagnostic = { result, ownerHeld: true, newClaimDenied: true, observations: observations(), output };
+        t.diagnostic(JSON.stringify(diagnostic));
+        throw Object.assign(new Error('MEDIFLOW_FIXTURE_TERMINAL_UNCONFIRMED ' + JSON.stringify(diagnostic)), { code: 'MEDIFLOW_FIXTURE_TERMINAL_UNCONFIRMED' });
+    };
+    const cleanup = () => cleanupTask ||= (async () => {
+        let failure;
+        try {
+            if (!terminalFailureObserved && child.exitCode === null && child.signalCode === null) {
+                child.send({ type: 'fixture-shutdown' });
+                await waitForTerminal();
+            }
+        } catch (error) { failure = error; }
+        finally {
+            if (child.exitCode === null && child.signalCode === null) {
+                let receive;
+                const drained = new Promise(resolve => {
+                    receive = frame => { if (frame?.type === 'fixture-cleanup-done') resolve(); };
+                    child.on('message', receive);
+                });
+                try {
+                    child.send({ type: 'fixture-cleanup' });
+                    await waitForFixtureClose(drained);
+                } finally { child.off('message', receive); }
+                const owner = observations().find(event => event.type === 'launcher-owner');
+                const endpoint = new URL('stop', owner.receipt.choiceUrl);
+                const response = await fetch(endpoint, { method: 'POST', headers: { Origin: endpoint.origin, 'Content-Type': 'application/json' },
+                    body: '{}', signal: AbortSignal.timeout(1000) });
+                assert.equal(response.status, 200);
+                await response.text();
+                await waitForFixtureClose(closed);
+            }
+            const events = observations(), created = events.filter(event => event.type === 'child-created');
+            for (const { pid, generation } of created) {
+                assert.ok(events.some(event => event.type === 'child-exit' && event.pid === pid && event.generation === generation));
+                assert.ok(events.some(event => event.type === 'child-stderr-close' && event.pid === pid && event.generation === generation));
+            }
+            if (process.env.MEDIFLOW_FIXTURE_OBSERVATION_AUDIT) appendFileSync(process.env.MEDIFLOW_FIXTURE_OBSERVATION_AUDIT,
+                JSON.stringify({ directory, launcher: child.pid, observations: events, cleanupConfirmed: true }) + '\n');
+            t.diagnostic(JSON.stringify({ fixture: directory, observations: events, cleanupConfirmed: true }));
+            rmSync(directory, { recursive: true, force: true });
+        }
+        if (failure) throw failure;
+    })();
+    if (observeStop) registerObservedFixtureCleanup(t, cleanup);
+    else t.after(async () => {
         await stopFixtureChild(child, closed);
         rmSync(directory, { recursive: true, force: true });
     });
-    child.stderr.on('data', chunk => { output += chunk; });
     const until = async predicate => {
         const deadline = Date.now() + 10_000;
         while (!predicate()) {
@@ -1313,7 +1476,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
             await new Promise(resolve => setTimeout(resolve, 10));
         }
     };
-    return { source, data, stateFiles, child, closed, until, stopControl, stopTrace, runtimePid, requestGroupCleanup: () => writeFileSync(groupCleanup,'owned fixture cleanup'), environment: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home }, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
+    return { source, data, stateFiles, child, closed, until, waitForTerminal, observations, cleanup, stopControl, stopTrace, runtimePid, requestGroupCleanup: () => writeFileSync(groupCleanup,'owned fixture cleanup'), environment: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home }, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
 }
 
 
@@ -1534,7 +1697,7 @@ test('headless ordinary runtime cannot acknowledge plugin navigation', async t =
 test('ordinary and plugin startup recover a stale owner before choosing pairing', async t => {
     for (const reuse of [false, true]) {
         for (const owner of [{ pid: 2147483647 }, { pid: process.pid, processIdentity: 'previous-process-generation' }]) {
-            const f = await ordinaryLauncherFixture(t, 'web', ['--scelta', 'web'], reuse, true, {}, owner);
+            const f = await ordinaryLauncherFixture(t, 'web', ['--scelta', 'web'], reuse, true, {}, owner, null, true);
             await f.until(() => f.output().includes('Pronto:'));
             const receipt = JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
             assert.equal(receipt.pid, f.child.pid);
@@ -1886,12 +2049,62 @@ test('a public revision response cannot establish owned Web identity', async t =
 });
 
 test('cancellation during an unverified Web startup sends no navigation frame', async t => {
-    const f = await ordinaryLauncherFixture(t, 'web', ['--scelta', 'web'], true, 'invalid-delayed');
+    const f = await ordinaryLauncherFixture(t, 'web', ['--scelta', 'web'], true, 'invalid-delayed', {}, null, null, true);
     await f.until(() => f.output().includes('FIXTURE_IDENTITY_PROOF'));
     f.child.send({ type: 'mediflow-local-ui-cancel', requestId: crypto.randomUUID() });
-    await f.closed;
+    await f.waitForTerminal();
     assert.equal(f.child.exitCode, 1);
     assert.doesNotMatch(f.output(), /FIXTURE_NAVIGATION/);
+    const events = f.observations(), created = events.filter(event => event.type === 'child-created');
+    assert.equal(created.length, 1);
+    assert.deepEqual(events.filter(event => event.type === 'child-runtime').map(({node,execPath}) => ({node,execPath})),
+        [{node:process.version,execPath:process.execPath}]);
+    assert.equal(created[0].pgid, process.platform === 'win32' ? null : created[0].pid);
+    const stopped = events.filter(event => event.type === 'stop-result');
+    assert.ok(stopped.length > 0);
+    for (const event of stopped) { assert.equal(event.cause, null); assert.equal(event.allowIpcStop, false); }
+    assert.equal(events.filter(event => event.type === 'child-exit' && event.generation === created[0].generation).length, 1);
+    assert.equal(events.filter(event => event.type === 'child-stderr-close' && event.generation === created[0].generation).length, 1);
+});
+
+for (const [name, count] of [
+    ['cancellation during an unverified Web startup sends no navigation frame', 1],
+    ['ordinary and plugin startup recover a stale owner before choosing pairing', 4],
+]) test(`unverified stop fails visibly and drains all owned fixtures: ${name}`, { timeout: 30000 }, async t => {
+    const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-stop-audit-~')));
+    const audit = path.join(directory, 'cleanup.ndjson');
+    const env = { ...process.env, MEDIFLOW_FIXTURE_STOP_DENY: '1', MEDIFLOW_FIXTURE_OBSERVATION_AUDIT: audit };
+    delete env.NODE_TEST_CONTEXT;
+    const child = spawn(process.execPath, ['--test', '--test-isolation=none', '--test-reporter=spec',
+        '--test-name-pattern=^' + name + '$', fileURLToPath(import.meta.url)], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const closed = once(child, 'close');
+    let output = '';
+    child.stdout.on('data', chunk => { output += chunk; });
+    child.stderr.on('data', chunk => { output += chunk; });
+    t.after(async () => { await stopFixtureChild(child, closed); rmSync(directory, { recursive: true, force: true }); });
+    const [code] = await waitForFixtureClose(closed, 25000);
+    assert.equal(code, 1, output);
+    assert.match(output, /MEDIFLOW_FIXTURE_TERMINAL_UNCONFIRMED/u);
+    assert.match(output, /fail 1/u); assert.match(output, /cancelled 0/u);
+    const receipts = readFileSync(audit, 'utf8').trim().split('\n').map(JSON.parse);
+    assert.equal(receipts.length, count, output);
+    for (const { observations: events, cleanupConfirmed, directory: fixture, launcher } of receipts) {
+        assert.equal(cleanupConfirmed, true);
+        assert.equal(existsSync(fixture), false);
+        assert.equal(events.filter(event => event.type === 'hook-active' && event.node === process.version && event.execPath === process.execPath).length, 1);
+        assert.ok(events.some(event => event.type === 'stop-result' && event.cause?.code === 'EPERM' && event.cause.message === 'SYNTHETIC_OBSERVED_STOP_EPERM'));
+        const held = events.findIndex(event => event.type === 'owner-preserved' && event.ownerHeld && event.newClaimDenied);
+        assert.ok(held >= 0 && held < events.findIndex(event => event.type === 'cleanup-start'));
+        const created = events.filter(event => event.type === 'child-created');
+        assert.equal(created.length, 1);
+        for (const { pid, generation } of created) for (const type of ['child-exit', 'child-stderr-close']) {
+            assert.equal(events.filter(event => event.type === type && event.pid === pid && event.generation === generation).length, 1);
+        }
+        assert.equal(events.filter(event => event.type === 'cleanup-group-absent').length, process.platform === 'win32' ? 0 : 1);
+        assert.equal(events.filter(event => event.type === 'launcher-exit' && event.pid === launcher).length, 1);
+        assert.equal(events.filter(event => event.type === 'launcher-stderr-close').length, 1);
+    }
+    t.diagnostic(JSON.stringify({ expectedFailure: true, receipts }));
 });
 
 test('cold navigator restarts after the owned launcher exits after handshake', t => {
