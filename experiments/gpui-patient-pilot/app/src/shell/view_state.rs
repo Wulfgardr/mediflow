@@ -1261,7 +1261,7 @@ mod tests {
                             "archiveGeneration":"synthetic-generation", "salt":"AwMDAwMDAwMDAwMDAwMDAw==",
                             "encryptedMasterKey":"v3:BQUFBQUFBQUFBQUFAm40aZvQGpityOwyLKhsE40tJdbsjtrugIXzoJ/lk9gjlh5j7pIPeh7DLQ7ikGhA"})
                     } else if route.starts_with("GET /api/v1/network/capabilities ") {
-                        json!({"protocolVersion":"1.13.0", "operatingMode":"network-home-base",
+                        json!({"protocolVersion":"1.14.0", "hostPorts": serde_json::from_str::<serde_json::Value>(include_str!("../../../transport/tests/fixtures/host-ports.json")).unwrap(), "operatingMode":"network-home-base",
                             "capabilities":[{"key":"network.replica.write-clinical-diary",
                                 "requiresPairing":true, "status":"available"}]})
                     } else if route.starts_with("GET /api/v1/network/ambulatories ") {

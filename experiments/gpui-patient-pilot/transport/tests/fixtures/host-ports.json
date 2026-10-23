@@ -1,0 +1,62 @@
+{
+  "revision": 1,
+  "writer": "host",
+  "ports": [
+    {
+      "id": "clinical",
+      "revision": 1,
+      "scope": "ambulatory",
+      "authority": "paired-operator",
+      "state": "available"
+    },
+    {
+      "id": "account-profile",
+      "revision": 1,
+      "scope": "operator",
+      "authority": "operator-session",
+      "state": "available"
+    },
+    {
+      "id": "ai-preferences",
+      "revision": 1,
+      "scope": "operator",
+      "authority": "explicit-admin-grant",
+      "state": "available"
+    },
+    {
+      "id": "administrative",
+      "revision": 1,
+      "scope": "operation",
+      "authority": "explicit-admin-grant",
+      "state": "not-exposed"
+    },
+    {
+      "id": "provider",
+      "revision": 1,
+      "scope": "operation",
+      "authority": "explicit-egress-consent",
+      "state": "not-exposed"
+    },
+    {
+      "id": "document-derived",
+      "revision": 1,
+      "scope": "ambulatory",
+      "authority": "named-host-service",
+      "state": "not-exposed"
+    },
+    {
+      "id": "voice",
+      "revision": 1,
+      "scope": "operation",
+      "authority": "explicit-microphone-permission",
+      "state": "not-exposed"
+    },
+    {
+      "id": "file",
+      "revision": 1,
+      "scope": "chosen-file",
+      "authority": "explicit-file-choice",
+      "state": "client-local"
+    }
+  ]
+}
