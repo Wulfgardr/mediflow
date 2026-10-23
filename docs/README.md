@@ -547,3 +547,8 @@ esiti R/L per host, importazione documentale, Fabric, catalogo delle viste,
 budget di prestazione e pubblicazione. Resta Proposed; qualifica sintetica,
 approvazione delle directory e ammissione clinica sono passaggi distinti.
 Il telecomando di ADR 0159 conserva il suo confine.
+
+Il [contratto porte e lifecycle GPUI](./adr/0161-gpui-host-ports-lifecycle.md)
+prepara G-1a.1: discovery versionata, scope e cancellazione comune.
+Il [verbale](./analysis/2026-10-23-gpui-ports-contract.md) distingue le prove
+eseguite dalla decisione 2 e dalla chiusura SEC-2/3 in G-1a.2.

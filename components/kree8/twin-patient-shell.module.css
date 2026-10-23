@@ -72,7 +72,7 @@
 .patientCanvas { min-height: 100%; }
 
 /* The overview places the existing diary beside the clinical context. */
-.patientBody[data-folder-section='quadro'] .readingPane > div { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 40px; align-items: start; }
+.patientBody[data-folder-section='quadro'] .readingPane > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; align-items: start; }
 .patientBody[data-folder-section='quadro'] :global(#diario) { display: block; }
 .patientBody[data-folder-section='quadro'] :global(#attenzione) { grid-column: 1 / -1; }
 .patientBody :global([data-folder-pane] > h3 > div) { min-height: 36px; border-bottom: 1px solid var(--lume-rule-strong); }

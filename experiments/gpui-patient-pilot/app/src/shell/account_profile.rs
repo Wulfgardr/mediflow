@@ -404,8 +404,16 @@ impl ClinicalApp {
                 if this.account_profile.generation != generation {
                     return;
                 }
-                if let Err(error) = &result
-                    && error.is_auth_failure()
+                if let Some(error) = result
+                    .as_ref()
+                    .err()
+                    .copied()
+                    .filter(RuntimeError::retires_session)
+                    .or_else(|| {
+                        this.session
+                            .as_ref()
+                            .and_then(RuntimeSession::retirement_error)
+                    })
                 {
                     let message = ui_error(error);
                     this.disconnect(cx);
@@ -800,7 +808,9 @@ mod tests {
         current: serde_json::Value,
         conflict: serde_json::Value,
         put_status: u16,
+        get_status: u16,
         requests: Vec<String>,
+        profile_pause: Option<(std::sync::mpsc::Sender<()>, std::sync::mpsc::Receiver<()>)>,
     }
 
     struct SyntheticProfileHost {
@@ -813,13 +823,19 @@ mod tests {
 
     impl SyntheticProfileHost {
         fn new() -> Self {
+            Self::with_context(RequestContext::default())
+        }
+
+        fn with_context(context: RequestContext) -> Self {
             let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
             let socket = listener.local_addr().unwrap();
             let state = Arc::new(Mutex::new(HostState {
                 current: profile_wire("p1:synthetic", Some("Dr. Rossi"), None),
                 conflict: conflict_wire("p1:other", Some("Dr. Altro"), Some("Studio Altro")),
                 put_status: 200,
+                get_status: 200,
                 requests: Vec::new(),
+                profile_pause: None,
             }));
             let shared = state.clone();
             let stop = Arc::new(AtomicBool::new(false));
@@ -857,16 +873,18 @@ mod tests {
                     } else if route.starts_with("GET /api/v1/network/capabilities ") {
                         (
                             200,
-                            serde_json::json!({"protocolVersion":"1.13.0",
+                            serde_json::json!({"protocolVersion":"1.14.0", "hostPorts": serde_json::from_str::<serde_json::Value>(include_str!("../../../transport/tests/fixtures/host-ports.json")).unwrap(),
                                 "operatingMode":"network-home-base",
                                 "capabilities":[{"key":"network.replica.write-clinical-diary",
                                     "requiresPairing":true, "status":"available"}]}),
                         )
                     } else if route.starts_with("GET /api/auth/profile ") {
-                        (200, host.current.clone())
+                        (host.get_status, host.current.clone())
                     } else if route.starts_with("PUT /api/auth/profile ") {
                         if host.put_status == 200 {
                             let mut confirmed = host.current.clone();
+                            confirmed.as_object_mut().unwrap().remove("operation");
+                            confirmed.as_object_mut().unwrap().remove("contractVersion");
                             confirmed["changed"] = serde_json::json!(true);
                             (200, confirmed)
                         } else {
@@ -877,6 +895,12 @@ mod tests {
                     } else {
                         (200, serde_json::json!({}))
                     };
+                    if route.contains("/api/auth/profile ")
+                        && let Some((seen, release)) = host.profile_pause.take()
+                    {
+                        seen.send(()).unwrap();
+                        release.recv_timeout(Duration::from_secs(5)).unwrap();
+                    }
                     let response = response.to_string();
                     write!(
                         stream,
@@ -884,14 +908,17 @@ mod tests {
                         "a".repeat(64),
                         response.len()
                     )
-                    .unwrap();
+                    .unwrap_or_else(|error| {
+                        assert!(matches!(error.kind(), std::io::ErrorKind::BrokenPipe | std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::ConnectionAborted));
+                    });
                 }
             });
             let client = RuntimeClient::new(RuntimeConfig {
                 base_url: format!("http://{socket}"),
                 tls_pin_sha256: None,
             })
-            .unwrap();
+            .unwrap()
+            .with_request_context(context);
             let session = client
                 .login(
                     PairingCredentials::new("synthetic-device", "x".repeat(64)).unwrap(),
@@ -1141,5 +1168,236 @@ mod tests {
             assert_eq!(app.account_profile.save_attempts, 1);
             assert_eq!(app.account_profile.display.read(cx).value(), "Dr. Nuovo");
         });
+    }
+    #[gpui::test]
+    fn review_pending_account_read_survives_workspace_epoch(cx: &mut gpui::TestAppContext) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let host = SyntheticProfileHost::with_context(
+            view.read_with(cx, |app, _| app.request_context.clone()),
+        );
+        view.update(cx, |app, _| app.session = Some(host.session.clone()));
+        let (seen_tx, seen_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        host.state.lock().unwrap().profile_pause = Some((seen_tx, release_rx));
+        let reader = host.session.clone();
+        let worker = thread::spawn(move || reader.read_account_profile());
+        seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        view.update(cx, |app, cx| {
+            app.begin_account_profile_read(move || worker.join().unwrap(), cx);
+            app.next_epoch();
+        });
+        release_tx.send(()).unwrap();
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert!(
+                matches!(app.account_profile.load, ReadLoad::Ready(())),
+                "workspace epoch cancelled an account-authority read"
+            );
+            assert!(!app.account_profile.requires_read);
+        });
+    }
+
+    #[gpui::test]
+    fn pending_account_save_survives_workspace_epoch(cx: &mut gpui::TestAppContext) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let host = SyntheticProfileHost::with_context(
+            view.read_with(cx, |app, _| app.request_context.clone()),
+        );
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.load_account_profile(cx);
+        });
+        cx.run_until_parked();
+        let (snapshot, display, ambulatory) = view.update(cx, |app, cx| {
+            app.account_profile
+                .display
+                .update(cx, |input, cx| input.set_content("Dr. Nuovo", cx));
+            app.begin_account_profile_save(cx).unwrap()
+        });
+        host.serve(
+            profile_wire("p1:updated", Some("Dr. Nuovo"), None),
+            serde_json::json!({}),
+            200,
+        );
+        let (seen_tx, seen_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        host.state.lock().unwrap().profile_pause = Some((seen_tx, release_rx));
+        let writer = host.session.clone();
+        let worker = thread::spawn(move || {
+            writer.update_account_profile(&snapshot, Some(&display), Some(&ambulatory))
+        });
+        seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        view.update(cx, |app, cx| {
+            app.run_account_profile(
+                app.account_profile.generation,
+                move || worker.join().unwrap(),
+                ClinicalApp::receive_account_profile_write,
+                cx,
+            );
+            app.next_epoch();
+        });
+        release_tx.send(()).unwrap();
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert_eq!(app.account_profile.message, SAVE_CONFIRMED);
+            assert!(!app.account_profile.requires_read);
+            assert_eq!(
+                app.account_profile
+                    .snapshot
+                    .as_ref()
+                    .unwrap()
+                    .profile_version,
+                "p1:updated"
+            );
+        });
+        assert_eq!(host.profile_writes(), 1);
+    }
+    fn profile_retirement(
+        cx: &mut gpui::TestAppContext,
+        mutation: bool,
+        explicit_code: bool,
+        indeterminate: bool,
+    ) {
+        let host = SyntheticProfileHost::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("synthetic-scope".into());
+            app.selected_id = Some("synthetic-cached-patient".into());
+            app.patient.entries = ReadLoad::Ready(vec![]);
+            app.load_account_profile(cx);
+        });
+        cx.run_until_parked();
+        let (snapshot, generation, editor) = view.update(cx, |app, cx| {
+            let snapshot = app.account_profile.snapshot.clone().unwrap();
+            app.account_profile
+                .set_editors("Bozza account sintetica", "Studio sintetico", cx);
+            let editor = super::super::tests::synthetic_notes_form(app, FormState::Draft, cx);
+            (snapshot, app.account_profile.generation, editor)
+        });
+        let retained_snapshot = snapshot.clone();
+        assert!(
+            host.session
+                .can_write("network.replica.write-clinical-diary")
+        );
+        let mut wire = profile_wire("p1:new", Some("Dr. Nuovo"), None);
+        wire["archiveGeneration"] = serde_json::json!("different-archive");
+        if explicit_code {
+            let error = serde_json::json!({"code":"ARCHIVE_REPLACED"});
+            host.serve(error.clone(), error, 409);
+            host.state.lock().unwrap().get_status = 409;
+        } else {
+            host.serve(wire, serde_json::json!({}), 200);
+        }
+        let session = host.session.clone();
+        view.update(cx, |app, cx| {
+            if mutation {
+                app.run_account_profile(
+                    generation,
+                    move || {
+                        let result =
+                            session.update_account_profile(&snapshot, Some("Dr. Nuovo"), None);
+                        assert_eq!(result, Err(RuntimeError::ArchiveReplaced));
+                        if indeterminate {
+                            Err(RuntimeError::Indeterminate)
+                        } else {
+                            result
+                        }
+                    },
+                    ClinicalApp::receive_account_profile_write,
+                    cx,
+                );
+            } else {
+                app.begin_account_profile_read(
+                    move || {
+                        let result = session.read_account_profile();
+                        assert_eq!(result, Err(RuntimeError::ArchiveReplaced));
+                        result
+                    },
+                    cx,
+                );
+            }
+        });
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert!(host.session.is_locked());
+            assert!(
+                app.session.is_none(),
+                "transport retired but shell retained dead session"
+            );
+            assert!(app.scope.is_none());
+            assert!(app.selected_id.is_none());
+            assert!(app.account_profile.snapshot.is_none());
+            assert!(app.account_profile.conflict.is_none());
+            assert_eq!(
+                app.account_profile.draft(cx),
+                (String::new(), String::new())
+            );
+            assert!(!app.account_profile.can_save(cx));
+            assert!(app.form.is_none());
+            assert!(matches!(app.patient.entries, ReadLoad::Idle));
+            assert_eq!(app.core.phase(), mediflow_patient_client::Phase::Locked);
+            assert!(
+                app.message
+                    .as_ref()
+                    .unwrap()
+                    .0
+                    .contains(&ui_error(RuntimeError::ArchiveReplaced))
+            );
+            app.run_account_profile(
+                generation,
+                || Ok(()),
+                |_, _, _| panic!("retired account callback applied"),
+                cx,
+            );
+        });
+        cx.run_until_parked();
+        editor.read_with(cx, |input, _| {
+            assert!(input.value().is_empty());
+            assert!(input.read_only);
+        });
+        let reads = host.profile_reads();
+        let writes = host.profile_writes();
+        assert!(host.session.read_account_profile().is_err());
+        assert!(
+            host.session
+                .update_account_profile(&retained_snapshot, Some("Late write"), None)
+                .is_err()
+        );
+        assert!(
+            !host
+                .session
+                .can_write("network.replica.write-clinical-diary")
+        );
+        assert_eq!(host.profile_reads(), reads);
+        assert_eq!(host.profile_writes(), writes);
+    }
+
+    #[gpui::test]
+    fn archive_replaced_profile_get_payload_disconnects_shell(cx: &mut gpui::TestAppContext) {
+        profile_retirement(cx, false, false, false);
+    }
+
+    #[gpui::test]
+    fn archive_replaced_profile_get_code_disconnects_shell(cx: &mut gpui::TestAppContext) {
+        profile_retirement(cx, false, true, false);
+    }
+
+    #[gpui::test]
+    fn archive_replaced_profile_put_payload_disconnects_shell(cx: &mut gpui::TestAppContext) {
+        profile_retirement(cx, true, false, false);
+    }
+
+    #[gpui::test]
+    fn archive_replaced_profile_put_code_disconnects_shell(cx: &mut gpui::TestAppContext) {
+        profile_retirement(cx, true, true, false);
+    }
+
+    #[gpui::test]
+    fn archive_replaced_profile_indeterminate_put_disconnects_shell(cx: &mut gpui::TestAppContext) {
+        profile_retirement(cx, true, false, true);
     }
 }

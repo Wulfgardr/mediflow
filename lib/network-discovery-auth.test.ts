@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import type { StoredNetworkPairedClient } from './network-pairing-model';
 import type { NetworkCapabilitiesResponse } from './api/v1/types';
+import { HOST_PORTS_CONTRACT } from './network-host-ports';
 
 process.env.MEDIFLOW_LOCAL_API_TOKEN = 'network-discovery-auth-test-token';
 
@@ -21,10 +22,11 @@ function createPairedClient(): StoredNetworkPairedClient {
 }
 
 const capabilitiesResponse: NetworkCapabilitiesResponse = {
+    hostPorts: HOST_PORTS_CONTRACT,
     territorialPacks: { schemaVersion: 'mediflow.territorial-packs.v1', revision: 0, preset: 'core', status: 'ready' },
     nodeId: 'node-1',
     operatingMode: 'network-home-base',
-    protocolVersion: '1.11.0',
+    protocolVersion: '1.14.0',
     capabilities: [
         {
             key: 'network.replica.readonly-documents',
