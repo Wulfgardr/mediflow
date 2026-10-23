@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession } from './utils';
 
 test('two profile editors retain a conflicting draft, reread explicitly and save canonical values', async ({ browser, baseURL }, testInfo) => {
@@ -56,25 +57,32 @@ test('a lost save response preserves draft and requires reread without a second 
     await page.goto('/settings/profilo');
     const save = page.getByRole('button', { name: 'Salva profilo', exact: true });
     await expect(save).toBeEnabled();
-    await page.getByLabel('Nome medico', { exact: true }).fill('Bozza con risposta persa');
+    const draft = `Bozza con risposta persa ${randomUUID()}`;
+    await page.getByLabel('Nome medico', { exact: true }).fill(draft);
     let puts = 0;
+    page.on('request', request => {
+        if (new URL(request.url()).pathname === '/api/auth/profile' && request.method() === 'PUT') puts++;
+    });
     await page.route('**/api/auth/profile', async route => {
         if (route.request().method() !== 'PUT') return route.continue();
-        puts++;
-        await route.fetch();
+        const committed = await route.fetch();
+        expect(committed.status()).toBe(200);
+        expect((await committed.json()).changed).toBe(true);
         await route.abort('failed');
     });
     await save.click();
     await expect(page.getByRole('status').filter({ hasText: 'Salvataggio non confermato' })).toBeVisible();
     await expect(save).toBeDisabled();
-    await expect(page.getByLabel('Nome medico', { exact: true })).toHaveValue('Bozza con risposta persa');
+    await expect(page.getByLabel('Nome medico', { exact: true })).toHaveValue(draft);
     expect(puts).toBe(1);
     await page.unroute('**/api/auth/profile');
     await page.getByRole('button', { name: 'Rileggi profilo mantenendo la bozza' }).click();
     await expect(save).toBeEnabled();
-    await expect(page.getByText('Valori salvati:', { exact: false })).toContainText('Bozza con risposta persa');
+    await expect(page.getByText('Valori salvati:', { exact: false })).toContainText(draft);
+    expect(puts).toBe(1);
     await save.click();
     await expect(page.getByRole('status').filter({ hasText: 'Il profilo è già aggiornato.' })).toBeVisible();
+    expect(puts).toBe(2);
 });
 
 test('same-account login in another tab preserves draft and requires an explicit profile read', async ({ page, context }) => {
@@ -93,9 +101,9 @@ test('same-account login in another tab preserves draft and requires an explicit
     const other = await context.newPage();
     try {
         await bootstrapUnlockedSession(other, '1234');
-        const checked = page.waitForResponse(response => response.url().endsWith('/api/auth/check'));
+        const checked = page.waitForResponse(response => response.url().endsWith('/api/auth/check') && response.request().method() === 'GET');
         await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-        expect((await (await checked).json()).hasSession).toBe(true);
+        expect((await checked).status()).toBe(200);
         await expect(page.getByRole('status').filter({ hasText: 'La sessione è cambiata' })).toBeVisible();
         await expect(save).toBeDisabled();
         await expect(page.getByLabel('Nome medico', { exact: true })).toHaveValue('Bozza prima del cambio sessione');

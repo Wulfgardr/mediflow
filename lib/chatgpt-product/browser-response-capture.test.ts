@@ -20,7 +20,7 @@ function fixture(text = good, options: { status?: number; cache?: string; chunks
     // Unit fixture metadata only; browser conformance uses genuine response properties.
     Object.defineProperties(response, { url: { value: base + namespace + 'consent' }, type: { value: 'basic' } });
     const promise = Promise.resolve(response);
-    const context = createContext({ Response, Request, URL, ReadableStream, Uint8Array, TextDecoder, AbortController, location: { href: base + '/' }, fetch: () => { fetches++; return promise; } });
+    const context = createContext({ Response, Request, URL, ReadableStream, Uint8Array, TextDecoder, AbortController, Headers, location: { href: base + '/' }, fetch: () => { fetches++; return promise; } });
     runInContext(`(${installSameResponseCapture.toString()})(${JSON.stringify({ base, namespace })})`, context);
     const api = context.__mfSameResponse;
     const start = (signal?: AbortSignal) => { api.arm('one', 'consent'); return context.fetch(namespace + 'consent', { method: 'POST', signal }); };
@@ -117,10 +117,24 @@ test('host oracle joins natural EOF and the same requestfinished without CDP bod
     const ticket = await oracle.arm('consent'); const wire = page.dispatch(); await page.consume(); wire.finish();
     assert.deepEqual(await ticket.json(), JSON.parse(good)); await oracle.check(); assert.deepEqual(page.eventNames(), []);
 });
-test('host oracle rejects loadingFailed even if ALL renderer bytes and EOF are present', async () => {
+test('Chromium no-store ERR_ABORTED requires the original natural EOF, not inspector body retrieval', async () => {
     const page = new SyntheticPage(); const oracle = await createBrowserResponseOracle(page as unknown as Page, base);
     const ticket = await oracle.arm('consent'); const wire = page.dispatch(true); await page.consume(); wire.finish();
-    await assert.rejects(ticket.json(), /ORACLE_NETWORK_FAILED: net::ERR_ABORTED/); assert.deepEqual(page.eventNames(), []);
+    assert.deepEqual(await ticket.json(), JSON.parse(good)); await oracle.check(); assert.deepEqual(page.eventNames(), []);
+});
+test('no-store ERR_ABORTED without natural EOF or after signal abort cannot succeed', async () => {
+    for (const fault of ['cancel', 'abort'] as const) {
+        const page = new SyntheticPage(); page.f = fixture(good, { open: true });
+        const oracle = await createBrowserResponseOracle(page as unknown as Page, base);
+        const ticket = await oracle.arm('consent'); const wire = page.dispatch(true);
+        const controller = new AbortController();
+        const response = await page.f.context.fetch(namespace + 'consent', { method: 'POST', signal: controller.signal });
+        const reader = response.body.getReader(); await reader.read();
+        if (fault === 'cancel') await reader.cancel(); else controller.abort();
+        wire.finish();
+        await assert.rejects(ticket.json(), /ORACLE_CANCEL_BEFORE_EOF|ORACLE_SIGNAL_ABORTED/);
+        assert.deepEqual(page.eventNames(), []);
+    }
 });
 for (const event of ['close', 'crash', 'framenavigated']) test(`host ${event} invalidates the response and drains observers`, async () => {
     const page = new SyntheticPage(); const oracle = await createBrowserResponseOracle(page as unknown as Page, base);
