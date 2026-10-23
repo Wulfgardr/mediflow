@@ -3493,14 +3493,22 @@ mod tests {
                 release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
                 send_reply(&mut stream, &ai_status_wire().to_string());
             });
-            let worker = thread::spawn(move || reader.read_ai_runtime_status());
+            let (done_tx, done_rx) = mpsc::channel();
+            let worker = thread::spawn(move || {
+                let result = reader.read_ai_runtime_status();
+                done_tx.send(()).unwrap();
+                result
+            });
             seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
             if lock_during_read {
                 session.lock();
             }
+            let completed_before_release =
+                !lock_during_read || done_rx.recv_timeout(Duration::from_secs(1)).is_ok();
             release_tx.send(()).unwrap();
             let result = worker.join().unwrap();
             server.join().unwrap();
+            assert!(completed_before_release);
             if lock_during_read {
                 assert!(matches!(result, Err(RuntimeError::Locked)));
             } else {
@@ -3893,17 +3901,25 @@ mod tests {
         headers + &String::from_utf8(body).unwrap()
     }
     fn send_reply(stream: &mut std::net::TcpStream, body: &str) {
+        send_status_reply(stream, 200, body);
+    }
+    fn send_status_reply(stream: &mut std::net::TcpStream, status: u16, body: &str) {
         let result = write!(
             stream,
-            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            "HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
             body.len(),
             body
         );
         if let Err(error) = result {
-            assert!(matches!(
-                error.kind(),
-                std::io::ErrorKind::BrokenPipe | std::io::ErrorKind::ConnectionReset
-            ));
+            assert!(
+                matches!(
+                    error.kind(),
+                    std::io::ErrorKind::BrokenPipe
+                        | std::io::ErrorKind::ConnectionReset
+                        | std::io::ErrorKind::ConnectionAborted
+                ),
+                "unexpected fixture response error: {error}"
+            );
         }
     }
     fn admit_fixture_read(session: &RuntimeSession) {
@@ -4594,17 +4610,7 @@ mod tests {
                 if pause_last && index + 1 == steps.len() {
                     release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
                 }
-                let reply = write!(
-                    stream,
-                    "HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                    body.len()
-                );
-                if let Err(error) = reply {
-                    assert!(matches!(
-                        error.kind(),
-                        std::io::ErrorKind::BrokenPipe | std::io::ErrorKind::ConnectionReset
-                    ));
-                }
+                send_status_reply(&mut stream, *status, body);
                 index += 1;
             }
         });
@@ -4708,7 +4714,7 @@ mod tests {
                     _ => value.clone(),
                 }
                 .to_string();
-                write!(stream, "HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+                send_status_reply(&mut stream, *status, &body);
                 index += 1;
             }
         });
@@ -5011,17 +5017,22 @@ mod tests {
         let intent = session.profile_query_intent();
         let pending = intent.clone();
         let worker_session = session.clone();
+        let (done_tx, done_rx) = mpsc::channel();
         let worker = thread::spawn(move || {
-            worker_session.prepare_scale("scope-a", "patient-a", &pending, &request)
+            let result = worker_session.prepare_scale("scope-a", "patient-a", &pending, &request);
+            done_tx.send(()).unwrap();
+            result
         });
         while seen.recv_timeout(Duration::from_secs(5)).unwrap() != 3 {}
         intent.cancel();
+        let completed_before_release = done_rx.recv_timeout(Duration::from_secs(1));
         release.send(()).unwrap();
         assert!(matches!(
             worker.join().unwrap(),
             Err(RuntimeError::ReadRequired)
         ));
         server.join().unwrap();
+        assert!(completed_before_release.is_ok());
     }
 
     #[test]
@@ -5038,11 +5049,18 @@ mod tests {
                 .seal_scale_entry(&prepared, "2026-10-19T07:00:00Z", None)
                 .unwrap();
             let worker_session = session.clone();
-            let worker = thread::spawn(move || worker_session.create_scale_entry(&attempt));
+            let (done_tx, done_rx) = mpsc::channel();
+            let worker = thread::spawn(move || {
+                let result = worker_session.create_scale_entry(&attempt);
+                done_tx.send(()).unwrap();
+                result
+            });
             while seen.recv_timeout(Duration::from_secs(5)).unwrap() != 5 {}
             if cancel {
                 prepared.intent.cancel();
             }
+            let completed_before_release =
+                !cancel || done_rx.recv_timeout(Duration::from_secs(1)).is_ok();
             release.send(()).unwrap();
             if cancel {
                 assert!(matches!(
@@ -5058,6 +5076,7 @@ mod tests {
                 assert!(session.is_locked());
             }
             server.join().unwrap();
+            assert!(completed_before_release);
         }
     }
 
