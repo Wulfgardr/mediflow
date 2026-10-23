@@ -7,7 +7,7 @@ import { ordinaryLauncherEnvironment } from '../plugins/mediflow-local-ui/src/ru
 import { readProductIdentity } from './launcher-helpers.mjs';
 
 const unavailable = () => { throw new Error('navigation_unavailable'); };
-export async function navigateOwnedLocalUiRuntime(child, intent, signal, expiresAt = Date.now() + 8000) {
+export async function navigateOwnedLocalUiRuntime(child, intent, signal, expiresAt = Date.now() + 8000, expected) {
   signal.throwIfAborted();
   if (!child?.connected || typeof child.send !== 'function' || child.exitCode !== null || child.signalCode !== null) return unavailable();
   const requestId = crypto.randomUUID();
@@ -35,7 +35,8 @@ export async function navigateOwnedLocalUiRuntime(child, intent, signal, expires
     child.on('message', message); child.once('exit', exited); child.once('disconnect', exited);
     signal.addEventListener('abort', abort, { once: true });
     if (signal.aborted) return abort();
-    child.send({ type: 'mediflow-local-ui-navigate', requestId, intent, expiresAt }, error => { if (error) finish(error); });
+    child.send({ type: 'mediflow-local-ui-navigate', requestId, intent, expiresAt,
+      sourceFingerprint: expected?.sourceFingerprint, dataDir: expected?.dataDir }, error => { if (error) finish(error); });
   });
 }
 
@@ -44,6 +45,7 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
     || !path.isAbsolute(dataDir) || fs.realpathSync(dataDir) !== dataDir) return unavailable();
   const identity = readProductIdentity(sourceRoot);
   if (identity.worktreeHash !== 'clean' || identity.revision !== revision.slice(0, 12)) return unavailable();
+  const expected = { sourceFingerprint: identity.sourceFingerprint, dataDir };
   let starting = null, launcher = null;
   const start = async () => {
     const port = await new Promise((resolve, reject) => {
@@ -66,7 +68,7 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
     if (!launcher) { starting ??= start().finally(() => { starting = null; }); await starting; }
     for (;;) {
       deadline.throwIfAborted();
-      if (await navigateOwnedLocalUiRuntime(launcher, intent, deadline, expiresAt)) return;
+      if (await navigateOwnedLocalUiRuntime(launcher, intent, deadline, expiresAt, expected)) return;
       await new Promise(resolve => { const timer = setTimeout(resolve, 100); timer.unref(); });
     }
   };
