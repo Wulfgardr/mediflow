@@ -134,6 +134,36 @@ modello. Prima dell'aggiornamento sono passati TLC sul modello corrente
 (5.903.794 stati distinti, coda vuota) e i 48 test del controller e della route.
 Il gate completo conserva invarianti, limiti, testimoni e controlli negativi.
 
+Il 23 ottobre 2026, revisione `2e73fe52f9a0cd021677cedac69745a1a8db81b3`, è stata riesaminata
+la composizione di Terapie. Titolo, contatori e creazione appartengono ora
+alla stessa sezione; i comandi meno frequenti passano nel menu comune.
+Le azioni disponibili per ciascuno stato e i relativi handler restano gli
+stessi: nessuna eliminazione o modifica è aggiunta alle righe sospese o concluse.
+Il form conserva la bozza; la soglia rimane montata e usa un ruolo secondario
+quando l'invio del form occupa il ruolo principale.
+
+Il collegamento alle porte e i callback di conferma, CAS, recupero, audit e
+transizioni fino a `handleSoftDelete` restano quelli di main `64e190438`.
+Il manager aggiunge un riferimento al form e un effetto di layout che porta
+il fuoco al primo campo quando si apre una bozza o si cambia terapia in modifica;
+l'effetto non invoca porte di lettura o scrittura. Sono stati riesaminati anche
+i callback JSX e le guardie dei
+comandi spostati: cambia la collocazione, non il comportamento. I componenti
+comuni non invocano l'azione all'apertura del menu. Modello, statechart,
+limiti e proprietà non cambiano. Prima dell'aggiornamento manuale della copertura
+sono passati TLC corrente (28.149.669 stati generati, 5.903.794 distinti,
+profondità 36, coda vuota) e tutti i 48 test controller/HTTP su Node 24.21.0.
+Il record usa come `syncCommit` la base di main
+`64e190438da8287928f0903b9b719c18b329a7ec`, che resta nella storia dopo lo squash;
+`2e73fe52f9a0cd021677cedac69745a1a8db81b3` identifica la revisione riesaminata
+della composizione. La voce di menu «Elimina (inserita per errore)» conserva
+il vincolo d'uso nel testo visibile e nel nome accessibile; conferma e recupero
+restano invariati. L'apertura di una bozza porta anche `defaultOpen` a true,
+sia per nuova terapia sia per modifica: il form diventa visibile se la sezione
+era chiusa. Cambia soltanto la visibilità del contenitore e non i comandi di
+scrittura. Si aggiorna solo l'hash del manager fra le superfici coperte;
+il comando completo viene rieseguito dopo l'aggiornamento.
+
 | Azione TLC / confine | Implementazione letta |
 | --- | --- |
 | `Begin`, `Cancel`, `Confirm` | [controller](../../../lib/therapy-status-confirmation.ts), [`begin/cancel/confirm`](https://github.com/Wulfgardr/mediflow/blob/dc9bcbf12cdd990b34676e3136be4cf412a3cd16/lib/therapy-status-confirmation.ts#L219): copia contesto, guardie, generazione; nessun `write` in `begin`. |
