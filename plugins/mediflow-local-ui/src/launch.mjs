@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { ordinaryLauncherEnvironment } from './runtime-environment.mjs';
 
 try {
   if (process.argv.length !== 2 || process.execArgv.length || Number(process.versions.node.split('.')[0]) !== 24) throw new Error('unavailable');
@@ -16,7 +17,7 @@ try {
   if (fs.realpathSync(process.execPath) !== config.nodePath) throw new Error('unavailable');
   const child = spawn(config.nodePath, [path.join(config.sourceRoot, 'scripts/source-runtime.mjs'), 'local-ui'], {
     cwd: config.sourceRoot, shell: false, stdio: ['inherit', 'inherit', 'pipe'],
-    env: { MEDIFLOW_DATA_DIR: config.dataDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1',
+    env: { ...ordinaryLauncherEnvironment(config.dataDir),
       MEDIFLOW_PLUGIN_EXPECTED_REVISION: config.revision },
   });
   child.stderr.resume();

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -223,7 +223,7 @@ test('runtime navigation checks archive, source identity and cancellation before
     await new Promise(resolve => revision.listen(0, '127.0.0.1', resolve));
     const origin = `http://127.0.0.1:${revision.address().port}`;
     const received = [];
-    const page = await createChoiceServer({ root: repoRoot, state: () => ({ ready: true, url: origin }),
+    const page = await createChoiceServer({ root: repoRoot, state: () => ({ ready: true, navigationReady: true, url: origin }),
         choose() {}, install() {}, stop() {}, navigate(intent) { received.push(intent); } });
     const receipt = { pid: process.pid, checkoutPath: repoRoot, dataDir: '/synthetic-only', choiceUrl: page.url };
     const expected = { sourceRoot: repoRoot, dataDir: '/synthetic-only', sourceFingerprint };
@@ -243,14 +243,14 @@ test('ordinary launcher forwards only closed navigation intents without giving t
     const intents = [];
     let stopped = false;
     const page = await createChoiceServer({ root: repoRoot,
-        state: () => ({ ready: true, url: 'http://127.0.0.1:32123' }),
+        state: () => ({ ready: true, navigationReady: true, url: 'http://127.0.0.1:32123' }),
         choose() {}, install() {}, stop() { stopped = true; },
         navigate(intent) { intents.push(intent); },
     });
     try {
         const endpoint = new URL('navigate', page.url);
         const post = body => fetch(endpoint, { method: 'POST',
-            headers: { Origin: endpoint.origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            headers: { Origin: endpoint.origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ requestId: crypto.randomUUID(), expiresAt: Date.now() + 5000, ...body }) });
         assert.equal((await post({ intent: 'history' })).status, 202);
         assert.deepEqual(intents, ['history']);
         for (const body of [{ intent: 'history', patientId: 'SYNTHETIC_SENTINEL' },
@@ -480,4 +480,200 @@ test('overlapping configuration and archive paths fail before creating either di
     overlapping.env.MEDIFLOW_DATA_DIR = path.join(config, platform === 'win32' ? 'MediFlow/launcher/clinical' : 'mediflow/launcher/clinical');
     assert.throws(() => prepareLauncherState(repoRoot, overlapping), /si sovrappone/u);
     assert.equal(existsSync(config), false);
+});
+
+
+test('cold plugin startup forwards ordinary launcher environment and preserves the remembered choice', t => {
+    const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-plugin-environment-')));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    const source = path.join(directory, 'source'), data = path.join(directory, 'data');
+    mkdirSync(source); mkdirSync(data);
+    const result = spawnSync(process.execPath, ['--input-type=module', '--eval', `
+        import { registerHooks } from 'node:module';
+        import { EventEmitter } from 'node:events';
+        const launcherHelpers = ${JSON.stringify(new URL('./launcher-helpers.mjs', import.meta.url).href)};
+        const launcherState = ${JSON.stringify(new URL('./launcher-state.mjs', import.meta.url).href)};
+        globalThis.captureSpawn = (_exe, args, options) => {
+            process.stdout.write(JSON.stringify({ args, env: options.env }));
+            const child = new EventEmitter();
+            queueMicrotask(() => child.emit('error', new Error('synthetic-stop')));
+            return child;
+        };
+        registerHooks({ load(url, context, nextLoad) {
+            if (url === launcherHelpers) return { format: 'module', shortCircuit: true, source:
+                'export const readProductIdentity = () => ({ worktreeHash: "clean", revision: "aaaaaaaaaaaa" }); export const probeRunningInstance = () => {};'};
+            if (url === launcherState) return { format: 'module', shortCircuit: true, source:
+                'export const prepareLauncherState = () => ({ lockDirectory: ' + JSON.stringify(${JSON.stringify(directory)}) + ' });' };
+            if (url === 'node:child_process') return { format: 'module', shortCircuit: true, source:
+                'export const spawn = globalThis.captureSpawn;' };
+            return nextLoad(url, context);
+        } });
+        const { createLocalUiRuntimeNavigator } = await import(${JSON.stringify(new URL('./local-ui-runtime.mjs', import.meta.url).href)});
+        const navigate = createLocalUiRuntimeNavigator({ sourceRoot: ${JSON.stringify(source)}, dataDir: ${JSON.stringify(data)}, revision: 'a'.repeat(40) });
+        try { await navigate('history', new AbortController().signal); } catch (error) {
+            if (error.message !== 'synthetic-stop') throw error;
+        }
+    `], { encoding: 'utf8', env: { ...process.env,
+        HOME: directory, LANG: 'it_IT.UTF-8', TMPDIR: directory, XDG_CONFIG_HOME: path.join(directory, 'config'),
+        MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', SYNTHETIC_E2E_FLAG: '1',
+        MEDIFLOW_PLUGIN_TEST_SECRET: 'never-forward', NODE_OPTIONS: '',
+    } });
+    assert.equal(result.status, 0, result.stderr);
+    const { args, env } = JSON.parse(result.stdout);
+    assert.deepEqual(Object.keys(env).filter(key => /E2E/iu.test(key)), []);
+    for (const [key, value] of Object.entries({ HOME: directory, LANG: 'it_IT.UTF-8', TMPDIR: directory,
+        XDG_CONFIG_HOME: path.join(directory, 'config'), MEDIFLOW_DATA_DIR: data })) assert.equal(env[key], value, key);
+    assert.equal(env.MEDIFLOW_PLUGIN_TEST_SECRET, undefined);
+    assert.equal(env.NODE_OPTIONS, undefined);
+    assert.equal(env.PATH, `${path.dirname(process.execPath)}${path.delimiter}${process.env.PATH}`);
+    assert.deepEqual(args.slice(1), ['--riusa']);
+});
+
+async function ordinaryLauncherFixture(t, remembered, args = []) {
+    const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-ordinary-launcher-')));
+    const source = path.join(directory, 'source'), home = path.join(directory, 'home'), data = path.join(directory, 'data');
+    mkdirSync(path.join(source, 'scripts'), { recursive: true }); mkdirSync(home); mkdirSync(data);
+    for (const name of ['mediflow.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs']) {
+        writeFileSync(path.join(source, 'scripts', name), readFileSync(path.join(repoRoot, 'scripts', name)));
+    }
+    mkdirSync(path.join(source, 'node_modules/next'), { recursive: true });
+    mkdirSync(path.join(source, 'node_modules/better-sqlite3'), { recursive: true });
+    writeFileSync(path.join(source, 'node_modules/next/package.json'), '{}');
+    writeFileSync(path.join(source, 'node_modules/better-sqlite3/package.json'), '{}');
+    const identity = { checkoutPath: source + path.sep, revision: 'aaaaaaaaaaaa', worktreeHash: 'clean', sourceFingerprint: 'synthetic@aaaaaaaaaaaa:clean' };
+    writeFileSync(path.join(source, 'scripts/launcher-helpers.mjs'), `
+        export * from ${JSON.stringify(new URL('./launcher-helpers.mjs', import.meta.url).href)};
+        export const checkNode = () => ({ ok: true });
+        export const knownMainUpdates = () => 0;
+        export const readProductIdentity = () => (${JSON.stringify(identity)});`);
+    writeFileSync(path.join(source, 'scripts/build-input-metadata.mjs'), 'export const macDerivedDataDirectory = () => "/synthetic-no-native";');
+    writeFileSync(path.join(source, 'scripts/source-runtime.mjs'), `
+        import http from 'node:http';
+        export const verifySourceRuntime = () => ({ identity: ${JSON.stringify(identity)} });
+        if (process.argv[1].endsWith('source-runtime.mjs')) {
+            const server = http.createServer((_req, res) => { res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ ...${JSON.stringify(identity)}, fingerprint: 'synthetic' })); });
+            server.listen(Number(process.env.PORT), '127.0.0.1', () => {
+                process.stderr.write('MEDIFLOW_HEADLESS_WEB_READY ' + JSON.stringify({ url: 'http://127.0.0.1:' + server.address().port }) + '\\n');
+            });
+            process.on('message', frame => process.stderr.write('FIXTURE_NAVIGATION ' + JSON.stringify(frame) + '\\n'));
+            process.on('SIGTERM', () => { server.close(); process.disconnect?.(); });
+        }`);
+    const options = { home, env: { MEDIFLOW_DATA_DIR: data, XDG_CONFIG_HOME: path.join(home, 'config'), APPDATA: path.join(home, 'Roaming') } };
+    const launcherStateSource = new URL('./launcher-state.mjs', import.meta.url).href;
+    const setup = spawnSync(process.execPath, ['--input-type=module', '-e', `
+        const { prepareLauncherState } = await import(${JSON.stringify(launcherStateSource)});
+        console.log(JSON.stringify(prepareLauncherState(${JSON.stringify(source)}, ${JSON.stringify(options)})));`], { encoding: 'utf8' });
+    assert.equal(setup.status, 0, setup.stderr);
+    const stateFiles = JSON.parse(setup.stdout);
+    atomicJson(stateFiles.preferencesFile, { schemaVersion: 1, choice: remembered });
+    let output = '';
+    const socket = createHttpServer();
+    await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
+    const port = socket.address().port; await new Promise(resolve => socket.close(resolve));
+    const child = spawn(process.execPath, [path.join(source, 'scripts/mediflow.mjs'), '--riusa', '--senza-browser', ...args], {
+        env: { ...process.env, ...options.env, HOME: home, USERPROFILE: home, PORT: String(port) }, stdio: ['ignore', 'ignore', 'pipe'] });
+    t.after(async () => {
+        if (child.exitCode === null && child.signalCode === null) { child.kill('SIGTERM'); await once(child, 'close'); }
+        rmSync(directory, { recursive: true, force: true });
+    });
+    child.stderr.on('data', chunk => { output += chunk; });
+    const until = async predicate => {
+        const deadline = Date.now() + 10_000;
+        while (!predicate()) {
+            assert.equal(child.exitCode, null, output);
+            if (Date.now() > deadline) assert.fail(output);
+            await new Promise(resolve => setTimeout(resolve, 10));
+        }
+    };
+    return { source, data, stateFiles, child, until, output: () => output };
+}
+
+test('headless ordinary runtime cannot acknowledge plugin navigation', async t => {
+    const f = await ordinaryLauncherFixture(t, 'agenti');
+    await f.until(() => f.output().includes('Pronto:'));
+    const receipt = JSON.parse(readFileSync(path.join(f.stateFiles.lockDirectory, 'instance.json')));
+    const endpoint = new URL('navigate', receipt.choiceUrl);
+    const response = await fetch(endpoint, { method: 'POST', headers: { Origin: endpoint.origin, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ intent: 'history', requestId: crypto.randomUUID(), expiresAt: Date.now() + 5000 }) });
+    assert.notEqual(response.status, 202);
+    assert.doesNotMatch(f.output(), /FIXTURE_NAVIGATION/);
+    await assert.rejects(navigateExistingLocalUiRuntime({ ...receipt, checkoutPath: f.source },
+        { sourceRoot: f.source, dataDir: f.data, sourceFingerprint: 'synthetic@aaaaaaaaaaaa:clean' }, 'history', new AbortController().signal));
+    assert.equal(JSON.parse(readFileSync(f.stateFiles.preferencesFile)).choice, 'agenti');
+});
+
+test('cancelled navigation is bound to its request and cannot dispatch after a delayed handoff', async () => {
+    const intents = [];
+    let entered, release;
+    const waiting = new Promise(resolve => { entered = resolve; });
+    const gate = new Promise(resolve => { release = resolve; });
+    const page = await createChoiceServer({ root: repoRoot,
+        state: () => ({ ready: true, navigationReady: true }), choose() {}, install() {}, stop() {},
+        async navigate(intent, request) { entered(); await gate; request.signal.throwIfAborted(); intents.push(intent); },
+    });
+    const endpoint = new URL('navigate', page.url), requestId = crypto.randomUUID();
+    const post = (route, body, signal) => fetch(new URL(route, page.url), { method: 'POST', signal,
+        headers: { Origin: endpoint.origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const controller = new AbortController();
+    try {
+        const pending = post('navigate', { intent: 'history', requestId, expiresAt: Date.now() + 5000 }, controller.signal);
+        // If the protocol is missing, the old launcher returns immediately instead of entering the handoff.
+        await Promise.race([waiting, pending.then(r => assert.equal(r.status, 202))]);
+        controller.abort();
+        await assert.rejects(pending);
+        assert.equal((await post('cancel-navigation', { requestId })).status, 202);
+        release(); await new Promise(resolve => setTimeout(resolve, 20));
+        assert.deepEqual(intents, []);
+        assert.notEqual((await post('navigate', { intent: 'identity', requestId, expiresAt: Date.now() + 5000 })).status, 202);
+    } finally { release(); await page.close(); }
+});
+
+test('internal reuse startup never overwrites ordinary preferences', async t => {
+    const f = await ordinaryLauncherFixture(t, 'agenti', ['--scelta', 'web']);
+    await f.until(() => f.output().includes('Pronto:'));
+    assert.equal(JSON.parse(readFileSync(f.stateFiles.preferencesFile)).choice, 'agenti');
+});
+
+test('ordinary web runtime accepts navigation and keeps remembered preferences', async t => {
+    const f = await ordinaryLauncherFixture(t, 'web');
+    await f.until(() => f.output().includes('Pronto:'));
+    const receipt = JSON.parse(readFileSync(path.join(f.stateFiles.lockDirectory, 'instance.json')));
+    assert.equal(await navigateExistingLocalUiRuntime({ ...receipt, checkoutPath: f.source },
+        { sourceRoot: f.source, dataDir: f.data, sourceFingerprint: 'synthetic@aaaaaaaaaaaa:clean' }, 'history', new AbortController().signal), true);
+    await f.until(() => f.output().includes('FIXTURE_NAVIGATION'));
+    assert.equal(JSON.parse(readFileSync(f.stateFiles.preferencesFile)).choice, 'web');
+});
+
+
+test('runtime cancellation during the POST revokes only that request before delayed dispatch', async () => {
+    const sourceFingerprint = 'synthetic@0123456789ab:clean';
+    const revision = createHttpServer((_request, response) => {
+        response.setHeader('Content-Type', 'application/json');
+        response.end(JSON.stringify({ revision: '0123456789ab', sourceFingerprint, fingerprint: 'synthetic' }));
+    });
+    await new Promise(resolve => revision.listen(0, '127.0.0.1', resolve));
+    const origin = `http://127.0.0.1:${revision.address().port}`;
+    let entered, release;
+    const waiting = new Promise(resolve => { entered = resolve; });
+    const gate = new Promise(resolve => { release = resolve; });
+    const intents = [], cancellations = [];
+    const page = await createChoiceServer({ root: repoRoot,
+        state: () => ({ ready: true, navigationReady: true, url: origin }), choose() {}, install() {}, stop() {},
+        async navigate(intent, request) { entered(); await gate; request.signal.throwIfAborted(); intents.push(intent); },
+        cancelNavigation(requestId) { cancellations.push(requestId); },
+    });
+    const receipt = { pid: process.pid, checkoutPath: repoRoot, dataDir: '/synthetic-only', choiceUrl: page.url };
+    const expected = { sourceRoot: repoRoot, dataDir: '/synthetic-only', sourceFingerprint };
+    const controller = new AbortController();
+    try {
+        const pending = navigateExistingLocalUiRuntime(receipt, expected, 'history', controller.signal);
+        await waiting; controller.abort(); await assert.rejects(pending);
+        release(); await new Promise(resolve => setTimeout(resolve, 20));
+        assert.deepEqual(intents, []);
+        assert.ok(cancellations.length > 0);
+        assert.equal(new Set(cancellations).size, 1);
+        await assert.rejects(navigateExistingLocalUiRuntime(receipt, expected, 'history', new AbortController().signal, Date.now() - 1));
+        assert.deepEqual(intents, []);
+    } finally { release(); await page.close(); await new Promise(resolve => revision.close(resolve)); }
 });
