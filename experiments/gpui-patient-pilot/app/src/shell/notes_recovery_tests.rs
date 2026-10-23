@@ -70,7 +70,7 @@ impl Host {
                 "POST /api/auth/native/login" => json!({"success":true, "id":"synthetic-user", "username":"synthetic", "role":"admin",
                     "archiveGeneration":"synthetic-generation", "salt":"AwMDAwMDAwMDAwMDAwMDAw==",
                     "encryptedMasterKey":"v3:BQUFBQUFBQUFBQUFAm40aZvQGpityOwyLKhsE40tJdbsjtrugIXzoJ/lk9gjlh5j7pIPeh7DLQ7ikGhA"}),
-                "GET /api/v1/network/capabilities" => json!({"protocolVersion":"1.13.0", "operatingMode":"network-home-base",
+                "GET /api/v1/network/capabilities" => json!({"protocolVersion":"1.14.0", "hostPorts": serde_json::from_str::<serde_json::Value>(include_str!("../../../transport/tests/fixtures/host-ports.json")).unwrap(), "operatingMode":"network-home-base",
                     "capabilities":[{"key":"network.replica.write-patient-profile", "requiresPairing":true, "status":"available"},{"key":"network.replica.write-therapies", "requiresPairing":true, "status":"available"}]}),
                 "GET /api/v1/network/ambulatories" => json!([{"id":"scope-a", "name":"Ambulatorio sintetico", "isDefault":true, "version":1}]),
                 "GET /api/v1/network/identity" => json!({"scope":{"effectiveAmbulatoryId":"scope-a", "requestBinding":"expected-ambulatory-id-v1"},

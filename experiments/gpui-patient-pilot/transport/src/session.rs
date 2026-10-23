@@ -40,11 +40,14 @@ use zeroize::Zeroizing;
 #[derive(Clone)]
 pub struct RuntimeSession {
     inner: Arc<SessionInner>,
+    context: RequestContext,
 }
 struct SessionInner {
+    account_context: RequestContext,
     client: RuntimeClient,
     user: RuntimeUser,
     closed: AtomicBool,
+    retirement: Mutex<Option<RuntimeError>>,
     writing: AtomicBool,
     read_epoch: AtomicU64,
     secrets: Mutex<SessionSecrets>,
@@ -93,12 +96,14 @@ struct ReadResponse {
 pub struct ProfileQueryIntent {
     owner: Weak<SessionInner>,
     active: Arc<Mutex<bool>>,
+    context: RequestContext,
     selection: Option<Arc<ProfileSelection>>,
     // Only a patient write captures this consumed preread; read intents do not.
     write_binding: Option<ProfileReadBinding>,
 }
 impl ProfileQueryIntent {
     pub fn cancel(&self) {
+        self.context.cancel();
         if let Ok(mut active) = self.active.lock() {
             *active = false;
         }
@@ -111,9 +116,11 @@ impl ProfileQueryIntent {
 pub struct AiPreferencesContext {
     owner: Weak<SessionInner>,
     active: Arc<AtomicBool>,
+    context: RequestContext,
 }
 impl AiPreferencesContext {
     pub fn cancel(&self) {
+        self.context.cancel();
         self.active.store(false, Ordering::Release);
     }
 }
@@ -175,11 +182,15 @@ impl RuntimeSession {
         cookie: Zeroizing<String>,
         master: MasterKey,
     ) -> Self {
+        let context = client.request_context();
+        let account_context = context.session_scope();
         Self {
             inner: Arc::new(SessionInner {
+                account_context,
                 client,
                 user,
                 closed: AtomicBool::new(false),
+                retirement: Mutex::new(None),
                 writing: AtomicBool::new(false),
                 read_epoch: AtomicU64::new(0),
                 secrets: Mutex::new(SessionSecrets {
@@ -193,8 +204,26 @@ impl RuntimeSession {
                 scopes: Mutex::new(HashSet::new()),
                 capabilities: Mutex::new(HashSet::new()),
             }),
+            context,
         }
     }
+    fn retire_result<T>(&self, result: Result<T>) -> Result<T> {
+        if let Err(error) = &result
+            && error.retires_session()
+        {
+            self.retire(*error);
+        }
+        result
+    }
+
+    pub fn request_context(&self) -> RequestContext {
+        self.context.clone()
+    }
+
+    pub fn renew_requests(&mut self) {
+        self.context = self.context.next_selection();
+    }
+
     pub fn user(&self) -> &RuntimeUser {
         &self.inner.user
     }
@@ -224,6 +253,7 @@ impl RuntimeSession {
     pub fn refresh_capabilities(&self) -> Result<()> {
         let response =
             self.read_json(None, &["api", "v1", "network", "capabilities"], JSON_LIMIT)?;
+        crate::ports::negotiate_host_ports(&response.value["hostPorts"])?;
         let version = response.value["protocolVersion"]
             .as_str()
             .ok_or(RuntimeError::InvalidResponse)?;
@@ -265,11 +295,25 @@ impl RuntimeSession {
         Ok(())
     }
 
+    pub fn retirement_error(&self) -> Option<RuntimeError> {
+        self.inner.retirement.lock().ok().and_then(|reason| *reason)
+    }
+
     /// Immediately fences all clones and discards the unlock key. Already sent
     /// writes still require server reconciliation; lock does not undo a commit.
     /// The opaque cookie/device secret remain only for bounded remote logout.
     pub fn lock(&self) {
+        self.retire(RuntimeError::Locked);
+    }
+
+    fn retire(&self, error: RuntimeError) {
+        if let Ok(mut reason) = self.inner.retirement.lock()
+            && (reason.is_none() || error == RuntimeError::ArchiveReplaced)
+        {
+            *reason = Some(error);
+        }
         self.inner.closed.store(true, Ordering::Release);
+        self.context.revoke();
         if let Ok(mut secrets) = self.inner.secrets.lock() {
             secrets.master.take();
         }
@@ -303,6 +347,7 @@ impl RuntimeSession {
             (Some(pairing), Some(cookie)) => self
                 .inner
                 .client
+                .with_request_context(RequestContext::default())
                 .raw(
                     Method::POST,
                     &["api", "auth", "native", "logout"],
@@ -347,6 +392,7 @@ impl RuntimeSession {
     }
 
     fn ensure_open(&self) -> Result<()> {
+        self.context.check()?;
         if self.is_locked() {
             Err(RuntimeError::Locked)
         } else {
@@ -380,6 +426,10 @@ impl RuntimeSession {
         intent: Option<&ProfileQueryIntent>,
     ) -> Result<Value> {
         self.ensure_open()?;
+        let context = intent
+            .map(|intent| &intent.context)
+            .unwrap_or(&self.context);
+        context.check()?;
         if let Some(intent) = intent {
             drop(self.profile_intent_guard(intent)?);
         }
@@ -400,23 +450,26 @@ impl RuntimeSession {
             // Negotiate the per-request scope assertion before accessing data.
             // An older host may ignore the header, so identity equality alone
             // cannot admit a subsequent scoped operation.
-            let identity = self.inner.client.json(
-                Method::GET,
-                &["api", "v1", "network", "identity"],
-                &[],
-                Some(scope),
-                &pairing,
-                &cookie,
-                None,
-                false,
-                JSON_LIMIT,
-                Some(&self.inner.user.archive_generation),
-            );
-            if identity
-                .as_ref()
-                .is_err_and(|error| error.is_auth_failure())
+            let identity = self
+                .inner
+                .client
+                .with_request_context(context.clone())
+                .json(
+                    Method::GET,
+                    &["api", "v1", "network", "identity"],
+                    &[],
+                    Some(scope),
+                    &pairing,
+                    &cookie,
+                    None,
+                    false,
+                    JSON_LIMIT,
+                    Some(&self.inner.user.archive_generation),
+                );
+            if let Err(error) = identity.as_ref()
+                && error.retires_session()
             {
-                self.lock();
+                self.retire(*error);
             }
             let identity = identity?;
             require_bound_scope_identity(&identity, scope, &self.inner.user.id)?;
@@ -430,18 +483,22 @@ impl RuntimeSession {
                 self.check_profile_write_binding(binding)?;
             }
         }
-        let result = self.inner.client.json(
-            method,
-            path,
-            query,
-            scope,
-            &pairing,
-            &cookie,
-            body,
-            mutation,
-            limit,
-            Some(&self.inner.user.archive_generation),
-        );
+        let result = self
+            .inner
+            .client
+            .with_request_context(context.clone())
+            .json(
+                method,
+                path,
+                query,
+                scope,
+                &pairing,
+                &cookie,
+                body,
+                mutation,
+                limit,
+                Some(&self.inner.user.archive_generation),
+            );
         if self.is_locked() {
             return Err(if mutation {
                 RuntimeError::Indeterminate
@@ -449,8 +506,10 @@ impl RuntimeSession {
                 RuntimeError::Locked
             });
         }
-        if result.as_ref().is_err_and(|error| error.is_auth_failure()) {
-            self.lock();
+        if let Err(error) = result.as_ref()
+            && error.retires_session()
+        {
+            self.retire(*error);
             // Host authentication failure must retire every presentation, even
             // when locking has also cancelled the associated profile intent.
             return result;
@@ -522,6 +581,7 @@ impl RuntimeSession {
         AiPreferencesContext {
             owner: Arc::downgrade(&self.inner),
             active: Arc::new(AtomicBool::new(true)),
+            context: self.context.child(),
         }
     }
     fn check_ai_preferences_context(&self, context: &AiPreferencesContext) -> Result<()> {
@@ -547,7 +607,11 @@ impl RuntimeSession {
         mutation: bool,
     ) -> Result<Value> {
         self.check_ai_preferences_context(context)?;
-        let result = self.request(
+        let contextual = Self {
+            inner: self.inner.clone(),
+            context: context.context.clone(),
+        };
+        let result = contextual.request(
             method,
             path,
             &[],
@@ -558,7 +622,7 @@ impl RuntimeSession {
         );
         // request() retires a session rejected by the host. Preserve that
         // signal so the window clears its context and returns to login.
-        if result.as_ref().is_err_and(|error| error.is_auth_failure()) {
+        if result.as_ref().is_err_and(|error| error.retires_session()) {
             return result;
         }
         if self.check_ai_preferences_context(context).is_err() {
@@ -638,14 +702,25 @@ impl RuntimeSession {
     /// ADR 0155 read. The response is closed to the eight documented fields and
     /// its subject must be this exact session user.
     pub fn read_account_profile(&self) -> Result<AccountProfileRead> {
+        self.account_session().read_account_profile_in_context()
+    }
+
+    fn account_session(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            context: self.inner.account_context.clone(),
+        }
+    }
+
+    fn read_account_profile_in_context(&self) -> Result<AccountProfileRead> {
         let epoch = self.inner.read_epoch.load(Ordering::Acquire);
         self.check_read_epoch(epoch)?;
         let response = self.read_json(None, ACCOUNT_PROFILE_PATH, ACCOUNT_PROFILE_LIMIT)?;
-        let profile = parse_account_profile_read(
+        let profile = self.retire_result(parse_account_profile_read(
             response.value,
             &self.inner.user.id,
             &self.inner.user.archive_generation,
-        )?;
+        ))?;
         self.check_read_epoch(response.epoch)?;
         Ok(profile)
     }
@@ -660,37 +735,54 @@ impl RuntimeSession {
         display_name: Option<&str>,
         ambulatory_name: Option<&str>,
     ) -> Result<AccountProfileUpdateOutcome> {
+        self.account_session().update_account_profile_in_context(
+            snapshot,
+            display_name,
+            ambulatory_name,
+        )
+    }
+
+    fn update_account_profile_in_context(
+        &self,
+        snapshot: &AccountProfileSnapshot,
+        display_name: Option<&str>,
+        ambulatory_name: Option<&str>,
+    ) -> Result<AccountProfileUpdateOutcome> {
         self.ensure_open()?;
         let body = AccountProfileUpdate::new(snapshot, display_name, ambulatory_name)?;
         let encoded = serde_json::to_vec(&body.wire()).map_err(|_| RuntimeError::InvalidInput)?;
         let _guard = self.begin_write()?;
         let (pairing, cookie) = self.credentials()?;
-        let result = self.inner.client.raw(
-            Method::PUT,
-            ACCOUNT_PROFILE_PATH,
-            &[],
-            None,
-            &pairing,
-            Some(&cookie),
-            Some(&encoded),
-            true,
-            ACCOUNT_PROFILE_LIMIT,
-            Some(&self.inner.user.archive_generation),
-        );
+        let result = self
+            .inner
+            .client
+            .with_request_context(self.context.clone())
+            .raw(
+                Method::PUT,
+                ACCOUNT_PROFILE_PATH,
+                &[],
+                None,
+                &pairing,
+                Some(&cookie),
+                Some(&encoded),
+                true,
+                ACCOUNT_PROFILE_LIMIT,
+                Some(&self.inner.user.archive_generation),
+            );
         if self.is_locked() {
             return Err(RuntimeError::Indeterminate);
         }
         let response = match result {
             Ok(response) => response,
-            Err(error) if error.is_auth_failure() => {
-                self.lock();
+            Err(error) if error.retires_session() => {
+                self.retire(error);
                 return Err(error);
             }
             Err(error) => return Err(error),
         };
         let value: Value =
             serde_json::from_slice(&response.body).map_err(|_| RuntimeError::Indeterminate)?;
-        match response.status {
+        self.retire_result(match response.status {
             200..=299 => parse_account_profile_update(
                 value,
                 &self.inner.user.id,
@@ -713,7 +805,7 @@ impl RuntimeSession {
                 _ => RuntimeError::Indeterminate,
             }),
             _ => Err(RuntimeError::Indeterminate),
-        }
+        })
     }
 
     pub fn list_ambulatories(&self) -> Result<Vec<Ambulatory>> {
@@ -865,6 +957,7 @@ impl RuntimeSession {
         ProfileQueryIntent {
             owner: Arc::downgrade(&self.inner),
             active: Arc::new(Mutex::new(true)),
+            context: self.context.child(),
             selection: self
                 .inner
                 .profile_selection
@@ -1067,6 +1160,9 @@ impl RuntimeSession {
                     error
                 }
             });
+        if result.as_ref().is_err_and(|error| error.retires_session()) {
+            return result.map(|_| unreachable!());
+        }
         self.check_profile_intent(intent, epoch)?;
         let key = read_key(scope, patient_id, "patients", patient_id);
         let value = match result {
@@ -2663,6 +2759,218 @@ mod tests {
         )
     }
 
+    #[test]
+    fn host_ports_reject_incompatible_revision_and_scope() {
+        let valid: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/host-ports.json")).unwrap();
+        let mut revision = valid.clone();
+        revision["revision"] = json!(99);
+        let mut scope = valid;
+        scope["ports"][0]["scope"] = json!("operator");
+        for contract in [revision, scope, Value::Null] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let server = thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                assert!(read_request(&mut stream).starts_with("GET /api/v1/network/capabilities "));
+                send_reply(
+                    &mut stream,
+                    &json!({
+                        "protocolVersion":"1.14.0", "operatingMode":"network-home-base",
+                        "capabilities":[], "hostPorts":contract
+                    })
+                    .to_string(),
+                );
+            });
+            let result = session.refresh_capabilities();
+            server.join().unwrap();
+            assert_eq!(result, Err(RuntimeError::UnsupportedProtocol));
+        }
+    }
+
+    #[test]
+    fn discovery_without_host_ports_is_rejected_without_authority() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            assert!(read_request(&mut stream).starts_with("GET /api/v1/network/capabilities "));
+            send_reply(
+                &mut stream,
+                &json!({
+                    "nodeId":"synthetic-host", "protocolVersion":"1.14.0",
+                    "operatingMode":"network-home-base",
+                    "capabilities":[{"key":"network.replica.write-clinical-diary",
+                        "requiresPairing":true, "status":"available"}]
+                })
+                .to_string(),
+            );
+        });
+        assert_eq!(
+            session.refresh_capabilities(),
+            Err(RuntimeError::UnsupportedProtocol)
+        );
+        assert!(!session.can_write("network.replica.write-clinical-diary"));
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn lock_cancels_pending_headers_and_body_before_server_release() {
+        for body_started in [false, true] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let reader = session.clone();
+            let (seen_tx, seen_rx) = mpsc::channel();
+            let (release_tx, release_rx) = mpsc::channel();
+            let (closed_tx, closed_rx) = mpsc::channel();
+            let server = thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                read_request(&mut stream);
+                if body_started {
+                    stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 10000\r\nConnection: close\r\n\r\n{").unwrap();
+                }
+                seen_tx.send(()).unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(1)))
+                    .unwrap();
+                closed_tx.send(stream.read(&mut [0])).unwrap();
+                release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            });
+            let (done_tx, done_rx) = mpsc::channel();
+            let worker = thread::spawn(move || {
+                done_tx
+                    .send(reader.read_ai_runtime_status().map(|_| ()))
+                    .unwrap();
+            });
+            seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            session.lock();
+            let prompt = done_rx.recv_timeout(Duration::from_secs(1));
+            let shutdown = closed_rx.recv_timeout(Duration::from_secs(2));
+            release_tx.send(()).unwrap();
+            worker.join().unwrap();
+            server.join().unwrap();
+            assert!(
+                matches!(shutdown, Ok(Ok(0)))
+                    || matches!(shutdown, Ok(Err(ref error)) if error.kind() == std::io::ErrorKind::ConnectionReset),
+                "socket did not close: {shutdown:?}"
+            );
+            assert!(
+                matches!(prompt, Ok(Err(RuntimeError::Locked))),
+                "pending body={body_started}: {prompt:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn selection_change_cancels_pending_ports_and_preserves_the_new_context() {
+        for mutation in [false, true] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let mut session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let old = session.clone();
+            let (seen_tx, seen_rx) = mpsc::channel();
+            let (release_tx, release_rx) = mpsc::channel();
+            let server = thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with(if mutation {
+                    "PUT /api/auth/profile "
+                } else {
+                    "GET /api/v1/network/ai-runtime "
+                }));
+                seen_tx.send(()).unwrap();
+                release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                drop(stream);
+                let (mut fresh, _) = listener.accept().unwrap();
+                assert!(read_request(&mut fresh).starts_with("GET /api/v1/network/ai-runtime "));
+                send_reply(&mut fresh, &ai_status_wire().to_string());
+                listener.set_nonblocking(true).unwrap();
+                assert!(
+                    listener.accept().is_err(),
+                    "cancellation must never retry a mutation"
+                );
+            });
+            let (done_tx, done_rx) = mpsc::channel();
+            let worker = thread::spawn(move || {
+                let result = if mutation {
+                    old.request(
+                        Method::PUT,
+                        ACCOUNT_PROFILE_PATH,
+                        &[],
+                        None,
+                        Some(&json!({"synthetic":true})),
+                        true,
+                        ACCOUNT_PROFILE_LIMIT,
+                    )
+                    .map(|_| ())
+                } else {
+                    old.read_ai_runtime_status().map(|_| ())
+                };
+                done_tx.send(result).unwrap();
+            });
+            seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            session.renew_requests();
+            let prompt = done_rx.recv_timeout(Duration::from_secs(1));
+            release_tx.send(()).unwrap();
+            assert!(session.read_ai_runtime_status().is_ok());
+            worker.join().unwrap();
+            server.join().unwrap();
+            assert_eq!(
+                prompt.unwrap(),
+                Err(if mutation {
+                    RuntimeError::Indeterminate
+                } else {
+                    RuntimeError::ReadRequired
+                })
+            );
+            assert!(!session.is_locked());
+        }
+    }
+
+    #[test]
+    fn archive_replacement_revokes_other_pending_requests() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let reader = session.clone();
+        let (seen_tx, seen_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let server = thread::spawn(move || {
+            let (mut pending, _) = listener.accept().unwrap();
+            read_request(&mut pending);
+            seen_tx.send(()).unwrap();
+            let (mut replaced, _) = listener.accept().unwrap();
+            read_request(&mut replaced);
+            let body = r#"{"code":"ARCHIVE_REPLACED"}"#;
+            write!(
+                replaced,
+                "HTTP/1.1 409 Conflict\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+            release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        });
+        let (done_tx, done_rx) = mpsc::channel();
+        let worker = thread::spawn(move || {
+            done_tx
+                .send(reader.read_ai_runtime_status().map(|_| ()))
+                .unwrap();
+        });
+        seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let replaced = session.read_ai_runtime_status().map(|_| ());
+        let prompt = done_rx.recv_timeout(Duration::from_secs(1));
+        release_tx.send(()).unwrap();
+        worker.join().unwrap();
+        server.join().unwrap();
+        assert_eq!(replaced, Err(RuntimeError::ArchiveReplaced));
+        assert!(
+            session.is_locked(),
+            "replacement must retire all session authority"
+        );
+        assert!(
+            matches!(prompt, Ok(Err(RuntimeError::Locked))),
+            "{prompt:?}"
+        );
+    }
+
     fn ai_status_wire() -> Value {
         json!({
             "plane":"ai-plane-separate-from-data-plane", "mode":"centralized-available",
@@ -2924,6 +3232,83 @@ mod tests {
             listener
         });
         (url, seen_rx, worker)
+    }
+
+    #[test]
+    fn session_retirement_cancels_pending_account_reads_and_writes_after_workspace_change() {
+        for mutation in [false, true] {
+            for archive_replaced in [false, true] {
+                let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+                let mut session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+                let account = session.clone();
+                let (seen_tx, seen_rx) = mpsc::channel();
+                let (release_tx, release_rx) = mpsc::channel();
+                let (closed_tx, closed_rx) = mpsc::channel();
+                let server = thread::spawn(move || {
+                    let (mut pending, _) = listener.accept().unwrap();
+                    let request = read_request(&mut pending);
+                    assert!(request.starts_with(if mutation {
+                        "PUT /api/auth/profile "
+                    } else {
+                        "GET /api/auth/profile "
+                    }));
+                    seen_tx.send(()).unwrap();
+                    pending
+                        .set_read_timeout(Some(Duration::from_secs(1)))
+                        .unwrap();
+                    closed_tx.send(pending.read(&mut [0])).unwrap();
+                    release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                });
+                let (done_tx, done_rx) = mpsc::channel();
+                let worker = thread::spawn(move || {
+                    let result = if mutation {
+                        account
+                            .update_account_profile(
+                                &account_profile_snapshot(),
+                                Some("Bozza"),
+                                None,
+                            )
+                            .map(|_| ())
+                    } else {
+                        account.read_account_profile().map(|_| ())
+                    };
+                    done_tx.send(result).unwrap();
+                });
+                seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                session.renew_requests();
+                if archive_replaced {
+                    session.retire(RuntimeError::ArchiveReplaced);
+                } else {
+                    session.lock();
+                }
+                let prompt = done_rx.recv_timeout(Duration::from_secs(1));
+                let shutdown = closed_rx.recv_timeout(Duration::from_secs(2));
+                release_tx.send(()).unwrap();
+                worker.join().unwrap();
+                server.join().unwrap();
+                assert!(
+                    matches!(shutdown, Ok(Ok(0)))
+                        || matches!(shutdown, Ok(Err(ref error)) if error.kind() == std::io::ErrorKind::ConnectionReset),
+                    "account socket did not close: {shutdown:?}"
+                );
+                assert_eq!(
+                    prompt.unwrap(),
+                    Err(if mutation {
+                        RuntimeError::Indeterminate
+                    } else {
+                        RuntimeError::Locked
+                    })
+                );
+                assert_eq!(
+                    session.retirement_error(),
+                    Some(if archive_replaced {
+                        RuntimeError::ArchiveReplaced
+                    } else {
+                        RuntimeError::Locked
+                    })
+                );
+            }
+        }
     }
 
     #[test]
@@ -3238,14 +3623,22 @@ mod tests {
                 release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
                 send_reply(&mut stream, &ai_status_wire().to_string());
             });
-            let worker = thread::spawn(move || reader.read_ai_runtime_status());
+            let (done_tx, done_rx) = mpsc::channel();
+            let worker = thread::spawn(move || {
+                let result = reader.read_ai_runtime_status();
+                done_tx.send(()).unwrap();
+                result
+            });
             seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
             if lock_during_read {
                 session.lock();
             }
+            let completed_before_release =
+                !lock_during_read || done_rx.recv_timeout(Duration::from_secs(1)).is_ok();
             release_tx.send(()).unwrap();
             let result = worker.join().unwrap();
             server.join().unwrap();
+            assert!(completed_before_release);
             if lock_during_read {
                 assert!(matches!(result, Err(RuntimeError::Locked)));
             } else {
@@ -3638,7 +4031,26 @@ mod tests {
         headers + &String::from_utf8(body).unwrap()
     }
     fn send_reply(stream: &mut std::net::TcpStream, body: &str) {
-        write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", body.len(), body).unwrap();
+        send_status_reply(stream, 200, body);
+    }
+    fn send_status_reply(stream: &mut std::net::TcpStream, status: u16, body: &str) {
+        let result = write!(
+            stream,
+            "HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        if let Err(error) = result {
+            assert!(
+                matches!(
+                    error.kind(),
+                    std::io::ErrorKind::BrokenPipe
+                        | std::io::ErrorKind::ConnectionReset
+                        | std::io::ErrorKind::ConnectionAborted
+                ),
+                "unexpected fixture response error: {error}"
+            );
+        }
     }
     fn admit_fixture_read(session: &RuntimeSession) {
         session
@@ -4328,7 +4740,7 @@ mod tests {
                 if pause_last && index + 1 == steps.len() {
                     release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
                 }
-                write!(stream, "HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+                send_status_reply(&mut stream, *status, body);
                 index += 1;
             }
         });
@@ -4432,7 +4844,7 @@ mod tests {
                     _ => value.clone(),
                 }
                 .to_string();
-                write!(stream, "HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+                send_status_reply(&mut stream, *status, &body);
                 index += 1;
             }
         });
@@ -4735,17 +5147,22 @@ mod tests {
         let intent = session.profile_query_intent();
         let pending = intent.clone();
         let worker_session = session.clone();
+        let (done_tx, done_rx) = mpsc::channel();
         let worker = thread::spawn(move || {
-            worker_session.prepare_scale("scope-a", "patient-a", &pending, &request)
+            let result = worker_session.prepare_scale("scope-a", "patient-a", &pending, &request);
+            done_tx.send(()).unwrap();
+            result
         });
         while seen.recv_timeout(Duration::from_secs(5)).unwrap() != 3 {}
         intent.cancel();
+        let completed_before_release = done_rx.recv_timeout(Duration::from_secs(1));
         release.send(()).unwrap();
         assert!(matches!(
             worker.join().unwrap(),
             Err(RuntimeError::ReadRequired)
         ));
         server.join().unwrap();
+        assert!(completed_before_release.is_ok());
     }
 
     #[test]
@@ -4762,11 +5179,18 @@ mod tests {
                 .seal_scale_entry(&prepared, "2026-10-19T07:00:00Z", None)
                 .unwrap();
             let worker_session = session.clone();
-            let worker = thread::spawn(move || worker_session.create_scale_entry(&attempt));
+            let (done_tx, done_rx) = mpsc::channel();
+            let worker = thread::spawn(move || {
+                let result = worker_session.create_scale_entry(&attempt);
+                done_tx.send(()).unwrap();
+                result
+            });
             while seen.recv_timeout(Duration::from_secs(5)).unwrap() != 5 {}
             if cancel {
                 prepared.intent.cancel();
             }
+            let completed_before_release =
+                !cancel || done_rx.recv_timeout(Duration::from_secs(1)).is_ok();
             release.send(()).unwrap();
             if cancel {
                 assert!(matches!(
@@ -4782,6 +5206,7 @@ mod tests {
                 assert!(session.is_locked());
             }
             server.join().unwrap();
+            assert!(completed_before_release);
         }
     }
 
