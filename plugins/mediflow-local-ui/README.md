@@ -5,6 +5,9 @@ Supervisor, profilo fisso `plugin_local_ui`. Il pacchetto apre la UI separata;
 non incorpora una cartella nell'host, non restituisce CF/storia alla chat e
 non permette al modello di ragionare su dati che non riceve.
 
+La [matrice host del 23 ottobre](evidence/2026-10-23-host-qualification.md)
+riporta prove CLI, lifecycle, canali osservabili e limiti delle app desktop.
+
 ## Preparazione locale
 
 Node **24.x**, secondo `.nvmrc` e `engines >=24 <25`, dipendenze locali dal lockfile e build sorgente ammessa sono
