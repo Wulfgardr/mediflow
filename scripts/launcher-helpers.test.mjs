@@ -677,3 +677,17 @@ test('runtime cancellation during the POST revokes only that request before dela
         assert.deepEqual(intents, []);
     } finally { release(); await page.close(); await new Promise(resolve => revision.close(resolve)); }
 });
+
+test('a rejected navigation handoff revokes its request before returning an error', async () => {
+    const revoked = [], requestId = crypto.randomUUID();
+    const page = await createChoiceServer({ root: repoRoot, state: () => ({ ready: true, navigationReady: true }),
+        choose() {}, install() {}, stop() {}, navigate() { throw new Error('synthetic handoff failure'); },
+        cancelNavigation(id) { revoked.push(id); },
+    });
+    try {
+        const endpoint = new URL('navigate', page.url);
+        const response = await fetch(endpoint, { method: 'POST', headers: { Origin: endpoint.origin, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ intent: 'history', requestId, expiresAt: Date.now() + 5000 }) });
+        assert.notEqual(response.status, 202); assert.deepEqual(revoked, [requestId]);
+    } finally { await page.close(); }
+});

@@ -106,7 +106,8 @@ L'ingresso del pacchetto verifica il payload sorgente versionato tramite il
 ledger e il runtime Node locali esistenti prima di eseguire il Supervisor.
 Niente MCP bare, HTTP generico, download impliciti, broker residente, nuovo
 writer, adattatore SQLite o cloud. Il controllo locale esistente del launcher
-ammette soltanto l'enum nel comando nominato `navigate`, protetto dal suo token
+ammette soltanto l'enum e i metadati di richiesta nel comando nominato `navigate`,
+con revoca nominata `cancel-navigation`, protetti dal suo token
 locale e dall'origine; non espone un inoltro HTTP arbitrario. La closure di staging comprende i nuovi
 ingressi. Il plugin sintetico storico rimane distinto. Rimozione del pacchetto
 non modifica archivio o chiavi; il Supervisor arresta solo i propri figli.

@@ -150,7 +150,8 @@ export async function createChoiceServer({ root, state, choose, install, stop, n
           await navigate(data.intent, { requestId: data.requestId, expiresAt: data.expiresAt, signal: controller.signal });
           controller.signal.throwIfAborted();
           if (Date.now() >= data.expiresAt) throw new Error('Navigazione non disponibile.');
-        } finally {
+        } catch (error) { abort(); throw error; }
+        finally {
           clearTimeout(timer); req.off('aborted', abort); res.off('close', disconnected);
         }
       }

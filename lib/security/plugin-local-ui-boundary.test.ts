@@ -259,7 +259,7 @@ test('all eight concurrent in-flight calls retain cancellation capacity at the r
 test('Web dispatch rejects expired requests and cancellation only withdraws the matching intent', () => {
   const channel = new EventEmitter(), seen: string[] = [];
   const target = { [Symbol.for('mediflow.local-ui.navigation.v1')]: (intent: string) => { seen.push(intent); return true; } };
-  const close = installLocalUiWebNavigation(channel, 'http://127.0.0.1:12345', () => assert.fail('unexpected open'), target);
+  const close = installLocalUiWebNavigation(channel, 'http://127.0.0.1:12345', () => assert.fail('unexpected open'), target as unknown as typeof globalThis);
   const first = '00000000-0000-0000-0000-000000000001', second = '00000000-0000-0000-0000-000000000002';
   const send = (requestId: string, expiresAt = Date.now() + 5000) => channel.emit('message', JSON.stringify({
     schemaVersion: 'mediflow.local-ui.navigation.v1', intent: 'history', requestId, expiresAt }));
