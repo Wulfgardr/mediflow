@@ -107,7 +107,7 @@ for (const width of [1440, 390]) {
     await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await openPatientSection(page, 'terapie');
     const suspendedCard = page.locator('#terapie').getByRole('row').filter({ has: page.getByText('Farmaco sintetico principale', { exact: true }) });
-    await expect(page.locator('#terapie').getByRole('heading', { name: 'Terapie sospese', exact: true })).toBeVisible();
+    await expect(page.locator('#terapie').getByRole('heading', { name: 'Sospese', exact: true })).toBeVisible();
     await suspendedCard.getByText('Dettagli terapia', { exact: true }).click();
     await expect(suspendedCard.getByText('Dose della bozza sintetica', { exact: true })).toBeVisible();
     await expect(suspendedCard.getByText('Nota sintetica da conservare', { exact: true })).toBeVisible();
