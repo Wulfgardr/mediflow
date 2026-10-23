@@ -33,11 +33,11 @@ permissions:
 
 jobs:
   e2e-shard:
-    name: e2e shard ${{ matrix.shard }}/2
+    name: e2e shard ${{ matrix.shard }}/3
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
@@ -187,7 +187,7 @@ jobs:
           # @Codex: document-flow-real-route owns an empty standalone runtime and
           # runs only when this explicit synthetic-fixture opt-in is present.
           E2E_DOCUMENTS_SYNTHETIC_ONLY: "1"
-        run: npm run test:e2e -- --shard=${{ matrix.shard }}/2
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}/3
 
       - name: Official UI production acceptance
         env:
