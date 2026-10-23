@@ -1,0 +1,149 @@
+{
+  "syncCommit": "64e190438da8287928f0903b9b719c18b329a7ec",
+  "tool": {
+    "release": "v1.7.4",
+    "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
+    "sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+    "verifier": {
+      "name": "TLC",
+      "version": "2.19",
+      "buildDate": "2024-08-08",
+      "revision": "5a47802"
+    },
+    "sha1": "bee4a54f3ee3d4afc347c3240ec2d9e93b075104"
+  },
+  "bounds": {
+    "clients": 2,
+    "attemptsTotalIncludingFailedAdmission": 2,
+    "therapy": 1,
+    "patient": 1,
+    "archive": 1,
+    "targets": [
+      "suspended",
+      "completed"
+    ],
+    "initialStatus": "active",
+    "serverVersionMax": 5,
+    "workers": 1,
+    "heapMiB": 512,
+    "timeoutSecondsPerProcess": 300,
+    "fingerprintPolynomialIndex": 37,
+    "clientSymmetry": true
+  },
+  "results": [
+    {
+      "name": "current",
+      "exit": 0,
+      "elapsedMs": 158863,
+      "logSha256": "7c894686cc005fe51436ae05c102dd70ba8858a881304475612c7e9a220b3dbf",
+      "generated": 28149669,
+      "distinct": 5903794,
+      "queued": 0
+    },
+    {
+      "name": "mutant-abort-unlocks",
+      "exit": 12,
+      "elapsedMs": 1932,
+      "logSha256": "fcc05f577b0fa46bf714127bd714eacb751171c54d8b52b6e7aae06b10590657",
+      "generated": 13969,
+      "distinct": 5291,
+      "queued": 2919
+    },
+    {
+      "name": "mutant-admission-uncertain",
+      "exit": 12,
+      "elapsedMs": 1301,
+      "logSha256": "c8d64150899ef3dd87bafee1afd3cd03759eb7fea3bbb8c7c4957c3a4ff79ac5",
+      "generated": 35,
+      "distinct": 20,
+      "queued": 13
+    },
+    {
+      "name": "mutant-owner-blind-remove",
+      "exit": 12,
+      "elapsedMs": 1260,
+      "logSha256": "032d821c50a8729484b1f4b25b22d9c4bf6671326a211dcdb38691d220abeb41",
+      "generated": 3115,
+      "distinct": 1136,
+      "queued": 670
+    },
+    {
+      "name": "reach-NoRegisteredWitness",
+      "exit": 12,
+      "elapsedMs": 2639,
+      "logSha256": "87670d857b4de28c2b85c38fcf2d351ec6fd5a5d2cbe8d17a35ed4a1eeb2aa13",
+      "generated": 115865,
+      "distinct": 37946,
+      "queued": 16757
+    },
+    {
+      "name": "reach-NoRejectedWitness",
+      "exit": 12,
+      "elapsedMs": 1155,
+      "logSha256": "cb5dd3b695308bdd9fb6a4d966260b90e9a0c0d795ec772e15ccc52d5cef6651",
+      "generated": 6557,
+      "distinct": 2492,
+      "queued": 1436
+    },
+    {
+      "name": "reach-NoAdmissionWitness",
+      "exit": 12,
+      "elapsedMs": 1429,
+      "logSha256": "7986556bfb062d732039aec9382d907097bd097aaf863186d6ae3683a4b25281",
+      "generated": 35,
+      "distinct": 20,
+      "queued": 13
+    },
+    {
+      "name": "reach-NoSameVersionWitness",
+      "exit": 12,
+      "elapsedMs": 1578,
+      "logSha256": "6051222be7bd31aa940a40aca1e1fc9722452c095c30f8998a644685b2fe247d",
+      "generated": 2739,
+      "distinct": 995,
+      "queued": 587
+    },
+    {
+      "name": "reach-NoRecoveryWitness",
+      "exit": 12,
+      "elapsedMs": 1856,
+      "logSha256": "fc85b63d3973f073835b7fc7c3f8c1db44e9cfa2303c77443b3d40faffe2842e",
+      "generated": 14853,
+      "distinct": 5500,
+      "queued": 2991
+    },
+    {
+      "name": "reach-NoReplacementWitness",
+      "exit": 12,
+      "elapsedMs": 4009,
+      "logSha256": "f47abe4e3033ebbd0db7a07af29f3ff3a387d2c4be103fdd22ff7a720944dbd3",
+      "generated": 113106,
+      "distinct": 37186,
+      "queued": 16453
+    },
+    {
+      "name": "code-current",
+      "exit": 0,
+      "elapsedMs": 5269,
+      "logSha256": "b36912688d1448accdf28b10eeb2a8cfc319f1841cfc7b583cedd11f8dc5bd8b"
+    },
+    {
+      "name": "code-mutant-abort",
+      "exit": 1,
+      "elapsedMs": 772,
+      "logSha256": "019cf91e54acb749dc608d1774e84721fd3aaefc54372c8b6ce2ace11d8321b9"
+    },
+    {
+      "name": "code-mutant-admission",
+      "exit": 1,
+      "elapsedMs": 483,
+      "logSha256": "1c90ae45be23aaefe77a37230e684a7883b4067fc01caf4fde9845328c1adefe"
+    },
+    {
+      "name": "code-restored",
+      "exit": 0,
+      "elapsedMs": 689,
+      "logSha256": "4df2543cc9e8c4abd9706719690e7675dedd303567ac15b222d9ef9be9b0b419"
+    }
+  ]
+}

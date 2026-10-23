@@ -183,6 +183,10 @@ test('Treatment Reasoning ordinary ChatGPT: source bindings and remote trace rem
   }, patientId);
   expect(therapy).toBe(true);
   await page.goto(`/patients/${patientId}/modules`); await openPatientSection(page, 'terapie');
+  const proposals = page.locator('#terapie').getByRole('button', { name: 'Proposte', exact: true });
+  await expect(proposals).toHaveAttribute('aria-expanded', 'false');
+  await proposals.click();
+  await expect(proposals).toHaveAttribute('aria-expanded', 'true');
   const panel = page.getByTestId('treatment-reasoning-panel');
   await panel.getByRole('button', { name: 'Prepara proposta' }).click();
   await panel.getByLabel('Ambulatorio per questa proposta').selectOption(AMBULATORY.id);
