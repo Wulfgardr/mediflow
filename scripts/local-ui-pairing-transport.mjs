@@ -70,6 +70,12 @@ export async function bridgeExistingLocalUi(directory, expected, channel = proce
   const file = path.join(directory, `${nonce}.json`);
   let peer = null, connected = false, closed = false;
   const sockets = new Set();
+  const pendingNavigation = new Map();
+  const rememberNavigation = requestId => {
+    if (pendingNavigation.size >= 256) return false;
+    pendingNavigation.set(requestId, setTimeout(() => pendingNavigation.delete(requestId), 8000).unref());
+    return true;
+  };
   const codePath = '/' + crypto.randomUUID();
   const codePage = http.createServer((request, response) => {
     if (request.method !== 'GET' || request.url !== codePath || request.headers.host !== `127.0.0.1:${codePage.address().port}`) { response.writeHead(404); response.end(); return; }
@@ -99,15 +105,28 @@ export async function bridgeExistingLocalUi(directory, expected, channel = proce
     socket.once('close', () => { if (peer === socket) close(); });
   });
   const receive = frame => {
-    if (!['mediflow-local-ui-navigate', 'mediflow-local-ui-cancel'].includes(frame?.type)) return;
-    if (!connected) {
-      if (frame.type === 'mediflow-local-ui-navigate' && channel.connected) channel.send({ type: 'mediflow-local-ui-result', requestId: frame.requestId, status: 'waiting' }, () => {});
+    if (!['mediflow-local-ui-navigate', 'mediflow-local-ui-cancel'].includes(frame?.type)
+      || typeof frame.requestId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/u.test(frame.requestId)) return;
+    const { requestId } = frame;
+    if (frame.type === 'mediflow-local-ui-cancel') {
+      if (Object.keys(frame).sort().join(',') !== 'requestId,type') return;
+      if (!pendingNavigation.has(requestId) && !rememberNavigation(requestId)) return;
+      if (connected) writeFrame(peer, frame);
       return;
     }
-    writeFrame(peer, frame);
+    if (Object.keys(frame).sort().join(',') === 'dataDir,expiresAt,intent,requestId,sourceFingerprint,type'
+      && frame.dataDir === expected.dataDir && frame.sourceFingerprint === expected.sourceFingerprint
+      && ['search', 'identity', 'history', 'prescribing'].includes(frame.intent)
+      && Number.isSafeInteger(frame.expiresAt) && frame.expiresAt > Date.now() && frame.expiresAt <= Date.now() + 8000
+      && !pendingNavigation.has(requestId) && rememberNavigation(requestId)) {
+      if (connected) { writeFrame(peer, frame); return; }
+      if (channel.connected) channel.send({ type: 'mediflow-local-ui-result', requestId, status: 'waiting' }, () => {});
+    } else if (channel.connected) channel.send({ type: 'mediflow-local-ui-result', requestId, status: 'denied' }, () => {});
   };
   const close = () => {
     if (closed) return; closed = true; clearTimeout(timer);
+    for (const timer of pendingNavigation.values()) clearTimeout(timer);
+    pendingNavigation.clear();
     channel.off('message', receive); channel.off('disconnect', close);
     for (const socket of sockets) socket.destroy(); server.close(); codePage.close(); codePage.closeAllConnections(); fs.rmSync(file, { force: true });
     fs.rmSync(temporary, { recursive: true, force: true });
