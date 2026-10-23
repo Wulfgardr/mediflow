@@ -38,7 +38,7 @@ export function PluginLocalUiPairing() {
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nonce, action, ...(action === 'allow' ? { code } : {}) }) }).catch(() => {});
   };
   if (!isAuthenticated || isLocked || (!status.pending.length && !status.active.length)) return null;
-  return <aside aria-label="Collegamento del plugin" className="mx-auto max-w-3xl space-y-3 p-4">
+  return <aside aria-label="Collegamento del plugin" className="fixed right-4 top-4 z-[220] max-h-[calc(100vh-2rem)] max-w-[min(32rem,calc(100vw-2rem))] space-y-3 overflow-y-auto rounded-xl border p-4 shadow-lg" style={{ background: 'var(--lume-surface-field)', color: 'var(--lume-ink)', borderColor: 'var(--lume-border-color)' }}>
     {status.pending.filter(request => request.expiresAt > Date.now()).map(request => <div key={request.nonce} className="rounded-xl border border-current/20 p-4">
       <p>Consenti a Codex/Claude di aprire schermate qui?</p>
       <label className="block">Codice temporaneo mostrato dal raccordo locale<input aria-label="Codice di abbinamento" autoComplete="off" spellCheck={false} className="mf-input block" value={code} onChange={event => setCode(event.target.value)} /></label>

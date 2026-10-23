@@ -3,10 +3,11 @@ import { bootstrapUnlockedSession } from './utils';
 
 test.use({ pluginLocalUiRuntime: true });
 
-test('trusted UI consent binds an ephemeral navigation capability and revokes it', async ({ page, isolatedRuntime }) => {
+test('trusted UI consent binds an ephemeral navigation capability and revokes it', async ({ page, isolatedRuntime }, testInfo) => {
   await bootstrapUnlockedSession(page, '1234');
   const pair = isolatedRuntime.offerPairing();
   await expect(page.getByText('Consenti a Codex/Claude di aprire schermate qui?', { exact: true })).toBeVisible();
+  await testInfo.attach('pairing-confirmation', { body: await page.screenshot(), contentType: 'image/png' });
   expect(await isolatedRuntime.usePairing(pair.nonce, pair.host)).toBe('denied');
   await page.getByLabel('Codice di abbinamento', { exact: true }).fill('a'.repeat(24));
   await page.getByRole('button', { name: 'Consenti', exact: true }).evaluate(button => (button as HTMLButtonElement).click());
