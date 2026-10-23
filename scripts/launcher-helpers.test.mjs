@@ -890,6 +890,26 @@ test('cold plugin startup forwards ordinary launcher environment and preserves t
     assert.deepEqual(args.slice(1), ['--riusa']);
 });
 
+async function waitForFixtureClose(closed, timeoutMs = 5000) {
+    let timer;
+    try {
+        return await Promise.race([closed, new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('Owned fixture process did not close.')), timeoutMs);
+        })]);
+    } finally { clearTimeout(timer); }
+}
+
+async function stopFixtureChild(child, closed) {
+    if (child.exitCode === null && child.signalCode === null) {
+        if (process.platform === 'win32') {
+            const result = spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { encoding: 'utf8', timeout: 5000 });
+            assert.ifError(result.error);
+            assert.equal(result.status, 0, result.stdout + result.stderr);
+        } else assert.equal(child.kill('SIGTERM'), true);
+    }
+    await waitForFixtureClose(closed);
+}
+
 async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, webIdentity = true, overrides = {}, initialOwner = null) {
     const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-ordinary-launcher-')));
     const source = path.join(directory, 'source'), home = path.join(directory, 'home'), data = path.join(directory, 'data');
@@ -959,9 +979,9 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     const port = socket.address().port; await new Promise(resolve => socket.close(resolve));
     const child = spawn(process.execPath, [path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), '--senza-browser', ...args], {
         env: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home, PORT: String(port) }, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
-    const closed = once(child, 'close');
+    const closed = Promise.all([once(child, 'exit'), once(child.stderr, 'close')]).then(([exit]) => exit);
     t.after(async () => {
-        if (child.exitCode === null && child.signalCode === null) { const exited = once(child, 'exit'); child.kill('SIGTERM'); await exited; }
+        await stopFixtureChild(child, closed);
         rmSync(directory, { recursive: true, force: true });
     });
     child.stderr.on('data', chunk => { output += chunk; });
@@ -1115,12 +1135,11 @@ test('README reproduces the preference-preserving reuse-only invocation', () => 
 test('plugin refuses forged receipts, replacement ports and lock directory aliases at the real entry', async t => {
     const f = await ordinaryLauncherFixture(t, 'web');
     await f.until(() => f.output().includes('Pronto:'));
+    const receiptFile = launcherReceiptFile(f.stateFiles.lockDirectory);
+    const original = readFileSync(receiptFile);
     const requests = [];
     const foreign = createHttpServer((request, response) => { requests.push(request.url); response.end('{}'); });
     await new Promise(resolve => foreign.listen(0, '127.0.0.1', resolve));
-    t.after(() => new Promise(resolve => foreign.close(resolve)));
-    const receiptFile = launcherReceiptFile(f.stateFiles.lockDirectory);
-    const original = readFileSync(receiptFile);
     const script = `
         import { registerHooks } from 'node:module';
         registerHooks({ load(url, context, next) {
@@ -1160,7 +1179,46 @@ test('plugin refuses forged receipts, replacement ports and lock directory alias
         rmSync(receiptFile); symlinkSync(f.stateFiles.preferencesFile, receiptFile);
         try { await deny(); } finally { rmSync(receiptFile); }
         assert.deepEqual(requests, []);
-    } finally { writeFileSync(receiptFile, original, { mode: 0o600 }); }
+    } finally {
+        try { writeFileSync(receiptFile, original, { mode: 0o600 }); }
+        finally { await new Promise(resolve => { foreign.close(resolve); foreign.closeAllConnections(); }); }
+    }
+});
+
+test('a fixture cleanup error fails visibly without retaining the foreign listener', { timeout: 30000 }, async t => {
+    const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-cleanup-regression-')));
+    const trace = path.join(directory, 'fixture.json'), loader = path.join(directory, 'fault.mjs');
+    writeFileSync(loader, `
+        import fs from 'node:fs';
+        import path from 'node:path';
+        import { syncBuiltinESMExports } from 'node:module';
+        const remove = fs.rmSync;
+        fs.rmSync = (file, ...args) => {
+            if (path.basename(String(file)).startsWith('mediflow-ordinary-launcher-')) {
+                fs.writeFileSync(${JSON.stringify(trace)}, JSON.stringify({ directory: String(file) }));
+                throw Object.assign(new Error('SYNTHETIC_FIXTURE_CLEANUP_EPERM'), { code: 'EPERM' });
+            }
+            return remove(file, ...args);
+        };
+        syncBuiltinESMExports();`);
+    const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
+    const child = spawn(process.execPath, ['--import', loader, '--test', '--test-isolation=none', '--test-reporter=spec',
+        '--test-name-pattern=^plugin refuses forged receipts,', fileURLToPath(import.meta.url)],
+        { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const closed = once(child, 'close');
+    let output = '';
+    child.stdout.on('data', chunk => { output += chunk; });
+    child.stderr.on('data', chunk => { output += chunk; });
+    t.after(async () => {
+        await stopFixtureChild(child, closed);
+        if (existsSync(trace)) rmSync(JSON.parse(readFileSync(trace)).directory, { recursive: true, force: true });
+        rmSync(directory, { recursive: true, force: true });
+    });
+    const [code] = await waitForFixtureClose(closed, 20000);
+    assert.equal(code, 1, output);
+    assert.match(output, /SYNTHETIC_FIXTURE_CLEANUP_EPERM/u);
+    assert.match(output, /fail 1/u);
+    assert.match(output, /cancelled 0/u);
 });
 
 test('disconnecting the plugin leaves its ordinary runtime alive and usable', { timeout: 12000 }, async t => {
