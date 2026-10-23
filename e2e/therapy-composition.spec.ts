@@ -182,7 +182,11 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
             const capture = async (state: string) => {
                 await section(page).scrollIntoViewIfNeeded();
                 const path = `${dir}/${baseline ? 'prima' : 'dopo'}-${theme}-${size}-${state}.png`;
-                await page.screenshot({ path, animations: 'disabled', fullPage: true });
+                const png = await page.screenshot({ path, animations: 'disabled', fullPage: !zoom });
+                if (zoom) {
+                    expect(png.readUInt32BE(16)).toBe(1440);
+                    expect(png.readUInt32BE(20)).toBe(1000);
+                }
                 await test.info().attach(`${state}-${sha}`, { path, contentType: 'image/png' });
                 if (!baseline) await assertNoHorizontalOverflow(page, [{ label: 'documento', selector: 'document' }, { label: 'terapie', selector: '#terapie' }]);
             };
