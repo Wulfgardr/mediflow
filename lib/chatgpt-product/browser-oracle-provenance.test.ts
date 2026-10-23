@@ -33,7 +33,7 @@ async function fixture(t: TestContext) {
     }) as unknown as Request;
     const response = (selected: Request, status: number) => ({
         request: () => selected, status: () => status,
-        fromServiceWorker: () => false, url: () => selected.url(),
+        fromServiceWorker: () => false, url: () => selected.url(), headers: () => ({}),
     }) as unknown as Response;
     return { page, frame, oracle, request, response };
 }

@@ -253,7 +253,7 @@ test('the unchanged negative-terminal rule reports only a validated diagnostic I
     const session = new EventEmitter();
     session.send = async method => method === 'Network.streamResourceContent' ? { bufferedData: '' } : {};
     session.detach = async () => {};
-    const page = Object.assign(new EventEmitter(), { url: () => 'http://synthetic.invalid/', context: () => ({ newCDPSession: async () => session }) });
+    const page = Object.assign(new EventEmitter(), { url: () => 'http://synthetic.invalid/', evaluate: async () => undefined, context: () => ({ newCDPSession: async () => session }) });
     const observed = await observeAnyDocProjectResponse(page, 'SYNTHETIC_EXCLUDED_SOURCE');
     session.emit('Network.requestWillBeSent', { requestId: 'fake-original-request', request: {
       method: 'POST', url: new URL(target, page.url()).href,
