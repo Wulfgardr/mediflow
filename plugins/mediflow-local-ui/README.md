@@ -85,6 +85,15 @@ La configurazione locale supportata viene conservata, comprese le variabili
 ATHENA per runner, modello, Python, pacchetto, seed e limite token. I flag E2E,
 loader e segreti dell'host non vengono ereditati.
 
+Il nuovo launcher recupera automaticamente una propria generazione dopo un
+crash, quando può verificare che il proprietario sia morto. Se compare
+«Stato legacy del lanciatore senza proprietario verificabile», conserva invece
+lo stato precedente: una lock vuota o un mutex anonimo possono appartenere a
+un vecchio processo ancora vivo. Serve un intervento con verifica dei processi
+di quel checkout e copia dello stato; non cancellare i file sulla sola base
+dell'età o dell'assenza della receipt. Il limite e le condizioni sono descritti
+nell'[ADR 0159](../../docs/adr/0159-plugin-local-ui-navigation.md).
+
 Se MediFlow è già aperta, il raccordo mostra un codice temporaneo nella propria
 pagina locale. Copialo nella MediFlow che stavi già usando, nel campo «Codice
 di abbinamento», e premi «Consenti». La richiesta dice «Consenti a Codex/Claude

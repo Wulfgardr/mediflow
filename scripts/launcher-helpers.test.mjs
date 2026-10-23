@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -18,6 +18,292 @@ import {
 } from './launcher-helpers.mjs';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+
+function launcherReceiptFile(directory) {
+    const active = path.join(directory, 'active');
+    const generations = existsSync(active) ? readdirSync(active).filter(name => /^owner-[a-f0-9]{32}$/u.test(name)) : [];
+    return generations.length === 1 ? path.join(active, generations[0], 'instance.json') : path.join(directory, 'instance.json');
+}
+
+function launcherCrashFixture(t) {
+    const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-launcher-crash-')));
+    const lock = path.join(directory, 'lock');
+    const children = [];
+    t.after(async () => {
+        for (const { child, closed } of children) {
+            if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+            await closed;
+        }
+        rmSync(directory, { recursive: true, force: true });
+    });
+    function start(pauseAt = '', release = false, legacy = false) {
+        const gate = path.join(directory, crypto.randomUUID() + '.resume');
+        const child = spawn(process.execPath, ['--input-type=module', '-e', `
+            import fs from 'node:fs';
+            import path from 'node:path';
+            import { syncBuiltinESMExports } from 'node:module';
+            const directory = ${JSON.stringify(lock)}, pauseAt = ${JSON.stringify(pauseAt)};
+            const output = value => fs.writeSync(1, JSON.stringify(value) + '\\n');
+            let paused = false;
+            const pause = () => {
+                if (paused) return;
+                paused = true; output({ type: 'paused', at: pauseAt });
+                while (!fs.existsSync(${JSON.stringify(gate)})) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+            };
+            const mkdir = fs.mkdirSync, rename = fs.renameSync, remove = fs.rmSync, link = fs.linkSync, unlink = fs.unlinkSync;
+            fs.mkdirSync = (name, ...args) => {
+                const result = mkdir(name, ...args);
+                if (pauseAt === 'prepare' && (name === directory + '.recovery' || String(name).startsWith(directory + '.candidate-'))) pause();
+                if (pauseAt === 'publish' && name === directory) pause();
+                return result;
+            };
+            fs.renameSync = (source, target) => {
+                const detach = (path.dirname(source) === path.join(directory, 'active') && path.basename(source).startsWith('owner-')) || source === path.join(directory, 'active');
+                if (pauseAt === 'before-detach' && detach) pause();
+                const result = rename(source, target);
+                if (pauseAt === 'publish' && (target === directory || target === path.join(directory, 'active'))) pause();
+                if (pauseAt === 'migration' && target === path.join(directory, 'protocol.json')) pause();
+                if ((pauseAt === 'after-detach' || pauseAt === 'cleanup') && detach) pause();
+                return result;
+            };
+            fs.rmSync = (name, ...args) => {
+                const result = remove(name, ...args);
+                if (pauseAt === 'cleanup' && name === path.join(directory, 'instance.json')) pause();
+                return result;
+            };
+            fs.linkSync = (source, target) => {
+                if (pauseAt === 'before-guard' && target === directory + '.recovery') pause();
+                const result = link(source, target);
+                if (pauseAt === 'guard' && target === directory + '.recovery') pause();
+                return result;
+            };
+            fs.unlinkSync = name => {
+                const result = unlink(name);
+                if (pauseAt === 'legacy-unlinked' && name === path.join(directory, 'instance.json')) pause();
+                return result;
+            };
+            syncBuiltinESMExports();
+            const launcher = await import(${JSON.stringify(new URL('./mediflow.mjs', import.meta.url).href)});
+            const keepAlive = setInterval(() => {}, 1000);
+            try {
+                let ownership;
+                if (${legacy}) {
+                    fs.mkdirSync(directory + '.recovery');
+                    fs.mkdirSync(directory);
+                    const receipt = { pid: process.pid, checkoutPath: ${JSON.stringify(repoRoot)} };
+                    fs.writeFileSync(path.join(directory, 'instance.json'), JSON.stringify(receipt), { mode: 0o600, flag: 'wx' });
+                    fs.rmdirSync(directory + '.recovery');
+                    ownership = { claimed: true, receipt };
+                } else ownership = launcher.claimLauncher(directory, ${JSON.stringify({ checkoutPath: repoRoot })}, { reuseLive: true });
+                output({ type: 'result', ...ownership });
+                if (${release}) { launcher.releaseLauncher(ownership); output({ type: 'released' }); }
+            } catch (error) { output({ type: 'result', error: error.message, code: error.code }); }
+            process.once('disconnect', () => clearInterval(keepAlive));
+        `], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
+        const closed = once(child, 'close'); children.push({ child, closed });
+        const events = [], waiting = [];
+        let buffer = '', stderr = '';
+        child.stderr.on('data', chunk => { stderr += chunk; });
+        child.stdout.on('data', chunk => {
+            buffer += chunk;
+            while (buffer.includes('\n')) {
+                const end = buffer.indexOf('\n'), event = JSON.parse(buffer.slice(0, end)); buffer = buffer.slice(end + 1);
+                if (waiting.length) waiting.shift()(event); else events.push(event);
+            }
+        });
+        return { child, closed, next: () => events.length ? Promise.resolve(events.shift()) : new Promise(resolve => waiting.push(resolve)),
+            resume: () => writeFileSync(gate, ''), stderr: () => stderr };
+    }
+    return { directory, lock, start };
+}
+
+for (const phase of ['prepare', 'guard', 'publish']) test(`SIGKILL during launcher ${phase} cannot strand acquisition`, { timeout: 15000 }, async t => {
+    const f = launcherCrashFixture(t), owner = f.start(phase);
+    assert.deepEqual(await owner.next(), { type: 'paused', at: phase });
+    owner.child.kill('SIGKILL'); await owner.closed;
+    t.diagnostic(JSON.stringify({ phase, signal: owner.child.signalCode, entries: readdirSync(f.directory),
+        canonical: existsSync(f.lock) ? readdirSync(f.lock) : null }));
+    assert.equal(claimLauncher(f.lock, { checkoutPath: repoRoot }).claimed, true);
+});
+
+test('SIGKILL after publishing into an initialized protocol container remains recoverable', { timeout: 15000 }, async t => {
+    const f = launcherCrashFixture(t); releaseLauncher(claimLauncher(f.lock, { checkoutPath: repoRoot }));
+    const owner = f.start('publish'); assert.equal((await owner.next()).type, 'paused');
+    owner.child.kill('SIGKILL'); await owner.closed;
+    assert.equal(claimLauncher(f.lock, { checkoutPath: repoRoot }).claimed, true);
+});
+
+for (const phase of ['prepare', 'publish']) test(`a legacy launcher paused during ${phase} remains protected even after its unexplained disappearance`, { timeout: 15000 }, async t => {
+    const f = launcherCrashFixture(t), owner = f.start(phase, false, true);
+    assert.equal((await owner.next()).type, 'paused');
+    const before = readdirSync(f.directory).sort();
+    assert.throws(() => claimLauncher(f.lock, { checkoutPath: repoRoot }), /Stato legacy.*quiescenza/u);
+    assert.deepEqual(readdirSync(f.directory).sort(), before);
+    assert.equal(owner.child.exitCode, null);
+    owner.child.kill('SIGKILL'); await owner.closed;
+    assert.throws(() => claimLauncher(f.lock, { checkoutPath: repoRoot }), /Stato legacy.*quiescenza/u);
+    assert.deepEqual(readdirSync(f.directory).sort(), before);
+    if (phase === 'publish') assert.deepEqual(readdirSync(f.lock), []);
+});
+
+test('legacy interrupted cleanup and partial receipts require verified quiescence', t => {
+    const f = launcherCrashFixture(t); mkdirSync(f.lock);
+    assert.throws(() => claimLauncher(f.lock, { checkoutPath: repoRoot }), /Stato legacy.*quiescenza/u);
+    assert.deepEqual(readdirSync(f.lock), []);
+    const file = path.join(f.lock, 'instance.json'); writeFileSync(file, '{"pid":');
+    assert.throws(() => claimLauncher(f.lock, { checkoutPath: repoRoot }), /Stato legacy.*quiescenza/u);
+    assert.equal(readFileSync(file, 'utf8'), '{"pid":');
+    assert.equal(existsSync(f.lock + '.recovery'), false);
+});
+
+test('the complete protocol marker prevents an older launcher from acquiring its anonymous mutex', { timeout: 15000 }, async t => {
+    const f = launcherCrashFixture(t), owned = claimLauncher(f.lock, { checkoutPath: repoRoot });
+    const legacy = f.start('', false, true), result = await legacy.next();
+    assert.equal(result.code, 'EEXIST'); assert.notEqual(result.claimed, true);
+    assert.equal(JSON.parse(readFileSync(owned.receiptFile)).pid, process.pid);
+});
+
+test('a legacy acquisition that wins the protocol race remains the only writer', { timeout: 15000 }, async t => {
+    const f = launcherCrashFixture(t), incoming = f.start('before-guard'); assert.equal((await incoming.next()).type, 'paused');
+    const legacy = f.start('prepare', false, true); assert.equal((await legacy.next()).type, 'paused');
+    incoming.resume(); const denied = await incoming.next();
+    assert.match(denied.error, /Stato legacy.*quiescenza/u); assert.notEqual(denied.claimed, true);
+    legacy.resume(); const owned = await legacy.next(); assert.equal(owned.claimed, true);
+    const current = claimLauncher(f.lock, { checkoutPath: repoRoot }, { reuseLive: true });
+    assert.equal(current.claimed, false); assert.equal(current.receipt.pid, legacy.child.pid);
+});
+
+test('hard-link aliases of generation ownership and receipt remain denied', t => {
+    const f = launcherCrashFixture(t), owned = claimLauncher(f.lock, { checkoutPath: repoRoot });
+    for (const file of [owned.receiptFile, path.join(path.dirname(owned.receiptFile), 'owner.json')]) {
+        const alias = path.join(f.directory, 'alias'); linkSync(file, alias);
+        try { assert.throws(() => claimLauncher(f.lock, { checkoutPath: repoRoot }), /non valido/u); }
+        finally { rmSync(alias); }
+    }
+});
+
+test('an unavailable OS identity query cannot reclaim a live complete generation', t => {
+    const f = launcherCrashFixture(t), owned = claimLauncher(f.lock, { checkoutPath: repoRoot });
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+        import assert from 'node:assert/strict'; import fs from 'node:fs'; import cp from 'node:child_process';
+        import { syncBuiltinESMExports } from 'node:module';
+        const { claimLauncher } = await import(${JSON.stringify(new URL('./mediflow.mjs', import.meta.url).href)});
+        const read = fs.readFileSync, run = cp.spawnSync, owner = ${process.pid};
+        fs.readFileSync = (file, ...args) => {
+            if (file === '/proc/' + owner + '/stat') throw Object.assign(new Error('synthetic inaccessible process'), { code: 'EPERM' });
+            return read(file, ...args);
+        };
+        cp.spawnSync = (file, args, ...rest) => {
+            if (args?.includes(String(owner)) || args?.some(arg => String(arg).includes('Get-Process -Id ' + owner + ')'))) return { status: 1, stdout: '' };
+            return run(file, args, ...rest);
+        };
+        syncBuiltinESMExports();
+        const ownership = claimLauncher(${JSON.stringify(f.lock)}, { checkoutPath: ${JSON.stringify(repoRoot)} }, { reuseLive: true });
+        assert.equal(ownership.claimed, false); assert.equal(ownership.receipt.pid, owner);
+    `], { encoding: 'utf8', timeout: 10000 });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(readFileSync(owned.receiptFile)).pid, process.pid);
+});
+
+test('six recoverers of a dead complete generation admit exactly one writer', { timeout: 30000 }, async t => {
+    const f = launcherCrashFixture(t), dead = f.start();
+    assert.equal((await dead.next()).claimed, true); dead.child.kill('SIGKILL'); await dead.closed;
+    const contenders = Array.from({ length: 6 }, () => f.start());
+    const results = await Promise.all(contenders.map(async contender => ({ ...await contender.next(), pid: contender.child.pid })));
+    const winners = results.filter(result => result.claimed);
+    assert.equal(winners.length, 1, JSON.stringify(results));
+    assert.equal(JSON.parse(readFileSync(winners[0].receiptFile)).pid, winners[0].pid);
+});
+
+for (const phase of ['migration', 'legacy-unlinked']) test(`SIGKILL during legacy ${phase} keeps the verified dead owner recoverable`, { timeout: 15000 }, async t => {
+    const f = launcherCrashFixture(t); mkdirSync(f.lock);
+    atomicJson(path.join(f.lock, 'instance.json'), { pid: 2147483647, checkoutPath: repoRoot });
+    const recovering = f.start(phase); assert.equal((await recovering.next()).type, 'paused');
+    recovering.child.kill('SIGKILL'); await recovering.closed;
+    assert.equal(claimLauncher(f.lock, { checkoutPath: repoRoot }).claimed, true);
+});
+
+test('publication primitives reject an existing populated directory and an existing protocol guard', t => {
+    const f = launcherCrashFixture(t), source = path.join(f.directory, 'prepared'), target = path.join(f.directory, 'occupied');
+    mkdirSync(source); mkdirSync(target); writeFileSync(path.join(source, 'complete'), 'new'); writeFileSync(path.join(target, 'owner'), 'live');
+    assert.throws(() => renameSync(source, target));
+    assert.equal(readFileSync(path.join(target, 'owner'), 'utf8'), 'live');
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+        import fs from 'node:fs';
+        const prepared = ${JSON.stringify(path.join(source, 'complete'))}, guard = ${JSON.stringify(path.join(f.directory, 'guard'))};
+        fs.linkSync(prepared, guard);
+        try { fs.linkSync(prepared, guard); process.exitCode = 1; }
+        catch (error) { if (error.code !== 'EEXIST') throw error; }
+        if (fs.readFileSync(guard, 'utf8') !== 'new') process.exitCode = 2;
+    `], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+});
+
+test('missing and partial receipts preserve a live generation and recover only after its death', { timeout: 30000 }, async t => {
+    const f = launcherCrashFixture(t);
+    for (const mode of ['missing', 'partial', 'empty-object', 'incomplete-object']) {
+        const owner = f.start(), original = await owner.next();
+        assert.equal(original.claimed, true);
+        if (mode === 'missing') rmSync(original.receiptFile);
+        else writeFileSync(original.receiptFile, mode === 'partial' ? '{"pid":' : mode === 'empty-object' ? '{}' : JSON.stringify({ pid: owner.child.pid }));
+        const current = claimLauncher(f.lock, { checkoutPath: repoRoot }, { reuseLive: true });
+        assert.equal(current.claimed, false);
+        assert.equal(current.receipt.pid, owner.child.pid);
+        owner.child.kill('SIGKILL'); await owner.closed;
+        const next = claimLauncher(f.lock, { checkoutPath: repoRoot });
+        assert.equal(next.claimed, true);
+        assert.notEqual(next.generation, original.generation);
+        releaseLauncher(next);
+    }
+});
+
+test('a live owner paused immediately after publication cannot be replaced', { timeout: 15000 }, async t => {
+    const f = launcherCrashFixture(t), owner = f.start('publish');
+    assert.equal((await owner.next()).type, 'paused');
+    const current = claimLauncher(f.lock, { checkoutPath: repoRoot }, { reuseLive: true });
+    assert.equal(current.claimed, false); assert.equal(current.receipt.pid, owner.child.pid);
+    owner.resume(); assert.equal((await owner.next()).claimed, true);
+});
+
+test('a delayed recoverer cannot detach the replacement live generation', { timeout: 30000 }, async t => {
+    const f = launcherCrashFixture(t), dead = f.start();
+    assert.equal((await dead.next()).claimed, true); dead.child.kill('SIGKILL'); await dead.closed;
+    const delayed = f.start('before-detach');
+    assert.equal((await delayed.next()).type, 'paused');
+    const replacement = f.start(), published = await replacement.next();
+    assert.equal(published.claimed, true);
+    delayed.resume();
+    const result = await delayed.next();
+    assert.equal(result.claimed, false, JSON.stringify(result));
+    assert.equal(result.receipt.pid, replacement.child.pid);
+    assert.equal(JSON.parse(readFileSync(published.receiptFile)).pid, replacement.child.pid);
+});
+
+test('SIGKILL after recovery detaches a dead generation leaves acquisition recoverable', { timeout: 30000 }, async t => {
+    const f = launcherCrashFixture(t), dead = f.start();
+    assert.equal((await dead.next()).claimed, true); dead.child.kill('SIGKILL'); await dead.closed;
+    const recovering = f.start('after-detach');
+    assert.equal((await recovering.next()).type, 'paused');
+    recovering.child.kill('SIGKILL'); await recovering.closed;
+    assert.equal(claimLauncher(f.lock, { checkoutPath: repoRoot }).claimed, true);
+});
+
+test('SIGKILL during generation cleanup does not strand the next acquisition', { timeout: 15000 }, async t => {
+    const f = launcherCrashFixture(t), owner = f.start('cleanup', true);
+    assert.equal((await owner.next()).claimed, true);
+    assert.equal((await owner.next()).type, 'paused');
+    owner.child.kill('SIGKILL'); await owner.closed;
+    assert.equal(claimLauncher(f.lock, { checkoutPath: repoRoot }).claimed, true);
+});
+
+test('delayed cleanup cannot remove a replacement live generation', { timeout: 30000 }, async t => {
+    const f = launcherCrashFixture(t), owner = f.start('cleanup', true);
+    assert.equal((await owner.next()).claimed, true); assert.equal((await owner.next()).type, 'paused');
+    const replacement = f.start(), published = await replacement.next(); assert.equal(published.claimed, true);
+    owner.resume(); assert.equal((await owner.next()).type, 'released');
+    assert.equal(JSON.parse(readFileSync(published.receiptFile)).pid, replacement.child.pid);
+    assert.equal(claimLauncher(f.lock, { checkoutPath: repoRoot }, { reuseLive: true }).claimed, false);
+});
 
 test('known updates stop an older main, but do not block an updated or development checkout', (t) => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'mediflow-launcher-git-'));
@@ -209,7 +495,7 @@ test('a verified instance stays valid when the local browser cannot be opened', 
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { atomicJson, buildDecision, claimLauncher, findExistingInstance, needsTextMenu, parseArguments, requireFreePort, selectChoice, stopOwnedChild, textualChoice } from './mediflow.mjs';
+import { atomicJson, buildDecision, claimLauncher, releaseLauncher, findExistingInstance, needsTextMenu, parseArguments, requireFreePort, selectChoice, stopOwnedChild, textualChoice } from './mediflow.mjs';
 import { createChoiceServer } from './mediflow-launcher-page.mjs';
 import { navigateOwnedLocalUiRuntime } from './local-ui-runtime.mjs';
 import { createServer as createHttpServer } from 'node:http';
@@ -300,12 +586,13 @@ test('launcher ownership refuses a live owner and recovers only a dead receipt',
     const root = mkdtempSync(path.join(tmpdir(), 'mediflow-launcher-owner-'));
     t.after(() => rmSync(root, { recursive: true, force: true }));
     const lock = path.join(root, 'lock');
-    claimLauncher(lock, cleanIdentity);
+    const owned = claimLauncher(lock, cleanIdentity);
     assert.throws(() => claimLauncher(lock, cleanIdentity), /già in corso/u);
-    assert.equal(JSON.parse(readFileSync(path.join(lock, 'instance.json'), 'utf8')).pid, process.pid);
+    assert.equal(JSON.parse(readFileSync(owned.receiptFile, 'utf8')).pid, process.pid);
+    releaseLauncher(owned);
     atomicJson(path.join(lock, 'instance.json'), { pid: 2147483647, checkoutPath: repoRoot });
     claimLauncher(lock, cleanIdentity);
-    assert.equal(JSON.parse(readFileSync(path.join(lock, 'instance.json'), 'utf8')).pid, process.pid);
+    assert.equal(JSON.parse(readFileSync(launcherReceiptFile(lock), 'utf8')).pid, process.pid);
 });
 
 test('launcher ownership recovers a recycled PID but preserves an unverifiable live owner', t => {
@@ -313,12 +600,16 @@ test('launcher ownership recovers a recycled PID but preserves an unverifiable l
     t.after(() => rmSync(root, { recursive: true, force: true }));
     const lock = path.join(root, 'lock');
     claimLauncher(lock, cleanIdentity);
-    const receiptFile = path.join(lock, 'instance.json');
+    let receiptFile = launcherReceiptFile(lock);
     const receipt = JSON.parse(readFileSync(receiptFile));
     assert.equal(typeof receipt.processIdentity, 'string');
     atomicJson(receiptFile, { ...receipt, processIdentity: 'previous-process-generation' });
-    claimLauncher(lock, cleanIdentity);
+    atomicJson(path.join(path.dirname(receiptFile), 'owner.json'), { ...receipt, processIdentity: 'previous-process-generation' });
+    const owned = claimLauncher(lock, cleanIdentity);
+    receiptFile = launcherReceiptFile(lock);
     assert.deepEqual(JSON.parse(readFileSync(receiptFile)), receipt);
+    releaseLauncher(owned);
+    receiptFile = path.join(lock, 'instance.json');
     atomicJson(receiptFile, { pid: process.pid, checkoutPath: repoRoot });
     assert.throws(() => claimLauncher(lock, cleanIdentity), /già in corso/u);
     assert.deepEqual(JSON.parse(readFileSync(receiptFile)), { pid: process.pid, checkoutPath: repoRoot });
@@ -351,7 +642,7 @@ test('concurrent launcher acquisition retains a single live writer', async t => 
     }));
     const winners = results.filter(result => result.claimed);
     assert.equal(winners.length, 1, JSON.stringify(results));
-    assert.equal(JSON.parse(readFileSync(path.join(lock, 'instance.json'))).pid, winners[0].pid);
+    assert.equal(JSON.parse(readFileSync(launcherReceiptFile(lock))).pid, winners[0].pid);
 });
 
 async function fakeRuntime(t, fingerprint = cleanIdentity.sourceFingerprint) {
@@ -477,7 +768,7 @@ test('launcher preferences and ownership never create or write to the selected a
         for (const directory of [path.dirname(path.dirname(state.preferencesFile)), path.dirname(state.preferencesFile), state.lockDirectory]) {
             assert.equal(statSync(directory).mode & 0o777, 0o700);
         }
-        for (const file of [state.preferencesFile, path.join(state.lockDirectory, 'instance.json')]) {
+        for (const file of [state.preferencesFile, launcherReceiptFile(state.lockDirectory)]) {
             assert.equal(statSync(file).mode & 0o777, 0o600);
         }
     }
@@ -688,7 +979,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
 test('headless ordinary runtime cannot acknowledge plugin navigation', async t => {
     const f = await ordinaryLauncherFixture(t, 'agenti');
     await f.until(() => f.output().includes('Pronto:'));
-    const receipt = JSON.parse(readFileSync(path.join(f.stateFiles.lockDirectory, 'instance.json')));
+    const receipt = JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
     const endpoint = new URL('navigate', receipt.choiceUrl);
     const response = await fetch(endpoint, { method: 'POST', headers: { Origin: endpoint.origin, 'Content-Type': 'application/json' },
         body: JSON.stringify({ intent: 'history', requestId: crypto.randomUUID(), expiresAt: Date.now() + 5000 }) });
@@ -703,7 +994,7 @@ test('ordinary and plugin startup recover a stale owner before choosing pairing'
         for (const owner of [{ pid: 2147483647 }, { pid: process.pid, processIdentity: 'previous-process-generation' }]) {
             const f = await ordinaryLauncherFixture(t, 'web', ['--scelta', 'web'], reuse, true, {}, owner);
             await f.until(() => f.output().includes('Pronto:'));
-            const receipt = JSON.parse(readFileSync(path.join(f.stateFiles.lockDirectory, 'instance.json')));
+            const receipt = JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
             assert.equal(receipt.pid, f.child.pid);
             assert.equal(typeof receipt.processIdentity, 'string');
             const state = await (await fetch(new URL('state', receipt.choiceUrl))).json();
@@ -828,7 +1119,7 @@ test('plugin refuses forged receipts, replacement ports and lock directory alias
     const foreign = createHttpServer((request, response) => { requests.push(request.url); response.end('{}'); });
     await new Promise(resolve => foreign.listen(0, '127.0.0.1', resolve));
     t.after(() => new Promise(resolve => foreign.close(resolve)));
-    const receiptFile = path.join(f.stateFiles.lockDirectory, 'instance.json');
+    const receiptFile = launcherReceiptFile(f.stateFiles.lockDirectory);
     const original = readFileSync(receiptFile);
     const script = `
         import { registerHooks } from 'node:module';
@@ -877,7 +1168,7 @@ test('disconnecting the plugin leaves its ordinary runtime alive and usable', { 
     await f.until(() => f.output().includes('Pronto:'));
     assert.equal(await navigateOwnedLocalUiRuntime(f.child, 'history', new AbortController().signal, Date.now() + 5000, f.expected), true);
     f.child.disconnect();
-    const receipt = JSON.parse(readFileSync(path.join(f.stateFiles.lockDirectory, 'instance.json')));
+    const receipt = JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
     const state = await (await fetch(new URL('state', receipt.choiceUrl), { signal: AbortSignal.timeout(3000) })).json();
     assert.equal(state.ready, true);
     assert.equal((await fetch(state.url, { signal: AbortSignal.timeout(3000) })).status, 200);
@@ -955,7 +1246,7 @@ test('a public revision response cannot establish owned Web identity', async t =
     await assert.rejects(navigateOwnedLocalUiRuntime(f.child, 'history', AbortSignal.timeout(2000), Date.now() + 1500, f.expected));
     await f.closed;
     assert.equal(f.child.exitCode, 1);
-    assert.equal(existsSync(f.stateFiles.lockDirectory), false);
+    assert.equal(existsSync(path.join(f.stateFiles.lockDirectory, 'active')), false);
     assert.doesNotMatch(f.output(), /FIXTURE_NAVIGATION/);
 });
 
@@ -1001,7 +1292,7 @@ test('cold navigator restarts after the owned launcher exits after handshake', t
 test('an existing ordinary launcher pairs only after code confirmation in its Web and revokes on lock', async t => {
     const f = await ordinaryLauncherFixture(t, 'web', [], false);
     await f.until(() => f.output().includes('Pronto:'));
-    const receipt = JSON.parse(readFileSync(path.join(f.stateFiles.lockDirectory, 'instance.json')));
+    const receipt = JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
     const state = await (await fetch(new URL('state', receipt.choiceUrl))).json();
     let output = '';
     const bridge = spawn(process.execPath, [path.join(f.source, 'scripts/mediflow.mjs'), '--riusa'], {
@@ -1042,7 +1333,7 @@ test('ordinary Web children preserve supported configuration through the plugin 
     for (const [reuse, config] of [[false, configured], [true, ordinaryLauncherEnvironment('/synthetic', configured)]]) {
         const f = await ordinaryLauncherFixture(t, 'web', [], reuse, true, config);
         await f.until(() => f.output().includes('Pronto:'));
-        const receipt = JSON.parse(readFileSync(path.join(f.stateFiles.lockDirectory, 'instance.json')));
+        const receipt = JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
         const state = await (await fetch(new URL('state', receipt.choiceUrl))).json();
         const environment = await (await fetch(state.url + '/fixture-env')).json();
         environments.push(Object.fromEntries(Object.keys(configured).map(key=>[key,environment[key]])));

@@ -22,14 +22,51 @@ restano la preferenza e il selettore ordinari. Il riuso non riscrive le preferen
 Un runtime headless, nativo o di sviluppo non dichiara capacità di navigazione
 Web: il controllo rifiuta l'intento e il raccordo non restituisce successo.
 
-Prima di scegliere fra abbinamento e avvio, il launcher acquisisce in modo
-esclusivo la verifica della lock. Una receipt con PID morto o con identità
-temporale del processo diversa viene sostituita atomicamente, senza rimuovere
-la directory fra verifica e acquisizione. Per un PID vivo, un’identità
-corrispondente, una vecchia receipt senza identità temporale o una verifica OS
-indisponibile non autorizzano il recupero. Le receipt e le directory con alias
-sono rifiutate. Questa verifica
-serve soltanto alla proprietà del launcher e non concede navigazione.
+Prima di scegliere fra abbinamento e avvio, il launcher prepara fuori dallo
+stato condiviso una generazione completa: owner immutabile con PID e identità
+temporale OS, e receipt aggiornabile separata. Pubblica l'intero contenitore
+con rename; un contenitore occupato e non vuoto non può essere sostituito.
+Le generazioni hanno nomi casuali non riutilizzati. Il recupero sposta soltanto
+il nome della generazione verificata morta, mai la directory `active` intera:
+un recuperatore in ritardo non può spostare una generazione successiva. Lo stop
+ritira nello stesso modo la propria generazione, senza prima cancellarne la
+receipt. Il contenitore di protocollo resta sul disco; `active` vuota o assente
+non rappresenta un writer.
+
+Il file permanente `${lockDirectory}.recovery`, con schema
+`mediflow.launcher-lock.v2`, seleziona il protocollo: non è un mutex e non
+attribuisce proprietà. È pubblicato completo con hard link esclusivo da una
+preparazione privata sullo stesso filesystem. Impedisce al vecchio protocollo
+di acquisire il proprio mutex con `mkdir`, anche mentre si pubblica il nuovo
+contenitore. Un crash può lasciare il secondo link della preparazione: è
+ammesso soltanto per questo marcatore pubblico e immutabile, non per owner o
+receipt. Directory, symlink o contenuti diversi nello stesso percorso sono
+stato legacy incerto, conservato senza conversione automatica.
+
+Per un PID vivo, un'identità corrispondente, una vecchia receipt senza identità
+temporale o una verifica OS indisponibile non autorizzano il recupero. La
+receipt aggiornabile mancante o parziale non cancella l'owner immutabile:
+finché è vivo o incerto resta protetto, dopo la morte verificata la generazione
+può essere ritirata. Alias e file non regolari di directory, owner e receipt
+restano negati. Le receipt legacy complete sono ancora riconosciute; la
+migrazione di un owner verificato morto scrive il protocollo prima di togliere
+la vecchia receipt, così un crash intermedio non crea uno stato anonimo nuovo.
+
+Una lock legacy vuota, una receipt legacy parziale e il vecchio mutex anonimo
+non provano la morte del proprietario. Anche dopo un crash osservato restano
+conservati con l'errore «Stato legacy del lanciatore senza proprietario
+verificabile». L'intervento richiede evidenza di quiescenza dei launcher di quel
+checkout, compresi processi vecchi sospesi o ancora in acquisizione e relativi
+figli, e una copia dello stato prima della rimozione delle sole tracce pertinenti.
+Il consenso a ignorare l'ownership, l'età e l'assenza della receipt non sono
+prove di quiescenza. Non esiste un flag di recupero forzato.
+
+Le garanzie riguardano concorrenza e terminazione dei processi sulle primitive
+di hard link esclusivo e rename locale; i test delle stesse primitive sono
+inclusi nella matrice CI Windows/Linux/macOS. Non attestano resistenza alla perdita
+di alimentazione o alla corruzione del filesystem. Preparazioni e generazioni
+ritirate lasciate da un crash non conferiscono proprietà e non bloccano nuovi
+ingressi. La proprietà del launcher non concede navigazione.
 
 Lo stop via IPC richiede un figlio ammesso dopo la readiness e, per il Web,
 dopo la prova HMAC. Su Windows un figlio non ancora verificato viene arrestato

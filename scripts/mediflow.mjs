@@ -139,49 +139,154 @@ function launcherProcessIdentity(pid) {
   } catch { return null; }
 }
 
-function readLauncherReceipt(directory) {
+function privateLauncherDirectory(directory) {
   const stat = fs.lstatSync(directory);
   if (!stat.isDirectory() || stat.isSymbolicLink() || (process.getuid && stat.uid !== process.getuid())) {
     throw new Error('Stato di avvio non valido.');
   }
-  const file = path.join(directory, 'instance.json');
-  const leaf = fs.lstatSync(file);
+}
+
+function launcherPathExists(file) {
+  try { fs.lstatSync(file); return true; }
+  catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+}
+
+function readLauncherJson(file, incomplete = false, singleLink = true) {
+  let leaf;
+  try { leaf = fs.lstatSync(file); }
+  catch (error) { if (incomplete && error.code === 'ENOENT') return null; throw error; }
   if (!leaf.isFile() || leaf.isSymbolicLink()) throw new Error('Stato di avvio non valido.');
   const fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
   try {
     const receiptStat = fs.fstatSync(fd);
     if (!receiptStat.isFile() || receiptStat.dev !== leaf.dev || receiptStat.ino !== leaf.ino
-      || receiptStat.nlink !== 1 || receiptStat.size > 4096
+      || (singleLink && receiptStat.nlink !== 1) || receiptStat.size > 4096
       || (process.getuid && receiptStat.uid !== process.getuid())) throw new Error('Stato di avvio non valido.');
-    const receipt = JSON.parse(fs.readFileSync(fd, 'utf8'));
-    if (!Number.isSafeInteger(receipt.pid) || receipt.pid < 1) throw new Error('Stato di avvio non valido.');
-    return receipt;
+    const bytes = fs.readFileSync(fd, 'utf8');
+    try { return JSON.parse(bytes); }
+    catch (error) { if (incomplete && error instanceof SyntaxError) return null; throw error; }
   } finally { fs.closeSync(fd); }
+}
+
+function staleLauncherOwner(owner) {
+  if (!Number.isSafeInteger(owner?.pid) || owner.pid < 1) throw new Error('Stato di avvio non valido.');
+  if (!alive(owner.pid)) return true;
+  const current = launcherProcessIdentity(owner.pid);
+  return typeof owner.processIdentity === 'string' && current !== null && current !== owner.processIdentity;
+}
+
+const LAUNCHER_LOCK_PROTOCOL = 'mediflow.launcher-lock.v2';
+const legacyLauncherState = () => new Error('Stato legacy del lanciatore senza proprietario verificabile. Recupero automatico sospeso: occorre verificare la quiescenza dei launcher di questa cartella prima di intervenire sullo stato.');
+
+function ensureLauncherProtocol(directory, candidate) {
+  const guard = `${directory}.recovery`;
+  const inspect = () => {
+    let value;
+    try {
+      value = readLauncherJson(guard, false, false);
+    } catch { throw legacyLauncherState(); }
+    if (value?.schema === LAUNCHER_LOCK_PROTOCOL && Object.keys(value).length === 1) return;
+    throw legacyLauncherState();
+  };
+  if (launcherPathExists(guard)) { inspect(); return; }
+  if (launcherPathExists(directory)) launcherState(directory);
+  const prepared = path.join(candidate, 'guard.json');
+  atomicJson(prepared, { schema: LAUNCHER_LOCK_PROTOCOL });
+  try { fs.linkSync(prepared, guard); }
+  catch (error) { if (error.code !== 'EEXIST') throw error; inspect(); }
+  fs.unlinkSync(prepared);
+}
+
+function launcherState(directory) {
+  privateLauncherDirectory(directory);
+  const protocolFile = path.join(directory, 'protocol.json');
+  const legacyFile = path.join(directory, 'instance.json');
+  if (!launcherPathExists(protocolFile)) {
+    if (!launcherPathExists(legacyFile)) throw legacyLauncherState();
+    const receipt = readLauncherJson(legacyFile, true);
+    if (!receipt || !Number.isSafeInteger(receipt.pid) || receipt.pid < 1) throw legacyLauncherState();
+    return { legacy: true, receiptFile: legacyFile, receipt };
+  }
+  if (readLauncherJson(protocolFile)?.schema !== LAUNCHER_LOCK_PROTOCOL) throw new Error('Stato di avvio non valido.');
+  if (launcherPathExists(legacyFile)) {
+    const receipt = readLauncherJson(legacyFile, true);
+    if (!receipt || !Number.isSafeInteger(receipt.pid) || receipt.pid < 1) throw legacyLauncherState();
+    return { legacy: true, receiptFile: legacyFile, receipt };
+  }
+  const active = path.join(directory, 'active');
+  if (!launcherPathExists(active)) return { empty: true };
+  privateLauncherDirectory(active);
+  const entries = fs.readdirSync(active);
+  if (!entries.length) return { empty: true, active };
+  if (entries.length !== 1 || !/^owner-[a-f0-9]{32}$/u.test(entries[0])) throw new Error('Stato di avvio non valido.');
+  const generation = entries[0], owned = path.join(active, generation);
+  privateLauncherDirectory(owned);
+  const owner = readLauncherJson(path.join(owned, 'owner.json'));
+  const receiptFile = path.join(owned, 'instance.json');
+  let receipt = readLauncherJson(receiptFile, true);
+  if (!Number.isSafeInteger(receipt?.pid) || typeof receipt?.processIdentity !== 'string'
+    || typeof receipt?.checkoutPath !== 'string') receipt = null;
+  if (receipt && (receipt.pid !== owner.pid || receipt.processIdentity !== owner.processIdentity
+    || receipt.checkoutPath !== owner.checkoutPath)) throw new Error('Stato di avvio non valido.');
+  return { generation, receiptFile, receipt: receipt ?? owner, owner };
+}
+
+function detachLauncherGeneration(directory, generation) {
+  const retired = `${directory}.retired-${crypto.randomUUID()}`;
+  fs.renameSync(path.join(directory, 'active', generation), retired);
+  try { fs.rmdirSync(path.join(directory, 'active')); }
+  catch (error) { if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) throw error; }
+  fs.rmSync(retired, { recursive: true, force: true });
+}
+
+export function releaseLauncher(ownership) {
+  if (ownership.claimed) detachLauncherGeneration(ownership.directory, ownership.generation);
 }
 
 export function claimLauncher(directory, identity, { reuseLive = false } = {}) {
   const processIdentity = launcherProcessIdentity(process.pid);
   if (!processIdentity) throw new Error('Impossibile verificare l’identità del processo lanciatore.');
-  const recovery = `${directory}.recovery`;
-  try { fs.mkdirSync(recovery, { mode: 0o700 }); }
-  catch { throw new Error('Un altro lanciatore sta recuperando lo stato di avvio. Riprova tra poco.'); }
+  const receipt = { pid: process.pid, processIdentity, checkoutPath: identity.checkoutPath };
+  const generation = `owner-${crypto.randomBytes(16).toString('hex')}`;
+  const candidate = `${directory}.candidate-${crypto.randomUUID()}`;
+  fs.mkdirSync(candidate, { mode: 0o700 });
   try {
-    try { fs.mkdirSync(directory, { mode: 0o700 }); }
-    catch (error) {
-      if (error.code !== 'EEXIST') throw error;
-      const receipt = readLauncherReceipt(directory);
-      const currentIdentity = alive(receipt.pid) ? launcherProcessIdentity(receipt.pid) : null;
-      const stale = !alive(receipt.pid) || (typeof receipt.processIdentity === 'string'
-        && currentIdentity !== null && currentIdentity !== receipt.processIdentity);
-      if (!stale) {
-        if (reuseLive) return { claimed: false, receipt };
-        throw new Error('Un avvio di questa cartella è già in corso. Controlla il terminale e riprova.');
+    const prepared = path.join(candidate, 'active', generation);
+    fs.mkdirSync(prepared, { recursive: true, mode: 0o700 });
+    atomicJson(path.join(candidate, 'protocol.json'), { schema: LAUNCHER_LOCK_PROTOCOL });
+    atomicJson(path.join(prepared, 'owner.json'), receipt);
+    atomicJson(path.join(prepared, 'instance.json'), receipt);
+    ensureLauncherProtocol(directory, candidate);
+    for (let attempt = 0; attempt < 32; attempt++) {
+      try {
+        let state;
+        if (!launcherPathExists(directory)) fs.renameSync(candidate, directory);
+        else {
+          state = launcherState(directory);
+          if (state.empty) {
+            if (state.active) fs.rmdirSync(state.active);
+            fs.renameSync(path.join(candidate, 'active'), path.join(directory, 'active'));
+          } else {
+            if (!staleLauncherOwner(state.owner ?? state.receipt)) {
+              if (reuseLive) return { claimed: false, directory, ...state };
+              throw new Error('Un avvio di questa cartella è già in corso. Controlla il terminale e riprova.');
+            }
+            if (state.legacy) {
+              atomicJson(path.join(directory, 'protocol.json'), { schema: LAUNCHER_LOCK_PROTOCOL });
+              fs.unlinkSync(state.receiptFile);
+            } else detachLauncherGeneration(directory, state.generation);
+            continue;
+          }
+        }
+        return { claimed: true, directory, generation, receipt,
+          receiptFile: path.join(directory, 'active', generation, 'instance.json') };
+      } catch (error) {
+        if (!['ENOENT', 'EEXIST', 'ENOTEMPTY', 'EPERM', 'EACCES'].includes(error.code)) throw error;
+        if (!launcherPathExists(directory)) throw error;
       }
     }
-    const receipt = { pid: process.pid, processIdentity, checkoutPath: identity.checkoutPath };
-    atomicJson(path.join(directory, 'instance.json'), receipt);
-    return { claimed: true, receipt };
-  } finally { fs.rmdirSync(recovery); }
+    throw new Error('Stato di avvio cambiato durante l’acquisizione. Riprova.');
+  } finally { fs.rmSync(candidate, { recursive: true, force: true }); }
 }
 
 export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = false } = {}) {
@@ -286,8 +391,7 @@ export async function main(args = process.argv.slice(2)) {
     terminal?.close();
     await stopChild();
     await chooser?.close();
-    fs.rmSync(path.join(lockDirectory, 'instance.json'), { force: true });
-    fs.rmdirSync(lockDirectory);
+    releaseLauncher(ownership);
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.off(signal, onSignal);
     process.off('message', onParentMessage);
     process.off('disconnect', onDisconnect);
@@ -533,7 +637,7 @@ export async function main(args = process.argv.slice(2)) {
       install: () => installApproval?.(true), stop: shutdown, nativeAvailable: !!native, development: dirty,
       version: identity.version, folder: path.basename(ROOT) });
     if (closing) { await chooser.close(); return; }
-    atomicJson(path.join(lockDirectory, 'instance.json'), { ...ownership.receipt, dataDir, choiceUrl: chooser.url });
+    atomicJson(ownership.receiptFile, { ...ownership.receipt, dataDir, choiceUrl: chooser.url });
     pairingPoll = setInterval(() => {
       if (!state.ready || !state.navigationReady || closing || !child?.connected) return;
       try {
