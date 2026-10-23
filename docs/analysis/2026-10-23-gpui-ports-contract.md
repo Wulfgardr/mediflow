@@ -180,3 +180,65 @@ barriera tra controllo ed effetto, il punto di non ritorno e la matrice di
 ritiro di tutti i form/effects restano **G-1a.2**, da eseguire dopo il merge.
 G-1a resta incompleta finché entrambe le PR non siano accettate. Non sono
 attestate installazione GPUI, prove sul prodotto distribuito o uso clinico.
+
+
+## Due rilievi Codex successivi al round 3 di Astra
+
+Baseline: `f7d68f395b6e29d6d63cf17117f11d49a7abfece`, la stessa head
+accettata da Astra nella review 5627711690. Le tre annotazioni di quella
+review sono state lette; le correzioni qui riguardano i due thread nuovi
+4358972899 e 4358972927.
+
+`RequestContext::run` controlla ora la future dell’operazione prima di quella
+di cancellazione. Se entrambe sono pronte, `Authentication`, `Locked` e
+`ArchiveReplaced` raggiungono il lifecycle di ritiro già presente. Gli altri
+esiti passano ancora dal controllo di cancellazione dopo il completamento:
+una lettura viene scartata e una scrittura resta indeterminata.
+
+La prova deterministica sospende la richiesta su un canale oneshot, rende
+pronte risposta e cancellazione e riprende il poll. Esegue 1.000 ripetizioni
+per lettura/scrittura × cancellazione selezione/sessione × tre errori di
+ritiro: **12.000 gare per esecuzione**. Una seconda prova controlla successo,
+403 ed errore di trasporto nella stessa gara. Sulla baseline la prima prova
+fallisce con `ReadRequired` al posto di `Authentication`; dopo il fix passa.
+
+OpenAPI **1.44.0** vincola le porte con otto descrittori `oneOf`, tutti con
+campi obbligatori, oggetti chiusi ed enum a un solo valore. `minItems: 8`,
+`maxItems: 8` e `uniqueItems: true` impongono il roster completo, senza
+imporre l’ordine. Il test Ajv parte dalla fixture Rust condivisa: accetta
+anche l’ordine inverso e respinge roster vuoto, incompleto, duplicato,
+aggiuntivo, ID/revisioni sconosciuti e combinazioni di scope/autorità/stato
+valide per una porta diversa. Il roster atteso nel test host usa anche
+`satisfies HostPortsContract`: produttore TS, tipo letterale, fixture Rust e
+schema sono verificati insieme. La baseline accetta il roster vuoto e fa
+fallire la prova. Gli override WUL-771 registrano il restringimento: il guard
+strutturale interpreta lo spostamento dei cinque campi nei rami `oneOf` come
+rimozioni, benché ogni campo resti obbligatorio in ciascun descrittore.
+
+Dieci falsificazioni, tutte rosse con errore semantico: cancellazione prima
+della risposta; rimozione del controllo dopo il completamento; rimozione
+della precedenza del ritiro; rimozione della cardinalità minima o
+unicità; allargamento di ID, revisione, scope, autorità o stato della porta
+clinica. Dopo ogni mutante sono ripristinati i byte originali; le prove Rust
+e host ripristinate tornano verdi.
+
+Verifiche locali con Rust 1.98.1, `--locked --offline`, Node 24.22.0,
+target privato e soli dati sintetici:
+
+- **134 test Rust**: 24 client, 109 trasporto e un probe, tutti i target dei
+  due crate. La suite app GPUI non viene rieseguita in questa correzione.
+- **20 test host**: `network-host-ports`, `network-contract`,
+  `network-discovery-auth`.
+- fmt workspace, Clippy sui due crate e tutti i loro target con `-D warnings`,
+  lint, typecheck, never-regress, claims, selezione test completa e inventario
+  browser verdi. OpenAPI drift verde sia contro `origin/main` sia contro la
+  baseline `f7d68f395`, dopo il bump e gli override tracciati.
+- Gate formale terapie verde, con modello, witness e mutanti propri; non è
+  una prova formale nuova del lifecycle GPUI.
+- **Build locale rossa** nel prebuild: `Build input metadata: private file is
+  reachable`. Non raggiunge la compilazione Next. È lo stesso blocco locale
+  documentato sopra; non è stato aggirato.
+
+Nessuna build/installazione GPUI o qualifica clinica è attestata da questi
+controlli. SEC-2/3 completi restano G-1a.2. Il coordinatore conserva
+l’accettazione indipendente e il merge della PR.
