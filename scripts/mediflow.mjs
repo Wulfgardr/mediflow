@@ -295,11 +295,11 @@ export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = fal
   const posix = process.platform !== 'win32';
   if (!child?.pid || (!posix && (child.exitCode !== null || child.signalCode !== null))) return;
   await new Promise((resolve, reject) => {
-    let forceTimer, timer, observationTimer, signalImmediate, groupAbsent = terminalOwnedGroups.has(child), settled = false;
+    let forceTimer, timer, signalImmediate, groupAbsent = terminalOwnedGroups.has(child), settled = false;
     const finish = cause => {
       if (settled) return;
       settled = true;
-      clearTimeout(forceTimer); clearTimeout(timer); clearTimeout(observationTimer); child.off('exit', exited);
+      clearTimeout(forceTimer); clearTimeout(timer); child.off('exit', exited);
       clearImmediate(signalImmediate);
       if (cause) reject(Object.assign(new Error('Arresto del processo posseduto non verificato.', { cause }), { code: 'MEDIFLOW_OWNED_STOP_UNCONFIRMED' }));
       else resolve();
@@ -322,11 +322,9 @@ export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = fal
     };
     const observe = () => {
       if (settled) return;
-      clearTimeout(observationTimer);
       try {
         if (groupExists()) requireOwnedLeader();
         else if (leaderTerminal()) { finish(); return; }
-        observationTimer = setTimeout(observe, 10);
       } catch (error) { finish(error); }
     };
     const exited = () => posix ? observe() : finish();
@@ -359,8 +357,7 @@ export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = fal
     timer = setTimeout(expired, graceMs);
     try {
       if (posix) {
-        observe();
-        if (settled || groupAbsent) return;
+        if (leaderTerminal() || groupAbsent) { observe(); return; }
         forceTimer = setTimeout(force, Math.floor(graceMs / 2));
         signalGroup('SIGTERM');
       } else if (child.connected && allowIpcStop) {
