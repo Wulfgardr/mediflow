@@ -155,6 +155,10 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
             document.documentElement.classList.toggle('light', theme === 'giorno');
         }, theme);
         if (zoomFixture) await zoomFixture.setZoom(size === 'zoom-200' ? 2 : 4);
+        const proposals = page.locator('#terapie').getByRole('button', { name: 'Proposte', exact: true });
+        await expect(proposals).toHaveAttribute('aria-expanded', 'false');
+        await proposals.click();
+        await expect(proposals).toHaveAttribute('aria-expanded', 'true');
         const clinical = await chooseLongName(page, 'treatment_reasoning');
         await clinical.select.focus();
         await assertNotClippedInViewport(clinical.select, 'Modello terapeutico');
