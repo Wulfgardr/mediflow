@@ -38,6 +38,11 @@ limiti originari; non attestano lo stato delle versioni successive.
 La [roadmap prodotto](./ROADMAP.md#roadmap-vigente--21-settembre-2026) riporta
 le tappe 0.9.0–1.0 definite nel
 [registro incrementale Linear](https://linear.app/wulfgardr/document/mediflow-incremental-release-ledger-090-to-10-ee0392f27b72).
+Il [contratto proposto della 0.9.1](./releases/0.9.1-contract.md) recepisce
+il mandato esteso confermato il 23 ottobre 2026: unità Web/GPUI/chat/plugin,
+tranche intelligente, target da scegliere e gate finale. Distingue le
+decisioni acquisite dalle proposte U0 ancora da approvare; il pilota chiuso
+non attesta il completamento della release.
 La [prima tranche locale del 26 settembre](./analysis/2026-09-26-090-first-tranche.md)
 distingue inventario, correzioni pazienti, audit pilota e prove dal rilascio.
 

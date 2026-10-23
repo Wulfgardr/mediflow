@@ -20,13 +20,14 @@ read_when:
 Il [registro incrementale su Linear](https://linear.app/wulfgardr/document/mediflow-incremental-release-ledger-090-to-10-ee0392f27b72)
 governa sequenza e destinazione del lavoro; le descrizioni delle issue ne
 contengono i risultati e i criteri di accettazione. Questa mappa riporta la
-decisione del 21 settembre e prevale sui precedenti rinvii generici alla 1.0.
+decisione del 21 settembre, con il mandato 0.9.1 confermato il 23 ottobre,
+e prevale sui precedenti rinvii generici alla 1.0.
 Le sezioni storiche sotto conservano le prove e i limiti delle singole versioni.
 
 | Tappa | Risultato previsto | Coordinamento e accettazione |
 | --- | --- | --- |
 | 0.9.0 | Consolidare le funzioni esistenti: scritture coerenti, protezione dei dati, recupero, test attendibili e semplificazione misurata. Nessuna migrazione di linguaggio. | [WUL-717](https://linear.app/wulfgardr/issue/WUL-717); ingresso [WUL-705](https://linear.app/wulfgardr/issue/WUL-705), verifica finale [WUL-735](https://linear.app/wulfgardr/issue/WUL-735). |
-| 0.9.1 | Una prima operazione di lettura e scrittura condizionata attraverso servizi applicativi condivisi, con autorità, audit e recupero definiti. | [WUL-573](https://linear.app/wulfgardr/issue/WUL-573)–585. |
+| 0.9.1 | Mandato esteso: pilota dei servizi condivisi, Web Punto d'inchiostro, GPUI installato sui target nominati, chat desktop, plugin local-ui e tranche di intelligenza; flussi, casi limite e parità qualificati su dati sintetici. | [Contratto 0.9.1](./releases/0.9.1-contract.md), proposta U0; [WUL-573](https://linear.app/wulfgardr/issue/WUL-573), [WUL-771](https://linear.app/wulfgardr/issue/WUL-771), [WUL-787](https://linear.app/wulfgardr/issue/WUL-787), [WUL-788](https://linear.app/wulfgardr/issue/WUL-788). |
 | 0.9.2 | Una migrazione Rust circoscritta, misurata e reversibile dietro il contratto già provato. Non una riscrittura dell'app. | [WUL-736](https://linear.app/wulfgardr/issue/WUL-736). |
 | 0.9.3 | Coerenza dei flussi clinici tra Web, API e accesso agentico, con revisione delle proposte e migrazione di gruppi di operazioni dichiarati. | [WUL-586](https://linear.app/wulfgardr/issue/WUL-586), [WUL-591](https://linear.app/wulfgardr/issue/WUL-591), [WUL-592](https://linear.app/wulfgardr/issue/WUL-592). |
 | 0.9.4 | Percorsi senza AI e con modelli locali, due integrazioni API remote esplicite e verifica della qualità dei risultati collegati alle fonti. | [WUL-602](https://linear.app/wulfgardr/issue/WUL-602), [WUL-743](https://linear.app/wulfgardr/issue/WUL-743). |
@@ -34,6 +35,18 @@ Le sezioni storiche sotto conservano le prove e i limiti delle singole versioni.
 | 0.9.6 | Client nativi e mobili, Mini e distribuzione verificati sui singoli sistemi: installazione, aggiornamento, recupero e rimozione. | [WUL-632](https://linear.app/wulfgardr/issue/WUL-632); piattaforme [WUL-694](https://linear.app/wulfgardr/issue/WUL-694), Mini [WUL-696](https://linear.app/wulfgardr/issue/WUL-696). |
 | 0.9.7 | Sperimentazioni avanzate di interoperabilità: CDS Hooks, Bulk Data e una sola transizione FHIR Task condizionata e rivista. | [WUL-737](https://linear.app/wulfgardr/issue/WUL-737), con [WUL-597](https://linear.app/wulfgardr/issue/WUL-597) prima delle scritture esterne. |
 | 1.0 | Qualifica cumulativa del prodotto e degli artefatti dichiarati, prove dei flussi clinici, supporto sostenibile e decisione esplicita di rilascio. | [WUL-598](https://linear.app/wulfgardr/issue/WUL-598)–601, [WUL-746](https://linear.app/wulfgardr/issue/WUL-746). |
+
+**Decisione del 23 ottobre 2026:** il pilota WUL-573–585 è accettato,
+ma non chiude la 0.9.1. Resta il mandato esteso del 19 ottobre, inclusi
+WUL-787 (unità 7–21 dell'addendum) e WUL-788 (unità 3–10 dell'ADR 0160).
+Il contratto U0 delimita i filoni W/G/C/P/I/Q e sottopone a Leonardo target,
+tranche intelligente e soglie; non attesta prove nuove o approvazioni già
+ottenute. Anticipa soltanto i contributi nominati delle tappe successive,
+senza chiudere i loro programmi complessivi. Mobile e installatori completi
+restano in 0.9.6; WUL-760/764 nel progetto Moduli prima degli adapter.
+La chiusura richiede qualifica sintetica con Leonardo, preparazione degli
+artefatti e suo GO/NO-GO prima di tag e release. Nessuna nuova ammissione
+clinica deriva dalla qualifica tecnica.
 
 Le versioni indicano tappe, non date promesse. La 0.9.0 conserva i suoi venti
 risultati e il coordinamento: le funzionalità future non diventano nuovi
