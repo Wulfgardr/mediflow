@@ -38,9 +38,7 @@ test('refusal, expiry, different instance and application lock deny navigation',
   await page.getByRole('button', { name: 'Consenti', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Revoca il collegamento del plugin', exact: true })).toBeVisible();
   expect(await isolatedRuntime.usePairing(locked.nonce, locked.host)).toBe('accepted');
-  const { trustedArchiveWebRequestHeaders } = await import('./fixtures/trusted-web-request');
-  const headers = await trustedArchiveWebRequestHeaders(page);
-  const response = await page.request.post('/api/auth/lock', { headers, data: {} });
-  expect(response.status()).toBe(200);
+  await page.getByRole('button', { name: 'Blocca', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true })).toBeVisible();
   expect(await isolatedRuntime.usePairing(locked.nonce, locked.host)).toBe('denied');
 });
