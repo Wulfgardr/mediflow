@@ -1,4 +1,6 @@
 import type { Page, Response as PlaywrightResponse } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+import { installSameResponseCapture, type Capture, type CaptureGlobal } from './browser-response-stream.ts';
 
 // Same ceiling as boundedResponseText(project), not a larger inspector buffer.
 const MAX_PROJECT_BYTES = 8 * 1024 * 1024 + 4096 + 2048;
@@ -7,7 +9,7 @@ const GRANT = 'x-mediflow-extraction-grant';
 type Headers = Record<string, string>;
 type RequestEvent = { requestId: string; redirectResponse?: unknown;
   request: { url: string; method: string; headers: Headers } };
-type ResponseEvent = { requestId: string; response: { url: string; status: number } };
+type ResponseEvent = { requestId: string; response: { url: string; status: number; headers?: Headers } };
 type DataEvent = { requestId: string; dataLength: number; data?: string };
 type FailedEvent = { requestId: string; canceled?: boolean; errorText?: string; type?: string; blockedReason?: string };
 const header = (headers: Headers, name: string): string | undefined =>
@@ -26,12 +28,16 @@ const safeNetworkError = (value: unknown) =>
 
 /**
  * Observe the one real project POST. Arm before clicking; no Fetch interception,
- * page instrumentation, getResponseBody, extra HTTP request or network override.
+ * getResponseBody, extra HTTP request or network override. The renderer probe
+ * observes only the application reader, preserving its native return values.
  * Streaming is requested at requestWillBeSent, NOT after responseReceived.
  * Unsupported/late/incomplete capture fails the test; there is no fallback.
  */
 export async function observeAnyDocProjectResponse(page: Page, attachmentId: string) {
   const url = new URL(`/api/attachments/${encodeURIComponent(attachmentId)}/local-extraction`, page.url()).href;
+  const id = randomUUID();
+  await page.evaluate(installSameResponseCapture, { base: new URL(url).origin, namespace: '/api/settings/ai/chatgpt/synthesis/', projectUrl: url });
+  await page.evaluate(id => (globalThis as CaptureGlobal).__mfSameResponse!.arm(id, 'project'), id);
   const session = await page.context().newCDPSession(page);
   const complete = Promise.withResolvers<string>();
   void complete.promise.catch(() => {}); // Preserve an earlier acquire/UI failure.
@@ -45,6 +51,9 @@ export async function observeAnyDocProjectResponse(page: Page, attachmentId: str
   let receivedBytes = 0;
   let streamedBytes = 0;
   let finished = false;
+  let noStoreAborted = false;
+  let noStore = false;
+  let capture: Capture | undefined;
   let disposed = false;
   let failure: Error | undefined;
   const fail = (reason: string) => {
@@ -58,14 +67,17 @@ export async function observeAnyDocProjectResponse(page: Page, attachmentId: str
     return bytes;
   };
   const finish = () => {
-    if (disposed || failure || !finished || prefix === undefined) return;
+    if (disposed || failure || (!finished && !noStoreAborted) || prefix === undefined || !capture) return;
     // dataLength is decoded body length, NOT loadingFinished.encodedDataLength.
     // The prefix covers all pre-stream bytes; data-bearing events cover the rest.
     if (status === undefined || receivedBytes === 0 || prefix.length + streamedBytes !== receivedBytes) {
       fail('incomplete response bytes'); return;
     }
+    const networkBytes = Buffer.concat([prefix, ...chunks]);
+    if (capture.id !== id || capture.url !== url || capture.status !== status || capture.grant !== grant
+      || !networkBytes.equals(Buffer.from(capture.bytes))) { fail('renderer/network response mismatch'); return; }
     try {
-      complete.resolve(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat([prefix, ...chunks])));
+      complete.resolve(new TextDecoder('utf-8', { fatal: true }).decode(networkBytes));
     } catch { fail('invalid UTF-8'); }
   };
   const onRequest = (event: RequestEvent) => {
@@ -90,6 +102,7 @@ export async function observeAnyDocProjectResponse(page: Page, attachmentId: str
     if (disposed || failure || event.requestId !== requestId) return;
     if (status !== undefined || event.response.url !== url) { fail('ambiguous project response'); return; }
     status = event.response.status;
+    noStore = header(event.response.headers ?? {}, 'cache-control') === 'no-store';
   };
   const onData = (event: DataEvent) => {
     if (disposed || failure || event.requestId !== requestId) return;
@@ -111,6 +124,10 @@ export async function observeAnyDocProjectResponse(page: Page, attachmentId: str
   };
   const onFailed = (event: FailedEvent) => {
     if (!disposed && event.requestId === requestId) {
+      // https://github.com/microsoft/playwright/issues/42742
+      if (event.errorText === 'net::ERR_ABORTED' && event.canceled === true && status === 200 && noStore) {
+        noStoreAborted = true; finish(); return;
+      }
       const canceled = event.canceled === undefined ? 'absent' : String(event.canceled);
       const terminal = `status=${status ?? 'null'} received=${receivedBytes} streamed=${streamedBytes} prefix=${prefix?.length ?? 0}`
         + ` finished=${finished} canceled=${canceled} error=${safeNetworkError(event.errorText)}`
@@ -120,6 +137,9 @@ export async function observeAnyDocProjectResponse(page: Page, attachmentId: str
     }
   };
   const onClose = () => { if (!disposed) fail('page closed'); };
+  const onNavigation = (frame: unknown) => { if (!disposed && frame === page.mainFrame()) fail('document changed'); };
+  page.on('framenavigated', onNavigation);
+  page.on('crash', onClose);
   session.on('Network.requestWillBeSent', onRequest);
   session.on('Network.responseReceived', onResponse);
   session.on('Network.dataReceived', onData);
@@ -134,18 +154,24 @@ export async function observeAnyDocProjectResponse(page: Page, attachmentId: str
     session.off('Network.loadingFinished', onFinished);
     session.off('Network.loadingFailed', onFailed);
     page.off('close', onClose);
+    page.off('framenavigated', onNavigation);
+    page.off('crash', onClose);
     complete.reject(new Error('AnyDoc same-response observation disposed'));
     prefix?.fill(0); prefix = undefined;
     for (const chunk of chunks) chunk.fill(0);
     chunks.length = 0;
+    await page.evaluate(() => (globalThis as CaptureGlobal).__mfSameResponse?.dispose()).catch(() => {});
     await session.detach().catch(() => {}); // Teardown only, never an observation PASS.
   };
   try { await session.send('Network.enable'); }
   catch { await dispose(); throw new Error('AnyDoc same-response Network observer unavailable'); }
+  void page.evaluate(id => (globalThis as CaptureGlobal).__mfSameResponse!.take(id), id).then(value => {
+    if (!disposed && !failure) { capture = value; finish(); }
+  }, () => { if (!disposed) fail('renderer did not reach natural EOF'); });
   const assertSameResponse = (response: PlaywrightResponse) => {
     if (failure) throw failure;
     const request = response.request();
-    if (matches !== 1 || !finished || response.url() !== url || response.status() !== status
+    if (matches !== 1 || (!finished && !noStoreAborted) || response.url() !== url || response.status() !== status
       || request.method() !== 'POST' || request.url() !== url
       || request.headers()[ACTION] !== 'project' || request.headers()[GRANT] !== grant)
       throw new Error('AnyDoc same-response observation does not match the UI request');
