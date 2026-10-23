@@ -14,6 +14,7 @@ function loadComponent(file: string, exportName: string, state: unknown[] = []) 
     let index = 0; const never = () => { throw new Error('outside synthetic component projection'); };
     const exports: { TestComponent?: (props: Record<string, unknown>) => Node } = {};
     const scopedRequire = (id: string): unknown => {
+        if (id === '@/components/choice-field') return { ChoiceField: (props: Record<string, unknown>) => jsx('select', props) };
         if (id === '@/components/disclosure') return { Disclosure: (props: Record<string, unknown>) => mountContract('components/disclosure.tsx', 'Disclosure', { props }).render() };
         if (id === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'fragment' };
         if (id === 'react') return { useState: (initial: unknown) => [index < state.length ? state[index++] : initial, never] };

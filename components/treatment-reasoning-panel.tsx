@@ -3,6 +3,7 @@
 import { Disclosure } from '@/components/disclosure';
 import { formatCountLabel } from '@/lib/format-count';
 import design from './treatment-reasoning.module.css';
+import { ChoiceField } from '@/components/choice-field';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -257,13 +258,11 @@ export default function TreatmentReasoningPanel({
                 <div className={design.preparation}>
                     <h4>Conferma il contesto</h4>
                     <p><PrivacyBlur>Paziente: {proposal.patientName}</PrivacyBlur></p>
-                    <label className={design.field}>Ambulatorio per questa proposta
-                        <select value={ambulatory?.ambulatoryId ?? ''}
+                    <ChoiceField label="Ambulatorio per questa proposta" value={ambulatory?.ambulatoryId ?? ''}
                             onChange={(event) => { setAmbulatory(proposal.ambulatories.find((row) => row.ambulatoryId === event.target.value) ?? null); setConfirmed(false); }}>
                             <option value="">Scegli l’ambulatorio</option>
                             {proposal.ambulatories.map((row) => <option key={row.ambulatoryId} value={row.ambulatoryId}>{row.name}{row.address ? ` · ${row.address}` : ''}</option>)}
-                        </select>
-                    </label>
+                        </ChoiceField>
                     <label className={design.confirmation}>
                         <input type="checkbox" disabled={!ambulatory} checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
                         <span>Confermo paziente e ambulatorio per una proposta da rivedere. La cartella resta invariata.</span>

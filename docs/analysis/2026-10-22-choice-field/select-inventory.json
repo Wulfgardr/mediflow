@@ -1,0 +1,159 @@
+{
+  "base": "8484c008e91de202270000e2d7e75df8b50d3f15",
+  "totalBefore": 38,
+  "migrated": 8,
+  "remaining": 30,
+  "commonShell": "components/choice-field.tsx",
+  "files": [
+    {
+      "file": "app/analytics/page.tsx",
+      "nativeSelectsBefore": 1,
+      "migratedToChoiceField": 0,
+      "remaining": 1
+    },
+    {
+      "file": "app/patients/[id]/entries/new/page.tsx",
+      "nativeSelectsBefore": 2,
+      "migratedToChoiceField": 0,
+      "remaining": 2
+    },
+    {
+      "file": "app/patients/[id]/scales/[scaleId]/page.tsx",
+      "nativeSelectsBefore": 1,
+      "migratedToChoiceField": 0,
+      "remaining": 1
+    },
+    {
+      "file": "app/settings/ai/funzioni/page.tsx",
+      "nativeSelectsBefore": 1,
+      "migratedToChoiceField": 0,
+      "remaining": 1
+    },
+    {
+      "file": "app/settings/ambulatories/page.tsx",
+      "nativeSelectsBefore": 2,
+      "migratedToChoiceField": 0,
+      "remaining": 2
+    },
+    {
+      "file": "components/document-synthesis-fabric-review-card.tsx",
+      "nativeSelectsBefore": 1,
+      "migratedToChoiceField": 1,
+      "remaining": 0
+    },
+    {
+      "file": "components/document-upload.tsx",
+      "nativeSelectsBefore": 1,
+      "migratedToChoiceField": 0,
+      "remaining": 1
+    },
+    {
+      "file": "components/function-models/function-model-picker.tsx",
+      "nativeSelectsBefore": 2,
+      "migratedToChoiceField": 2,
+      "remaining": 0
+    },
+    {
+      "file": "components/function-models/function-preferences-panel.tsx",
+      "nativeSelectsBefore": 2,
+      "migratedToChoiceField": 2,
+      "remaining": 0
+    },
+    {
+      "file": "components/intelligent-host-checkup-action.tsx",
+      "nativeSelectsBefore": 1,
+      "migratedToChoiceField": 0,
+      "remaining": 1
+    },
+    {
+      "file": "components/kree8/areas/incarico-area.tsx",
+      "nativeSelectsBefore": 1,
+      "migratedToChoiceField": 0,
+      "remaining": 1
+    },
+    {
+      "file": "components/observation-manager.tsx",
+      "nativeSelectsBefore": 2,
+      "migratedToChoiceField": 0,
+      "remaining": 2
+    },
+    {
+      "file": "components/patient-action-modal.tsx",
+      "nativeSelectsBefore": 1,
+      "migratedToChoiceField": 0,
+      "remaining": 1
+    },
+    {
+      "file": "components/patient-form.tsx",
+      "nativeSelectsBefore": 1,
+      "migratedToChoiceField": 0,
+      "remaining": 1
+    },
+    {
+      "file": "components/patient-profile-access-action.tsx",
+      "nativeSelectsBefore": 1,
+      "migratedToChoiceField": 0,
+      "remaining": 1
+    },
+    {
+      "file": "components/patient-smart-import-fabric-preview-card.tsx",
+      "nativeSelectsBefore": 1,
+      "migratedToChoiceField": 1,
+      "remaining": 0
+    },
+    {
+      "file": "components/prosthetic-prescription-manager.tsx",
+      "nativeSelectsBefore": 3,
+      "migratedToChoiceField": 0,
+      "remaining": 3
+    },
+    {
+      "file": "components/prosthetics-catalog-manager-lookup.tsx",
+      "nativeSelectsBefore": 1,
+      "migratedToChoiceField": 0,
+      "remaining": 1
+    },
+    {
+      "file": "components/prosthetics-import-fields.tsx",
+      "nativeSelectsBefore": 2,
+      "migratedToChoiceField": 0,
+      "remaining": 2
+    },
+    {
+      "file": "components/service-prescription-manager.tsx",
+      "nativeSelectsBefore": 4,
+      "migratedToChoiceField": 0,
+      "remaining": 4
+    },
+    {
+      "file": "components/settings/ai-model-selector.tsx",
+      "nativeSelectsBefore": 1,
+      "migratedToChoiceField": 1,
+      "remaining": 0
+    },
+    {
+      "file": "components/settings/chatgpt-synthesis-panel.tsx",
+      "nativeSelectsBefore": 1,
+      "migratedToChoiceField": 0,
+      "remaining": 1
+    },
+    {
+      "file": "components/settings/who-local-setup-guide.tsx",
+      "nativeSelectsBefore": 1,
+      "migratedToChoiceField": 0,
+      "remaining": 1
+    },
+    {
+      "file": "components/siss-handoff-diary.tsx",
+      "nativeSelectsBefore": 3,
+      "migratedToChoiceField": 0,
+      "remaining": 3
+    },
+    {
+      "file": "components/treatment-reasoning-panel.tsx",
+      "nativeSelectsBefore": 1,
+      "migratedToChoiceField": 1,
+      "remaining": 0
+    }
+  ]
+}

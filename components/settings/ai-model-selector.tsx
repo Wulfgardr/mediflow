@@ -1,6 +1,7 @@
 'use client';
 
 
+import { ChoiceField } from '@/components/choice-field';
 import { formatCountLabel } from '@/lib/format-count';
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { isInstalledOllamaModel, parseInstalledOllamaModels } from '@/lib/installed-ollama-models';
@@ -82,14 +83,13 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
             </div>
 
             <div className={styles.stack}>
-                <label htmlFor={`installed-model-${selectorId}`}>Modelli installati · {label}</label>
-                <select id={`installed-model-${selectorId}`} className={SETTINGS_INPUT_CLASS}
+                <ChoiceField label={`Modelli installati · ${label}`} id={`installed-model-${selectorId}`}
                     value={installedSelection ?? ''} disabled={loading || Boolean(error) || installedModels.length === 0}
                     onChange={event => { if (event.target.value) onChange(event.target.value); }}
                     aria-describedby={`installed-status-${selectorId}`}>
                     <option value="">{value && !installedSelection ? `Selezione attuale: ${value}` : 'Scegli un modello installato'}</option>
                     {installedModels.map(model => <option key={model} value={model}>{model}</option>)}
-                </select>
+                </ChoiceField>
                 <button type="button" onClick={checkInstalled} disabled={loading || !targetUrl}
                     className={cn(SETTINGS_SECONDARY_BUTTON_CLASS, 'justify-self-start')}>
                     <RefreshCw aria-hidden="true" className="h-4 w-4" />

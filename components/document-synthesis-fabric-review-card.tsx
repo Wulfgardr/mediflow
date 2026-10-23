@@ -6,6 +6,7 @@ import styles from './clinical-register.module.css';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { FileSearch, Loader2, RotateCcw, ShieldCheck } from 'lucide-react';
 
+import { ChoiceField } from '@/components/choice-field';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import PrivacyBlur from '@/components/privacy-blur';
 import disclosure from '@/components/patient-disclosure.module.css';
@@ -176,9 +177,7 @@ function DocumentSynthesisFabricReviewCardSession({
                         <p><PrivacyBlur>Paziente: {proposal.patientName}</PrivacyBlur></p>
                         <p><PrivacyBlur>Documento: {attachmentName}</PrivacyBlur></p>
                     </div>
-                    <label className="grid min-w-0 gap-2 font-medium">
-                        Ambulatorio per questa proposta
-                        <select className="min-h-[var(--lume-control-height)] w-full min-w-0 rounded-[var(--lume-control-radius)] border border-[color:var(--lume-ink-muted)] bg-[color:var(--lume-surface-focal)] px-3 py-2 text-[color:var(--lume-ink)]" value={ambulatory?.ambulatoryId ?? ''} onChange={(event) => {
+                    <ChoiceField label="Ambulatorio per questa proposta" value={ambulatory?.ambulatoryId ?? ''} onChange={(event) => {
                             picker.client.reset(picker.active);
                             setAmbulatory(proposal.ambulatories.find((choice) => choice.ambulatoryId === event.target.value) ?? null);
                             setConfirmed(false);
@@ -189,8 +188,7 @@ function DocumentSynthesisFabricReviewCardSession({
                                     {choice.name}{choice.address ? ` · ${choice.address}` : ''}
                                 </option>
                             ))}
-                        </select>
-                    </label>
+                        </ChoiceField>
                     <p className="text-[color:var(--lume-ink-muted)]">Scegli l’ambulatorio in cui segui questo paziente. L’applicazione verificherà l’associazione prima di procedere.</p>
                     <label className="flex min-h-[var(--lume-control-height)] items-start gap-3">
                         <input className="mt-1 h-4 w-4 shrink-0 accent-[var(--lume-accent)]" type="checkbox" disabled={!ambulatory} checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />

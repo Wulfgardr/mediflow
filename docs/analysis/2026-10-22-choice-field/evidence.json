@@ -1,0 +1,408 @@
+{
+  "base": "8484c008e91de202270000e2d7e75df8b50d3f15",
+  "beforeRuntime": "1f3d42d535f09bfa24ebef7566f81814995ede48",
+  "afterRuntime": "3042aed3e0f26a1e17aaeaf8397b0e8e183aa34b",
+  "beforeNote": "Before adds only the synthetic fixture/spec to base. The final capture spec and zoom helper were copied into that checkout; production sources remain identical to base.",
+  "testInputs": {
+    "e2e/choice-field.spec.ts": "a685885a1d7fb8ca910780a7d57777675342fd9ef4fbe9fc951430262c41e33c",
+    "e2e/fixtures/browser-zoom.ts": "d175459beb2a8a031ccf053555638f52ed260816b2749d8b6b55c0b522cf5257"
+  },
+  "environment": {
+    "node": "24.21.0",
+    "browser": "Chromium",
+    "data": "synthetic; isolated temporary directories",
+    "primaryCheckoutBuiltOrRun": false
+  },
+  "matrix": {
+    "themes": [
+      "giorno",
+      "grafite"
+    ],
+    "widths": [
+      1440,
+      768,
+      390,
+      320
+    ],
+    "browserZoom": [
+      2,
+      4
+    ],
+    "zoomPhysicalWidth": 1440,
+    "zoomVerification": "chrome.tabs.setZoom/getZoom and CSS innerWidth 720/360; no CSS zoom"
+  },
+  "captures": [
+    {
+      "file": "before/choice-giorno-1440.png",
+      "sha256": "f5478ebb4b9373b15d0d3f317170cb546539eaea77b4dbad3b4c61824bfd6c6a"
+    },
+    {
+      "file": "before/clinical-giorno-1440.png",
+      "sha256": "b9f7aa5c1ec6cc6f59e66657c5e42b972ed8e081b8c5221ee6602c0e9c70c9ef"
+    },
+    {
+      "file": "before/choice-giorno-320.png",
+      "sha256": "66922159c7ee81ab90592f960460ceeb7704e575233803e2c6b2bf8800e4036b"
+    },
+    {
+      "file": "before/clinical-giorno-320.png",
+      "sha256": "a67cc988245c99c34b2b651c6044736ef5e7ec4a5c5727c2c80b30ec9df5b6bc"
+    },
+    {
+      "file": "before/choice-giorno-390.png",
+      "sha256": "884745955f2d5045285d48701b089b905491672d9c4c0511c4fee2c57aeb3edf"
+    },
+    {
+      "file": "before/clinical-giorno-390.png",
+      "sha256": "a4b512ab0245d70510f3dc33ab71b26062d0b870025a7297f6bb010a024c1606"
+    },
+    {
+      "file": "before/choice-giorno-768.png",
+      "sha256": "b22e1faab249a204c3e249455331355a3bbf490367d3ffce3e360da05282982c"
+    },
+    {
+      "file": "before/clinical-giorno-768.png",
+      "sha256": "58674d14e8980e1178e06becadd3c54b317663fe8d9becdcd4f3471d35a3da82"
+    },
+    {
+      "file": "before/choice-giorno-zoom-200.png",
+      "sha256": "fc2dd8c12a80ba2a8f543ffb57a811e79b297e31e3be8f268165e15a0f45691a"
+    },
+    {
+      "file": "before/clinical-giorno-zoom-200.png",
+      "sha256": "f4599acdf7fd00de9288252edb1e3a22b9d6f53de2cf6b5291c56e091f82a154"
+    },
+    {
+      "file": "before/choice-giorno-zoom-400.png",
+      "sha256": "a2f93961041a805708c6ed10bc52e0f9c829ff950b5177f0565ea7863d18ab2d"
+    },
+    {
+      "file": "before/clinical-giorno-zoom-400.png",
+      "sha256": "c1b82be3bbfdcd494496adefcd10b76080766bc58d87afe97d140bd87b5d1c2c"
+    },
+    {
+      "file": "before/choice-grafite-1440.png",
+      "sha256": "1cade948694a74f4159ca6a5e85ee477887ce9003b901ac485e73f08474f3294"
+    },
+    {
+      "file": "before/clinical-grafite-1440.png",
+      "sha256": "8eeaf08a1caa2753d89fcec6cbb31435cd5fac486c92f2febe761010928c5775"
+    },
+    {
+      "file": "before/choice-grafite-320.png",
+      "sha256": "a1007c5a894f221337602214f4f986b17cec4a93eeb61ff6b6e1288d7baeefa6"
+    },
+    {
+      "file": "before/clinical-grafite-320.png",
+      "sha256": "3292b978761db38c31ce297aa43caaa471cad748bb4d0531bf4110960059c421"
+    },
+    {
+      "file": "before/choice-grafite-390.png",
+      "sha256": "61f9d45219096456356ce9881226043989be2b04d0d4bad3898b4cd943cea3a9"
+    },
+    {
+      "file": "before/clinical-grafite-390.png",
+      "sha256": "7f7bff9c3468fc810b04799e7ae8e67df82e82f7c8c501450545ab6e109a14ad"
+    },
+    {
+      "file": "before/choice-grafite-768.png",
+      "sha256": "61c8d104c4d96bcffa885096a706c965d19f7da4e7f9934d757a5f87a4b95e83"
+    },
+    {
+      "file": "before/clinical-grafite-768.png",
+      "sha256": "15a85e38e03379ce328791e7cdb14815d2395ca1d0e6ef772a71f4349b28cd21"
+    },
+    {
+      "file": "before/choice-grafite-zoom-200.png",
+      "sha256": "a5255a3dc95e854122df5671f435303f40f62d7fc9729ba4d62d2baa07004c84"
+    },
+    {
+      "file": "before/clinical-grafite-zoom-200.png",
+      "sha256": "df70d54953ed3fab4e517fa9a1c508331163671c0b5a550ef2af710a6f41bb85"
+    },
+    {
+      "file": "before/choice-grafite-zoom-400.png",
+      "sha256": "edf9aece54287bfb5ed935ea9691bca066ae38323db6fb9e458d529e74f6e3ff"
+    },
+    {
+      "file": "before/clinical-grafite-zoom-400.png",
+      "sha256": "44ffdb03c309d8c7fade07b735f1ec8179ecfb53e50e53de7228ee0e537f7332"
+    },
+    {
+      "file": "after/choice-giorno-1440.png",
+      "sha256": "f0bba76d27c9a2ac03c9927465bf01eff60195f6bfb273b715af69a76a6a8fc9"
+    },
+    {
+      "file": "after/clinical-giorno-1440.png",
+      "sha256": "9d5559880cbf513ba4c91c7499e6ae525f71b19bfe3ad7bbc1a4b071074e2a0b"
+    },
+    {
+      "file": "after/choice-giorno-320.png",
+      "sha256": "d24f83ccfc168c0eccc03f577a58f20a95fd4eba9a56cdec53e17e99440373dc"
+    },
+    {
+      "file": "after/clinical-giorno-320.png",
+      "sha256": "99358ebfce8c14a79369cb11026e32740bf62c6b98f0f0e192a20cabc48881c5"
+    },
+    {
+      "file": "after/choice-giorno-390.png",
+      "sha256": "51b7c8f690d09e87db463645d1885d6c2ccf75aecacfb042c27f865dcba20d33"
+    },
+    {
+      "file": "after/clinical-giorno-390.png",
+      "sha256": "da4d99f375e66ee4240bbf456a2b1d559177ac4b20beaf1cd0388fde21605bda"
+    },
+    {
+      "file": "after/choice-giorno-768.png",
+      "sha256": "78e69dcb0e8f412894e477aa660ca1e6b02bc1f5cac03394fdbe278b35c4030b"
+    },
+    {
+      "file": "after/clinical-giorno-768.png",
+      "sha256": "fa01c5eeb485fa806926d1f02a923a054633dabb11b8043f1c6fa50760b67f51"
+    },
+    {
+      "file": "after/choice-giorno-zoom-200.png",
+      "sha256": "d6866180d30638bcafab05a9b2d8ecb9270c64fa50f3a88335d2a64ab40e2370"
+    },
+    {
+      "file": "after/clinical-giorno-zoom-200.png",
+      "sha256": "105218770e4f85de7ae6b17056e2c49e6ebbe82c9c60e73b9dee194b085511b3"
+    },
+    {
+      "file": "after/choice-giorno-zoom-400.png",
+      "sha256": "9e583d23df58889e4df9e69cea86c6214edc3fcb664ca96c2547018353ff5daf"
+    },
+    {
+      "file": "after/clinical-giorno-zoom-400.png",
+      "sha256": "b4765f09ebc78efd067042b9bc766c04ec6f851cf465b1c3e696f1ebb6880b02"
+    },
+    {
+      "file": "after/choice-grafite-1440.png",
+      "sha256": "5341dd88a0cf879c5df95e3440c41435a4810dd2f52d1a1860802793fec4c62a"
+    },
+    {
+      "file": "after/clinical-grafite-1440.png",
+      "sha256": "132456b289e597a53389fa73c4a923b80f779de793c83a456b8bce3e7c943c25"
+    },
+    {
+      "file": "after/choice-grafite-320.png",
+      "sha256": "d0014896ff5d307fa73cf46959a70d4bc1ebf887a71bb1b457ce4320ac5d734d"
+    },
+    {
+      "file": "after/clinical-grafite-320.png",
+      "sha256": "364b5a46416735e9be937825c70cf5df8a79a67e5c44c7731e7d24d907cf15e1"
+    },
+    {
+      "file": "after/choice-grafite-390.png",
+      "sha256": "12d9500b766cac21762d19fc8c66d9b9b5b47cb8d6c2d40341af9c43ef9630d3"
+    },
+    {
+      "file": "after/clinical-grafite-390.png",
+      "sha256": "06237ec9dfc657ce086575d469b301156d9c8ccc1e36168c68667f50deef52d4"
+    },
+    {
+      "file": "after/choice-grafite-768.png",
+      "sha256": "d02afbed9004fc53ef4ad6a95a8ca90e807372bde9a0f10905d114700a7733ca"
+    },
+    {
+      "file": "after/clinical-grafite-768.png",
+      "sha256": "8b0ba9ad313c51a737fed94ddf6db9691e26404e8442761fee18438147be753d"
+    },
+    {
+      "file": "after/choice-grafite-zoom-200.png",
+      "sha256": "0b1fcb53832fb81553cc2a12ee54d8de4c94becb402fbda43120adaae13768c5"
+    },
+    {
+      "file": "after/clinical-grafite-zoom-200.png",
+      "sha256": "50999e97b27b3e61c1ddc58459bb0e20676d8e96d4e4a664c36aa4a9dd88d54c"
+    },
+    {
+      "file": "after/choice-grafite-zoom-400.png",
+      "sha256": "665d0d1ce7dd285a9f5ad6a2dd2be987d6c4a2274b2c17cea2ac92e05460c140"
+    },
+    {
+      "file": "after/clinical-grafite-zoom-400.png",
+      "sha256": "74b07f7ac00bd45302dc419b9b9174689b3d8a0463009bc2ec675c82a0d33077"
+    }
+  ],
+  "regression": {
+    "before": "RED: summary Modello: predefinito / Cambia absent",
+    "fixed": "GREEN: shared native shell, full accessible option/title, focus, error, disabled explanation, unchanged choice on render and reopening, no preference writes",
+    "falsification": "RED: pinning the local value to an empty string causes option:checked to remain Predefinito after choosing the long option; mutant restored",
+    "consent": "Four clinical journeys with synthetic HTTP transport; opening/closing Cambia keeps unchecked consent visible; no live provider"
+  },
+  "unit": {
+    "tests": 7757,
+    "pass": 7715,
+    "fail": 28,
+    "skipped": 14,
+    "allFailuresAlsoOnBase": true,
+    "failures": [
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts:134:1",
+        "test": "cancellation before and during import leaves no selectable partial object",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts:147:1",
+        "test": "interrupted staging is not auto-promoted or erased without explicit recovery",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts:159:1",
+        "test": "live lock is not removed by recovery or concurrent import",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts:230:1",
+        "test": "physical-memory gate blocks activation of even synthetic fixtures; no admission is emitted",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts:254:1",
+        "test": "host root is lazy for status but mandatory for consent-bound offline worker verification",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts:267:1",
+        "test": "explicit host root, not the library source, binds worker integrity at import and activation",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts:279:1",
+        "test": "default host cwd is captured once; later chdir cannot rebind the worker",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts:295:1",
+        "test": "host-root aliases and traversal remain rejected at artifact verification, never canonicalized into authority",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts:53:1",
+        "test": "only Windows/Linux supported architecture combinations are admitted as candidates",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts:60:1",
+        "test": "offline import requires digest-bound consent and does not select or activate",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts:82:1",
+        "test": "revocation persists and is terminal for the same release",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.test.ts:92:1",
+        "test": "tamper and undeclared artifact files cannot pass staging; old admitted version survives",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts:105:1",
+        "test": "single flight blocks concurrent preparation until the verified lease is closed",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts:115:1",
+        "test": "authority lookup is deadline bounded even before process launch",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts:123:1",
+        "test": "malformed, wrong-engine, oversized and empty stdout never succeed",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts:137:1",
+        "test": "stderr is discarded and bounded; errors never include the raw process output",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts:154:1",
+        "test": "controlled execution deadline kills the child and awaits close before releasing the slot",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts:195:1",
+        "test": "request cancellation and revocation terminate pending local work",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts:221:1",
+        "test": "unconfirmed termination poisons single flight until the actual close event",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts:241:1",
+        "test": "artifact changed after execution is not published as a successful invocation",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts:257:1",
+        "test": "real synthetic Node child exercises stdin/stdout and process close, NOT model inference",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts:271:1",
+        "test": "mid-flight catalog change and pre-dispatch cancellation prevent output without a fallback",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts:297:1",
+        "test": "synchronous launch failure clears poll, returns provider_failed and permits a later explicit prepare",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts:62:1",
+        "test": "inference never acquires/installs an artifact, and never launches when missing or unadmitted",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/ai-providers/fabric/treatment-reasoning-portable-runtime.test.ts:73:1",
+        "test": "one-shot invocation uses isolated args, offline allowlisted environment and true local identity",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/chatgpt-execution/execution-mac.test.ts:23:1",
+        "test": "pinned complete source, receipts and 24 C1 comparisons validate only the fixed projection",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/chatgpt-execution/execution-mac.test.ts:33:1",
+        "test": "source truncation, wrong receipt and unknown or invalid typed inputs are rejected",
+        "alsoFailsOnBase": true
+      },
+      {
+        "location": "lib/chatgpt-execution/execution-mac.test.ts:50:1",
+        "test": "native source pin is over the complete delivered C bytes, never a caller helper digest",
+        "alsoFailsOnBase": true
+      }
+    ],
+    "baseOnlyFailures": [
+      {
+        "location": "scripts/fhir-r4-gate.test.mjs:193:1",
+        "test": "cancellation terminates validator group and descendants",
+        "error": "kill EPERM"
+      }
+    ]
+  },
+  "checks": {
+    "build": "PASS: separate sparse checkout at afterRuntime, excluding only the tracked synthetic Swift DB per docs/native-launch.md",
+    "lint": "PASS",
+    "typecheck": "PASS",
+    "inventoryBrowser": "PASS",
+    "lumeTokens": "PASS",
+    "testSelection": "PASS",
+    "typeScale": "PASS",
+    "neverRegress": "PASS",
+    "claims": "PASS",
+    "fabricCrosswalk": "PASS: 19 tests",
+    "formal": "CI range gate PASS: no covered input changed",
+    "e2e": "24/24 clinical/choice tests at 24e39c26918d21300754020efff509044cf37456; 15/15 choice tests and real zoom captures at afterRuntime"
+  },
+  "limits": [
+    "Native OS popup preserved and not photographed.",
+    "No native installation or real provider/model execution claimed."
+  ]
+}
