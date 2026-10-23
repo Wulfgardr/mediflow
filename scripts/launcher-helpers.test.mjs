@@ -838,6 +838,70 @@ test('POSIX absent group still requires the original exit before its deadline', 
     t.diagnostic(result.stdout.trim());
 });
 
+test('Windows terminal entry requires a confirmed stop on the same original handle', t => {
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+        import assert from 'node:assert/strict'; import cp from 'node:child_process';
+        import {EventEmitter} from 'node:events'; import {syncBuiltinESMExports} from 'node:module';
+        import {stopOwnedChild} from ${JSON.stringify(new URL('./mediflow.mjs', import.meta.url).href)};
+        Object.defineProperty(process,'platform',{value:'win32'});
+        let child, calls=0, frames=0, fail=false;
+        cp.spawnSync=(command,args)=>{assert.equal(command,'taskkill');assert.deepEqual(args,['/pid','424249','/T','/F']);calls++;
+            if(fail) return {status:1};queueMicrotask(()=>{child.exitCode=0;child.emit('exit',0);});return {status:0};};
+        syncBuiltinESMExports();
+        const make=(exitCode=null,signalCode=null)=>Object.assign(new EventEmitter(),{pid:424249,exitCode,signalCode,connected:true,send(){frames++;throw new Error('Terminal IPC denied');}});
+        for(const [code,signal] of [[0,null],[null,'SIGTERM']]) {
+            child=make(code,signal);
+            await assert.rejects(stopOwnedChild(child,30),error=>error.code === 'MEDIFLOW_OWNED_STOP_UNCONFIRMED');
+            assert.equal(child.listenerCount('exit'),0);
+        }
+        assert.equal(calls,0);assert.equal(frames,0);
+        child=make();await stopOwnedChild(child,30);await stopOwnedChild(child,30);
+        assert.equal(calls,1,'A confirmed stop was not retained on its original handle');
+        await assert.rejects(stopOwnedChild(make(0),30),error=>error.code === 'MEDIFLOW_OWNED_STOP_UNCONFIRMED');
+        assert.equal(calls,1,'A distinct handle sharing the PID inherited stop authority');
+        fail=true;child=make();await assert.rejects(stopOwnedChild(child,30));
+        child.exitCode=0;child.emit('exit',0);
+        await assert.rejects(stopOwnedChild(child,30),error=>error.code === 'MEDIFLOW_OWNED_STOP_UNCONFIRMED');
+        assert.equal(calls,2);assert.equal(frames,0);
+        await new Promise(resolve=>setTimeout(resolve,40));assert.equal(calls,2);
+        console.log(JSON.stringify({simulatedWindows:true,calls,frames,sameHandleOnly:true,failedStopNotRetained:true,lateCalls:false}));
+    `], {encoding:'utf8',timeout:2000});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+    t.diagnostic(result.stdout.trim());
+});
+
+test('Windows unconfirmed terminal child retains the original launcher claim', t => {
+    const directory=realpathSync(mkdtempSync(path.join(tmpdir(),'mf-win-terminal-~')));
+    t.after(()=>rmSync(directory,{recursive:true,force:true}));
+    const result=spawnSync(process.execPath,['--input-type=module','-e',`
+        import assert from 'node:assert/strict'; import {spawn} from 'node:child_process';import {once} from 'node:events';import crypto from 'node:crypto';
+        import {stopOwnedChild,claimLauncher,releaseLauncher} from ${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)};
+        const host=process.platform,lock=${JSON.stringify(path.join(directory,'lock'))},checkoutPath=${JSON.stringify(directory + path.sep)};
+        const owner=claimLauncher(lock,{checkoutPath});assert.equal(owner.claimed,true);let ownerReleased=false;
+        const child=spawn(process.execPath,['-e',"process.once('message',()=>process.exit(0));process.send('ready');"],{detached:host!=='win32',stdio:['ignore','ignore','pipe','ipc']});
+        const generation=crypto.randomUUID(),exit=once(child,'exit'),stderrClose=once(child.stderr,'close');child.stderr.resume();
+        try {
+            await once(child,'message');child.send('fixture-exit');await Promise.all([exit,stderrClose]);
+            assert.throws(()=>process.kill(host==='win32'?child.pid:-child.pid,0),{code:'ESRCH'});
+            let resolved=false,error;
+            Object.defineProperty(process,'platform',{value:'win32',configurable:true});
+            try {await stopOwnedChild(child,40);resolved=true;releaseLauncher(owner);ownerReleased=true;} catch(value){error=value;}
+            finally {Object.defineProperty(process,'platform',{value:host,configurable:true});}
+            const next=claimLauncher(lock,{checkoutPath},{reuseLive:true});
+            try {assert.equal(next.claimed,false,'A terminal leader without a tree receipt released its owner');assert.equal(next.receipt.pid,process.pid);}
+            finally {if(next.claimed)releaseLauncher(next);}
+            assert.equal(resolved,false);assert.equal(error.code,'MEDIFLOW_OWNED_STOP_UNCONFIRMED');
+            console.log(JSON.stringify({simulatedWindows:true,actualOS:host,launcher:process.pid,pid:child.pid,generation,pgid:host==='win32'?null:child.pid,exitCode:child.exitCode,stderrClosed:true,groupAbsent:host!=='win32',ownerHeld:true,newClaimDenied:true}));
+        } finally {
+            Object.defineProperty(process,'platform',{value:host,configurable:true});
+            if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');
+            await Promise.all([exit,stderrClose]);if(!ownerReleased)releaseLauncher(owner);
+        }
+    `],{encoding:'utf8',timeout:4000});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+    t.diagnostic(result.stdout.trim());
+});
+
 test('Windows shutdown sends no IPC frame without explicit permission', () => {
     const result = spawnSync(process.execPath, ['--input-type=module', '--eval', `
         import assert from 'node:assert/strict';
