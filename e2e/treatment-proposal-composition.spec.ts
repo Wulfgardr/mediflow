@@ -44,7 +44,10 @@ async function fixture(page: Page, state: State = 'pronta') {
 }
 
 async function open(page: Page) {
-    if (await disclosure(page).count()) await disclosure(page).click();
+    if (await disclosure(page).count()) {
+        await disclosure(page).click();
+        await expect(disclosure(page)).toHaveAttribute('aria-expanded', 'true');
+    }
     await expect(panel(page)).toBeVisible();
 }
 
@@ -102,10 +105,14 @@ test('difetto D6: Proposte chiusa sotto il registro, senza generazione all’ape
     await expect(panel(page)).toBeHidden();
     expect(await disclosure(page).evaluate(element => !!(document.querySelector('#terapie [data-clinical-register="therapies"]')!.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
     await disclosure(page).focus(); await page.keyboard.press('Enter');
+    await expect(disclosure(page)).toHaveAttribute('aria-expanded', 'true');
     await expect(panel(page)).toBeVisible();
     expect(generations).toEqual([]);
     await prepare(page);
-    await disclosure(page).click(); await disclosure(page).click();
+    await disclosure(page).click();
+    await expect(disclosure(page)).toHaveAttribute('aria-expanded', 'false');
+    await disclosure(page).click();
+    await expect(disclosure(page)).toHaveAttribute('aria-expanded', 'true');
     await expect(panel(page).getByLabel('Ambulatorio per questa proposta')).toBeVisible();
     await disclosure(page).focus(); await page.keyboard.press('Space');
     await expect(disclosure(page)).toBeFocused();

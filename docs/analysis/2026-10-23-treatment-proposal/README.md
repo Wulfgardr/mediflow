@@ -130,3 +130,39 @@ I tre errori macOS e il confronto aggiornato con main sono riportati
 
 Sviluppo assistito: GPT 6.1 Sol, effort Medium. Rilavorazione: adeguamento
 dei livelli semantici e dei selettori CSS; nessun cambiamento al contratto clinico.
+
+
+## Correzione della selezione E2E dopo la CI
+
+Il caso Treatment Reasoning di `ordinary-chatgpt-four-functions.spec.ts`
+tentava «Prepara proposta» senza aprire «Proposte», chiusa per impostazione
+iniziale. Ora apre la disclosure con il ruolo button e verifica
+`aria-expanded` prima di raggiungere i comandi. Anche gli altri tre spec che
+usano il pannello verificano lo stato accessibile dopo l’apertura, compresa
+l’interazione da tastiera. Le asserzioni su source bindings, trace remoto,
+consenso e assenza di scritture restano intatte; nessun runtime è modificato.
+
+La precedente selezione locale copriva Terapie, composizione, payload strict e
+kill switch, ma ometteva il consumatore trasversale ChatGPT. I 47 casi dichiarati
+non erano l’intero insieme dei consumatori del pannello: mancava la ricerca per
+identificativo prima della scelta degli spec. La selezione di questa correzione
+è ricavata dal contenuto, includendo tutti i quattro file trovati:
+
+```bash
+grep -rlE 'treatment-reasoning-panel|TreatmentReasoningPanel|treatment-proposal-disclosure' e2e --include='*.spec.ts'
+```
+
+La ricerca più ampia di `treatment-reasoning-panel`, `Prepara proposta` e
+`Conferma e genera proposta` in `e2e`, `tests` e nei test di componenti,
+librerie e script trova anche comandi di Smart Import e Document Synthesis,
+oltre a controlli statici del sorgente: non attraversano questa disclosure.
+
+Verifiche locali prima del push, con Node 24.21.0: 28/28 casi dei quattro
+spec verdi, senza retry; `test:inventory-browser` verde con tutte le quattro
+ricette; lint e `git diff --check` verdi. Verdi i 17 guard di selezione test,
+claims, dashboard, schema writer, scritture AI, confine DB, error leak,
+never-regress, crosswalk Fabric, Apple QA, MLX, OpenAPI, schema drift, audit,
+scala tipografica, token Lume e movimento.
+
+Sviluppo assistito: GPT 6.1 Sol, effort Medium. Rilavorazione: estensione della
+selezione E2E al consumatore ChatGPT omesso e verifica di `aria-expanded`.

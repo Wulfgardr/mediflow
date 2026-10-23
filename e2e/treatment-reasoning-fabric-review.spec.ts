@@ -117,7 +117,10 @@ test('Treatment Reasoning UI invia payload strict e mostra una proposta source-b
 
   await openPatientSection(page, 'terapie');
 
-  await page.locator('#terapie').getByRole('button', { name: 'Proposte', exact: true }).click();
+  const proposals = page.locator('#terapie').getByRole('button', { name: 'Proposte', exact: true });
+  await expect(proposals).toHaveAttribute('aria-expanded', 'false');
+  await proposals.click();
+  await expect(proposals).toHaveAttribute('aria-expanded', 'true');
   const panel = page.getByTestId('treatment-reasoning-panel');
   const generate = panel.getByRole('button', { name: 'Prepara proposta' });
   await expect(panel).toBeVisible();
