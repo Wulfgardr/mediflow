@@ -22,6 +22,19 @@ restano la preferenza e il selettore ordinari. Il riuso non riscrive le preferen
 Un runtime headless, nativo o di sviluppo non dichiara capacità di navigazione
 Web: il controllo rifiuta l'intento e il raccordo non restituisce successo.
 
+Prima di scegliere fra abbinamento e avvio, il launcher acquisisce in modo
+esclusivo la verifica della lock. Una receipt con PID morto o con identità
+temporale del processo diversa viene sostituita atomicamente, senza rimuovere
+la directory fra verifica e acquisizione. Per un PID vivo, un’identità
+corrispondente, una vecchia receipt senza identità temporale o una verifica OS
+indisponibile non autorizzano il recupero. Le receipt e le directory con alias
+sono rifiutate. Questa verifica
+serve soltanto alla proprietà del launcher e non concede navigazione.
+
+Lo stop via IPC richiede un figlio ammesso dopo la readiness e, per il Web,
+dopo la prova HMAC. Su Windows un figlio non ancora verificato viene arrestato
+tramite il suo albero di processi posseduto, senza inviare frame sul canale IPC.
+
 Il pacchetto e il navigator applicano la stessa allowlist esplicita in
 `plugins/mediflow-local-ui/src/runtime-environment.mjs`. HOME e le variabili
 profilo Windows conservano la sede utente; APPDATA, LOCALAPPDATA e XDG conservano
