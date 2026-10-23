@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { createHash } from 'node:crypto';
 import { readSqliteArchiveGeneration } from '../archive-generation.ts';
 import { readTerritorialPacks } from '../territorial-pack-store.ts';
 import { createAipOperationRpcHostV1 } from '../../packages/aip/src/operation-rpc.ts';
@@ -17,7 +18,7 @@ type ChildPort = Readonly<{
 type Child = Readonly<{ kind: 'local_operation_child' }>;
 
 /** Local composition root. None of these ports is supplied by MCP, a page, or an HTTP request body. */
-export function createLocalOperationHost(ports: Omit<LocalOperationPorts, 'journal' | 'currentTerritory' | 'currentContext'> & {
+export function createLocalOperationHost(ports: Omit<LocalOperationPorts, 'journal' | 'currentTerritory' | 'currentContext' | 'captureArchive'> & {
     database(): Database.Database;
     currentContext(): LiveContext | null;
     currentArchiveKey(): Uint8Array | null;
@@ -43,7 +44,23 @@ export function createLocalOperationHost(ports: Omit<LocalOperationPorts, 'journ
             },
         });
     }
-    const service = createLocalOperationService({ ...ports, currentContext,
+    function captureArchive() {
+        const connection = ports.database(), context = currentContext();
+        const keyHash = () => {
+            const key = ports.currentArchiveKey();
+            if (!key || key.byteLength !== 32) deny();
+            return createHash('sha256').update(key).digest('hex');
+        };
+        if (!context) deny();
+        const installation = context.installationId, generation = context.archiveGeneration, key = keyHash();
+        return Object.freeze({ assertCurrent() {
+            // Compare the connection before reading any journal/generation of a detached archive.
+            if (ports.database() !== connection || keyHash() !== key) deny();
+            const live = currentContext();
+            if (!live || live.installationId !== installation || live.archiveGeneration !== generation) deny();
+        } });
+    }
+    const service = createLocalOperationService({ ...ports, currentContext, captureArchive,
         currentTerritory: () => readTerritorialPacks(ports.database()),
         journal: {
             read: operationId => journal().read(operationId),

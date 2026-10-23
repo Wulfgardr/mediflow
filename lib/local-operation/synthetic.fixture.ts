@@ -6,7 +6,7 @@ import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { createSqliteLocalOperationJournal } from './sqlite-journal.ts';
 import { createLocalOperationService } from './service.ts';
-import { planDigest, type LocalOperationAdapter, type LocalOperationPlan, type LocalOperationReceipt,
+import { deny, planDigest, type LocalOperationAdapter, type LocalOperationPlan, type LocalOperationReceipt,
     type LiveContext, type AdapterContext, type Destination } from './contract.ts';
 import type { TerritorialPackCapability } from '../territorial-pack-contract.ts';
 
@@ -109,7 +109,13 @@ export async function syntheticFixture() {
         },
     });
     let journal = makeJournal();
-    const ports = { journal, adapter, currentContext: () => context, currentTerritory: () => territory,
+    const ports = { journal, adapter,
+        captureArchive() {
+            const connection = db, installation = context.installationId, generation = context.archiveGeneration;
+            return { assertCurrent() {
+                if (connection !== db || installation !== context.installationId || generation !== context.archiveGeneration) deny();
+            } };
+        }, currentContext: () => context, currentTerritory: () => territory,
         resolvePlan: () => plan, confirmExactPlan: () => confirmation(), now: () => now,
         subscribeInvalidation(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; } };
     let service = createLocalOperationService(ports);

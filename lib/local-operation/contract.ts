@@ -46,7 +46,7 @@ export type LiveContext = Readonly<{
 export type Observation = Readonly<{ patientId: string; practiceId: string; portalAccountId: string;
     uiVersion: string; humanRevision: number; planDigest: string | null; unclassifiedFields: readonly string[] }>;
 export type AdapterContext = Readonly<{
-    operationId: string; attempt: number; signal: AbortSignal;
+    operationId: string; attempt: number; revision: number; signal: AbortSignal;
     assertCurrent(): void;
     authorizeRequest(destination: Destination): void;
 }>;
@@ -68,7 +68,10 @@ export interface LocalOperationJournal {
     save(record: LocalOperationRecord, expectedRevision: number, assertCurrent: () => void,
         lane: 'core' | 'territorial'): LocalOperationRecord;
 }
+/** Trusted origin guard must compare the connection, archive generation, installation and key before journal access. */
+export type ArchiveAuthority = Readonly<{ assertCurrent(): void }>;
 export type LocalOperationPorts = Readonly<{
+    captureArchive(): ArchiveAuthority;
     journal: LocalOperationJournal;
     adapter: LocalOperationAdapter;
     currentContext(): LiveContext | null;

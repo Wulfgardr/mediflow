@@ -1,7 +1,6 @@
 {
-  "syncCommit": "e1d0e149c06dece571ae60437c2560721d97885c",
   "baseCommit": "17af7eae8c9f55ccd43e670d80a9cb00ec6cdf2d",
-  "scope": "Finite recovery model mapped in README; runtime session and wire mutants are separate code checks, not TLA properties.",
+  "scope": "R1 marker and dispatch are separate model actions; R2 immutable identity and R3 archive/connection/key origin are runtime regressions, outside TLA. Hashes identify the reviewed mapping, not equivalence.",
   "tool": {
     "release": "v1.7.4",
     "verifier": "TLC 2.19",
@@ -17,23 +16,37 @@
     "timeoutSeconds": 60
   },
   "files": {
-    "lib/local-operation/contract.ts": "a78182daabfd01b6cf03c8fd531ad1714f5034673c9e8f124aeb043adecb48a6",
-    "lib/local-operation/service.ts": "fd6371d158c3b03259cf724cea31d351415b1e4830ec18f194624ee25357a464",
+    "lib/local-operation/contract.ts": "19a58c9bcfa00b02da15cfc3c1c7c00d653d1dbb05057d80e846f64fd6cf1457",
+    "lib/local-operation/service.ts": "4f0c3e3ddb4b2ddeb2ad75d60beef97bcb761f02cdfbba8e4dd32ff8cf80c634",
     "lib/local-operation/sqlite-journal.ts": "27b252ff36a37e9bc1d499c0b83a7833ef260c869c38835f3cac1c687d536566",
-    "lib/local-operation/host.ts": "70ecb2b05d58afd75d4ad5b54969ffbf86a0e096430526251f4041fdd2f2a415",
+    "lib/local-operation/host.ts": "fd67b633fa3b5db7e1b6d7f93cba96efec2ea26f92d681e99f3abb9279d9e3f7",
     "lib/local-operation/journal-cipher.ts": "44001319c6928cf124b2102fe999a30622e134204c662ce689134a6895768f8e",
     "lib/local-operation/remote-host.ts": "679cf9966780466b28de1a17b1116bc214cd59b873dba393bab1c900944e4c55",
     "packages/mcp/src/local-operation-server.ts": "d05334130383563da84c36df5aaa5e6ded3e5ad246d88af86d86162628c1421b",
     "packages/mcp/src/local-operation-contract.ts": "12c8bd9ab76ee2505d08c8ae4da8e6dce7104cf3ea193f31144f48b5691e49ec",
     "packages/mcp/src/local-operation-client.ts": "805d85af134bc11375edade271629706d9c762999dc4e0ef2691b597cceca7f1",
     "scripts/local-operation-mcp-stdio.mjs": "bdd8e4a67da4762d77407b67a41830e74728504e17984cc0c118431d1d19c0f9",
-    "docs/formal/local-operation/LocalOperation.tla": "65a64dbca699ef64391b667b80177136d61f3898e3b21ae512947b63c7cc912c",
-    "docs/formal/local-operation/MC.cfg": "15d5f55090564ec8ff39b5ba3e8f4d27deff21d7a11c52439d88c666751cb891"
+    "docs/formal/local-operation/LocalOperation.tla": "23eed5b454d3f30a64fd39ac3de424f29efbb07f6ad43d27f2949f5a03168565",
+    "docs/formal/local-operation/MC.cfg": "06f928e226df16faeba56c30b642a9b68ca421535883aec585552fac80d15c9f"
   },
+  "verificationInputs": [
+    "scripts/verify-local-operation.mjs",
+    "lib/local-operation/service.test.ts",
+    "lib/local-operation/host.test.ts",
+    "lib/local-operation/local-operation.test.ts",
+    "lib/local-operation/wire.test.ts",
+    "lib/local-operation/synthetic.fixture.ts",
+    "package.json",
+    "package-lock.json",
+    ".nvmrc",
+    "lib/local-operation/review-regressions.test.ts"
+  ],
+  "reviewBaseCommit": "c8beebe1d561c75b45e3902100a7da39529cda8c",
   "lastRun": {
-    "at": "2026-10-23T12:09:47.369Z",
-    "generatedStates": 159,
-    "distinctStates": 66,
+    "at": "2026-10-23T13:09:09.195Z",
+    "generatedStates": 171,
+    "distinctStates": 73,
+    "automaticUnreachableRejected": true,
     "checks": [
       {
         "label": "baseline",
@@ -46,7 +59,7 @@
         "expectedExitCode": 12
       },
       {
-        "label": "completion-witness",
+        "label": "automatic-witness",
         "exitCode": 12,
         "expectedExitCode": 12
       },
@@ -54,6 +67,31 @@
         "label": "manual-witness",
         "exitCode": 12,
         "expectedExitCode": 12
+      },
+      {
+        "label": "automatic-unreachable",
+        "exitCode": 0,
+        "expectedExitCode": 0
+      },
+      {
+        "label": "dispatch-before-marker-mutant",
+        "exitCode": 12,
+        "expectedExitCode": 12
+      },
+      {
+        "label": "runtime-request-authority-mutant",
+        "exitCode": 1,
+        "expectedExitCode": 1
+      },
+      {
+        "label": "runtime-identity-mutant",
+        "exitCode": 1,
+        "expectedExitCode": 1
+      },
+      {
+        "label": "runtime-origin-mutant",
+        "exitCode": 1,
+        "expectedExitCode": 1
       },
       {
         "label": "runtime-recovery-mutant",
@@ -81,16 +119,5 @@
         "expectedExitCode": 0
       }
     ]
-  },
-  "verificationInputs": [
-    "scripts/verify-local-operation.mjs",
-    "lib/local-operation/service.test.ts",
-    "lib/local-operation/host.test.ts",
-    "lib/local-operation/local-operation.test.ts",
-    "lib/local-operation/wire.test.ts",
-    "lib/local-operation/synthetic.fixture.ts",
-    "package.json",
-    "package-lock.json",
-    ".nvmrc"
-  ]
+  }
 }
