@@ -27,6 +27,7 @@ la data di questo indice non rinnova le prove cui rimandano.
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [Contratto 0.9.1](./releases/0.9.1-contract.md) | U0 approvato il 23 ottobre 2026: unità chiuse, target M4 Max/36 GB, tranche intelligente e GO/NO-GO. | Per accettare W/G/C/P/I/Q e seguire le decisioni ancora aperte; non attesta rilascio o ammissione clinica. |
+| [Censimento GPUI G-0](./analysis/2026-10-23-gpui-census.md) | Matrice di 66 funzioni, 36 route Web, 17 route Impostazioni e crosswalk CSV delle 205 righe della specifica; 40 unità PR proposte sotto G-1–9. | Per assegnare residui e prove, verificare writer e porte host, distinguere sorgente e pilota installato e chiudere i gate immediati. |
 | [Tranche indipendente 0.9.x](./analysis/2026-09-26-09x-independent-development.md) | Codice sintetico, demo, prove e prerequisiti delle patch successive. | Per riprodurre e riesaminare i candidati senza confonderli con il core 0.9.0. |
 | [Delta regolatorio futuro](./analysis/2026-09-26-09x-regulatory-delta.md) | Matrice candidata, fonti datate e responsabilità aperte WUL-738. | Prima di ampliare finalità, distribuzione o trattamento; non qualifica un deployment. |
 
