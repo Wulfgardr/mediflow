@@ -50,6 +50,7 @@ base `0a1980f32` con le 66 righe di parità, tutte le route Web e Punto
 d'inchiostro. Assegna i residui alle unità G-1–9, distingue il pilota
 installato dal sorgente e propone una scomposizione finita delle PR;
 non attesta parità o qualifica del bundle.
+Il [filone CU](./analysis/2026-10-23-computer-use-procedures.md), aggiunto in coda il 23 ottobre, propone procedure clinico-amministrative con identità locale: [contratti](./analysis/2026-10-23-computer-use-procedure-contracts.md), [fonti verificate e limiti](./analysis/2026-10-23-computer-use-sources.md), [ADR 0162 Proposed](./adr/0162-local-computer-use-executor.md). Questa prima consegna è solo documentale; non attesta un esecutore o una qualifica istituzionale.
 La [prima tranche locale del 26 settembre](./analysis/2026-09-26-090-first-tranche.md)
 distingue inventario, correzioni pazienti, audit pilota e prove dal rilascio.
 
