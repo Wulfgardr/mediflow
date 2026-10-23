@@ -113,4 +113,13 @@ mod tests {
             );
         }
     }
+    #[test]
+    fn rejects_root_revision_with_otherwise_valid_roster() {
+        let mut contract = host();
+        contract["revision"] = json!(99);
+        assert_eq!(
+            negotiate_host_ports(&contract),
+            Err(RuntimeError::UnsupportedProtocol)
+        );
+    }
 }

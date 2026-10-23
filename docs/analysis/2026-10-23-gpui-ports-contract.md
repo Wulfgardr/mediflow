@@ -6,7 +6,7 @@ Part of WUL-771; riferimento WUL-706.
 Il [censimento](./2026-10-23-gpui-census.md), riga G-1a e SEC-2/3,
 e il [contratto 0.9.1](../releases/0.9.1-contract.md), sezione G, definiscono
 il perimetro. [ADR 0161](../adr/0161-gpui-host-ports-lifecycle.md) conserva
-roster, compatibilità e proposta per la decisione 2.
+roster, compatibilità e decisione 2 approvata da Leonardo il 23 ottobre.
 
 ## Risultato
 
@@ -16,9 +16,11 @@ una divergenza non può passare silenziosamente. Il nuovo client rifiuta la
 negoziazione incompatibile; i vecchi client possono ignorare il campo additivo.
 Nessuna nuova route privilegiata, grant, generazione, writer o SQLite nel client.
 
-`RequestContext` ritira le future HTTP e i body in attesa. Sessione, selezione
-e richieste figlie di profilo/preferenze AI condividono il lifecycle; i cloni
-vecchi restano ritirati e una selezione nuova non rinnova una sessione revocata.
+`RequestContext` ritira le future HTTP e i body in attesa. I contesti workspace,
+profilo paziente e preferenze AI seguono la selezione; il profilo account segue
+invece la sessione operatore. Condividono la radice di revoca della sessione:
+i cloni workspace vecchi restano ritirati e una selezione nuova non rinnova
+una sessione revocata.
 Il ritiro conserva il segnale di sostituzione archivio distinto da un
 normale conflitto di versione. Una mutazione avviata e poi cancellata rimane indeterminata.
 
@@ -43,10 +45,11 @@ Nessun archivio clinico reale o installazione primaria utilizzati come fixture.
   Le prove di cancellazione osservano il socket chiuso prima della risposta
   del server, sia prima degli header sia durante il body. Il cambio selezione
   preserva il contesto nuovo; la mutazione pendente è indeterminata e non ritentata.
-- **Falsificazione:** togliere il controllo di revisione, di scope, il ramo di
-  cancellazione della future o il ritiro su `ARCHIVE_REPLACED` rende rossa la
-  rispettiva prova, per una violazione semantica. Ripristinati i sorgenti,
-  i 104 test del trasporto tornano verdi nella copia isolata dei mutanti.
+- **Falsificazione iniziale:** le prove di scope, cancellazione della future e
+  ritiro su `ARCHIVE_REPLACED` hanno evidenza rossa. La precedente affermazione
+  sulla revisione non era sostenuta dal log: quel mutante passava, perché la
+  fixture aveva anche un roster incompleto. La nuova prova isolata della
+  revisione è riportata sotto.
 - **Host mirato:** 18 test verdi su discovery, contratto e assenza di grant
   paired impliciti. Inventario/fixture del selettore: 24 test verdi.
 - **Altri gate:** Clippy workspace con `-D warnings`, fmt, lint, typecheck,
@@ -63,6 +66,41 @@ cargo test --locked --offline --workspace --all-targets --features gpui_platform
 cargo clippy --locked --offline --workspace --all-targets --features gpui_platform/runtime_shaders -- -D warnings
 cargo fmt --all --check
 ```
+
+## Correzioni della review del 23 ottobre
+
+La riproduzione di Astra, con GET account pendente e barriera sul server,
+fallisce su `b076f267e` con `workspace epoch cancelled an account-authority read`.
+È ora inclusa nei test GPUI, insieme alla PUT pendente. Entrambe usano il
+contesto della shell per il login, così il cambio workspace ritira anche la
+selezione iniziale senza interrompere il profilo account. Il trasporto crea
+un contesto account con la stessa radice di revoca, indipendente dalle selezioni
+workspace. Il runner conserva la propria generazione account.
+
+La suite finale passa **285 test Rust**: 154 app, 24 client, 106 trasporto e
+un probe. La nuova prova di revoca verifica GET e PUT account dopo il cambio
+workspace, sia per lock sia per ritiro dell’archivio: il socket si chiude prima
+del rilascio del server; una PUT già avviata resta indeterminata. Le prove
+esistenti della risposta host `ARCHIVE_REPLACED` continuano a passare.
+
+I test della revisione radice e dello scope partono ora dal roster completo,
+modificando una sola dimensione. In copia isolata, sostituire il confronto
+`value["revision"] != 1` con `value.get("revision").is_none()` rende rosse
+sia la nuova prova diretta sia la discovery su loopback. Il controllo di
+presenza rimane: il mutante ammette la revisione 99 di un roster valido.
+Anche ricollegare il contesto account al workspace rende rosse le due
+sonde GPUI. Ripristinati i sorgenti nella copia isolata, tutte queste prove
+tornano verdi.
+
+Prima del push: fmt e Clippy workspace con `-D warnings`, 18 test host,
+lint, typecheck, never-regress, claims, OpenAPI drift e inventario test verdi.
+Il gate formale terapie passa, senza estendere la sua copertura al lifecycle.
+La build locale riproduce ancora il blocco di metadata descritto sotto;
+l’intera suite JavaScript non viene rieseguita in questa correzione Rust.
+
+ADR 0161 registra la decisione 2, opzione 1, già approvata da Leonardo e
+comunicata sulla PR. SEC-2/3 restano G-1a.2; serve il secondo round indipendente
+prima del merge.
 
 ## Errori finali già presenti sulla base
 
