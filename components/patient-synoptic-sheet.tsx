@@ -63,7 +63,7 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
                 </tr>)}</tbody>
             </table>
         </Section>
-        <Section name="Misure recenti" read={{ ...measures, data: measures.data === undefined ? undefined : measureRows }} count={formatCountLabel(measureRows.length, 'misura', 'misure')} empty="Nessuna misura registrata.">
+        <Section name="Misure recenti" read={{ ...measures, data: measures.data === undefined ? undefined : measureRows }} count={formatCountLabel(measureRows.length, 'parametro', 'parametri')} empty="Nessuna misura registrata.">
             <table className={`${register.table} ${reading.measures}`} aria-label="Misure recenti">
                 <thead><tr><th scope="col">Nome</th><th scope="col" className={reading.value}>Valore e unità</th><th scope="col">Data</th><th scope="col" className={register.secondaryColumn}>Variazione</th></tr></thead>
                 <tbody>{measureRows.map(measure => <tr key={measure.id}>

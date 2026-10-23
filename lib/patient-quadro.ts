@@ -3,13 +3,27 @@ import { classifyObservationRange, toNumericValue } from './observation-range';
 import { resolveStaticTerminology } from './terminology';
 
 export function projectQuadroMeasures(observations: Observation[]) {
-    const dated = observations.filter(item => !item.deletedAt).toSorted((left, right) =>
-        new Date(right.observedAt).getTime() - new Date(left.observedAt).getTime());
-    return dated.map((item, index) => {
-        const previous = dated.slice(index + 1).find(candidate =>
-            candidate.codeSystem === item.codeSystem && candidate.code === item.code
-            && candidate.unitSystem === item.unitSystem && candidate.unitCode === item.unitCode
-            && new Date(candidate.observedAt).getTime() < new Date(item.observedAt).getTime());
+    const parameters = new Map<string, { latest: Observation; previous?: Observation }>();
+    for (const item of observations) {
+        if (item.deletedAt) continue;
+        const key = JSON.stringify([item.codeSystem, item.code, item.unitSystem, item.unitCode]);
+        const parameter = parameters.get(key);
+        if (!parameter) {
+            parameters.set(key, { latest: item });
+            continue;
+        }
+        const time = new Date(item.observedAt).getTime();
+        const latestTime = new Date(parameter.latest.observedAt).getTime();
+        if (time > latestTime) {
+            parameter.previous = parameter.latest;
+            parameter.latest = item;
+        } else if (time < latestTime && (!parameter.previous || time > new Date(parameter.previous.observedAt).getTime())) {
+            parameter.previous = item;
+        }
+    }
+    return [...parameters.values()].toSorted((left, right) =>
+        new Date(right.latest.observedAt).getTime() - new Date(left.latest.observedAt).getTime())
+        .map(({ latest: item, previous }) => {
         const value = toNumericValue(item.value);
         const previousValue = previous ? toNumericValue(previous.value) : null;
         const difference = value !== null && previousValue !== null ? Math.round((value - previousValue) * 100) / 100 : null;

@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
+import { bootstrapUnlockedSession, assertNoHorizontalOverflow, openPatientSection } from './utils';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
 const quadro = (page: Page) => page.locator('#quadro');
@@ -34,7 +34,7 @@ for (const count of [0, 1, 8]) test(`quattro tabelle e conteggi con ${count} rec
     for (const [index, name] of names.entries()) {
         const section = quadro(page).getByRole('region', { name, exact: true });
         await expect(section).toBeVisible();
-        await expect(section.getByRole('heading')).toContainText(`${count} ${index === 1 ? (count === 1 ? 'attiva' : 'attive') : index === 3 ? (count === 1 ? 'aperto' : 'aperti') : index === 0 ? (count === 1 ? 'problema' : 'problemi') : (count === 1 ? 'misura' : 'misure')}`);
+        await expect(section.getByRole('heading')).toContainText(`${count} ${index === 1 ? (count === 1 ? 'attiva' : 'attive') : index === 3 ? (count === 1 ? 'aperto' : 'aperti') : index === 0 ? (count === 1 ? 'problema' : 'problemi') : (count === 1 ? 'parametro' : 'parametri')}`);
         if (count) await expect(section.locator('tbody tr')).toHaveCount(count);
         else await expect(section).toContainText(['Nessun problema registrato', 'Nessuna terapia attiva', 'Nessuna misura registrata', 'Nessun controllo aperto'][index]);
     }
@@ -42,6 +42,36 @@ for (const count of [0, 1, 8]) test(`quattro tabelle e conteggi con ${count} rec
         for (const label of ['Codice', 'Descrizione', 'Da quando', 'Nome e dose', 'Posologia', 'ATC', 'Nome', 'Valore e unità', 'Data', 'Variazione', 'Scadenza']) await expect(quadro(page).getByRole('columnheader', { name: label, exact: true }).first()).toBeVisible();
         await expect(quadro(page).getByRole('cell', { name: '70 kg', exact: true })).toHaveCSS('text-align', 'right');
     }
+});
+
+test('Misure recenti conta i parametri e conserva lo storico completo in Misure', async ({ page }) => {
+    const id = await fixture(page, 0);
+    await page.evaluate(async patientId => {
+        for (const unitCode of ['kg', 'g']) for (let n = 0; n < 12; n++) {
+            const response = await fetch('/api/observations', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ patientId, codeSystem: 'LOINC', code: 'SYN-WEIGHT', display: 'Peso sintetico', unitSystem: 'UCUM', unitCode, value: (70 + n) * (unitCode === 'g' ? 1000 : 1), observedAt: `2026-09-${String(n + 1).padStart(2, '0')}`, source: 'manual' }),
+            });
+            if (!response.ok) throw new Error(`Observation fixture: ${response.status}`);
+        }
+    }, id);
+    await page.goto(`/patients/${id}/modules`);
+    const measures = quadro(page).getByRole('region', { name: 'Misure recenti', exact: true });
+    await expect(measures.getByRole('heading')).toContainText('2 parametri');
+    await expect(measures.locator('tbody tr')).toHaveCount(2);
+    await expect(measures.getByRole('cell', { name: '81 kg', exact: true })).toBeVisible();
+    await expect(measures.getByRole('cell', { name: '81000 g', exact: true })).toBeVisible();
+    await expect(measures.getByRole('cell', { name: '12/9/2026', exact: true })).toHaveCount(2);
+    await expect(measures.getByRole('cell', { name: '+1 kg dal 11/9/2026', exact: true })).toBeVisible();
+    await expect(measures.getByRole('cell', { name: '+1000 g dal 11/9/2026', exact: true })).toBeVisible();
+    await openPatientSection(page, 'misure');
+    const history = page.getByRole('complementary', { name: 'Andamento e storia delle misure' });
+    await expect(history).toBeVisible();
+    await page.locator('#misure').getByRole('button', { name: 'Peso sintetico', exact: true }).click();
+    await history.getByRole('button', { name: 'Tutte (24)', exact: true }).click();
+    await expect(history.locator('tbody tr')).toHaveCount(24);
+    await expect(history.getByRole('cell', { name: '70', exact: true })).toBeVisible();
+    await expect(history.getByRole('cell', { name: '70000', exact: true })).toBeVisible();
 });
 
 for (const [route, sectionName] of [['therapies', 'Terapie attive'], ['observations', 'Misure recenti'], ['checkups', 'Controlli aperti']]) test(`errore ${route} distinto dal vuoto`, async ({ page }) => {
