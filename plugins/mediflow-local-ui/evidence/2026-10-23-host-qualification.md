@@ -46,8 +46,12 @@ non è stato effettuato alcun contatto o invio a una directory.
 La riserva del Mac è stata confermata. Il primo accesso Computer Use a Codex ha
 restituito `Computer Use server error -10005: cgWindowNotFound`; lo stesso errore
 è rimasto dopo l'unico reset autorizzato. Per istruzione del collaudo le prove
-desktop si sono fermate, senza ulteriori tentativi su Claude e senza modifiche
-alle configurazioni desktop. Nessun esito desktop viene dedotto dalle CLI.
+desktop si sono fermate. Dopo lo sblocco del Mac e una nuova autorizzazione,
+un secondo reset ha restituito `Sky Computer Use native pipe startup failed`;
+l'inventario ha confermato lo stesso errore, con zero app disponibili al tool.
+Nessun tentativo su Claude, conversazione o modifica alle configurazioni desktop.
+Non è stato possibile inviare Cmd+Q; la chiusura di ChatGPT è stata rimessa al
+collaudatore. Nessun esito desktop viene dedotto dalle CLI.
 
 ## Percorso osservato nelle CLI
 
@@ -56,8 +60,9 @@ locali del collaudo; Claude Code usa il pacchetto di sviluppo immutabile, le sol
 permissioni del tool ammesso e connettori di account disabilitati per la sessione.
 Account della prova: Codex autenticato tramite ChatGPT, piano restituito
 `prolite`; Claude tramite `claude.ai`, provider first-party, abbonamento Pro.
-Gli identificativi degli account rimangono privati. Non sono stati modificati
-i file di impostazioni personali dei due client. Claude ha aggiornato il proprio
+Gli identificativi degli account rimangono privati. Il collaudo non ha applicato
+modifiche manuali alle impostazioni personali. Gli aggiornamenti concorrenti
+rilevati nelle impostazioni Codex sono stati preservati. Claude ha aggiornato il proprio
 contatore di uso del plugin, ripristinato limitatamente alla chiave del collaudo;
 gli aggiornamenti di cache del client sono stati conservati.
 
