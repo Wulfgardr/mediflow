@@ -3,7 +3,7 @@
 import { useEffect, useState, type MouseEvent } from 'react';
 import { useSecurity } from './security-provider';
 
-type Status = { pending: { nonce: string; expiresAt: number }[]; active: string[] };
+type Status = { available?: boolean; pending: { nonce: string; expiresAt: number }[]; active: string[] };
 const empty: Status = { pending: [], active: [] };
 
 export function PluginLocalUiPairing() {
@@ -22,6 +22,7 @@ export function PluginLocalUiPairing() {
         const response = await fetch('/api/plugin-local-ui/pairing', { cache: 'no-store', credentials: 'same-origin', signal: controller.signal });
         if (!response.ok) { setStatus(empty); clearInterval(timer); return; }
         const value = await response.json() as Status;
+        if (value.available === false) clearInterval(timer);
         if (!controller.signal.aborted) setStatus(value);
       } catch { if (!controller.signal.aborted) setStatus(empty); }
       finally { running = false; }
