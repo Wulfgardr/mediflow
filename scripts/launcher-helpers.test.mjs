@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -737,12 +737,12 @@ test('owned shutdown requires an observed exit and rejects failed OS termination
         import assert from 'node:assert/strict'; import cp from 'node:child_process';
         import { EventEmitter } from 'node:events'; import { syncBuiltinESMExports } from 'node:module';
         const { stopOwnedChild } = await import(${JSON.stringify(new URL('./mediflow.mjs', import.meta.url).href)});
-        let child, outcome, calls, frames;
+        let child, outcome, calls, frames, groupAlive;
         const terminate = () => {
             calls++;
             if (outcome === 'error') throw Object.assign(new Error('synthetic EPERM'),{code:'EPERM'});
             if (outcome === 'status') return {status:1};
-            if (outcome === 'exit') setTimeout(()=>{child.exitCode=0;child.emit('exit',0);},2);
+            if (outcome === 'exit') setTimeout(()=>{groupAlive=false;child.exitCode=0;child.emit('exit',0);},2);
             return {status:0};
         };
         cp.spawnSync = (command,args,options) => {
@@ -751,7 +751,9 @@ test('owned shutdown requires an observed exit and rejects failed OS termination
             try { return terminate(); } catch(error) {return {status:null,error};}
         };
         process.kill = (pid,signal) => {
-            assert.equal(pid,-424242); assert.ok(['SIGTERM','SIGKILL'].includes(signal));
+            assert.equal(pid,-424242);
+            if (signal === 0) { if(groupAlive) return true; throw Object.assign(new Error('synthetic absent group'),{code:'ESRCH'}); }
+            assert.ok(['SIGTERM','SIGKILL'].includes(signal));
             const result = terminate();
             if(result.status !== 0) throw Object.assign(new Error('synthetic EPERM'),{code:'EPERM'});
             return true;
@@ -761,7 +763,7 @@ test('owned shutdown requires an observed exit and rejects failed OS termination
             for (const allowIpcStop of platform === 'win32' ? [false,true] : [false]) {
                 if (outcome.startsWith('ipc-') && !allowIpcStop) continue;
                 Object.defineProperty(process,'platform',{value:platform,configurable:true});
-                calls=0;frames=[];child=new EventEmitter();
+                calls=0;frames=[];groupAlive=true;child=new EventEmitter();
                 Object.assign(child,{pid:424242,connected:true,exitCode:null,signalCode:null,
                     send(frame,done){frames.push(frame);done(outcome === 'ipc-error' ? Object.assign(new Error('synthetic IPC EPERM'),{code:'EPERM'}) : null);if(outcome === 'ipc-exit') queueMicrotask(()=>{child.exitCode=0;child.emit('exit',0);});}});
                 const pending=stopOwnedChild(child,25,{allowIpcStop});
@@ -777,6 +779,36 @@ test('owned shutdown requires an observed exit and rejects failed OS termination
             }
         }
     `],{encoding:'utf8',timeout:5000});
+    assert.equal(result.status,0,result.stderr);
+});
+
+test('POSIX terminal group proof is retained across delayed child exit and repeated stop', () => {
+    const result = spawnSync(process.execPath,['--input-type=module','-e',`
+        import assert from 'node:assert/strict'; import {EventEmitter} from 'node:events';
+        import {stopOwnedChild} from ${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)};
+        Object.defineProperty(process,'platform',{value:'linux'});
+        let probes=0,signals=0;
+        process.kill=(pid,signal)=>{
+            assert.equal(pid,-424243);
+            if(signal !== 0) {signals++;throw new Error('A retired group must never receive another signal');}
+            if(++probes !== 1) throw new Error('The retired group ID now belongs to a successor');
+            throw Object.assign(new Error('absent original group'),{code:'ESRCH'});
+        };
+        const child=new EventEmitter();Object.assign(child,{pid:424243,exitCode:null,signalCode:null});
+        setTimeout(()=>{child.exitCode=0;child.emit('exit',0);},30);
+        await stopOwnedChild(child,50);
+        await stopOwnedChild(child,50);
+        await new Promise(resolve=>setTimeout(resolve,60));
+        assert.equal(probes,1);assert.equal(signals,0);assert.equal(child.listenerCount('exit'),0);
+        for(const code of ['EPERM','EIO']) {
+            let observations=0;
+            process.kill=(pid,signal)=>{assert.equal(pid,-424244);assert.equal(signal,0);observations++;throw Object.assign(new Error(code),{code});};
+            const terminalLeader=new EventEmitter();Object.assign(terminalLeader,{pid:424244,exitCode:0,signalCode:null});
+            await assert.rejects(stopOwnedChild(terminalLeader,50),error=>error.code === 'MEDIFLOW_OWNED_STOP_UNCONFIRMED' && error.cause.code === code);
+            assert.equal(terminalLeader.listenerCount('exit'),0);
+            await new Promise(resolve=>setTimeout(resolve,60));assert.equal(observations,1);
+        }
+    `],{encoding:'utf8',timeout:2000});
     assert.equal(result.status,0,result.stderr);
 });
 
@@ -963,9 +995,16 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     const source = path.join(directory, 'source'), home = path.join(directory, 'home'), data = path.join(directory, 'data');
     mkdirSync(path.join(source, 'scripts'), { recursive: true }); mkdirSync(home); mkdirSync(data);
     const stopControl = path.join(directory, 'stop.json'), runtimePid = path.join(directory, 'runtime-pid.json');
+    const groupHistory = path.join(directory,'owned-groups.ndjson');
     const stopTrace = path.join(directory, 'stop-trace.ndjson'), stopLoader = path.join(directory, 'stop-loader.mjs');
     if (lifecycle) {
         atomicJson(stopControl, lifecycle);
+        if (lifecycle.group) writeFileSync(path.join(source, 'scripts/group-descendant.mjs'), `
+            import http from 'node:http';
+            process.on('SIGTERM', () => {});
+            const server = http.createServer((_request,response) => response.end('owned-descendant-alive'));
+            server.listen(0, '127.0.0.1', () => process.send({pid:process.pid,port:server.address().port}));
+        `);
         writeFileSync(stopLoader, `
             import fs from 'node:fs'; import cp from 'node:child_process';
             import { registerHooks, syncBuiltinESMExports } from 'node:module';
@@ -985,7 +1024,23 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 if (args.length !== 4 || args[0] !== '/pid' || args[2] !== '/T' || args[3] !== '/F') throw new Error('FIXTURE_STOP_SCOPE_DENIED');
                 try { return stop(Number(args[1]), 'taskkill'); } catch(error) { return {status:null,error}; }
             };
-            process.kill = (pid,signal) => pid < 0 && signal !== 0 ? (() => {
+            process.kill = (pid,signal) => pid < 0 && ${Boolean(lifecycle.group)} ? (() => {
+                const owned = JSON.parse(fs.readFileSync(${JSON.stringify(runtimePid)})).pid;
+                if (pid !== -owned) throw new Error('FIXTURE_FOREIGN_GROUP_DENIED');
+                const {failure} = JSON.parse(fs.readFileSync(${JSON.stringify(stopControl)}));
+                if (signal === 0 && failure?.startsWith('probe-')) {
+                    let terminal = false;
+                    try { kill(owned,0); } catch(error) { if(error.code !== 'ESRCH') throw error; terminal = true; }
+                    if (terminal) throw Object.assign(new Error('SYNTHETIC_GROUP_' + failure),{code:failure.slice(6)});
+                }
+                if (signal !== 0) fs.appendFileSync(${JSON.stringify(stopTrace)}, JSON.stringify({pid:owned,signal}) + '\\n');
+                if (signal === 'SIGKILL' && failure === 'group-no-exit') return true;
+                try { return kill(pid,signal); }
+                catch(error) {
+                    if(signal === 0) fs.appendFileSync(${JSON.stringify(stopTrace)},JSON.stringify({pid:owned,signal,error:error.code})+'\\n');
+                    throw error;
+                }
+            })() : pid < 0 && signal !== 0 ? (() => {
                 const result = stop(-pid,signal);
                 if (result.status !== 0) throw Object.assign(new Error('SYNTHETIC_STOP_EPERM'),{code:'EPERM'});
                 return true;
@@ -998,20 +1053,26 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     let text = String(result.source);
                     const from = text.indexOf('export async function stopOwnedChild'), to = text.indexOf('export function installDesktopEntry',from);
                     text = text.slice(0,from) + text.slice(from,to).replaceAll('process.platform', ${JSON.stringify(JSON.stringify(lifecycle.platform))}) + text.slice(to);
-                    result.source = text.replace('stopOwnedChild(child, 8000,', 'stopOwnedChild(child, 60,');
+                    result.source = text.replace('stopOwnedChild(child, 8000,', 'stopOwnedChild(child, ${lifecycle.group ? 600 : 60},')
+                        .replace('const finish = cause => {', 'const finish = cause => { if(cause) process.stderr.write("FIXTURE_STOP_CAUSE " + cause.code + " " + cause.message + String.fromCharCode(10));');
                 }
                 return result;
             }});`);
         t.after(async () => {
             if (!existsSync(runtimePid)) return;
-            const { pid } = JSON.parse(readFileSync(runtimePid));
-            try { process.kill(pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+            const ownedGroups = lifecycle.group
+                ? readFileSync(groupHistory,'utf8').trim().split('\n').map(line => JSON.parse(line))
+                : [JSON.parse(readFileSync(runtimePid))];
+            for (const {pid} of ownedGroups) {
+                try { process.kill(lifecycle.group ? -pid : pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+            }
             const deadline = Date.now() + 2000;
-            for (;;) {
-                try { process.kill(pid, 0); } catch (error) { if (error.code === 'ESRCH') break; throw error; }
+            for (const {pid,descendantPid} of ownedGroups) for (const owned of [pid,descendantPid].filter(Boolean)) for (;;) {
+                try { process.kill(owned, 0); } catch (error) { if (error.code === 'ESRCH') break; throw error; }
                 assert.ok(Date.now() < deadline, 'Owned synthetic runtime did not exit');
                 await new Promise(resolve => setTimeout(resolve, 10));
             }
+            if (process.env.MEDIFLOW_LAUNCHER_FIXTURE_AUDIT) appendFileSync(process.env.MEDIFLOW_LAUNCHER_FIXTURE_AUDIT,JSON.stringify({directory,ownedGroups,cleanupConfirmed:true})+'\n');
             if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
         });
     }
@@ -1034,11 +1095,22 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     writeFileSync(path.join(source, 'scripts/source-runtime.mjs'), `
         import http from 'node:http';
         import fs from 'node:fs';
+        import { spawn } from 'node:child_process';
         import { webIdentityProof } from ${JSON.stringify(new URL('./local-ui-web-identity.mjs', import.meta.url).href)};
         import { installLocalUiWebNavigation } from ${JSON.stringify(new URL('./local-ui-web-navigation.mjs', import.meta.url).href)};
         export const verifySourceRuntime = () => ({ identity: ${JSON.stringify(identity)} });
         if (process.argv[1].endsWith('source-runtime.mjs')) {
-            ${lifecycle ? `fs.writeFileSync(${JSON.stringify(runtimePid)}, JSON.stringify({pid:process.pid}));` : ''}
+            ${lifecycle?.group ? `
+                const descendant = spawn(process.execPath,[new URL('./group-descendant.mjs',import.meta.url).pathname],{stdio:['ignore','ignore','ignore','ipc']});
+                fs.appendFileSync(${JSON.stringify(groupHistory)},JSON.stringify({pid:process.pid,descendantPid:descendant.pid})+'\\n');
+                const info = await new Promise((resolve,reject) => {
+                    const timer = setTimeout(() => reject(new Error('Owned descendant readiness timeout')),2000);
+                    descendant.once('message', value => {clearTimeout(timer);resolve(value);});
+                    descendant.once('error', error => {clearTimeout(timer);reject(error);});
+                });
+                fs.writeFileSync(${JSON.stringify(runtimePid)}, JSON.stringify({pid:process.pid,descendantPid:info.pid,port:info.port}));
+                process.on('SIGTERM', () => process.exit(0));
+            ` : lifecycle ? `fs.writeFileSync(${JSON.stringify(runtimePid)}, JSON.stringify({pid:process.pid}));` : ''}
             let live = true;
             const pairing = () => globalThis[Symbol.for('mediflow.local-ui.pairing.v1')];
             installLocalUiWebNavigation(process, 'http://127.0.0.1:' + process.env.PORT, () => {});
@@ -1097,6 +1169,90 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         }
     };
     return { source, data, stateFiles, child, closed, until, stopControl, stopTrace, runtimePid, environment: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home }, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
+}
+
+
+for (const scenario of ['signal','chooser','error','switch','probe-EPERM','probe-EIO','group-no-exit']) {
+    test(`POSIX owned group stays claimed until its descendant is terminal: ${scenario}`, {timeout:15000,skip:process.platform === 'win32'}, async t => {
+        const failure = scenario === 'switch' ? 'probe-EPERM' : scenario.startsWith('probe-') || scenario === 'group-no-exit' ? scenario : null;
+        const f = await ordinaryLauncherFixture(t,'web',['--scelta','web'],true,scenario !== 'error',{},null,{platform:process.platform,group:true,failure});
+        if (scenario !== 'error') await f.until(() => f.output().includes('Pronto:'));
+        else await f.until(() => existsSync(f.stopTrace));
+        const receiptFile = launcherReceiptFile(f.stateFiles.lockDirectory), receipt = JSON.parse(readFileSync(receiptFile));
+        const stop = async () => {
+            const endpoint = new URL('stop',receipt.choiceUrl);
+            const response = await fetch(endpoint,{method:'POST',headers:{Origin:endpoint.origin,'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(1000)});
+            assert.equal(response.status,200); await response.text();
+        };
+        if (scenario === 'signal') f.child.kill('SIGTERM');
+        else if (scenario === 'switch') {
+            const endpoint = new URL('choose',receipt.choiceUrl);
+            const response = await fetch(endpoint,{method:'POST',headers:{Origin:endpoint.origin,'Content-Type':'application/json'},body:JSON.stringify({choice:'agenti'}),signal:AbortSignal.timeout(1000)});
+            assert.equal(response.status,202); await response.text();
+        } else if (scenario !== 'error') await stop();
+        await f.until(() => existsSync(f.stopTrace));
+        const {pid,descendantPid,port} = JSON.parse(readFileSync(f.runtimePid));
+        await new Promise(resolve => setTimeout(resolve,80));
+        assert.throws(() => process.kill(pid,0),{code:'ESRCH'},'Leader should already be terminal');
+        process.kill(descendantPid,0); process.kill(-pid,0);
+        assert.equal(await (await fetch('http://127.0.0.1:'+port,{signal:AbortSignal.timeout(1000)})).text(),'owned-descendant-alive');
+        const assertHeld = () => {
+            const candidate = claimLauncher(f.stateFiles.lockDirectory,{checkoutPath:f.source+path.sep},{reuseLive:true});
+            try { assert.equal(candidate.claimed,false,'A second writer acquired while a descendant is alive'); }
+            finally { if(candidate.claimed) releaseLauncher(candidate); }
+            assert.equal(candidate.receipt.pid,f.child.pid);
+            assert.equal(JSON.parse(readFileSync(receiptFile)).pid,f.child.pid);
+            assert.equal(f.child.exitCode,null,f.output()); assert.equal(f.child.signalCode,null,f.output());
+            assert.doesNotMatch(f.output(),/unhandled|MediFlow arrestato\./iu);
+        };
+        assertHeld();
+        let finalAttemptErrors = 1;
+        if (failure) {
+            await f.until(() => f.output().includes('Arresto non verificato'));
+            assertHeld();
+            const errors = f.output().split('Arresto non verificato').length;
+            await stop();
+            await f.until(() => f.output().split('Arresto non verificato').length > errors);
+            assertHeld(); process.kill(descendantPid,0);
+            atomicJson(f.stopControl,{platform:process.platform,group:true,failure:null});
+            finalAttemptErrors = f.output().split('Arresto non verificato').length;
+            await stop();
+        }
+        {
+            await f.until(() => f.output().includes('MediFlow arrestato.') || f.output().split('Arresto non verificato').length > finalAttemptErrors);
+            if (!f.output().includes('MediFlow arrestato.')) {
+                assertHeld();
+                assert.match(f.output().split('FIXTURE_STOP_CAUSE ').at(-1),/^EPERM kill EPERM/u);
+                assert.match(readFileSync(f.stopTrace,'utf8'), /"signal":0,"error":"EPERM"/u);
+                const deadline = Date.now() + 2000;
+                for (;;) {
+                    try { process.kill(-pid,0); }
+                    catch(error) { if(error.code === 'ESRCH') break; if(error.code !== 'EPERM') throw error; }
+                    assert.ok(Date.now() < deadline,'Owned group absence was not confirmed');
+                    await new Promise(resolve => setTimeout(resolve,10));
+                }
+                t.diagnostic('Real POSIX group probe returned EPERM after SIGKILL; owner retained, explicit stop after ESRCH.');
+                await stop();
+            }
+        }
+        try { await waitForFixtureClose(f.closed); }
+        catch(error) { t.diagnostic(f.output()); t.diagnostic(readFileSync(f.stopTrace,'utf8')); throw error; }
+        assert.throws(() => process.kill(-pid,0),{code:'ESRCH'});
+        assert.throws(() => process.kill(descendantPid,0),{code:'ESRCH'});
+        await assert.rejects(fetch('http://127.0.0.1:'+port,{signal:AbortSignal.timeout(1000)}));
+        assert.equal(existsSync(path.join(f.stateFiles.lockDirectory,'active')),false);
+        const successor = claimLauncher(f.stateFiles.lockDirectory,{checkoutPath:f.source+path.sep});
+        try {
+            assert.equal(successor.claimed,true);
+            const trace = readFileSync(f.stopTrace,'utf8');
+            assert.match(trace,/SIGKILL/u);
+            await new Promise(resolve => setTimeout(resolve,650));
+            assert.equal(readFileSync(f.stopTrace,'utf8'),trace,'A late timer signalled the retired group');
+            assert.equal(JSON.parse(readFileSync(successor.receiptFile)).pid,process.pid);
+            process.kill(process.pid,0);
+            t.diagnostic(JSON.stringify({scenario,leader:pid,descendant:descendantPid,groupAbsent:true,successor:process.pid,lateSignals:false}));
+        } finally { releaseLauncher(successor); }
+    });
 }
 
 for (const platform of ['win32', 'linux']) for (const failure of platform === 'win32' ? ['error', 'status', 'no-exit'] : ['error', 'no-exit']) {

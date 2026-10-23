@@ -289,18 +289,40 @@ export function claimLauncher(directory, identity, { reuseLive = false } = {}) {
   } finally { fs.rmSync(candidate, { recursive: true, force: true }); }
 }
 
+const terminalOwnedGroups = new WeakSet();
+
 export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = false } = {}) {
-  if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
+  const posix = process.platform !== 'win32';
+  if (!child?.pid || (!posix && (child.exitCode !== null || child.signalCode !== null))) return;
   await new Promise((resolve, reject) => {
-    let forceTimer, timer, settled = false;
+    let forceTimer, timer, observationTimer, groupAbsent = terminalOwnedGroups.has(child), settled = false;
     const finish = cause => {
       if (settled) return;
       settled = true;
-      clearTimeout(forceTimer); clearTimeout(timer); child.off('exit', exited);
+      clearTimeout(forceTimer); clearTimeout(timer); clearTimeout(observationTimer); child.off('exit', exited);
       if (cause) reject(Object.assign(new Error('Arresto del processo posseduto non verificato.', { cause }), { code: 'MEDIFLOW_OWNED_STOP_UNCONFIRMED' }));
       else resolve();
     };
-    const exited = () => finish();
+    const groupExists = () => {
+      if (groupAbsent) return false;
+      try { process.kill(-child.pid, 0); return true; }
+      catch (error) {
+        if (error.code !== 'ESRCH') throw error;
+        groupAbsent = true;
+        terminalOwnedGroups.add(child);
+        clearTimeout(forceTimer);
+        return false;
+      }
+    };
+    const observe = () => {
+      if (settled) return;
+      clearTimeout(observationTimer);
+      try {
+        if (!groupExists() && (child.exitCode !== null || child.signalCode !== null)) { finish(); return; }
+        observationTimer = setTimeout(observe, 10);
+      } catch (error) { finish(error); }
+    };
+    const exited = () => posix ? observe() : finish();
     const deadline = Date.now() + graceMs;
     const force = () => {
       if (settled) return;
@@ -309,20 +331,22 @@ export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = fal
           const result = spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'],
             { stdio: 'ignore', timeout: Math.max(1, deadline - Date.now()), windowsHide: true });
           if (result.error || result.status !== 0) throw result.error || new Error(`taskkill: ${result.status}`);
-        } else process.kill(-child.pid, 'SIGKILL');
-      } catch (error) { finish(error); }
+        } else if (groupExists()) process.kill(-child.pid, 'SIGKILL');
+      } catch (error) { if (posix && error.code === 'ESRCH') observe(); else finish(error); }
     };
     child.once('exit', exited);
-    timer = setTimeout(() => finish(new Error('Exit del processo posseduto non osservato.')), graceMs);
+    timer = setTimeout(() => finish(new Error(posix ? 'Exit del processo posseduto o scomparsa del gruppo non osservato.' : 'Exit del processo posseduto non osservato.')), graceMs);
     try {
-      if (process.platform !== 'win32') {
-        process.kill(-child.pid, 'SIGTERM');
+      if (posix) {
+        observe();
+        if (settled || groupAbsent) return;
         forceTimer = setTimeout(force, Math.floor(graceMs / 2));
+        if (groupExists()) process.kill(-child.pid, 'SIGTERM');
       } else if (child.connected && allowIpcStop) {
         forceTimer = setTimeout(force, Math.floor(graceMs / 2));
         child.send({ type: 'mediflow-launcher-stop' }, error => { if (error) finish(error); });
       } else force();
-    } catch (error) { finish(error); }
+    } catch (error) { if (posix && error.code === 'ESRCH') observe(); else finish(error); }
   });
 }
 
