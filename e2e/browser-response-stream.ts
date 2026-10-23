@@ -120,4 +120,3 @@ export function installSameResponseCapture(options: { base: string; namespace: s
     };
     globalThis.fetch = wrappedFetch;
 }
-
