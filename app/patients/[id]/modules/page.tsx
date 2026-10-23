@@ -13,7 +13,7 @@ import { PluginLocalUiNavigation, PluginPrescribingGuide } from '@/components/pl
 import { PatientClinicalSupport } from '@/components/patient-clinical-support';
 import { AttentionGroup } from '@/components/attention-group';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
-import { PatientSynopticSheet, type SynopticMeasure, type SynopticSignal, type SynopticTherapyLine } from '@/components/patient-synoptic-sheet';
+import { PatientSynopticSheet } from '@/components/patient-synoptic-sheet';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
 import DocumentUpload from '@/components/document-upload';
@@ -53,7 +53,6 @@ import {
     countUsableSources,
 } from '@/lib/domain/documents/patient-smart-import-projection-capture';
 import { classifyInsightReadability } from '@/lib/patient-insight-view-model';
-import { classifyObservationRange, toNumericValue } from '@/lib/observation-range';
 import { resolveStaticTerminology } from '@/lib/terminology';
 import { projectFollowupSuggestions } from '@/lib/patient-followup-projection';
 import { deriveOpenLoopProjection, type OpenLoop } from '@/lib/patient-open-loops';
@@ -96,7 +95,7 @@ export default function PatientDetailPage() {
     const confirm = useConfirm();
     const { showToast } = useToast();
 
-    const patient = useLiveQuery(() => db.patients.get(id), [id], undefined, ['patients']);
+    const { data: patient, loading: patientLoading, error: patientError } = useLiveQueryState(() => db.patients.get(id), [id], undefined, ['patients']);
     const entries = useLiveQuery(
         async () => {
             const items = await db.entries.query({ patientId: id, includeDeleted: true }).toArray();
@@ -110,11 +109,11 @@ export default function PatientDetailPage() {
        annullati): cosi nextCheckup, la sezione Follow-up e i conteggi condivisi
        raccontano lo stesso insieme, e un appuntamento annullato non compare piu
        come prossimo follow-up. */
-    const checkups = useLiveQuery(
+    const { data: checkups, loading: checkupsLoading, error: checkupsError } = useLiveQueryState(
         async () => {
-            const items = await db.checkups.query({ patientId: id }).toArray();
+            const items = await db.checkups.query({ patientId: id }).toArray({ rejectAuthUnavailable: true });
             return items
-                .filter((checkup: Checkup) => checkup.status !== 'completed' && checkup.status !== 'cancelled')
+                .filter((checkup: Checkup) => !checkup.deletedAt && checkup.status !== 'completed' && checkup.status !== 'cancelled')
                 .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
         },
         [id],
@@ -131,8 +130,8 @@ export default function PatientDetailPage() {
     /* WUL-UIUX Fase 7: array completi per buildPatientWorkspaceFromRecords,
        le stesse letture che il cockpit fa per il Quadro (tutte le terapie e tutte
        le osservazioni del paziente, senza filtri). */
-    const therapies = useLiveQuery(
-        async () => db.therapies.query({ patientId: id }).toArray(),
+    const { data: therapies, loading: therapiesLoading, error: therapiesError } = useLiveQueryState(
+        async () => db.therapies.query({ patientId: id }).toArray({ rejectAuthUnavailable: true }),
         [id],
         undefined,
         ['therapies'],
@@ -149,8 +148,8 @@ export default function PatientDetailPage() {
             }),
         [therapies],
     );
-    const observations = useLiveQuery(
-        async () => db.observations.query({ patientId: id }).toArray(),
+    const { data: observations, loading: observationsLoading, error: observationsError } = useLiveQueryState(
+        async () => db.observations.query({ patientId: id }).toArray({ rejectAuthUnavailable: true }),
         [id],
         undefined,
         ['observations'],
@@ -185,43 +184,11 @@ export default function PatientDetailPage() {
     // Un'unica lettura alimenta l'ultima osservazione e la sua variazione.
     const datedObservations = useMemo(
         () => observations
-            ?.filter((observation) => observation.observedAt)
+            ?.filter((observation) => !observation.deletedAt && observation.observedAt)
             .sort((left, right) => new Date(right.observedAt).getTime() - new Date(left.observedAt).getTime()),
         [observations],
     );
     const latestObservation = datedObservations === undefined ? undefined : datedObservations[0] ?? null;
-    /* WUL-UIUX (Fase 4): ultima misura per il Foglio sinottico, con delta
-       calcolato DENTRO il gruppo per codice (mai tra analiti diversi) e solo se
-       stessa unita e valori numerici. Classificazione fuori-range da observation-range. */
-    const latestMeasure = useMemo<SynopticMeasure | null | undefined>(
-        () => {
-            if (datedObservations === undefined) return undefined;
-            const latest = datedObservations[0];
-            if (!latest) return null;
-            const previous = datedObservations.find(
-                (observation, index) => index > 0 && observation.code === latest.code && observation.unitCode === latest.unitCode,
-            );
-            let delta: SynopticMeasure['delta'];
-            const latestNum = toNumericValue(latest.value);
-            const previousNum = previous ? toNumericValue(previous.value) : null;
-            if (latestNum !== null && previousNum !== null && previous) {
-                const diff = Math.round((latestNum - previousNum) * 100) / 100;
-                delta = {
-                    direction: diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat',
-                    label: `${diff > 0 ? '+' : ''}${String(diff).replace('.', ',')}`,
-                    sinceLabel: `dal ${new Date(previous.observedAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })}`,
-                };
-            }
-            return {
-                display: resolveStaticTerminology('LOINC', latest.code)?.displayIt ?? latest.display,
-                valueLabel: `${latest.value}${latest.unitCode ? ` ${latest.unitCode}` : ''}`,
-                dateLabel: new Date(latest.observedAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }),
-                delta,
-                outOfRange: classifyObservationRange(latest.value, latest.refLow, latest.refHigh) ?? undefined,
-            };
-        },
-        [datedObservations],
-    );
     /* WUL-UIUX: conteggi leggeri per i chip delle sezioni collassabili. */
     const prestazioniCount = servicePrescriptions?.length;
     const protesicaCount = useLiveQuery(
@@ -334,7 +301,7 @@ export default function PatientDetailPage() {
                 backHref="/?area=incarico"
                 backLabel="Pazienti"
             >
-                <div className={workspaceStyles.loadingCard}>Caricamento scheda paziente...</div>
+                <div className={workspaceStyles.loadingCard} role={patientError ? 'alert' : 'status'}>{patientError ? 'Impossibile leggere la scheda paziente.' : 'Caricamento scheda paziente...'}</div>
             </Kree8WorkspaceShell>
         );
     }
@@ -359,8 +326,6 @@ export default function PatientDetailPage() {
        la loro sezione). Manteniamo le voci cancellate per il toggle audit interno
        di Timeline; filtriamo solo il tipo scala, cosi il conteggio del chip torna. */
     const timelineEntries = (entries ?? []).filter((entry) => entry.type !== 'scale');
-    const leadDiagnosis = diagnosisItems[0];
-    const nextCheckup = (checkups ?? [])[0];
     // Proiezione read-only dei follow-up suggeriti dai documenti (nessun auto-write).
     const followupSuggestions = projectFollowupSuggestions(documentInsights);
     const openObservationForm = (loop: OpenLoop) => {
@@ -468,50 +433,6 @@ export default function PatientDetailPage() {
     const reviewQueueAttentionRows = reviewQueueSummary.rows.filter((row) =>
         ['da-rivedere', 'bloccato', 'serve-testo'].includes(row.state),
     );
-    /* WUL-UIUX: i numeri che contano subito, soprattutto su pazienti
-       complessi. Nessun "fuori range": senza range di riferimento clinici non si
-       inventano flag (resta onesto). */
-    // Ultimo contatto = voce di diario piu recente; warning oltre 90 giorni se il
-    // percorso e ancora aperto (rilevante soprattutto per l'ADI).
-    const lastEntryDate = activeEntries[0]?.date ? new Date(activeEntries[0].date) : null;
-    const daysSinceContact = lastEntryDate
-        ? Math.floor((currentTimestampMs - lastEntryDate.getTime()) / (1000 * 60 * 60 * 24))
-        : null;
-    const contactStale = daysSinceContact !== null && daysSinceContact > 90 && !patient.isArchived;
-    // Documenti caricati senza sintesi: azionabile, a differenza del conteggio referti.
-    const missingSynthesisCount = attachmentItems.length - attachmentsWithTextCount;
-    /* WUL-UIUX (Fase 4): input per il Foglio sinottico. Terapie e ultima
-       misura hanno righe dedicate; qui restano i segnali di contesto onesti senza
-       una riga propria. Nessun flag fuori-range inventato. */
-    const otherProblemsCount = Math.max(0, diagnosisItems.length - (leadDiagnosis ? 1 : 0));
-    const synopticTherapies: SynopticTherapyLine[] | undefined = activeTherapies?.map((therapy) => ({
-        id: therapy.id,
-        drugName: therapy.drugName,
-        dosage: therapy.dosage,
-    }));
-    const synopticSignals: SynopticSignal[] = [
-        {
-            label: 'Da rivedere',
-            value: reviewQueueSummary.attentionCount,
-            tone: reviewQueueSummary.attentionCount > 0 ? 'warning' : 'neutral',
-            href: '#attenzione',
-        },
-        {
-            label: 'Ultimo contatto',
-            value: lastEntryDate ? lastEntryDate.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) : 'Nessuno',
-            tone: contactStale ? 'warning' : 'neutral',
-        },
-        {
-            label: 'Doc. da sintetizzare',
-            value: missingSynthesisCount,
-            tone: missingSynthesisCount > 0 ? 'warning' : 'neutral',
-            href: '#documenti',
-        },
-        { label: 'Esenzioni', value: exemptionCodes.length },
-    ];
-    const nextCheckupLabel = nextCheckup
-        ? new Date(nextCheckup.date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
-        : undefined;
     const updatedLabel = new Date(patient.updatedAt).toLocaleDateString('it-IT', {
         day: '2-digit',
         month: '2-digit',
@@ -746,14 +667,10 @@ export default function PatientDetailPage() {
                                 enabled={isAiSmartImportEnabledValue(smartImportKillSwitch?.value)} />
                         ) : null} />}
                     notesContent={<PatientProfileNotes patientId={id} patientVersion={patient.version} />}
-                    leadDiagnosis={leadDiagnosis}
-                    otherProblemsCount={otherProblemsCount}
-                    signals={synopticSignals}
-                    therapies={synopticTherapies}
-                    therapiesTotal={workspace?.activeTherapiesCount}
-                    latestMeasure={latestMeasure}
-                    nextCheckupLabel={nextCheckupLabel}
-                    nextCheckupTitle={nextCheckup?.title}
+                    problems={{ data: diagnosisItems, loading: patientLoading, error: patientError }}
+                    therapies={{ data: activeTherapies, loading: therapiesLoading, error: therapiesError }}
+                    measures={{ data: observations, loading: observationsLoading, error: observationsError }}
+                    checkups={{ data: checkups, loading: checkupsLoading, error: checkupsError }}
                 />
 
                 {/* WUL-678: three actual folder destinations; #identita remains an identity-only alias. */}

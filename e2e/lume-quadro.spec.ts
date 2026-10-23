@@ -99,7 +99,7 @@ async function resolveColor(page: Page, variable: string): Promise<string> {
 
 async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePatientFixture): Promise<void> {
   await expect(page.getByRole('heading', { name: patient.name, level: 1 })).toHaveCount(1);
-  await expect(quadro.getByRole('heading', { name: 'Quadro clinico', exact: true })).toBeVisible();
+  await expect(quadro.getByRole('heading', { name: /^Problemi/ })).toBeVisible();
   await expect(quadro.getByText('Controllo sintetico del Quadro', { exact: true })).toBeVisible();
   await expect(quadro.getByText('5 mg · 1-0-0', { exact: true })).toBeVisible();
   await expect(quadro.locator('[aria-pressed]')).toHaveCount(0);
@@ -110,8 +110,8 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
   expect(elevations).toEqual([]);
   await expect(page.getByTestId('lume-scheda-surface')).toHaveCSS('box-shadow', 'none');
 
-  const measure = quadro.getByRole('heading', { name: 'Ultima misura', exact: true }).locator('../..');
-  const value = measure.locator(':scope > strong');
+  const measure = quadro.getByRole('region', { name: 'Misure recenti', exact: true });
+  const value = measure.getByRole('cell', { name: /160 mm\[Hg\]/ });
   await expect(value).toContainText('160 mm[Hg]');
   await expect(value).toHaveCSS('color', await resolveColor(page, '--lume-signal-critical'));
   await expect(value).toHaveCSS('font-variant-numeric', 'tabular-nums');
@@ -122,9 +122,9 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
     .toHaveCSS('color', await resolveColor(page, '--lume-ink'));
 
   const hierarchy = await measure.evaluate(element => {
-    const heading = element.querySelector('h3')!;
-    const number = element.querySelector(':scope > strong')!;
-    const date = element.querySelector(':scope > span')!;
+    const heading = element.querySelector('th')!;
+    const number = element.querySelector('tbody td:nth-child(2)')!;
+    const date = element.querySelector('time')!;
     return { heading: parseFloat(getComputedStyle(heading).fontSize), number: parseFloat(getComputedStyle(number).fontSize),
       headingWeight: parseFloat(getComputedStyle(heading).fontWeight), dateWeight: parseFloat(getComputedStyle(date).fontWeight) };
   });
@@ -159,15 +159,13 @@ async function assertReflowStack(quadro: Locator): Promise<void> {
       const rect = node.getBoundingClientRect();
       return { top: rect.top, bottom: rect.bottom, left: rect.left };
     };
-    const main = box(element.querySelector(':scope > div')!);
-    const context = box(element.querySelector(':scope > aside')!);
-    const measure = box(element.querySelector('aside > div:has(h3)')!);
-    const followup = box([...element.querySelectorAll('aside > div:has(h3)')][1]);
-    return { main, context, measure, followup };
+    return [...element.querySelectorAll(':scope > section')].map(box);
   });
-  expect(geometry.context.top).toBeGreaterThanOrEqual(geometry.main.bottom);
-  expect(geometry.followup.top).toBeGreaterThanOrEqual(geometry.measure.bottom);
-  expect(Math.abs(geometry.followup.left - geometry.measure.left)).toBeLessThanOrEqual(1);
+  expect(geometry).toHaveLength(4);
+  for (let index = 1; index < geometry.length; index++) {
+    expect(geometry[index].top).toBeGreaterThanOrEqual(geometry[index - 1].bottom);
+    expect(Math.abs(geometry[index].left - geometry[index - 1].left)).toBeLessThanOrEqual(1);
+  }
 }
 
 test('la navigazione Quadro del paziente selezionato converge sulla Scheda', async ({ page }) => {
@@ -198,7 +196,7 @@ for (const quadroCase of QUADRO_CASES) {
     if (quadroCase.width <= 390) await assertReflowStack(quadro);
     await page.screenshot({ path: test.info().outputPath('quadro.png'), fullPage: true, animations: 'disabled' });
     // Values lead to the same patient and the underlying working modules.
-    await quadro.getByRole('link', { name: 'Gestisci', exact: true }).click();
+    await openPatientSection(page, 'terapie');
     await expect(page.locator('#terapie')).toHaveAttribute('data-folder-active', 'true');
     await expect(page.locator('#terapie')).toContainText('Ramipril sintetico');
     if (quadroCase.width === 320) {
