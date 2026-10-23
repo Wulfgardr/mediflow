@@ -207,7 +207,7 @@ export default function PatientDetailPage() {
         ['siss_handoff_events'],
     );
     const { data: documentSynthesisKillSwitch, loading: documentSynthesisKillSwitchLoading } = useLiveQueryState(
-        () => db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY),
+        () => db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY, { signal: db.getSessionReadSignal() }),
         [],
         undefined,
         ['settings'],
