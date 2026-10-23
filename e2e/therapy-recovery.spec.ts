@@ -126,7 +126,9 @@ test('a list refresh during editing cannot silently advance the draft version', 
   await openDraft(page, data);
   await concurrentEdit(page, data);
   const refreshed = page.waitForResponse(response => response.request().method() === 'GET' && response.url().includes('/api/therapies?'));
-  await page.locator('#terapie').getByRole('row').filter({ has: page.getByText('Farmaco sintetico secondario', { exact: true }) }).getByRole('button', { name: 'Sospendi', exact: true }).click();
+  const otherRow = page.locator('#terapie').getByRole('row').filter({ has: page.getByText('Farmaco sintetico secondario', { exact: true }) });
+  await otherRow.getByRole('button', { name: /^Altre azioni/ }).click();
+  await otherRow.getByRole('menuitem', { name: 'Sospendi', exact: true }).click();
   await page.getByRole('button', { name: 'Conferma e registra', exact: true }).click();
   expect((await refreshed).status()).toBe(200);
   await expect(page.locator('#terapie').getByText('Dose concorrente 2', { exact: true })).toBeVisible();
@@ -289,8 +291,14 @@ async function openTherapies(page: Page, data: Fixture): Promise<void> {
   await expect(page.locator('#terapie').getByText('Farmaco sintetico principale', { exact: true })).toBeVisible();
 }
 
+async function deletionAction(page: Page, drugName = 'Farmaco sintetico principale') {
+  const target = page.locator('#terapie').getByRole('row').filter({ has: page.getByText(drugName, { exact: true }) });
+  await target.getByRole('button', { name: /^Altre azioni/ }).click();
+  return target.getByRole('menuitem', { name: 'Elimina', exact: true });
+}
+
 async function requestDeletion(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Elimina Farmaco sintetico principale solo se inserito per errore', exact: true }).click();
+  await (await deletionAction(page)).click();
   const dialog = page.getByRole('dialog', { name: 'Eliminare questo farmaco dalla cartella?', exact: true });
   await dialog.getByRole('textbox', { name: "Motivazione dell'eliminazione" }).fill(deletionReason);
   await dialog.getByRole('button', { name: 'Elimina', exact: true }).click();
@@ -391,7 +399,7 @@ test('discarding recovery still requires reread and a new reason before another 
   await expect(deleteRecovery(page)).toContainText('L’esito non è confermato');
   await deleteRecovery(page).getByRole('button', { name: 'Annulla recupero e scarta la motivazione', exact: true }).click();
   await expect(deleteRecovery(page)).toHaveCount(0);
-  await page.getByRole('button', { name: 'Elimina Farmaco sintetico principale solo se inserito per errore', exact: true }).click();
+  await (await deletionAction(page)).click();
   await expect(deleteRecovery(page)).toContainText('La motivazione precedente è stata scartata');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(writes).toBe(1);
@@ -681,7 +689,7 @@ for (const transition of ['patient', 'session', 'unmount'] as const) {
         await expect(deleteRecovery(page)).toHaveCount(0);
         // Establish a fresh prompt before releasing the old result. It must
         // retain an empty reason and remain cancellable without another DELETE.
-        await page.getByRole('button', { name: 'Elimina Farmaco sintetico secondario solo se inserito per errore', exact: true }).click();
+        await (await deletionAction(page, 'Farmaco sintetico secondario')).click();
         const freshPrompt = page.getByRole('dialog', { name: 'Eliminare questo farmaco dalla cartella?', exact: true });
         await expect(freshPrompt.getByRole('textbox', { name: "Motivazione dell'eliminazione" })).toHaveValue('');
         if (held) {
