@@ -246,6 +246,7 @@ export async function main(args = process.argv.slice(2)) {
   };
   const onSignal = () => { void shutdown(); };
   const pendingNavigation = new Set();
+  const navigationControllers = new Map();
   const rememberNavigation = requestId => {
     if (pendingNavigation.size >= 256) return false;
     pendingNavigation.add(requestId);
@@ -253,6 +254,7 @@ export async function main(args = process.argv.slice(2)) {
     return true;
   };
   const cancelNavigation = requestId => {
+    navigationControllers.get(requestId)?.abort();
     if (child?.connected) child.send(JSON.stringify({ schemaVersion: 'mediflow.local-ui.cancel.v1', requestId }), () => {});
   };
   const navigate = async (intent, request, pair = null) => {
@@ -293,11 +295,12 @@ export async function main(args = process.argv.slice(2)) {
       && Number.isSafeInteger(message.expiresAt) && message.expiresAt > Date.now() && message.expiresAt <= Date.now() + 8000) {
       if (!state.ready && !closing && state.step !== 'errore') status = 'waiting';
       else if (rememberNavigation(requestId)) {
+        const controller = new AbortController(); navigationControllers.set(requestId, controller);
         try {
-          await navigate(message.intent, { requestId, expiresAt: message.expiresAt, signal: AbortSignal.timeout(message.expiresAt - Date.now()) }, pair);
+          await navigate(message.intent, { requestId, expiresAt: message.expiresAt, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(message.expiresAt - Date.now())]) }, pair);
           status = isConnected() ? 'accepted' : 'denied';
         } catch { cancelNavigation(requestId); }
-
+        finally { navigationControllers.delete(requestId); }
       }
     }
     if (isConnected()) reply({ type: 'mediflow-local-ui-result', requestId, status });

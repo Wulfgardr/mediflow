@@ -559,10 +559,12 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     res.end(JSON.stringify({ok})); return; }
                 if (_req.url === '/fixture-lock') { live = false; pairing().snapshot(); res.end('{}'); return; }
                 if (_req.url === '/fixture-env') { res.end(JSON.stringify(process.env)); return; }
-                if (${webIdentity} && _req.url === '/api/plugin-local-ui/identity') {
+                if (${JSON.stringify(webIdentity)} && _req.url === '/api/plugin-local-ui/identity') {
                     let challenge = ''; for await (const part of _req) challenge += part;
                     const proof = webIdentityProof(process.env.MEDIFLOW_LOCAL_UI_WEB_SECRET, challenge);
-                    res.setHeader('Content-Length', '64'); res.end(proof); return;
+                    process.stderr.write('FIXTURE_IDENTITY_PROOF\\n');
+                    res.setHeader('Content-Length', '64');
+                    if (${JSON.stringify(webIdentity)} === 'delayed') setTimeout(() => res.end(proof), 100); else res.end(proof); return;
                 }
                 res.setHeader('Content-Type', 'application/json');
                 res.end(JSON.stringify({ ...${JSON.stringify(identity)}, fingerprint: 'synthetic' })); });
@@ -938,4 +940,17 @@ test('ordinary Web children preserve supported configuration through the plugin 
     }
     assert.deepEqual(environments[1], environments[0]);
     assert.deepEqual(environments[0], configured);
+});
+
+
+test('IPC cancellation during the Web identity proof cannot dispatch a late intent', async t => {
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, 'delayed');
+    await f.until(() => f.output().includes('Pronto:'));
+    const requestId = crypto.randomUUID();
+    const result = new Promise(resolve => { const receive = frame => { if(frame.requestId === requestId) { f.child.off('message',receive); resolve(frame.status); } }; f.child.on('message',receive); });
+    f.child.send({type:'mediflow-local-ui-navigate',requestId,intent:'history',expiresAt:Date.now()+5000,...f.expected});
+    await f.until(() => (f.output().match(/FIXTURE_IDENTITY_PROOF/gu) ?? []).length >= 2);
+    f.child.send({type:'mediflow-local-ui-cancel',requestId});
+    assert.equal(await result, 'denied');
+    assert.doesNotMatch(f.output(), /mediflow.local-ui.navigation.v1/);
 });
