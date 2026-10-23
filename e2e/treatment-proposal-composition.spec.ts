@@ -155,6 +155,27 @@ test('errore: causa visibile distinta da funzione spenta e recupero esplicito', 
     await expect(panel(page).getByRole('button', { name: 'Prepara proposta' })).toBeEnabled();
 });
 
+test.describe('comandi al tocco', () => {
+    test.use({ hasTouch: true });
+    test('conferma raggiungibile con bersaglio di almeno 44 px', async ({ page }) => {
+        await fixture(page); await open(page); await prepare(page);
+        await panel(page).getByLabel('Ambulatorio per questa proposta').selectOption(AMBULATORY_A.id);
+        await panel(page).getByRole('checkbox').check();
+        const confirm = panel(page).getByRole('button', { name: 'Conferma e genera proposta' });
+        for (const width of [1440, 768, 390, 320]) {
+            await page.setViewportSize({ width, height: 1000 });
+            await confirm.scrollIntoViewIfNeeded();
+            await expect(confirm).toBeEnabled();
+            expect(await confirm.evaluate(element => {
+                const rect = element.getBoundingClientRect();
+                return matchMedia('(pointer: coarse)').matches && rect.height >= 44
+                    && rect.left >= 0 && rect.right <= innerWidth
+                    && [rect.top + 2, rect.bottom - 2].every(y => element.contains(document.elementFromPoint(rect.x + rect.width / 2, y)));
+            }), `Conferma al tocco a ${width}`).toBe(true);
+        }
+    });
+});
+
 for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', '320', 'zoom-200', 'zoom-400']) {
     test(`catture proposta ${theme} ${size}`, async ({ page, baseURL }) => {
         test.setTimeout(180_000);

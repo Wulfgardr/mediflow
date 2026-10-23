@@ -40,6 +40,11 @@
     "owner": "@Wulfgardr"
   },
   {
+    "path": "e2e/fixtures/treatment-reasoning.ts",
+    "reason": "Synthetic catalog, publication and patient factories consumed by treatment-proposal-composition.spec.ts and treatment-reasoning-fabric-review.spec.ts; no standalone test registration.",
+    "owner": "@Wulfgardr"
+  },
+  {
     "path": "e2e/fixtures/trusted-web-request.ts",
     "reason": "WUL-729: Shared request headers and session assertions consumed by selected Playwright specs; no standalone test registration.",
     "owner": "@Wulfgardr"

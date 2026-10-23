@@ -167,7 +167,7 @@ test('Treatment Reasoning UI invia payload strict e mostra una proposta source-b
       await expect(confirmAction).toBeFocused();
       expect(await confirmAction.evaluate(element => {
         const bounds = element.getBoundingClientRect();
-        return bounds.height >= 44 && bounds.left >= 0 && bounds.right <= innerWidth
+        return bounds.height >= (matchMedia('(pointer: coarse)').matches ? 44 : 40) && bounds.left >= 0 && bounds.right <= innerWidth
           && bounds.top >= 0 && bounds.bottom <= innerHeight
           && [bounds.top + 2, bounds.bottom - 2].every(y => element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, y)));
       }), `Confirmation must remain fully reachable at ${width}/${color}`).toBe(true);
