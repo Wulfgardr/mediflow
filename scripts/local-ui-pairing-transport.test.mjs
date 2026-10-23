@@ -30,9 +30,13 @@ test('rendezvous contains no secret and only the code transferred through the lo
   writeFrame(foreign, { type: 'paired', ...expected, nonce: request.nonce, token: 'a'.repeat(24), status: 'accepted' });
   await once(foreign, 'close');
   assert.equal(channel.connected, true);
+  const wrongHost = net.createConnection(request.returnPath); await once(wrongHost, 'connect');
+  writeFrame(wrongHost, { type: 'paired', ...expected, nonce: request.nonce, host: 'another-host', token: code, status: 'accepted' });
+  const rejected = await Promise.race([once(wrongHost, 'close').then(() => true), new Promise(resolve => setTimeout(() => resolve(false), 300))]);
+  wrongHost.destroy(); assert.equal(rejected, true, 'the UI code must retain the requesting host binding');
   const peer = net.createConnection(request.returnPath); await once(peer, 'connect');
   const received = []; frames(peer, frame => received.push(frame));
-  writeFrame(peer, { type: 'paired', ...expected, nonce: request.nonce, token: code, status: 'accepted' });
+  writeFrame(peer, { type: 'paired', ...expected, nonce: request.nonce, host: request.host, token: code, status: 'accepted' });
   await new Promise(resolve => setTimeout(resolve, 20));
   channel.emit('message', { type: 'mediflow-local-ui-navigate', requestId: 'after-confirmation' });
   await new Promise(resolve => setTimeout(resolve, 20));

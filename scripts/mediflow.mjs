@@ -407,7 +407,7 @@ export async function main(args = process.argv.slice(2)) {
         if (pair.socket || pair.expiresAt <= Date.now() || pair.instance !== instance) return;
         const socket = net.createConnection(pair.returnPath); pair.socket = socket;
         socket.on('error', () => {});
-        socket.once('connect', () => writeFrame(socket, { type: 'paired', token: frame.proof, nonce: pair.nonce,
+        socket.once('connect', () => writeFrame(socket, { type: 'paired', token: frame.proof, nonce: pair.nonce, host: pair.host,
           dataDir, sourceFingerprint: identity.sourceFingerprint, status: 'accepted' }));
         frames(socket, message => { void handleNavigation(message, result => writeFrame(socket, result), () => !socket.destroyed, pair); });
         socket.once('close', () => {
