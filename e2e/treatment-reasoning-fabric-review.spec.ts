@@ -7,6 +7,8 @@ import {
 import { HANDLE, RECEIPT_REF, PROVENANCE_REF, AMBULATORY_A, AMBULATORY_B, FIXTURE_CATALOG, publicationFor, createFixture } from './fixtures/treatment-reasoning';
 import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
 
+type Projection = TreatmentReasoningProjectionAttachment;
+
 type RecordedBodies = {
   selection?: unknown;
   ingest?: unknown;
