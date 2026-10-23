@@ -1,0 +1,132 @@
+{
+  "baseCommit": "17af7eae8c9f55ccd43e670d80a9cb00ec6cdf2d",
+  "scope": "R1 marker and dispatch remain separate model actions. R2 immutable identity, R3 archive/connection/key origin and R5 original approval expiry at HTTP dispatch are runtime regressions, outside TLA. adapter.act may await between marker and dispatch. Hashes identify the reviewed mapping, not equivalence.",
+  "tool": {
+    "release": "v1.7.4",
+    "verifier": "TLC 2.19",
+    "sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88"
+  },
+  "bounds": {
+    "operations": 1,
+    "executors": 1,
+    "territorialChanges": 2,
+    "externalEffects": 1,
+    "heapMiB": 512,
+    "workers": 1,
+    "timeoutSeconds": 60
+  },
+  "files": {
+    "lib/local-operation/contract.ts": "19a58c9bcfa00b02da15cfc3c1c7c00d653d1dbb05057d80e846f64fd6cf1457",
+    "lib/local-operation/service.ts": "265984c916f54a6ec3f74d9b3d9254c7d18c492d6ebd221ca94ea5d6625bf4a2",
+    "lib/local-operation/sqlite-journal.ts": "27b252ff36a37e9bc1d499c0b83a7833ef260c869c38835f3cac1c687d536566",
+    "lib/local-operation/host.ts": "fd67b633fa3b5db7e1b6d7f93cba96efec2ea26f92d681e99f3abb9279d9e3f7",
+    "lib/local-operation/journal-cipher.ts": "44001319c6928cf124b2102fe999a30622e134204c662ce689134a6895768f8e",
+    "lib/local-operation/remote-host.ts": "679cf9966780466b28de1a17b1116bc214cd59b873dba393bab1c900944e4c55",
+    "packages/mcp/src/local-operation-server.ts": "d05334130383563da84c36df5aaa5e6ded3e5ad246d88af86d86162628c1421b",
+    "packages/mcp/src/local-operation-contract.ts": "12c8bd9ab76ee2505d08c8ae4da8e6dce7104cf3ea193f31144f48b5691e49ec",
+    "packages/mcp/src/local-operation-client.ts": "805d85af134bc11375edade271629706d9c762999dc4e0ef2691b597cceca7f1",
+    "scripts/local-operation-mcp-stdio.mjs": "bdd8e4a67da4762d77407b67a41830e74728504e17984cc0c118431d1d19c0f9",
+    "docs/formal/local-operation/LocalOperation.tla": "23eed5b454d3f30a64fd39ac3de424f29efbb07f6ad43d27f2949f5a03168565",
+    "docs/formal/local-operation/MC.cfg": "06f928e226df16faeba56c30b642a9b68ca421535883aec585552fac80d15c9f"
+  },
+  "verificationInputs": [
+    "scripts/verify-local-operation.mjs",
+    "lib/local-operation/service.test.ts",
+    "lib/local-operation/host.test.ts",
+    "lib/local-operation/local-operation.test.ts",
+    "lib/local-operation/wire.test.ts",
+    "lib/local-operation/synthetic.fixture.ts",
+    "package.json",
+    "package-lock.json",
+    ".nvmrc",
+    "lib/local-operation/review-regressions.test.ts",
+    "lib/local-operation/approval-expiry.test.ts"
+  ],
+  "reviewBaseCommit": "c8beebe1d561c75b45e3902100a7da39529cda8c",
+  "lastRun": {
+    "at": "2026-10-23T13:44:32.615Z",
+    "generatedStates": 171,
+    "distinctStates": 73,
+    "automaticUnreachableRejected": true,
+    "checks": [
+      {
+        "label": "baseline",
+        "exitCode": 0,
+        "expectedExitCode": 0
+      },
+      {
+        "label": "model-mutant",
+        "exitCode": 12,
+        "expectedExitCode": 12
+      },
+      {
+        "label": "automatic-witness",
+        "exitCode": 12,
+        "expectedExitCode": 12
+      },
+      {
+        "label": "manual-witness",
+        "exitCode": 12,
+        "expectedExitCode": 12
+      },
+      {
+        "label": "automatic-unreachable",
+        "exitCode": 0,
+        "expectedExitCode": 0
+      },
+      {
+        "label": "dispatch-before-marker-mutant",
+        "exitCode": 12,
+        "expectedExitCode": 12
+      },
+      {
+        "label": "runtime-request-authority-mutant",
+        "exitCode": 1,
+        "expectedExitCode": 1
+      },
+      {
+        "label": "runtime-identity-mutant",
+        "exitCode": 1,
+        "expectedExitCode": 1
+      },
+      {
+        "label": "runtime-origin-mutant",
+        "exitCode": 1,
+        "expectedExitCode": 1
+      },
+      {
+        "label": "runtime-approval-expiry-mutant",
+        "exitCode": 1,
+        "expectedExitCode": 1
+      },
+      {
+        "label": "runtime-recovery-mutant",
+        "exitCode": 1,
+        "expectedExitCode": 1
+      },
+      {
+        "label": "runtime-session-mutant",
+        "exitCode": 1,
+        "expectedExitCode": 1
+      },
+      {
+        "label": "wire-mutant",
+        "exitCode": 1,
+        "expectedExitCode": 1
+      },
+      {
+        "label": "runtime-restored",
+        "exitCode": 0,
+        "expectedExitCode": 0
+      },
+      {
+        "label": "model-restored",
+        "exitCode": 0,
+        "expectedExitCode": 0
+      }
+    ]
+  },
+  "mappedCodeCommit": "e0d591af536068fb5911d64506badf980536df53",
+  "integrationBaseCommit": "a12cd01b01cccfe2ab45b590a86dab27ddf46a66",
+  "approvalExpiryReviewBaseCommit": "cec371630c72ff56d5b57c540575d50217a7ceac"
+}

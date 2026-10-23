@@ -73,6 +73,7 @@ export const AUDIT_EVENT_TYPES = [
     'agent.semantic_query.executed',
     /* non-terminal PHI-safe attempt emitted by generic AIP ports. */
     'agent.operation.attempted',
+    'local_operation.changed',
     /* PHI-safe receipt for the host-owned WHO reference-data boundary. */
     'reference_data.icd11.search',
     'reference_data.icd11.code_check',
