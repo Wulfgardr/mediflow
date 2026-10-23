@@ -7,7 +7,7 @@ import { ChoiceField } from '@/components/choice-field';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { RefreshCw } from 'lucide-react';
+import { Pencil, RefreshCw } from 'lucide-react';
 import { indexTreatmentReasoningSources } from './treatment-reasoning-sources';
 import PrivacyBlur from '@/components/privacy-blur';
 import {
@@ -113,6 +113,8 @@ export default function TreatmentReasoningPanel({
     const publication = picker.active && publicationState?.contextRevision === contextRevision ? publicationState.value : null;
     const [sourcesOpen, setSourcesOpen] = useState(false);
     const sourceDetailsId = useId();
+    const boundaryNoteId = useId();
+    const confirmationNoteId = useId();
     const proposalSources = useMemo(() => indexTreatmentReasoningSources(publication ? [
         ...publication.sourceBindings.map(binding => binding.evidenceRefs),
         ...publication.value.data.keyEvidence.map(evidence => evidence.evidenceRefs),
@@ -226,10 +228,14 @@ export default function TreatmentReasoningPanel({
     };
 
     return (
+        <Disclosure title="Proposte" headingLevel={3}>
         <section className={design.panel} data-testid="treatment-reasoning-panel" aria-label="Ragionamento terapeutico">
+            {!treatmentReasoningEnabled ? <div className={design.notice}>
+                <p className={design.strong}>Ragionamento terapeutico spento</p>
+                <Link href="/settings/ai/funzioni">Apri le funzioni cliniche</Link>
+            </div> : <>
             <header className={design.header}>
-                <p className={design.sectionLabel}>Proposte</p>
-                <h3>Ragionamento terapeutico</h3>
+                <h4>Ragionamento terapeutico</h4>
                 <p className={design.meta}>Supporto alle terapie · solo revisione. Nessuna modifica alla cartella.</p>
             </header>
 
@@ -239,14 +245,7 @@ export default function TreatmentReasoningPanel({
                 ))}
             </dl>
 
-            {!treatmentReasoningEnabled && <div className={design.notice}>
-                <p className={design.strong}>Ragionamento terapeutico spento</p>
-                <p>Si accende per funzione nelle impostazioni dell’Intelligence Fabric.</p>
-                <Link href="/settings/ai/funzioni">Apri le funzioni cliniche</Link>
-            </div>}
-
             <div className={design.modelSelection}>
-                <p className={design.groupLabel}>Modello per la proposta</p>
                 <FunctionModelPicker picker={picker} />
             </div>
 
@@ -256,7 +255,7 @@ export default function TreatmentReasoningPanel({
 
             {proposal && !isGenerating ? (
                 <div className={design.preparation}>
-                    <h4>Conferma il contesto</h4>
+                    <h5>Conferma il contesto</h5>
                     <p><PrivacyBlur>Paziente: {proposal.patientName}</PrivacyBlur></p>
                     <ChoiceField label="Ambulatorio per questa proposta" value={ambulatory?.ambulatoryId ?? ''}
                             onChange={(event) => { setAmbulatory(proposal.ambulatories.find((row) => row.ambulatoryId === event.target.value) ?? null); setConfirmed(false); }}>
@@ -268,25 +267,33 @@ export default function TreatmentReasoningPanel({
                         <span>Confermo paziente e ambulatorio per una proposta da rivedere. La cartella resta invariata.</span>
                     </label>
                     <div className={design.actionBar}>
-                        <p className={design.meta}>Verranno usate solo le fonti del contesto confermato.</p>
+                        <p id={confirmationNoteId} className={design.meta}>
+                            {!ambulatory ? 'Scegli l’ambulatorio e conferma paziente e ambulatorio prima di generare.'
+                                : !confirmed ? 'Conferma paziente e ambulatorio prima di generare.'
+                                : !picker.canGenerate ? 'Verifica il modello e i prerequisiti indicati prima di generare.'
+                                : 'Verranno usate solo le fonti del contesto confermato.'}
+                        </p>
                         <div className={design.actions}>
-                            <button type="button" className={design.secondary} onClick={cancelProposal}>Annulla</button>
-                            <button type="button" className={design.primary} disabled={!treatmentReasoningEnabled || !ambulatory || !confirmed || !picker.canGenerate || isBusy} onClick={generatePreview}>Conferma e genera proposta</button>
+                            <button type="button" className="mf-button-secondary" onClick={cancelProposal}>Annulla</button>
+                            <button type="button" className="mf-button-secondary" aria-describedby={confirmationNoteId} disabled={!treatmentReasoningEnabled || !ambulatory || !confirmed || !picker.canGenerate || isBusy} onClick={generatePreview}>Conferma e genera proposta</button>
                         </div>
                     </div>
                 </div>
             ) : !isGenerating && !picker.view.remote?.state && !picker.view.remote?.loading ? (
                 <div className={design.actionBar}>
-                    <p className={design.meta}>La preparazione richiede la conferma di paziente e ambulatorio. Non avvia una generazione automatica.</p>
+                    <p id={boundaryNoteId} className={design.meta}>
+                        {!picker.canGenerate ? 'Verifica il modello e i prerequisiti indicati prima di preparare una proposta.'
+                            : 'La preparazione richiede la conferma di paziente e ambulatorio. Non avvia una generazione automatica.'}
+                    </p>
                     <button type="button" onClick={loadProposal} disabled={!canPrepare}
-                        aria-describedby="treatment-reasoning-boundary-note" className={design.primary}>
+                        aria-describedby={boundaryNoteId} className="mf-button-secondary">
                         {loadingProposal ? 'Preparazione…' : publication ? 'Prepara una nuova proposta' : 'Prepara proposta'}
                     </button>
                 </div>
             ) : null}
-            <p id="treatment-reasoning-boundary-note" className={design.meta}>
-                {!publication && !isBusy && !proposal ? 'Anteprima manuale per verificare coerenza, rischi e prossime azioni. Non modifica la scheda e richiede sempre revisione clinica.' : null}
-            </p>
+            {!publication && !isBusy && !proposal && <p className={design.meta}>
+                Anteprima manuale per verificare coerenza, rischi e prossime azioni. Non modifica la scheda e richiede sempre revisione clinica.
+            </p>}
 
             {isGenerating && <div role="status" aria-live="polite" className={design.loading}>
                 <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -295,7 +302,7 @@ export default function TreatmentReasoningPanel({
 
             {publication && !isGenerating && <article className={design.proposal} data-testid="treatment-reasoning-proposal" data-ink-state="proposal">
                 <header className={design.proposalHeader}>
-                    <h4><span className={design.pencilPoint} aria-hidden="true" />Proposta</h4>
+                    <h5><Pencil size={14} aria-hidden="true" />Proposta</h5>
                     <p className={design.meta}>Da verificare sulle fonti · {formatDateTime(publication.capturedAt)}</p>
                     <p className={design.meta}>Supporto alla revisione: non è una prescrizione, esegue 0 scritture e non applica modifiche.</p>
                 </header>
@@ -310,7 +317,7 @@ export default function TreatmentReasoningPanel({
                 </div>
 
                 {(publication.value.data.caveats.length > 0 || publication.value.data.safetyFlags.length > 0) && <section className={design.group}>
-                    <h4>Cautele e informazioni mancanti</h4>
+                    <h5>Cautele e informazioni mancanti</h5>
                     {publication.value.data.safetyFlags.map(flag => <div key={flag.id} className={`${design.signal} ${severityClasses(flag.severity)}`}>
                         <span aria-hidden="true">{flag.severity === 'urgent_review' ? '◆' : flag.severity === 'caution' ? '▲' : 'ℹ'}</span>
                         <div><p className={design.strong}>{flag.severity === 'urgent_review' ? 'Revisione urgente' : flag.severity === 'caution' ? 'Cautela' : 'Informazione'} · <PrivacyBlur intensity="sm">{flag.label}</PrivacyBlur></p>
@@ -325,7 +332,7 @@ export default function TreatmentReasoningPanel({
 
                 <div className={design.reviewColumns}>
                     <section className={design.group}>
-                        <h4>Elementi a sostegno</h4>
+                        <h5>Elementi a sostegno</h5>
                         {publication.value.data.keyEvidence.length === 0 ? <p className={design.meta}>Nessuna evidenza chiave strutturata.</p>
                             : publication.value.data.keyEvidence.map(evidence => <div key={evidence.id} className={design.proposalRow}>
                                 <p className={design.pencil}><PrivacyBlur intensity="sm">{evidence.statement}</PrivacyBlur></p>
@@ -333,7 +340,7 @@ export default function TreatmentReasoningPanel({
                             </div>)}
                     </section>
                     {publication.value.data.suggestedActions.length > 0 && <section className={design.group}>
-                        <h4>Azioni da valutare</h4>
+                        <h5>Azioni da valutare</h5>
                         {publication.value.data.suggestedActions.map(action => <div key={action.id} className={design.proposalRow}>
                             <p className={design.strong}><PrivacyBlur intensity="sm">{action.label}</PrivacyBlur></p>
                             <p className={design.pencil}><PrivacyBlur intensity="sm">{action.rationale}</PrivacyBlur></p>
@@ -371,6 +378,8 @@ export default function TreatmentReasoningPanel({
                     </dl>
                 </Disclosure>
             </article>}
+            </>}
         </section>
+        </Disclosure>
     );
 }
