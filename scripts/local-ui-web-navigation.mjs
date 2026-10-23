@@ -1,3 +1,5 @@
+import { installWebPairing } from './local-ui-web-pairing.mjs';
+
 const SCHEMA = 'mediflow.local-ui.navigation.v1';
 const INTENTS = new Set(['search', 'identity', 'history', 'prescribing']);
 
@@ -23,11 +25,14 @@ export function installLocalUiWebNavigation(channel, origin, open, target = glob
       || value.expiresAt <= Date.now() || value.expiresAt > Date.now() + 8000) return;
     currentRequestId = value.requestId;
     try {
-      if (typeof publish === 'function' && publish(value.intent) === true) return;
+      if (typeof publish === 'function' && publish(value.intent) === true) return true;
       open(`${origin}/plugin-local-ui`);
+      return true;
     } catch { /* navigation has no clinical effect */ }
   };
-  const close = () => { connected = false; channel.off('message', receive); channel.off('disconnect', close); };
+  const closePairing = installWebPairing(channel, { instance: process.env.MEDIFLOW_LOCAL_UI_INSTANCE,
+    dataDir: process.env.MEDIFLOW_DATA_DIR, sourceFingerprint: process.env.MEDIFLOW_APP_SOURCE_FINGERPRINT }, receive, target);
+  const close = () => { closePairing(); connected = false; channel.off('message', receive); channel.off('disconnect', close); };
   channel.on('message', receive); channel.once('disconnect', close);
   channel.send?.('{"schemaVersion":"mediflow.local-ui.ready.v1"}');
   return close;

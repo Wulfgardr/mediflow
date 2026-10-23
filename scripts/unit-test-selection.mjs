@@ -9,6 +9,8 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/fhir-scale-export-falsification.test.mjs',
   'scripts/owned-synthetic-http-suite.test.mjs',
   'scripts/launcher-helpers.test.mjs',
+  'scripts/local-ui-pairing-authority.test.mjs',
+  'scripts/local-ui-pairing-transport.test.mjs',
   'scripts/package-local-ui-plugin.test.mjs',
   'scripts/check-static-routes.test.mjs',
   'scripts/portable-local-test-selection.test.mjs',

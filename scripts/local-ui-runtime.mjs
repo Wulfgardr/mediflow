@@ -47,7 +47,7 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
   if (identity.worktreeHash !== 'clean' || identity.revision !== revision.slice(0, 12)) return unavailable();
   const expected = { sourceFingerprint: identity.sourceFingerprint, dataDir };
   let starting = null, launcher = null;
-  const start = async () => {
+  const start = async signal => {
     const port = await new Promise((resolve, reject) => {
       const server = net.createServer(); server.once('error', reject);
       server.listen(0, '127.0.0.1', () => { const port = server.address().port; server.close(error => error ? reject(error) : resolve(port)); });
@@ -60,26 +60,32 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
       await new Promise((resolve, reject) => {
         const timer = setTimeout(() => finish(new Error('navigation_unavailable')), 8000);
         const exited = () => finish(new Error('navigation_unavailable'));
+        const abort = () => finish(new Error('navigation_unavailable'));
         const receive = frame => {
           if (frame?.type !== 'mediflow-local-ui-connected') return;
           finish(frame.dataDir === expected.dataDir && frame.sourceFingerprint === expected.sourceFingerprint
             ? null : new Error('navigation_unavailable'));
         };
         const finish = error => {
-          clearTimeout(timer); child.off('message', receive); child.off('error', exited);
+          clearTimeout(timer); signal.removeEventListener('abort', abort); child.off('message', receive); child.off('error', exited);
           child.off('exit', exited); child.off('disconnect', exited);
-          if (error) reject(error); else resolve();
+          if (error) { if (child.connected) child.disconnect(); reject(error); } else resolve();
         };
+        signal.addEventListener('abort', abort, { once: true });
+        if (signal.aborted) { abort(); return; }
         child.on('message', receive); child.once('error', exited); child.once('exit', exited); child.once('disconnect', exited);
       });
+      if (!child.connected || child.exitCode !== null || child.signalCode !== null) return unavailable();
       launcher = child;
+      const retire = () => { if (launcher === child) launcher = null; };
+      child.once('exit', retire); child.once('disconnect', retire);
     } finally { child.unref(); child.channel?.unref(); }
   };
   return async (intent, signal) => {
     const expiresAt = Date.now() + 8000;
     const deadline = AbortSignal.any([signal, AbortSignal.timeout(8000)]);
     deadline.throwIfAborted();
-    if (!launcher) { starting ??= start().finally(() => { starting = null; }); await starting; }
+    if (!launcher) { starting ??= start(deadline).finally(() => { starting = null; }); await starting; }
     for (;;) {
       deadline.throwIfAborted();
       if (await navigateOwnedLocalUiRuntime(launcher, intent, deadline, expiresAt, expected)) return;

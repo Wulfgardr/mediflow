@@ -4,6 +4,7 @@
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import { PluginLocalUiPairing } from '@/components/plugin-local-ui-pairing';
 import { RuntimeTwinWorkspace } from '@/components/runtime-twin-workspace';
 import { AppRevisionGuard } from '@/components/app-revision-guard';
 import { PrivacyProvider } from '@/components/privacy-provider';
@@ -40,6 +41,7 @@ export function RootRuntimeShell({
       <ThemeProvider defaultTheme="system" storageKey="mediflow-theme">
         <AppRevisionGuard fingerprint={fingerprint} />
         <SecurityProvider>
+          <PluginLocalUiPairing />
           <UIAccessibilityProvider>
             <UIStyleProvider>
               <PrivacyProvider>
