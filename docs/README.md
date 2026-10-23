@@ -45,6 +45,11 @@ macOS 27.2. Treatment Reasoning resta ATHENA/MLX locale; I-3b definisce il
 filone riutilizzabile e condiziona le celle remote. Le decisioni ancora aperte
 sono nominate nel contratto; U0 e pilota chiuso non attestano il completamento
 della release.
+Il [censimento GPUI G-0](./analysis/2026-10-23-gpui-census.md) confronta la
+base `0a1980f32` con le 66 righe di parità, tutte le route Web e Punto
+d'inchiostro. Assegna i residui alle unità G-1–9, distingue il pilota
+installato dal sorgente e propone una scomposizione finita delle PR;
+non attesta parità o qualifica del bundle.
 La [prima tranche locale del 26 settembre](./analysis/2026-09-26-090-first-tranche.md)
 distingue inventario, correzioni pazienti, audit pilota e prove dal rilascio.
 
