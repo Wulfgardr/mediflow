@@ -502,23 +502,32 @@ test('cold plugin startup forwards ordinary launcher environment and preserves t
         HOME: directory, LANG: 'it_IT.UTF-8', TMPDIR: directory, XDG_CONFIG_HOME: path.join(directory, 'config'),
         MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', SYNTHETIC_E2E_FLAG: '1',
         MEDIFLOW_PLUGIN_TEST_SECRET: 'never-forward', NODE_OPTIONS: '',
+        MEDIFLOW_ATHENA_MLX_GENERATE_BIN: '/synthetic/runner', MEDIFLOW_ATHENA_MODEL_DIR: '/synthetic/model',
+        MEDIFLOW_ATHENA_MLX_PYTHON: '3.12', MEDIFLOW_ATHENA_MLX_LM_PACKAGE: 'mlx-lm==0.29.1',
+        MEDIFLOW_ATHENA_MAX_TOKENS: '512', MEDIFLOW_ATHENA_SEED: '17', MEDIFLOW_UVX_BIN: '/synthetic/uvx',
     } });
     assert.equal(result.status, 0, result.stderr);
     const { args, env } = JSON.parse(result.stdout);
     assert.deepEqual(Object.keys(env).filter(key => /E2E/iu.test(key)), []);
     for (const [key, value] of Object.entries({ HOME: directory, LANG: 'it_IT.UTF-8', TMPDIR: directory,
         XDG_CONFIG_HOME: path.join(directory, 'config'), MEDIFLOW_DATA_DIR: data })) assert.equal(env[key], value, key);
+    for (const name of ['MEDIFLOW_ATHENA_MLX_GENERATE_BIN', 'MEDIFLOW_ATHENA_MODEL_DIR', 'MEDIFLOW_ATHENA_MLX_PYTHON',
+        'MEDIFLOW_ATHENA_MLX_LM_PACKAGE', 'MEDIFLOW_ATHENA_MAX_TOKENS', 'MEDIFLOW_ATHENA_SEED', 'MEDIFLOW_UVX_BIN']) {
+        assert.equal(env[name], ({ MEDIFLOW_ATHENA_MLX_GENERATE_BIN: '/synthetic/runner', MEDIFLOW_ATHENA_MODEL_DIR: '/synthetic/model',
+          MEDIFLOW_ATHENA_MLX_PYTHON: '3.12', MEDIFLOW_ATHENA_MLX_LM_PACKAGE: 'mlx-lm==0.29.1',
+          MEDIFLOW_ATHENA_MAX_TOKENS: '512', MEDIFLOW_ATHENA_SEED: '17', MEDIFLOW_UVX_BIN: '/synthetic/uvx' })[name], name);
+    }
     assert.equal(env.MEDIFLOW_PLUGIN_TEST_SECRET, undefined);
     assert.equal(env.NODE_OPTIONS, undefined);
     assert.equal(env.PATH, `${path.dirname(process.execPath)}${path.delimiter}${process.env.PATH}`);
     assert.deepEqual(args.slice(1), ['--riusa']);
 });
 
-async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true) {
+async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, webIdentity = true, overrides = {}) {
     const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-ordinary-launcher-')));
     const source = path.join(directory, 'source'), home = path.join(directory, 'home'), data = path.join(directory, 'data');
     mkdirSync(path.join(source, 'scripts'), { recursive: true }); mkdirSync(home); mkdirSync(data);
-    for (const name of ['mediflow.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs']) {
+    for (const name of ['mediflow.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs']) {
         const bytes = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
         writeFileSync(path.join(source, 'scripts', name), name === 'mediflow.mjs' ? bytes.replace('const startOptionalOllama = () => {', 'const startOptionalOllama = () => { process.stderr.write(\"FIXTURE_OLLAMA_START\\n\"); return;') : bytes);
     }
@@ -531,14 +540,31 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true) {
         export * from ${JSON.stringify(new URL('./launcher-helpers.mjs', import.meta.url).href)};
         export const checkNode = () => ({ ok: true });
         export const knownMainUpdates = () => 0;
-        export const openUrl = () => 0;
+        export const openUrl = url => { process.stderr.write('FIXTURE_OPEN ' + url + '\\n'); return 0; };
         export const readProductIdentity = () => (${JSON.stringify(identity)});`);
     writeFileSync(path.join(source, 'scripts/build-input-metadata.mjs'), 'export const macDerivedDataDirectory = () => "/synthetic-no-native";');
     writeFileSync(path.join(source, 'scripts/source-runtime.mjs'), `
         import http from 'node:http';
+        import { webIdentityProof } from ${JSON.stringify(new URL('./local-ui-web-identity.mjs', import.meta.url).href)};
+        import { installLocalUiWebNavigation } from ${JSON.stringify(new URL('./local-ui-web-navigation.mjs', import.meta.url).href)};
         export const verifySourceRuntime = () => ({ identity: ${JSON.stringify(identity)} });
         if (process.argv[1].endsWith('source-runtime.mjs')) {
-            const server = http.createServer((_req, res) => { res.setHeader('Content-Type', 'application/json');
+            let live = true;
+            const pairing = () => globalThis[Symbol.for('mediflow.local-ui.pairing.v1')];
+            installLocalUiWebNavigation(process, 'http://127.0.0.1:' + process.env.PORT, () => {});
+            const server = http.createServer(async (_req, res) => {
+                if (_req.url === '/fixture-pairing') { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(pairing().snapshot())); return; }
+                if (_req.url === '/fixture-decision') { let body = ''; for await (const part of _req) body += part;
+                    const value = JSON.parse(body); const ok = pairing().decide(value.nonce, value.allow, {current:()=>live}, value.code);
+                    res.end(JSON.stringify({ok})); return; }
+                if (_req.url === '/fixture-lock') { live = false; pairing().snapshot(); res.end('{}'); return; }
+                if (_req.url === '/fixture-env') { res.end(JSON.stringify(process.env)); return; }
+                if (${webIdentity} && _req.url === '/api/plugin-local-ui/identity') {
+                    let challenge = ''; for await (const part of _req) challenge += part;
+                    const proof = webIdentityProof(process.env.MEDIFLOW_LOCAL_UI_WEB_SECRET, challenge);
+                    res.setHeader('Content-Length', '64'); res.end(proof); return;
+                }
+                res.setHeader('Content-Type', 'application/json');
                 res.end(JSON.stringify({ ...${JSON.stringify(identity)}, fingerprint: 'synthetic' })); });
             server.listen(Number(process.env.PORT), '127.0.0.1', () => {
                 process.stderr.write('MEDIFLOW_HEADLESS_WEB_READY ' + JSON.stringify({ url: 'http://127.0.0.1:' + server.address().port }) + '\\n');
@@ -559,7 +585,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true) {
     await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
     const port = socket.address().port; await new Promise(resolve => socket.close(resolve));
     const child = spawn(process.execPath, [path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), '--senza-browser', ...args], {
-        env: { ...process.env, ...options.env, HOME: home, USERPROFILE: home, PORT: String(port) }, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
+        env: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home, PORT: String(port) }, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
     t.after(async () => {
         if (child.exitCode === null && child.signalCode === null) { const exited = once(child, 'exit'); child.kill('SIGTERM'); await exited; }
         rmSync(directory, { recursive: true, force: true });
@@ -573,7 +599,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true) {
             await new Promise(resolve => setTimeout(resolve, 10));
         }
     };
-    return { source, data, stateFiles, child, until, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
+    return { source, data, stateFiles, child, until, environment: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home }, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
 }
 
 test('headless ordinary runtime cannot acknowledge plugin navigation', async t => {
@@ -821,4 +847,95 @@ test('cold navigator waits for the inherited peer handshake before its first req
     `;
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], { timeout: 4000, encoding:'utf8' });
     assert.equal(result.status, 0, result.stderr);
+});
+
+
+test('a public revision response cannot establish owned Web identity', async t => {
+    const f = await ordinaryLauncherFixture(t, 'web', ['--scelta', 'web'], true, false);
+    await f.until(() => f.output().includes('Pronto:') || f.output().includes('identità Web'));
+    await assert.rejects(navigateOwnedLocalUiRuntime(f.child, 'history', AbortSignal.timeout(2000), Date.now() + 1500, f.expected));
+    assert.doesNotMatch(f.output(), /FIXTURE_NAVIGATION/);
+});
+
+test('cold navigator restarts after the owned launcher exits after handshake', t => {
+    const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-ipc-handshake-')));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    const source = path.join(directory, 'source'), data = path.join(directory, 'data');
+    mkdirSync(path.join(source, 'scripts'), { recursive: true }); mkdirSync(data);
+    writeFileSync(path.join(source, 'scripts/mediflow.mjs'), `
+        process.on('message', () => {});
+        process.once('disconnect', () => process.exit(0));
+        setTimeout(() => {
+            process.on('message', frame => {
+                if (frame.type === 'mediflow-local-ui-navigate') { process.send({type:'mediflow-local-ui-result',requestId:frame.requestId,status:'accepted'}, () => { process.disconnect(); process.exit(0); }); }
+            });
+            process.send({type:'mediflow-local-ui-connected',dataDir:process.env.MEDIFLOW_DATA_DIR,sourceFingerprint:'synthetic'});
+        }, 100);`);
+    const script = `
+        import { registerHooks } from 'node:module';
+        registerHooks({ load(url, context, next) {
+            if (url === ${JSON.stringify(new URL('./launcher-helpers.mjs', import.meta.url).href)}) return { format: 'module', shortCircuit: true,
+                source: 'export const readProductIdentity = () => ({ worktreeHash: "clean", revision: "aaaaaaaaaaaa", sourceFingerprint:"synthetic" });' };
+            return next(url, context);
+        } });
+        const { createLocalUiRuntimeNavigator } = await import(${JSON.stringify(new URL('./local-ui-runtime.mjs', import.meta.url).href)});
+        const keepAlive = setInterval(() => {}, 1000);
+        try { const navigate = createLocalUiRuntimeNavigator({sourceRoot:${JSON.stringify(source)}, dataDir:${JSON.stringify(data)}, revision:'a'.repeat(40)}); await navigate('history',AbortSignal.timeout(1500)); await new Promise(r=>setTimeout(r,150)); await navigate('identity',AbortSignal.timeout(1500)); }
+        finally {clearInterval(keepAlive);}
+    `;
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], { timeout: 4000, encoding:'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+});
+
+test('an existing ordinary launcher pairs only after code confirmation in its Web and revokes on lock', async t => {
+    const f = await ordinaryLauncherFixture(t, 'web', [], false);
+    await f.until(() => f.output().includes('Pronto:'));
+    const receipt = JSON.parse(readFileSync(path.join(f.stateFiles.lockDirectory, 'instance.json')));
+    const state = await (await fetch(new URL('state', receipt.choiceUrl))).json();
+    let output = '';
+    const bridge = spawn(process.execPath, [path.join(f.source, 'scripts/mediflow.mjs'), '--riusa'], {
+        env: f.environment, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
+    bridge.stderr.on('data', chunk => { output += chunk; });
+    t.after(async () => { if (bridge.connected) { const exited = once(bridge, 'exit'); bridge.disconnect(); await exited; } });
+    await f.until(() => output.includes('FIXTURE_OPEN '));
+    const codeUrl = output.match(/FIXTURE_OPEN (http[^\s]+)/u)[1];
+    const html = await (await fetch(codeUrl)).text();
+    const code = html.match(/<code[^>]*>([a-f0-9]{24})<\/code>/u)[1];
+    let pending;
+    for (let index = 0; index < 100; index++) {
+        pending = (await (await fetch(state.url + '/fixture-pairing')).json()).pending[0];
+        if (pending) break;
+        await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    assert.ok(pending);
+    assert.equal(await navigateOwnedLocalUiRuntime(bridge, 'history', AbortSignal.timeout(1500), Date.now()+1400, f.expected), false);
+    const decision = await fetch(state.url + '/fixture-decision', { method: 'POST', body: JSON.stringify({nonce:pending.nonce, allow:true, code}) });
+    assert.equal((await decision.json()).ok, true);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(await navigateOwnedLocalUiRuntime(bridge, 'history', AbortSignal.timeout(1500), Date.now()+1400, f.expected), true);
+    await fetch(state.url + '/fixture-lock');
+    await f.until(() => !bridge.connected);
+    await assert.rejects(navigateOwnedLocalUiRuntime(bridge, 'identity', AbortSignal.timeout(1000), Date.now()+900, f.expected));
+    assert.equal((await (await fetch(state.url + '/fixture-pairing')).json()).active.length, 0);
+    assert.equal(f.child.exitCode, null);
+});
+
+test('ordinary Web children preserve supported configuration through the plugin environment', async t => {
+    const configured = { MEDIFLOW_ATHENA_MLX_GENERATE_BIN:'/synthetic/runner', MEDIFLOW_ATHENA_MODEL_DIR:'/synthetic/model',
+      MEDIFLOW_ATHENA_MLX_PYTHON:'3.12', MEDIFLOW_ATHENA_MLX_LM_PACKAGE:'mlx-lm==0.29.1',
+      MEDIFLOW_ATHENA_MAX_TOKENS:'512', MEDIFLOW_ATHENA_SEED:'17', MEDIFLOW_UVX_BIN:'/synthetic/uvx',
+      MEDIFLOW_ICD_WHO_ENABLED:'1', MEDIFLOW_ICD_WHO_LOCAL_IMAGE_DIGEST:'synthetic-image',
+      MEDIFLOW_ICD_WHO_LOCAL_DATASET_ID:'synthetic-dataset', MEDIFLOW_NETWORK_DISABLED:'1', MEDIFLOW_ATTACHMENT_MAX_BYTES:'4096' };
+    const { ordinaryLauncherEnvironment } = await import('../plugins/mediflow-local-ui/src/runtime-environment.mjs');
+    const environments = [];
+    for (const [reuse, config] of [[false, configured], [true, ordinaryLauncherEnvironment('/synthetic', configured)]]) {
+        const f = await ordinaryLauncherFixture(t, 'web', [], reuse, true, config);
+        await f.until(() => f.output().includes('Pronto:'));
+        const receipt = JSON.parse(readFileSync(path.join(f.stateFiles.lockDirectory, 'instance.json')));
+        const state = await (await fetch(new URL('state', receipt.choiceUrl))).json();
+        const environment = await (await fetch(state.url + '/fixture-env')).json();
+        environments.push(Object.fromEntries(Object.keys(configured).map(key=>[key,environment[key]])));
+    }
+    assert.deepEqual(environments[1], environments[0]);
+    assert.deepEqual(environments[0], configured);
 });

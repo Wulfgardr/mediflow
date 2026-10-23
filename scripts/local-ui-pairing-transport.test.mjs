@@ -1,0 +1,44 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import net from 'node:net';
+import { once } from 'node:events';
+import { bridgeExistingLocalUi, readPairingRequests, frames, writeFrame } from './local-ui-pairing-transport.mjs';
+
+test('rendezvous contains no secret and only the code transferred through the local UI admits the return peer', async t => {
+  const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-ui-test-')));
+  fs.chmodSync(directory, 0o700); t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const channel = new EventEmitter(), sent = [];
+  Object.assign(channel, { connected: true, send(frame, done) { sent.push(frame); done?.(); },
+    disconnect() { this.connected = false; this.emit('disconnect'); } });
+  const expected = { dataDir: '/synthetic/archive', sourceFingerprint: 'synthetic-source' };
+  let codeUrl;
+  const close = await bridgeExistingLocalUi(directory, expected, channel, url => { codeUrl = url; }); t.after(close);
+  const files = fs.readdirSync(directory); assert.equal(files.length, 1);
+  const bytes = fs.readFileSync(path.join(directory, files[0]), 'utf8');
+  const [request] = readPairingRequests(directory);
+  assert.deepEqual(Object.keys(request).sort(), ['dataDir', 'expiresAt', 'host', 'nonce', 'returnPath', 'sourceFingerprint']);
+  channel.emit('message', { type: 'mediflow-local-ui-navigate', requestId: 'before-confirmation' });
+  assert.deepEqual(sent.at(-1), { type: 'mediflow-local-ui-result', requestId: 'before-confirmation', status: 'waiting' });
+  const html = await (await fetch(codeUrl)).text();
+  const code = html.match(/<code[^>]*>([a-f0-9]{24})<\/code>/u)?.[1]; assert.ok(code);
+  assert.ok(!bytes.includes(code)); assert.ok(!JSON.stringify(sent).includes(code));
+  const foreign = net.createConnection(request.returnPath); await once(foreign, 'connect');
+  writeFrame(foreign, { type: 'paired', ...expected, nonce: request.nonce, token: 'a'.repeat(24), status: 'accepted' });
+  await once(foreign, 'close');
+  assert.equal(channel.connected, true);
+  const peer = net.createConnection(request.returnPath); await once(peer, 'connect');
+  const received = []; frames(peer, frame => received.push(frame));
+  writeFrame(peer, { type: 'paired', ...expected, nonce: request.nonce, token: code, status: 'accepted' });
+  await new Promise(resolve => setTimeout(resolve, 20));
+  channel.emit('message', { type: 'mediflow-local-ui-navigate', requestId: 'after-confirmation' });
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.deepEqual(received, [{ type: 'mediflow-local-ui-navigate', requestId: 'after-confirmation' }]);
+  assert.ok(!JSON.stringify(sent).includes(code));
+  peer.destroy(); await once(channel, 'disconnect');
+  assert.equal(channel.connected, false);
+  assert.equal(fs.readdirSync(directory).length, 0);
+});

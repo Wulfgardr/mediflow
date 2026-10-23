@@ -12,6 +12,8 @@ import { verifySourceRuntime } from './source-runtime.mjs';
 import { macDerivedDataDirectory } from './build-input-metadata.mjs';
 import { createChoiceServer } from './mediflow-launcher-page.mjs';
 import { prepareLauncherState } from './launcher-state.mjs';
+import { verifyOwnedWeb } from './local-ui-web-identity.mjs';
+import { pairingDirectory, readPairingRequests, bridgeExistingLocalUi, frames, writeFrame } from './local-ui-pairing-transport.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CHOICES = ['web', 'mac', 'agenti', 'sviluppo'];
@@ -185,12 +187,21 @@ export async function main(args = process.argv.slice(2)) {
     if (!options.noBrowser && !needsTextMenu()) openUrl(url);
     return;
   }
+  const requestsDirectory = pairingDirectory(lockDirectory);
+  if (pluginChannel && fs.existsSync(lockDirectory)) {
+    const stat = fs.lstatSync(lockDirectory);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('navigation_unavailable');
+    await bridgeExistingLocalUi(requestsDirectory, { dataDir, sourceFingerprint: identity.sourceFingerprint });
+    return;
+  }
   claimLauncher(lockDirectory, identity, !pluginChannel);
   const native = nativeApplication(ROOT);
   const dirty = identity.worktreeHash !== 'clean';
   let state = { busy: false, ready: false, url: null, message: 'Scegli come aprire MediFlow.', needsInstall: false };
   let child = null, chooser = null, closing = false, installApproval = null, failedBuild = null, generation = 0;
-  let terminal = null, useTerminal = false;
+  let terminal = null, useTerminal = false, webSecret = null, instance = null;
+  const pairRequests = new Map();
+  let pairingPoll = null;
   const question = async prompt => {
     if (!process.stdin.isTTY) throw new Error('Serve una scelta esplicita. Usa --scelta web --senza-browser, oppure --scelta sviluppo per sviluppo.');
     terminal ||= createInterface({ input: process.stdin, output: process.stderr });
@@ -218,6 +229,9 @@ export async function main(args = process.argv.slice(2)) {
     if (closing) return;
     closing = true;
     update({ ready: false, url: null, message: 'Arresto in corso.' });
+    clearInterval(pairingPoll);
+    for (const pair of pairRequests.values()) pair.socket?.destroy();
+    pairRequests.clear();
     installApproval?.(false);
     terminal?.close();
     await stopOwnedChild(child);
@@ -241,14 +255,29 @@ export async function main(args = process.argv.slice(2)) {
   const cancelNavigation = requestId => {
     if (child?.connected) child.send(JSON.stringify({ schemaVersion: 'mediflow.local-ui.cancel.v1', requestId }), () => {});
   };
-  const navigate = async (intent, request) => {
+  const navigate = async (intent, request, pair = null) => {
     request.signal.throwIfAborted();
     if (!state.navigationReady || !state.ready || !state.url || !child?.connected || child.exitCode !== null || child.signalCode !== null) throw new Error('Navigazione non disponibile.');
-    await new Promise((resolve, reject) => child.send(JSON.stringify({ schemaVersion: 'mediflow.local-ui.navigation.v1', intent, requestId: request.requestId, expiresAt: request.expiresAt }), error => error ? reject(new Error('Navigazione non disponibile.')) : resolve()));
+    if (!await verifyOwnedWeb(state.url, webSecret)) throw new Error('identità Web non verificata.');
+    request.signal.throwIfAborted();
+    const navigation = JSON.stringify({ schemaVersion: 'mediflow.local-ui.navigation.v1', intent, requestId: request.requestId, expiresAt: request.expiresAt });
+    if (pair) {
+      const owned = child;
+      await new Promise((resolve, reject) => {
+        const finish = error => { clearTimeout(timer); owned.off('message', receive); request.signal.removeEventListener('abort', abort); error ? reject(error) : resolve(); };
+        const abort = () => finish(new Error('Navigazione non disponibile.'));
+        const receive = frame => {
+          if (frame?.type === 'mediflow-local-ui-pair-result' && frame.requestId === request.requestId) finish(frame.status === 'accepted' ? null : new Error('Navigazione non disponibile.'));
+        };
+        const timer = setTimeout(abort, Math.max(1, request.expiresAt - Date.now()));
+        owned.on('message', receive); request.signal.addEventListener('abort', abort, { once: true });
+        owned.send({ type: 'mediflow-local-ui-pair-use', nonce: pair.nonce, host: pair.host, requestId: request.requestId, navigation }, error => { if (error) abort(); });
+      });
+    } else await new Promise((resolve, reject) => child.send(navigation, error => error ? reject(new Error('Navigazione non disponibile.')) : resolve()));
   };
-  const onParentMessage = async message => {
-    if (message?.type === 'mediflow-launcher-stop') { if (!pluginChannel) onSignal(); return; }
-    if (!pluginChannel || typeof message?.requestId !== 'string' || !/^[a-f0-9-]{36}$/u.test(message.requestId)) return;
+  const handleNavigation = async (message, reply, isConnected, pair = null) => {
+    if (message?.type === 'mediflow-launcher-stop') { if (!pair && !pluginChannel) onSignal(); return; }
+    if ((!pluginChannel && !pair) || typeof message?.requestId !== 'string' || !/^[a-f0-9-]{36}$/u.test(message.requestId)) return;
     const { requestId } = message;
     if (message.type === 'mediflow-local-ui-cancel') {
       if (Object.keys(message).sort().join(',') !== 'requestId,type') return;
@@ -265,14 +294,15 @@ export async function main(args = process.argv.slice(2)) {
       if (!state.ready && !closing && state.step !== 'errore') status = 'waiting';
       else if (rememberNavigation(requestId)) {
         try {
-          await navigate(message.intent, { requestId, expiresAt: message.expiresAt, signal: AbortSignal.timeout(message.expiresAt - Date.now()) });
-          status = process.connected ? 'accepted' : 'denied';
+          await navigate(message.intent, { requestId, expiresAt: message.expiresAt, signal: AbortSignal.timeout(message.expiresAt - Date.now()) }, pair);
+          status = isConnected() ? 'accepted' : 'denied';
         } catch { cancelNavigation(requestId); }
 
       }
     }
-    if (process.connected) process.send({ type: 'mediflow-local-ui-result', requestId, status }, () => {});
+    if (isConnected()) reply({ type: 'mediflow-local-ui-result', requestId, status });
   };
+  const onParentMessage = message => handleNavigation(message, frame => process.send(frame, () => {}), () => process.connected);
   const onDisconnect = () => {
     for (const requestId of pendingNavigation) cancelNavigation(requestId);
     if (!pluginChannel) onSignal();
@@ -346,7 +376,11 @@ export async function main(args = process.argv.slice(2)) {
       const port = Number(process.env.PORT || 3000);
       if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT deve essere un numero tra 1 e 65535.');
       if (choice !== 'agenti') await requireFreePort(port);
-      const env = { ...process.env, HOSTNAME: '127.0.0.1', PORT: String(port),
+      for (const pair of pairRequests.values()) pair.socket?.destroy();
+      pairRequests.clear();
+      instance = crypto.randomUUID();
+      webSecret = choice === 'web' ? crypto.randomBytes(32).toString('hex') : null;
+      const env = { ...process.env, ...(webSecret ? { MEDIFLOW_LOCAL_UI_WEB_SECRET: webSecret, MEDIFLOW_LOCAL_UI_INSTANCE: instance } : {}), HOSTNAME: '127.0.0.1', PORT: String(port),
         ...(choice === 'web' ? { MEDIFLOW_PLUGIN_LOCAL_UI: '1' } : {}),
         MEDIFLOW_APP_REVISION: current.revision, MEDIFLOW_APP_BRANCH: current.branch,
         MEDIFLOW_APP_WORKTREE_HASH: current.worktreeHash, MEDIFLOW_APP_SOURCE_FINGERPRINT: current.sourceFingerprint,
@@ -354,6 +388,30 @@ export async function main(args = process.argv.slice(2)) {
       const owned = choice === 'sviluppo'
         ? run(process.execPath, [path.join(ROOT, 'node_modules/next/dist/bin/next'), 'dev', '--hostname', '127.0.0.1', '--port', String(port)], true, env)
         : run(process.execPath, [path.join(ROOT, 'scripts/source-runtime.mjs'), choice === 'agenti' ? 'headless' : 'web'], true, env);
+      owned.on('message', frame => {
+        if (!['mediflow-local-ui-pair-approved', 'mediflow-local-ui-pair-revoked'].includes(frame?.type)) return;
+        const pair = pairRequests.get(frame.nonce);
+        if (!pair || owned !== child) return;
+        if (frame.type.endsWith('revoked')) {
+          if (pair.socket) pair.socket.destroy();
+          else {
+            const denied = net.createConnection(pair.returnPath); denied.on('error', () => {});
+            denied.once('connect', () => denied.end(JSON.stringify({ type: 'paired', token: '', nonce: pair.nonce,
+              dataDir, sourceFingerprint: identity.sourceFingerprint, status: 'denied' }) + '\n'));
+          }
+          pairRequests.delete(frame.nonce); return;
+        }
+        if (pair.socket || pair.expiresAt <= Date.now() || pair.instance !== instance) return;
+        const socket = net.createConnection(pair.returnPath); pair.socket = socket;
+        socket.on('error', () => {});
+        socket.once('connect', () => writeFrame(socket, { type: 'paired', token: frame.proof, nonce: pair.nonce,
+          dataDir, sourceFingerprint: identity.sourceFingerprint, status: 'accepted' }));
+        frames(socket, message => { void handleNavigation(message, result => writeFrame(socket, result), () => !socket.destroyed, pair); });
+        socket.once('close', () => {
+          pairRequests.delete(pair.nonce);
+          if (owned.connected) owned.send({ type: 'mediflow-local-ui-pair-revoke', nonce: pair.nonce }, () => {});
+        });
+      });
       const headlessUrl = new Promise((resolve, reject) => {
         if (choice !== 'agenti') { resolve(`http://127.0.0.1:${port}`); return; }
         let buffer = '';
@@ -379,6 +437,7 @@ export async function main(args = process.argv.slice(2)) {
           if (closing || !owned.pid || owned.exitCode !== null || owned.signalCode !== null) throw new Error('Il processo MediFlow si è arrestato prima di essere pronto.');
           return probeRunningInstance(url, expected);
         } });
+      if (choice === 'web' && !await verifyOwnedWeb(target, webSecret)) throw new Error('L’identità Web non è verificata.');
       if (!ready.ok) throw new Error('MediFlow non risponde con l’identità attesa. Controlla il terminale.');
       if (owned.exitCode !== null || owned.signalCode !== null) throw new Error('Il processo MediFlow si è arrestato durante l’avvio.');
     }
@@ -417,6 +476,20 @@ export async function main(args = process.argv.slice(2)) {
       version: identity.version, folder: path.basename(ROOT) });
     if (closing) { await chooser.close(); return; }
     atomicJson(path.join(lockDirectory, 'instance.json'), { pid: process.pid, checkoutPath: identity.checkoutPath, dataDir, choiceUrl: chooser.url });
+    pairingPoll = setInterval(() => {
+      if (!state.ready || !state.navigationReady || closing || !child?.connected) return;
+      try {
+        for (const request of readPairingRequests(requestsDirectory)) {
+          if (request.dataDir !== dataDir || request.sourceFingerprint !== identity.sourceFingerprint || pairRequests.size >= 64) continue;
+          const pair = { ...request, instance, socket: null }; pairRequests.set(pair.nonce, pair);
+          child.send({ type: 'mediflow-local-ui-pair-offer', request: { nonce: pair.nonce, host: pair.host,
+            expiresAt: pair.expiresAt, dataDir, sourceFingerprint: identity.sourceFingerprint, instance } }, () => {});
+        }
+        for (const [nonce, pair] of pairRequests) if (!pair.socket && pair.expiresAt <= Date.now()) {
+          pairRequests.delete(nonce); child.send({ type: 'mediflow-local-ui-pair-revoke', nonce }, () => {});
+        }
+      } catch { /* An invalid rendezvous never grants navigation. */ }
+    }, 100);
     log(`MediFlow ${identity.version}\nCartella: ${ROOT}\nAvvio: ${chooser.url}\nCtrl+C per arrestare.`);
     const preference = readJson(preferencesFile);
     const selected = selectChoice({ explicit: options.choice, remembered: preference?.schemaVersion === 1 ? preference.choice : null,

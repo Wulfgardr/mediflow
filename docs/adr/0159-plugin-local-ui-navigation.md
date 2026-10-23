@@ -31,7 +31,10 @@ PATH conserva i programmi locali configurati, preceduto dal Node fisico ammesso;
 SystemRoot/WINDIR/ComSpec/PATHEXT servono ai comandi Windows. DISPLAY,
 WAYLAND_DISPLAY, XDG_RUNTIME_DIR e DBUS_SESSION_BUS_ADDRESS conservano l'accesso
 alla sessione grafica Linux. MEDIFLOW_MAC_CONFIG conserva la scelta del bundle
-locale. MEDIFLOW_DATA_DIR proviene sempre dall'archivio ammesso nel pacchetto;
+locale. Le sei configurazioni MEDIFLOW_ATHENA_* lette dal prodotto e
+MEDIFLOW_UVX_BIN conservano runner MLX, modello locale, Python, pacchetto, seed
+e limite token; restano inoltre le configurazioni esplicite di ICD WHO locale,
+OpenMed locale, limite allegati e rete. MEDIFLOW_DATA_DIR proviene sempre dall'archivio ammesso nel pacchetto;
 PORT viene scelto dal navigator. Le chiavi residenti e il loro wrapping restano
 nei percorsi ordinari dell'archivio e della UI: nessun segreto viene preso
 dall'ambiente dell'host MCP. Non vengono ereditati flag E2E, loader Node,
@@ -104,7 +107,7 @@ nessun tool decide terapia, conferma, firma o trasmette prescrizioni.
 
 L'ingresso del pacchetto verifica il payload sorgente versionato tramite il
 ledger e il runtime Node locali esistenti prima di eseguire il Supervisor.
-Niente MCP bare, HTTP generico, download impliciti, broker residente, nuovo
+Niente MCP bare, HTTP generico, download impliciti, broker persistente, nuovo
 writer, adattatore SQLite o cloud. Il controllo locale esistente del launcher
 ammette soltanto l'enum e i metadati di richiesta nel comando nominato `navigate`,
 con revoca nominata `cancel-navigation`, protetti dal suo token
@@ -140,13 +143,58 @@ Avvia il launcher ordinario con il solo `--riusa` su IPC ereditato e inoltra
 soltanto enum, ID casuale e scadenza, con fingerprint sorgente e archivio attesi,
 sul medesimo canale di processo. Il launcher confronta questi ultimi con la
 propria identità e il proprio archivio prima di inoltrare un intento.
-Il launcher avviato così reclama esclusivamente una directory lock nuova:
-nessuna adozione o recupero di ricevute, PID o porte, inclusi alias della lock.
-Il Web è quello avviato direttamente da quel launcher, sul proprio IPC.
-Se esiste un launcher separato la navigazione fallisce chiusa; va arrestato
-localmente prima di avviare una nuova sessione plugin. È un limite esplicito
-rispetto al precedente riuso per discovery, comprese le riconnessioni dopo
-la chiusura dell'host. Non modifica l'archivio o le preferenze ordinarie.
+Per l'avvio a freddo reclama una directory lock nuova. Una lock già presente
+non viene letta come prova e non autorizza HTTP verso un candidato. Gli alias
+sono rifiutati. L'uscita o la disconnessione del figlio ritira il suo handle;
+la richiesta successiva può avviare una nuova generazione senza riusare stato.
+
+### Abbinamento confermato di un'istanza già aperta — decisione 23 ottobre
+
+Il medico mantiene aperta la propria MediFlow. Il raccordo posseduto dalla
+sessione host crea un nonce, un identificativo host e un codice casuale a 96 bit,
+con scadenza di 60 secondi. Mostra il codice in una propria pagina loopback,
+servita su un socket che mantiene aperto; il medico lo copia nella UI MediFlow
+che stava già usando e preme «Consenti a Codex/Claude di aprire schermate qui?».
+Il bottone «Consenti» richiede un evento browser trusted, user activation e
+documento visibile. «Rifiuta» non concede navigazione. Non si apre mai come
+bootstrap una pagina del listener candidato o un URL ricavato dalla receipt.
+
+Il codice resta nella memoria del raccordo e nei due documenti locali usati
+dal medico. Non va in file, receipt, schema, risultati, stderr o chat MCP.
+Il rendezvous privato su disco contiene soltanto nonce, sede di ritorno,
+identità sorgente/archivio, host casuale e scadenza: non è una prova di fiducia.
+Il launcher già vivo lo consuma senza seguire symlink e inoltra la richiesta
+al proprio Web solo dopo la prova di possesso del listener. Il codice inserito
+tramite la sessione Web autenticata torna sul suo IPC e su una connessione
+locale dedicata. Il raccordo verifica codice, nonce e identità prima di usare
+quella connessione. Un listener che legge o falsifica il rendezvous pubblico
+non conosce il codice e non può creare un abbinamento. Un endpoint che dichiara
+semplicemente «confermato» non basta.
+
+La capacità resta legata al nonce consumato, host fisico (vita del raccordo
+sul suo IPC), istanza Web/generazione casuale, sorgente e archivio canonico,
+nonché alla sessione Web e alla generazione effettiva dell'archivio. Ogni uso
+ricontrolla la risorsa di sessione proprietaria prima dell'inoltro dei soli
+quattro intenti. Non compone servizi o autorità cliniche. La UI espone la revoca;
+lock, logout, scadenza della sessione, sostituzione dell'archivio, riavvio Web,
+disconnessione dell'host o chiusura del canale ritirano la capacità e il suo
+intento corrente. Anche la richiesta già osservata nella UI è ritirata al lock.
+Un nonce rifiutato, scaduto o revocato non è ripresentabile. Una nuova sessione
+host richiede una nuova conferma.
+
+Il tool mantiene il proprio limite di otto secondi. Nessun intento viene
+accodato in attesa del medico: se l'abbinamento avviene dopo il termine serve
+una nuova richiesta esplicita. Ricevuta ed errore MCP restano fissi e non
+rivelano codice, consenso, archivio o sessione. La pagina del codice non è una
+superficie clinica; la UI fidata rimane quella già aperta dal launcher ordinario.
+Le prove non promettono isolamento dagli altri strumenti del medesimo utente
+OS autorizzati a leggere browser o memoria, né da un OS compromesso.
+
+Il Web autentica il proprio listener con HMAC di una sfida fresca. Il segreto
+casuale per generazione è trasmesso al figlio posseduto e resta fuori da HTTP e
+receipt. Il launcher verifica la risposta del server dopo il bind e prima di
+ogni handoff: fingerprint pubblico, PID vivo e ready IPC prematuro non bastano.
+Se la prova manca o la porta passa a un listener estraneo, navigazione negata.
 
 Il navigator attende l’handshake del processo figlio prima della prima
 richiesta: il solo evento OS `spawn` precede l’installazione dei gestori IPC

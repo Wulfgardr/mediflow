@@ -81,9 +81,24 @@ Conserva preferenza e selettore ordinari, senza riscrivere le preferenze.
 Una scelta Mac o agenti può rendere la navigazione indisponibile: non viene
 sostituita con Web. `reuse` richiede una build già ammessa e conserva l'avvio
 ordinario dei servizi facoltativi, incluso Ollama se installato ma fermo.
-La navigazione usa solo l'IPC ereditato dal launcher avviato in questa sessione.
-Un runtime già aperto separatamente, o sopravvissuto a un precedente host, viene
-rifiutato: arrestarlo dal suo launcher prima di una nuova sessione plugin.
+La configurazione locale supportata viene conservata, comprese le variabili
+ATHENA per runner, modello, Python, pacchetto, seed e limite token. I flag E2E,
+loader e segreti dell'host non vengono ereditati.
+
+Se MediFlow è già aperta, il raccordo mostra un codice temporaneo nella propria
+pagina locale. Copialo nella MediFlow che stavi già usando, nel campo «Codice
+di abbinamento», e premi «Consenti». La richiesta dice «Consenti a Codex/Claude
+di aprire schermate qui?». Il codice scade dopo un minuto: resta nelle UI locali
+e non va inserito nella chat. Un rifiuto o una scadenza non concede navigazione.
+La prima chiamata può terminare prima della conferma: dopo l'abbinamento richiedi
+di nuovo il percorso; il plugin non riprende un intento scaduto.
+
+«Revoca il collegamento del plugin» ritira la capacità. Lock, logout,
+sostituzione dell'archivio, riavvio e chiusura dell'host richiedono un nuovo
+abbinamento. La chiusura dell'host lascia vivo il lavoro locale in MediFlow.
+L'abbinamento concede soltanto i quattro intenti, senza autorità clinica.
+La receipt su disco e il fingerprint pubblico non autorizzano un listener;
+il Web deve dimostrare la propria generazione a ogni inoltro.
 Attende soltanto la readiness tecnica, entro il timeout; non attende lookup o rendering di un paziente.
 
 Prima del login, o senza un documento connesso, si apre l'URL locale fisso
