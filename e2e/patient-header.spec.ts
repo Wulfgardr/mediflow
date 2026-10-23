@@ -79,9 +79,11 @@ test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state
   });
   await expect(quadro).toHaveCount(1);
   await expect(quadro).toBeVisible();
-  await expect(quadro.getByRole('heading', { name: 'Quadro clinico', exact: true })).toBeVisible();
-  await expect(quadro.getByText('EF00 · ICD-11 · un’altra diagnosi', { exact: true })).toHaveCount(1);
-  await expect(quadro.getByText(diagnosisDescription, { exact: true })).toHaveCount(1);
+  const problems = quadro.getByRole('region', { name: 'Problemi', exact: true });
+  await expect(problems.getByRole('heading')).toContainText('2 problemi');
+  await expect(problems.locator('tbody tr')).toHaveCount(2);
+  await expect(problems.getByRole('row').filter({ hasText: diagnosisDescription })).toContainText('EF00');
+  await expect(problems.getByRole('row').filter({ hasText: secondaryDiagnosisDescription })).toContainText('BA00');
 
   await openPatientSection(page, 'clinica');
   const clinicalSection = page.locator('#clinica');
@@ -122,10 +124,10 @@ test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state
   });
   await expect(emptyQuadro).toHaveCount(1);
   await expect(emptyQuadro).toBeVisible();
-  await expect(emptyQuadro.getByRole('heading', { name: 'Quadro clinico', exact: true })).toBeVisible();
-  await expect(emptyQuadro).toContainText('Diagnosi non registrata.');
-  await expect(emptyQuadro.getByRole('link', { name: 'Consulta le diagnosi', exact: true }))
-    .toHaveAttribute('href', '#clinica');
+  const emptyProblems = emptyQuadro.getByRole('region', { name: 'Problemi', exact: true });
+  await expect(emptyProblems.getByRole('heading')).toContainText('0 problemi');
+  await expect(emptyProblems).toContainText('Nessun problema registrato.');
+  await expect(emptyProblems.locator('table')).toHaveCount(0);
   await expect(emptyQuadro).not.toContainText('EF00');
   await expect(emptyQuadro).not.toContainText(diagnosisDescription);
   await expect(emptyQuadro).not.toContainText('ICD-11');
