@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { buildNetworkCapabilitiesResponse } from './network-contract';
 import { projectNetworkCapabilitiesForDiscoveryAuth } from './network-discovery-auth';
 
@@ -30,4 +31,23 @@ test('host port discovery declares revisions and scopes without granting authori
     });
     assert.deepEqual(projected.hostPorts, JSON.parse(readFileSync(new URL('../experiments/gpui-patient-pilot/transport/tests/fixtures/host-ports.json', import.meta.url), 'utf8')));
     assert.ok(projected.capabilities.filter(c => c.requiresPairing).every(c => c.status !== 'available'));
+});
+
+test('capabilities schema requires hostPorts and accepts the complete host response', () => {
+    const loadPackage = createRequire(import.meta.url);
+    const spec = loadPackage('js-yaml').load(readFileSync(new URL('../docs/openapi/mediflow-v1.yaml', import.meta.url), 'utf8'));
+    const Ajv = loadPackage('ajv');
+    const validate = new Ajv({ logger: false }).compile({
+        $ref: '#/components/schemas/NetworkCapabilitiesResponse',
+        components: spec.components,
+    });
+    const response = buildNetworkCapabilitiesResponse({
+        nodeId: 'synthetic-host', snapshot: { 'network.mode': 'network-home-base' }, platform: 'darwin',
+    });
+    assert.equal(validate(response), true, JSON.stringify(validate.errors));
+    const missingPorts: Partial<typeof response> = { ...response };
+    delete missingPorts.hostPorts;
+    assert.equal(validate(missingPorts), false);
+    assert.ok(validate.errors.some((error: { keyword: string; params: { missingProperty?: string } }) =>
+        error.keyword === 'required' && error.params.missingProperty === 'hostPorts'));
 });

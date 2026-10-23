@@ -8,8 +8,9 @@ Part of WUL-771; riferimenti WUL-706, ADR 0145 e censimento G-0.
 
 ## Contratto e roster
 
-G-1a.1 aggiunge `hostPorts` alla discovery network esistente. È una
-negoziazione di schema, non una concessione. I vecchi client possono ignorare
+G-1a.1 rende `hostPorts` obbligatorio nella risposta della discovery network
+1.14.0, nello schema OpenAPI e nel tipo TypeScript. È una negoziazione di
+schema, non una concessione. I vecchi client possono ignorare
 il campo; questo client GPUI rifiuta un host che non lo dichiari o abbia una
 revisione, uno scope o un'autorità incompatibili. Il protocollo resta 1.14.0:
 il campo è additivo, senza nuovi endpoint né cambi delle ammissioni.
@@ -54,6 +55,15 @@ una scrittura annullata è indeterminata. Chiudere il trasporto non prova il
 rollback del writer host. Nessun retry automatico. `ARCHIVE_REPLACED` e il
 diniego di autenticazione ritirano la sessione e le richieste sorelle. Un
 semplice `403` di capability resta un diniego della singola operazione.
+
+Quando GET o PUT del profilo account rilevano `ARCHIVE_REPLACED` o una
+generazione diversa, il runner account consuma anche il motivo di ritiro
+conservato dalla sessione, compreso un risultato corrente indeterminato.
+Invoca la disconnessione comune: rimuove sessione, selezione, cache e bozze
+non salvabili, revoca l’autorità e scarta i callback della generazione account
+precedente. I cloni della vecchia sessione non possono inviare altre richieste.
+Questa correzione chiude l’incoerenza introdotta dal ritiro del trasporto in
+G-1a.1; la matrice completa di form ed effetti SEC-3 resta in G-1a.2.
 
 Il contesto è disponibile anche per gli effetti file e viene controllato
 prima della copia. **G-1a.1 non chiude SEC-2/3:** G-1a.2 deve fissare il punto

@@ -99,8 +99,55 @@ La build locale riproduce ancora il blocco di metadata descritto sotto;
 l’intera suite JavaScript non viene rieseguita in questa correzione Rust.
 
 ADR 0161 registra la decisione 2, opzione 1, già approvata da Leonardo e
-comunicata sulla PR. SEC-2/3 restano G-1a.2; serve il secondo round indipendente
-prima del merge.
+comunicata sulla PR. Il round 2 ha confermato questi tre punti e richiesto
+la correzione del P1 descritta sotto.
+
+## Correzioni del round 2
+
+Il runner account ora consuma `retires_session()` e il motivo conservato dalla
+sessione, come il runner comune. GET e PUT del profilo che rilevano
+`ARCHIVE_REPLACED` o una generazione diversa disconnettono la shell e rimuovono
+selezione, cache e bozze non salvabili. I callback della generazione account
+precedente vengono scartati e i cloni della sessione non inviano altre richieste.
+Questo corregge l’incoerenza introdotta da G-1a.1, senza chiudere tutta SEC-3.
+
+Le quattro sonde comparative di Astra sono state ripetute su `b64fbcd80`:
+**4/4 rosse** con trasporto ritirato e shell ancora con sessione, selezione e
+snapshot account. I test permanenti derivano da quelle sonde e aggiungono
+cache paziente, bozza account, editor note ancora referenziato, autorità di
+scrittura, callback tardivo e tentativi GET/PUT con il clone ritirato.
+Una quinta prova conserva il ritiro reale da HTTP e presenta al runner un
+risultato `Indeterminate`, per esercitare separatamente il motivo registrato
+nella sessione. Tutte e cinque sono rosse prima del fix e verdi dopo.
+
+`NetworkCapabilitiesResponse` richiede ora `hostPorts` in OpenAPI e TypeScript;
+la fixture discovery dichiara il roster corrente e il protocollo 1.14.0. Il
+produttore host già emette il campo. Il test dello schema accetta la risposta
+completa e respinge quella con il solo `hostPorts` rimosso; prima del fix
+quest’ultima era erroneamente valida. Una discovery HTTP senza il campo viene
+respinta dal client con `UnsupportedProtocol` e non abilita la scrittura.
+Il passaggio a campo obbligatorio è registrato esplicitamente nella policy
+OpenAPI per WUL-771; il guard resta attivo.
+
+Suite finale: **291 test Rust verdi**, 159 app, 24 client, 107 trasporto e
+un probe, dopo pulizia dei tre package sul target privato; **19 test host verdi**.
+Verdi anche fmt, Clippy workspace `-D warnings`, lint, typecheck, never-regress,
+claims, OpenAPI drift, inventario test, browser inventory e gate formale terapie.
+Quest’ultimo non prova il lifecycle account. L’estensione iniziale della fixture
+condivideva lo status HTTP tra GET e PUT, facendo fallire la rilettura dopo un
+conflitto; i due status sono ora separati e la prova esistente torna verde.
+
+Falsificazioni in copia isolata: ripristinare il vecchio controllo
+`is_auth_failure()` rende rosse le cinque regressioni; togliere soltanto il
+fallback a `retirement_error()` rende rossa la prova indeterminata. Ammettere
+una discovery senza `hostPorts` rende rossa la prova HTTP; rimuovere il campo
+da `required` rende rossa la prova dello schema. Ripristino verde in ogni caso.
+I mutanti non sono stati applicati al worktree di consegna.
+
+**Nessun merge: serve il round 3 indipendente di Astra.** SEC-2 e la matrice
+completa SEC-3 restano G-1a.2; il runner account dopo ritiro archivio è corretto
+in questa tranche. Build e suite JavaScript completa non rieseguite nel round 2;
+i risultati precedenti restano distinti sotto.
 
 ## Errori finali già presenti sulla base
 

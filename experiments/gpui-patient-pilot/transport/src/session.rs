@@ -2789,6 +2789,32 @@ mod tests {
     }
 
     #[test]
+    fn discovery_without_host_ports_is_rejected_without_authority() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            assert!(read_request(&mut stream).starts_with("GET /api/v1/network/capabilities "));
+            send_reply(
+                &mut stream,
+                &json!({
+                    "nodeId":"synthetic-host", "protocolVersion":"1.14.0",
+                    "operatingMode":"network-home-base",
+                    "capabilities":[{"key":"network.replica.write-clinical-diary",
+                        "requiresPairing":true, "status":"available"}]
+                })
+                .to_string(),
+            );
+        });
+        assert_eq!(
+            session.refresh_capabilities(),
+            Err(RuntimeError::UnsupportedProtocol)
+        );
+        assert!(!session.can_write("network.replica.write-clinical-diary"));
+        server.join().unwrap();
+    }
+
+    #[test]
     fn lock_cancels_pending_headers_and_body_before_server_release() {
         for body_started in [false, true] {
             let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
