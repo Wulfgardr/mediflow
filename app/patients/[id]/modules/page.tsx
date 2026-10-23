@@ -2,6 +2,8 @@
 
 import { Disclosure } from '@/components/disclosure';
 import { formatCountLabel } from '@/lib/format-count';
+import { projectFollowupReadState } from '@/lib/followup-read-state';
+import { ViewState } from '@/components/ui/view-state';
 import Link from 'next/link';
 import { differenceInYears } from 'date-fns';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
@@ -120,6 +122,7 @@ export default function PatientDetailPage() {
         undefined,
         ['checkups'],
     );
+    const followupRead = projectFollowupReadState({ data: checkups, loading: checkupsLoading, error: checkupsError });
     /* The sheet consumes metadata and stored summaries, not original file bytes. */
     const { data: attachments, error: attachmentsError } = useLiveQueryState(
         async () => db.attachments.query({ patientId: id, metadataOnly: true }).toArray(),
@@ -837,26 +840,23 @@ export default function PatientDetailPage() {
                         </div>
                     </CollapsibleSection>
 
-                {/* WUL-678: connect the folder follow-up action to the existing planner. */}
                 <CollapsibleSection
                     id="follow-up"
                     kicker="Pianificazione"
                     title="Follow-up"
-                    count={workspace ? String(workspace.pendingCheckupsCount) : undefined}
-                    summary={(checkups ?? []).length === 0 ? 'Nessun follow-up pianificato.' : 'Apri i prossimi passaggi pianificati.'}
+                    count={followupRead.count}
+                    summary={followupRead.summary}
                     surfaceClassName={workspaceStyles.clinicalSection}
+                    headerAction={<Link href={`/patients/${id}/edit#pianificazione`} className="mf-button-text">
+                        <Plus className="h-4 w-4" aria-hidden="true" />
+                        Aggiungi follow-up
+                    </Link>}
                 >
-                        {!checkups || checkups.length === 0 ? (
-                            <div>
-                                <p className={workspaceStyles.emptyState}>Nessun follow-up pianificato.</p>
-                                <Link href={`/patients/${id}/edit#pianificazione`} className={workspaceStyles.followupAction}>
-                                    <Plus className="h-4 w-4" aria-hidden="true" />
-                                    Aggiungi follow-up
-                                </Link>
-                            </div>
+                        {followupRead.state !== 'available' ? (
+                            <ViewState state={followupRead.state} title={followupRead.summary} />
                         ) : (
                             <div className={workspaceStyles.followupList}>
-                                {checkups.map((checkup) => (
+                                {checkups?.map((checkup) => (
                                     <div key={checkup.id} className={workspaceStyles.followupRow}>
                                         <div className={workspaceStyles.followupHeader}>
                                             <div>
@@ -869,10 +869,6 @@ export default function PatientDetailPage() {
                                         </div>
                                     </div>
                                 ))}
-                                <Link href={`/patients/${id}/edit#pianificazione`} className={workspaceStyles.followupAction}>
-                                    <Plus className="h-4 w-4" aria-hidden="true" />
-                                    Aggiungi follow-up
-                                </Link>
                             </div>
                         )}
 
