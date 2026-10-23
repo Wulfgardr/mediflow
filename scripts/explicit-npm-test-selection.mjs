@@ -171,12 +171,12 @@ export function collectShardedPlaywrightBinding(root) {
   const workflowPath = '.github/workflows/e2e.yml';
   const binding = collectNpmScriptBinding(root, {
     script: 'test:e2e', workflow: workflowPath, job: 'e2e-shard',
-    ciCall: 'npm run test:e2e -- --shard=${{ matrix.shard }}/2',
+    ciCall: 'npm run test:e2e -- --shard=${{ matrix.shard }}/3',
   }, 'playwright test --workers=1');
   const workflow = load(readText(root, workflowPath), { schema: JSON_SCHEMA });
   const shard = workflow.jobs['e2e-shard'];
   const gate = workflow.jobs.e2e;
-  if (!isDeepStrictEqual(shard.strategy, { 'fail-fast': false, matrix: { shard: [1, 2] } })
+  if (!isDeepStrictEqual(shard.strategy, { 'fail-fast': false, matrix: { shard: [1, 2, 3] } })
     || binding.jobIf !== null || binding.stepIf !== null) throw new Error('Incomplete Playwright shard matrix');
   if (!isDeepStrictEqual(gate, {
     if: 'always()', needs: ['e2e-shard'], 'runs-on': 'ubuntu-latest', 'timeout-minutes': 2,
