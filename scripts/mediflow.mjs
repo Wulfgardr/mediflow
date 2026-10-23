@@ -290,10 +290,15 @@ export function claimLauncher(directory, identity, { reuseLive = false } = {}) {
 }
 
 const terminalOwnedGroups = new WeakSet();
+const confirmedWindowsStops = new WeakSet();
 
 export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = false } = {}) {
   const posix = process.platform !== 'win32';
-  if (!child?.pid || (!posix && (child.exitCode !== null || child.signalCode !== null))) return;
+  if (!child?.pid) return;
+  if (!posix && (child.exitCode !== null || child.signalCode !== null)) {
+    if (confirmedWindowsStops.has(child)) return;
+    throw Object.assign(new Error('Arresto del processo posseduto non verificato.', { cause: new Error('Albero del processo già terminale non verificato.') }), { code: 'MEDIFLOW_OWNED_STOP_UNCONFIRMED' });
+  }
   await new Promise((resolve, reject) => {
     let forceTimer, timer, signalImmediate, groupAbsent = terminalOwnedGroups.has(child), settled = false;
     const finish = cause => {
@@ -366,6 +371,7 @@ export async function stopOwnedChild(child, graceMs = 8000, { allowIpcStop = fal
       } else force();
     } catch (error) { if (posix && error.code === 'ESRCH') observe(); else finish(error); }
   });
+  if (!posix) confirmedWindowsStops.add(child);
 }
 
 export function installDesktopEntry(root = ROOT, home = os.homedir()) {
