@@ -140,7 +140,8 @@ function admittedPackage(t) {
       fs.writeFileSync(${JSON.stringify(marker)}, JSON.stringify({
         nodePath: fs.realpathSync(process.execPath), profile, dataDir: process.env.MEDIFLOW_DATA_DIR,
         revision: process.env.MEDIFLOW_PLUGIN_EXPECTED_REVISION,
-        legacyCopy: process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY,
+        legacyCopy: process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY ?? null,
+        home: process.env.HOME, lang: process.env.LANG, tmp: process.env.TMPDIR,
         unexpectedEnvironment: process.env.MEDIFLOW_PLUGIN_TEST_SECRET ?? null }));
     }`);
   put(web, 'node_modules/better-sqlite3/package.json', { name: 'better-sqlite3', version: 'synthetic', main: 'index.js' });
@@ -154,9 +155,9 @@ function admittedPackage(t) {
   packageLocalUiPlugin(destination, data, source);
   const launch = path.join(destination, 'src/launch.mjs');
   const run = (nodeArgs = [], args = []) => spawnSync(process.execPath, [...nodeArgs, launch, ...args], {
-    encoding: 'utf8', timeout: 10_000, env: { MEDIFLOW_PLUGIN_TEST_SECRET: 'synthetic-not-forwarded' },
+    encoding: 'utf8', timeout: 10_000, env: { MEDIFLOW_PLUGIN_TEST_SECRET: 'synthetic-not-forwarded', HOME: directory, LANG: 'it_IT.UTF-8', TMPDIR: directory, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1' },
   });
-  return { destination, marker, revision, data, web, ledger, run };
+  return { destination, marker, revision, data, web, ledger, run, directory };
 }
 
 test('Node 24 packages and launches a sealed synthetic 24.21 payload with the pinned physical runtime', t => {
@@ -166,7 +167,7 @@ test('Node 24 packages and launches a sealed synthetic 24.21 payload with the pi
   assert.equal(result.stdout, ''); assert.equal(result.stderr, '');
   assert.deepEqual(JSON.parse(fs.readFileSync(f.marker)), { nodePath: fs.realpathSync(process.execPath),
     profile: 'plugin_local_ui', dataDir: f.data, revision: f.revision,
-    legacyCopy: '1', unexpectedEnvironment: null });
+    legacyCopy: null, home: f.directory, lang: 'it_IT.UTF-8', tmp: f.directory, unexpectedEnvironment: null });
 });
 
 test('the runtime launcher rejects extra arguments, Node flags and noncanonical or mismatched nodePath', t => {

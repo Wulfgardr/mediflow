@@ -17,9 +17,36 @@ staccato, con build già ammessa e decisione `reuse`. Non adotta listener arbitr
 non avvia build o installazioni implicite e non registra il launcher o il Web fra
 i figli posseduti. La chiusura dell'host termina soltanto il raccordo MCP.
 
+L'avvio interno usa `--riusa` senza imporre `--scelta` o `--senza-browser`:
+restano la preferenza e il selettore ordinari. Il riuso non riscrive le preferenze.
+Un runtime headless, nativo o di sviluppo non dichiara capacità di navigazione
+Web: il controllo rifiuta l'intento e il raccordo non restituisce successo.
+
+Il pacchetto e il navigator applicano la stessa allowlist esplicita in
+`plugins/mediflow-local-ui/src/runtime-environment.mjs`. HOME e le variabili
+profilo Windows conservano la sede utente; APPDATA, LOCALAPPDATA e XDG conservano
+configurazione e risorse locali; TMPDIR/TMP/TEMP mantengono la sede temporanea;
+LANG, LANGUAGE, le categorie LC elencate e TZ conservano lingua, formati e fuso.
+PATH conserva i programmi locali configurati, preceduto dal Node fisico ammesso;
+SystemRoot/WINDIR/ComSpec/PATHEXT servono ai comandi Windows. DISPLAY,
+WAYLAND_DISPLAY, XDG_RUNTIME_DIR e DBUS_SESSION_BUS_ADDRESS conservano l'accesso
+alla sessione grafica Linux. MEDIFLOW_MAC_CONFIG conserva la scelta del bundle
+locale. MEDIFLOW_DATA_DIR proviene sempre dall'archivio ammesso nel pacchetto;
+PORT viene scelto dal navigator. Le chiavi residenti e il loro wrapping restano
+nei percorsi ordinari dell'archivio e della UI: nessun segreto viene preso
+dall'ambiente dell'host MCP. Non vengono ereditati flag E2E, loader Node,
+preload dinamici, token o variabili non elencate.
+
 La navigazione attraversa il controllo locale già posseduto dal launcher e il suo
 IPC Web: soltanto i quattro intenti chiusi, dopo verifica di identità e archivio.
-La risposta al modello resta fissa. Non cambiano sessione clinica, single-writer,
+Ogni inoltro porta un identificativo casuale e la scadenza della richiesta
+corrente. Il raccordo ricontrolla il segnale prima del POST e dopo la risposta;
+annullamento o timeout revocano quell'identificativo. Il controllo rifiuta
+identificativi già usati o revocati, inoltri scaduti e runtime privi della capacità
+Web; la disconnessione HTTP annulla un inoltro ancora pendente. Il Web ricontrolla
+la scadenza al ricevimento IPC e ritira soltanto l'intento della richiesta
+revocata, lasciando intatta un'eventuale richiesta successiva. Non viene
+conservata una coda da riprendere. La risposta al modello resta fissa. Non cambiano sessione clinica, single-writer,
 conferma locale, epoch, scadenza o revoca. Nessuna porta clinica viene composta dal
 raccordo. Il recupero cifrato delle bozze dopo riavvio resta una proposta separata.
 

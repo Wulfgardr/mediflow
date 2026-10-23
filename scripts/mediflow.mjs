@@ -247,7 +247,7 @@ export async function main(args = process.argv.slice(2)) {
   };
   const start = async (choice, remember) => {
     const attempt = ++generation;
-    update({ busy: true, ready: false, url: null, step: 'dipendenze', message: 'Controllo delle dipendenze.' });
+    update({ busy: true, ready: false, navigationReady: false, url: null, step: 'dipendenze', message: 'Controllo delle dipendenze.' });
     await stopOwnedChild(child);
     if (closing) return;
     if (!fs.existsSync(path.join(ROOT, 'node_modules/next/package.json')) || !fs.existsSync(path.join(ROOT, 'node_modules/better-sqlite3/package.json'))) {
@@ -339,9 +339,9 @@ export async function main(args = process.argv.slice(2)) {
     child.once('exit', () => {
       if (!closing && attempt === generation) update({ ready: false, busy: false, url: null, step: 'errore', message: 'MediFlow si è arrestato. Controlla i log nel terminale prima di riaprire.' });
     });
-    if (remember && choice !== 'sviluppo') atomicJson(preferencesFile, { schemaVersion: 1, choice });
-    else if (!remember) atomicJson(preferencesFile, { schemaVersion: 1, choice: null });
-    update({ busy: false, ready: true, url: target, step: 'pronto', message: choice === 'mac' ? 'App per Mac avviata. Lascia aperto il terminale.' : `Pronto: ${target}` });
+    if (!options.reuseOnly && remember && choice !== 'sviluppo') atomicJson(preferencesFile, { schemaVersion: 1, choice });
+    else if (!options.reuseOnly && !remember) atomicJson(preferencesFile, { schemaVersion: 1, choice: null });
+    update({ busy: false, ready: true, navigationReady: choice === 'web', url: target, step: 'pronto', message: choice === 'mac' ? 'App per Mac avviata. Lascia aperto il terminale.' : `Pronto: ${target}` });
     if (options.noBrowser) log(`Per cambiare scelta o arrestare: ${chooser.url}`);
   };
   const choose = (choice, remember = false) => {
@@ -365,9 +365,13 @@ export async function main(args = process.argv.slice(2)) {
   };
   try {
     chooser = await createChoiceServer({ root: ROOT, state: () => ({ ...state }), choose,
-      navigate: async intent => {
-        if (!state.ready || !state.url || !child?.connected || child.exitCode !== null || child.signalCode !== null) throw new Error('Navigazione non disponibile.');
-        await new Promise((resolve, reject) => child.send(JSON.stringify({ schemaVersion: 'mediflow.local-ui.navigation.v1', intent }), error => error ? reject(new Error('Navigazione non disponibile.')) : resolve()));
+      navigate: async (intent, request) => {
+        request.signal.throwIfAborted();
+        if (!state.navigationReady || !state.ready || !state.url || !child?.connected || child.exitCode !== null || child.signalCode !== null) throw new Error('Navigazione non disponibile.');
+        await new Promise((resolve, reject) => child.send(JSON.stringify({ schemaVersion: 'mediflow.local-ui.navigation.v1', intent, requestId: request.requestId, expiresAt: request.expiresAt }), error => error ? reject(new Error('Navigazione non disponibile.')) : resolve()));
+      },
+      cancelNavigation: requestId => {
+        if (child?.connected) child.send(JSON.stringify({ schemaVersion: 'mediflow.local-ui.cancel.v1', requestId }), () => {});
       },
       install: () => installApproval?.(true), stop: shutdown, nativeAvailable: !!native, development: dirty,
       version: identity.version, folder: path.basename(ROOT) });

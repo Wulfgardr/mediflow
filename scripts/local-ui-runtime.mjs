@@ -1,7 +1,9 @@
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
+import { ordinaryLauncherEnvironment } from '../plugins/mediflow-local-ui/src/runtime-environment.mjs';
 import { prepareLauncherState } from './launcher-state.mjs';
 import { probeRunningInstance, readProductIdentity } from './launcher-helpers.mjs';
 
@@ -11,7 +13,7 @@ const alive = pid => {
   try { process.kill(pid, 0); return true; } catch (error) { return error.code !== 'ESRCH'; }
 };
 
-export async function navigateExistingLocalUiRuntime(receipt, expected, intent, signal) {
+export async function navigateExistingLocalUiRuntime(receipt, expected, intent, signal, expiresAt = Date.now() + 8000) {
   signal.throwIfAborted();
   if (!receipt || receipt.checkoutPath !== expected.sourceRoot || !alive(receipt.pid)) return unavailable();
   if (receipt.choiceUrl === undefined) return false;
@@ -21,12 +23,26 @@ export async function navigateExistingLocalUiRuntime(receipt, expected, intent, 
   if (!status.ok) return unavailable();
   const state = await status.json();
   if (!state.ready) return false;
+  if (state.navigationReady !== true) return unavailable();
   if (!/^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}$/u.test(state.url)
     || !(await probeRunningInstance(state.url, expected.sourceFingerprint)).ok) return unavailable();
-  signal.throwIfAborted();
-  const response = await fetch(new URL('navigate', receipt.choiceUrl), { method: 'POST', signal,
-    headers: { Origin: new URL(receipt.choiceUrl).origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ intent }) });
-  if (response.status !== 202) return unavailable();
+  const requestId = crypto.randomUUID();
+  const headers = { Origin: new URL(receipt.choiceUrl).origin, 'Content-Type': 'application/json' };
+  let revocation;
+  const cancel = () => revocation ??= (async () => {
+    try { await fetch(new URL('cancel-navigation', receipt.choiceUrl), { method: 'POST', headers,
+      body: JSON.stringify({ requestId }), signal: AbortSignal.timeout(1000) }); } catch { /* Best-effort revocation; the handoff also expires. */ }
+  })();
+  const abort = () => { void cancel(); };
+  signal.addEventListener('abort', abort, { once: true });
+  try {
+    signal.throwIfAborted();
+    const response = await fetch(new URL('navigate', receipt.choiceUrl), { method: 'POST', signal, headers,
+      body: JSON.stringify({ intent, requestId, expiresAt }) });
+    signal.throwIfAborted();
+    if (response.status !== 202) return unavailable();
+  } catch (error) { await cancel(); throw error; }
+  finally { signal.removeEventListener('abort', abort); }
   return true;
 }
 
@@ -51,15 +67,15 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
       const server = net.createServer(); server.once('error', reject);
       server.listen(0, '127.0.0.1', () => { const port = server.address().port; server.close(error => error ? reject(error) : resolve(port)); });
     });
-    const child = spawn(process.execPath, [path.join(sourceRoot, 'scripts/mediflow.mjs'), '--scelta', 'web', '--senza-browser', '--riusa'], {
+    const child = spawn(process.execPath, [path.join(sourceRoot, 'scripts/mediflow.mjs'), '--riusa'], {
       cwd: sourceRoot, detached: true, stdio: 'ignore', shell: false,
-      env: { PATH: `${path.dirname(process.execPath)}${path.delimiter}/usr/bin${path.delimiter}/bin`,
-        MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', PORT: String(port) },
+      env: { ...ordinaryLauncherEnvironment(dataDir), PORT: String(port) },
     });
     await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
     child.unref();
   };
   return async (intent, signal) => {
+    const expiresAt = Date.now() + 8000;
     const deadline = AbortSignal.any([signal, AbortSignal.timeout(8000)]);
     deadline.throwIfAborted();
     const first = read();
@@ -67,7 +83,7 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
     for (;;) {
       deadline.throwIfAborted();
       const receipt = read();
-      if (receipt && alive(receipt.pid) && await navigateExistingLocalUiRuntime(receipt, expected, intent, deadline)) return;
+      if (receipt && alive(receipt.pid) && await navigateExistingLocalUiRuntime(receipt, expected, intent, deadline, expiresAt)) return;
       await new Promise(resolve => { const timer = setTimeout(resolve, 100); timer.unref(); });
     }
   };
