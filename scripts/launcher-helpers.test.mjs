@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
     classifyRevisionPayload,
     hashWorktreeStatus,
@@ -18,6 +18,26 @@ import {
 } from './launcher-helpers.mjs';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+
+function fixtureImportArguments(loader, options) {
+    return ['--import', pathToFileURL(loader, options).href];
+}
+
+test('fixture preloads accept Windows drive paths and reserved filename characters', t => {
+    const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-preload-')));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    const loader = path.join(directory, 'loader #% name.mjs');
+    writeFileSync(loader, 'globalThis.fixturePreloaded = true;');
+    const loaded = spawnSync(process.execPath, [...fixtureImportArguments(loader), '-e',
+        'if (globalThis.fixturePreloaded !== true) process.exitCode = 7;'], { encoding: 'utf8' });
+    assert.equal(loaded.status, 0, loaded.stderr);
+    const windowsPath = 'C:\\synthetic fixture\\loader #% name.mjs';
+    const args = fixtureImportArguments(windowsPath, { windows: true });
+    assert.deepEqual(args, ['--import', 'file:///C:/synthetic%20fixture/loader%20%23%25%20name.mjs']);
+    const rejected = spawnSync(process.execPath, ['--import', windowsPath, '-e', ''], { encoding: 'utf8' });
+    assert.notEqual(rejected.status, 0);
+    assert.match(rejected.stderr, /ERR_UNSUPPORTED_ESM_URL_SCHEME/u);
+});
 
 function launcherReceiptFile(directory) {
     const active = path.join(directory, 'active');
@@ -41,7 +61,18 @@ function launcherCrashFixture(t) {
         const child = spawn(process.execPath, ['--input-type=module', '-e', `
             import fs from 'node:fs';
             import path from 'node:path';
+            import cp from 'node:child_process';
             import { syncBuiltinESMExports } from 'node:module';
+            const identityQueries = [], query = cp.spawnSync;
+            cp.spawnSync = (executable, args, options) => {
+                const started = performance.now(), result = query(executable, args, options);
+                if (process.platform === 'win32' && args?.at(-1)?.includes('Get-Process -Id ')) identityQueries.push({
+                    elapsedMs: performance.now() - started, timeout: options.timeout, status: result.status,
+                    signal: result.signal, error: result.error?.code,
+                    stdout: String(result.stdout ?? '').slice(0, 512), stderr: String(result.stderr ?? '').slice(0, 1024),
+                });
+                return result;
+            };
             const directory = ${JSON.stringify(lock)}, pauseAt = ${JSON.stringify(pauseAt)};
             const output = value => fs.writeSync(1, JSON.stringify(value) + '\\n');
             let paused = false;
@@ -97,7 +128,7 @@ function launcherCrashFixture(t) {
                 } else ownership = launcher.claimLauncher(directory, ${JSON.stringify({ checkoutPath: repoRoot })}, { reuseLive: true });
                 output({ type: 'result', ...ownership });
                 if (${release}) { launcher.releaseLauncher(ownership); output({ type: 'released' }); }
-            } catch (error) { output({ type: 'result', error: error.message, code: error.code }); }
+            } catch (error) { output({ type: 'result', error: error.message, code: error.code, identityQueries }); }
             process.once('disconnect', () => clearInterval(keepAlive));
         `], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
         const closed = once(child, 'close'); children.push({ child, closed });
@@ -1257,7 +1288,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     const socket = createHttpServer();
     await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
     const port = socket.address().port; await new Promise(resolve => socket.close(resolve));
-    const child = spawn(process.execPath, [...(lifecycle ? ['--import', stopLoader] : []), path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), '--senza-browser', ...args], {
+    const child = spawn(process.execPath, [...(lifecycle ? fixtureImportArguments(stopLoader) : []), path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), '--senza-browser', ...args], {
         env: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home, PORT: String(port) }, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
     const closed = Promise.all([once(child, 'exit'), once(child.stderr, 'close')]).then(([exit]) => exit);
     t.after(async () => {
@@ -1607,7 +1638,20 @@ test('plugin refuses forged receipts, replacement ports and lock directory alias
     const foreign = createHttpServer((request, response) => { requests.push(request.url); response.end('{}'); });
     await new Promise(resolve => foreign.listen(0, '127.0.0.1', resolve));
     const script = `
-        import { registerHooks } from 'node:module';
+        import assert from 'node:assert/strict';
+        import cp from 'node:child_process';
+        import { once } from 'node:events';
+        import { registerHooks, syncBuiltinESMExports } from 'node:module';
+        const spawn = cp.spawn, launchers = [];
+        cp.spawn = (command, args, options) => {
+            assert.equal(command, process.execPath);
+            assert.deepEqual(args, [${JSON.stringify(path.join(f.source, 'scripts/mediflow.mjs'))}, '--riusa']);
+            assert.equal(options.cwd, ${JSON.stringify(f.source)});
+            const child = spawn(command, args, options);
+            launchers.push({ child, exited: once(child, 'exit') });
+            return child;
+        };
+        syncBuiltinESMExports();
         registerHooks({ load(url, context, next) {
             if (url === ${JSON.stringify(new URL('./launcher-helpers.mjs', import.meta.url).href)}) return { format: 'module', shortCircuit: true,
                 source: 'export const readProductIdentity = () => ({ worktreeHash: "clean", revision: "aaaaaaaaaaaa" });' };
@@ -1618,15 +1662,22 @@ test('plugin refuses forged receipts, replacement ports and lock directory alias
         const keepAlive = setInterval(() => {}, 1000);
         try { await navigate('history', AbortSignal.timeout(3000)); process.exitCode = 7; }
         catch (error) { if (error.message !== 'navigation_unavailable') throw error; }
-        finally { clearInterval(keepAlive); }
+        finally {
+            try {
+                for (const {child} of launchers) if (child.connected) child.disconnect();
+                await Promise.all(launchers.map(({exited}) => exited));
+                assert.equal(launchers.length, 1);
+            } finally { clearInterval(keepAlive); }
+        }
     `;
     const deny = async () => {
         const processUnderTest = spawn(process.execPath, ['--input-type=module', '-e', script], { stdio: ['ignore', 'ignore', 'pipe'],
             env: { ...process.env, HOME: path.dirname(f.source) + '/home', USERPROFILE: path.dirname(f.source) + '/home',
                 XDG_CONFIG_HOME: path.dirname(f.source) + '/home/config', APPDATA: path.dirname(f.source) + '/home/Roaming' } });
+        const closed = Promise.all([once(processUnderTest, 'exit'), once(processUnderTest.stderr, 'close')]);
         let stderr = ''; processUnderTest.stderr.on('data', chunk => { stderr += chunk; });
         const timer = setTimeout(() => processUnderTest.kill('SIGKILL'), 5000);
-        try { const [status] = await once(processUnderTest, 'exit'); assert.equal(status, 0, stderr); }
+        try { const [[status]] = await closed; assert.equal(status, 0, stderr); }
         finally { clearTimeout(timer); }
     };
     try {
@@ -1651,24 +1702,51 @@ test('plugin refuses forged receipts, replacement ports and lock directory alias
     }
 });
 
-test('a fixture cleanup error fails visibly without retaining the foreign listener', { timeout: 30000 }, async t => {
+for (const scenario of ['remove-error', 'pending-launcher']) test(scenario === 'remove-error'
+    ? 'a fixture cleanup error fails visibly without retaining the foreign listener'
+    : 'denied fixture launchers exit before their working directory is removed', { timeout: 30000 }, async t => {
     const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-cleanup-regression-')));
-    const trace = path.join(directory, 'fixture.json'), loader = path.join(directory, 'fault.mjs');
+    const trace = path.join(directory, 'fixture.json'), ledger = path.join(directory, 'launchers.ndjson'), loader = path.join(directory, 'fault.mjs');
     writeFileSync(loader, `
         import fs from 'node:fs';
         import path from 'node:path';
+        import cp from 'node:child_process';
         import { syncBuiltinESMExports } from 'node:module';
-        const remove = fs.rmSync;
+        const remove = fs.rmSync, write = fs.writeFileSync, spawn = cp.spawn;
+        const record = value => fs.appendFileSync(${JSON.stringify(ledger)}, JSON.stringify(value) + '\\n');
+        cp.spawn = (command, args, options) => {
+            const child = spawn(command, args, options);
+            if (options?.detached && path.basename(options.cwd || '') === 'source') {
+                record({pid:child.pid,directory:path.dirname(options.cwd),event:'spawn'});
+                child.once('exit', () => record({pid:child.pid,event:'exit'}));
+            }
+            return child;
+        };
+        fs.writeFileSync = (file, bytes, ...args) => {
+            if (${JSON.stringify(scenario)} === 'pending-launcher' && String(file).endsWith(path.join('source','scripts','mediflow.mjs'))) {
+                bytes = String(bytes).replace('await bridgeExistingLocalUi(requestsDirectory,',
+                    "const fixtureHold = setInterval(() => {},1000); process.once('disconnect', () => setTimeout(() => clearInterval(fixtureHold),500)); await bridgeExistingLocalUi(requestsDirectory,");
+            }
+            return write(file, bytes, ...args);
+        };
         fs.rmSync = (file, ...args) => {
             if (path.basename(String(file)).startsWith('mediflow-ordinary-launcher-')) {
                 fs.writeFileSync(${JSON.stringify(trace)}, JSON.stringify({ directory: String(file) }));
-                throw Object.assign(new Error('SYNTHETIC_FIXTURE_CLEANUP_EPERM'), { code: 'EPERM' });
+                if (${JSON.stringify(scenario)} === 'remove-error') throw Object.assign(new Error('SYNTHETIC_FIXTURE_CLEANUP_EPERM'), { code: 'EPERM' });
+                const events = fs.existsSync(${JSON.stringify(ledger)}) ? fs.readFileSync(${JSON.stringify(ledger)},'utf8').trim().split('\\n').map(JSON.parse) : [];
+                const launched = events.filter(event => event.event === 'spawn' && event.directory === String(file));
+                if (!launched.length) throw new Error('FIXTURE_LAUNCH_OBSERVATION_MISSING');
+                for (const {pid} of launched) {
+                    try { process.kill(pid,0); }
+                    catch (error) { if(error.code === 'ESRCH') continue; throw error; }
+                    throw new Error('SYNTHETIC_FIXTURE_CWD_STILL_OWNED ' + pid);
+                }
             }
             return remove(file, ...args);
         };
         syncBuiltinESMExports();`);
-    const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
-    const child = spawn(process.execPath, ['--import', loader, '--test', '--test-isolation=none', '--test-reporter=spec',
+    const env = { ...process.env, NODE_OPTIONS: '--import=' + pathToFileURL(loader).href }; delete env.NODE_TEST_CONTEXT;
+    const child = spawn(process.execPath, [...fixtureImportArguments(loader), '--test', '--test-isolation=none', '--test-reporter=spec',
         '--test-name-pattern=^plugin refuses forged receipts,', fileURLToPath(import.meta.url)],
         { env, stdio: ['ignore', 'pipe', 'pipe'] });
     const closed = once(child, 'close');
@@ -1677,13 +1755,21 @@ test('a fixture cleanup error fails visibly without retaining the foreign listen
     child.stderr.on('data', chunk => { output += chunk; });
     t.after(async () => {
         await stopFixtureChild(child, closed);
+        if (existsSync(ledger)) {
+            const deadline = Date.now() + 5000;
+            for (const {pid,event} of readFileSync(ledger,'utf8').trim().split('\n').map(JSON.parse)) if (event === 'spawn') for (;;) {
+                try { process.kill(pid,0); } catch(error) { if(error.code === 'ESRCH') break; throw error; }
+                assert.ok(Date.now() < deadline, 'Owned denied launcher did not exit');
+                await new Promise(resolve => setTimeout(resolve,10));
+            }
+        }
         if (existsSync(trace)) rmSync(JSON.parse(readFileSync(trace)).directory, { recursive: true, force: true });
         rmSync(directory, { recursive: true, force: true });
     });
     const [code] = await waitForFixtureClose(closed, 20000);
-    assert.equal(code, 1, output);
-    assert.match(output, /SYNTHETIC_FIXTURE_CLEANUP_EPERM/u);
-    assert.match(output, /fail 1/u);
+    assert.equal(code, scenario === 'remove-error' ? 1 : 0, output);
+    assert.match(output, scenario === 'remove-error' ? /SYNTHETIC_FIXTURE_CLEANUP_EPERM/u : /pass 1/u);
+    assert.match(output, scenario === 'remove-error' ? /fail 1/u : /fail 0/u);
     assert.match(output, /cancelled 0/u);
 });
 
