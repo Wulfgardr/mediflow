@@ -10,9 +10,8 @@
 .panel button,.picker button { min-height:var(--lume-control-height,44px); white-space:normal; }
 @media (pointer: fine) and (min-width: 701px) { .picker button { white-space:nowrap; } }
 .panel label,.picker label { display:grid; gap:6px; min-width:0; font-size:0.875rem; }
-.panel select,.picker select { width:100%; min-width:0; min-height:var(--lume-control-height,44px); border-radius:var(--lume-control-radius,12px); padding:8px 12px; background:var(--lume-surface-focal); color:var(--lume-ink); border:1px solid var(--lume-border-color); }
 .panel summary { min-height:var(--lume-control-height,44px); display:list-item; align-content:center; cursor:pointer; }
-.panel :is(button,select,summary):focus-visible,.picker :is(button,select):focus-visible { outline:2px solid var(--lume-accent); outline-offset:3px; }
+.panel :is(button,summary):focus-visible,.picker button:focus-visible { outline:2px solid var(--lume-accent); outline-offset:3px; }
 .hint { color:var(--lume-ink-muted); }
 .error { color:var(--lume-signal-critical); }
 .picker { display:grid; gap:var(--lume-control-gap,8px); min-width:0; max-width:100%; margin-block:12px; font-size:0.8125rem; }
@@ -21,7 +20,9 @@
 
 /* one compact selector; recovery is visible only when needed. */
 .pickerRow { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
-.pickerRow select { flex:1 1 180px; max-width:100%; font-size:0.8125rem; text-overflow:ellipsis; }
+.pickerRow > [data-choice-field] { flex:1 1 180px; }
+.summary { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-width:0; }
+.summary > span:first-child { min-width:0; overflow-wrap:anywhere; }
 .pickerDetailBody { display:grid; gap:8px; padding-bottom:8px; }
 
 .pickerDetails { flex:0 0 auto; }

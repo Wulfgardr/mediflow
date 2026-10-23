@@ -136,6 +136,7 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
   await expect(insightDisclosure.locator(':scope > div > [data-disclosure-control]')).toHaveAttribute('aria-expanded', 'true');
   // this spec already owns a synthetic preview transport; make its local
   // catalog prerequisite explicit without claiming a real provider invocation.
+  await page.getByTestId('model-picker-patient_insight').getByRole('button', { name: 'Cambia', exact: true }).click();
   const modelPicker = page.getByRole('combobox', { name: 'Modello per questa proposta' });
   await expect(modelPicker).toBeEnabled();
   // the picker reads its catalog on first focus, matching ordinary UI use.
