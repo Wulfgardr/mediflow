@@ -86,7 +86,7 @@ export async function bridgeExistingLocalUi(directory, expected, channel = proce
     frames(socket, frame => {
       if (!connected) {
         if (frame?.type === 'paired' && frame.nonce === nonce && frame.status === 'denied') { close(); return; }
-        if (frame?.type !== 'paired' || typeof frame.token !== 'string' || frame.token.length !== token.length || !crypto.timingSafeEqual(Buffer.from(frame.token), Buffer.from(token)) || frame.nonce !== nonce
+        if (frame?.type !== 'paired' || typeof frame.token !== 'string' || frame.token.length !== token.length || !crypto.timingSafeEqual(Buffer.from(frame.token), Buffer.from(token)) || frame.nonce !== nonce || frame.host !== host
           || frame.dataDir !== expected.dataDir || frame.sourceFingerprint !== expected.sourceFingerprint) { socket.destroy(); return; }
         if (frame.status !== 'accepted') { close(); return; }
         peer = socket; connected = true; socket.setTimeout(0); clearTimeout(timer); codePage.close(); codePage.closeAllConnections();
