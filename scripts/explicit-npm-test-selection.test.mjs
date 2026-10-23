@@ -238,7 +238,7 @@ console.log(JSON.stringify(result.files));`;
 test('seven required npm script bodies and CI bindings select the actual independent expected paths', () => {
   const actual = collectExplicitNpmSelections(sourceRoot);
   assert.deepEqual(Object.fromEntries(Object.entries(actual).map(([id, value]) => [id, value.files])), {
-    'npm:test:launcher-helpers': ['scripts/launcher-helpers.test.mjs'],
+    'npm:test:launcher-helpers': ['scripts/launcher-helpers.test.mjs', 'scripts/windows-system-command.test.mjs'],
     'npm:test:native-launcher': ['scripts/launch-mediflow-mac.test.mjs'],
     'npm:test:usage-dashboard': ['scripts/build-usage-dashboard.test.mjs'],
     'npm:test:database-import-boundary': ['scripts/check-database-import-boundary.test.mjs'],

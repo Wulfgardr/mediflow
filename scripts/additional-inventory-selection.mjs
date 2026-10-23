@@ -50,6 +50,16 @@ export function collectAdditionalInventorySelections(root) {
       binding: collectLiteralCiBinding(root, { workflow: '.github/workflows/cross-platform.yml', job: 'build-start', ciCall: 'node scripts/ci-start-smoke.mjs' }),
     };
   });
+  add('ci:windows-bootstrap', 'ordinary', 'scripts/prepare-windows-launcher-bootstrap.mjs', () => {
+    source(root, 'scripts/prepare-windows-launcher-bootstrap.mjs', [
+      "import { initializeWindowsSystemCommand } from './windows-system-command.mjs';",
+      "else if (command === 'source-first') await sourceFirst();",
+      "initializeWindowsSystemCommand(); const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'mf-source-first-~'));",
+      "assert.match(diagnostic, /Mancano le dipendenze\\. Conferma l’installazione con npm ci\\./u);",
+    ]);
+    return { files: ['scripts/prepare-windows-launcher-bootstrap.mjs'],
+      binding: collectLiteralCiBinding(root, { workflow: '.github/workflows/cross-platform.yml', job: 'windows-bootstrap', ciCall: 'node scripts/prepare-windows-launcher-bootstrap.mjs source-first' }) };
+  });
   add('npm:test:clinical-http', 'ordinary', 'scripts/run-clinical-http-suite.mjs', () => ({
     files: CLINICAL_HTTP_TEST_FILES,
     binding: collectNpmScriptBinding(root, { script: 'test:clinical-http', workflow: '.github/workflows/web-core.yml', job: 'web-core' }, 'node scripts/run-clinical-http-suite.mjs'),

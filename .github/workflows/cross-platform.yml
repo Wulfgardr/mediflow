@@ -14,7 +14,42 @@ permissions:
   contents: read
 
 jobs:
+  windows-bootstrap:
+    name: Native launcher bootstrap (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+          - os: windows-11-arm
+            arch: arm64
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          architecture: ${{ matrix.arch }}
+      - name: Build native Windows bootstrap (development only)
+        if: hashFiles(format('scripts/windows-launcher-bootstrap/prebuilds/win32-{0}/system-directory.node', matrix.arch)) == '' && hashFiles(format('scripts/windows-launcher-bootstrap/prebuilds/win32-{0}/manifest.json', matrix.arch)) == ''
+        run: node scripts/prepare-windows-launcher-bootstrap.mjs build
+      - name: Verify delivered artifact and OS path
+        run: node scripts/prepare-windows-launcher-bootstrap.mjs verify
+      - name: Verify native bootstrap with hostile cwd PATH and root variables
+        run: node scripts/prepare-windows-launcher-bootstrap.mjs verify-shadow
+      - name: Prove source-first before npm ci
+        run: node scripts/prepare-windows-launcher-bootstrap.mjs source-first
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-launcher-bootstrap-${{ matrix.arch }}
+          path: |
+            scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/system-directory.node
+            scripts/windows-launcher-bootstrap/prebuilds/win32-${{ matrix.arch }}/manifest.json
+          if-no-files-found: error
+
   headless-contracts:
+    needs: windows-bootstrap
     name: Headless contracts (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -27,6 +62,14 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: runner.os == 'Windows' && hashFiles('scripts/windows-launcher-bootstrap/prebuilds/win32-x64/system-directory.node') == '' && hashFiles('scripts/windows-launcher-bootstrap/prebuilds/win32-x64/manifest.json') == ''
+        with:
+          name: windows-launcher-bootstrap-x64
+          path: scripts/windows-launcher-bootstrap/prebuilds/win32-x64
+      - name: Verify received native bootstrap
+        if: runner.os == 'Windows'
+        run: node scripts/prepare-windows-launcher-bootstrap.mjs verify
       - name: Install (npm ci)
         run: npm ci
       - name: Deny DB, Web, native and network imports in portable surfaces
@@ -42,6 +85,7 @@ jobs:
         run: npm run test:native-launcher
 
   build-start:
+    needs: windows-bootstrap
     name: build + start (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -65,6 +109,14 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: runner.os == 'Windows' && hashFiles('scripts/windows-launcher-bootstrap/prebuilds/win32-x64/system-directory.node') == '' && hashFiles('scripts/windows-launcher-bootstrap/prebuilds/win32-x64/manifest.json') == ''
+        with:
+          name: windows-launcher-bootstrap-x64
+          path: scripts/windows-launcher-bootstrap/prebuilds/win32-x64
+      - name: Verify received native bootstrap
+        if: runner.os == 'Windows'
+        run: node scripts/prepare-windows-launcher-bootstrap.mjs verify
       - name: Install (npm ci)
         run: npm ci
       - name: Verify better-sqlite3 native binding loads

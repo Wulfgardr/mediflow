@@ -136,8 +136,13 @@ ricevuta non viene adottato. Non si arrestano PID trovati sulla rete.
 
 Arresta e Ctrl+C chiudono i figli posseduti e la pagina Avvio. Il runtime
 sorgente accetta anche un messaggio di arresto sul canale IPC del proprio
-padre; questo permette il drain del Supervisor su Windows prima dell'eventuale
-terminazione forzata. Non aggiunge un endpoint clinico o un'autorità agente.
+padre per i suoi consumer cooperativi. Lo Stop del launcher ordinario Windows
+segue invece ADR0159: una taskkill di sistema `/T /F` e l'exit originale
+costituiscono insieme la prova richiesta, con costo di arresto forzato.
+Il bootstrap Node-API precompilato del launcher deve essere distribuito prima
+di `npm ci`; non installa né compila componenti all'avvio e nega architetture
+o artefatti mancanti. La sua build di sviluppo/CI è distinta dal percorso
+utente source-first. Non aggiunge un endpoint clinico o un'autorità agente.
 Ollama, facoltativo e condiviso, mantiene il ciclo di vita indipendente.
 
 Senza display o browser si usa un menu testuale; senza TTY serve `--scelta`.

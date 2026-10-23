@@ -9,6 +9,7 @@ import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { checkNode, knownMainUpdates, openUrl, probeRunningInstance, readProductIdentity, waitForRunningInstance } from './launcher-helpers.mjs';
 import { verifySourceRuntime } from './source-runtime.mjs';
+import { initializeWindowsSystemCommand, windowsTaskkillCommand } from './windows-system-command.mjs';
 import { macDerivedDataDirectory } from './build-input-metadata.mjs';
 import { createChoiceServer } from './mediflow-launcher-page.mjs';
 import { prepareLauncherState } from './launcher-state.mjs';
@@ -299,6 +300,7 @@ export async function stopOwnedChild(child, graceMs = 8000) {
     if (confirmedWindowsStops.has(child)) return;
     throw Object.assign(new Error('Arresto del processo posseduto non verificato.', { cause: new Error('Albero del processo già terminale non verificato.') }), { code: 'MEDIFLOW_OWNED_STOP_UNCONFIRMED' });
   }
+  const windowsCommand = posix ? null : windowsTaskkillCommand();
   await new Promise((resolve, reject) => {
     let forceTimer, timer, signalImmediate, groupAbsent = terminalOwnedGroups.has(child), settled = false;
     let windowsTreeStopped = false, originalExitObserved = false;
@@ -360,7 +362,7 @@ export async function stopOwnedChild(child, graceMs = 8000) {
         if (process.platform === 'win32') {
           if (Date.now() >= deadline) { expired(); return; }
           if (leaderTerminal()) throw new Error('Albero del processo già terminale non verificato.');
-          const result = spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'],
+          const result = spawnSync(windowsCommand, ['/pid', String(child.pid), '/T', '/F'],
             { stdio: 'ignore', timeout: Math.max(1, deadline - Date.now()), windowsHide: true });
           if (result.error || result.status !== 0) throw result.error || new Error(`taskkill: ${result.status}`);
           if (Date.now() >= deadline) { expired(); return; }
@@ -402,6 +404,7 @@ export async function main(args = process.argv.slice(2)) {
   process.chdir(ROOT);
   const runtime = checkNode();
   if (!runtime.ok) throw new Error(runtime.error);
+  initializeWindowsSystemCommand();
   if (options.desktop) { log(`Collegamento creato: ${installDesktopEntry()}`); return; }
   if (knownMainUpdates(ROOT)) throw new Error('Questa copia non contiene aggiornamenti già noti a Git. Esegui git pull --ff-only e riapri MediFlow.');
   const identity = readProductIdentity(ROOT);
