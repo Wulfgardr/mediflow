@@ -294,7 +294,7 @@ async function openTherapies(page: Page, data: Fixture): Promise<void> {
 async function deletionAction(page: Page, drugName = 'Farmaco sintetico principale') {
   const target = page.locator('#terapie').getByRole('row').filter({ has: page.getByText(drugName, { exact: true }) });
   await target.getByRole('button', { name: /^Altre azioni/ }).click();
-  return target.getByRole('menuitem', { name: 'Elimina', exact: true });
+  return target.getByRole('menuitem', { name: 'Elimina (inserita per errore)', exact: true });
 }
 
 async function requestDeletion(page: Page): Promise<void> {

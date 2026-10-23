@@ -78,7 +78,7 @@ for (const theme of ['giorno', 'grafite']) for (const width of [1440, 768]) {
     await openPatientSection(page, 'terapie');
     await setTheme(page, theme);
     await page.getByRole('button', { name: 'Altre azioni per Ramipril', exact: true }).click();
-    await page.getByRole('menuitem', { name: 'Elimina', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Elimina (inserita per errore)', exact: true }).click();
     const dialog = page.getByRole('dialog');
     const confirm = dialog.getByRole('button', { name: 'Elimina', exact: true });
     await expect(confirm).toBeDisabled();

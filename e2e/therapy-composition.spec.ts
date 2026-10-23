@@ -59,6 +59,42 @@ test('creazione testuale accanto al titolo anche nel vuoto', async ({ page }) =>
     expect(Math.abs(titleBox!.y - createBox!.y)).toBeLessThan(45);
 });
 
+test('Nuova terapia apre la sezione chiusa e mostra subito la bozza', async ({ page }) => {
+    await fixture(page);
+    const toolbar = page.getByTestId('runtime-twin-toolbar');
+    if (await toolbar.count()) await toolbar.getByRole('button', { name: 'Originale', exact: true }).click();
+    const toggle = section(page).getByRole('button', { name: /Terapie farmacologiche/ });
+    if (await toggle.count()) {
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    }
+    await expect(creation(page)).toBeEnabled();
+    await creation(page).click();
+    if (await toggle.count()) await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(section(page).getByLabel('Farmaco manuale o galenico')).toBeVisible();
+    await expect(creation(page)).toBeDisabled();
+    await expect(section(page).locator('form')).toContainText('Farmaco');
+    await expect(section(page).locator('form input:focus')).toHaveCount(1);
+    await section(page).getByRole('button', { name: 'Annulla', exact: true }).click();
+    if (await toggle.count()) {
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    }
+    await creation(page).click();
+    if (await toggle.count()) await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(section(page).getByLabel('Farmaco manuale o galenico')).toBeVisible();
+    await expect(section(page).locator('form input:focus')).toHaveCount(1);
+});
+
+test('Modifica porta il fuoco nel form anche passando fra terapie', async ({ page }) => {
+    await fixture(page, { active: 2, suspended: 0, completed: 0 });
+    await row(page).getByRole('button', { name: 'Modifica', exact: true }).click();
+    await expect(section(page).locator('form')).toBeVisible();
+    await expect(section(page).locator('form input:focus')).toHaveCount(1);
+    await row(page, 'Farmaco sintetico active 2').getByRole('button', { name: 'Modifica', exact: true }).click();
+    await expect(section(page).locator('form input:focus')).toHaveCount(1);
+});
+
 test('form aperto ha un solo principale e conserva bozza e soglia', async ({ page }) => {
     await fixture(page, { active: 1, suspended: 0, completed: 0 });
     await draft(page);
@@ -86,7 +122,7 @@ test('riga attiva espone solo Modifica e menu con distruttiva ultima', async ({ 
     await expect(row(page).getByRole('button', { name: 'Concludi', exact: true })).toHaveCount(0);
     await expect(row(page).getByRole('button', { name: 'Modifica', exact: true })).toBeVisible();
     const actions = await menu(page);
-    await expect(actions.getByRole('menuitem')).toHaveText(['Sospendi', 'Concludi', 'Elimina']);
+    await expect(actions.getByRole('menuitem')).toHaveText(['Sospendi', 'Concludi', 'Elimina (inserita per errore)']);
     await actions.press('Escape');
     await expect(row(page).getByRole('button', { name: /^Altre azioni/ })).toBeFocused();
 });
@@ -150,7 +186,7 @@ test('eliminazione conserva motivo obbligatorio, ritorno prioritario e un solo i
     const writes: string[] = [];
     page.on('request', request => { if (request.method() === 'DELETE') writes.push(request.url()); });
     const actions = await menu(page);
-    const remove = actions.getByRole('menuitem', { name: 'Elimina', exact: true });
+    const remove = actions.getByRole('menuitem', { name: 'Elimina (inserita per errore)', exact: true });
     await expect(remove).not.toHaveClass(/mf-button-destructive/);
     await remove.click();
     const dialog = page.getByRole('dialog', { name: 'Eliminare questo farmaco dalla cartella?' });
@@ -161,7 +197,7 @@ test('eliminazione conserva motivo obbligatorio, ritorno prioritario e un solo i
     await expect(confirm).toHaveClass(/mf-button-destructive/);
     expect(writes).toEqual([]);
     await dialog.getByRole('button', { name: 'Annulla', exact: true }).click();
-    await (await menu(page)).getByRole('menuitem', { name: 'Elimina', exact: true }).click();
+    await (await menu(page)).getByRole('menuitem', { name: 'Elimina (inserita per errore)', exact: true }).click();
     await dialog.getByRole('textbox', { name: "Motivazione dell'eliminazione" }).fill('Duplicato sintetico');
     await confirm.click();
     await expect(row(page)).toHaveCount(0);

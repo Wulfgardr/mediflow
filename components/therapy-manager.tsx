@@ -58,6 +58,7 @@ const chipClassName = 'inline-flex min-h-8 items-center gap-1.5 rounded-full bor
 
 export default function TherapyManager({ patientId, embedded = false, before, children, surfaceClassName = '' }: { patientId: string; embedded?: boolean; before?: ReactNode; children?: ReactNode; surfaceClassName?: string }) {
     const [isAdding, setIsAdding] = useState(false);
+    const formRef = useRef<HTMLFormElement>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isGalenic, setIsGalenic] = useState(false); // Toggle for Free Text vs AIFA
     const [selectedDiagnosis, setSelectedDiagnosis] = useState<{ code: string; title: string } | null>(null);
@@ -188,6 +189,10 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         resolver: zodResolver(therapySchema) as any
     });
+
+    useLayoutEffect(() => {
+        if (isAdding) formRef.current?.querySelector<HTMLInputElement>('input:not([type="hidden"]):not([readonly]):not(:disabled)')?.focus();
+    }, [isAdding, editingId]);
 
     const startEditing = (therapy: Therapy) => {
         if (deletion.blocked || statusChange.blocked || isSaving || isReading || therapy.patientId !== patientId) return;
@@ -517,7 +522,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                         </label>
                     </div>
 
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    <form ref={formRef} onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                         {draft?.patientId !== patientId && (
                             <p role="alert">Questa bozza appartiene a un altro paziente. Torna alla sua cartella prima di continuare.</p>
                         )}
@@ -683,7 +688,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                                     trigger={props => <Button {...props} variant="icon" aria-label={`Altre azioni per ${t.drugName}`}>⋯</Button>}>
                                     {group.status === 'active' && <button type="button" role="menuitem" disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'suspended')}>Sospendi</button>}
                                     <button type="button" role="menuitem" disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'completed')}>Concludi</button>
-                                    {group.status === 'active' && <button type="button" role="menuitem" disabled={!!deleteRecovery || statusChange.blocked || isAdding} onClick={() => handleSoftDelete(t.id)}>Elimina</button>}
+                                    {group.status === 'active' && <button type="button" role="menuitem" disabled={!!deleteRecovery || statusChange.blocked || isAdding} onClick={() => handleSoftDelete(t.id)}>Elimina (inserita per errore)</button>}
                                 </PatientSheetMenu>}
                             </div>{group.status === 'completed' && <small className={styles.compactOnly}>Conclusa il {format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</small>}</td>
                         </tr>)}
@@ -748,7 +753,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
         </section>
     );
     return embedded ? <CollapsibleSection id="terapie" title="Terapie farmacologiche" count={count}
-        headerAction={newButton} surfaceClassName={`${surfaceClassName} ${styles.therapySection}`} keepMounted>
+        defaultOpen={isAdding} headerAction={newButton} surfaceClassName={`${surfaceClassName} ${styles.therapySection}`} keepMounted>
         <div className="space-y-4">{before}{content}{children}</div>
     </CollapsibleSection> : content;
 }
