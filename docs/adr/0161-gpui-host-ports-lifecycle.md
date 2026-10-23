@@ -14,6 +14,9 @@ schema, non una concessione. I vecchi client possono ignorare
 il campo; questo client GPUI rifiuta un host che non lo dichiari o abbia una
 revisione, uno scope o un'autorità incompatibili. Il protocollo resta 1.14.0:
 il campo è additivo, senza nuovi endpoint né cambi delle ammissioni.
+Lo schema vincola il roster alle otto combinazioni della revisione 1, ciascuna
+presente una sola volta, senza imporre l’ordine. ID, revisioni, scope, autorità
+e stati diversi richiedono un’evoluzione esplicita del contratto.
 
 | Porta, revisione 1 | Scope | Autorità richiesta | Ingresso corrente |
 | --- | --- | --- | --- |
@@ -55,6 +58,10 @@ una scrittura annullata è indeterminata. Chiudere il trasporto non prova il
 rollback del writer host. Nessun retry automatico. `ARCHIVE_REPLACED` e il
 diniego di autenticazione ritirano la sessione e le richieste sorelle. Un
 semplice `403` di capability resta un diniego della singola operazione.
+Se risposta e cancellazione sono entrambe pronte, il trasporto esamina prima
+la risposta: un ritiro completato conserva il motivo e raggiunge il lifecycle
+di sessione. Gli altri esiti restano soggetti al controllo di cancellazione
+dopo il completamento; una scrittura cancellata resta indeterminata.
 
 Quando GET o PUT del profilo account rilevano `ARCHIVE_REPLACED` o una
 generazione diversa, il runner account consuma anche il motivo di ritiro

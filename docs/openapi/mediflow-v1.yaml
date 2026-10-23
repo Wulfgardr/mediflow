@@ -6396,25 +6396,163 @@ components:
           enum: [host]
         ports:
           type: array
+          minItems: 8
+          maxItems: 8
+          uniqueItems: true
           items:
-            type: object
-            additionalProperties: false
-            required: [id, revision, scope, authority, state]
-            properties:
-              id:
-                type: string
-              revision:
-                type: integer
-                enum: [1]
-              scope:
-                type: string
-                enum: [ambulatory, operator, operation, chosen-file]
-              authority:
-                type: string
-                enum: [paired-operator, operator-session, explicit-admin-grant, explicit-egress-consent, named-host-service, explicit-microphone-permission, explicit-file-choice]
-              state:
-                type: string
-                enum: [available, not-exposed, client-local]
+            oneOf:
+              - type: object
+                additionalProperties: false
+                required: [id, revision, scope, authority, state]
+                properties:
+                  id:
+                    type: string
+                    enum: [clinical]
+                  revision:
+                    type: integer
+                    enum: [1]
+                  scope:
+                    type: string
+                    enum: [ambulatory]
+                  authority:
+                    type: string
+                    enum: [paired-operator]
+                  state:
+                    type: string
+                    enum: [available]
+              - type: object
+                additionalProperties: false
+                required: [id, revision, scope, authority, state]
+                properties:
+                  id:
+                    type: string
+                    enum: [account-profile]
+                  revision:
+                    type: integer
+                    enum: [1]
+                  scope:
+                    type: string
+                    enum: [operator]
+                  authority:
+                    type: string
+                    enum: [operator-session]
+                  state:
+                    type: string
+                    enum: [available]
+              - type: object
+                additionalProperties: false
+                required: [id, revision, scope, authority, state]
+                properties:
+                  id:
+                    type: string
+                    enum: [ai-preferences]
+                  revision:
+                    type: integer
+                    enum: [1]
+                  scope:
+                    type: string
+                    enum: [operator]
+                  authority:
+                    type: string
+                    enum: [explicit-admin-grant]
+                  state:
+                    type: string
+                    enum: [available]
+              - type: object
+                additionalProperties: false
+                required: [id, revision, scope, authority, state]
+                properties:
+                  id:
+                    type: string
+                    enum: [administrative]
+                  revision:
+                    type: integer
+                    enum: [1]
+                  scope:
+                    type: string
+                    enum: [operation]
+                  authority:
+                    type: string
+                    enum: [explicit-admin-grant]
+                  state:
+                    type: string
+                    enum: [not-exposed]
+              - type: object
+                additionalProperties: false
+                required: [id, revision, scope, authority, state]
+                properties:
+                  id:
+                    type: string
+                    enum: [provider]
+                  revision:
+                    type: integer
+                    enum: [1]
+                  scope:
+                    type: string
+                    enum: [operation]
+                  authority:
+                    type: string
+                    enum: [explicit-egress-consent]
+                  state:
+                    type: string
+                    enum: [not-exposed]
+              - type: object
+                additionalProperties: false
+                required: [id, revision, scope, authority, state]
+                properties:
+                  id:
+                    type: string
+                    enum: [document-derived]
+                  revision:
+                    type: integer
+                    enum: [1]
+                  scope:
+                    type: string
+                    enum: [ambulatory]
+                  authority:
+                    type: string
+                    enum: [named-host-service]
+                  state:
+                    type: string
+                    enum: [not-exposed]
+              - type: object
+                additionalProperties: false
+                required: [id, revision, scope, authority, state]
+                properties:
+                  id:
+                    type: string
+                    enum: [voice]
+                  revision:
+                    type: integer
+                    enum: [1]
+                  scope:
+                    type: string
+                    enum: [operation]
+                  authority:
+                    type: string
+                    enum: [explicit-microphone-permission]
+                  state:
+                    type: string
+                    enum: [not-exposed]
+              - type: object
+                additionalProperties: false
+                required: [id, revision, scope, authority, state]
+                properties:
+                  id:
+                    type: string
+                    enum: [file]
+                  revision:
+                    type: integer
+                    enum: [1]
+                  scope:
+                    type: string
+                    enum: [chosen-file]
+                  authority:
+                    type: string
+                    enum: [explicit-file-choice]
+                  state:
+                    type: string
+                    enum: [client-local]
     TerritorialPackCapability:
       type: object
       additionalProperties: false
