@@ -257,7 +257,8 @@ export async function main(args = process.argv.slice(2)) {
     }
     if (message.type !== 'mediflow-local-ui-navigate') return;
     let status = 'denied';
-    if (Object.keys(message).sort().join(',') === 'expiresAt,intent,requestId,type'
+    if (Object.keys(message).sort().join(',') === 'dataDir,expiresAt,intent,requestId,sourceFingerprint,type'
+      && message.dataDir === dataDir && message.sourceFingerprint === identity.sourceFingerprint
       && !pendingNavigation.has(requestId)
       && ['search', 'identity', 'history', 'prescribing'].includes(message.intent)
       && Number.isSafeInteger(message.expiresAt) && message.expiresAt > Date.now() && message.expiresAt <= Date.now() + 8000) {

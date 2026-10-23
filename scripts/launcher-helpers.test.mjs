@@ -573,7 +573,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true) {
             await new Promise(resolve => setTimeout(resolve, 10));
         }
     };
-    return { source, data, stateFiles, child, until, output: () => output };
+    return { source, data, stateFiles, child, until, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
 }
 
 test('headless ordinary runtime cannot acknowledge plugin navigation', async t => {
@@ -585,7 +585,7 @@ test('headless ordinary runtime cannot acknowledge plugin navigation', async t =
         body: JSON.stringify({ intent: 'history', requestId: crypto.randomUUID(), expiresAt: Date.now() + 5000 }) });
     assert.notEqual(response.status, 202);
     assert.doesNotMatch(f.output(), /FIXTURE_NAVIGATION/);
-    await assert.rejects(navigateOwnedLocalUiRuntime(f.child, 'history', new AbortController().signal));
+    await assert.rejects(navigateOwnedLocalUiRuntime(f.child, 'history', new AbortController().signal, Date.now() + 5000, f.expected));
     assert.equal(JSON.parse(readFileSync(f.stateFiles.preferencesFile)).choice, 'agenti');
 });
 
@@ -624,7 +624,7 @@ test('internal reuse startup never overwrites ordinary preferences', async t => 
 test('ordinary web runtime accepts navigation and keeps remembered preferences', async t => {
     const f = await ordinaryLauncherFixture(t, 'web');
     await f.until(() => f.output().includes('Pronto:'));
-    assert.equal(await navigateOwnedLocalUiRuntime(f.child, 'history', new AbortController().signal), true);
+    assert.equal(await navigateOwnedLocalUiRuntime(f.child, 'history', new AbortController().signal, Date.now() + 5000, f.expected), true);
     await f.until(() => f.output().includes('FIXTURE_NAVIGATION'));
     assert.equal(JSON.parse(readFileSync(f.stateFiles.preferencesFile)).choice, 'web');
 });
@@ -746,7 +746,7 @@ test('plugin refuses forged receipts, replacement ports and lock directory alias
 test('disconnecting the plugin leaves its ordinary runtime alive and usable', { timeout: 12000 }, async t => {
     const f = await ordinaryLauncherFixture(t, 'web');
     await f.until(() => f.output().includes('Pronto:'));
-    assert.equal(await navigateOwnedLocalUiRuntime(f.child, 'history', new AbortController().signal), true);
+    assert.equal(await navigateOwnedLocalUiRuntime(f.child, 'history', new AbortController().signal, Date.now() + 5000, f.expected), true);
     f.child.disconnect();
     const receipt = JSON.parse(readFileSync(path.join(f.stateFiles.lockDirectory, 'instance.json')));
     const state = await (await fetch(new URL('state', receipt.choiceUrl), { signal: AbortSignal.timeout(3000) })).json();
@@ -764,7 +764,7 @@ test('IPC rejects replay, expiry, revoked IDs and extra fields without new navig
         const receive = result => { if (result.requestId === frame.requestId) { f.child.off('message', receive); resolve(result.status); } };
         f.child.on('message', receive); f.child.send(frame);
     });
-    const request = { type: 'mediflow-local-ui-navigate', requestId: crypto.randomUUID(), intent: 'identity', expiresAt: Date.now() + 5000 };
+    const request = { type: 'mediflow-local-ui-navigate', requestId: crypto.randomUUID(), intent: 'identity', expiresAt: Date.now() + 5000, ...f.expected };
     assert.equal(await send(request), 'accepted');
     assert.equal(await send(request), 'denied');
     for (const frame of [{ ...request, requestId: crypto.randomUUID(), expiresAt: Date.now() - 1 },
@@ -775,4 +775,15 @@ test('IPC rejects replay, expiry, revoked IDs and extra fields without new navig
     await f.until(() => f.output().includes('FIXTURE_NAVIGATION'));
     const navigation = f.output().split('\n').filter(line => line.includes('mediflow.local-ui.navigation.v1'));
     assert.equal(navigation.length, 1);
+});
+
+
+test('the inherited peer must retain the expected archive and source generation', async t => {
+    const f = await ordinaryLauncherFixture(t, 'web');
+    await f.until(() => f.output().includes('Pronto:'));
+    for (const expected of [{ dataDir: '/different-archive', sourceFingerprint: 'synthetic@aaaaaaaaaaaa:clean' },
+        { dataDir: f.data, sourceFingerprint: 'different-generation' }]) {
+        await assert.rejects(navigateOwnedLocalUiRuntime(f.child, 'history', AbortSignal.timeout(2000), Date.now() + 5000, expected));
+    }
+    assert.doesNotMatch(f.output(), /FIXTURE_NAVIGATION/);
 });

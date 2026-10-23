@@ -137,7 +137,9 @@ esistono dati clinici, autorizzazioni o richieste persistenti da convertire.
 La ricevuta su disco e il fingerprint pubblico non autenticano un listener.
 Il navigator non legge `instance.json` e non invia più HTTP al controllo scoperto.
 Avvia il launcher ordinario con il solo `--riusa` su IPC ereditato e inoltra
-soltanto enum, ID casuale e scadenza sul medesimo canale di processo.
+soltanto enum, ID casuale e scadenza, con fingerprint sorgente e archivio attesi,
+sul medesimo canale di processo. Il launcher confronta questi ultimi con la
+propria identità e il proprio archivio prima di inoltrare un intento.
 Il launcher avviato così reclama esclusivamente una directory lock nuova:
 nessuna adozione o recupero di ricevute, PID o porte, inclusi alias della lock.
 Il Web è quello avviato direttamente da quel launcher, sul proprio IPC.
