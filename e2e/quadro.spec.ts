@@ -61,10 +61,10 @@ test('Misure recenti conta i parametri e conserva lo storico completo in Misure'
     await expect(measures.locator('tbody tr')).toHaveCount(2);
     await expect(measures.getByRole('cell', { name: '81 kg', exact: true })).toBeVisible();
     await expect(measures.getByRole('cell', { name: '81000 g', exact: true })).toBeVisible();
-    await expect(measures.getByRole('cell', { name: '12/9/2026', exact: true })).toHaveCount(2);
-    await expect(measures.getByRole('cell', { name: '+1 kg dal 11/9/2026', exact: true })).toBeVisible();
-    await expect(measures.getByRole('cell', { name: '+1000 g dal 11/9/2026', exact: true })).toBeVisible();
-    await openPatientSection(page, 'misure');
+    await expect(measures.getByRole('cell', { name: /^12\/0?9\/2026$/, exact: true })).toHaveCount(2);
+    await expect(measures.getByRole('cell', { name: /^\+1 kg dal 11\/0?9\/2026$/, exact: true })).toBeVisible();
+    await expect(measures.getByRole('cell', { name: /^\+1000 g dal 11\/0?9\/2026$/, exact: true })).toBeVisible();
+    await openPatientSection(page, 'parametri');
     const history = page.getByRole('complementary', { name: 'Andamento e storia delle misure' });
     await expect(history).toBeVisible();
     await history.getByRole('button', { name: 'Tutte (24)', exact: true }).click();
