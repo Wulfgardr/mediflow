@@ -166,3 +166,118 @@ test('Windows bootstrap source digests survive real checkouts with different loc
     }
   }
 });
+
+test('source-first observer preserves the exact own identity query result throw and nonmatching calls', t => {
+  t.diagnostic(driver(`
+    import assert from 'node:assert/strict';import cp from 'node:child_process';import {registerHooks,syncBuiltinESMExports} from 'node:module';
+    const command=${JSON.stringify(String.raw`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`)};
+    const statement="$ErrorActionPreference='Stop'; (Get-Process -Id "+process.pid+").StartTime.ToUniversalTime().Ticks.ToString()";
+    const argv=Object.freeze(['-NoProfile','-NonInteractive','-Command',statement]);
+    const options=Object.freeze({encoding:'utf8',timeout:3000,windowsHide:true});
+    const calls=[],records=[];let response,thrown,admissions=0;
+    const native=cp.spawnSync,write=process.stderr.write;
+    cp.spawnSync=(...args)=>{calls.push(args);if(thrown)throw thrown;return response;};
+    globalThis.admittedTaskkill=()=>{admissions++;return 'C:'+String.fromCharCode(92)+'Windows'+String.fromCharCode(92)+'System32'+String.fromCharCode(92)+'taskkill.exe';};
+    registerHooks({load(url,context,next){if(url===${JSON.stringify(resolver)})return {format:'module',shortCircuit:true,source:'export const windowsTaskkillCommand=globalThis.admittedTaskkill;'};return next(url,context);}});
+    process.stderr.write=text=>{records.push(text);return true;};
+    try {
+      await import(${JSON.stringify(new URL('./windows-launcher-bootstrap/observe-command.mjs', import.meta.url).href)});
+      assert.equal(calls.length,0,'Observer warmed up the query');
+      const receipts=[];
+      for(const outcome of ['success','empty','status','error','throw']) {
+        response={pid:424100,status:outcome==='status'?1:outcome==='error'?null:0,signal:outcome==='error'?'SIGTERM':null,
+          stdout:outcome==='empty'?'':'638000000000000000\\r\\n',stderr:outcome==='status'?String.fromCharCode(1).repeat(3000)+'PRIVATE_TAIL_SENTINEL':'',
+          env:{secret:'PRIVATE_ENV_SENTINEL'}};
+        if(outcome==='error')response.error=Object.assign(new Error('synthetic timeout'),{code:'ETIMEDOUT',errno:-110,syscall:'spawnSync',stack:'PRIVATE_STACK_SENTINEL',extra:'PRIVATE_EXTRA_SENTINEL'});
+        thrown=outcome==='throw'?Object.assign(new Error('synthetic delivery failure'),{code:'EACCES',stack:'PRIVATE_STACK_SENTINEL'}):null;
+        const before=calls.length,count=records.length;
+        if(thrown)assert.throws(()=>cp.spawnSync(command,argv,options),error=>error===thrown);
+        else assert.equal(cp.spawnSync(command,argv,options),response,'Observer replaced the original result');
+        assert.equal(calls.length,before+1);assert.equal(calls.at(-1).length,3);
+        assert.equal(calls.at(-1)[0],command);assert.equal(calls.at(-1)[1],argv);assert.equal(calls.at(-1)[2],options);
+        assert.equal(records.length,count+1,'Missing own-query receipt');
+        const line=records.at(-1);assert.ok(Buffer.byteLength(line)<8192);assert.match(line,/^\\[launcher-identity-query\\] /u);
+        assert.doesNotMatch(line,/PRIVATE_(?:TAIL|ENV|STACK|EXTRA)_SENTINEL/u);
+        const receipt=JSON.parse(line.slice('[launcher-identity-query] '.length));receipts.push(receipt);
+        assert.equal(receipt.type,'launcher-identity-query');assert.equal(receipt.launcherPid,process.pid);assert.equal(receipt.command.text,command);
+        assert.equal(receipt.threw,Boolean(thrown));assert.equal(receipt.status,thrown?null:response.status);
+        assert.equal(receipt.signal.text,thrown?'':response.signal??'');assert.ok(receipt.elapsedMs>=0);assert.ok(BigInt(receipt.endMonotonicNs)>=BigInt(receipt.startMonotonicNs));
+        if(outcome==='empty'){assert.equal(receipt.stdout.empty,true);assert.equal(receipt.stdout.present,true);assert.equal(receipt.stdout.truncated,false);}
+        if(outcome==='status'){assert.equal(receipt.stderr.truncated,true);assert.equal(receipt.stderr.empty,false);assert.ok(Buffer.byteLength(JSON.stringify(receipt.stderr.text))<=1024);}
+        if(outcome==='error')assert.equal(receipt.error.code.text,'ETIMEDOUT');
+        if(outcome==='throw')assert.equal(receipt.error.code.text,'EACCES');
+        assert.deepEqual(Object.keys(receipt).sort(),['arch','command','elapsedMs','endMonotonicNs','error','launcherPid','node','queryPid','signal','startMonotonicNs','startedAt','status','stderr','stdout','threw','type','uv'].sort());
+      }
+      thrown=null;response={status:7,stdout:'PRIVATE_NONMATCH_SENTINEL',stderr:''};
+      const nonmatches=[['cmd.exe',argv],['powershell.exe',[...argv,'extra']],[command,[...argv.slice(0,3),statement.replace(String(process.pid),String(process.pid+1))]],
+        [command,['-noprofile',...argv.slice(1)]],[command,[...argv.slice(0,3),statement+'; Get-ChildItem Env:']],[command,undefined]];
+      for(const [executable,args] of nonmatches){const before=calls.length,count=records.length;assert.equal(cp.spawnSync(executable,args,options),response);assert.equal(calls.length,before+1);assert.equal(calls.at(-1)[1],args);assert.equal(calls.at(-1)[2],options);assert.equal(records.length,count);}
+      const stop=globalThis.admittedTaskkill();response={status:0};const before=calls.length;
+      assert.equal(cp.spawnSync(stop,['/pid','424100','/T','/F'],options),response);assert.equal(calls.length,before+1);assert.match(records.at(-1),/^\\[windows-system-stop\\] /u);
+      assert.throws(()=>cp.spawnSync('taskkill',['/pid','424100','/T','/F'],options),/unadmitted/u);assert.equal(calls.length,before+1);
+      assert.equal(admissions,3);assert.equal(receipts.length,5);
+      process.stderr.write=()=>{throw new Error('Synthetic diagnostic delivery failure');};
+      response={status:0,stdout:'638000000000000000',stderr:''};
+      assert.equal(cp.spawnSync(command,argv,options),response,'Logging replaced the query return');
+      thrown=new Error('Original query failure');assert.throws(()=>cp.spawnSync(command,argv,options),error=>error===thrown);
+    } finally {cp.spawnSync=native;syncBuiltinESMExports();process.stderr.write=write;}
+    console.log(JSON.stringify({syntheticNativeCalls:true,realPowerShellStarted:false,calls:calls.length,queryCases:5,nonmatches:6,stopGuardPreserved:true}));
+  `));
+});
+
+
+test('source-first tooling uses a canonical observer preload and retains the original gate failure', t => {
+  const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-source-observer-~')));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const scripts = path.join(directory, 'scripts'); fs.mkdirSync(scripts);
+  const preparer = path.join(scripts, 'prepare-windows-launcher-bootstrap.mjs');
+  fs.copyFileSync(new URL('./prepare-windows-launcher-bootstrap.mjs', import.meta.url), preparer);
+  fs.writeFileSync(path.join(scripts, 'windows-system-command.mjs'), '');
+  t.diagnostic(driver(`
+    import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
+    import cp from 'node:child_process';import {EventEmitter} from 'node:events';import {registerHooks,syncBuiltinESMExports} from 'node:module';
+    const preparer=${JSON.stringify(preparer)},root=${JSON.stringify(directory)},url=${JSON.stringify(pathToFileURL(preparer).href)};
+    const calls=[],logs=[],errors=[];let diagnostic,initializations=0;
+    globalThis.initializeSourceFirst=()=>{initializations++;return 'synthetic admitted command';};
+    registerHooks({load(url,context,next){if(url===${JSON.stringify(pathToFileURL(path.join(scripts, 'windows-system-command.mjs')).href)})return {format:'module',shortCircuit:true,source:'export const initializeWindowsSystemCommand=globalThis.initializeSourceFirst;'};return next(url,context);}});
+    const spawn=cp.spawn,machine=os.machine,log=console.log,error=console.error;
+    cp.spawn=(...args)=>{
+      calls.push(args);const child=new EventEmitter();child.stderr=new EventEmitter();child.pid=424200;child.exitCode=null;child.signalCode=null;
+      setImmediate(()=>{child.stderr.emit('data',Buffer.from(diagnostic));child.exitCode=1;child.emit('exit',1,null);child.stderr.emit('close');});
+      return child;
+    };
+    os.machine=()=> 'arm64';syncBuiltinESMExports();Object.defineProperty(process,'platform',{value:'win32'});Object.defineProperty(process,'arch',{value:'arm64'});
+    console.log=text=>logs.push(text);console.error=text=>errors.push(text);
+    process.argv=[process.execPath,preparer,'source-first'];
+    const receipt='[launcher-identity-query] '+JSON.stringify({type:'launcher-identity-query',queryPid:424200,status:null,error:{code:{text:'ETIMEDOUT'}}});
+    try {
+      for(const outcome of ['failure','ordinary']) {
+        const before=logs.length,errorCount=errors.length;process.exitCode=undefined;
+        diagnostic=receipt+'\\n'+(outcome==='failure'?'Impossibile verificare l’identità del processo lanciatore.\\n':'Avvio: http://127.0.0.1:3333\\nMancano le dipendenze. Conferma l’installazione con npm ci.\\nServe una scelta esplicita.\\n');
+        await import(url+'?case='+outcome);
+        const [command,args,options]=calls.at(-1);assert.equal(command,process.execPath);
+        const observer=new URL('./windows-launcher-bootstrap/observe-command.mjs',url).href;
+        assert.deepEqual(args,['--import',observer,path.join(root,'scripts/mediflow.mjs'),'--scelta','web','--senza-browser']);
+        assert.match(observer,/%7E/u,'Observer URL must be canonical in a path containing ~');
+        const fixture=path.dirname(options.env.MEDIFLOW_DATA_DIR);
+        assert.equal(path.resolve(options.cwd),root);assert.deepEqual(options.stdio,['ignore','ignore','pipe']);
+        assert.deepEqual(Object.keys(options).sort(),['cwd','env','stdio']);
+        const expectedEnv={...process.env,MEDIFLOW_DATA_DIR:path.join(fixture,'archive'),MEDIFLOW_E2E_DISABLE_LEGACY_COPY:'1',APPDATA:path.join(fixture,'profile'),LOCALAPPDATA:path.join(fixture,'local')};
+        assert.ok(JSON.stringify(options.env)===JSON.stringify(expectedEnv),'Source-first environment changed');
+        assert.equal(fs.existsSync(fixture),false,'Terminal synthetic fixture retained');
+        assert.equal(fs.existsSync(path.join(root,'node_modules')),false);
+        assert.ok(logs.slice(before).includes(receipt),'Gate did not expose the query receipt');
+        if(outcome==='failure') {
+          assert.equal(process.exitCode,1,'Receipt converted the original gate failure into success');
+          assert.equal(errors.length,errorCount+1);assert.match(errors.at(-1),/Avvio/u);assert.match(errors.at(-1),/Impossibile verificare/u);
+          assert.equal(logs.slice(before).some(text=>text.includes('source-first-qualified')),false);
+        } else {
+          assert.equal(process.exitCode,undefined);assert.equal(errors.length,errorCount);
+          assert.ok(logs.slice(before).some(text=>text.includes('source-first-qualified')));
+        }
+      }
+      assert.equal(calls.length,2);assert.equal(initializations,2);
+    } finally {console.log=log;console.error=error;cp.spawn=spawn;os.machine=machine;syncBuiltinESMExports();process.exitCode=undefined;}
+    console.log(JSON.stringify({launcherChildrenSynthetic:true,realPowerShellStarted:false,canonicalPreload:true,failureRetained:true,ordinaryGateRetained:true,fixturesRemoved:true}));
+  `));
+});

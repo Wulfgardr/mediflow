@@ -66,7 +66,8 @@ async function sourceFirst() {
   initializeWindowsSystemCommand();
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'mf-source-first-~'));
   const data = path.join(fixture, 'archive'); fs.mkdirSync(data);
-  const child = spawn(process.execPath, [path.join(root, 'scripts/mediflow.mjs'), '--scelta', 'web', '--senza-browser'], {
+  const child = spawn(process.execPath, ['--import', new URL('./windows-launcher-bootstrap/observe-command.mjs', import.meta.url).href,
+    path.join(root, 'scripts/mediflow.mjs'), '--scelta', 'web', '--senza-browser'], {
     cwd: root, env: { ...process.env, MEDIFLOW_DATA_DIR: data, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1',
       APPDATA: path.join(fixture, 'profile'), LOCALAPPDATA: path.join(fixture, 'local') }, stdio: ['ignore', 'ignore', 'pipe'],
   });
@@ -92,6 +93,9 @@ async function sourceFirst() {
       dependencyConfirmationReached: true, expectedNonTtyRefusal: true, launcherExit: child.exitCode }));
   } finally {
     clearTimeout(timer);
+    for (const line of diagnostic.split(/\r?\n/u)) {
+      if (line.startsWith('[launcher-identity-query] ')) console.log(line);
+    }
     if (closed) fs.rmSync(fixture, { recursive: true, force: true });
     else { child.unref(); child.stderr.unref(); throw new Error(`Source-first fixture retained without terminal proof: ${fixture}`); }
   }
