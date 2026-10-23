@@ -1,9 +1,9 @@
 # ADR 0162 — Esecutore locale per procedure clinico-amministrative
 
-- Stato: **Proposed**
+- Stato: **Proposed** — resta tale finché le prove di CU-1 non sono accettate.
 - Data: 2026-10-23
 - Autore: Astra
-- Ambito: filone CU, in coda al programma 0.9.1; solo progetto documentale in questa PR.
+- Ambito: filone CU, issue madre [WUL-791](https://linear.app/wulfgardr/issue/WUL-791); CU-1 e contratti sintetici nella 0.9.1, qualifica istituzionale nella 0.9.6/0.9.7 con Moduli. Solo progetto documentale in questa PR.
 - Collegamenti: [analisi/dipendenze](../analysis/2026-10-23-computer-use-procedures.md), [contratti](../analysis/2026-10-23-computer-use-procedure-contracts.md), [fonti](../analysis/2026-10-23-computer-use-sources.md), [contratto 0.9.1](../releases/0.9.1-contract.md).
 
 ## Contesto
@@ -25,7 +25,15 @@ Sono conservate l'autorità territoriale dell'[ADR 0158](./0158-territorial-pack
 | Solo API istituzionali | Contratti più espliciti e potenziale idempotenza lato servizio. | Disponibilità/ruoli/qualificazione non equivalgono alla GUI. Rimane un futuro trasporto ammesso, senza bloccare i simulatori UI. |
 | Esecutore locale deterministico con contratti e nativo fidato | Valori risolti e controllati localmente; modello limitato a intenti opachi; procedura separata dal trasporto. | Richiede adapter versionati, gestione dell'incertezza e qualifica dell'isolamento. **Alternativa raccomandata.** |
 
-## Decisione proposta
+## Decisioni di Leonardo del 23 ottobre 2026
+
+Fonte: [commento di Leonardo del 23 ottobre 2026 sulla PR #626](https://github.com/Wulfgardr/mediflow/pull/626#issuecomment-6362872795). Sono decisioni di indirizzo; non attestano implementazione, prove superate o adozione dell'ADR.
+
+1. **Modalità 1 come base.** Sui desktop con strumenti generici il claim riguarda soltanto il canale MediFlow, non l'intero Mac.
+2. **Preparare la modalità 2 per l'uso reale.** Avviare la valutazione di destinatari, account e trattamento riusando D2, D3, D-I1 e i revisori del contratto 0.9.1. L'abilitazione richiede prove e decisioni dedicate; fino ad allora resta sintetica. La sequenza CU-7a/7b nell'analisi distingue preparazione e verifica dall'ammissione reale.
+3. **Ultimo passo manuale quando necessario.** Se il portale non consente un atto finale protetto e riconciliabile, l'esecutore prepara e compila, il medico esegue invio e firma nel portale e MediFlow riconcilia l'esito. La consegna al medico non prova il completamento.
+
+## Progetto proposto
 
 ### 1. Componenti e responsabilità
 
@@ -74,7 +82,7 @@ Si prova l'intero traffico, non solo `content`. Il budget dei messaggi e il poll
 
 ### 4. Modalità 2: proiezione clinica approvata
 
-È un ingresso separato e facoltativo, non un ripiego automatico quando la modalità 1 fallisce. Riusa emission plan, redazione e mapping di sessione esistenti; applica C-B/C-L, scelta della funzione/venue e revisione nativa dell'esatto payload prima dell'uscita. La mappa non viene inviata. Ricomposizione solo nella superficie nativa proposta da ADR 0160, senza presentarla come decisione D3 già approvata.
+La preparazione per l’uso reale è decisa; l’abilitazione non lo è. CU-7a deve produrre la valutazione di destinatari, account e trattamento, con criteri e decisioni residue D2/D3/D-I1 e revisori del contratto 0.9.1. Fino all’accettazione delle prove e alle decisioni dedicate la modalità resta sintetica. È un ingresso separato e facoltativo, non un ripiego automatico quando la modalità 1 fallisce. Riusa emission plan, redazione e mapping di sessione esistenti; applica C-B/C-L, scelta della funzione/venue e revisione nativa dell'esatto payload prima dell'uscita. La mappa non viene inviata. Ricomposizione solo nella superficie nativa proposta da ADR 0160, senza presentarla come decisione D3 già approvata.
 
 Identificativi diretti, date/luoghi non necessari, terzi, originali e combinazioni rare richiedono minimizzazione o blocco secondo la policy approvata; riconoscibilità residua dichiarata. Fallimento del redattore, evidenza scaduta/non pertinente, token ignoti o testo non classificato impediscono l'emissione. Il risultato del modello è una proposta: non diventa valore del piano senza revisione del medico e invalidazione della precedente autorizzazione. Questa modalità non amplia capability, destinatari o atti consentiti.
 
@@ -98,7 +106,7 @@ Un plugin non è un sandbox del client. Istruzioni nelle skill, modalità read-o
 
 Per un claim esteso all'harness occorre una configurazione verificata che esponga solo l'ingresso CU, senza shell/file/browser/screenshot/clipboard alternativi, MCP aggiuntivi, hook o deleghe con maggiori poteri. Il processo remoto deve essere separato dal profilo browser clinico, archivi, IPC privilegiati, credenziali, schermo e directory di lavoro mediante un confine OS effettivo (ad esempio identità OS/ambiente separato con IPC ristretto); eliminare tool dall'elenco non basta se lo stesso processo può accedere alle risorse. Verificare anche configurazioni ereditate e sessioni riprese.
 
-Su desktop con strumenti generici non confinabili, dichiarare garanzia del solo canale CU e continuare nel nativo; non dichiarare protezione dell'intero host. Se il requisito dell'uso concreto è impedire anche l'accesso dell'host, quel client/configurazione resta non ammesso fino alla prova dell'isolamento. Le CLI sono candidate a un profilo ristretto, non una dimostrazione già acquisita. Nessun diniego viene aggirato con shell, file o screenshot generici.
+Per decisione di Leonardo, sui desktop con strumenti generici dichiarare garanzia del solo canale MediFlow CU e continuare nel nativo; non dichiarare protezione dell’intero Mac o host. Se il requisito dell'uso concreto è impedire anche l'accesso dell'host, quel client/configurazione resta non ammesso fino alla prova dell'isolamento. Le CLI sono candidate a un profilo ristretto, non una dimostrazione già acquisita. Nessun diniego viene aggirato con shell, file o screenshot generici.
 
 ### 7. Medico, concorrenza e autorizzazione dell'atto
 
@@ -106,7 +114,7 @@ Il medico conserva decisione clinica, revisione dei valori e dichiarazioni perso
 
 L'esecutore possiede una lease esclusiva sulla sola superficie di lavoro interessata. Input umano, cambio scheda/focus rilevante o modifica del medico sospendono prima del prossimo comando. Alla ripresa si rilegge uno snapshot coerente, si confrontano tutti i vincoli e si invalida la prova se il contenuto è cambiato. Il medico può sospendere deliberatamente in qualsiasi fase; l'esecutore non interpreta tale scelta come errore da correggere o motivo per ricreare la pratica.
 
-Prima dell'atto si rileggono identità, pratica, dati, account e stato autorizzativo. Osservare il focus non rende atomico un clic su un portale esterno: se una corsa con modifica umana o una transizione del portale non può essere esclusa in modo verificabile, l'ultimo passo resta manuale nel nativo oppure il percorso non viene ammesso. Dopo che l'atto potrebbe essere partito, una sospensione non ne certifica l'annullamento.
+Prima dell'atto si rileggono identità, pratica, dati, account e stato autorizzativo. Osservare il focus non rende atomico un clic su un portale esterno: se il portale non consente un atto finale protetto e riconciliabile, anche per una corsa non escludibile con modifiche umane o transizioni del portale, l'ultimo passo resta manuale. L'esecutore prepara e compila, registra il passaggio «in attesa dell'atto manuale» e cede la superficie al medico; il medico esegue invio e firma nel portale. MediFlow riconcilia poi l'esito con la stessa pratica e il piano corrente, senza ripetere l'atto. Dopo che l'atto potrebbe essere partito, una sospensione non ne certifica l'annullamento.
 
 ### 8. Stati, registro e riconciliazione
 
@@ -117,6 +125,8 @@ La pratica ha stato CU e stato del servizio separati, con provenienza e data del
 | **Preparata** | Piano locale completo/revisionabile, nessuna prova di salvataggio sul portale. |
 | **Salvata** | Specificare ambito locale oppure bozza del destinatario riletta e correlata. Non implica firma o presentazione. |
 | **Sospesa per scelta** | Motivo locale e volontà esplicita, stato precedente preservato. Ripresa della stessa pratica dopo rilettura; nessuna nuova autorizzazione desunta dal trascorrere del tempo. |
+| **In attesa dell'atto manuale** | Piano e stessa pratica consegnati al medico, esecutore fermo e superficie ceduta. Invio e firma spettano al medico nel portale. Alla ripresa riconciliare prima di ogni altro tentativo; attesa o dichiarazione di completamento non provano l'esito. |
+| **Sospesa per pacchetto disattivato** | Nessun effetto esterno avviato; conservare pratica e piano, senza chiamate esterne né nuovi tentativi. Se un effetto potrebbe essere avvenuto, conservare invece «esito incerto, riconciliazione in attesa della riattivazione». |
 | **Autorizzata all'atto** | Prova nativa valida per singola operazione e contenuto corrente; scadenza/revoca/cambi riportano alla revisione, senza eseguire. |
 | **Tentativo avviato** | Identità dell'operazione e numero del tentativo registrati durevolmente **prima** del comando potenzialmente irreversibile. Il successo del clic non è il successo dell'atto. |
 | **Esito incerto** | Timeout, crash, cancellazione o risposta incompleta dopo possibile avvio. Bloccare un nuovo invio finché non si riconcilia; la UI deve mostrare l'incertezza. |
@@ -124,7 +134,7 @@ La pratica ha stato CU e stato del servizio separati, con provenienza e data del
 
 Una sospensione durante un tentativo conserva anche il fatto che l'esito è incerto: non sovrascriverlo con una bozza riutilizzabile. Un rifiuto esplicito del servizio è un esito documentato con motivo locale, distinto dall'incertezza; può richiedere revisione, non una reiterazione automatica. Annullamento e altri stati specifici del servizio restano distinguibili senza inventare effetti inversi.
 
-La chiave durevole dell'operazione è distinta dal riferimento remoto. Impedisce due tentativi concorrenti sulla stessa pratica/atto; non vieta una ripetizione clinicamente legittima decisa come nuova operazione. Si tenta prima il recupero della ricevuta e la ricerca autorevole della pratica già esistente. Un elenco temporaneamente vuoto o un token scaduto non prova assenza dell'effetto, soprattutto con richieste ancora in corso. Se la risposta divide l'atto, riconciliare ciascuna parte senza ripetere quelle confermate.
+La chiave durevole dell'operazione è distinta dal riferimento remoto. Impedisce due tentativi concorrenti sulla stessa pratica/atto; non vieta una ripetizione clinicamente legittima decisa come nuova operazione. Si tenta prima il recupero della ricevuta e la ricerca autorevole della pratica già esistente, solo con capacità territoriale attiva e autorità corrente; il divieto di rete del §9 vale anche per questi accessi. Un elenco temporaneamente vuoto o un token scaduto non prova assenza dell'effetto, soprattutto con richieste ancora in corso. Se la risposta divide l'atto, riconciliare ciascuna parte senza ripetere quelle confermate.
 
 Un nuovo tentativo è possibile solo quando il contratto dispone di prova sufficiente che il precedente non abbia prodotto l'effetto, oppure di un meccanismo ufficiale idempotente per la stessa operazione; occorrono nuova verifica locale e autorizzazione valida. Se il servizio non offre un criterio affidabile, sospendere per verifica manuale, non promettere “exactly once”. L'identità dell'operazione resta la stessa, il tentativo ha progressivo distinto e non si ricrea la pratica.
 
@@ -138,7 +148,9 @@ L'adapter consegna a un Application Service un risultato tipizzato locale: opera
 
 Il servizio verifica autorità applicabile, versione e correlazione; registra esito, riferimenti documentali e audit secondo la transazione locale esistente, con deduplicazione durevole. Non applica automaticamente proposte cliniche del modello. L'adapter non apre il database, non inserisce righe audit autonomamente e non crea una seconda fonte di verità. Le ricevute e gli identificativi istituzionali non entrano nel protocollo remoto.
 
-La disattivazione di un pacchetto blocca nuovi atti e revoca i piani interessati. Conservazione e lettura dello storico rimangono possibili secondo ADR 0158; il core deve permettere il recupero autorizzato delle evidenze di un effetto già avviato, senza riabilitare la capacità di eseguire nuovi atti. Distinguere riconciliazione documentale e nuova operazione sanitaria.
+La disattivazione di un pacchetto revoca i piani interessati e, secondo ADR 0158, vieta ogni chiamata esterna e ogni mutazione attraverso i writer operativi territoriali. L'esecutore non contatta il portale neppure per riconciliare: niente ricerca della pratica, polling o download della ricevuta; anche il traffico di fondo del browser deve arrestarsi. Restano la conservazione e la consultazione locale delle evidenze già acquisite, senza eccezioni ai writer territoriali. La pratica diventa «sospesa per pacchetto disattivato» se l'atto non è avviato, oppure «esito incerto, riconciliazione in attesa della riattivazione» se un effetto è possibile. Nessun nuovo tentativo e nessun annullamento presunto dell'effetto già partito.
+
+La riconciliazione remota riprende soltanto dopo riattivazione esplicita tramite l'operazione host e i canali ammessi dall'ADR 0158, rilettura delle capacità e nuova autorità; la riattivazione non rinnova i vecchi grant né reinvia l'atto. In alternativa il medico verifica o completa manualmente nel portale, fuori dall'esecutore CU, e acquisisce la ricevuta. Questo intervento non autorizza rete o writer del pacchetto disattivato: MediFlow può consultare le evidenze già locali; la registrazione tramite writer territoriali attende la riattivazione. Se l'esito precedente è incerto, anche il medico verifica prima di un eventuale nuovo invio. Senza evidenza correlata non si dichiara la pratica confermata.
 
 ## Verifica richiesta prima dell'adozione runtime
 
@@ -150,7 +162,8 @@ La sequenza completa è nell'analisi. CU-1 deve provare end-to-end sul simulator
 4. Paziente/pratica errati, scambio riferimento fra sessioni/client, replay dopo revoca/completamento, scadenza, cambio capacità/dati/destinazione e risposta tardiva senza effetti.
 5. Approvazione non falsificabile dal modello; modifica del contenuto invalidante; intervento medico simultaneo e sospensione deliberata con ripresa della stessa pratica.
 6. Crash prima e dopo il clic, risposta persa, effetto tardivo, ricevuta duplicata, esito parziale e writer locale fallito: nessun reinvio delle parti confermate; incertezza visibile e registro recuperabile.
-7. Client/build/configurazione esatti, accessi alternativi e limiti della garanzia documentati. Un controllo rimosso deve far fallire il relativo caso negativo: i test del solo schema non provano il confine OS.
+7. Portale senza atto finale protetto: compilazione → attesa dell’atto manuale → invio/firma del medico nel simulatore → riconciliazione della stessa pratica; modifica manuale del contenuto richiede nuova revisione locale, ricevuta assente lascia esito incerto e nessun reinvio. Disattivazione prima/dopo il possibile atto: zero chiamate esterne, anche di riconciliazione o del browser in background, zero mutazioni dei writer territoriali; stato sospeso/incerto conservato anche dopo riavvio. Riattivazione esplicita o intervento manuale senza duplicato e senza riuso dei vecchi grant.
+8. Client/build/configurazione esatti, accessi alternativi e limiti della garanzia documentati. Un controllo rimosso deve far fallire il relativo caso negativo: i test del solo schema non provano il confine OS.
 
 Tutte le prove usano dati inventati e portali sintetici. Nessun atto o chiamata applicativa istituzionale, nemmeno di prova, è autorizzato da questo ADR. Nessuna modifica di rete. La documentazione pubblica può essere consultata in sola lettura. Qualificazione del servizio e ammissione clinica richiedono le autorizzazioni e le prove specifiche di Moduli e del programma.
 
@@ -160,4 +173,4 @@ Si riusano servizi, redazione, capacità territoriali e autorità native; si agg
 
 Modalità 1 riduce l'esposizione ma non dimostra anonimato; modalità 2 resta pseudonimizzata e necessita valutazione di destinatari e condizioni. Il [registro delle fonti](../analysis/2026-10-23-computer-use-sources.md) delimita C-413/23 P e distingue consultazioni EDPB da testi finali. Nessuna conformità o ammissione istituzionale è dichiarata.
 
-Le sole decisioni di Leonardo sono quelle elencate nell'[analisi](../analysis/2026-10-23-computer-use-procedures.md): confine offerto per client, eventuale trattamento della modalità 2 e perimetro/responsabilità del successivo uso istituzionale. Questo ADR non le anticipa e non modifica le decisioni già assunte in ADR 0160. Fino all'accettazione e alle prove, lo stato è **Proposed/documentato**, non esecutore installato o funzionante.
+Le decisioni di indirizzo del 23 ottobre sono registrate sopra e nell'[analisi](../analysis/2026-10-23-computer-use-procedures.md). Restano da decidere contenuti/destinatari/account e trattamento della modalità 2, D2/D3/D-I1, nomina dei revisori e perimetro/responsabilità dell'uso istituzionale; la preparazione non li approva. Nessuna modifica alle decisioni già assunte in ADR 0160. L'ADR resta **Proposed** finché le prove di CU-1 non sono accettate; quell'accettazione non abilita da sola modalità 2 reale, portali istituzionali o uso clinico.
