@@ -791,28 +791,11 @@ export default function PatientDetailPage() {
                     {entries ? <Timeline entries={timelineEntries} /> : <p className={workspaceStyles.mutedText}>Diario in caricamento.</p>}
                 </CollapsibleSection>
 
-                    <CollapsibleSection
-                        id="terapie"
-                        kicker="Terapie"
-                        title="Terapie farmacologiche"
-                        icon={Pill}
-                        count={workspace ? formatCountLabel(workspace.activeTherapiesCount, 'attiva', 'attive') : undefined}
-                        summary={workspace?.activeTherapiesCount === 0 ? 'Nessuna terapia attiva registrata.' : undefined}
-                        surfaceClassName={workspaceStyles.clinicalSection}
-                        keepMounted
-                    >
-                        <div className="space-y-4">
-                            <PluginPrescribingGuide />
-                            <TherapyManager patientId={id} embedded />
-                            <TreatmentReasoningPanel
-                                patient={patient}
-                                entries={entries}
-                                therapies={therapies}
-                                observations={observations}
-                                attachments={attachments}
-                            />
-                        </div>
-                    </CollapsibleSection>
+                    <TherapyManager patientId={id} embedded surfaceClassName={workspaceStyles.clinicalSection}
+                        before={<PluginPrescribingGuide />}>
+                        <TreatmentReasoningPanel patient={patient} entries={entries} therapies={therapies}
+                            observations={observations} attachments={attachments} />
+                    </TherapyManager>
 
                     <CollapsibleSection
                         id="prestazioni"

@@ -15,7 +15,8 @@ soltanto alcuni degli ingressi; qui sono censiti i `.md` tracciati, con una
 breve indicazione d’uso.
 
 La mappa precedente era aggiornata al 2026-09-08. Revisione editoriale:
-2026-10-17; aggiunta ADR 0160: 2026-10-22. I verbali di luglio e le proposte
+2026-10-17; aggiunta ADR 0160: 2026-10-22; contratto 0.9.1 e proposta CU: 2026-10-23.
+I verbali di luglio e le proposte
 superate rimossi dall’albero
 restano consultabili nell’[indice del tag v0.9.0](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/docs/markdown-index.md).
 Le voci storiche conservano date, conteggi, revisioni e limiti:
@@ -25,6 +26,12 @@ la data di questo indice non rinnova le prove cui rimandano.
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
+| [Contratto 0.9.1](./releases/0.9.1-contract.md) | U0 approvato il 23 ottobre 2026: unità chiuse, target M4 Max/36 GB, tranche intelligente e GO/NO-GO. | Per accettare W/G/C/P/I/Q e seguire le decisioni ancora aperte; non attesta rilascio o ammissione clinica. |
+| [Analisi CU](./analysis/2026-10-23-computer-use-procedures.md) | Delta, alternative privacy, dipendenze e unità del filone computer use locale. | Per valutare la proposta aggiunta in coda alla 0.9.1 e le sole decisioni sostanziali. |
+| [Contratti CU](./analysis/2026-10-23-computer-use-procedure-contracts.md) | Specialistica, farmaceutica, protesica, esenzioni e introduttivo INPS. | Per implementare simulatori e adapter senza dedurre atti o campi non autorizzati. |
+| [Fonti CU](./analysis/2026-10-23-computer-use-sources.md) | Fonti privacy, client e procedure, con data/versione/stato e limiti. | Per distinguere normativa, consultazioni, conoscenza procedurale e prove runtime. |
+| [ADR 0162](./adr/0162-local-computer-use-executor.md) | Proposed: esecutore locale, capability, uscite, intervento medico e riconciliazione. | Prima di sviluppare CU; non attesta un runtime o una qualifica istituzionale. |
+| [Censimento GPUI G-0](./analysis/2026-10-23-gpui-census.md) | Matrice di 66 funzioni, 36 route Web, 17 route Impostazioni e crosswalk CSV delle 205 righe della specifica; 40 unità PR proposte sotto G-1–9. | Per assegnare residui e prove, verificare writer e porte host, distinguere sorgente e pilota installato e chiudere i gate immediati. |
 | [Tranche indipendente 0.9.x](./analysis/2026-09-26-09x-independent-development.md) | Codice sintetico, demo, prove e prerequisiti delle patch successive. | Per riprodurre e riesaminare i candidati senza confonderli con il core 0.9.0. |
 | [Delta regolatorio futuro](./analysis/2026-09-26-09x-regulatory-delta.md) | Matrice candidata, fonti datate e responsabilità aperte WUL-738. | Prima di ampliare finalità, distribuzione o trattamento; non qualifica un deployment. |
 

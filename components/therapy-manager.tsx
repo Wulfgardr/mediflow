@@ -1,9 +1,13 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
+import { PatientSheetMenu } from '@/components/patient-sheet-menu';
+import { CollapsibleSection } from '@/components/kree8/collapsible-section';
+import { formatCountLabel } from '@/lib/format-count';
 import { Disclosure } from '@/components/disclosure';
 import styles from './clinical-register.module.css';
 import { clientArchiveGeneration } from '@/lib/security/client-auth-api';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createTherapyDeleteRecovery, type DeleteRecovery } from '@/lib/therapy-delete-recovery';
 import { useLiveQuery } from '@/lib/live-query';
 import { ApiConflictError, ApiWriteRejectedError, db, Therapy } from '@/lib/db';
@@ -12,7 +16,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Pill, X, Clock, StopCircle, Trash2, Shield, Ban, Database, Pencil, Play, Beaker } from 'lucide-react';
+import { X, Shield, Ban, Database, Beaker } from 'lucide-react';
 import { differenceInYears, format } from 'date-fns';
 import { InkState } from './ui/ink-state';
 import { createTherapyStatusConfirmation, createTherapyStatusWriteJournal, type StatusConfirmation } from '@/lib/therapy-status-confirmation';
@@ -52,8 +56,9 @@ const quietButtonClassName = 'inline-flex h-9 items-center justify-center gap-1.
 const recoveryButtonClassName = `${quietButtonClassName.replace('h-9', 'min-h-11')} whitespace-normal py-2 text-left`;
 const chipClassName = 'inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors';
 
-export default function TherapyManager({ patientId, embedded = false }: { patientId: string; embedded?: boolean }) {
+export default function TherapyManager({ patientId, embedded = false, before, children, surfaceClassName = '' }: { patientId: string; embedded?: boolean; before?: ReactNode; children?: ReactNode; surfaceClassName?: string }) {
     const [isAdding, setIsAdding] = useState(false);
+    const formRef = useRef<HTMLFormElement>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isGalenic, setIsGalenic] = useState(false); // Toggle for Free Text vs AIFA
     const [selectedDiagnosis, setSelectedDiagnosis] = useState<{ code: string; title: string } | null>(null);
@@ -184,6 +189,10 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         resolver: zodResolver(therapySchema) as any
     });
+
+    useLayoutEffect(() => {
+        if (isAdding) formRef.current?.querySelector<HTMLInputElement>('input:not([type="hidden"]):not([readonly]):not(:disabled)')?.focus();
+    }, [isAdding, editingId]);
 
     const startEditing = (therapy: Therapy) => {
         if (deletion.blocked || statusChange.blocked || isSaving || isReading || therapy.patientId !== patientId) return;
@@ -404,37 +413,19 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
         }));
     };
 
-    const hasTherapyGroups = visibleTherapies.length > 0;
-    const newButton = !isAdding ? (
-        <button
-            onClick={startAdding}
-            disabled={!!deleteRecovery || statusChange.blocked}
-            className="ui-btn-primary"
-        >
-            <Plus className="w-4 h-4" />
-            Nuova terapia
-        </button>
-    ) : null;
+    const count = therapies === undefined ? undefined : [
+        formatCountLabel(activeTherapies.length, 'attiva', 'attive'),
+        ...(suspendedTherapies.length ? [formatCountLabel(suspendedTherapies.length, 'sospesa', 'sospese')] : []),
+        ...(endedTherapies.length ? [formatCountLabel(endedTherapies.length, 'conclusa', 'concluse')] : []),
+    ].join(' · ');
+    const newButton = <Button variant="text" onClick={startAdding}
+        disabled={isAdding || !!deleteRecovery || statusChange.blocked}>Nuova terapia</Button>;
 
-    return (
+    const content = (
         <section className={styles.register} data-clinical-register="therapies">
-            {embedded ? (
-                newButton && !hasTherapyGroups ? <div className="mb-4 flex justify-end">{newButton}</div> : null
-            ) : (
-                <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                        <p className="section-kicker">Terapie</p>
-                        <h2 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
-                            <Pill className="h-5 w-5 text-[color:var(--lume-ink-muted)]" />
-                            Terapie farmacologiche
-                        </h2>
-                        <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--lume-ink-muted)]">
-                            Farmaci attivi, sospesi e conclusi restano nello stesso registro locale della cartella.
-                        </p>
-                    </div>
-                    {newButton}
-                </div>
-            )}
+            {!embedded && <header className={styles.therapyHeading}>
+                <h2>Terapie farmacologiche <span>{count}</span></h2>{newButton}
+            </header>}
 
             {deleteRecovery && deleteRecovery.phase !== 'prompt' && (
                 <div ref={deleteRef} role="alert" aria-atomic="true" aria-label="Recupero eliminazione terapia" tabIndex={-1} className="mb-6 rounded-[14px] border border-[color:var(--lume-signal-critical)] p-4 text-sm leading-6 focus-visible:shadow-[var(--lume-focus-ring)]">
@@ -493,7 +484,6 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                 <div className={styles.form}>
                     <div className="mb-5 flex items-start justify-between gap-3 border-b border-[color:color-mix(in_srgb,var(--lume-ink)_11%,transparent)] pb-4">
                         <div>
-                            <p className="section-kicker">Registro terapia</p>
                             <h3 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">
                                 {editingId ? 'Modifica terapia' : 'Nuova terapia'}
                             </h3>
@@ -532,7 +522,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                         </label>
                     </div>
 
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    <form ref={formRef} onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                         {draft?.patientId !== patientId && (
                             <p role="alert">Questa bozza appartiene a un altro paziente. Torna alla sua cartella prima di continuare.</p>
                         )}
@@ -663,22 +653,22 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                         )}
                         <div className="flex justify-end pt-2 gap-2">
                             <button type="button" onClick={cancelEditing} disabled={isSaving || isReading} className={quietButtonClassName}>Annulla</button>
-                            <button type="submit" disabled={isSaving || !!recovery || draft?.patientId !== patientId} className="ui-btn-primary inline-flex h-10 items-center gap-1.5 px-4 text-sm font-semibold disabled:opacity-50">
+                            <Button type="submit" disabled={isSaving || !!recovery || draft?.patientId !== patientId}>
                                 {isSaving ? 'Salvataggio...' : editingId ? 'Aggiorna terapia' : 'Salva terapia'}
-                            </button>
+                            </Button>
                         </div>
                     </form>
                 </div>
             )}
 
             {therapies === undefined ? <div className={styles.loading} role="status" aria-label="Caricamento terapie"><span className="sr-only">Caricamento terapie…</span>{[0,1,2].map(row => <div key={row} className="mf-skeleton" aria-hidden />)}</div> : <>
-                {activeTherapies.length === 0 && suspendedTherapies.length === 0 && <p className={styles.empty}>Nessuna terapia attiva registrata. Aggiungi una terapia quando serve tenere traccia di farmaco e posologia.</p>}
+                {visibleTherapies.length === 0 && <p className={styles.empty}>Nessuna terapia registrata.</p>}
                 {[
-                    { title: 'Terapie attive', rows: activeTherapies, status: 'active' },
-                    { title: 'Terapie sospese', rows: suspendedTherapies, status: 'suspended' },
-                    { title: 'Terapie concluse', rows: endedTherapies, status: 'completed' },
-                ].filter(group => group.rows.length > 0).map((group, index) => <section key={group.status}>
-                    <header className={styles.sectionHead}><h3>{group.title}</h3><span>{group.rows.length}</span>{embedded && index === 0 && newButton ? <div className={styles.sectionHeadAction}>{newButton}</div> : null}</header>
+                    { title: 'Attive', rows: activeTherapies, status: 'active' },
+                    { title: 'Sospese', rows: suspendedTherapies, status: 'suspended' },
+                    { title: 'Concluse', rows: endedTherapies, status: 'completed' },
+                ].filter(group => group.rows.length > 0).map((group) => <section key={group.status}>
+                    <header className={styles.sectionHead}><h3>{group.title}</h3></header>
                     <table className={`${styles.table} ${styles.therapyTable}`}><thead><tr><th>Farmaco</th><th>Posologia</th><th className={styles.secondaryColumn}>Periodo</th><th className={styles.secondaryColumn}>Codici</th><th>Azioni</th></tr></thead><tbody>
                         {group.rows.map(t => <tr key={t.id}>
                             <td><strong>{t.drugName}</strong>{t.activePrinciple && <small>{t.activePrinciple}</small>}
@@ -691,16 +681,15 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                             <td className="lume-registro">{t.dosage}</td>
                             <td className={`${styles.secondaryColumn} ${styles.muted}`}>{group.status === 'completed' ? <>Conclusa il {format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</> : t.startDate ? <>Dal {format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</> : '—'}</td>
                             <td className={`${styles.secondaryColumn} lume-code`}>{t.atc && <div>ATC {t.atc}</div>}{t.aic && <div>AIC {t.aic}</div>}{!t.atc && !t.aic && '—'}</td>
-                            <td><div className={`${styles.controls} ${styles.rowControls}`}>
-                                {group.status === 'active' ? <>
-                                    <button disabled={!!deleteRecovery || statusChange.blocked} onClick={() => startEditing(t)} title="Modifica terapia"><Pencil size={14} aria-hidden />Modifica</button>
-                                    <button disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'suspended')} title="Sospendi temporaneamente"><Clock size={14} aria-hidden />Sospendi</button>
-                                    <button disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'completed')} title="Termina terapia"><StopCircle size={14} aria-hidden />Concludi</button>
-                                    <button disabled={!!deleteRecovery || statusChange.blocked || isAdding} onClick={() => handleSoftDelete(t.id)} title="Elimina solo se inserito per errore" aria-label={`Elimina ${t.drugName} solo se inserito per errore`}><Trash2 size={16} aria-hidden /></button>
-                                </> : group.status === 'suspended' ? <>
-                                    <button disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'active')}><Play size={14} aria-hidden />Riattiva</button>
-                                    <button disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'completed')}><StopCircle size={14} aria-hidden />Concludi</button>
-                                </> : <button disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'active')}>Riattiva</button>}
+                            <td><div className={styles.therapyActions}>
+                                {group.status === 'active' ? <Button variant="text" disabled={!!deleteRecovery || statusChange.blocked} onClick={() => startEditing(t)}>Modifica</Button>
+                                    : <Button variant="text" disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'active')}>Riattiva</Button>}
+                                {group.status !== 'completed' && <PatientSheetMenu label={`Azioni terapia ${t.drugName}`}
+                                    trigger={props => <Button {...props} variant="icon" aria-label={`Altre azioni per ${t.drugName}`}>⋯</Button>}>
+                                    {group.status === 'active' && <button type="button" role="menuitem" disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'suspended')}>Sospendi</button>}
+                                    <button type="button" role="menuitem" disabled={!!deleteRecovery || statusChange.blocked} onClick={() => updateStatus(t.id, 'completed')}>Concludi</button>
+                                    {group.status === 'active' && <button type="button" role="menuitem" disabled={!!deleteRecovery || statusChange.blocked || isAdding} onClick={() => handleSoftDelete(t.id)}>Elimina (inserita per errore)</button>}
+                                </PatientSheetMenu>}
                             </div>{group.status === 'completed' && <small className={styles.compactOnly}>Conclusa il {format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</small>}</td>
                         </tr>)}
                     </tbody></table>
@@ -722,7 +711,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                             <p className="type-body">Ricontrolla dopo il ripristino della disponibilità. Il controllo non invia richieste di modifica e non cancella tentativi precedenti. Se il registro resta illeggibile, serve assistenza per ripristinarlo: non cancellare i dati del browser.</p>
                         </div>
                         <div className={styles.statusActions}>
-                            <button type="button" className="ui-btn-primary" disabled={statusConfirmation.checking} onClick={() => statusChange.recheck()}>{statusConfirmation.checking ? 'Controllo in corso' : 'Ricontrolla disponibilità'}</button>
+                            <button type="button" className={isAdding ? 'mf-button-secondary' : 'mf-button-primary'} disabled={statusConfirmation.checking} onClick={() => statusChange.recheck()}>{statusConfirmation.checking ? 'Controllo in corso' : 'Ricontrolla disponibilità'}</button>
                         </div>
                     </> : <>
                     <div className={styles.statusSummary}>
@@ -755,12 +744,16 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                     </div>
                     <div className={styles.statusActions}>
                         {['confirm', 'registered', 'reviewed'].includes(statusConfirmation.phase) && <button type="button" className="mf-btn-secondary" onClick={() => statusChange.cancel()}>Torna alla scheda</button>}
-                        {statusConfirmation.phase === 'confirm' && <button type="button" className="ui-btn-primary" onClick={() => statusChange.confirm()}>Conferma e registra</button>}
-                        {['conflict', 'rejected', 'uncertain'].includes(statusConfirmation.phase) && <button type="button" className="ui-btn-primary" disabled={statusConfirmation.writePending} onClick={() => statusChange.reread()}>{statusConfirmation.conflict ? 'Rileggi la terapia' : 'Rileggi e verifica'}</button>}
+                        {statusConfirmation.phase === 'confirm' && <button type="button" className={isAdding ? 'mf-button-secondary' : 'mf-button-primary'} onClick={() => statusChange.confirm()}>Conferma e registra</button>}
+                        {['conflict', 'rejected', 'uncertain'].includes(statusConfirmation.phase) && <button type="button" className={isAdding ? 'mf-button-secondary' : 'mf-button-primary'} disabled={statusConfirmation.writePending} onClick={() => statusChange.reread()}>{statusConfirmation.conflict ? 'Rileggi la terapia' : 'Rileggi e verifica'}</button>}
                     </div>
                     </>}
                 </div>
             )}
         </section>
     );
+    return embedded ? <CollapsibleSection id="terapie" title="Terapie farmacologiche" count={count}
+        defaultOpen={isAdding} headerAction={newButton} surfaceClassName={`${surfaceClassName} ${styles.therapySection}`} keepMounted>
+        <div className="space-y-4">{before}{content}{children}</div>
+    </CollapsibleSection> : content;
 }

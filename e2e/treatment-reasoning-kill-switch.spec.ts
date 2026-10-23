@@ -86,8 +86,13 @@ test('treatment reasoning kill switch blocks new drafts on the Scheda', async ({
   await openPatientSection(page, 'terapie');
 
   const panel = page.getByTestId('treatment-reasoning-panel');
+  const proposals = page.locator('#terapie').getByRole('button', { name: 'Proposte', exact: true });
+  await expect(proposals).toHaveAttribute('aria-expanded', 'false');
+  await proposals.click();
+  await expect(proposals).toHaveAttribute('aria-expanded', 'true');
   await expect(panel).toBeVisible();
   await expect(panel).toContainText('Ragionamento terapeutico spento');
   await expect(panel.getByRole('link', { name: 'Apri le funzioni cliniche' })).toHaveAttribute('href', '/settings/ai/funzioni');
-  await expect(panel.getByRole('button', { name: 'Prepara proposta' })).toBeDisabled();
+  await expect(panel.getByRole('button', { name: 'Prepara proposta' })).toHaveCount(0);
+  await expect(panel.getByTestId('model-picker-treatment_reasoning')).toHaveCount(0);
 });
