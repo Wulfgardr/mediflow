@@ -43,7 +43,7 @@
   ],
   "reviewBaseCommit": "c8beebe1d561c75b45e3902100a7da39529cda8c",
   "lastRun": {
-    "at": "2026-10-23T13:09:09.195Z",
+    "at": "2026-10-23T13:11:53.419Z",
     "generatedStates": 171,
     "distinctStates": 73,
     "automaticUnreachableRejected": true,
@@ -119,5 +119,7 @@
         "expectedExitCode": 0
       }
     ]
-  }
+  },
+  "mappedCodeCommit": "38478857757348f9c158aa7f13c535c9234ad009",
+  "integrationBaseCommit": "f9cac0bdf2f85f7fe04bdf0e5545868413324529"
 }
