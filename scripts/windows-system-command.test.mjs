@@ -133,3 +133,36 @@ test('Windows bootstrap CI selection requires the real source-first consumer and
   fs.writeFileSync(ci, workflow.replace('run: node scripts/prepare-windows-launcher-bootstrap.mjs source-first', 'run: echo source-first'));
   assert.ok(selected().errors.length);
 });
+
+test('Windows bootstrap source digests survive real checkouts with different local EOL settings', t => {
+  const fixture = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-bootstrap-eol-~')));
+  t.after(() => fs.rmSync(fixture, { recursive: true, force: true }));
+  const seed = path.join(fixture, 'seed'); fs.mkdirSync(seed);
+  const config = path.join(fixture, 'empty-git-config'); fs.writeFileSync(config, '');
+  const env = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: config };
+  const git = (cwd, ...args) => {
+    const result = spawnSync('git', args, { cwd, env, timeout: 5000 });
+    assert.equal(result.status, 0, result.stdout?.toString() + result.stderr?.toString());
+    return result.stdout;
+  };
+  const files = ['scripts/windows-launcher-bootstrap/system-directory.c', 'scripts/windows-launcher-bootstrap/build.ps1', 'scripts/prepare-windows-launcher-bootstrap.mjs'];
+  git(seed, 'init', '--quiet');
+  for (const file of ['.gitattributes', ...files]) {
+    const target = path.join(seed, file); fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(new URL('../' + file, import.meta.url), target);
+  }
+  git(seed, '-c', 'core.autocrlf=false', 'add', '.');
+  git(seed, '-c', 'user.name=Synthetic EOL test', '-c', 'user.email=synthetic@example.invalid', 'commit', '--quiet', '-m', 'Synthetic bootstrap source');
+  const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+  for (const [autocrlf, eol] of [['true', 'crlf'], ['false', 'crlf'], ['input', 'lf']]) {
+    const checkout = path.join(fixture, autocrlf);
+    git(fixture, 'clone', '--quiet', '--no-local', '--no-checkout', seed, checkout);
+    git(checkout, '-c', `core.autocrlf=${autocrlf}`, '-c', `core.eol=${eol}`, 'checkout', '--quiet', '--detach', 'HEAD');
+    for (const file of files) {
+      const blob = git(checkout, 'show', 'HEAD:' + file), bytes = fs.readFileSync(path.join(checkout, file));
+      t.diagnostic(JSON.stringify({ syntheticCheckout: true, autocrlf, eol, file, gitBlobSha256: sha(blob), checkoutSha256: sha(bytes), crlf: bytes.includes(Buffer.from('\r\n')) }));
+      assert.deepEqual(bytes, blob, `Checkout byte drift with core.autocrlf=${autocrlf}, core.eol=${eol}: ${file}`);
+      assert.equal(bytes.includes(Buffer.from('\r\n')), false);
+    }
+  }
+});

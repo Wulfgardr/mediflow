@@ -30,3 +30,6 @@ packages/web-auth-lifecycle-owner/package.json text eol=lf
 packages/web-auth-lifecycle-owner/index.* text eol=lf
 packages/web-auth-lifecycle-owner/internal/** text eol=lf
 packages/web-auth-lifecycle-owner/artifacts/*.provenance.json text eol=lf
+scripts/windows-launcher-bootstrap/system-directory.c text eol=lf
+scripts/windows-launcher-bootstrap/build.ps1 text eol=lf
+scripts/prepare-windows-launcher-bootstrap.mjs text eol=lf
