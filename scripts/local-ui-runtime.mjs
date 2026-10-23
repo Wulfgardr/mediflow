@@ -56,10 +56,24 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
       cwd: sourceRoot, detached: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'], shell: false,
       env: { ...ordinaryLauncherEnvironment(dataDir), PORT: String(port) },
     });
-    await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
-    child.unref();
-    child.channel.unref();
-    launcher = child;
+    try {
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => finish(new Error('navigation_unavailable')), 8000);
+        const exited = () => finish(new Error('navigation_unavailable'));
+        const receive = frame => {
+          if (frame?.type !== 'mediflow-local-ui-connected') return;
+          finish(frame.dataDir === expected.dataDir && frame.sourceFingerprint === expected.sourceFingerprint
+            ? null : new Error('navigation_unavailable'));
+        };
+        const finish = error => {
+          clearTimeout(timer); child.off('message', receive); child.off('error', exited);
+          child.off('exit', exited); child.off('disconnect', exited);
+          if (error) reject(error); else resolve();
+        };
+        child.on('message', receive); child.once('error', exited); child.once('exit', exited); child.once('disconnect', exited);
+      });
+      launcher = child;
+    } finally { child.unref(); child.channel?.unref(); }
   };
   return async (intent, signal) => {
     const expiresAt = Date.now() + 8000;

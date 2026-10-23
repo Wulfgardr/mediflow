@@ -281,6 +281,7 @@ export async function main(args = process.argv.slice(2)) {
   if (process.connected) {
     process.on('message', onParentMessage);
     process.once('disconnect', onDisconnect);
+    if (pluginChannel) process.send({ type: 'mediflow-local-ui-connected', dataDir, sourceFingerprint: identity.sourceFingerprint }, () => {});
   }
   const startOptionalOllama = () => {
     void fetch('http://127.0.0.1:11434/api/version', { signal: AbortSignal.timeout(300) }).then(response => {
