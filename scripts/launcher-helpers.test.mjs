@@ -732,6 +732,112 @@ test('shutdown asks an owned runtime to stop and waits for its exit', async () =
     assert.equal(child.exitCode, 0);
 });
 
+test('POSIX stop observes the original exit without polling its live group', t => {
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+        import assert from 'node:assert/strict'; import {EventEmitter} from 'node:events';
+        import {stopOwnedChild} from ${JSON.stringify(new URL('./mediflow.mjs', import.meta.url).href)};
+        Object.defineProperty(process,'platform',{value:'linux'});
+        const child=new EventEmitter(), calls=[];
+        Object.assign(child,{pid:424246,exitCode:null,signalCode:null});
+        let stopping=false, forbiddenProbes=0, terminalTimer;
+        process.kill=(pid,signal)=>{
+            assert.equal(pid,-child.pid); calls.push({signal,terminal:child.exitCode !== null});
+            if(signal === 0) {
+                if(child.exitCode !== null) throw Object.assign(new Error('final group absent'),{code:'ESRCH'});
+                if(stopping) { forbiddenProbes++; throw Object.assign(new Error('SENTINEL_PERIODIC_PROBE_EPERM'),{code:'EPERM'}); }
+                return true;
+            }
+            assert.equal(signal,'SIGTERM'); stopping=true;
+            terminalTimer=setTimeout(()=>{child.exitCode=0;child.emit('exit',0);},40);
+            return true;
+        };
+        try {
+            await stopOwnedChild(child,200);
+            assert.equal(forbiddenProbes,0);
+            assert.deepEqual(calls.map(call=>call.signal),[0,'SIGTERM',0]);
+            assert.equal(calls.at(-1).terminal,true);
+            assert.equal(child.listenerCount('exit'),0);
+            const count=calls.length;
+            await new Promise(resolve=>setTimeout(resolve,210));
+            assert.equal(calls.length,count,'A late callback touched the retired group');
+            console.log(JSON.stringify({simulated:true,calls,forbiddenProbes,lateCalls:false}));
+        } finally { clearTimeout(terminalTimer); }
+    `], {encoding:'utf8',timeout:2000});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+    t.diagnostic(result.stdout.trim());
+});
+
+test('POSIX necessary probe errors remain final and dispose pending callbacks', t => {
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+        import assert from 'node:assert/strict'; import {EventEmitter} from 'node:events';
+        import {stopOwnedChild} from ${JSON.stringify(new URL('./mediflow.mjs', import.meta.url).href)};
+        Object.defineProperty(process,'platform',{value:'linux'});
+        const later=setTimeout,clearLater=clearTimeout,immediate=setImmediate,clearNow=clearImmediate;
+        const timers=new Set(),immediates=new Set();
+        globalThis.setTimeout=(fn,ms,...args)=>{const handle=later((...values)=>{timers.delete(handle);fn(...values);},ms,...args);timers.add(handle);return handle;};
+        globalThis.clearTimeout=handle=>{timers.delete(handle);clearLater(handle);};
+        globalThis.setImmediate=(fn,...args)=>{const handle=immediate((...values)=>{immediates.delete(handle);fn(...values);},...args);immediates.add(handle);return handle;};
+        globalThis.clearImmediate=handle=>{immediates.delete(handle);clearNow(handle);};
+        for(const scenario of ['terminal-present','terminal-EPERM','terminal-EIO','exit-present','exit-EPERM','exit-EIO','pre-term-EPERM','pre-kill-EPERM']) {
+            const child=new EventEmitter(),calls=[];
+            Object.assign(child,{pid:424247,exitCode:scenario.startsWith('terminal-') ? 0 : null,signalCode:null});
+            let stopping=false, failures=0;
+            process.kill=(pid,signal)=>{
+                assert.equal(pid,-child.pid);calls.push({signal,terminal:child.exitCode !== null});
+                if(signal === 0) {
+                    const failing=scenario.startsWith('terminal-') || (scenario.startsWith('exit-') && child.exitCode !== null)
+                        || scenario === 'pre-term-EPERM' || (scenario === 'pre-kill-EPERM' && stopping);
+                    if(failing && !scenario.endsWith('present')) {
+                        failures++; throw Object.assign(new Error('necessary '+scenario),{code:scenario.endsWith('EIO') ? 'EIO' : 'EPERM'});
+                    }
+                    return true;
+                }
+                assert.equal(signal,'SIGTERM');stopping=true;
+                if(scenario.startsWith('exit-')) queueMicrotask(()=>{child.exitCode=0;child.emit('exit',0);});
+                return true;
+            };
+            await assert.rejects(stopOwnedChild(child,80),error=>error.code === 'MEDIFLOW_OWNED_STOP_UNCONFIRMED'
+                && (scenario.endsWith('present') ? /Continuità/u.test(error.cause.message) : error.cause.code === (scenario.endsWith('EIO') ? 'EIO' : 'EPERM')));
+            assert.equal(failures,scenario.endsWith('present') ? 0 : 1,'A necessary error was retried');
+            assert.deepEqual(calls.filter(call=>call.signal !== 0).map(call=>call.signal),scenario.startsWith('exit-') || scenario === 'pre-kill-EPERM' ? ['SIGTERM'] : []);
+            assert.ok(calls.filter(call=>call.signal !== 0).every(call=>!call.terminal));
+            assert.equal(timers.size,0);assert.equal(immediates.size,0);assert.equal(child.listenerCount('exit'),0);
+            const count=calls.length;child.exitCode=0;child.emit('exit',0);
+            await new Promise(resolve=>later(resolve,90));
+            assert.equal(calls.length,count,'A late callback retried the uncertain group');
+            console.log(JSON.stringify({simulated:true,scenario,calls,failures,timers:timers.size,immediates:immediates.size,lateCalls:false}));
+        }
+    `], {encoding:'utf8',timeout:3000});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+    t.diagnostic(result.stdout.trim());
+});
+
+test('POSIX absent group still requires the original exit before its deadline', t => {
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+        import assert from 'node:assert/strict'; import {EventEmitter} from 'node:events';
+        import {stopOwnedChild} from ${JSON.stringify(new URL('./mediflow.mjs', import.meta.url).href)};
+        Object.defineProperty(process,'platform',{value:'linux'});
+        for(const deliverExit of [true,false]) {
+            const child=new EventEmitter(),calls=[];
+            Object.assign(child,{pid:424248,exitCode:null,signalCode:null});
+            process.kill=(pid,signal)=>{assert.equal(pid,-child.pid);assert.equal(signal,0);calls.push(signal);throw Object.assign(new Error('owned group absent'),{code:'ESRCH'});};
+            let settled=false;
+            const pending=stopOwnedChild(child,60).finally(()=>{settled=true;});
+            const outcome=pending.then(()=>null,error=>error);
+            await new Promise(resolve=>setTimeout(resolve,15));
+            assert.equal(settled,false,'ESRCH alone completed the stop');assert.deepEqual(calls,[0]);
+            if(deliverExit) {child.exitCode=0;child.emit('exit',0);assert.equal(await outcome,null);}
+            else {const error=await outcome;assert.equal(error.code,'MEDIFLOW_OWNED_STOP_UNCONFIRMED');assert.match(error.cause.message,/Exit.*non osservato/u);}
+            assert.equal(child.listenerCount('exit'),0);
+            const count=calls.length;child.exitCode=0;child.emit('exit',0);
+            await new Promise(resolve=>setTimeout(resolve,70));assert.equal(calls.length,count);
+            console.log(JSON.stringify({simulated:true,deliverExit,calls,settled,lateCalls:false}));
+        }
+    `], {encoding:'utf8',timeout:2000});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+    t.diagnostic(result.stdout.trim());
+});
+
 test('Windows shutdown sends no IPC frame without explicit permission', () => {
     const result = spawnSync(process.execPath, ['--input-type=module', '--eval', `
         import assert from 'node:assert/strict';
@@ -906,7 +1012,7 @@ for (const scenario of ['terminal-first','signal-terminal-first','retry-after-fa
                 if(signal === 0) {
                     if(absent) throw Object.assign(new Error('original group absent'),{code:'ESRCH'});
                     probes++;
-                    if(scenario === 'before-term' && probes >= 2) child.exitCode=0;
+                    if(scenario === 'before-term') child.exitCode=0;
                     if(scenario === 'before-kill' && escalationDue) child.exitCode=0;
                     return true;
                 }
@@ -1154,11 +1260,24 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
             import { registerHooks, syncBuiltinESMExports } from 'node:module';
             const owned = new Map(), spawn = cp.spawn, run = cp.spawnSync, kill = process.kill.bind(process);
             const record = value => {
-                const event = { actualOS: process.platform, ...owned.get(value.pid)?.identity, ...value, at: Date.now() };
+                const event = { actualOS: process.platform, ...owned.get(value.pid)?.identity, ...value, at: Date.now(), monotonicNs: process.hrtime.bigint().toString() };
                 fs.appendFileSync(${JSON.stringify(observationFile)}, JSON.stringify(event) + '\n');
                 process.stderr.write('FIXTURE_STOP_OBSERVATION ' + JSON.stringify(event) + '\n');
             };
             globalThis[Symbol.for('mediflow.fixture.stop-observation')] = record;
+            process.kill = (target, signal) => {
+                const child = owned.get(Math.abs(target))?.child;
+                if (!child) return kill(target, signal);
+                const fields = { type: 'owned-os-call', pid: child.pid, target, signal };
+                try {
+                    const result = kill(target, signal);
+                    record({ ...fields, result, exitCode: child.exitCode, signalCode: child.signalCode });
+                    return result;
+                } catch (error) {
+                    record({ ...fields, error: { code: error.code, message: error.message }, exitCode: child.exitCode, signalCode: child.signalCode });
+                    throw error;
+                }
+            };
             cp.spawn = (executable, argv, options) => {
                 if (executable !== process.execPath || argv[0] !== ${JSON.stringify(path.join(source, 'scripts/source-runtime.mjs'))}) throw new Error('FIXTURE_FOREIGN_CHILD_DENIED');
                 const inheritedStderr = options.stdio[2] === 2;
@@ -2131,6 +2250,14 @@ test('cancellation during an unverified Web startup sends no navigation frame', 
     const stopped = events.filter(event => event.type === 'stop-result');
     assert.ok(stopped.length > 0);
     for (const event of stopped) { assert.equal(event.cause, null); assert.equal(event.allowIpcStop, false); }
+    if (process.platform !== 'win32') {
+        const calls = events.filter(event => event.type === 'owned-os-call');
+        assert.deepEqual(calls.map(event => event.signal), [0, 'SIGTERM', 0]);
+        assert.equal(calls[1].result, true);
+        assert.equal(calls[2].error.code, 'ESRCH');
+        assert.equal(calls[2].exitCode, 0);
+        assert.ok(events.indexOf(calls[2]) > events.findIndex(event => event.type === 'child-exit'));
+    }
     assert.equal(events.filter(event => event.type === 'child-exit' && event.generation === created[0].generation).length, 1);
     assert.equal(events.filter(event => event.type === 'child-stderr-close' && event.generation === created[0].generation).length, 1);
 });
