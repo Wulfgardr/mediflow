@@ -1,3 +1,4 @@
+import { HOST_PORTS_CONTRACT } from './network-host-ports';
 import { randomUUID } from 'node:crypto';
 import { createDefaultTerritorialPackCapability, type TerritorialPackCapability } from './territorial-pack-contract';
 import type {
@@ -273,6 +274,7 @@ export function buildNetworkCapabilitiesResponse(input: {
         operatingMode,
         protocolVersion: NETWORK_PROTOCOL_VERSION,
         territorialPacks: input.territorialPacks ?? createDefaultTerritorialPackCapability(),
+        hostPorts: HOST_PORTS_CONTRACT,
         capabilities: [
             capability(
                 'network.pairing.bootstrap',

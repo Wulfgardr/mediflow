@@ -140,7 +140,7 @@ pub(super) mod tests {
                         "POST /api/auth/native/login" => json!({"success":true, "id":"synthetic-user", "username":"synthetic", "role":"admin",
                             "archiveGeneration":"synthetic-generation", "salt":"AwMDAwMDAwMDAwMDAwMDAw==",
                             "encryptedMasterKey":"v3:BQUFBQUFBQUFBQUFAm40aZvQGpityOwyLKhsE40tJdbsjtrugIXzoJ/lk9gjlh5j7pIPeh7DLQ7ikGhA"}),
-                        "GET /api/v1/network/capabilities" => json!({"protocolVersion":"1.13.0", "operatingMode":"network-home-base",
+                        "GET /api/v1/network/capabilities" => json!({"protocolVersion":"1.14.0", "hostPorts": serde_json::from_str::<serde_json::Value>(include_str!("../../../transport/tests/fixtures/host-ports.json")).unwrap(), "operatingMode":"network-home-base",
                             "capabilities":[{"key":"network.replica.write-clinical-diary", "requiresPairing":true, "status":"available"},
                                 {"key":"network.replica.readonly-clinical-diary", "requiresPairing":true, "status":"available"}]}),
                         "GET /api/v1/network/ambulatories" => json!([{"id":"scope-a", "name":"Ambulatorio sintetico", "isDefault":true, "version":1}]),
@@ -948,7 +948,7 @@ impl ClinicalApp {
         if self.form.is_some() || self.area != Area::Scales {
             return;
         }
-        let (Some(session), Some(scope), Some(patient), Some(catalog)) = (
+        let (Some(_), Some(scope), Some(patient), Some(catalog)) = (
             self.session.clone(),
             self.scope.clone(),
             self.patient.detail.ready().cloned(),
@@ -966,6 +966,7 @@ impl ClinicalApp {
             return;
         };
         self.next_epoch();
+        let session = self.session.as_ref().expect("active session").clone();
         let intent = session.profile_query_intent();
         let fields = vec![
             Field::new(
@@ -1293,7 +1294,7 @@ impl ClinicalApp {
         scale.working = Some(Working::Save);
         form.state = FormState::Saving;
         self.message = None;
-        self.next_epoch();
+        self.next_presentation_epoch();
         self.run(
             move || session.create_scale_entry(&attempt),
             Self::receive_scale_readback,
@@ -1339,7 +1340,7 @@ impl ClinicalApp {
             scale.working = Some(Working::Read);
             scale.retry_ready = false;
             form.state = FormState::Saving;
-            self.next_epoch();
+            self.next_presentation_epoch();
             self.message = None;
             self.run(
                 move || session.read_scale_entry(&attempt),
@@ -1355,7 +1356,7 @@ impl ClinicalApp {
             scale.intent.cancel();
             scale.intent = session.profile_query_intent();
             let intent = scale.intent.clone();
-            self.next_epoch();
+            self.next_presentation_epoch();
             self.message = None;
             self.run(
                 move || {

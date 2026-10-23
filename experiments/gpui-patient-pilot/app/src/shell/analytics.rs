@@ -495,7 +495,7 @@ mod tests {
                         "archiveGeneration":"synthetic-generation", "salt":"AwMDAwMDAwMDAwMDAwMDAw==",
                         "encryptedMasterKey":"v3:BQUFBQUFBQUFBQUFAm40aZvQGpityOwyLKhsE40tJdbsjtrugIXzoJ/lk9gjlh5j7pIPeh7DLQ7ikGhA"})
                     } else if route.starts_with("GET /api/v1/network/capabilities") {
-                        json!({"protocolVersion":"1.13.0", "operatingMode":"network-home-base",
+                        json!({"protocolVersion":"1.14.0", "hostPorts": serde_json::from_str::<serde_json::Value>(include_str!("../../../transport/tests/fixtures/host-ports.json")).unwrap(), "operatingMode":"network-home-base",
                         "capabilities":[{"key":POPULATION_DEMOGRAPHICS_CAPABILITY, "requiresPairing":true, "status":"available"}]})
                     } else if route.starts_with("GET /api/v1/network/ambulatories") {
                         json!([{"id":"scope-a", "name":"Ambulatorio sintetico", "isDefault":true, "version":1}])
@@ -727,8 +727,8 @@ mod tests {
         for (mode, expected) in [
             (RESPONSE_DENIED, "forbidden"),
             (RESPONSE_CANCELLED, "cancelled"),
-            (RESPONSE_REPLACED, "replaced"),
             (RESPONSE_TOO_LARGE, "too-large"),
+            (RESPONSE_REPLACED, "replaced"),
         ] {
             host.mode.store(mode, Ordering::Release);
             view.update(cx, |app, cx| app.load_analytics(cx));
@@ -736,8 +736,17 @@ mod tests {
             view.read_with(cx, |app, _| match (expected, &app.analytics.state) {
                 ("forbidden", AnalyticsState::Denied(_))
                 | ("cancelled", AnalyticsState::Cancelled)
-                | ("replaced", AnalyticsState::Stale(_))
                 | ("too-large", AnalyticsState::Failed(_)) => {}
+                ("replaced", AnalyticsState::Idle) => {
+                    assert!(app.session.is_none());
+                    assert!(
+                        app.message
+                            .as_ref()
+                            .unwrap()
+                            .0
+                            .contains("Riapri l'archivio")
+                    );
+                }
                 _ => panic!("unexpected state for {expected}"),
             });
             render_window(cx);

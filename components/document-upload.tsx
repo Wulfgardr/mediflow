@@ -159,7 +159,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
         [patientId], undefined, ['attachments'],
     );
     const { data: killSwitch, error: settingError, loading: settingLoading, refresh: refreshSetting } = useLiveQueryState(
-        () => db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY),
+        () => db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY, { signal: db.getSessionReadSignal() }),
         [], undefined, ['settings'],
     );
     const documentSynthesisEnabled = !settingLoading && !settingError && isAiDocumentSynthesisEnabledValue(killSwitch?.value);
