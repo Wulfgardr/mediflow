@@ -43,6 +43,7 @@ pub struct RuntimeSession {
     context: RequestContext,
 }
 struct SessionInner {
+    account_context: RequestContext,
     client: RuntimeClient,
     user: RuntimeUser,
     closed: AtomicBool,
@@ -182,8 +183,10 @@ impl RuntimeSession {
         master: MasterKey,
     ) -> Self {
         let context = client.request_context();
+        let account_context = context.session_scope();
         Self {
             inner: Arc::new(SessionInner {
+                account_context,
                 client,
                 user,
                 closed: AtomicBool::new(false),
@@ -699,6 +702,17 @@ impl RuntimeSession {
     /// ADR 0155 read. The response is closed to the eight documented fields and
     /// its subject must be this exact session user.
     pub fn read_account_profile(&self) -> Result<AccountProfileRead> {
+        self.account_session().read_account_profile_in_context()
+    }
+
+    fn account_session(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            context: self.inner.account_context.clone(),
+        }
+    }
+
+    fn read_account_profile_in_context(&self) -> Result<AccountProfileRead> {
         let epoch = self.inner.read_epoch.load(Ordering::Acquire);
         self.check_read_epoch(epoch)?;
         let response = self.read_json(None, ACCOUNT_PROFILE_PATH, ACCOUNT_PROFILE_LIMIT)?;
@@ -716,6 +730,19 @@ impl RuntimeSession {
     /// returns the host's current values without any retry; an archive
     /// replacement stays a distinct error.
     pub fn update_account_profile(
+        &self,
+        snapshot: &AccountProfileSnapshot,
+        display_name: Option<&str>,
+        ambulatory_name: Option<&str>,
+    ) -> Result<AccountProfileUpdateOutcome> {
+        self.account_session().update_account_profile_in_context(
+            snapshot,
+            display_name,
+            ambulatory_name,
+        )
+    }
+
+    fn update_account_profile_in_context(
         &self,
         snapshot: &AccountProfileSnapshot,
         display_name: Option<&str>,
@@ -2734,13 +2761,13 @@ mod tests {
 
     #[test]
     fn host_ports_reject_incompatible_revision_and_scope() {
-        for contract in [
-            json!({"revision": 99, "writer": "host", "ports": []}),
-            json!({"revision": 1, "writer": "host", "ports": [
-                {"id":"clinical", "revision":1, "scope":"operator", "authority":"paired-operator", "state":"available"}
-            ]}),
-            Value::Null,
-        ] {
+        let valid: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/host-ports.json")).unwrap();
+        let mut revision = valid.clone();
+        revision["revision"] = json!(99);
+        let mut scope = valid;
+        scope["ports"][0]["scope"] = json!("operator");
+        for contract in [revision, scope, Value::Null] {
             let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
             let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
             let server = thread::spawn(move || {
@@ -3179,6 +3206,83 @@ mod tests {
             listener
         });
         (url, seen_rx, worker)
+    }
+
+    #[test]
+    fn session_retirement_cancels_pending_account_reads_and_writes_after_workspace_change() {
+        for mutation in [false, true] {
+            for archive_replaced in [false, true] {
+                let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+                let mut session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+                let account = session.clone();
+                let (seen_tx, seen_rx) = mpsc::channel();
+                let (release_tx, release_rx) = mpsc::channel();
+                let (closed_tx, closed_rx) = mpsc::channel();
+                let server = thread::spawn(move || {
+                    let (mut pending, _) = listener.accept().unwrap();
+                    let request = read_request(&mut pending);
+                    assert!(request.starts_with(if mutation {
+                        "PUT /api/auth/profile "
+                    } else {
+                        "GET /api/auth/profile "
+                    }));
+                    seen_tx.send(()).unwrap();
+                    pending
+                        .set_read_timeout(Some(Duration::from_secs(1)))
+                        .unwrap();
+                    closed_tx.send(pending.read(&mut [0])).unwrap();
+                    release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                });
+                let (done_tx, done_rx) = mpsc::channel();
+                let worker = thread::spawn(move || {
+                    let result = if mutation {
+                        account
+                            .update_account_profile(
+                                &account_profile_snapshot(),
+                                Some("Bozza"),
+                                None,
+                            )
+                            .map(|_| ())
+                    } else {
+                        account.read_account_profile().map(|_| ())
+                    };
+                    done_tx.send(result).unwrap();
+                });
+                seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                session.renew_requests();
+                if archive_replaced {
+                    session.retire(RuntimeError::ArchiveReplaced);
+                } else {
+                    session.lock();
+                }
+                let prompt = done_rx.recv_timeout(Duration::from_secs(1));
+                let shutdown = closed_rx.recv_timeout(Duration::from_secs(2));
+                release_tx.send(()).unwrap();
+                worker.join().unwrap();
+                server.join().unwrap();
+                assert!(
+                    matches!(shutdown, Ok(Ok(0)))
+                        || matches!(shutdown, Ok(Err(ref error)) if error.kind() == std::io::ErrorKind::ConnectionReset),
+                    "account socket did not close: {shutdown:?}"
+                );
+                assert_eq!(
+                    prompt.unwrap(),
+                    Err(if mutation {
+                        RuntimeError::Indeterminate
+                    } else {
+                        RuntimeError::Locked
+                    })
+                );
+                assert_eq!(
+                    session.retirement_error(),
+                    Some(if archive_replaced {
+                        RuntimeError::ArchiveReplaced
+                    } else {
+                        RuntimeError::Locked
+                    })
+                );
+            }
+        }
     }
 
     #[test]

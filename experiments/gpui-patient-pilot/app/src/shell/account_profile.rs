@@ -801,6 +801,7 @@ mod tests {
         conflict: serde_json::Value,
         put_status: u16,
         requests: Vec<String>,
+        profile_pause: Option<(std::sync::mpsc::Sender<()>, std::sync::mpsc::Receiver<()>)>,
     }
 
     struct SyntheticProfileHost {
@@ -813,6 +814,10 @@ mod tests {
 
     impl SyntheticProfileHost {
         fn new() -> Self {
+            Self::with_context(RequestContext::default())
+        }
+
+        fn with_context(context: RequestContext) -> Self {
             let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
             let socket = listener.local_addr().unwrap();
             let state = Arc::new(Mutex::new(HostState {
@@ -820,6 +825,7 @@ mod tests {
                 conflict: conflict_wire("p1:other", Some("Dr. Altro"), Some("Studio Altro")),
                 put_status: 200,
                 requests: Vec::new(),
+                profile_pause: None,
             }));
             let shared = state.clone();
             let stop = Arc::new(AtomicBool::new(false));
@@ -867,6 +873,8 @@ mod tests {
                     } else if route.starts_with("PUT /api/auth/profile ") {
                         if host.put_status == 200 {
                             let mut confirmed = host.current.clone();
+                            confirmed.as_object_mut().unwrap().remove("operation");
+                            confirmed.as_object_mut().unwrap().remove("contractVersion");
                             confirmed["changed"] = serde_json::json!(true);
                             (200, confirmed)
                         } else {
@@ -877,6 +885,12 @@ mod tests {
                     } else {
                         (200, serde_json::json!({}))
                     };
+                    if route.contains("/api/auth/profile ")
+                        && let Some((seen, release)) = host.profile_pause.take()
+                    {
+                        seen.send(()).unwrap();
+                        release.recv_timeout(Duration::from_secs(5)).unwrap();
+                    }
                     let response = response.to_string();
                     write!(
                         stream,
@@ -884,14 +898,17 @@ mod tests {
                         "a".repeat(64),
                         response.len()
                     )
-                    .unwrap();
+                    .unwrap_or_else(|error| {
+                        assert!(matches!(error.kind(), std::io::ErrorKind::BrokenPipe | std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::ConnectionAborted));
+                    });
                 }
             });
             let client = RuntimeClient::new(RuntimeConfig {
                 base_url: format!("http://{socket}"),
                 tls_pin_sha256: None,
             })
-            .unwrap();
+            .unwrap()
+            .with_request_context(context);
             let session = client
                 .login(
                     PairingCredentials::new("synthetic-device", "x".repeat(64)).unwrap(),
@@ -1141,5 +1158,90 @@ mod tests {
             assert_eq!(app.account_profile.save_attempts, 1);
             assert_eq!(app.account_profile.display.read(cx).value(), "Dr. Nuovo");
         });
+    }
+    #[gpui::test]
+    fn review_pending_account_read_survives_workspace_epoch(cx: &mut gpui::TestAppContext) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let host = SyntheticProfileHost::with_context(
+            view.read_with(cx, |app, _| app.request_context.clone()),
+        );
+        view.update(cx, |app, _| app.session = Some(host.session.clone()));
+        let (seen_tx, seen_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        host.state.lock().unwrap().profile_pause = Some((seen_tx, release_rx));
+        let reader = host.session.clone();
+        let worker = thread::spawn(move || reader.read_account_profile());
+        seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        view.update(cx, |app, cx| {
+            app.begin_account_profile_read(move || worker.join().unwrap(), cx);
+            app.next_epoch();
+        });
+        release_tx.send(()).unwrap();
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert!(
+                matches!(app.account_profile.load, ReadLoad::Ready(())),
+                "workspace epoch cancelled an account-authority read"
+            );
+            assert!(!app.account_profile.requires_read);
+        });
+    }
+
+    #[gpui::test]
+    fn pending_account_save_survives_workspace_epoch(cx: &mut gpui::TestAppContext) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let host = SyntheticProfileHost::with_context(
+            view.read_with(cx, |app, _| app.request_context.clone()),
+        );
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.load_account_profile(cx);
+        });
+        cx.run_until_parked();
+        let (snapshot, display, ambulatory) = view.update(cx, |app, cx| {
+            app.account_profile
+                .display
+                .update(cx, |input, cx| input.set_content("Dr. Nuovo", cx));
+            app.begin_account_profile_save(cx).unwrap()
+        });
+        host.serve(
+            profile_wire("p1:updated", Some("Dr. Nuovo"), None),
+            serde_json::json!({}),
+            200,
+        );
+        let (seen_tx, seen_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        host.state.lock().unwrap().profile_pause = Some((seen_tx, release_rx));
+        let writer = host.session.clone();
+        let worker = thread::spawn(move || {
+            writer.update_account_profile(&snapshot, Some(&display), Some(&ambulatory))
+        });
+        seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        view.update(cx, |app, cx| {
+            app.run_account_profile(
+                app.account_profile.generation,
+                move || worker.join().unwrap(),
+                ClinicalApp::receive_account_profile_write,
+                cx,
+            );
+            app.next_epoch();
+        });
+        release_tx.send(()).unwrap();
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert_eq!(app.account_profile.message, SAVE_CONFIRMED);
+            assert!(!app.account_profile.requires_read);
+            assert_eq!(
+                app.account_profile
+                    .snapshot
+                    .as_ref()
+                    .unwrap()
+                    .profile_version,
+                "p1:updated"
+            );
+        });
+        assert_eq!(host.profile_writes(), 1);
     }
 }

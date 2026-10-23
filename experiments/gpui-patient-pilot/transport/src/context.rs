@@ -65,6 +65,9 @@ impl RequestContext {
     }
     pub(crate) fn next_selection(&self) -> Self {
         self.cancel();
+        self.session_scope()
+    }
+    pub(crate) fn session_scope(&self) -> Self {
         Self {
             session: self.session.clone(),
             selections: vec![Cancellation::new()],
