@@ -27,7 +27,7 @@ Le sezioni storiche sotto conservano le prove e i limiti delle singole versioni.
 | Tappa | Risultato previsto | Coordinamento e accettazione |
 | --- | --- | --- |
 | 0.9.0 | Consolidare le funzioni esistenti: scritture coerenti, protezione dei dati, recupero, test attendibili e semplificazione misurata. Nessuna migrazione di linguaggio. | [WUL-717](https://linear.app/wulfgardr/issue/WUL-717); ingresso [WUL-705](https://linear.app/wulfgardr/issue/WUL-705), verifica finale [WUL-735](https://linear.app/wulfgardr/issue/WUL-735). |
-| 0.9.1 | Mandato esteso: pilota dei servizi condivisi, Web Punto d'inchiostro, GPUI installato sui target nominati, chat desktop, plugin local-ui e tranche di intelligenza; flussi, casi limite e parità qualificati su dati sintetici. | [Contratto 0.9.1](./releases/0.9.1-contract.md), proposta U0; [WUL-573](https://linear.app/wulfgardr/issue/WUL-573), [WUL-771](https://linear.app/wulfgardr/issue/WUL-771), [WUL-787](https://linear.app/wulfgardr/issue/WUL-787), [WUL-788](https://linear.app/wulfgardr/issue/WUL-788). |
+| 0.9.1 | Mandato esteso: pilota dei servizi condivisi, Web Punto d'inchiostro, GPUI installato sul MacBook Pro M4 Max/36 GB, macOS 27.2, chat desktop, plugin local-ui e tranche di intelligenza; flussi, casi limite e parità qualificati su dati sintetici. | [Contratto 0.9.1](./releases/0.9.1-contract.md), U0 approvato; [WUL-573](https://linear.app/wulfgardr/issue/WUL-573), [WUL-771](https://linear.app/wulfgardr/issue/WUL-771), [WUL-787](https://linear.app/wulfgardr/issue/WUL-787), [WUL-788](https://linear.app/wulfgardr/issue/WUL-788). |
 | 0.9.2 | Una migrazione Rust circoscritta, misurata e reversibile dietro il contratto già provato. Non una riscrittura dell'app. | [WUL-736](https://linear.app/wulfgardr/issue/WUL-736). |
 | 0.9.3 | Coerenza dei flussi clinici tra Web, API e accesso agentico, con revisione delle proposte e migrazione di gruppi di operazioni dichiarati. | [WUL-586](https://linear.app/wulfgardr/issue/WUL-586), [WUL-591](https://linear.app/wulfgardr/issue/WUL-591), [WUL-592](https://linear.app/wulfgardr/issue/WUL-592). |
 | 0.9.4 | Percorsi senza AI e con modelli locali, due integrazioni API remote esplicite e verifica della qualità dei risultati collegati alle fonti. | [WUL-602](https://linear.app/wulfgardr/issue/WUL-602), [WUL-743](https://linear.app/wulfgardr/issue/WUL-743). |
@@ -39,11 +39,21 @@ Le sezioni storiche sotto conservano le prove e i limiti delle singole versioni.
 **Decisione del 23 ottobre 2026:** il pilota WUL-573–585 è accettato,
 ma non chiude la 0.9.1. Resta il mandato esteso del 19 ottobre, inclusi
 WUL-787 (unità 7–21 dell'addendum) e WUL-788 (unità 3–10 dell'ADR 0160).
-Il contratto U0 delimita i filoni W/G/C/P/I/Q e sottopone a Leonardo target,
-tranche intelligente e soglie; non attesta prove nuove o approvazioni già
-ottenute. Anticipa soltanto i contributi nominati delle tappe successive,
-senza chiudere i loro programmi complessivi. Mobile e installatori completi
-restano in 0.9.6; WUL-760/764 nel progetto Moduli prima degli adapter.
+Il contratto U0 approvato fissa W=36, G=10, C/P/I/Q e la soglia di sei
+compiti su sei con al massimo un intervento. L’unico target GPUI installato
+è il MacBook Pro Mac16,5, M4 Max, 36 GB, macOS 27.2 build 26B118, con Touch ID
+attivo; la versione minima è macOS 27.2 su questo target, senza promessa su
+altri Mac. G-9 fissa toolchain, runtime e bundle. Web/headless Windows e Linux
+restano nelle VM Parallels di Q-6; GPUI su quei sistemi, mobile e installatori
+completi restano in 0.9.6.
+La tranche intelligente comprende 13 celle: tre funzioni su quattro venue e
+Treatment Reasoning ATHENA/MLX locale. I-3b separa il metodo ATHENA dal runner;
+le tre possibili celle remote, inclusa la quarta generazione ChatGPT, sono
+condizionate all’ADR accettato e alla prova di qualità I-7. Build dei client
+Codex/Claude (D1), D2–D5, account/quote/spesa (D-I1), revisori e scenario,
+Moduli e SISS restano decisioni aperte. WUL-760/764 restano nel progetto
+Moduli prima degli adapter. U0 anticipa solo i contributi nominati delle
+tappe successive, senza chiudere i loro programmi o attestare prove nuove.
 La chiusura richiede qualifica sintetica con Leonardo, preparazione degli
 artefatti e suo GO/NO-GO prima di tag e release. Nessuna nuova ammissione
 clinica deriva dalla qualifica tecnica.
