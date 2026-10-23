@@ -38,6 +38,19 @@ limiti originari; non attestano lo stato delle versioni successive.
 La [roadmap prodotto](./ROADMAP.md#roadmap-vigente--21-settembre-2026) riporta
 le tappe 0.9.0–1.0 definite nel
 [registro incrementale Linear](https://linear.app/wulfgardr/document/mediflow-incremental-release-ledger-090-to-10-ee0392f27b72).
+Il [contratto U0 approvato della 0.9.1](./releases/0.9.1-contract.md) registra
+le decisioni di Leonardo del 23 ottobre 2026: W=36, G=10, C/P/I/Q, soglia
+6/6 con al massimo un intervento e GPUI sul solo MacBook Pro M4 Max/36 GB,
+macOS 27.2. Treatment Reasoning resta ATHENA/MLX locale; I-3b definisce il
+filone riutilizzabile e condiziona le celle remote. Le decisioni ancora aperte
+sono nominate nel contratto; U0 e pilota chiuso non attestano il completamento
+della release.
+Il [censimento GPUI G-0](./analysis/2026-10-23-gpui-census.md) confronta la
+base `0a1980f32` con le 66 righe di parità, tutte le route Web e Punto
+d'inchiostro. Assegna i residui alle unità G-1–9, distingue il pilota
+installato dal sorgente e propone una scomposizione finita delle PR;
+non attesta parità o qualifica del bundle.
+Il [filone CU](./analysis/2026-10-23-computer-use-procedures.md), aggiunto in coda il 23 ottobre, propone procedure clinico-amministrative con identità locale: [contratti](./analysis/2026-10-23-computer-use-procedure-contracts.md), [fonti verificate e limiti](./analysis/2026-10-23-computer-use-sources.md), [ADR 0162 Proposed](./adr/0162-local-computer-use-executor.md). Questa prima consegna è solo documentale; non attesta un esecutore o una qualifica istituzionale.
 La [prima tranche locale del 26 settembre](./analysis/2026-09-26-090-first-tranche.md)
 distingue inventario, correzioni pazienti, audit pilota e prove dal rilascio.
 

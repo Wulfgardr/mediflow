@@ -24,6 +24,7 @@ interface CollapsibleSectionProps {
     keepMounted?: boolean;
     /* Allinea la superficie Lume alla colonna che ospita la sezione. */
     surfaceClassName?: string;
+    headerAction?: ReactNode;
     children: ReactNode;
 }
 
@@ -38,6 +39,7 @@ export function CollapsibleSection({
     keepMounted = false,
     surfaceClassName = 'patient-detail-section',
     children,
+    headerAction,
 }: CollapsibleSectionProps) {
     const [open, setOpen] = useState(defaultOpen);
     const reactId = useId();
@@ -73,20 +75,21 @@ export function CollapsibleSection({
         return () => window.removeEventListener('hashchange', openIfTargeted);
     }, [id]);
 
+    const heading = (
+        <h3 className="m-0 px-5 md:px-6">
+            {folderActive ? <div className="flex items-center gap-3 py-5 md:py-6"><span className="mt-1 flex min-w-0 flex-1 items-center gap-2 text-lg font-semibold text-ink">{Icon ? <Icon className="h-5 w-5 text-muted" aria-hidden="true" /> : null}{title}</span>{count !== undefined && count !== '' ? <span className="ml-3 apple-chip">{count}</span> : null}</div>
+                : <DisclosureControl expanded={expanded} controls={regionId} onToggle={() => setOpen(value => !value)}>
+                    {kicker && !folderSection ? <span className="section-kicker">{kicker}</span> : null}
+                    <span className="flex items-center gap-2">{Icon ? <Icon size={20} aria-hidden="true" /> : null}{title}
+                        {count !== undefined && count !== '' ? <span className="apple-chip">{count}</span> : null}</span>
+                    {!expanded && summary ? <span className="block text-sm text-muted">{summary}</span> : null}
+                </DisclosureControl>}
+        </h3>
+    );
+
     return (
         <section id={id} data-folder-pane={id} data-folder-active={folderActive} className={`${surfaceClassName} scroll-mt-28 border-0 shadow-none`}>
-            {/* Il titolo resta un heading che contiene il controllo, come nel
-                pattern W3C APG: è raggiungibile per livello dagli screen reader.
-                La cartella attiva espone solo il titolo, senza controllo. */}
-            <h3 className="m-0 px-5 md:px-6">
-                {folderActive ? <div className="flex items-center gap-3 py-5 md:py-6"><span className="mt-1 flex min-w-0 flex-1 items-center gap-2 text-lg font-semibold text-ink">{Icon ? <Icon className="h-5 w-5 text-muted" aria-hidden="true" /> : null}{title}</span>{count !== undefined && count !== '' ? <span className="ml-3 apple-chip">{count}</span> : null}</div>
-                    : <DisclosureControl expanded={expanded} controls={regionId} onToggle={() => setOpen(value => !value)}>
-                        {kicker && !folderSection ? <span className="section-kicker">{kicker}</span> : null}
-                        <span className="flex items-center gap-2">{Icon ? <Icon size={20} aria-hidden="true" /> : null}{title}
-                            {count !== undefined && count !== '' ? <span className="apple-chip">{count}</span> : null}</span>
-                        {!expanded && summary ? <span className="block text-sm text-muted">{summary}</span> : null}
-                    </DisclosureControl>}
-            </h3>
+            {headerAction ? <div data-section-header className="flex flex-wrap items-center justify-between gap-3">{heading}{headerAction}</div> : heading}
             <div id={regionId} hidden={!expanded} className="px-5 pb-5 md:px-6 md:pb-6">
                 {keepMounted || expanded || visited ? children : null}
             </div>

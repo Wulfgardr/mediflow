@@ -118,19 +118,10 @@
  .form :is(input:not([type='checkbox']):not([type='radio']),select,textarea) { min-height: 44px; }
 }
 
-/* Row commands inside a register table: quiet text, a border only on hover; the bin stays an icon. */
-.rowControls { flex-wrap: wrap; justify-content: flex-start; gap: 2px; }
-.rowControls > :is(button,a) { min-height: var(--lume-control-height, 44px); padding: 6px 8px; border-color: transparent; color: var(--lume-ink); }
-.rowControls > button:not([aria-label]) svg { display: none; }
-.rowControls > button[aria-label] { color: var(--lume-ink-muted); }
-@media (min-width: 701px) { .therapyTable :is(th,td):last-child { width: 19rem; } }
 .reasoningActions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; min-width: 0; }
 .reasoningActions > [data-testid^='model-picker'] { margin-block: 0; flex: 1 1 18rem; }
 @media (min-width: 1024px) { .reasoningActions { flex-wrap: nowrap; } }
-.sectionHead:has(.sectionHeadAction) { justify-content: flex-start; align-items: center; }
-.sectionHeadAction { margin-left: auto; }
 .register > section:first-child > .sectionHead { margin-top: 0; }
-@media (pointer: fine) and (min-width: 701px) { .rowControls > :is(button,a) { white-space: nowrap; overflow-wrap: normal; } }
 @media (pointer: fine) and (min-width: 701px) { .reasoningAction { white-space: nowrap; } }
 
 .statusThreshold { padding: 16px; font: var(--type-body); outline: none; }
@@ -142,3 +133,16 @@
 .statusWarning { color: var(--lume-signal-warning); }
 .statusActions { display: flex; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 700px) { .statusActions, .statusActions button { width: 100%; } }
+
+.therapyHeading, .therapySection > [data-section-header] { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding-bottom: 12px; border-bottom: 1px solid var(--lume-rule-strong); }
+.therapyHeading h2, .therapySection > [data-section-header] h3 { margin: 0; padding: 0; font: 600 0.75rem/1.5 var(--lume-font-sans); letter-spacing: .05em; text-transform: uppercase; }
+.therapyHeading h2 > span { margin-left: 12px; }
+.therapySection > [data-section-header] h3 > div, .therapySection > [data-section-header] h3 > button { padding: 0; min-height: 44px; font: inherit; }
+.therapySection > [data-section-header] h3 :global(.text-ink) { margin-top: 0; font: inherit; color: var(--lume-ink); }
+.therapySection > [data-section-header] :global(.apple-chip), .therapyHeading h2 > span { padding: 0; border: 0; background: transparent; border-radius: 0; font: 400 0.8125rem/1.5 var(--lume-font-sans); letter-spacing: 0; text-transform: none; color: var(--lume-ink-muted); }
+.therapyActions { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+@media (min-width: 701px) { .therapyTable :is(th,td):last-child { width: 9rem; } }
+.therapySection > [data-section-header] { padding: 0 0 12px !important; }
+.therapySection > [data-section-header] h3 { min-width: 0; flex: 1 1 22rem; }
+.therapySection > [data-section-header] h3 > div { flex-wrap: wrap; }
+.therapySection > [data-section-header] :global(.apple-chip) { margin-left: 0; white-space: normal; }
