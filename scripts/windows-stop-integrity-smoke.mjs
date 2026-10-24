@@ -80,7 +80,15 @@ export async function windowsTransactionTreeProbe(directory) {
       process.chdir(shadow);
       process.env.PATH = shadow; process.env.Path = shadow;
       process.env.SystemRoot = shadow; process.env.WINDIR = shadow;
-      await stopOwnedChild(child, 8000);
+      record({ type: 'tree-stop-context', pid: child.pid, writer: frame.writer,
+        leaderNonTerminal: child.exitCode === null && child.signalCode === null, cwdIsShadow: process.cwd() === shadow,
+        envIsShadow: Object.fromEntries(['PATH', 'Path', 'SystemRoot', 'WINDIR'].map(key => [key, process.env[key] === shadow])), budgetMs: 8000 });
+      try { await stopOwnedChild(child, 8000); }
+      catch (error) {
+        try { record({ type: 'tree-stop-rejected', code: error.code, message: error.message,
+          cause: error.cause == null ? error.cause : { code: error.cause.code, message: error.cause.message } }); }
+        finally { throw error; }
+      }
     } finally {
       process.chdir(cwd);
       for (const [key, value] of Object.entries(saved)) if (value === undefined) delete process.env[key]; else process.env[key] = value;
