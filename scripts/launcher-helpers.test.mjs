@@ -1505,6 +1505,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     const groupHistory = path.join(directory,'owned-groups.ndjson'), groupCleanup = path.join(directory,'owned-group-cleanup');
     const stopTrace = path.join(directory, 'stop-trace.ndjson'), stopLoader = path.join(directory, 'stop-loader.mjs');
     const startupGate = path.join(directory, 'startup.release'), stopExitGate = path.join(directory, 'stop-exit.release');
+    const stopExitRequest = path.join(directory, 'stop-exit.request');
     const observationFile = path.join(directory, 'stop-observation.ndjson'), ownerLoader = path.join(directory, 'owner-loader.mjs');
     const controlRequest = path.join(directory, 'drain-request.json'), controlReply = path.join(directory, 'drain-reply.json');
     const fixtureGeneration = crypto.randomUUID();
@@ -1656,6 +1657,13 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 if (failure === 'status') return {status:1};
                 if (failure === 'status-exit') { kill(pid, 'SIGTERM'); return {status:1}; }
                 if (failure === 'no-exit') return {status:0};
+                if (${Boolean(lifecycle.stopExitGate)}) {
+                    const request = { pid, fixtureGeneration: ${JSON.stringify(fixtureGeneration)} };
+                    fs.writeFileSync(${JSON.stringify(stopExitRequest)} + '.tmp', JSON.stringify(request), {mode:0o600});
+                    fs.renameSync(${JSON.stringify(stopExitRequest)} + '.tmp', ${JSON.stringify(stopExitRequest)});
+                    globalThis[Symbol.for('mediflow.fixture.stop-observation')]({type:'stop-exit-request',pid,status:0,simulatedStopPlatform:${JSON.stringify(lifecycle.platform)}});
+                    return {status:0};
+                }
                 kill(pid, 'SIGTERM'); return {status:0};
             };
             cp.spawnSync = (command,args,...rest) => {
@@ -1778,13 +1786,19 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 process.stderr.write('MEDIFLOW_HEADLESS_WEB_READY ' + JSON.stringify({ url: 'http://127.0.0.1:' + server.address().port }) + '\\n');
             });
             process.on('message', frame => process.stderr.write('FIXTURE_NAVIGATION ' + JSON.stringify(frame) + '\\n'));
-            process.on('SIGTERM', async () => {
-                ${lifecycle?.stopExitGate ? `
-                    fs.appendFileSync(${JSON.stringify(observationFile)}, JSON.stringify({type:'child-stop-waiting',pid:process.pid,at:Date.now()})+'\\n');
+            const closeRuntime = () => { server.close(); process.disconnect?.(); };
+            process.on('SIGTERM', closeRuntime);
+            ${lifecycle?.stopExitGate ? `
+                const requestTimer = setInterval(async () => {
+                    if (!fs.existsSync(${JSON.stringify(stopExitRequest)})) return;
+                    const request = JSON.parse(fs.readFileSync(${JSON.stringify(stopExitRequest)}, 'utf8'));
+                    if (request.pid !== process.pid || request.fixtureGeneration !== ${JSON.stringify(fixtureGeneration)}) throw new Error('FIXTURE_STOP_EXIT_SCOPE_DENIED');
+                    clearInterval(requestTimer);
+                    fs.appendFileSync(${JSON.stringify(observationFile)}, JSON.stringify({type:'child-stop-waiting',pid:process.pid,actualOS:process.platform,simulatedStopPlatform:${JSON.stringify(lifecycle.platform)},at:Date.now()})+'\\n');
                     await new Promise(resolve => { const timer = setInterval(() => { if (fs.existsSync(${JSON.stringify(stopExitGate)})) { clearInterval(timer); resolve(); } }, 10); });
-                ` : ''}
-                server.close(); process.disconnect?.();
-            });
+                    closeRuntime();
+                }, 10);
+            ` : ''}
         }`);
     mkdirSync(path.join(source, 'node_modules/next/dist/bin'), { recursive: true });
     writeFileSync(path.join(source, 'node_modules/next/dist/bin/next'), readFileSync(path.join(source, 'scripts/source-runtime.mjs'), 'utf8').replace("endsWith('source-runtime.mjs')", "endsWith('next')"));
@@ -1811,6 +1825,10 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     const terminal = new Promise(resolve => { resolveTerminal = resolve; });
     const observations = () => existsSync(observationFile) ? readFileSync(observationFile, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)) : [];
     const recordLauncher = (type, fields = {}) => appendFileSync(observationFile, JSON.stringify({ type, pid: child.pid, at: Date.now(), ...fields }) + '\n');
+    const releaseStopExit = (phase = 'test') => {
+        recordLauncher('stop-exit-released', { phase });
+        writeFileSync(stopExitGate, 'owned fixture stop release');
+    };
     {
         child.once('exit', (code, signal) => recordLauncher('launcher-exit', { code, signal }));
         child.stderr.once('close', () => recordLauncher('launcher-stderr-close'));
@@ -1897,7 +1915,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     })();
     const cleanup = () => cleanupTask ||= (async () => {
         const failures = [];
-        if (lifecycle?.stopExitGate) writeFileSync(stopExitGate, 'owned fixture stop release');
+        if (lifecycle?.stopExitGate) releaseStopExit('cleanup');
         try {
             if (!terminalFailureObserved && child.exitCode === null && child.signalCode === null) {
                 await postStop('shutdown');
@@ -1949,7 +1967,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
             await new Promise(resolve => setTimeout(resolve, 10));
         }
     };
-    return { source, data, stateFiles, child, closed, until, waitForTerminal, observations, cleanup, stopControl, stopTrace, runtimePid, releaseStopExit: () => writeFileSync(stopExitGate, 'owned fixture stop release'), releaseStartup: () => writeFileSync(startupGate,'owned fixture startup'), requestGroupCleanup: () => writeFileSync(groupCleanup,'owned fixture cleanup'), environment: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home }, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
+    return { source, data, stateFiles, child, closed, until, waitForTerminal, observations, cleanup, stopControl, stopTrace, runtimePid, releaseStopExit, releaseStartup: () => writeFileSync(startupGate,'owned fixture startup'), requestGroupCleanup: () => writeFileSync(groupCleanup,'owned fixture cleanup'), environment: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home }, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
 }
 
 
@@ -2086,16 +2104,33 @@ for (const simulatedStopPlatform of ['win32', 'linux']) for (const failure of si
         try {
             await stop();
             if (stopExitGate) {
-                await f.until(() => f.observations().some(event => event.type === 'child-stop-waiting'));
+                await f.until(() => f.observations().some(event => ['child-stop-waiting', 'child-exit'].includes(event.type)));
+                const waiting = f.observations().find(event => event.type === 'child-stop-waiting');
+                assert.ok(waiting, 'Original child exited before the portable barrier was reached');
+                assert.deepEqual({pid:waiting.pid,actualOS:waiting.actualOS,simulatedStopPlatform:waiting.simulatedStopPlatform}, {pid,actualOS,simulatedStopPlatform});
+                const request = f.observations().find(event => event.type === 'stop-exit-request');
+                assert.equal(request?.pid, pid); assert.equal(request.status, 0);
                 await new Promise(resolve => setTimeout(resolve, 120));
+                assert.equal(f.observations().some(event => event.type === 'child-exit'), false, 'Original child exited before release');
                 assert.equal(f.observations().filter(event => event.type === 'stop-result').length, 1, 'The positive stop inherited the synthetic negative deadline');
-                assert.equal(f.observations().some(event => event.type === 'child-exit'), false);
+                process.kill(pid, 0);
+                assert.deepEqual(JSON.parse(readFileSync(file)), receipt);
+                assert.equal(f.observations().some(event => event.type === 'stop-exit-released'), false);
                 const pending = claimLauncher(f.stateFiles.lockDirectory,{checkoutPath:f.source+path.sep},{reuseLive:true});
                 try { assert.equal(pending.claimed,false); assert.deepEqual(pending.receipt,receipt); }
                 finally { if (pending.claimed) releaseLauncher(pending); }
             }
         } finally { if (stopExitGate) f.releaseStopExit(); }
         await waitForFixtureClose(f.closed);
+        if (stopExitGate) {
+            const events = f.observations(), released = events.findIndex(event => event.type === 'stop-exit-released');
+            const exited = events.findIndex(event => event.type === 'child-exit' && event.pid === pid);
+            const confirmed = events.findIndex(event => event.type === 'stop-result' && event.windowsTreeStopped && event.originalExitObserved);
+            assert.ok(released >= 0 && exited > released && confirmed > exited, JSON.stringify(events));
+            assert.equal(events[exited].code, 0); assert.equal(events[exited].signal, null);
+            assert.deepEqual(readFileSync(f.stopTrace,'utf8').trim().split('\n').map(line => JSON.parse(line)), [...trace, {pid,signal:'taskkill',failure:null}]);
+            assert.doesNotMatch(f.output(), /FIXTURE_NAVIGATION/u);
+        }
         assert.equal(existsSync(path.join(f.stateFiles.lockDirectory,'active')),false);
         const successor = claimLauncher(f.stateFiles.lockDirectory,{checkoutPath:f.source+path.sep});
         try {
