@@ -1292,13 +1292,17 @@ for (const scenario of ['terminal-first','signal-terminal-first','retry-after-fa
             const completed=stopOwnedChild(child,25).then(()=>({ok:true}),error=>({error}));
             await Promise.resolve();
             runImmediates();
-            advance(12);
-            if(scenario === 'deadline-before-kill') now=25;
-            runImmediates();
-            advance(25-now);
-            console.log(JSON.stringify({phase:'driven',scenario,now,calls,timers:timers.size,immediates:immediates.size}));
+            if(['after-term','before-kill','owned-leader-alive','deadline-before-kill','deadline-without-exit'].includes(scenario)) {
+                advance(12);
+                if(scenario === 'deadline-before-kill') now=25;
+                runImmediates();
+                if(scenario === 'deadline-without-exit') advance(13);
+            }
             const outcome=await completed;
-            console.log(JSON.stringify({phase:'settled',scenario,outcome:outcome.error ? {code:outcome.error.code,cause:outcome.error.cause?.message} : {ok:true}}));
+            console.log(JSON.stringify({phase:'completion-checkpoint',scenario,now,calls,
+                outcome:outcome.error ? {code:outcome.error.code,cause:outcome.error.cause?.message} : {ok:true},
+                timers:timers.size,pendingTimers:[...timers].map(({due,delay})=>({due,delay})),
+                immediates:immediates.size,exitListeners:child.listenerCount('exit')}));
             if(scenario === 'owned-leader-alive') assert.equal(outcome.ok,true);
             else assert.equal(outcome.error?.code,'MEDIFLOW_OWNED_STOP_UNCONFIRMED');
             if(scenario.startsWith('deadline-')) assert.match(outcome.error.cause.message,/Exit.*non osservato/u);
@@ -1322,13 +1326,15 @@ for (const scenario of ['terminal-first','signal-terminal-first','retry-after-fa
                 assert.equal(calls.length,count,'A repeated stop observed the retired group');
                 assert.equal(timers.size,0);assert.equal(immediates.size,0);
             }
+            console.log(JSON.stringify({phase:'follow-up-checkpoint',scenario,now,timers:timers.size,immediates:immediates.size,exitListeners:child.listenerCount('exit')}));
+            assert.equal(child.listenerCount('exit'),0);
             const count=calls.length;
             child.emit('exit',child.exitCode,child.signalCode);
             advance(40);runImmediates();
             assert.equal(calls.length,count,'A late timer observed or signalled a successor');
             assert.equal(child.listenerCount('exit'),0);
             assert.equal(timers.size,0);assert.equal(immediates.size,0);
-            console.log(JSON.stringify({scenario,signals,probes,lateCalls:false,timers:timers.size,immediates:immediates.size}));
+            console.log(JSON.stringify({phase:'after-late-drain',scenario,now,signals,probes,lateCalls:false,timers:timers.size,immediates:immediates.size,exitListeners:child.listenerCount('exit')}));
         `],{encoding:'utf8',timeout:2000});
         assert.equal(result.status,0,result.stdout+result.stderr);
         t.diagnostic(result.stdout.trim());
