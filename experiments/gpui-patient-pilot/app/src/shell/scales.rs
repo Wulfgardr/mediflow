@@ -959,8 +959,6 @@ impl ClinicalApp {
         if self.form.is_some() {
             return;
         }
-        // Retire the abandoned area even when no session/scope can start a new
-        // read; its late authentication result cannot affect this destination.
         self.next_epoch();
         let (Some(session), Some(scope)) = (self.session.clone(), self.scope.clone()) else {
             return;

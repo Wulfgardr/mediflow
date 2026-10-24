@@ -346,6 +346,13 @@ impl Default for PatientData {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CallbackState {
+    Current,
+    StaleAuthority,
+    Retired,
+}
+
 // Device pairing is deliberately separate from the operator session. It lives
 // only in this window; dropping/changing it zeroizes the retained device token.
 struct StoredPairing {
@@ -825,6 +832,46 @@ impl ClinicalApp {
             .expect("window request generation exhausted");
     }
 
+    fn check_callback(
+        &mut self,
+        authority: u64,
+        error: Option<RuntimeError>,
+        cx: &mut Context<Self>,
+    ) -> CallbackState {
+        if self.account_profile.generation != authority {
+            return CallbackState::StaleAuthority;
+        }
+        let Some(error) = error.filter(RuntimeError::retires_session).or_else(|| {
+            self.session
+                .as_ref()
+                .and_then(RuntimeSession::retirement_error)
+        }) else {
+            return CallbackState::Current;
+        };
+        let message = if self.ai_preferences.is_saving() {
+            format!(
+                "Salvataggio delle preferenze AI non verificato. {}",
+                ui_error(error)
+            )
+        } else if self.form.as_ref().is_some_and(|form| {
+            form.kind == FormKind::Scale
+                && form
+                    .scale
+                    .as_ref()
+                    .is_some_and(ScaleAssessment::has_attempt)
+        }) {
+            format!(
+                "Salvataggio della valutazione non verificato. {}",
+                ui_error(error)
+            )
+        } else {
+            ui_error(error)
+        };
+        self.disconnect(cx);
+        self.message = Some((message, true));
+        CallbackState::Retired
+    }
+
     fn run<T: Send + 'static>(
         &self,
         operation: impl FnOnce() -> Result<T, RuntimeError> + Send + 'static,
@@ -837,41 +884,9 @@ impl ClinicalApp {
         cx.spawn(async move |this, cx| {
             let result = task.await;
             let _ = this.update(cx, |this, cx| {
-                if this.account_profile.generation != authority {
-                    return;
-                }
-                if let Some(error) = result
-                    .as_ref()
-                    .err()
-                    .copied()
-                    .filter(RuntimeError::retires_session)
-                    .or_else(|| {
-                        this.session
-                            .as_ref()
-                            .and_then(RuntimeSession::retirement_error)
-                    })
+                if this.check_callback(authority, result.as_ref().err().copied(), cx)
+                    != CallbackState::Current
                 {
-                    let message = if this.ai_preferences.is_saving() {
-                        format!(
-                            "Salvataggio delle preferenze AI non verificato. {}",
-                            ui_error(error)
-                        )
-                    } else if this.form.as_ref().is_some_and(|form| {
-                        form.kind == FormKind::Scale
-                            && form
-                                .scale
-                                .as_ref()
-                                .is_some_and(ScaleAssessment::has_attempt)
-                    }) {
-                        format!(
-                            "Salvataggio della valutazione non verificato. {}",
-                            ui_error(error)
-                        )
-                    } else {
-                        ui_error(error)
-                    };
-                    this.disconnect(cx);
-                    this.message = Some((message, true));
                     return;
                 }
                 if this.epoch != epoch {

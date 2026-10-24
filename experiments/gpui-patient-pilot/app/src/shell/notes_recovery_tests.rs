@@ -22,11 +22,12 @@ struct HostState {
     epoch: u64,
     outcome: u16,
     replaced: bool,
+    identity_replaced: bool,
     replace_after_successful_put: bool,
     archived: bool,
 }
-struct Host {
-    session: RuntimeSession,
+pub(super) struct Host {
+    pub(super) session: RuntimeSession,
     socket: std::net::SocketAddr,
     requests: Arc<Mutex<Vec<(String, Value)>>>,
     state: Arc<Mutex<HostState>>,
@@ -34,7 +35,7 @@ struct Host {
     worker: Option<thread::JoinHandle<()>>,
 }
 impl Host {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let socket = listener.local_addr().unwrap();
         let requests = Arc::new(Mutex::new(Vec::new()));
@@ -45,6 +46,7 @@ impl Host {
             epoch: 1,
             outcome: 200,
             replaced: false,
+            identity_replaced: false,
             replace_after_successful_put: false,
             archived: false,
         }));
@@ -73,8 +75,11 @@ impl Host {
                 "GET /api/v1/network/capabilities" => json!({"protocolVersion":"1.14.0", "hostPorts": serde_json::from_str::<serde_json::Value>(include_str!("../../../transport/tests/fixtures/host-ports.json")).unwrap(), "operatingMode":"network-home-base",
                     "capabilities":(["write-patient-profile", "write-therapies", "write-clinical-diary", "write-observations", "write-documents", "write-checkups", "write-patient-lifecycle"].map(|key| json!({"key":format!("network.replica.{key}"), "requiresPairing":true, "status":"available"}))) }),
                 "GET /api/v1/network/ambulatories" => json!([{"id":"scope-a", "name":"Ambulatorio sintetico", "isDefault":true, "version":1}]),
-                "GET /api/v1/network/identity" => json!({"scope":{"effectiveAmbulatoryId":"scope-a", "requestBinding":"expected-ambulatory-id-v1"},
-                    "operator":{"userId":"synthetic-user", "authChannel":"native"}}),
+                "GET /api/v1/network/identity" => {
+                    if state.identity_replaced { status = 409; json!({"code":"ARCHIVE_REPLACED"}) }
+                    else { json!({"scope":{"effectiveAmbulatoryId":"scope-a", "requestBinding":"expected-ambulatory-id-v1"},
+                        "operator":{"userId":"synthetic-user", "authChannel":"native"}}) }
+                },
                 "GET /api/v1/network/patient-profile/selection-epoch" => {
                     if state.replaced { status = 409; json!({"code":"ARCHIVE_REPLACED"}) }
                     else { json!({"contractVersion":1,"selectionEpoch":state.epoch}) }
@@ -138,6 +143,14 @@ impl Host {
             worker: Some(worker),
         }
     }
+    pub(super) fn replace_archive(&self) {
+        self.state.lock().unwrap().identity_replaced = true;
+    }
+
+    pub(super) fn request_count(&self) -> usize {
+        self.requests.lock().unwrap().len()
+    }
+
     fn writes(&self) -> Vec<Value> {
         self.requests
             .lock()

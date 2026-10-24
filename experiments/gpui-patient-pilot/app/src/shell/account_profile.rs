@@ -99,6 +99,12 @@ impl AccountProfile {
         }
     }
 
+    #[cfg(test)]
+    pub(super) fn synthetic_draft(&mut self, cx: &mut Context<ClinicalApp>) -> Entity<TextInput> {
+        self.set_editors("Bozza account sintetica", "Studio sintetico", cx);
+        self.display.clone()
+    }
+
     pub(super) fn reset(&mut self, theme: Theme, cx: &mut Context<ClinicalApp>) {
         let generation = self
             .generation
