@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+const exports = ['getProcessCreationTimeTicks', 'getSystemDirectory'];
 const deny = () => { throw new Error('Windows bootstrap artifact unavailable or invalid.'); };
 const regular = file => {
   const stat = fs.lstatSync(file);
@@ -20,7 +21,8 @@ export function loadSystemDirectoryBinding() {
   const manifest = JSON.parse(regular(path.join(directory, 'manifest.json')).toString('utf8'));
   const binary = path.join(directory, 'system-directory.node');
   const bytes = regular(binary);
-  if (manifest.schemaVersion !== 1 || manifest.platform !== 'win32' || manifest.arch !== arch
+  if (manifest.schemaVersion !== 2 || manifest.platform !== 'win32' || manifest.arch !== arch
+    || !Array.isArray(manifest.exports) || manifest.exports.join(',') !== exports.join(',')
     || manifest.napiVersion !== 1 || manifest.binary !== 'system-directory.node'
     || manifest.bytes !== bytes.length || manifest.sha256 !== sha256(bytes)
     || manifest.sourceSha256 !== sha256(regular(path.join(root, 'system-directory.c')))
@@ -32,6 +34,6 @@ export function loadSystemDirectoryBinding() {
   if (!Array.isArray(manifest.dependencies) || manifest.dependencies.length !== 2
     || [...manifest.dependencies].sort().join(',').toLowerCase() !== 'kernel32.dll,node.exe') deny();
   const binding = createRequire(import.meta.url)(binary);
-  if (Object.keys(binding).join(',') !== 'getSystemDirectory' || typeof binding.getSystemDirectory !== 'function') deny();
+  if (Object.keys(binding).sort().join(',') !== exports.join(',') || exports.some(name => typeof binding[name] !== 'function')) deny();
   return binding;
 }

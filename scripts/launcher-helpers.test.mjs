@@ -17,6 +17,9 @@ import {
     waitForInstanceAndOpen,
 } from './launcher-helpers.mjs';
 
+import { initializeWindowsSystemCommand } from './windows-system-command.mjs';
+initializeWindowsSystemCommand();
+
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 function fixtureImportArguments(loader, options) {
@@ -61,6 +64,8 @@ function launcherCrashFixture(t) {
         const child = spawn(process.execPath, ['--input-type=module', '-e', `
             import fs from 'node:fs';
             import path from 'node:path';
+            import {initializeWindowsSystemCommand} from ${JSON.stringify(new URL('./windows-system-command.mjs',import.meta.url).href)};
+            initializeWindowsSystemCommand();
             import cp from 'node:child_process';
             import { syncBuiltinESMExports } from 'node:module';
             const identityQueries = [], query = cp.spawnSync;
@@ -217,7 +222,14 @@ test('an unavailable OS identity query cannot reclaim a live complete generation
     const f = launcherCrashFixture(t), owned = claimLauncher(f.lock, { checkoutPath: repoRoot });
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
         import assert from 'node:assert/strict'; import fs from 'node:fs'; import cp from 'node:child_process';
-        import { syncBuiltinESMExports } from 'node:module';
+        import { registerHooks, syncBuiltinESMExports } from 'node:module';
+        registerHooks({load(url,context,next) {
+            if(url === ${JSON.stringify(new URL('./windows-launcher-bootstrap/index.mjs',import.meta.url).href)}) return {format:'module',shortCircuit:true,source:
+                'import {loadSystemDirectoryBinding as real} from '+${JSON.stringify(JSON.stringify(new URL('./windows-launcher-bootstrap/index.mjs?original',import.meta.url).href))}+';export const loadSystemDirectoryBinding=()=>{const binding=real();return {...binding,getProcessCreationTimeTicks:pid=>{if(pid==='+${process.pid}+')throw new Error("SYNTHETIC_OWNER_QUERY_DENIED");return binding.getProcessCreationTimeTicks(pid);}}};'};
+            return next(url,context);
+        }});
+        const {initializeWindowsSystemCommand}=await import(${JSON.stringify(new URL('./windows-system-command.mjs',import.meta.url).href)});
+        initializeWindowsSystemCommand();
         const { claimLauncher } = await import(${JSON.stringify(new URL('./mediflow.mjs', import.meta.url).href)});
         const read = fs.readFileSync, run = cp.spawnSync, owner = ${process.pid};
         fs.readFileSync = (file, ...args) => {
@@ -661,6 +673,8 @@ test('concurrent launcher acquisition retains a single live writer', async t => 
     });
     const results = await Promise.all(Array.from({ length: 6 }, async () => {
         const child = spawn(process.execPath, ['--input-type=module', '-e', `
+            const {initializeWindowsSystemCommand}=await import(${JSON.stringify(new URL('./windows-system-command.mjs',import.meta.url).href)});
+            initializeWindowsSystemCommand();
             const { claimLauncher } = await import(${JSON.stringify(new URL('./mediflow.mjs', import.meta.url).href)});
             const keepAlive = setInterval(() => {}, 1000);
             try { process.send(claimLauncher(${JSON.stringify(lock)}, ${JSON.stringify(cleanIdentity)}, { reuseLive: true })); }
@@ -847,6 +861,11 @@ function windowsBootstrapFixture(sourceRoot = repoRoot) {
     return `
         import fsBootstrap from 'node:fs';
         import {registerHooks as bootstrapHooks} from 'node:module';
+        const bootstrapHost = process.platform;
+        const fixtureNativeTicks = bootstrapHost === 'win32'
+            ? (await import(${JSON.stringify(binding)}+'?fixture-native')).loadSystemDirectoryBinding().getProcessCreationTimeTicks
+            : pid => String(638000000000000000n+BigInt(pid));
+        globalThis[Symbol.for('mediflow.fixture.native-ticks')] = fixtureNativeTicks;
         const fixtureSystemDirectory = 'C:' + String.fromCharCode(92) + 'MediFlow OS' + String.fromCharCode(92) + 'System32';
         const fixtureTaskkill = fixtureSystemDirectory + String.fromCharCode(92) + 'taskkill.exe';
         const bootstrapStat = fsBootstrap.lstatSync, bootstrapRealpath = fsBootstrap.realpathSync.native;
@@ -856,10 +875,9 @@ function windowsBootstrapFixture(sourceRoot = repoRoot) {
         fsBootstrap.realpathSync.native = (file,...rest) => file === fixtureSystemDirectory || file === fixtureTaskkill ? file : bootstrapRealpath(file,...rest);
         bootstrapHooks({load(url,context,next) {
             if(url === ${JSON.stringify(binding)}) return {format:'module',shortCircuit:true,
-                source:'export const loadSystemDirectoryBinding = () => ({getSystemDirectory:()=>'+JSON.stringify(fixtureSystemDirectory)+'});'};
+                source:'export const loadSystemDirectoryBinding = () => ({getSystemDirectory:()=>'+JSON.stringify(fixtureSystemDirectory)+',getProcessCreationTimeTicks:globalThis[Symbol.for("mediflow.fixture.native-ticks")]});'};
             return next(url,context);
         }});
-        const bootstrapHost = process.platform;
         Object.defineProperty(process,'platform',{value:'win32',configurable:true});
         const {initializeWindowsSystemCommand: fixtureBootstrap} = await import(${JSON.stringify(resolver)});
         fixtureBootstrap();

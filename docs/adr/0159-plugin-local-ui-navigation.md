@@ -70,11 +70,36 @@ ingressi. La proprietà del launcher non concede navigazione.
 
 Prima di acquisire o pubblicare owner e generazione su Windows, il bootstrap
 carica un piccolo binding C Node-API precompilato per `process.arch` (x64 o
-ARM64). La sola funzione espone `GetSystemDirectoryW`, con buffer Unicode
-ridimensionato e diniego su errore o troncamento. Il binding appartiene al
+ARM64). Le due funzioni espongono `GetSystemDirectoryW`, con buffer Unicode
+ridimensionato, e `getProcessCreationTimeTicks(pid)`. Quest’ultima apre un
+handle non ereditabile con il solo `PROCESS_QUERY_LIMITED_INFORMATION`,
+legge `GetProcessTimes` e chiude esattamente una volta ogni handle aperto.
+Qualsiasi errore, anche di chiusura o conversione, nega l’identità. Il binding appartiene al
 launcher: non entra nella closure Headless, che continua a negare `.node` e
 DLL. Non usa report, DbgHelp, FFI, ambiente o processi ausiliari.
 
+L’identità Windows usa la stessa funzione per ogni PID, proprio e di un
+owner precedente. La conversione intera FILETIME → FileTimeToSystemTime →
+calendario gregoriano e frazione sub-millisecondo conserva esattamente la
+stringa decimale dei tick UTC .NET, poi il precedente SHA-256. Non usa double
+per i tick, subprocessi, lookup di root ambiente, wait, polling o privilegi
+elevati. Il bootstrap pubblica insieme binding e percorso taskkill soltanto
+dopo tutte le verifiche, prima del claim. Errore proprio impedisce qualsiasi
+owner; errore per un owner vivo conserva owner e receipt. Non si modificano
+lo schema V2, la pubblicazione o il recupero per morte già verificata.
+
+La compatibilità richiede, su Windows x64 e ARM64, confronto byte-per-byte
+con l’espressione PowerShell legacy sul medesimo processo vivo, proprio e
+figlio posseduto, e poi confronto degli hash. L’oracle è soltanto nel gate
+esterno al prodotto, con budget 30 s per invocazione, senza retry o warm-up;
+non modifica le deadline del launcher. Timeout significa prova mancante.
+Una receipt legacy viva deve restare invariata e negare il nuovo claim.
+Se l’equivalenza non è dimostrata, la distribuzione resta bloccata: nessuna
+nuova identità incompatibile viene ammessa sotto lo schema precedente.
+
+Il manifest schema 2 e il loader richiedono esattamente i due export
+`getProcessCreationTimeTicks,getSystemDirectory`, entrambi funzioni. Il
+medesimo artefatto per architettura mantiene il nome system-directory.node.
 Il loader verifica architettura PE, digest, provenienza del sorgente e della
 ricetta dell'artefatto locale. Digest e ledger identificano i byte: non provano
 l'equivalenza fra sorgente e binario. Sorgente, ricetta e artefatti ammessi

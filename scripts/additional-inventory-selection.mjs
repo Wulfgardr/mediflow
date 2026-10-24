@@ -52,7 +52,7 @@ export function collectAdditionalInventorySelections(root) {
   });
   add('ci:windows-bootstrap', 'ordinary', 'scripts/prepare-windows-launcher-bootstrap.mjs', () => {
     source(root, 'scripts/prepare-windows-launcher-bootstrap.mjs', [
-      "import { initializeWindowsSystemCommand } from './windows-system-command.mjs';",
+      "import { initializeWindowsSystemCommand, windowsProcessCreationTimeTicks } from './windows-system-command.mjs';",
       "else if (command === 'source-first') await sourceFirst();",
       "initializeWindowsSystemCommand(); const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'mf-source-first-~'));",
       "assert.match(diagnostic, /Mancano le dipendenze\\. Conferma l’installazione con npm ci\\./u);",
