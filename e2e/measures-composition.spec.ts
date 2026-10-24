@@ -177,6 +177,13 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
             if (zoom) await zoom.setZoom(size === 'zoom-200' ? 2 : 4);
             await expect(history(page).locator('tbody tr')).toHaveCount(5);
             await capture(page, 'registro', theme, size);
+            if (!baseline && size === '320') {
+                await register(page).getByRole('button', { name: 'Per data', exact: true }).click();
+                await expect(register(page).locator('tbody tr')).toHaveCount(8);
+                await capture(page, 'per-data', theme, size);
+                await assertNoHorizontalOverflow(page, [{ label: 'Misure per data', selector: '#parametri' }]);
+                await register(page).getByRole('button', { name: 'Per parametro', exact: true }).click();
+            }
             await creation(page).click();
             await register(page).getByLabel('Valore', { exact: true }).fill('127');
             await capture(page, 'form', theme, size);
