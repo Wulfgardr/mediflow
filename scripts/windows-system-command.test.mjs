@@ -81,18 +81,18 @@ test('Windows bootstrap artifacts require source identity, digest, architecture 
     const original=JSON.parse(fs.readFileSync(manifestFile));let loads=0,shape='valid';
     const requireNative=module.createRequire;
     module.createRequire=url=>url===${JSON.stringify(pathToFileURL(path.join(pack, 'index.mjs')).href)}?file=>{
-      assert.equal(file,artifact);loads++;if(shape==='missing')return {getSystemDirectory:()=>''};if(shape==='type')return {getProcessCreationTimeTicks:'invalid',getSystemDirectory:()=>''};if(shape==='extra')return {getProcessCreationTimeTicks:()=>'',getSystemDirectory:()=>'',extra:()=>''};return {getProcessCreationTimeTicks:()=>"638000000000000001",getSystemDirectory:()=>String.raw\`C:\\Windows\\System32\`};
+      assert.equal(file,artifact);loads++;if(shape==='missing')return {getSystemDirectory:()=>''};if(shape==='type')return {getProcessCreationTimeTicks:'invalid',getSystemDirectory:()=>''};if(shape==='extra')return {getProcessCreationTimeTicks:()=>'',getSystemDirectory:()=>'',extra:()=>''};const exported={getProcessCreationTimeTicks:()=>"638000000000000001",getSystemDirectory:()=>String.raw\`C:\\Windows\\System32\`};if(shape==='hidden')Object.defineProperty(exported,'extra',{value:()=>''});if(shape==='symbol')exported[Symbol('extra')]=()=>'';return exported;
     }:requireNative(url);module.syncBuiltinESMExports();
     const {loadSystemDirectoryBinding}=await import(${JSON.stringify(pathToFileURL(path.join(pack, 'index.mjs')).href)});
     Object.defineProperty(process,'platform',{value:'win32'});Object.defineProperty(process,'arch',{value:'x64',configurable:true});
     assert.equal(typeof loadSystemDirectoryBinding().getSystemDirectory,'function');assert.equal(loads,1);
-    for(const [field,value] of [['schemaVersion',1],['exports',['getSystemDirectory']],['exports',['getSystemDirectory','getProcessCreationTimeTicks']],['exports',['getProcessCreationTimeTicks','getSystemDirectory','extra']],['sha256','0'.repeat(64)],['arch','arm64'],['sourceSha256','0'.repeat(64)],['recipeSha256','0'.repeat(64)],['builderSha256','0'.repeat(64)],['dependencies',['dbghelp.dll','node.exe']]]) {
+    for(const [field,value] of [['schemaVersion',1],['exports',['getProcessCreationTimeTicks,getSystemDirectory']],['exports',['getSystemDirectory']],['exports',['getSystemDirectory','getProcessCreationTimeTicks']],['exports',['getProcessCreationTimeTicks','getSystemDirectory','extra']],['sha256','0'.repeat(64)],['arch','arm64'],['sourceSha256','0'.repeat(64)],['recipeSha256','0'.repeat(64)],['builderSha256','0'.repeat(64)],['dependencies',['dbghelp.dll','node.exe']]]) {
       fs.writeFileSync(manifestFile,JSON.stringify({...original,[field]:value}));assert.throws(loadSystemDirectoryBinding,undefined,field);assert.equal(loads,1);
     }
     fs.writeFileSync(manifestFile,JSON.stringify(original));
     for(const arch of ['arm64','ia32']) {Object.defineProperty(process,'arch',{value:arch});assert.throws(loadSystemDirectoryBinding);assert.equal(loads,1);}
     Object.defineProperty(process,'arch',{value:'x64'});
-    for(const value of ['missing','type','extra']){shape=value;assert.throws(loadSystemDirectoryBinding,undefined,value);}
+    for(const value of ['missing','type','extra','hidden','symbol']){shape=value;assert.throws(loadSystemDirectoryBinding,undefined,value);}
     const beforeMissing=loads;fs.unlinkSync(artifact);assert.throws(loadSystemDirectoryBinding);assert.equal(loads,beforeMissing);
     console.log(JSON.stringify({artifactBytesSynthetic:true,nativeLoadStubbed:true,loads,invalidArtifactsNotLoaded:true}));
   `));

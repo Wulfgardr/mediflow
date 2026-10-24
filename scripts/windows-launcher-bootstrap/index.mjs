@@ -22,7 +22,8 @@ export function loadSystemDirectoryBinding() {
   const binary = path.join(directory, 'system-directory.node');
   const bytes = regular(binary);
   if (manifest.schemaVersion !== 2 || manifest.platform !== 'win32' || manifest.arch !== arch
-    || !Array.isArray(manifest.exports) || manifest.exports.join(',') !== exports.join(',')
+    || !Array.isArray(manifest.exports) || manifest.exports.length !== exports.length
+    || manifest.exports.some((name, index) => name !== exports[index])
     || manifest.napiVersion !== 1 || manifest.binary !== 'system-directory.node'
     || manifest.bytes !== bytes.length || manifest.sha256 !== sha256(bytes)
     || manifest.sourceSha256 !== sha256(regular(path.join(root, 'system-directory.c')))
@@ -34,6 +35,7 @@ export function loadSystemDirectoryBinding() {
   if (!Array.isArray(manifest.dependencies) || manifest.dependencies.length !== 2
     || [...manifest.dependencies].sort().join(',').toLowerCase() !== 'kernel32.dll,node.exe') deny();
   const binding = createRequire(import.meta.url)(binary);
-  if (Object.keys(binding).sort().join(',') !== exports.join(',') || exports.some(name => typeof binding[name] !== 'function')) deny();
+  const names = Reflect.ownKeys(binding);
+  if (names.length !== exports.length || exports.some(name => !names.includes(name) || typeof binding[name] !== 'function')) deny();
   return binding;
 }
