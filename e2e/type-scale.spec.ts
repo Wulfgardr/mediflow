@@ -174,15 +174,52 @@ const typographyTest = test.extend<{ patientFixture: { id: string; name: string 
   },
 });
 
+const diagnosticEvents = new WeakMap<Page, { events: unknown[]; pending: Promise<void>[] }>();
+
 // Una sessione e un paziente di prova per tema: ripeterli per ogni pagina
 // portava il job E2E oltre il suo limite. Ogni pagina resta un passo del rapporto.
 for (const theme of ['light', 'dark'] as const) {
   typographyTest.describe(`Punto: testo renderizzato, ${theme}`, () => {
     typographyTest.setTimeout(ROUTES.length * 20_000 + 120_000);
     typographyTest.beforeEach(async ({ page }) => {
+      const events: unknown[] = [];
+      const pending: Promise<void>[] = [];
+      diagnosticEvents.set(page, { events, pending });
+      const path = (url: string) => { try { return new URL(url).pathname; } catch { return url.split('?')[0]; } };
+      const record = (event: Record<string, unknown>) => events.push({ at: Date.now(), ...event });
+      page.on('request', request => {
+        if (request.isNavigationRequest() || path(request.url()).startsWith('/api/')) record({ event: 'request', path: path(request.url()), method: request.method() });
+      });
+      page.on('response', response => {
+        const pathname = path(response.url());
+        if (response.request().isNavigationRequest() || pathname.startsWith('/api/')) record({ event: 'response', path: pathname, method: response.request().method(), status: response.status() });
+        if (pathname === '/api/auth/check') pending.push((async () => {
+          const data = await response.json();
+          record({ event: 'auth-check', status: response.status(), hasSession: data.hasSession, isSetup: data.isSetup,
+            health: data.status, errorCode: data.error?.code });
+        })().catch(error => { record({ event: 'auth-check-body-unavailable', reason: String(error) }); }));
+      });
+      page.on('framenavigated', frame => { if (frame === page.mainFrame()) record({ event: 'navigation', path: path(frame.url()) }); });
+      page.on('console', message => { if (message.type() === 'error') record({ event: 'console-error', message: message.text().slice(0, 2000) }); });
+      page.on('pageerror', error => record({ event: 'page-error', message: error.message.slice(0, 2000) }));
+      await page.exposeFunction('__w11Navigation', (event: Record<string, unknown>) => record(event));
+      await page.addInitScript(() => {
+        const emit = (event: string) => {
+          const report = (window as unknown as { __w11Navigation: (data: unknown) => Promise<void> }).__w11Navigation;
+          void report({ event, path: location.pathname, timeOrigin: performance.timeOrigin,
+            navigationType: (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)?.type });
+        };
+        addEventListener('pageshow', () => emit('pageshow'));
+        addEventListener('pagehide', () => emit('pagehide'));
+      });
       await page.setViewportSize({ width: 1440, height: 960 });
       await page.addInitScript(value => localStorage.setItem('mediflow-theme', value), theme);
       await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    });
+    typographyTest.afterEach(async ({ page }, info) => {
+      const diagnostic = diagnosticEvents.get(page)!;
+      await Promise.allSettled(diagnostic.pending);
+      await info.attach('diagnostica-sessione-e-navigazioni', { contentType: 'application/json', body: JSON.stringify(diagnostic.events, null, 2) });
     });
     typographyTest('tutte le pagine e i dettagli', async ({ page, patientFixture: fixture }, info) => {
       for (const routePattern of ROUTES) await typographyTest.step(routePattern, async () => {
