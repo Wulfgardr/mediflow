@@ -1,4 +1,4 @@
-name: WUL-787 remaining diagnostics
+name: WUL-787 Per data candidate and removal
 
 on:
   push:
@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   native-diagnostics:
-    name: WUL-787 native remaining diagnostics
+    name: WUL-787 native Per data candidate and removal
     if: github.repository == 'Wulfgardr/mediflow' && github.ref == 'refs/heads/codex/WUL-787-linux-diagnostics-20261024'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -24,11 +24,22 @@ jobs:
           ref: ${{ github.sha }}
           path: diagnostic-source
           persist-credentials: false
-      - name: Checkout immutable application source
+      - name: Checkout immutable candidate source
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
-          ref: 347699434b321d5576d4e9debd706cc142d1f9fe
-          path: runtime-source
+          ref: 50b292674330a95143c57c6c873982cf0c7aa18a
+          path: runtime-candidate
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/native/MediFlowMac/Tests/MediFlowCoreTests/Fixtures/medical_fixture.db
+      - name: Checkout immutable declaration-removal source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: 265a046cbe9c26df74be05367cb7915e658cb1f1
+          fetch-depth: 2
+          path: runtime-removal
           persist-credentials: false
           sparse-checkout-cone-mode: false
           sparse-checkout: |
@@ -38,10 +49,11 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24.21.0
-      - name: Build W347 once and run the three closed remaining invocations
+      - name: Build and qualify each immutable variant before its single invocation
         run: >-
           node diagnostic-source/diagnostics/wul-787-linux/run.mjs
-          "$GITHUB_WORKSPACE/runtime-source"
+          "$GITHUB_WORKSPACE/runtime-candidate"
+          "$GITHUB_WORKSPACE/runtime-removal"
           "$RUNNER_TEMP/wul-787-linux-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
       - name: Preserve synthetic diagnostic evidence
         if: always()
