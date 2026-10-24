@@ -1,6 +1,7 @@
 import { createAipOperationRpcHostV1 } from '../../packages/aip/src/operation-rpc.ts';
 import { LOCAL_UI_IPC_SCHEMA, LOCAL_UI_OPERATION, LOCAL_UI_RESULT,
-  localUiArgumentsSchema } from '../../packages/mcp/src/local-ui-contract.ts';
+  localUiArgumentsSchema, type LocalUiIntent } from '../../packages/mcp/src/local-ui-contract.ts';
+import { createLocalUiRuntimeNavigator } from '../../scripts/local-ui-runtime.mjs';
 import { createPortableSupervisorProductionChildProcessesV1,
   type PortableSupervisorChildProcessesOptionsV1,
   type PortableSupervisorProductionChildProcessesV1 } from './portable-supervisor-child-processes.ts';
@@ -8,7 +9,8 @@ import { createPortableSupervisorProductionChildProcessesV1,
 export const LOCAL_UI_WEB_READY = '{"schemaVersion":"mediflow.local-ui.ready.v1"}';
 const READY_TIMEOUT_MS = 8_000;
 
-export function createLocalUiSupervisorRuntime(children: PortableSupervisorProductionChildProcessesV1) {
+export function createLocalUiSupervisorRuntime(children: PortableSupervisorProductionChildProcessesV1,
+  navigate?: (intent: LocalUiIntent, signal: AbortSignal) => Promise<void>) {
   let terminal = false, ready = false;
   let resolveClosed!: () => void;
   const closed = new Promise<void>(resolve => { resolveClosed = resolve; });
@@ -34,6 +36,11 @@ export function createLocalUiSupervisorRuntime(children: PortableSupervisorProdu
     async execute(input: unknown, signal: AbortSignal) {
       const parsed = localUiArgumentsSchema.safeParse(input);
       if (terminal || signal.aborted || !parsed.success) throw new Error('navigation_unavailable');
+      if (navigate) {
+        await navigate(parsed.data.intent, signal);
+        if (terminal || signal.aborted) throw new Error('navigation_unavailable');
+        return LOCAL_UI_RESULT;
+      }
       await transportReady(signal);
       if (terminal || signal.aborted) throw new Error('navigation_unavailable');
       children.sendWeb(JSON.stringify({ schemaVersion: LOCAL_UI_IPC_SCHEMA, intent: parsed.data.intent }),
@@ -56,11 +63,12 @@ export function createLocalUiSupervisorRuntime(children: PortableSupervisorProdu
 
 export function createLocalUiSupervisorProduction(
   options: Pick<PortableSupervisorChildProcessesOptionsV1,
-    'spawnChild' | 'webDirectory' | 'webTargetPath' | 'webBuildIdentity'> = {},
+    'spawnChild' | 'webDirectory' | 'webTargetPath' | 'webBuildIdentity'> & { sourceRoot?: string } = {},
 ) {
   const dataDir = process.env.MEDIFLOW_DATA_DIR;
-  if (!dataDir) throw new Error('data_directory_required');
+  if (!dataDir || !options.sourceRoot || !options.webBuildIdentity?.revision) throw new Error('data_directory_required');
+  const navigate = createLocalUiRuntimeNavigator({ sourceRoot: options.sourceRoot, dataDir, revision: options.webBuildIdentity.revision });
   const children = createPortableSupervisorProductionChildProcessesV1({ ...options, dataDir, agentKind: 'plugin_local_ui' });
-  try { return createLocalUiSupervisorRuntime(children); }
+  try { return createLocalUiSupervisorRuntime(children, navigate); }
   catch (error) { children.terminateAll(); throw error; }
 }

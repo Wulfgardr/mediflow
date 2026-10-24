@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 
+const navigationIntents = new Set(['search', 'identity', 'history', 'prescribing']);
+
 const escape = value => String(value).replace(/[&<>"']/gu, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 export function launcherPage(base, nonce, { nativeAvailable, development, version = '', folder = '' }) {
@@ -91,11 +93,18 @@ async function poll(){if(stopped)return;try{const r=await fetch(base+'/state');i
 </script></main></body></html>`;
 }
 
-export async function createChoiceServer({ root, state, choose, install, stop, nativeAvailable = false, development = false, version = '', folder = '' }) {
+export async function createChoiceServer({ root, state, choose, install, stop, navigate = undefined, cancelNavigation = undefined, nativeAvailable = false, development = false, version = '', folder = '' }) {
   const token = crypto.randomBytes(24).toString('hex');
   const nonce = crypto.randomBytes(18).toString('base64');
   const base = `/${token}`;
   let origin;
+  const requests = new Map();
+  const validId = value => typeof value === 'string' && /^[a-f0-9-]{36}$/u.test(value);
+  const remember = (requestId, controller) => {
+    if (requests.size >= 256) throw new Error('Navigazione non disponibile.');
+    const timer = setTimeout(() => { controller.abort(); requests.delete(requestId); }, 8000);
+    timer.unref(); requests.set(requestId, { controller, timer });
+  };
   const server = http.createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Referrer-Policy', 'no-referrer');
@@ -124,7 +133,36 @@ export async function createChoiceServer({ root, state, choose, install, stop, n
         if (body.length > 2048) return respond(413, 'Richiesta troppo grande.');
       }
       const data = JSON.parse(body);
-      if (route === `${base}/choose`) choose(data.choice, data.remember === true);
+      if (route === `${base}/navigate`) {
+        if (!data || Object.keys(data).sort().join(',') !== 'expiresAt,intent,requestId' || !navigationIntents.has(data.intent)
+          || !validId(data.requestId) || !Number.isSafeInteger(data.expiresAt)
+          || data.expiresAt <= Date.now() || data.expiresAt > Date.now() + 8000
+          || requests.has(data.requestId) || !state().ready || state().navigationReady !== true
+          || typeof navigate !== 'function') return respond(400, 'Navigazione non disponibile.');
+        const controller = new AbortController();
+        remember(data.requestId, controller);
+        const abort = () => { controller.abort(); cancelNavigation?.(data.requestId); };
+        const disconnected = () => { if (!res.writableFinished) abort(); };
+        const timer = setTimeout(abort, Math.max(0, data.expiresAt - Date.now()));
+        req.once('aborted', abort); res.once('close', disconnected);
+        try {
+          controller.signal.throwIfAborted();
+          await navigate(data.intent, { requestId: data.requestId, expiresAt: data.expiresAt, signal: controller.signal });
+          controller.signal.throwIfAborted();
+          if (Date.now() >= data.expiresAt) throw new Error('Navigazione non disponibile.');
+        } catch (error) { abort(); throw error; }
+        finally {
+          clearTimeout(timer); req.off('aborted', abort); res.off('close', disconnected);
+        }
+      }
+      else if (route === `${base}/cancel-navigation`) {
+        if (!data || Object.keys(data).join(',') !== 'requestId' || !validId(data.requestId)) return respond(400, 'Navigazione non disponibile.');
+        const existing = requests.get(data.requestId);
+        if (existing) existing.controller.abort();
+        else { const controller = new AbortController(); controller.abort(); remember(data.requestId, controller); }
+        cancelNavigation?.(data.requestId);
+      }
+      else if (route === `${base}/choose`) choose(data.choice, data.remember === true);
       else if (route === `${base}/install`) install();
       else if (route === `${base}/stop`) {
         respond(200, 'Arresto in corso.'); void stop(); return;
@@ -136,5 +174,8 @@ export async function createChoiceServer({ root, state, choose, install, stop, n
   server.headersTimeout = 5000;
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   origin = `http://127.0.0.1:${server.address().port}`;
-  return { server, url: `${origin}${base}/`, close: () => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }) };
+  return { server, url: `${origin}${base}/`, close: () => new Promise(resolve => {
+    for (const { controller, timer } of requests.values()) { controller.abort(); clearTimeout(timer); }
+    requests.clear(); server.close(resolve); server.closeAllConnections();
+  }) };
 }

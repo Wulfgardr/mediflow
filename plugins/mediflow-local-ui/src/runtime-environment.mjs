@@ -1,0 +1,25 @@
+import path from 'node:path';
+
+const inheritedNames = [
+  'HOME', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'APPDATA', 'LOCALAPPDATA',
+  'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_RUNTIME_DIR',
+  'TMPDIR', 'TMP', 'TEMP', 'LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE', 'LC_MESSAGES',
+  'LC_COLLATE', 'LC_TIME', 'LC_NUMERIC', 'LC_MONETARY', 'LC_PAPER', 'LC_NAME',
+  'LC_ADDRESS', 'LC_TELEPHONE', 'LC_MEASUREMENT', 'LC_IDENTIFICATION', 'TZ',
+  'SystemRoot', 'WINDIR', 'ComSpec', 'PATHEXT',
+  'MEDIFLOW_ATHENA_MLX_GENERATE_BIN', 'MEDIFLOW_ATHENA_MODEL_DIR',
+  'MEDIFLOW_ATHENA_MLX_PYTHON', 'MEDIFLOW_ATHENA_MLX_LM_PACKAGE',
+  'MEDIFLOW_ATHENA_MAX_TOKENS', 'MEDIFLOW_ATHENA_SEED', 'MEDIFLOW_UVX_BIN',
+  'MEDIFLOW_ATTACHMENT_MAX_BYTES', 'MEDIFLOW_ICD_EMBEDDED_DISABLED',
+  'MEDIFLOW_NETWORK_DISABLED', 'MEDIFLOW_CHATGPT_CODEX_BIN', 'MEDIFLOW_ZIMBRA_ASSISTANT_DIR',
+  'OPENMED_BASE_URL', 'OPENMED_REDACTION_CONFIDENCE_THRESHOLD',
+  'MEDIFLOW_ICD_WHO_ENABLED', 'MEDIFLOW_ICD_WHO_LOCAL_IMAGE_DIGEST', 'MEDIFLOW_ICD_WHO_LOCAL_DATASET_ID',
+  'DISPLAY', 'WAYLAND_DISPLAY', 'DBUS_SESSION_BUS_ADDRESS', 'MEDIFLOW_MAC_CONFIG',
+];
+
+export function ordinaryLauncherEnvironment(dataDir, inherited = process.env) {
+  const env = Object.fromEntries(inheritedNames.filter(name => inherited[name] !== undefined)
+    .map(name => [name, inherited[name]]));
+  return { ...env, PATH: [path.dirname(process.execPath), inherited.PATH].filter(Boolean).join(path.delimiter),
+    MEDIFLOW_DATA_DIR: dataDir };
+}
