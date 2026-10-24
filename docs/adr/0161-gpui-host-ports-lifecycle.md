@@ -80,6 +80,15 @@ riletture di creazione/modifica non diventano semplici esiti non confermati.
 Form ordinari, upload, selettore farmaco annidato e valutazione con tentativo
 sigillato seguono lo stesso ritiro; nessun vecchio invio viene riabilitato.
 
+I callback dedicati del repertorio farmaci e di WHO, sia readiness sia ricerca,
+condividono con il runner workspace il controllo di lifecycle. L’ordine è:
+autorità catturata, segnale `retires_session` o motivo conservato dalla sessione,
+poi currentness ordinaria di query/editor/area/epoch. Una query chiusa o cambiata
+non nasconde il ritiro dell’autorità corrente. Un risultato dell’autorità
+precedente, anche di ritiro, non altera invece la nuova sessione o bozza.
+I risultati ordinari tardivi restano scartati per currentness; il cambio di
+workspace da solo non costituisce un cambio dell’autorità operatore.
+
 ## G-1a.2: punto di non ritorno della copia
 
 La scelta nativa della destinazione precede la lettura del documento. La vista
