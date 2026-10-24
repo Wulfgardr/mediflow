@@ -730,18 +730,8 @@ export default function PatientDetailPage() {
                         <ServicePrescriptionManager patientId={id} embedded />
                     </CollapsibleSection>
 
-                    <CollapsibleSection
-                        id="parametri"
-                        kicker="Parametri"
-                        title="Parametri clinici"
-                        icon={Activity}
-                        count={workspace ? String(workspace.observationsCount) : undefined}
-                        summary={workspace?.observationsCount === 0 ? 'Nessun parametro registrato.' : undefined}
-                        surfaceClassName={workspaceStyles.clinicalSection}
-                        keepMounted
-                    >
-                        <ObservationManager patientId={id} embedded prefill={observationPrefill} />
-                    </CollapsibleSection>
+                    <ObservationManager patientId={id} embedded prefill={observationPrefill}
+                        surfaceClassName={workspaceStyles.clinicalSection} />
 
                     <CollapsibleSection
                         id="protesica"
