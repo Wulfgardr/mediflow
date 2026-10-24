@@ -889,9 +889,16 @@ test('Windows unattributed system stop cannot use a cwd or PATH impostor to rele
     const directory=realpathSync(mkdtempSync(path.join(tmpdir(),'mf-taskkill-shadow-~')));
     t.after(()=>rmSync(directory,{recursive:true,force:true}));
     const result=spawnSync(process.execPath,['--input-type=module','-e',`
+        ${windowsBootstrapFixture()}
         import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import cp from 'node:child_process';
-        import {EventEmitter} from 'node:events';import {syncBuiltinESMExports} from 'node:module';
-        import {stopOwnedChild,claimLauncher,releaseLauncher} from ${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)};
+        import {EventEmitter} from 'node:events';import {registerHooks,syncBuiltinESMExports} from 'node:module';
+        const {claimLauncher,releaseLauncher}=await import(${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)});
+        const coldLauncher=${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)}+'?fixture-uninitialized-stop';
+        registerHooks({resolve(specifier,context,next){
+            if(context.parentURL===coldLauncher&&specifier==='./windows-system-command.mjs')return next(specifier+'?fixture-uninitialized-stop',context);
+            return next(specifier,context);
+        }});
+        const {stopOwnedChild}=await import(coldLauncher);
         const root=${JSON.stringify(directory)},shadow=path.join(root,'shadow'),marker=path.join(root,'impostor-invoked');fs.mkdirSync(shadow);
         const program=path.join(shadow,'taskkill');
         fs.writeFileSync(program,'import fs from "node:fs";fs.writeFileSync('+JSON.stringify(marker)+',"only leader");');
@@ -919,11 +926,14 @@ test('Windows unattributed system stop cannot use a cwd or PATH impostor to rele
         try {
             try {await stopOwnedChild(child,80);resolutions++;await stopOwnedChild(child,80);resolutions++;}
             catch(error){failure={code:error.code,cause:error.cause?.message};}
+            await assert.rejects(stopOwnedChild(child,80),error=>error.code==='MEDIFLOW_OWNED_STOP_UNCONFIRMED');
         } finally {Object.defineProperty(process,'platform',{value:host,configurable:true});cp.spawnSync=native;syncBuiltinESMExports();}
         try {
             if(resolutions)releaseLauncher(owner);
             successor=claimLauncher(lock,identity,{reuseLive:true});
             const observed={node:process.version,execPath:process.execPath,uv:process.versions.uv,actualOS:host,simulatedWindows:true,
+                simulatedDependencies:['binding system directory','OS command filesystem','isolated uninitialized stop resolver'],
+                processIdentity:host==='win32'?'native creation ticks':'host identity',
                 realCounterfeitProgram:fs.existsSync(marker),realProductChild:false,exitOfLeaderSimulated:child.exitCode!==null,
                 descendantAlive,resolutions,commands,failure,ownerHeld:!successor.claimed,newClaimDenied:!successor.claimed,
                 ownerGeneration:owner.generation,lateSignals:false};
@@ -932,6 +942,7 @@ test('Windows unattributed system stop cannot use a cwd or PATH impostor to rele
             assert.equal(successor.claimed,false,'An unattributed command released the owned generation');
             assert.equal(resolutions,0,'A leader-only stop contaminated the same-handle receipt');
             assert.equal(failure?.code,'MEDIFLOW_OWNED_STOP_UNCONFIRMED');
+            assert.equal(failure?.cause,'Windows system command bootstrap not completed.');
             assert.deepEqual(commands,[],'Unattributed system command must not execute or fall back');
             assert.equal(child.listenerCount('exit'),0);
             await new Promise(resolve=>setTimeout(resolve,100));assert.deepEqual(commands,[]);
@@ -1028,8 +1039,9 @@ test('Windows unconfirmed terminal child retains the original launcher claim', t
     const directory=realpathSync(mkdtempSync(path.join(tmpdir(),'mf-win-terminal-~')));
     t.after(()=>rmSync(directory,{recursive:true,force:true}));
     const result=spawnSync(process.execPath,['--input-type=module','-e',`
+        ${windowsBootstrapFixture()}
         import assert from 'node:assert/strict'; import {spawn} from 'node:child_process';import {once} from 'node:events';import crypto from 'node:crypto';
-        import {stopOwnedChild,claimLauncher,releaseLauncher} from ${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)};
+        const {stopOwnedChild,claimLauncher,releaseLauncher}=await import(${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)});
         const host=process.platform,lock=${JSON.stringify(path.join(directory,'lock'))},checkoutPath=${JSON.stringify(directory + path.sep)};
         const owner=claimLauncher(lock,{checkoutPath});assert.equal(owner.claimed,true);let ownerReleased=false;
         const child=spawn(process.execPath,['-e',"process.once('message',()=>process.exit(0));process.send('ready');"],{detached:host!=='win32',stdio:['ignore','ignore','pipe','ipc']});
@@ -1039,13 +1051,18 @@ test('Windows unconfirmed terminal child retains the original launcher claim', t
             assert.throws(()=>process.kill(host==='win32'?child.pid:-child.pid,0),{code:'ESRCH'});
             let resolved=false,error;
             Object.defineProperty(process,'platform',{value:'win32',configurable:true});
-            try {await stopOwnedChild(child,40);resolved=true;releaseLauncher(owner);ownerReleased=true;} catch(value){error=value;}
+            try {
+                try {await stopOwnedChild(child,40);resolved=true;releaseLauncher(owner);ownerReleased=true;} catch(value){error=value;}
+                assert.equal(error?.cause?.message,'Albero del processo già terminale non verificato.');
+                await assert.rejects(stopOwnedChild(child,40),value=>value.code==='MEDIFLOW_OWNED_STOP_UNCONFIRMED'
+                    && value.cause?.message==='Albero del processo già terminale non verificato.');
+            }
             finally {Object.defineProperty(process,'platform',{value:host,configurable:true});}
             const next=claimLauncher(lock,{checkoutPath},{reuseLive:true});
             try {assert.equal(next.claimed,false,'A terminal leader without a tree receipt released its owner');assert.equal(next.receipt.pid,process.pid);}
             finally {if(next.claimed)releaseLauncher(next);}
             assert.equal(resolved,false);assert.equal(error.code,'MEDIFLOW_OWNED_STOP_UNCONFIRMED');
-            console.log(JSON.stringify({simulatedWindows:true,actualOS:host,launcher:process.pid,pid:child.pid,generation,pgid:host==='win32'?null:child.pid,exitCode:child.exitCode,stderrClosed:true,groupAbsent:host!=='win32',ownerHeld:true,newClaimDenied:true}));
+            console.log(JSON.stringify({simulatedWindows:true,actualOS:host,simulatedDependencies:['binding system directory','OS command filesystem'],processIdentity:host==='win32'?'native creation ticks':'host identity',launcher:process.pid,pid:child.pid,generation,pgid:host==='win32'?null:child.pid,exitCode:child.exitCode,stderrClosed:true,groupAbsent:host!=='win32',ownerHeld:true,newClaimDenied:true}));
         } finally {
             Object.defineProperty(process,'platform',{value:host,configurable:true});
             if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');
@@ -2112,61 +2129,89 @@ test('Windows failed tree command cannot release owner after independent origina
     assert.doesNotMatch(f.output(),/FIXTURE_NAVIGATION/u);
 });
 
-for (const scenario of ['stop-timeout','readiness-error','exit']) test(`CI smoke preserves an unconfirmed runtime and its fixture: ${scenario}`, t => {
-    const directory = realpathSync(mkdtempSync(path.join(tmpdir(),'mediflow-smoke-stop-contract-')));
+for (const smokePlatform of new Set([process.platform, 'win32']))
+for (const scenario of ['stop-timeout','readiness-error','exit']) test(`CI smoke preserves an unconfirmed runtime and its fixture: ${scenario} (${smokePlatform})`, t => {
+    const directory = realpathSync.native(mkdtempSync(path.join(tmpdir(),'mediflow-smoke-stop-contract-')));
     t.after(()=>rmSync(directory,{recursive:true,force:true}));
     const fixture = path.join(directory,'fixture'), trace = path.join(directory,'result.json'); mkdirSync(fixture);
     const result = spawnSync(process.execPath,['--input-type=module','-e',`
-        import fs from 'node:fs'; import {EventEmitter} from 'node:events';
+        import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import {EventEmitter} from 'node:events';
         import {registerHooks,syncBuiltinESMExports} from 'node:module';
-        const events={forced:0,removed:0,unhandled:[],error:null};let live=true,spawns=0;
-        const primary=new EventEmitter();Object.assign(primary,{pid:424242,exitCode:null,signalCode:null,stderr:new EventEmitter()});
-        globalThis[Symbol.for('smoke-owned-fixture')]=primary;
-        const remove=fs.rmSync;fs.mkdtempSync=()=>${JSON.stringify(fixture)};
-        fs.rmSync=(file,...args)=>{if(file===${JSON.stringify(fixture)}){events.removed++;return;}return remove(file,...args);};
+        const actualOS=process.platform,platform=${JSON.stringify(smokePlatform)},scenario=${JSON.stringify(scenario)},fixture=${JSON.stringify(fixture)};
+        const windows=platform==='win32',lock=path.join(fixture,'lock'),data=path.join(fixture,'archive');
+        const events={forced:0,removed:0,unhandled:[],error:null,phases:[],starts:0};let live=false,primary,committed=null;
+        const remove=fs.rmSync;fs.mkdtempSync=()=>fixture;
+        fs.rmSync=(file,...args)=>{if(file===fixture){events.removed++;return;}return remove(file,...args);};
         syncBuiltinESMExports();
         process.on('unhandledRejection',error=>events.unhandled.push(error.message));
+        Object.defineProperty(process,'platform',{value:platform});
         globalThis.fetch=async url=>{
             const pathname=new URL(url).pathname;
-            if(pathname.endsWith('/state'))return {json:async()=>({ready:true})};
-            if(pathname.endsWith('/go'))return {status:303,headers:{get:()=> 'http://127.0.0.1:3000'}};
+            if(pathname==='/'){assert.equal(live,false);throw new TypeError('synthetic stopped web');}
+            if(pathname.endsWith('/state')){events.phases.push('ready-'+events.starts);return {json:async()=>({ready:true})};}
+            if(pathname.endsWith('/go')){events.phases.push('go');return {status:303,headers:{get:()=> 'http://127.0.0.1:3000'}};}
+            if(pathname==='/api/auth/check'){events.phases.push('health-'+events.starts);return {status:200,json:async()=>({db:{state:'ready'}})};}
             if(pathname.endsWith('/stop')){
-                if(${JSON.stringify(scenario)}==='exit')queueMicrotask(()=>{live=false;primary.exitCode=0;primary.emit('exit',0);primary.stderr.emit('close');});
+                events.phases.push('stop-'+events.starts);
+                if(scenario==='exit')queueMicrotask(()=>{live=false;if(windows)remove(primary.generation,{recursive:true});primary.exitCode=0;primary.emit('exit',0);primary.stderr.emit('close');});
                 return {status:200,text:async()=> 'stopping'};
             }
-            throw new Error('Unexpected fixture request');
+            throw new Error('Unexpected fixture request '+pathname);
         };
         globalThis[Symbol.for('smoke-probe')]=async()=>{
-            if(${JSON.stringify(scenario)}==='readiness-error')throw new Error('SYNTHETIC_READINESS_FAILURE');
+            if(scenario==='readiness-error'){events.phases.push('readiness-error');throw new Error('SYNTHETIC_READINESS_FAILURE');}
             return {ok:live};
         };
-        globalThis[Symbol.for('smoke-spawn')]=()=>{
-            if(spawns++===0){queueMicrotask(()=>primary.stderr.emit('data','Avvio: http://127.0.0.1:3001/'+ 'a'.repeat(48) +'/'));return primary;}
-            const second=new EventEmitter();second.stderr=new EventEmitter();
-            queueMicrotask(()=>{second.stderr.emit('data','già attivo');second.emit('exit',0);second.stderr.emit('close');});return second;
+        globalThis[Symbol.for('smoke-spawn')]=(_executable,argv,options)=>{
+            assert.equal(options.env.MEDIFLOW_DATA_DIR,data);assert.equal(options.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY,'1');
+            assert.equal(argv.includes('--import'),windows);
+            if(options.stdio==='pipe'){
+                events.phases.push('reuse');const second=new EventEmitter();second.stderr=new EventEmitter();
+                queueMicrotask(()=>{second.stderr.emit('data','già attivo');second.emit('exit',0);second.stderr.emit('close');});return second;
+            }
+            events.starts++;live=true;events.phases.push('start-'+events.starts);
+            primary=Object.assign(new EventEmitter(),{pid:424242+events.starts,exitCode:null,signalCode:null,stderr:new EventEmitter()});
+            if(windows){primary.generation=path.join(lock,'active','owner-'+String(events.starts).padStart(32,'0'));fs.mkdirSync(primary.generation,{recursive:true});fs.writeFileSync(path.join(primary.generation,'instance.json'),JSON.stringify({pid:primary.pid}));}
+            queueMicrotask(()=>primary.stderr.emit('data','Avvio: http://127.0.0.1:3001/'+ 'a'.repeat(48) +'/'));return primary;
         };
-        globalThis[Symbol.for('smoke-force')]=async()=>{events.forced++;if(${JSON.stringify(scenario)}==='stop-timeout')throw new Error('SYNTHETIC_FORCED_STOP_FAILURE');};
+        globalThis[Symbol.for('smoke-force')]=async()=>{events.forced++;throw new Error('SYNTHETIC_FORCED_STOP_FAILURE');};
+        globalThis[Symbol.for('smoke-bootstrap')]=()=>{events.phases.push('bootstrap');return 'synthetic OS command';};
+        globalThis[Symbol.for('smoke-archive')]=(directory,token,write)=>{
+            assert.equal(directory,data);if(write){assert.equal(committed,null);committed=token;events.phases.push('commit');}
+            else {assert.equal(token,committed);events.phases.push('integrity-'+events.starts);}
+        };
+        globalThis[Symbol.for('smoke-tree')]=async()=>{assert.equal(live,false);events.phases.push('tree-rollback');};
         registerHooks({load(url,context,next){
-            if(url==='node:child_process')return {format:'module',shortCircuit:true,source:'export const spawn=globalThis[Symbol.for("smoke-spawn")];'};
+            if(url==='node:child_process')return {format:'module',shortCircuit:true,source:'export const spawn=globalThis[Symbol.for("smoke-spawn")];export default {spawn,spawnSync(){throw new Error("Unexpected real system command");}};'};
             if(url===${JSON.stringify(new URL('./launcher-helpers.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const readProductIdentity=()=>({sourceFingerprint:"synthetic"});export const probeRunningInstance=globalThis[Symbol.for("smoke-probe")];'};
             if(url===${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const stopOwnedChild=globalThis[Symbol.for("smoke-force")];'};
+            if(url===${JSON.stringify(new URL('./windows-system-command.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const initializeWindowsSystemCommand=globalThis[Symbol.for("smoke-bootstrap")];export const windowsTaskkillCommand=()=>{throw new Error("Unexpected stop discovery");};'};
+            if(url===${JSON.stringify(new URL('./launcher-state.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const prepareLauncherState=()=>({lockDirectory:'+JSON.stringify(lock)+'});'};
+            if(url===${JSON.stringify(new URL('./windows-stop-integrity-smoke.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const committedArchiveProbe=globalThis[Symbol.for("smoke-archive")];export const windowsTransactionTreeProbe=globalThis[Symbol.for("smoke-tree")];'};
             const result=next(url,context);
-            if(url===${JSON.stringify(new URL('./ci-start-smoke.mjs',import.meta.url).href)})result.source=String(result.source).replaceAll('15000','60').replaceAll('1000','60');
+            if(url===${JSON.stringify(new URL('./windows-launcher-bootstrap/observe-command.mjs',import.meta.url).href)})events.phases.push('observer');
+            if(url===${JSON.stringify(new URL('./ci-start-smoke.mjs',import.meta.url).href)})result.source=String(result.source).replaceAll('15000','60').replaceAll('8000','60').replaceAll('1000','60');
             return result;
         }});
         const hold=setInterval(()=>{},1000);
-        const save=()=>fs.writeFileSync(${JSON.stringify(trace)},JSON.stringify({...events,live}));
+        const save=()=>fs.writeFileSync(${JSON.stringify(trace)},JSON.stringify({...events,live,actualOS,platform}));
         const watchdog=setTimeout(()=>{save();process.exit(42);},500);
         try{await import(${JSON.stringify(new URL('./ci-start-smoke.mjs',import.meta.url).href)});}
         catch(error){events.error=error.message;process.exitCode=1;}
         finally{clearTimeout(watchdog);clearInterval(hold);save();}
     `],{env:{...process.env,PORT:'3000'},encoding:'utf8',timeout:2000});
     const observed = JSON.parse(readFileSync(trace));
-    t.diagnostic(JSON.stringify({scenario,...observed}));
+    t.diagnostic(JSON.stringify({scenario,...observed,simulatedDependencies:['child_process','fetch','identity probe','OS bootstrap','launcher state','archive and tree probes'],realConsumers:smokePlatform==='win32'?['ci-start-smoke','observe-command']:['ci-start-smoke'],fixtureDeadlineMs:60}));
     assert.equal(result.status,scenario === 'exit' ? 0 : 1,result.stderr);
     assert.deepEqual(observed.unhandled,[]); assert.equal(observed.forced,0);
     assert.equal(observed.removed,scenario === 'exit' ? 1 : 0);
     assert.equal(observed.live,scenario !== 'exit');
+    const windows=smokePlatform==='win32',prefix=windows?['bootstrap','observer']:[];
+    const ready=['start-1','ready-1','go','reuse',...(windows?['health-1','commit']:[])];
+    const phases=scenario==='readiness-error'?['start-1','readiness-error','stop-1']:[...ready,'stop-1'];
+    if(scenario==='exit'&&windows)phases.push('integrity-1','start-2','ready-2','health-2','integrity-2','stop-2','tree-rollback');
+    assert.deepEqual(observed.phases,[...prefix,...phases]);
+    assert.equal(observed.starts,scenario==='exit'&&windows?2:1);
     if (scenario === 'readiness-error') assert.equal(observed.error,'SYNTHETIC_READINESS_FAILURE');
     if (scenario === 'stop-timeout') assert.match(observed.error,/arresto.*non verificato/iu);
 });
