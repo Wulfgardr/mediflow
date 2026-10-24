@@ -152,7 +152,7 @@
 @media (max-width: 700px) {
  .observationTable thead { display: none; }
  .observationTable, .observationTable tbody { display: block; width: 100%; }
- .observationTable tr { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); padding-block: 12px; border-bottom: 1px solid var(--lume-rule); }
+ .observationTable tr { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); column-gap: 16px; padding-block: 12px; border-bottom: 1px solid var(--lume-rule); }
  .observationTable td { min-width: 0; padding: 4px 0; border: 0; }
  .observationTable td:first-child { grid-column: 1 / -1; }
 }
