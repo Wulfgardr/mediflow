@@ -482,7 +482,7 @@ export default function ObservationManager({
             : groups.length === 0 ? <ViewState state="empty" title="Nessuna misura registrata." />
             : viewMode === 'data' ? (byDay ?? []).map(day => <section key={day.key}>
                 <header className={styles.sectionHead}><h3>Misure del {day.date.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}</h3><span>{day.items.length} misure</span></header>
-                <table className={styles.table}><thead><tr><th>Misura</th><th className={styles.value}>Valore</th><th>Riferimento</th></tr></thead><tbody>
+                <table className={`${styles.table} ${styles.observationDayTable}`}><thead><tr><th>Misura</th><th className={styles.value}>Valore</th><th>Riferimento</th></tr></thead><tbody>
                     {day.items.map(item => { const flag = classifyObservationRange(item.value, item.refLow, item.refHigh); return <tr key={item.id}>
                         <td>{italianLoincLabel(item.code, item.display)}</td>
                         <td className={`${styles.value} ${flag ? styles.critical : ''}`}>{item.value} {item.unitCode}{flag && <small>{flag === 'alto' ? '▲ Alto' : '▼ Basso'}</small>}</td>
