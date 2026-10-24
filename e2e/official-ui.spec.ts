@@ -323,6 +323,7 @@ test('unavailable preference storage is transient and ordinary lock clears open 
   await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Cartelle aperte' })).toHaveCount(0);
   await noComparison();
+  await expect(page.getByLabel('PIN operatore', { exact: true })).toBeEnabled();
   await unlockIfNeeded(page, pin);
   await expect(nav()).toBeVisible();
   // Preserve known auth conflict diagnostics; any other console error fails.
