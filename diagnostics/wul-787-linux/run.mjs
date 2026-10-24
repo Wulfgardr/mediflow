@@ -1,4 +1,4 @@
-import { classify, classifyBaseline, preserveOfficialObservation } from './classification.mjs';
+import { classify, classifyBaseline } from './classification.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -148,29 +148,9 @@ function restoreBaseline() {
   check(!git(source, 'status', '--porcelain=v1'), 'Baseline test source restore incomplete');
 }
 
-let originalOfficial;
-const ownedFixtures = new Set();
-let overlayWritten = false;
 let failure;
 const outcomes = [];
 const phaseStates = [];
-const official = path.join(source, 'e2e/official-ui.spec.ts');
-const fixture = path.join(source, 'e2e/fixtures/official-lock-interleaving.ts');
-const observer = path.join(source, 'e2e/fixtures/official-lock-observation.ts');
-function restoreOfficialOverlay() {
-  if (!overlayWritten) return;
-  const current = hash(fs.readFileSync(official));
-  check([manifest.files['official-ui-red.spec.ts'], manifest.greenSha256, manifest.originalOfficialSha256].includes(current), 'Unexpected caller edit; refusing restore');
-  fs.writeFileSync(official, originalOfficial);
-  for (const target of ownedFixtures) {
-    check(hash(fs.readFileSync(target)) === manifest.files[path.basename(target)], 'Unexpected fixture edit; refusing removal');
-    fs.unlinkSync(target);
-    ownedFixtures.delete(target);
-  }
-  check(!git(source, 'status', '--porcelain=v1'), 'Application test source restore incomplete');
-  write(path.join(evidence, 'overlay-cleanup.json'), { clean: true, restoredCallerSha256: hash(fs.readFileSync(official)), removedOnlyOwnedFixtures: true });
-  overlayWritten = false;
-}
 try {
   check(process.platform === 'linux' && process.arch === 'x64' && os.machine() === 'x86_64'
     && process.version === 'v24.21.0' && process.versions.modules === '137', 'Native Linux x64 / Node24.21 ABI137 required');
@@ -188,10 +168,7 @@ try {
     && !git(diagnostic, 'status', '--porcelain=v1'), 'Diagnostic checkout identity mismatch');
   for (const [file, expected] of Object.entries(manifest.files)) check(hash(fs.readFileSync(path.join(DIR, file))) === expected, 'Diagnostic source hash mismatch: ' + file);
   check(hash(fs.readFileSync(path.join(diagnostic, '.github/workflows/wul-787-linux-diagnostics.yml'))) === manifest.workflowSha256, 'Workflow source mismatch');
-  check(!fs.existsSync(fixture) && !fs.existsSync(observer), 'Fixture destination already exists');
-  check(manifest.plan === 'official-green-consumers-two-baselines' && manifest.invocations === 4 && manifest.cases === 5, 'Wrong diagnostic plan');
-  originalOfficial = fs.readFileSync(official);
-  check(hash(originalOfficial) === manifest.originalOfficialSha256, 'Original caller mismatch');
+  check(manifest.plan === 'remaining-consumers-two-baselines' && manifest.invocations === 3 && manifest.cases === 4, 'Wrong diagnostic plan');
   write(path.join(evidence, 'source-identity.json'), { application: { revision: SHA, tree: TREE, cleanBeforeBuild: true },
     diagnostic: { revision: git(diagnostic, 'rev-parse', 'HEAD'), tree: git(diagnostic, 'rev-parse', 'HEAD^{tree}'), files: manifest.files },
     runtime: { node: process.version, abi: process.versions.modules, platform: process.platform, arch: process.arch, machine: os.machine() } });
@@ -231,31 +208,23 @@ try {
   write(path.join(evidence, 'qualified-runtime.json'), { identity: qualified.identity,
     contract: read(path.join(qualified.web, 'mediflow-runtime-contract.json')), ledgerSha256: ledgerHash,
     sourceRevision: SHA, sourceTree: TREE, qualifiedBeforeOverlay: true });
-  const red = fs.readFileSync(path.join(DIR, 'official-ui-red.spec.ts'), 'utf8');
-  const green = red.replace(manifest.anchor, manifest.anchor.replace('  await unlockIfNeeded', manifest.assertion + '\n  await unlockIfNeeded'));
-  check(red.split(manifest.anchor).length === 2 && hash(Buffer.from(green)) === manifest.greenSha256, 'Single-assertion composition mismatch');
-  overlayWritten = true;
-  for (const target of [observer, fixture]) {
-    fs.copyFileSync(path.join(DIR, path.basename(target)), target, fs.constants.COPYFILE_EXCL);
-    ownedFixtures.add(target);
-  }
-  for (const phase of ['green', 'consumers']) {
+  {
+    const phase = 'consumers';
     const phaseState = { phase, invocation: 'not reached', observation: 'not applicable', classification: 'not reached', serverCleanup: 'not reached' };
     phaseStates.push(phaseState);
     const phaseDir = path.join(evidence, phase); fs.mkdirSync(phaseDir);
     check(hash(fs.readFileSync(path.join(source, 'e2e/utils.ts'))) === manifest.helperSha256, 'Unchanged helper source mismatch');
-    fs.writeFileSync(official, phase === 'green' ? green : originalOfficial);
     write(path.join(phaseDir, 'test-identity.json'), { phase, runtimeRevision: SHA, runtimeTree: TREE,
       diagnosticRevision: process.env.GITHUB_SHA, originalHelperBlob: git(source, 'rev-parse', 'HEAD:e2e/utils.ts'),
       helperSha256: hash(fs.readFileSync(path.join(source, 'e2e/utils.ts'))),
-      callerSha256: hash(fs.readFileSync(official)), fixtureSha256: hash(fs.readFileSync(fixture)),
-      observerSha256: hash(fs.readFileSync(observer)), includesCandidateAssertion: phase === 'green', ledgerSha256: hash(fs.readFileSync(ledger)) });
+      spec: 'e2e/web-auth-recovery.spec.ts', specSha256: hash(fs.readFileSync(path.join(source, 'e2e/web-auth-recovery.spec.ts'))),
+      officialOverlayApplied: false, ledgerSha256: hash(fs.readFileSync(ledger)) });
     check(hash(fs.readFileSync(ledger)) === ledgerHash, 'Runtime ledger changed before phase');
     const data = path.join(work, phase + '-data'); fs.mkdirSync(data);
     fs.writeFileSync(path.join(data, 'SYNTHETIC-PROTOTYPE'), 'Owned synthetic WUL-787 diagnostic fixture\n', { flag: 'wx' });
     const phaseEnv = { ...baseEnv, MEDIFLOW_DATA_DIR: data, MEDIFLOW_E2E_DATA_DIR: data,
       E2E_BASE_URL: 'http://127.0.0.1:3252', PORT: '3252', E2E_PIN: '1234',
-      MEDIFLOW_TEST_OFFICIAL_UI: '1', PLAYWRIGHT_JSON_OUTPUT_FILE: path.join(phaseDir, 'report.json'),
+      PLAYWRIGHT_JSON_OUTPUT_FILE: path.join(phaseDir, 'report.json'),
       PLAYWRIGHT_HTML_OUTPUT_DIR: path.join(phaseDir, 'html'), PLAYWRIGHT_HTML_OPEN: 'never' };
     await run(phase + '-seed', process.execPath, [path.join(source, 'scripts/prepare-e2e-db.mjs')], phaseEnv);
     await assertPortFree();
@@ -264,14 +233,12 @@ try {
     let phaseFailure;
     try {
       write(path.join(phaseDir, 'http-runtime-identity.json'), await ready(server, phaseEnv.E2E_BASE_URL, qualified.identity));
-      const consumer = phase === 'consumers';
-      const argv = [cli, 'test', consumer ? 'e2e/web-auth-recovery.spec.ts' : 'e2e/official-ui.spec.ts',
-        '--grep', consumer ? manifest.consumers.join('|') : manifest.title,
+      const argv = [cli, 'test', 'e2e/web-auth-recovery.spec.ts',
+        '--grep', manifest.consumers.join('|'),
         '--workers=1', '--retries=0', '--reporter=line,json,html', '--output=' + path.join(phaseDir, 'test-output')];
       phaseState.invocation = 'started';
       const command = await run(phase + '-playwright', process.execPath, argv, phaseEnv, false);
       phaseState.invocation = 'completed';
-      if (!consumer) phaseState.observation = preserveOfficialObservation(phaseDir);
       phaseState.classification = 'started';
       outcome = classify(phase, command, phaseDir, manifest);
       phaseState.classification = outcome.outcome;
@@ -283,12 +250,15 @@ try {
     finally {
       try { await stopServer(server, phaseDir); phaseState.serverCleanup = 'complete'; }
       catch (error) { phaseState.serverCleanup = { failed: error.message }; phaseFailure = [phaseFailure, 'Server cleanup: ' + error.stack].filter(Boolean).join('\n'); }
+      try {
+        check(!git(source, 'status', '--porcelain=v1'), 'Consumer test sources changed; no diagnostic overlay was applied');
+        write(path.join(phaseDir, 'source-cleanup.json'), { clean: true, diagnosticOverlaysApplied: false });
+      } catch (error) { phaseFailure = [phaseFailure, 'Test source cleanup: ' + error.stack].filter(Boolean).join('\n'); }
       write(path.join(phaseDir, 'phase-state.json'), phaseState);
     }
     if (phaseFailure) throw new Error(phaseFailure);
     outcomes.push(outcome);
   }
-  restoreOfficialOverlay();
   for (const baseline of manifest.baselines) {
     const phase = baseline.phase;
     const phaseDir = path.join(evidence, phase); fs.mkdirSync(phaseDir);
@@ -334,13 +304,14 @@ try {
 } catch (error) {
   failure = error instanceof Error ? error.stack : String(error);
 } finally {
-  try { restoreOfficialOverlay(); }
-  catch (error) { failure = [failure, 'Overlay cleanup: ' + error.stack].filter(Boolean).join('\n'); }
   if (baselineOwned.size) try { restoreBaseline(); }
   catch (error) { failure = [failure, 'Baseline cleanup: ' + error.stack].filter(Boolean).join('\n'); }
   const baselineCaseFailure = outcomes.some(outcome => outcome.caseOutcome === 'FAIL');
   write(path.join(evidence, 'summary.json'), { applicationRevision: SHA, applicationTree: TREE,
-    diagnosticRevision: process.env.GITHUB_SHA, groupsPresent: manifest.groups, outcomes, failure, phaseStates, baselineCaseFailure,
+    diagnosticRevision: process.env.GITHUB_SHA, groupsPresent: manifest.groups,
+    plannedExecution: { invocations: manifest.invocations, cases: manifest.cases }, reusedEvidence: manifest.reusedOfficialEvidence,
+    outcomesScope: 'Only invocations executed in this run; reused Official evidence is not an outcome or case',
+    outcomes, failure, phaseStates, baselineCaseFailure,
     rawCommandResultsPreserved: true, acceptance: 'Diagnostic evidence only; independent review and publication remain separate' });
   if (failure) process.stderr.write(failure + '\n');
   if (failure || baselineCaseFailure) process.exitCode = 1;

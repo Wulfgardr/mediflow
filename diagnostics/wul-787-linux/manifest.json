@@ -4,9 +4,9 @@
   "title": "unavailable preference storage is transient and ordinary lock clears open records",
   "originalOfficialSha256": "5e443f8b5c5d82f722fbef8b3697fcc9f3855ea2ca6591fcaa08dcb9b2cfe651",
   "helperSha256": "dd0c0f6efb6468c46e08a5f3949a844dbc036e827f6e28700da6bbb81197d711",
-  "workflowSha256": "6ed8bd3f3be8028a67cd340cf18b03555dbf3c08ed277217c00f2d74ea9de84a",
+  "workflowSha256": "a7e0ee5397a14aeb31d784373faac30684283d9cb8a410438e0e7987ac1b666c",
   "files": {
-    "README.md": "6dc475753d7899960ffd04eb8626a7fb15ae9d7483794a73a45de435d73f7eb3",
+    "README.md": "ea0bd7c98d0493b649fe8ebf51f1f4abf386aca02149141b4363c194b1a71139",
     "classification.mjs": "4651d2389ce157c45e2f5feecb86b1319e0c3c75fc5e7dcc962d6aa8744f7d41",
     "official-lock-interleaving.ts": "536cc51f0f32654a47d1d73321bfb7eed0b161d12dfdcf5433816a864edeb101",
     "official-lock-observation.ts": "fe37345065e1953d375284be9d2bda4312caa4c1daf69dc7b5cbe96a8c857136",
@@ -16,7 +16,7 @@
     "overlays/per-data/e2e/fixtures/measures-per-data-geometry.ts": "355755f51e06b532e23e1997227537850529f9e2facdcddc158d47182e6baee3",
     "overlays/per-data/e2e/measures-composition.spec.ts": "6f2675716291e2225216816a29b6bac5d70fb5b0bc0a45183bcb62d3f15d3a30",
     "overlays/shared/e2e/fixtures/diagnostic-operation.ts": "087e5a9231110a0643fbeb1883a660f4260308156a00e693abf5f52335db073d",
-    "run.mjs": "a79359b759264b1cb84455a26e53f9ee6379a59b9b71e7d170e0cdea57cf785c"
+    "run.mjs": "d83430abf6af321a4791634cd3d4af5b7515fb5dc1c751ab58815130cf2d667d"
   },
   "playwrightFiles": {
     "playwright-core/lib/client/locator.js": "9c4fa569fd160b2f5a3204615967499f925deca68fc6846af13e0cdbfde87135",
@@ -27,20 +27,19 @@
     "playwright/lib/reporters/base.js": "e28f9fd60fdd47a0481de2cfa5e6772abaa3a4e26970f4ecbfc5c4b037ed0d10"
   },
   "groups": [
-    "official-green",
     "auth-recovery-consumers",
     "per-data",
     "anydoc"
   ],
-  "revision": "R5: retain R4 controlled passage and closed plan; stop baselines on explicit native Playwright fixture teardown timeout (R4-01)",
+  "revision": "R6: execute only three remaining invocations/four cases; reuse one bounded Official observation from R5 without reclassification",
   "inactiveR2History": {
     "status": "R2 RED and removal are not scheduled; R3 reused as bounded no-assertion evidence, never reclassified",
     "originalR2Invocations": 6,
     "R3Run": 40103571025,
     "R3Outcome": "FAILURE; total3/checkpoint1; not EXPECTED_RED"
   },
-  "plan": "official-green-consumers-two-baselines",
-  "invocations": 4,
+  "plan": "remaining-consumers-two-baselines",
+  "invocations": 3,
   "fixtureCallsite": {
     "line": 141,
     "column": 14
@@ -118,5 +117,48 @@
       ]
     }
   ],
-  "cases": 5
+  "cases": 4,
+  "reusedOfficialEvidence": {
+    "source": {
+      "run": 40111903083,
+      "attempt": 1,
+      "runUrl": "https://github.com/Wulfgardr/mediflow/actions/runs/40111903083",
+      "diagnosticHead": "b56923cd0591a69611f9c81f47578a70866ff861",
+      "diagnosticTree": "47612f88e36a9d615ad41db40fd38ec5da33e089",
+      "commitUrl": "https://github.com/Wulfgardr/mediflow/commit/b56923cd0591a69611f9c81f47578a70866ff861",
+      "applicationRevision": "347699434b321d5576d4e9debd706cc142d1f9fe",
+      "applicationTree": "34b50b7940e4e59466f3c67fa31b2c87412ef8c9"
+    },
+    "sourceHashes": {
+      "callerSha256": "068d2e9e032be7fe06b2c4f972b4c2897e555a8fcb7a813228a3e29f57aaf281",
+      "helperSha256": "dd0c0f6efb6468c46e08a5f3949a844dbc036e827f6e28700da6bbb81197d711",
+      "fixtureSha256": "536cc51f0f32654a47d1d73321bfb7eed0b161d12dfdcf5433816a864edeb101",
+      "observerSha256": "fe37345065e1953d375284be9d2bda4312caa4c1daf69dc7b5cbe96a8c857136",
+      "reportSha256": "fff2566f4aaf1f72e178451d12b8eea9fa23b72c0e1c5a9258b217b330a69802",
+      "captureSha256": "c5c98d18606804b8aa74cea926445d8c2773b1cbc297c87592a40d7f6a4e04a0",
+      "transitionSha256": "82fa6f57be5cd16889f4b03a6727c37cbfb07809556a626a8bd8934cfcfecfc7"
+    },
+    "historicalVerdict": {
+      "run": "FAILURE",
+      "phase": "FAILURE",
+      "accepted": false,
+      "observationComplete": false,
+      "truncated": true
+    },
+    "acceptedProposition": "In the observed controlled R5 execution, the caller with the single native PIN assertion avoided the isVisible-true/isEnabled branch and completed the observable unlock: native assertion, Rinnova=false, enabledCalls=0, lock1/login1 and original navigation/console assertions.",
+    "limits": [
+      "global diagnostic completeness",
+      "atomicity or all interleavings",
+      "future quiescence",
+      "historical CI cause",
+      "product or PR acceptance",
+      "runtime payload reuse"
+    ],
+    "reuseScope": "Prospective provenance decision only; no artifact download, historical reclassification, new Official outcome or runtime payload reuse",
+    "inactiveSources": [
+      "official-lock-interleaving.ts",
+      "official-lock-observation.ts",
+      "official-ui-red.spec.ts"
+    ]
+  }
 }

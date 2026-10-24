@@ -1,4 +1,4 @@
-name: WUL-787 completion diagnostics
+name: WUL-787 remaining diagnostics
 
 on:
   push:
@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   native-diagnostics:
-    name: WUL-787 native completion diagnostics
+    name: WUL-787 native remaining diagnostics
     if: github.repository == 'Wulfgardr/mediflow' && github.ref == 'refs/heads/codex/WUL-787-linux-diagnostics-20261024'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -38,7 +38,7 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24.21.0
-      - name: Build W347 once and run the four closed completion invocations
+      - name: Build W347 once and run the three closed remaining invocations
         run: >-
           node diagnostic-source/diagnostics/wul-787-linux/run.mjs
           "$GITHUB_WORKSPACE/runtime-source"
