@@ -62,10 +62,10 @@ static BOOL creation_ticks(const FILETIME *creation, ULONGLONG *ticks) {
 }
 
 static napi_value get_process_creation_time_ticks(napi_env env, napi_callback_info info) {
-  napi_value argv[2], result = NULL;
+  napi_value argv[2], result = NULL, canonical = NULL;
   size_t argc = 2, length = 0;
-  double input;
-  DWORD pid;
+  uint32_t pid = 0;
+  bool exact = false;
   HANDLE process;
   FILETIME creation, exit_time, kernel_time, user_time;
   ULONGLONG ticks = 0;
@@ -73,11 +73,11 @@ static napi_value get_process_creation_time_ticks(napi_env env, napi_callback_in
   napi_status status = napi_generic_failure;
   char digits[20];
   if (napi_get_cb_info(env, info, &argc, argv, NULL, NULL) != napi_ok || argc != 1
-      || napi_get_value_double(env, argv[0], &input) != napi_ok
-      || !(input >= 1 && input <= 4294967295.0)) return identity_unavailable(env);
-  pid = (DWORD)input;
-  if ((double)pid != input) return identity_unavailable(env);
-  process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+      || napi_get_value_uint32(env, argv[0], &pid) != napi_ok || pid == 0
+      || napi_create_uint32(env, pid, &canonical) != napi_ok
+      || napi_strict_equals(env, argv[0], canonical, &exact) != napi_ok
+      || !exact) return identity_unavailable(env);
+  process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, (DWORD)pid);
   if (process == NULL) return identity_unavailable(env);
   read = GetProcessTimes(process, &creation, &exit_time, &kernel_time, &user_time);
   converted = read && creation_ticks(&creation, &ticks);

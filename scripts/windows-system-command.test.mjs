@@ -273,11 +273,10 @@ test('native process identity source confines handle lifetime and calendar arith
   assert.match(conversion,/2650467743999999999ULL/u);
   assert.doesNotMatch(conversion,/double|float|sprintf|Number|504911232/u);
   const query=text.slice(text.indexOf('static napi_value get_process_creation_time_ticks'),text.indexOf('static napi_value init'));
-  assert.match(query,/OpenProcess\(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid\)/u);
+  assert.match(query,/OpenProcess\(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, \(DWORD\)pid\)/u);
   assert.match(query,/GetProcessTimes\(process, &creation, &exit_time, &kernel_time, &user_time\)/u);
   assert.equal(query.split('CloseHandle(process)').length-1,1);
   assert.match(query,/!closed \|\| status != napi_ok/u);
-  assert.match(query,/\(double\)pid != input/u);
   assert.match(query,/napi_create_string_latin1/u);
   assert.doesNotMatch(query,/PROCESS_ALL_ACCESS|SYNCHRONIZE|GetCurrentProcess|WaitFor|Sleep|sprintf/u);
   const launcher=fs.readFileSync(new URL('./mediflow.mjs',import.meta.url),'utf8');
