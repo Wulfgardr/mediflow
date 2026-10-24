@@ -546,6 +546,32 @@ mod tests {
     }
 
     #[gpui::test]
+    fn g1a2_restore_retires_nested_therapy_search_and_late_results(cx: &mut gpui::TestAppContext) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let (token, editor) = view.update(cx, |app, cx| {
+            stage(app, true, cx);
+            let pending = pending(app, cx);
+            app.save_error(RuntimeError::ArchiveReplaced, cx);
+            assert!(
+                app.form.is_none(),
+                "restore retained therapy form and nested picker"
+            );
+            pending
+        });
+        editor.read_with(cx, |input, _| {
+            assert!(input.value().is_empty());
+            assert!(input.read_only);
+        });
+        view.update(cx, |app, cx| {
+            stage(app, false, cx);
+            app.receive_drug_results(token, Ok(vec![catalog_drug()]), cx);
+            app.choose_drug(token, 0, cx);
+            assert!(app.form.as_ref().unwrap().selected_drug().is_none());
+        });
+    }
+
+    #[gpui::test]
     fn therapy_picker_helpers_accessible_ids(cx: &mut gpui::TestAppContext) {
         let mut app: Option<Entity<ClinicalApp>> = None;
         rendered_command::assert_unique_texts(

@@ -71,7 +71,7 @@ impl Host {
                     "archiveGeneration":"synthetic-generation", "salt":"AwMDAwMDAwMDAwMDAwMDAw==",
                     "encryptedMasterKey":"v3:BQUFBQUFBQUFBQUFAm40aZvQGpityOwyLKhsE40tJdbsjtrugIXzoJ/lk9gjlh5j7pIPeh7DLQ7ikGhA"}),
                 "GET /api/v1/network/capabilities" => json!({"protocolVersion":"1.14.0", "hostPorts": serde_json::from_str::<serde_json::Value>(include_str!("../../../transport/tests/fixtures/host-ports.json")).unwrap(), "operatingMode":"network-home-base",
-                    "capabilities":[{"key":"network.replica.write-patient-profile", "requiresPairing":true, "status":"available"},{"key":"network.replica.write-therapies", "requiresPairing":true, "status":"available"}]}),
+                    "capabilities":(["write-patient-profile", "write-therapies", "write-clinical-diary", "write-observations", "write-documents", "write-checkups", "write-patient-lifecycle"].map(|key| json!({"key":format!("network.replica.{key}"), "requiresPairing":true, "status":"available"}))) }),
                 "GET /api/v1/network/ambulatories" => json!([{"id":"scope-a", "name":"Ambulatorio sintetico", "isDefault":true, "version":1}]),
                 "GET /api/v1/network/identity" => json!({"scope":{"effectiveAmbulatoryId":"scope-a", "requestBinding":"expected-ambulatory-id-v1"},
                     "operator":{"userId":"synthetic-user", "authChannel":"native"}}),
@@ -1212,4 +1212,185 @@ fn threshold_all_primary_labels_fit_three_lines_in_minimum_shell(cx: &mut gpui::
             );
         }
     }
+}
+
+#[gpui::test]
+fn g1a2_restore_retires_real_forms_and_retained_editors(cx: &mut gpui::TestAppContext) {
+    for kind in [
+        FormKind::Notes,
+        FormKind::Entry,
+        FormKind::Therapy,
+        FormKind::Observation,
+        FormKind::Checkup,
+        FormKind::PatientNew,
+        FormKind::PatientProfile,
+    ] {
+        let host = Host::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            app.select_patient("patient-a", false, cx);
+        });
+        cx.run_until_parked();
+        cx.update_window_entity(&view, |app, window, cx| match kind {
+            FormKind::PatientNew => app.new_patient(cx),
+            FormKind::PatientProfile => {
+                let row = app.patient.detail.ready().unwrap().clone();
+                app.stage_fields(kind, patient_forms::fields(Some(&row)), None, cx);
+            }
+            _ => app.open_form(kind, window, cx),
+        });
+        let editors = view.update(cx, |app, cx| {
+            let form = app.form.as_ref().expect("real form opened");
+            assert!(form.kind == kind);
+            let editors: Vec<_> = form
+                .fields
+                .iter()
+                .map(|field| field.editor.clone())
+                .collect();
+            for editor in &editors {
+                editor.update(cx, |input, cx| {
+                    input.set_content("Bozza sintetica da ritirare", cx)
+                });
+            }
+            app.save_error(RuntimeError::ArchiveReplaced, cx);
+            assert!(
+                app.session.is_none(),
+                "restore retained session for {}",
+                kind.title()
+            );
+            assert!(app.form.is_none(), "restore retained form {}", kind.title());
+            assert!(app.selected_id.is_none());
+            assert!(app.scope.is_none());
+            assert_eq!(app.core.phase(), Phase::Locked);
+            editors
+        });
+        for editor in editors {
+            editor.read_with(cx, |input, _| {
+                assert!(input.value().is_empty());
+                assert!(input.read_only);
+            });
+        }
+        assert!(host.session.is_locked());
+        assert!(host.session.request_context().check().is_err());
+    }
+}
+
+#[gpui::test]
+fn g1a2_restore_from_old_workspace_callback_retires_current_authority(
+    cx: &mut gpui::TestAppContext,
+) {
+    let host = Host::new();
+    let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+    view.update(cx, |app, cx| {
+        app.session = Some(host.session.clone());
+        app.scope = Some("scope-a".into());
+        app.run(
+            || Err::<(), _>(RuntimeError::ArchiveReplaced),
+            |_, _, _| panic!("retired callback applied"),
+            cx,
+        );
+        app.next_epoch();
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |app, _| {
+        assert!(
+            app.session.is_none(),
+            "old workspace hid current session retirement"
+        );
+        assert!(app.scope.is_none());
+    });
+    assert!(host.session.is_locked());
+}
+
+#[gpui::test]
+fn g1a2_restore_retires_document_upload_and_late_upload_callback(cx: &mut gpui::TestAppContext) {
+    let host = Host::new();
+    let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+    let upload = || documents::Upload {
+        name: "Documento sintetico.txt".into(),
+        mime_type: "text/plain".into(),
+        bytes: std::sync::Arc::new(Zeroizing::new(b"synthetic document".to_vec())),
+    };
+    view.update(cx, |app, cx| {
+        app.session = Some(host.session.clone());
+        app.scope = Some("scope-a".into());
+        app.select_patient("patient-a", false, cx);
+    });
+    cx.run_until_parked();
+    view.update(cx, |app, cx| {
+        app.receive_document_upload(Ok(Ok(upload())), cx);
+        assert!(
+            app.form
+                .as_ref()
+                .is_some_and(|form| form.kind == FormKind::Document && form.upload.is_some())
+        );
+        app.run(
+            move || Ok(Ok(upload())),
+            ClinicalApp::receive_document_upload,
+            cx,
+        );
+        app.save_error(RuntimeError::ArchiveReplaced, cx);
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |app, _| {
+        assert!(app.session.is_none());
+        assert!(
+            app.form.is_none(),
+            "late upload reattached retired clinical bytes"
+        );
+        assert!(app.patient.attachments.ready().is_none());
+        assert!(!app.document_busy);
+    });
+}
+
+#[gpui::test]
+fn g1a2_old_authority_callback_preserves_new_session_form_and_writer_fence(
+    cx: &mut gpui::TestAppContext,
+) {
+    let old = Host::new();
+    let fresh = Host::new();
+    let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+    let editor = view.update(cx, |app, cx| {
+        app.session = Some(old.session.clone());
+        app.run(
+            || Err::<(), _>(RuntimeError::ArchiveReplaced),
+            |_, _, _| panic!("old callback applied"),
+            cx,
+        );
+        app.disconnect(cx);
+        app.session = Some(fresh.session.clone());
+        app.scope = Some("scope-a".into());
+        super::tests::synthetic_notes_form(app, FormState::Draft, cx)
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |app, cx| {
+        assert!(
+            app.session
+                .as_ref()
+                .is_some_and(|session| !session.is_locked())
+        );
+        assert!(app.form.is_some());
+        assert!(!editor.read(cx).value().is_empty());
+        assert_eq!(app.scope.as_deref(), Some("scope-a"));
+    });
+    let requests = old.requests.lock().unwrap().len();
+    assert_eq!(
+        old.session
+            .update_patient_notes("scope-a", "patient-a", 1, "late synthetic write"),
+        Err(RuntimeError::Locked)
+    );
+    assert_eq!(
+        old.requests.lock().unwrap().len(),
+        requests,
+        "retired session reached writer"
+    );
+    assert!(
+        fresh
+            .session
+            .can_write("network.replica.write-patient-profile")
+    );
+    assert!(fresh.writes().is_empty());
 }

@@ -2,7 +2,7 @@
 //! clinical record is opened. A download requires a path chosen by the operator.
 
 use base64::{Engine, engine::general_purpose::STANDARD};
-use mediflow_runtime_client::Attachment;
+use mediflow_runtime_client::{Attachment, RequestContext};
 use std::{
     fs::{File, OpenOptions},
     io::{Read, Write},
@@ -203,10 +203,93 @@ fn decode_payload(
     Ok(bytes)
 }
 
-pub fn write_download(path: &Path, bytes: &[u8]) -> Result<(), DocumentError> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CopyState {
+    Reading,
+    Writing,
+    Withdrawn,
+    Finished(Result<(), DocumentError>),
+}
+impl CopyState {
+    pub fn is_writing(self) -> bool {
+        self == Self::Writing
+    }
+
+    pub fn notice(self) -> (&'static str, bool) {
+        match self {
+            Self::Reading => (
+                "Lettura della copia. Prima dell’avvio del salvataggio puoi annullarla cambiando scheda o bloccando la sessione.",
+                false,
+            ),
+            Self::Writing => (
+                "Copia avviata nella destinazione scelta. Il salvataggio può completarsi anche se cambi scheda o blocchi la sessione.",
+                false,
+            ),
+            Self::Withdrawn => (
+                "Copia annullata prima dell’avvio del salvataggio. Nessun file è stato creato.",
+                false,
+            ),
+            Self::Finished(Ok(())) => (
+                "Copia già avviata completata nella destinazione scelta. Il documento non è stato aperto.",
+                false,
+            ),
+            Self::Finished(Err(DocumentError::Exists)) => (
+                "Copia non salvata: la destinazione esiste già e non è stata modificata. Nessun secondo salvataggio automatico.",
+                true,
+            ),
+            Self::Finished(Err(_)) => (
+                "Copia non completata. Può esserci un file parziale: controlla la destinazione. Nessun secondo salvataggio automatico.",
+                true,
+            ),
+        }
+    }
+}
+
+pub struct Download {
+    path: PathBuf,
+    bytes: Zeroizing<Vec<u8>>,
+}
+
+impl Download {
+    pub fn write(self) -> Result<(), DocumentError> {
+        write_download_inner(&self.path, &self.bytes)
+    }
+}
+
+pub fn admit_download(
+    context: &RequestContext,
+    path: PathBuf,
+    bytes: Zeroizing<Vec<u8>>,
+) -> mediflow_runtime_client::Result<Download> {
+    admit_download_after_check(context, path, bytes, || {})
+}
+
+fn admit_download_after_check(
+    context: &RequestContext,
+    path: PathBuf,
+    bytes: Zeroizing<Vec<u8>>,
+    before_admission: impl FnOnce(),
+) -> mediflow_runtime_client::Result<Download> {
+    context.check()?;
+    before_admission();
+    context.admit_file_effect()?;
+    Ok(Download { path, bytes })
+}
+
+fn write_download_inner(path: &Path, bytes: &[u8]) -> Result<(), DocumentError> {
     if bytes.len() > MAX_DOCUMENT_BYTES {
         return Err(DocumentError::TooLarge);
     }
+    write_download_to(path, bytes, |file, bytes| {
+        file.write_all(bytes).and_then(|_| file.sync_all())
+    })
+}
+
+fn write_download_to(
+    path: &Path,
+    bytes: &[u8],
+    write_and_sync: impl FnOnce(&mut File, &[u8]) -> std::io::Result<()>,
+) -> Result<(), DocumentError> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
@@ -221,14 +304,99 @@ pub fn write_download(path: &Path, bytes: &[u8]) -> Result<(), DocumentError> {
             DocumentError::NotWritten
         }
     })?;
-    file.write_all(bytes)
-        .and_then(|_| file.sync_all())
-        .map_err(|_| DocumentError::NotWritten)
+    write_and_sync(&mut file, bytes).map_err(|_| DocumentError::NotWritten)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn synthetic_destination(label: &str) -> PathBuf {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("g1a2-{label}-{}-{nonce}", std::process::id()))
+    }
+
+    #[test]
+    fn g1a2_admitted_copy_finishes_exact_payload_after_withdrawal_without_retry() {
+        let context = RequestContext::default();
+        let path = synthetic_destination("admitted");
+        let download = admit_download(
+            &context,
+            path.clone(),
+            Zeroizing::new(b"synthetic exact payload".to_vec()),
+        )
+        .unwrap();
+        context.cancel();
+        assert!(context.check().is_err());
+        download.write().unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"synthetic exact payload");
+        assert!(
+            admit_download(
+                &context,
+                path.clone(),
+                Zeroizing::new(b"second automatic copy".to_vec())
+            )
+            .is_err()
+        );
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn g1a2_io_failure_leaves_observable_partial_file_and_preserves_existing_destination() {
+        let path = synthetic_destination("partial");
+        let context = RequestContext::default();
+        let download = admit_download(
+            &context,
+            path.clone(),
+            Zeroizing::new(b"synthetic exact payload".to_vec()),
+        )
+        .unwrap();
+        let result = write_download_to(&download.path, &download.bytes, |file, bytes| {
+            file.write_all(&bytes[..3])?;
+            context.cancel();
+            Err(std::io::Error::other("synthetic storage failure"))
+        });
+        assert_eq!(result, Err(DocumentError::NotWritten));
+        assert_eq!(std::fs::read(&path).unwrap(), b"syn");
+        let replacement = admit_download(
+            &RequestContext::default(),
+            path.clone(),
+            Zeroizing::new(b"replacement".to_vec()),
+        )
+        .unwrap();
+        assert_eq!(replacement.write(), Err(DocumentError::Exists));
+        assert_eq!(std::fs::read(&path).unwrap(), b"syn");
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn g1a2_withdrawal_between_check_and_admission_creates_no_file() {
+        let context = RequestContext::default();
+        let path = synthetic_destination("withdrawn");
+        assert!(!path.exists());
+        let result = admit_download_after_check(
+            &context,
+            path.clone(),
+            Zeroizing::new(b"synthetic exact payload".to_vec()),
+            || context.cancel(),
+        )
+        .map(Download::write);
+        let exists = path.exists();
+        if exists {
+            std::fs::remove_file(&path).unwrap();
+        }
+        assert!(
+            matches!(
+                result,
+                Err(mediflow_runtime_client::RuntimeError::ReadRequired)
+            ),
+            "withdrawal after preliminary check admitted an effect: {result:?}"
+        );
+        assert!(!exists, "withdrawn copy reached the chosen destination");
+    }
 
     #[test]
     fn unreadable_optional_snapshots_do_not_hide_a_readable_original() {
@@ -335,9 +503,19 @@ mod tests {
         std::fs::create_dir(&directory).unwrap();
         let path = directory.join("Documento.txt");
         let bytes = "Città 🩺\n".as_bytes();
-        write_download(&path, bytes).unwrap();
+        let context = RequestContext::default();
+        admit_download(&context, path.clone(), Zeroizing::new(bytes.to_vec()))
+            .unwrap()
+            .write()
+            .unwrap();
         assert_eq!(
-            write_download(&path, b"replacement"),
+            admit_download(
+                &context,
+                path.clone(),
+                Zeroizing::new(b"replacement".to_vec())
+            )
+            .unwrap()
+            .write(),
             Err(DocumentError::Exists)
         );
         let read = read_selected_file(&path).unwrap();
