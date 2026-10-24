@@ -157,3 +157,5 @@
  .observationTable td { min-width: 0; padding: 4px 0; border: 0; }
  .observationTable td:first-child { grid-column: 1 / -1; }
 }
+
+.register[data-clinical-register='observations'] .form :is(input:not([type='checkbox']):not([type='radio']),select,textarea):focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: 2px; }
