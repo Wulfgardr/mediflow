@@ -72,27 +72,7 @@ export async function windowsTransactionTreeProbe(directory) {
     assert.equal(await fetch(url, { signal: AbortSignal.timeout(1000) }).then(response => response.text()), generation);
     record({ type: 'transaction-open', ...frame, database });
     stopAttempted = true;
-    const cwd = process.cwd(), shadow = path.join(fixture, 'shadow');
-    fs.mkdirSync(shadow);
-    fs.writeFileSync(path.join(shadow, 'taskkill.exe'), 'synthetic non-executable shadow');
-    const saved = Object.fromEntries(['PATH', 'Path', 'SystemRoot', 'WINDIR'].map(key => [key, process.env[key]]));
-    try {
-      process.chdir(shadow);
-      process.env.PATH = shadow; process.env.Path = shadow;
-      process.env.SystemRoot = shadow; process.env.WINDIR = shadow;
-      record({ type: 'tree-stop-context', pid: child.pid, writer: frame.writer,
-        leaderNonTerminal: child.exitCode === null && child.signalCode === null, cwdIsShadow: process.cwd() === shadow,
-        envIsShadow: Object.fromEntries(['PATH', 'Path', 'SystemRoot', 'WINDIR'].map(key => [key, process.env[key] === shadow])), budgetMs: 8000 });
-      try { await stopOwnedChild(child, 8000); }
-      catch (error) {
-        try { record({ type: 'tree-stop-rejected', code: error.code, message: error.message,
-          cause: error.cause == null ? error.cause : { code: error.cause.code, message: error.cause.message } }); }
-        finally { throw error; }
-      }
-    } finally {
-      process.chdir(cwd);
-      for (const [key, value] of Object.entries(saved)) if (value === undefined) delete process.env[key]; else process.env[key] = value;
-    }
+    await stopOwnedChild(child, 8000);
     await bounded(Promise.all([exit, stderrClosed]), 5000);
     await assert.rejects(fetch(url, { signal: AbortSignal.timeout(1000) }), 'The transaction descendant must no longer serve HTTP');
     const lease = openAdmittedSqlite(database, { role: 'synthetic-stop-check', sqliteOptions: { fileMustExist: true } });

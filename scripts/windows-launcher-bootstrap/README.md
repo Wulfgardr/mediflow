@@ -58,9 +58,10 @@ exclusions or an identity override. The initial artifact-production run is not
 final source-package qualification.
 
 `verify-shadow` initializes the real binding with an owned cwd/PATH shadow and
-false inherited roots. The separate transaction-tree gate stops its original
-owned tree with those hostile process-local settings and restores them in
-`finally`. No user or global environment configuration is modified.
+false inherited roots to verify command discovery separately. The positive
+transaction-tree gate stops its original owned tree in the supported Windows
+environment inherited from the job, without changing cwd or system roots.
+No user or global environment configuration is modified.
 
 The supported loader candidates are x64 and ARM64; a missing artifact denies
 that candidate. ia32/WOW64 is denied. ARM64 is a bootstrap candidate, not a
@@ -72,7 +73,8 @@ Web transaction interrupted in-flight. Neither Windows gate ran on macOS.
 
 `observe-command.mjs` is a CI preload, never imported by the product. It
 records only the actual admitted stop executable, architecture, owned PID and
-command result. It preserves the original spawn function and return value.
+command result. It passes command, arguments and options to the original
+spawn function without changing stdio, and preserves its return value.
 
 `verify` additionally holds a real owned child alive and compares repeated
 native identities for own PID and child PID. A gate-only PowerShell oracle
