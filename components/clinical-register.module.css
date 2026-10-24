@@ -150,6 +150,7 @@
 .observationHistory :is(th,td):first-child { width: 6rem; }
 .observationHistory :is(th,td):last-child { width: 3rem; }
 @media (max-width: 700px) {
+ .observationDayTable { table-layout: auto; }
  .observationHistory :is(th,td):last-child { width: 3.5rem; }
  .observationTable thead { display: none; }
  .observationTable, .observationTable tbody { display: block; width: 100%; }
