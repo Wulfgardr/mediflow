@@ -61,7 +61,7 @@ test('Windows native-source resolver rejects invalid paths and caches only a can
 });
 
 test('Windows bootstrap artifacts require source identity, digest, architecture and exact native export before admission', t => {
-  const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-bootstrap-artifact-~')));
+  const directory = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-bootstrap-artifact-~')));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const sha = value => crypto.createHash('sha256').update(value).digest('hex');
   const scripts = path.join(directory, 'scripts'), pack = path.join(scripts, 'windows-launcher-bootstrap');
@@ -78,14 +78,22 @@ test('Windows bootstrap artifacts require source identity, digest, architecture 
   t.diagnostic(driver(`
     import assert from 'node:assert/strict';import fs from 'node:fs';import module from 'node:module';
     const artifact=${JSON.stringify(artifact)},manifestFile=${JSON.stringify(path.join(pack, 'prebuilds/win32-x64/manifest.json'))};
-    const original=JSON.parse(fs.readFileSync(manifestFile));let loads=0,shape='valid';
-    const requireNative=module.createRequire;
-    module.createRequire=url=>url===${JSON.stringify(pathToFileURL(path.join(pack, 'index.mjs')).href)}?file=>{
+    const actualOS=process.platform,original=JSON.parse(fs.readFileSync(manifestFile));let loads=0,shape='valid';
+    const nativeRealpath=fs.realpathSync.native,nativeStat=fs.lstatSync;
+    module.createRequire=url=>{assert.equal(url,${JSON.stringify(pathToFileURL(path.join(pack, 'index.mjs')).href)});return file=>{
       assert.equal(file,artifact);loads++;if(shape==='missing')return {getSystemDirectory:()=>''};if(shape==='type')return {getProcessCreationTimeTicks:'invalid',getSystemDirectory:()=>''};if(shape==='extra')return {getProcessCreationTimeTicks:()=>'',getSystemDirectory:()=>'',extra:()=>''};const exported={getProcessCreationTimeTicks:()=>"638000000000000001",getSystemDirectory:()=>String.raw\`C:\\Windows\\System32\`};if(shape==='hidden')Object.defineProperty(exported,'extra',{value:()=>''});if(shape==='symbol')exported[Symbol('extra')]=()=>'';return exported;
-    }:requireNative(url);module.syncBuiltinESMExports();
+    };};module.syncBuiltinESMExports();
     const {loadSystemDirectoryBinding}=await import(${JSON.stringify(pathToFileURL(path.join(pack, 'index.mjs')).href)});
     Object.defineProperty(process,'platform',{value:'win32'});Object.defineProperty(process,'arch',{value:'x64',configurable:true});
     assert.equal(typeof loadSystemDirectoryBinding().getSystemDirectory,'function');assert.equal(loads,1);
+    for(const file of [manifestFile,artifact,${JSON.stringify(path.join(pack,'system-directory.c'))},${JSON.stringify(path.join(pack,'build.ps1'))},${JSON.stringify(path.join(scripts,'prepare-windows-launcher-bootstrap.mjs'))}]) {
+      fs.realpathSync.native=(candidate,...args)=>candidate===file?file+'.noncanonical':nativeRealpath(candidate,...args);
+      assert.throws(loadSystemDirectoryBinding,undefined,'noncanonical '+file);assert.equal(loads,1);
+      fs.realpathSync.native=nativeRealpath;
+      fs.lstatSync=(candidate,...args)=>candidate===file?{isFile:()=>true,isSymbolicLink:()=>true}:nativeStat(candidate,...args);
+      assert.throws(loadSystemDirectoryBinding,undefined,'symlink '+file);assert.equal(loads,1);
+      fs.lstatSync=nativeStat;
+    }
     for(const [field,value] of [['schemaVersion',1],['exports',['getProcessCreationTimeTicks,getSystemDirectory']],['exports',['getSystemDirectory']],['exports',['getSystemDirectory','getProcessCreationTimeTicks']],['exports',['getProcessCreationTimeTicks','getSystemDirectory','extra']],['sha256','0'.repeat(64)],['arch','arm64'],['sourceSha256','0'.repeat(64)],['recipeSha256','0'.repeat(64)],['builderSha256','0'.repeat(64)],['dependencies',['dbghelp.dll','node.exe']]]) {
       fs.writeFileSync(manifestFile,JSON.stringify({...original,[field]:value}));assert.throws(loadSystemDirectoryBinding,undefined,field);assert.equal(loads,1);
     }
@@ -94,7 +102,7 @@ test('Windows bootstrap artifacts require source identity, digest, architecture 
     Object.defineProperty(process,'arch',{value:'x64'});
     for(const value of ['missing','type','extra','hidden','symbol']){shape=value;assert.throws(loadSystemDirectoryBinding,undefined,value);}
     const beforeMissing=loads;fs.unlinkSync(artifact);assert.throws(loadSystemDirectoryBinding);assert.equal(loads,beforeMissing);
-    console.log(JSON.stringify({artifactBytesSynthetic:true,nativeLoadStubbed:true,loads,invalidArtifactsNotLoaded:true}));
+    console.log(JSON.stringify({actualOS,simulatedPlatform:'win32',simulatedArch:'x64',artifactBytesSynthetic:true,nativeLoadStubbed:true,filesystemNegativesSimulated:['noncanonical path','symlink'],loads,invalidArtifactsNotLoaded:true}));
   `));
 });
 
