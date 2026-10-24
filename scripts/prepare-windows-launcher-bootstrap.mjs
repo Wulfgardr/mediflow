@@ -80,7 +80,7 @@ async function verifyNativeIdentity() {
   const taskkill = initializeWindowsSystemCommand();
   const {loadSystemDirectoryBinding} = await import('./windows-launcher-bootstrap/index.mjs');
   const nativeTicks = loadSystemDirectoryBinding().getProcessCreationTimeTicks;
-  for(const input of [undefined,null,true,'1',0,-1,1.5,NaN,Infinity,0x100000000,1n]) assert.throws(() => nativeTicks(input));
+  for(const input of [undefined,null,true,'1',0,-1,1.5,NaN,Infinity,0x100000000,1n,process.pid + 0.5,process.pid + 0x100000000,process.pid - 0x100000000]) assert.throws(() => nativeTicks(input));
   assert.throws(() => nativeTicks());assert.throws(() => nativeTicks(process.pid,process.pid));
   const own = windowsProcessCreationTimeTicks(process.pid);
   assert.equal(windowsProcessCreationTimeTicks(process.pid), own);
