@@ -69,8 +69,8 @@ test('Misure recenti conta i parametri e conserva lo storico completo in Misure'
     await expect(history).toBeVisible();
     await history.getByRole('button', { name: 'Tutte (24)', exact: true }).click();
     await expect(history.locator('tbody tr')).toHaveCount(24);
-    await expect(history.getByRole('cell', { name: '70', exact: true })).toBeVisible();
-    await expect(history.getByRole('cell', { name: '70000', exact: true })).toBeVisible();
+    await expect(history.getByRole('cell', { name: '70 kg', exact: true })).toBeVisible();
+    await expect(history.getByRole('cell', { name: '70000 g', exact: true })).toBeVisible();
 });
 
 for (const [route, sectionName] of [['therapies', 'Terapie attive'], ['observations', 'Misure recenti'], ['checkups', 'Controlli aperti']]) test(`errore ${route} distinto dal vuoto`, async ({ page }) => {

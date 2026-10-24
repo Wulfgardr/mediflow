@@ -1245,7 +1245,7 @@ test('POSIX stop drains the native reaped-child batch before signalling a group'
         t.diagnostic(result.stdout.trim());
 });
 
-for (const scenario of ['terminal-first','signal-terminal-first','retry-after-failure','before-term','pending-exit-callback','after-term','before-kill','owned-leader-alive']) {
+for (const scenario of ['terminal-first','signal-terminal-first','retry-after-failure','before-term','pending-exit-callback','after-term','before-kill','owned-leader-alive','deadline-before-kill','deadline-without-exit']) {
     test(`POSIX ambiguous group never receives an unowned signal: ${scenario}`, t => {
         const result = spawnSync(process.execPath,['--input-type=module','-e',`
             import assert from 'node:assert/strict'; import {EventEmitter} from 'node:events';
@@ -1253,14 +1253,25 @@ for (const scenario of ['terminal-first','signal-terminal-first','retry-after-fa
             Object.defineProperty(process,'platform',{value:'linux'});
             const scenario=${JSON.stringify(scenario)}, child=new EventEmitter(), calls=[];
             Object.assign(child,{pid:424245,exitCode:scenario === 'terminal-first' ? 0 : null,signalCode:scenario === 'signal-terminal-first' ? 'SIGTERM' : null});
-            let probes=0,absent=false,escalationDue=false;
-            const timers=new Set(),immediates=new Set(),later=setTimeout,clearLater=clearTimeout,immediate=setImmediate,clearNow=clearImmediate;
-            globalThis.setTimeout=(fn,ms,...args)=>{const handle=later((...values)=>{timers.delete(handle);if(ms === 12) escalationDue=true;fn(...values);},ms,...args);timers.add(handle);return handle;};
-            globalThis.clearTimeout=handle=>{timers.delete(handle);clearLater(handle);};
-            globalThis.setImmediate=(fn,...args)=>{const handle=immediate((...values)=>{immediates.delete(handle);fn(...values);},...args);immediates.add(handle);return handle;};
-            globalThis.clearImmediate=handle=>{immediates.delete(handle);clearNow(handle);};
+            let probes=0,absent=false,escalationDue=false,now=0;
+            const timers=new Set(),immediates=new Set();
+            Date.now=()=>now;
+            globalThis.setTimeout=(fn,ms,...args)=>{const handle={fn:()=>fn(...args),due:now+ms,delay:ms};timers.add(handle);return handle;};
+            globalThis.clearTimeout=handle=>{timers.delete(handle);};
+            globalThis.setImmediate=(fn,...args)=>{const handle=()=>fn(...args);immediates.add(handle);return handle;};
+            globalThis.clearImmediate=handle=>{immediates.delete(handle);};
+            const runImmediates=()=>{for(const handle of [...immediates]) if(immediates.delete(handle)) handle();};
+            const advance=ms=>{
+                const target=now+ms;
+                for(;;) {
+                    const handle=[...timers].filter(timer=>timer.due<=target).sort((left,right)=>left.due-right.due)[0];
+                    if(!handle) break;
+                    now=handle.due;timers.delete(handle);if(handle.delay === 12) escalationDue=true;handle.fn();
+                }
+                now=target;
+            };
             process.kill=(pid,signal)=>{
-                assert.equal(pid,-child.pid);calls.push({signal,terminal:child.exitCode !== null || child.signalCode !== null});
+                assert.equal(pid,-child.pid);calls.push({signal,terminal:child.exitCode !== null || child.signalCode !== null,at:now});
                 if(signal === 0) {
                     if(absent) throw Object.assign(new Error('original group absent'),{code:'ESRCH'});
                     probes++;
@@ -1278,12 +1289,30 @@ for (const scenario of ['terminal-first','signal-terminal-first','retry-after-fa
                 return true;
             };
             if(scenario === 'pending-exit-callback') queueMicrotask(()=>{child.exitCode=0;child.emit('exit',0);});
-            if(scenario === 'owned-leader-alive') await stopOwnedChild(child,25);
-            else await assert.rejects(stopOwnedChild(child,25),error=>error.code === 'MEDIFLOW_OWNED_STOP_UNCONFIRMED');
+            const completed=stopOwnedChild(child,25).then(()=>({ok:true}),error=>({error}));
+            await Promise.resolve();
+            runImmediates();
+            if(['after-term','before-kill','owned-leader-alive','deadline-before-kill','deadline-without-exit'].includes(scenario)) {
+                advance(12);
+                if(scenario === 'deadline-before-kill') now=25;
+                runImmediates();
+                if(scenario === 'deadline-without-exit') advance(13);
+            }
+            const outcome=await completed;
+            console.log(JSON.stringify({phase:'completion-checkpoint',scenario,now,calls,
+                outcome:outcome.error ? {code:outcome.error.code,cause:outcome.error.cause?.message} : {ok:true},
+                timers:timers.size,pendingTimers:[...timers].map(({due,delay})=>({due,delay})),
+                immediates:immediates.size,exitListeners:child.listenerCount('exit')}));
+            if(scenario === 'owned-leader-alive') assert.equal(outcome.ok,true);
+            else assert.equal(outcome.error?.code,'MEDIFLOW_OWNED_STOP_UNCONFIRMED');
+            if(scenario.startsWith('deadline-')) assert.match(outcome.error.cause.message,/Exit.*non osservato/u);
             assert.equal(timers.size,0);assert.equal(immediates.size,0);
             const signals=calls.filter(call=>call.signal !== 0);
-            assert.deepEqual(signals.map(call=>call.signal),scenario === 'owned-leader-alive' ? ['SIGTERM','SIGKILL'] : ['retry-after-failure','after-term','before-kill'].includes(scenario) ? ['SIGTERM'] : []);
+            const expectedSignals=['owned-leader-alive','deadline-without-exit'].includes(scenario) ? ['SIGTERM','SIGKILL']
+                : ['retry-after-failure','after-term','before-kill','deadline-before-kill'].includes(scenario) ? ['SIGTERM'] : [];
+            assert.deepEqual(signals.map(call=>call.signal),expectedSignals);
             assert.ok(signals.every(call=>!call.terminal),'A non-null signal was sent after the leader became terminal');
+            assert.ok(signals.every(call=>call.at<25),'A non-null signal was sent at or after the deadline');
             assert.equal(child.listenerCount('exit'),0);
             if(scenario !== 'owned-leader-alive') {
                 child.exitCode=0;
@@ -1291,12 +1320,21 @@ for (const scenario of ['terminal-first','signal-terminal-first','retry-after-fa
                 await assert.rejects(stopOwnedChild(child,25),error=>error.code === 'MEDIFLOW_OWNED_STOP_UNCONFIRMED');
                 assert.equal(calls.slice(count).filter(call=>call.signal !== 0).length,0,'Explicit retry signalled an ambiguous successor');
                 assert.equal(timers.size,0);assert.equal(immediates.size,0);
+            } else {
+                const count=calls.length;
+                await stopOwnedChild(child,25);
+                assert.equal(calls.length,count,'A repeated stop observed the retired group');
+                assert.equal(timers.size,0);assert.equal(immediates.size,0);
             }
+            console.log(JSON.stringify({phase:'follow-up-checkpoint',scenario,now,timers:timers.size,immediates:immediates.size,exitListeners:child.listenerCount('exit')}));
+            assert.equal(child.listenerCount('exit'),0);
             const count=calls.length;
-            await new Promise(resolve=>setTimeout(resolve,40));
+            child.emit('exit',child.exitCode,child.signalCode);
+            advance(40);runImmediates();
             assert.equal(calls.length,count,'A late timer observed or signalled a successor');
             assert.equal(child.listenerCount('exit'),0);
-            console.log(JSON.stringify({scenario,signals,probes,lateCalls:false,timers:timers.size,immediates:immediates.size}));
+            assert.equal(timers.size,0);assert.equal(immediates.size,0);
+            console.log(JSON.stringify({phase:'after-late-drain',scenario,now,signals,probes,lateCalls:false,timers:timers.size,immediates:immediates.size,exitListeners:child.listenerCount('exit')}));
         `],{encoding:'utf8',timeout:2000});
         assert.equal(result.status,0,result.stdout+result.stderr);
         t.diagnostic(result.stdout.trim());

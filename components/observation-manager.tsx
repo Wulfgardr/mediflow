@@ -1,11 +1,17 @@
 'use client';
 
-import { Disclosure, DisclosureControl } from '@/components/disclosure';
+import { DisclosureControl } from '@/components/disclosure';
 import styles from './clinical-register.module.css';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useLiveQuery } from '@/lib/live-query';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useLiveQueryState } from '@/lib/live-query';
+import { Button } from '@/components/ui/button';
+import { ChoiceField } from '@/components/choice-field';
+import { ViewState } from '@/components/ui/view-state';
+import { PatientSheetMenu } from '@/components/patient-sheet-menu';
+import { CollapsibleSection } from '@/components/kree8/collapsible-section';
+import { formatCountLabel } from '@/lib/format-count';
 import { v4 as uuidv4 } from 'uuid';
-import { Minus, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { Minus, MoreHorizontal, Plus, TrendingDown, TrendingUp } from 'lucide-react';
 import { ApiConflictError, db } from '@/lib/db';
 import { notifyDbChange } from '@/lib/live-query';
 import { searchStaticTerminology } from '@/lib/terminology';
@@ -81,10 +87,12 @@ export default function ObservationManager({
     patientId,
     embedded = false,
     prefill,
+    surfaceClassName = '',
 }: {
     patientId: string;
     embedded?: boolean;
     prefill?: ObservationPrefill;
+    surfaceClassName?: string;
 }) {
     const { showToast } = useToast();
     const confirm = useConfirm();
@@ -101,12 +109,14 @@ export default function ObservationManager({
     const [isSaving, setIsSaving] = useState(false);
     const [valueError, setValueError] = useState<string | null>(null);
     const initialObservedAt = useRef(observedAt);
-    const codeSelectRef = useRef<HTMLSelectElement>(null);
+    const formRef = useRef<HTMLFormElement>(null);
+    const creationRef = useRef<HTMLButtonElement>(null);
+    const formId = useId();
     const [formOpen, setFormOpen] = useState(false);
     const [formFocusRequest, setFormFocusRequest] = useState(0);
     // Il comando richiede il focus dopo che React ha rimosso hidden dal form.
     useLayoutEffect(() => {
-        if (formFocusRequest > 0) codeSelectRef.current?.focus();
+        if (formFocusRequest > 0) formRef.current?.querySelector<HTMLSelectElement>('select')?.focus();
     }, [formFocusRequest]);
     /* WUL-UIUX: piu analiti possono restare aperti insieme (confronto tra
        parametri in polifarmaco); "full" espande l'intera storia oltre le ultime 5. */
@@ -132,7 +142,7 @@ export default function ObservationManager({
         || servicePrescriptionItemId
         || servicePrescriptionItem,
     );
-    useRuntimeTwinPendingForm(hasPendingObservation);
+    useRuntimeTwinPendingForm(formOpen || hasPendingObservation);
 
     useEffect(() => {
         if (!prefill) return;
@@ -172,10 +182,10 @@ export default function ObservationManager({
     const italianLoincLabel = (analyteCode: string, fallback: string) =>
         loincOptions.find((item) => item.code === analyteCode)?.displayIt ?? fallback;
 
-    const observations = useLiveQuery(
+    const { data: observations, loading: observationsLoading, error: observationsError, refresh } = useLiveQueryState(
         async () => {
             if (!patientId) return [];
-            const items = await db.observations.query({ patientId }).toArray();
+            const items = await db.observations.query({ patientId }).toArray({ rejectAuthUnavailable: true });
             return items.sort((a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime());
         },
         [patientId],
@@ -298,7 +308,7 @@ export default function ObservationManager({
             setRefHigh('');
             setServicePrescriptionItemId(undefined);
             setServicePrescriptionItem(undefined);
-            codeSelectRef.current?.focus();
+            formRef.current?.querySelector<HTMLSelectElement>('select')?.focus();
         } catch (error) {
             console.error('Failed to save observation', error);
             showToast({ tone: 'error', title: 'Salvataggio osservazione fallito' });
@@ -333,11 +343,24 @@ export default function ObservationManager({
         }
     };
 
-    return (
+    const closeForm = () => {
+        setFormOpen(false);
+        creationRef.current?.focus();
+    };
+    const newButton = <Button ref={creationRef} variant="text" disabled={isSaving} aria-expanded={formOpen} aria-controls={formId}
+        onClick={() => {
+            if (formOpen) closeForm();
+            else { setFormOpen(true); setFormFocusRequest(request => request + 1); }
+        }}>Nuova misura</Button>;
+    const failed = observationsError !== null && observationsError !== undefined;
+    const unavailable = observationsError instanceof Error && observationsError.message === 'Authenticated list unavailable.';
+    const readable = !failed && !observationsLoading && observations !== undefined;
+    const count = readable ? formatCountLabel(observations.length, 'misura', 'misure') : undefined;
+    const content = (
         <div className={styles.register} data-clinical-register="observations">
-            {!embedded && <header className={styles.toolbar}><h2>Parametri clinici</h2></header>}
-            <Disclosure open={formOpen} onOpenChange={setFormOpen} className={styles.formDisclosure} title="Nuova misura">
-            <form onSubmit={saveObservation} className={styles.form + " grid grid-cols-1 gap-3 md:grid-cols-2"}>
+            {!embedded && <header className={styles.therapyHeading}><h2>Misure <span>{count}</span></h2>{newButton}</header>}
+            <div id={formId} hidden={!formOpen}>
+            <form ref={formRef} onSubmit={saveObservation} className={styles.form + " grid grid-cols-1 gap-3 md:grid-cols-2"}>
                 {servicePrescriptionItemId && servicePrescriptionItem ? (
                     <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3.5 py-2.5">
                         <span className="text-sm text-[color:var(--lume-ink)]">
@@ -355,34 +378,15 @@ export default function ObservationManager({
                         </button>
                     </div>
                 ) : null}
-                <label className="space-y-1">
-                    <span className="section-kicker">Parametro</span>
-                    <select
-                        ref={codeSelectRef}
-                        value={code}
-                        onChange={(e) => {
-                            const next = e.target.value;
-                            setCode(next);
-                            /* Imposta l'unita di default dell'analita
-                               (resta modificabile), evita "Glicemia 90 mmHg". */
-                            const option = loincOptions.find((item) => item.code === next);
-                            if (option?.defaultUnit) setUnitCode(option.defaultUnit);
-                        }}
-                        className="mf-input"
-                    >
-                        <option value="">Seleziona parametro</option>
-                        {loincOptions.map((item) => (
-                            <option key={item.code} value={item.code}>
-                                {item.displayIt ?? item.display}
-                            </option>
-                        ))}
-                    </select>
-                    {selectedLoinc ? (
-                        <span className="block lume-code uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
-                            LOINC {selectedLoinc.code}
-                        </span>
-                    ) : null}
-                </label>
+                <ChoiceField label="Parametro" value={code} onChange={event => {
+                    const next = event.target.value;
+                    setCode(next);
+                    const option = loincOptions.find(item => item.code === next);
+                    if (option?.defaultUnit) setUnitCode(option.defaultUnit);
+                }} description={selectedLoinc ? <span className="lume-code">LOINC {selectedLoinc.code}</span> : undefined}>
+                    <option value="">Seleziona parametro</option>
+                    {loincOptions.map(item => <option key={item.code} value={item.code}>{item.displayIt ?? item.display}</option>)}
+                </ChoiceField>
 
                 <label className="space-y-1">
                     <span className="section-kicker">Data e ora</span>
@@ -412,24 +416,11 @@ export default function ObservationManager({
                     ) : null}
                 </label>
 
-                <label className="space-y-1">
-                    <span className="section-kicker">Unita</span>
-                    <select
-                        value={unitCode}
-                        onChange={(e) => setUnitCode(e.target.value)}
-                        className="mf-input"
-                    >
-                        <option value="">Seleziona unità</option>
-                        {ucumOptions.map((item) => (
-                            <option key={item.code} value={item.code}>
-                                {item.displayIt ?? item.display}
-                            </option>
-                        ))}
-                    </select>
-                    <span className="block lume-code uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
-                        UCUM {unitCode}
-                    </span>
-                </label>
+                <ChoiceField label="Unità" value={unitCode} onChange={event => setUnitCode(event.target.value)}
+                    description={<span className="lume-code">UCUM {unitCode}</span>}>
+                    <option value="">Seleziona unità</option>
+                    {ucumOptions.map(item => <option key={item.code} value={item.code}>{item.displayIt ?? item.display}</option>)}
+                </ChoiceField>
 
                 <label className="space-y-1">
                     <span className="section-kicker">Rif. min (opzionale)</span>
@@ -464,30 +455,34 @@ export default function ObservationManager({
                     />
                 </label>
 
-                <div className="md:col-span-2 flex justify-end">
-                    <button
+                <div className="md:col-span-2 flex flex-wrap justify-end gap-2">
+                    <Button variant="secondary" onClick={closeForm} disabled={isSaving}>Annulla</Button>
+                    <Button
                         type="submit"
                         disabled={isSaving || value.trim().length === 0 || !code || !unitCode}
-                        className="ui-btn-primary inline-flex h-10 items-center gap-1.5 px-4 text-sm font-semibold disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5"
                     >
                         <Plus className="w-4 h-4" />
                         {isSaving ? 'Salvataggio...' : 'Registra parametro'}
-                    </button>
+                    </Button>
                 </div>
             </form>
-            </Disclosure>
-            <div className={styles.toolbar}>
-                <h2>Ultime misure <span className={styles.muted}>{groups?.length ?? ''}</span></h2>
-                {groups && groups.length > 0 && <div role="group" aria-label="Vista parametri" className={styles.controls}>
+            </div>
+            {readable && groups && groups.length > 0 && <div className={styles.toolbar}>
+                <div role="group" aria-label="Vista parametri" className={styles.controls}>
                     <button type="button" aria-pressed={viewMode === 'parametro'} onClick={() => setViewMode('parametro')}>Per parametro</button>
                     <button type="button" aria-pressed={viewMode === 'data'} onClick={() => setViewMode('data')}>Per data</button>
-                </div>}
-            </div>
-            {groups === undefined ? <div className={styles.loading} role="status" aria-label="Caricamento misure"><span className="sr-only">Caricamento misure…</span>{[0,1,2].map(row => <div key={row} className="mf-skeleton" aria-hidden />)}</div>
-            : groups.length === 0 ? <p className={styles.empty}>Nessun parametro registrato. Apri “Nuova misura” per registrare la prima misura.</p>
+                </div>
+            </div>}
+            {failed ? <ViewState state={unavailable ? 'unavailable' : 'error'}
+                title={unavailable ? 'La lettura delle misure non è disponibile.' : 'Impossibile leggere le misure.'}
+                action={unavailable ? undefined : { label: 'Riprova la lettura', onClick: refresh }} />
+            : observationsLoading ? <ViewState state="loading" title="Lettura delle misure in corso…" />
+            : groups === undefined ? <ViewState state="unavailable" title="La lettura delle misure non è disponibile." />
+            : groups.length === 0 ? <ViewState state="empty" title="Nessuna misura registrata." />
             : viewMode === 'data' ? (byDay ?? []).map(day => <section key={day.key}>
                 <header className={styles.sectionHead}><h3>Misure del {day.date.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}</h3><span>{day.items.length} misure</span></header>
-                <table className={styles.table}><thead><tr><th>Misura</th><th className={styles.value}>Valore</th><th>Riferimento</th></tr></thead><tbody>
+                <table className={`${styles.table} ${styles.observationDayTable}`}><thead><tr><th>Misura</th><th className={styles.value}>Valore</th><th>Riferimento</th></tr></thead><tbody>
                     {day.items.map(item => { const flag = classifyObservationRange(item.value, item.refLow, item.refHigh); return <tr key={item.id}>
                         <td>{italianLoincLabel(item.code, item.display)}</td>
                         <td className={`${styles.value} ${flag ? styles.critical : ''}`}>{item.value} {item.unitCode}{flag && <small>{flag === 'alto' ? '▲ Alto' : '▼ Basso'}</small>}</td>
@@ -495,7 +490,7 @@ export default function ObservationManager({
                     </tr>; })}
                 </tbody></table>
             </section>) : <div className={styles.split}>
-                <div><table className={styles.table}><thead><tr><th>Misura</th><th className={styles.value}>Valore</th><th>Data</th><th className={styles.secondaryColumn}>Variazione</th></tr></thead><tbody>
+                <div><table className={`${styles.table} ${styles.observationTable}`}><thead><tr><th>Misura</th><th className={styles.value}>Valore</th><th>Data</th><th className={styles.secondaryColumn}>Variazione</th></tr></thead><tbody>
                     {groups.map(group => {
                         const latest = group.items[0]; const previous = group.items[1];
                         const latestNum = toNumeric(latest.value); const previousNum = previous ? toNumeric(previous.value) : null;
@@ -523,11 +518,14 @@ export default function ObservationManager({
                                 <header className={styles.sectionHead}><h3>{label}</h3><span>{group.unitCode}</span></header>
                                 <p className={`${styles.muted} lume-code`}>{group.codeSystem} {group.code}</p>
                                 <div className={styles.trend}><Sparkline values={chartValues} /></div>
-                                <table className={styles.table}><thead><tr><th>Data</th><th>Valore</th><th aria-label="Azioni" /></tr></thead><tbody>{visibleItems.map(item => {
+                                <table className={`${styles.table} ${styles.observationHistory}`}><thead><tr><th>Data</th><th>Valore</th><th aria-label="Azioni" /></tr></thead><tbody>{visibleItems.map(item => {
                                     const flag = classifyObservationRange(item.value, item.refLow, item.refHigh); const range = formatReferenceRange(item.refLow, item.refHigh, item.refText);
                                     return <tr key={item.id}><td className={styles.muted}><time title={new Date(item.observedAt).toLocaleString('it-IT')}>{new Date(item.observedAt).toLocaleDateString('it-IT')}</time></td>
-                                        <td><strong className={flag ? styles.critical : undefined}>{item.value}</strong>{flag && <span className={styles.critical}> {flag === 'alto' ? '▲ Alto' : '▼ Basso'}</span>}{range && <small>rif {range}</small>}{item.notes && <small>{item.notes}</small>}</td>
-                                        <td><button type="button" onClick={() => deleteObservation(item.id)} className={styles.control} title="Elimina misura" aria-label={`Elimina misura ${label} del ${new Date(item.observedAt).toLocaleDateString('it-IT')}`}><Trash2 size={16} aria-hidden /></button></td>
+                                        <td><strong className={flag ? styles.critical : undefined}>{item.value}</strong> <span className={styles.muted}>{item.unitCode}</span>{flag && <span className={styles.critical}> {flag === 'alto' ? '▲ Alto' : '▼ Basso'}</span>}{range && <small>rif {range}</small>}{item.notes && <small>{item.notes}</small>}</td>
+                                        <td><PatientSheetMenu label={`Azioni misura ${label} del ${new Date(item.observedAt).toLocaleDateString('it-IT')}`}
+                                            trigger={props => <Button {...props} variant="icon" aria-label={`Azioni misura ${label} del ${new Date(item.observedAt).toLocaleDateString('it-IT')}`}><MoreHorizontal size={16} aria-hidden /></Button>}>
+                                            <button type="button" role="menuitem" onClick={() => deleteObservation(item.id)}>Elimina misura</button>
+                                        </PatientSheetMenu></td>
                                     </tr>;
                                 })}</tbody></table>
                                 <div className={`${styles.controls} mt-3`}><button type="button" onClick={() => prefillGroup(group.code, group.unitCode)}>Registra nuova misura</button>{group.items.length > 5 && <button type="button" onClick={() => toggleFull(group.code)}>{isFull ? 'Ultime 5' : `Tutte (${group.items.length})`}</button>}</div>
@@ -538,4 +536,8 @@ export default function ObservationManager({
             </div>}
         </div>
     );
+    return embedded ? <CollapsibleSection id="parametri" title="Misure" count={count} defaultOpen={formOpen}
+        headerAction={newButton} surfaceClassName={`${surfaceClassName} ${styles.therapySection}`} keepMounted>
+        {content}
+    </CollapsibleSection> : content;
 }
