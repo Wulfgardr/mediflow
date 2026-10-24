@@ -1,0 +1,107 @@
+{
+  "runtimeRevision": "347699434b321d5576d4e9debd706cc142d1f9fe",
+  "runtimeTree": "34b50b7940e4e59466f3c67fa31b2c87412ef8c9",
+  "title": "unavailable preference storage is transient and ordinary lock clears open records",
+  "consumers": [
+    "an active session without the tab key needs explicit renewal and waits for its real lock receipt",
+    "failed renewal keeps the PIN disabled and requires another explicit successful recovery"
+  ],
+  "originalOfficialSha256": "5e443f8b5c5d82f722fbef8b3697fcc9f3855ea2ca6591fcaa08dcb9b2cfe651",
+  "helperSha256": "dd0c0f6efb6468c46e08a5f3949a844dbc036e827f6e28700da6bbb81197d711",
+  "greenSha256": "068d2e9e032be7fe06b2c4f972b4c2897e555a8fcb7a813228a3e29f57aaf281",
+  "anchor": "  await noComparison();\n  await unlockIfNeeded(page, pin);\n",
+  "assertion": "  await expect(page.getByLabel('PIN operatore', { exact: true })).toBeEnabled();",
+  "workflowSha256": "c1be2ff2f76ffcbcbb99545f685d9051471645518c98a4f3b6994feab20374fb",
+  "files": {
+    "run.mjs": "ddae48e1789a7072881ac45839414be6aa08f6f1cf259dee98d1a8e4176f5fc0",
+    "official-ui-red.spec.ts": "b5afd7769cabeabcc27e4d9153bfcb9d9825644ff5878273e443fa56575b478a",
+    "official-lock-interleaving.ts": "1bec50bc6ccd23f28378d82b56b0b686f636d7859bdc5902146a463bec8acbe1",
+    "README.md": "1365cff9498a5ad73e77ea6375b1b829d0280a1543f1ddbe765f4747a5c89f2a",
+    "overlays/per-data/e2e/measures-composition.spec.ts": "6f2675716291e2225216816a29b6bac5d70fb5b0bc0a45183bcb62d3f15d3a30",
+    "overlays/per-data/e2e/fixtures/measures-per-data-geometry.ts": "355755f51e06b532e23e1997227537850529f9e2facdcddc158d47182e6baee3",
+    "overlays/anydoc/e2e/document-upload-anydoc-focus.spec.ts": "c035c44e2f40e0a7dd3a5baa1cc284323d0d67e286cdea44f1a223620ab000c8",
+    "overlays/anydoc/e2e/fixtures/anydoc-passive-protocol.ts": "4bd4ca28160ad228f2fc6e52c6f1876f5c4808aef9e4b446ae29e79c67598324",
+    "classification.mjs": "9886fbde10a8ce33fad5977aa8a9f2e2c03de4272a886f05a8561b5318156677",
+    "overlays/shared/e2e/fixtures/diagnostic-operation.ts": "087e5a9231110a0643fbeb1883a660f4260308156a00e693abf5f52335db073d"
+  },
+  "playwrightFiles": {
+    "playwright-core/lib/client/locator.js": "9c4fa569fd160b2f5a3204615967499f925deca68fc6846af13e0cdbfde87135",
+    "playwright-core/lib/client/frame.js": "f3eeec1734312b518d488763365f7b3f877284bf92c01edc267bdbb1648ef8c7",
+    "playwright-core/lib/server/frames.js": "fa67e7a3755a79cf0e0ac96b6930987ec2bcc643f60735c6ec748066f7c3e16b",
+    "playwright/lib/matchers/matchers.js": "707fcaf9bda762ab7fdd8c588307b9c07c50f2fee8389f96e61d1cdaee82adc7",
+    "playwright/lib/reporters/json.js": "a5119d9da4c221b4cecf42d27a882deaecc7d90903571b735b9c7f91578f5003",
+    "playwright/lib/reporters/base.js": "e28f9fd60fdd47a0481de2cfa5e6772abaa3a4e26970f4ecbfc5c4b037ed0d10"
+  },
+  "groups": [
+    "official-ui",
+    "per-data",
+    "anydoc"
+  ],
+  "baselines": [
+    {
+      "phase": "per-data",
+      "spec": "e2e/measures-composition.spec.ts",
+      "title": "cattura Misure giorno 320",
+      "grep": "(?:^| )cattura Misure giorno 320$",
+      "reporter": "line,json",
+      "attachment": "misure-per-data-320-geometria-prima-assert",
+      "overlays": [
+        {
+          "source": "overlays/per-data/e2e/measures-composition.spec.ts",
+          "destination": "e2e/measures-composition.spec.ts",
+          "originalSha256": "2ed304526ed8c8353bce130f7a11ec0beb458d09ee86346dd2c8cd8734982e0e",
+          "overlaySha256": "6f2675716291e2225216816a29b6bac5d70fb5b0bc0a45183bcb62d3f15d3a30"
+        },
+        {
+          "source": "overlays/per-data/e2e/fixtures/measures-per-data-geometry.ts",
+          "destination": "e2e/fixtures/measures-per-data-geometry.ts",
+          "originalSha256": null,
+          "overlaySha256": "355755f51e06b532e23e1997227537850529f9e2facdcddc158d47182e6baee3",
+          "receivedW_R1Sha256": "5bc4e1736c272792bbe9eb20d1a14b2f81fe5314345588deb60684fa435bce4d",
+          "R2Reason": "R1-02 mark only added diagnostic operation failures and preserve secondary causes"
+        },
+        {
+          "source": "overlays/shared/e2e/fixtures/diagnostic-operation.ts",
+          "destination": "e2e/fixtures/diagnostic-operation.ts",
+          "originalSha256": null,
+          "overlaySha256": "087e5a9231110a0643fbeb1883a660f4260308156a00e693abf5f52335db073d",
+          "R2Reason": "R1-02 shared wrappers for added observations only"
+        }
+      ]
+    },
+    {
+      "phase": "anydoc",
+      "spec": "e2e/document-upload-anydoc-focus.spec.ts",
+      "title": "AnyDoc: le azioni allegato restano visibili al focus e sui viewport stretti",
+      "grep": "(?:^| )AnyDoc: le azioni allegato restano visibili al focus e sui viewport stretti$",
+      "reporter": "line,json",
+      "attachment": "anydoc-passive-protocol",
+      "overlays": [
+        {
+          "source": "overlays/anydoc/e2e/document-upload-anydoc-focus.spec.ts",
+          "destination": "e2e/document-upload-anydoc-focus.spec.ts",
+          "originalSha256": "750b810470fa802aee762a576c4c7ed96c7d3cca1fef88d64ec648994170f0c5",
+          "overlaySha256": "c035c44e2f40e0a7dd3a5baa1cc284323d0d67e286cdea44f1a223620ab000c8",
+          "receivedW_R1Sha256": "112a30c51fdd515ea427e85f6e8f5efc416e4161565fc4966f85fe8d04ad4b8b",
+          "R2Reason": "R1-02 mark only added diagnostic operation failures and preserve secondary causes"
+        },
+        {
+          "source": "overlays/anydoc/e2e/fixtures/anydoc-passive-protocol.ts",
+          "destination": "e2e/fixtures/anydoc-passive-protocol.ts",
+          "originalSha256": null,
+          "overlaySha256": "4bd4ca28160ad228f2fc6e52c6f1876f5c4808aef9e4b446ae29e79c67598324",
+          "receivedW_R1Sha256": "dc19a44aac2d3d45bb6c7ada70b588efd2bb3c5aedde3711842a03a994a58f45",
+          "R2Reason": "R1-02 mark only added diagnostic operation failures and preserve secondary causes"
+        },
+        {
+          "source": "overlays/shared/e2e/fixtures/diagnostic-operation.ts",
+          "destination": "e2e/fixtures/diagnostic-operation.ts",
+          "originalSha256": null,
+          "overlaySha256": "087e5a9231110a0643fbeb1883a660f4260308156a00e693abf5f52335db073d",
+          "R2Reason": "R1-02 shared wrappers for added observations only"
+        }
+      ]
+    }
+  ],
+  "revision": "R2: R1-01 complete error family; R1-02 marked diagnostic operation failures"
+}

@@ -1,0 +1,19 @@
+# Diagnostica Linux WUL-787
+
+Ingresso push limitato a `codex/WUL-787-linux-diagnostics-20261024`; nessun evento PR o dispatch e nessuna modifica ai gate esistenti. Il commit diagnostico è distinto dal runtime costruito: W347699434b321d5576d4e9debd706cc142d1f9fe, tree34b50b7940e4e59466f3c67fa31b2c87412ef8c9.
+
+Un runner Ubuntu24.04 x64 con Node24.21.0/ABI137 installa dal lock, verifica PW1.58.2 e Chromium, esegue una build completa con prebuild/postbuild originali e verifica payload/ledger prima degli overlay. Non allarga guard o permission. I test riusano la sola installazione e lo standalone sigillato; hash dei test e identità del runtime sono distinti.
+
+Sei invocazioni seriali, worker1/retry0: Official UI RED controllato, GREEN con singola assertion PIN-ready e tutte le assertion originali, rimozione byte-identica al RED, due consumer web-auth-recovery nella quarta invocazione, baseline Per data Giorno320, baseline AnyDoc originale. Nessuna prova normale Official UI aggiuntiva, suite completa, mutante W o fix automatico. Timeout e sequenze dei casi originali restano invariati.
+
+Official UI inoltra una receipt autentica trattenuta e delega l'assertion nativa Locator._expect1.58.2. EXPECTED_RED richiede proprietà, sequenza, cleanup e l’intero insieme degli errori ammessi: un timeout test45000ms e una sola eccezione nativa isEnabled sul rinnovo nel helper. Errori ulteriori di hook/fixture/teardown sono respinti e conservati con il primario; exit1 generico non basta. La sequenza controllata non ricostruisce il timing della CI storica e non corregge il helper generale.
+
+Per data conserva la geometria prima dell'assert originale anche se passa o non riproduce. AnyDoc osserva passivamente la connessione originale: esito del caso, compatibilità, troncamento/pending/errori e ripristino dei wrapper sono distinti nel report. Nessun evento pubblico non prova assenza CDP; adozione e forwarding interni non sono osservati separatamente. I wrapper possono influire sul timing. Un fallimento del caso W resta FAIL, senza qualificazione di RED causale; dopo cleanup valido si raccoglie anche la successiva baseline indipendente. Il check termina nonzero se una baseline fallisce. Le sole operazioni aggiunte evaluate/produzione/attach/installazione/restore marcano ogni eccezione con causa originale. Il driver riconosce questi errori anche senza attachment; un’assertion originale fallita prima della sonda resta baseline FAIL/incompleta. La raccolta AnyDoc conserva anche gli errori secondari nel messaggio visibile al reporter. Un difetto del driver, osservatore o cleanup interrompe le fasi successive.
+
+Ogni fase ha dati sintetici e output esterni propri; build-data separata e legacy-copy disabilitato. I sorgenti test originali vengono ripristinati e Git clean verificato dopo Official UI e dopo ciascuna baseline; si rimuovono soltanto fixture proprie con hash noto. SIGTERM/cleanup riguarda solo processi creati dal driver, mai kill per porta. SIGKILL del runner può impedire un finally.
+
+Upload limitato a evidence/: argv/log, identità, JSON, HTML Official UI e attachment sintetici. Le baseline W mantengono line,json e result.json/results/captures distinti. Esclusi database, build data, cache, checkout, dipendenze e payload. Del ledger si pubblica solo l'hash. Niente dump dell'ambiente o configurazioni personali.
+
+Il manifest fissa sorgenti, selezioni e reporter/seam. Questo check diagnostico non è un gate verde delle PR. Review, accettazione e prima pubblicazione/esecuzione restano al coordinatore.
+
+Refs WUL-787. Preparazione assistita da GPT-6.1 Sol, effort High; overlay W ricevuti dal coordinatore: nella revisione R2 tre copie sono corrette solo per R1-02, con hash/provenienza distinti; la spec Per data resta identica a W R1. Nessuna esecuzione delle sonde è attestata da questi sorgenti.

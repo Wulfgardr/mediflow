@@ -1,0 +1,288 @@
+import { diagnosticOperation, diagnosticAsyncOperation, diagnosticFailure, rethrowCollectedFailures } from './fixtures/diagnostic-operation';
+import { expect, test, type Page } from '@playwright/test';
+
+import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
+import { chooserReady, installKeyboardChooserObservation, keyboardChooserDecision, type KeyboardChooserSnapshot } from './anydoc-keyboard-chooser';
+import { installAnyDocPassiveProtocol } from './fixtures/anydoc-passive-protocol';
+
+const SYNTHETIC_ATTACHMENT_NAME = 'allegato-anydoc-focus-sintetico.pdf';
+const SYNTHETIC_RTF_TEXT = 'Synthetic AnyDoc browser route evidence.';
+
+async function createSyntheticFixture(page: Page): Promise<string> {
+  const marker = `${Date.now()}`.slice(-8);
+  return page.evaluate(async ({ attachmentName, suffix }) => {
+    const patientResponse = await fetch('/api/patients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firstName: `Focus${suffix.slice(0, 4)}`,
+        lastName: `AnyDoc${suffix.slice(4)}`,
+        taxCode: `FCS${suffix.padStart(13, '0')}`,
+        birthDate: '1975-01-01T00:00:00.000Z',
+        address: 'Indirizzo sintetico AnyDoc focus',
+        phone: '0000000085',
+        diagnoses: [],
+      }),
+    });
+    if (!patientResponse.ok) throw new Error(`Fixture paziente AnyDoc focus: HTTP ${patientResponse.status}`);
+    const patientId = (await patientResponse.json() as { id: string }).id;
+
+    const attachmentResponse = await fetch('/api/attachments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: `attachment-anydoc-focus-${suffix}`,
+        patientId,
+        name: attachmentName,
+        type: 'application/pdf',
+        size: 24,
+        path: `uploads/${attachmentName}`,
+        data: 'data:application/pdf;base64,JVBERi0xLjQ=',
+        ocrQueueState: 'pending',
+        ocrQueueReason: 'text_layer_absent',
+      }),
+    });
+    if (!attachmentResponse.ok) throw new Error(`Fixture allegato AnyDoc focus: HTTP ${attachmentResponse.status}`);
+    return patientId;
+  }, { attachmentName: SYNTHETIC_ATTACHMENT_NAME, suffix: marker });
+}
+
+async function createExtractableRtf(page: Page, patientId: string): Promise<Readonly<{ id: string; name: string }>> {
+  const suffix = `${Date.now()}`.slice(-8);
+  const name = `allegato-anydoc-route-${suffix}.rtf`;
+  await openDocumentArchive(page, patientId);
+  const saved = page.waitForResponse((response) => response.request().method() === 'POST'
+    && new URL(response.url()).pathname === '/api/attachments');
+  await page.locator('#documenti input[type="file"]').setInputFiles({
+    name, mimeType: 'application/rtf', buffer: Buffer.from(`{\\rtf1\\ansi ${SYNTHETIC_RTF_TEXT}}`),
+  });
+  const response = await saved;
+  expect(response.ok()).toBe(true);
+  const uploaded = response.request().postDataJSON() as { id: string; patientId: string; data: string };
+  expect(uploaded.patientId).toBe(patientId);
+  expect(uploaded.data).toMatch(/^ENC:/u);
+  return { id: uploaded.id, name };
+}
+
+async function establishSyntheticSession(page: Page): Promise<void> {
+  const pin = process.env.E2E_PIN || '1234';
+  await bootstrapUnlockedSession(page, pin);
+}
+
+async function openDocumentArchive(page: Page, patientId: string): Promise<void> {
+  await page.goto(`/patients/${patientId}/modules`);
+  await openPatientSection(page, 'documenti');
+  await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
+}
+
+test.describe.configure({ retries: 0 });
+
+test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport stretti', async ({ page }, testInfo) => {
+  const consoleErrors: string[] = [];
+  const browserMessages: { type: string; text: string }[] = [];
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await establishSyntheticSession(page);
+
+  // The deterministic login helper deliberately probes an already-locked state
+  // and receives one expected 409. Observe only the AnyDoc surface under test.
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+    if (['warning', 'error'].includes(message.type()) && browserMessages.length < 20) {
+      browserMessages.push({ type: message.type(), text: message.text().slice(0, 1000) });
+    }
+  });
+  page.on('pageerror', (error) => {
+    consoleErrors.push(error.message);
+    if (browserMessages.length < 20) browserMessages.push({ type: 'pageerror', text: error.message.slice(0, 1000) });
+  });
+
+  const patientId = await createSyntheticFixture(page);
+  await openDocumentArchive(page, patientId);
+
+  // one accessible chooser opens the native picker and Tab visits the viewer before local extraction.
+  const chooser = page.getByRole('button', { name: 'Carica documenti', exact: true });
+  await expect(chooser).toHaveCount(1);
+  await expect(chooser).toBeVisible();
+  await expect(chooser).toBeEnabled();
+  await expect(chooser).toHaveAttribute('aria-disabled', 'false');
+  await expect(chooser).toHaveAttribute('aria-busy', 'false');
+  await expect(chooser).toHaveAttribute('tabindex', '0');
+  const fileInput = chooser.locator('input[type="file"]');
+  await expect(fileInput).toHaveCount(1);
+  await expect(fileInput).toBeEnabled();
+  await expect(fileInput).toHaveAttribute('tabindex', '-1');
+  await chooser.focus();
+  await expect(chooser).toBeFocused();
+
+  // No locator.press/refocus: a later focus loss must remain a failure. Observe
+  // the original root/input through the real Enter and the real native picker.
+  const observation = await chooser.evaluateHandle(installKeyboardChooserObservation);
+  let keyboardSnapshot: KeyboardChooserSnapshot | null = null;
+  let nativeEvent = false;
+  let nativeInputMatches: boolean | null = null;
+  let decision = 'OBSERVATION_NOT_READ';
+  const failures: unknown[] = [];
+  let gesture: Promise<void> | undefined;
+  let protocolObservation: ReturnType<typeof installAnyDocPassiveProtocol> | undefined;
+  try {
+    const initialSnapshot: KeyboardChooserSnapshot = await observation.evaluate((probe) => probe.snapshot());
+    keyboardSnapshot = initialSnapshot;
+    decision = !chooserReady(initialSnapshot.initial) ? 'PRECONDITION_NOT_READY'
+      : !initialSnapshot.initial.rootFocused ? 'PRECONDITION_FOCUS_MISSING' : 'READY_FOR_ENTER';
+    expect(chooserReady(initialSnapshot.initial), 'chooser readiness changed after focus').toBe(true);
+    expect(initialSnapshot.initial.rootFocused, 'focus changed before Enter').toBe(true);
+    protocolObservation = installAnyDocPassiveProtocol(page);
+    const nativeWaiter = page.waitForEvent('filechooser').then((value) => {
+      nativeEvent = true;
+      protocolObservation?.mark('public-filechooser-resolved');
+      return value;
+    });
+    protocolObservation.mark('waiter-call-returned');
+    gesture = (async () => {
+      protocolObservation?.mark('enter-call');
+      await page.keyboard.press('Enter');
+      const afterEnter: KeyboardChooserSnapshot = await observation.evaluate((probe) => probe.snapshot());
+      keyboardSnapshot = afterEnter;
+      decision = keyboardChooserDecision(afterEnter);
+      // Commit the discriminator before a native-event timeout can close the page.
+      await testInfo.attach('anydoc-keyboard-activation', {
+        body: Buffer.from(JSON.stringify({ decision, keyboardSnapshot, browserMessages })), contentType: 'application/json',
+      });
+      expect(decision, 'AnyDoc keyboard activation chain').toBe('AWAIT_NATIVE_CHOOSER');
+    })();
+    const [nativeChooser] = await Promise.all([nativeWaiter, gesture]);
+    nativeInputMatches = await observation.evaluate((probe, input) => probe.isOriginalInput(input), nativeChooser.element());
+    decision = nativeInputMatches ? 'NATIVE_INPUT_VERIFIED' : 'NATIVE_INPUT_MISMATCH';
+    protocolObservation.mark(nativeInputMatches ? 'native-input-verified' : 'native-input-mismatch');
+    expect(nativeInputMatches, 'native chooser must belong to the observed file input').toBe(true);
+    await nativeChooser.setFiles([]);
+    decision = 'NATIVE_CHOOSER_VERIFIED';
+  } catch (error) { failures.push(error); }
+  finally {
+    // Join the SAME gesture promise before removing its observation, including
+    // when the native waiter failed first. This never sends another key.
+    try { await gesture; } catch (error) { if (!failures.includes(error)) failures.push(error); }
+    try {
+      const restored = protocolObservation?.restore();
+      if (restored && (!restored.protocolRestored || !restored.subscriptionRestored)) {
+        failures.push(diagnosticFailure('anydoc.restore', new Error('ANYDOC_PROTOCOL_PROBE_RESTORE_CONFLICT')));
+      }
+    } catch (error) { failures.push(error); }
+    try {
+      const body = diagnosticOperation('anydoc.produce', () => Buffer.from(JSON.stringify(protocolObservation?.snapshot() ?? { installed: false }, null, 2)));
+      await diagnosticAsyncOperation('anydoc.attach', () => testInfo.attach('anydoc-passive-protocol', { body, contentType: 'application/json' }));
+    } catch (error) { failures.push(error); }
+  }
+  // The test fixture owns the page. On a stage failure Promise.all observes
+  // both rejections; Playwright removes it on timeout/page teardown.
+  // Never replace a primary keyboard/chooser error with a cleanup/report error.
+  try {
+    if (!page.isClosed()) await observation.evaluate((probe) => probe.stop());
+  } catch (error) { failures.push(error); }
+  try { await observation.dispose(); } catch (error) { failures.push(error); }
+  try {
+    await testInfo.attach('anydoc-keyboard-chooser', {
+      body: Buffer.from(JSON.stringify({ decision, nativeEvent, nativeInputMatches, keyboardSnapshot, browserMessages })),
+      contentType: 'application/json',
+    });
+  } catch (error) { failures.push(error); }
+  rethrowCollectedFailures(failures);
+
+  await chooser.focus();
+  await page.keyboard.press('Tab');
+
+  await expect(page.getByRole('button', { name: `Visualizza ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+
+  let extractButton = page.getByRole('button', { name: `Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}` });
+  await expect(extractButton).toBeFocused();
+  await expect(extractButton).toBeVisible();
+  await expect(extractButton).toHaveAccessibleName(`Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}`);
+  let actionGroup = extractButton.locator('..');
+  await page.mouse.move(0, 0);
+  // named document actions remain visible before pointer or keyboard focus.
+  await expect(actionGroup).toHaveCSS('opacity', '1');
+
+  await extractButton.focus();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: `Prepara sintesi di ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: `Elimina ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Shift+Tab');
+  await expect(extractButton).toBeFocused();
+  await expect(actionGroup).toHaveCSS('opacity', '1');
+  await assertNoHorizontalOverflow(page, [
+    { label: 'documento AnyDoc desktop', selector: 'document' },
+    { label: 'card allegato AnyDoc desktop', selector: '[data-document-area="list"]' },
+  ]);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  // resize the same open document pane, as the user does; reloading
+  // would replace the UI whose responsive focus controls are being verified.
+  await openPatientSection(page, 'documenti');
+  extractButton = page.getByRole('button', { name: `Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}` });
+  actionGroup = extractButton.locator('..');
+  await page.mouse.move(0, 0);
+  await expect(actionGroup).toHaveCSS('opacity', '1');
+  await expect(extractButton).toHaveAccessibleName(`Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}`);
+  await assertNoHorizontalOverflow(page, [
+    { label: 'documento AnyDoc mobile', selector: 'document' },
+    { label: 'card allegato AnyDoc mobile', selector: '[data-document-area="list"]' },
+  ]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('AnyDoc: il browser usa la route autenticata e mostra solo l’anteprima locale', async ({ page }) => {
+  await establishSyntheticSession(page);
+  const patientId = await createSyntheticFixture(page);
+  const attachment = await createExtractableRtf(page, patientId);
+  await openDocumentArchive(page, patientId);
+
+  const responsePromise = page.waitForResponse((response) => (
+    response.request().method() === 'POST'
+    && response.request().headers()['x-mediflow-extraction-action'] === 'project'
+    && response.url().endsWith(`/api/attachments/${attachment.id}/local-extraction`)
+  ));
+  await page.getByRole('button', { name: `Estrai testo localmente da ${attachment.name}` }).click();
+
+  const response = await responsePromise;
+  expect(response.status()).toBe(200);
+  expect(response.url().endsWith(`/api/attachments/${attachment.id}/local-extraction`)).toBe(true);
+  expect(response.request().headers()['x-mediflow-extraction-action']).toBe('project');
+  expect(response.headers()['content-type']).toContain('application/json');
+
+  const preview = page.getByTestId('anydoc-local-extraction-preview');
+  await expect(preview).toBeVisible();
+  // the receipt is reachable only after the client strictly validates the acquired grant,
+  // current canonical source, response provenance/digest and review-only contract (client lines 233-247).
+  // CDP response-body retrieval is unavailable in both CI and the packaged runtime.
+  await preview.getByRole('button', { name: /Testo .*localmente/ }).click();
+  await expect(preview.getByRole('button', { name: /Testo .*localmente/ })).toHaveText('Testo estratto localmente · da rivedere');
+  await expect(preview.locator('pre')).toBeVisible();
+  await expect(preview).toContainText(SYNTHETIC_RTF_TEXT);
+  await expect(page.getByText('review_required · unsupported_local_extraction', { exact: false })).toHaveCount(0);
+});
+
+// native options must conceal filenames while preserving source identity.
+test('Documenti: privacy nasconde i nomi nel selettore prima e dopo la scelta', async ({ page }) => {
+  await establishSyntheticSession(page);
+  const patientId = await createSyntheticFixture(page);
+  await openDocumentArchive(page, patientId);
+  const toggle = page.getByTestId('privacy-mode-header-toggle').first();
+  if (await toggle.getAttribute('aria-pressed') === 'true') await toggle.click();
+  const selector = page.getByLabel('Documento da sintetizzare');
+  const sourceId = await selector.locator('option').nth(1).getAttribute('value');
+  expect(sourceId).toBeTruthy();
+  await toggle.click();
+  await expect(selector.locator('option').nth(1)).toHaveText('Documento 1');
+  await selector.selectOption(sourceId!);
+  await expect(selector).toHaveValue(sourceId!);
+  await expect(selector.locator('option:checked')).toHaveText('Documento 1');
+  await toggle.click();
+  await expect(selector.locator('option:checked')).toHaveText(SYNTHETIC_ATTACHMENT_NAME);
+  await toggle.click();
+  await expect(selector.locator('option:checked')).toHaveText('Documento 1');
+  await expect(selector).toHaveValue(sourceId!);
+  await toggle.click();
+});
