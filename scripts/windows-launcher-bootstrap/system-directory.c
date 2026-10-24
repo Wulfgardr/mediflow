@@ -62,7 +62,7 @@ static BOOL creation_ticks(const FILETIME *creation, ULONGLONG *ticks) {
 }
 
 static napi_value get_process_creation_time_ticks(napi_env env, napi_callback_info info) {
-  napi_value argv[2], result;
+  napi_value argv[2], result = NULL;
   size_t argc = 2, length = 0;
   double input;
   DWORD pid;
