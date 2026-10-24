@@ -70,6 +70,75 @@ export function preserveOfficialObservation(phaseDir) {
   fs.writeFileSync(path.join(phaseDir, 'official-observation.json'), JSON.stringify(preserved, null, 2) + '\n', { flag: 'wx' });
   return review;
 }
+function cleanPassed(result) {
+  return result.status === 'passed' && (result.errors ?? []).length === 0 && result.error == null;
+}
+export function assessGreenTransition(capture, result) {
+  const issues = [];
+  const requireProperty = (value, message) => { if (!value) issues.push(message); };
+  const events = Array.isArray(capture.events) ? capture.events : [];
+  const matching = name => events.filter(event => event?.event === name);
+  const completions = matching('green-observable-completion');
+  const completion = completions.length === 1 ? completions[0] : null;
+  const index = completion ? events.indexOf(completion) : -1;
+  const prefix = completion ? events.slice(0, index + 1) : [];
+  const tail = completion ? events.slice(index + 1) : null;
+  const countRequests = list => ({
+    lock: list.filter(event => event?.event === 'request' && event.pathname === '/api/auth/lock').length,
+    login: list.filter(event => event?.event === 'request' && event.pathname === '/api/auth/login').length,
+  });
+  const all = countRequests(events);
+  const before = completion ? countRequests(prefix) : null;
+  const after = tail ? countRequests(tail) : null;
+  const held = matching('real-receipt-held');
+  const delivered = matching('real-receipt-delivered');
+  const pin = matching('native-pin-expect-entered');
+  const visible = matching('native-renew-isVisible-result');
+  const release = matching('delivery-release');
+  const disposeEntered = matching('fixture-dispose-entered');
+  const disposed = matching('fixture-disposed');
+  requireProperty(cleanPassed(result), 'GREEN result or additional result/hook/teardown error');
+  requireProperty(Array.isArray(capture.events) && events.length > 0, 'Missing fixture events');
+  requireProperty(events.every((event, i) => event && Number.isSafeInteger(event.seq) && event.seq > 0
+    && Number.isFinite(event.nodeMonotonicMs) && event.nodeMonotonicMs >= 0
+    && (!i || event.seq > events[i - 1].seq && event.nodeMonotonicMs >= events[i - 1].nodeMonotonicMs)),
+  'Incoherent fixture event order');
+  requireProperty(completions.length === 1, 'Completion absent or ambiguous');
+  requireProperty(events.every(event => event?.event !== 'request'
+    || ['/api/auth/lock', '/api/auth/login'].includes(event.pathname)), 'Unknown counted request');
+  requireProperty(Number.isSafeInteger(capture.lockRequests) && capture.lockRequests === all.lock
+    && Number.isSafeInteger(capture.loginRequests) && capture.loginRequests === all.login,
+  'Integral request counters disagree with fixture events');
+  requireProperty(before?.lock === 1, 'Additional lock before completion');
+  requireProperty(before?.login === 1, 'Expected one login through completion');
+  requireProperty(capture.confirmedReceipt === true && !capture.routeError && capture.held === false,
+    'Fixture receipt/route failure or held receipt');
+  requireProperty(held.length === all.lock && delivered.length === all.lock
+    && held.every(event => event.status === 200 && event.etagPresent === true), 'Incomplete or invalid receipts across capture');
+  requireProperty(completion && prefix.filter(event => event.event === 'real-receipt-held').length === before.lock
+    && prefix.filter(event => event.event === 'real-receipt-delivered').length === before.lock,
+  'Receipts incomplete through completion');
+  requireProperty(capture.releaseSource === 'pin-ready-assertion' && capture.expectCalls === 1
+    && capture.visibleCalls === 1 && capture.enabledCalls === 0,
+  'GREEN native query counters/release mismatch');
+  requireProperty(pin.length === 1 && visible.length === 1 && visible[0].visible === false
+    && matching('native-renew-isEnabled-entered').length === 0 && release.length === 1
+    && release[0].source === 'pin-ready-assertion'
+    && events.indexOf(pin[0]) < events.indexOf(release[0])
+    && events.indexOf(release[0]) < events.indexOf(visible[0]) && events.indexOf(visible[0]) < index,
+  'GREEN release/native query sequence not observed');
+  requireProperty(disposeEntered.length === 1 && disposed.length === 1
+    && index < events.indexOf(disposeEntered[0]) && events.indexOf(disposeEntered[0]) < events.indexOf(disposed[0]),
+  'Fixture cleanup absent, ambiguous or before completion');
+  const observation = assessOfficialObservation(capture);
+  for (const issue of observation.diagnosticErrors) issues.push(issue);
+  return { accepted: issues.length === 0, issues, completion,
+    counts: { all, throughCompletion: before, afterCompletion: after },
+    afterCompletion: tail === null ? null : { events: tail, requests: tail.filter(event => event.event === 'request'),
+      interpretation: 'Preserved without caller attribution or a claim that these requests are harmless.' },
+    receipts: { held: held.length, delivered: delivered.length }, observation,
+    primaryError: result.error ?? null, errors: result.errors ?? [] };
+}
 export function classify(phase, command, phaseDir, manifest) {
   const report = read(path.join(phaseDir, 'report.json'));
   check((report.errors ?? []).length === 0, phase + ': runner/cleanup error');
@@ -78,24 +147,23 @@ export function classify(phase, command, phaseDir, manifest) {
   for (const test of tests) check(test.results.length === 1 && test.results[0].retry === 0, phase + ': unexpected retry');
   check(report.config.projects.every(project => project.outputDir === path.join(phaseDir, 'test-output')), 'Reporter output identity mismatch');
   if (phase === 'consumers') {
-    check(command.code === 0 && tests.every(test => test.results[0].status === 'passed'), 'Consumer failure');
+    check(command.code === 0 && tests.every(test => cleanPassed(test.results[0])), 'Consumer failure');
     return { phase, outcome: 'PASS', tests: tests.map(test => test.title) };
   }
   check(tests[0].title === manifest.title, 'Official UI test identity mismatch');
   const captures = findFiles(path.join(phaseDir, 'test-output'), 'interleaving.json');
   check(captures.length === 1, phase + ': fixture capture absent/ambiguous');
   const capture = read(captures[0]);
+  const status = tests[0].results[0];
+  if (phase === 'green') {
+    const transition = assessGreenTransition(capture, status);
+    fs.writeFileSync(path.join(phaseDir, 'green-transition.json'), JSON.stringify(transition, null, 2) + '\n', { flag: 'wx' });
+    check(command.code === 0 && transition.accepted, 'GREEN passage not qualifying; see green-transition.json');
+    return { phase, outcome: 'PASS', tests: [manifest.title], transition };
+  }
   check(capture.confirmedReceipt && !capture.routeError && capture.lockRequests === 1, 'Fixture receipt/request failure');
   check(capture.events.some(event => event.event === 'fixture-disposed'), 'Fixture cleanup incomplete');
   check(assessOfficialObservation(capture).diagnosticErrors.length === 0, 'Official passive observation incomplete; see official-observation.json');
-  const status = tests[0].results[0];
-  if (phase === 'green') {
-    check(command.code === 0 && status.status === 'passed'
-      && capture.releaseSource === 'pin-ready-assertion' && capture.expectCalls === 1
-      && capture.enabledCalls === 0 && capture.loginRequests === 1
-      && capture.events.some(event => event.event === 'green-observable-completion'), 'GREEN properties not met');
-    return { phase, outcome: 'PASS', tests: [manifest.title] };
-  }
   const errorReview = assessExpectedRedErrors(status, manifest.fixtureCallsite);
   fs.writeFileSync(path.join(phaseDir, 'expected-red-errors.json'), JSON.stringify(errorReview, null, 2) + '\n', { flag: 'wx' });
   check(errorReview.accepted, phase + ': unexpected test/hook/fixture/teardown error; see expected-red-errors.json');
@@ -145,6 +213,11 @@ export function classifyBaseline(baseline, command, phaseDir) {
     (error.message ?? '').match(/WUL787_DIAGNOSTIC_FAILURE\[[^\]]+\]/g) ?? []);
   outcome.diagnosticFailures = markedFailures;
   if (markedFailures.length) outcome.diagnosticErrors.push('Added observation operation failed: ' + markedFailures.join(', '));
+  const nativeFixtureTeardownTimeout = (result.errors ?? []).some(error =>
+    /^Tearing down "[^"\r\n]+" exceeded the test timeout of [0-9]+ms\.(?:\r?\n|$)/.test(
+      (error.message ?? '').replace(/\x1b\[[0-9;]*m/g, '')));
+  if (nativeFixtureTeardownTimeout)
+    outcome.diagnosticErrors.push('Native Playwright fixture teardown timeout; see retained result.errors');
   if (baseline.phase === 'per-data') {
     if (observation) {
       const complete = observation.schemaVersion === 1 && observation.viewport?.width === 320
