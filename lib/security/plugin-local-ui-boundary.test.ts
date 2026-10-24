@@ -123,7 +123,7 @@ test('private Web navigation opens a constant URL, broadcasts only to current do
   const channel = new EventEmitter(), opened: string[] = [], seen: string[] = [];
   const target = {} as typeof globalThis;
   const close = installLocalUiWebNavigation(channel, 'http://127.0.0.1:12345', (url: string) => opened.push(url), target);
-  const send = (intent: string, extras = {}) => channel.emit('message', JSON.stringify({ schemaVersion: 'mediflow.local-ui.navigation.v1', intent, ...extras }));
+  const send = (intent: string, extras = {}) => channel.emit('message', JSON.stringify({ schemaVersion: 'mediflow.local-ui.navigation.v1', intent, requestId: '00000000-0000-0000-0000-000000000001', expiresAt: Date.now() + 5000, ...extras }));
   send('search'); send('history');
   assert.deepEqual(opened, ['http://127.0.0.1:12345/plugin-local-ui', 'http://127.0.0.1:12345/plugin-local-ui']);
   (target as unknown as Record<symbol, unknown>)[Symbol.for('mediflow.local-ui.navigation.v1')] = (intent: string) => { seen.push(intent); return true; };
@@ -254,4 +254,18 @@ test('all eight concurrent in-flight calls retain cancellation capacity at the r
     assert.equal(f.stopped(), false);
     assert.deepEqual(f.stderr, []);
   } finally { f.runtime.terminate(); await exited; }
+});
+
+test('Web dispatch rejects expired requests and cancellation only withdraws the matching intent', () => {
+  const channel = new EventEmitter(), seen: string[] = [];
+  const target = { [Symbol.for('mediflow.local-ui.navigation.v1')]: (intent: string) => { seen.push(intent); return true; } };
+  const close = installLocalUiWebNavigation(channel, 'http://127.0.0.1:12345', () => assert.fail('unexpected open'), target as unknown as typeof globalThis);
+  const first = '00000000-0000-0000-0000-000000000001', second = '00000000-0000-0000-0000-000000000002';
+  const send = (requestId: string, expiresAt = Date.now() + 5000) => channel.emit('message', JSON.stringify({
+    schemaVersion: 'mediflow.local-ui.navigation.v1', intent: 'history', requestId, expiresAt }));
+  const cancel = (requestId: string) => channel.emit('message', JSON.stringify({ schemaVersion: 'mediflow.local-ui.cancel.v1', requestId }));
+  send(first, Date.now() - 1); assert.deepEqual(seen, []);
+  send(first); send(second); cancel(first); assert.deepEqual(seen, ['history', 'history']);
+  cancel(second); assert.deepEqual(seen, ['history', 'history', 'reset']);
+  close();
 });

@@ -1,7 +1,7 @@
 /* destructive auth tests own their process and initially empty data directory. */
 import { test as base, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID, randomBytes } from 'node:crypto';
 import { createServer } from 'node:net';
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,7 +33,10 @@ export function isolatedRuntimeArguments(bundle: string): string[] {
   return [launcher, 'web'];
 }
 
-type IsolatedRuntime = Readonly<{ url: string }>;
+type IsolatedRuntime = Readonly<{ url: string;
+  offerPairing(options?: { nonce?: string; expiresIn?: number; instance?: string }): { nonce: string; host: string };
+  usePairing(nonce: string, host: string): Promise<string>;
+}>;
 
 export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRuntimeServices: boolean; pluginLocalUiRuntime: boolean }>({
   pluginLocalUiRuntime: [false, { option: true }],
@@ -74,10 +77,23 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
       MEDIFLOW_DATA_DIR: dataDirectory, MEDIFLOW_E2E_DATA_DIR: dataDirectory,
       MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', E2E_DISABLE_LEGACY_COPY: '1',
     };
+    environment.MEDIFLOW_LOCAL_UI_INSTANCE = randomUUID();
+    environment.MEDIFLOW_LOCAL_UI_WEB_SECRET = randomBytes(32).toString('hex');
     environment.MEDIFLOW_PLUGIN_LOCAL_UI = pluginLocalUiRuntime ? '1' : '0';
     delete environment.MEDIFLOW_RUNTIME_TWIN;
     delete environment.NEXT_PUBLIC_MEDIFLOW_RUNTIME_TWIN;
-    const child = spawn(process.execPath, isolatedRuntimeArguments(bundle), {
+    let args = isolatedRuntimeArguments(bundle);
+    if (pluginLocalUiRuntime && args.length === 1) {
+      const metadata = JSON.parse(readFileSync(path.join(bundle, 'mediflow-build-identity.json'), 'utf8'));
+      environment.MEDIFLOW_APP_SOURCE_FINGERPRINT = metadata.sourceFingerprint;
+      const bootstrap = path.join(directory, 'plugin-web.mjs');
+      writeFileSync(bootstrap, `import { createRequire } from 'node:module';
+        import { installLocalUiWebNavigation } from ${JSON.stringify(path.join(repositoryRoot, 'scripts/local-ui-web-navigation.mjs'))};
+        installLocalUiWebNavigation(process, ${JSON.stringify(url)}, () => {});
+        createRequire(${JSON.stringify(serverPath)})(${JSON.stringify(serverPath)});`);
+      args = [bootstrap];
+    }
+    const child = spawn(process.execPath, args, {
       cwd: bundle, env: environment, stdio: pluginLocalUiRuntime ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'], windowsHide: true,
     });
     const closed = new Promise<void>(resolve => child.once('close', () => resolve()));
@@ -111,7 +127,27 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
       expect(initial.status).toBe(200);
       expect(await initial.json()).toMatchObject({ status: 'ok', isSetup: false, hasSession: false, db: { state: 'ready' } });
       initialEmptyAccount = true;
-      await provide({ url });
+      await provide({ url,
+        offerPairing(options = {}) {
+          const request = { nonce: options.nonce ?? randomUUID(), host: randomUUID(), expiresAt: Date.now() + (options.expiresIn ?? 60000),
+            instance: options.instance ?? environment.MEDIFLOW_LOCAL_UI_INSTANCE,
+            dataDir: dataDirectory, sourceFingerprint: revision.sourceFingerprint };
+          child.send({ type: 'mediflow-local-ui-pair-offer', request });
+          return { nonce: request.nonce, host: request.host };
+        },
+        usePairing(nonce, host) {
+          const requestId = randomUUID();
+          return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => { child.off('message', receive); reject(new Error('pairing IPC timeout')); }, 3000);
+            const receive = (frame: any) => { if (frame?.type === 'mediflow-local-ui-pair-result' && frame.requestId === requestId) {
+              clearTimeout(timer); child.off('message', receive); resolve(frame.status);
+            } };
+            child.on('message', receive);
+            child.send({ type: 'mediflow-local-ui-pair-use', nonce, host, requestId,
+              navigation: JSON.stringify({ schemaVersion: 'mediflow.local-ui.navigation.v1', intent: 'search', requestId, expiresAt: Date.now() + 5000 }) });
+          });
+        },
+      });
     } finally {
       // Only the child we created is terminated. No port-wide kill, account restore or DB edit.
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');

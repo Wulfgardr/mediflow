@@ -1,9 +1,12 @@
 # MediFlow locale — pacchetto privato 0.1.0
 
-Target: Codex CLI 0.163.0 e Claude Code 2.1.306. Un solo server MCP e
+Target qualificati nel dossier U1: Codex CLI 0.163.0-alpha.11.1 e Claude Code 2.1.308. Un solo server MCP e
 Supervisor, profilo fisso `plugin_local_ui`. Il pacchetto apre la UI separata;
 non incorpora una cartella nell'host, non restituisce CF/storia alla chat e
 non permette al modello di ragionare su dati che non riceve.
+
+La [matrice host del 23 ottobre](evidence/2026-10-23-host-qualification.md)
+riporta prove CLI, lifecycle, canali osservabili e limiti delle app desktop.
 
 ## Preparazione locale
 
@@ -67,8 +70,45 @@ clinica è inclusa; WUL-759 riserva il contatto a Leonardo.
 Chiedi “Apri la ricerca locale di MediFlow”. Il tool accetta soltanto un
 intento fra `search`, `identity`, `history`, `prescribing` e torna sempre
 `continue_in_mediflow`. La ricevuta non attesta apertura o un esito clinico.
-Il primo comando attende soltanto la readiness tecnica privata del Web, con
-timeout; non attende lookup o rendering di un paziente.
+Il primo comando avvia il launcher ordinario staccato, con lo stesso ingresso di
+`MediFlow.command`. L'invocazione effettiva è:
+
+```sh
+node scripts/mediflow.mjs --riusa
+```
+
+Conserva preferenza e selettore ordinari, senza riscrivere le preferenze.
+Una scelta Mac o agenti può rendere la navigazione indisponibile: non viene
+sostituita con Web. `reuse` richiede una build già ammessa e conserva l'avvio
+ordinario dei servizi facoltativi, incluso Ollama se installato ma fermo.
+La configurazione locale supportata viene conservata, comprese le variabili
+ATHENA per runner, modello, Python, pacchetto, seed e limite token. I flag E2E,
+loader e segreti dell'host non vengono ereditati.
+
+Il nuovo launcher recupera automaticamente una propria generazione dopo un
+crash, quando può verificare che il proprietario sia morto. Se compare
+«Stato legacy del lanciatore senza proprietario verificabile», conserva invece
+lo stato precedente: una lock vuota o un mutex anonimo possono appartenere a
+un vecchio processo ancora vivo. Serve un intervento con verifica dei processi
+di quel checkout e copia dello stato; non cancellare i file sulla sola base
+dell'età o dell'assenza della receipt. Il limite e le condizioni sono descritti
+nell'[ADR 0159](../../docs/adr/0159-plugin-local-ui-navigation.md).
+
+Se MediFlow è già aperta, il raccordo mostra un codice temporaneo nella propria
+pagina locale. Copialo nella MediFlow che stavi già usando, nel campo «Codice
+di abbinamento», e premi «Consenti». La richiesta dice «Consenti a Codex/Claude
+di aprire schermate qui?». Il codice scade dopo un minuto: resta nelle UI locali
+e non va inserito nella chat. Un rifiuto o una scadenza non concede navigazione.
+La prima chiamata può terminare prima della conferma: dopo l'abbinamento richiedi
+di nuovo il percorso; il plugin non riprende un intento scaduto.
+
+«Revoca il collegamento del plugin» ritira la capacità. Lock, logout,
+sostituzione dell'archivio, riavvio e chiusura dell'host richiedono un nuovo
+abbinamento. La chiusura dell'host lascia vivo il lavoro locale in MediFlow.
+L'abbinamento concede soltanto i quattro intenti, senza autorità clinica.
+La receipt su disco e il fingerprint pubblico non autorizzano un listener;
+il Web deve dimostrare la propria generazione a ogni inoltro.
+Attende soltanto la readiness tecnica, entro il timeout; non attende lookup o rendering di un paziente.
 
 Prima del login, o senza un documento connesso, si apre l'URL locale fisso
 `/plugin-local-ui`, senza query o frammenti. Login/PIN, ricerca anche per CF e
@@ -94,9 +134,12 @@ Altri strumenti dell'host possono accedere a file, browser o screenshot se
 hanno autorità propria: il plugin non isola il Mac e non garantisce anonimato.
 Non usarli come ripiego a un tool negato.
 
-Ogni istanza possiede i propri figli Web/MCP: non adotta processi preesistenti,
-non crea broker residente e termina soltanto i figli posseduti. Rimuovere questo
-pacchetto non elimina archivio o chiavi. Aggiornamento/rimozione e qualifica
+Il raccordo possiede soltanto il figlio MCP. Il launcher ordinario possiede il Web:
+chiudere l'host o rimuovere il plugin non arresta quel runtime né il lavoro aperto.
+Il raccordo non adotta listener da `instance.json`: PID, porta e fingerprint
+pubblico non sono credenziali. Il canale ereditato collega direttamente il
+processo avviato alla sessione, senza discovery o POST di navigazione HTTP. Il runtime si arresta dal proprio launcher.
+Rimuovere questo pacchetto non elimina archivio o chiavi. Aggiornamento/rimozione e qualifica
 clinica completa restano risultati separati, WUL-758/WUL-738. Il prototipo
 `mediflow-synthetic` rimane indipendente e contiene soltanto esempi inventati.
 
@@ -126,3 +169,11 @@ La validazione del manifest non prova l'invocazione dell'agente. Un limite
 account, overage, pagamenti o nuovi tentativi automatici. Lo stato locale del
 client può aggiornarsi anche con impostazioni caricate solo per la sessione;
 non ripristinare file globali sopra lavoro concorrente.
+
+Per qualificare il caricamento effettivo del plugin Claude Code, usare
+`--plugin-dir` e l'allowlist `mcp__plugin_mediflow-local-ui_mediflow-local-ui__mediflow_local_ui_navigate_v1`.
+`--strict-mcp-config` esclude anche i server forniti dal plugin: non usarlo per
+questa prova. Per escludere i connettori dell'account nella sola sessione usare
+`ENABLE_CLAUDEAI_MCP_SERVERS=false` e `--setting-sources ''`.
+Un server ancora `pending` non prova disponibilità del tool: attendere la
+connessione e richiedere esplicitamente un nuovo intento, senza riprendere il precedente.
