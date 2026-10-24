@@ -137,8 +137,11 @@ test('Misure: chiusura e ripresa conservano bozza, select e data; invio usa il p
     const write = page.waitForRequest(request => request.url().endsWith('/api/observations') && request.method() === 'POST');
     await form.getByRole('button', { name: 'Registra parametro', exact: true }).click();
     const body = (await write).postDataJSON();
+    await test.info().attach('scrittura-misura-osservata', { contentType: 'application/json', body: JSON.stringify(body) });
     expect(body).toMatchObject({ patientId: id, code: '2339-0', unitCode: 'mg/dL', value: 95.5, source: 'manual' });
     expect(body.id).toMatch(/^[0-9a-f-]{36}$/);
+    await expect(register(page).getByRole('cell', { name: '95.5 mg/dL', exact: true })).toBeVisible();
+    await register(page).getByRole('button', { name: 'Glicemia', exact: true }).click();
     await expect(history(page)).toContainText('95.5');
     await expect(form.getByLabel('Valore', { exact: true })).toHaveValue('');
 });

@@ -150,6 +150,7 @@
 .observationHistory :is(th,td):first-child { width: 6rem; }
 .observationHistory :is(th,td):last-child { width: 3rem; }
 @media (max-width: 700px) {
+ .observationHistory :is(th,td):last-child { width: 3.5rem; }
  .observationTable thead { display: none; }
  .observationTable, .observationTable tbody { display: block; width: 100%; }
  .observationTable tr { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); column-gap: 16px; padding-block: 12px; border-bottom: 1px solid var(--lume-rule); }
