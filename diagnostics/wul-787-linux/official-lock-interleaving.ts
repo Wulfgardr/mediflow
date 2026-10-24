@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { installOfficialLockObservation } from './official-lock-observation';
 import { expect, type Locator, type Page, type Request, type Route } from '@playwright/test';
 
 type NativeExpect = (expression: string, options: { isNot?: boolean; [key: string]: unknown }) => Promise<unknown>;
@@ -20,6 +21,7 @@ export async function armOfficialLockInterleaving(page: Page, evidencePath: stri
   const pin = getByLabel('PIN operatore', { exact: true });
   const renew = getByRole('button', { name: 'Rinnova accesso', exact: true });
   const form = getByLabel('MediFlow lock screen', { exact: true }).locator('form');
+  const observation = installOfficialLockObservation(page);
   const events: Array<Record<string, unknown>> = [];
   let lockRequests = 0;
   let loginRequests = 0;
@@ -31,14 +33,16 @@ export async function armOfficialLockInterleaving(page: Page, evidencePath: stri
   let held = false;
   let routeError: string | undefined;
   const record = (event: string, details: Record<string, unknown> = {}) => {
-    events.push({ event, ...details });
+    const entry = observation.record(event, details);
+    if (entry) events.push(entry);
     fs.mkdirSync(path.dirname(evidencePath), { recursive: true });
     fs.writeFileSync(evidencePath, JSON.stringify({
       schemaVersion: 'mediflow.fixture.official-lock-interleaving.v1',
       lockRequests, loginRequests, releaseSource, expectCalls, visibleCalls, enabledCalls,
-      confirmedReceipt, held, routeError, events,
+      confirmedReceipt, held, routeError, events, observation: observation.snapshot(),
     }, null, 2));
   };
+  try {
   record('armed');
   const requestListener = (request: Request) => {
     if (request.method() !== 'POST') return;
@@ -149,7 +153,7 @@ export async function armOfficialLockInterleaving(page: Page, evidencePath: stri
       expect(expectCalls).toBe(1);
       expect(visibleCalls).toBe(1);
       expect(enabledCalls).toBe(0);
-      expect(events.filter(event => event.event === 'native-renew-isVisible-result')).toEqual([
+      expect(events.filter(event => event.event === 'native-renew-isVisible-result').map(({ event, visible }) => ({ event, visible }))).toEqual([
         { event: 'native-renew-isVisible-result', visible: false },
       ]);
       expect(lockRequests).toBe(1);
@@ -157,13 +161,29 @@ export async function armOfficialLockInterleaving(page: Page, evidencePath: stri
       record('green-observable-completion');
     },
     async dispose() {
-      if (!releaseSource) releaseSource = 'cleanup';
-      delivery.release();
-      if (page.getByLabel === wrappedLabel) page.getByLabel = previousLabel;
-      if (page.getByRole === wrappedRole) page.getByRole = previousRole;
-      page.off('request', requestListener);
-      if (!page.isClosed()) await page.unroute('**/api/auth/lock', handler);
-      record('fixture-disposed');
+      const failures: unknown[] = [];
+      try { record('fixture-dispose-entered'); } catch (error) { failures.push(error); }
+      try {
+        if (!releaseSource) releaseSource = 'cleanup';
+        delivery.release();
+        if (page.getByLabel === wrappedLabel) page.getByLabel = previousLabel;
+        if (page.getByRole === wrappedRole) page.getByRole = previousRole;
+        page.off('request', requestListener);
+        if (!page.isClosed()) await page.unroute('**/api/auth/lock', handler);
+      } catch (error) { failures.push(error); }
+      finally {
+        observation.restore();
+        try { record('fixture-disposed'); } catch (error) { failures.push(error); }
+      }
+      if (failures.length === 1) throw failures[0];
+      if (failures.length > 1) throw new Error('OFFICIAL_FIXTURE_DISPOSE_FAILURES\n' + failures.map((error, index) =>
+        `[${index}] ${error instanceof Error ? error.stack : String(error)}`).join('\n'), { cause: failures[0] });
+
     },
   };
+  } catch (error) {
+    observation.restore();
+    try { record('fixture-arm-failed'); } catch { /* Preserve the original setup failure. */ }
+    throw error;
+  }
 }
