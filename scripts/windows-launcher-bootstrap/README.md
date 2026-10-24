@@ -5,12 +5,19 @@ native-free AIP/MCP/Mini delivery closure. Node 24 and trusted Windows are
 prerequisites; no report, environment-derived system root, FFI, runtime build
 or runtime download is used.
 
-`system-directory.c` exports one C Node-API function using
+`system-directory.c` exports exactly two C Node-API v1 functions: getSystemDirectory using
 [GetSystemDirectoryW](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getsystemdirectoryw).
+getProcessCreationTimeTicks(pid) opens one non-inheritable process handle
+with QUERY_LIMITED_INFORMATION, reads GetProcessTimes and closes it once on
+every successful open. Every error denies identity. FILETIME is converted
+through FileTimeToSystemTime, integer Gregorian calendar arithmetic and its
+sub-millisecond 100 ns fraction to an ASCII .NET tick string. No floating
+point timestamp, pseudo-handle, wait, privilege elevation or subprocess is
+used. The same function serves own PID and previous owner PID.
 Node-API version 1 uses the stable C ABI. The MSVC recipe links only Node and
 Kernel32, without a dynamic CRT dependency or DLL entry point. The producer
 checks the actual dependency list with dumpbin, the PE architecture, exact
-export, native API, canonical taskkill path and source-first startup.
+exports, native API, canonical taskkill path and source-first startup.
 
 Development/CI commands on **native Windows x64 or ARM64**, with matching Node 24:
 
@@ -32,7 +39,8 @@ non-TTY installation refusal, original exit and stderr close. It does not
 install dependencies or prove a GUI interaction.
 
 Output is exactly `prebuilds/win32-<arch>/{system-directory.node,manifest.json}`.
-The manifest identifies binary bytes, PE architecture, source/recipe/builder
+Manifest schema 2 lists the exact ordered exports
+`getProcessCreationTimeTicks,getSystemDirectory` and identifies binary bytes, PE architecture, source/recipe/builder
 digests, SDK and compiler provenance. Hashes attest identity/integrity, not
 source-to-binary equivalence. Review and commit both files for each admitted
 architecture before distributing source. The cross-platform workflow uploads
@@ -60,3 +68,28 @@ Web transaction interrupted in-flight. Neither Windows gate ran on macOS.
 `observe-command.mjs` is a CI preload, never imported by the product. It
 records only the actual admitted stop executable, architecture, owned PID and
 command result. It preserves the original spawn function and return value.
+
+`verify` additionally holds a real owned child alive and compares repeated
+native identities for own PID and child PID. A gate-only PowerShell oracle
+uses the exact legacy expression, bounded to 30000 ms per call without retry
+or warm-up: tick strings must match before SHA-256 comparison. A legacy
+receipt for that live child must deny the new claim without changing bytes.
+A separate isolated-child loop performs 4096 native queries; external
+HandleCount observations must remain equal. Child exit and stderr-close
+are observed during attributed cleanup. An oracle timeout means missing
+proof, never demonstrated incompatibility or a pass. These oracle processes
+are outside the product.
+
+`source-first` separately preloads a private guard that denies PowerShell
+execution, requires a zero-call terminal marker and checks that process
+identity source has no environment-root lookup. The original no-node_modules,
+dependency-confirmation and non-TTY refusal assertions remain mandatory.
+It runs no legacy oracle. The retired R37 identity diagnostic is not used;
+the admitted taskkill observation and guard remain unchanged.
+
+The old native schema 1 artifacts are not admitted by this loader. Newly
+built x64/ARM64 artifacts require exact legacy compatibility on Windows
+before admission/distribution. macOS stubs and source checks cannot qualify
+Win32 conversion, handle lifetime, or source-first Windows. Native mutation
+recipes (raw FILETIME, floating-point rounding, omitted CloseHandle) belong
+to the development evidence, not the distributed addon or portable closure.

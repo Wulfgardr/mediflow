@@ -9,7 +9,7 @@ import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { checkNode, knownMainUpdates, openUrl, probeRunningInstance, readProductIdentity, waitForRunningInstance } from './launcher-helpers.mjs';
 import { verifySourceRuntime } from './source-runtime.mjs';
-import { initializeWindowsSystemCommand, windowsTaskkillCommand } from './windows-system-command.mjs';
+import { initializeWindowsSystemCommand, windowsTaskkillCommand, windowsProcessCreationTimeTicks } from './windows-system-command.mjs';
 import { macDerivedDataDirectory } from './build-input-metadata.mjs';
 import { createChoiceServer } from './mediflow-launcher-page.mjs';
 import { prepareLauncherState } from './launcher-state.mjs';
@@ -125,13 +125,10 @@ function launcherProcessIdentity(pid) {
       const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
       value = fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim()
         + ':' + stat.slice(stat.lastIndexOf(')') + 2).trim().split(/\s+/u)[19];
+    } else if (process.platform === 'win32') {
+      value = windowsProcessCreationTimeTicks(pid);
     } else {
-      const result = process.platform === 'win32'
-        ? spawnSync(path.win32.join(process.env.SystemRoot || process.env.WINDIR || 'C:\\Windows',
-          'System32/WindowsPowerShell/v1.0/powershell.exe'), ['-NoProfile', '-NonInteractive', '-Command',
-          `$ErrorActionPreference='Stop'; (Get-Process -Id ${pid}).StartTime.ToUniversalTime().Ticks.ToString()`],
-        { encoding: 'utf8', timeout: 3000, windowsHide: true })
-        : spawnSync('/bin/ps', ['-p', String(pid), '-o', 'lstart=', '-o', 'comm='],
+      const result = spawnSync('/bin/ps', ['-p', String(pid), '-o', 'lstart=', '-o', 'comm='],
           { encoding: 'utf8', timeout: 3000, env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' } });
       if (result.status !== 0 || !result.stdout.trim()) return null;
       value = result.stdout.trim();

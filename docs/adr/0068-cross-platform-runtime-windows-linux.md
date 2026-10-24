@@ -142,7 +142,15 @@ costituiscono insieme la prova richiesta, con costo di arresto forzato.
 Il bootstrap Node-API precompilato del launcher deve essere distribuito prima
 di `npm ci`; non installa né compila componenti all'avvio e nega architetture
 o artefatti mancanti. La sua build di sviluppo/CI è distinta dal percorso
-utente source-first. Non aggiunge un endpoint clinico o un'autorità agente.
+utente source-first. Lo stesso artefatto espone GetSystemDirectoryW e la
+lettura del creation time per qualunque PID tramite OpenProcess con diritto
+limitato, GetProcessTimes e CloseHandle, senza subprocesso PowerShell nel
+prodotto. Manifest schema 2 ed export esatti sono obbligatori. I tick UTC
+interi devono coincidere byte-per-byte con l’identità legacy: l’oracle
+PowerShell resta soltanto nel gate esterno (30 s per invocazione, nessun
+retry), insieme a verifica di receipt viva e stabilità degli handle. Senza
+questa prova x64/ARM64 e nuovi artefatti ammessi, la distribuzione resta
+non qualificata. Non aggiunge un endpoint clinico o un'autorità agente.
 Ollama, facoltativo e condiviso, mantiene il ciclo di vita indipendente.
 
 Senza display o browser si usa un menu testuale; senza TTY serve `--scelta`.
