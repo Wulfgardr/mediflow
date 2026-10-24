@@ -39,6 +39,7 @@ async function capture(page: Page, state: string, theme: string, size: string) {
     if (state === 'fuoco-parametro') await register(page).getByRole('combobox', { name: 'Parametro', exact: true }).scrollIntoViewIfNeeded();
     else if (state === 'vuoto' && !baseline) await register(page).getByRole('status').scrollIntoViewIfNeeded();
     else await section(page).scrollIntoViewIfNeeded();
+    await expect(page.locator('html')).toHaveClass(theme === 'grafite' ? /dark/ : /light/);
     await page.screenshot({ path: png, animations: 'disabled' });
     await writeFile(`${root}/${name}.json`, JSON.stringify({
         head: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
@@ -205,7 +206,18 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
             }
             await capture(page, 'conferma', theme, size);
             await page.getByRole('dialog', { name: 'Eliminare questa misura?', exact: true }).getByRole('button', { name: 'Annulla', exact: true }).click();
-            if (!baseline) await assertNoHorizontalOverflow(page, [{ label: 'Misure', selector: '#parametri' }, { label: 'Pagina', selector: 'document' }]);
+            if (!baseline) {
+                const geometry = await section(page).evaluate(element => {
+                    const table = element.querySelector('aside table')!;
+                    const cell = table.querySelector('tbody tr td:last-child')!;
+                    const button = cell.querySelector('button')!;
+                    const box = (node: Element) => { const r = node.getBoundingClientRect(); return { left: r.left, right: r.right, width: r.width }; };
+                    return { section: { clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, ...box(element) },
+                        table: box(table), cell: { ...box(cell), paddingLeft: getComputedStyle(cell).paddingLeft }, button: box(button) };
+                });
+                await test.info().attach('geometria-misure', { contentType: 'application/json', body: JSON.stringify(geometry) });
+                await assertNoHorizontalOverflow(page, [{ label: 'Misure', selector: '#parametri' }, { label: 'Pagina', selector: 'document' }]);
+            }
             await page.route('**/api/observations?**', route => route.fulfill({ json: [] }));
             await page.goto(`/patients/${id}/modules`);
             await openPatientSection(page, 'parametri');
