@@ -362,6 +362,7 @@ pub struct ClinicalApp {
     login_scroll: gpui::ScrollHandle,
     connecting: bool,
     document_busy: bool,
+    copy_state: Option<documents::CopyState>,
     edit_pending: bool,
     focus_first_field: bool,
     login_fields: Vec<Field>,
@@ -636,6 +637,7 @@ impl ClinicalApp {
             login_scroll,
             connecting: false,
             document_busy: false,
+            copy_state: None,
             edit_pending: false,
             focus_first_field: false,
             login_fields,
@@ -657,7 +659,7 @@ impl ClinicalApp {
             reference_run_target: ScrollTarget::new(&area_scroll, cx),
             ai_refresh_target: ScrollTarget::new(&area_scroll, cx),
             ai_preferences: AiPreferences::new(&area_scroll, cx),
-            account_profile: AccountProfile::new(&area_scroll, Theme::for_dark(false), cx),
+            account_profile: AccountProfile::new(Theme::for_dark(false), cx),
             who: WhoLookup::new(&area_scroll, cx),
             scales: ScaleArea::new(&area_scroll, theme, cx),
             analytics: AnalyticsArea::new(theme, cx),
@@ -794,6 +796,9 @@ impl ClinicalApp {
     }
 
     fn next_epoch(&mut self) {
+        if self.copy_state == Some(documents::CopyState::Reading) {
+            self.copy_state = Some(documents::CopyState::Withdrawn);
+        }
         self.request_context.cancel();
         self.request_context = RequestContext::default();
         if let Some(session) = &mut self.session {
@@ -827,13 +832,12 @@ impl ClinicalApp {
         cx: &mut Context<Self>,
     ) {
         let epoch = self.epoch;
+        let authority = self.account_profile.generation;
         let task = cx.background_executor().spawn(async move { operation() });
         cx.spawn(async move |this, cx| {
             let result = task.await;
             let _ = this.update(cx, |this, cx| {
-                if this.epoch != epoch
-                    && !this.session.as_ref().is_some_and(RuntimeSession::is_locked)
-                {
+                if this.account_profile.generation != authority {
                     return;
                 }
                 if let Some(error) = result
@@ -868,6 +872,9 @@ impl ClinicalApp {
                     };
                     this.disconnect(cx);
                     this.message = Some((message, true));
+                    return;
+                }
+                if this.epoch != epoch {
                     return;
                 }
                 apply(this, result, cx);
@@ -1002,7 +1009,7 @@ impl ClinicalApp {
     fn disconnect(&mut self, cx: &mut Context<Self>) {
         self.analytics.reset(cx);
         self.scales.reset(cx);
-        self.account_profile.reset(cx);
+        self.account_profile.reset(self.theme, cx);
         self.focus_after_render = true;
         self.focus_search_after_render = false;
         self.patient_targets.clear();
@@ -2350,12 +2357,7 @@ impl ClinicalApp {
 
     fn save_error(&mut self, error: RuntimeError, cx: &mut Context<Self>) {
         self.focus_after_render = true;
-        if error == RuntimeError::ArchiveReplaced
-            && self
-                .form
-                .as_ref()
-                .is_some_and(|form| form.kind == FormKind::Notes)
-        {
+        if error.retires_session() {
             self.disconnect(cx);
             self.message = Some((ui_error(error), true));
             return;
@@ -4291,13 +4293,14 @@ impl ClinicalApp {
                 .child(heading("clinical-workspace-documents-heading", "Documenti", theme))
                 .child(button("clinical-workspace-new-document", "Aggiungi documento…", theme, true, writable)
                     .when(writable, |el| el.on_click(cx.listener(|this, _, _, cx| this.pick_document(cx))))))
+            .child(div().text_color(theme.secondary).child(text!("Prima del salvataggio puoi annullare la copia cambiando scheda o bloccando la sessione. Una copia già avviata può completarsi anche dopo il blocco.")))
             .when(self.document_busy, |el| el.child(notice("clinical-workspace-document-operation", "Operazione sul documento in corso…", theme, false)))
             .when(self.patient.attachments.message().is_some(), |el| el.child(self.load_hint("clinical-workspace-attachments-state", &self.patient.attachments)))
             .when(self.patient.attachments.ready().is_some_and(Vec::is_empty), |el| el.child(text!("Nessun documento presente nella scheda.")))
             .children(self.patient.attachments.ready().into_iter().flatten().map(|row| {
                 let name = if row.locked_fields.iter().any(|field| field == "name") { "Nome del documento non leggibile".into() } else { row.name.clone() };
                 let can_open = !self.document_busy && self.form.is_none();
-                let available = can_open && documents::original_readable(row);
+                let available = can_open && !self.copy_state.is_some_and(documents::CopyState::is_writing) && documents::original_readable(row);
                 let details_open = self.patient.document_details_id.as_deref() == Some(row.id.as_str());
                 let details_id = row.id.clone();
                 let id = row.id.clone();
@@ -6168,6 +6171,13 @@ impl Render for ClinicalApp {
                                     )
                                 },
                             )
+                            .when_some(self.copy_state, |el, state| {
+                                let (message, error) = state.notice();
+                                el.child(
+                                    notice("clinical-workspace-copy-state", message, theme, error)
+                                        .flex_shrink_0(),
+                                )
+                            })
                             .child(content),
                     ),
             )
@@ -6603,6 +6613,7 @@ impl ClinicalApp {
         self.document_busy = true;
         self.message = None;
         let epoch = self.epoch;
+        let authority = self.account_profile.generation;
         let chosen = cx.prompt_for_paths(gpui::PathPromptOptions {
             files: true,
             directories: false,
@@ -6612,27 +6623,11 @@ impl ClinicalApp {
         cx.spawn(async move |this, cx| {
             let result = chosen.await;
             let _ = this.update(cx, |this, cx| {
-                if this.epoch != epoch || this.session.is_none() { return; }
+                if !this.accept_document_picker(epoch, authority, cx) { return; }
                 match result {
                     Ok(Ok(Some(paths))) if paths.len() == 1 => {
                         let path = paths.into_iter().next().expect("one selected path");
-                        this.run(move || Ok(documents::read_selected_file(&path)), |this, result, _| {
-                            this.document_busy = false;
-                            match result {
-                                Ok(Ok(upload)) if this.form.is_none() && this.can_write(FormKind::Document) => {
-                                    this.form = Some(Form { kind: FormKind::Document, fields: vec![], upload: Some(upload), edit: None, patient_original: None, created_id: None, therapy: None, scale: None, state: FormState::Draft, _subscriptions: vec![] });
-                                    this.show_sections = false;
-                                    this.patient_section = PatientSection::Documents;
-                                    this.directory = false;
-                                    this.verified = None;
-                                    this.focus_after_render = true;
-                                    this.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
-                                }
-                                Ok(Ok(_)) => this.message = Some(("È già aperta una bozza o l'accesso è cambiato. Il file non è stato aggiunto.".into(), false)),
-                                Ok(Err(error)) => this.message = Some((error.to_string(), true)),
-                                Err(error) => this.message = Some((ui_error(error), true)),
-                            }
-                        }, cx);
+                        this.run(move || Ok(documents::read_selected_file(&path)), Self::receive_document_upload, cx);
                     }
                     Ok(Ok(None)) => this.document_busy = false,
                     _ => {
@@ -6646,8 +6641,95 @@ impl ClinicalApp {
         cx.notify();
     }
 
+    fn receive_document_upload(
+        &mut self,
+        result: Result<Result<documents::Upload, documents::DocumentError>, RuntimeError>,
+        _cx: &mut Context<Self>,
+    ) {
+        self.document_busy = false;
+        match result {
+            Ok(Ok(upload)) if self.form.is_none() && self.can_write(FormKind::Document) => {
+                self.form = Some(Form {
+                    kind: FormKind::Document,
+                    fields: vec![],
+                    upload: Some(upload),
+                    edit: None,
+                    patient_original: None,
+                    created_id: None,
+                    therapy: None,
+                    scale: None,
+                    state: FormState::Draft,
+                    _subscriptions: vec![],
+                });
+                self.show_sections = false;
+                self.patient_section = PatientSection::Documents;
+                self.directory = false;
+                self.verified = None;
+                self.focus_after_render = true;
+                self.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
+            }
+            Ok(Ok(_)) => {
+                self.message = Some((
+                    "È già aperta una bozza o l'accesso è cambiato. Il file non è stato aggiunto."
+                        .into(),
+                    false,
+                ))
+            }
+            Ok(Err(error)) => self.message = Some((error.to_string(), true)),
+            Err(error) => self.message = Some((ui_error(error), true)),
+        }
+    }
+
+    fn accept_document_picker(
+        &mut self,
+        epoch: u64,
+        authority: u64,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if self.account_profile.generation != authority {
+            return false;
+        }
+        if let Some(error) = self
+            .session
+            .as_ref()
+            .and_then(RuntimeSession::retirement_error)
+        {
+            self.save_error(error, cx);
+            return false;
+        }
+        self.epoch == epoch && self.session.is_some()
+    }
+
+    fn run_document_copy(
+        &mut self,
+        operation: impl FnOnce() -> Result<(), documents::DocumentError> + Send + 'static,
+        cx: &mut Context<Self>,
+    ) {
+        let epoch = self.epoch;
+        let authority = self.account_profile.generation;
+        self.copy_state = Some(documents::CopyState::Writing);
+        let task = cx.background_executor().spawn(async move { operation() });
+        cx.spawn(async move |this, cx| {
+            let result = task.await;
+            let _ = this.update(cx, |this, cx| {
+                this.copy_state = Some(documents::CopyState::Finished(result));
+                if this.epoch == epoch && this.account_profile.generation == authority {
+                    this.document_busy = false;
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+        cx.notify();
+    }
+
     fn download_document(&mut self, document_id: &str, cx: &mut Context<Self>) {
-        if self.document_busy || self.form.is_some() {
+        if self.document_busy
+            || self.form.is_some()
+            || self
+                .copy_state
+                .is_some_and(documents::CopyState::is_writing)
+        {
             return;
         }
         let Some(row) = self
@@ -6667,33 +6749,44 @@ impl ClinicalApp {
         // retains only the identifier, never an already-decrypted document.
         let chosen = cx.prompt_for_new_path(&directory, Some(&suggested));
         let epoch = self.epoch;
+        let authority = self.account_profile.generation;
         self.document_busy = true;
         self.message = Some(("Scegli dove salvare la copia del documento.".into(), false));
         cx.spawn(async move |this, cx| {
             let result = chosen.await;
             let _ = this.update(cx, |this, cx| {
-                if this.epoch != epoch || this.session.is_none() { return; }
+                if !this.accept_document_picker(epoch, authority, cx) { return; }
                 match result {
                     Ok(Ok(Some(path))) => {
                         let (Some(session), Some(scope), Some(patient_id)) = (this.session.clone(), this.scope.clone(), this.selected_id.clone()) else { return; };
-                        this.message = Some(("Lettura, verifica e salvataggio della copia…".into(), false));
+                        let context = session.request_context();
+                        this.copy_state = Some(documents::CopyState::Reading);
+                        this.message = None;
                         this.run(move || {
-                            let context = session.request_context();
                             context.check()?;
                             let attachment = session.read_attachment(&scope, &patient_id, &id)?;
-                            let bytes = match documents::decode_attachment(&attachment) {
-                                Ok(bytes) => bytes,
-                                Err(error) => return Ok(Err(error)),
-                            };
-                            context.check()?;
-                            Ok(documents::write_download(&path, &bytes))
-                        }, |this, result, _| {
-                            this.document_busy = false;
-                            this.message = Some(match result {
-                                Ok(Ok(())) => ("Copia salvata nella destinazione scelta. Il documento non è stato aperto.".into(), false),
-                                Ok(Err(error)) => (error.to_string(), true),
-                                Err(error) => (ui_error(error), true),
-                            });
+                            Ok(documents::decode_attachment(&attachment).map(|bytes| (context, path, bytes)))
+                        }, |this, result, cx| {
+                            match result {
+                                Ok(Ok((context, path, bytes))) => match documents::admit_download(&context, path, bytes) {
+                                    Ok(download) => this.run_document_copy(move || download.write(), cx),
+                                    Err(error) => {
+                                        this.copy_state = Some(documents::CopyState::Withdrawn);
+                                        this.document_busy = false;
+                                        if error.retires_session() { this.save_error(error, cx); }
+                                    }
+                                },
+                                Ok(Err(error)) => {
+                                    this.copy_state = None;
+                                    this.document_busy = false;
+                                    this.message = Some((error.to_string(), true));
+                                }
+                                Err(error) => {
+                                    this.copy_state = Some(documents::CopyState::Withdrawn);
+                                    this.document_busy = false;
+                                    this.message = Some((ui_error(error), true));
+                                }
+                            }
                         }, cx);
                     }
                     Ok(Ok(None)) => { this.document_busy = false; this.message = None; }
@@ -7148,7 +7241,7 @@ fn after_create_read<T>(
 ) -> Result<bool, RuntimeError> {
     match result {
         Ok(row) => Ok(matches(row)),
-        Err(error) if error.is_auth_failure() => Err(error),
+        Err(error) if error.retires_session() => Err(error),
         // Creation was acknowledged. A later read failure must never return the
         // form to an editable/resendable state: the record may already exist.
         Err(_) => Ok(false),
@@ -7341,6 +7434,60 @@ mod tests {
         }
     }
 
+    #[gpui::test]
+    fn g1a2_admitted_copy_result_after_restore_contains_only_technical_state(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            synthetic_notes_form(app, FormState::Draft, cx);
+            app.document_busy = true;
+            app.run_document_copy(|| Ok(()), cx);
+            app.disconnect(cx);
+        });
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert_eq!(app.copy_state, Some(documents::CopyState::Finished(Ok(()))));
+            assert!(app.copy_state.unwrap().notice().0.contains("completata"));
+            assert!(app.session.is_none());
+            assert!(app.form.is_none());
+            assert!(app.selected_id.is_none());
+            assert!(app.scope.is_none());
+            assert!(app.patient.detail.ready().is_none());
+            assert!(!app.document_busy);
+        });
+    }
+
+    #[gpui::test]
+    fn g1a2_copy_failure_and_stale_picker_cannot_mutate_a_new_form(cx: &mut gpui::TestAppContext) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let editor = view.update(cx, |app, cx| {
+            let epoch = app.epoch;
+            let authority = app.account_profile.generation;
+            app.run_document_copy(|| Err(documents::DocumentError::NotWritten), cx);
+            app.disconnect(cx);
+            let editor = synthetic_notes_form(app, FormState::Draft, cx);
+            app.message = Some(("Nuova bozza sintetica".into(), false));
+            assert!(!app.accept_document_picker(epoch, authority, cx));
+            editor
+        });
+        cx.run_until_parked();
+        view.read_with(cx, |app, cx| {
+            assert!(
+                app.form
+                    .as_ref()
+                    .is_some_and(|form| form.kind == FormKind::Notes)
+            );
+            assert!(!editor.read(cx).value().is_empty());
+            assert_eq!(app.message.as_ref().unwrap().0, "Nuova bozza sintetica");
+            let (message, failed) = app.copy_state.unwrap().notice();
+            assert!(failed);
+            assert!(message.contains("parziale"));
+        });
+    }
+
     #[test]
     fn worklist_keymap_keeps_characters_and_arrows_in_every_text_input() {
         let worklist = "MediFlowConnected MediFlowWorklist";
@@ -7477,6 +7624,14 @@ mod tests {
         assert_eq!(
             agenda_group("unknown", "2026-10-16", today),
             AgendaGroup::Undated
+        );
+    }
+
+    #[test]
+    fn g1a2_nested_restore_must_propagate_retirement() {
+        assert_eq!(
+            after_create_read::<()>(Err(RuntimeError::ArchiveReplaced), |_| true),
+            Err(RuntimeError::ArchiveReplaced)
         );
     }
 

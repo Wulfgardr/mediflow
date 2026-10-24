@@ -481,7 +481,7 @@ impl Record {
                 && row.patient_id() == self.patient_id()
                 && row.version() == expected
                 && draft.matches(&row)),
-            Err(error) if error.is_auth_failure() => Err(error),
+            Err(error) if error.retires_session() => Err(error),
             Err(_) => Ok(false), // An acknowledged write is never a resendable failure.
         }
     }
