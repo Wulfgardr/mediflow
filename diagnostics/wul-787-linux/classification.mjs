@@ -252,3 +252,53 @@ export function classifyBaseline(baseline, command, phaseDir) {
   // An earlier original assertion can fail before the probe is reached. Preserve it as FAIL/incomplete.
   return outcome;
 }
+
+export function assessPerDataResults(report, command, variant, phaseDir, source, manifest, formatError) {
+  const issues = [];
+  const requireProperty = (value, message) => { if (!value) issues.push(message); };
+  const tests = results(report);
+  requireProperty((report.errors ?? []).length === 0, 'Global runner/fixture/cleanup error');
+  requireProperty(report.config.projects.length === 1
+    && report.config.projects.every(project => project.outputDir === path.join(phaseDir, 'results')), 'Wrong reporter output/project');
+  requireProperty(tests.length === variant.titles.length
+    && [...tests.map(test => test.title)].sort().join('\n') === [...variant.titles].sort().join('\n'), 'Wrong case selection/count');
+  requireProperty(tests.every(test => test.expectedStatus === 'passed' && test.timeout === 45000
+    && test.results.length === 1 && test.results[0].retry === 0), 'Unexpected expectation/timeout/repeat/retry');
+  requireProperty(report.stats.skipped === 0 && report.stats.flaky === 0, 'Skipped or flaky case');
+  let overflowDelta = null;
+  if (variant.id === 'candidate') {
+    requireProperty(command.code === 0 && tests.every(test => test.results.length === 1
+      && cleanPassed(test.results[0])), 'Candidate cases did not both complete cleanly');
+    requireProperty(report.stats.expected === 2 && report.stats.unexpected === 0, 'Candidate summary disagreement');
+  } else {
+    const result = tests.length === 1 && tests[0].results.length === 1 ? tests[0].results[0] : null;
+    requireProperty(command.code === 1 && result?.status === 'failed'
+      && report.stats.expected === 0 && report.stats.unexpected === 1, 'Removal did not fail as required; PASS is a missed falsification');
+    const primary = result?.error;
+    const errors = result?.errors ?? [];
+    const strip = text => (text ?? '').replace(/\x1b\[[0-9;]*m/g, '');
+    const message = strip(primary?.message);
+    const match = /^Error: Overflow orizzontale su Misure per data\n\nexpect\(received\)\.toBeLessThanOrEqual\(expected\)\n\nExpected: <= 1\nReceived: +([0-9]+)$/.exec(message);
+    const helper = path.join(source, 'e2e/utils.ts');
+    const spec = path.join(source, 'e2e/measures-composition.spec.ts');
+    const point = manifest.overflowCallsite;
+    const location = value => value?.file === helper && value.line === point.helper.line && value.column === point.helper.column;
+    const expectedStack = message + '\n    at assertNoHorizontalOverflow (' + helper + ':' + point.helper.line + ':' + point.helper.column + ')'
+      + '\n    at ' + spec + ':' + point.spec.line + ':' + point.spec.column;
+    const primaryApproved = primary && Object.keys(primary).every(key => ['message', 'stack', 'location', 'snippet'].includes(key))
+      && match && Number.isSafeInteger(Number(match[1])) && Number(match[1]) > 1
+      && location(primary.location) && location(result.errorLocation) && strip(primary.stack) === expectedStack;
+    let formattedApproved = false;
+    if (primaryApproved && errors.length === 1) {
+      const expected = formatError(primary);
+      formattedApproved = Object.keys(errors[0]).every(key => ['message', 'location'].includes(key))
+        && errors[0].message === expected.message && location(errors[0].location);
+    }
+    requireProperty(Boolean(primaryApproved && formattedApproved), 'Not the sole original Per data overflow assertion; all errors retained');
+    if (primaryApproved && formattedApproved) overflowDelta = Number(match[1]);
+  }
+  return { phase: variant.id, accepted: issues.length === 0, issues, rawExit: command.code,
+    outcome: issues.length ? 'REJECTED' : variant.id === 'candidate' ? 'PASS' : 'EXPECTED_ORIGINAL_OVERFLOW',
+    overflowDelta, tests, globalErrors: report.errors ?? [], stats: report.stats,
+    interpretation: 'Only the new controlled variant contract; no historical reclassification or visual acceptance' };
+}
