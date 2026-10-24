@@ -65,6 +65,7 @@ impl WhoLookup {
 
 #[derive(Clone)]
 struct WhoToken {
+    authority: u64,
     epoch: u64,
     revision: u64,
     query: Option<String>,
@@ -91,6 +92,7 @@ impl ClinicalApp {
         }
         self.who.query = query.clone();
         WhoToken {
+            authority: self.account_profile.generation,
             epoch: self.epoch,
             revision: self.who.revision,
             query,
@@ -98,7 +100,8 @@ impl ClinicalApp {
     }
 
     fn current_who(&self, token: &WhoToken, cx: &App) -> bool {
-        self.area == Area::References
+        self.account_profile.generation == token.authority
+            && self.area == Area::References
             && self.reference_kind == ReferenceKind::Who
             && self.epoch == token.epoch
             && self.who.revision == token.revision
@@ -109,21 +112,19 @@ impl ClinicalApp {
     }
 
     fn receive_who(&mut self, token: WhoToken, result: WhoResult, cx: &mut Context<Self>) -> bool {
+        let error = match &result {
+            WhoResult::Readiness(result) => result.as_ref().err().copied(),
+            WhoResult::Search(result) => result.as_ref().err().copied(),
+        };
+        match self.check_callback(token.authority, error, cx) {
+            CallbackState::StaleAuthority => return false,
+            CallbackState::Retired => return true,
+            CallbackState::Current => {}
+        }
         if !self.current_who(&token, cx) {
             return false;
         }
-        let error = match &result {
-            WhoResult::Readiness(result) => result.as_ref().err(),
-            WhoResult::Search(result) => result.as_ref().err(),
-        };
-        if let Some(error) = error {
-            if error.is_auth_failure() {
-                let message = ui_error(*error);
-                self.disconnect(cx);
-                self.message = Some((message, true));
-                return true;
-            }
-            // A past availability observation must not obscure a failed request.
+        if error.is_some() {
             self.who.readiness = Load::Idle;
         }
         match result {
@@ -220,6 +221,7 @@ impl ClinicalApp {
         let query_valid = normalize_who_query(self.reference_search.read(cx).value()).is_ok();
         let can_search = can_read && query_valid;
         let token = WhoToken {
+            authority: self.account_profile.generation,
             epoch: self.epoch,
             revision: self.who.revision,
             query: self.who.query.clone(),
@@ -385,6 +387,176 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    fn restore_result(search: bool, error: RuntimeError) -> WhoResult {
+        if search {
+            WhoResult::Search(Err(error))
+        } else {
+            WhoResult::Readiness(Err(error))
+        }
+    }
+
+    fn callback_restore(
+        cx: &mut gpui::TestAppContext,
+        search: bool,
+        stale_query: bool,
+        retained_reason: bool,
+    ) {
+        let host = crate::shell::notes_recovery_tests::Host::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let (token, editor) = view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            app.area = Area::References;
+            app.reference_kind = ReferenceKind::Who;
+            app.reference_search
+                .update(cx, |input, cx| input.set_content("synthetic", cx));
+            let editor = app.account_profile.synthetic_draft(cx);
+            let token = if retained_reason {
+                app.begin_who(search.then(|| "synthetic".into()))
+            } else {
+                host.replace_archive();
+                app.request_who(search, cx);
+                WhoToken {
+                    authority: app.account_profile.generation,
+                    epoch: app.epoch,
+                    revision: app.who.revision,
+                    query: app.who.query.clone(),
+                }
+            };
+            if stale_query {
+                app.reference_search
+                    .update(cx, |input, cx| input.set_content("different", cx));
+                app.who_query_changed();
+            }
+            (token, editor)
+        });
+        if retained_reason {
+            host.replace_archive();
+            let result = if search {
+                host.session.search_who("scope-a", "synthetic").map(|_| ())
+            } else {
+                host.session.read_who_readiness("scope-a").map(|_| ())
+            };
+            assert_eq!(result, Err(RuntimeError::ArchiveReplaced));
+            view.update(cx, |app, cx| {
+                app.receive_who(token, restore_result(search, RuntimeError::Transport), cx);
+            });
+        }
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert!(
+                app.session.is_none(),
+                "WHO callback lost current-authority restore"
+            );
+            assert!(app.form.is_none());
+            assert!(app.scope.is_none());
+            assert!(app.selected_id.is_none());
+            assert!(matches!(app.who.readiness, Load::Idle));
+            assert!(matches!(app.who.rows, Load::Idle));
+            assert!(
+                app.message
+                    .as_ref()
+                    .unwrap()
+                    .0
+                    .contains(&ui_error(RuntimeError::ArchiveReplaced))
+            );
+        });
+        editor.read_with(cx, |input, _| {
+            assert!(input.value().is_empty());
+            assert!(input.read_only);
+        });
+        let requests = host.request_count();
+        assert_eq!(
+            host.session
+                .update_patient_notes("scope-a", "patient-a", 1, "late write"),
+            Err(RuntimeError::Locked)
+        );
+        assert_eq!(host.request_count(), requests);
+    }
+
+    fn old_authority(cx: &mut gpui::TestAppContext, search: bool) {
+        let old = crate::shell::notes_recovery_tests::Host::new();
+        let fresh = crate::shell::notes_recovery_tests::Host::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            app.session = Some(old.session.clone());
+            let old_token = app.begin_who(search.then(|| "synthetic".into()));
+            app.disconnect(cx);
+            app.session = Some(fresh.session.clone());
+            app.message = None;
+            app.scope = Some("scope-a".into());
+            pending(app, cx);
+            let editor = app.account_profile.synthetic_draft(cx);
+            assert!(!app.receive_who(
+                old_token,
+                restore_result(search, RuntimeError::ArchiveReplaced),
+                cx
+            ));
+            assert!(
+                app.session
+                    .as_ref()
+                    .is_some_and(|session| !session.is_locked())
+            );
+            assert_eq!(editor.read(cx).value(), "Bozza account sintetica");
+            assert!(app.message.is_none());
+            assert!(matches!(app.who.rows, Load::Loading));
+        });
+        cx.run_until_parked();
+        let requests = old.request_count();
+        assert_eq!(
+            old.session
+                .update_patient_notes("scope-a", "patient-a", 1, "late write"),
+            Err(RuntimeError::Locked)
+        );
+        assert_eq!(old.request_count(), requests);
+        assert!(
+            fresh
+                .session
+                .can_write("network.replica.write-patient-profile")
+        );
+    }
+
+    #[gpui::test]
+    fn g1a2_r2_who_readiness_current_callback_retires_restore(cx: &mut gpui::TestAppContext) {
+        callback_restore(cx, false, false, false);
+    }
+    #[gpui::test]
+    fn g1a2_r2_who_search_current_callback_retires_restore(cx: &mut gpui::TestAppContext) {
+        callback_restore(cx, true, false, false);
+    }
+    #[gpui::test]
+    fn g1a2_r2_who_readiness_old_query_same_authority_retires_restore(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        callback_restore(cx, false, true, false);
+    }
+    #[gpui::test]
+    fn g1a2_r2_who_search_old_query_same_authority_retires_restore(cx: &mut gpui::TestAppContext) {
+        callback_restore(cx, true, true, false);
+    }
+    #[gpui::test]
+    fn g1a2_r2_who_readiness_consumes_retained_retirement_reason(cx: &mut gpui::TestAppContext) {
+        callback_restore(cx, false, true, true);
+    }
+    #[gpui::test]
+    fn g1a2_r2_who_search_consumes_retained_retirement_reason(cx: &mut gpui::TestAppContext) {
+        callback_restore(cx, true, true, true);
+    }
+    #[gpui::test]
+    fn g1a2_r2_who_readiness_old_authority_preserves_new_session_and_draft(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        old_authority(cx, false);
+    }
+    #[gpui::test]
+    fn g1a2_r2_who_search_old_authority_preserves_new_session_and_draft(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        old_authority(cx, true);
+    }
+
     #[gpui::test]
     fn who_text_accessible_ids(cx: &mut gpui::TestAppContext) {
         let mut app: Option<Entity<ClinicalApp>> = None;
@@ -442,6 +614,8 @@ mod tests {
             assert!(!app.receive_who(old, WhoResult::Search(Ok(response(false))), cx));
             let token = pending(app, cx);
             app.who.clear_results();
+            app.disconnect(cx);
+            pending(app, cx);
             assert!(!app.receive_who(
                 token,
                 WhoResult::Search(Err(RuntimeError::Authentication)),

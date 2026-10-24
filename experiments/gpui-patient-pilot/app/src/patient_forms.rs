@@ -193,7 +193,7 @@ pub fn create(
     let draft = create_draft(values).map_err(|_| RuntimeError::InvalidInput)?;
     let created = session.create_patient(scope, &draft)?;
     if let Err(error) = session.bind_created_profile(scope, &created.id, intent) {
-        if error.is_auth_failure() {
+        if error.retires_session() {
             return Err(error);
         }
         return Ok(Creation::Unconfirmed {
@@ -221,7 +221,7 @@ pub fn create(
         {
             Ok(Creation::Verified(Box::new(row)))
         }
-        Err(error) if error.is_auth_failure() => Err(error),
+        Err(error) if error.retires_session() => Err(error),
         Err(RuntimeError::ProfileTooLarge) => Ok(Creation::Unconfirmed {
             id: created.id,
             read_error: Some(RuntimeError::ProfileTooLarge),
@@ -279,7 +279,7 @@ pub fn update(
         {
             Ok(Some(row))
         }
-        Err(error) if error.is_auth_failure() || error == RuntimeError::ProfileTooLarge => {
+        Err(error) if error.retires_session() || error == RuntimeError::ProfileTooLarge => {
             Err(error)
         }
         _ => Ok(None),
