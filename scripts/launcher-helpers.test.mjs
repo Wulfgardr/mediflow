@@ -1504,7 +1504,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     const stopControl = path.join(directory, 'stop.json'), runtimePid = path.join(directory, 'runtime-pid.json');
     const groupHistory = path.join(directory,'owned-groups.ndjson'), groupCleanup = path.join(directory,'owned-group-cleanup');
     const stopTrace = path.join(directory, 'stop-trace.ndjson'), stopLoader = path.join(directory, 'stop-loader.mjs');
-    const startupGate = path.join(directory, 'startup.release');
+    const startupGate = path.join(directory, 'startup.release'), stopExitGate = path.join(directory, 'stop-exit.release');
     const observationFile = path.join(directory, 'stop-observation.ndjson'), ownerLoader = path.join(directory, 'owner-loader.mjs');
     const controlRequest = path.join(directory, 'drain-request.json'), controlReply = path.join(directory, 'drain-reply.json');
     const fixtureGeneration = crypto.randomUUID();
@@ -1698,7 +1698,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     const from = text.indexOf('export async function stopOwnedChild'), to = text.indexOf('export function installDesktopEntry',from);
                     if (from < 0 || to < from) throw new Error('FIXTURE_STOP_HELPER_NOT_FOUND');
                     text = text.slice(0,from) + text.slice(from,to).replaceAll('process.platform', ${JSON.stringify(JSON.stringify(lifecycle.platform))}) + text.slice(to);
-                    result.source = text.replace('stopOwnedChild(child, 8000)', 'stopOwnedChild(child, ${lifecycle.group ? 600 : 60})')
+                    result.source = text.replace('stopOwnedChild(child, 8000)', ${JSON.stringify(lifecycle.group ? 'stopOwnedChild(child, 600)' : `stopOwnedChild(child, JSON.parse(fs.readFileSync(${JSON.stringify(stopControl)})).failure === null ? 8000 : 60)`)})
                         .replace('const finish = cause => {', 'const finish = cause => { if(cause) process.stderr.write("FIXTURE_STOP_CAUSE " + cause.code + " " + cause.message + String.fromCharCode(10));');
                 }
                 return result;
@@ -1778,7 +1778,13 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 process.stderr.write('MEDIFLOW_HEADLESS_WEB_READY ' + JSON.stringify({ url: 'http://127.0.0.1:' + server.address().port }) + '\\n');
             });
             process.on('message', frame => process.stderr.write('FIXTURE_NAVIGATION ' + JSON.stringify(frame) + '\\n'));
-            process.on('SIGTERM', () => { server.close(); process.disconnect?.(); });
+            process.on('SIGTERM', async () => {
+                ${lifecycle?.stopExitGate ? `
+                    fs.appendFileSync(${JSON.stringify(observationFile)}, JSON.stringify({type:'child-stop-waiting',pid:process.pid,at:Date.now()})+'\\n');
+                    await new Promise(resolve => { const timer = setInterval(() => { if (fs.existsSync(${JSON.stringify(stopExitGate)})) { clearInterval(timer); resolve(); } }, 10); });
+                ` : ''}
+                server.close(); process.disconnect?.();
+            });
         }`);
     mkdirSync(path.join(source, 'node_modules/next/dist/bin'), { recursive: true });
     writeFileSync(path.join(source, 'node_modules/next/dist/bin/next'), readFileSync(path.join(source, 'scripts/source-runtime.mjs'), 'utf8').replace("endsWith('source-runtime.mjs')", "endsWith('next')"));
@@ -1891,6 +1897,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     })();
     const cleanup = () => cleanupTask ||= (async () => {
         const failures = [];
+        if (lifecycle?.stopExitGate) writeFileSync(stopExitGate, 'owned fixture stop release');
         try {
             if (!terminalFailureObserved && child.exitCode === null && child.signalCode === null) {
                 await postStop('shutdown');
@@ -1942,7 +1949,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
             await new Promise(resolve => setTimeout(resolve, 10));
         }
     };
-    return { source, data, stateFiles, child, closed, until, waitForTerminal, observations, cleanup, stopControl, stopTrace, runtimePid, releaseStartup: () => writeFileSync(startupGate,'owned fixture startup'), requestGroupCleanup: () => writeFileSync(groupCleanup,'owned fixture cleanup'), environment: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home }, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
+    return { source, data, stateFiles, child, closed, until, waitForTerminal, observations, cleanup, stopControl, stopTrace, runtimePid, releaseStopExit: () => writeFileSync(stopExitGate, 'owned fixture stop release'), releaseStartup: () => writeFileSync(startupGate,'owned fixture startup'), requestGroupCleanup: () => writeFileSync(groupCleanup,'owned fixture cleanup'), environment: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home }, expected: { dataDir: data, sourceFingerprint: identity.sourceFingerprint }, output: () => output };
 }
 
 
@@ -2027,7 +2034,8 @@ for (const scenario of ['signal','chooser','error','switch','probe-EPERM','probe
 for (const simulatedStopPlatform of ['win32', 'linux']) for (const failure of simulatedStopPlatform === 'win32' ? ['error', 'status', 'no-exit'] : ['error', 'no-exit']) {
     for (const trigger of ['signal', 'chooser', 'error', 'switch']) test(`unconfirmed ${simulatedStopPlatform} ${failure} stop via ${trigger} retains the live owner`, { timeout: 15000 }, async t => {
         const actualOS = process.platform;
-        const f = await ordinaryLauncherFixture(t, 'web', ['--scelta', 'web'], true, trigger !== 'error', {}, null, {platform:simulatedStopPlatform,failure});
+        const stopExitGate = simulatedStopPlatform === 'win32' && failure === 'no-exit' && trigger === 'chooser';
+        const f = await ordinaryLauncherFixture(t, 'web', ['--scelta', 'web'], true, trigger !== 'error', {}, null, {platform:simulatedStopPlatform,failure,stopExitGate});
         if (trigger !== 'error') await f.until(() => f.output().includes('Pronto:'));
         else await f.until(() => existsSync(f.stopTrace));
         const file = launcherReceiptFile(f.stateFiles.lockDirectory), receipt = JSON.parse(readFileSync(file));
@@ -2075,7 +2083,19 @@ for (const simulatedStopPlatform of ['win32', 'linux']) for (const failure of si
         assert.deepEqual(causes,['FIXTURE_STOP_CAUSE '+expectedCause],f.output());
         t.diagnostic(JSON.stringify({actualOS,simulatedStopPlatform,failure,trigger,activations,frames,trace,causes}));
         atomicJson(f.stopControl,{platform:simulatedStopPlatform,failure:null});
-        await stop(); await waitForFixtureClose(f.closed);
+        try {
+            await stop();
+            if (stopExitGate) {
+                await f.until(() => f.observations().some(event => event.type === 'child-stop-waiting'));
+                await new Promise(resolve => setTimeout(resolve, 120));
+                assert.equal(f.observations().filter(event => event.type === 'stop-result').length, 1, 'The positive stop inherited the synthetic negative deadline');
+                assert.equal(f.observations().some(event => event.type === 'child-exit'), false);
+                const pending = claimLauncher(f.stateFiles.lockDirectory,{checkoutPath:f.source+path.sep},{reuseLive:true});
+                try { assert.equal(pending.claimed,false); assert.deepEqual(pending.receipt,receipt); }
+                finally { if (pending.claimed) releaseLauncher(pending); }
+            }
+        } finally { if (stopExitGate) f.releaseStopExit(); }
+        await waitForFixtureClose(f.closed);
         assert.equal(existsSync(path.join(f.stateFiles.lockDirectory,'active')),false);
         const successor = claimLauncher(f.stateFiles.lockDirectory,{checkoutPath:f.source+path.sep});
         try {
