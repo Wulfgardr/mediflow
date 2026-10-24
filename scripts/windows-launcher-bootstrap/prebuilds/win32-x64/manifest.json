@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 2,
+  "exports": [
+    "getProcessCreationTimeTicks",
+    "getSystemDirectory"
+  ],
+  "platform": "win32",
+  "arch": "x64",
+  "napiVersion": 1,
+  "binary": "system-directory.node",
+  "bytes": 5120,
+  "sha256": "517987b01c4b81dcebc38eb23751508da5ef9003b9a7863cea6282974a8c476a",
+  "dependencies": [
+    "kernel32.dll",
+    "node.exe"
+  ],
+  "sourceSha256": "af84f4fa50b5d58aea74ff025d623d242d9c69785052f5fe3cdb3a2106aa1852",
+  "recipeSha256": "576c867a61525717b5bb5d613b92f195432357306ced21cdec07adae78c9c1f1",
+  "builderSha256": "06bb682508752468bb3244057c33665a12a0906bf1a576df0fbe1d71f6aeca22",
+  "sdk": {
+    "node": "24.22.0",
+    "headersSha256": "00e9f08b9057f9f5428387a5ffd496e53f274565b40b144b7ba876700755352a",
+    "librarySha256": "a0a84aa03917b578d286010b7521837e9ff1136ffb2e4a406c14316c33fd06f7"
+  },
+  "build": {
+    "node": "v24.22.1",
+    "arch": "x64",
+    "machine": "x86_64",
+    "uv": "1.52.1",
+    "compiler": "19.51.36260.0",
+    "architecture": "x64"
+  }
+}

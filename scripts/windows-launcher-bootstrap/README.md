@@ -44,13 +44,18 @@ Manifest schema 2 lists the exact ordered exports
 digests, SDK and compiler provenance. Hashes attest identity/integrity, not
 source-to-binary equivalence. Review and commit both files for each admitted
 architecture before distributing source. The cross-platform workflow uploads
-these two files, and consumer jobs download and verify them without building
-at product startup. Missing/unreviewed artifacts do not qualify distribution.
-No artifacts have yet been produced or admitted in this checkout. Before
-admission, downloaded untracked artifacts change Git source identity: the
-production build/start gate may deny that checkout. It must not be bypassed
-with automatic staging, commits, exclusions or an identity override. The
-initial artifact-production run is not final source-package qualification.
+these two files, and consumer jobs download them only when absent, then verify
+them without building at product startup. Missing/unreviewed artifacts do not
+qualify distribution. The original x64 and ARM64 binary/manifest pairs are
+admitted and versioned in this checkout. With both pairs present, the workflow
+skips the development build and consumer download; native jobs verify the
+checkout files with `verify`, `verify-shadow` and `source-first`. Versioning
+these artifacts does not qualify the final Windows candidate; its CI and
+application gates remain required. Before admission, downloaded untracked
+artifacts change Git source identity: the production build/start gate may deny
+that checkout. It must not be bypassed with automatic staging, commits,
+exclusions or an identity override. The initial artifact-production run is not
+final source-package qualification.
 
 `verify-shadow` initializes the real binding with an owned cwd/PATH shadow and
 false inherited roots. The separate transaction-tree gate stops its original
