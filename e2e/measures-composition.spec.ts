@@ -113,12 +113,33 @@ for (const state of ['loading', 'error', 'denied'] as const) test(`Misure: lettu
 });
 
 test('Misure: chiusura e ripresa conservano bozza, select e data; invio usa il paziente corrente', async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1000 });
     const id = await fixture(page, 0);
+    await page.evaluate(() => { document.documentElement.classList.remove('light'); document.documentElement.classList.add('dark'); });
     await creation(page).click();
     const form = register(page).locator('form');
     const parameter = form.getByRole('combobox', { name: 'Parametro', exact: true });
     await expect(parameter).toBeFocused();
     await expect(page.locator('.mf-button-primary:visible, .ui-btn-primary:visible')).toHaveCount(1);
+    const value = form.getByLabel('Valore', { exact: true });
+    const indicator = () => value.evaluate(element => {
+        const css = getComputedStyle(element);
+        return { active: document.activeElement === element, border: css.borderColor, borderStyle: css.borderStyle,
+            borderWidth: css.borderWidth, outline: css.outlineColor, outlineStyle: css.outlineStyle,
+            outlineWidth: css.outlineWidth, shadow: css.boxShadow };
+    });
+    const resting = await indicator();
+    await value.focus();
+    await value.fill('127');
+    await expect(value).toBeFocused();
+    const focused = await indicator();
+    await test.info().attach('indicatori-fuoco-valore', { contentType: 'application/json', body: JSON.stringify({ resting, focused }) });
+    await value.scrollIntoViewIfNeeded();
+    await test.info().attach('fuoco-valore-grafite-768', { body: await page.screenshot({ animations: 'disabled' }), contentType: 'image/png' });
+    const visibleColor = (color: string) => color !== 'transparent' && !/rgba\([^)]*, 0\)/.test(color);
+    const border = focused.border !== resting.border && visibleColor(focused.border) && parseFloat(focused.borderWidth) > 0 && focused.borderStyle !== 'none';
+    const outline = visibleColor(focused.outline) && parseFloat(focused.outlineWidth) > 0 && !['none', 'hidden'].includes(focused.outlineStyle);
+    expect(border || outline || focused.shadow !== 'none', JSON.stringify({ resting, focused })).toBe(true);
     await parameter.selectOption('2339-0');
     await form.getByLabel('Valore', { exact: true }).fill('95,5');
     await form.getByLabel('Data e ora').fill('2026-10-12T09:30');
