@@ -10,6 +10,56 @@ final class HomeBasePatientsClientTests: XCTestCase {
         super.tearDown()
     }
 
+    func testNativeFabricUsesOnlyNamedRoutesAndClosedSelectorOrAttempt() async throws {
+        let id = "12345678-1234-4234-8234-123456789abc"
+        let grant = String(repeating: "a", count: 64)
+        var paths: [String] = []
+        let client = makeClient { request in
+            let path = try XCTUnwrap(request.url?.path); paths.append("\(request.httpMethod ?? "GET") \(path)")
+            XCTAssertNil(request.url?.query)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cache-Control"), "no-store")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "synthetic-client")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "mediflow_session=synthetic; ambulatory_id=synthetic-ambulatory")
+            XCTAssertNil(request.value(forHTTPHeaderField: "x-mediflow-function-model"))
+            if path.hasSuffix("/prepare") {
+                let body = try self.requestObject(request)
+                XCTAssertEqual(Set(body.keys), ["functionId", "patientId", "ambulatoryId", "patientRevision", "input"])
+                XCTAssertEqual((body["input"] as? [String: String])?["selector"], "current_patient_insight")
+            } else if path.hasSuffix("/generate") || path.hasSuffix("/cancel") {
+                XCTAssertEqual(try self.requestObject(request) as? [String: String], ["attemptId": id])
+            } else if path.hasSuffix("/project") {
+                XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Ordinary-Projection"), grant)
+            } else { XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Fabric-Attempt"), id) }
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+                Data("{\"schema\":\"mediflow.native-fabric.v1\",\"phase\":\"closed\",\"cleanupConfirmed\":true}".utf8))
+        }
+        let credentials = HomeBasePairedCredentials(clientId: "synthetic-client", clientToken: "synthetic-token")
+        let cookie = "mediflow_session=synthetic"
+        _ = try await client.prepareNativeFabric(.init(functionId: .patientInsight, patientId: "synthetic-patient", ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .patientInsight), credentials: credentials, sessionCookie: cookie)
+        let planData = Data("{\"schemaVersion\":\"mediflow.native-ordinary.source-projection.v1\",\"grantId\":\"\(grant)\",\"functionId\":\"patient_insight\",\"expiresAt\":9999999999999,\"roster\":[{\"entity\":\"patient\",\"id\":\"synthetic-patient\",\"fields\":[\"notes\"]}]}".utf8)
+        let plan = try JSONDecoder().decode(NativeOrdinaryProjectionPlan.self, from: planData)
+        _ = try await client.projectNativeFabric(plan, body: Data("{}".utf8), credentials: credentials, sessionCookie: cookie, ambulatoryId: "synthetic-ambulatory")
+        _ = try await client.commandNativeFabric(.generate(id), credentials: credentials, sessionCookie: cookie, ambulatoryId: "synthetic-ambulatory")
+        _ = try await client.statusNativeFabric(attemptId: id, credentials: credentials, sessionCookie: cookie, ambulatoryId: "synthetic-ambulatory")
+        _ = try await client.commandNativeFabric(.cancel(id), credentials: credentials, sessionCookie: cookie, ambulatoryId: "synthetic-ambulatory")
+        _ = try await client.cancelNativeFabricProjection(plan, credentials: credentials, sessionCookie: cookie, ambulatoryId: "synthetic-ambulatory")
+        XCTAssertEqual(paths, ["POST /api/v1/network/ai/fabric/prepare", "POST /api/v1/network/ai/fabric/project", "POST /api/v1/network/ai/fabric/generate", "GET /api/v1/network/ai/fabric/status", "POST /api/v1/network/ai/fabric/cancel", "DELETE /api/v1/network/ai/fabric/project"])
+    }
+    func testNativeFabricFailureDoesNotExposeHostErrorTextOrUnknownCodes() async throws {
+        for code in ["function_disabled", "forged-sensitive-message"] {
+            let client = makeClient { request in
+                (HTTPURLResponse(url: request.url!, statusCode: 403, httpVersion: nil, headerFields: nil)!,
+                 Data("{\"code\":\"\(code)\",\"error\":\"sensitive synthetic host marker\"}".utf8))
+            }
+            do {
+                _ = try await client.statusNativeFabric(attemptId: nil, credentials: .init(clientId: "synthetic", clientToken: "synthetic"), sessionCookie: "mediflow_session=synthetic", ambulatoryId: nil)
+                XCTFail("Expected closed typed failure")
+            } catch let error as NativeFabricFailure {
+                XCTAssertEqual(error.code, code == "function_disabled" ? .functionDisabled : .unavailable)
+            }
+        }
+    }
+
     func testArchiveHealthErrorsUseOnlyPublicCodeBeforeSendingCredentials() async throws {
         let messages = [
             "DATA_DIR_UNAVAILABLE": "La cartella dell’archivio sul Mac non è disponibile. Verifica l’accesso alla cartella dati sul Mac e riprova.",

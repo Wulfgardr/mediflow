@@ -1,6 +1,6 @@
 {
   "generated": "2026-08-21",
-  "source": "MediFlow 0.8 parity closeout against the frozen local source candidate",
+  "source": "Fotografia storica MediFlow 0.8: gap e conteggi congelati non classificano il candidato corrente; aggiornamento AI4 WUL-794 nel campo nativeFabric794",
   "release08Gate": {
     "asOf": "2026-09-04",
     "status": "hold-promotion",
@@ -137,8 +137,8 @@
       "area": "terapie",
       "feature": "Ragionamento terapeutico AI (Treatment Reasoning, review-only)",
       "web": "pannello AI genera bozza (raccomandazione/evidenze/flag sicurezza/writePolicy), gated kill switch AI_TREATMENT_REASONING (components/treatment-reasoning-panel.tsx)",
-      "native": "missing: nessuna superficie AI reasoning lato Apple",
-      "boundary": "missing: nessuna route paired; /api/system/treatment-reasoning/athena-mlx host-only",
+      "native": "Quattro consumer Apple già presenti in NativeOrdinaryViews: Treatment Reasoning include la lane ChatGPT ordinary esplicita. WUL-794 collega anche il percorso locale host tramite NativeFabricModel/NativeFabricViews; proposta review-only, senza writer. Prove sintetiche distinte da UI integrata e modello reale.",
+      "boundary": "ADR0076 emendato: network/ai/fabric nominative, pairing+operatore+scope+fonti+lease e FunctionModelDispatch host; ATHENA locale già configurato, nessuna installazione o fallback. Amministrazione runtime host-only. Il campo gap appartiene alla fotografia storica 0.8.",
       "gap": "host-only",
       "wave": "W5-ai-avanzate",
       "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; docs-plan(AI plane separato)"
@@ -197,8 +197,8 @@
       "area": "documenti",
       "feature": "Upload documenti + OCR + sintesi clinica (Archivio documenti)",
       "web": "drag&drop multi-file, OCR automatico, sintesi, coda OCR-needed, riprova OCR, preview, delete (components/document-upload.tsx)",
-      "native": "partial nella riga aggregata: upload nativo con picker singolo (fileImporter allowsMultipleSelection:false e PhotosPickerItem?) e sigillo ENC client-side, precheck dimensione wire, archivio, dettaglio on-demand, preview e condivisione. Il multi-file web è una differenza operativa del picker; OCR, sintesi e curation restano intenzionalmente host/web per ADR 0076 Classe C; SPM/UI/interop del percorso nativo resta pending",
-      "boundary": "partial nella riga aggregata: famiglia documenti network con create Classe A sigillata ENC; PUT/DELETE e OCR/sintesi/curation restano host per ADR 0076. Il boundary è platform-specific-documented",
+      "native": "partial nella riga aggregata: upload nativo con picker singolo (fileImporter allowsMultipleSelection:false e PhotosPickerItem?) e sigillo ENC client-side, precheck dimensione wire, archivio, dettaglio on-demand, preview e condivisione. Il multi-file web è una differenza operativa del picker; OCR e curation restano host/web per ADR 0076 Classe C; Document Synthesis ha già un consumer ordinary e WUL-794 aggiunge la proposta locale tramite host, senza persistenza; SPM/UI/interop del percorso nativo resta pending",
+      "boundary": "partial nella riga aggregata: famiglia documenti network con create Classe A sigillata ENC; PUT/DELETE, OCR e curation restano host per ADR 0076; la proposta Document Synthesis è accessibile tramite le lane nominate ordinary/Fabric, senza write. Il boundary è platform-specific-documented",
       "gap": "partial",
       "wave": "W5-ai-avanzate",
       "evidence": "PR #16 + PR #17; PairedPatientDocumentsSection (fileImporter allowsMultipleSelection:false, PhotosPickerItem?, uploadAttachmentForSelectedPatient), PairedAttachmentDetailView e PairedAttachmentPreview; lib/network-attachment-{read,write}; smoke home-base-documents-write; Evidence Stack web E2E 2/2 su base 9ee798887 con PIN sintetico 0000. OCR/sintesi/curation restano host ADR 0076; prova UI/interop nativa pending"
@@ -217,8 +217,8 @@
       "area": "documenti",
       "feature": "Smart Import (candidati diagnosi/terapie da documenti, applica in scheda)",
       "web": "analisi AI candidati ICD-11/AIFA, select/edit/scarta, preview resolver, applica scrittura, kill switch AI_SMART_IMPORT (https://github.com/Wulfgardr/mediflow/blob/v0.9.0/components/patient-smart-import-panel.tsx)",
-      "native": "host-only per la policy corrente: nessuna superficie Smart Import lato Apple; WUL-409 resta una lane review-first separata, non un requisito automatico di parity",
-      "boundary": "host-only: ADR 0076 esclude scritture document-derived/AI dal client paired finche una nuova decisione non ne ridefinisce il boundary",
+      "native": "Consumer Smart Import Apple già presente per ChatGPT ordinary; WUL-794 collega anche la proposta locale governata dall’host. Nessun apply da mobile: WUL-409 e i writer restano separati.",
+      "boundary": "ADR0076: eccezioni nominate ordinary e Fabric locale, con acquisizione/proiezione canoniche e proposta-only. Le scritture document-derived restano escluse. Il campo gap è storico 0.8.",
       "gap": "host-only",
       "wave": "W5-ai-avanzate",
       "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; native-ui.documenti"
@@ -237,8 +237,8 @@
       "area": "insight",
       "feature": "AI Patient Insight (sintesi/follow-up/alert generati)",
       "web": "generate/regenerate insight, stop, badge stale, dettagli fonti/limiti, kill switch AI_PATIENT_INSIGHT (components/ai-patient-insight.tsx)",
-      "native": "missing (view-only): aiSummary mostrato read-only, nessuna generazione lato client",
-      "boundary": "missing: conversations/messages/AI writes esclusi; solo output già persistiti eventualmente leggibili",
+      "native": "Consumer Patient Insight Apple già presente per ChatGPT ordinary; WUL-794 aggiunge preparazione/generazione locale sull’host con catalogo e preferenza host, revoca e risultato da rivedere.",
+      "boundary": "Route ordinary e Fabric nominate: nessuna chat generica o scrittura clinica; fonte e currentness host-owned. Il campo gap è storico 0.8.",
       "gap": "host-only",
       "wave": "W5-ai-avanzate",
       "evidence": "PR #16 (Wave 5) + PR #17 (gate XCUITest), CI GitHub pubblica; docs-plan(AI plane separato)"
@@ -708,7 +708,7 @@
       "feature": "Governance AI: parliament dei modelli e prontezza al rollout",
       "web": "AiModelParliamentPanel e AiRolloutReadinessPanel in app/settings/ai/governance/page.tsx",
       "native": "host-only: parliament e readiness descrivono il runtime e la postura di rilascio del nodo host, non del client paired",
-      "boundary": "host-only: ADR 0076 esclude l'invocazione AI paired; la governance osserva e governa il calcolo dell'host e non e un gap di parity del client Apple.",
+      "boundary": "host-only amministrativo: ADR0076 ammette soltanto i quattro consumer nominati ordinary/Fabric; la governance osserva e governa il calcolo dell'host e non e un gap di parity del client Apple.",
       "gap": "host-only",
       "wave": "W5-ai-avanzate",
       "evidence": "2026-08-07: app/settings/ai/governance/page.tsx; lib/settings-navigation.ts; docs/adr/0076-paired-document-domain-write-policy.md"
@@ -802,5 +802,29 @@
     "missing": 0,
     "hostOnly": 23,
     "openNonHost": 13
+  },
+  "nativeFabric794": {
+    "asOf": "2026-10-25",
+    "issue": "WUL-794",
+    "status": "implemented-synthetic-verification",
+    "historicalCounts": "rows.gap, summary and reconciliation.featureParity remain the frozen 0.8 classification, not current AI4 readiness",
+    "functions": [
+      "patient_insight",
+      "smart_import",
+      "document_synthesis",
+      "treatment_reasoning"
+    ],
+    "consumers": "NativeOrdinaryViews routes all four to NativeFabricExperience; local host path and explicit ChatGPT ordinary remain separate",
+    "localAuthority": "paired native operator + scope + original source/ENC/AnyDoc owner + lease + host FunctionModelDispatch; no arbitrary provider/model/endpoint/prompt or clinical writes",
+    "evidence": [
+      "lib/chatgpt-product/native-fabric-http.test.cjs: original four owners with synthetic transport/readiness and plain-text AnyDoc parser; no network/model process",
+      "NativeFabricTests.swift: DTO, model lifecycle, late response and closure boundaries",
+      "iOS simulator generic build: Xcode 27.0; no simulator interaction or runtime model claim"
+    ],
+    "pending": [
+      "final independent review",
+      "integrated iPhone/iPad UI test by parent",
+      "physical device and real model qualification"
+    ]
   }
 }
