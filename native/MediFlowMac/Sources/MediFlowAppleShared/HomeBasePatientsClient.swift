@@ -651,6 +651,23 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseCreatedResource.self, from: data)
     }
 
+    public func fetchEntry(
+        patientId: String, entryId: String, credentials: HomeBasePairedCredentials,
+        sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseEntrySummary {
+        let url = try configuration.apiBaseURL()
+            .appendingPathComponent("network/patients")
+            .appendingPathComponent(patientId)
+            .appendingPathComponent("entries")
+            .appendingPathComponent(entryId)
+        let headers = pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+            .merging(["Cache-Control": "no-store"]) { _, new in new }
+        let (data, _) = try await send(to: url, headers: headers)
+        let entry = try decode(HomeBaseEntrySummary.self, from: data)
+        guard entry.id == entryId, entry.patientId == patientId else { throw HomeBaseClientError.contract }
+        return entry
+    }
+
     public func fetchEntries(
         patientId: String,
         credentials: HomeBasePairedCredentials,
