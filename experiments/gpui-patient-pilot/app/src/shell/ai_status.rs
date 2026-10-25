@@ -163,6 +163,49 @@ mod tests {
     }
 
     #[gpui::test]
+    fn g1a2_r2_ai_same_authority_retirement_survives_navigation(cx: &mut gpui::TestAppContext) {
+        let host = crate::shell::notes_recovery_tests::Host::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let editor = view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.area = Area::Settings;
+            let editor = app.account_profile.synthetic_draft(cx);
+            app.run(
+                || Err(RuntimeError::Authentication),
+                ClinicalApp::receive_ai_status,
+                cx,
+            );
+            app.navigate(Area::Scales, cx);
+            editor
+        });
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert!(app.session.is_none());
+            assert!(app.form.is_none());
+            assert!(matches!(app.ai_status, Load::Idle));
+            assert!(
+                app.message
+                    .as_ref()
+                    .unwrap()
+                    .0
+                    .contains(&ui_error(RuntimeError::Authentication))
+            );
+        });
+        editor.read_with(cx, |input, _| {
+            assert!(input.value().is_empty());
+            assert!(input.read_only);
+        });
+        let requests = host.request_count();
+        assert_eq!(
+            host.session
+                .update_patient_notes("scope-a", "patient-a", 1, "late write"),
+            Err(RuntimeError::Locked)
+        );
+        assert_eq!(host.request_count(), requests);
+    }
+
+    #[gpui::test]
     fn ai_status_results_are_retired_by_refresh_navigation_and_lock(cx: &mut gpui::TestAppContext) {
         let (view, cx) =
             cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
@@ -199,9 +242,8 @@ mod tests {
         cx.run_until_parked();
         view.update(cx, |app, cx| {
             assert!(matches!(app.ai_status, Load::Idle));
-            // A failure from an abandoned read cannot log out a newer context.
             app.run(
-                || Err(RuntimeError::Authentication),
+                || Err(RuntimeError::Transport),
                 ClinicalApp::receive_ai_status,
                 cx,
             );
