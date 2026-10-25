@@ -217,6 +217,13 @@ struct PairedPatientsWorklistView: View {
                         .id(ObjectIdentifier(csv))
                 }
             }
+            #if os(iOS)
+            .toolbar {
+                if dynamicTypeSize.isAccessibilitySize {
+                    ToolbarItem(placement: .primaryAction) { csvImportAction }
+                }
+            }
+            #endif
     }
 
     @ViewBuilder
@@ -250,7 +257,7 @@ struct PairedPatientsWorklistView: View {
         // the list as a stack of loose cards instead of one list.
         VStack(alignment: .leading, spacing: Self.mobileStackSpacing) {
             // A named collection, followed directly by its filters and rows.
-            if verticalSizeClass != .compact {
+            if verticalSizeClass != .compact && !dynamicTypeSize.isAccessibilitySize {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Pazienti")
                         .inkVoice(26)
@@ -259,7 +266,7 @@ struct PairedPatientsWorklistView: View {
                     mobileResultCount
                 }
             }
-            if !usesCompactWorklistControls {
+            if !usesCompactWorklistControls && !dynamicTypeSize.isAccessibilitySize {
                 csvImportAction
             }
             worklistContent
@@ -783,7 +790,7 @@ struct PairedPatientsWorklistView: View {
         HStack(spacing: 12) {
             patientViewModePicker
                 .frame(maxWidth: .infinity, alignment: .leading)
-            if verticalSizeClass == .compact { mobileResultCount }
+            if verticalSizeClass == .compact || dynamicTypeSize.isAccessibilitySize { mobileResultCount }
         }
         #endif
     }

@@ -444,8 +444,7 @@ struct PairedPatientsWorkspaceView: View {
         ) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    mobilePairedStatus
-                    workspaceFeedbackLine
+                    mobileWorklistStatus
                     compactWorklist
                 }
                 .padding(20)
@@ -634,28 +633,49 @@ struct PairedPatientsWorkspaceView: View {
     }
 
     @ViewBuilder
-    private var mobilePairedStatus: some View {
-        #if DEBUG
-        if let override = MobilePairedStatusUITestOverride.load() {
-            MobilePairedStatusView(presentation: override.presentation, onPrimaryAction: {})
+    private var mobileWorklistStatus: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            DisclosureGroup {
+                mobilePairedStatus
+                Text(mobilePairedStatusPresentation.detail)
+                    .font(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+                workspaceFeedbackLine
+            } label: {
+                Text(mobilePairedStatusPresentation.title)
+                    .font(.caption.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityHint("Mostra lo stato completo del collegamento, le azioni e i messaggi dell’elenco.")
+            .accessibilityIdentifier("patient-worklist-connection-disclosure")
         } else {
-            liveMobilePairedStatus
+            mobilePairedStatus
+            workspaceFeedbackLine
         }
-        #else
-        liveMobilePairedStatus
-        #endif
     }
 
-    private var liveMobilePairedStatus: some View {
+    private var mobilePairedStatusPresentation: MobilePairedStatusPresentation {
+        #if DEBUG
+        if let override = MobilePairedStatusUITestOverride.load() {
+            return override.presentation
+        }
+        #endif
+        return .make(
+            connectionState: model.connectionState,
+            isWorking: model.isWorking,
+            errorMessage: model.errorMessage,
+            reconciliationLine: model.reconciliationLine,
+            cacheIsStale: model.cacheIsStale
+        )
+    }
+
+    private var mobilePairedStatus: some View {
         MobilePairedStatusView(
-            presentation: .make(
-                connectionState: model.connectionState,
-                isWorking: model.isWorking,
-                errorMessage: model.errorMessage,
-                reconciliationLine: model.reconciliationLine,
-                cacheIsStale: model.cacheIsStale
-            )
+            presentation: mobilePairedStatusPresentation
         ) {
+            #if DEBUG
+            if MobilePairedStatusUITestOverride.load() != nil { return }
+            #endif
             switch model.connectionState {
             case .notLoaded, .sessionExpired:
                 showsConnectionSetup = true
