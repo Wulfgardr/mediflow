@@ -35,6 +35,32 @@ final class MobileVisitProductCoordinator: ObservableObject {
         }
     }
 
+    func dismiss() {
+        let cancelLogin = needsAuthentication && isWorking
+        requestID = nil
+        recordID = nil
+        needsAuthentication = false
+        isWorking = false
+        message = nil
+        vault.cancelPendingWork()
+        if cancelLogin { workspace?.retireMobileVisitAuthentication() }
+    }
+
+    func selectPatient(_ patient: HomeBasePatientSummary) async {
+        guard !isWorking, let workspace else { return }
+        let ticket = UUID()
+        requestID = ticket
+        recordID = nil
+        vault.cancelPendingWork()
+        isWorking = true
+        defer { if requestID == ticket { isWorking = false } }
+        do {
+            try await workspace.selectMobileVisitPatient(id: patient.id, isCurrent: { [weak self] in
+                self?.requestID == ticket
+            })
+        } catch { if requestID == ticket { show(error) } }
+    }
+
     func prepare() async {
         guard let workspace, let patientID = workspace.selectedPatient?.id else { return }
         do {
@@ -77,8 +103,11 @@ final class MobileVisitProductCoordinator: ObservableObject {
                 guard expected == context else { throw MobileVisitError.invalidContext }
                 return try workspace.mobileVisitReader()
             })
-            guard requestID == ticket, vault.onlineReview != nil else { return }
-            try await workspace.selectMobileVisitPatient(context)
+            guard requestID == ticket, !Task.isCancelled, vault.onlineReview != nil else { return }
+            try await workspace.selectMobileVisitPatient(context, isCurrent: { [weak self] in
+                self?.requestID == ticket
+            })
+            guard requestID == ticket, !Task.isCancelled else { return }
             message = "Accesso corrente verificato. Rivedi le fonti e l’appunto prima di importarlo."
         } catch { if requestID == ticket { show(error) } }
     }

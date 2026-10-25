@@ -622,6 +622,144 @@ final class PairedDiarySaveTests: XCTestCase {
     }
 
     @MainActor
+    func testMobileVisitPatientSelectionPreservesExistingComposer() async throws {
+        for editing in [false, true] {
+            let (model, transport) = try harness(mobile: true)
+            await model.loadPatients()
+            await model.loadPatient(try XCTUnwrap(model.patients.first))
+            let coordinator = try XCTUnwrap(model.mobileVisit)
+            await coordinator.prepare()
+            let context = try XCTUnwrap(coordinator.vault.selected?.context)
+            if editing {
+                model.startEditingEntry(DiaryFixture.entry())
+                model.editEntryTitle = "Modifica ordinaria da conservare"
+            } else {
+                model.newEntryTitle = "Bozza ordinaria da conservare"
+                model.newEntryEditorDocument = .load(html: "<p>Testo originale non registrato</p>")
+            }
+            let requests = transport.requests.count
+            do { try await model.selectMobileVisitPatient(context) }
+            catch { XCTAssertEqual(error as? MobileVisitError, .occupied) }
+            await coordinator.selectPatient(try XCTUnwrap(model.patients.first))
+            XCTAssertEqual(transport.requests.count, requests, "Selecting the same chart must not reload it")
+            if editing {
+                XCTAssertTrue(model.isEditingEntry)
+                XCTAssertEqual(model.editEntryTitle, "Modifica ordinaria da conservare")
+            } else {
+                XCTAssertEqual(model.newEntryTitle, "Bozza ordinaria da conservare")
+                XCTAssertTrue(model.newEntryEditorDocument.renderedHTML.contains("Testo originale non registrato"))
+            }
+        }
+    }
+
+    @MainActor
+    func testMobileVisitReviewSourcesCannotEraseDraftCreatedAfterLogin() async throws {
+        let (model, transport) = try harness(mobile: true)
+        let coordinator = try XCTUnwrap(model.mobileVisit)
+        await coordinator.prepare()
+        let id = try XCTUnwrap(coordinator.vault.selected?.id)
+        coordinator.vault.saveNote("Nota locale protetta")
+        coordinator.requestOnlineReview(id)
+        model.password = transport.legacyPasscode
+        let started = transport.holdNext(method: "GET", suffix: "/api/auth/profile")
+        let review = Task { await coordinator.authenticateAndReview() }
+        await fulfillment(of: [started], timeout: 5)
+        model.newEntryTitle = "Bozza creata durante la rilettura"
+        model.newEntryEditorDocument = .load(html: "<p>Contenuto scritto durante le attese</p>")
+        transport.release()
+        await review.value
+        XCTAssertEqual(model.newEntryTitle, "Bozza creata durante la rilettura")
+        XCTAssertTrue(model.newEntryEditorDocument.renderedHTML.contains("Contenuto scritto durante le attese"))
+        XCTAssertNil(model.selectedPatient, "The review must not navigate over a newly occupied composer")
+        XCTAssertTrue(coordinator.message?.contains("bozza") == true)
+        XCTAssertEqual(transport.entryCreates.count, 0)
+    }
+
+    @MainActor
+    func testMobileVisitDismissalRetiresReadAndPatientNavigationWithoutClearingDraft() async throws {
+        for pause in ["sources", "navigation", "navigation-without-dismissal"] {
+            let (model, transport) = try harness(mobile: true)
+            let coordinator = try XCTUnwrap(model.mobileVisit)
+            await coordinator.prepare()
+            let id = try XCTUnwrap(coordinator.vault.selected?.id)
+            coordinator.vault.saveNote("Nota locale ancora da registrare")
+            coordinator.requestOnlineReview(id)
+            model.password = transport.legacyPasscode
+            let started = transport.holdNext(method: "GET",
+                suffix: pause == "sources" ? "/api/auth/profile" : "/patients/patient-a",
+                skip: pause == "sources" ? 0 : 2)
+            let review = Task { await coordinator.authenticateAndReview() }
+            await fulfillment(of: [started], timeout: 5)
+            if pause != "navigation-without-dismissal" { coordinator.dismiss() }
+            model.newEntryTitle = "Bozza successiva alla chiusura"
+            model.newEntryEditorDocument = .load(html: "<p>Da preservare</p>")
+            transport.release()
+            await review.value
+            XCTAssertEqual(model.newEntryTitle, "Bozza successiva alla chiusura", pause)
+            XCTAssertTrue(model.newEntryEditorDocument.renderedHTML.contains("Da preservare"), pause)
+            XCTAssertNil(model.selectedPatient, pause)
+            if pause != "navigation-without-dismissal" { XCTAssertNil(coordinator.vault.onlineReview, pause) }
+            XCTAssertFalse(coordinator.isWorking, pause)
+            XCTAssertEqual(transport.entryCreates.count, 0)
+        }
+    }
+
+    @MainActor
+    func testMobileVisitDismissalDuringLoginPreservesDraftAndRetiresLateSession() async throws {
+        let (model, transport) = try harness(mobile: true)
+        let coordinator = try XCTUnwrap(model.mobileVisit)
+        await coordinator.prepare()
+        let id = try XCTUnwrap(coordinator.vault.selected?.id)
+        coordinator.vault.saveNote("Nota prima dell’accesso")
+        coordinator.requestOnlineReview(id)
+        model.password = transport.legacyPasscode
+        let started = transport.holdNext(method: "POST", suffix: "/api/auth/native/login")
+        let review = Task { await coordinator.authenticateAndReview() }
+        await fulfillment(of: [started], timeout: 5)
+        model.newEntryTitle = "Bozza indipendente dall’accesso"
+        coordinator.dismiss()
+        transport.release()
+        await review.value
+        XCTAssertEqual(model.newEntryTitle, "Bozza indipendente dall’accesso")
+        XCTAssertFalse(coordinator.needsAuthentication)
+        XCTAssertFalse(coordinator.vault.isUnlocked)
+        XCTAssertNil(coordinator.vault.onlineReview)
+        XCTAssertTrue(transport.requests.contains { $0.request.url?.path == "/api/auth/native/logout" })
+        XCTAssertEqual(transport.entryCreates.count, 0)
+    }
+
+    @MainActor
+    func testMobileVisitDismissalAfterImportKeepsExplicitRegistrationAvailable() async throws {
+        let (model, transport, _) = try await mobileScenario()
+        let coordinator = try XCTUnwrap(model.mobileVisit)
+        let binding = try XCTUnwrap(model.mobileVisitDraft)
+        let document = model.newEntryEditorDocument
+        coordinator.dismiss()
+        XCTAssertEqual(model.newEntryEditorDocument, document)
+        XCTAssertEqual(model.mobileVisitDraft?.entryID, binding.entryID)
+        await model.createEntryForSelectedPatient()
+        XCTAssertEqual(transport.entryCreates.count, 1)
+        XCTAssertEqual(try coordinator.vault.registration(for: binding).phase, .registered)
+    }
+
+    @MainActor
+    func testMobileVisitReviewAlsoPreservesAnOrdinaryTherapyDraft() async throws {
+        let (model, transport) = try harness(mobile: true)
+        let coordinator = try XCTUnwrap(model.mobileVisit)
+        await coordinator.prepare()
+        let id = try XCTUnwrap(coordinator.vault.selected?.id)
+        model.newTherapyDrugName = "Terapia sintetica non registrata"
+        let requests = transport.requests.count
+        coordinator.requestOnlineReview(id)
+        model.password = transport.legacyPasscode
+        await coordinator.authenticateAndReview()
+        XCTAssertEqual(model.newTherapyDrugName, "Terapia sintetica non registrata")
+        XCTAssertEqual(transport.requests.count, requests)
+        XCTAssertFalse(coordinator.needsAuthentication)
+        XCTAssertTrue(coordinator.message?.contains("bozza") == true)
+    }
+
+    @MainActor
     private func mobileUncertainRestart() async throws -> (PairedPatientsWorkspaceModel, DiarySaveTransport, MobileVisitImport) {
         let (original, transport, id) = try await mobileScenario()
         let binding = try XCTUnwrap(original.mobileVisitDraft)
@@ -874,12 +1012,12 @@ private final class DiarySaveTransport: @unchecked Sendable {
         get { lock.withLock { readCode } }
         set { lock.withLock { readCode = newValue } }
     }
-    private var gate: (String, String?, XCTestExpectation)?
+    private var gate: (String, String?, Int, XCTestExpectation)?
     private var held: DiarySaveURLProtocol?
-    func holdNext(method: String, suffix: String? = nil) -> XCTestExpectation {
+    func holdNext(method: String, suffix: String? = nil, skip: Int = 0) -> XCTestExpectation {
         lock.withLock {
             let started = XCTestExpectation(description: "Synthetic diary transport held")
-            gate = (method, suffix, started)
+            gate = (method, suffix, skip, started)
             return started
         }
     }
@@ -892,9 +1030,13 @@ private final class DiarySaveTransport: @unchecked Sendable {
             captured.append(.init(request: request.request, body: request.body))
             if let gate, request.request.httpMethod == gate.0,
                gate.1 == nil || request.request.url?.path.hasSuffix(gate.1!) == true {
+                if gate.2 > 0 {
+                    self.gate = (gate.0, gate.1, gate.2 - 1, gate.3)
+                    return false
+                }
                 held = request
                 self.gate = nil
-                gate.2.fulfill()
+                gate.3.fulfill()
                 return true
             }
             return false

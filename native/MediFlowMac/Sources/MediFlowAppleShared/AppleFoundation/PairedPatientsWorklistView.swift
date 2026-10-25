@@ -210,6 +210,12 @@ struct PairedPatientsWorklistView: View {
     // Compact navigation belongs to the workspace, not to a row.
     var onOpenPatient: ((HomeBasePatientSummary) -> Void)? = nil
 
+    private var mobileVisitPresentation: Binding<Bool> {
+        Binding(get: { showingMobileVisit }, set: { showingMobileVisit = $0
+            if !$0 { model.mobileVisit?.dismiss() }
+        })
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             #if os(iOS)
@@ -220,18 +226,18 @@ struct PairedPatientsWorklistView: View {
             #endif
             platformWorklist
         }
-            .sheet(isPresented: $showingMobileVisit) {
+            .sheet(isPresented: mobileVisitPresentation) {
                 if let coordinator = model.mobileVisit {
                     NavigationStack {
                         MobileVisitWorkspaceView(workspace: model, coordinator: coordinator) {
-                            showingMobileVisit = false
+                            mobileVisitPresentation.wrappedValue = false
                             if let patient = model.patients.first(where: { $0.id == model.selectedPatient?.id }) { onOpenPatient?(patient) }
                         }
                         .navigationTitle("Visita senza rete")
                         #if os(iOS)
                         .navigationBarTitleDisplayMode(.inline)
                         #endif
-                        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Chiudi") { showingMobileVisit = false } } }
+                        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Chiudi") { mobileVisitPresentation.wrappedValue = false } } }
                     }
                 } else { Text("Archivio locale non disponibile: Application Support non accessibile.") }
             }

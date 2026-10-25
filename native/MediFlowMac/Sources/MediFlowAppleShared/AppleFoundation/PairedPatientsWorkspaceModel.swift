@@ -5251,6 +5251,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
     func cancelMobileVisitAuthentication() { clearOperatorSessionPresentation() }
 
+    func retireMobileVisitAuthentication() {
+        invalidateLoginGeneration()
+        password = ""
+    }
+
     private var mobileVisitComposerIsEmpty: Bool {
         newEntryTitle.isEmpty && newEntryType == .note && newEntryEditorDocument.blocks.isEmpty
             && newEntryAttachmentIds.isEmpty && newEntryVisitTranscript.isEmpty
@@ -5258,7 +5263,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     private var hasMobileVisitBlockingComposer: Bool {
-        !mobileVisitComposerIsEmpty || mobileVisitDraft != nil
+        hasNavigationBlockingDraft || !mobileVisitComposerIsEmpty || mobileVisitDraft != nil
     }
 
     func requireMobileVisitReviewAvailability() throws {
@@ -5276,14 +5281,27 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
               sessionCookie != nil, masterKey != nil, connectionState == .pairedOnline else { throw MobileVisitError.denied }
     }
 
-    func selectMobileVisitPatient(_ context: MobileVisitContext) async throws {
-        guard let summary = patients.first(where: { $0.id == context.patientID && $0.deletedAt == nil }) else {
+    func selectMobileVisitPatient(
+        _ context: MobileVisitContext, isCurrent: @escaping @MainActor () -> Bool = { true }
+    ) async throws {
+        try requireMobileVisitReviewAvailability()
+        try await selectMobileVisitPatient(id: context.patientID, isCurrent: isCurrent)
+        guard isCurrent(), !Task.isCancelled, mobileVisitContextIsCurrent(context) else {
             throw MobileVisitError.invalidContext
         }
-        let identity = nativeOperatorConnection?.identity
-        await loadPatient(summary)
-        guard nativeOperatorConnection?.identity == identity, selectedPatient?.id == context.patientID else {
+    }
+
+    func selectMobileVisitPatient(id: String, isCurrent: @escaping @MainActor () -> Bool) async throws {
+        guard isCurrent(), !Task.isCancelled,
+              patients.contains(where: { $0.id == id && $0.deletedAt == nil }) else {
             throw MobileVisitError.invalidContext
+        }
+        if selectedPatientID == id, selectedPatient?.id == id { return }
+        let result = await openNavigationPatient(id: id, section: .overview, isCurrent: isCurrent)
+        switch result {
+        case .opened: return
+        case .blocked: throw MobileVisitError.occupied
+        default: throw MobileVisitError.invalidContext
         }
     }
 
