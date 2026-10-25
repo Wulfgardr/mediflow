@@ -268,8 +268,8 @@ final class PairedDiarySaveTests: XCTestCase {
     }
 
     @MainActor
-    private func mobileScenario() async throws -> (PairedPatientsWorkspaceModel, DiarySaveTransport, UUID) {
-        let (model, transport) = try harness(mobile: true)
+    private func mobileScenario(persistenceFailure: DiaryMobilePersistenceFailure? = nil) async throws -> (PairedPatientsWorkspaceModel, DiarySaveTransport, UUID) {
+        let (model, transport) = try harness(mobile: true, persistenceFailure: persistenceFailure)
         let coordinator = try XCTUnwrap(model.mobileVisit)
         await coordinator.prepare()
         let id = try XCTUnwrap(coordinator.vault.selected?.id)
@@ -344,6 +344,301 @@ final class PairedDiarySaveTests: XCTestCase {
         XCTAssertEqual(try json(transport.entryCreates[0]) as NSDictionary, try json(transport.entryCreates[1]) as NSDictionary,
             "ID, timestamp and every sealed field must stay byte-identical.")
         XCTAssertNil(model.mobileVisitDraft)
+    }
+
+    @MainActor
+    func testMobileVisit404AfterRestartPreservesBodylessOrdinaryDrafts() async throws {
+        for occupiedField in ["title", "attachments", "transcript"] {
+            let (model, transport, binding) = try await mobileUncertainRestart()
+            switch occupiedField {
+            case "title": model.newEntryTitle = "Titolo sintetico da conservare"
+            case "attachments": model.newEntryAttachmentIds = ["synthetic-attachment"]
+            default: model.newEntryVisitTranscript = "Trascrizione sintetica da conservare"
+            }
+            let title = model.newEntryTitle
+            let attachments = model.newEntryAttachmentIds
+            let transcript = model.newEntryVisitTranscript
+            XCTAssertTrue(model.newEntryEditorDocument.isEffectivelyEmpty)
+            do {
+                try await model.reconcileMobileVisit(binding)
+                XCTFail("404 must reject an occupied \(occupiedField) draft before restoring the frozen payload")
+            } catch {
+                XCTAssertEqual(error as? MobileVisitError, .occupied)
+            }
+            XCTAssertEqual(model.newEntryTitle, title, occupiedField)
+            XCTAssertEqual(model.newEntryAttachmentIds, attachments, occupiedField)
+            XCTAssertEqual(model.newEntryVisitTranscript, transcript, occupiedField)
+            XCTAssertTrue(model.newEntryEditorDocument.isEffectivelyEmpty, occupiedField)
+            XCTAssertNil(model.mobileVisitDraft, occupiedField)
+            XCTAssertEqual(try model.mobileVisit!.vault.registration(for: binding).phase, .uncertain,
+                           "Rejected reconciliation must retain its recoverable phase: \(occupiedField)")
+            XCTAssertEqual(transport.entryCreates.count, 1, "Reconciliation cannot submit another entry")
+        }
+    }
+
+    @MainActor
+    func testMobileVisit404OccupiedBodyCanRecoverAfterComposerIsCleared() async throws {
+        let (model, transport, binding) = try await mobileUncertainRestart()
+        let ordinaryDraft = ClinicalRichTextEditorDocument.load(html: "<p>Altra bozza sintetica</p>")
+        model.newEntryEditorDocument = ordinaryDraft
+        do {
+            try await model.reconcileMobileVisit(binding)
+            XCTFail("An unrelated body must prevent restoration")
+        } catch {
+            XCTAssertEqual(error as? MobileVisitError, .occupied)
+        }
+        XCTAssertEqual(model.newEntryEditorDocument, ordinaryDraft)
+        XCTAssertNil(model.mobileVisitDraft)
+        XCTAssertEqual(try model.mobileVisit!.vault.registration(for: binding).phase, .uncertain,
+                       "A rejected restore cannot consume the uncertain registration")
+
+        model.newEntryEditorDocument = ClinicalRichTextEditorDocument()
+        do {
+            try await model.reconcileMobileVisit(binding)
+        } catch {
+            XCTFail("After the unrelated draft is cleared, the same canonical 404 must remain recoverable: \(error)")
+        }
+        XCTAssertEqual(model.mobileVisitDraft?.entryID, binding.entryID)
+        XCTAssertTrue(model.canCreateEntry)
+        XCTAssertEqual(transport.entryCreates.count, 1, "Restoration waits for an explicit Registra")
+        await model.createEntryForSelectedPatient()
+        XCTAssertEqual(transport.entryCreates.count, 2)
+        if transport.entryCreates.count == 2 {
+            XCTAssertEqual(try json(transport.entryCreates[0]) as NSDictionary,
+                           try json(transport.entryCreates[1]) as NSDictionary)
+        }
+    }
+
+    @MainActor
+    func testMobileVisitSuccessfulAckReconciliationPreservesLaterComposerEdits() async throws {
+        let (model, transport, _) = try await mobileScenario()
+        let binding = try XCTUnwrap(model.mobileVisitDraft)
+        transport.loseNextCreateAcknowledgement = true
+        await model.createEntryForSelectedPatient()
+        XCTAssertEqual(try model.mobileVisit!.vault.registration(for: binding).phase, .uncertain)
+        let editedTitle = "Titolo sintetico corretto dopo l’invio"
+        let editedDocument = ClinicalRichTextEditorDocument.load(html: "<p>Correzione sintetica successiva all’ACK perso</p>")
+        model.newEntryTitle = editedTitle
+        model.newEntryEditorDocument = editedDocument
+        model.newEntryAttachmentIds = ["synthetic-later-attachment"]
+        model.newEntryVisitTranscript = "Trascrizione sintetica successiva"
+        model.startEditingEntry(DiaryFixture.entry())
+        model.editEntryTitle = "Modifica sintetica ancora aperta"
+        let editingDocument = model.editEntryEditorDocument
+
+        try await model.reconcileMobileVisit(binding)
+
+        XCTAssertEqual(try model.mobileVisit!.vault.registration(for: binding).phase, .registered)
+        XCTAssertEqual(model.newEntryTitle, editedTitle)
+        XCTAssertEqual(model.newEntryEditorDocument, editedDocument)
+        XCTAssertEqual(model.newEntryAttachmentIds, ["synthetic-later-attachment"])
+        XCTAssertEqual(model.newEntryVisitTranscript, "Trascrizione sintetica successiva")
+        XCTAssertEqual(model.editingEntryId, "entry-a")
+        XCTAssertEqual(model.editEntryTitle, "Modifica sintetica ancora aperta")
+        XCTAssertEqual(model.editEntryEditorDocument, editingDocument)
+        XCTAssertEqual(transport.entryCreates.count, 1, "Confirmation must not resend a locally modified draft")
+    }
+
+    @MainActor
+    func testMobileVisit404RetrySurvivesBackgroundAndRestartBeforeRegistra() async throws {
+        let (model, transport, binding) = try await mobileUncertainRestart()
+        try await model.reconcileMobileVisit(binding)
+        XCTAssertTrue(model.canCreateEntry)
+        XCTAssertEqual(try model.mobileVisit!.vault.registration(for: binding).phase, .draft)
+        model.mobileVisit?.lock()
+
+        let (restarted, _) = try harness(mobile: true, using: transport)
+        let coordinator = try XCTUnwrap(restarted.mobileVisit)
+        coordinator.requestOnlineReview(binding.recordID)
+        restarted.password = transport.legacyPasscode
+        await coordinator.authenticateAndReview()
+        XCTAssertNotNil(coordinator.vault.onlineReview, coordinator.message ?? "Review assente")
+        do {
+            try await restarted.reconcileMobileVisit(binding)
+        } catch {
+            XCTFail("A confirmed 404 restored before background must still restore after restart: \(error)")
+        }
+        XCTAssertEqual(restarted.mobileVisitDraft?.entryID, binding.entryID)
+        XCTAssertTrue(restarted.canCreateEntry)
+        XCTAssertEqual(transport.entryCreates.count, 1, "Restart and reconciliation cannot send automatically")
+    }
+
+    @MainActor
+    func testMobileVisitOnlineReviewPreservesAnExistingOrdinaryComposer() async throws {
+        let (model, transport, id) = try await mobileScenario()
+        let coordinator = try XCTUnwrap(model.mobileVisit)
+        coordinator.lock()
+        let title = "Altra bozza ordinaria sintetica"
+        let document = ClinicalRichTextEditorDocument.load(html: "<p>Contenuto ordinario da conservare durante l’accesso</p>")
+        model.newEntryTitle = title
+        model.newEntryEditorDocument = document
+        model.newEntryAttachmentIds = ["synthetic-ordinary-attachment"]
+        model.newEntryVisitTranscript = "Trascrizione ordinaria sintetica"
+        model.startEditingEntry(DiaryFixture.entry())
+        let loginCount = transport.requests.filter { $0.request.url?.path == "/api/auth/native/login" }.count
+
+        coordinator.requestOnlineReview(id)
+        model.password = transport.legacyPasscode
+        await coordinator.authenticateAndReview()
+
+        XCTAssertEqual(model.newEntryTitle, title)
+        XCTAssertEqual(model.newEntryEditorDocument, document)
+        XCTAssertEqual(model.newEntryAttachmentIds, ["synthetic-ordinary-attachment"])
+        XCTAssertEqual(model.newEntryVisitTranscript, "Trascrizione ordinaria sintetica")
+        XCTAssertEqual(model.editingEntryId, "entry-a")
+        XCTAssertFalse(coordinator.needsAuthentication)
+        XCTAssertEqual(transport.requests.filter { $0.request.url?.path == "/api/auth/native/login" }.count, loginCount)
+        XCTAssertEqual(transport.entryCreates.count, 0, "Opening the online review cannot register an entry")
+    }
+
+    @MainActor
+    func testMobileVisit404NeverOverwritesChangesOnTheSameBinding() async throws {
+        for field in ["title", "body", "attachments", "transcript", "edit"] {
+            let (model, transport, _) = try await mobileScenario()
+            let binding = try XCTUnwrap(model.mobileVisitDraft)
+            transport.writeStatus = 503
+            await model.createEntryForSelectedPatient()
+            transport.writeStatus = nil
+            let registration = try model.mobileVisit!.vault.registration(for: binding)
+            switch field {
+            case "title": model.newEntryTitle += " modificato"
+            case "body": model.newEntryEditorDocument = .load(html: "<p>Modifica sintetica locale</p>")
+            case "attachments": model.newEntryAttachmentIds = ["synthetic-local-attachment"]
+            case "transcript": model.newEntryVisitTranscript = "Trascrizione sintetica locale"
+            default: model.startEditingEntry(DiaryFixture.entry())
+            }
+            let title = model.newEntryTitle
+            let document = model.newEntryEditorDocument
+            let attachments = model.newEntryAttachmentIds
+            let transcript = model.newEntryVisitTranscript
+            do { try await model.reconcileMobileVisit(binding); XCTFail("Occupied \(field) must survive the 404") }
+            catch { XCTAssertEqual(error as? MobileVisitError, .occupied) }
+            XCTAssertEqual(model.newEntryTitle, title, field)
+            XCTAssertEqual(model.newEntryEditorDocument, document, field)
+            XCTAssertEqual(model.newEntryAttachmentIds, attachments, field)
+            XCTAssertEqual(model.newEntryVisitTranscript, transcript, field)
+            XCTAssertEqual(model.isEditingEntry, field == "edit")
+            XCTAssertEqual(try model.mobileVisit!.vault.registration(for: binding), registration)
+            XCTAssertEqual(transport.entryCreates.count, 1)
+        }
+    }
+
+    @MainActor
+    func testMobileVisit404DecodesEveryFrozenFieldBeforeEnablingRetry() async throws {
+        for field in ["title", "content", "attachments"] {
+            let (model, transport, binding) = try await mobileUncertainRestart()
+            let store = MobileVisitStore(directory: try XCTUnwrap(transport.mobileDirectory))
+            let original = try store.read(key: DiaryFixture.key)
+            var unreadable = original
+            let frozen = try XCTUnwrap(original.first?.registrations?.first?.payload)
+            unreadable[0].registrations![0].payload = MobileVisitEntryPayload(.init(
+                id: frozen.id, type: frozen.type, title: field == "title" ? "ENC:unreadable" : frozen.title,
+                date: frozen.date, content: field == "content" ? "ENC:unreadable" : frozen.content,
+                attachmentReferences: HomeBaseSealedEntryAttachmentReferences(encodedValue: field == "attachments" ? "ENC:unreadable" : frozen.attachments)))
+            model.mobileVisit!.vault.lock()
+            try store.write(unreadable, key: DiaryFixture.key)
+            await model.mobileVisit!.vault.unlock()
+            do { try await model.reconcileMobileVisit(binding); XCTFail("Unreadable \(field) must reject restoration") }
+            catch { XCTAssertEqual(error as? MobileVisitError, .corrupt) }
+            XCTAssertEqual(try model.mobileVisit!.vault.registration(for: binding).phase, .uncertain)
+            XCTAssertNil(model.mobileVisitDraft)
+            XCTAssertTrue(model.newEntryEditorDocument.blocks.isEmpty)
+            XCTAssertEqual(try store.read(key: DiaryFixture.key).first?.registrations?.first?.phase, .uncertain)
+            model.mobileVisit!.vault.lock()
+            try store.write(original, key: DiaryFixture.key)
+            await model.mobileVisit!.vault.unlock()
+            try await model.reconcileMobileVisit(binding)
+            XCTAssertEqual(model.mobileVisitDraft?.entryID, binding.entryID)
+            XCTAssertTrue(model.canCreateEntry)
+            XCTAssertEqual(transport.entryCreates.count, 1)
+        }
+    }
+
+    @MainActor
+    func testMobileVisit404PersistenceFailureBeforePresentationCanRecoverAfterRestart() async throws {
+        let failure = DiaryMobilePersistenceFailure()
+        let (model, transport, id) = try await mobileScenario(persistenceFailure: failure)
+        let binding = try XCTUnwrap(model.mobileVisitDraft)
+        transport.writeStatus = 503
+        await model.createEntryForSelectedPatient()
+        transport.writeStatus = nil
+        failure.fail = true
+        do { try await model.reconcileMobileVisit(binding); XCTFail("Failed retry persistence must be reported") }
+        catch { XCTAssertEqual(error as? MobileVisitError, .storage) }
+        XCTAssertEqual(try model.mobileVisit!.vault.registration(for: binding).phase, .uncertain)
+        failure.fail = false
+        model.mobileVisit?.lock()
+        let (restarted, _) = try harness(mobile: true, using: transport, persistenceFailure: failure)
+        let coordinator = try XCTUnwrap(restarted.mobileVisit)
+        coordinator.requestOnlineReview(id)
+        restarted.password = transport.legacyPasscode
+        await coordinator.authenticateAndReview()
+        try await restarted.reconcileMobileVisit(binding)
+        XCTAssertTrue(restarted.canCreateEntry)
+        XCTAssertEqual(transport.entryCreates.count, 1)
+        await restarted.createEntryForSelectedPatient()
+        XCTAssertEqual(transport.entryCreates.count, 2)
+        XCTAssertEqual(try json(transport.entryCreates[0]) as NSDictionary, try json(transport.entryCreates[1]) as NSDictionary)
+    }
+
+    @MainActor
+    func testMobileVisitReviewRejectsDraftCreatedBeforeAuthenticationStarts() async throws {
+        let (model, transport, id) = try await mobileScenario()
+        let coordinator = try XCTUnwrap(model.mobileVisit)
+        coordinator.lock()
+        coordinator.requestOnlineReview(id)
+        XCTAssertTrue(coordinator.needsAuthentication)
+        model.newEntryType = .visit
+        let count = transport.requests.count
+        model.password = transport.legacyPasscode
+        await coordinator.authenticateAndReview()
+        XCTAssertEqual(transport.requests.count, count)
+        XCTAssertEqual(model.newEntryType, .visit)
+        XCTAssertFalse(coordinator.vault.isUnlocked)
+        XCTAssertNil(coordinator.vault.onlineReview)
+        XCTAssertTrue(coordinator.message?.contains("bozza") == true)
+    }
+
+    @MainActor
+    func testMobileVisitReviewRejectsDraftCreatedWhileLoginIsPending() async throws {
+        let (model, transport, id) = try await mobileScenario()
+        let coordinator = try XCTUnwrap(model.mobileVisit)
+        coordinator.lock()
+        coordinator.requestOnlineReview(id)
+        model.password = transport.legacyPasscode
+        let started = transport.holdNext(method: "POST", suffix: "/api/auth/native/login")
+        let login = Task { await coordinator.authenticateAndReview() }
+        await fulfillment(of: [started], timeout: 3)
+        model.newEntryTitle = "Bozza sintetica durante accesso"
+        transport.release()
+        await login.value
+        XCTAssertEqual(model.newEntryTitle, "Bozza sintetica durante accesso")
+        XCTAssertFalse(coordinator.vault.isUnlocked)
+        XCTAssertNil(coordinator.vault.onlineReview)
+        XCTAssertTrue(coordinator.message?.contains("bozza") == true)
+        XCTAssertTrue(transport.requests.contains { $0.request.url?.path == "/api/auth/native/logout" })
+        XCTAssertEqual(transport.entryCreates.count, 0)
+        XCTAssertEqual(model.password, "")
+    }
+
+    @MainActor
+    private func mobileUncertainRestart() async throws -> (PairedPatientsWorkspaceModel, DiarySaveTransport, MobileVisitImport) {
+        let (original, transport, id) = try await mobileScenario()
+        let binding = try XCTUnwrap(original.mobileVisitDraft)
+        transport.writeStatus = 503
+        await original.createEntryForSelectedPatient()
+        XCTAssertEqual(try original.mobileVisit!.vault.registration(for: binding).phase, .uncertain)
+        original.mobileVisit?.lock()
+        transport.writeStatus = nil
+        let (restarted, _) = try harness(mobile: true, using: transport)
+        let coordinator = try XCTUnwrap(restarted.mobileVisit)
+        coordinator.requestOnlineReview(id)
+        restarted.password = transport.legacyPasscode
+        await coordinator.authenticateAndReview()
+        XCTAssertNotNil(coordinator.vault.onlineReview, coordinator.message ?? "Review assente")
+        XCTAssertNil(restarted.mobileVisitDraft)
+        XCTAssertEqual(try coordinator.vault.registration(for: binding).phase, .uncertain)
+        return (restarted, transport, binding)
     }
 
     @MainActor

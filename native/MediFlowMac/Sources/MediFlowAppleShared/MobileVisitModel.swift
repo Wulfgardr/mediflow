@@ -283,7 +283,8 @@ final class MobileVisitModel: ObservableObject {
 
     func allowExplicitRetry(_ binding: MobileVisitImport) throws {
         let registration = try registration(for: binding)
-        guard registration.phase == .uncertain, registration.payload != nil else { throw MobileVisitError.changed }
+        guard registration.phase != .registered, registration.payload != nil else { throw MobileVisitError.changed }
+        guard registration.phase != .draft else { return }
         try updateRegistration(binding) { $0.phase = .draft }
     }
 
