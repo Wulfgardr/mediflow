@@ -219,10 +219,11 @@ struct PairedPatientsWorklistView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             #if os(iOS)
-            Button("Visita senza rete", systemImage: "note.text") { showingMobileVisit = true }
-                .frame(minHeight: 44)
-                .buttonStyle(.bordered)
-                .accessibilityIdentifier("mobile-visit-entry")
+            if !usesToolbarVisitAction {
+                mobileVisitAction
+                    .frame(minHeight: 44)
+                    .buttonStyle(.bordered)
+            }
             #endif
             platformWorklist
         }
@@ -237,7 +238,12 @@ struct PairedPatientsWorklistView: View {
                         #if os(iOS)
                         .navigationBarTitleDisplayMode(.inline)
                         #endif
-                        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Chiudi") { mobileVisitPresentation.wrappedValue = false } } }
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Chiudi") { mobileVisitPresentation.wrappedValue = false }
+                                    .accessibilityIdentifier("mobile-visit-close")
+                            }
+                        }
                     }
                 } else { Text("Archivio locale non disponibile: Application Support non accessibile.") }
             }
@@ -247,7 +253,40 @@ struct PairedPatientsWorklistView: View {
                         .id(ObjectIdentifier(csv))
                 }
             }
+            #if os(iOS)
+            .toolbar {
+                if usesToolbarVisitAction {
+                    ToolbarItem(placement: .primaryAction) {
+                        Menu {
+                            mobileVisitAction
+                            if dynamicTypeSize.isAccessibilitySize {
+                                Divider()
+                                patientViewModePicker
+                                mobileResultCount
+                                csvImportAction
+                            }
+                        } label: {
+                            Label("Elenco", systemImage: "line.3.horizontal.decrease")
+                        }
+                        .accessibilityLabel("Azioni elenco pazienti")
+                        .accessibilityValue("\(filteredPatients.count) pazienti visibili nell’elenco caricato")
+                        .accessibilityIdentifier("patient-worklist-tools-menu")
+                    }
+                }
+            }
+            #endif
     }
+
+    #if os(iOS)
+    private var usesToolbarVisitAction: Bool {
+        dynamicTypeSize.isAccessibilitySize || verticalSizeClass == .compact
+    }
+
+    private var mobileVisitAction: some View {
+        Button("Visita senza rete", systemImage: "note.text") { showingMobileVisit = true }
+            .accessibilityIdentifier("mobile-visit-entry")
+    }
+    #endif
 
     @ViewBuilder
     private var platformWorklist: some View {
@@ -280,7 +319,7 @@ struct PairedPatientsWorklistView: View {
         // the list as a stack of loose cards instead of one list.
         VStack(alignment: .leading, spacing: Self.mobileStackSpacing) {
             // A named collection, followed directly by its filters and rows.
-            if verticalSizeClass != .compact {
+            if verticalSizeClass != .compact && !dynamicTypeSize.isAccessibilitySize {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Pazienti")
                         .inkVoice(26)
@@ -289,7 +328,7 @@ struct PairedPatientsWorklistView: View {
                     mobileResultCount
                 }
             }
-            if !usesCompactWorklistControls {
+            if !usesCompactWorklistControls && !dynamicTypeSize.isAccessibilitySize {
                 csvImportAction
             }
             worklistContent
@@ -417,7 +456,7 @@ struct PairedPatientsWorklistView: View {
             // macOS hoists the filters above the list, so the column keeps them
             // in place while the list scrolls.
             #if !os(macOS)
-            mobileWorklistControls
+            if !dynamicTypeSize.isAccessibilitySize { mobileWorklistControls }
             #endif
             let results = filteredPatients
             if results.isEmpty {
@@ -813,7 +852,7 @@ struct PairedPatientsWorklistView: View {
         HStack(spacing: 12) {
             patientViewModePicker
                 .frame(maxWidth: .infinity, alignment: .leading)
-            if verticalSizeClass == .compact { mobileResultCount }
+            if verticalSizeClass == .compact || dynamicTypeSize.isAccessibilitySize { mobileResultCount }
         }
         #endif
     }

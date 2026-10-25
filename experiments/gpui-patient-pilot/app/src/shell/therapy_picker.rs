@@ -12,6 +12,7 @@ struct DrugChoice {
 
 #[derive(Clone, Copy)]
 struct SearchToken {
+    authority: u64,
     editor: EntityId,
     revision: u64,
     epoch: u64,
@@ -199,7 +200,8 @@ impl ClinicalApp {
     }
 
     fn drug_search_current(&self, token: SearchToken, cx: &App) -> bool {
-        self.epoch == token.epoch
+        self.account_profile.generation == token.authority
+            && self.epoch == token.epoch
             && self.form.as_ref().is_some_and(|form| {
                 form.state == FormState::Draft
                     && form
@@ -246,6 +248,7 @@ impl ClinicalApp {
         }
         search.rows = Load::Loading;
         let token = SearchToken {
+            authority: self.account_profile.generation,
             editor: search.field.editor.entity_id(),
             revision: search.revision,
             epoch: self.epoch,
@@ -270,19 +273,13 @@ impl ClinicalApp {
         result: Result<Vec<DrugCatalogItem>, RuntimeError>,
         cx: &mut Context<Self>,
     ) -> bool {
-        // Test currentness before handling even an auth error: a retired search
-        // must not alter a later operator session or a different draft.
+        match self.check_callback(token.authority, result.as_ref().err().copied(), cx) {
+            CallbackState::StaleAuthority => return false,
+            CallbackState::Retired => return true,
+            CallbackState::Current => {}
+        }
         if !self.drug_search_current(token, cx) {
             return false;
-        }
-        if let Err(error) = &result
-            && error.is_auth_failure()
-        {
-            let message = ui_error(error);
-            self.disconnect(cx);
-            self.message = Some((message, true));
-            cx.notify();
-            return true;
         }
         let search = self
             .form
@@ -462,6 +459,7 @@ impl ClinicalApp {
             );
         };
         let token = SearchToken {
+            authority: self.account_profile.generation,
             editor: search.field.editor.entity_id(),
             revision: search.revision,
             epoch: self.epoch,
@@ -537,12 +535,178 @@ mod tests {
         search.rows = Load::Loading;
         let editor = search.field.editor.clone();
         let token = SearchToken {
+            authority: app.account_profile.generation,
             editor: editor.entity_id(),
             revision: search.revision,
             epoch: app.epoch,
         };
         app.form.as_mut().unwrap().therapy.as_mut().unwrap().search = Some(search);
         (token, editor)
+    }
+
+    fn callback_restore(cx: &mut gpui::TestAppContext, stale_query: bool, retained_reason: bool) {
+        let host = crate::shell::notes_recovery_tests::Host::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let (token, editor) = view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            stage(app, true, cx);
+            let (token, editor) = pending(app, cx);
+            if !retained_reason {
+                app.form
+                    .as_mut()
+                    .unwrap()
+                    .therapy
+                    .as_mut()
+                    .unwrap()
+                    .search
+                    .as_mut()
+                    .unwrap()
+                    .rows = Load::Idle;
+                host.replace_archive();
+                app.search_drug_catalog(cx);
+            }
+            if stale_query {
+                editor.update(cx, |input, cx| input.set_content("Ricerca successiva", cx));
+                app.drug_query_changed(editor.entity_id());
+            }
+            (token, editor)
+        });
+        if retained_reason {
+            host.replace_archive();
+            assert_eq!(
+                host.session
+                    .search_drugs("scope-a", "synthetic", 50)
+                    .map(|_| ()),
+                Err(RuntimeError::ArchiveReplaced)
+            );
+            view.update(cx, |app, cx| {
+                app.receive_drug_results(token, Err(RuntimeError::Transport), cx);
+            });
+        }
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert!(
+                app.session.is_none(),
+                "drug callback lost current-authority restore"
+            );
+            assert!(app.form.is_none());
+            assert!(app.scope.is_none());
+            assert!(app.selected_id.is_none());
+            assert!(
+                app.message
+                    .as_ref()
+                    .unwrap()
+                    .0
+                    .contains(&ui_error(RuntimeError::ArchiveReplaced))
+            );
+        });
+        editor.read_with(cx, |input, _| {
+            assert!(input.value().is_empty());
+            assert!(input.read_only);
+        });
+        let requests = host.request_count();
+        assert_eq!(
+            host.session
+                .update_patient_notes("scope-a", "patient-a", 1, "late write"),
+            Err(RuntimeError::Locked)
+        );
+        assert_eq!(host.request_count(), requests);
+    }
+
+    #[gpui::test]
+    fn g1a2_r2_drug_current_callback_retires_restore(cx: &mut gpui::TestAppContext) {
+        callback_restore(cx, false, false);
+    }
+
+    #[gpui::test]
+    fn g1a2_r2_drug_old_query_same_authority_retires_restore(cx: &mut gpui::TestAppContext) {
+        callback_restore(cx, true, false);
+    }
+
+    #[gpui::test]
+    fn g1a2_r2_drug_old_query_consumes_retained_retirement_reason(cx: &mut gpui::TestAppContext) {
+        callback_restore(cx, true, true);
+    }
+
+    #[gpui::test]
+    fn g1a2_r2_drug_old_authority_preserves_new_session_and_draft(cx: &mut gpui::TestAppContext) {
+        let old = crate::shell::notes_recovery_tests::Host::new();
+        let fresh = crate::shell::notes_recovery_tests::Host::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let old_token = view.update(cx, |app, cx| {
+            app.session = Some(old.session.clone());
+            app.scope = Some("scope-a".into());
+            stage(app, true, cx);
+            let (token, _) = pending(app, cx);
+            app.disconnect(cx);
+            app.session = Some(fresh.session.clone());
+            app.message = None;
+            app.scope = Some("scope-a".into());
+            stage(app, false, cx);
+            app.form.as_ref().unwrap().fields[0]
+                .editor
+                .update(cx, |input, cx| {
+                    input.set_content("  Preparazione manuale annotata  ", cx)
+                });
+            pending(app, cx);
+            token
+        });
+        view.update(cx, |app, cx| {
+            assert!(!app.receive_drug_results(old_token, Err(RuntimeError::ArchiveReplaced), cx));
+            assert!(
+                app.session
+                    .as_ref()
+                    .is_some_and(|session| !session.is_locked())
+            );
+            assert!(app.form.is_some());
+            assert!(app.message.is_none());
+            assert_eq!(
+                app.form.as_ref().unwrap().fields[0].value(cx),
+                "  Preparazione manuale annotata  "
+            );
+        });
+        cx.run_until_parked();
+        let requests = old.request_count();
+        assert_eq!(
+            old.session
+                .update_patient_notes("scope-a", "patient-a", 1, "late write"),
+            Err(RuntimeError::Locked)
+        );
+        assert_eq!(old.request_count(), requests);
+        assert!(
+            fresh
+                .session
+                .can_write("network.replica.write-patient-profile")
+        );
+    }
+
+    #[gpui::test]
+    fn g1a2_restore_retires_nested_therapy_search_and_late_results(cx: &mut gpui::TestAppContext) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let (token, editor) = view.update(cx, |app, cx| {
+            stage(app, true, cx);
+            let pending = pending(app, cx);
+            app.save_error(RuntimeError::ArchiveReplaced, cx);
+            assert!(
+                app.form.is_none(),
+                "restore retained therapy form and nested picker"
+            );
+            pending
+        });
+        editor.read_with(cx, |input, _| {
+            assert!(input.value().is_empty());
+            assert!(input.read_only);
+        });
+        view.update(cx, |app, cx| {
+            stage(app, false, cx);
+            app.receive_drug_results(token, Ok(vec![catalog_drug()]), cx);
+            app.choose_drug(token, 0, cx);
+            assert!(app.form.as_ref().unwrap().selected_drug().is_none());
+        });
     }
 
     #[gpui::test]
@@ -607,6 +771,8 @@ mod tests {
             );
             app.close_drug_search(cx);
             assert!(query.read(cx).value().is_empty() && query.read(cx).read_only);
+            app.disconnect(cx);
+            stage(app, false, cx);
             assert!(!app.receive_drug_results(fresh, Err(RuntimeError::Authentication), cx));
             assert!(
                 app.form.is_some(),
@@ -625,6 +791,7 @@ mod tests {
             assert!(!app.receive_drug_results(review, Ok(vec![catalog_drug()]), cx));
             app.form.as_mut().unwrap().state = FormState::Draft;
             let (retired, query) = pending(app, cx);
+            app.disconnect(cx);
             stage(app, true, cx);
             assert!(query.read(cx).value().is_empty() && query.read(cx).read_only);
             assert!(!app.receive_drug_results(retired, Err(RuntimeError::Authentication), cx));

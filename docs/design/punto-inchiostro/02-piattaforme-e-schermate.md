@@ -104,28 +104,65 @@ valgono qualunque essa sia.
 
 ### iPhone Duo
 
-Misure usate nel banco, in punti: schermo esterno 466 × 678, schermo interno
-aperto 890 × 626. Sono ricavate dividendo per 3 i pixel riportati dalla stampa
-al lancio (esterno 1398 × 2034, interno 2670 × 1878); la densità effettiva e
-le API di postura vanno lette nella documentazione Apple prima di
-implementare. Non le ho verificate su un dispositivo.
+La compatibilità richiesta riguarda il layout completo. Il target seguente
+resta da completare e qualificare con Xcode/SDK 27.1 e Device Hub Duo.
+Le dimensioni ricavate dalla stampa non sono un vincolo hardware, una
+soglia di riconoscimento del dispositivo o una misura della piega.
 
-- **Chiuso:** come iPhone. Lo schermo è più largo e più basso: nell'elenco
-  entrano meno righe, la disposizione non cambia.
-- **Aperto:** due pagine ai lati della piega. Nessun testo, comando o riga
-  attraversa il centro.
-  - Pazienti: elenco a sinistra, anteprima a destra.
-  - Scheda: quadro a sinistra, diario a destra.
-  - Scrittura: quadro a sinistra, voce viva a destra; nella soglia il
-    messaggio sta sulla pagina sinistra e i comandi sulla destra.
-  - Testate e barre di strumenti si dividono in due metà, con una distanza al
-    centro di 40 pt.
-  - Le schede in basso restano quattro, due per pagina.
-- **Passaggio da chiuso ad aperto:** la vista e la bozza restano le stesse.
-  Aprire o chiudere il dispositivo non perde testo, selezione o stato della
-  soglia.
-- **Semiaperto, appoggiato:** non progettato. Vale la disposizione aperta
-  finché non c'è una ragione d'uso.
+**Target di prodotto**
+
+- **Chiuso:** tutti i percorsi dell'iPhone restano disponibili, adattati allo
+  spazio effettivo; elenco, scheda e scrittura mantengono continuità.
+- **Aperto, Pazienti:** elenco e anteprima nelle due regioni disponibili.
+- **Aperto, Scheda:** quadro e diario nelle due regioni disponibili.
+- **Aperto, Scrittura:** quadro e voce viva nelle due regioni disponibili.
+  Il messaggio della soglia e i suoi comandi occupano regioni distinte,
+  mantenendo chiaro a quale paziente e a quale operazione si riferiscono.
+- Ogni regione ha una testata e comandi di conferma distinti, con contesto
+  paziente e operazione espliciti. Le quattro schede restano visibili anche
+  aperto: due per regione, secondo la composizione da qualificare con le
+  API ufficiali.
+- Contenuti, testo e controlli non si sovrappongono alle regioni di divisione
+  o di occlusione. Posizione e spazio derivano dalle API ufficiali, non da
+  una distanza centrale fissa. Le safe area asimmetriche restano rispettate.
+- Aprire, chiudere o cambiare postura preserva paziente selezionato, sezione,
+  bozza completa e stato della soglia/conferma, senza registrare dati o
+  confermare operazioni. Tutte le funzioni restano raggiungibili.
+- **Parziale, anche appoggiato:** adattare le regioni effettivamente usabili
+  senza perdere questi contenuti o comandi. Non assumere la geometria della
+  postura aperta; definire e verificare la composizione con l'SDK ufficiale.
+
+**Incremento adattivo implementato**
+
+Il client usa una sola gerarchia mobile: `TabView` con quattro schede
+native e `NavigationSplitView` per elenco e scheda. Su spazio regolare la
+navigazione principale è un elenco nativo in overlay: non aggiunge una
+terza colonna alla cartella. Le colonne dipendono dallo spazio effettivo, dalla dimensione
+del testo e dalla size class verticale, senza riconoscere il dispositivo
+per nome o idiom. Il 42% è una larghezza ideale dell'elenco entro limiti di
+contenuto, non la posizione della piega. Altro e Progetto restano percorsi
+per le altre superfici.
+
+Questo incremento compila con SDK 27.0 e prepara la continuità durante i
+cambi di spazio. Non implementa ancora quadro/diario e quadro/voce in regioni
+distinte, né la composizione Duo delle testate, delle quattro schede e della
+soglia. Le prove simulate verificano anche che la navigazione laterale non
+riduca l'area clinica protetta dall'overlay (#142).
+
+**Qualifica residua**
+
+Le fonti Apple sono [Above the fold](https://developer.apple.com/videos/play/tech-talks/111461/)
+e [Adaptive layouts](https://developer.apple.com/videos/play/tech-talks/111463/).
+Con Xcode/SDK 27.1 occorre verificare i contenitori di sistema e le API
+`ReservedRegion` (divisione e occlusione) e `ArrangementView` prima di
+utilizzarle. Non sono sostituite da API ricostruite.
+
+Restano aperte implementazione e qualifica del target completo: posture
+chiusa/aperta/parziale, divisione, occlusioni, safe area, tastiera, dimensioni
+accessibili, quattro schede e continuità di bozze e conferme attraverso le
+transizioni reali. Larghezze sintetiche, runtime 27.1 senza il relativo SDK
+e build riuscite non qualificano la compatibilità fisica Duo. Lo stato
+resta **non completo** fino alla verifica con SDK 27.1 e alle prove richieste.
 
 ### Mini e Headless
 
