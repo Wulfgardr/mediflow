@@ -1000,9 +1000,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                     return
                 }
                 self.invalidateCacheAfterReadFailure(error)
-                if self.connectionState == .notLoaded {
-                    self.statusMessage = "Sessione operatore attiva. Lettura dell’archivio non riuscita."
-                }
+                self.statusMessage = "Sessione operatore attiva. Lettura dell’archivio non riuscita."
                 throw error
             }
             guard canPublishList() else { return }
