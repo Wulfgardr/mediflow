@@ -140,8 +140,11 @@ final class MediFlowMobileAppUITests: XCTestCase {
     }
 
     private func tab(_ label: String) -> XCUIElement {
-        let inTabBar = app.tabBars.buttons[label]
-        return inTabBar.exists ? inTabBar : app.buttons[label]
+        let inTabBar = app.tabBars.buttons.matching(NSPredicate(format: "label == %@", label))
+        if let visible = inTabBar.allElementsBoundByIndex.first(where: { $0.isHittable }) {
+            return visible
+        }
+        return app.buttons[label].firstMatch
     }
 
     // MARK: - Navigazione fra sezioni, su entrambi gli idiomi
@@ -280,15 +283,6 @@ final class MediFlowMobileAppUITests: XCTestCase {
     }
 
     func testProjectMenuOpensEverySurface() throws {
-        /* La meta speculare della matrice adattiva. I quattro contratti solo-iPad
-           si auto-saltano su iPhone; questi cinque pretendono il cromo compatto,
-           cioe la tab bar mobile e il menu Progetto che vive solo nel ramo TabView,
-           e su iPad quel cromo non esiste per scelta dichiarata (#142): li la
-           navigazione e una NavigationSplitView con la sidebar. Un test che lo
-           pretende su iPad asserisce l opposto del progetto. La copertura iPad
-           equivalente esiste gia in testEveryClinicalSurfaceOpensOnThisIdiom, che
-           gira su entrambi gli idiomi. */
-        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "compact-only layout contract")
         launch()
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
         let projectButton = app.navigationBars.buttons["Progetto"].firstMatch
@@ -327,9 +321,11 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(patientWorkspace.waitForExistence(timeout: 20))
         let workspaceFrameBeforeOverlay = patientWorkspace.frame
 
-        let navigationButtons = app.navigationBars.buttons
-        XCTAssertGreaterThan(navigationButtons.count, 0, "iPad should expose the system sidebar control")
-        navigationButtons.element(boundBy: 0).tap()
+        let sidebarToggle = app.buttons.matching(NSPredicate(
+            format: "identifier == %@ OR identifier == %@", "ToggleSideBar", "ToggleSidebar"
+        )).firstMatch
+        XCTAssertTrue(sidebarToggle.waitForExistence(timeout: 10), "iPad should expose the native tab sidebar control")
+        sidebarToggle.tap()
 
         let projectSidebar = sectionView("clinical-workspace-project-sidebar")
         XCTAssertTrue(projectSidebar.waitForExistence(timeout: 10))
@@ -355,7 +351,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
         overlayEvidence.lifetime = .keepAlways
         add(overlayEvidence)
 
-        app.buttons["Agenda"].firstMatch.tap()
+        let agenda = app.buttons["Agenda"].firstMatch.exists
+            ? app.buttons["Agenda"].firstMatch : app.staticTexts["Agenda"].firstMatch
+        agenda.tap()
         XCTAssertTrue(sectionView("clinical-workspace-agenda-view").waitForExistence(timeout: 10))
         XCTAssertTrue(
             projectSidebar.waitForNonExistence(timeout: 5),
@@ -593,6 +591,44 @@ final class MediFlowMobileAppUITests: XCTestCase {
             "rotating back must not drop the open chart"
         )
         attachScreenshot(named: "matrix-ipad-selection-preserved")
+    }
+
+    func testAdaptiveWorkspaceKeepsDiaryDraftAcrossShellAndColumnChanges() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "Resizable workspace fixture needs an iPad canvas")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        app.launchEnvironment["MEDIFLOW_APPLE_UITEST_ADAPTIVE_LAYOUT"] = "1"
+        launch(seedPatients: true, section: "modules")
+        let patient = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(patient.waitForExistence(timeout: 20))
+        patient.tap()
+        openPatientSection(.diary)
+        let openEntry = app.buttons["homebase-open-new-entry-button"]
+        XCTAssertTrue(scrollDown(to: openEntry, requireHittable: true))
+        openEntry.tap()
+        let title = app.textFields["homebase-new-entry-title-field"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        title.tap()
+        title.typeText("Bozza sintetica adattiva")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+
+        for width in [1000, 650, 400, 1000, 400] {
+            app.buttons["layout-test-width-\(width)"].tap()
+            XCTAssertTrue(title.waitForExistence(timeout: 10), "The open editor must survive the \(width)pt transition")
+            XCTAssertEqual(title.value as? String, "Bozza sintetica adattiva")
+            XCTAssertTrue(sectionView("patient-section-navigation").exists)
+            XCTAssertFalse(sectionView("patient-detail-empty").exists)
+            attachScreenshot(named: "adaptive-draft-\(width)pt")
+        }
+        openPatientSection(.documents)
+        assertLoadedEmptyDocuments()
+        openPatientSection(.diary)
+        let resume = app.buttons["homebase-open-new-entry-button"]
+        if resume.exists {
+            XCTAssertTrue(scrollDown(to: resume, requireHittable: true))
+            resume.tap()
+        }
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertEqual(title.value as? String, "Bozza sintetica adattiva")
     }
 
     /// Clinical content must stay inside the workspace at the largest text size.

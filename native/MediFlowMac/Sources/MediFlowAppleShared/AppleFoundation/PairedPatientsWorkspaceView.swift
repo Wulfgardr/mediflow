@@ -9,6 +9,7 @@ struct PairedPatientsWorkspaceView: View {
     @Environment(\.clinicalPatientNavigation) private var linkedPatient
     @Environment(\.clinicalNavigationInteraction) private var navigationInteraction
     @State private var navigationInteractionID = UUID()
+    private let onShowProject: (() -> Void)?
     @ObservedObject private var model: PairedPatientsWorkspaceModel
     // S6 (D7-bis): gates the new document surfaces on the effective capability
     // matrix returned for this pairing. The server downgrades host-supported but
@@ -46,12 +47,15 @@ struct PairedPatientsWorkspaceView: View {
     @State private var selectedFseObservationId: String?
     @State private var expandedInsightId: String?
     @State private var isCompactPatientHeaderExpanded = false
-    // A navigation destination, not authority to operate on this patient.
-    @State private var compactPatientID: String?
+    #if os(iOS)
+    @State private var preferredPatientColumn: NavigationSplitViewColumn = .sidebar
+    @State private var patientDestinationID: String?
+    #endif
 
-    init(model: PairedPatientsWorkspaceModel, capabilities: ClinicalWorkspaceCapabilitiesStore) {
+    init(model: PairedPatientsWorkspaceModel, capabilities: ClinicalWorkspaceCapabilitiesStore, onShowProject: (() -> Void)? = nil) {
         self.model = model
         self.capabilities = capabilities
+        self.onShowProject = onShowProject
     }
 
     var body: some View {
@@ -84,64 +88,6 @@ struct PairedPatientsWorkspaceView: View {
         #else
         .clinicalFieldShape()
         .background(mobileCanvasColor)
-        // Creating a patient is the home's primary action, so it belongs in the
-        // navigation bar. Inline it consumed the first viewport at accessibility
-        // text sizes and pushed the first patient off screen.
-        // Three related controls declared as one group rather than as three
-        // separate `ToolbarItem`s, which is what they are: a list-wide action
-        // and two list-wide settings.
-        //
-        // Stated honestly, because it was tried as a fix and was not one: on a
-        // 13-inch iPad the toolbar draws a capsule roughly a thousand points
-        // wide with the new-patient glyph pinned at its far left, the sort menu
-        // and the ambulatory picker at its far right, and empty glass between.
-        // Grouping the three changed nothing visible. Tapping the empty span
-        // does nothing either, so it is not the collapsed search field — search
-        // is the separate circle at the trailing edge. The cause is still
-        // unknown and the symptom is recorded in the handover rather than
-        // papered over.
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button {
-                    model.startCreatingPatient()
-                } label: {
-                    Label("Nuovo paziente", systemImage: "person.badge.plus")
-                }
-                .disabled(model.isWorking)
-                .accessibilityLabel("Nuovo paziente")
-                .accessibilityIdentifier("new-patient-button")
-
-                // Sort is a list-wide setting, not content: as a toolbar menu it
-                // states the active order on its own face and stops competing
-                // with the patients for first-viewport height.
-                Picker("Ordina", selection: $patientSortMode) {
-                    Text("Recenti").tag(PatientListSortMode.recent)
-                    Text("Alfabetico").tag(PatientListSortMode.alpha)
-                }
-                .pickerStyle(.menu)
-                .accessibilityLabel("Ordina pazienti")
-                .accessibilityValue(patientSortMode == .recent ? "Recenti" : "Alfabetico")
-                .accessibilityIdentifier("patient-sort-menu")
-
-                // Renders only when the host has published ambulatories. Same
-                // identifier as before, because it is the same control.
-                if !model.availableAmbulatories.isEmpty {
-                    Menu {
-                        ForEach(model.availableAmbulatories) { ambulatory in
-                            Button(ambulatory.name) {
-                                model.selectAmbulatory(ambulatory.id)
-                            }
-                        }
-                    } label: {
-                        Label(activeAmbulatoryScopeLabel, systemImage: "building.2")
-                    }
-                    .accessibilityLabel("Ambulatorio attivo")
-                    .accessibilityValue(activeAmbulatoryScopeLabel)
-                    .accessibilityIdentifier("ambulatory-scope-picker")
-                    .contentShape(.interaction, Rectangle().inset(by: -4))
-                }
-            }
-        }
         // The query stays owned by this view, so the field and the filtering read
         // the same storage and recomposition does not swap it out.
         .searchable(
@@ -152,6 +98,58 @@ struct PairedPatientsWorkspaceView: View {
         .modifier(MinimizedSearchToolbarBehavior())
         #endif
     }
+
+    #if os(iOS)
+    @ToolbarContentBuilder
+    private var mobileWorklistToolbar: some ToolbarContent {
+        if let onShowProject {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Progetto", systemImage: "ellipsis.circle", action: onShowProject)
+                    .accessibilityIdentifier("clinical-workspace-project-menu-button")
+            }
+        }
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button {
+                model.startCreatingPatient()
+            } label: {
+                Label("Nuovo paziente", systemImage: "person.badge.plus")
+            }
+            .disabled(model.isWorking)
+            .accessibilityLabel("Nuovo paziente")
+            .accessibilityIdentifier("new-patient-button")
+
+            // Sort is a list-wide setting, not content: as a toolbar menu it
+            // states the active order on its own face and stops competing
+            // with the patients for first-viewport height.
+            Picker("Ordina", selection: $patientSortMode) {
+                Text("Recenti").tag(PatientListSortMode.recent)
+                Text("Alfabetico").tag(PatientListSortMode.alpha)
+            }
+            .pickerStyle(.menu)
+            .accessibilityLabel("Ordina pazienti")
+            .accessibilityValue(patientSortMode == .recent ? "Recenti" : "Alfabetico")
+            .accessibilityIdentifier("patient-sort-menu")
+
+            // Renders only when the host has published ambulatories. Same
+            // identifier as before, because it is the same control.
+            if !model.availableAmbulatories.isEmpty {
+                Menu {
+                    ForEach(model.availableAmbulatories) { ambulatory in
+                        Button(ambulatory.name) {
+                            model.selectAmbulatory(ambulatory.id)
+                        }
+                    }
+                } label: {
+                    Label(activeAmbulatoryScopeLabel, systemImage: "building.2")
+                }
+                .accessibilityLabel("Ambulatorio attivo")
+                .accessibilityValue(activeAmbulatoryScopeLabel)
+                .accessibilityIdentifier("ambulatory-scope-picker")
+                .contentShape(.interaction, Rectangle().inset(by: -4))
+            }
+        }
+    }
+    #endif
 
     private var sheetWorkspace: some View {
         platformWorkspace
@@ -219,8 +217,8 @@ struct PairedPatientsWorkspaceView: View {
         #if os(macOS)
         // The split already shows the selected patient. Consume this
         // one-shot intent so returning to the workspace cannot replay it.
-        .onAppear { revealLinkedPatient(isWide: true) }
-        .onChange(of: linkedPatient?.id) { _ in revealLinkedPatient(isWide: true) }
+        .onAppear { revealLinkedPatient() }
+        .onChange(of: linkedPatient?.id) { _ in revealLinkedPatient() }
         #endif
         // The archive summary remains available when Documents is not mounted.
         .task(id: attachmentReadPatientID) {
@@ -236,7 +234,12 @@ struct PairedPatientsWorkspaceView: View {
             }
         }
         .onChange(of: model.selectedPatientID) { patientID in
-            if patientID == nil { compactPatientID = nil }
+            if patientID == nil {
+                #if os(iOS)
+                preferredPatientColumn = .sidebar
+                patientDestinationID = nil
+                #endif
+            }
             isCompactPatientHeaderExpanded = false
         }
         .onChange(of: model.isEditingPatient) { isEditing in
@@ -386,26 +389,21 @@ struct PairedPatientsWorkspaceView: View {
         #else
         GeometryReader { proxy in
             mobileWorkspace(containerWidth: proxy.size.width)
-                // Reuse the existing width decision; this only opens
-                // the chart selected by a successfully completed navigation read.
-                .onAppear { revealLinkedPatient(isWide: usesSplitLayout(containerWidth: proxy.size.width)) }
+                .onAppear { revealLinkedPatient() }
                 .onChange(of: linkedPatient?.id) { _ in
-                    revealLinkedPatient(isWide: usesSplitLayout(containerWidth: proxy.size.width))
+                    revealLinkedPatient()
                 }
-                .onChange(of: usesSplitLayout(containerWidth: proxy.size.width)) { isWide in
-                    compactPatientID = isWide ? nil : model.selectedPatientID
-                }
-        }
-        .navigationDestination(isPresented: compactDetailIsPresented) {
-            compactPatientDestination
         }
         #endif
     }
 
-    private func revealLinkedPatient(isWide: Bool) {
+    private func revealLinkedPatient() {
         guard let linkedPatient else { return }
         if model.selectedPatient?.id == linkedPatient.patientID {
-            compactPatientID = isWide ? nil : linkedPatient.patientID
+            #if os(iOS)
+            patientDestinationID = linkedPatient.patientID
+            preferredPatientColumn = .detail
+            #endif
         }
         linkedPatient.consume()
     }
@@ -435,93 +433,44 @@ struct PairedPatientsWorkspaceView: View {
     }
 
     #if !os(macOS)
-    @ViewBuilder
     private func mobileWorkspace(containerWidth: CGFloat) -> some View {
-        if usesSplitLayout(containerWidth: containerWidth) {
-            HStack(spacing: 0) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        mobilePairedStatus
-                        workspaceFeedbackLine
-                        patientsListContent
-                    }
-                    .padding(20)
-                }
-                .frame(width: PatientsWorkspaceLayout.listWidth(forContainerWidth: containerWidth))
-
-                Divider()
-
-                // Identity and navigation stay outside the scrolling
-                // plane. Section changes reset the scroll without replacing it.
-                VStack(spacing: 0) {
-                    if let detail = model.selectedPatient {
-                        mobileWidePatientHeader(detail)
-                        MobilePatientSectionNavigation(
-                            selection: $model.activePatientSection,
-                            showsAllSections: true
-                        )
-                        .padding(.horizontal, 12)
-                        Divider()
-                    }
-                    ScrollViewReader { scroll in
-                        ScrollView {
-                            patientDetailContent
-                                .padding(24)
-                                .frame(
-                                    width: PatientsWorkspaceLayout.detailWidth(forContainerWidth: containerWidth),
-                                    alignment: .topLeading
-                                )
-                                .id("mobile-patient-chart-top")
-                        }
-                        .onChange(of: model.activePatientSection) { _ in
-                            scroll.scrollTo("mobile-patient-chart-top", anchor: .top)
-                        }
-                    }
-                }
-                .frame(width: PatientsWorkspaceLayout.detailWidth(forContainerWidth: containerWidth))
-                .background(PlatformColors.chartCardSurface)
-                .accessibilityElement(children: .contain) // Preserve child navigation identifiers.
-                .accessibilityIdentifier("patient-workspace-detail")
-            }
-        } else {
+        let isWide = usesSplitLayout(containerWidth: containerWidth)
+        return NavigationSplitView(
+            columnVisibility: .constant(.all),
+            preferredCompactColumn: $preferredPatientColumn
+        ) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    #if DEBUG
-                    if focusedDetailOnly, let detail = model.selectedPatient {
-                        selectedPatientSections(detail)
-                            .compactContainerWidth(inset: 40)
-                    } else {
-                        mobilePairedStatus
-                        workspaceFeedbackLine
-                        compactWorklist
-                    }
-                    #else
                     mobilePairedStatus
                     workspaceFeedbackLine
                     compactWorklist
-                    #endif
                 }
                 .padding(20)
-                // Use the workspace's offered width without asking the
-                // enclosing navigation container for another layout measurement.
-                .frame(width: containerWidth, alignment: .topLeading)
             }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                // The chart header belongs to the chart destination.
-                #if DEBUG
-                if focusedDetailOnly, let detail = model.selectedPatient {
-                    VStack(spacing: 0) {
-                        compactPatientHeader(detail)
-                        patientSectionPicker
-                    }
-                }
-                #endif
+            .inkWorkspaceTitle("Pazienti")
+            .toolbar { mobileWorklistToolbar }
+            .navigationSplitViewColumnWidth(
+                min: PatientsWorkspaceLayout.minimumListWidth,
+                ideal: PatientsWorkspaceLayout.listWidth(forContainerWidth: containerWidth),
+                max: PatientsWorkspaceLayout.maximumListWidth
+            )
+        } detail: {
+            mobilePatientDestination(isWide: isWide)
+                .navigationSplitViewColumnWidth(min: PatientsWorkspaceLayout.minimumDetailWidth, ideal: PatientsWorkspaceLayout.minimumDetailWidth)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier(isWide ? "patient-workspace-detail" : "patient-compact-detail-destination")
+        }
+        .navigationSplitViewStyle(.balanced)
+        .environment(\.horizontalSizeClass, isWide ? .regular : .compact)
+        .toolbar(removing: .sidebarToggle)
+        #if DEBUG
+        .onAppear {
+            if focusedDetailOnly {
+                patientDestinationID = model.selectedPatientID
+                preferredPatientColumn = .detail
             }
         }
-    }
-
-    private var compactDetailIsPresented: Binding<Bool> {
-        Binding(get: { compactPatientID != nil }, set: { if !$0 { compactPatientID = nil } })
+        #endif
     }
 
     private var compactWorklist: some View {
@@ -532,7 +481,8 @@ struct PairedPatientsWorkspaceView: View {
             patientSortMode: $patientSortMode,
             onOpenPatient: { patient in
                 guard model.canChangePatientSelection else { return }
-                compactPatientID = patient.id
+                patientDestinationID = patient.id
+                preferredPatientColumn = .detail
                 // Returning to the same chart must not discard its draft or refetch it.
                 if model.selectedPatient?.id != patient.id {
                     Task { await model.loadPatient(patient) }
@@ -542,23 +492,27 @@ struct PairedPatientsWorkspaceView: View {
         .chartCard()
     }
 
-    private var compactPatientDestination: some View {
+    private var presentedPatientID: String? {
+        patientDestinationID ?? model.selectedPatientID
+    }
+
+    private func mobilePatientDestination(isWide: Bool) -> some View {
         ScrollViewReader { scroll in
             ScrollView {
                 VStack(alignment: .leading, spacing: ClinicalChartMetrics.sectionSpacing) {
                     workspaceFeedbackLine
-                    if let detail = model.selectedPatient, detail.id == compactPatientID {
+                    if let detail = model.selectedPatient, detail.id == presentedPatientID {
                         selectedPatientSections(detail)
-                    } else if let profile = model.cachedPatientProfile, profile.id == compactPatientID {
+                    } else if let profile = model.cachedPatientProfile, profile.id == presentedPatientID {
                         cachedPatientProfile(profile)
-                    } else if let patientID = compactPatientID {
+                    } else if let patientID = presentedPatientID {
                         pendingPatientDetail(patientID: patientID)
+                    } else {
+                        emptyDetailState.accessibilityIdentifier("patient-detail-empty")
                     }
                 }
                 .padding(20)
-                .compactContainerWidth()
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("patient-compact-detail-destination")
+                .frame(maxWidth: .infinity, alignment: .topLeading)
                 .id("mobile-patient-chart-top")
             }
             .onChange(of: model.activePatientSection) { _ in
@@ -569,11 +523,15 @@ struct PairedPatientsWorkspaceView: View {
         .navigationTitle(model.activePatientSection.title)
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) {
-            if let detail = model.selectedPatient, detail.id == compactPatientID {
+            if let detail = model.selectedPatient, detail.id == presentedPatientID {
                 VStack(spacing: 0) {
                     // One 44pt context row leaves clinical space above
                     // the keyboard. Native compact toolbars cap controls at 36pt.
-                    if verticalSizeClass == .compact {
+                    if isWide {
+                        mobileWidePatientHeader(detail)
+                        MobilePatientSectionNavigation(selection: $model.activePatientSection, showsAllSections: true)
+                            .padding(.horizontal, 12)
+                    } else if verticalSizeClass == .compact {
                         compactHeightPatientNavigation(detail)
                             .padding(.horizontal, 20)
                     } else {

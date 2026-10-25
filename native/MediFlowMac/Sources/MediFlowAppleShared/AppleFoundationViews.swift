@@ -271,6 +271,23 @@ public struct AppleCapabilityLaneCard: View {
     }
 }
 
+#if os(iOS)
+private struct MobileAdaptiveTabStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content
+                .tabViewStyle(.sidebarAdaptable)
+                .tabViewSidebarHeader {
+                    Text("MediFlow")
+                        .accessibilityIdentifier("clinical-workspace-project-sidebar")
+                }
+        } else {
+            content
+        }
+    }
+}
+#endif
+
 public struct AppleFoundationMobileRootView: View {
     public let snapshot: AppleFoundationSnapshot
     @ObservedObject private var appearance: AppleAppearanceStore
@@ -279,8 +296,6 @@ public struct AppleFoundationMobileRootView: View {
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    /* #142: keep the project sidebar out of the iPad patient split. */
-    @State private var projectColumnVisibility: NavigationSplitViewVisibility = .detailOnly
     #endif
     @State private var section: ClinicalWorkspaceSection
     @State private var showsProjectSurfaces = false
@@ -299,94 +314,52 @@ public struct AppleFoundationMobileRootView: View {
         _section = State(initialValue: launchOverrides.initialSection.map(ClinicalWorkspaceSection.init(legacy:)) ?? .patients)
     }
 
+    #if DEBUG && os(iOS)
+    @State private var layoutTestWidth: CGFloat = 400
+    private var usesLayoutTestHarness: Bool {
+        ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_ADAPTIVE_LAYOUT"] == "1"
+    }
+    #endif
+
     public var body: some View {
-        Group {
-            if usesSplitLayout {
-                #if os(macOS)
-                NavigationSplitView {
-                    List {
-                        Section("Clinica") { ForEach(ClinicalWorkspaceSection.clinicalSections) { sidebarButton($0) } }
-                        Section("Impostazioni") { ForEach(ClinicalWorkspaceSection.settingsSections) { sidebarButton($0) } }
-                        Section("Progetto") { ForEach(ClinicalWorkspaceSection.projectSections) { sidebarButton($0) } }
-                    }
-                    .navigationTitle("MediFlow")
-                } detail: {
-                    detailView(for: section)
-                        .inkWorkspaceTitle(section.title)
-                }
-                #else
-                // #142: the project sidebar overlays iPad detail instead of
-                // creating a third simultaneous column beside the patient workspace.
-                NavigationSplitView(columnVisibility: $projectColumnVisibility) {
-                    List {
-                        Section("Clinica") { ForEach(ClinicalWorkspaceSection.clinicalSections) { sidebarButton($0) } }
-                        Section("Impostazioni") { ForEach(ClinicalWorkspaceSection.settingsSections) { sidebarButton($0) } }
-                        Section("Progetto") { ForEach(ClinicalWorkspaceSection.projectSections) { sidebarButton($0) } }
-                    }
-                    .navigationTitle("MediFlow")
-                    .accessibilityIdentifier("clinical-workspace-project-sidebar")
-                } detail: {
-                    // A narrow iPad workspace uses the same chart push
-                    // as iPhone while the project sidebar keeps its own selection.
-                    NavigationStack {
-                        detailView(for: section)
-                            .inkWorkspaceTitle(section.title)
-                    }
-                }
-                .navigationSplitViewStyle(.prominentDetail)
-                #endif
-            } else {
-                TabView(selection: Binding(
-                    get: { [.patients, .agenda, .diary].contains(section) ? section : .settings },
-                    set: { item in selectSection(item == .settings ? selectedOtherSection ?? .settings : item) }
-                )) {
-                    ForEach([ClinicalWorkspaceSection.patients, .agenda, .diary]) { item in
-                        NavigationStack {
-                            detailView(for: item)
-                                .inkWorkspaceTitle(item.title)
-                                .toolbar {
-                                    if item == .patients {
-                                        ToolbarItem(placement: .automatic) {
-                                            Button("Progetto", systemImage: "ellipsis.circle") {
-                                                navigationRouter.cancel()
-                                                projectNavigationPath = []
-                                                showsProjectSurfaces = true
-                                            }
-                                                .accessibilityIdentifier("clinical-workspace-project-menu-button")
-                                        }
-                                    }
-                                }
-                        }
-                        .tag(item)
-                        .tabItem {
-                            Label(item.title, systemImage: item.symbolName)
+        #if DEBUG && os(iOS)
+        if usesLayoutTestHarness {
+            GeometryReader { proxy in
+                VStack(spacing: 0) {
+                    HStack {
+                        ForEach([400, 650, 1000], id: \.self) { width in
+                            Button("\(width) pt") { layoutTestWidth = CGFloat(width) }
+                                .accessibilityIdentifier("layout-test-width-\(width)")
                         }
                     }
-                    NavigationStack {
-                        compactOtherContent
-                    }
-                    .tag(ClinicalWorkspaceSection.settings)
-                    .tabItem { Label("Altro", systemImage: "ellipsis") }
+                    .frame(height: 44)
+                    workspaceBody
+                        .environment(\.horizontalSizeClass, layoutTestWidth == 400 ? .compact : .regular)
+                        .frame(width: min(layoutTestWidth, proxy.size.width))
                 }
-                #if os(iOS)
-                .background(
-                    TabBarAccessibilityIdentifierBridge(
-                        identifiersByTitle: Dictionary(
-                            uniqueKeysWithValues:
-                                [ClinicalWorkspaceSection.patients, .agenda, .diary].map {
-                                    (
-                                        $0.title,
-                                        "clinical-workspace-section-\($0.rawValue)-button"
-                                    )
-                                } + [("Altro", "clinical-workspace-section-other-button")]
-                        ),
-                        selection: section.rawValue
-                    )
-                    .frame(width: 0, height: 0)
-                    .accessibilityHidden(true)
-                )
-                #endif
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        } else {
+            workspaceBody
+        }
+        #else
+        workspaceBody
+        #endif
+    }
+
+    private var workspaceBody: some View {
+        Group {
+            #if os(macOS)
+            NavigationSplitView {
+                projectSidebar
+            } detail: {
+                detailView(for: section)
+                    .inkWorkspaceTitle(section.title)
+            }
+            #else
+            mobileTabWorkspace
+                .modifier(MobileAdaptiveTabStyle())
+            #endif
         }
         .task(id: workspaceModel.clinicalWorkspaceConnection?.identity) {
             await capabilitiesStore.loadIfNeeded(using: workspaceModel.clinicalWorkspaceConnection)
@@ -409,6 +382,66 @@ public struct AppleFoundationMobileRootView: View {
         .foregroundStyle(PlatformColors.ink)
         .inkRegister()
     }
+
+    private var projectSidebar: some View {
+        List {
+            Section("Clinica") { ForEach(ClinicalWorkspaceSection.clinicalSections) { sidebarButton($0) } }
+            Section("Impostazioni") { ForEach(ClinicalWorkspaceSection.settingsSections) { sidebarButton($0) } }
+            Section("Progetto") { ForEach(ClinicalWorkspaceSection.projectSections) { sidebarButton($0) } }
+        }
+        .navigationTitle("MediFlow")
+        .accessibilityIdentifier("clinical-workspace-project-sidebar")
+    }
+
+    #if os(iOS)
+    private var mobileTabWorkspace: some View {
+        TabView(selection: Binding(
+            get: { [.patients, .agenda, .diary].contains(section) ? section : .settings },
+            set: { item in selectSection(item == .settings ? selectedOtherSection ?? .settings : item) }
+        )) {
+            ForEach([ClinicalWorkspaceSection.patients, .agenda, .diary]) { item in
+                Group {
+                    if item == .patients {
+                        detailView(for: item)
+                            .inkWorkspaceTitle(item.title)
+                    } else {
+                        NavigationStack {
+                            detailView(for: item)
+                                .inkWorkspaceTitle(item.title)
+                        }
+                    }
+                }
+                .tag(item)
+                .tabItem {
+                    Label(item.title, systemImage: item.symbolName)
+                }
+            }
+            NavigationStack {
+                compactOtherContent
+            }
+            .tag(ClinicalWorkspaceSection.settings)
+            .tabItem { Label("Altro", systemImage: "ellipsis") }
+        }
+        #if os(iOS)
+        .background(
+            TabBarAccessibilityIdentifierBridge(
+                identifiersByTitle: Dictionary(
+                    uniqueKeysWithValues:
+                        [ClinicalWorkspaceSection.patients, .agenda, .diary].map {
+                            (
+                                $0.title,
+                                "clinical-workspace-section-\($0.rawValue)-button"
+                            )
+                        } + [("Altro", "clinical-workspace-section-other-button")]
+                ),
+                selection: section.rawValue
+            )
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
+        )
+        #endif
+    }
+    #endif
 
     @ViewBuilder
     private var compactOtherContent: some View {
@@ -442,11 +475,8 @@ public struct AppleFoundationMobileRootView: View {
 
     private func sidebarButton(_ item: ClinicalWorkspaceSection) -> some View {
         Button {
+            selectedOtherSection = [.patients, .agenda, .diary].contains(item) ? nil : item
             selectSection(item)
-            #if os(iOS)
-            // #142: preserve the patient list/detail width after a destination change.
-            projectColumnVisibility = .detailOnly
-            #endif
         } label: {
             HStack {
                 Label(item.title, systemImage: item.symbolName)
@@ -496,10 +526,8 @@ public struct AppleFoundationMobileRootView: View {
             showsProjectSurfaces = true
         } else {
             showsProjectSurfaces = false
+            selectedOtherSection = [.patients, .agenda, .diary].contains(target) ? nil : target
             section = target
-            #if os(iOS)
-            projectColumnVisibility = .detailOnly
-            #endif
         }
     }
 
@@ -507,6 +535,9 @@ public struct AppleFoundationMobileRootView: View {
         #if os(macOS)
         return true
         #else
+        #if DEBUG
+        if usesLayoutTestHarness { return layoutTestWidth != 400 }
+        #endif
         return horizontalSizeClass == .regular
         #endif
     }
@@ -515,7 +546,11 @@ public struct AppleFoundationMobileRootView: View {
     private func detailView(for section: ClinicalWorkspaceSection) -> some View {
         switch section {
         case .patients:
-            PairedPatientsWorkspaceView(model: workspaceModel, capabilities: capabilitiesStore)
+            PairedPatientsWorkspaceView(model: workspaceModel, capabilities: capabilitiesStore, onShowProject: {
+                navigationRouter.cancel()
+                projectNavigationPath = []
+                showsProjectSurfaces = true
+            })
                 // Container, so the identifier names this workspace only and is
                 // not propagated onto descendants. Without it the identifier was
                 // inherited by the safeAreaInset chart header, which made the

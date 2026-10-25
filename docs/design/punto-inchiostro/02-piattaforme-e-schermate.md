@@ -104,28 +104,39 @@ valgono qualunque essa sia.
 
 ### iPhone Duo
 
-Misure usate nel banco, in punti: schermo esterno 466 × 678, schermo interno
-aperto 890 × 626. Sono ricavate dividendo per 3 i pixel riportati dalla stampa
-al lancio (esterno 1398 × 2034, interno 2670 × 1878); la densità effettiva e
-le API di postura vanno lette nella documentazione Apple prima di
-implementare. Non le ho verificate su un dispositivo.
+La compatibilità richiesta riguarda il layout. Le dimensioni 466 × 678 e
+890 × 626 usate nel banco provengono da resoconti di stampa: non sono misure
+verificate del dispositivo e non guidano il riconoscimento del layout.
 
-- **Chiuso:** come iPhone. Lo schermo è più largo e più basso: nell'elenco
-  entrano meno righe, la disposizione non cambia.
-- **Aperto:** due pagine ai lati della piega. Nessun testo, comando o riga
-  attraversa il centro.
-  - Pazienti: elenco a sinistra, anteprima a destra.
-  - Scheda: quadro a sinistra, diario a destra.
-  - Scrittura: quadro a sinistra, voce viva a destra; nella soglia il
-    messaggio sta sulla pagina sinistra e i comandi sulla destra.
-  - Testate e barre di strumenti si dividono in due metà, con una distanza al
-    centro di 40 pt.
-  - Le schede in basso restano quattro, due per pagina.
-- **Passaggio da chiuso ad aperto:** la vista e la bozza restano le stesse.
-  Aprire o chiudere il dispositivo non perde testo, selezione o stato della
-  soglia.
-- **Semiaperto, appoggiato:** non progettato. Vale la disposizione aperta
-  finché non c'è una ragione d'uso.
+Il client mobile usa una sola gerarchia di navigazione: `TabView` con stile
+`sidebarAdaptable` da iOS 18 e `NavigationSplitView` per elenco e scheda.
+Su iOS 17 restano le schede native. La scelta delle colonne dipende dallo
+spazio effettivo, dalla dimensione del testo e dalla size class verticale,
+senza controllare il nome o l'idiom del dispositivo. La sidebar del sistema
+resta disponibile in larghezza regolare; Altro e Progetto mantengono
+raggiungibili le altre superfici.
+
+- **Spazio compatto:** elenco e scheda si raggiungono con navigazione nativa.
+- **Spazio largo:** elenco e scheda affiancati. Il 42% è una larghezza ideale
+  per l'elenco, entro i suoi limiti di contenuto; il sistema dispone le
+  colonne e il separatore. Il diario resta una sezione della scheda.
+- **Cambio di spazio:** la gerarchia conserva l'editor aperto, la selezione e
+  le bozze. Ridimensionare non registra dati né conferma operazioni.
+- **Testo accessibile o altezza compatta:** una sola colonna clinica; tutte
+  le sezioni restano raggiungibili dal selettore.
+
+Le indicazioni Apple correnti richiedono Xcode/SDK 27.1 per qualificare le
+posture Duo: [Above the fold](https://developer.apple.com/videos/play/tech-talks/111461/)
+e [Adaptive layouts](https://developer.apple.com/videos/play/tech-talks/111463/).
+I contenitori di sistema possono adattarsi alle regioni riservate. `ReservedRegion`
+(divisione e occlusione) e `ArrangementView` richiedono verifica con quell'SDK;
+non sono sostituiti con una distanza centrale fissa o con API ricostruite.
+
+La parte adattiva compila con SDK 27.0. Restano da verificare con SDK 27.1
+e Device Hub Duo le posture chiusa, aperta e parziale, le safe area
+asimmetriche, la piega, le occlusioni e la continuità delle conferme e della
+bozza attraverso le transizioni reali. Le prove con larghezze sintetiche
+non qualificano l'hardware né dimostrano che nessun controllo attraversi la piega.
 
 ### Mini e Headless
 
