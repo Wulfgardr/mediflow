@@ -78,3 +78,11 @@ identificativo esplicito e payload identico mantengono 200 idempotente senza
 nuova scrittura o audit; payload diverso produce 409. Un errore audit annulla
 l'intera modifica invece di diventare un successo senza evidenza. Payload
 cifrati e vincoli paired restano invariati; nessun nuovo writer headless.
+
+## Emendamento WUL-793 del 25 ottobre 2026 (Proposed)
+
+[ADR 0163](./0163-mobile-visit-dossier.md) ammette appunti mobili durevoli,
+protetti come dati sanitari. Sono distinti dalle entries: nessuna scrittura o
+coda offline. Nuovo login, rivalidazione online e revisione esplicita precedono
+la precompilazione del compositore ordinario. Writer, audit e rilettura restano
+quelli esistenti. Esiti incerti non autorizzano retry né cancellazione dell'appunto.

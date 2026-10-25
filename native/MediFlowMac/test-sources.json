@@ -71,6 +71,7 @@
     "MediFlowQAStorageTests.swift",
     "MobilePairedStatusPresentationTests.swift",
     "MobilePairedStatusUITestOverrideTests.swift",
+    "MobileVisitTests.swift",
     "NativeAIConfigurationTests.swift",
     "NativeOrdinaryClientDecryptionTests.swift",
     "NativeOrdinaryDTOTests.swift",
