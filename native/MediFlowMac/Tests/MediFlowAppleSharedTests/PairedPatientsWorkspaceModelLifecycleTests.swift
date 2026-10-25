@@ -729,7 +729,35 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
                 XCTAssertNotEqual(model.connectionState, .pairedOnline)
                 XCTAssertNotEqual(model.connectionState, .cached)
                 XCTAssertEqual(model.errorMessage, failure.localizedDescription)
+                if case .httpStatus(401, _) = failure {
+                    XCTAssertEqual(model.statusMessage, "Sessione operatore scaduta. Accedi di nuovo per continuare.")
+                } else if case .httpStatus(403, _) = failure {
+                    XCTAssertEqual(model.statusMessage, "Operazione non autorizzata nello scope paired corrente.")
+                }
                 XCTAssertFalse(model.statusMessage?.contains("Nessun paziente") == true)
+                XCTAssertTrue(model.patients.isEmpty)
+                XCTAssertNil(model.cacheMetadata)
+            }
+            let requests = await source.includeDiagnosesRequests
+            XCTAssertEqual(requests, [true])
+        }
+    }
+
+    func testLoginUnreachableOrTimeoutWithoutCacheFinishesWithReadFailureMessage() async {
+        for failure: HomeBaseClientError in [.transport(.unreachable), .transport(.timeout)] {
+            let source = LifecycleMockDataSource(createListError: failure)
+            let model = await makeModel(source: source)
+            await MainActor.run {
+                model.password = String(repeating: "2", count: 4)
+                model.pairedClientId = "synthetic-client"
+                model.pairedClientToken = "synthetic-token"
+            }
+            await model.login()
+            await MainActor.run {
+                XCTAssertEqual(model.connectionState, .pairedOfflineDegraded)
+                XCTAssertEqual(model.statusMessage, "Sessione operatore attiva. Lettura dell’archivio non riuscita.", "\(failure)")
+                XCTAssertEqual(model.errorMessage, failure.localizedDescription)
+                XCTAssertFalse(model.isWorking)
                 XCTAssertTrue(model.patients.isEmpty)
                 XCTAssertNil(model.cacheMetadata)
             }
