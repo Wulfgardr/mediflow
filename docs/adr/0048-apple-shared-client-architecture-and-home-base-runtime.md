@@ -260,3 +260,10 @@ Negativo:
 - una UI unica cross-platform che azzeri le differenze tra macOS, iPhone e iPad
 - promozione implicita dell'AI plane remoto dentro il data plane clinico
 - estensione del vecchio shell macOS come base della nuova delivery
+
+## Emendamento WUL-793 del 25 ottobre 2026 (Proposed)
+
+[ADR 0163](./0163-mobile-visit-dossier.md) definisce un dossier visita opt-in
+separato dalla cache legata alla sessione. Lo sblocco locale dopo riavvio riguarda
+soltanto quella copia derivata e gli appunti cifrati; non crea una sessione host.
+La cache precedente conserva integralmente il binding, incluso sessionDigest.

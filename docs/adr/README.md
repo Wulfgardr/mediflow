@@ -142,3 +142,5 @@ prima porzione di lavoro verificabile:
 - [0156-therapy-status-uncertain-client-write.md](./0156-therapy-status-uncertain-client-write.md) — **Accepted (2026-10-21)**: delimita il blocco Web dopo esito incerto, separando abort del client, vita del writer host e confronto tramite CAS.
 
 - [0161 — Porte host e lifecycle GPUI](./0161-gpui-host-ports-lifecycle.md) — Accepted; contratto G-1a.1 e decisione 2 approvata da Leonardo.
+
+- [0163 — Dossier visita mobile](./0163-mobile-visit-dossier.md) — Proposed; WUL-793, copia esplicita e appunti cifrati, nessun writer offline.
