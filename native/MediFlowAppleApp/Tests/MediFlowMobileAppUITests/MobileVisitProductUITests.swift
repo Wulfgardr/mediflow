@@ -1,6 +1,34 @@
 import XCTest
 
 final class MobileVisitProductUITests: XCTestCase {
+    func testVisitEntryKeepsFirstPatientVisibleAtAX5() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "compact-only layout contract")
+        let app = XCUIApplication()
+        app.launchEnvironment = [
+            "MEDIFLOW_APPLE_UITEST_PATIENTS": "1",
+            "MEDIFLOW_APPLE_UITEST_VISIT": UUID().uuidString,
+            "MEDIFLOW_APPLE_UITEST_DYNAMIC_TYPE_SIZE": "accessibility5"
+        ]
+        app.launch()
+        let row = app.buttons["patient-cell-visit-synthetic-patient"]
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 10))
+        XCTAssertTrue(row.isHittable)
+        XCTAssertLessThanOrEqual(row.frame.maxY, tabBar.frame.minY)
+
+        openVisit(app)
+        let close = app.buttons["mobile-visit-close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        close.tap()
+        XCTAssertTrue(close.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(row.isHittable)
+        XCTAssertLessThanOrEqual(row.frame.maxY, tabBar.frame.minY)
+        row.tap()
+        XCTAssertTrue(app.descendants(matching: .any)
+            .matching(identifier: "patient-compact-header-disclosure").firstMatch.waitForExistence(timeout: 10))
+    }
+
     func testRealAppVisitPreparationOfflineRestartAndOrdinaryRegistration() {
         let app = XCUIApplication()
         let run = UUID().uuidString
@@ -70,8 +98,25 @@ final class MobileVisitProductUITests: XCTestCase {
     }
 
     private func openVisit(_ app: XCUIApplication) {
-        XCTAssertTrue(app.buttons["mobile-visit-entry"].waitForExistence(timeout: 15))
-        app.buttons["mobile-visit-entry"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)
+            .matching(identifier: "clinical-workspace-patients-view").firstMatch.waitForExistence(timeout: 15))
+        let entry = app.buttons["mobile-visit-entry"]
+        if !entry.isHittable {
+            let tools = app.buttons["patient-worklist-tools-menu"]
+            if tools.isHittable {
+                tools.tap()
+            } else {
+                let overflow = app.buttons["OverflowBarButtonItem"]
+                XCTAssertTrue(overflow.waitForExistence(timeout: 5))
+                overflow.tap()
+                let menu = tools.isHittable ? tools : app.buttons["Elenco"]
+                XCTAssertTrue(menu.waitForExistence(timeout: 5))
+                menu.tap()
+            }
+        }
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        XCTAssertTrue(entry.isHittable)
+        entry.tap()
     }
 
     private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
