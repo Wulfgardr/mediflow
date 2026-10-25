@@ -436,3 +436,18 @@ public enum NativeOrdinaryCommand: Sendable {
         }
     }
 }
+
+public struct NativeAuthorityRetirement: Decodable {
+    public let schema: String
+    public let previousAuthorityRef: String
+    public let currentAuthorityRef: String
+    public let authorityRetired: Bool
+    public let physicalCleanup: String
+    public func validate(previous: String, current: String) throws {
+        guard schema == "mediflow.native-authority-retirement.v1", previousAuthorityRef == previous,
+              currentAuthorityRef == current, previous != current, authorityRetired,
+              NativeOrdinaryDisclosure.matches(previous, "^[a-f0-9]{64}$"),
+              NativeOrdinaryDisclosure.matches(current, "^[a-f0-9]{64}$"),
+              physicalCleanup == "not_attested" else { throw NativeOrdinaryContractError.cleanupUnconfirmed }
+    }
+}

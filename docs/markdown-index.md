@@ -492,3 +492,5 @@ di ciascuna proposta e il limite di autorità dell’host.
 - `docs/adr/0159-plugin-local-ui-navigation.md`
 - `plugins/mediflow-local-ui/README.md`
 - `plugins/mediflow-local-ui/skills/local-ui/SKILL.md`
+
+[ADR 0164 — Ricevuta di ritiro dell’autorità native](adr/0164-native-inference-authority-retirement.md): recupero dei medesimi owner dopo revoca della sessione; cleanup fisico distinto.

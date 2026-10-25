@@ -1,16 +1,17 @@
 /* fake HTTP transport only. Mac UI/viewmodel tests, no authority/admission claims. */
 #if canImport(MediFlowAppleShared)
 import Foundation
+import CryptoKit
 import XCTest
 @testable import MediFlowAppleShared
 
 @MainActor
 final class NativeOrdinaryModelTests: XCTestCase {
     typealias F = NativeOrdinaryTestFixtures
-    private func source(generation: UInt = 0, fingerprint: String = "synthetic-source-a") -> NativeOrdinarySnapshot {
+    private func source(generation: UInt = 0, fingerprint: String = "synthetic-source-a", key: SymmetricKey? = nil) -> NativeOrdinarySnapshot {
         let connection = ClinicalWorkspaceConnection(dataSource: S6MockDataSource(details: [:]),
             credentials: HomeBasePairedCredentials(clientId: "synthetic-mac", clientToken: "synthetic-token"),
-            sessionCookie: "mediflow_session=synthetic-native", ambulatoryId: "synthetic-ambulatory", masterKey: nil,
+            sessionCookie: "mediflow_session=synthetic-native-\(generation)", ambulatoryId: "synthetic-ambulatory", masterKey: key,
             serverURL: "https://localhost", tlsPin: String(repeating: "a", count: 64), sessionGeneration: generation)
         return NativeOrdinarySnapshot(connection: connection, preparation: NativeOrdinaryPreparation(functionId: .patientInsight,
             patientId: "synthetic-patient", ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .patientInsight), fingerprint: fingerprint)
@@ -19,6 +20,133 @@ final class NativeOrdinaryModelTests: XCTestCase {
     private func settle(_ model: NativeOrdinaryModel) async {
         for _ in 0..<200 where model.isWorking { await Task.yield() }
     }
+    private func retirement(_ reference: String, _ connection: ClinicalWorkspaceConnection) throws -> NativeAuthorityRetirement {
+        try JSONDecoder().decode(NativeAuthorityRetirement.self, from: JSONSerialization.data(withJSONObject: [
+            "schema": "mediflow.native-authority-retirement.v1", "previousAuthorityRef": reference,
+            "currentAuthorityRef": NativeOrdinaryAuthority.reference(connection), "authorityRetired": true, "physicalCleanup": "not_attested"]))
+    }
+    func testRetiredAuthorityReleasesSuspendedPrepareWithoutKeyAndLateReplyCannotRegressNewAttempt() async throws {
+        var session: UInt = 1, key: SymmetricKey? = SymmetricKey(data: Data(repeating: 9, count: 32))
+        var resume: CheckedContinuation<NativeOrdinaryResponse, Error>?, calls = 0, commands = 0
+        var service = .init(prepare: { _, _ in try self.response("needs_consent") }, command: { _, _ in try self.response("closed") }, status: { _ in try self.response("closed") }) as NativeOrdinaryModel.Services
+        service.prepare = { _, connection in
+            XCTAssertNil(connection.masterKey, "suspended prepare must retain no key")
+            calls += 1
+            if calls == 1 { return try await withCheckedThrowingContinuation { resume = $0 } }
+            return try self.response("needs_consent")
+        }
+        service.command = { _, connection in commands += 1; throw HomeBaseClientError.httpStatus(401, nil) }
+        service.status = { _ in throw HomeBaseClientError.httpStatus(401, nil) }
+        service.retirement = { ref, connection in try self.retirement(ref, connection) }
+        let model = NativeOrdinaryModel(function: .patientInsight, snapshot: { self.source(generation: session, key: key) }, services: service)
+        model.prepare(); for _ in 0..<500 where resume == nil { await Task.yield() }
+        let retained = Mirror(reflecting: model).children.first { $0.label == "original" }!.value
+        let saved = Mirror(reflecting: retained).children.first?.value as? NativeOrdinarySnapshot
+        XCTAssertNotNil(saved); XCTAssertNil(saved?.connection.masterKey)
+        key = nil; model.invalidate(); await settle(model); XCTAssertEqual(model.phase, .blocked)
+        session = 2; key = SymmetricKey(data: Data(repeating: 8, count: 32))
+        model.verifyClosure(); await settle(model); XCTAssertEqual(model.phase, .idle)
+        XCTAssertTrue(model.canPrepare, "retirement releases the preparation gate even while S1 awaits transport")
+        model.prepare(); await settle(model); XCTAssertEqual(model.phase, .needsConsent)
+        resume?.resume(returning: try self.response("needs_consent"))
+        for _ in 0..<500 { await Task.yield() }
+        XCTAssertEqual(model.phase, .needsConsent); XCTAssertEqual(calls, 2); XCTAssertEqual(commands, 0)
+        XCTAssertNil(model.proposal)
+        model.invalidate(); await settle(model)
+    }
+    func testRetirementNetworkTLS401AndChangedHostRemainBlocked() async throws {
+        for error in [HomeBaseClientError.transport(.unreachable), HomeBaseClientError.transport(.tlsHandshakeFailed), HomeBaseClientError.httpStatus(401, nil)] {
+            var session: UInt = 1, recoveryCalls = 0
+            var service = .init(prepare: { _, _ in try self.response("needs_consent") }, command: { _, _ in try self.response("closed") }, status: { _ in try self.response("closed") }) as NativeOrdinaryModel.Services
+            service.command = { _, _ in throw HomeBaseClientError.httpStatus(401, nil) }
+            service.retirement = { _, _ in recoveryCalls += 1; throw error }
+            let model = NativeOrdinaryModel(function: .patientInsight, snapshot: { self.source(generation: session) }, services: service)
+            model.prepare(); await settle(model); model.invalidate(); await settle(model)
+            session = 2; model.verifyClosure(); await settle(model)
+            XCTAssertEqual(model.phase, .blocked); XCTAssertFalse(model.canPrepare); XCTAssertEqual(recoveryCalls, 1)
+        }
+        let previous = source(generation: 1).connection
+        var other = source(generation: 2).connection
+        other.serverURL = "https://localhost:3444"
+        XCTAssertThrowsError(try NativeOrdinaryAuthority.recoveryConnection(previous: previous, current: other))
+        other = source(generation: 2).connection; other.tlsPin = String(repeating: "b", count: 64)
+        XCTAssertThrowsError(try NativeOrdinaryAuthority.recoveryConnection(previous: previous, current: other))
+    }
+    func testRetirementReplyForS2CannotReleaseOwnerAfterS3() async throws {
+        var session: UInt = 1
+        var resume: CheckedContinuation<NativeAuthorityRetirement, Error>?, captured: ClinicalWorkspaceConnection?
+        var reference = ""
+        var service = .init(prepare: { _, _ in try self.response("needs_consent") }, command: { _, _ in try self.response("closed") }, status: { _ in try self.response("closed") }) as NativeOrdinaryModel.Services
+        service.command = { _, _ in throw HomeBaseClientError.httpStatus(401, nil) }
+        service.retirement = { ref, connection in
+            reference = ref; captured = connection
+            return try await withCheckedThrowingContinuation { resume = $0 }
+        }
+        let model = NativeOrdinaryModel(function: .patientInsight, snapshot: { self.source(generation: session) }, services: service)
+        model.prepare(); await settle(model); model.invalidate(); await settle(model)
+        session = 2; model.verifyClosure()
+        for _ in 0..<500 where resume == nil { await Task.yield() }
+        session = 3; model.invalidate()
+        resume?.resume(returning: try retirement(reference, XCTUnwrap(captured)))
+        await settle(model)
+        XCTAssertEqual(model.phase, .blocked); XCTAssertFalse(model.canPrepare); XCTAssertNil(model.proposal)
+    }
+
+    func testRetirementRecoveryDoesNotRequireOldClinicalDocumentSnapshot() async throws {
+        var session: UInt = 1, missingDocument = false
+        var service = .init(prepare: { _, _ in try self.response("needs_consent") }, command: { _, _ in try self.response("closed") }, status: { _ in try self.response("closed") }) as NativeOrdinaryModel.Services
+        service.command = { _, _ in throw HomeBaseClientError.httpStatus(401, nil) }
+        service.retirement = { ref, connection in try self.retirement(ref, connection) }
+        let model = NativeOrdinaryModel(function: .patientInsight, snapshot: {
+            guard !missingDocument else { throw NativeOrdinaryContractError.noSources }
+            return self.source(generation: session)
+        }, currentConnection: { self.source(generation: session).connection }, services: service)
+        model.prepare(); await settle(model); model.invalidate(); await settle(model)
+        XCTAssertEqual(model.phase, .blocked)
+        session = 2; missingDocument = true
+        model.verifyClosure(); await settle(model)
+        XCTAssertEqual(model.phase, .idle); XCTAssertTrue(model.canPrepare); XCTAssertNil(model.proposal)
+    }
+
+    func testRevokedSession401ThenS2RecoversSameOwner() async throws {
+        var session: UInt = 1, retired = false, references: [String] = []
+        var service = .init(prepare: { _, _ in try self.response("needs_consent") }, command: { _, _ in try self.response("closed") }, status: { _ in try self.response("closed") }) as NativeOrdinaryModel.Services
+        service.command = { _, connection in
+            if connection.sessionGeneration == 1 { throw HomeBaseClientError.httpStatus(401, nil) }
+            if !retired { XCTFail("S2 must not cancel S1's attempt") }
+            return try self.response("closed")
+        }
+        service.status = { _ in throw HomeBaseClientError.httpStatus(401, nil) }
+        service.retirement = { reference, connection in
+            references.append(reference)
+            XCTAssertEqual(connection.sessionGeneration, 2)
+            XCTAssertNil(connection.masterKey)
+            guard retired else { throw NativeOrdinaryContractError.cleanupUnconfirmed }
+            let body: [String: Any] = ["schema": "mediflow.native-authority-retirement.v1",
+                "previousAuthorityRef": reference, "currentAuthorityRef": NativeOrdinaryAuthority.reference(connection),
+                "authorityRetired": true, "physicalCleanup": "not_attested"]
+            return try JSONDecoder().decode(NativeAuthorityRetirement.self, from: JSONSerialization.data(withJSONObject: body))
+        }
+        let model = NativeOrdinaryModel(function: .patientInsight, snapshot: { self.source(generation: session) }, services: service)
+        model.prepare(); await settle(model)
+        model.invalidate(); await settle(model)
+        XCTAssertEqual(model.phase, .blocked)
+        model.verifyClosure(); await settle(model)
+        XCTAssertEqual(model.phase, .blocked, "S1 still denied is not a retirement receipt")
+        session = 2
+        model.verifyClosure(); await settle(model)
+        XCTAssertEqual(model.phase, .blocked, "S2 alone does not prove old authority retirement")
+        retired = true
+        model.verifyClosure(); await settle(model)
+        XCTAssertEqual(model.phase, .idle, "host-attested retired S1 must release the stable owner")
+        XCTAssertTrue(model.canPrepare)
+        XCTAssertEqual(references.count, 2)
+        XCTAssertNil(model.proposal)
+        model.prepare(); await settle(model)
+        XCTAssertEqual(model.phase, .needsConsent)
+        model.invalidate(); await settle(model)
+    }
+
     func testNeverPreparedInvalidationKeepsInitialMessageWithoutServiceCalls() {
         var calls = 0
         let model = NativeOrdinaryModel(function: .patientInsight, snapshot: { self.source() }, services: .init(

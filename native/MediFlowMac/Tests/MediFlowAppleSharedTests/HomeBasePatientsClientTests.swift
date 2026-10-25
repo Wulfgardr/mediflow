@@ -10,6 +10,35 @@ final class HomeBasePatientsClientTests: XCTestCase {
         super.tearDown()
     }
 
+    func testNativeAuthorityRetirementUsesCurrentSessionAndReferenceOnly() async throws {
+        let previous = String(repeating: "a", count: 64), current = String(repeating: "b", count: 64)
+        let client = makeClient { request in
+            XCTAssertEqual(request.url?.path, "/api/v1/network/ai/authority-retirement")
+            XCTAssertEqual(request.httpMethod, "POST"); XCTAssertNil(request.url?.query)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cache-Control"), "no-store")
+            XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalAndRemoteCacheData)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "mediflow_session=current-synthetic")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "synthetic-client")
+            XCTAssertEqual(try self.requestObject(request) as? [String: String], ["previousAuthorityRef": previous])
+            let body: [String: Any] = ["schema": "mediflow.native-authority-retirement.v1", "previousAuthorityRef": previous,
+                "currentAuthorityRef": current, "authorityRetired": true, "physicalCleanup": "not_attested"]
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+                try JSONSerialization.data(withJSONObject: body))
+        }
+        let receipt = try await client.verifyPreviousNativeAuthorityRetirement(previous,
+            credentials: .init(clientId: "synthetic-client", clientToken: "synthetic-token"), sessionCookie: "mediflow_session=current-synthetic")
+        try receipt.validate(previous: previous, current: current)
+        XCTAssertThrowsError(try receipt.validate(previous: current, current: previous))
+        XCTAssertThrowsError(try receipt.validate(previous: previous, current: previous))
+        for (key, forged) in [("authorityRetired", false as Any), ("physicalCleanup", "confirmed"), ("schema", "other")] {
+            var body: [String: Any] = ["schema": "mediflow.native-authority-retirement.v1", "previousAuthorityRef": previous,
+                "currentAuthorityRef": current, "authorityRetired": true, "physicalCleanup": "not_attested"]
+            body[key] = forged
+            let invalid = try JSONDecoder().decode(NativeAuthorityRetirement.self, from: JSONSerialization.data(withJSONObject: body))
+            XCTAssertThrowsError(try invalid.validate(previous: previous, current: current))
+        }
+    }
+
     func testNativeFabricUsesOnlyNamedRoutesAndClosedSelectorOrAttempt() async throws {
         let id = "12345678-1234-4234-8234-123456789abc"
         let grant = String(repeating: "a", count: 64)

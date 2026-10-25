@@ -97,6 +97,59 @@ final class NativeFabricVenuePresentationTests: XCTestCase {
         }
         return try JSONDecoder().decode(NativeFabricResponse.self, from: JSONSerialization.data(withJSONObject: value))
     }
+    func testWorkspaceOwnerRecoversAfterSessionAndClinicalSelectionDisappearWithoutMountingAView() async throws {
+        for useChatGPT in [false, true] {
+            let suite = "FabricAuthority.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suite)!
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent(suite)
+            defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: directory) }
+            let store = HomeBasePairedStore(userDefaults: defaults, keychainReader: { _, _ in .success(nil) },
+                keychainWriter: { _, _, _ in .success(()) }, keychainDeleter: { _, _ in .success(()) })
+            let workspace = PairedPatientsWorkspaceModel(pairedStore: store,
+                cacheStore: HomeBasePatientCacheStore(cacheDirectory: directory, keyProvider: { throw NativeOrdinaryContractError.invalid }),
+                dataSourceFactory: { _ in S6MockDataSource(details: [:]) })
+            let patient = HomeBasePatientDetail(id: "synthetic-patient", firstName: "Ada", lastName: "Sintetica", birthDate: nil,
+                taxCode: "SYNTHETIC", address: nil, phone: nil, caregiver: nil, exemptions: nil, diagnoses: nil, monitoringProfile: nil,
+                statusReason: nil, notes: nil, aiSummary: nil, documentInsights: nil, isAdi: false, isArchived: false,
+                version: 1, ambulatoryId: "synthetic-ambulatory", createdAt: nil, updatedAt: nil)
+            let document = HomeBaseAttachmentSummary(id: "synthetic-document", patientId: patient.id, name: "Documento sintetico",
+                type: "text/plain", size: 12, path: "synthetic", summarySnapshot: nil, parseEvidenceArtifactSnapshot: nil,
+                ocrQueueState: nil, ocrQueueReason: nil, ocrQueueUpdatedAt: nil, ocrReplayArtifactSnapshot: nil, createdAt: nil)
+            workspace.ambulatoryId = "synthetic-ambulatory"; workspace.serverURL = "https://localhost"
+            workspace.tlsPin = String(repeating: "a", count: 64)
+            workspace.configurePairedOnlineForTests(sessionCookie: "mediflow_session=synthetic-s1", selectedPatient: patient, attachments: [document])
+            let retirement: (String, ClinicalWorkspaceConnection) async throws -> NativeAuthorityRetirement = { ref, connection in
+                try JSONDecoder().decode(NativeAuthorityRetirement.self, from: JSONSerialization.data(withJSONObject: [
+                    "schema": "mediflow.native-authority-retirement.v1", "previousAuthorityRef": ref,
+                    "currentAuthorityRef": NativeOrdinaryAuthority.reference(connection), "authorityRetired": true, "physicalCleanup": "not_attested"]))
+            }
+            var local = NativeFabricModel.Services(prepare: { _, _ in try self.response("ready") },
+                command: { _, _ in throw HomeBaseClientError.httpStatus(401, nil) }, status: { _, _ in throw HomeBaseClientError.httpStatus(401, nil) })
+            local.retirement = retirement
+            var ordinary = NativeOrdinaryModel.Services(prepare: { _, _ in
+                try NativeOrdinaryTestFixtures.decode(NativeOrdinaryResponse.self, NativeOrdinaryTestFixtures.response(.documentSynthesis, "needs_consent"))
+            }, command: { _, _ in throw HomeBaseClientError.httpStatus(401, nil) }, status: { _ in throw HomeBaseClientError.httpStatus(401, nil) })
+            ordinary.retirement = retirement
+            NativeFabricPresentationProbe.localServices = local; NativeFabricPresentationProbe.ordinaryServices = ordinary
+            defer { NativeFabricPresentationProbe.localServices = nil; NativeFabricPresentationProbe.ordinaryServices = nil }
+            let owner = workspace.nativeFabricPresentation(for: .documentSynthesis)
+            owner.selectDocument(document.id); owner.selectVenue(useChatGPT: useChatGPT)
+            if useChatGPT { owner.ordinary.prepare() } else { owner.local.prepare() }
+            for _ in 0..<500 where owner.local.isWorking || owner.ordinary.isWorking { await Task.yield() }
+            owner.selectDocument(nil)
+            for _ in 0..<500 where owner.local.isWorking || owner.ordinary.isWorking { await Task.yield() }
+            XCTAssertFalse(owner.canChangeVenue)
+            workspace.configurePairedOnlineForTests(sessionCookie: "mediflow_session=synthetic-s2")
+            for _ in 0..<500 where owner.local.isWorking || owner.ordinary.isWorking { await Task.yield() }
+            if useChatGPT { owner.ordinary.verifyClosure() } else { owner.local.verifyClosure() }
+            for _ in 0..<500 { await Task.yield() }
+            XCTAssertTrue(owner === workspace.nativeFabricPresentation(for: .documentSynthesis))
+            XCTAssertEqual(owner.local.phase, .idle); XCTAssertEqual(owner.ordinary.phase, .idle)
+            XCTAssertTrue(owner.canChangeVenue); XCTAssertEqual(owner.useChatGPT, useChatGPT)
+            owner.selectVenue(useChatGPT: !useChatGPT); XCTAssertEqual(owner.useChatGPT, !useChatGPT)
+        }
+    }
+
     func testDocumentChangeKeepsExplicitChatGPTLaneInMountedSwiftUIView() async throws {
         try await withMountedDocument { host, capture in
             let venue = try XCTUnwrap(capture.venue)

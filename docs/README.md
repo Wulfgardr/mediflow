@@ -552,3 +552,7 @@ Il [contratto porte e lifecycle GPUI](./adr/0161-gpui-host-ports-lifecycle.md)
 prepara G-1a.1: discovery versionata, scope e cancellazione comune.
 Il [verbale](./analysis/2026-10-23-gpui-ports-contract.md) distingue le prove
 eseguite dalla decisione 2 e dalla chiusura SEC-2/3 in G-1a.2.
+
+Il recupero dell’autorità native dopo un nuovo login è circoscritto da
+[ADR 0164](adr/0164-native-inference-authority-retirement.md) e dal
+[contratto OpenAPI dedicato](openapi/native-authority-retirement-v1.json).
