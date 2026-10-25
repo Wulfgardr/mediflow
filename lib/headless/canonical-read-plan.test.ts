@@ -304,12 +304,15 @@ test('classifies all 39 OpenAPI GETs without admitting separate native authority
       runtimeRef: 'app/api/v1/network/analytics/demographics/route.ts',
     },
   ] as const;
-  // ADR 0134 publishes this native-only status route in a supplemental OpenAPI
-  // document. It is not a primary /api/v1 read-plan candidate.
+  // ADR 0134 and ADR 0076 publish these native status routes in supplemental OpenAPI documents.
   const excludedSupplementalNativeAuthority = [
     {
       route: '/api/v1/network/ai/chatgpt/ordinary/status',
       runtimeRef: 'app/api/v1/network/ai/chatgpt/ordinary/status/route.ts',
+    },
+    {
+      route: '/api/v1/network/ai/fabric/status',
+      runtimeRef: 'app/api/v1/network/ai/fabric/status/route.ts',
     },
   ] as const;
   const observed = openApiNetworkGets();

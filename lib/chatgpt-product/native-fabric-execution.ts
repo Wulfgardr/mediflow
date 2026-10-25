@@ -18,6 +18,32 @@ export function createNativeFabricExecution(dependencies: Readonly<{
     sourceSignal(context: Context): AbortSignal; close(context: Context): void;
 }>) {
     const entries = new Map<string, Entry>();
+    type Preparation = { session: PairedNativeSession; controller: AbortController; context?: Context; detach(): void };
+    const preparations = new Set<Preparation>();
+    function retirePreparation(preparation: Preparation, close = true) {
+        preparations.delete(preparation); preparation.detach();
+        if (close) {
+            preparation.controller.abort();
+            if (preparation.context) dependencies.close(preparation.context);
+        }
+    }
+    function prepare(session: PairedNativeSession) {
+        const preparation: Preparation = { session, controller: new AbortController(), detach: () => {} };
+        preparations.add(preparation);
+        return Object.freeze({ signal: preparation.controller.signal,
+            cancel: () => retirePreparation(preparation),
+            bind(context: Context) {
+                if (context.session !== session || !preparations.has(preparation) || preparation.context) {
+                    dependencies.close(context); throw new ProductError('revoked');
+                }
+                preparation.context = context;
+                const signal = dependencies.sourceSignal(context), abort = () => retirePreparation(preparation);
+                preparation.detach = () => signal.removeEventListener('abort', abort);
+                signal.addEventListener('abort', abort, { once: true });
+                if (signal.aborted) { retirePreparation(preparation); throw new ProductError('revoked'); }
+            },
+        });
+    }
     const evidence = (selection: Selection) => Object.freeze({ modelOptionId: selection.binding.modelOptionId,
         catalogRevision: selection.catalogRevision, preferenceRevision: selection.preferenceRevision, source: selection.source,
         provider: selection.binding.provider, model: selection.binding.model, venue: 'local', fallback: 'none' });
@@ -42,12 +68,15 @@ export function createNativeFabricExecution(dependencies: Readonly<{
     function ready(context: Context, selection: Selection): Response {
         verify(context, selection);
         if (entries.size >= 16 || [...entries.values()].some(entry => entry.context.session === context.session)) throw new ProductError('busy');
+        const pending = [...preparations].find(value => value.context?.sources === context.sources && value.session === context.session);
+        if (!pending || pending.controller.signal.aborted) throw new ProductError('revoked');
         const signal = dependencies.sourceSignal(context);
         const entry: Entry = { context, selection, id: randomUUID(), phase: 'ready', controller: new AbortController(), dispose: () => {} };
         const abort = () => retire(entry);
         entry.dispose = () => signal.removeEventListener('abort', abort);
         entries.set(entry.id, entry); signal.addEventListener('abort', abort, { once: true });
         if (signal.aborted) { retire(entry); throw new ProductError('revoked'); }
+        retirePreparation(pending, false);
         return reply({ phase: 'ready', attemptId: entry.id, functionId: context.request.functionId,
             expiresAt: context.selection.expiresAt, selection: evidence(selection) });
     }
@@ -88,11 +117,14 @@ export function createNativeFabricExecution(dependencies: Readonly<{
         return reply({ phase: 'closed', attemptId: id, cleanupConfirmed: true });
     }
     function status(session: PairedNativeSession, id: string | null): Response {
-        if (!id) return reply({ phase: [...entries.values()].some(entry => entry.context.session === session) ? 'busy' : 'closed',
-            cleanupConfirmed: ![...entries.values()].some(entry => entry.context.session === session) });
+        if (!id) {
+            for (const pending of [...preparations]) if (pending.session === session) retirePreparation(pending);
+            const busy = [...entries.values()].some(entry => entry.context.session === session);
+            return reply({ phase: busy ? 'busy' : 'closed', cleanupConfirmed: !busy });
+        }
         const entry = find(session, id);
         return reply({ phase: 'current', attemptId: id, functionId: entry.context.request.functionId,
             expiresAt: entry.context.selection.expiresAt, selection: evidence(entry.selection) });
     }
-    return Object.freeze({ capture, verify, ready, generate, cancel, status });
+    return Object.freeze({ prepare, capture, verify, ready, generate, cancel, status });
 }

@@ -357,6 +357,7 @@
       "get": {
         "operationId": "nativeFabricStatusGet",
         "summary": "Revalidate an operation or confirm no outstanding local handles",
+        "description": "With an attempt header, revalidate that exact handle. Without it, revoke pending Fabric preparations and source-projection grants for the authenticated session, then report busy while any ready, generating or completed handle remains. ChatGPT grants are outside this lane.",
         "security": [
           {
             "NativeOrdinarySession": [],

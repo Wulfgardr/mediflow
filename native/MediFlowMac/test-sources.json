@@ -74,6 +74,7 @@
     "MobilePairedStatusUITestOverrideTests.swift",
     "NativeAIConfigurationTests.swift",
     "NativeFabricTests.swift",
+    "NativeFabricVenuePresentationTests.swift",
     "NativeOrdinaryClientDecryptionTests.swift",
     "NativeOrdinaryDTOTests.swift",
     "NativeOrdinaryModelTests.swift",

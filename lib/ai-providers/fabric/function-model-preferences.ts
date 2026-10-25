@@ -1,3 +1,4 @@
+import { FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY, readFunctionModelConfigurationGeneration } from './function-model-configuration-generation';
 import { createHash } from 'node:crypto';
 import type { PortableStatus } from './treatment-reasoning-portable-provisioning';
 import { isAiLaneEnabledValue } from '../../ai-lane-kill-switch';
@@ -11,7 +12,7 @@ export const FUNCTION_PREFERENCES_KEY = 'ai.fabric.functionPreferences';
 export const FUNCTION_SWITCH_KEYS = Object.freeze({ patient_insight: 'aiPatientInsightKillSwitch', smart_import: 'aiSmartImportKillSwitch',
     document_synthesis: 'aiDocumentSynthesisKillSwitch', treatment_reasoning: 'aiTreatmentReasoningKillSwitch' });
 const CONFIG_KEYS = ['aiProvider', 'aiModel_clinical', 'aiModel_reasoning', 'aiModel', 'aiUrl', 'ollamaUrl'] as const;
-export const FUNCTION_MODEL_SETTING_KEYS = [...CONFIG_KEYS, ...Object.values(FUNCTION_SWITCH_KEYS), FUNCTION_PREFERENCES_KEY];
+export const FUNCTION_MODEL_SETTING_KEYS = [...CONFIG_KEYS, ...Object.values(FUNCTION_SWITCH_KEYS), FUNCTION_PREFERENCES_KEY, FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY];
 export type FunctionModelSettings = Readonly<Record<string, string | undefined>>;
 export type FunctionModelSources = Readonly<{ settings: FunctionModelSettings; ollamaLifecycle: unknown; athenaLifecycle: unknown;
     athenaIdentity: string; athenaAvailable: boolean; portable?: PortableStatus }>;
@@ -118,7 +119,7 @@ function readState(raw: string | undefined): State {
 }
 const switches = (settings: FunctionModelSettings) => Object.fromEntries(FUNCTION_MODEL_IDS.map(id => [id, isAiLaneEnabledValue(settings[FUNCTION_SWITCH_KEYS[id]])])) as Record<FunctionModelId, boolean>;
 const fingerprint = (state: State, settings: FunctionModelSettings) => functionModelDigest([state.defaults, switches(settings)]);
-const revision = (state: State, settings: FunctionModelSettings) => functionModelDigest([state, ...FUNCTION_MODEL_IDS.map(id => settings[FUNCTION_SWITCH_KEYS[id]] ?? null)]);
+const revision = (state: State, settings: FunctionModelSettings) => functionModelDigest([state, ...FUNCTION_MODEL_IDS.map(id => settings[FUNCTION_SWITCH_KEYS[id]] ?? null), readFunctionModelConfigurationGeneration(settings[FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY])]);
 function lookup(catalog: FunctionModelCatalog, id: FunctionModelId, option: string | null, requireAvailable: boolean): FunctionModelBinding {
     const binding = catalog.bindings.find(item => item.modelOptionId === option);
     if (!binding) return fail('model_not_cataloged');
