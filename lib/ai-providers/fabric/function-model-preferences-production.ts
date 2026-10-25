@@ -8,6 +8,7 @@ import { createHostProviderLifecycleService } from './provider-lifecycle-service
 import { createFunctionModelPreferencesService, FUNCTION_MODEL_SETTING_KEYS, FUNCTION_PREFERENCES_KEY, FUNCTION_SWITCH_KEYS, FunctionModelError, functionModelDigest, type FunctionModelSources } from './function-model-preferences';
 import { createFunctionModelDispatch } from './function-model-dispatch';
 import { createPortableProvisioning } from './treatment-reasoning-portable-provisioning';
+import { FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY } from './function-model-configuration-generation';
 
 // launcher-owned root, independent of the Webpack module/asset location.
 const portable = createPortableProvisioning({ applicationRoot: process.cwd() });
@@ -24,7 +25,7 @@ export function readProductionFunctionModelSources(): FunctionModelSources {
 export const functionModelPreferencesService = createFunctionModelPreferencesService({
     readSources: readProductionFunctionModelSources, immediate: runDbServerImmediateTransaction,
     writeSettings(writes) {
-        const allowed = [FUNCTION_PREFERENCES_KEY, ...Object.values(FUNCTION_SWITCH_KEYS)];
+        const allowed = [FUNCTION_PREFERENCES_KEY, FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY, ...Object.values(FUNCTION_SWITCH_KEYS)];
         if (Object.keys(writes).some(key => !allowed.includes(key))) throw new FunctionModelError('input_invalid');
         for (const [key, value] of Object.entries(writes)) dbServer.insert(settings).values({ key: key, value: value })
             .onConflictDoUpdate({ target: settings.key, set: { value: value } }).run();

@@ -260,11 +260,17 @@ La verifica di chiusura senza identificativo revoca anche le preparazioni e i
 grant di proiezione ancora pendenti nella stessa sessione e lane Fabric. Una
 risposta `202` persa non lascia quindi un grant consumabile dopo una chiusura
 confermata; le operazioni già pronte restano individuate dal proprio handle.
-Le modifiche effettive alla configurazione AI tramite i writer generici delle
-impostazioni incrementano una generazione host nella stessa transazione della
-modifica. Questa generazione entra nelle revisioni Fabric e ordinary: anche un
-cambio A→B→A fra due verifiche invalida il tentativo precedente. Il client non
-può scrivere la generazione. La scelta esplicita fra locale e ChatGPT resta
+Le modifiche effettive alla configurazione AI tramite i writer generici e i
+comandi dedicati delle funzioni incrementano una generazione host nella stessa
+transazione della modifica e della ricevuta del comando. Un replay idempotente
+o un CAS negato non la incrementa. Questa generazione entra nelle revisioni
+Fabric e ordinary ed è fissata nell'owner del tentativo ordinary prima della
+preparazione: ogni guardia, comprese invio e pubblicazione, la confronta con
+l'archivio corrente. Anche un cambio A→B→A fra due verifiche rende terminale il
+tentativo precedente. Salvare il modello preferito per le operazioni future
+non cambia il modello già scelto nel tentativo; disabilitare ordinary ne
+revoca esplicitamente tutte le operazioni. Il client non può scrivere la
+generazione. La scelta esplicita fra locale e ChatGPT resta
 stabile al cambio documento, che invalida soltanto lo stato operativo relativo
 alle fonti precedenti.
 

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
 import path from 'node:path';
-import { test, mock, after } from 'node:test';
+import { test, mock, after, afterEach } from 'node:test';
 import { randomUUID } from 'node:crypto';
 
 const parent = process.env.MEDIFLOW_DATA_DIR!;
@@ -24,13 +24,53 @@ const generation = await import('../../security/archive-session-generation.ts');
 const syntheticUser = `synthetic-config-${randomUUID()}`;
 const web = fixture.issueSyntheticWebSession({ id: syntheticUser, username: syntheticUser, role: 'admin' }, randomUUID());
 mock.method((auth as unknown as { default?: typeof auth }).default ?? auth, 'requireSessionOrLocalToken', async () => web);
+mock.method((auth as unknown as { default?: typeof auth }).default ?? auth, 'requireSession', async () => web);
 after(() => { mock.restoreAll(); fixture.retireSyntheticWebSession(web); });
+afterEach(() => { dbServer.insert(settings).values({ key: 'aiPatientInsightKillSwitch', value: 'enabled' })
+    .onConflictDoUpdate({ target: settings.key, set: { value: 'enabled' } }).run(); });
 const { POST } = await import('../../../app/api/settings/route.ts');
 const { PUT } = await import('../../../app/api/settings/[key]/route.ts');
 const { createFunctionModelDispatch } = await import('./function-model-dispatch.ts');
 const { readProductionFunctionModelSources: readSources } = await import('./function-model-preferences-production.ts');
 const { createNativeFabricExecution } = await import('../../chatgpt-product/native-fabric-execution.ts');
 const { readOrdinaryCloudSettings } = await import('../../chatgpt-product/ordinary-settings.ts');
+const dedicated = await import('../../../app/api/settings/ai/functions/route.ts');
+async function activation(enabled: boolean) {
+    const response = await dedicated.GET(new Request('http://localhost/api/settings/ai/functions', { headers: { 'x-mediflow-function-preferences': '2' } }));
+    assert.equal(response.status, 200);
+    const view = await response.json();
+    return { schemaVersion: 'mediflow.function-preferences-command.v2', commandId: randomUUID(),
+        expectedRevision: view.revision, expectedCatalogRevision: view.catalogRevision,
+        action: 'set_activation', functionId: 'patient_insight', enabled };
+}
+function applyActivation(command: Awaited<ReturnType<typeof activation>>) {
+    return dedicated.POST(new Request('http://localhost/api/settings/ai/functions', { method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-mediflow-function-preferences': '2' }, body: JSON.stringify(command) }));
+}
+test('R4 dedicated HTTP kill-switch ABA advances ordinary revocation and preserves idempotency/CAS', async () => {
+    const before = await readOrdinaryCloudSettings();
+    const off = await activation(false);
+    const offResponse = await applyActivation(off); assert.equal(offResponse.status, 200);
+    const offView = await offResponse.json(), disabled = await readOrdinaryCloudSettings();
+    assert.notEqual(disabled.revision, before.revision);
+    assert.deepEqual(await (await applyActivation(off)).json(), offView);
+    assert.equal((await readOrdinaryCloudSettings()).revision, disabled.revision, 'idempotent replay does not revoke again');
+    const stale = await applyActivation({ ...off, commandId: randomUUID(), enabled: true });
+    assert.equal(stale.status, 409);
+    assert.equal((await readOrdinaryCloudSettings()).revision, disabled.revision, 'CAS denial leaves generation unchanged');
+    const onResponse = await applyActivation(await activation(true)); assert.equal(onResponse.status, 200);
+    const after = await readOrdinaryCloudSettings();
+    assert.notEqual(after.revision, before.revision); assert.deepEqual(after.lanes, before.lanes);
+});
+test('R4 dedicated settings, command receipt and generation roll back together', async () => {
+    const command = await activation(false), disk = openDbServer();
+    const before = disk.prepare('SELECT key,value FROM settings ORDER BY key').all();
+    disk.exec("CREATE TEMP TRIGGER synthetic_dedicated_generation_failure BEFORE INSERT ON settings WHEN NEW.key='ai.fabric.configurationGeneration' BEGIN SELECT RAISE(ABORT, 'synthetic_dedicated_generation_failure'); END");
+    try {
+        assert.equal((await applyActivation(command)).status, 503);
+        assert.deepEqual(disk.prepare('SELECT key,value FROM settings ORDER BY key').all(), before);
+    } finally { disk.exec('DROP TRIGGER synthetic_dedicated_generation_failure'); }
+});
 async function write(key: string, value: string, method: 'POST' | 'PUT') {
     const request = new Request('http://localhost/api/settings' + (method === 'PUT' ? '/' + key : ''), { method,
         headers: { 'content-type': 'application/json', 'x-mediflow-archive-generation': generation.currentArchiveGeneration() },

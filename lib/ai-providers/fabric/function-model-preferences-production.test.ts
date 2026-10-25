@@ -8,6 +8,7 @@ import Database from 'better-sqlite3';
 import { createHostProviderLifecycleService } from './provider-lifecycle-service.ts';
 import { createFunctionModelDispatch, FUNCTION_MODEL_CHOICE_HEADER, functionModelBindingSettings } from './function-model-dispatch.ts';
 import { FUNCTION_PREFERENCES_KEY } from './function-model-preferences.ts';
+import { FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY } from './function-model-configuration-generation.ts';
 
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-function-model-production-'));
 process.env.MEDIFLOW_DATA_DIR = directory;
@@ -33,12 +34,14 @@ const command = () => {
         defaultModelOptionId: view.functions[0].options[1].modelOptionId };
 };
 
-test('production settings owner persists only dedicated preferences and existing switch, and the real binding reader consumes the selection', async () => {
+test('production settings owner persists preferences and revocation together, and the real binding reader consumes the selection', async () => {
     const initial = service.read();
-    const before = disk.prepare('SELECT key,value FROM settings WHERE key <> ? ORDER BY key').all(FUNCTION_PREFERENCES_KEY);
+    const unchanged = () => disk.prepare('SELECT key,value FROM settings WHERE key NOT IN (?,?) ORDER BY key').all(FUNCTION_PREFERENCES_KEY, FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY);
+    const before = unchanged();
     const selected = command(); const saved = service.apply(selected);
     assert.deepEqual(service.read(), saved); assert.deepEqual(service.apply(selected), saved);
-    assert.deepEqual(disk.prepare('SELECT key,value FROM settings WHERE key <> ? ORDER BY key').all(FUNCTION_PREFERENCES_KEY), before);
+    assert.deepEqual(unchanged(), before);
+    assert.deepEqual(disk.prepare('SELECT value FROM settings WHERE key=?').get(FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY), { value: '1' });
     const consume = createFunctionModelDispatch({ authenticate: async () => 'synthetic-session', readSources: readProductionFunctionModelSources })('patient_insight', async () => {
         const binding = await createHostLocalProviderBindingService().readClinical();
         assert.equal(binding.status, 'available');
