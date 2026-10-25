@@ -149,15 +149,6 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     // MARK: - Navigazione fra sezioni, su entrambi gli idiomi
 
-    /// Opens a section by name, wherever this idiom keeps its sections.
-    ///
-    /// On iPhone they are tabs. On iPad they are rows in the `NavigationSplitView`
-    /// sidebar, and that sidebar starts at `.detailOnly` — hidden. `tab(_:)`
-    /// therefore found nothing on iPad, which is most of why the navigation tests
-    /// failed there: not a layout regression, a helper that only knew one idiom.
-    ///
-    /// Reveals the sidebar only when the row is not already reachable, so on
-    /// iPhone this stays exactly the tap it was.
     @discardableResult
     private func openSection(_ label: String) -> Bool {
         let direct = tab(label)
@@ -183,10 +174,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
             }
         }
 
-        // iPad: the sections live in the split-view sidebar, which starts hidden.
-        // The system's toggle carries no stable identifier, so it is found by
-        // position: the leading control of the navigation bar.
-        let toggle = app.navigationBars.buttons.element(boundBy: 0)
+        let toggle = app.buttons["clinical-workspace-project-menu-button"]
         if toggle.exists && toggle.isHittable {
             toggle.tap()
         }
@@ -285,24 +273,27 @@ final class MediFlowMobileAppUITests: XCTestCase {
     func testProjectMenuOpensEverySurface() throws {
         launch()
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
-        let projectButton = app.navigationBars.buttons["Progetto"].firstMatch
-        XCTAssertTrue(projectButton.waitForExistence(timeout: 10))
-        projectButton.tap()
-
         let surfaces = [
-            (label: "Runtime", identifier: "apple-foundation-runtime-view"),
-            (label: "Panoramica", identifier: "apple-foundation-overview-view"),
-            (label: "Tappe", identifier: "apple-foundation-milestones-view"),
+            (label: "Runtime", section: "runtime", identifier: "apple-foundation-runtime-view"),
+            (label: "Panoramica", section: "overview", identifier: "apple-foundation-overview-view"),
+            (label: "Tappe", section: "milestones", identifier: "apple-foundation-milestones-view"),
         ]
         for (index, surface) in surfaces.enumerated() {
-            let link = app.buttons[surface.label]
+            let projectButton = app.buttons["clinical-workspace-project-menu-button"]
+            if index == 0 || !app.navigationBars.buttons["Progetto"].exists {
+                XCTAssertTrue(projectButton.waitForExistence(timeout: 10))
+                projectButton.tap()
+            }
+            let sidebar = sectionView("clinical-workspace-project-sidebar")
+            let usesSidebar = sidebar.exists
+            let link = usesSidebar
+                ? sidebar.buttons["clinical-workspace-section-\(surface.section)-button"]
+                : app.buttons[surface.label]
             XCTAssertTrue(link.waitForExistence(timeout: 10))
             link.tap()
-            XCTAssertTrue(
-                sectionView(surface.identifier).waitForExistence(timeout: 20),
-                "The project menu should open \(surface.label)"
-            )
-            if index < surfaces.count - 1 {
+            XCTAssertTrue(sectionView(surface.identifier).waitForExistence(timeout: 20),
+                          "The project menu should open \(surface.label)")
+            if !usesSidebar && index < surfaces.count - 1 {
                 let backButton = app.navigationBars.buttons["Progetto"].firstMatch
                 XCTAssertTrue(backButton.waitForExistence(timeout: 10))
                 backButton.tap()
@@ -319,12 +310,20 @@ final class MediFlowMobileAppUITests: XCTestCase {
         launch(seedPatients: true, section: "modules")
         let patientWorkspace = sectionView("clinical-workspace-patients-view")
         XCTAssertTrue(patientWorkspace.waitForExistence(timeout: 20))
-        let workspaceFrameBeforeOverlay = patientWorkspace.frame
+        let patient = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(patient.waitForExistence(timeout: 10))
+        patient.tap()
+        openPatientSection(.diary)
+        let openEntry = app.buttons["homebase-open-new-entry-button"]
+        XCTAssertTrue(scrollDown(to: openEntry, requireHittable: true))
+        openEntry.tap()
+        let title = app.textFields["homebase-new-entry-title-field"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        let anchors = [patientWorkspace, patient, sectionView("patient-workspace-header"), title]
+        let framesBeforeOverlay = anchors.map(\.frame)
 
-        let sidebarToggle = app.buttons.matching(NSPredicate(
-            format: "identifier == %@ OR identifier == %@", "ToggleSideBar", "ToggleSidebar"
-        )).firstMatch
-        XCTAssertTrue(sidebarToggle.waitForExistence(timeout: 10), "iPad should expose the native tab sidebar control")
+        let sidebarToggle = app.buttons["clinical-workspace-project-menu-button"]
+        XCTAssertTrue(sidebarToggle.waitForExistence(timeout: 10), "Regular space should expose the project overlay")
         sidebarToggle.tap()
 
         let projectSidebar = sectionView("clinical-workspace-project-sidebar")
@@ -333,27 +332,19 @@ final class MediFlowMobileAppUITests: XCTestCase {
             sectionView("clinical-workspace-patients-view").exists,
             "Opening the project sidebar must preserve the patient workspace behind the overlay"
         )
-        let workspaceFrameWithOverlay = patientWorkspace.frame
-        XCTAssertEqual(
-            workspaceFrameWithOverlay.minX,
-            workspaceFrameBeforeOverlay.minX,
-            accuracy: 2,
-            "Opening the overlay must not shift the patient workspace"
-        )
-        XCTAssertEqual(
-            workspaceFrameWithOverlay.width,
-            workspaceFrameBeforeOverlay.width,
-            accuracy: 2,
-            "Opening the overlay must not compress the patient workspace"
-        )
+        for (anchor, before) in zip(anchors, framesBeforeOverlay) {
+            XCTAssertTrue(anchor.exists)
+            XCTAssertEqual(anchor.frame.minX, before.minX, accuracy: 2,
+                           "Opening navigation must not shift \(anchor.identifier)")
+            XCTAssertEqual(anchor.frame.width, before.width, accuracy: 2,
+                           "Opening navigation must not compress \(anchor.identifier)")
+        }
         let overlayEvidence = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         overlayEvidence.name = "issue-142-project-sidebar-overlay"
         overlayEvidence.lifetime = .keepAlways
         add(overlayEvidence)
 
-        let agenda = app.buttons["Agenda"].firstMatch.exists
-            ? app.buttons["Agenda"].firstMatch : app.staticTexts["Agenda"].firstMatch
-        agenda.tap()
+        projectSidebar.buttons["clinical-workspace-section-agenda-button"].tap()
         XCTAssertTrue(sectionView("clinical-workspace-agenda-view").waitForExistence(timeout: 10))
         XCTAssertTrue(
             projectSidebar.waitForNonExistence(timeout: 5),
@@ -609,12 +600,23 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         title.tap()
         title.typeText("Bozza sintetica adattiva")
+        let addParagraph = app.buttons["homebase-new-entry-content-add-paragraph"]
+        XCTAssertTrue(scrollDown(to: addParagraph, requireHittable: true))
+        addParagraph.tap()
+        let paragraph = app.textViews.matching(NSPredicate(
+            format: "identifier BEGINSWITH %@", "homebase-new-entry-content-text-"
+        )).firstMatch
+        XCTAssertTrue(scrollDown(to: paragraph, requireHittable: true))
+        paragraph.tap()
+        paragraph.typeText("Synthetic note: preserve the complete draft without saving.")
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
 
         for width in [1000, 650, 400, 1000, 400] {
             app.buttons["layout-test-width-\(width)"].tap()
             XCTAssertTrue(title.waitForExistence(timeout: 10), "The open editor must survive the \(width)pt transition")
             XCTAssertEqual(title.value as? String, "Bozza sintetica adattiva")
+            XCTAssertEqual(paragraph.value as? String, "Synthetic note: preserve the complete draft without saving.")
+            XCTAssertFalse(app.buttons["homebase-open-new-entry-button"].exists)
             XCTAssertTrue(sectionView("patient-section-navigation").exists)
             XCTAssertFalse(sectionView("patient-detail-empty").exists)
             attachScreenshot(named: "adaptive-draft-\(width)pt")
@@ -629,6 +631,34 @@ final class MediFlowMobileAppUITests: XCTestCase {
         }
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         XCTAssertEqual(title.value as? String, "Bozza sintetica adattiva")
+        XCTAssertEqual(paragraph.value as? String, "Synthetic note: preserve the complete draft without saving.")
+    }
+
+    func testRequestedPatientDoesNotRenderPreviousChartBeforeSelectionCompletes() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "Synthetic pending-selection fixture needs an iPad canvas")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        app.launchEnvironment["MEDIFLOW_APPLE_UITEST_ADAPTIVE_LAYOUT"] = "1"
+        app.launchEnvironment["MEDIFLOW_APPLE_UITEST_HOLD_PATIENT_SELECTION"] = "1"
+        launch(seedPatients: true, section: "modules")
+        app.buttons["layout-test-width-1000"].tap()
+        let first = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(first.waitForExistence(timeout: 20))
+        first.tap()
+        XCTAssertTrue(sectionView("patient-workspace-header").waitForExistence(timeout: 5))
+        app.buttons["patient-cell-uitest-2"].tap()
+        let release = app.buttons["layout-test-release-patient-selection"]
+        XCTAssertTrue(release.waitForExistence(timeout: 5))
+        for width in [650, 400, 1000] {
+            app.buttons["layout-test-width-\(width)"].tap()
+            XCTAssertTrue(sectionView("patient-detail-pending").waitForExistence(timeout: 5))
+            XCTAssertFalse(sectionView("patient-workspace-header").exists)
+            XCTAssertFalse(sectionView("patient-compact-header-disclosure").exists)
+            XCTAssertFalse(sectionView("patient-detail-name").exists)
+        }
+        release.tap()
+        let header = sectionView("patient-workspace-header")
+        XCTAssertTrue(header.waitForExistence(timeout: 5))
+        XCTAssertTrue(header.label.contains("Bianchi Anna"))
     }
 
     /// Clinical content must stay inside the workspace at the largest text size.

@@ -50,6 +50,9 @@ struct PairedPatientsWorkspaceView: View {
     #if os(iOS)
     @State private var preferredPatientColumn: NavigationSplitViewColumn = .sidebar
     @State private var patientDestinationID: String?
+    #if DEBUG
+    @State private var heldSyntheticPatientSelection: HomeBasePatientSummary?
+    #endif
     #endif
 
     init(model: PairedPatientsWorkspaceModel, capabilities: ClinicalWorkspaceCapabilitiesStore, onShowProject: (() -> Void)? = nil) {
@@ -456,6 +459,19 @@ struct PairedPatientsWorkspaceView: View {
             )
         } detail: {
             mobilePatientDestination(isWide: isWide)
+                #if DEBUG
+                .toolbar {
+                    if let patient = heldSyntheticPatientSelection {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Complete synthetic selection") {
+                                heldSyntheticPatientSelection = nil
+                                Task { await model.loadPatient(patient) }
+                            }
+                            .accessibilityIdentifier("layout-test-release-patient-selection")
+                        }
+                    }
+                }
+                #endif
                 .navigationSplitViewColumnWidth(min: PatientsWorkspaceLayout.minimumDetailWidth, ideal: PatientsWorkspaceLayout.minimumDetailWidth)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier(isWide ? "patient-workspace-detail" : "patient-compact-detail-destination")
@@ -485,6 +501,14 @@ struct PairedPatientsWorkspaceView: View {
                 preferredPatientColumn = .detail
                 // Returning to the same chart must not discard its draft or refetch it.
                 if model.selectedPatient?.id != patient.id {
+                    #if DEBUG
+                    if model.selectedPatient != nil,
+                       ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENTS"] == "1",
+                       ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_HOLD_PATIENT_SELECTION"] == "1" {
+                        heldSyntheticPatientSelection = patient
+                        return
+                    }
+                    #endif
                     Task { await model.loadPatient(patient) }
                 }
             }
