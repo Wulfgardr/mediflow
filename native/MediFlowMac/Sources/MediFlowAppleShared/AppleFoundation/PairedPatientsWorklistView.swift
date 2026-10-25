@@ -220,7 +220,18 @@ struct PairedPatientsWorklistView: View {
             #if os(iOS)
             .toolbar {
                 if dynamicTypeSize.isAccessibilitySize {
-                    ToolbarItem(placement: .primaryAction) { csvImportAction }
+                    ToolbarItem(placement: .primaryAction) {
+                        Menu {
+                            patientViewModePicker
+                            mobileResultCount
+                            csvImportAction
+                        } label: {
+                            Label("Elenco", systemImage: "line.3.horizontal.decrease")
+                        }
+                        .accessibilityLabel("Filtra e importa pazienti")
+                        .accessibilityValue("\(filteredPatients.count) pazienti visibili nell’elenco caricato")
+                        .accessibilityIdentifier("patient-worklist-tools-menu")
+                    }
                 }
             }
             #endif
@@ -394,7 +405,7 @@ struct PairedPatientsWorklistView: View {
             // macOS hoists the filters above the list, so the column keeps them
             // in place while the list scrolls.
             #if !os(macOS)
-            mobileWorklistControls
+            if !dynamicTypeSize.isAccessibilitySize { mobileWorklistControls }
             #endif
             let results = filteredPatients
             if results.isEmpty {

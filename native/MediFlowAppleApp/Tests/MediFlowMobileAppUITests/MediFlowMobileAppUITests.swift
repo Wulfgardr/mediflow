@@ -820,7 +820,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         )
     }
 
-    func testAX5ConnectionMessagesExpandWithoutLosingPatientSelection() throws {
+    func testAX5WorklistToolsAndConnectionPreserveFirstViewport() throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "compact-only layout contract")
         launch(seedPatients: true, section: "modules", dynamicTypeSize: "accessibility5")
         let row = app.buttons["patient-cell-uitest-1"]
@@ -830,19 +830,31 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(row.isHittable)
         XCTAssertLessThanOrEqual(row.frame.maxY, tabBar.frame.minY)
 
-        let disclosure = app.buttons["patient-worklist-connection-disclosure"]
-        XCTAssertTrue(disclosure.waitForExistence(timeout: 10))
-        XCTAssertTrue(disclosure.label.contains("Home-base non configurato"))
-        XCTAssertFalse(sectionView("workspace-status-message").exists)
-        XCTAssertTrue(sectionView("patient-view-mode").isHittable)
-        XCTAssertTrue(sectionView("patient-worklist-count").exists)
+        func toolbarAction(_ identifier: String, overflowTitle: String? = nil) -> XCUIElement {
+            let direct = app.buttons[identifier]
+            if direct.isHittable { return direct }
+            app.buttons["OverflowBarButtonItem"].tap()
+            let button = direct.isHittable ? direct : app.buttons[overflowTitle ?? identifier]
+            XCTAssertTrue(button.waitForExistence(timeout: 5))
+            XCTAssertTrue(button.isHittable)
+            return button
+        }
 
-        disclosure.tap()
-        XCTAssertTrue(sectionView("mobile-paired-status").waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Collega al computer MediFlow per aprire le cartelle autorizzate."].exists)
-        XCTAssertEqual(sectionView("workspace-status-message").label, "Dati di test caricati.")
-        disclosure.tap()
-        XCTAssertFalse(sectionView("workspace-status-message").exists)
+        let connection = toolbarAction("patient-worklist-connection-button")
+        XCTAssertEqual(connection.value as? String, "Home-base non configurato")
+        connection.tap()
+        XCTAssertTrue(sectionView("homebase-configuration-sheet").waitForExistence(timeout: 5))
+        XCTAssertTrue(sectionView("homebase-connection-state").exists)
+        XCTAssertTrue(sectionView("homebase-reconciliation-state").exists)
+        app.buttons["homebase-configuration-close-button"].tap()
+        XCTAssertTrue(row.isHittable)
+        XCTAssertLessThanOrEqual(row.frame.maxY, tabBar.frame.minY)
+
+        toolbarAction("patient-worklist-tools-menu", overflowTitle: "Elenco").tap()
+        XCTAssertTrue(sectionView("patient-view-mode").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Importa CSV"].exists)
+        sectionView("patient-view-mode").tap()
+        app.buttons["Attivi"].tap()
         XCTAssertTrue(row.isHittable)
         XCTAssertLessThanOrEqual(row.frame.maxY, tabBar.frame.minY)
         row.tap()
@@ -855,6 +867,13 @@ final class MediFlowMobileAppUITests: XCTestCase {
     func testScopeFilterRemainsLegibleAtAX5() {
         launch(seedPatients: true, section: "modules", dynamicTypeSize: "accessibility5")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
+        let tools = app.buttons["patient-worklist-tools-menu"]
+        if tools.isHittable {
+            tools.tap()
+        } else {
+            app.buttons["OverflowBarButtonItem"].tap()
+            app.buttons["Elenco"].tap()
+        }
         let scope = sectionView("patient-view-mode")
         XCTAssertTrue(scope.waitForExistence(timeout: 15))
         XCTAssertTrue(
