@@ -760,10 +760,60 @@ final class PairedDiarySaveTests: XCTestCase {
     }
 
     @MainActor
-    private func mobileUncertainRestart() async throws -> (PairedPatientsWorkspaceModel, DiarySaveTransport, MobileVisitImport) {
+    func testMobileVisitDismissalRetiresReconciliationBeforeAndAfterEntryRead() async throws {
+        for pause in ["sources", "entry-404", "entry-ack"] {
+            let (model, transport, binding) = try await mobileUncertainRestart(acknowledged: pause == "entry-ack")
+            let coordinator = try XCTUnwrap(model.mobileVisit)
+            let registration = try coordinator.vault.registration(for: binding)
+            let started = transport.holdNext(method: "GET", suffix: pause == "sources" ? "/api/auth/profile" : "/entries/" + binding.entryID)
+            let recovery = Task { await coordinator.reconcile(binding.recordID) }
+            await fulfillment(of: [started], timeout: 5)
+            coordinator.dismiss()
+            model.activePatientSection = .therapies
+            transport.release()
+            await recovery.value
+            XCTAssertEqual(try coordinator.vault.registration(for: binding), registration, pause)
+            XCTAssertNil(model.mobileVisitDraft, pause)
+            XCTAssertTrue(model.newEntryEditorDocument.blocks.isEmpty, pause)
+            XCTAssertEqual(model.activePatientSection, .therapies, pause)
+            XCTAssertNil(coordinator.message, pause)
+            XCTAssertFalse(coordinator.isWorking, pause)
+            XCTAssertEqual(transport.entryCreates.count, 1, pause)
+        }
+    }
+
+    @MainActor
+    func testMobileVisitRetiredReconciliationCannotFinishANewerRequest() async throws {
+        let (model, transport, binding) = try await mobileUncertainRestart()
+        let coordinator = try XCTUnwrap(model.mobileVisit)
+        let started = transport.holdNext(method: "GET", suffix: "/entries/" + binding.entryID)
+        let old = Task { await coordinator.reconcile(binding.recordID) }
+        await fulfillment(of: [started], timeout: 5)
+        let finishOld = transport.takeHeldResponse()
+        coordinator.dismiss()
+        let newStarted = transport.holdNext(method: "GET", suffix: "/api/auth/profile")
+        let new = Task { await coordinator.reconcile(binding.recordID) }
+        await fulfillment(of: [newStarted], timeout: 5)
+        finishOld()
+        await old.value
+        XCTAssertTrue(coordinator.isWorking, "Only the new request owns the working state")
+        XCTAssertNil(coordinator.message)
+        XCTAssertNil(model.mobileVisitDraft)
+        XCTAssertEqual(try coordinator.vault.registration(for: binding).phase, .uncertain)
+        transport.release()
+        await new.value
+        XCTAssertFalse(coordinator.isWorking)
+        XCTAssertEqual(model.mobileVisitDraft?.entryID, binding.entryID)
+        XCTAssertEqual(try coordinator.vault.registration(for: binding).phase, .draft)
+        XCTAssertEqual(transport.entryCreates.count, 1)
+    }
+
+    @MainActor
+    private func mobileUncertainRestart(acknowledged: Bool = false) async throws -> (PairedPatientsWorkspaceModel, DiarySaveTransport, MobileVisitImport) {
         let (original, transport, id) = try await mobileScenario()
         let binding = try XCTUnwrap(original.mobileVisitDraft)
-        transport.writeStatus = 503
+        if acknowledged { transport.loseNextCreateAcknowledgement = true }
+        else { transport.writeStatus = 503 }
         await original.createEntryForSelectedPatient()
         XCTAssertEqual(try original.mobileVisit!.vault.registration(for: binding).phase, .uncertain)
         original.mobileVisit?.lock()
@@ -1021,10 +1071,11 @@ private final class DiarySaveTransport: @unchecked Sendable {
             return started
         }
     }
-    func release() {
+    func takeHeldResponse() -> () -> Void {
         let pending = lock.withLock { let value = held; held = nil; return value }
-        if let pending { respond(pending) }
+        return { [weak self] in if let pending { self?.respond(pending) } }
     }
+    func release() { takeHeldResponse()() }
     func start(_ request: DiarySaveURLProtocol) {
         let shouldHold = lock.withLock {
             captured.append(.init(request: request.request, body: request.body))

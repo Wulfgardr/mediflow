@@ -5333,14 +5333,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         statusMessage = "Appunto importato nel diario. Apri Riprendi nuova voce e premi Registra dopo la revisione."
     }
 
-    func reconcileMobileVisit(_ binding: MobileVisitImport) async throws {
-        guard mobileVisitContextIsCurrent(binding.context), let cookie = sessionCookie, let credentials = pairedCredentials,
+    func reconcileMobileVisit(
+        _ binding: MobileVisitImport, isCurrent requestIsCurrent: @escaping @MainActor () -> Bool = { true }
+    ) async throws {
+        guard requestIsCurrent(), !Task.isCancelled, mobileVisitContextIsCurrent(binding.context), let cookie = sessionCookie, let credentials = pairedCredentials,
               let vault = mobileVisit?.vault else { throw MobileVisitError.invalidContext }
         let isCurrent = diaryWriteCurrentness(patientID: binding.context.patientID, cookie: cookie, credentials: credentials)
         do {
             let entry = try await makeClient().fetchEntry(patientId: binding.context.patientID, entryId: binding.entryID,
                 credentials: credentials, sessionCookie: cookie, ambulatoryId: binding.context.scopeID)
-            guard isCurrent() else { throw MobileVisitError.invalidContext }
+            guard requestIsCurrent(), !Task.isCancelled, isCurrent() else { throw MobileVisitError.invalidContext }
             let frozen = try vault.registration(for: binding)
             let unchanged = frozen.payload.flatMap { try? self.mobileVisitComposer(from: $0) }
                 .map { self.mobileVisitComposerMatches($0, binding: binding) } == true
@@ -5354,7 +5356,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 }
             }
         } catch HomeBaseClientError.httpStatus(404, _) {
-            guard isCurrent() else { throw MobileVisitError.invalidContext }
+            guard requestIsCurrent(), !Task.isCancelled, isCurrent() else { throw MobileVisitError.invalidContext }
             let frozen = try vault.registration(for: binding)
             guard let payload = frozen.payload else { throw MobileVisitError.corrupt }
             let restored = try mobileVisitComposer(from: payload)
