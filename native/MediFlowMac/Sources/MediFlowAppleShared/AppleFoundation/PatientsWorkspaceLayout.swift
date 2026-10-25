@@ -31,15 +31,9 @@ enum PatientWorkspaceSection: String, CaseIterable, Identifiable {
     }
 }
 
-/// Layout rule for the patients workspace on iPhone and iPad.
-///
-/// The arrangement is decided by the width the container actually offers, never
-/// by the device name or by the size class alone. A regular size class says
-/// "not a phone"; it does not say how much room the workspace got, and on iPad
-/// the same app runs at continuously varying widths. Both column floors below
-/// are content requirements, not device metrics: the list needs enough room for
-/// a patient identity line, and the chart needs enough room for clinical rows
-/// that must not truncate.
+/// Content budgets for the native patient split, independent of device identity.
+/// NavigationSplitView owns the actual columns and system separation; these
+/// floors decide when the workspace should request a single clinical plane.
 enum PatientsWorkspaceLayout {
     /// Narrowest list column that still fits the identity line, the scope filter
     /// and the diagnosis summary without truncating them.
@@ -63,6 +57,7 @@ enum PatientsWorkspaceLayout {
         containerWidth - listWidth(forContainerWidth: containerWidth) - dividerWidth
     }
 
+    /// Minimum separation budget; not a hinge measurement or system divider frame.
     static let dividerWidth: CGFloat = 1
 
     /// Whether list and chart can sit side by side in `containerWidth`.
