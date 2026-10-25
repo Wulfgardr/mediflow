@@ -28,9 +28,11 @@ final class MobileVisitProductCoordinator: ObservableObject {
         isWorking = false
         message = nil
         vault.lock()
-        workspace?.password = ""
         workspace?.clearMobileVisitComposer()
-        if cancelAuthentication { workspace?.cancelMobileVisitAuthentication() }
+        if cancelAuthentication {
+            workspace?.password = ""
+            workspace?.cancelMobileVisitAuthentication()
+        }
     }
 
     func prepare() async {
@@ -42,7 +44,17 @@ final class MobileVisitProductCoordinator: ObservableObject {
     }
 
     func requestOnlineReview(_ id: UUID) {
+        guard !isWorking, let workspace else { return }
+        do { try workspace.requireMobileVisitReviewAvailability() }
+        catch {
+            requestID = nil
+            recordID = nil
+            needsAuthentication = false
+            show(error)
+            return
+        }
         lock()
+        workspace.password = ""
         requestID = UUID()
         recordID = id
         needsAuthentication = true
@@ -54,6 +66,7 @@ final class MobileVisitProductCoordinator: ObservableObject {
         isWorking = true
         defer { if requestID == ticket { isWorking = false } }
         do {
+            try workspace.requireMobileVisitReviewAvailability()
             try await workspace.authenticateMobileVisit()
             guard requestID == ticket, !Task.isCancelled else { return }
             needsAuthentication = false

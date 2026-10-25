@@ -780,13 +780,17 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     func login() async {
+        _ = await login(protectingMobileVisitComposer: false)
+    }
+
+    private func login(protectingMobileVisitComposer: Bool) async -> Bool {
         guard !password.isEmpty else {
             errorMessage = "Inserisci la passphrase o il PIN precedente."
-            return
+            return false
         }
         guard let credentials = pairedCredentials else {
             errorMessage = "Inserisci le credenziali paired rilasciate dal Mac."
-            return
+            return false
         }
         let generation = beginLoginGeneration()
         let client = makeClient()
@@ -802,6 +806,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             guard !Task.isCancelled, self.loginGeneration == generation else {
                 _ = try? await client.logout(credentials: credentials, sessionCookie: result.sessionCookie)
                 return
+            }
+            if protectingMobileVisitComposer && self.hasMobileVisitBlockingComposer {
+                _ = try? await client.logout(credentials: credentials, sessionCookie: result.sessionCookie)
+                throw MobileVisitError.occupied
             }
             self.sessionCookie = result.sessionCookie
             self.operatorIdentity = result.id.map {
@@ -821,8 +829,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             self.statusMessage = "Sessione operatore attiva. Caricamento dell’archivio in corso."
         }, canApplyFailure: { self.loginGeneration == generation })
         guard !Task.isCancelled, self.loginGeneration == generation,
-              let authenticatedSession, self.sessionCookie == authenticatedSession else { return }
+              let authenticatedSession, self.sessionCookie == authenticatedSession else { return false }
         await loadPatients()
+        return true
     }
 
     func changePin(currentPin: String, newPin: String) async {
@@ -5242,12 +5251,28 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
     func cancelMobileVisitAuthentication() { clearOperatorSessionPresentation() }
 
+    private var mobileVisitComposerIsEmpty: Bool {
+        newEntryTitle.isEmpty && newEntryType == .note && newEntryEditorDocument.blocks.isEmpty
+            && newEntryAttachmentIds.isEmpty && newEntryVisitTranscript.isEmpty
+            && newEntryVisitDraftResponse == nil && !newEntryVisitDraftReviewed && !isEditingEntry
+    }
+
+    private var hasMobileVisitBlockingComposer: Bool {
+        !mobileVisitComposerIsEmpty || mobileVisitDraft != nil
+    }
+
+    func requireMobileVisitReviewAvailability() throws {
+        guard !hasMobileVisitBlockingComposer, !isWorking else { throw MobileVisitError.occupied }
+    }
+
     func authenticateMobileVisit() async throws {
         defer { password = "" }
+        try requireMobileVisitReviewAvailability()
         let target = [serverURL, tlsPin, pairedClientId, pairedClientToken, ambulatoryId]
         let generation = loginGeneration &+ 1
-        await login()
-        guard loginGeneration == generation, target == [serverURL, tlsPin, pairedClientId, pairedClientToken, ambulatoryId],
+        let authenticated = await login(protectingMobileVisitComposer: true)
+        try requireMobileVisitReviewAvailability()
+        guard authenticated, loginGeneration == generation, target == [serverURL, tlsPin, pairedClientId, pairedClientToken, ambulatoryId],
               sessionCookie != nil, masterKey != nil, connectionState == .pairedOnline else { throw MobileVisitError.denied }
     }
 
@@ -5276,8 +5301,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         guard mobileVisitContextIsCurrent(request.context), permitsCapability(NetworkCapabilityKey.writeClinicalDiary) else {
             throw MobileVisitError.invalidContext
         }
-        guard newEntryTitle.isEmpty, newEntryEditorDocument.isEffectivelyEmpty, newEntryAttachmentIds.isEmpty,
-              newEntryVisitTranscript.isEmpty, newEntryVisitDraftResponse == nil, !isEditingEntry, !isWorking else {
+        guard mobileVisitComposerIsEmpty, mobileVisitDraft == nil, !isWorking else {
             throw MobileVisitError.occupied
         }
         newEntryDraftId = request.entryID
@@ -5299,27 +5323,63 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             let entry = try await makeClient().fetchEntry(patientId: binding.context.patientID, entryId: binding.entryID,
                 credentials: credentials, sessionCookie: cookie, ambulatoryId: binding.context.scopeID)
             guard isCurrent() else { throw MobileVisitError.invalidContext }
+            let frozen = try vault.registration(for: binding)
+            let unchanged = frozen.payload.flatMap { try? self.mobileVisitComposer(from: $0) }
+                .map { self.mobileVisitComposerMatches($0, binding: binding) } == true
             try vault.confirm(binding, entry: entry)
-            if mobileVisitDraft?.entryID == binding.entryID { invalidatePatientBoundNewEntryState() }
+            if mobileVisitDraft?.entryID == binding.entryID {
+                if unchanged { invalidatePatientBoundNewEntryState() }
+                else {
+                    mobileVisitDraft = nil
+                    newEntryDraftId = UUID().uuidString
+                    statusMessage = "Voce confermata. Le modifiche successive restano in una bozza non registrata."
+                }
+            }
         } catch HomeBaseClientError.httpStatus(404, _) {
             guard isCurrent() else { throw MobileVisitError.invalidContext }
-            try vault.allowExplicitRetry(binding)
             let frozen = try vault.registration(for: binding)
             guard let payload = frozen.payload else { throw MobileVisitError.corrupt }
-            guard newEntryEditorDocument.isEffectivelyEmpty || mobileVisitDraft?.entryID == binding.entryID else { throw MobileVisitError.occupied }
-            guard let key = masterKey,
-                  let content = CryptoService.decryptField(payload.content, masterKey: key) else { throw MobileVisitError.corrupt }
+            let restored = try mobileVisitComposer(from: payload)
+            guard !isWorking, (mobileVisitComposerIsEmpty && mobileVisitDraft == nil)
+                    || mobileVisitComposerMatches(restored, binding: binding) else { throw MobileVisitError.occupied }
+            try vault.allowExplicitRetry(binding)
             newEntryDraftId = binding.entryID
             mobileVisitDraft = binding
-            newEntryTitle = payload.title.flatMap { CryptoService.decryptField($0, masterKey: key) }.map { CryptoService.jsonDecodeString($0) ?? $0 } ?? ""
-            newEntryType = PairedDiaryEntryType(rawValue: payload.type) ?? .note
-            newEntryEditorDocument = .load(html: CryptoService.jsonDecodeString(content) ?? content)
-            newEntryAttachmentIds = Set(HomeBaseEntryAttachmentReferencesCodec.decode(payload.attachments.flatMap {
-                CryptoService.decryptField($0, masterKey: key)
-            }))
+            newEntryTitle = restored.title
+            newEntryType = restored.type
+            newEntryEditorDocument = restored.document
+            newEntryAttachmentIds = restored.attachmentIDs
             activePatientSection = .diary
             statusMessage = "Esito riletto: nessuna voce corrispondente. Registra può riprovare la stessa registrazione; nessun invio automatico."
         }
+    }
+
+    private func mobileVisitComposer(from payload: MobileVisitEntryPayload) throws -> DiaryEditorSnapshot {
+        guard let key = masterKey, let type = PairedDiaryEntryType(rawValue: payload.type),
+              payload.setting == nil, payload.metadata == nil else { throw MobileVisitError.corrupt }
+        func decrypt(_ field: String) throws -> String {
+            guard let plaintext = CryptoService.decryptField(field, masterKey: key) else { throw MobileVisitError.corrupt }
+            return plaintext
+        }
+        let content = try decrypt(payload.content)
+        let title = try payload.title.map(decrypt).map { CryptoService.jsonDecodeString($0) ?? $0 } ?? ""
+        let attachments = try payload.attachments.map { field -> Set<String> in
+            let plaintext = try decrypt(field)
+            guard let data = plaintext.data(using: .utf8), let ids = try? JSONDecoder().decode([String].self, from: data) else {
+                throw MobileVisitError.corrupt
+            }
+            return Set(ids)
+        } ?? []
+        return .init(title: title, type: type, document: .load(html: CryptoService.jsonDecodeString(content) ?? content),
+                     attachmentIDs: attachments)
+    }
+
+    private func mobileVisitComposerMatches(_ snapshot: DiaryEditorSnapshot, binding: MobileVisitImport) -> Bool {
+        mobileVisitDraft?.entryID == binding.entryID && newEntryDraftId == binding.entryID
+            && newEntryTitle == snapshot.title && newEntryType == snapshot.type
+            && newEntryEditorDocument.renderedHTML == snapshot.document.renderedHTML
+            && newEntryAttachmentIds == snapshot.attachmentIDs && newEntryVisitTranscript.isEmpty
+            && newEntryVisitDraftResponse == nil && !newEntryVisitDraftReviewed && !isEditingEntry
     }
 
     var isEditingEntry: Bool {

@@ -88,7 +88,7 @@ enum MobileVisitError: Error, LocalizedError, Equatable {
         case .storage: return "Salvataggio cifrato non riuscito. La modifica non è stata accettata."
         case .locked: return "Sblocca il dossier con l’autenticazione del dispositivo."
         case .changed: return "L’appunto o le fonti sono cambiati. Rileggi e confronta le versioni prima di procedere."
-        case .occupied: return "La nuova voce del diario contiene già una bozza. Conservala prima di importare l’appunto."
+        case .occupied: return "Il diario contiene già una bozza o una modifica aperta. Conservala prima di continuare con l’appunto."
         case .pendingRegistration: return "Un invio precedente ha esito incerto. Verifica online quella ricevuta prima di importare un’altra revisione."
         case .alreadyRegistered: return "Questa revisione ha già una ricevuta confermata. La copia dell’appunto resta conservata."
         case .tooLarge: return "Appunto troppo lungo (massimo 100.000 caratteri)."
