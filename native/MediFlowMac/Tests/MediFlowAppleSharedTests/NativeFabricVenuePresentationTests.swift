@@ -8,6 +8,7 @@ import XCTest
 final class NativeFabricVenuePresentationTests: XCTestCase {
     @MainActor
     private final class Capture {
+        var workspace: PairedPatientsWorkspaceModel?
         var document: Binding<String>?
         var venue: Binding<Bool>?
         var local: NativeFabricModel? { locals.last }
@@ -19,7 +20,7 @@ final class NativeFabricVenuePresentationTests: XCTestCase {
         try await Task.sleep(nanoseconds: 80_000_000)
         host.layoutSubtreeIfNeeded(); host.displayIfNeeded()
     }
-    private func withMountedDocument(local: NativeFabricModel.Services? = nil,
+    private func withMountedDocument(workspaceConsumer: Bool = false, local: NativeFabricModel.Services? = nil,
                                      ordinary: NativeOrdinaryModel.Services? = nil,
                                      _ action: (NSView, Capture) async throws -> Void) async throws {
         let suite = "FabricVenue.\(UUID().uuidString)"
@@ -30,7 +31,9 @@ final class NativeFabricVenuePresentationTests: XCTestCase {
             keychainWriter: { _, _, _ in .success(()) }, keychainDeleter: { _, _ in .success(()) })
         let workspace = PairedPatientsWorkspaceModel(pairedStore: store,
             cacheStore: HomeBasePatientCacheStore(cacheDirectory: directory, keyProvider: { throw NativeOrdinaryContractError.invalid }),
-            dataSourceFactory: { _ in S6MockDataSource(details: [:]) })
+            dataSourceFactory: { _ in S6MockDataSource(details: [:], capabilities: [
+                NetworkCapability(key: "network.replica.readonly-documents", status: "available", requiresPairing: true, description: "Synthetic documents")
+            ]) })
         let patient = HomeBasePatientDetail(id: "synthetic-patient", firstName: "Ada", lastName: "Sintetica", birthDate: nil,
             taxCode: "SYNTHETIC", address: nil, phone: nil, caregiver: nil, exemptions: nil, diagnoses: nil,
             monitoringProfile: nil, statusReason: nil, notes: nil, aiSummary: nil, documentInsights: nil,
@@ -42,6 +45,7 @@ final class NativeFabricVenuePresentationTests: XCTestCase {
         workspace.ambulatoryId = "synthetic-ambulatory"
         workspace.configurePairedOnlineForTests(selectedPatient: patient, attachments: documents)
         let capture = Capture()
+        capture.workspace = workspace
         NativeFabricPresentationProbe.documentPicker = { capture.document = $0 }
         NativeFabricPresentationProbe.venuePicker = { capture.venue = $0 }
         NativeFabricPresentationProbe.localModel = { capture.locals.append($0) }
@@ -59,7 +63,13 @@ final class NativeFabricVenuePresentationTests: XCTestCase {
             NativeFabricPresentationProbe.ordinaryServices = nil
         }
         _ = NSApplication.shared
-        let host = NSHostingView(rootView: NativeDocumentSynthesisView(workspaceModel: workspace).padding(20))
+        workspace.activePatientSection = .documents
+        let capabilities = ClinicalWorkspaceCapabilitiesStore()
+        await capabilities.loadIfNeeded(using: workspace.clinicalWorkspaceConnection)
+        let root = workspaceConsumer
+            ? AnyView(PairedPatientsWorkspaceView(model: workspace, capabilities: capabilities))
+            : AnyView(NativeDocumentSynthesisView(workspaceModel: workspace).padding(20))
+        let host = NSHostingView(rootView: root)
         host.frame = NSRect(x: 0, y: 0, width: 800, height: 1000)
         try await settle(host)
         try await action(host, capture)
@@ -230,5 +240,82 @@ final class NativeFabricVenuePresentationTests: XCTestCase {
             XCTAssertEqual(requests, ["synthetic-document-A", "synthetic-document-B"])
         }
     }
+    func testClinicalSectionRemountRetainsLocalClosureAndRecovery() async throws {
+        var requests = 0, mayClose = false, firstClose = true
+        var pending: CheckedContinuation<NativeFabricResponse, Error>?
+        defer { pending?.resume(throwing: NativeOrdinaryContractError.invalid) }
+        let services = NativeFabricModel.Services(prepare: { _, _ in
+            requests += 1; return try self.response("ready")
+        }, command: { _, _ in
+            if firstClose {
+                firstClose = false
+                return try await withCheckedThrowingContinuation { pending = $0 }
+            }
+            guard mayClose else { throw HomeBaseClientError.transport(.unreachable) }
+            return try self.response("closed")
+        }, status: { id, _ in try self.response(id == nil ? "closed" : "current") })
+        try await withMountedDocument(workspaceConsumer: true, local: services) { host, capture in
+            try await self.select("A", host, capture)
+            let owner = try XCTUnwrap(capture.local)
+            owner.prepare(); try await self.settle(host)
+            XCTAssertEqual(owner.phase, .ready)
+            capture.workspace?.activePatientSection = .scales; try await self.settle(host)
+            XCTAssertEqual(owner.phase, .closing)
+            capture.workspace?.activePatientSection = .documents; try await self.settle(host)
+            XCTAssertTrue(capture.local === owner)
+            XCTAssertEqual(capture.local?.phase, .closing)
+            capture.local?.prepare(); try await self.settle(host)
+            XCTAssertEqual(requests, 1)
+            let close = try XCTUnwrap(pending); pending = nil
+            close.resume(throwing: HomeBaseClientError.transport(.unreachable)); try await self.settle(host)
+            XCTAssertEqual(capture.local?.phase, .blocked)
+            capture.workspace?.activePatientSection = .scales; try await self.settle(host)
+            capture.workspace?.activePatientSection = .documents; try await self.settle(host)
+            XCTAssertTrue(capture.local === owner)
+            XCTAssertEqual(capture.local?.phase, .blocked)
+            XCTAssertEqual(capture.document?.wrappedValue, "synthetic-document-A")
+            mayClose = true
+            capture.local?.verifyClosure(); try await self.settle(host)
+            XCTAssertEqual(capture.local?.phase, .idle)
+            capture.local?.prepare(); try await self.settle(host)
+            XCTAssertEqual(requests, 2)
+        }
+    }
+
+    func testClinicalSectionRemountRetainsOrdinaryClosureAndExplicitLane() async throws {
+        var requests = 0, mayClose = false
+        func response(_ phase: String) throws -> NativeOrdinaryResponse {
+            try NativeOrdinaryTestFixtures.decode(NativeOrdinaryResponse.self,
+                NativeOrdinaryTestFixtures.response(.documentSynthesis, phase))
+        }
+        let services = NativeOrdinaryModel.Services(prepare: { _, _ in
+            requests += 1; return try response("needs_consent")
+        }, command: { _, _ in
+            guard mayClose else { throw HomeBaseClientError.transport(.unreachable) }
+            return try response("closed")
+        }, status: { _ in try response("closed") })
+        try await withMountedDocument(workspaceConsumer: true, ordinary: services) { host, capture in
+            try await self.select("A", host, capture)
+            try XCTUnwrap(capture.venue).wrappedValue = true; try await self.settle(host)
+            let owner = try XCTUnwrap(capture.ordinary)
+            owner.prepare(); try await self.settle(host)
+            XCTAssertEqual(owner.phase, .needsConsent)
+            capture.workspace?.activePatientSection = .scales; try await self.settle(host)
+            XCTAssertEqual(owner.phase, .blocked)
+            capture.workspace?.activePatientSection = .documents; try await self.settle(host)
+            XCTAssertEqual(capture.venue?.wrappedValue, true)
+            try XCTUnwrap(capture.venue).wrappedValue = true; try await self.settle(host)
+            XCTAssertTrue(capture.ordinary === owner)
+            XCTAssertEqual(capture.ordinary?.phase, .blocked)
+            capture.ordinary?.prepare(); try await self.settle(host)
+            XCTAssertEqual(requests, 1)
+            mayClose = true
+            capture.ordinary?.verifyClosure(); try await self.settle(host)
+            XCTAssertEqual(capture.ordinary?.phase, .idle)
+            capture.ordinary?.prepare(); try await self.settle(host)
+            XCTAssertEqual(requests, 2)
+        }
+    }
+
 }
 #endif
