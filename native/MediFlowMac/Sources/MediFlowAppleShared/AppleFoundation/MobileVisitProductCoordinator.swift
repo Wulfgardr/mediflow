@@ -121,17 +121,21 @@ final class MobileVisitProductCoordinator: ObservableObject {
 
     func reconcile(_ id: UUID) async {
         guard !isWorking, let workspace else { return }
+        let ticket = UUID()
+        requestID = ticket
         isWorking = true
-        defer { isWorking = false }
+        defer { if requestID == ticket { isWorking = false } }
         do {
             let binding = try vault.unresolvedImport(recordID: id)
             let reader = try workspace.mobileVisitReader()
             guard reader.loginDigest != (try vault.preparationDigest(for: id)) else { throw MobileVisitError.denied }
             let current = try await reader.acquire(patientID: binding.context.patientID, forImport: true)
+            guard requestID == ticket, !Task.isCancelled else { return }
             guard current.context == binding.context else { throw MobileVisitError.invalidContext }
-            try await workspace.reconcileMobileVisit(binding)
+            try await workspace.reconcileMobileVisit(binding, isCurrent: { [weak self] in self?.requestID == ticket })
+            guard requestID == ticket, !Task.isCancelled else { return }
             message = vault.statusMessage ?? "Nessuna voce trovata per quell’ID. Puoi riprovare esplicitamente la stessa registrazione, conservando il contenuto originale."
-        } catch { show(error) }
+        } catch { if requestID == ticket, !Task.isCancelled { show(error) } }
     }
 
     func registrationCanSubmit(_ binding: MobileVisitImport) -> Bool {
