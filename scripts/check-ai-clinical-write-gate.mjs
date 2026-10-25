@@ -61,6 +61,14 @@ const CLINICAL_TABLES = new Set([
 
 // Ogni scrittura del percorso AI, dichiarata. `policy` decide che cosa viene verificato.
 const AI_PATH_WRITE_CONTRACTS = [
+    {
+        module: 'lib/ai-providers/fabric/function-model-settings-write.ts',
+        lane: 'host-configuration',
+        policy: 'bounded-settings',
+        table: 'settings',
+        reason: 'Persiste le impostazioni autorizzate dai controller HTTP esistenti e la generazione di revoca AI nella stessa transazione; nessuna scrittura clinica o ammissione provider.',
+        reference: 'docs/adr/0076-paired-document-domain-write-policy.md',
+    },
     /* @Codex: named CAS owner, no patient or other clinical table. */
     {
         module: 'lib/ai-providers/fabric/function-model-preferences-production.ts',
@@ -506,14 +514,15 @@ function selfTest() {
     checkAllowlistIntegrity(widened, new Set([...DERIVED_PROJECTION_FIELDS.keys()]));
     check('allowlist reale già non conforme', widened.length === 0);
 
-    // @Codex: declaring the preferences writer cannot permit clinical writes.
-    const preferenceModule = 'lib/ai-providers/fabric/function-model-preferences-production.ts';
-    const preferenceFindings = [];
-    checkDerivedProjections(preferenceFindings, new Map([[preferenceModule, writesOf('db.insert(patients).values({ diagnoses: value }).run();')]]));
-    check('il contratto preferenze ammette una tabella clinica', preferenceFindings.some(item => item.code === 'AI_WRITE_TABLE_NOT_ALLOWED'));
-    const settingsFindings = [];
-    checkDerivedProjections(settingsFindings, new Map([[preferenceModule, writesOf('db.insert(settings).values({ key: key, value: value }).run();')]]));
-    check('il contratto preferenze rifiuta key/value', settingsFindings.length === 0);
+    for (const contract of AI_PATH_WRITE_CONTRACTS.filter(item => item.policy === 'bounded-settings')) {
+        check(`${contract.module} ammette una tabella diversa da settings`, contract.table === 'settings');
+        const clinicalFindings = [];
+        checkDerivedProjections(clinicalFindings, new Map([[contract.module, writesOf('db.insert(patients).values({ diagnoses: value }).run();')]]));
+        check(`${contract.module} ammette una scrittura clinica`, clinicalFindings.some(item => item.code === 'AI_WRITE_TABLE_NOT_ALLOWED'));
+        const settingsFindings = [];
+        checkDerivedProjections(settingsFindings, new Map([[contract.module, writesOf('db.insert(settings).values({ key: key, value: value }).run();')]]));
+        check(`${contract.module} rifiuta key/value`, settingsFindings.length === 0);
+    }
 
     // Ogni contratto porta motivo e riferimento leggibili.
     for (const contract of AI_PATH_WRITE_CONTRACTS) {
