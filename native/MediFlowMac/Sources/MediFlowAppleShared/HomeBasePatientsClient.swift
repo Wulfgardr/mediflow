@@ -20,6 +20,17 @@ public actor HomeBasePatientsClient {
         self.session = URLSession(configuration: sessionConfiguration, delegate: delegate, delegateQueue: nil)
     }
 
+    public func verifyPreviousNativeAuthorityRetirement(_ reference: String, credentials: HomeBasePairedCredentials,
+                                                        sessionCookie: String) async throws -> NativeAuthorityRetirement {
+        guard NativeOrdinaryDisclosure.matches(reference, "^[a-f0-9]{64}$") else { throw NativeOrdinaryContractError.invalid }
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/authority-retirement")
+        let headers = pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: nil)
+            .merging(["Cache-Control": "no-store"]) { _, new in new }
+        let (data, _) = try await send(to: url, method: "POST", headers: headers,
+            body: encode(["previousAuthorityRef": reference]))
+        return try decode(NativeAuthorityRetirement.self, from: data)
+    }
+
     public func prepareNativeFabric(_ preparation: NativeOrdinaryPreparation, credentials: HomeBasePairedCredentials,
                                     sessionCookie: String) async throws -> NativeFabricResponse {
         try preparation.validate()

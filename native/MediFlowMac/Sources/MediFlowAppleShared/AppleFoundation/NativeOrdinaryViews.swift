@@ -62,8 +62,9 @@ final class NativeFabricPresentationOwner: ObservableObject {
         let localServices = NativeFabricModel.Services.live
         let ordinaryServices = NativeOrdinaryModel.Services.live
         #endif
-        local = NativeFabricModel(function: function, snapshot: snapshot, services: localServices)
-        ordinary = NativeOrdinaryModel(function: function, snapshot: snapshot, services: ordinaryServices)
+        let currentConnection = { [weak workspace] in workspace?.clinicalWorkspaceConnection }
+        local = NativeFabricModel(function: function, snapshot: snapshot, currentConnection: currentConnection, services: localServices)
+        ordinary = NativeOrdinaryModel(function: function, snapshot: snapshot, currentConnection: currentConnection, services: ordinaryServices)
         local.observe(workspace)
         ordinary.observe(workspace)
         workspace.$selectedPatientID.dropFirst().removeDuplicates().sink { [weak self] _ in

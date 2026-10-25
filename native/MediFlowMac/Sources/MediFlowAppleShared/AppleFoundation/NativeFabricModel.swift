@@ -14,6 +14,8 @@ final class NativeFabricModel: ObservableObject {
     private var projection: NativeOrdinaryProjectionPlan?
     private var original: NativeOrdinarySnapshot?
     private var generation: UInt = 0
+    private var authorityToken: UUID?
+    private var preparationToken: UUID?
     @Published private var preparationInFlight = false
     private var task: Task<Void, Never>?
     private var watchdog: Task<Void, Never>?
@@ -21,12 +23,17 @@ final class NativeFabricModel: ObservableObject {
     private var subscriptions = Set<AnyCancellable>()
     private let function: NativeOrdinaryFunction
     private let snapshot: () throws -> NativeOrdinarySnapshot
+    private let currentConnection: () -> ClinicalWorkspaceConnection?
     struct Services {
         var prepare: (NativeOrdinaryPreparation, ClinicalWorkspaceConnection) async throws -> NativeFabricResponse
         var command: (NativeFabricCommand, ClinicalWorkspaceConnection) async throws -> NativeFabricResponse
         var status: (String?, ClinicalWorkspaceConnection) async throws -> NativeFabricResponse
         var project: (NativeOrdinaryProjectionPlan, NativeOrdinaryPreparation, NativeOrdinaryProjectionIO) async throws -> NativeFabricResponse = { _, _, _ in throw NativeOrdinaryContractError.invalid }
         var cancelProjection: (NativeOrdinaryProjectionPlan, ClinicalWorkspaceConnection) async throws -> NativeFabricResponse = { _, _ in throw NativeOrdinaryContractError.cleanupUnconfirmed }
+        var retirement: (String, ClinicalWorkspaceConnection) async throws -> NativeAuthorityRetirement = { reference, connection in
+            try await client(connection).verifyPreviousNativeAuthorityRetirement(reference,
+                credentials: connection.credentials, sessionCookie: connection.sessionCookie)
+        }
         static let live = Services(prepare: { preparation, connection in
             try await client(connection).prepareNativeFabric(preparation, credentials: connection.credentials, sessionCookie: connection.sessionCookie)
         }, command: { command, connection in
@@ -47,8 +54,9 @@ final class NativeFabricModel: ObservableObject {
         }
     }
     private let services: Services
-    init(function: NativeOrdinaryFunction, snapshot: @escaping () throws -> NativeOrdinarySnapshot, services: Services = .live) {
+    init(function: NativeOrdinaryFunction, snapshot: @escaping () throws -> NativeOrdinarySnapshot, currentConnection: (() -> ClinicalWorkspaceConnection?)? = nil, services: Services = .live) {
         self.function = function; self.snapshot = snapshot; self.services = services
+        self.currentConnection = currentConnection ?? { try? snapshot().connection }
     }
     func observe(_ workspace: PairedPatientsWorkspaceModel) {
         guard subscriptions.isEmpty else { return }
@@ -69,14 +77,15 @@ final class NativeFabricModel: ObservableObject {
     func prepare() {
         guard canPrepare else { return }
         do {
-            let source = try snapshot(); original = source; generation &+= 1; let epoch = generation
+            let source = try snapshot().retained; original = source; generation &+= 1; let epoch = generation
             phase = .preparing; isWorking = true; preparationInFlight = true; expiry = .infinity
             message = "Verifica delle fonti e della funzione locale sull’host…"
+            let token = UUID(); authorityToken = token; preparationToken = token
             task = Task {
-                defer { preparationInFlight = false }
+                defer { if preparationToken == token { preparationInFlight = false; preparationToken = nil } }
                 do {
                     var value = try await services.prepare(source.preparation, source.connection)
-                    guard current(epoch, source) else { await retireLate(value, source); return }
+                    guard current(epoch, source) else { await retireLate(value, source, token: token); return }
                     retain(value)
                     try value.validate(function: function)
                     if value.phase == "needs_source_projection" {
@@ -92,7 +101,7 @@ final class NativeFabricModel: ObservableObject {
                             self.expiry = Date().timeIntervalSince1970 * 1000 + 120_000
                         })
                         value = try await services.project(plan, source.preparation, io)
-                        guard current(epoch, source) else { await retireLate(value, source); return }
+                        guard current(epoch, source) else { await retireLate(value, source, token: token); return }
                         retain(value); try value.validate(function: function)
                     }
                     guard value.phase == "ready", value.attemptId != nil, let choice = value.selection, let deadline = value.expiresAt else { throw NativeOrdinaryContractError.invalid }
@@ -147,7 +156,7 @@ final class NativeFabricModel: ObservableObject {
         guard let source = original else { phase = .idle; isWorking = false; return }
         close(source, message: "Operazione chiusa. Prepara una nuova proposta per il contesto corrente.")
     }
-    func verifyClosure() { guard phase == .blocked, !isWorking, let original else { return }; close(original) }
+    func verifyClosure() { guard phase == .blocked, !isWorking, let original else { return }; close(original, allowRetirement: true) }
     private func fail(_ error: Error, _ source: NativeOrdinarySnapshot) {
         proposal = nil; selection = nil; generation &+= 1; watchdog?.cancel()
         let reason: String
@@ -160,11 +169,23 @@ final class NativeFabricModel: ObservableObject {
         }
         close(source, message: reason + " Nessuna alternativa avviata; nessuna modifica alla cartella.")
     }
-    private func close(_ source: NativeOrdinarySnapshot, message closedMessage: String = "Operazione chiusa. Nessuna modifica alla cartella.") {
+    private func close(_ source: NativeOrdinarySnapshot, allowRetirement: Bool = false, message closedMessage: String = "Operazione chiusa. Nessuna modifica alla cartella.") {
         let id = attemptId, plan = projection, epoch = generation
         phase = .closing; isWorking = true; message = "Chiusura dell’operazione locale…"
         task = Task {
             do {
+                if allowRetirement, let fresh = currentConnection().map(NativeOrdinaryAuthority.transport),
+                   NativeOrdinaryAuthority.reference(fresh) != NativeOrdinaryAuthority.reference(source.connection) {
+                    let connection = try NativeOrdinaryAuthority.recoveryConnection(previous: source.connection, current: fresh)
+                    let receipt = try await services.retirement(NativeOrdinaryAuthority.reference(source.connection), connection)
+                    guard generation == epoch, currentConnection()?.identity == connection.identity else { throw NativeOrdinaryContractError.stale }
+                    try receipt.validate(previous: NativeOrdinaryAuthority.reference(source.connection), current: NativeOrdinaryAuthority.reference(connection))
+                    authorityToken = nil; preparationToken = nil; preparationInFlight = false
+                    attemptId = nil; projection = nil; original = nil; expiry = .infinity
+                    phase = .idle; isWorking = false
+                    message = "La sessione precedente non può più usare la funzione. Prepara una nuova proposta."
+                    return
+                }
                 let response: NativeFabricResponse
                 if let id { response = try await services.command(.cancel(id), source.connection) }
                 else if let plan { response = try await services.cancelProjection(plan, source.connection) }
@@ -181,7 +202,8 @@ final class NativeFabricModel: ObservableObject {
             }
         }
     }
-    private func retireLate(_ response: NativeFabricResponse, _ source: NativeOrdinarySnapshot) async {
+    private func retireLate(_ response: NativeFabricResponse, _ source: NativeOrdinarySnapshot, token: UUID) async {
+        guard authorityToken == token else { return }
         generation &+= 1; watchdog?.cancel(); original = source; proposal = nil; selection = nil
         guard response.functionId == function else {
             phase = .blocked; isWorking = false; message = "Risposta tardiva non verificata. Verifica la chiusura."; return
