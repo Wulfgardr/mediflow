@@ -96,7 +96,7 @@ final class MobileVisitTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: store.fileURL), bytes)
     }
 
-    func testExactExpiryAndRollbackHideDossierButKeepNoteForOnlineRecovery() async throws {
+    func testExactExpiryAndRollbackHideDossierButAllowOwnNoteOffline() async throws {
         let (first, id) = try await prepared()
         first.saveNote("Conservare anche dopo scadenza")
         first.lock()
@@ -106,7 +106,8 @@ final class MobileVisitTests: XCTestCase {
             XCTAssertTrue(closed.dossiers.isEmpty)
             closed.open(id)
             XCTAssertNil(closed.selected)
-            XCTAssertEqual(closed.noteText, "")
+            XCTAssertEqual(closed.noteText, "Conservare anche dopo scadenza")
+            XCTAssertEqual(closed.selectedNote?.context, context())
             XCTAssertEqual(try store.read(key: key).first?.note.text, "Conservare anche dopo scadenza")
         }
         let recovered = model(now: { self.instant.addingTimeInterval(90_000) })
@@ -117,7 +118,7 @@ final class MobileVisitTests: XCTestCase {
         XCTAssertNotNil(recovered.onlineReview)
     }
 
-    func testOpenedViewExpiresWithoutNavigationAndRejectsFurtherEditing() async throws {
+    func testOpenedDossierExpiresWithoutHidingOrBlockingOwnNote() async throws {
         var time = instant
         let mobile = model(now: { time })
         await mobile.prepare(patientID: "synthetic-patient", online: VisitTestReader(dossier: dossier()), consent: true)
@@ -125,9 +126,9 @@ final class MobileVisitTests: XCTestCase {
         time = instant.addingTimeInterval(86_400)
         mobile.checkExpiry()
         XCTAssertNil(mobile.selected)
-        XCTAssertEqual(mobile.noteText, "")
+        XCTAssertEqual(mobile.noteText, "Prima della scadenza")
         mobile.saveNote("Dopo scadenza")
-        XCTAssertEqual(try store.read(key: key).first?.note.text, "Prima della scadenza")
+        XCTAssertEqual(try store.read(key: key).first?.note.text, "Dopo scadenza")
     }
 
     func testLastOpeningWatermarkRejectsClockRollbackAfterRestart() async throws {
@@ -166,7 +167,7 @@ final class MobileVisitTests: XCTestCase {
         let fresh = VisitTestReader(dossier: dossier(), login: 2)
         await restarted.reviewOnline(id: id, freshLogin: { _ in fresh })
         var inserts = 0
-        await restarted.importReviewedNote(confirmed: false, freshLogin: { _ in fresh }, insertIntoOrdinaryComposer: { _, _ in inserts += 1 })
+        await restarted.importReviewedNote(confirmed: false, freshLogin: { _ in fresh }, insertIntoOrdinaryComposer: { _ in inserts += 1 })
         XCTAssertEqual(inserts, 0)
         XCTAssertEqual(fresh.calls, 1)
         XCTAssertEqual(try store.read(key: key).first?.note.text, "Nessun invio automatico")
@@ -180,12 +181,12 @@ final class MobileVisitTests: XCTestCase {
         XCTAssertTrue(mobile.statusMessage?.contains("Fonti cambiate") == true)
         var inserted = false
         await mobile.importReviewedNote(confirmed: true, freshLogin: { _ in VisitTestReader(dossier: self.dossier(version: 3), login: 3) },
-            insertIntoOrdinaryComposer: { _, _ in inserted = true })
+            insertIntoOrdinaryComposer: { _ in inserted = true })
         XCTAssertFalse(inserted)
         await mobile.reviewOnline(id: id, freshLogin: { _ in changed })
-        await mobile.importReviewedNote(confirmed: true, freshLogin: { _ in changed }, insertIntoOrdinaryComposer: { context, text in
-            XCTAssertEqual(context, self.context())
-            XCTAssertEqual(text, "Proposta clinica sintetica")
+        await mobile.importReviewedNote(confirmed: true, freshLogin: { _ in changed }, insertIntoOrdinaryComposer: { request in
+            XCTAssertEqual(request.context, self.context())
+            XCTAssertEqual(request.text, "Proposta clinica sintetica")
             inserted = true
         })
         XCTAssertTrue(inserted)
@@ -200,7 +201,7 @@ final class MobileVisitTests: XCTestCase {
         XCTAssertNil(mobile.onlineReview)
         await mobile.reviewOnline(id: id, freshLogin: { _ in reader })
         var calls = 0
-        await mobile.importReviewedNote(confirmed: true, freshLogin: { _ in reader }, insertIntoOrdinaryComposer: { _, _ in
+        await mobile.importReviewedNote(confirmed: true, freshLogin: { _ in reader }, insertIntoOrdinaryComposer: { _ in
             calls += 1
             throw URLError(.timedOut)
         })
@@ -260,7 +261,7 @@ final class MobileVisitTests: XCTestCase {
         var inserts = 0
         let importing = Task {
             await mobile.importReviewedNote(confirmed: true, freshLogin: { _ in reader },
-                insertIntoOrdinaryComposer: { _, _ in inserts += 1 })
+                insertIntoOrdinaryComposer: { _ in inserts += 1 })
         }
         while reader.continuation == nil { await Task.yield() }
         mobile.lock()

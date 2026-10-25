@@ -23,7 +23,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         let ambulatoryName: String?
     }
     @Published private(set) var operatorIdentity: OperatorIdentity? {
-        didSet { if oldValue?.userId != operatorIdentity?.userId { discardCachedPatientPresentation() } }
+        didSet { if oldValue?.userId != operatorIdentity?.userId { invalidateMobileVisitAuthority(); discardCachedPatientPresentation() } }
     }
     private(set) lazy var settingsProfileModel = SettingsProfileModel(
         connectionProvider: { [weak self] in self?.nativeOperatorConnection },
@@ -48,6 +48,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var ambulatoryId = "" {
         didSet {
             guard oldValue.trimmedOrNil != ambulatoryId.trimmedOrNil else { return }
+            mobileVisit?.lock()
             discardCachedPatientPresentation()
             invalidatePatientLoadContext()
             clearSelectedPatientWorkspace()
@@ -338,7 +339,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     private let automaticActions: AppleFoundationLaunchOverrides.AutomaticActions
     private var didPerformAutomaticActions = false
     private var sessionCookie: String? {
-        didSet { if oldValue != sessionCookie { discardCachedPatientPresentation() } }
+        didSet { if oldValue != sessionCookie { invalidateMobileVisitAuthority(); discardCachedPatientPresentation() } }
     }
     @Published private(set) var cacheMetadata: HomeBasePatientCacheMetadata?
     @Published private(set) var cachedPatientProfile: HomeBasePatientDetail?
@@ -350,6 +351,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     var cacheIsStale: Bool { cacheMetadata?.isStale == true || cachedProfileMetadata?.isStale == true }
     private var loginGeneration: UInt = 0
     private let clinicalSessionInvalidations = PassthroughSubject<Void, Never>()
+    private var mobileVisitBackgroundObserver: AnyCancellable?
+    private let mobileVisitStore: MobileVisitStore?
+    private let mobileVisitUnlocker: (any MobileVisitUnlocking)?
+    var mobileVisitClientFactory: (() -> HomeBasePatientsClient)?
+    @Published private(set) var mobileVisitDraft: MobileVisitImport?
+    private(set) lazy var mobileVisit: MobileVisitProductCoordinator? = {
+        guard let store = mobileVisitStore ?? (try? MobileVisitStore.applicationStore()) else { return nil }
+        return MobileVisitProductCoordinator(workspace: self, store: store,
+            unlocker: mobileVisitUnlocker ?? MobileVisitLocalUnlock())
+    }()
     private var newEntryDraftId = UUID().uuidString
     private var newTherapyDrugCatalogTask: Task<Void, Never>?
     private var editTherapyDrugCatalogTask: Task<Void, Never>?
@@ -427,14 +438,32 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         pairedStore: HomeBasePairedStore = .shared,
         cacheStore: HomeBasePatientCacheStore = .shared,
         dataSourceFactory: (@MainActor (PairedPatientsWorkspaceModel) -> any HomeBasePatientsDataSource)? = nil,
-        systemActions: SystemActionsPerforming = SystemActions()
+        systemActions: SystemActionsPerforming = SystemActions(),
+        mobileVisitStore: MobileVisitStore? = nil, mobileVisitUnlocker: (any MobileVisitUnlocking)? = nil
     ) {
+        #if DEBUG && os(iOS) && targetEnvironment(simulator)
+        let syntheticVisit = MobileVisitSyntheticRuntime.shared
+        self.mobileVisitStore = mobileVisitStore ?? syntheticVisit?.store
+        self.mobileVisitUnlocker = mobileVisitUnlocker ?? syntheticVisit
+        #else
+        self.mobileVisitStore = mobileVisitStore
+        self.mobileVisitUnlocker = mobileVisitUnlocker
+        #endif
         self.pairedStore = pairedStore
         self.cacheStore = cacheStore
+        #if DEBUG && os(iOS) && targetEnvironment(simulator)
+        self.dataSourceFactory = dataSourceFactory ?? syntheticVisit.map { runtime in { _ in runtime.source } }
+        self.mobileVisitClientFactory = syntheticVisit.map { runtime in { runtime.source } }
+        #else
         self.dataSourceFactory = dataSourceFactory
+        #endif
         self.systemActions = systemActions
         let launchOverrides = AppleFoundationLaunchOverrides.load()
         self.automaticActions = launchOverrides.automaticActions
+        #if os(iOS)
+        mobileVisitBackgroundObserver = NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.mobileVisit?.lock() } }
+        #endif
         // Exact defaults also protect date-only drafts, without treating
         // the form's initial Date() values as user changes.
         defer { for form in NavigationDraftForm.allCases { markNavigationDatesClean(form) } }
@@ -524,6 +553,21 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         guard !didPerformAutomaticActions else { return }
         didPerformAutomaticActions = true
 
+        #if DEBUG && os(iOS) && targetEnvironment(simulator)
+        if let synthetic = MobileVisitSyntheticRuntime.shared {
+            serverURL = synthetic.configuration.serverURLString
+            tlsPin = synthetic.configuration.tlsPin
+            ambulatoryId = "AMB-1"
+            if ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_VISIT_OFFLINE"] == "1" {
+                statusMessage = "Fixture sintetica senza sessione host. Apri Visita senza rete per gli appunti già conservati."
+                return
+            }
+            configurePairedOnlineForTests(credentials: synthetic.credentials, sessionCookie: "mediflow_session=synthetic-prepared",
+                operatorId: "synthetic-operator", masterKey: MobileVisitSyntheticRuntime.key, patients: [synthetic.patient])
+            statusMessage = "Solo dati sintetici: host e autenticazione dispositivo simulati. Nessuna prova del Keychain fisico."
+            return
+        }
+        #endif
         #if DEBUG
         if let seeded = Self.uiTestSeededPatients() {
             patients = seeded
@@ -852,6 +896,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     func lockSessionNow() async {
+        mobileVisit?.lock()
         // capture only what the best-effort remote logout needs. Local
         // revocation and presentation clearing must finish before the first await.
         let logoutClient = makeClient()
@@ -1320,6 +1365,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
         let submitted = newDiarySnapshot
         let draftID = newEntryDraftId
+        let mobileBinding = mobileVisitDraft
         let transcriptMutation = newEntryVisitTranscriptMutationReference
         let scope = ambulatoryId.trimmedOrNil
         let title = submitted.title.trimmedOrNil
@@ -1343,21 +1389,28 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 referencedAttachmentIds: attachmentIds,
                 masterKey: masterKey
             )
-            _ = try await self.makeClient().createEntry(
-                patientId: patientId,
-                payload: HomeBaseEntryCreatePayload(
-                    id: draftID,
-                    type: type,
-                    title: try self.sealField(title),
-                    date: Date(),
-                    content: try self.sealField(content) ?? "",
-                    attachmentReferences: attachmentReferences
-                ),
-                credentials: credentials,
-                sessionCookie: sessionCookie,
-                ambulatoryId: scope
-            )
+            var payload = HomeBaseEntryCreatePayload(id: draftID, type: type, title: try self.sealField(title),
+                date: Date(timeIntervalSince1970: floor(Date().timeIntervalSince1970)),
+                content: try self.sealField(content) ?? "", attachmentReferences: attachmentReferences)
+            if let mobileBinding {
+                guard self.mobileVisitContextIsCurrent(mobileBinding.context), let vault = self.mobileVisit?.vault else {
+                    throw MobileVisitError.invalidContext
+                }
+                let digest = Data(SHA256.hash(data: try JSONEncoder().encode([title ?? "", type, content] + attachmentIds.sorted())))
+                payload = try vault.beginSubmission(mobileBinding, candidate: payload, composerDigest: digest)
+            }
+            let acknowledgement = try await self.makeClient().createEntry(patientId: patientId, payload: payload,
+                credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: scope)
             guard isCurrent(), self.newEntryDraftId == draftID else { return }
+            if let mobileBinding {
+                guard let vault = self.mobileVisit?.vault else { throw MobileVisitError.locked }
+                try vault.acknowledge(mobileBinding, id: acknowledgement.id, version: acknowledgement.version)
+                let entry = try await self.makeClient().fetchEntry(patientId: patientId, entryId: draftID,
+                    credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: scope)
+                guard isCurrent(), self.newEntryDraftId == draftID else { return }
+                try vault.confirm(mobileBinding, entry: entry)
+                self.mobileVisitDraft = nil
+            }
             let unchanged = self.newDiarySnapshot == submitted
                 && self.newEntryVisitTranscriptMutationReference == transcriptMutation
             if unchanged {
@@ -3854,6 +3907,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     // invalidate both pending/reviewed visit drafts and anything already
     // inserted into the composer before it can be saved under another patient.
     private func invalidatePatientBoundNewEntryState() {
+        mobileVisitDraft = nil
         newEntryTitle = ""
         newEntryType = .note
         newEntryEditorDocument = ClinicalRichTextEditorDocument()
@@ -4025,6 +4079,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     private func invalidateLoginGeneration() {
+        invalidateMobileVisitAuthority()
         loginGeneration &+= 1
         patientCSVImport?.invalidate()
         clinicalSessionInvalidations.send() // clear retained cross-patient models synchronously.
@@ -4032,6 +4087,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
     private func invalidateLoginIfChanged(_ oldValue: String, _ newValue: String) {
         guard oldValue != newValue else { return }
+        mobileVisit?.lock()
         if sessionCookie != nil {
             // Remove transport authority before synchronous invalidation observers run.
             sessionCookie = nil
@@ -5162,6 +5218,110 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         markNavigationDatesClean(.prosthetic)
     }
 
+    private func invalidateMobileVisitAuthority() {
+        mobileVisit?.invalidateAuthority()
+        clearMobileVisitComposer()
+    }
+
+    func clearMobileVisitComposer() {
+        guard mobileVisitDraft != nil else { return }
+        invalidatePatientBoundNewEntryState()
+    }
+
+    func mobileVisitReader() throws -> MobileVisitOnlineAdapter {
+        guard let connection = nativeOperatorConnection, let key = connection.masterKey,
+              let operatorID = operatorIdentity?.userId, let scope = connection.ambulatoryId,
+              connectionState == .pairedOnline else { throw MobileVisitError.denied }
+        let identity = connection.identity
+        return MobileVisitOnlineAdapter(configuration: .init(serverURLString: serverURL, tlsPin: tlsPin),
+            credentials: connection.credentials, sessionCookie: connection.sessionCookie, operatorID: operatorID,
+            scopeID: scope, masterKey: key, isCurrent: { [weak self] in
+                self?.nativeOperatorConnection?.identity == identity && self?.operatorIdentity?.userId == operatorID
+            }, clientFactory: mobileVisitClientFactory)
+    }
+
+    func cancelMobileVisitAuthentication() { clearOperatorSessionPresentation() }
+
+    func authenticateMobileVisit() async throws {
+        defer { password = "" }
+        let target = [serverURL, tlsPin, pairedClientId, pairedClientToken, ambulatoryId]
+        let generation = loginGeneration &+ 1
+        await login()
+        guard loginGeneration == generation, target == [serverURL, tlsPin, pairedClientId, pairedClientToken, ambulatoryId],
+              sessionCookie != nil, masterKey != nil, connectionState == .pairedOnline else { throw MobileVisitError.denied }
+    }
+
+    func selectMobileVisitPatient(_ context: MobileVisitContext) async throws {
+        guard let summary = patients.first(where: { $0.id == context.patientID && $0.deletedAt == nil }) else {
+            throw MobileVisitError.invalidContext
+        }
+        let identity = nativeOperatorConnection?.identity
+        await loadPatient(summary)
+        guard nativeOperatorConnection?.identity == identity, selectedPatient?.id == context.patientID else {
+            throw MobileVisitError.invalidContext
+        }
+    }
+
+    private func mobileVisitContextIsCurrent(_ context: MobileVisitContext) -> Bool {
+        guard let credentials = pairedCredentials else { return false }
+        return context.serverURL == (try? HomeBaseConnectionConfiguration(serverURLString: serverURL, tlsPin: tlsPin).apiBaseURL().absoluteString)
+            && context.tlsPin == HomeBaseConnectionConfiguration(tlsPin: tlsPin).normalizedTLSPin
+            && context.pairedClientID == credentials.clientId
+            && context.pairedTokenDigest == Data(SHA256.hash(data: Data(credentials.clientToken.utf8)))
+            && context.operatorID == operatorIdentity?.userId && context.scopeID == ambulatoryId.trimmedOrNil
+            && context.patientID == selectedPatient?.id && connectionState == .pairedOnline && masterKey != nil && sessionCookie != nil
+    }
+
+    func importMobileVisit(_ request: MobileVisitImport) throws {
+        guard mobileVisitContextIsCurrent(request.context), permitsCapability(NetworkCapabilityKey.writeClinicalDiary) else {
+            throw MobileVisitError.invalidContext
+        }
+        guard newEntryTitle.isEmpty, newEntryEditorDocument.isEffectivelyEmpty, newEntryAttachmentIds.isEmpty,
+              newEntryVisitTranscript.isEmpty, newEntryVisitDraftResponse == nil, !isEditingEntry, !isWorking else {
+            throw MobileVisitError.occupied
+        }
+        newEntryDraftId = request.entryID
+        mobileVisitDraft = request
+        newEntryTitle = "Appunto visita"
+        newEntryType = .note
+        newEntryEditorDocument = ClinicalRichTextEditorDocument(blocks: [
+            ClinicalRichTextEditorBlock(kind: .paragraph, span: ClinicalRichTextTextRun(text: request.text))
+        ])
+        activePatientSection = .diary
+        statusMessage = "Appunto importato nel diario. Apri Riprendi nuova voce e premi Registra dopo la revisione."
+    }
+
+    func reconcileMobileVisit(_ binding: MobileVisitImport) async throws {
+        guard mobileVisitContextIsCurrent(binding.context), let cookie = sessionCookie, let credentials = pairedCredentials,
+              let vault = mobileVisit?.vault else { throw MobileVisitError.invalidContext }
+        let isCurrent = diaryWriteCurrentness(patientID: binding.context.patientID, cookie: cookie, credentials: credentials)
+        do {
+            let entry = try await makeClient().fetchEntry(patientId: binding.context.patientID, entryId: binding.entryID,
+                credentials: credentials, sessionCookie: cookie, ambulatoryId: binding.context.scopeID)
+            guard isCurrent() else { throw MobileVisitError.invalidContext }
+            try vault.confirm(binding, entry: entry)
+            if mobileVisitDraft?.entryID == binding.entryID { invalidatePatientBoundNewEntryState() }
+        } catch HomeBaseClientError.httpStatus(404, _) {
+            guard isCurrent() else { throw MobileVisitError.invalidContext }
+            try vault.allowExplicitRetry(binding)
+            let frozen = try vault.registration(for: binding)
+            guard let payload = frozen.payload else { throw MobileVisitError.corrupt }
+            guard newEntryEditorDocument.isEffectivelyEmpty || mobileVisitDraft?.entryID == binding.entryID else { throw MobileVisitError.occupied }
+            guard let key = masterKey,
+                  let content = CryptoService.decryptField(payload.content, masterKey: key) else { throw MobileVisitError.corrupt }
+            newEntryDraftId = binding.entryID
+            mobileVisitDraft = binding
+            newEntryTitle = payload.title.flatMap { CryptoService.decryptField($0, masterKey: key) }.map { CryptoService.jsonDecodeString($0) ?? $0 } ?? ""
+            newEntryType = PairedDiaryEntryType(rawValue: payload.type) ?? .note
+            newEntryEditorDocument = .load(html: CryptoService.jsonDecodeString(content) ?? content)
+            newEntryAttachmentIds = Set(HomeBaseEntryAttachmentReferencesCodec.decode(payload.attachments.flatMap {
+                CryptoService.decryptField($0, masterKey: key)
+            }))
+            activePatientSection = .diary
+            statusMessage = "Esito riletto: nessuna voce corrispondente. Registra può riprovare la stessa registrazione; nessun invio automatico."
+        }
+    }
+
     var isEditingEntry: Bool {
         editingEntryId != nil
     }
@@ -5174,6 +5334,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && !newEntryEditorDocument.isEffectivelyEmpty
             && !isWorking
             && permitsCapability(NetworkCapabilityKey.writeClinicalDiary)
+            && (mobileVisitDraft.map { mobileVisit?.registrationCanSubmit($0) == true } ?? true)
     }
 
     var isEditingTherapy: Bool {

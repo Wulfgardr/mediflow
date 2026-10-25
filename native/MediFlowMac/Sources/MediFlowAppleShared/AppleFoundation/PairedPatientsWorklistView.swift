@@ -202,6 +202,7 @@ struct PairedPatientsWorklistView: View {
     #endif
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showingCSVImport = false
+    @State private var showingMobileVisit = false
     @ObservedObject var model: PairedPatientsWorkspaceModel
     @Binding var patientQuery: String
     @Binding var patientViewMode: PatientListViewMode
@@ -210,7 +211,30 @@ struct PairedPatientsWorklistView: View {
     var onOpenPatient: ((HomeBasePatientSummary) -> Void)? = nil
 
     var body: some View {
-        platformWorklist
+        VStack(alignment: .leading, spacing: 12) {
+            #if os(iOS)
+            Button("Visita senza rete", systemImage: "note.text") { showingMobileVisit = true }
+                .frame(minHeight: 44)
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("mobile-visit-entry")
+            #endif
+            platformWorklist
+        }
+            .sheet(isPresented: $showingMobileVisit) {
+                if let coordinator = model.mobileVisit {
+                    NavigationStack {
+                        MobileVisitWorkspaceView(workspace: model, coordinator: coordinator) {
+                            showingMobileVisit = false
+                            if let patient = model.patients.first(where: { $0.id == model.selectedPatient?.id }) { onOpenPatient?(patient) }
+                        }
+                        .navigationTitle("Visita senza rete")
+                        #if os(iOS)
+                        .navigationBarTitleDisplayMode(.inline)
+                        #endif
+                        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Chiudi") { showingMobileVisit = false } } }
+                    }
+                } else { Text("Archivio locale non disponibile: Application Support non accessibile.") }
+            }
             .sheet(isPresented: $showingCSVImport) {
                 if let csv = model.patientCSVImport {
                     PairedPatientCSVImportSheet(model: csv, startNew: { model.resetPatientCSVImport() })

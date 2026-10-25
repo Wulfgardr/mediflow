@@ -39,7 +39,13 @@ Orologio precedente all'acquisizione o all'ultima apertura persistita nega la
 lettura. Un controllo periodico invalida una vista lasciata aperta oltre scadenza.
 Non esiste un orologio fidato offline: rollback non osservabile dopo spegnimento
 rimane un limite, da qualificare su dispositivo. La scadenza conserva il ciphertext
-dell'appunto, recuperabile solo dopo nuova autenticazione online e rivalidazione.
+dell'appunto. Il TTL riguarda soltanto la copia derivata dell'host. L'appunto scritto
+dal medico ha conservazione separata senza TTL di lettura: dopo userPresence può
+essere letto e modificato offline, anche dopo la scadenza del dossier. Mostra solo
+la propria identità/provenienza minima (etichetta paziente, host, operatore, scope,
+revisione e data), conservate con l'appunto; non ripresenta sezioni del dossier
+scaduto. Rimane dato sanitario cifrato, non un record clinico registrato. Non si
+cancella automaticamente e non diventa autorità per scrivere sull'host.
 
 ## Revisione online
 
@@ -49,8 +55,30 @@ nega l'importazione. Versioni diverse richiedono confronto esplicito; non ribasa
 l'appunto. L'importazione precompila il compositore ordinario solo per gesto medico,
 senza sovrascrivere una bozza già presente. Il writer e l'audit ADR 0053 restano
 unici. L'appunto rimane conservato anche dopo importazione, timeout o esito incerto:
-questa tranche non espone uno stato «registrato» e non cancella dopo un ack HTTP.
-Un futuro raccordo di ricevuta deve associare conferma e rilettura del writer.
+un ack HTTP da solo non lo dichiara registrato. Il collegamento noteID/revisione/
+entryID è persistito prima dell'importazione. Prima del primo tentativo il writer
+ordinario conserva nel vault il payload esatto (data e ciphertext inclusi), quindi
+marca l'esito incerto prima di chiamare il create ordinario. Nessuna seconda coda
+HTTP: soltanto Registra avvia il tentativo. Il writer conserva lo stesso ID e gli
+stessi byte per un eventuale nuovo tentativo esplicito, perché sameNetworkCreate
+confronta anche data, ciphertext e riferimenti agli allegati.
+
+La ricevuta richiede id/version del DTO HomeBaseCreatedResource e rilettura fresca
+dell'esatta voce tramite il GET canonico per entryID; si confrontano paziente,
+versione, campi e stato con il payload congelato. Dopo perdita dell'ack la stessa
+rilettura può riconciliare la voce. Il solo 404 corrente autorizza a ripresentare
+lo stesso payload a Registra; rete assente, errore o mismatch non autorizzano un
+nuovo ID. L'assenza da una lista limitata non prova nulla. Un fallimento nel salvare
+la ricevuta lascia appunto e riferimento recuperabili; non sblocca un nuovo invio.
+Le ricevute restano associate alla revisione inviata, anche se l'appunto viene
+modificato successivamente.
+
+La riautenticazione è una sequenza esplicita, senza callback sospesa che conservi
+materiale decifrato: un riferimento opaco all'appunto sopravvive al lock; nuovo
+login, nuovo userPresence, rilettura e review sono fasi separate. L'importazione
+riusa quella sessione, purché diversa da quella di preparazione e ancora valida,
+e rilegge le fonti prima di precompilare. Logout, background e cambi di autorità
+invalidano chiave, presentazione, compositore associato e risposte tardive.
 
 ## Minacce e limiti
 
@@ -69,10 +97,23 @@ anche sul simulatore. L'esclusione backup è sempre riletta e verificata.
 
 ## Consegna
 
-Componenti e adapter possono essere verificati indipendentemente. Finché il parent
-non monta il percorso e collega i confini di sessione/compositore nei file con altra
-ownership, questa ADR non attesta una feature disponibile né chiude WUL-793.
+L'ingresso Visita senza rete è montato nella Worklist iOS, anche prima del login.
+La sheet permette preparazione esplicita, apertura di appunti conservati, nuovo
+accesso e review; l'importazione apre il Diario ordinario e lascia Registra al
+medico. Ricevute e riconciliazione sono nella stessa sheet. NSFaceIDUsageDescription
+è presente nel progetto iOS. La qualifica sintetica non chiude da sola WUL-793.
 Servono review indipendente del diff finale e prove UI native iPhone/iPad sintetiche.
+
+Il test `MobileVisitProductUITests` usa la vera app Debug sul simulatore, con
+`MEDIFLOW_APPLE_UITEST_PATIENTS=1` e un namespace sintetico univoco in
+`MEDIFLOW_APPLE_UITEST_VISIT`. Il trasporto canonico incontra soltanto un URLProtocol
+locale simulato; chiave, archivio host e autenticazione dispositivo sono fixture,
+senza rete esterna né Keychain reale. `MEDIFLOW_APPLE_UITEST_VISIT_OFFLINE=1`
+riavvia l'app senza sessione host conservando il vault sintetico del namespace.
+Il percorso copre preparazione, appunto, riavvio senza sessione, nuovo accesso,
+review, importazione, Registra e ricevuta dopo un altro riavvio. La sua compilazione
+non equivale alla sua esecuzione, né qualifica userPresence su dispositivo fisico.
+Il raccordo sintetico è escluso da Release e da ogni build su dispositivo.
 
 ## Fonti Apple
 
