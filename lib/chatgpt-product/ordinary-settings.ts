@@ -1,3 +1,4 @@
+import { FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY, readFunctionModelConfigurationGeneration } from '../ai-providers/fabric/function-model-configuration-generation';
 /* named setting, default OFF; no bearer capabilities are persisted. */
 import 'server-only';
 import * as owner from '../security/web-auth-lifecycle-owner-adapter';
@@ -39,10 +40,10 @@ async function database() {
 export async function readOrdinaryCloudSettings(): Promise<OrdinaryCloudSettings> {
     const { dbServer, settings, inArray } = await database();
     const rows = dbServer.select({ key: settings.key, value: settings.value }).from(settings)
-        .where(inArray(settings.key, [ORDINARY_CLOUD_SETTINGS_KEY, ...Object.values(FUNCTION_SWITCH_KEYS)])).all();
+        .where(inArray(settings.key, [ORDINARY_CLOUD_SETTINGS_KEY, FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY, ...Object.values(FUNCTION_SWITCH_KEYS)])).all();
     const values = Object.fromEntries(rows.map((row: { key: string; value: string }) => [row.key, row.value]));
     const stored = parseOrdinaryStoredSettings(values[ORDINARY_CLOUD_SETTINGS_KEY]);
-    return Object.freeze({ ...stored, revision: hash(JSON.stringify(stored)),
+    return Object.freeze({ ...stored, revision: hash(JSON.stringify([stored, readFunctionModelConfigurationGeneration(values[FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY])])),
         lanes: Object.freeze(Object.fromEntries(FUNCTION_MODEL_IDS.map(id => [id, values[FUNCTION_SWITCH_KEYS[id]]]))) as OrdinaryCloudSettings['lanes'] });
 }
 /** Caller is the authenticated named HTTP controller. It must retain the original
@@ -60,7 +61,9 @@ export async function writeOrdinaryCloudSettings(session: owner.WebSessionProjec
         try {
         const row = dbServer.select({ value: settings.value }).from(settings).where(eq(settings.key, ORDINARY_CLOUD_SETTINGS_KEY)).get();
         const before = parseOrdinaryStoredSettings(row?.value);
-        if (hash(JSON.stringify(before)) !== expectedRevision) throw new ProductError('consent_stale');
+        const configuration = dbServer.select({ value: settings.value }).from(settings)
+            .where(eq(settings.key, FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY)).get()?.value;
+        if (hash(JSON.stringify([before, readFunctionModelConfigurationGeneration(configuration)])) !== expectedRevision) throw new ProductError('consent_stale');
         if (change.preference && !isFunctionModelId(change.preference.functionId)) throw new ProductError('invalid_request');
         const after = parseOrdinaryStoredSettings(JSON.stringify({ ...before, ...(change.enabled === undefined ? {} : { enabled: change.enabled }),
             preferences: change.preference ? { ...before.preferences, [change.preference.functionId]: change.preference.value } : before.preferences }));

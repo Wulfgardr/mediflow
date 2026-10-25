@@ -4,6 +4,14 @@ import SwiftUI
 import SafariServices
 #endif
 
+#if DEBUG
+@MainActor
+enum NativeFabricPresentationProbe {
+    static var documentPicker: ((Binding<String>) -> Void)?
+    static var venuePicker: ((Binding<Bool>) -> Void)?
+}
+#endif
+
 struct NativePatientInsightView: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
     var body: some View { NativeFabricExperience(workspaceModel: workspaceModel, function: .patientInsight) }
@@ -29,10 +37,13 @@ struct NativeDocumentSynthesisView: View {
                 }
             }.labelsHidden().accessibilityIdentifier("clinical-workspace-document-synthesis-document")
             NativeFabricExperience(workspaceModel: workspaceModel, function: .documentSynthesis,
-                attachmentId: attachmentId.isEmpty ? nil : attachmentId).id(attachmentId)
+                attachmentId: attachmentId.isEmpty ? nil : attachmentId)
             Text("Il documento deve essere estraibile localmente dall’host. File non supportati o cifrati senza una lettura autorizzata non vengono inviati.")
                 .font(.caption).foregroundStyle(.secondary)
         }.onChange(of: workspaceModel.selectedPatientID) { _ in attachmentId = "" }
+        #if DEBUG
+        .onAppear { NativeFabricPresentationProbe.documentPicker?($attachmentId) }
+        #endif
     }
 }
 private struct NativeFabricExperience: View {
@@ -51,11 +62,16 @@ private struct NativeFabricExperience: View {
             if useChatGPT {
                 NativeOrdinaryExperience(workspaceModel: workspaceModel, function: function, attachmentId: attachmentId,
                     activityChanged: { canChangeVenue = $0 })
+                    .id(attachmentId)
             } else {
                 NativeFabricLocalExperience(workspaceModel: workspaceModel, function: function, attachmentId: attachmentId,
                     activityChanged: { canChangeVenue = $0 })
+                    .id(attachmentId)
             }
         }
+        #if DEBUG
+        .onAppear { NativeFabricPresentationProbe.venuePicker?($useChatGPT) }
+        #endif
     }
 }
 private struct NativeOrdinaryExperience: View {
@@ -157,7 +173,7 @@ private struct NativeOrdinaryExperience: View {
         .frame(maxWidth: .infinity, alignment: .leading).buttonStyle(.bordered)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-ordinary")
-        .onAppear { model.observe(workspaceModel) }
+        .onAppear { model.observe(workspaceModel); activityChanged(model.phase == .idle || model.phase == .completed) }
         .onDisappear { model.invalidate() }
         .onChange(of: model.phase) { phase in statusFocused = true; activityChanged(phase == .idle || phase == .completed) }
         .onChange(of: scenePhase) { phase in

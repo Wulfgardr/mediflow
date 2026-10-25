@@ -98,10 +98,13 @@ test('shared group selections have actual ordinary or Apple conditional CI consu
   const selections = collectCiDispositionSelections(root);
   assert.equal(Object.keys(selections).length, 9);
   for (const selection of Object.values(selections)) assert.deepEqual(selection.errors, []);
-  for (const [id, count] of [['npm:test:inventory-browser', 4], ['npm:test:fixture-generators', 2], ['npm:test:research-boundary', 3], ['npm:test:portable-local', 113], ['npm:test:owned-http', 20], ['npm:test:owned-http-standalone', 1]]) {
+  for (const [id, count] of [['npm:test:inventory-browser', 4], ['npm:test:fixture-generators', 2], ['npm:test:research-boundary', 3], ['npm:test:portable-local', 115], ['npm:test:owned-http', 20], ['npm:test:owned-http-standalone', 1]]) {
     assert.equal(selections[id].mode, 'ordinary');
     assert.equal(selections[id].files.length, count);
     assert.equal(selections[id].binding.jobIf, null);
+  }
+  for (const file of ['lib/chatgpt-product/native-fabric-contract.test.cjs', 'lib/chatgpt-product/native-fabric-http.test.cjs']) {
+    assert.ok(selections['npm:test:portable-local'].files.includes(file));
   }
   assert.deepEqual(selections['ci:apple-native-entrypoint'].files, ['scripts/native-test.sh']);
   assert.equal(selections['ci:apple-native-entrypoint'].mode, 'conditional');
