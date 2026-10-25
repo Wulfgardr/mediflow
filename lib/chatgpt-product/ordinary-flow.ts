@@ -11,7 +11,7 @@ import { acquireOrdinarySessionResourceIdentity } from '../security/ordinary-ses
 import { createOrdinaryProductAttempt } from '../chatgpt-execution/ordinary-product-attempt';
 import { createSharedMacProductPlatform, reportMacProductPreparationDiagnostic } from '../chatgpt-execution/execution-mac-product';
 import { readOrdinaryGovernance } from '../chatgpt-execution/ordinary-governance';
-import { readOrdinaryCloudSettings, writeOrdinaryCloudSettings } from './ordinary-settings';
+import { captureOrdinarySettings, readOrdinaryCloudSettings, writeOrdinaryCloudSettings } from './ordinary-settings';
 import { readOrdinaryTaskProfile, type OrdinaryTaskProfile } from '../chatgpt-execution/ordinary-task-profile';
 import type { RedactionSessionInput } from '../ai-redaction-session';
 import type { OrdinaryExecutionResult } from '../chatgpt-execution/execution-service';
@@ -26,6 +26,7 @@ type Entry = {
     id: string; functionId: OrdinaryFunction; controller: AbortController; active: boolean; busy: boolean; claimed: boolean;
     publishing: boolean; delivered: boolean; expiresAt: number; deadline: number; attempt?: Attempt; catalog?: SynthesisCatalog;
     nativeSources?: NativeOrdinaryHostSourceCapture; detachNativeSources?: () => void;
+    settingsCurrent?: () => boolean;
     applicationCurrent?: () => boolean; knownIdentifiers?: RedactionSessionInput['knownIdentifiers'];
     sourceCurrent?: () => boolean; sourceTimer?: ReturnType<typeof setInterval>; timer?: ReturnType<typeof setTimeout>;
     initial: Deferred<Response>; output: Deferred<OrdinaryExecutionResult>; original?: Promise<Response>;
@@ -45,10 +46,11 @@ const shared = globalThis as typeof globalThis & { [registryKey]?: Map<owner.Aut
 const entries = shared[registryKey] ??= new Map();
 const key = 'x-mediflow-function-model';
 function local(entry: Entry): boolean {
-    return entry.active && !entry.controller.signal.aborted && !entry.delivered && Date.now() < entry.expiresAt && performance.now() < entry.deadline;
+    return entry.active && !entry.controller.signal.aborted && !entry.delivered && Date.now() < entry.expiresAt && performance.now() < entry.deadline
+        && (!entry.settingsCurrent || entry.settingsCurrent());
 }
 function guard(entry: Entry, withSource = true) {
-    if (!local(entry)) throw new ProductError('revoked');
+    if (!local(entry)) { void close(entry); throw new ProductError('revoked'); }
     const use = owner.beginResourceUse(entry.port); if (!use) throw new ProductError('session_expired');
     owner.abortResourceUse(use);
     if (withSource && entry.nativeSources && !nativeOrdinaryHostSourcesAreCurrent(entry.nativeSources)) throw new ProductError('revoked');
@@ -182,8 +184,9 @@ export async function beginOrdinaryFunction(request: Request, functionId: Ordina
     request.signal.addEventListener('abort', retire, { once: true });
     try {
         if (request.signal.aborted) throw new ProductError('revoked');
-        const settings = await readOrdinaryCloudSettings(); guard(entry);
-        if (!settings.enabled) throw new ProductError('unqualified_boundary');
+        const configuration = await captureOrdinarySettings(functionId); guard(entry);
+        if (!configuration.settings.enabled) throw new ProductError('unqualified_boundary');
+        entry.settingsCurrent = configuration.isCurrent; guard(entry);
         const headers = new Headers(request.headers); headers.delete(key);
         const ownedRequest = new Request(request, { headers, signal: entry.controller.signal });
         const original: Promise<Response> = scope.run(entry, async () => {

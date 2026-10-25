@@ -9,6 +9,8 @@ import { validateTerritorialPackExamples } from './validate-territorial-openapi.
 const ROOT = process.cwd();
 const SPEC_PATH = 'docs/openapi/mediflow-v1.yaml';
 const NATIVE_SPEC_PATH = 'docs/openapi/native-ordinary-v1.json';
+const FABRIC_SPEC_PATH = 'docs/openapi/native-fabric-v1.json';
+const AUTHORITY_RETIREMENT_SPEC_PATH = 'docs/openapi/native-authority-retirement-v1.json';
 const POLICY_PATH = 'docs/openapi/contract-policy.json';
 const TYPES_PATH = 'lib/api/v1/types.ts';
 const ROUTE_ROOT = 'app/api/v1';
@@ -174,7 +176,34 @@ function hasRecognizedApiV1AuthGuard(sourcePath, source) {
         && source.includes("import { handleNativeOrdinaryHttp } from '@/lib/chatgpt-product/native-ordinary-http'")
         && source.includes(`return handleNativeOrdinaryHttp(request, '${nativeOperation[0]}')`)
         && extractMethods(source).join(',') === nativeOperation[1];
-    return hasLocalTokenGuard || hasPairedClientGuard || hasNativeConfigurationGuard || hasNativeOrdinaryGuard
+    const fabricOperations = new Map([['prepare', 'POST'], ['project', 'POST,DELETE'], ['generate', 'POST'], ['cancel', 'POST'], ['status', 'GET']]);
+    const fabricOperation = [...fabricOperations].find(([operation]) => sourcePath === `app/api/v1/network/ai/fabric/${operation}/route.ts`);
+    const hasNativeFabricGuard = fabricOperation !== undefined
+        && source.includes("import { handleNativeFabricHttp } from '@/lib/chatgpt-product/native-fabric-http'")
+        && source.includes(`return handleNativeFabricHttp(request, '${fabricOperation[0]}')`)
+        && extractMethods(source).join(',') === fabricOperation[1];
+    const hasNativeAuthorityRetirementGuard = (() => {
+        if (sourcePath !== 'app/api/v1/network/ai/authority-retirement/route.ts' || extractMethods(source).join(',') !== 'POST') return false;
+        const file = ts.createSourceFile(sourcePath, source, ts.ScriptTarget.Latest, true);
+        if (file.statements.length !== 3) return false;
+        const [imported, runtime, entry] = file.statements;
+        if (!ts.isImportDeclaration(imported) || !ts.isStringLiteral(imported.moduleSpecifier)
+            || imported.moduleSpecifier.text !== '@/lib/chatgpt-product/native-authority-retirement-http'
+            || imported.importClause?.isTypeOnly || imported.importClause?.name) return false;
+        const bindings = imported.importClause?.namedBindings;
+        if (!bindings || !ts.isNamedImports(bindings) || bindings.elements.length !== 1
+            || bindings.elements[0].isTypeOnly || bindings.elements[0].propertyName
+            || bindings.elements[0].name.text !== 'handleNativeAuthorityRetirementHttp') return false;
+        if (runtime.getText(file).replace(/\s/gu, '') !== "exportconstruntime='nodejs';") return false;
+        if (!ts.isFunctionDeclaration(entry) || entry.name?.text !== 'POST'
+            || !entry.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)
+            || entry.parameters.length !== 1 || entry.parameters[0].name.getText(file) !== 'request'
+            || entry.parameters[0].initializer || !entry.body || entry.body.statements.length !== 1) return false;
+        const returned = entry.body.statements[0];
+        return ts.isReturnStatement(returned)
+            && returned.expression?.getText(file).replace(/\s/gu, '') === 'handleNativeAuthorityRetirementHttp(request)';
+    })();
+    return hasNativeAuthorityRetirementGuard || hasLocalTokenGuard || hasPairedClientGuard || hasNativeConfigurationGuard || hasNativeOrdinaryGuard || hasNativeFabricGuard
         || hasProfileFseAdmission(sourcePath, source) || hasScopedProfileAdmission(sourcePath, source);
 }
 
@@ -621,10 +650,10 @@ function serializeOperations(operations) {
 }
 
 // Additive namespace only. Conflicts or a supplement outside the named Mac lane fail closed.
-function mergeNativeSpec(main, native) {
+function mergeNativeSpec(main, native, namespace = '/api/v1/network/ai/chatgpt/ordinary/') {
     if (!native) return main;
     for (const key of Object.keys(native.paths ?? {})) {
-        if (!key.startsWith('/api/v1/network/ai/chatgpt/ordinary/') || main.paths?.[key]) throw new Error('Native OpenAPI namespace collision');
+        if (!(namespace.endsWith('/') ? key.startsWith(namespace) : key === namespace) || main.paths?.[key]) throw new Error('Native OpenAPI namespace collision');
     }
     const components = { ...(main.components ?? {}) };
     for (const [section, values] of Object.entries(native.components ?? {})) {
@@ -639,7 +668,9 @@ function main() {
     const currentRoutes = buildCurrentRoutes();
     const currentMainSpec = loadYamlFile(SPEC_PATH);
     const currentNativeSpec = JSON.parse(fs.readFileSync(path.join(ROOT, NATIVE_SPEC_PATH), 'utf8'));
-    const currentSpec = mergeNativeSpec(currentMainSpec, currentNativeSpec);
+    const currentFabricSpec = JSON.parse(fs.readFileSync(path.join(ROOT, FABRIC_SPEC_PATH), 'utf8'));
+    const currentAuthoritySpec = JSON.parse(fs.readFileSync(path.join(ROOT, AUTHORITY_RETIREMENT_SPEC_PATH), 'utf8'));
+    const currentSpec = mergeNativeSpec(mergeNativeSpec(mergeNativeSpec(currentMainSpec, currentNativeSpec), currentFabricSpec, '/api/v1/network/ai/fabric/'), currentAuthoritySpec, '/api/v1/network/ai/authority-retirement');
     const policy = JSON.parse(fs.readFileSync(path.join(ROOT, POLICY_PATH), 'utf8'));
     const documentedOperations = normalizeSpec(currentSpec);
     const { undocumented, overrides } = expandPolicy(policy);
@@ -673,7 +704,9 @@ function main() {
     const baseRoutes = buildRefRoutes(baseRef);
     const baseMainSpec = loadYamlFromRef(baseRef, SPEC_PATH);
     const baseNativeSpec = loadYamlFromRef(baseRef, NATIVE_SPEC_PATH);
-    const baseSpec = baseMainSpec ? mergeNativeSpec(baseMainSpec, baseNativeSpec) : null;
+    const baseFabricSpec = loadYamlFromRef(baseRef, FABRIC_SPEC_PATH);
+    const baseAuthoritySpec = loadYamlFromRef(baseRef, AUTHORITY_RETIREMENT_SPEC_PATH);
+    const baseSpec = baseMainSpec ? mergeNativeSpec(mergeNativeSpec(mergeNativeSpec(baseMainSpec, baseNativeSpec), baseFabricSpec, '/api/v1/network/ai/fabric/'), baseAuthoritySpec, '/api/v1/network/ai/authority-retirement') : null;
     const changedFiles = collectChangedFiles(baseRef);
     const semanticSpecChanged = baseSpec
         ? serializeOperations(normalizeSpec(baseSpec)) !== serializeOperations(documentedOperations)
@@ -687,7 +720,7 @@ function main() {
 
     if (baseRoutes) {
         const routeInventoryChanged = JSON.stringify([...baseRoutes.keys()].sort()) !== JSON.stringify([...currentRoutes.routes.keys()].sort());
-        if (routeInventoryChanged && !changedFiles.has(SPEC_PATH) && !changedFiles.has(NATIVE_SPEC_PATH) && !changedFiles.has(POLICY_PATH)) {
+        if (routeInventoryChanged && !changedFiles.has(SPEC_PATH) && !changedFiles.has(NATIVE_SPEC_PATH) && !changedFiles.has(FABRIC_SPEC_PATH) && !changedFiles.has(AUTHORITY_RETIREMENT_SPEC_PATH) && !changedFiles.has(POLICY_PATH)) {
             errors.push('Route inventory changed without updating the OpenAPI spec or contract policy');
         }
     }
@@ -695,8 +728,12 @@ function main() {
     if (baseSpec && semanticSpecChanged) {
         const mainChanged = serializeOperations(normalizeSpec(baseMainSpec)) !== serializeOperations(normalizeSpec(currentMainSpec));
         const nativeChanged = !baseNativeSpec || serializeOperations(normalizeSpec(baseNativeSpec)) !== serializeOperations(normalizeSpec(currentNativeSpec));
+        const fabricChanged = !baseFabricSpec || serializeOperations(normalizeSpec(baseFabricSpec)) !== serializeOperations(normalizeSpec(currentFabricSpec));
+        const authorityChanged = !baseAuthoritySpec || serializeOperations(normalizeSpec(baseAuthoritySpec)) !== serializeOperations(normalizeSpec(currentAuthoritySpec));
         if ((mainChanged && (baseMainSpec.info?.version ?? null) === (currentMainSpec.info?.version ?? null))
-            || (nativeChanged && baseNativeSpec && baseNativeSpec.info?.version === currentNativeSpec.info?.version)) {
+            || (nativeChanged && baseNativeSpec && baseNativeSpec.info?.version === currentNativeSpec.info?.version)
+            || (fabricChanged && baseFabricSpec && baseFabricSpec.info?.version === currentFabricSpec.info?.version)
+            || (authorityChanged && baseAuthoritySpec && baseAuthoritySpec.info?.version === currentAuthoritySpec.info?.version)) {
             errors.push(`OpenAPI contract changed but info.version stayed at ${currentSpec.info?.version}`);
         }
 
@@ -845,6 +882,19 @@ export async function ${method}(request${query ? ', context' : ''}) { return sco
             ].map(([name, candidate, expected]) => ({ name: `${kind}: ${name}`,
                 run: () => hasRecognizedApiV1AuthGuard(sourcePath, candidate), expect: actual => actual === expected }));
         }),
+        ...(() => {
+            const source = "import { handleNativeAuthorityRetirementHttp } from '@/lib/chatgpt-product/native-authority-retirement-http';\nexport const runtime = 'nodejs';\nexport async function POST(request) { return handleNativeAuthorityRetirementHttp(request); }";
+            return [
+                ['fixed retirement route', source, true],
+                ['retirement admission unreachable', source.replace('return handle', 'return Response.json({}); return handle'), false],
+                ['retirement admission conditional', source.replace('return handle', 'if (false) return handle'), false],
+                ['retirement imported from another module', source.replace('@/lib/chatgpt-product/native-authority-retirement-http', './untrusted'), false],
+                ['retirement import shadowed', source.replace('POST(request)', 'POST(handleNativeAuthorityRetirementHttp)'), false],
+                ['retirement extra method', source + '\nexport function GET() { return Response.json({}); }', false],
+            ].map(([name, candidate, expected]) => ({ name,
+                run: () => hasRecognizedApiV1AuthGuard('app/api/v1/network/ai/authority-retirement/route.ts', candidate),
+                expect: value => value === expected }));
+        })(),
         ...[
             { name: 'fixed delegated FSE admission', source: "import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read'; export async function GET(request) { const resolved = await getNetworkScopedPatientDetail(request, () => 'synthetic', 'network-fse'); if (!resolved.ok) return resolved.response; return Response.json({}); }", expected: true },
             { name: 'canonical try delegates FSE admission before operations', source: "import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read'; export async function GET(request) { try { let patientId = null; const resolved = await getNetworkScopedPatientDetail(request, () => 'synthetic', 'network-fse'); if (!resolved.ok) return resolved.response; return Response.json({}); } catch { return Response.json({}, {status:500}); } }", expected: true },

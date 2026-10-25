@@ -7,6 +7,9 @@ struct NativeOrdinarySnapshot {
     let connection: ClinicalWorkspaceConnection
     let preparation: NativeOrdinaryPreparation
     let fingerprint: String
+    var retained: NativeOrdinarySnapshot {
+        NativeOrdinarySnapshot(connection: NativeOrdinaryAuthority.transport(connection), preparation: preparation, fingerprint: fingerprint)
+    }
     func matches(_ other: NativeOrdinarySnapshot) -> Bool {
         connection.identity == other.connection.identity && preparation.functionId == other.preparation.functionId &&
         preparation.patientId == other.preparation.patientId && preparation.ambulatoryId == other.preparation.ambulatoryId &&
@@ -40,5 +43,27 @@ enum NativeOrdinaryInputs {
         let bytes = try encoder.encode(preparation)
         let fingerprint = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
         return NativeOrdinarySnapshot(connection: connection, preparation: preparation, fingerprint: fingerprint)
+    }
+}
+
+enum NativeOrdinaryAuthority {
+    static func transport(_ connection: ClinicalWorkspaceConnection) -> ClinicalWorkspaceConnection {
+        ClinicalWorkspaceConnection(dataSource: connection.dataSource, credentials: connection.credentials,
+            sessionCookie: connection.sessionCookie, ambulatoryId: connection.ambulatoryId, masterKey: nil,
+            serverURL: connection.serverURL, tlsPin: connection.tlsPin, sessionGeneration: connection.sessionGeneration)
+    }
+    static func recoveryConnection(previous: ClinicalWorkspaceConnection, current: ClinicalWorkspaceConnection) throws -> ClinicalWorkspaceConnection {
+        guard previous.serverURL == current.serverURL, previous.tlsPin == current.tlsPin,
+              previous.credentials.clientId == current.credentials.clientId,
+              previous.credentials.clientToken == current.credentials.clientToken,
+              reference(previous) != reference(current) else { throw NativeOrdinaryContractError.cleanupUnconfirmed }
+        return transport(current)
+    }
+
+    static func reference(_ connection: ClinicalWorkspaceConnection) -> String {
+        let cookie = connection.sessionCookie.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { $0.hasPrefix("mediflow_session=") } ?? ""
+        let bearer = String(cookie.dropFirst("mediflow_session=".count))
+        return SHA256.hash(data: Data(bearer.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 }

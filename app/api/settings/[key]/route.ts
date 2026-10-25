@@ -1,3 +1,4 @@
+import { writeSettingWithFunctionModelGeneration } from '@/lib/ai-providers/fabric/function-model-settings-write';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -58,10 +59,7 @@ export async function PUT(
 
         const persistedValue = normalizeSettingValue(value);
 
-        await dbServer
-            .insert(settings)
-            .values({ key, value: persistedValue })
-            .onConflictDoUpdate({ target: settings.key, set: { value: persistedValue } });
+        writeSettingWithFunctionModelGeneration(key, persistedValue);
 
         try {
             const context = auditContextFromRequest(request, session);

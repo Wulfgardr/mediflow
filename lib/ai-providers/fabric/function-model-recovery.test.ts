@@ -52,7 +52,7 @@ for (const reason of ['model_removed', 'lifecycle_changed'] as const) {
         assert.equal(plan.view.functions[0].defaultModelOptionId, oldDefault.modelOptionId);
         assert.throws(() => resolveFunctionModelDispatch(disabled, 'patient_insight'), /function_disabled/);
         assert.deepEqual(planFunctionModelUpdate(disabled, disable).writes, {});
-        assert.deepEqual(Object.keys(plan.writes).sort(), [FUNCTION_PREFERENCES_KEY, FUNCTION_SWITCH_KEYS.patient_insight].sort());
+        assert.deepEqual(Object.keys(plan.writes).sort(), ['ai.fabric.configurationGeneration', FUNCTION_PREFERENCES_KEY, FUNCTION_SWITCH_KEYS.patient_insight].sort());
         // An unrelated toggle cannot silently rebind this now-disabled stale preference.
         const other = planFunctionModelUpdate(disabled, command(disabled, { functionId: 'smart_import',
             enabled: false, defaultModelOptionId: null }));
@@ -119,7 +119,7 @@ test('all_off preview/apply/reread preserves stale choices, while host_defaults 
     const preview = service.preview(off); assert.equal(writes, 0); assert.deepEqual(service.read(), baseline);
     assert.equal(preview.proposed.functions[0].bindingState, 'stale');
     const applied = service.apply(off); assert.deepEqual(service.read(), applied); assert.deepEqual(service.apply(off), applied);
-    assert.equal(writes, 5); assert.ok(applied.functions.every(row => !row.enabled));
+    assert.equal(writes, 6); assert.ok(applied.functions.every(row => !row.enabled));
     assert.deepEqual(savedDefault(sources), savedDefault(saved));
     const host = preset('host_defaults'); const hostPreview = service.preview(host);
     const reset = service.apply(host); assert.deepEqual(reset, hostPreview.proposed);

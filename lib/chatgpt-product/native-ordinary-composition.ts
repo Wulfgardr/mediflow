@@ -8,7 +8,7 @@ import { createAuthenticatedWebSessionSelectionService } from '../security/serve
 import type { AuthenticatedWebSessionProjectionOwnerContext } from '../security/server-auth';
 import type { PairedNativeSession } from '../security/paired-native-session';
 import { ProductError } from './product-contract';
-import { beginOrdinaryFunction, bindNativeOrdinaryHostSources } from './ordinary-flow';
+import { isOrdinaryFunctionSelected, beginOrdinaryFunction, bindNativeOrdinaryHostSources } from './ordinary-flow';
 import { parseNativeOrdinaryPreparation, type NativeOrdinaryPreparation } from './native-ordinary-wire';
 import { ExecutionError } from '../chatgpt-execution/execution-contract';
 import { reportMacProductPreparationDiagnostic } from '../chatgpt-execution/execution-mac-product';
@@ -19,13 +19,23 @@ import { captureNativeOrdinaryProjectionSources, readNativeOrdinaryHostSource, c
     nativeOrdinaryProjectionReadControl, finalizeNativeOrdinaryChartProjection, completeNativeOrdinaryProjection,
     type NativeOrdinaryHostSourceCapture, type NativeOrdinarySelectionLease } from '../security/server-session-clinical-context-native-sources';
 
+import { createNativeFabricExecution } from './native-fabric-execution';
+import { readProductionFunctionModelSources } from '../ai-providers/fabric/function-model-preferences-production';
 import { NATIVE_PROJECTION_HEADER } from './native-ordinary-projection-wire';
 import { readNativeOrdinaryProjectionJson } from './native-ordinary-projection-transport';
 import type { DocumentSynthesisProductionOperation } from '../ai-providers/fabric/document-synthesis-production-operation';
 type DocumentPreparation = { operation: DocumentSynthesisProductionOperation; discard(input: unknown): void; captureHandle: string; previewHandle?: string };
 const documents = new WeakMap<NativeOrdinaryHostSourceCapture, DocumentPreparation>();
-type Context = AuthenticatedWebSessionProjectionOwnerContext & { session: PairedNativeSession; request: NativeOrdinaryPreparation; selection: NativeOrdinarySelectionLease; sources: NativeOrdinaryHostSourceCapture | null };
+type Context = AuthenticatedWebSessionProjectionOwnerContext & { session: PairedNativeSession; request: NativeOrdinaryPreparation; selection: NativeOrdinarySelectionLease; sources: NativeOrdinaryHostSourceCapture };
 const scope = new AsyncLocalStorage<Context>();
+const fabricSelections = new WeakMap<NativeOrdinaryHostSourceCapture, ReturnType<typeof fabric.capture>>();
+const fabric = createNativeFabricExecution({
+    readSources: readProductionFunctionModelSources, confirm,
+    execute: (request, context) => scope.run(context, () => originalFunction(request, context)),
+    sourceSignal: context => nativeOrdinaryHostSourceSignal(context.sources!),
+    close: context => closeNativeOrdinaryHostSources(context.sources!),
+});
+export const nativeFabricExecution = Object.freeze({ generate: fabric.generate, cancel: fabric.cancel, status: fabric.status });
 function confirm(context: Context): void {
     const port = native.mintResourcePort(context.session);
     if (!port) throw new ProductError('session_expired');
@@ -70,7 +80,7 @@ async function originalFunction(request: Request, context: Context): Promise<Res
     confirm(context);
     const prepared = context.request;
     const source = context.sources ? readNativeOrdinaryHostSource(context.sources, context.session, prepared.functionId) : null;
-    if (context.sources) bindNativeOrdinaryHostSources(context.sources);
+    if (context.sources && isOrdinaryFunctionSelected(prepared.functionId)) bindNativeOrdinaryHostSources(context.sources);
     if (prepared.functionId === 'patient_insight') {
         if (source?.functionId !== 'patient_insight') throw new ProductError('revoked');
         const input = source.input;
@@ -153,6 +163,8 @@ async function ingestDocument(context: Context, request?: Request): Promise<void
 async function beginPrepared(request: Request, context: Context): Promise<Response> {
     if (!context.sources) throw new ProductError('revoked');
     completeNativeOrdinaryProjection(context.sources); confirm(context);
+    const local = fabricSelections.get(context.sources);
+    if (local) return fabric.ready(context, local);
     // Both prepare and project ingress streams may already be disturbed; never reuse their body.
     const identity = new Request(request.url, { method: 'POST', headers: request.headers,
         signal: AbortSignal.any([request.signal, nativeOrdinaryHostSourceSignal(context.sources)]) });
@@ -165,11 +177,23 @@ async function beginPrepared(request: Request, context: Context): Promise<Respon
 }
 /** Only the paired Mac ingress calls this fixed four-way composition. No attempt exists during a grant. */
 export async function prepareNativeOrdinary(request: Request, session: PairedNativeSession, input: NativeOrdinaryPreparation): Promise<Response> {
+    return prepareNativeFunction(request, session, input, false);
+}
+export async function prepareNativeFabric(request: Request, session: PairedNativeSession, input: NativeOrdinaryPreparation): Promise<Response> {
+    return prepareNativeFunction(request, session, input, true);
+}
+async function prepareNativeFunction(request: Request, session: PairedNativeSession, input: NativeOrdinaryPreparation, local: boolean): Promise<Response> {
     input = parseNativeOrdinaryPreparation(input);
+    const selectionModel = local ? fabric.capture(input.functionId) : null;
     const port = native.mintResourcePort(session);
     if (!port) throw new ProductError('session_expired');
+    const pending = local ? fabric.prepare(session) : null;
+    const registration = pending ? native.registerPrivateResource(port, () => pending.cancel()) : null;
+    if (pending && !registration) { pending.cancel(); native.releaseResourcePort(port); throw new ProductError('session_expired'); }
+    if (pending) request = new Request(request.url, { method: request.method, headers: request.headers,
+        signal: AbortSignal.any([request.signal, pending.signal]) });
     let sources: NativeOrdinaryHostSourceCapture | null = null;
-    const cancel = () => { if (sources) closeNativeOrdinaryHostSources(sources); };
+    const cancel = () => { pending?.cancel(); if (sources) closeNativeOrdinaryHostSources(sources); };
     request.signal.addEventListener('abort', cancel, { once: true });
     try {
         if (request.signal.aborted) throw new ProductError('revoked');
@@ -180,29 +204,45 @@ export async function prepareNativeOrdinary(request: Request, session: PairedNat
         if (request.signal.aborted) throw new ProductError('revoked');
         sources = captureNativeOrdinaryProjectionSources(session, owner, input, selection);
         const context: Context = Object.freeze({ session, owner, request: input, selection, sources });
+        pending?.bind(context);
+        if (selectionModel) fabricSelections.set(sources, selectionModel);
         return await scope.run(context, async () => {
             confirm(context);
+            if (selectionModel) fabric.verify(context, selectionModel);
             const plan = issueNativeOrdinaryProjection(sources!);
             if (input.functionId === 'document_synthesis') await captureDocument(context);
             confirm(context);
             if (request.signal.aborted) throw new ProductError('revoked');
-            if (plan) return Response.json({ schema: 'mediflow.native-ordinary.v1', phase: 'needs_source_projection',
+            if (plan) return Response.json({ schema: local ? 'mediflow.native-fabric.v1' : 'mediflow.native-ordinary.v1', phase: 'needs_source_projection',
                 functionId: input.functionId, expiresAt: plan.expiresAt, sourceProjection: plan },
                 { status: 202, headers: { 'Cache-Control': 'no-store' } });
             if (input.functionId === 'document_synthesis') await ingestDocument(context);
             return beginPrepared(request, context);
         });
-    } catch (error) { cancel(); nativePreparationFailure(error); }
-    finally { request.signal.removeEventListener('abort', cancel); native.releaseResourcePort(port); }
+    } catch (error) { cancel(); return nativePreparationFailure(error); }
+    finally {
+        request.signal.removeEventListener('abort', cancel);
+        if (registration) native.unregisterPrivateResource(port, registration);
+        native.releaseResourcePort(port);
+    }
 }
 /** Claims before any body read; header, MIME and body never select the source or function. */
 export async function projectNativeOrdinary(request: Request, session: PairedNativeSession): Promise<Response> {
+    return projectNativeFunction(request, session, false);
+}
+export async function projectNativeFabric(request: Request, session: PairedNativeSession): Promise<Response> {
+    return projectNativeFunction(request, session, true);
+}
+async function projectNativeFunction(request: Request, session: PairedNativeSession, local: boolean): Promise<Response> {
     const capture = claimNativeOrdinaryProjection(session, request.headers.get(NATIVE_PROJECTION_HEADER));
     const cancel = () => closeNativeOrdinaryHostSources(capture);
     request.signal.addEventListener('abort', cancel, { once: true });
     try {
         if (request.signal.aborted || request.headers.has('content-encoding')) throw new ProductError('revoked');
         const context: Context = nativeOrdinaryProjectionContext(capture);
+        const selectionModel = fabricSelections.get(capture);
+        if (local !== !!selectionModel) throw new ProductError('revoked');
+        if (selectionModel) fabric.verify(context, selectionModel);
         return await scope.run(context, async () => {
             confirm(context);
             if (context.request.functionId === 'document_synthesis') {
@@ -216,6 +256,6 @@ export async function projectNativeOrdinary(request: Request, session: PairedNat
             if (request.signal.aborted) throw new ProductError('revoked');
             return beginPrepared(request, context);
         });
-    } catch (error) { cancel(); nativePreparationFailure(error); }
+    } catch (error) { cancel(); return nativePreparationFailure(error); }
     finally { request.signal.removeEventListener('abort', cancel); }
 }

@@ -114,3 +114,13 @@ confermato, la successiva scrittura esplicita della voce, rifiuto e risultato
 incerto, refresh fallito e risposte tardive dopo interruzione o invalidazione.
 Il test del client HTTP verifica la proiezione sealed e le credenziali paired.
 La prova UI su Mac, iPhone e iPad resta distinta da questi controlli.
+
+## Recupero dopo un nuovo login
+
+L’owner della funzione resta nel workspace. Se cancel/status della vecchia
+sessione non sono ammessi, «Verifica la chiusura» può usare una sessione corrente
+per chiedere la sola ricevuta di ritiro della precedente autorità, secondo
+[ADR 0164](adr/0164-native-inference-authority-retirement.md). Un nuovo login
+o un 401 non attestano la chiusura. Il servizio non cancella tentativi altrui
+e non dichiara il cleanup fisico: reservation e tombstone host restano valide.
+La preparazione conservata non contiene la chiave di decifratura.

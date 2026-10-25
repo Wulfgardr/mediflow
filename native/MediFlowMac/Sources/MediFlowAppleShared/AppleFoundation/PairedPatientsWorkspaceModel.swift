@@ -31,6 +31,15 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         sessionExpired: { [weak self] in await self?.lockSessionNow() }
     )
 
+    private var nativeFabricPresentations: [NativeOrdinaryFunction: NativeFabricPresentationOwner] = [:]
+
+    func nativeFabricPresentation(for function: NativeOrdinaryFunction) -> NativeFabricPresentationOwner {
+        if let owner = nativeFabricPresentations[function] { return owner }
+        let owner = NativeFabricPresentationOwner(workspace: self, function: function)
+        nativeFabricPresentations[function] = owner
+        return owner
+    }
+
     @Published var serverURL = HomeBasePairedSettings.defaultServerURL {
         didSet { invalidateLoginIfChanged(oldValue, serverURL) }
     }

@@ -20,7 +20,59 @@ public actor HomeBasePatientsClient {
         self.session = URLSession(configuration: sessionConfiguration, delegate: delegate, delegateQueue: nil)
     }
 
-    /* named ADR0135 configuration services, native credentials only. */
+    public func verifyPreviousNativeAuthorityRetirement(_ reference: String, credentials: HomeBasePairedCredentials,
+                                                        sessionCookie: String) async throws -> NativeAuthorityRetirement {
+        guard NativeOrdinaryDisclosure.matches(reference, "^[a-f0-9]{64}$") else { throw NativeOrdinaryContractError.invalid }
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/authority-retirement")
+        let headers = pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: nil)
+            .merging(["Cache-Control": "no-store"]) { _, new in new }
+        let (data, _) = try await send(to: url, method: "POST", headers: headers,
+            body: encode(["previousAuthorityRef": reference]))
+        return try decode(NativeAuthorityRetirement.self, from: data)
+    }
+
+    public func prepareNativeFabric(_ preparation: NativeOrdinaryPreparation, credentials: HomeBasePairedCredentials,
+                                    sessionCookie: String) async throws -> NativeFabricResponse {
+        try preparation.validate()
+        return try await fabricRequest("prepare", method: "POST", credentials: credentials, sessionCookie: sessionCookie,
+            ambulatoryId: preparation.ambulatoryId, body: encode(preparation))
+    }
+    public func projectNativeFabric(_ plan: NativeOrdinaryProjectionPlan, body: Data, credentials: HomeBasePairedCredentials,
+                                    sessionCookie: String, ambulatoryId: String?) async throws -> NativeFabricResponse {
+        let maximum = plan.functionId == .documentSynthesis ? 25 * 1024 * 1024 : 2 * 1024 * 1024
+        guard NativeOrdinaryDisclosure.matches(plan.grantId, "^[a-f0-9]{64}$"), !body.isEmpty, body.count <= maximum else { throw NativeOrdinaryContractError.invalid }
+        return try await fabricRequest("project", method: "POST", credentials: credentials, sessionCookie: sessionCookie,
+            ambulatoryId: ambulatoryId, body: body, extra: ["X-MediFlow-Ordinary-Projection": plan.grantId,
+                "Content-Type": plan.functionId == .documentSynthesis ? "application/octet-stream" : "application/json"])
+    }
+    public func cancelNativeFabricProjection(_ plan: NativeOrdinaryProjectionPlan, credentials: HomeBasePairedCredentials,
+                                             sessionCookie: String, ambulatoryId: String?) async throws -> NativeFabricResponse {
+        guard NativeOrdinaryDisclosure.matches(plan.grantId, "^[a-f0-9]{64}$") else { throw NativeOrdinaryContractError.invalid }
+        return try await fabricRequest("project", method: "DELETE", credentials: credentials, sessionCookie: sessionCookie,
+            ambulatoryId: ambulatoryId, extra: ["X-MediFlow-Ordinary-Projection": plan.grantId])
+    }
+    public func commandNativeFabric(_ command: NativeFabricCommand, credentials: HomeBasePairedCredentials,
+                                    sessionCookie: String, ambulatoryId: String?) async throws -> NativeFabricResponse {
+        guard UUID(uuidString: command.attemptId) != nil else { throw NativeOrdinaryContractError.invalid }
+        return try await fabricRequest(command.path, method: "POST", credentials: credentials, sessionCookie: sessionCookie,
+            ambulatoryId: ambulatoryId, body: encode(["attemptId": command.attemptId]))
+    }
+    public func statusNativeFabric(attemptId: String?, credentials: HomeBasePairedCredentials,
+                                   sessionCookie: String, ambulatoryId: String?) async throws -> NativeFabricResponse {
+        if let attemptId, UUID(uuidString: attemptId) == nil { throw NativeOrdinaryContractError.invalid }
+        return try await fabricRequest("status", method: "GET", credentials: credentials, sessionCookie: sessionCookie,
+            ambulatoryId: ambulatoryId, extra: attemptId.map { ["X-MediFlow-Fabric-Attempt": $0] } ?? [:])
+    }
+    private func fabricRequest(_ path: String, method: String, credentials: HomeBasePairedCredentials,
+                               sessionCookie: String, ambulatoryId: String?, body: Data? = nil,
+                               extra: [String: String] = [:]) async throws -> NativeFabricResponse {
+        let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/fabric/\(path)")
+        let headers = pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
+            .merging(["Cache-Control": "no-store"]) { _, new in new }.merging(extra) { _, new in new }
+        let (data, _) = try await send(to: url, method: method, headers: headers, body: body)
+        return try decode(NativeFabricResponse.self, from: data)
+    }
+
     /* named paired Apple ordinary routes, distinct from account/configuration. */
     public func prepareNativeOrdinary(_ preparation: NativeOrdinaryPreparation, credentials: HomeBasePairedCredentials,
                                       sessionCookie: String) async throws -> NativeOrdinaryResponse {
@@ -1553,6 +1605,10 @@ public actor HomeBasePatientsClient {
                     let failure = try? JSONDecoder().decode(AuthHealthFailure.self, from: data)
                     throw HomeBaseClientError.httpStatus(httpResponse.statusCode,
                         failure?.publicMessage ?? AuthHealthFailure.unavailableMessage)
+                }
+                if url.path.hasPrefix("/api/v1/network/ai/fabric/") {
+                    let code = (try? JSONDecoder().decode(APIErrorPayload.self, from: data))?.code
+                    throw NativeFabricFailure(status: httpResponse.statusCode, code: NativeFabricFailure.Code(rawValue: code ?? "") ?? .unavailable)
                 }
                 // Only this exact native operation may preserve a pending device login.
                 if method == "POST", url.path == "/api/v1/network/ai/chatgpt/ordinary/login/complete",
