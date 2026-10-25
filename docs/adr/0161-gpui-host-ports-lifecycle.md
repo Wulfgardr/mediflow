@@ -70,13 +70,64 @@ Invoca la disconnessione comune: rimuove sessione, selezione, cache e bozze
 non salvabili, revoca l’autorità e scarta i callback della generazione account
 precedente. I cloni della vecchia sessione non possono inviare altre richieste.
 Questa correzione chiude l’incoerenza introdotta dal ritiro del trasporto in
-G-1a.1; la matrice completa di form ed effetti SEC-3 resta in G-1a.2.
+G-1a.1. G-1a.2 estende il ritiro ai consumer dei risultati annidati e agli
+editor trattenuti: il reset account ritira le vecchie entità e ne crea di nuove,
+con una generazione di autorità distinta dall’epoch workspace. Un callback
+di una vecchia autorità non modifica la nuova sessione o la nuova bozza.
+Un segnale di ritiro dell’autorità corrente raggiunge invece la disconnessione
+anche se proviene da un workspace già lasciato. Errori di restore nelle
+riletture di creazione/modifica non diventano semplici esiti non confermati.
+Form ordinari, upload, selettore farmaco annidato e valutazione con tentativo
+sigillato seguono lo stesso ritiro; nessun vecchio invio viene riabilitato.
 
-Il contesto è disponibile anche per gli effetti file e viene controllato
-prima della copia. **G-1a.1 non chiude SEC-2/3:** G-1a.2 deve fissare il punto
-di non ritorno del file, mettere una barriera deterministica tra controllo ed
-effetto e verificare il ritiro di tutti i form, callback e risultati annidati.
-La finestra tra controllo ed apertura del file non è dichiarata risolta qui.
+I callback dedicati del repertorio farmaci e di WHO, sia readiness sia ricerca,
+condividono con il runner workspace il controllo di lifecycle. L’ordine è:
+autorità catturata, segnale `retires_session` o motivo conservato dalla sessione,
+poi currentness ordinaria di query/editor/area/epoch. Una query chiusa o cambiata
+non nasconde il ritiro dell’autorità corrente. Un risultato dell’autorità
+precedente, anche di ritiro, non altera invece la nuova sessione o bozza.
+I risultati ordinari tardivi restano scartati per currentness; il cambio di
+workspace da solo non costituisce un cambio dell’autorità operatore.
+
+## G-1a.2: punto di non ritorno della copia
+
+La scelta nativa della destinazione precede la lettura del documento. La vista
+Documenti avvisa prima della scelta: una copia già avviata può completarsi anche
+dopo cambio scheda o blocco. Il client legge e verifica il contenuto; poi
+`admit_download` fissa in una struttura consumabile una sola volta il percorso
+scelto e i byte verificati. Non accetta percorsi provenienti dal record clinico.
+
+Il punto di non ritorno è **l’ammissione locale riuscita** mediante
+`RequestContext::admit_file_effect`, prima dell’apertura del file. Un mutex
+condiviso dalla sessione e dalle sue selezioni serializza l’ultimo controllo e
+l’ammissione rispetto a cancellazione e revoca. Non attribuisce autorità e non
+sostituisce scelta della destinazione o consenso al contenuto. Il mutex viene
+rilasciato prima di qualsiasi I/O: un filesystem lento non trattiene il ritiro
+della sessione né il thread della UI.
+
+- Ritiro prima dell’ammissione: nessuna apertura o scrittura; il risultato
+  clinico e i callback dei picker vengono scartati.
+- Ritiro dopo l’ammissione, anche prima dell’apertura effettiva o durante la
+  copia: l’unica copia già annunciata può completarsi. Il ritiro non ne dichiara
+  il rollback e non aspetta l’I/O.
+- Dopo lock/restore/navigazione resta soltanto lo stato tecnico minimo della
+  copia ammessa: in corso, completata o fallita. Non contiene percorso,
+  identificativi, contenuto, sessione, selezione o autorità e non riapre form.
+  Non viene avviata una seconda copia mentre quella ammessa è pendente.
+
+Il successo è mostrato soltanto dopo `write_all` e `sync_all`. L’apertura usa
+`create_new` e, su Unix, modalità `0600`: una destinazione preesistente non viene
+sovrascritta né rimossa. Un errore può lasciare il **nuovo file parziale**;
+l’interfaccia chiede di controllare la destinazione e non riprova, non sceglie
+un altro nome e non elimina il file. L’arresto del processo o la chiusura della
+finestra non garantiscono completamento né consegna dell’esito; alla riapertura
+non c’è recupero o secondo salvataggio automatico. La verifica di ammissione
+non è una garanzia contro guasti del filesystem o perdita di alimentazione.
+
+La barriera sintetica fra controllo preliminare e ammissione riproduce
+l’interleaving individuato staticamente dal censimento; non attesta un exploit
+pregresso. Le prove separano ritiro prima dell’ammissione, completamento dei
+byte già ammessi, errore parziale, collisione e notifica minima dopo restore.
 
 ## Decisione 2: opzione 1 approvata
 
@@ -110,6 +161,14 @@ prima degli header e durante il body, ritiro di richieste sorelle al restore,
 cancellazione di contesto e scrittura dall'esito incerto. Le fixture sono
 inventate e i server di prova ascoltano soltanto sul loopback.
 
-Sono prove del trasporto e del contratto, non accettazione del prodotto
-installato, di ogni form o dell'ammissione clinica. G-1a resta incompleta fino
-all'accettazione di G-1a.1 e G-1a.2.
+Le regressioni G-1a.2 esercitano i costruttori e i callback effettivi dei
+form, il ritiro degli editor ancora referenziati, l’upload e il selettore
+farmaco annidato, la scala preparata e il tentativo sigillato, oltre ai runner
+workspace/account e alle richieste sorelle. Le falsificazioni rimuovono i
+vincoli osservabili e devono far fallire le regressioni pertinenti.
+
+Sono prove sintetiche del sorgente e del trasporto, non accettazione del
+prodotto installato o dell’ammissione clinica. Non espongono restore o altre
+porte amministrative: provano il ritiro quando l’host segnala il cambio
+archivio. Accettazione indipendente di G-1a.2, integrazione e qualifica del
+bundle restano passaggi distinti. Nessun impatto sul contratto HTTP/OpenAPI.

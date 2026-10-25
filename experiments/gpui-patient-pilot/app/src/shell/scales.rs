@@ -72,6 +72,7 @@ pub(super) mod tests {
         socket: std::net::SocketAddr,
         requests: Arc<Mutex<Vec<(String, Value)>>>,
         next_write: Arc<AtomicU16>,
+        replaced: Arc<AtomicBool>,
         stop: Arc<AtomicBool>,
         worker: Option<thread::JoinHandle<()>>,
     }
@@ -86,6 +87,8 @@ pub(super) mod tests {
             let captured = requests.clone();
             let next_write = Arc::new(AtomicU16::new(201));
             let write_status = next_write.clone();
+            let replaced = Arc::new(AtomicBool::new(false));
+            let archive_replaced = replaced.clone();
             let stop = Arc::new(AtomicBool::new(false));
             let stopping = stop.clone();
             let worker = thread::spawn(move || {
@@ -134,7 +137,10 @@ pub(super) mod tests {
                     // All fixtures, including unlock material below, are synthetic.
                     captured.lock().unwrap().push((route.clone(), body.clone()));
                     let mut status = 200;
-                    let response = match route.as_str() {
+                    let response = if archive_replaced.load(Ordering::Acquire) && route.starts_with("GET /api/v1/") {
+                        status = 409;
+                        json!({"code":"ARCHIVE_REPLACED"})
+                    } else { match route.as_str() {
                         "GET /api/auth/check" => json!({"status":"ok", "isSetup":true, "archiveGeneration":"synthetic-generation",
                             "unlock":{"credential":"passphrase", "kdfVersion":3, "salt":"AwMDAwMDAwMDAwMDAwMDAw=="}}),
                         "POST /api/auth/native/login" => json!({"success":true, "id":"synthetic-user", "username":"synthetic", "role":"admin",
@@ -174,7 +180,7 @@ pub(super) mod tests {
                             entries.get(id).cloned().unwrap_or_else(|| { status = 404; json!({}) })
                         }
                         _ => panic!("unexpected synthetic UI route: {route}"),
-                    }.to_string();
+                    }}.to_string();
                     write!(stream, "HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nSet-Cookie: mediflow_session={}; Path=/; HttpOnly\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}", "a".repeat(64), response.len()).unwrap();
                 }
             });
@@ -196,6 +202,7 @@ pub(super) mod tests {
                 socket,
                 requests,
                 next_write,
+                replaced,
                 stop,
                 worker: Some(worker),
             }
@@ -297,6 +304,64 @@ pub(super) mod tests {
             );
         }
         nodes.into_iter().map(|(id, _)| id).collect()
+    }
+
+    #[gpui::test]
+    fn g1a2_restore_retires_prepared_scale_attempt_and_callbacks(cx: &mut gpui::TestAppContext) {
+        let host = SyntheticHost::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        enter_scales(&view, &host, cx);
+        prepare(&view, cx);
+        host.next_write.store(500, Ordering::Release);
+        view.update(cx, |app, cx| app.confirm_scale(cx));
+        cx.run_until_parked();
+        let (editors, intent, attempt) = view.read_with(cx, |app, _| {
+            let form = app.form.as_ref().unwrap();
+            let scale = form.scale.as_ref().unwrap();
+            assert!(scale.has_attempt());
+            (
+                form.fields
+                    .iter()
+                    .map(|field| field.editor.clone())
+                    .collect::<Vec<_>>(),
+                scale.intent.clone(),
+                scale.attempt.clone().unwrap(),
+            )
+        });
+        host.replaced.store(true, Ordering::Release);
+        view.update(cx, |app, cx| app.reread_scale(cx));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert!(app.form.is_none());
+            assert!(app.session.is_none());
+            assert!(app.selected_id.is_none());
+            assert!(app.scales.catalog.ready().is_none());
+            app.receive_scale_readback(Ok(ScaleEntryReadback::NotFound), cx);
+            app.confirm_scale(cx);
+            app.reread_scale(cx);
+            assert!(app.form.is_none());
+        });
+        for editor in editors {
+            editor.read_with(cx, |input, _| {
+                assert!(input.value().is_empty());
+                assert!(input.read_only);
+            });
+        }
+        let requests = host.requests.lock().unwrap().len();
+        assert!(host.session.read_scale_entry(&attempt).is_err());
+        assert!(host.session.create_scale_entry(&attempt).is_err());
+        assert!(
+            host.session
+                .read_patient_profile("scope-a", "patient-a", &intent)
+                .is_err()
+        );
+        assert_eq!(host.requests.lock().unwrap().len(), requests);
+        assert_eq!(
+            host.writes().len(),
+            1,
+            "restore or callback retried a scale write"
+        );
     }
 
     #[gpui::test]
@@ -894,8 +959,6 @@ impl ClinicalApp {
         if self.form.is_some() {
             return;
         }
-        // Retire the abandoned area even when no session/scope can start a new
-        // read; its late authentication result cannot affect this destination.
         self.next_epoch();
         let (Some(session), Some(scope)) = (self.session.clone(), self.scope.clone()) else {
             return;
@@ -1469,6 +1532,10 @@ impl ClinicalApp {
     }
 
     fn scale_save_failure(&mut self, error: RuntimeError, cx: &mut Context<Self>) {
+        if error.retires_session() {
+            self.save_error(error, cx);
+            return;
+        }
         let Some(form) = &mut self.form else {
             return;
         };

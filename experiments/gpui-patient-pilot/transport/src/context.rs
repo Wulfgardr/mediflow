@@ -1,6 +1,7 @@
 use crate::{Result, RuntimeError};
 use futures_util::future::{Either, select, select_all};
 use std::future::Future;
+use std::sync::{Arc, Mutex};
 use tokio::sync::watch;
 
 #[derive(Clone)]
@@ -30,18 +31,34 @@ impl Cancellation {
 pub struct RequestContext {
     session: Cancellation,
     selections: Vec<Cancellation>,
+    file_admission: Arc<Mutex<()>>,
 }
 impl Default for RequestContext {
     fn default() -> Self {
         Self {
             session: Cancellation::new(),
             selections: vec![Cancellation::new()],
+            file_admission: Arc::new(Mutex::new(())),
         }
     }
 }
 impl RequestContext {
     pub fn cancel(&self) {
+        let _admission = self
+            .file_admission
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         self.selections.last().expect("selection context").cancel();
+    }
+    /// Local point of no return for an already announced, fixed file copy.
+    /// Revocation before admission denies it; after admission it may finish.
+    /// No IO runs under this lock. This is a lifetime fence, never a grant.
+    pub fn admit_file_effect(&self) -> Result<()> {
+        let _admission = self
+            .file_admission
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?;
+        self.check()
     }
     pub fn check(&self) -> Result<()> {
         if self.session.is_cancelled() {
@@ -58,9 +75,14 @@ impl RequestContext {
         Self {
             session: self.session.clone(),
             selections,
+            file_admission: self.file_admission.clone(),
         }
     }
     pub(crate) fn revoke(&self) {
+        let _admission = self
+            .file_admission
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         self.session.cancel();
     }
     pub(crate) fn next_selection(&self) -> Self {
@@ -71,6 +93,7 @@ impl RequestContext {
         Self {
             session: self.session.clone(),
             selections: vec![Cancellation::new()],
+            file_admission: self.file_admission.clone(),
         }
     }
     pub(crate) async fn run<T>(
@@ -128,6 +151,23 @@ mod tests {
                 panic!("completed response and cancellation were both ready")
             }
         }
+    }
+
+    #[test]
+    fn g1a2_file_admission_obeys_selection_children_and_session_retirement() {
+        let root = RequestContext::default();
+        let child = root.child();
+        let account = root.session_scope();
+        assert_eq!(child.admit_file_effect(), Ok(()));
+        root.cancel();
+        assert_eq!(child.admit_file_effect(), Err(RuntimeError::ReadRequired));
+        assert_eq!(account.admit_file_effect(), Ok(()));
+        let next = root.next_selection();
+        assert_eq!(next.admit_file_effect(), Ok(()));
+        root.revoke();
+        assert_eq!(next.admit_file_effect(), Err(RuntimeError::Locked));
+        assert_eq!(account.admit_file_effect(), Err(RuntimeError::Locked));
+        assert_eq!(root.child().admit_file_effect(), Err(RuntimeError::Locked));
     }
 
     #[test]
