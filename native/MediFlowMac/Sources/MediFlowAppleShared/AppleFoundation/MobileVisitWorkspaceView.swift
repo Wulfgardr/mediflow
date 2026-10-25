@@ -109,6 +109,7 @@ struct MobileVisitWorkspaceView: View {
         } message: {
             Text("Dossier e appunti sono cifrati e non inclusi nel backup. Rimuovere il codice del dispositivo può rendere irrecuperabili gli appunti non registrati. Il dossier scade entro 24 ore; gli appunti restano fino a una tua decisione esplicita. Lo sblocco del dispositivo non accede al computer dell’archivio. Le variazioni dei permessi sono verificabili solo online.")
         }
+        .onDisappear { coordinator.dismiss() }
         .onReceive(expiryTimer) { _ in model.checkExpiry() }
         .onChange(of: model.onlineReview?.id) { _ in reviewed = false }
         .overlay {
@@ -136,7 +137,7 @@ struct MobileVisitWorkspaceView: View {
         if workspace.connectionState == .pairedOnline {
             Menu("Scegli il paziente per la visita") {
                 ForEach(workspace.patients.filter { $0.deletedAt == nil }) { patient in
-                    Button("\(patient.lastName) \(patient.firstName)") { Task { await workspace.loadPatient(patient) } }
+                    Button("\(patient.lastName) \(patient.firstName)") { Task { await coordinator.selectPatient(patient) } }
                 }
             }
             .accessibilityIdentifier("mobile-visit-choose-patient")

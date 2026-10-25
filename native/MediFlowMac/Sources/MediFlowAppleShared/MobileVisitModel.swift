@@ -55,6 +55,14 @@ final class MobileVisitModel: ObservableObject {
         statusMessage = nil
     }
 
+    func cancelPendingWork() {
+        epoch = UUID()
+        onlineReview = nil
+        reviewID = nil
+        reviewedRevision = nil
+        isBusy = false
+    }
+
     func unlock() async {
         guard !isBusy else { return }
         let ticket = epoch
