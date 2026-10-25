@@ -1,0 +1,550 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MediFlow native Apple local Fabric supplemental contract",
+    "version": "0.9.6-native-fabric.1",
+    "description": "ADR0076 / WUL-794. Four named proposal-only functions, host preferences/catalog and original source authority. No cloud egress, arbitrary model selection or apply. Synthetic qualification only."
+  },
+  "paths": {
+    "/api/v1/network/ai/fabric/prepare": {
+      "post": {
+        "operationId": "nativeFabricPreparePost",
+        "summary": "Capture selected host sources and pin configured local model; no provider execution",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "proposal_only",
+        "x-native-only": [
+          "macos",
+          "ios",
+          "ipados"
+        ],
+        "responses": {
+          "200": {
+            "description": "No-store response, original proposal or lifecycle state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeFabricResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Fresh bounded source-projection grant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeFabricResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Closed DTO, query, method or header rejected"
+          },
+          "401": {
+            "description": "Paired device/operator session unavailable"
+          },
+          "403": {
+            "description": "Function disabled"
+          },
+          "409": {
+            "description": "Context, source, model binding stale or operation consumed"
+          },
+          "503": {
+            "description": "Local venue or verified proposal unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryPreparation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/fabric/project": {
+      "post": {
+        "operationId": "nativeFabricProjectPost",
+        "summary": "Consume/cancel the existing one-shot source projection grant; no provider execution",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "proposal_only",
+        "x-native-only": [
+          "macos",
+          "ios",
+          "ipados"
+        ],
+        "responses": {
+          "200": {
+            "description": "No-store response, original proposal or lifecycle state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeFabricResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Fresh bounded source-projection grant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeFabricResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Closed DTO, query, method or header rejected"
+          },
+          "401": {
+            "description": "Paired device/operator session unavailable"
+          },
+          "403": {
+            "description": "Function disabled"
+          },
+          "409": {
+            "description": "Context, source, model binding stale or operation consumed"
+          },
+          "503": {
+            "description": "Local venue or verified proposal unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-MediFlow-Ordinary-Projection",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeOrdinaryProjectionBody"
+              }
+            },
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "description": "DS only: decoded selected attachment bytes, 1..26214400 bytes. No JSON, source paths or parser settings."
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "nativeFabricProjectDelete",
+        "summary": "Consume/cancel the existing one-shot source projection grant; no provider execution",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "proposal_only",
+        "x-native-only": [
+          "macos",
+          "ios",
+          "ipados"
+        ],
+        "responses": {
+          "200": {
+            "description": "No-store response, original proposal or lifecycle state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeFabricResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Fresh bounded source-projection grant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeFabricResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Closed DTO, query, method or header rejected"
+          },
+          "401": {
+            "description": "Paired device/operator session unavailable"
+          },
+          "403": {
+            "description": "Function disabled"
+          },
+          "409": {
+            "description": "Context, source, model binding stale or operation consumed"
+          },
+          "503": {
+            "description": "Local venue or verified proposal unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-MediFlow-Ordinary-Projection",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/network/ai/fabric/generate": {
+      "post": {
+        "operationId": "nativeFabricGeneratePost",
+        "summary": "Execute the original named owner once; validate sources and binding until publication",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "proposal_only",
+        "x-native-only": [
+          "macos",
+          "ios",
+          "ipados"
+        ],
+        "responses": {
+          "200": {
+            "description": "No-store response, original proposal or lifecycle state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeFabricResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Fresh bounded source-projection grant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeFabricResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Closed DTO, query, method or header rejected"
+          },
+          "401": {
+            "description": "Paired device/operator session unavailable"
+          },
+          "403": {
+            "description": "Function disabled"
+          },
+          "409": {
+            "description": "Context, source, model binding stale or operation consumed"
+          },
+          "503": {
+            "description": "Local venue or verified proposal unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeFabricAttempt"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/fabric/cancel": {
+      "post": {
+        "operationId": "nativeFabricCancelPost",
+        "summary": "Revoke the exact operation and its publication authority",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "proposal_only",
+        "x-native-only": [
+          "macos",
+          "ios",
+          "ipados"
+        ],
+        "responses": {
+          "200": {
+            "description": "No-store response, original proposal or lifecycle state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeFabricResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Fresh bounded source-projection grant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeFabricResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Closed DTO, query, method or header rejected"
+          },
+          "401": {
+            "description": "Paired device/operator session unavailable"
+          },
+          "403": {
+            "description": "Function disabled"
+          },
+          "409": {
+            "description": "Context, source, model binding stale or operation consumed"
+          },
+          "503": {
+            "description": "Local venue or verified proposal unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativeFabricAttempt"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/ai/fabric/status": {
+      "get": {
+        "operationId": "nativeFabricStatusGet",
+        "summary": "Revalidate an operation or confirm no outstanding local handles",
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ],
+        "x-authority-ceiling": "proposal_only",
+        "x-native-only": [
+          "macos",
+          "ios",
+          "ipados"
+        ],
+        "responses": {
+          "200": {
+            "description": "No-store response, original proposal or lifecycle state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeFabricResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Fresh bounded source-projection grant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeFabricResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Closed DTO, query, method or header rejected"
+          },
+          "401": {
+            "description": "Paired device/operator session unavailable"
+          },
+          "403": {
+            "description": "Function disabled"
+          },
+          "409": {
+            "description": "Context, source, model binding stale or operation consumed"
+          },
+          "503": {
+            "description": "Local venue or verified proposal unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-MediFlow-Fabric-Attempt",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "NativeFabricResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "phase"
+        ],
+        "properties": {
+          "schema": {
+            "const": "mediflow.native-fabric.v1"
+          },
+          "phase": {
+            "enum": [
+              "needs_source_projection",
+              "ready",
+              "completed",
+              "current",
+              "closed",
+              "busy"
+            ]
+          },
+          "functionId": {
+            "enum": [
+              "patient_insight",
+              "smart_import",
+              "document_synthesis",
+              "treatment_reasoning"
+            ]
+          },
+          "attemptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expiresAt": {
+            "type": "number"
+          },
+          "cleanupConfirmed": {
+            "type": "boolean"
+          },
+          "sourceProjection": {
+            "$ref": "#/components/schemas/NativeOrdinaryProjectionPlan"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/NativeFabricSelection"
+          },
+          "result": {
+            "type": "object",
+            "description": "Original function wire proposal, including its canonical receipt/provenance; no raw model output."
+          },
+          "clinicalWrites": {
+            "const": 0
+          },
+          "apply": {
+            "const": "denied"
+          }
+        }
+      },
+      "NativeFabricSelection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "modelOptionId",
+          "catalogRevision",
+          "preferenceRevision",
+          "source",
+          "provider",
+          "model",
+          "venue",
+          "fallback"
+        ],
+        "properties": {
+          "modelOptionId": {
+            "type": "string",
+            "pattern": "^model_option_[a-f0-9]{32}$"
+          },
+          "catalogRevision": {
+            "type": "string",
+            "pattern": "^sha256_[a-f0-9]{64}$"
+          },
+          "preferenceRevision": {
+            "type": "string",
+            "pattern": "^sha256_[a-f0-9]{64}$"
+          },
+          "source": {
+            "enum": [
+              "host_configuration",
+              "saved_preference"
+            ]
+          },
+          "provider": {
+            "enum": [
+              "ollama",
+              "athena_mlx",
+              "athena_transformers"
+            ]
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "venue": {
+            "const": "local"
+          },
+          "fallback": {
+            "const": "none"
+          }
+        }
+      },
+      "NativeFabricAttempt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attemptId"
+        ],
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
+    }
+  }
+}

@@ -209,3 +209,53 @@ soddisfano.
 host (ADR0135); non concede inferenza e non viene esteso da questo adapter.
 Le prove su dispositivi fisici e l'accettazione della parità complessiva
 rimangono in WUL-589/WUL-694, distinte dalle prove sintetiche del contratto.
+
+
+## Emendamento 25 ottobre 2026 — Fabric locale sui client Apple (WUL-794)
+
+Il mandato mobile estende la Classe D alle sole route nominate
+`/api/v1/network/ai/fabric/{prepare,project,generate,cancel,status}`. `project`
+ammette POST e DELETE, `status` GET, le altre POST. Le quattro funzioni sono
+Patient Insight, Smart Import, Document Synthesis e Treatment Reasoning.
+L'estensione non concede configurazione amministrativa, chat, apply o writer.
+
+Ogni ingresso richiede pairing e sessione operatore nativa correnti, capability
+`network.ai.central-runtime` e `network.replica.readonly-patients`, ruolo ammesso,
+scope e lease autentici. `prepare` accetta esclusivamente il DTO selector-only
+già usato da ordinary; `generate` e `cancel` soltanto l'identificativo opaco
+creato dall'host. Query, prompt, provider, modello, endpoint e opzioni arbitrarie
+sono negati. La scelta locale è la preferenza corrente dell'host, risolta dal
+catalogo tramite FunctionModelDispatch; viene fissata alla preparazione e
+rivalidata fino alla pubblicazione. Nessuna installazione o alternativa implicita.
+
+Acquisizione, roster, digest, revisioni, proiezione ENC monouso e AnyDoc riusano
+l'owner e i contratti ordinary originari. Un grant resta legato anche alla lane:
+non può passare da Fabric a ChatGPT o viceversa. La provenienza della decifratura
+resta `authenticated_client_decryption`, `ciphertextEquality: not_attested`.
+La proiezione non esegue un provider: restituisce un'operazione pronta; soltanto
+il gesto online di generazione avvia l'owner originale della funzione.
+
+Le esecuzioni locali ammettono esclusivamente le venue locali già configurate
+sull'host (Ollama o ATHENA tramite il dispatch esistente). Le route nuove non
+ammettono egress cloud. Il percorso ChatGPT resta una scelta esplicita distinta,
+con il proprio consenso, login, catalogo, effort e ricevuta di chiusura. Nessuna
+bozza offline può invocare un provider e nessun invio viene accodato offline.
+
+La risposta contiene la proposta originale con ricevuta/provenienza e la scelta
+host descrittiva (opzione opaca, revisione catalogo e origine della preferenza).
+Non scrive cartella né artefatti document-derived. Errori, funzione disabilitata,
+configurazione variata e host irraggiungibile restano visibili senza fallback.
+
+Cambio paziente, scope, sessione, fonti, configurazione, lock, background,
+chiusura o annullamento rendono terminale la richiesta precedente. Le guardie
+sono verificate prima/dopo le attese, al trasporto e alla pubblicazione; una
+risposta tardiva non riabilita una proposta. Il client azzera la proposta e
+chiude il preciso handle precedente; se la chiusura non è confermata blocca un
+nuovo invio. La chiusura conferma revoca e impossibilità di pubblicazione; non
+attesta che un runtime locale abbia interrotto fisicamente ogni elaborazione.
+Le proposte già mostrate sono ritirate quando viene osservata la revoca delle
+fonti o delle impostazioni, anche senza una nuova generazione.
+
+Le prove sono sintetiche e separate dalla qualifica del modello, dal dispositivo
+fisico e dall'ammissione clinica. La review finale indipendente e la prova UI
+integrata restano responsabilità del parent.

@@ -6,15 +6,15 @@ import SafariServices
 
 struct NativePatientInsightView: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
-    var body: some View { NativeOrdinaryExperience(workspaceModel: workspaceModel, function: .patientInsight) }
+    var body: some View { NativeFabricExperience(workspaceModel: workspaceModel, function: .patientInsight) }
 }
 struct NativeSmartImportView: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
-    var body: some View { NativeOrdinaryExperience(workspaceModel: workspaceModel, function: .smartImport) }
+    var body: some View { NativeFabricExperience(workspaceModel: workspaceModel, function: .smartImport) }
 }
 struct NativeTreatmentReasoningView: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
-    var body: some View { NativeOrdinaryExperience(workspaceModel: workspaceModel, function: .treatmentReasoning) }
+    var body: some View { NativeFabricExperience(workspaceModel: workspaceModel, function: .treatmentReasoning) }
 }
 struct NativeDocumentSynthesisView: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
@@ -28,24 +28,49 @@ struct NativeDocumentSynthesisView: View {
                     Text(attachment.name).tag(attachment.id)
                 }
             }.labelsHidden().accessibilityIdentifier("clinical-workspace-document-synthesis-document")
-            NativeOrdinaryExperience(workspaceModel: workspaceModel, function: .documentSynthesis,
+            NativeFabricExperience(workspaceModel: workspaceModel, function: .documentSynthesis,
                 attachmentId: attachmentId.isEmpty ? nil : attachmentId).id(attachmentId)
             Text("Il documento deve essere estraibile localmente dall’host. File non supportati o cifrati senza una lettura autorizzata non vengono inviati.")
                 .font(.caption).foregroundStyle(.secondary)
         }.onChange(of: workspaceModel.selectedPatientID) { _ in attachmentId = "" }
     }
 }
+private struct NativeFabricExperience: View {
+    @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
+    let function: NativeOrdinaryFunction
+    var attachmentId: String? = nil
+    @State private var useChatGPT = false
+    @State private var canChangeVenue = true
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Picker("Esegui la funzione", selection: $useChatGPT) {
+                Text("Locale sull’host").tag(false)
+                Text("ChatGPT").tag(true)
+            }.disabled(!canChangeVenue)
+                .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-venue")
+            if useChatGPT {
+                NativeOrdinaryExperience(workspaceModel: workspaceModel, function: function, attachmentId: attachmentId,
+                    activityChanged: { canChangeVenue = $0 })
+            } else {
+                NativeFabricLocalExperience(workspaceModel: workspaceModel, function: function, attachmentId: attachmentId,
+                    activityChanged: { canChangeVenue = $0 })
+            }
+        }
+    }
+}
 private struct NativeOrdinaryExperience: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
     let function: NativeOrdinaryFunction
+    let activityChanged: (Bool) -> Void
     @StateObject private var model: NativeOrdinaryModel
     @Environment(\.scenePhase) private var scenePhase
     @AccessibilityFocusState private var statusFocused: Bool
     #if os(iOS)
     @State private var loginPage: NativeOrdinaryLoginPage?
     #endif
-    init(workspaceModel: PairedPatientsWorkspaceModel, function: NativeOrdinaryFunction, attachmentId: String? = nil) {
-        self.workspaceModel = workspaceModel; self.function = function
+    init(workspaceModel: PairedPatientsWorkspaceModel, function: NativeOrdinaryFunction, attachmentId: String? = nil,
+         activityChanged: @escaping (Bool) -> Void = { _ in }) {
+        self.workspaceModel = workspaceModel; self.function = function; self.activityChanged = activityChanged
         _model = StateObject(wrappedValue: NativeOrdinaryModel(function: function, snapshot: {
             try NativeOrdinaryInputs.build(function, workspace: workspaceModel, attachmentId: attachmentId)
         }))
@@ -134,7 +159,7 @@ private struct NativeOrdinaryExperience: View {
         .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-ordinary")
         .onAppear { model.observe(workspaceModel) }
         .onDisappear { model.invalidate() }
-        .onChange(of: model.phase) { _ in statusFocused = true }
+        .onChange(of: model.phase) { phase in statusFocused = true; activityChanged(phase == .idle || phase == .completed) }
         .onChange(of: scenePhase) { phase in
             if phase == .background { model.invalidate() }
         }
@@ -176,7 +201,7 @@ private struct NativeOrdinaryExperience: View {
     }
 
 }
-private struct NativeOrdinaryProposalView: View {
+struct NativeOrdinaryProposalView: View {
     let function: NativeOrdinaryFunction
     let result: NativeOrdinaryJSON
     var body: some View {

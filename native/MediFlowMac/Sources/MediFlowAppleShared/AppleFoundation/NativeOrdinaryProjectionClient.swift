@@ -13,6 +13,21 @@ struct NativeOrdinaryProjectionIO {
 enum NativeOrdinaryProjectionClient {
     static func project(_ plan: NativeOrdinaryProjectionPlan, preparation: NativeOrdinaryPreparation,
                         io: NativeOrdinaryProjectionIO, client injectedClient: HomeBasePatientsClient? = nil) async throws -> NativeOrdinaryResponse {
+        try await projectUsing(plan, preparation: preparation, io: io, client: injectedClient) { client, body, connection in
+            try await client.projectNativeOrdinary(plan, body: body, credentials: connection.credentials,
+                sessionCookie: connection.sessionCookie, ambulatoryId: preparation.ambulatoryId)
+        }
+    }
+    static func projectFabric(_ plan: NativeOrdinaryProjectionPlan, preparation: NativeOrdinaryPreparation,
+                              io: NativeOrdinaryProjectionIO) async throws -> NativeFabricResponse {
+        try await projectUsing(plan, preparation: preparation, io: io) { client, body, connection in
+            try await client.projectNativeFabric(plan, body: body, credentials: connection.credentials,
+                sessionCookie: connection.sessionCookie, ambulatoryId: preparation.ambulatoryId)
+        }
+    }
+    private static func projectUsing<Result>(_ plan: NativeOrdinaryProjectionPlan, preparation: NativeOrdinaryPreparation,
+                        io: NativeOrdinaryProjectionIO, client injectedClient: HomeBasePatientsClient? = nil,
+                        submit: (HomeBasePatientsClient, Data, ClinicalWorkspaceConnection) async throws -> Result) async throws -> Result {
         try plan.validate(preparation: preparation)
         let initial = try io.current(), identity = initial.identity
         guard let url = initial.serverURL, let pin = initial.tlsPin, !pin.isEmpty else { throw NativeOrdinaryContractError.invalid }
@@ -127,7 +142,6 @@ enum NativeOrdinaryProjectionClient {
         try Task.checkCancellation()
         // Return even a late response so the model can cancel its exact attempt before discarding it.
         // No response is published here; the model rechecks identity, generation and lock on return.
-        return try await client.projectNativeOrdinary(plan, body: body, credentials: submitting.credentials,
-            sessionCookie: submitting.sessionCookie, ambulatoryId: preparation.ambulatoryId)
+        return try await submit(client, body, submitting)
     }
 }

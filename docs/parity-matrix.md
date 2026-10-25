@@ -117,7 +117,7 @@ per la revisione e la superficie indicate, senza trasferirsi ad altri candidati.
 | Diario ed editor | Composizione, allegati e recupero bozza da provare | Interazione nel guest da provare | Ambiente assente | Client `b8eb2ed67`: rientri annidati, due allegati e titolo aggiornato da iPad visibili; host `9028b0772` | iPad simulato `b8eb2ed67`: Diario senza arresto, rientri visibili e modifica titolo salvata; versione 2 e due allegati riletti via HTTPS dall’host `9028b0772`. Altri flussi editor da provare; niente scritture offline |
 | Documenti e OCR | Percorso HTTP/UI completo da provare; composizione locale AnyDoc → Apple Vision riuscita su `b8eb2ed67` | OCR Tesseract e dipendenze guest da provare | Ambiente assente; Omarchy resta distinto | Upload di due file riuscito su `9028b0772`; nel client `b8eb2ed67` Documenti è disponibile subito senza cambio di sezione. OCR locale provato separatamente, senza UI | Upload multiplo integrato con #541; motore OCR sull'host, non sul dispositivo |
 | Repertori WHO, AIFA, esenzioni, protesica | Importazione, ricerca e aggiornamento da provare | Servizi e cataloghi locali al guest da provare | Ambiente assente | Lookup e flussi manuali presenti; amministrazione sull'host | Lookup paired e inserimento manuale; amministrazione sull'host |
-| Quattro esperienze AI / ChatGPT | Tre funzioni locali Ollama con almeno una preview HTTP riuscita sul candidato `c3ee6f5f1`; limiti Patient Insight descritti sotto. ChatGPT: accesso/catalogo riusciti, generazione bloccata dalla quota | Esecuzione locale ChatGPT non qualificata | Target ed esecuzione locale ChatGPT non qualificati | Quattro viste presenti; generazioni e revisione finale ancora da verificare | Quattro viste integrate con #541; esecuzione sull'host Mac, generazioni da mobile non provate |
+| Quattro esperienze AI / ChatGPT | Tre funzioni locali Ollama con almeno una preview HTTP riuscita sul candidato `c3ee6f5f1`; limiti Patient Insight descritti sotto. ChatGPT: accesso/catalogo riusciti, generazione bloccata dalla quota | Esecuzione locale ChatGPT non qualificata | Target ed esecuzione locale ChatGPT non qualificati | Quattro consumer ordinary presenti; WUL-794 aggiunge il percorso locale host. Prove sintetiche distinte da qualifica del modello e UI finale | Quattro viste integrate con #541; esecuzione sull'host Mac, generazioni da mobile non provate |
 | Conflitti, lock, backup e recupero | Ripristino sintetico locale provato su `b8eb2ed67`; conflitto, riavvio e recupero dal file tramite UI da provare | Supervisor canonico riuscito su `32437e7c5`: cinque operazioni, checkup, aggiornamento e audit, revoca e pulizia; dettagli sotto | Ambiente assente | Writer HTTP e lock presenti; recupero completo amministrato sull'host | Writer HTTP e cache cifrata read-only presenti; niente coda write offline; backup e recupero sull'host |
 
 Il contributo editor #544 aggiunge aumento e riduzione del rientro, elenchi
@@ -474,7 +474,7 @@ della release.
 | Viste globali | `MIXED` | agenda, diario globale, analytics e interazione macOS reale; router/deep-link source-present per la sessione ordinaria | apertura OS, focus, resize, VoiceOver e app-freeze proof della slice restano pending; cockpit sintetico partial |
 | Documenti | `PARTIAL` e policy-limited | upload cifrato, picker nativo singolo, archivio read, insight read, follow-up, allegati e stati web verificati | multi-file è differenza operativa; OCR, sintesi, curation e delete insight restano host per ADR 0076; UI/interop nativa pending |
 | Offline mobile | `PARTIAL` | lista e ultimo profilo in cache cifrata, TTL massimo 24h e renderer read-only source-present nel candidato WUL-676 | workflow offline ordinario e verifica UI/device del renderer integrato (`WUL-403`) |
-| AI generativa, Fabric e governance | `HOST-ONLY` | stato runtime/kill switch leggibile; registro Fabric read-only (16 capability, 4 venue, profili egress) e parliament/readiness del nodo host | ADR 0076 esclude l'invocazione AI paired; il registro e la governance descrivono il calcolo della macchina host, quindi non sono gap del client Apple |
+| AI generativa, Fabric e governance | `HOST-ONLY` | stato runtime/kill switch leggibile; registro Fabric read-only (16 capability, 4 venue, profili egress) e parliament/readiness del nodo host | ADR0076 ammette le sole quattro route ordinary/Fabric nominate; registro e governance amministrativa restano host-only. I quattro consumer Apple sono presenti; qualifica UI/runtime separata |
 | Backup, diagnostica, repertori, update | `HOST-ONLY` | gestiti dal nodo Mac autorevole | non sono gap di parity client |
 
 ## Wave completate
@@ -577,7 +577,7 @@ mancanza implicita del client.
 
 ### Fuori Wave 6
 
-- chat/generazione AI paired;
+- chat generica AI paired e scritture da proposte; le quattro funzioni ordinary/Fabric nominate sono l’eccezione ADR0076;
 - gestione modelli, registro Fabric, governance/rollout, backup, diagnostica e import repertori dal client;
 - hard delete remoto;
 - writeback SISS/FSE;
@@ -641,3 +641,29 @@ jq empty docs/apple-parity-matrix.json
 git diff --check
 rg --files -g '*.md' | sort
 ```
+
+
+## Funzioni Fabric sui client Apple — WUL-794, 25 ottobre 2026
+
+Patient Insight, Smart Import, Document Synthesis e Treatment Reasoning avevano
+quattro consumer Swift effettivi nella lane ChatGPT ordinary. Le vecchie righe
+che dichiaravano assente ogni superficie non descrivevano il codice corrente.
+Il candidato WUL-794 collega gli stessi quattro ingressi al percorso locale host,
+accanto alla scelta ChatGPT esplicita. L’host risolve la preferenza corrente nel
+proprio catalogo; il telefono non sceglie provider, modello libero o endpoint.
+
+Le route `network/ai/fabric/{prepare,project,generate,cancel,status}` riusano owner,
+fonti e proiezione ENC/AnyDoc originari. Preparazione e generazione sono separate;
+le proposte non salvano dati clinici. Configurazione variata, fonti non correnti,
+annullamento, sessione/scope cambiati e risposte tardive impediscono pubblicazione
+e riuso. La vista ritira il risultato quando il controllo corrente dell’host
+fallisce; non avvia alternative e non modifica appunti o dossier offline.
+
+Prove HTTP sintetiche attraversano i quattro owner originali, dispatch, parser e
+ricevute con fixture isolate. Readiness, risposte del trasporto locale e parser
+AnyDoc testo sono simulati: nessun modello o worker OCR reale è qualificato.
+Build iOS generica con Xcode 27.0 riuscita. Test Swift coprono DTO, client e stati
+locali; la prova UI iPhone/iPad integrata e la review indipendente appartengono al
+parent. Dispositivo fisico, modello reale e ammissione clinica restano non provati.
+I conteggi 66/30/13/23 della fotografia 0.8 rimangono storici e non misurano questo
+candidato; non sono una dichiarazione corrente di parità AI.

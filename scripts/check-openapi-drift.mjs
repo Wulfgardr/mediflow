@@ -9,6 +9,7 @@ import { validateTerritorialPackExamples } from './validate-territorial-openapi.
 const ROOT = process.cwd();
 const SPEC_PATH = 'docs/openapi/mediflow-v1.yaml';
 const NATIVE_SPEC_PATH = 'docs/openapi/native-ordinary-v1.json';
+const FABRIC_SPEC_PATH = 'docs/openapi/native-fabric-v1.json';
 const POLICY_PATH = 'docs/openapi/contract-policy.json';
 const TYPES_PATH = 'lib/api/v1/types.ts';
 const ROUTE_ROOT = 'app/api/v1';
@@ -174,7 +175,13 @@ function hasRecognizedApiV1AuthGuard(sourcePath, source) {
         && source.includes("import { handleNativeOrdinaryHttp } from '@/lib/chatgpt-product/native-ordinary-http'")
         && source.includes(`return handleNativeOrdinaryHttp(request, '${nativeOperation[0]}')`)
         && extractMethods(source).join(',') === nativeOperation[1];
-    return hasLocalTokenGuard || hasPairedClientGuard || hasNativeConfigurationGuard || hasNativeOrdinaryGuard
+    const fabricOperations = new Map([['prepare', 'POST'], ['project', 'POST,DELETE'], ['generate', 'POST'], ['cancel', 'POST'], ['status', 'GET']]);
+    const fabricOperation = [...fabricOperations].find(([operation]) => sourcePath === `app/api/v1/network/ai/fabric/${operation}/route.ts`);
+    const hasNativeFabricGuard = fabricOperation !== undefined
+        && source.includes("import { handleNativeFabricHttp } from '@/lib/chatgpt-product/native-fabric-http'")
+        && source.includes(`return handleNativeFabricHttp(request, '${fabricOperation[0]}')`)
+        && extractMethods(source).join(',') === fabricOperation[1];
+    return hasLocalTokenGuard || hasPairedClientGuard || hasNativeConfigurationGuard || hasNativeOrdinaryGuard || hasNativeFabricGuard
         || hasProfileFseAdmission(sourcePath, source) || hasScopedProfileAdmission(sourcePath, source);
 }
 
@@ -621,10 +628,10 @@ function serializeOperations(operations) {
 }
 
 // Additive namespace only. Conflicts or a supplement outside the named Mac lane fail closed.
-function mergeNativeSpec(main, native) {
+function mergeNativeSpec(main, native, namespace = '/api/v1/network/ai/chatgpt/ordinary/') {
     if (!native) return main;
     for (const key of Object.keys(native.paths ?? {})) {
-        if (!key.startsWith('/api/v1/network/ai/chatgpt/ordinary/') || main.paths?.[key]) throw new Error('Native OpenAPI namespace collision');
+        if (!key.startsWith(namespace) || main.paths?.[key]) throw new Error('Native OpenAPI namespace collision');
     }
     const components = { ...(main.components ?? {}) };
     for (const [section, values] of Object.entries(native.components ?? {})) {
@@ -639,7 +646,8 @@ function main() {
     const currentRoutes = buildCurrentRoutes();
     const currentMainSpec = loadYamlFile(SPEC_PATH);
     const currentNativeSpec = JSON.parse(fs.readFileSync(path.join(ROOT, NATIVE_SPEC_PATH), 'utf8'));
-    const currentSpec = mergeNativeSpec(currentMainSpec, currentNativeSpec);
+    const currentFabricSpec = JSON.parse(fs.readFileSync(path.join(ROOT, FABRIC_SPEC_PATH), 'utf8'));
+    const currentSpec = mergeNativeSpec(mergeNativeSpec(currentMainSpec, currentNativeSpec), currentFabricSpec, '/api/v1/network/ai/fabric/');
     const policy = JSON.parse(fs.readFileSync(path.join(ROOT, POLICY_PATH), 'utf8'));
     const documentedOperations = normalizeSpec(currentSpec);
     const { undocumented, overrides } = expandPolicy(policy);
@@ -673,7 +681,8 @@ function main() {
     const baseRoutes = buildRefRoutes(baseRef);
     const baseMainSpec = loadYamlFromRef(baseRef, SPEC_PATH);
     const baseNativeSpec = loadYamlFromRef(baseRef, NATIVE_SPEC_PATH);
-    const baseSpec = baseMainSpec ? mergeNativeSpec(baseMainSpec, baseNativeSpec) : null;
+    const baseFabricSpec = loadYamlFromRef(baseRef, FABRIC_SPEC_PATH);
+    const baseSpec = baseMainSpec ? mergeNativeSpec(mergeNativeSpec(baseMainSpec, baseNativeSpec), baseFabricSpec, '/api/v1/network/ai/fabric/') : null;
     const changedFiles = collectChangedFiles(baseRef);
     const semanticSpecChanged = baseSpec
         ? serializeOperations(normalizeSpec(baseSpec)) !== serializeOperations(documentedOperations)
@@ -687,7 +696,7 @@ function main() {
 
     if (baseRoutes) {
         const routeInventoryChanged = JSON.stringify([...baseRoutes.keys()].sort()) !== JSON.stringify([...currentRoutes.routes.keys()].sort());
-        if (routeInventoryChanged && !changedFiles.has(SPEC_PATH) && !changedFiles.has(NATIVE_SPEC_PATH) && !changedFiles.has(POLICY_PATH)) {
+        if (routeInventoryChanged && !changedFiles.has(SPEC_PATH) && !changedFiles.has(NATIVE_SPEC_PATH) && !changedFiles.has(FABRIC_SPEC_PATH) && !changedFiles.has(POLICY_PATH)) {
             errors.push('Route inventory changed without updating the OpenAPI spec or contract policy');
         }
     }
@@ -695,8 +704,10 @@ function main() {
     if (baseSpec && semanticSpecChanged) {
         const mainChanged = serializeOperations(normalizeSpec(baseMainSpec)) !== serializeOperations(normalizeSpec(currentMainSpec));
         const nativeChanged = !baseNativeSpec || serializeOperations(normalizeSpec(baseNativeSpec)) !== serializeOperations(normalizeSpec(currentNativeSpec));
+        const fabricChanged = !baseFabricSpec || serializeOperations(normalizeSpec(baseFabricSpec)) !== serializeOperations(normalizeSpec(currentFabricSpec));
         if ((mainChanged && (baseMainSpec.info?.version ?? null) === (currentMainSpec.info?.version ?? null))
-            || (nativeChanged && baseNativeSpec && baseNativeSpec.info?.version === currentNativeSpec.info?.version)) {
+            || (nativeChanged && baseNativeSpec && baseNativeSpec.info?.version === currentNativeSpec.info?.version)
+            || (fabricChanged && baseFabricSpec && baseFabricSpec.info?.version === currentFabricSpec.info?.version)) {
             errors.push(`OpenAPI contract changed but info.version stayed at ${currentSpec.info?.version}`);
         }
 
