@@ -202,6 +202,9 @@ struct PairedPatientsWorklistView: View {
     #endif
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showingCSVImport = false
+    @Environment(\.clinicalNavigationInteraction) private var navigationInteraction
+    @State private var navigationInteractionID = UUID()
+    @State var showingMobileVisit = false
     @ObservedObject var model: PairedPatientsWorkspaceModel
     @Binding var patientQuery: String
     @Binding var patientViewMode: PatientListViewMode
@@ -209,15 +212,87 @@ struct PairedPatientsWorklistView: View {
     // Compact navigation belongs to the workspace, not to a row.
     var onOpenPatient: ((HomeBasePatientSummary) -> Void)? = nil
 
+    private var mobileVisitPresentation: Binding<Bool> {
+        Binding(get: { showingMobileVisit }, set: { showingMobileVisit = $0
+            if !$0 { model.mobileVisit?.dismiss() }
+        })
+    }
+
     var body: some View {
-        platformWorklist
+        VStack(alignment: .leading, spacing: 12) {
+            #if os(iOS)
+            if !usesToolbarVisitAction {
+                mobileVisitAction
+                    .frame(minHeight: 44)
+                    .buttonStyle(.bordered)
+            }
+            #endif
+            platformWorklist
+        }
+            .sheet(isPresented: mobileVisitPresentation) {
+                if let coordinator = model.mobileVisit {
+                    NavigationStack {
+                        MobileVisitWorkspaceView(workspace: model, coordinator: coordinator) {
+                            mobileVisitPresentation.wrappedValue = false
+                            if let patient = model.patients.first(where: { $0.id == model.selectedPatient?.id }) { onOpenPatient?(patient) }
+                        }
+                        .navigationTitle("Visita senza rete")
+                        #if os(iOS)
+                        .navigationBarTitleDisplayMode(.inline)
+                        #endif
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Chiudi") { mobileVisitPresentation.wrappedValue = false }
+                                    .accessibilityIdentifier("mobile-visit-close")
+                            }
+                        }
+                    }
+                } else { Text("Archivio locale non disponibile: Application Support non accessibile.") }
+            }
             .sheet(isPresented: $showingCSVImport) {
                 if let csv = model.patientCSVImport {
                     PairedPatientCSVImportSheet(model: csv, startNew: { model.resetPatientCSVImport() })
                         .id(ObjectIdentifier(csv))
                 }
             }
+            #if os(iOS)
+            .toolbar {
+                if usesToolbarVisitAction {
+                    ToolbarItem(placement: .primaryAction) {
+                        Menu {
+                            mobileVisitAction
+                            if dynamicTypeSize.isAccessibilitySize {
+                                Divider()
+                                patientViewModePicker
+                                mobileResultCount
+                                csvImportAction
+                            }
+                        } label: {
+                            Label("Elenco", systemImage: "line.3.horizontal.decrease")
+                        }
+                        .accessibilityLabel("Azioni elenco pazienti")
+                        .accessibilityValue("\(filteredPatients.count) pazienti visibili nell’elenco caricato")
+                        .accessibilityIdentifier("patient-worklist-tools-menu")
+                    }
+                }
+            }
+            #endif
+            .onAppear {
+                navigationInteraction?.register(navigationInteractionID, { showingMobileVisit })
+            }
+            .onDisappear { navigationInteraction?.unregister(navigationInteractionID) }
     }
+
+    #if os(iOS)
+    private var usesToolbarVisitAction: Bool {
+        dynamicTypeSize.isAccessibilitySize || verticalSizeClass == .compact
+    }
+
+    private var mobileVisitAction: some View {
+        Button("Visita senza rete", systemImage: "note.text") { showingMobileVisit = true }
+            .accessibilityIdentifier("mobile-visit-entry")
+    }
+    #endif
 
     @ViewBuilder
     private var platformWorklist: some View {
@@ -250,7 +325,7 @@ struct PairedPatientsWorklistView: View {
         // the list as a stack of loose cards instead of one list.
         VStack(alignment: .leading, spacing: Self.mobileStackSpacing) {
             // A named collection, followed directly by its filters and rows.
-            if verticalSizeClass != .compact {
+            if verticalSizeClass != .compact && !dynamicTypeSize.isAccessibilitySize {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Pazienti")
                         .inkVoice(26)
@@ -259,7 +334,7 @@ struct PairedPatientsWorklistView: View {
                     mobileResultCount
                 }
             }
-            if !usesCompactWorklistControls {
+            if !usesCompactWorklistControls && !dynamicTypeSize.isAccessibilitySize {
                 csvImportAction
             }
             worklistContent
@@ -387,7 +462,7 @@ struct PairedPatientsWorklistView: View {
             // macOS hoists the filters above the list, so the column keeps them
             // in place while the list scrolls.
             #if !os(macOS)
-            mobileWorklistControls
+            if !dynamicTypeSize.isAccessibilitySize { mobileWorklistControls }
             #endif
             let results = filteredPatients
             if results.isEmpty {
@@ -783,7 +858,7 @@ struct PairedPatientsWorklistView: View {
         HStack(spacing: 12) {
             patientViewModePicker
                 .frame(maxWidth: .infinity, alignment: .leading)
-            if verticalSizeClass == .compact { mobileResultCount }
+            if verticalSizeClass == .compact || dynamicTypeSize.isAccessibilitySize { mobileResultCount }
         }
         #endif
     }
