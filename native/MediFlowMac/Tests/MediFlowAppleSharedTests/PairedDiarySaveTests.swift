@@ -268,10 +268,220 @@ final class PairedDiarySaveTests: XCTestCase {
     }
 
     @MainActor
-    private func harness() throws -> (PairedPatientsWorkspaceModel, DiarySaveTransport) {
+    private func mobileScenario() async throws -> (PairedPatientsWorkspaceModel, DiarySaveTransport, UUID) {
+        let (model, transport) = try harness(mobile: true)
+        let coordinator = try XCTUnwrap(model.mobileVisit)
+        await coordinator.prepare()
+        let id = try XCTUnwrap(coordinator.vault.selected?.id)
+        coordinator.vault.saveNote("Appunto clinico sintetico durevole")
+        coordinator.requestOnlineReview(id)
+        XCTAssertFalse(coordinator.vault.isUnlocked)
+        model.password = transport.legacyPasscode
+        await coordinator.authenticateAndReview()
+        XCTAssertNotNil(coordinator.vault.onlineReview, coordinator.message ?? coordinator.vault.errorMessage ?? "Review assente")
+        await coordinator.importNote(confirmed: true)
+        XCTAssertNotNil(model.mobileVisitDraft, coordinator.vault.errorMessage ?? "Import assente")
+        return (model, transport, id)
+    }
+
+    @MainActor
+    func testMobileVisitRealLoginUnlockReviewImportAndOrdinaryReceipt() async throws {
+        let (model, transport, id) = try await mobileScenario()
+        XCTAssertTrue(model.newEntryEditorDocument.renderedHTML.contains("Appunto clinico sintetico durevole"))
+        XCTAssertEqual(model.activePatientSection, .diary)
+        XCTAssertEqual(transport.entryCreates.count, 0)
+        let binding = try XCTUnwrap(model.mobileVisitDraft)
+        await model.createEntryForSelectedPatient()
+        XCTAssertEqual(transport.entryCreates.count, 1)
+        let registration = try model.mobileVisit!.vault.registration(for: binding)
+        XCTAssertEqual(registration.phase, .registered)
+        XCTAssertEqual(registration.entryID, try json(transport.entryCreates[0])["id"] as? String)
+        XCTAssertEqual(registration.acknowledgedVersion, 1)
+        XCTAssertNotNil(registration.confirmedAt)
+        XCTAssertEqual(model.mobileVisit!.vault.retainedNotes.first(where: { $0.id == id })?.revision, binding.revision)
+        XCTAssertNil(model.mobileVisitDraft)
+        XCTAssertThrowsError(try model.mobileVisit!.vault.prepareImport(recordID: id))
+        await model.createEntryForSelectedPatient()
+        XCTAssertEqual(transport.entryCreates.count, 1)
+        XCTAssertEqual(transport.requests.filter { $0.request.url?.path == "/api/auth/native/login" }.count, 1,
+            "Import and Registra reuse the newly authenticated session.")
+    }
+
+    @MainActor
+    func testMobileVisitLostAckRestartReconcilesExactIDWithoutNewCreate() async throws {
+        let (model, transport, id) = try await mobileScenario()
+        let binding = try XCTUnwrap(model.mobileVisitDraft)
+        transport.loseNextCreateAcknowledgement = true
+        await model.createEntryForSelectedPatient()
+        XCTAssertFalse(model.canCreateEntry)
+        XCTAssertEqual(try model.mobileVisit!.vault.registration(for: binding).phase, .uncertain)
+        await model.createEntryForSelectedPatient()
+        XCTAssertEqual(transport.entryCreates.count, 1)
+        model.mobileVisit?.lock()
+        let (restarted, _) = try harness(mobile: true, using: transport)
+        let coordinator = try XCTUnwrap(restarted.mobileVisit)
+        coordinator.requestOnlineReview(id)
+        restarted.password = transport.legacyPasscode
+        await coordinator.authenticateAndReview()
+        await coordinator.reconcile(id)
+        XCTAssertEqual(try coordinator.vault.registration(for: binding).phase, .registered)
+        XCTAssertEqual(transport.entryCreates.count, 1)
+        XCTAssertTrue(transport.requests.contains { $0.request.url?.lastPathComponent == binding.entryID && $0.request.httpMethod == "GET" })
+    }
+
+    @MainActor
+    func testMobileVisitConfirmedAbsenceAllowsOnlyExplicitIdenticalPayloadRetry() async throws {
+        let (model, transport, id) = try await mobileScenario()
+        transport.writeStatus = 503
+        await model.createEntryForSelectedPatient()
+        XCTAssertFalse(model.canCreateEntry)
+        transport.writeStatus = nil
+        await model.mobileVisit!.reconcile(id)
+        XCTAssertEqual(transport.entryCreates.count, 1, "404 reconciliation itself cannot write")
+        XCTAssertTrue(model.canCreateEntry)
+        await model.createEntryForSelectedPatient()
+        XCTAssertEqual(transport.entryCreates.count, 2)
+        XCTAssertEqual(try json(transport.entryCreates[0]) as NSDictionary, try json(transport.entryCreates[1]) as NSDictionary,
+            "ID, timestamp and every sealed field must stay byte-identical.")
+        XCTAssertNil(model.mobileVisitDraft)
+    }
+
+    @MainActor
+    func testMobileVisitWrongPatientOrChangedReadbackCannotConfirmOrRetry() async throws {
+        for mutation in ["patient", "content", "version"] {
+            let (model, transport, id) = try await mobileScenario()
+            let binding = try XCTUnwrap(model.mobileVisitDraft)
+            let started = transport.holdNext(method: "GET", suffix: "/entries/" + binding.entryID)
+            let saving = Task { await model.createEntryForSelectedPatient() }
+            await fulfillment(of: [started], timeout: 3)
+            let sent = try XCTUnwrap(transport.entries.first)
+            transport.entries = [DiaryFixture.entry(id: sent.id,
+                version: mutation == "version" ? sent.version + 1 : sent.version,
+                content: mutation == "content" ? "Contenuto successivo non riconciliato" : sent.content,
+                title: sent.title, type: sent.type, attachments: sent.attachments,
+                date: sent.date, patientID: mutation == "patient" ? "another-patient" : sent.patientId)]
+            transport.release()
+            await saving.value
+            await model.mobileVisit!.reconcile(id)
+            XCTAssertEqual(try model.mobileVisit!.vault.registration(for: binding).phase, .uncertain)
+            XCTAssertFalse(model.canCreateEntry)
+            await model.createEntryForSelectedPatient()
+            XCTAssertEqual(transport.entryCreates.count, 1)
+        }
+    }
+
+    @MainActor
+    func testMobileVisitNoteRevisionAndWrongContextCannotWrite() async throws {
+        let (model, transport, id) = try await mobileScenario()
+        let binding = try XCTUnwrap(model.mobileVisitDraft)
+        model.mobileVisit!.vault.open(id)
+        model.mobileVisit!.vault.saveNote("Correzione locale successiva all’importazione")
+        await model.createEntryForSelectedPatient()
+        XCTAssertEqual(transport.entryCreates.count, 0)
+        XCTAssertEqual(try model.mobileVisit!.vault.registration(for: binding).phase, .draft)
+        model.ambulatoryId = "scope-b"
+        XCTAssertNil(model.mobileVisitDraft)
+        XCTAssertEqual(model.newEntryEditorDocument.blocks.count, 0)
+        await model.createEntryForSelectedPatient()
+        XCTAssertEqual(transport.entryCreates.count, 0)
+    }
+
+    @MainActor
+    func testMobileVisitLateAckAfterScopeChangeRemainsUncertainAndCannotClearNewContext() async throws {
+        let (model, transport, id) = try await mobileScenario()
+        let binding = try XCTUnwrap(model.mobileVisitDraft)
+        let started = transport.holdNext(method: "POST", suffix: "/entries")
+        let saving = Task { await model.createEntryForSelectedPatient() }
+        await fulfillment(of: [started], timeout: 3)
+        model.ambulatoryId = "scope-b"
+        transport.release()
+        await saving.value
+        XCTAssertNil(model.mobileVisitDraft)
+        XCTAssertEqual(transport.entryCreates.count, 1)
+        await model.mobileVisit!.vault.unlock()
+        XCTAssertEqual(try model.mobileVisit!.vault.registration(for: binding).phase, .uncertain)
+        XCTAssertTrue(model.mobileVisit!.vault.retainedNoteIDs.contains(id))
+    }
+
+    @MainActor
+    func testMobileVisitModifiedAfterUnknownCannotAllocateAnotherIDBeforeReconciliation() async throws {
+        let (model, transport, id) = try await mobileScenario()
+        let original = try XCTUnwrap(model.mobileVisitDraft)
+        transport.loseNextCreateAcknowledgement = true
+        await model.createEntryForSelectedPatient()
+        let vault = model.mobileVisit!.vault
+        vault.open(id)
+        vault.saveNote("Versione locale successiva, non ancora inviata")
+        XCTAssertThrowsError(try vault.prepareImport(recordID: id))
+        await model.mobileVisit!.reconcile(id)
+        XCTAssertEqual(try vault.registration(for: original).phase, .registered)
+        let next = try vault.prepareImport(recordID: id)
+        XCTAssertNotEqual(next.entryID, original.entryID)
+        XCTAssertGreaterThan(next.revision, original.revision)
+        XCTAssertEqual(transport.entryCreates.count, 1)
+    }
+
+    @MainActor
+    func testMobileVisitReceiptPersistenceFailureRetainsNoteAndBlocksAnotherSend() async throws {
+        let failure = DiaryMobilePersistenceFailure()
+        let (model, transport) = try harness(mobile: true, persistenceFailure: failure)
+        let coordinator = try XCTUnwrap(model.mobileVisit)
+        await coordinator.prepare()
+        let id = try XCTUnwrap(coordinator.vault.selected?.id)
+        coordinator.vault.saveNote("Conservare anche se la ricevuta non è salvabile")
+        coordinator.requestOnlineReview(id)
+        model.password = transport.legacyPasscode
+        await coordinator.authenticateAndReview()
+        await coordinator.importNote(confirmed: true)
+        let binding = try XCTUnwrap(model.mobileVisitDraft)
+        let started = transport.holdNext(method: "GET", suffix: "/entries/" + binding.entryID)
+        let save = Task { await model.createEntryForSelectedPatient() }
+        await fulfillment(of: [started], timeout: 3)
+        failure.fail = true
+        transport.release()
+        await save.value
+        XCTAssertEqual(try coordinator.vault.registration(for: binding).phase, .uncertain)
+        XCTAssertFalse(model.canCreateEntry)
+        XCTAssertEqual(transport.entryCreates.count, 1)
+        coordinator.vault.open(id)
+        XCTAssertEqual(coordinator.vault.noteText, "Conservare anche se la ricevuta non è salvabile")
+        XCTAssertNil(coordinator.vault.selected, "A failed read watermark cannot authorize dossier presentation")
+        await model.createEntryForSelectedPatient()
+        XCTAssertEqual(transport.entryCreates.count, 1)
+    }
+
+    @MainActor
+    func testMobileVisitAuthenticationCancelledByBackgroundCannotPublishLateSession() async throws {
+        let (model, transport) = try harness(mobile: true)
+        let coordinator = try XCTUnwrap(model.mobileVisit)
+        await coordinator.prepare()
+        let id = try XCTUnwrap(coordinator.vault.selected?.id)
+        coordinator.vault.saveNote("Nota conservata durante l’accesso interrotto")
+        coordinator.requestOnlineReview(id)
+        model.password = transport.legacyPasscode
+        let started = transport.holdNext(method: "POST", suffix: "/api/auth/native/login")
+        let login = Task { await coordinator.authenticateAndReview() }
+        await fulfillment(of: [started], timeout: 3)
+        coordinator.lock()
+        transport.release()
+        await login.value
+        XCTAssertFalse(coordinator.vault.isUnlocked)
+        XCTAssertNil(coordinator.vault.onlineReview)
+        XCTAssertNil(model.operatorIdentity)
+        XCTAssertEqual(model.connectionState, .sessionExpired)
+        XCTAssertEqual(model.password, "")
+        XCTAssertEqual(transport.entryCreates.count, 0)
+        await coordinator.vault.unlock()
+        coordinator.vault.open(id)
+        XCTAssertEqual(coordinator.vault.noteText, "Nota conservata durante l’accesso interrotto")
+    }
+
+    @MainActor
+    private func harness(mobile: Bool = false, using existing: DiarySaveTransport? = nil, persistenceFailure: DiaryMobilePersistenceFailure? = nil) throws -> (PairedPatientsWorkspaceModel, DiarySaveTransport) {
         let id = UUID().uuidString.lowercased()
-        let transport = DiarySaveTransport()
-        let endpoint = DiarySaveURLProtocol.register(transport)
+        let transport = existing ?? DiarySaveTransport()
+        let endpoint = transport.endpoint ?? DiarySaveURLProtocol.register(transport)
+        transport.endpoint = endpoint
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpShouldSetCookies = false
         configuration.protocolClasses = [DiarySaveURLProtocol.self]
@@ -283,7 +493,16 @@ final class PairedDiarySaveTests: XCTestCase {
             keychainReader: { _, _ in .success(nil) }, keychainWriter: { _, _, _ in .success(()) },
             keychainDeleter: { _, _ in .success(()) })
         let cache = HomeBasePatientCacheStore(cacheDirectory: directory, keyProvider: { DiaryFixture.key })
-        let model = PairedPatientsWorkspaceModel(pairedStore: store, cacheStore: cache, dataSourceFactory: { _ in source })
+        let mobileDirectory = transport.mobileDirectory ?? directory.appendingPathComponent("visit")
+        transport.mobileDirectory = mobileDirectory
+        let model = PairedPatientsWorkspaceModel(pairedStore: store, cacheStore: cache, dataSourceFactory: { _ in source },
+            mobileVisitStore: mobile ? MobileVisitStore(directory: mobileDirectory, afterSave: { url in
+                try MobileVisitStore.protect(url)
+                if persistenceFailure?.fail == true { throw MobileVisitError.storage }
+            }) : nil,
+            mobileVisitUnlocker: mobile ? DiaryMobileUnlock() : nil)
+        model.mobileVisitClientFactory = { source }
+        if mobile { model.tlsPin = String(repeating: "a", count: 64) }
         model.serverURL = endpoint.absoluteString
         model.ambulatoryId = "scope-a"
         model.configurePairedOnlineForTests(
@@ -322,9 +541,9 @@ private enum DiaryFixture {
     static func entry(id: String = "entry-a", version: Int = 1,
                       content: String = "<p>Voce <strong>sintetica</strong> iniziale</p>",
                       title: String = "Titolo sintetico", type: String = "note", attachments: String? = nil,
-                      deletedAt: Date? = nil) -> HomeBaseEntrySummary {
-        .init(id: id, patientId: "patient-a", type: type, title: title,
-              date: Date(timeIntervalSince1970: 1), content: content, setting: nil, metadata: nil,
+                      deletedAt: Date? = nil, date: Date = Date(timeIntervalSince1970: 1), patientID: String = "patient-a") -> HomeBaseEntrySummary {
+        .init(id: id, patientId: patientID, type: type, title: title,
+              date: date, content: content, setting: nil, metadata: nil,
               attachments: attachments, deletedAt: deletedAt, deletionReason: nil, version: version, createdAt: nil, updatedAt: nil)
     }
 }
@@ -336,8 +555,14 @@ private struct DiaryCapturedRequest {
 
 private final class DiarySaveTransport: @unchecked Sendable {
     private let lock = NSLock()
+    var endpoint: URL?
+    var mobileDirectory: URL?
+    let legacyPasscode = String(Int.random(in: 1000...9999))
+    var loseNextCreateAcknowledgement = false
+    private var loginCounter = 0
     private var captured: [DiaryCapturedRequest] = []
     var requests: [DiaryCapturedRequest] { lock.withLock { captured } }
+    var entryCreates: [DiaryCapturedRequest] { requests.filter { $0.request.httpMethod == "POST" && $0.request.url?.path.hasSuffix("/entries") == true } }
     var writes: [DiaryCapturedRequest] { requests.filter { ["POST", "PUT"].contains($0.request.httpMethod ?? "") } }
     private var rows = [DiaryFixture.entry()]
     var entries: [HomeBaseEntrySummary] {
@@ -391,10 +616,40 @@ private final class DiarySaveTransport: @unchecked Sendable {
         }
         do {
             let encoder = JSONEncoder()
-            encoder.dateEncodingStrategy = .iso8601
+            encoder.dateEncodingStrategy = .custom { date, encoder in
+                var box = encoder.singleValueContainer()
+                let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                try box.encode(formatter.string(from: date))
+            }
             let path = request.request.url?.path ?? ""
             let data: Data
-            if isWrite {
+            if path == "/api/auth/check" {
+                data = Data(#"{"status":"ok","isSetup":true,"unlock":{"credential":"pin"}}"#.utf8)
+            } else if path == "/api/auth/native/login" {
+                loginCounter += 1
+                let salt = Data(repeating: 8, count: 16)
+                let wrapped = CryptoService.wrapMasterKeyVersioned(DiaryFixture.key, pin: legacyPasscode, salt: salt, version: 2)!
+                data = try JSONSerialization.data(withJSONObject: ["success": true, "id": "operator-synthetic", "username": "synthetic",
+                    "encryptedMasterKey": wrapped, "salt": salt.base64EncodedString()])
+                request.complete(status: 200, data: data, cookie: "mediflow_session=diary-fresh-\(loginCounter); Path=/; Secure; HttpOnly")
+                return
+            } else if path == "/api/auth/profile" {
+                data = Data(#"{"operation":"account-profile.read.v1","contractVersion":1,"userId":"operator-synthetic","username":"synthetic","displayName":null,"ambulatoryName":null,"profileVersion":"v1","archiveGeneration":"archive-a"}"#.utf8)
+            } else if path.hasSuffix("/identity") {
+                data = Data(#"{"identityModel":"paired","pairingBoundary":"separate","credentialState":"session-bound","loginMode":"explicit","operator":{"userId":"operator-synthetic","role":"admin","authChannel":"paired-native"},"scope":{"policy":"session-context","effectiveAmbulatoryId":"scope-a","source":"session-context"},"audit":{"actorType":"user","actorBinding":"session-user"},"limitations":[]}"#.utf8)
+            } else if path.hasSuffix("/capabilities") {
+                data = try JSONSerialization.data(withJSONObject: ["nodeId": "node-a", "operatingMode": "network-home-base", "protocolVersion": "1",
+                    "capabilities": ["network.replica.readonly-patients", "network.replica.write-clinical-diary"].map {
+                        ["key": $0, "status": "available", "requiresPairing": true, "description": "synthetic"] as [String: Any] }])
+            } else if path.hasSuffix("/patients") {
+                data = try encoder.encode([HomeBasePatientSummary(id: "patient-a", firstName: "Paziente", lastName: "Sintetico", birthDate: nil,
+                    taxCode: "SYNTHETIC", isAdi: false, isArchived: false, version: 1, updatedAt: nil)])
+            } else if !isWrite && path.contains("/entries/") {
+                guard let entry = entries.first(where: { $0.id == request.request.url?.lastPathComponent }) else {
+                    request.complete(status: 404, data: Data()); return
+                }
+                data = try encoder.encode(entry)
+            } else if isWrite {
                 let body = try JSONSerialization.jsonObject(with: request.body) as! [String: Any]
                 let existing = entries.first ?? DiaryFixture.entry()
                 let id = method == "POST" ? (body["id"] as! String) : existing.id
@@ -402,7 +657,13 @@ private final class DiarySaveTransport: @unchecked Sendable {
                     content: body["content"] as? String ?? existing.content,
                     title: body["title"] as? String ?? existing.title,
                     type: body["type"] as? String ?? existing.type,
-                    attachments: body["attachments"] as? String ?? existing.attachments)]
+                    attachments: body["attachments"] as? String ?? existing.attachments,
+                    date: Self.date(body["date"] as? String) ?? existing.date)]
+                if method == "POST", loseNextCreateAcknowledgement {
+                    loseNextCreateAcknowledgement = false
+                    request.client?.urlProtocol(request, didFailWithError: URLError(.networkConnectionLost))
+                    return
+                }
                 let acknowledgement: [String: Any] = method == "POST" ? ["id": id, "version": 1] : ["success": true]
                 data = try JSONSerialization.data(withJSONObject: acknowledgement)
             } else if path.hasSuffix("/patients/patient-a") {
@@ -413,6 +674,14 @@ private final class DiarySaveTransport: @unchecked Sendable {
             request.complete(status: 200, data: data)
         } catch { request.client?.urlProtocol(request, didFailWithError: error) }
     }
+
+    private static func date(_ value: String?) -> Date? {
+        guard let value else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+    }
+
 }
 
 private final class DiarySaveURLProtocol: URLProtocol, @unchecked Sendable {
@@ -457,11 +726,19 @@ private final class DiarySaveURLProtocol: URLProtocol, @unchecked Sendable {
         transport.start(self)
     }
     override func stopLoading() {}
-    func complete(status: Int, data: Data) {
+    func complete(status: Int, data: Data, cookie: String? = nil) {
         let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil,
-                                      headerFields: ["Content-Type": "application/json"])!
+                                      headerFields: ["Content-Type": "application/json"].merging(cookie.map { ["Set-Cookie": $0] } ?? [:]) { _, new in new })!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: data)
         client?.urlProtocolDidFinishLoading(self)
     }
 }
+
+@MainActor
+private final class DiaryMobileUnlock: MobileVisitUnlocking {
+    func unlock(createIfMissing: Bool) async throws -> SymmetricKey { DiaryFixture.key }
+    func invalidate() {}
+}
+
+private final class DiaryMobilePersistenceFailure { var fail = false }

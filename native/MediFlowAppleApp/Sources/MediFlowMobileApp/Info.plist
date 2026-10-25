@@ -39,6 +39,8 @@
 	<array>
 		<string>_mediflow-homebase._tcp</string>
 	</array>
+	<key>NSFaceIDUsageDescription</key>
+	<string>MediFlow usa Face ID per aprire sul dispositivo i dossier visita e gli appunti cifrati.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>MediFlow cerca il tuo home-base sulla rete locale per collegarsi in modo paired e cifrato.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

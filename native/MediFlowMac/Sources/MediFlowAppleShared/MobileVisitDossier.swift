@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import MediFlowCore
 
 struct MobileVisitContext: Codable, Equatable, Sendable {
     let serverURL: String
@@ -63,6 +64,7 @@ struct MobileVisitNote: Codable, Equatable, Sendable {
     var text: String
     var revision: Int
     var updatedAt: Date
+    var patientLabel: String? = nil
 }
 
 struct MobileVisitRecord: Codable, Equatable, Identifiable, Sendable {
@@ -70,23 +72,56 @@ struct MobileVisitRecord: Codable, Equatable, Identifiable, Sendable {
     var note: MobileVisitNote
     let preparationLoginDigest: Data
     var lastOpenedAt: Date
+    var registrations: [MobileVisitRegistration]? = nil
     var id: UUID { dossier.id }
 }
 
 enum MobileVisitError: Error, LocalizedError, Equatable {
-    case denied, invalidContext, expired, corrupt, storage, locked, changed, occupied, tooLarge
+    case denied, invalidContext, expired, corrupt, storage, locked, changed, occupied, tooLarge, pendingRegistration, alreadyRegistered
 
     var errorDescription: String? {
         switch self {
         case .denied: return "Accesso negato. Verifica autenticazione e autorizzazioni."
-        case .invalidContext: return "Archivio, paziente o contesto non corrispondenti. Riaccedi online."
-        case .expired: return "Dossier scaduto o orologio incoerente. L’appunto resta cifrato: riaccedi online per recuperarlo."
+        case .invalidContext: return "Archivio, paziente, operatore o ambulatorio non corrispondenti. Riaccedi online."
+        case .expired: return "Dossier scaduto o orologio incoerente. Puoi aprire il tuo appunto con l’autenticazione del dispositivo."
         case .corrupt: return "Archivio locale non leggibile. I file conservati non vengono sostituiti."
         case .storage: return "Salvataggio cifrato non riuscito. La modifica non è stata accettata."
         case .locked: return "Sblocca il dossier con l’autenticazione del dispositivo."
-        case .changed: return "Le fonti sono cambiate. Rileggi il dossier aggiornato prima di importare l’appunto."
-        case .occupied: return "Il compositore contiene già una bozza. Conservala prima di importare l’appunto."
+        case .changed: return "L’appunto o le fonti sono cambiati. Rileggi e confronta le versioni prima di procedere."
+        case .occupied: return "La nuova voce del diario contiene già una bozza. Conservala prima di importare l’appunto."
+        case .pendingRegistration: return "Un invio precedente ha esito incerto. Verifica online quella ricevuta prima di importare un’altra revisione."
+        case .alreadyRegistered: return "Questa revisione ha già una ricevuta confermata. La copia dell’appunto resta conservata."
         case .tooLarge: return "Appunto troppo lungo (massimo 100.000 caratteri)."
         }
     }
+}
+
+struct MobileVisitRegistration: Codable, Equatable, Sendable {
+    enum Phase: String, Codable { case draft, uncertain, registered }
+    let entryID: String
+    let noteRevision: Int
+    var phase: Phase
+    var payload: MobileVisitEntryPayload?
+    var composerDigest: Data?
+    var acknowledgedVersion: Int?
+    var confirmedAt: Date?
+}
+
+struct MobileVisitImport: Equatable {
+    let recordID: UUID
+    let noteID: UUID
+    let revision: Int
+    let entryID: String
+    let context: MobileVisitContext
+    let text: String
+}
+
+struct MobileVisitRetainedNote: Identifiable, Equatable {
+    let id: UUID
+    let label: String
+    let context: MobileVisitContext
+    let revision: Int
+    let updatedAt: Date
+    let dossierExpired: Bool
+    let registrations: [MobileVisitRegistration]
 }
