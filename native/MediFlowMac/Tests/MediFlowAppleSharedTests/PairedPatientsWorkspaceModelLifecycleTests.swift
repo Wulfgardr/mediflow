@@ -699,9 +699,97 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertFalse(locked.2); XCTAssertTrue(locked.3)
     }
 
-    func testNativeConfigurationConnectionNeedsLoginButNotPatientReadAndClearsOnLock() async {
+    func testLoginLoadsArchiveBeforeReportingOnline() async {
+        let source = LifecycleMockDataSource(summaries: [summary(id: "synthetic-p1", archived: false, version: 1)])
+        let model = await makeModel(source: source)
+        await MainActor.run {
+            model.password = String(repeating: "2", count: 4); model.pairedClientId = "synthetic-client"; model.pairedClientToken = "synthetic-token"
+        }
+        await model.login()
+        await MainActor.run {
+            XCTAssertEqual(model.connectionState, .pairedOnline)
+            XCTAssertEqual(model.patients.map(\.id), ["synthetic-p1"])
+            XCTAssertNil(model.errorMessage)
+        }
+        let requests = await source.includeDiagnosesRequests
+        XCTAssertEqual(requests, [true])
+    }
+
+    func testLoginReadFailuresNeverReportEmptyArchiveOrOnlineSuccess() async {
+        let failures: [HomeBaseClientError] = [.httpStatus(401, "expired"), .httpStatus(403, "denied"),
+            .transport(.tlsHandshakeFailed), .httpStatus(503, "archive unavailable"), .contract]
+        for failure in failures {
+            let source = LifecycleMockDataSource(createListError: failure)
+            let model = await makeModel(source: source)
+            await MainActor.run {
+                model.password = String(repeating: "2", count: 4); model.pairedClientId = "synthetic-client"; model.pairedClientToken = "synthetic-token"
+            }
+            await model.login()
+            await MainActor.run {
+                XCTAssertNotEqual(model.connectionState, .pairedOnline)
+                XCTAssertNotEqual(model.connectionState, .cached)
+                XCTAssertEqual(model.errorMessage, failure.localizedDescription)
+                XCTAssertFalse(model.statusMessage?.contains("Nessun paziente") == true)
+                XCTAssertTrue(model.patients.isEmpty)
+                XCTAssertNil(model.cacheMetadata)
+            }
+            let requests = await source.includeDiagnosesRequests
+            XCTAssertEqual(requests, [true])
+        }
+    }
+
+    func testLoginDeniedDoesNotReadArchive() async {
+        for failure: HomeBaseClientError in [.httpStatus(401, "denied"), .transport(.tlsHandshakeFailed)] {
+            let source = LifecycleMockDataSource(loginErrors: [failure])
+            let model = await makeModel(source: source)
+            await MainActor.run {
+                model.password = String(repeating: "2", count: 4); model.pairedClientId = "synthetic-client"; model.pairedClientToken = "synthetic-token"
+            }
+            await model.login()
+            let requests = await source.includeDiagnosesRequests
+            XCTAssertTrue(requests.isEmpty)
+            let error = await model.errorMessage
+            XCTAssertEqual(error, failure.localizedDescription)
+        }
+    }
+
+    func testLatePostLoginReadCannotPublishAfterLockOrContextChange() async {
+        for contextChange in ["lock", "host", "scope"] {
+            for failure: HomeBaseClientError? in [nil, .httpStatus(401, "stale") , .transport(.tlsHandshakeFailed)] {
+                let gate = LifecycleLoadGate(["create-list"])
+                let source = LifecycleMockDataSource(
+                    summaries: [summary(id: "synthetic-late", archived: false, version: 1)],
+                    createListError: failure, loadGate: gate)
+                let model = await makeModel(source: source)
+                await MainActor.run {
+                    model.password = String(repeating: "2", count: 4); model.pairedClientId = "synthetic-client"; model.pairedClientToken = "synthetic-token"
+                }
+                let login = Task { await model.login() }
+                await gate.wait(for: "create-list")
+                await MainActor.run {
+                    XCTAssertNotEqual(model.connectionState, .pairedOnline, "Authentication alone does not prove a read")
+                }
+                if contextChange == "host" { await MainActor.run { model.serverURL = "https://localhost:3444" } }
+                else if contextChange == "scope" { await MainActor.run { model.ambulatoryId = "synthetic-replacement-scope" } }
+                else { await model.lockSessionNow() }
+                let retired = await MainActor.run { (model.connectionState, model.statusMessage, model.errorMessage) }
+                await gate.release("create-list")
+                await login.value
+                await MainActor.run {
+                    XCTAssertEqual(model.connectionState, retired.0)
+                    XCTAssertEqual(model.statusMessage, retired.1)
+                    XCTAssertEqual(model.errorMessage, retired.2)
+                    XCTAssertTrue(model.patients.isEmpty)
+                    if contextChange != "scope" { XCTAssertNil(model.operatorIdentity) }
+                }
+            }
+        }
+    }
+
+    func testNativeConfigurationConnectionSurvivesPatientReadFailureAndClearsOnLock() async {
         let source = LifecycleMockDataSource(loginResult: HomeBaseLoginResult(
-            sessionCookie: "mediflow_session=synthetic-native", encryptedMasterKey: nil, salt: nil, id: "synthetic-admin"))
+            sessionCookie: "mediflow_session=synthetic-native", encryptedMasterKey: nil, salt: nil, id: "synthetic-admin"),
+            createListError: .contract)
         let model = await makeModel(source: source)
         await MainActor.run {
             XCTAssertNil(model.nativeOperatorConnection)
