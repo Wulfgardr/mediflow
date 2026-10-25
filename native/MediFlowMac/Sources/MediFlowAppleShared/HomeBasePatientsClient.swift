@@ -103,6 +103,9 @@ public actor HomeBasePatientsClient {
         let checkURL = try configuration.serverURL().appendingPathComponent("api/auth/check")
         let (checkData, _) = try await send(to: checkURL,
             headers: ["Cache-Control": "no-store"], includesSourceSurface: false)
+        if let failure = try? JSONDecoder().decode(AuthHealthFailure.self, from: checkData), failure.status == "error" {
+            throw HomeBaseClientError.httpStatus(503, failure.publicMessage)
+        }
         let check = try decode(AuthUnlockCheck.self, from: checkData)
         guard check.status == "ok", check.isSetup, let parameters = check.unlock else { throw HomeBaseClientError.contract }
         let material: CryptoService.UnlockMaterial?
@@ -1529,6 +1532,11 @@ public actor HomeBasePatientsClient {
                 throw HomeBaseClientError.contract
             }
             guard 200..<300 ~= httpResponse.statusCode else {
+                if url == (try? configuration.serverURL().appendingPathComponent("api/auth/check")) {
+                    let failure = try? JSONDecoder().decode(AuthHealthFailure.self, from: data)
+                    throw HomeBaseClientError.httpStatus(httpResponse.statusCode,
+                        failure?.publicMessage ?? AuthHealthFailure.unavailableMessage)
+                }
                 // Only this exact native operation may preserve a pending device login.
                 if method == "POST", url.path == "/api/v1/network/ai/chatgpt/ordinary/login/complete",
                    httpResponse.statusCode == 503,
@@ -1662,6 +1670,34 @@ private struct AuthLoginRequest: Encodable {
     let username: String?
     var password: String? = nil
     var verifier: String? = nil
+}
+
+private struct AuthHealthFailure: Decodable {
+    let status: String
+    let error: Diagnostic
+
+    struct Diagnostic: Decodable {
+        let code: String
+    }
+
+    static let unavailableMessage = "Il servizio di accesso sul Mac non è disponibile. Verifica MediFlow sul Mac e riprova."
+
+    var publicMessage: String {
+        switch error.code {
+        case "DATA_DIR_UNAVAILABLE":
+            return "La cartella dell’archivio sul Mac non è disponibile. Verifica l’accesso alla cartella dati sul Mac e riprova."
+        case "DB_MISSING":
+            return "L’archivio sul Mac non è stato trovato. Verifica la cartella dati o un backup valido sul Mac, conservando l’originale."
+        case "DB_SCHEMA_MISSING":
+            return "L’archivio richiede una versione compatibile di MediFlow. Verifica il recupero sul Mac, conservando l’originale."
+        case "DB_NATIVE_DEPENDENCY_INVALID", "DB_NATIVE_DEPENDENCY_MISSING":
+            return "Il componente SQLite sul Mac non è disponibile o compatibile. Verifica l’installazione di MediFlow sul Mac e riavviala."
+        case "DB_QUERY_FAILED":
+            return "L’archivio sul Mac non è leggibile. Verifica MediFlow sul Mac, conservando l’originale."
+        default:
+            return Self.unavailableMessage
+        }
+    }
 }
 
 private struct AuthUnlockCheck: Decodable {

@@ -552,7 +552,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             await login()
         }
 
-        if automaticActions.shouldAutoLoadPatients(hasActiveSession: sessionCookie != nil) {
+        if !automaticActions.autoLogin && automaticActions.shouldAutoLoadPatients(hasActiveSession: sessionCookie != nil) {
             await loadPatients()
         }
     }
@@ -748,13 +748,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         let client = makeClient()
         let username = self.username.trimmedOrNil
         let password = self.password
+        var authenticatedSession: String?
         await runTask({
             let result = try await client.login(
                 username: username,
                 password: password,
                 credentials: credentials
             )
-            guard self.loginGeneration == generation else {
+            guard !Task.isCancelled, self.loginGeneration == generation else {
                 _ = try? await client.logout(credentials: credentials, sessionCookie: result.sessionCookie)
                 return
             }
@@ -769,10 +770,15 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             self.unlockFieldCrypto(with: result, pin: password)
             if result.masterKey != nil { self.password = "" }
             self.resetCatalogAvailability()
-            self.statusMessage = self.masterKey == nil
-                ? "Sessione operatore attiva. Cifratura campi non disponibile."
-                : "Sessione operatore attiva."
+            self.patients = []
+            self.clearSelectedPatientWorkspace()
+            self.connectionState = .notLoaded
+            authenticatedSession = result.sessionCookie
+            self.statusMessage = "Sessione operatore attiva. Caricamento dell’archivio in corso."
         }, canApplyFailure: { self.loginGeneration == generation })
+        guard !Task.isCancelled, self.loginGeneration == generation,
+              let authenticatedSession, self.sessionCookie == authenticatedSession else { return }
+        await loadPatients()
     }
 
     func changePin(currentPin: String, newPin: String) async {
@@ -994,6 +1000,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                     return
                 }
                 self.invalidateCacheAfterReadFailure(error)
+                if self.connectionState == .notLoaded {
+                    self.statusMessage = "Sessione operatore attiva. Lettura dell’archivio non riuscita."
+                }
                 throw error
             }
             guard canPublishList() else { return }
