@@ -3,16 +3,8 @@ import SwiftUI
 struct NativeFabricLocalExperience: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
     let function: NativeOrdinaryFunction
-    let activityChanged: (Bool) -> Void
-    @StateObject private var model: NativeFabricModel
+    @ObservedObject var model: NativeFabricModel
     @Environment(\.scenePhase) private var scenePhase
-    init(workspaceModel: PairedPatientsWorkspaceModel, function: NativeOrdinaryFunction, attachmentId: String? = nil,
-         activityChanged: @escaping (Bool) -> Void = { _ in }) {
-        self.workspaceModel = workspaceModel; self.function = function; self.activityChanged = activityChanged
-        _model = StateObject(wrappedValue: NativeFabricModel(function: function, snapshot: {
-            try NativeOrdinaryInputs.build(function, workspace: workspaceModel, attachmentId: attachmentId)
-        }))
-    }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(function.title).chartGroupHeading()
@@ -29,7 +21,7 @@ struct NativeFabricLocalExperience: View {
             }
             if model.isWorking { ProgressView("Verifica sull’host…") }
             if model.phase == .idle {
-                Button("Prepara sul Mac") { model.prepare() }
+                Button("Prepara sul Mac") { model.prepare() }.disabled(!model.canPrepare)
                     .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-fabric-prepare")
             }
             if model.phase == .ready {
@@ -49,9 +41,11 @@ struct NativeFabricLocalExperience: View {
             }
         }.buttonStyle(.bordered).frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-fabric")
-        .onAppear { model.observe(workspaceModel); activityChanged(model.phase == .idle) }
+        .onAppear { model.observe(workspaceModel) }
         .onDisappear { model.invalidate() }
-        .onChange(of: model.phase) { activityChanged($0 == .idle) }
+        #if DEBUG
+        .onAppear { NativeFabricPresentationProbe.localModel?(model) }
+        #endif
         .onChange(of: scenePhase) { if $0 == .background { model.invalidate() } }
     }
 }

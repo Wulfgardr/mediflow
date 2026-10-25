@@ -16,7 +16,7 @@ final class NativeOrdinaryModel: ObservableObject {
     @Published private(set) var isWorking = false
     private(set) var attemptId: String?
     private var pendingProjection: NativeOrdinaryProjectionPlan?
-    private var preparationInFlight = false
+    @Published private var preparationInFlight = false
     private var original: NativeOrdinarySnapshot?
     private var generation: UInt = 0
     private var task: Task<Void, Never>?
@@ -70,8 +70,9 @@ final class NativeOrdinaryModel: ObservableObject {
               let fresh = try? snapshot() else { return false }
         return source.matches(fresh)
     }
+    var canPrepare: Bool { !isWorking && !preparationInFlight && (phase == .idle || phase == .completed) }
     func prepare() {
-        guard !isWorking, !preparationInFlight, phase == .idle || phase == .completed else { return }
+        guard canPrepare else { return }
         do {
             let source = try snapshot(); generation &+= 1; let epoch = generation
             original = source; attemptId = nil; pendingProjection = nil; expiry = .infinity; proposal = nil; disclosure = nil; challenge = nil; catalog = nil
