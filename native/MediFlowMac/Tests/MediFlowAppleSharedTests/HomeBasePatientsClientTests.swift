@@ -10,6 +10,40 @@ final class HomeBasePatientsClientTests: XCTestCase {
         super.tearDown()
     }
 
+    func testArchiveHealthErrorsUseOnlyPublicCodeBeforeSendingCredentials() async throws {
+        let messages = [
+            "DATA_DIR_UNAVAILABLE": "La cartella dell’archivio sul Mac non è disponibile. Verifica l’accesso alla cartella dati sul Mac e riprova.",
+            "DB_MISSING": "L’archivio sul Mac non è stato trovato. Verifica la cartella dati o un backup valido sul Mac, conservando l’originale.",
+            "DB_SCHEMA_MISSING": "L’archivio richiede una versione compatibile di MediFlow. Verifica il recupero sul Mac, conservando l’originale.",
+            "DB_NATIVE_DEPENDENCY_INVALID": "Il componente SQLite sul Mac non è disponibile o compatibile. Verifica l’installazione di MediFlow sul Mac e riavviala.",
+            "DB_NATIVE_DEPENDENCY_MISSING": "Il componente SQLite sul Mac non è disponibile o compatibile. Verifica l’installazione di MediFlow sul Mac e riavviala.",
+            "DB_QUERY_FAILED": "L’archivio sul Mac non è leggibile. Verifica MediFlow sul Mac, conservando l’originale.",
+            "AUTH_CONTROL_UNAVAILABLE": "Il servizio di accesso sul Mac non è disponibile. Verifica MediFlow sul Mac e riprova.",
+            "UNKNOWN_FUTURE_CODE": "Il servizio di accesso sul Mac non è disponibile. Verifica MediFlow sul Mac e riprova."
+        ]
+        for status in [200, 503] {
+            for (code, message) in messages {
+                var paths: [String] = []
+                let client = makeClient { request in
+                    paths.append(request.url!.path)
+                    let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+                    return (response, try JSONSerialization.data(withJSONObject: [
+                        "status": "error", "isSetup": false, "hasSession": false,
+                        "error": ["code": code, "category": "unknown", "message": "/private/synthetic/raw-secret",
+                                  "nextAction": "unsafe command", "remediationCommand": "unsafe command"],
+                        "db": ["state": "unavailable"]]))
+                }
+                do {
+                    _ = try await client.login(username: "doctor", password: "1992", credentials: creds)
+                    XCTFail("Health failure must stop login")
+                } catch {
+                    XCTAssertEqual(error.localizedDescription, message, "\(status) \(code)")
+                }
+                XCTAssertEqual(paths, ["/api/auth/check"])
+            }
+        }
+    }
+
     func testCreateAttachmentSendsOnlySealedPairedProjection() async throws {
         let masterKey = SymmetricKey(data: Data(repeating: 5, count: 32))
         let rawData = Data("PDF".utf8).base64EncodedString()
