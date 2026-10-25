@@ -53,6 +53,7 @@
     "ExemptionCodesCodecTests.swift",
     "HomeBaseBonjourDiscoveryTests.swift",
     "HomeBaseDateCodingTests.swift",
+    "HomeBaseEntryFetchTests.swift",
     "HomeBaseOptionalServicesProbeTests.swift",
     "HomeBasePairedStoreTests.swift",
     "HomeBasePatientCacheStoreTests.swift",
