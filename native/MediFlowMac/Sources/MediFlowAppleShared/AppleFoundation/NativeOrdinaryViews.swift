@@ -34,7 +34,7 @@ struct NativeDocumentSynthesisView: View {
     var body: some View { NativeFabricExperience(workspaceModel: workspaceModel, function: .documentSynthesis) }
 }
 @MainActor
-private final class NativeFabricPresentationOwner: ObservableObject {
+final class NativeFabricPresentationOwner: ObservableObject {
     private final class Input {
         var requestedAttachmentId: String?
         var acceptedAttachmentId: String?
@@ -42,6 +42,7 @@ private final class NativeFabricPresentationOwner: ObservableObject {
     let local: NativeFabricModel
     let ordinary: NativeOrdinaryModel
     @Published private(set) var attachmentId: String?
+    @Published private(set) var useChatGPT = false
     private let input: Input
     private var subscriptions = Set<AnyCancellable>()
     var canChangeVenue: Bool {
@@ -50,8 +51,8 @@ private final class NativeFabricPresentationOwner: ObservableObject {
     init(workspace: PairedPatientsWorkspaceModel, function: NativeOrdinaryFunction) {
         let input = Input()
         self.input = input
-        let snapshot = {
-            guard input.requestedAttachmentId == input.acceptedAttachmentId else { throw NativeOrdinaryContractError.stale }
+        let snapshot = { [weak workspace] in
+            guard let workspace, input.requestedAttachmentId == input.acceptedAttachmentId else { throw NativeOrdinaryContractError.stale }
             return try NativeOrdinaryInputs.build(function, workspace: workspace, attachmentId: input.acceptedAttachmentId)
         }
         #if DEBUG
@@ -63,11 +64,20 @@ private final class NativeFabricPresentationOwner: ObservableObject {
         #endif
         local = NativeFabricModel(function: function, snapshot: snapshot, services: localServices)
         ordinary = NativeOrdinaryModel(function: function, snapshot: snapshot, services: ordinaryServices)
+        local.observe(workspace)
+        ordinary.observe(workspace)
+        workspace.$selectedPatientID.dropFirst().removeDuplicates().sink { [weak self] _ in
+            self?.selectDocument(nil)
+        }.store(in: &subscriptions)
         for publisher in [local.objectWillChange, ordinary.objectWillChange] {
             publisher.sink { [weak self] _ in
                 Task { @MainActor [weak self] in self?.reconcileSelection() }
             }.store(in: &subscriptions)
         }
+    }
+    func selectVenue(useChatGPT: Bool) {
+        guard canChangeVenue else { return }
+        self.useChatGPT = useChatGPT
     }
     func selectDocument(_ value: String?) {
         let value = value.flatMap { $0.isEmpty ? nil : $0 }
@@ -86,15 +96,14 @@ private final class NativeFabricPresentationOwner: ObservableObject {
 private struct NativeFabricExperience: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
     let function: NativeOrdinaryFunction
-    @State private var useChatGPT = false
-    @StateObject private var owner: NativeFabricPresentationOwner
+    @ObservedObject private var owner: NativeFabricPresentationOwner
     init(workspaceModel: PairedPatientsWorkspaceModel, function: NativeOrdinaryFunction) {
         self.workspaceModel = workspaceModel
         self.function = function
-        _owner = StateObject(wrappedValue: NativeFabricPresentationOwner(workspace: workspaceModel, function: function))
+        _owner = ObservedObject(wrappedValue: workspaceModel.nativeFabricPresentation(for: function))
     }
     private var venue: Binding<Bool> {
-        Binding(get: { useChatGPT }, set: { if owner.canChangeVenue { useChatGPT = $0 } })
+        Binding(get: { owner.useChatGPT }, set: { owner.selectVenue(useChatGPT: $0) })
     }
     private var document: Binding<String> {
         Binding(get: { owner.attachmentId ?? "" }, set: { owner.selectDocument($0) })
@@ -115,7 +124,7 @@ private struct NativeFabricExperience: View {
                 Text("ChatGPT").tag(true)
             }.disabled(!owner.canChangeVenue)
                 .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-venue")
-            if useChatGPT {
+            if owner.useChatGPT {
                 NativeOrdinaryExperience(workspaceModel: workspaceModel, function: function, model: owner.ordinary)
             } else {
                 NativeFabricLocalExperience(workspaceModel: workspaceModel, function: function, model: owner.local)
@@ -124,7 +133,7 @@ private struct NativeFabricExperience: View {
                 Text("Il documento deve essere estraibile localmente dall’host. File non supportati o cifrati senza una lettura autorizzata non vengono inviati.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-        }.onChange(of: workspaceModel.selectedPatientID) { _ in owner.selectDocument(nil) }
+        }
         #if DEBUG
         .onAppear {
             NativeFabricPresentationProbe.venuePicker?(venue)
