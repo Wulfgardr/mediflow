@@ -3,8 +3,75 @@ import Foundation
 import MediFlowCore
 import XCTest
 @testable import MediFlowAppleShared
+#if canImport(AppKit)
+import AppKit
+import SwiftUI
+#endif
 
 final class PairedPatientsNavigationTests: XCTestCase {
+    #if canImport(AppKit)
+    @MainActor
+    func testMobileVisitSheetBlocksNewLinksUntilItsOwnerDisappears() async throws {
+        let (model, transport) = try harness()
+        let router = ClinicalNavigationRouter()
+        let host = await mountedVisitWorklist(model: model, router: router)
+        defer { host.rootView = AnyView(EmptyView()); host.layoutSubtreeIfNeeded() }
+        var areas: [ClinicalNavigationArea] = []
+        let link = URL(string: "mediflow://navigate?area=patients&paziente=patient-b&section=documents")!
+        await router.open(link, platform: .mobile, workspace: model) { areas.append($0) }.value
+        assertOriginalChart(model)
+        XCTAssertTrue(transport.requests.isEmpty)
+        XCTAssertTrue(areas.isEmpty)
+        XCTAssertNil(router.patientPresentation)
+        XCTAssertNotNil(router.notice)
+
+        host.rootView = AnyView(EmptyView())
+        host.layoutSubtreeIfNeeded()
+        await Task.yield()
+        await router.open(link, platform: .mobile, workspace: model) { areas.append($0) }.value
+        XCTAssertEqual(model.selectedPatient?.id, "patient-b")
+        XCTAssertEqual(areas, [.patients])
+        XCTAssertEqual(transport.requests.count, 8)
+    }
+
+    @MainActor
+    func testMobileVisitSheetBlocksAPatientLinkAlreadyWaitingForItsRead() async throws {
+        let (model, transport) = try harness()
+        let router = ClinicalNavigationRouter()
+        var areas: [ClinicalNavigationArea] = []
+        let started = transport.holdNextPatient()
+        let link = URL(string: "mediflow://navigate?area=patients&paziente=patient-b&section=documents")!
+        let read = router.open(link, platform: .mobile, workspace: model) { areas.append($0) }
+        await fulfillment(of: [started], timeout: 3)
+        let host = await mountedVisitWorklist(model: model, router: router)
+        defer { host.rootView = AnyView(EmptyView()); host.layoutSubtreeIfNeeded() }
+        transport.releasePatient()
+        await read.value
+        assertOriginalChart(model)
+        XCTAssertEqual(transport.requests.count, 1)
+        XCTAssertTrue(areas.isEmpty)
+        XCTAssertNil(router.patientPresentation)
+    }
+
+    @MainActor
+    private func mountedVisitWorklist(
+        model: PairedPatientsWorkspaceModel, router: ClinicalNavigationRouter
+    ) async -> NSHostingView<AnyView> {
+        let appeared = expectation(description: "Worklist with visit sheet mounted")
+        let content = PairedPatientsWorklistView(
+            showingMobileVisit: true, model: model,
+            patientQuery: .constant(""), patientViewMode: .constant(.active), patientSortMode: .constant(.recent)
+        )
+        .environment(\.clinicalNavigationInteraction, router.interactionScope)
+        .onAppear { appeared.fulfill() }
+        let host = NSHostingView(rootView: AnyView(content))
+        host.frame = NSRect(x: 0, y: 0, width: 600, height: 700)
+        host.layoutSubtreeIfNeeded()
+        await fulfillment(of: [appeared], timeout: 3)
+        return host
+    }
+    #endif
+
     @MainActor
     func testExistingPatientUsesScopedOrdinaryReadsBeforeReplacingTheChart() async throws {
         let (model, transport) = try harness()
@@ -325,7 +392,10 @@ final class PairedPatientsNavigationTests: XCTestCase {
             keychainReader: { _, _ in .success(nil) }, keychainWriter: { _, _, _ in .success(()) },
             keychainDeleter: { _, _ in .success(()) })
         let cache = HomeBasePatientCacheStore(cacheDirectory: directory, keyProvider: { NavigationFixture.key })
-        let model = PairedPatientsWorkspaceModel(pairedStore: store, cacheStore: cache, dataSourceFactory: { _ in source })
+        let model = PairedPatientsWorkspaceModel(
+            pairedStore: store, cacheStore: cache, dataSourceFactory: { _ in source },
+            mobileVisitStore: MobileVisitStore(directory: directory.appendingPathComponent("visit"))
+        )
         model.serverURL = endpoint.absoluteString
         model.ambulatoryId = "scope-a"
         model.configurePairedOnlineForTests(

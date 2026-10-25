@@ -202,7 +202,9 @@ struct PairedPatientsWorklistView: View {
     #endif
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showingCSVImport = false
-    @State private var showingMobileVisit = false
+    @Environment(\.clinicalNavigationInteraction) private var navigationInteraction
+    @State private var navigationInteractionID = UUID()
+    @State var showingMobileVisit = false
     @ObservedObject var model: PairedPatientsWorkspaceModel
     @Binding var patientQuery: String
     @Binding var patientViewMode: PatientListViewMode
@@ -275,6 +277,10 @@ struct PairedPatientsWorklistView: View {
                 }
             }
             #endif
+            .onAppear {
+                navigationInteraction?.register(navigationInteractionID, { showingMobileVisit })
+            }
+            .onDisappear { navigationInteraction?.unregister(navigationInteractionID) }
     }
 
     #if os(iOS)
