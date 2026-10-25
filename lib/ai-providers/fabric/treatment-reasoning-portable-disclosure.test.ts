@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY } from './function-model-configuration-generation';
 import { ATHENA_R1_QWEN3_8B_MODEL_ID } from '../../athena-model-identity';
 import { assessPortableHardware, type PortableStatus } from './treatment-reasoning-portable-provisioning';
 import { buildTreatmentReasoningPortableDisclosure, parseTreatmentReasoningPortableDisclosure,
@@ -150,14 +151,14 @@ test('browser rejects mislabeled v1 portable payloads, extra data, impossible re
 });
 
 function http(t: { after(callback: () => void): void }) {
-    let input = sources(); let writes = 0;
+    let input = sources(); let writes = 0; const batches: string[][] = [];
     const session = issueSyntheticWebSession({ id: `synthetic-${randomUUID()}`, username: randomUUID(), role: 'admin' }, randomUUID());
     t.after(() => retireSyntheticWebSession(session));
     const service = createFunctionModelPreferencesService({ readSources: () => input, immediate: callback => callback(), writeSettings(next) {
-        writes += Object.keys(next).length; input = { ...input, settings: { ...input.settings, ...next } };
+        batches.push(Object.keys(next).sort()); writes += Object.keys(next).length; input = { ...input, settings: { ...input.settings, ...next } };
     } });
     const handlers = createFunctionModelPreferencesHttp({ authenticate: async () => session, service });
-    return { service, handlers, session, writes: () => writes, input: () => input };
+    return { service, handlers, session, writes: () => writes, batches: () => batches, input: () => input };
 }
 const request = (version?: string, body?: unknown, signal?: AbortSignal) => new Request('http://localhost/api/settings/ai/functions', {
     method: body ? 'POST' : 'GET', signal, headers: { ...(version ? { [FUNCTION_PREFERENCES_VERSION_HEADER]: version } : {}),
@@ -190,7 +191,9 @@ test('current browser uses negotiated v2 through real producer preview/apply/rer
     await client.preview({ action: 'set', functionId: 'treatment_reasoning', enabled: true,
         defaultModelOptionId: buildFunctionModelCatalog(f.input()).hostDefaults.treatment_reasoning });
     assert.ok(client.getSnapshot().proposed); assert.equal(f.writes(), 0);
-    await client.apply(); assert.equal(client.getSnapshot().saved, true); assert.equal(f.writes(), 2);
+    await client.apply(); assert.equal(client.getSnapshot().saved, true); assert.deepEqual(f.batches(), [[FUNCTION_PREFERENCES_KEY, FUNCTION_SWITCH_KEYS.treatment_reasoning,
+        FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY].sort()]);
+    assert.equal(f.input().settings[FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY], '1');
     assert.deepEqual(headers, ['2', '2', '2', '2']);
     assert.equal(resolveFunctionModelDispatch(f.input(), 'treatment_reasoning').binding.provider, 'athena_transformers');
 });
