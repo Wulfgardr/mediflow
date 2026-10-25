@@ -14,7 +14,7 @@ final class NativeFabricModel: ObservableObject {
     private var projection: NativeOrdinaryProjectionPlan?
     private var original: NativeOrdinarySnapshot?
     private var generation: UInt = 0
-    private var preparationInFlight = false
+    @Published private var preparationInFlight = false
     private var task: Task<Void, Never>?
     private var watchdog: Task<Void, Never>?
     private var expiry = Double.infinity
@@ -65,8 +65,9 @@ final class NativeFabricModel: ObservableObject {
               let fresh = try? snapshot() else { return false }
         return source.matches(fresh)
     }
+    var canPrepare: Bool { phase == .idle && !isWorking && !preparationInFlight }
     func prepare() {
-        guard phase == .idle, !isWorking, !preparationInFlight else { return }
+        guard canPrepare else { return }
         do {
             let source = try snapshot(); original = source; generation &+= 1; let epoch = generation
             phase = .preparing; isWorking = true; preparationInFlight = true; expiry = .infinity
