@@ -129,6 +129,11 @@ public protocol HomeBasePatientsDataSource: Sendable {
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseCreatedResource
 
+    func fetchEntry(
+        patientId: String, entryId: String, credentials: HomeBasePairedCredentials,
+        sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseEntrySummary
+
     // limit has no default in the protocol requirement (Swift forbids it); the
     // 4-argument convenience below restores the call sites' boundary maximum.
     func fetchEntries(
@@ -323,6 +328,13 @@ public extension HomeBasePatientsDataSource {
         try await fetchPatients(
             credentials: credentials, sessionCookie: sessionCookie,
             ambulatoryId: ambulatoryId, includeDeleted: false)
+    }
+
+    func fetchEntry(
+        patientId: String, entryId: String, credentials: HomeBasePairedCredentials,
+        sessionCookie: String, ambulatoryId: String?
+    ) async throws -> HomeBaseEntrySummary {
+        throw HomeBaseClientError.contract
     }
 
     func fetchEntries(
