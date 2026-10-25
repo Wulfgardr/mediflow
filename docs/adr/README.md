@@ -144,3 +144,5 @@ prima porzione di lavoro verificabile:
 - [0161 — Porte host e lifecycle GPUI](./0161-gpui-host-ports-lifecycle.md) — Accepted; contratto G-1a.1 e decisione 2 approvata da Leonardo.
 
 - [0163 — Dossier visita mobile](./0163-mobile-visit-dossier.md) — Proposed; WUL-793, copia esplicita e appunti cifrati, nessun writer offline.
+
+- [ADR 0164 — Ricevuta di ritiro dell’autorità native](0164-native-inference-authority-retirement.md): recupero circoscritto oltre la sessione; chiusura fisica distinta.

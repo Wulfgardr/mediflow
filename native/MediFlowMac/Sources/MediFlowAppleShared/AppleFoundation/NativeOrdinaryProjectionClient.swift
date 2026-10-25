@@ -13,8 +13,23 @@ struct NativeOrdinaryProjectionIO {
 enum NativeOrdinaryProjectionClient {
     static func project(_ plan: NativeOrdinaryProjectionPlan, preparation: NativeOrdinaryPreparation,
                         io: NativeOrdinaryProjectionIO, client injectedClient: HomeBasePatientsClient? = nil) async throws -> NativeOrdinaryResponse {
+        try await projectUsing(plan, preparation: preparation, io: io, client: injectedClient) { client, body, connection in
+            try await client.projectNativeOrdinary(plan, body: body, credentials: connection.credentials,
+                sessionCookie: connection.sessionCookie, ambulatoryId: preparation.ambulatoryId)
+        }
+    }
+    static func projectFabric(_ plan: NativeOrdinaryProjectionPlan, preparation: NativeOrdinaryPreparation,
+                              io: NativeOrdinaryProjectionIO) async throws -> NativeFabricResponse {
+        try await projectUsing(plan, preparation: preparation, io: io) { client, body, connection in
+            try await client.projectNativeFabric(plan, body: body, credentials: connection.credentials,
+                sessionCookie: connection.sessionCookie, ambulatoryId: preparation.ambulatoryId)
+        }
+    }
+    private static func projectUsing<Result>(_ plan: NativeOrdinaryProjectionPlan, preparation: NativeOrdinaryPreparation,
+                        io: NativeOrdinaryProjectionIO, client injectedClient: HomeBasePatientsClient? = nil,
+                        submit: (HomeBasePatientsClient, Data, ClinicalWorkspaceConnection) async throws -> Result) async throws -> Result {
         try plan.validate(preparation: preparation)
-        let initial = try io.current(), identity = initial.identity
+        let initial = NativeOrdinaryAuthority.transport(try io.current()), identity = initial.identity
         guard let url = initial.serverURL, let pin = initial.tlsPin, !pin.isEmpty else { throw NativeOrdinaryContractError.invalid }
         // The test seam substitutes only URLSession transport, never a plaintext or local-data provider.
         let client = injectedClient ?? HomeBasePatientsClient(configuration: HomeBaseConnectionConfiguration(serverURLString: url, tlsPin: pin))
@@ -36,7 +51,7 @@ enum NativeOrdinaryProjectionClient {
             else { throw NativeOrdinaryContractError.noSources }
             return plaintext
         }
-        let connection = try current()
+        let connection = NativeOrdinaryAuthority.transport(try current())
         let patient = try await client.fetchPatient(id: preparation.patientId, credentials: connection.credentials,
             sessionCookie: connection.sessionCookie, ambulatoryId: preparation.ambulatoryId, fresh: true)
         _ = try current()
@@ -47,7 +62,7 @@ enum NativeOrdinaryProjectionClient {
         var body = Data()
         defer { body.resetBytes(in: 0..<body.count); body.removeAll(keepingCapacity: false) }
         if plan.functionId == .documentSynthesis {
-            let row = plan.roster[0], fresh = try current()
+            let row = plan.roster[0], fresh = NativeOrdinaryAuthority.transport(try current())
             let attachment = try await client.fetchAttachment(patientId: preparation.patientId, attachmentId: row.id,
                 credentials: fresh.credentials, sessionCookie: fresh.sessionCookie, ambulatoryId: preparation.ambulatoryId, fresh: true)
             _ = try current()
@@ -71,7 +86,7 @@ enum NativeOrdinaryProjectionClient {
                     stored = ["notes": patient.notes, "diagnoses": patient.diagnoses]
                 case "entries":
                     if entries == nil {
-                        let fresh = try current()
+                        let fresh = NativeOrdinaryAuthority.transport(try current())
                         entries = try await client.fetchEntries(patientId: preparation.patientId, credentials: fresh.credentials,
                             sessionCookie: fresh.sessionCookie, ambulatoryId: preparation.ambulatoryId, fresh: true)
                     }
@@ -82,7 +97,7 @@ enum NativeOrdinaryProjectionClient {
                     stored = ["title": value.title, "content": value.content]
                 case "therapies":
                     if therapies == nil {
-                        let fresh = try current()
+                        let fresh = NativeOrdinaryAuthority.transport(try current())
                         therapies = try await client.fetchTherapies(patientId: preparation.patientId, credentials: fresh.credentials,
                             sessionCookie: fresh.sessionCookie, ambulatoryId: preparation.ambulatoryId, fresh: true)
                     }
@@ -93,7 +108,7 @@ enum NativeOrdinaryProjectionClient {
                     stored = ["drugName": value.drugName, "dosage": value.dosage, "activePrinciple": value.activePrinciple, "aic": value.aic, "atc": value.atc]
                 case "observations":
                     if observations == nil {
-                        let fresh = try current()
+                        let fresh = NativeOrdinaryAuthority.transport(try current())
                         observations = try await client.fetchObservations(patientId: preparation.patientId, credentials: fresh.credentials,
                             sessionCookie: fresh.sessionCookie, ambulatoryId: preparation.ambulatoryId, fresh: true)
                     }
@@ -103,7 +118,7 @@ enum NativeOrdinaryProjectionClient {
                           value.deletedAt == nil, value.version > 0 else { throw NativeOrdinaryContractError.stale }
                     stored = ["display": value.display, "value": value.value, "unitCode": value.unitCode]
                 case "attachments":
-                    let fresh = try current()
+                    let fresh = NativeOrdinaryAuthority.transport(try current())
                     let value = try await client.fetchAttachment(patientId: preparation.patientId, attachmentId: row.id,
                         credentials: fresh.credentials, sessionCookie: fresh.sessionCookie, ambulatoryId: preparation.ambulatoryId, fresh: true)
                     _ = try current()
@@ -122,12 +137,11 @@ enum NativeOrdinaryProjectionClient {
             body = try JSONEncoder().encode(projection)
             guard !body.isEmpty, body.count <= 2 * 1024 * 1024 else { throw NativeOrdinaryContractError.invalid }
         }
-        let submitting = try current()
+        let submitting = NativeOrdinaryAuthority.transport(try current())
         try io.willSubmit() // changes only the local processing watchdog; cannot extend the host grant.
         try Task.checkCancellation()
         // Return even a late response so the model can cancel its exact attempt before discarding it.
         // No response is published here; the model rechecks identity, generation and lock on return.
-        return try await client.projectNativeOrdinary(plan, body: body, credentials: submitting.credentials,
-            sessionCookie: submitting.sessionCookie, ambulatoryId: preparation.ambulatoryId)
+        return try await submit(client, body, submitting)
     }
 }

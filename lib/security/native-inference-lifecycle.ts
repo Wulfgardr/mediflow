@@ -1,5 +1,6 @@
 import 'server-only';
 import { types } from 'node:util';
+import { createHash } from 'node:crypto';
 import { serverSessions, type WebResourceDisposer, type NativeSessionResourcePort, type NativeSessionResourceUse,
     type NativeSessionResourceRegistration, type NativeSessionResourceBinding, type NativeAuthenticationGeneration } from './web-auth-lifecycle-owner-adapter';
 import { withCurrentNativeInferenceEnvironment } from './native-inference-environment';
@@ -13,6 +14,9 @@ export type NativeInferenceBinding = NativeSessionResourceBinding;
 export type NativeInferenceGeneration = NativeAuthenticationGeneration;
 type PortRecord = { session: unknown; raw: NativeSessionResourcePort; active: boolean };
 type UseRecord = { port: PortRecord; raw: NativeSessionResourceUse; active: boolean; binding: boolean; poisoned: boolean };
+type AuthorityRecord = { session: unknown; binding: NativeInferenceBinding };
+const authorities = new Map<string, AuthorityRecord>();
+const authorityReference = (id: string) => createHash('sha256').update(id).digest('hex');
 const ports = new WeakMap<object, PortRecord>();
 const uses = new WeakMap<object, UseRecord>();
 const opaque = <T>(): T => Object.freeze(Object.create(null)) as T;
@@ -39,7 +43,13 @@ export function mintResourcePort(session: unknown): NativeInferencePort | null {
     const record: PortRecord = { session, raw, active: true };
     const use = serverSessions.beginNativeSessionResourceUse(raw);
     try {
-        if (!use || !bindRaw(record, use, () => undefined)) return null;
+        let binding: NativeInferenceBinding | undefined;
+        if (!use || !bindRaw(record, use, value => { binding = value; }) || !binding) return null;
+        const reference = authorityReference(binding.sessionId);
+        if (!authorities.has(reference)) {
+            if (authorities.size >= 4096) { record.active = false; return null; }
+            authorities.set(reference, { session, binding });
+        }
         const port = opaque<NativeInferencePort>(); ports.set(port, record); return port;
     } finally {
         if (use) serverSessions.abortNativeSessionResourceUse(use);
@@ -108,4 +118,24 @@ export function registerPrivateResource(port: unknown, dispose: WebResourceDispo
 export function unregisterPrivateResource(port: unknown, registration: unknown): boolean {
     const record = lookupPort(port);
     return Boolean(record && serverSessions.unregisterNativeSessionPrivateResource(record.raw, registration));
+}
+
+/** Attests only irreversible native-cell retirement, never runtime cleanup or a transfer of authority. */
+export function verifyPreviousAuthorityRetirement(use: NativeInferenceUse, previousAuthorityRef: string) {
+    if (!/^[a-f0-9]{64}$/u.test(previousAuthorityRef)) return null;
+    const previous = authorities.get(previousAuthorityRef);
+    if (!previous) return null;
+    let receipt: Readonly<{ schema: string; previousAuthorityRef: string; currentAuthorityRef: string;
+        authorityRetired: true; physicalCleanup: 'not_attested' }> | null = null;
+    const current = withCurrentResourceBinding(use, binding => {
+        const old = previous.binding;
+        if (binding.sessionId === old.sessionId || binding.principalRef !== old.principalRef
+            || binding.username !== old.username || binding.role !== old.role || binding.clientId !== old.clientId
+            || binding.clientPlatform !== old.clientPlatform || binding.tokenHash !== old.tokenHash) return;
+        const active = serverSessions.mintNativeSessionResourcePort(previous.session);
+        if (active) { serverSessions.releaseNativeSessionResourcePort(active); return; }
+        receipt = Object.freeze({ schema: 'mediflow.native-authority-retirement.v1', previousAuthorityRef,
+            currentAuthorityRef: authorityReference(binding.sessionId), authorityRetired: true, physicalCleanup: 'not_attested' });
+    });
+    return current ? receipt : null;
 }

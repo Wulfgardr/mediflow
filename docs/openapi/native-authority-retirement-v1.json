@@ -1,0 +1,96 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MediFlow native inference authority retirement",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/network/ai/authority-retirement": {
+      "post": {
+        "operationId": "verifyPreviousNativeInferenceAuthorityRetirement",
+        "summary": "Attest only irreversible retirement of a previous native inference authority; never physical cleanup",
+        "x-authority-ceiling": "scoped_local_candidate",
+        "x-native-only": [
+          "macos",
+          "ios",
+          "ipados"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "previousAuthorityRef"
+                ],
+                "properties": {
+                  "previousAuthorityRef": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Same principal and pairing, different current session, previous native authority irreversibly retired; physical cleanup not attested",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema",
+                    "previousAuthorityRef",
+                    "currentAuthorityRef",
+                    "authorityRetired",
+                    "physicalCleanup"
+                  ],
+                  "properties": {
+                    "schema": {
+                      "const": "mediflow.native-authority-retirement.v1"
+                    },
+                    "previousAuthorityRef": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "currentAuthorityRef": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "authorityRetired": {
+                      "const": true
+                    },
+                    "physicalCleanup": {
+                      "const": "not_attested"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid reference or extra fields"
+          },
+          "401": {
+            "description": "Current admission denied; not a retirement receipt"
+          },
+          "409": {
+            "description": "Authority still active, unknown or differently bound; no receipt"
+          }
+        },
+        "security": [
+          {
+            "NativeOrdinarySession": [],
+            "NativeOrdinaryClientId": [],
+            "NativeOrdinaryClientToken": []
+          }
+        ]
+      }
+    }
+  }
+}

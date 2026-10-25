@@ -1,55 +1,157 @@
 /* original function surfaces, no settings copy or apply action. */
 import SwiftUI
+import Combine
 #if os(iOS)
 import SafariServices
 #endif
 
+#if DEBUG
+@MainActor
+enum NativeFabricPresentationProbe {
+    static var documentPicker: ((Binding<String>) -> Void)?
+    static var venuePicker: ((Binding<Bool>) -> Void)?
+    static var localModel: ((NativeFabricModel) -> Void)?
+    static var ordinaryModel: ((NativeOrdinaryModel) -> Void)?
+    static var localServices: NativeFabricModel.Services?
+    static var ordinaryServices: NativeOrdinaryModel.Services?
+}
+#endif
+
 struct NativePatientInsightView: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
-    var body: some View { NativeOrdinaryExperience(workspaceModel: workspaceModel, function: .patientInsight) }
+    var body: some View { NativeFabricExperience(workspaceModel: workspaceModel, function: .patientInsight) }
 }
 struct NativeSmartImportView: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
-    var body: some View { NativeOrdinaryExperience(workspaceModel: workspaceModel, function: .smartImport) }
+    var body: some View { NativeFabricExperience(workspaceModel: workspaceModel, function: .smartImport) }
 }
 struct NativeTreatmentReasoningView: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
-    var body: some View { NativeOrdinaryExperience(workspaceModel: workspaceModel, function: .treatmentReasoning) }
+    var body: some View { NativeFabricExperience(workspaceModel: workspaceModel, function: .treatmentReasoning) }
 }
 struct NativeDocumentSynthesisView: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
-    @State private var attachmentId = ""
+    var body: some View { NativeFabricExperience(workspaceModel: workspaceModel, function: .documentSynthesis) }
+}
+@MainActor
+final class NativeFabricPresentationOwner: ObservableObject {
+    private final class Input {
+        var requestedAttachmentId: String?
+        var acceptedAttachmentId: String?
+    }
+    let local: NativeFabricModel
+    let ordinary: NativeOrdinaryModel
+    @Published private(set) var attachmentId: String?
+    @Published private(set) var useChatGPT = false
+    private let input: Input
+    private var subscriptions = Set<AnyCancellable>()
+    var canChangeVenue: Bool {
+        local.canPrepare && ordinary.canPrepare && input.requestedAttachmentId == input.acceptedAttachmentId
+    }
+    init(workspace: PairedPatientsWorkspaceModel, function: NativeOrdinaryFunction) {
+        let input = Input()
+        self.input = input
+        let snapshot = { [weak workspace] in
+            guard let workspace, input.requestedAttachmentId == input.acceptedAttachmentId else { throw NativeOrdinaryContractError.stale }
+            return try NativeOrdinaryInputs.build(function, workspace: workspace, attachmentId: input.acceptedAttachmentId)
+        }
+        #if DEBUG
+        let localServices = NativeFabricPresentationProbe.localServices ?? .live
+        let ordinaryServices = NativeFabricPresentationProbe.ordinaryServices ?? .live
+        #else
+        let localServices = NativeFabricModel.Services.live
+        let ordinaryServices = NativeOrdinaryModel.Services.live
+        #endif
+        let currentConnection = { [weak workspace] in workspace?.clinicalWorkspaceConnection }
+        local = NativeFabricModel(function: function, snapshot: snapshot, currentConnection: currentConnection, services: localServices)
+        ordinary = NativeOrdinaryModel(function: function, snapshot: snapshot, currentConnection: currentConnection, services: ordinaryServices)
+        local.observe(workspace)
+        ordinary.observe(workspace)
+        workspace.$selectedPatientID.dropFirst().removeDuplicates().sink { [weak self] _ in
+            self?.selectDocument(nil)
+        }.store(in: &subscriptions)
+        for publisher in [local.objectWillChange, ordinary.objectWillChange] {
+            publisher.sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.reconcileSelection() }
+            }.store(in: &subscriptions)
+        }
+    }
+    func selectVenue(useChatGPT: Bool) {
+        guard canChangeVenue else { return }
+        self.useChatGPT = useChatGPT
+    }
+    func selectDocument(_ value: String?) {
+        let value = value.flatMap { $0.isEmpty ? nil : $0 }
+        guard input.requestedAttachmentId != value else { return }
+        input.requestedAttachmentId = value
+        attachmentId = value
+        local.invalidate()
+        ordinary.invalidate()
+        reconcileSelection()
+    }
+    private func reconcileSelection() {
+        if local.canPrepare && ordinary.canPrepare { input.acceptedAttachmentId = input.requestedAttachmentId }
+        objectWillChange.send()
+    }
+}
+private struct NativeFabricExperience: View {
+    @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
+    let function: NativeOrdinaryFunction
+    @ObservedObject private var owner: NativeFabricPresentationOwner
+    init(workspaceModel: PairedPatientsWorkspaceModel, function: NativeOrdinaryFunction) {
+        self.workspaceModel = workspaceModel
+        self.function = function
+        _owner = ObservedObject(wrappedValue: workspaceModel.nativeFabricPresentation(for: function))
+    }
+    private var venue: Binding<Bool> {
+        Binding(get: { owner.useChatGPT }, set: { owner.selectVenue(useChatGPT: $0) })
+    }
+    private var document: Binding<String> {
+        Binding(get: { owner.attachmentId ?? "" }, set: { owner.selectDocument($0) })
+    }
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Documento da sintetizzare").chartGroupHeading()
-            Picker("Documento da sintetizzare", selection: $attachmentId) {
-                Text("Scegli un documento").tag("")
-                ForEach(workspaceModel.attachments.filter { $0.patientId == workspaceModel.selectedPatientID }, id: \.id) { attachment in
-                    Text(attachment.name).tag(attachment.id)
-                }
-            }.labelsHidden().accessibilityIdentifier("clinical-workspace-document-synthesis-document")
-            NativeOrdinaryExperience(workspaceModel: workspaceModel, function: .documentSynthesis,
-                attachmentId: attachmentId.isEmpty ? nil : attachmentId).id(attachmentId)
-            Text("Il documento deve essere estraibile localmente dall’host. File non supportati o cifrati senza una lettura autorizzata non vengono inviati.")
-                .font(.caption).foregroundStyle(.secondary)
-        }.onChange(of: workspaceModel.selectedPatientID) { _ in attachmentId = "" }
+        VStack(alignment: .leading, spacing: 12) {
+            if function == .documentSynthesis {
+                Text("Documento da sintetizzare").chartGroupHeading()
+                Picker("Documento da sintetizzare", selection: document) {
+                    Text("Scegli un documento").tag("")
+                    ForEach(workspaceModel.attachments.filter { $0.patientId == workspaceModel.selectedPatientID }, id: \.id) { attachment in
+                        Text(attachment.name).tag(attachment.id)
+                    }
+                }.labelsHidden().accessibilityIdentifier("clinical-workspace-document-synthesis-document")
+            }
+            Picker("Esegui la funzione", selection: venue) {
+                Text("Locale sull’host").tag(false)
+                Text("ChatGPT").tag(true)
+            }.disabled(!owner.canChangeVenue)
+                .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-venue")
+            if owner.useChatGPT {
+                NativeOrdinaryExperience(workspaceModel: workspaceModel, function: function, model: owner.ordinary)
+            } else {
+                NativeFabricLocalExperience(workspaceModel: workspaceModel, function: function, model: owner.local)
+            }
+            if function == .documentSynthesis {
+                Text("Il documento deve essere estraibile localmente dall’host. File non supportati o cifrati senza una lettura autorizzata non vengono inviati.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        #if DEBUG
+        .onAppear {
+            NativeFabricPresentationProbe.venuePicker?(venue)
+            if function == .documentSynthesis { NativeFabricPresentationProbe.documentPicker?(document) }
+        }
+        #endif
     }
 }
 private struct NativeOrdinaryExperience: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
     let function: NativeOrdinaryFunction
-    @StateObject private var model: NativeOrdinaryModel
+    @ObservedObject var model: NativeOrdinaryModel
     @Environment(\.scenePhase) private var scenePhase
     @AccessibilityFocusState private var statusFocused: Bool
     #if os(iOS)
     @State private var loginPage: NativeOrdinaryLoginPage?
     #endif
-    init(workspaceModel: PairedPatientsWorkspaceModel, function: NativeOrdinaryFunction, attachmentId: String? = nil) {
-        self.workspaceModel = workspaceModel; self.function = function
-        _model = StateObject(wrappedValue: NativeOrdinaryModel(function: function, snapshot: {
-            try NativeOrdinaryInputs.build(function, workspace: workspaceModel, attachmentId: attachmentId)
-        }))
-    }
     var body: some View {
         VStack(alignment: .leading, spacing: function == .treatmentReasoning ? 16 : 10) {
             if function == .treatmentReasoning {
@@ -134,6 +236,9 @@ private struct NativeOrdinaryExperience: View {
         .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-ordinary")
         .onAppear { model.observe(workspaceModel) }
         .onDisappear { model.invalidate() }
+        #if DEBUG
+        .onAppear { NativeFabricPresentationProbe.ordinaryModel?(model) }
+        #endif
         .onChange(of: model.phase) { _ in statusFocused = true }
         .onChange(of: scenePhase) { phase in
             if phase == .background { model.invalidate() }
@@ -154,7 +259,7 @@ private struct NativeOrdinaryExperience: View {
         switch model.phase {
         case .idle, .completed:
             primaryAction {
-                Button(model.phase == .completed ? "Prepara una nuova proposta" : "Prepara proposta") { model.prepare() }
+                Button(model.phase == .completed ? "Prepara una nuova proposta" : "Prepara proposta") { model.prepare() }.disabled(!model.canPrepare)
                     .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-prepare")
             }
         case .consented:
@@ -176,7 +281,7 @@ private struct NativeOrdinaryExperience: View {
     }
 
 }
-private struct NativeOrdinaryProposalView: View {
+struct NativeOrdinaryProposalView: View {
     let function: NativeOrdinaryFunction
     let result: NativeOrdinaryJSON
     var body: some View {

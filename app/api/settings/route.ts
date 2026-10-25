@@ -1,8 +1,7 @@
+import { writeSettingWithFunctionModelGeneration } from '@/lib/ai-providers/fabric/function-model-settings-write';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 
 import { NextResponse } from 'next/server';
-import { dbServer } from '@/lib/db-server';
-import { settings } from '@/lib/schema';
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
 import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
 import { normalizeSettingValue } from '@/lib/settings-value';
@@ -35,10 +34,7 @@ export async function POST(request: Request) {
 
         // Upsert (Insert or Update) logic
         // This allows db.settings.put({ key: '...', value: '...' }) to work via POST
-        await dbServer
-            .insert(settings)
-            .values({ key, value: persistedValue })
-            .onConflictDoUpdate({ target: settings.key, set: { value: persistedValue } });
+        writeSettingWithFunctionModelGeneration(key, persistedValue);
 
         try {
             const context = auditContextFromRequest(request, session);

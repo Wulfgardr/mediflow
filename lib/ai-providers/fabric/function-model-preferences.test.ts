@@ -207,10 +207,10 @@ test('authenticated settings HTTP is bounded, read-only on GET/preview, and rech
     let authCalls = 0;
     const locked = createFunctionModelPreferencesHttp({ authenticate: async () => ++authCalls === 1 ? session : null, service });
     assert.equal((await locked.POST(post(command))).status, 401); assert.equal(writes, 0);
-    assert.equal((await handlers.POST(post(command))).status, 200); assert.equal(writes, 5);
+    assert.equal((await handlers.POST(post(command))).status, 200); assert.equal(writes, 6);
     const reread = await handlers.GET(new Request('http://localhost/api/settings/ai/functions'));
     assert.deepEqual(await reread.json(), service.read());
-    assert.equal((await handlers.POST(post(command))).status, 200); assert.equal(writes, 5);
+    assert.equal((await handlers.POST(post(command))).status, 200); assert.equal(writes, 6);
     authenticated = false; assert.equal((await handlers.GET(new Request('http://localhost/api/settings/ai/functions'))).status, 401);
 });
 
