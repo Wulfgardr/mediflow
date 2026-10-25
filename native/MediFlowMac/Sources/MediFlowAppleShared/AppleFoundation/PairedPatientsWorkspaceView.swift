@@ -112,6 +112,15 @@ struct PairedPatientsWorkspaceView: View {
             }
         }
         ToolbarItemGroup(placement: .primaryAction) {
+            if dynamicTypeSize.isAccessibilitySize {
+                Button {
+                    showsConnectionSetup = true
+                } label: {
+                    Label("Collegamento", systemImage: mobilePairedStatusPresentation.symbolName)
+                }
+                .accessibilityValue(mobilePairedStatusPresentation.title)
+                .accessibilityIdentifier("patient-worklist-connection-button")
+            }
             Button {
                 model.startCreatingPatient()
             } label: {
@@ -634,21 +643,7 @@ struct PairedPatientsWorkspaceView: View {
 
     @ViewBuilder
     private var mobileWorklistStatus: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            DisclosureGroup {
-                mobilePairedStatus
-                Text(mobilePairedStatusPresentation.detail)
-                    .font(.caption)
-                    .fixedSize(horizontal: false, vertical: true)
-                workspaceFeedbackLine
-            } label: {
-                Text(mobilePairedStatusPresentation.title)
-                    .font(.caption.weight(.semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .accessibilityHint("Mostra lo stato completo del collegamento, le azioni e i messaggi dell’elenco.")
-            .accessibilityIdentifier("patient-worklist-connection-disclosure")
-        } else {
+        if !dynamicTypeSize.isAccessibilitySize {
             mobilePairedStatus
             workspaceFeedbackLine
         }
