@@ -72,6 +72,7 @@
     "MediFlowQAStorageTests.swift",
     "MobilePairedStatusPresentationTests.swift",
     "MobilePairedStatusUITestOverrideTests.swift",
+    "MobileVisitTests.swift",
     "NativeAIConfigurationTests.swift",
     "NativeFabricTests.swift",
     "NativeFabricVenuePresentationTests.swift",

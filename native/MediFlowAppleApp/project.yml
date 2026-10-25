@@ -34,6 +34,7 @@ targets:
             CFBundleURLSchemes: [mediflow]
         # Local-network discovery: required so Bonjour home-base discovery and
         # pairing work on a real device. Guarded by check-apple-network-entitlements.sh.
+        NSFaceIDUsageDescription: "MediFlow usa Face ID per aprire sul dispositivo i dossier visita e gli appunti cifrati."
         NSLocalNetworkUsageDescription: "MediFlow cerca il tuo home-base sulla rete locale per collegarsi in modo paired e cifrato."
         NSBonjourServices:
           - _mediflow-homebase._tcp

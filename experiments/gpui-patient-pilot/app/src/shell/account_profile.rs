@@ -38,7 +38,7 @@ pub(super) struct AccountProfile {
     /// the previous session or archive cannot reach this editor. The workspace
     /// epoch is deliberately not involved: AI status refreshes and navigation
     /// belong to other surfaces.
-    generation: u64,
+    pub(super) generation: u64,
     /// The automatic initial read of the current authority has already been
     /// requested. Navigation must not turn that into an implicit reread.
     auto_read: bool,
@@ -53,7 +53,7 @@ pub(super) struct AccountProfile {
 }
 
 impl AccountProfile {
-    pub(super) fn new(scroll: &ScrollHandle, theme: Theme, cx: &mut Context<ClinicalApp>) -> Self {
+    pub(super) fn new(theme: Theme, cx: &mut Context<ClinicalApp>) -> Self {
         let display = cx.new(|cx| {
             TextInput::new(
                 "clinical-workspace-profile-display",
@@ -80,7 +80,6 @@ impl AccountProfile {
                 cx.notify();
             }));
         }
-        let _ = scroll;
         Self {
             load: ReadLoad::Idle,
             snapshot: None,
@@ -100,18 +99,22 @@ impl AccountProfile {
         }
     }
 
-    pub(super) fn reset(&mut self, cx: &mut Context<ClinicalApp>) {
-        self.generation = self.generation.wrapping_add(1);
-        self.load = ReadLoad::Idle;
-        self.snapshot = None;
-        self.conflict = None;
-        self.requires_read = true;
-        self.working = None;
-        self.auto_read = false;
-        self.message.clear();
-        self.message_failed = false;
-        self.failure = None;
-        self.set_editors("", "", cx);
+    #[cfg(test)]
+    pub(super) fn synthetic_draft(&mut self, cx: &mut Context<ClinicalApp>) -> Entity<TextInput> {
+        self.set_editors("Bozza account sintetica", "Studio sintetico", cx);
+        self.display.clone()
+    }
+
+    pub(super) fn reset(&mut self, theme: Theme, cx: &mut Context<ClinicalApp>) {
+        let generation = self
+            .generation
+            .checked_add(1)
+            .expect("account authority generation exhausted");
+        for editor in [&self.display, &self.ambulatory] {
+            editor.update(cx, |input, cx| input.retire(cx));
+        }
+        *self = Self::new(theme, cx);
+        self.generation = generation;
     }
 
     pub(super) fn configure(
@@ -596,6 +599,34 @@ mod tests {
             profile_version: version.into(),
             archive_generation: "archive_1".into(),
         }
+    }
+
+    #[gpui::test]
+    fn g1a2_restore_replaces_retained_account_editors(cx: &mut gpui::TestAppContext) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let retained = view.update(cx, |app, cx| {
+            app.account_profile
+                .set_editors("Bozza sintetica", "Studio sintetico", cx);
+            let retained = app.account_profile.display.clone();
+            app.disconnect(cx);
+            retained
+        });
+        retained.read_with(cx, |input, _| {
+            assert!(input.value().is_empty());
+            assert!(
+                input.read_only,
+                "retired account editor still accepts input"
+            );
+        });
+        view.update(cx, |app, cx| {
+            app.account_profile.configure(app.theme, false, cx);
+            retained.update(cx, |input, cx| input.set_content("Risposta tardiva", cx));
+            assert!(
+                app.account_profile.draft(cx).0.is_empty(),
+                "old entity mutated a new account editor"
+            );
+        });
     }
 
     #[gpui::test]
