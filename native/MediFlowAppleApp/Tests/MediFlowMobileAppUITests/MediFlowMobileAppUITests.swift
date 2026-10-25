@@ -820,6 +820,35 @@ final class MediFlowMobileAppUITests: XCTestCase {
         )
     }
 
+    func testAX5ConnectionMessagesExpandWithoutLosingPatientSelection() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "compact-only layout contract")
+        launch(seedPatients: true, section: "modules", dynamicTypeSize: "accessibility5")
+        let row = app.buttons["patient-cell-uitest-1"]
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 10))
+        XCTAssertTrue(row.isHittable)
+        XCTAssertLessThanOrEqual(row.frame.maxY, tabBar.frame.minY)
+
+        let disclosure = app.buttons["patient-worklist-connection-disclosure"]
+        XCTAssertTrue(disclosure.waitForExistence(timeout: 10))
+        XCTAssertTrue(disclosure.label.contains("Home-base non configurato"))
+        XCTAssertFalse(sectionView("workspace-status-message").exists)
+        XCTAssertTrue(sectionView("patient-view-mode").isHittable)
+        XCTAssertTrue(sectionView("patient-worklist-count").exists)
+
+        disclosure.tap()
+        XCTAssertTrue(sectionView("mobile-paired-status").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Collega al computer MediFlow per aprire le cartelle autorizzate."].exists)
+        XCTAssertEqual(sectionView("workspace-status-message").label, "Dati di test caricati.")
+        disclosure.tap()
+        XCTAssertFalse(sectionView("workspace-status-message").exists)
+        XCTAssertTrue(row.isHittable)
+        XCTAssertLessThanOrEqual(row.frame.maxY, tabBar.frame.minY)
+        row.tap()
+        XCTAssertTrue(sectionView("patient-compact-header-disclosure").waitForExistence(timeout: 10))
+    }
+
     /// The scope filter is a segmented control, which truncates instead of
     /// wrapping. At accessibility sizes it has to become a menu so the active
     /// scope is still legible.
