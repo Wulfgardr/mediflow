@@ -37,14 +37,33 @@ async function database() {
     const [{ dbServer, runDbServerImmediateTransaction }, { settings }, orm] = await Promise.all([import('../db-server'), import('../schema'), import('drizzle-orm')]);
     return { dbServer, runDbServerImmediateTransaction, settings, ...orm };
 }
-export async function readOrdinaryCloudSettings(): Promise<OrdinaryCloudSettings> {
-    const { dbServer, settings, inArray } = await database();
+function readConfiguration({ dbServer, settings, inArray }: Awaited<ReturnType<typeof database>>) {
     const rows = dbServer.select({ key: settings.key, value: settings.value }).from(settings)
         .where(inArray(settings.key, [ORDINARY_CLOUD_SETTINGS_KEY, FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY, ...Object.values(FUNCTION_SWITCH_KEYS)])).all();
     const values = Object.fromEntries(rows.map((row: { key: string; value: string }) => [row.key, row.value]));
     const stored = parseOrdinaryStoredSettings(values[ORDINARY_CLOUD_SETTINGS_KEY]);
-    return Object.freeze({ ...stored, revision: hash(JSON.stringify([stored, readFunctionModelConfigurationGeneration(values[FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY])])),
+    const generation = readFunctionModelConfigurationGeneration(values[FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY]);
+    const snapshot: OrdinaryCloudSettings = Object.freeze({ ...stored, revision: hash(JSON.stringify([stored, generation])),
         lanes: Object.freeze(Object.fromEntries(FUNCTION_MODEL_IDS.map(id => [id, values[FUNCTION_SWITCH_KEYS[id]]]))) as OrdinaryCloudSettings['lanes'] });
+    return { snapshot, generation };
+}
+export async function readOrdinaryCloudSettings(): Promise<OrdinaryCloudSettings> {
+    return readConfiguration(await database()).snapshot;
+}
+/** Owned attempt binding; saved model defaults do not change an existing choice. */
+export async function captureOrdinarySettings(functionId: FunctionModelId) {
+    const connection = await database();
+    const initial = readConfiguration(connection);
+    let active = true;
+    return Object.freeze({ settings: initial.snapshot, isCurrent(): boolean {
+        if (!active) return false;
+        try {
+            const current = readConfiguration(connection);
+            active = current.generation === initial.generation && current.snapshot.enabled
+                && current.snapshot.lanes[functionId] === initial.snapshot.lanes[functionId];
+        } catch { active = false; }
+        return active;
+    } });
 }
 /** Caller is the authenticated named HTTP controller. It must retain the original
  * resource use across this await, then commit its response. No generic settings writer. */

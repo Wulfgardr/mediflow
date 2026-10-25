@@ -67,7 +67,7 @@ for (const functionId of FUNCTION_MODEL_IDS) test(`${functionId}: explicit OpenA
     assert.deepEqual(applied.functions.map(row => row.defaultModelOptionId), before.functions.map(row => row.defaultModelOptionId));
     assert.deepEqual(JSON.parse(source.settings[FUNCTION_PREFERENCES_KEY]!).defaults,
         Object.fromEntries(FUNCTION_MODEL_IDS.map(id => [id, null])));
-    assert.equal(settingsWrites, 2); assert.deepEqual(service.apply(command), applied); assert.equal(settingsWrites, 2);
+    assert.equal(settingsWrites, 3); assert.deepEqual(service.apply(command), applied); assert.equal(settingsWrites, 3);
     assert.throws(() => resolveFunctionModelDispatch(source, functionId), /provider_unavailable/u);
     // An explicit unavailable local selection still denies, never choosing OpenAI.
     await picker.read(); await assert.rejects(picker.begin(), /provider_unavailable/u);

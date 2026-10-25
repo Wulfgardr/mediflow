@@ -1,4 +1,4 @@
-import { FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY, readFunctionModelConfigurationGeneration } from './function-model-configuration-generation';
+import { FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY, nextFunctionModelConfigurationGeneration, readFunctionModelConfigurationGeneration } from './function-model-configuration-generation';
 import { createHash } from 'node:crypto';
 import type { PortableStatus } from './treatment-reasoning-portable-provisioning';
 import { isAiLaneEnabledValue } from '../../ai-lane-kill-switch';
@@ -259,7 +259,9 @@ export function planFunctionModelUpdate(sources: FunctionModelSources, value: un
     Object.assign(nextSettings, writes);
     const next: State = { schemaVersion: state.schemaVersion, defaults, lastCommand: null };
     const persisted: State = { ...next, lastCommand: { id: command.commandId, digest, resultFingerprint: fingerprint(next, nextSettings) } };
-    writes[FUNCTION_PREFERENCES_KEY] = JSON.stringify(persisted); Object.assign(nextSettings, writes);
+    writes[FUNCTION_PREFERENCES_KEY] = JSON.stringify(persisted);
+    writes[FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY] = nextFunctionModelConfigurationGeneration(sources.settings[FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY]);
+    Object.assign(nextSettings, writes);
     return { writes, view: readFunctionModelPreferences({ ...sources, settings: nextSettings }, version), command };
 }
 
