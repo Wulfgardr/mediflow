@@ -119,7 +119,7 @@ export default function NewEntryPage() {
     const patient = patientRead.data;
     /* WUL-420 */
     const entriesRead = useLiveQueryState<ClinicalEntry[]>(
-        async () => db.entries.query({ patientId: id }).toArray(),
+        async () => db.entries.query({ patientId: id }).toArray({ rejectAuthUnavailable: true }),
         [id],
         undefined,
         ['entries'],

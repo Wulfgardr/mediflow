@@ -139,9 +139,9 @@ test('Quadro in scrittura distingue lettura, errore e paziente non disponibile',
     });
     let release!: () => void;
     const pending = new Promise<void>(resolve => { release = resolve; });
-    for (const name of ['therapies', 'observations', 'checkups']) await page.route(`**/api/${name}?**`, async route => {
+    for (const name of ['therapies', 'observations', 'checkups', 'entries']) await page.route(`**/api/${name}?**`, async route => {
         if (new URL(route.request().url()).searchParams.get('patientId') !== patientId) return route.continue();
-        await pending; return route.fulfill({ status: 500, json: { error: 'Lettura sintetica indisponibile' } });
+        await pending; return route.fulfill({ status: name === 'entries' ? 503 : 500, json: { error: 'Lettura sintetica indisponibile' } });
     });
     try {
         await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto(`/patients/${patientId}/entries/new`);
@@ -150,7 +150,10 @@ test('Quadro in scrittura distingue lettura, errore e paziente non disponibile',
             const section = quadro.getByRole('region', { name, exact: true });
             await expect(section.getByRole('status')).toContainText('in corso'); await expect(section).not.toContainText(/Nessun[ao]? /u);
         }
+        const previous = page.getByRole('region', { name: 'Ultime voci registrate', exact: true });
+        await expect(previous.getByRole('status')).toContainText('Lettura'); await expect(previous).not.toContainText('Nessuna voce recente');
         release();
+        await expect(previous.getByRole('alert')).toHaveText('Voci precedenti non disponibili.'); await expect(previous).not.toContainText('Nessuna voce recente');
         for (const name of ['Terapie attive', 'Misure recenti', 'Controlli aperti']) {
             const section = quadro.getByRole('region', { name, exact: true });
             await expect(section.getByRole('alert')).toContainText('Impossibile leggere'); await expect(section).not.toContainText(/Nessun[ao]? /u);
