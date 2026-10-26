@@ -178,12 +178,12 @@ test('[E2E fixture] Smart Import exposes only the Fabric review preview and neve
   await openPatientSection(page, 'quadro');
   await expect(page.locator('#quadro')).toBeVisible();
   await expect(page.locator('#quadro [data-testid="fabric-preview-card"]')).toHaveCount(0);
-  await expect(page.getByTestId('smart-import-proposal-summary')).toContainText('Nessuna proposta da rivedere');
+  await expect(page.getByTestId('patient-proposals-summary')).toContainText('Nessuna proposta da rivedere');
   await openPatientSection(page, 'documenti');
   await page.locator('#smart-import').getByRole('button', { name: 'Proposte', exact: true }).click();
 
   const card = page.getByTestId('fabric-preview-card');
-  await expect(page.getByTestId('smart-import-proposal-summary')).toHaveCount(1);
+  await expect(page.getByTestId('patient-proposals-summary')).toHaveCount(1);
   expect(calls.preview).toBe(0);
   await expect(card).toContainText('Raccogli dalle fonti della cartella');
   await card.getByRole('button', { name: 'Prepara proposta' }).click();
@@ -282,9 +282,9 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
         await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules#quadro$`));
         await expect(page.locator('#quadro')).toBeVisible();
         await expect(card).not.toBeVisible();
-        const summary = page.getByTestId('smart-import-proposal-summary');
+        const summary = page.getByTestId('patient-proposals-summary');
         await expect(summary).toContainText('1 proposta da rivedere');
-        await summary.getByRole('link').click(); await expect(card).toBeVisible();
+        await summary.getByRole('link', { name: 'Smart Import', exact: true }).click(); await expect(card).toBeVisible();
         expect(calls.preview).toBe(1);
       }
       fail = true;
@@ -296,7 +296,7 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
       expect(calls.legacyApply).toBe(0);
       if (!baseline) {
         await openPatientSection(page, 'quadro');
-        await expect(page.getByTestId('smart-import-proposal-summary')).toContainText('Nessuna proposta da rivedere');
+        await expect(page.getByTestId('patient-proposals-summary')).toContainText('Nessuna proposta da rivedere');
       }
       expect(runtimeErrors).toEqual([]);
       await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'disabled');
@@ -308,3 +308,86 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
     } finally { release.resolve(); await zoom?.close(); }
   });
 }
+
+test('Proposte combinate: un solo conteggio effettivo e due destinazioni senza rigenerare', async ({ baseURL }) => {
+  test.setTimeout(120_000);
+  const zoom = await openBrowserZoomFixture(baseURL!);
+  const page = zoom.page;
+  let insightCalls = 0;
+  try {
+    const { calls } = await installSmartImportFixture(page);
+    const catalog = { ...FIXTURE_CATALOG, functions: FIXTURE_CATALOG.functions.map(row => ({ ...row,
+      enabled: row.id === 'patient_insight' || row.id === 'smart_import' })) };
+    await page.route('**/api/settings/ai/functions', route => route.fulfill({ json: catalog }));
+    await page.route('**/api/ai/patient-insight/preview', route => {
+      insightCalls += 1;
+      const request = route.request().postDataJSON() as { capturedAt: string; patientRevision: number };
+      return route.fulfill({ json: { preview: {
+        writesPerformed: 0, apply: 'denied', status: 'available', code: null,
+        proposal: { schemaVersion: 'mediflow.patient-insight.review-proposal.v2', reviewOnly: true,
+          summary: 'Proposta Insight sintetica combinata. [S1]', currentState: [], alerts: [], nextSteps: [], gaps: [],
+          generatedAt: request.capturedAt, currentness: { selectionEpoch: 7, patientRevision: request.patientRevision,
+            projectionDigest: `sha256_${'a'.repeat(64)}`, capturedAt: request.capturedAt, verifiedAt: request.capturedAt } },
+        receipt: { schemaVersion: 'mediflow.ai.fabric-resolution.v1', capability: 'patient_insight', venue: 'local_process',
+          provider: 'ollama', model: FIXTURE_MODEL.model, egress: 'none' },
+        provenance: { schemaVersion: 'mediflow.ai.fabric-provenance.v1', capability: 'patient_insight', venue: 'local_process',
+          provider: 'ollama', model: FIXTURE_MODEL.model, preprocessing: ['context_minimization', 'envelope_validation'] },
+        reviewRef: `review_${HEX.review}`,
+      } } });
+    });
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    await page.route('**/api/ambulatories', route => route.fulfill({ json: [{ id: 'ambulatory.synthetic', name: 'Ambulatorio di prova', address: '', version: 1 }] }));
+    await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
+    await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'enabled');
+    const patientId = await createPatient(page);
+    await page.goto(`/patients/${patientId}/modules`); await openPatientSection(page, 'quadro');
+    const summary = page.getByTestId('patient-proposals-summary');
+    await expect(summary).toHaveCount(1); await expect(summary).toContainText('Nessuna proposta da rivedere');
+    await expect(summary.getByRole('link')).toHaveCount(2);
+    await summary.getByRole('link', { name: 'Patient Insight', exact: true }).click();
+    const insight = page.locator('#patient-insight');
+    await insight.locator(':scope > div > [data-disclosure-control]').click();
+    await insight.getByRole('button', { name: 'Cambia', exact: true }).click();
+    await insight.getByRole('combobox', { name: 'Modello per questa proposta' }).selectOption(FIXTURE_MODEL.modelOptionId);
+    await insight.getByRole('button', { name: 'Avvia supporto', exact: true }).click();
+    const insightProposal = insight.getByTestId('patient-insight-review-proposal');
+    await expect(insightProposal).toBeVisible();
+    await openPatientSection(page, 'quadro'); await expect(summary).toContainText('1 proposta da rivedere');
+    await expect(insightProposal).not.toBeVisible();
+    await summary.getByRole('link', { name: 'Smart Import', exact: true }).click();
+    const smart = page.locator('#smart-import');
+    await smart.locator(':scope > div > [data-disclosure-control]').click();
+    await smart.getByRole('button', { name: 'Cambia', exact: true }).click();
+    await smart.getByRole('combobox', { name: 'Modello per questa proposta' }).selectOption(FIXTURE_MODEL.modelOptionId);
+    await smart.getByRole('button', { name: 'Prepara proposta', exact: true }).click();
+    await smart.getByRole('combobox', { name: 'Ambulatorio per questa proposta' }).selectOption('ambulatory.synthetic');
+    await smart.getByRole('checkbox').check(); await smart.getByRole('button', { name: 'Conferma e genera proposta', exact: true }).click();
+    const smartProposal = smart.getByTestId('smart-import-review-proposal');
+    await expect(smartProposal).toBeVisible();
+    await openPatientSection(page, 'quadro'); await expect(summary).toContainText('2 proposte da rivedere');
+    await expect(summary).toHaveCount(1); await expect(insightProposal).not.toBeVisible(); await expect(smartProposal).not.toBeVisible();
+    await expect(page.locator('#quadro [data-testid$="review-proposal"]')).toHaveCount(0);
+    const directory = process.env.SMART_IMPORT_CAPTURES;
+    for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', '320', 'zoom-200', 'zoom-400']) {
+      await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
+      if (size.startsWith('zoom-')) await zoom.setZoom(size === 'zoom-200' ? 2 : 4);
+      else await page.setViewportSize({ width: Number(size), height: 1000 });
+      await page.evaluate(theme => {
+        document.documentElement.classList.toggle('dark', theme === 'grafite');
+        document.documentElement.classList.toggle('light', theme === 'giorno');
+      }, theme);
+      await summary.scrollIntoViewIfNeeded();
+      await assertNoHorizontalOverflow(page, [{ label: 'pagina', selector: 'document' }, { label: 'Riepilogo proposte', selector: '[data-testid="patient-proposals-summary"]' }]);
+      for (const name of ['Patient Insight', 'Smart Import']) await assertNotClippedInViewport(summary.getByRole('link', { name, exact: true }), name);
+      if (directory) { await mkdir(directory, { recursive: true }); await page.screenshot({ path: `${directory}/${theme}-${size}-riepilogo-combinato.png`, animations: 'disabled' }); }
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
+    await summary.getByRole('link', { name: 'Patient Insight', exact: true }).click();
+    await expect(insightProposal).toBeVisible(); await insight.getByRole('button', { name: 'Riusa predefinito', exact: true }).click();
+    await openPatientSection(page, 'quadro'); await expect(summary).toContainText('1 proposta da rivedere');
+    await summary.getByRole('link', { name: 'Smart Import', exact: true }).click();
+    await expect(smartProposal).toBeVisible(); await smart.getByRole('button', { name: 'Ricomincia', exact: true }).click();
+    await openPatientSection(page, 'quadro'); await expect(summary).toContainText('Nessuna proposta da rivedere');
+    expect(insightCalls).toBe(1); expect(calls.preview).toBe(1); expect(calls.legacyApply).toBe(0);
+  } finally { await zoom.close(); }
+});

@@ -8,6 +8,8 @@ import { AlertTriangle, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 import PrivacyBlur from '@/components/privacy-blur';
+import { InkState } from '@/components/ui/ink-state';
+import styles from './patient-insight.module.css';
 import disclosure from '@/components/patient-disclosure.module.css';
 import {
     AI_PATIENT_INSIGHT_KILL_SWITCH_KEY,
@@ -24,6 +26,7 @@ import { useLiveQuery } from '@/lib/live-query';
 interface AIPatientInsightProps {
     patient: Patient;
     stale?: boolean;
+    onProposalChange?: (patientKey: string | null) => void;
 }
 
 type AvailablePreview = Extract<PatientInsightPreviewWire, { status: 'available' }>;
@@ -61,7 +64,7 @@ function InsightList({ items, warning = false }: Readonly<{ items: readonly stri
     );
 }
 
-export default function AIPatientInsight({ patient, stale = false }: AIPatientInsightProps) {
+export default function AIPatientInsight({ patient, stale = false, onProposalChange }: AIPatientInsightProps) {
     const patientKey = `${patient.id}:${patient.version ?? 'unknown'}`;
     const picker = useFunctionModelPicker('patient_insight', patientKey, stale);
     const [storedPreview, setPreview] = useState<Readonly<{ patientKey: string; value: AvailablePreview }> | null>(null);
@@ -78,6 +81,11 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
     const error = storedError?.patientKey === patientKey ? storedError.value : null;
     const isGenerating = generation.patientKey === patientKey && generation.active;
     const setError = (value: string | null) => setStoredError({ patientKey, value });
+
+    useEffect(() => {
+        onProposalChange?.(preview ? patientKey : null);
+        return () => onProposalChange?.(null);
+    }, [onProposalChange, patientKey, preview]);
 
     useEffect(() => {
         abortControllerRef.current?.abort(); setPreview(null); setGeneration({ patientKey, active: false });
@@ -186,9 +194,9 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
             )}
 
             {!isGenerating && preview && (
-                <section className="min-w-0 space-y-5" data-testid="patient-insight-review-proposal">
+                <section className={`${styles.proposal} min-w-0 space-y-5`} data-testid="patient-insight-review-proposal">
                     <div>
-                        <h4 className="text-base font-semibold">Bozza da revisionare</h4>
+                        <h4 className="text-base font-semibold"><InkState state="pencil">Proposta · da rivedere</InkState></h4>
                         <p className="mt-1 text-[color:var(--lume-ink-muted)]">La cartella resta invariata.</p>
                         <p className="mt-2"><span className="text-[color:var(--lume-ink-muted)]">Modello usato: </span>{preview.receipt.model} · {preview.receipt.provider}</p>
                     </div>
@@ -198,8 +206,8 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
                     {preview.proposal.nextSteps.length > 0 && <div><h4 className="font-semibold">Follow-up proposto</h4><InsightList items={preview.proposal.nextSteps} /></div>}
                     {preview.proposal.gaps.length > 0 && <div><h4 className="font-semibold">Dati mancanti</h4><InsightList items={preview.proposal.gaps} /></div>}
                     <div>
-                        <h4 className="font-semibold">Dati di riferimento</h4>
-                        <p className="mt-1 text-[color:var(--lume-ink-muted)]">Confronta i riferimenti della bozza con le informazioni in cartella.</p>
+                        <h4 className="font-semibold">Fonti della proposta</h4>
+                        <p className="mt-1 text-[color:var(--lume-ink-muted)]">Scheda clinica, terapie attive e voci recenti del diario raccolte per questa generazione. Confronta la proposta con le informazioni in cartella.</p>
                         <nav aria-label="Dati in cartella per la revisione" className="mt-2 flex flex-wrap gap-2">
                             <Link href={`/patients/${patient.id}/modules#quadro`} className="ui-btn-secondary" style={actionStyle}>Quadro clinico</Link>
                             <Link href={`/patients/${patient.id}/modules#terapie`} className="ui-btn-secondary" style={actionStyle}>Terapie</Link>

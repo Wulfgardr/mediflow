@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Accessibility, Activity, ChevronRight, FileText, Pill, Plus, ShieldCheck, Stethoscope } from 'lucide-react';
 
 import { PluginLocalUiNavigation, PluginPrescribingGuide } from '@/components/plugin-local-ui-navigation';
-import { PatientClinicalSupport } from '@/components/patient-clinical-support';
+import { PatientClinicalSupport, PatientProposalsSummary } from '@/components/patient-clinical-support';
 import { AttentionGroup } from '@/components/attention-group';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
 import { PatientSynopticSheet } from '@/components/patient-synoptic-sheet';
@@ -27,7 +27,7 @@ import { PatientProfileNotes } from '@/components/patient-profile-notes';
 import { PatientIdentityLens } from '@/components/patient-identity-lens';
 import { PatientHeaderActions } from '@/components/patient-header-actions';
 import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-summary';
-import { PatientSmartImportFabricPreviewCard, PatientSmartImportSummary } from '@/components/patient-smart-import-fabric-preview-card';
+import { PatientSmartImportFabricPreviewCard } from '@/components/patient-smart-import-fabric-preview-card';
 import ProstheticPrescriptionManager from '@/components/prosthetic-prescription-manager';
 import ServicePrescriptionManager from '@/components/service-prescription-manager';
 import SissWorkspace from '@/components/siss-workspace';
@@ -80,6 +80,7 @@ export default function PatientDetailPage() {
     const params = useParams();
     const id = params.id as string;
     const [smartImportProposalCapture, setSmartImportProposalCapture] = useState<PatientSmartImportProjectionCaptureInput | null>(null);
+    const [insightProposalKey, setInsightProposalKey] = useState<string | null>(null);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     /* Whether this browser can actually hand a file to the system.
        Probed rather than assumed: the Web Share API accepts files on iOS, iPadOS
@@ -406,6 +407,7 @@ export default function PatientDetailPage() {
     const insightStale = Boolean(patient.aiSummary?.trim())
         && insightGeneratedAt !== null
         && maxClinicalTimestamp > insightGeneratedAt + 5000;
+    const hasInsightProposal = insightProposalKey === `${patient.id}:${patient.version ?? 'unknown'}`;
     const reviewQueueProjection = buildPatientReviewQueueSummary({
         insight: {
             enabled: isAiPatientInsightEnabledValue(patientInsightKillSwitch?.value),
@@ -449,7 +451,7 @@ export default function PatientDetailPage() {
        oggetto conserva href, label e meta del caller senza binding inferiti. */
     const workspaceNavItems: Kree8WorkspaceNavItem[] = [
         { href: '#quadro', label: 'Quadro' },
-        { href: '#attenzione', label: 'Attenzione', meta: String(reviewQueueSummary.attentionCount + openLoopCount) },
+        { href: '#attenzione', label: 'Attenzione', meta: String(reviewQueueSummary.attentionCount + openLoopCount + Number(hasInsightProposal)) },
         { href: '#identita', label: 'Anagrafica' },
         { href: '#clinica', label: 'Diagnosi' },
         { href: '#amministrazione', label: 'Amministrazione' },
@@ -604,7 +606,7 @@ export default function PatientDetailPage() {
             )}
         >
             <div className={workspaceStyles.clinicalStack}>
-                <section id="attenzione" className={workspaceStyles.attentionBand} data-has-attention={reviewQueueSummary.attentionCount + openLoopCount > 0} aria-labelledby="attention-title" data-testid="lume-scheda-attention">
+                <section id="attenzione" className={workspaceStyles.attentionBand} data-has-attention={reviewQueueSummary.attentionCount + openLoopCount > 0 || hasInsightProposal} aria-labelledby="attention-title" data-testid="lume-scheda-attention">
                     <div className={workspaceStyles.attentionHead}>
                         <div>
                             {!proposal ? <p className={workspaceStyles.sectionLabel}>Attenzione</p> : null}
@@ -654,20 +656,22 @@ export default function PatientDetailPage() {
                                     </button>
                                 );
                             })}
-                            {reviewQueueSummary.attentionCount === 0
+                            {!hasInsightProposal && reviewQueueSummary.attentionCount === 0
                                 && openLoopProjection.groups.length === 0
                                 && openLoopProjection.standaloneLoops.length === 0 ? (
                                 <p className={workspaceStyles.mutedText}>Nessuna decisione o attesa aperta al momento.</p>
                             ) : null}
                         </div>
                     </div>
+                    <PatientClinicalSupport patient={patient} stale={insightStale} onProposalChange={setInsightProposalKey} />
                 </section>
 
                 <PluginLocalUiNavigation key={id} patientId={id} patientVersion={patient.version} patientLabel={`${patient.firstName} ${patient.lastName}`} />
                 <PatientSynopticSheet
                     clinicalSupport={<>
-                        <PatientClinicalSupport patient={patient} stale={insightStale} />
-                        {smartImportSourceCount > 0 ? <PatientSmartImportSummary hasProposal={smartImportProposalCapture !== null && smartImportProposalCapture === smartImportFabricCaptureInput} /> : null}
+                        <PatientProposalsSummary hasInsightProposal={hasInsightProposal}
+                            hasSmartImportProposal={smartImportProposalCapture !== null && smartImportProposalCapture === smartImportFabricCaptureInput}
+                            smartImportAvailable={smartImportSourceCount > 0} />
                     </>}
                     notesContent={<PatientProfileNotes patientId={id} patientVersion={patient.version} />}
                     problems={{ data: diagnosisItems, loading: patientLoading, error: patientError }}

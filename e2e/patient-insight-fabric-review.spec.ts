@@ -1,11 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
 import type { FunctionModelPreferences } from '../lib/function-models/browser';
 import {
   parsePatientInsightPreviewRequest,
   type PatientInsightPreviewRequest,
 } from '../lib/ai-providers/fabric/patient-insight-preview-contract';
-import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 
 const MODEL = 'synthetic-patient-insight:latest';
 const REVIEW_REF = `review_${'b'.repeat(32)}`;
@@ -131,7 +134,12 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
   await page.goto(`/patients/${patientId}/modules#quadro`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules#quadro$`));
   await openPatientSection(page, 'quadro');
+  await expect(page.locator('#quadro #patient-insight')).toHaveCount(0);
+  await expect(page.getByTestId('patient-proposals-summary')).toContainText('Nessuna proposta da rivedere');
+  await openPatientSection(page, 'attenzione');
   const insightDisclosure = page.locator('#patient-insight');
+  await expect(insightDisclosure.locator(':scope > div > [data-disclosure-control]')).toHaveAttribute('aria-expanded', 'false');
+  expect(previewCalls).toBe(0);
   await insightDisclosure.locator(':scope > div > [data-disclosure-control]').click();
   await expect(insightDisclosure.locator(':scope > div > [data-disclosure-control]')).toHaveAttribute('aria-expanded', 'true');
   // this spec already owns a synthetic preview transport; make its local
@@ -153,7 +161,9 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
 
   const proposal = page.getByTestId('patient-insight-review-proposal');
   await expect(proposal).toBeVisible();
-  await expect(proposal).toContainText('Bozza da revisionare');
+  await expect(proposal).toContainText('Proposta · da rivedere');
+  await expect(proposal.locator('[data-ink="pencil"]')).toBeVisible();
+  await expect(proposal).toContainText('Fonti della proposta');
   await expect(proposal).toContainText('0 scritture');
   await expect(proposal).toContainText('Applicazione non consentita');
   await expect(proposal).toContainText('Sintesi Patient Insight sintetica da revisionare. [S1]');
@@ -189,4 +199,85 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
     /"(?:provider|model|endpoint|venue|prompt|fallback|egress|apply)"\s*:/u,
   );
   expect(postGestureMutations).toEqual(['POST /api/ai/patient-insight/preview']);
+  await openPatientSection(page, 'quadro');
+  await expect(page.getByTestId('patient-proposals-summary')).toContainText('1 proposta da rivedere');
+  await expect(proposal).not.toBeVisible();
+  await expect(page.locator('#quadro [data-testid="patient-insight-review-proposal"]')).toHaveCount(0);
+  await page.getByTestId('patient-proposals-summary').getByRole('link', { name: 'Patient Insight', exact: true }).click();
+  await expect(proposal).toBeVisible();
+  expect(previewCalls).toBe(1);
+  await insightDisclosure.getByRole('button', { name: 'Riusa predefinito', exact: true }).click();
+  await expect(proposal).toHaveCount(0);
+  await openPatientSection(page, 'quadro');
+  await expect(page.getByTestId('patient-proposals-summary')).toContainText('Nessuna proposta da rivedere');
+  expect(previewCalls).toBe(1);
 });
+
+for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', '320', 'zoom-200', 'zoom-400']) {
+  test(`Patient Insight composizione ${theme} ${size}`, async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+    const baseline = process.env.PATIENT_INSIGHT_BASELINE === '1';
+    const zoom = size.startsWith('zoom-') ? await openBrowserZoomFixture(baseURL!) : undefined;
+    const release = Promise.withResolvers<void>(), entered = Promise.withResolvers<void>();
+    let fail = false;
+    try {
+      if (zoom) page = zoom.page;
+      await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+      await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
+      const patientId = await createSyntheticPatient(page);
+      await page.route('**/api/settings/ai/functions', route => route.fulfill({ status: 200, json: PATIENT_INSIGHT_CATALOG }));
+      await page.route('**/api/ai/patient-insight/preview', async route => {
+        const request = parsePatientInsightPreviewRequest(route.request().postDataJSON());
+        if (!request) throw new Error('Invalid synthetic preview request');
+        entered.resolve(); await release.promise;
+        return fail ? route.fulfill({ status: 503, json: { error: 'synthetic-provider-unavailable' } })
+          : route.fulfill({ status: 200, json: availablePreview(request) });
+      });
+      await page.goto(`/patients/${patientId}/modules`);
+      await openPatientSection(page, baseline ? 'quadro' : 'attenzione');
+      const panel = page.locator('#patient-insight');
+      await panel.locator(':scope > div > [data-disclosure-control]').click();
+      await panel.getByRole('button', { name: 'Cambia', exact: true }).click();
+      const model = panel.getByRole('combobox', { name: 'Modello per questa proposta', exact: true });
+      await model.focus(); await model.selectOption(MODEL_OPTION_ID);
+      await page.setViewportSize({ width: zoom ? 1440 : Number(size), height: 1000 });
+      await page.evaluate(theme => {
+        document.documentElement.classList.toggle('dark', theme === 'grafite');
+        document.documentElement.classList.toggle('light', theme === 'giorno');
+      }, theme);
+      if (zoom) await zoom.setZoom(size === 'zoom-200' ? 2 : 4);
+      const directory = process.env.PATIENT_INSIGHT_CAPTURES;
+      if (directory) await mkdir(directory, { recursive: true });
+      const capture = async (state: string) => {
+        await panel.scrollIntoViewIfNeeded();
+        if (!baseline) await assertNoHorizontalOverflow(page, [{ label: 'Patient Insight', selector: '#patient-insight' }, { label: 'pagina', selector: 'document' }]);
+        if (directory) await page.screenshot({ path: `${directory}/${theme}-${size}-${state}.png`, animations: 'disabled' });
+      };
+      await capture('pronta');
+      await panel.getByRole('button', { name: 'Avvia supporto', exact: true }).click();
+      await entered.promise;
+      await capture('in-corso');
+      release.resolve();
+      await expect(panel.getByTestId('patient-insight-review-proposal')).toBeVisible();
+      await capture('proposta');
+      const source = panel.getByRole('link', { name: 'Quadro clinico', exact: true });
+      await source.scrollIntoViewIfNeeded(); await source.focus();
+      if (!baseline) await assertNotClippedInViewport(source, 'Fonte Quadro clinico');
+      if (directory) await page.screenshot({ path: `${directory}/${theme}-${size}-fonti.png`, animations: 'disabled' });
+      fail = true;
+      await panel.getByRole('button', { name: 'Riusa predefinito', exact: true }).click();
+      await panel.getByRole('button', { name: 'Avvia supporto', exact: true }).click();
+      await expect(panel.getByRole('alert')).toContainText('Patient Insight non è disponibile');
+      await capture('errore');
+      await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'disabled');
+      await page.reload(); await openPatientSection(page, baseline ? 'quadro' : 'attenzione');
+      await panel.locator(':scope > div > [data-disclosure-control]').click();
+      await expect(panel.getByTestId('patient-insight-disabled-card')).toBeVisible();
+      await capture('spenta');
+      await test.info().attach('surface', { body: JSON.stringify({ theme, size, baseline,
+        revision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+        zoom: zoom ? { mechanism: 'chrome.tabs.setZoom/getZoom', factor: size === 'zoom-200' ? 2 : 4,
+          physicalWidth: 1440, innerWidth: await page.evaluate(() => innerWidth) } : null }), contentType: 'application/json' });
+    } finally { release.resolve(); await zoom?.close(); }
+  });
+}
