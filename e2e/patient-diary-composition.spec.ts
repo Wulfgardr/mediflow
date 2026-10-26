@@ -108,7 +108,13 @@ test('Diario paziente: prosa, provenienza e storico senza cambiare Scale o Timel
         await expect(row).not.toContainText('Motivo sintetico di prova W15a'); if (!baseline) await expect(row).toContainText('Ada Sintetica'); await expect(row.getByRole('button', { name: 'fonte-diario-inventata.txt', exact: false })).toBeVisible();
         await openPatientSection(page, 'scale'); await expect(page.getByRole('feed', { name: 'Storico delle scale del paziente', exact: true })).toContainText('Valutazione storica sintetica W15a.');
         await expect(page.locator('#scale article > time')).toHaveCount(0);
-        await openPatientSection(page, 'timeline'); await expect(page.locator('#timeline')).toContainText('Racconto clinico sintetico W15a');
+        await openPatientSection(page, 'timeline');
+        if (baseline) await expect(page.locator('#timeline')).toContainText('Racconto clinico sintetico W15a');
+        else {
+            await expect(page.locator('#timeline')).not.toContainText(PROSE);
+            await page.locator('#timeline').getByRole('link', { name: 'Apri Controllo sintetico W15a · Diario', exact: true }).click();
+            await expect(pane).toBeVisible(); await expect(row).toContainText(PROSE);
+        }
         await openPatientSection(page, 'diario'); await expect(feed.locator(':scope > article')).toHaveCount(3);
         const readback = await page.evaluate(async patientId => (await fetch(`/api/entries?patientId=${patientId}&includeDeleted=true`)).json(), fixture.patientId);
         expect(readback).toHaveLength(4); expect(readback.find((item: { id: string }) => item.id === fixture.entryId)).toMatchObject({ version: 3, deletedAt: null });
