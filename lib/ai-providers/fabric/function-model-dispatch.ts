@@ -82,13 +82,18 @@ export function captureFunctionModelTransportGuard(provider: 'ollama' | 'athena_
     };
 }
 export function guardFunctionModelResolution(resolution: LocalProviderResolution): LocalProviderResolution {
-    if (!scopes.getStore()) return resolution;
+    const scope = scopes.getStore();
+    if (!scope) return resolution;
     const raw = resolution.adapter;
     const verify = captureFunctionModelTransportGuard('ollama', raw.getModel(), raw.getBaseUrl());
     return Object.freeze({ ...resolution, adapter: Object.freeze({ id: raw.id, kind: raw.kind, capabilities: raw.capabilities,
         getModel: () => raw.getModel(), getBaseUrl: () => raw.getBaseUrl(), listModels: () => raw.listModels(),
         async chat(...args: Parameters<typeof raw.chat>) {
-            await verify(); const result = await raw.chat(...args); await verify(); return result;
+            await verify();
+            const [messages, signal, maxTokens, options] = args;
+            const ownedSignal = signal ? AbortSignal.any([scope.signal, signal]) : scope.signal;
+            const result = await raw.chat(messages, ownedSignal, maxTokens, options);
+            await verify(); return result;
         },
     }) });
 }
