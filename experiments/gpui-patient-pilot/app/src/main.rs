@@ -17,12 +17,17 @@ mod text_input;
 mod theme;
 
 use gpui::{App, AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions, px, size};
-use std::borrow::Cow;
+use std::{borrow::Cow, path::PathBuf};
+
+const STATE_DIRECTORY_MISSING: &str = "Indica una cartella dopo --state-directory.";
+const STATE_DIRECTORY_INVALID: &str = "La cartella deve essere assoluta, già esistente, privata, appartenere all’utente corrente e non contenere collegamenti simbolici nel percorso.";
+const LAUNCH_USAGE: &str = "Uso: --server INDIRIZZO oppure --demo [--state-directory CARTELLA]. La cartella facoltativa contiene preferenze e dati di recupero dell’interfaccia, non l’archivio clinico.";
 
 #[derive(Default, Debug, PartialEq, Eq)]
 struct Launch {
     demo: bool,
     server: String,
+    state_directory: Option<PathBuf>,
 }
 
 fn parse_launch(args: impl IntoIterator<Item = String>) -> Result<Launch, &'static str> {
@@ -37,7 +42,18 @@ fn parse_launch(args: impl IntoIterator<Item = String>) -> Result<Launch, &'stat
                     .filter(|value| !value.starts_with("--") && !value.is_empty())
                     .ok_or("Indica l'indirizzo dopo --server.")?;
             }
-            _ => return Err("Argomento non riconosciuto. Usa --server INDIRIZZO oppure --demo."),
+            "--state-directory" if launch.state_directory.is_none() => {
+                let path = args
+                    .next()
+                    .filter(|value| !value.starts_with("--") && !value.is_empty())
+                    .map(PathBuf::from)
+                    .ok_or(STATE_DIRECTORY_MISSING)?;
+                if !path.is_absolute() {
+                    return Err(STATE_DIRECTORY_INVALID);
+                }
+                launch.state_directory = Some(path);
+            }
+            _ => return Err(LAUNCH_USAGE),
         }
     }
     if launch.demo && !launch.server.is_empty() {
@@ -64,8 +80,20 @@ fn main() {
         Ok(launch) => launch,
         Err(message) => {
             eprintln!("{message}");
-            return;
+            std::process::exit(2);
         }
+    };
+    let local_preferences = match launch.state_directory.as_ref() {
+        Some(directory) => {
+            match shell::local_preferences::LocalPreferencesStore::from_directory(directory) {
+                Ok(store) => Some(store),
+                Err(_) => {
+                    eprintln!("{STATE_DIRECTORY_INVALID}");
+                    std::process::exit(2);
+                }
+            }
+        }
+        None => None,
     };
     gpui_platform::application().run(move |cx: &mut App| {
         #[cfg(unix)]
@@ -94,7 +122,10 @@ fn main() {
         let result = if launch.demo {
             cx.open_window(options, |window, cx| cx.new(|cx| demo_app::PatientApp::new(window, cx))).map(|_| ())
         } else {
-            cx.open_window(options, |window, cx| cx.new(|cx| shell::ClinicalApp::new(launch.server, window, cx))).map(|_| ())
+            cx.open_window(options, |window, cx| cx.new(|cx| match local_preferences {
+                Some(store) => shell::ClinicalApp::with_local_preferences(launch.server, store, window, cx),
+                None => shell::ClinicalApp::new(launch.server, window, cx),
+            })).map(|_| ())
         };
         if let Err(error) = result {
             eprintln!("Impossibile aprire la finestra di MediFlow: {error}");
@@ -108,6 +139,31 @@ fn main() {
 mod tests {
     use super::*;
     #[test]
+    fn state_directory_is_explicit_for_connected_and_demo_without_secret_flags() {
+        for prefix in [vec!["--demo"], vec!["--server", "http://127.0.0.1:43181"]] {
+            let mut args = prefix;
+            args.extend(["--state-directory", "/private/tmp/mediflow-owned"]);
+            assert_eq!(
+                parse_launch(args.into_iter().map(String::from))
+                    .unwrap()
+                    .state_directory,
+                Some(PathBuf::from("/private/tmp/mediflow-owned"))
+            );
+        }
+        for args in [
+            vec!["--state-directory"],
+            vec!["--state-directory", "relative"],
+            vec![
+                "--state-directory",
+                "/private/tmp/a",
+                "--state-directory",
+                "/private/tmp/b",
+            ],
+        ] {
+            assert!(parse_launch(args.into_iter().map(String::from)).is_err());
+        }
+    }
+    #[test]
     fn launch_does_not_treat_demo_as_a_connected_archive_or_accept_secret_flags() {
         assert_eq!(parse_launch(Vec::<String>::new()), Ok(Launch::default()));
         assert!(
@@ -120,7 +176,8 @@ mod tests {
             parse_launch(["--server", "https://127.0.0.1:43181"].map(String::from)),
             Ok(Launch {
                 demo: false,
-                server: "https://127.0.0.1:43181".into()
+                server: "https://127.0.0.1:43181".into(),
+                ..Launch::default()
             })
         );
     }
