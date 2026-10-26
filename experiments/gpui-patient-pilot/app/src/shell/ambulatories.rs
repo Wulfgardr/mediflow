@@ -885,6 +885,53 @@ mod tests {
     }
 
     #[gpui::test]
+    fn reload_during_save_keeps_the_callback_epoch_and_retired_reads_can_restart(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            app.area = Area::Settings;
+            stage(app, Some(row("a", 1, false, None)), cx);
+            app.ambulatory_management.draft.as_mut().unwrap().saving = true;
+            let epoch = app.epoch;
+            app.request_discard(Discard::Reload, cx);
+            assert_eq!(
+                app.epoch, epoch,
+                "reload cannot orphan an in-flight mutation callback"
+            );
+            assert!(app.ambulatory_management.is_saving());
+            assert_eq!(
+                app.ambulatory_management.draft.as_ref().unwrap().fields[0].value(cx),
+                "Bozza sintetica"
+            );
+            app.ambulatory_management.draft.as_mut().unwrap().saving = false;
+            app.ambulatories = Load::Loading;
+            app.next_epoch();
+            assert!(
+                matches!(app.ambulatories, Load::Idle),
+                "a cancelled loading state must be rereadable on return"
+            );
+            app.request_discard(Discard::Reload, cx);
+            assert!(
+                app.ambulatory_management.rebase,
+                "a deliberate reload belongs to the active editor"
+            );
+            app.ambulatory_management.rebase = false;
+            app.area = Area::Agenda;
+            app.request_discard(Discard::Reload, cx);
+            assert!(
+                !app.ambulatory_management.rebase,
+                "reload belongs to the currently visible area"
+            );
+            assert_eq!(
+                app.ambulatory_management.draft.as_ref().unwrap().fields[0].value(cx),
+                "Bozza sintetica"
+            );
+        });
+    }
+
+    #[gpui::test]
     fn conflict_preserves_draft_and_only_explicit_reread_updates_the_base(
         cx: &mut gpui::TestAppContext,
     ) {
