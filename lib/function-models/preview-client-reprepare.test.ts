@@ -183,3 +183,74 @@ for (const operation of ['status', 'settings'] as const) test(`cancel during ${o
     const second = await h.start(); await h.ready(); await h.client.remote.action('generate');
     assert.deepEqual(await (await second.final).json(), { syntheticResult: 2 });
 });
+
+for (const [code, status, expected] of [
+    ['busy', 409, /riservata|chiusura/u], ['revoked', 409, /ritirata/u],
+    ['catalog_stale', 409, /catalogo/u], ['model_unavailable', 409, /modello.*disponibile/u],
+    ['session_expired', 401, /sessione|Sblocca/u],
+] as const) test(`remote preparation ${code} keeps its own denial instead of declaring a stale local choice`, async t => {
+    const calls: string[] = [];
+    const settings = { schema: 'mediflow.chatgpt-ordinary-settings.v1', revision: `sha256_${'a'.repeat(64)}`, enabled: true,
+        retention: 'chatgpt_service_terms_apply', preferences: Object.fromEntries([...functions, 'treatment_reasoning'].map(id => [id, { use: 'local', model: null, effort: null }])),
+        lanes: Object.fromEntries([...functions, 'treatment_reasoning'].map(id => [id, 'enabled'])) };
+    const client = createModelPreviewClient('document_synthesis', (async input => {
+        calls.push(String(input));
+        return String(input).endsWith('/settings') ? Response.json(settings) : Response.json({ error: 'PRIVATE_ERROR_SENTINEL', code }, { status });
+    }) as typeof fetch);
+    t.after(() => client.reset(false)); client.reset(true); client.chooseRemote(); await until(() => !client.remote.getSnapshot().loading);
+    await client.begin();
+    const response = await client.fetch('/api/ai/document-synthesis/preview', { method: 'POST', body: '{}' });
+    assert.equal(response.status, status); assert.equal((await response.json()).code, code);
+    assert.equal(client.getSnapshot().blocked, true); assert.equal(client.getSnapshot().consumed, true);
+    assert.doesNotMatch(client.getSnapshot().error ?? '', /scelta del modello.*attuale/u);
+    assert.match(client.remote.getSnapshot().error ?? '', expected);
+    assert.doesNotMatch(JSON.stringify(client.getSnapshot()), /PRIVATE_ERROR_SENTINEL/u);
+    await assert.rejects(client.begin());
+    assert.equal(calls.filter(path => path.endsWith('/preview')).length, 1);
+});
+
+test('Document Synthesis context reset retires the old lease; explicit remote reselection can prepare again', async t => {
+    const h = harness('document_synthesis'); t.after(() => h.client.reset(false));
+    await h.select(); const old = await h.client.begin(); h.client.reset(true);
+    assert.equal(h.client.isCurrent(old), false); assert.equal(h.client.getSnapshot().remote, undefined);
+    await assert.rejects(h.client.fetch('/api/ai/document-synthesis/preview', { method: 'POST', body: '{}' }));
+    assert.equal(h.calls.filter(call => call.operation === 'preview').length, 0);
+    await h.select(); const run = await h.start(); assert.equal(h.client.isCurrent(run.token), true);
+    assert.equal(h.client.remote.getSnapshot().state?.phase, 'needs_consent');
+    h.client.cancel(); await assert.rejects(run.final);
+    assert.equal(h.calls.filter(call => call.operation === 'preview').length, 1);
+    assert.equal(h.calls.some(call => call.operation === 'login/start' || call.operation === 'generate'), false);
+});
+
+test('late remote error-body parsing cannot restore a retired picker or disclose server prose', async () => {
+    let release!: (value: unknown) => void, reading = false;
+    const response = Response.json({ code: 'busy' }, { status: 409 }); const copy = response.clone();
+    copy.json = () => { reading = true; return new Promise(resolve => { release = resolve; }); }; response.clone = () => copy;
+    const settings = { schema: 'mediflow.chatgpt-ordinary-settings.v1', revision: `sha256_${'a'.repeat(64)}`, enabled: true,
+        retention: 'chatgpt_service_terms_apply', preferences: Object.fromEntries([...functions, 'treatment_reasoning'].map(id => [id, { use: 'local', model: null, effort: null }])),
+        lanes: Object.fromEntries([...functions, 'treatment_reasoning'].map(id => [id, 'enabled'])) };
+    const client = createModelPreviewClient('document_synthesis', (async input => String(input).endsWith('/settings') ? Response.json(settings) : response) as typeof fetch);
+    client.reset(true); client.chooseRemote(); await until(() => !client.remote.getSnapshot().loading); await client.begin();
+    const pending = client.fetch('/api/ai/document-synthesis/preview', { method: 'POST', body: '{}' });
+    await until(() => reading); client.reset(false); release({ error: 'PRIVATE_LATE_PROSE', code: 'busy' });
+    await assert.rejects(pending, error => (error as { code?: string }).code === 'revoked');
+    assert.equal(client.getSnapshot().remote, undefined); assert.equal(client.remote.getSnapshot().error, null);
+    assert.equal(client.getSnapshot().blocked, true);
+});
+
+test('unknown and malformed remote denials stay blocked with fixed copy and no server prose', async () => {
+    for (const raw of [{ error: 'PRIVATE_UNKNOWN_PROSE', code: 'PRIVATE_UNKNOWN_CODE' }, { error: 'PRIVATE_PROTO_PROSE', code: '__proto__' }, null, 'invalid-json']) {
+        const settings = { schema: 'mediflow.chatgpt-ordinary-settings.v1', revision: `sha256_${'a'.repeat(64)}`, enabled: true,
+            retention: 'chatgpt_service_terms_apply', preferences: Object.fromEntries([...functions, 'treatment_reasoning'].map(id => [id, { use: 'local', model: null, effort: null }])),
+            lanes: Object.fromEntries([...functions, 'treatment_reasoning'].map(id => [id, 'enabled'])) };
+        const client = createModelPreviewClient('document_synthesis', (async input => String(input).endsWith('/settings') ? Response.json(settings)
+            : raw === 'invalid-json' ? new Response('invalid-json', { status: 409 }) : Response.json(raw, { status: 409 })) as typeof fetch);
+        try {
+            client.reset(true); client.chooseRemote(); await until(() => !client.remote.getSnapshot().loading); await client.begin();
+            assert.equal((await client.fetch('/api/ai/document-synthesis/preview', { method: 'POST', body: '{}' })).status, 409);
+            assert.equal(client.getSnapshot().blocked, true); assert.equal(client.getSnapshot().consumed, true);
+            assert.match(client.remote.getSnapshot().error ?? '', /Preparazione OpenAI non riuscita/u);
+            assert.doesNotMatch(JSON.stringify(client.getSnapshot()), /PRIVATE_|invalid-json|scelta del modello.*attuale/u);
+        } finally { client.reset(false); }
+    }
+});

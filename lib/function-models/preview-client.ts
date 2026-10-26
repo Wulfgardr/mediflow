@@ -81,7 +81,8 @@ export function createModelPreviewClient(functionId: FunctionModelId, request: t
             } else if (path.includes('/preview')) throw new ModelUiError('invalid');
             const signal = init?.signal ? AbortSignal.any([transport.signal, init.signal]) : transport.signal;
             const response = remoteRequest ? await remote.execute(input, { ...init, headers }, signal) : await request(input, { ...init, headers, signal }); current(token);
-            if (path === previewPath && (response.status === 409 || response.status === 401)) {
+            if (path === previewPath && remoteRequest && !response.ok) emit({ choice: null, blocked: true, error: null });
+            else if (path === previewPath && (response.status === 409 || response.status === 401)) {
                 emit({ choice: null, blocked: true, error: errorText(new ModelUiError(response.status === 409 ? 'stale' : 'locked')) });
                 throw new ModelUiError('stale');
             }
