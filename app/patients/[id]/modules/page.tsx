@@ -9,7 +9,7 @@ import { differenceInYears } from 'date-fns';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { Accessibility, Activity, ChevronRight, FileText, Pill, Plus, ShieldCheck } from 'lucide-react';
+import { Activity, ChevronRight, FileText, Pill, Plus, ShieldCheck } from 'lucide-react';
 
 import { PluginLocalUiNavigation, PluginPrescribingGuide } from '@/components/plugin-local-ui-navigation';
 import { PatientClinicalSupport, PatientProposalsSummary } from '@/components/patient-clinical-support';
@@ -726,18 +726,7 @@ export default function PatientDetailPage() {
                     <ObservationManager patientId={id} embedded prefill={observationPrefill}
                         surfaceClassName={workspaceStyles.clinicalSection} />
 
-                    <CollapsibleSection
-                        id="protesica"
-                        kicker="Protesica"
-                        title="Diario ausili e prescrizioni"
-                        icon={Accessibility}
-                        count={protesicaCount !== undefined ? String(protesicaCount) : undefined}
-                        summary={protesicaCount === 0 ? 'Nessuna voce protesica registrata.' : undefined}
-                        surfaceClassName={workspaceStyles.clinicalSection}
-                        keepMounted
-                    >
-                        <ProstheticPrescriptionManager patientId={id} embedded />
-                    </CollapsibleSection>
+                    <ProstheticPrescriptionManager patientId={id} embedded surfaceClassName={workspaceStyles.clinicalSection} />
 
                     <CollapsibleSection
                         id="siss"

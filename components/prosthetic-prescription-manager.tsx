@@ -1,10 +1,14 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
+import { PatientSheetMenu } from '@/components/patient-sheet-menu';
+import { CollapsibleSection } from '@/components/kree8/collapsible-section';
+import { formatCountLabel } from '@/lib/format-count';
 import { Disclosure } from '@/components/disclosure';
 
 import styles from './clinical-register.module.css';
-import { type FormEvent, useMemo, useState } from 'react';
-import { Accessibility, CheckCircle2, LoaderCircle, Plus, Trash2 } from 'lucide-react';
+import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { LoaderCircle, MoreHorizontal, Plus } from 'lucide-react';
 import { db, type ProstheticPrescription, type ProstheticPrescriptionCategory, type ProstheticPrescriptionStatus } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -19,6 +23,7 @@ import type { SemanticSignal } from '@/lib/ui-semantic-signal';
 type Props = {
     patientId: string;
     embedded?: boolean;
+    surfaceClassName?: string;
 };
 
 type FormState = {
@@ -118,12 +123,21 @@ function parseDocumentRefs(value: string | undefined): string[] {
     }
 }
 
-export default function ProstheticPrescriptionManager({ patientId, embedded = false }: Props) {
+export default function ProstheticPrescriptionManager({ patientId, embedded = false, surfaceClassName = 'patient-detail-section' }: Props) {
     const confirm = useConfirm();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState<FormState>(() => emptyForm());
+    const formId = useId();
+    const creationRef = useRef<HTMLButtonElement>(null);
+    const formRef = useRef<HTMLFormElement>(null);
+    const wasFormOpen = useRef(false);
+    useEffect(() => {
+        if (isFormOpen) formRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+        else if (wasFormOpen.current) creationRef.current?.focus();
+        wasFormOpen.current = isFormOpen;
+    }, [isFormOpen]);
 
     /* the conditional form's open state is the pending-form signal. */
     useRuntimeTwinPendingForm(isFormOpen);
@@ -211,40 +225,13 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
         await db.prostheticPrescriptions.delete(item.id, { version: item.version });
     };
 
-    const headerActions = (
-        <>
-            <span className="apple-chip">{prescriptions?.length ?? 0} {prescriptions?.length === 1 ? 'voce' : 'voci'}</span>
-            <span className="apple-chip">{testedCount} collaudi</span>
-            <button
-                type="button"
-                onClick={() => setIsFormOpen((value) => !value)}
-                className="ui-btn-primary h-10 px-4 text-sm font-semibold"
-            >
-                <Plus className="h-4 w-4" />
-                Nuova voce
-            </button>
-        </>
-    );
-
-    return (
+    const count = prescriptions === undefined ? undefined : formatCountLabel(prescriptions.length, 'voce', 'voci');
+    const newButton = <Button ref={creationRef} variant="text" aria-expanded={isFormOpen} aria-controls={formId}
+        onClick={() => setIsFormOpen(value => !value)}>Nuova voce protesica</Button>;
+    const content = (
         <section className={styles.register}>
-            {embedded ? (
-                <div className="mb-4 flex flex-wrap items-center justify-end gap-2">{headerActions}</div>
-            ) : (
-                <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                        <p className="section-kicker">Protesica</p>
-                        <h2 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
-                            <Accessibility className="h-5 w-5 text-[color:var(--lume-accent)]" />
-                            Diario ausili e prescrizioni
-                        </h2>
-                        <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--lume-ink-muted)]">
-                            Registra cosa è stato prescritto, con codice ISO, misure, documenti prodotti e collaudo. Le voci da allegati restano da revisione operatore.
-                        </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">{headerActions}</div>
-                </div>
-            )}
+            {!embedded && <header className={styles.therapyHeading}><h2>Diario ausili e prescrizioni <span>{count}</span></h2>{newButton}</header>}
+            {prescriptions && prescriptions.length > 0 ? <p className={styles.muted}>{formatCountLabel(testedCount, 'collaudo', 'collaudi')}</p> : null}
 
             {isFormOpen && (
                 <Disclosure className="mb-4" title="Cerca un ausilio nel repertorio">
@@ -257,7 +244,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
             )}
 
             {isFormOpen && (
-                <form onSubmit={handleSubmit} className={styles.form}>
+                <form id={formId} ref={formRef} aria-label="Nuova voce protesica" onSubmit={handleSubmit} className={styles.form}>
                     <div className="grid gap-3 md:grid-cols-2">
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Data prescrizione
@@ -373,17 +360,13 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                             <td className={`${styles.secondaryColumn} lume-registro`}>{new Date(item.prescribedAt).toLocaleDateString('it-IT')}</td>
                             <td><Badge tone={prostheticStatusSignal(item.status)} size="xs" className={styles.status}>{statusLabel(item.status)}</Badge></td>
                             <td>
-                                    <div className={styles.controls}>
-                                        {item.status !== 'tested' && (
-                                            <button type="button" className="ui-btn-secondary h-9 px-3 text-xs" onClick={() => void markTested(item)}>
-                                                <CheckCircle2 className="h-4 w-4" />
-                                                Collaudo
-                                            </button>
-                                        )}
-                                        <button type="button" aria-label={`Elimina ${item.description}`} className="ui-btn-secondary h-9 px-3 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]" onClick={() => void deleteItem(item)}>
-                                            <Trash2 className="h-4 w-4" />
-                                        </button>
-                                    </div>
+                                <div className={styles.therapyActions}>
+                                    {item.status !== 'tested' ? <Button variant="text" onClick={() => void markTested(item)}>Collaudo</Button> : null}
+                                    <PatientSheetMenu label={`Azioni voce protesica ${item.description}`}
+                                        trigger={props => <Button {...props} variant="icon" aria-label={`Azioni voce protesica ${item.description}`}><MoreHorizontal size={16} aria-hidden /></Button>}>
+                                        <button type="button" role="menuitem" onClick={() => void deleteItem(item)}>Elimina voce protesica</button>
+                                    </PatientSheetMenu>
+                                </div>
 
                             </td>
                         </tr>;                    })}
@@ -392,4 +375,8 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
             )}
         </section>
     );
+    return embedded ? <CollapsibleSection id="protesica" title="Diario ausili e prescrizioni" count={count}
+        defaultOpen={isFormOpen} headerAction={newButton} surfaceClassName={`${surfaceClassName} ${styles.therapySection}`} keepMounted>
+        {content}
+    </CollapsibleSection> : content;
 }
