@@ -5,6 +5,7 @@ test.describe.configure({ retries: 0 });
 const phrase = 'Passphrase recupero soltanto sintetica';
 
 test('complete backup is encrypted in the browser and verification never claims a proven restore', async ({ page }, testInfo) => {
+    await page.route('**/api/siss/session-status', route => route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } }));
     const pageErrors: string[] = []; const sent: string[] = [];
     page.on('pageerror', error => pageErrors.push(error.message));
     page.on('request', request => { if (request.method() === 'POST') sent.push(request.postData() ?? ''); });
@@ -35,7 +36,7 @@ test('complete backup is encrypted in the browser and verification never claims 
     if (await manual.isVisible()) await manual.click();
     await navigation.locator('summary').filter({ hasText: /^Altro$/u }).click();
     await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();
-    await page.getByRole('link', { name: 'Backup', exact: true }).click();
+    await page.getByTestId('settings-overview-link-backup').click();
     const panel = page.getByRole('region', { name: 'Backup completo di recupero', exact: true });
     await expect(panel).toBeVisible();
     const denied = await page.request.post('/api/system/recovery-backup', { data: {}, headers: {
