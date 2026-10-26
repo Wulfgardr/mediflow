@@ -78,7 +78,8 @@ export async function createOrdinaryProductAttempt(session: OrdinarySession, pla
             try { await host?.close(); } catch { confirmed = false; }
             try { await platform.close?.(); } catch { confirmed = false; }
             if (host && !host.cleanupComplete()) confirmed = false;
-            if (platform.preparation && !['not_prepared', 'closed'].includes(platform.preparation().state)) confirmed = false;
+            const preparation = platform.ownedPreparation?.() ?? platform.preparation?.();
+            if (preparation && !['not_prepared', 'closed'].includes(preparation.state)) confirmed = false;
             if (registration) owner.unregisterPrivateResource(port, registration);
             owner.releaseResourcePort(port);
             return Object.freeze({ cleanupConfirmed: confirmed });
