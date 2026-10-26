@@ -441,6 +441,7 @@ pub struct ClinicalApp {
     threshold_menu_scroll: ScrollHandle,
     threshold_menu_targets: [ScrollTarget; 3],
     threshold_mode: std::rc::Rc<std::cell::Cell<ThresholdMode>>,
+    threshold_scrolls_with_content: std::rc::Rc<std::cell::Cell<bool>>,
     form_actions: [ScrollTarget; 8],
     focus_after_render: bool,
     focus_search_after_render: bool,
@@ -717,6 +718,7 @@ impl ClinicalApp {
                 ScrollTarget::new(&threshold_menu_scroll, cx)
             }),
             threshold_mode: std::rc::Rc::new(std::cell::Cell::new(ThresholdMode::Complete)),
+            threshold_scrolls_with_content: Default::default(),
             form_actions,
             focus_after_render: false,
             focus_search_after_render: false,
@@ -1466,8 +1468,9 @@ impl ClinicalApp {
                 .as_ref()
                 .is_some_and(|therapy| therapy.reveal_if_focused(window, cx))
                 && !reveal_fields(&form.fields, window, cx)
-                && Layout::for_window(f32::from(window.viewport_size().width), self.text_scale)
-                    .magnified
+                && (self.threshold_scrolls_with_content.get()
+                    || Layout::for_window(f32::from(window.viewport_size().width), self.text_scale)
+                        .magnified)
             {
                 self.form_actions
                     .iter()
@@ -2652,6 +2655,9 @@ impl ClinicalApp {
             .aria_label("Aree di MediFlow")
             .min_w_0()
             .max_w_full()
+            .mx(px(8.))
+            .mb(px(8.))
+            .rounded(px(theme.paper_radius))
             .flex()
             .flex_shrink_0()
             .border_t_1()
@@ -3572,6 +3578,8 @@ impl ClinicalApp {
                     .flex_wrap()
                     .flex_shrink_0()
                     .px(px(if layout.compact { 16. } else { layout.margin }))
+                    .py(px(8.))
+                    .gap(px(4.))
                     .bg(theme.shade)
                     .children(PatientSection::ALL.into_iter().map(|patient_section| {
                         tab(
@@ -4578,12 +4586,19 @@ impl ClinicalApp {
             .as_ref()
             .is_some_and(|form| form.state == FormState::Review)
             && self.discard.is_none();
+        let editing_text = self.discard.is_none()
+            && self.form.as_ref().is_some_and(|form| {
+                form.state == FormState::Draft
+                    && !form.fields.is_empty()
+                    && form.kind != FormKind::Scale
+            });
         let detail = self.threshold_detail(ThresholdMode::Compact, cx);
         let limited = self.threshold_recovery(layout, cx);
         let has_recovery_region = limited.is_some();
         let content = content.into_any_element();
         let scroll = self.profile_scroll.clone();
         let mode = self.threshold_mode.clone();
+        let scrolls_with_content = self.threshold_scrolls_with_content.clone();
         let menu_open = self.threshold_menu_open.clone();
         let question_focus = self.threshold_question.focus.clone();
         let theme = self.theme;
@@ -4593,6 +4608,7 @@ impl ClinicalApp {
             .min_h_0()
             .min_w_0()
             .bg(theme.paper)
+            .rounded(px(theme.paper_radius))
             .overflow_hidden()
             .on_action(cx.listener(|this, _: &NextFocus, window, cx| {
                 if this.threshold_mode.get() == ThresholdMode::FullPlane {
@@ -4629,18 +4645,22 @@ impl ClinicalApp {
                         );
                         let measured = measure.layout_as_root(available, window, cx);
                         let essential = measure_essential.layout_as_root(available, window, cx);
-                        let decision = ThresholdLayout::measured(
+                        let mut decision = ThresholdLayout::measured(
                             f32::from(bounds.size.height),
                             f32::from(measured.height),
                             f32::from(essential.height),
                             confirming,
                             layout,
                         );
+                        decision.scrolls_with_content =
+                            editing_text && essential.height > bounds.size.height / 3.;
+                        scrolls_with_content.set(decision.scrolls_with_content);
                         let minimum_content = px(theme.role(TypeRole::Body).line_height.ceil())
                             .min(bounds.size.height);
                         let recovery_height = bounds.size.height - minimum_content;
                         let overflow = decision.mode == ThresholdMode::Compact
                             && !confirming
+                            && !decision.scrolls_with_content
                             && essential.height > recovery_height;
                         if !overflow {
                             menu_open.set(false);
@@ -4662,7 +4682,9 @@ impl ClinicalApp {
                                 .child(full_plane)
                                 .into_any_element()
                         } else {
-                            let threshold = if decision.mode == ThresholdMode::Compact {
+                            let threshold = if decision.scrolls_with_content {
+                                complete
+                            } else if decision.mode == ThresholdMode::Compact {
                                 if overflow {
                                     limited
                                         .map(|bar| bar.max_h(recovery_height).into_any_element())
@@ -4693,6 +4715,7 @@ impl ClinicalApp {
                                 .child(content)
                                 .when(
                                     decision.mode == ThresholdMode::Compact
+                                        && !decision.scrolls_with_content
                                         && (!overflow || !has_recovery_region),
                                     |el| el.child(div().p(px(layout.margin)).child(detail)),
                                 );
@@ -4868,6 +4891,9 @@ impl ClinicalApp {
                                 .when(!compact, |el| {
                                     el.child(
                                         div()
+                                            .min_w_0()
+                                            .max_w_full()
+                                            .whitespace_normal()
                                             .type_role(theme, TypeRole::Meta)
                                             .child(text!(subject)),
                                     )
@@ -6168,7 +6194,14 @@ impl Render for ClinicalApp {
                             .flex()
                             .flex_col()
                             .when(connected, |el| {
-                                el.p(px(if layout.compact { 0. } else { 12. })).gap(px(12.))
+                                el.p(px(if layout.magnified {
+                                    0.
+                                } else if layout.compact {
+                                    8.
+                                } else {
+                                    12.
+                                }))
+                                .gap(px(12.))
                             })
                             .when(
                                 connected
@@ -8486,15 +8519,26 @@ mod tests {
                     render_clinical_window(cx);
                     let bar = cx.debug_bounds("threshold-bar").unwrap();
                     let scroll = cx.debug_bounds("threshold-scroll").unwrap();
-                    assert_eq!(bar.bottom(), px(700.));
-                    assert!(bar.top() >= px(0.) && scroll.bottom() <= bar.top());
+                    let inline =
+                        app.read_with(cx, |app, _| app.threshold_scrolls_with_content.get());
+                    if inline {
+                        assert_eq!(scroll.size.height, px(700.));
+                        assert!(bar.top() >= scroll.top());
+                    } else {
+                        assert_eq!(bar.bottom(), px(700.));
+                        assert!(bar.top() >= px(0.) && scroll.bottom() <= bar.top());
+                    }
                     assert!(scroll.size.height > px(0.));
                     app.read_with(cx, |app, _| {
                         app.profile_scroll
                             .set_offset(gpui::point(px(0.), px(-100000.)))
                     });
                     render_clinical_window(cx);
-                    assert_eq!(cx.debug_bounds("threshold-bar").unwrap(), bar);
+                    if inline {
+                        assert!(cx.debug_bounds("threshold-bar").unwrap().top() < bar.top());
+                    } else {
+                        assert_eq!(cx.debug_bounds("threshold-bar").unwrap(), bar);
+                    }
                 }
             }
         }
