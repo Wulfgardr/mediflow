@@ -211,4 +211,8 @@ export function createAmbulatoryDestructiveService(options: { now?: () => number
         },
     };
 }
-export const ambulatoryDestructiveService = createAmbulatoryDestructiveService();
+const processOwnerKey = Symbol.for('mediflow.ambulatory-destructive-service.v1');
+const processOwners = globalThis as typeof globalThis & {
+    [processOwnerKey]?: ReturnType<typeof createAmbulatoryDestructiveService>;
+};
+export const ambulatoryDestructiveService = processOwners[processOwnerKey] ??= createAmbulatoryDestructiveService();
