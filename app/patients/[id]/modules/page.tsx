@@ -27,7 +27,7 @@ import { PatientProfileNotes } from '@/components/patient-profile-notes';
 import { PatientIdentityLens } from '@/components/patient-identity-lens';
 import { PatientHeaderActions } from '@/components/patient-header-actions';
 import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-summary';
-import { PatientSmartImportFabricPreviewCard } from '@/components/patient-smart-import-fabric-preview-card';
+import { PatientSmartImportFabricPreviewCard, PatientSmartImportSummary } from '@/components/patient-smart-import-fabric-preview-card';
 import ProstheticPrescriptionManager from '@/components/prosthetic-prescription-manager';
 import ServicePrescriptionManager from '@/components/service-prescription-manager';
 import SissWorkspace from '@/components/siss-workspace';
@@ -51,6 +51,7 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/ui/toast-provider';
 import { buildPatientReviewQueueSummary } from '@/lib/domain/documents/patient-review-queue-summary';
 import {
+    type PatientSmartImportProjectionCaptureInput,
     buildPatientSmartImportProjectionCaptureInput,
     countUsableSources,
 } from '@/lib/domain/documents/patient-smart-import-projection-capture';
@@ -78,6 +79,7 @@ export default function PatientDetailPage() {
     const { proposal } = useRuntimeTwinDesign();
     const params = useParams();
     const id = params.id as string;
+    const [smartImportProposalCapture, setSmartImportProposalCapture] = useState<PatientSmartImportProjectionCaptureInput | null>(null);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     /* Whether this browser can actually hand a file to the system.
        Probed rather than assumed: the Web Share API accepts files on iOS, iPadOS
@@ -663,12 +665,10 @@ export default function PatientDetailPage() {
 
                 <PluginLocalUiNavigation key={id} patientId={id} patientVersion={patient.version} patientLabel={`${patient.firstName} ${patient.lastName}`} />
                 <PatientSynopticSheet
-                    clinicalSupport={<PatientClinicalSupport patient={patient} stale={insightStale}
-                        smartImport={smartImportSourceCount > 0 && smartImportFabricCaptureInput ? (
-                            <PatientSmartImportFabricPreviewCard patientId={patient.id}
-                                captureInput={smartImportFabricCaptureInput}
-                                enabled={isAiSmartImportEnabledValue(smartImportKillSwitch?.value)} />
-                        ) : null} />}
+                    clinicalSupport={<>
+                        <PatientClinicalSupport patient={patient} stale={insightStale} />
+                        {smartImportSourceCount > 0 ? <PatientSmartImportSummary hasProposal={smartImportProposalCapture !== null && smartImportProposalCapture === smartImportFabricCaptureInput} /> : null}
+                    </>}
                     notesContent={<PatientProfileNotes patientId={id} patientVersion={patient.version} />}
                     problems={{ data: diagnosisItems, loading: patientLoading, error: patientError }}
                     therapies={{ data: activeTherapies, loading: therapiesLoading, error: therapiesError }}
@@ -789,6 +789,15 @@ export default function PatientDetailPage() {
                             </Disclosure>
                         ) : null}
                     </DocumentUpload>
+                    {smartImportSourceCount > 0 && smartImportFabricCaptureInput ? <section className={disclosure.clinicalSupport} aria-label="Smart Import">
+                        <h3 className="type-body font-semibold">Smart Import</h3>
+                        <Disclosure id="smart-import" className={disclosure.disclosure} title="Proposte">
+                            <PatientSmartImportFabricPreviewCard patientId={patient.id}
+                                captureInput={smartImportFabricCaptureInput}
+                                enabled={isAiSmartImportEnabledValue(smartImportKillSwitch?.value)}
+                                onProposalChange={setSmartImportProposalCapture} />
+                        </Disclosure>
+                    </section> : null}
                 </CollapsibleSection>
 
                     <CollapsibleSection
