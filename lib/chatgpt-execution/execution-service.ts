@@ -1,13 +1,15 @@
 import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
 import { isAbsolute } from 'node:path';
+import { createExecutionQuotaMonitor, type ExecutionQuotaMonitor } from './execution-quota';
+import type { ExecutionQuotaView } from './quota-view';
 import { ExecutionError, isSupportedChatGptPlan } from './execution-contract';
 import { reportExecutionDiagnostic, type ExecutionDiagnostic } from './execution-transport';
 import { readPreparedOrdinaryProfile, closePreparedOrdinaryProfile, type PreparedOrdinaryProfile, type PreparedOrdinaryRead } from './ordinary-preparation';
 import { assertOrdinaryProductConsent, ordinaryConsentIsCurrent, closeOrdinaryProductConsent, type OrdinaryProductConsent } from '../chatgpt-product/product-consent';
 import { assertOrdinaryEgress } from './ordinary-egress-chokepoint';
 import type { OrdinaryTaskOutput } from './ordinary-task-profile';
-import type { ExecutionCode, ExecutionMethod, ExecutionTransport, ModelEffort, SynthesisCatalog, SynthesisChoice, SynthesisInput, SynthesisRequest, SynthesisResult } from './execution-contract';
+import type { ExecutionDenial, ExecutionCode, ExecutionMethod, ExecutionTransport, ModelEffort, SynthesisCatalog, SynthesisChoice, SynthesisInput, SynthesisRequest, SynthesisResult } from './execution-contract';
 
 type RecordValue = Record<string, unknown>;
 const record = (value: unknown): RecordValue => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as RecordValue : {};
@@ -30,7 +32,7 @@ const outputSchema = {
 type ExecutionAuthorityOptions = Readonly<{
     transport: ExecutionTransport; isCurrent: () => boolean;
     boundaryQualified: () => boolean; cwd: string; now?: () => number; timeoutMs?: number;
-    diagnostic?: (event: ExecutionDiagnostic) => void;
+    diagnostic?: (event: ExecutionDiagnostic) => void; quotaMonitor?: ExecutionQuotaMonitor;
 }>;
 // Private engine inputs are assembled by the named host factories below. This
 // callback is not exported as a route/configuration or an admission mechanism.
@@ -44,6 +46,7 @@ type ExecutionTask<Result extends object> = Readonly<{
 function createTaskExecutionService<Result extends object>(options: ExecutionAuthorityOptions, task: ExecutionTask<Result>) {
     const { transport, isCurrent, boundaryQualified, cwd } = options;
     const now = options.now ?? Date.now;
+    const quota = options.quotaMonitor ?? createExecutionQuotaMonitor();
     const timeoutMs = options.timeoutMs ?? 120_000;
     if (!isAbsolute(cwd) || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 600_000) throw new ExecutionError('invalid_request');
     let catalog: SynthesisCatalog | undefined;
@@ -52,6 +55,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
     let verifiedAccountRevision = 0;
     let accountCheck: Promise<void> | undefined;
     let terminal: ExecutionCode | undefined;
+    let terminalDenial: ExecutionDenial | null = null;
     let usedTurn = false;
     let threadId: string | undefined;
     let turnId: string | undefined;
@@ -59,7 +63,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
     let turnPending = false;
     let finalText: string | undefined;
     let completed = false;
-    type Event = { method: string; thread: string; turn: string; text?: string; status?: string };
+    type Event = { method: string; thread: string; turn: string; text?: string; status?: string; quotaExceeded?: boolean };
     let early: Event[] = [];
     let earlyBytes = 0;
     let resolveCompletion: (() => void) | undefined;
@@ -76,7 +80,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
     }
     function guard() {
         const code = terminal ?? authority();
-        if (code) throw new ExecutionError(code);
+        if (code) throw new ExecutionError(code, terminalDenial);
         if (active && now() >= active.deadline) throw new ExecutionError('timeout');
     }
     async function bounded(task: () => Promise<unknown>, milliseconds: number) {
@@ -98,12 +102,13 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
         })();
         return shutdown;
     }
-    function invalidate(code: ExecutionCode) {
-        terminal ??= code;
+    function invalidate(code: ExecutionCode, denial: ExecutionDenial | null = null) {
+        if (!terminal) terminalDenial = denial;
+        terminal ??= code; quota.retire(code);
         catalog = undefined;
         early = [];
         finalText = undefined;
-        active?.reject(new ExecutionError(terminal));
+        active?.reject(new ExecutionError(terminal, terminalDenial));
         void close(true);
     }
     async function rpc(method: ExecutionMethod, params?: unknown) {
@@ -120,7 +125,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
         guard();
         return response;
     }
-    async function operation<T extends SynthesisCatalog | Result>(work: () => Promise<T>, signal?: AbortSignal, kind: 'catalog' | 'result' = 'catalog'): Promise<T> {
+    async function operation<T extends SynthesisCatalog | Result | ExecutionQuotaView>(work: () => Promise<T>, signal?: AbortSignal, kind: 'catalog' | 'result' | 'quota' = 'catalog'): Promise<T> {
         guard();
         if (active) throw new ExecutionError('busy');
         if (usedTurn) throw new ExecutionError('session_expired');
@@ -141,13 +146,13 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
             const result = await Promise.race([work(), failure]);
             await ensureAccountCurrent();
             guard();
-            resultBindings.set(result, { accountRevision, signal, kind });
+            if (kind !== 'quota') resultBindings.set(result, { accountRevision, signal, kind });
             return result;
         } catch (error) {
             const code = terminal ?? (error instanceof ExecutionError ? error.code : 'upstream_error');
-            invalidate(code);
+            invalidate(code, error instanceof ExecutionError ? error.denial : null);
             await close(true);
-            throw new ExecutionError(code);
+            throw new ExecutionError(code, terminalDenial);
         } finally {
             clearInterval(poll); clearTimeout(deadline);
             signal?.removeEventListener('abort', abort);
@@ -183,19 +188,6 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
         if (accountRevision !== verifiedAccountRevision) await account();
         guard();
     }
-    function limits(raw: unknown) {
-        const response = record(raw);
-        // An existing map without codex is unknown, never permission to use the legacy bucket.
-        const value = record(response.rateLimitsByLimitId == null ? response.rateLimits : record(response.rateLimitsByLimitId).codex);
-        if (value.rateLimitReachedType != null || value.spendControlReached === true) throw new ExecutionError('quota_exhausted');
-        const windows = [value.primary, value.secondary].filter(window => window != null);
-        for (const window of windows) {
-            const used = record(window).usedPercent;
-            if (typeof used === 'number' && used >= 100) throw new ExecutionError('quota_exhausted');
-        }
-        // Some plans have only one window. Null is absent, never zero usage.
-        if (!windows.length || windows.some(window => { const used = record(window).usedPercent; return typeof used !== 'number' || !Number.isFinite(used) || used < 0; })) throw new ExecutionError('limits_unavailable');
-    }
     function inspectItems(items: unknown) {
         if (!Array.isArray(items) || items.length > 64) throw new ExecutionError('protocol_error');
         for (const raw of items) {
@@ -203,8 +195,17 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
             if (type !== 'reasoning' && type !== 'agentMessage' && type !== 'userMessage') throw new ExecutionError('tool_use_denied');
         }
     }
+    function quotaFailure(method: 'error' | 'turn/start' | 'turn/completed') {
+        return new ExecutionError('quota_exhausted', Object.freeze({ source: 'backend_error', method, rpcCode: null, backendCode: 'usageLimitExceeded' }));
+    }
+    function turnQuotaExceeded(turn: RecordValue): boolean {
+        const error = Object.getOwnPropertyDescriptor(turn, 'error');
+        if (!error || !('value' in error) || !error.value || typeof error.value !== 'object') return false;
+        const code = Object.getOwnPropertyDescriptor(error.value, 'codexErrorInfo');
+        return !!code && 'value' in code && code.value === 'usageLimitExceeded';
+    }
     function turnFailed(event: 'turn_start_failed' | 'turn_completed_failed') {
-        // Status only: do not read turn.error, prompt/output or private reasoning.
+        // Status only; fixed quota classification is handled separately without error prose.
         reportExecutionDiagnostic(options.diagnostic, { event, method: 'turn/start', errorCode: 'upstream_error',
             rpcCode: null, httpStatus: null, tls: false, network: false, device: false, experimental: false, permission: false });
     }
@@ -215,6 +216,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
             if (finalText !== undefined) throw new ExecutionError('invalid_output');
             finalText = event.text;
         } else {
+            if (event.quotaExceeded) throw quotaFailure('turn/completed');
             if (event.status !== 'completed') {
                 if (event.status === 'failed') turnFailed('turn_completed_failed');
                 throw new ExecutionError('upstream_error');
@@ -231,7 +233,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
             // This protocol notice has no account ID. Matching plan/auth alone cannot
             // authorize a silent account switch: require a fresh matching private hash.
             if (shutdown || notice.authMode !== 'chatgpt' || !isSupportedChatGptPlan(notice.planType) || !accountFingerprint) invalidate('revoked');
-            else accountRevision++;
+            else { quota.discardAccountSnapshot(); accountRevision++; }
             return;
         }
         if (shutdown) return;
@@ -241,21 +243,11 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
             guard();
             const params = record(raw);
             if (method === 'account/rateLimits/updated') {
-                // Rolling updates are sparse. Absent fields cannot clear the
-                // verified snapshot or restore an exhausted/terminal session.
-                const update = record(params.rateLimits);
-                if (update.limitId != null && update.limitId !== 'codex') return;
-                if (update.rateLimitReachedType != null || update.spendControlReached === true) throw new ExecutionError('quota_exhausted');
-                for (const window of [update.primary, update.secondary]) {
-                    if (window == null) continue;
-                    const used = record(window).usedPercent;
-                    if (typeof used !== 'number' || !Number.isFinite(used) || used < 0) throw new ExecutionError('limits_unavailable');
-                    if (used >= 100) throw new ExecutionError('quota_exhausted');
-                }
+                quota.notice(raw);
                 return;
             }
             if (method === 'error') {
-                if (record(params.error).codexErrorInfo === 'usageLimitExceeded') throw new ExecutionError('quota_exhausted');
+                if (record(params.error).codexErrorInfo === 'usageLimitExceeded') throw quotaFailure('error');
                 throw new ExecutionError('upstream_error');
             }
             if (method !== 'item/started' && method !== 'item/completed' && method !== 'turn/completed') return;
@@ -263,7 +255,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
             if (method === 'turn/completed') {
                 const turn = record(params.turn);
                 inspectItems(turn.items);
-                event = { method, thread: params.threadId as string, turn: turn.id as string, status: turn.status as string };
+                event = { method, thread: params.threadId as string, turn: turn.id as string, status: turn.status as string, quotaExceeded: turnQuotaExceeded(turn) };
             } else {
                 const item = record(params.item);
                 if (item.type === 'reasoning') return;
@@ -282,7 +274,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
                 if (early.length >= 64 || earlyBytes > 80_000) throw new ExecutionError('protocol_error');
                 early.push(event);
             } else consume(event);
-        } catch (error) { invalidate(error instanceof ExecutionError ? error.code : 'protocol_error'); }
+        } catch (error) { invalidate(error instanceof ExecutionError ? error.code : 'protocol_error', error instanceof ExecutionError ? error.denial : null); }
     }, code => invalidate(code));
 
     async function catalogChoices(): Promise<readonly SynthesisChoice[]> {
@@ -321,6 +313,10 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
     }
 
     return {
+        quotaView: quota.snapshot,
+        readQuota(): Promise<ExecutionQuotaView> {
+            return operation(async () => { await account(); return quota.read(() => rpc('account/rateLimits/read')); }, undefined, 'quota');
+        },
         readCatalog(): Promise<SynthesisCatalog> {
             return operation(async () => {
                 catalog = undefined;
@@ -344,7 +340,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
                 const fresh = await catalogChoices();
                 const signature = (values: readonly SynthesisChoice[]) => JSON.stringify(values.map(value => JSON.stringify([value.model, value.effort])).sort());
                 if (signature(fresh) !== signature(catalog.choices)) throw new ExecutionError('catalog_stale');
-                limits(await rpc('account/rateLimits/read'));
+                await quota.read(() => rpc('account/rateLimits/read'));
                 await task.beforeContent?.(); guard();
                 usedTurn = true;
                 const started = record(await rpc('thread/start', {
@@ -374,6 +370,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
                 turnId = turn.id;
                 if (earlyTurnId && earlyTurnId !== turnId) throw new ExecutionError('protocol_error');
                 inspectItems(turn.items);
+                if (turnQuotaExceeded(turn)) throw quotaFailure('turn/start');
                 if (turn.status !== 'inProgress' && turn.status !== 'completed') {
                     if (turn.status === 'failed') turnFailed('turn_start_failed');
                     throw new ExecutionError('upstream_error');
@@ -399,7 +396,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
                 const code = terminal ?? (error instanceof ExecutionError ? error.code : 'upstream_error');
                 invalidate(code);
                 await close(true); // Reuses the same shutdown; no second close or RPC.
-                throw new ExecutionError(code);
+                throw new ExecutionError(code, terminalDenial);
             }
         },
         // Local result witness, NOT an owner grant. The binding must still commit
@@ -511,6 +508,8 @@ export function createOrdinaryExecutionService(options: ExecutionAuthorityOption
     const release = async () => { closeOrdinaryProductConsent(consent); await closePreparedOrdinaryProfile(preparation); };
     return Object.freeze({
         readCatalog: () => service.readCatalog(),
+        readQuota: () => service.readQuota(),
+        quotaView: service.quotaView,
         async generate(request: SynthesisRequest, signal?: AbortSignal) {
             try { return await service.generate(request, signal); }
             catch (error) { await release(); throw error; }

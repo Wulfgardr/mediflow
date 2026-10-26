@@ -9,6 +9,7 @@ import type { ProductExecutionPlatform } from './execution-platform';
 import { reportMacProductPreparationDiagnostic } from './execution-mac-product';
 import type { PreparationDiagnosticStage } from './execution-transport';
 import type { QualifiedExecutionHost } from './execution-host';
+import { createExecutionQuotaMonitor } from './execution-quota';
 import { createExecutionLogin } from './execution-login';
 import { ExecutionError, type SynthesisCatalog, type SynthesisRequest } from './execution-contract';
 import { createOrdinaryExecutionService, type OrdinaryExecutionResult } from './execution-service';
@@ -37,6 +38,9 @@ export async function createOrdinaryProductAttempt(session: OrdinarySession, pla
     let host: QualifiedExecutionHost | undefined;
     let login: ReturnType<typeof createExecutionLogin> | undefined;
     let execution: ReturnType<typeof createOrdinaryExecutionService> | undefined;
+    const quota = createExecutionQuotaMonitor();
+    let stopQuotaStartup = () => {};
+    let quotaStartupFailure: ExecutionError | undefined;
     let cleanup: Promise<Readonly<{ cleanupConfirmed: boolean }>> | undefined;
     let expiry: ReturnType<typeof setTimeout> | undefined;
     let watcher: ReturnType<typeof setInterval> | undefined;
@@ -51,6 +55,7 @@ export async function createOrdinaryProductAttempt(session: OrdinarySession, pla
         owner.abortResourceUse(use); return local();
     }
     function guard(expected = epoch) {
+        if (quotaStartupFailure) throw quotaStartupFailure;
         if (!current() || expected !== epoch) throw new ProductError('revoked');
         if (qualificationRevision) {
             const qualification = platform.snapshot();
@@ -60,7 +65,7 @@ export async function createOrdinaryProductAttempt(session: OrdinarySession, pla
     /** Called synchronously by owner/selection retirement; cleanup runs outside binding. */
     function dispose(): Promise<Readonly<{ cleanupConfirmed: boolean }>> {
         if (cleanup) return cleanup;
-        active = false; epoch++; state = 'closed'; controller.abort();
+        active = false; quota.retire('revoked'); stopQuotaStartup(); epoch++; state = 'closed'; controller.abort();
         clearTimeout(expiry); clearInterval(watcher);
         selectionSignal?.removeEventListener('abort', retire);
         consent?.close(); login?.dispose();
@@ -107,7 +112,7 @@ export async function createOrdinaryProductAttempt(session: OrdinarySession, pla
     }
     return Object.freeze({
         /** No content, account secret, map or ordinary output in this projection. */
-        snapshot() { guard(); return Object.freeze({ state, attemptRevision, contextRevision, qualificationRevision, expiresAt }); },
+        snapshot() { guard(); return Object.freeze({ state, attemptRevision, contextRevision, qualificationRevision, expiresAt, quota: quota.snapshot() }); },
         prepare(profile: OrdinaryTaskProfile, selectedContextRevision: string, configuration: OrdinaryRunnerConfiguration, signal: AbortSignal, knownIdentifiers?: RedactionSessionInput['knownIdentifiers']) {
             return operation(['empty'], async (expected, setPreparationStage) => {
                 if (typeof selectedContextRevision !== 'string' || !selectedContextRevision || selectedContextRevision.length > 256 || !signal) throw new ProductError('invalid_request');
@@ -140,6 +145,10 @@ export async function createOrdinaryProductAttempt(session: OrdinarySession, pla
                 // A late host is never adopted or abandoned by a newer attempt.
                 try { guard(expected); if (!owned.boundaryQualified()) throw new ProductError('unqualified_boundary'); } catch (error) { await owned.close(); throw error; }
                 host = owned;
+                stopQuotaStartup = host.transport.subscribe((method, raw) => {
+                    if (method !== 'account/rateLimits/updated' || !active) return;
+                    try { quota.notice(raw); } catch (error) { quotaStartupFailure = error instanceof ExecutionError ? error : new ExecutionError('limits_unavailable'); void dispose(); }
+                }, () => {});
                 login = createExecutionLogin(host.transport, () => { guard(); }, () => {}, retire, host.cwd);
                 const challenge = await login.start(); guard(expected); state = 'awaiting_login'; return challenge;
             });
@@ -148,12 +157,12 @@ export async function createOrdinaryProductAttempt(session: OrdinarySession, pla
             return operation(['awaiting_login'], async expected => {
                 const plan = await login!.complete(); guard(expected);
                 execution = createOrdinaryExecutionService({ transport: host!.transport, cwd: host!.cwd, diagnostic: host!.diagnostic,
-                    preparation: preparation!, consent: consent!.token, isCurrent: current,
+                    preparation: preparation!, consent: consent!.token, isCurrent: current, quotaMonitor: quota,
                     boundaryQualified: () => local() && platform.snapshot().revision === qualificationRevision && host!.boundaryQualified() });
-                state = 'connected'; return Object.freeze({ plan });
+                stopQuotaStartup(); state = 'connected'; return Object.freeze({ plan });
             });
         },
-        models() { return operation(['connected', 'ready'], async expected => { const catalog = await execution!.readCatalog(); guard(expected); state = 'ready'; return catalog; }); },
+        models() { return operation(['connected', 'ready'], async expected => { await execution!.readQuota(); guard(expected); const catalog = await execution!.readCatalog(); guard(expected); state = 'ready'; return catalog; }); },
         generate(request: SynthesisRequest) {
             return operation(['ready'], async expected => {
                 const result = await execution!.generate(request, controller.signal);
