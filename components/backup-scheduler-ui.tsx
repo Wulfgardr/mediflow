@@ -60,7 +60,7 @@ const INPUT_CLASS = 'mf-input mt-1 p-3';
 const PRIMARY_BUTTON_CLASS = 'ui-btn-primary lume-press px-5 py-2.5 disabled:cursor-not-allowed disabled:opacity-50';
 const SECONDARY_BUTTON_CLASS = 'mf-btn-secondary lume-press px-4 py-2.5 disabled:cursor-not-allowed disabled:opacity-50';
 
-export default function BackupSchedulerUI() {
+export default function BackupSchedulerUI({ primary = true }: { primary?: boolean }) {
     const [status, setStatus] = useState<BackupSchedulerResponse | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -320,7 +320,8 @@ export default function BackupSchedulerUI() {
                 <button
                     onClick={save}
                     disabled={isSaving || isLoading || !status || status.installed === null || schedulingUnsupported}
-                    className={PRIMARY_BUTTON_CLASS}
+                    className={primary ? PRIMARY_BUTTON_CLASS : SECONDARY_BUTTON_CLASS}
+                    data-backup-primary={primary || undefined}
                 >
                     {isSaving ? <RefreshCw className="w-4 h-4" /> : <Save className="w-4 h-4" />}
                     Salva schedulazione

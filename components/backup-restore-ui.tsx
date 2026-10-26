@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Download, Upload, AlertTriangle, CheckCircle, RefreshCw, ShieldCheck } from 'lucide-react';
 import { BackupRestoreBlockedError, BackupRestorePreflightError, exportRawDatabase, importRawDatabase, verifyRawDatabase } from '@/lib/db';
 import { BackupRestoreKeyError } from '@/lib/backup-restore-key-check';
 import { useSecurity } from './security-provider';
 import { RecoveryBackupUI } from './recovery-backup-ui';
+import { Disclosure } from './disclosure';
+import composition from './settings/backup-composition.module.css';
 
 // WUL-297: parola chiave richiesta per confermare il restore.
 const RESTORE_CONFIRM_KEYWORD = 'RIPRISTINA';
@@ -50,12 +52,18 @@ function failedOutcome(err: unknown, action: 'verify' | 'restore'): Outcome {
     return { type: 'error', title: action === 'verify' ? 'Verifica non riuscita' : 'Ripristino non riuscito', message };
 }
 
-export default function BackupRestoreUI() {
+export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendingChange, children }: {
+    recoveryPrimary?: boolean;
+    onRestorePendingChange?: (pending: boolean) => void;
+    children?: ReactNode;
+}) {
     const { isAuthenticated, lock } = useSecurity();
     const [isLoading, setIsLoading] = useState(false);
     const [status, setStatus] = useState<Outcome | null>(null);
     const [pendingRestoreFile, setPendingRestoreFile] = useState<File | null>(null);
     const [restoreConfirmText, setRestoreConfirmText] = useState('');
+
+    useEffect(() => { onRestorePendingChange?.(pendingRestoreFile !== null); }, [pendingRestoreFile, onRestorePendingChange]);
 
     const handleExport = async () => {
         setIsLoading(true);
@@ -158,12 +166,11 @@ export default function BackupRestoreUI() {
     if (!isAuthenticated) return null;
 
     return (
-        <div className="grid gap-6 xl:grid-cols-2">
-            <div className="xl:col-span-2"><RecoveryBackupUI /></div>
-            <div className="mf-section lume-focal p-6 md:p-7">
-                <p className="section-kicker">Export locale</p>
-                <h3 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--lume-ink)' }}>
-                    <Download className="w-5 h-5 text-[color:var(--lume-ink-secondary)]" />
+        <div className={composition.workspace}>
+            <RecoveryBackupUI primary={recoveryPrimary && !pendingRestoreFile} />
+            {children}
+            <section className={composition.section}>
+                <h3 className={composition.sectionTitle}>
                     Esportazione portabile
                 </h3>
                 <p className="mb-4 mt-2 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
@@ -174,12 +181,12 @@ export default function BackupRestoreUI() {
                 <button
                     onClick={handleExport}
                     disabled={isLoading}
-                    className="ui-btn-primary lume-press px-5 py-2.5 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mf-btn-secondary lume-press px-5 py-2.5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {isLoading ? <RefreshCw className="w-4 h-4" /> : <Download className="w-4 h-4" />}
                     Scarica Backup
                 </button>
-                <label className="mf-btn-secondary lume-press ml-2 w-fit cursor-pointer">
+                <label className={`mf-btn-secondary lume-press w-fit cursor-pointer ${composition.fileControl}`}>
                     <ShieldCheck className="w-4 h-4" />
                     Verifica un backup
                     <input
@@ -188,7 +195,7 @@ export default function BackupRestoreUI() {
                         onChange={handleVerifyFileSelected}
                         disabled={isLoading}
                         data-testid="backup-verify-input"
-                        className="hidden"
+                        className="sr-only"
                     />
                 </label>
                 <p className="mt-4 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
@@ -196,13 +203,11 @@ export default function BackupRestoreUI() {
                     <strong>Provare un ripristino</strong> è un passo diverso: la prova sintetica ripristina un backup in un archivio
                     di prova e lo confronta, con <code>npm run test:backup-restore:drill</code> dalla cartella del progetto.
                 </p>
-            </div>
+            </section>
 
-            <div className="mf-section lume-focal p-6 md:p-7">
-                <p className="section-kicker">Ripristino controllato</p>
-                <h3 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--lume-ink)' }}>
-                    <Upload className="w-5 h-5 text-[color:var(--lume-signal-warning)]" />
-                    Restore
+            <section className={composition.section}>
+                <h3 className={composition.sectionTitle}>
+                    Ripristino del file portabile
                 </h3>
                 <div className="mf-alert mf-alert-warning mt-2 mb-4 p-4 flex gap-3 text-sm">
                     <AlertTriangle className="w-5 h-5 flex-shrink-0" />
@@ -212,7 +217,7 @@ export default function BackupRestoreUI() {
                     </p>
                 </div>
 
-                <label className="mf-btn-secondary lume-press w-fit cursor-pointer">
+                <label className={`mf-btn-secondary lume-press w-fit cursor-pointer ${composition.fileControl}`}>
                     {isLoading ? <RefreshCw className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
                     Seleziona file .mediflow v1
                     <input
@@ -220,7 +225,7 @@ export default function BackupRestoreUI() {
                         accept=".mediflow,.json"
                         onChange={handleRestoreFileSelected}
                         disabled={isLoading || pendingRestoreFile !== null}
-                        className="hidden"
+                        className="sr-only"
                     />
                 </label>
 
@@ -258,26 +263,27 @@ export default function BackupRestoreUI() {
                         <div className="flex flex-wrap items-center gap-2">
                             <button
                                 type="button"
+                                onClick={cancelRestore}
+                                disabled={isLoading}
+                                data-backup-primary="true"
+                                className="ui-btn-primary inline-flex items-center px-4 py-2 text-xs font-semibold disabled:opacity-50"
+                            >
+                                Annulla
+                            </button>
+                            <button
+                                type="button"
                                 onClick={confirmRestore}
                                 disabled={!restoreConfirmed || isLoading}
                                 data-testid="restore-confirmation-submit"
-                                className="ui-btn-primary mf-tone-critical inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                                className="mf-button-destructive inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {isLoading ? <RefreshCw className="w-3.5 h-3.5" /> : <Upload className="w-3.5 h-3.5" />}
                                 Ripristina adesso
                             </button>
-                            <button
-                                type="button"
-                                onClick={cancelRestore}
-                                disabled={isLoading}
-                                className="mf-btn-secondary inline-flex items-center px-4 py-2 text-xs font-semibold disabled:opacity-50"
-                            >
-                                Annulla
-                            </button>
                         </div>
                     </div>
                 )}
-            </div>
+            </section>
 
             {status && (
                 <div className={`mf-alert xl:col-span-2 p-4 flex items-center gap-3 ${status.type === 'success' ? 'mf-alert-success' :
@@ -291,7 +297,7 @@ export default function BackupRestoreUI() {
                         <p className="font-medium">{status.message}</p>
                         {status.nextStep && <p className="text-sm">{status.nextStep}</p>}
                         {status.preflight && (
-                            <div className="space-y-3 text-sm">
+                            <Disclosure title="Dettagli della verifica">
                                 <div className="border-t border-[color:var(--lume-rule)] py-2">
                                     <p className="font-semibold">Preflight restore</p>
                                     <p>
@@ -312,7 +318,7 @@ export default function BackupRestoreUI() {
                                         </div>
                                     ))}
                                 </div>
-                            </div>
+                            </Disclosure>
                         )}
                     </div>
                 </div>
