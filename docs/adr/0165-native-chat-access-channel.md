@@ -45,7 +45,10 @@ l'ammissibilità, per non aggirare un lockout del PIN sullo stesso account.
 
 La concessione resta RAM e appartiene alla connessione OS, alla richiesta e
 alla selezione catturata. Una sola operazione può consumarla. Il consumo
-ricontrolla autorità e selezione, anche dopo attese asincrone. Una vista
+ricontrolla autorità e selezione, anche dopo attese asincrone. Il contesto
+congela anche l'epoch della selezione host: un epoch diverso, locale o riletto
+dalla porta `patient-profile/selection-epoch`, nega conferma e consumo.
+Una vista
 inattiva termina dopo cinque minuti, senza rinnovo automatico. EOF, reload,
 revoca, lock della sessione/Mac, cambio selezione anche A→B→A, cambio archivio
 e riavvio ritirano richieste e concessioni; una risposta tardiva non le ricrea.

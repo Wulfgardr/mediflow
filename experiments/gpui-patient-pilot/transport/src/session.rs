@@ -125,6 +125,7 @@ pub struct ChatAccessContext {
     intent: ProfileQueryIntent,
     scope: String,
     patient: String,
+    selection_epoch: u64,
 }
 impl AiPreferencesContext {
     pub fn cancel(&self) {
@@ -187,16 +188,28 @@ impl RuntimeSession {
         self.ensure_open()?;
         let intent = self.profile_query_intent();
         self.profile_target_matches(&intent, scope, patient)?;
+        let selection_epoch = intent
+            .selection
+            .as_ref()
+            .ok_or(RuntimeError::ReadRequired)?
+            .host_epoch
+            .load(Ordering::Acquire);
         Ok(ChatAccessContext {
             intent,
             scope: scope.into(),
             patient: patient.into(),
+            selection_epoch,
         })
     }
 
     pub fn check_chat_access_context(&self, context: &ChatAccessContext) -> Result<()> {
         self.ensure_open()?;
         drop(self.profile_intent_guard(&context.intent)?);
+        if context.intent.selection.as_ref().is_none_or(|selection| {
+            selection.host_epoch.load(Ordering::Acquire) != context.selection_epoch
+        }) {
+            return Err(RuntimeError::ReadRequired);
+        }
         self.profile_target_matches(&context.intent, &context.scope, &context.patient)
     }
 
@@ -214,14 +227,29 @@ impl RuntimeSession {
         )?;
         self.check_chat_access_context(context)?;
         if eligibility == json!({"status": "eligible"}) {
-            Ok(())
+            let epoch = self.request_with_profile_intent(
+                Method::GET,
+                &["api", "v1", "network", "patient-profile", "selection-epoch"],
+                &[],
+                Some(&context.scope),
+                None,
+                false,
+                JSON_LIMIT,
+                Some(&context.intent),
+            )?;
+            self.check_chat_access_context(context)?;
+            if epoch == json!({"contractVersion":1,"selectionEpoch":context.selection_epoch}) {
+                Ok(())
+            } else {
+                Err(RuntimeError::ReadRequired)
+            }
         } else {
             Err(RuntimeError::Forbidden)
         }
     }
 
     pub fn confirm_chat_access_pin(&self, context: &ChatAccessContext, pin: &str) -> Result<()> {
-        self.check_chat_access_context(context)?;
+        self.revalidate_chat_access_context(context)?;
         let body = json!({ "operation": "mediflow.chat.access-status.v1", "pin": pin });
         let result = self.request_with_profile_intent(
             Method::POST,
@@ -235,7 +263,7 @@ impl RuntimeSession {
         )?;
         self.check_chat_access_context(context)?;
         if result == json!({"status": "confirmed"}) {
-            Ok(())
+            self.revalidate_chat_access_context(context)
         } else {
             Err(RuntimeError::Forbidden)
         }
@@ -6155,6 +6183,18 @@ mod tests {
         a.select_profile_patient("scope-a", "patient-a").unwrap();
         assert_eq!(
             a.check_chat_access_context(&context),
+            Err(RuntimeError::ReadRequired)
+        );
+        let current = a.chat_access_context("scope-a", "patient-a").unwrap();
+        current
+            .intent
+            .selection
+            .as_ref()
+            .unwrap()
+            .host_epoch
+            .store(7, Ordering::Release);
+        assert_eq!(
+            a.check_chat_access_context(&current),
             Err(RuntimeError::ReadRequired)
         );
         let current = a.chat_access_context("scope-a", "patient-a").unwrap();
