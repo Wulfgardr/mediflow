@@ -9,9 +9,12 @@ import { useAiSettingsController } from '@/lib/hooks/use-ai-settings-controller'
 import AiRolloutGuardNotice from '@/components/settings/ai-rollout-guard-notice';
 import { ModelSelector } from '@/components/settings/ai-model-selector';
 import styles from '@/components/settings/guided-local-models.module.css';
+import composition from './models-composition.module.css';
+import { Disclosure } from '@/components/disclosure';
+import { ViewState } from '@/components/ui/view-state';
 import {
-    SETTINGS_CARD_CLASS, SETTINGS_INPUT_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS,
-    SETTINGS_SECONDARY_BUTTON_CLASS, SettingsSectionIntro,
+    SETTINGS_INPUT_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS,
+    SETTINGS_SECONDARY_BUTTON_CLASS,
 } from '@/components/settings/settings-ui';
 
 const recommended = [
@@ -26,20 +29,23 @@ export default function SettingsAiModelsPage() {
         applyHardwareProfile, saveAiConfig, savedConfigurationRevision, testAiConnection } = useAiSettingsController();
 
     return (
-        <section className={styles.surface} data-testid="settings-ai-models-section">
-            <SettingsSectionIntro kicker="Intelligenza locale" title="Modelli e hardware"
-                description="Collega Ollama, scegli i modelli installati e salva. Le funzioni cliniche richiedono un’abilitazione separata e revisione delle proposte." />
+        <section className={`${styles.surface} ${composition.page}`} data-testid="settings-ai-models-section">
+            <div className={composition.intro}>
+                <h2 className={composition.title}>Modelli e hardware</h2>
+                <p>Collega Ollama, scegli i modelli installati e salva. Le funzioni cliniche richiedono un’abilitazione separata e revisione delle proposte.</p>
+            </div>
 
-            {aiSettingsLoadState !== 'ready' && <p role="status">
-                {aiSettingsLoadState === 'loading' ? 'Caricamento delle impostazioni…'
-                    : 'Impossibile leggere le impostazioni. Ricarica questa pagina prima di modificarle.'}
-            </p>}
+            {aiSettingsLoadState !== 'ready' && <ViewState
+                state={aiSettingsLoadState === 'loading' ? 'loading' : 'unavailable'}
+                title={aiSettingsLoadState === 'loading' ? 'Caricamento delle impostazioni…' : 'Impossibile leggere le impostazioni.'}
+                detail={aiSettingsLoadState === 'loading' ? undefined : 'Ricarica questa pagina prima di modificarle.'}
+            />}
             <fieldset disabled={aiSettingsLoadState !== 'ready'} aria-busy={aiSettingsLoadState === 'loading'}
                 aria-label="Impostazioni dei modelli locali" data-testid="ai-settings-controls"
                 className={`min-w-0 border-0 p-0 ${styles.surface}`}>
 
-            <div className={`${SETTINGS_CARD_CLASS} ${styles.card} ${styles.stack}`}>
-                <h3 className="text-base font-semibold">1. Verifica la connessione</h3>
+            <div className={`${composition.section} ${styles.stack}`}>
+                <h3 className={composition.title}>1. Verifica la connessione</h3>
                 <p>Collega i modelli che lavorano sul tuo computer.</p>
                 <label htmlFor="ollama-url">Indirizzo di Ollama sul computer</label>
                 <input id="ollama-url" type="text" value={aiConfig.url}
@@ -60,8 +66,8 @@ export default function SettingsAiModelsPage() {
                 </div>
             </div>
 
-            <div className={`${SETTINGS_CARD_CLASS} ${styles.card} ${styles.stack}`}>
-                <h3 className="text-base font-semibold">2. Scegli i modelli</h3>
+            <div className={`${composition.section} ${styles.stack}`}>
+                <h3 className={composition.title}>2. Scegli i modelli</h3>
                 <p className={styles.hint}>L’elenco viene letto da Ollama all’apertura e quando lo aggiorni. La scelta modifica la configurazione da salvare.</p>
                 <ModelSelector selectorId="clinical" label="Sintesi e organizzazione"
                     description="Per sintesi, insight e organizzazione del testo dopo l’estrazione locale."
@@ -81,8 +87,7 @@ export default function SettingsAiModelsPage() {
                 ]} />
             </div>
 
-            <details className={`${SETTINGS_CARD_CLASS} ${styles.card} ${styles.stack}`}>
-                <summary>Configurazioni consigliate</summary>
+            <Disclosure title="Configurazioni consigliate" className={composition.details}>
                 <p>Parti dalla memoria del computer, poi scegli i modelli per le tue attività.</p>
                 <div className={styles.presets}>
                     {([
@@ -99,8 +104,7 @@ export default function SettingsAiModelsPage() {
                     ))}
                 </div>
                 <p className={styles.hint}>Il preset aggiorna la bozza. Verifica i modelli installati e salva per applicarlo.</p>
-                <details>
-                <summary>Cosa cambia con un preset</summary>
+                <Disclosure title="Cosa cambia con un preset">
                 <dl className={styles.roles}>
                     <div>
                         <dt className="font-semibold">Sintesi e organizzazione</dt>
@@ -112,26 +116,34 @@ export default function SettingsAiModelsPage() {
                     </div>
                 </dl>
                 <p className={styles.hint}>Il preset sceglie lo stesso modello per i due ruoli, senza scaricarlo o salvarlo. La memoria è un’indicazione orientativa: compatibilità e qualità vanno verificate. OCR e revisione terapeutica ATHENA hanno una configurazione separata.</p>
-                </details>
-            </details>
+                </Disclosure>
+            </Disclosure>
 
-            <div className={`${SETTINGS_CARD_CLASS} ${styles.card} ${styles.stack}`}>
-                <h3 className="text-base font-semibold">3. Salva e verifica le funzioni</h3>
+            <div className={`${composition.section} ${styles.stack}`}>
+                <h3 className={composition.title}>3. Salva e verifica le funzioni</h3>
                 <div className={styles.actions}>
                     <button type="button" onClick={saveAiConfig} disabled={isSavingAi} className={SETTINGS_PRIMARY_BUTTON_CLASS}>
                         <Save aria-hidden="true" className="h-4 w-4" />
                         {isSavingAi ? 'Salvataggio...' : 'Salva configurazione'}
                     </button>
                     <Link href="/settings/ai/funzioni">Abilita le funzioni cliniche</Link>
-                    <Link href="/settings/ai/fabric">Verifica lo stato delle funzioni</Link>
-                    <Link href="/settings/ai/governance">Consulta le verifiche dei modelli</Link>
                 </div>
                 <p className={styles.hint}>I risultati restano proposte da rivedere prima dell’uso. Salvare il modello non equivale ad ammettere il provider o a verificare una funzione clinica.</p>
+                <Disclosure title="Funzioni e verifiche">
+                    <div className={styles.actions}>
+                        <Link href="/settings/ai/fabric">Verifica lo stato delle funzioni</Link>
+                        <Link href="/settings/ai/governance">Consulta le verifiche dei modelli</Link>
+                    </div>
+                </Disclosure>
             </div>
 
             </fieldset>
-            <details className={styles.accountDetails}><summary>Account OpenAI · ChatGPT</summary><ChatGptAccountPanel /></details>
-            <LocalProviderOnboardingPanel configurationRevision={savedConfigurationRevision} />
+            <Disclosure title="Account OpenAI · ChatGPT" className={composition.details}>
+                <div data-models-auxiliary="account"><ChatGptAccountPanel /></div>
+            </Disclosure>
+            <div data-models-auxiliary="local">
+                <LocalProviderOnboardingPanel configurationRevision={savedConfigurationRevision} />
+            </div>
         </section>
     );
 }
