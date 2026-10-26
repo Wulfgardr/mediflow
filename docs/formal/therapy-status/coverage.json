@@ -1,5 +1,5 @@
 {
-  "syncCommit": "64e190438da8287928f0903b9b719c18b329a7ec",
+  "syncCommit": "c4ae8c6eab6966e40414457ae3b666ac618154e8",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -46,7 +46,7 @@
     "lib/therapy-status-command-http.ts": "e48bafce3eb7b8bd280ea04c7afd5624cc73c5afee1d3e3abac04f4c19a8b955",
     "lib/therapy-status-command-backup.ts": "2f63951192b92749658de3ae289fb7cc16cccd1a90202342e8bd949b98271f64",
     "lib/therapy-status-command-schema.ts": "98c0aba0a361ef83655a632be41a257f8b9e99a950591113683a8094e26f4c87",
-    "lib/therapy-status-command-recovery-schema.ts": "24bb5a8ea04048a4eb4bd7f64cd8535bc6eda6d671616ea3e35d58c913cb76ac"
+    "lib/therapy-status-command-recovery-schema.ts": "875b647218eaea2ac4d154746db20023f74b2914cc4e1e07dd13fa56b749182f"
   },
   "verificationInputs": [
     "docs/formal/therapy-status/",
@@ -65,12 +65,20 @@
     "lib/therapy-status-command-confirmation.test.ts",
     "lib/therapy-status-command-backup.test.ts",
     "lib/therapy-status-command-client.test.ts",
+    "lib/therapy-status-command-recovery-schema.test.ts",
     "e2e/therapy-status-confirmation.spec.ts",
     "e2e/therapy-composition.spec.ts"
   ],
   "durableProtocolCoverage": {
     "adr": "0168",
     "baseRevision": "3828bb17d4883b28a646c16af10f9505fddded38",
-    "proof": "causal controller/client/HTTP tests and real SQLite crashes/races/restore; TLC remains legacy ADR0156"
-  }
+    "proof": "causal controller/client/HTTP tests and real SQLite crashes/races/restore; TLC remains legacy ADR0156",
+    "recoveryCompatibility": {
+      "reviewedRevision": "c4ae8c6eab6966e40414457ae3b666ac618154e8",
+      "contract": "ADR0168 exact canonical v4 predecessor; current v5 physical extensions unchanged",
+      "proof": "8 causal canonical/drift tests in code-current; encrypted recovery owner evidence remains separate",
+      "outsideTlc": "schema, migration, encryption, keys and durable receipts are not modeled by TherapyStatus.tla"
+    }
+  },
+  "legacyModelSyncCommit": "64e190438da8287928f0903b9b719c18b329a7ec"
 }
