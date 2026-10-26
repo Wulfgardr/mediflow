@@ -70,6 +70,7 @@ fn main() {
     gpui_platform::application().run(move |cx: &mut App| {
         #[cfg(unix)]
         chat_access::install_lock_observer();
+        native_lock::monitor_installed();
         let fonts: Vec<Cow<'static, [u8]>> = vec![
             Cow::Borrowed(include_bytes!("../../../../app/fonts/Newsreader-Native-Regular.ttf")),
             Cow::Borrowed(include_bytes!("../../../../app/fonts/Newsreader-Native-Bold.ttf")),
