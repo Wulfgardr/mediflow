@@ -68,6 +68,8 @@ function normalize(stdout: unknown, configuration: unknown) {
         const data = root && exact(root.data, ['recommendation', 'keyEvidence', 'reasoning', 'caveats', 'safetyFlags', 'suggestedActions', 'trace']);
         const summary = root && claim(root.summary), recommendation = data && claim(data.recommendation);
         const reasoning = data && claims(data.reasoning), caveats = data && claims(data.caveats);
+        const trace = data && exact(data.trace, ['mode', 'toolsUsed', 'limitations']);
+        if (!trace || !Array.isArray(trace.toolsUsed) || trace.toolsUsed.length !== 0) return deny();
         if (!root || root.schemaVersion !== SCHEMA || root.task !== 'treatment_reasoning' || !data || !summary || !recommendation || !reasoning || !caveats) return deny();
         const sourceBindings = [
             { claimPath: 'summary', ...summary }, { claimPath: 'data.recommendation', ...recommendation },
@@ -84,5 +86,5 @@ function normalize(stdout: unknown, configuration: unknown) {
     } catch { return deny(); }
 }
 
-/** Private producer ABI: the MLX owner selects this inseparable instruction/decoder pair. */
+/** Diagnostic-only producer ABI; ordinary execution retains its direct-V2 method. */
 export const athenaClaimsProfileV1 = Object.freeze({ id: SCHEMA, instruction, normalize });

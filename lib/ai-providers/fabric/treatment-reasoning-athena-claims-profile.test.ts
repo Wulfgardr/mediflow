@@ -109,3 +109,14 @@ test('declares trace array types explicitly and rejects the observed scalar limi
     value.data.trace.limitations = ['Nessuna ricerca esterna.'];
     assert.equal(decode(value).status, 'accepted');
 });
+
+
+test('diagnostic claims deny invented tools without changing shared V2 compatibility', () => {
+    const value = producer(); value.data.trace.toolsUsed = [];
+    assert.equal(decode(value).status, 'accepted');
+    for (const tools of [['tool.synthetic.local'], ['tool.synthetic.first', 'tool.synthetic.second']]) {
+        value.data.trace.toolsUsed = tools; deny(value);
+    }
+    const legacy = structuredClone(fixture.expectedOutput); legacy.data.trace.toolsUsed = ['tool.synthetic.local'];
+    assert.equal(createTreatmentReasoningAthenaOutputContractV2(config).normalize(legacy).status, 'accepted');
+});

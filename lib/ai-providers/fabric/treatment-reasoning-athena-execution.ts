@@ -1,7 +1,6 @@
 import 'server-only';
 
 import { types } from 'node:util';
-import { athenaClaimsProfileV1 } from './treatment-reasoning-athena-claims-profile';
 import { buildAthenaTreatmentReasoningInstruction } from './treatment-reasoning-athena-method';
 
 import { ATHENA_R1_QWEN3_8B_MODEL_ID } from '../../athena-model-identity';
@@ -10,6 +9,7 @@ import {
     type TreatmentReasoningProjectionAttachment,
 } from './treatment-reasoning-projection';
 import {
+    createTreatmentReasoningAthenaOutputContractV2,
     createTreatmentReasoningPortableOutputContractV2,
     snapshotTreatmentReasoningPortableAttestation,
     type TreatmentReasoningPortableAttestation,
@@ -153,7 +153,7 @@ function providerValue(value: unknown): unknown {
 
 function denied(code: Denied['code']): Denied { return freeze({ status: 'denied' as const, code, value: null, sourceBindings: null, attestation: null, ...COMMON }) as Denied; }
 
-function invokeOnce(host: Host, timeoutMs: number, instruction: string): Promise<Readonly<{ kind: 'value'; value: unknown }> | Readonly<{ kind: 'failed' }> | Readonly<{ kind: 'timeout' }>> {
+function invokeOnce(host: Host, timeoutMs: number, input: Snapshot): Promise<Readonly<{ kind: 'value'; value: unknown }> | Readonly<{ kind: 'failed' }> | Readonly<{ kind: 'timeout' }>> {
     const state = cancellation();
     return new Promise((resolve) => {
         let settled = false;
@@ -163,7 +163,7 @@ function invokeOnce(host: Host, timeoutMs: number, instruction: string): Promise
         const timer = setTimeout(() => { state.cancel(); finish(freeze({ kind: 'timeout' as const })); }, timeoutMs);
         Promise.resolve().then(() => {
             try {
-                const result = host.invoke(freeze({ instruction, signal: state.signal }));
+                const result = host.invoke(freeze({ instruction: buildAthenaTreatmentReasoningInstruction(input.projection), signal: state.signal }));
                 if (!nativePromise(result)) return finish(freeze({ kind: 'value' as const, value: result }));
                 Promise.prototype.then.call(result, (value) => finish(freeze({ kind: 'value' as const, value })), () => finish(freeze({ kind: 'failed' as const })));
             } catch { finish(freeze({ kind: 'failed' as const })); }
@@ -181,11 +181,11 @@ export function createTreatmentReasoningAthenaExecution(value: unknown): Readonl
         let attestation: TreatmentReasoningAthenaV2Attestation | null;
         try { attestation = hostAttestation(config.host.policy(), input); } catch { attestation = null; }
         if (!attestation) return Promise.resolve(denied('host_invalid'));
-        return invokeOnce(config.host, config.timeoutMs, athenaClaimsProfileV1.instruction(input.projection)).then((outcome): TreatmentReasoningAthenaExecutionResult => {
+        return invokeOnce(config.host, config.timeoutMs, input).then((outcome): TreatmentReasoningAthenaExecutionResult => {
             if (outcome.kind === 'timeout') return denied('execution_timeout');
             if (outcome.kind === 'failed') return denied('provider_failed');
             try {
-                const normalized = athenaClaimsProfileV1.normalize(outcome.value, { allowedEvidenceRefs: input.evidenceRefs, attestation });
+                const normalized = createTreatmentReasoningAthenaOutputContractV2({ allowedEvidenceRefs: input.evidenceRefs, attestation }).normalize(providerValue(outcome.value));
                 return normalized.status === 'accepted'
                     ? freeze({ status: 'completed' as const, code: null, resultSchema: normalized.resultSchema, value: normalized.value, sourceBindings: normalized.sourceBindings, attestation: normalized.attestation, ...COMMON }) as Completed
                     : denied('provider_invalid');
@@ -197,7 +197,7 @@ export function createTreatmentReasoningAthenaExecution(value: unknown): Readonl
 export type TreatmentReasoningPortableExecutionResult =
     | (Omit<Completed, 'attestation'> & Readonly<{ attestation: TreatmentReasoningPortableAttestation }>)
     | Denied;
-/** Portable engine metadata is validated separately; projection and V2 clinical rules are shared; its original direct-V2 prompt is retained. */
+/** Portable engine metadata is validated separately; projection, prompt and V2 clinical rules are identical. */
 export function createTreatmentReasoningPortableExecution(value: unknown) {
     const config = configuration(value);
     if (!config) throw new TreatmentReasoningAthenaExecutionConfigurationError();
@@ -207,7 +207,7 @@ export function createTreatmentReasoningPortableExecution(value: unknown) {
         let attestation: TreatmentReasoningPortableAttestation | null;
         try { attestation = snapshotTreatmentReasoningPortableAttestation(config.host.policy()); } catch { attestation = null; }
         if (!attestation || attestation.receiptRef !== input.receiptRef || attestation.provenanceRef !== input.provenanceRef) return denied('host_invalid');
-        const outcome = await invokeOnce(config.host, config.timeoutMs, buildAthenaTreatmentReasoningInstruction(input.projection));
+        const outcome = await invokeOnce(config.host, config.timeoutMs, input);
         if (outcome.kind === 'timeout') return denied('execution_timeout');
         if (outcome.kind === 'failed') return denied('provider_failed');
         try {

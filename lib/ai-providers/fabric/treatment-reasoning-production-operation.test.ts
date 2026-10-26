@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { athenaClaimsProfileV1 } from './treatment-reasoning-athena-claims-profile.ts';
 import { createTreatmentReasoningProductionService } from './treatment-reasoning-production-operation.ts';
 
 const projection = () => Object.freeze({
@@ -53,6 +54,7 @@ const providerOutput = () => ({
 
 const claimsOutput = () => {
     const value = providerOutput();
+    value.data.trace.toolsUsed = [];
     const pair = (path: string) => { const binding = value.sourceBindings.find(item => item.claimPath === path)!; return { claim: binding.claim, evidenceRefs: binding.evidenceRefs }; };
     return { schemaVersion: 'mediflow.treatment-reasoning.claims.v1', task: value.task, summary: pair('summary'), data: { ...value.data,
         recommendation: pair('data.recommendation'), reasoning: value.data.reasoning.map((_, i) => pair(`data.reasoning.${i}`)), caveats: value.data.caveats.map((_, i) => pair(`data.caveats.${i}`)) } };
@@ -99,7 +101,7 @@ function fixture(options: FixtureOptions = {}) {
             invoke({ instruction }: Readonly<{ instruction: string }>) {
                 calls.push('invoke');
                 assert.match(instruction, /source_payload_json=/u);
-                return options.providerValue ?? JSON.stringify(claimsOutput());
+                return options.providerValue ?? JSON.stringify(providerOutput());
             },
         }),
         entropy: () => Uint8Array.from({ length: 32 }, (_, index) => index + 1),
@@ -234,15 +236,31 @@ test('portable currentness CAS failure never publishes and does not retry', asyn
     assert.equal(result.code, 'source_stale'); assert.equal(f.calls.filter(x => x === 'invoke').length, 1); assert.equal(f.calls.at(-1), 'abort');
 });
 
-test('a valid claims response arriving after the host retires its context cannot publish or invoke again', async () => {
+test('a valid direct-V2 response arriving after the host retires its context cannot publish or invoke again', async () => {
     let finish: ((value: string) => void) | undefined;
     const options = { commit: true, providerValue: new Promise<string>(resolve => { finish = resolve; }) };
     const current = fixture(options); const operation = await current.service.acquirePreview();
     const pending = operation.preview({ handle: 'trp_0123456789abcdef0123456789abcdef', requestId: 'request.synthetic.retired' });
     for (let i = 0; i < 20 && !current.calls.includes('invoke'); i++) await new Promise<void>(resolve => setImmediate(resolve));
     assert.equal(current.calls.filter(x => x === 'invoke').length, 1);
-    options.commit = false; finish!(JSON.stringify(claimsOutput()));
+    options.commit = false; finish!(JSON.stringify(providerOutput()));
     const result = await pending;
     assert.equal(result.status, 'denied'); assert.equal(result.code, 'source_stale'); assert.equal(result.publication, null);
     assert.equal(current.calls.filter(x => x === 'invoke').length, 1);
+});
+
+
+test('an already enabled ordinary lane cannot publish a valid diagnostic claims response', async () => {
+    const value = JSON.stringify(claimsOutput());
+    const decoded = athenaClaimsProfileV1.normalize(value, { allowedEvidenceRefs: projection().evidenceRefs, attestation: {
+        schema: 'mediflow.ai.treatment-reasoning-athena-attestation.v1', readiness: 'available_unqualified',
+        provider: 'athena_mlx', venue: 'local_process', egress: 'none', receiptRef: 'receipt.synthetic', provenanceRef: 'provenance.synthetic',
+    } });
+    assert.equal(decoded.status, 'accepted');
+    const current = fixture({ enabled: true, providerValue: value });
+    const operation = await current.service.acquirePreview();
+    const result = await operation.preview({ handle: 'trp_0123456789abcdef0123456789abcdef', requestId: 'request.synthetic.claims.diagnostic' });
+    assert.equal(result.status, 'denied'); assert.equal(result.code, 'provider_invalid');
+    assert.equal(result.publication, null); assert.equal(current.calls.includes('commit'), false);
+    assert.equal(current.calls.filter(call => call === 'invoke').length, 1); assert.equal(current.aborts(), 1);
 });
