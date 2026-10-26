@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { after, test, type TestContext } from 'node:test';
 import { lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
+const syntheticUsername = basename(new URL(import.meta.url).pathname);
 import type { WebSessionProjection } from '../security/web-auth-lifecycle-owner-adapter';
 import type { ProductResponse } from './product-contract';
 import type { MacQualificationAudit } from '../chatgpt-execution/execution-mac-qualification';
@@ -46,7 +47,7 @@ function identity(path = hold) {
 let sequence = 0;
 function session(t: TestContext) {
     const name = `retained-${++sequence}`;
-    const context = issueSyntheticWebSessionContext({ id: name, username: 'synthetic', role: 'doctor' }, name);
+    const context = issueSyntheticWebSessionContext({ id: name, username: syntheticUsername, role: 'doctor' }, name);
     t.after(() => retireSyntheticWebSession(context.session));
     return context;
 }
