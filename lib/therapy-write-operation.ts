@@ -85,5 +85,5 @@ export function updateTherapyOperationInTransaction(tx: Tx, input: TherapyUpdate
 }
 
 export function updateTherapyOperation(input: TherapyUpdateInput): Result {
-    return dbServer.transaction(tx => updateTherapyOperationInTransaction(tx, input), { behavior: 'immediate' });
+    return dbServer.transaction((tx) => updateTherapyOperationInTransaction(tx, input), { behavior: 'immediate' });
 }
