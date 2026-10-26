@@ -841,17 +841,29 @@ impl Render for TextInput {
             .tab_stop(true)
             .cursor(CursorStyle::IBeam)
             .w_full()
-            .max_h(px(256.))
+            .max_h(px(if self.multiline {
+                (theme.role(TypeRole::Prose).line_height * 5. + 28.).max(256.)
+            } else {
+                256.
+            }))
             .track_scroll(&self.scroll)
             .overflow_y_scroll()
             .min_h(px(40.))
-            .when(self.multiline, |el| el.min_h(px(160.)))
+            .when(self.multiline, |el| {
+                el.min_h(px(
+                    (theme.role(TypeRole::Prose).line_height * 3. + 28.).max(160.)
+                ))
+            })
             .p(px(if self.multiline { 12. } else { 8. }))
             .border_1()
             .border_color(theme.strong_rule)
             .rounded(px(theme.control_radius))
             .bg(theme.paper)
-            .focus(|style| style.border_color(theme.fresh).border_2())
+            .focus(|style| {
+                style
+                    .border_color(theme.fresh)
+                    .shadow(vec![theme.focus_ring(false)])
+            })
             .text_color(theme.ink)
             .when_some(self.writing_ink, |element, ink| {
                 element.writing_ink(ink, WritingSurface::Plane, theme)
