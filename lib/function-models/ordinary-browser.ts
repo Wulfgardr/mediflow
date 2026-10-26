@@ -61,6 +61,23 @@ function parseDisclosure(value: unknown, state: OrdinaryFlowState): OrdinaryCont
         || JSON.stringify(x.egress) !== JSON.stringify(['auth.openai.com:443','chatgpt.com:443']) || x.proposalOnly !== true || x.clinicalWrites !== 0) throw failure();
     return Object.freeze({ ...x, egress: Object.freeze([...(x.egress as string[])]) }) as OrdinaryContentDisclosure;
 }
+const preparationErrors: Readonly<Record<string, string>> = Object.freeze({
+    busy: 'Una preparazione OpenAI è riservata o in chiusura. Verifica la chiusura precedente; nessuna ripetizione automatica.',
+    revoked: 'La preparazione OpenAI è stata ritirata. Verifica sessione e contesto prima di preparare di nuovo.',
+    catalog_stale: 'Il catalogo OpenAI è cambiato. Verifica il catalogo corrente prima di scegliere di nuovo.',
+    model_unavailable: 'Il modello OpenAI scelto non è disponibile. Nessun modello alternativo viene usato.',
+    session_expired: 'La sessione MediFlow non è disponibile. Sblocca MediFlow prima di una nuova preparazione.',
+});
+async function preparationError(response: Response): Promise<string> {
+    if (response.status === 401) return preparationErrors.session_expired;
+    try {
+        const value = await response.clone().json();
+        const code = value && typeof value === 'object' && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype
+            ? Object.getOwnPropertyDescriptor(value, 'code') : undefined;
+        if (code && 'value' in code && typeof code.value === 'string' && Object.hasOwn(preparationErrors, code.value)) return preparationErrors[code.value];
+    } catch { /* Unknown responses cannot supply UI prose or authority. */ }
+    return 'Preparazione OpenAI non riuscita. Verifica l’esito e la chiusura prima di preparare di nuovo; nessuna ripetizione automatica.';
+}
 export function createOrdinaryBrowser(functionId: OrdinaryFunction, transport: typeof fetch, changed: (view: OrdinaryBrowserView) => void) {
     const empty = (): OrdinaryBrowserView => ({ loading: false, error: null, settings: null, state: null, disclosure: null, challenge: null, catalog: null, choice: '', completed: false });
     let view = empty(), generation = 0, pending: { resolve(value: Response): void; reject(error: Error): void } | undefined;
@@ -120,7 +137,11 @@ export function createOrdinaryBrowser(functionId: OrdinaryFunction, transport: t
                 const headers = new Headers(init.headers); headers.set('x-mediflow-function-model', JSON.stringify({ schema: ORDINARY_SELECTION_SCHEMA, expectedPreferenceRevision: view.settings.revision }));
                 const response = await transport(input, { ...init, headers, signal });
                 if (generation !== token || signal.aborted) throw failure('revoked');
-                if (response.status !== 202) { emit({ loading: false }); return response; }
+                if (response.status !== 202) {
+                    const error = response.ok ? null : await preparationError(response);
+                    if (generation !== token || signal.aborted) throw failure('revoked');
+                    emit({ loading: false, error }); return response;
+                }
                 const value = await response.json(); const state = parseState(value, functionId); const disclosure = parseDisclosure(value.disclosure, state);
                 if (state.phase !== 'needs_consent') throw failure();
                 const waiting = new Promise<Response>((resolve, reject) => { pending = { resolve, reject }; });
