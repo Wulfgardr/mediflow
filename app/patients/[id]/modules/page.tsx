@@ -9,7 +9,7 @@ import { differenceInYears } from 'date-fns';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, ChevronRight, Pill, Plus, ShieldCheck } from 'lucide-react';
+import { Activity, ChevronRight, Pill, Plus } from 'lucide-react';
 
 import { PluginLocalUiNavigation, PluginPrescribingGuide } from '@/components/plugin-local-ui-navigation';
 import { PatientClinicalSupport, PatientProposalsSummary } from '@/components/patient-clinical-support';
@@ -31,6 +31,7 @@ import { PatientSmartImportFabricPreviewCard } from '@/components/patient-smart-
 import ProstheticPrescriptionManager from '@/components/prosthetic-prescription-manager';
 import ServicePrescriptionManager from '@/components/service-prescription-manager';
 import SissWorkspace from '@/components/siss-workspace';
+import sissStyles from '@/components/siss-workspace.module.css';
 import TherapyManager from '@/components/therapy-manager';
 import TreatmentReasoningPanel from '@/components/treatment-reasoning-panel';
 import Timeline from '@/components/timeline';
@@ -732,10 +733,9 @@ export default function PatientDetailPage() {
                         id="siss"
                         kicker="SISS / FSE"
                         title="SISS e FSE"
-                        icon={ShieldCheck}
                         count={sissHandoffCount !== undefined ? formatCountLabel(sissHandoffCount, 'passaggio', 'passaggi') : undefined}
                         summary="Apertura assistita dei portali regionali e diario dei passaggi."
-                        surfaceClassName={workspaceStyles.clinicalSection}
+                        surfaceClassName={`${workspaceStyles.clinicalSection} ${sissStyles.section}`}
                     >
                         {/* SISS presentation reuses the existing export/share gates. */}
                         <SissWorkspace
