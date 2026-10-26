@@ -103,7 +103,7 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
                         <div className="mf-alert mf-alert-info">
                             <Check className="w-4 h-4 mt-0.5 shrink-0" />
                             <div>
-                                <p>Verrà generato un file <strong>FHIR JSON</strong> dopo il controllo FSE. Gli errori bloccanti fermano il download; i warning chiedono una conferma.</p>
+                                <p>Verrà generato un file <strong>FHIR JSON</strong> dopo il controllo locale dei dati. Gli errori bloccanti fermano il download; le attenzioni chiedono una conferma. Il file non viene inviato automaticamente al FSE.</p>
                                 <ul className="list-disc ml-4 mt-1 opacity-80">
                                     <li>Anagrafica paziente</li>
                                     <li>Diagnosi registrate</li>
