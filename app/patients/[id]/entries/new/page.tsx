@@ -1,18 +1,19 @@
 'use client';
 
 import { formatCountLabel } from '@/lib/format-count';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { v4 as uuidv4 } from 'uuid';
 import { AlertTriangle, ArrowLeft, Building2, Calendar, CheckCircle2, ChevronDown, ClipboardList, Clock, FileCheck2, FileText, Home, Loader2, Mic, MicOff, Paperclip, Pause, Play, RotateCcw, Save, Square, Stethoscope, Upload, Video, Wand2, X } from 'lucide-react';
 
+import { PatientSynopticSheet } from '@/components/patient-synoptic-sheet';
 import { InkState } from '@/components/ui/ink-state';
 import { ClinicalRichTextEditor } from '@/components/clinical-rich-text-editor';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
-import { db, type Attachment, type ClinicalEntry, type Therapy } from '@/lib/db';
+import { db, type Attachment, type ClinicalEntry, type Therapy, type Observation, type Checkup } from '@/lib/db';
 import { clinicalRichTextToPlainText, isClinicalRichTextBlank, sanitizeClinicalRichTextHtml } from '@/lib/clinical-rich-text';
 import { useLiveQuery, useLiveQueryState } from '@/lib/live-query';
 import { cn } from '@/lib/utils';
@@ -93,6 +94,17 @@ export default function NewEntryPage() {
     const [visitDraftError, setVisitDraftError] = useState('');
     const [visitMedicationCandidates, setVisitMedicationCandidates] = useState<VisitMedicationCandidate[]>([]);
     const [isContextOpen, setIsContextOpen] = useState(false);
+    const [isReadingQuadro, setIsReadingQuadro] = useState(false);
+    const writingRef = useRef<HTMLDivElement>(null);
+    const quadroHeadingRef = useRef<HTMLHeadingElement>(null);
+    const consultQuadro = () => {
+        setIsReadingQuadro(true);
+        requestAnimationFrame(() => quadroHeadingRef.current?.focus());
+    };
+    const resumeDraft = () => {
+        setIsReadingQuadro(false);
+        requestAnimationFrame(() => writingRef.current?.querySelector<HTMLElement>('[contenteditable="true"]')?.focus());
+    };
     const hasUnsavedChanges = !isClinicalRichTextBlank(content)
         || type !== 'visit'
         || setting !== 'ambulatory'
@@ -103,14 +115,16 @@ export default function NewEntryPage() {
 
     /* WUL-676: keep the workspace guard active during pending saves. */
     useRuntimeTwinPendingForm(hasUnsavedChanges);
-    const patient = useLiveQuery(() => db.patients.get(id), [id], undefined, ['patients']);
+    const patientRead = useLiveQueryState(() => db.patients.get(id), [id], undefined, ['patients']);
+    const patient = patientRead.data;
     /* WUL-420 */
-    const patientEntries = useLiveQuery<ClinicalEntry[], ClinicalEntry[]>(
-        async () => db.entries.query({ patientId: id }).toArray(),
+    const entriesRead = useLiveQueryState<ClinicalEntry[]>(
+        async () => db.entries.query({ patientId: id }).toArray({ rejectAuthUnavailable: true }),
         [id],
-        [],
+        undefined,
         ['entries'],
-    ) ?? [];
+    );
+    const patientEntries = useMemo(() => entriesRead.data ?? [], [entriesRead.data]);
     /* WUL-420 */
     const patientAttachments = useLiveQuery<Attachment[], Attachment[]>(
         async () => db.attachments.query({ patientId: id }).toArray(),
@@ -119,16 +133,31 @@ export default function NewEntryPage() {
         ['attachments'],
     ) ?? [];
 
-    /* WUL-676: on-demand consultation; no clinical writes or auto-insert. */
     const activeTherapies = useLiveQueryState<Therapy[]>(
-        async () => proposal && isContextOpen
-            ? (await db.therapies.query({ patientId: id }).toArray())
+        async () => proposal
+            ? (await db.therapies.query({ patientId: id }).toArray({ rejectAuthUnavailable: true }))
                 .filter((therapy) => therapy.status === 'active' && !therapy.deletedAt)
             : [],
-        [id, proposal, isContextOpen],
+        [id, proposal],
         undefined,
         ['therapies'],
     );
+
+    const measuresRead = useLiveQueryState<Observation[]>(
+        async () => proposal ? db.observations.query({ patientId: id }).toArray({ rejectAuthUnavailable: true }) : [],
+        [id, proposal], undefined, ['observations'],
+    );
+    const checkupsRead = useLiveQueryState<Checkup[]>(
+        async () => proposal ? (await db.checkups.query({ patientId: id }).toArray({ rejectAuthUnavailable: true }))
+            .filter(checkup => !checkup.deletedAt && checkup.status !== 'completed' && checkup.status !== 'cancelled')
+            .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime()) : [],
+        [id, proposal], undefined, ['checkups'],
+    );
+    const quadroTherapies = useMemo(() => activeTherapies.data?.slice().sort((left, right) => {
+        const leftTime = left.startDate ? new Date(left.startDate).getTime() : 0;
+        const rightTime = right.startDate ? new Date(right.startDate).getTime() : 0;
+        return rightTime - leftTime;
+    }), [activeTherapies.data]);
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
         setFiles((prev) => [...prev, ...acceptedFiles]);
@@ -807,6 +836,20 @@ export default function NewEntryPage() {
         </section>
     );
 
+    const recentDiary = (
+        <section className={composerStyles.previousEntries} aria-label="Ultime voci registrate">
+            <h2>Voci precedenti</h2>
+            {entriesRead.loading ? <p role="status">Lettura delle voci precedenti…</p>
+                : entriesRead.error ? <p role="alert">Voci precedenti non disponibili.</p>
+                    : recentEntries.length ? recentEntries.map(entry => (
+                        <details key={entry.id} className={composerStyles.contextSource}>
+                            <summary>{formatEntryDate(entry.date)} · <PrivacyBlur>{entry.title}</PrivacyBlur></summary>
+                            <p><PrivacyBlur>{clinicalRichTextToPlainText(entry.content)}</PrivacyBlur></p>
+                        </details>
+                    )) : <p>Nessuna voce recente disponibile.</p>}
+        </section>
+    );
+
     const entryForm = (
         <div
             className={proposal ? composerStyles.sheet : "patient-detail-section lume-panel border p-6 md:p-7"}
@@ -849,15 +892,6 @@ export default function NewEntryPage() {
                                     </ul>
                                 ) : <p>Nessuna terapia attiva registrata.</p>}
                             </section>
-                            <section aria-label="Ultime voci registrate">
-                                <h3>Ultime voci registrate</h3>
-                                {recentEntries.length ? recentEntries.map((entry) => (
-                                    <details key={entry.id} className={composerStyles.contextSource}>
-                                        <summary>{formatEntryDate(entry.date)} · <PrivacyBlur>{entry.title}</PrivacyBlur></summary>
-                                        <p><PrivacyBlur>{clinicalRichTextToPlainText(entry.content)}</PrivacyBlur></p>
-                                    </details>
-                                )) : <p>Nessuna voce recente disponibile.</p>}
-                            </section>
                             <section aria-label="Documenti in cartella">
                                 <h3>Documenti in cartella</h3>
                                 {patientAttachments.length ? (
@@ -876,7 +910,7 @@ export default function NewEntryPage() {
                     </details>
                 ) : null}
                 <div className={proposal ? composerStyles.actions : "flex justify-end border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-4"}>
-                    {proposal ? <div className={composerStyles.saveSummary} role="status"><InkState state="fresh">{isSubmitting ? 'Registrazione in corso' : 'Bozza non registrata'}</InkState><p>{patient ? <PrivacyBlur>{`${patient.lastName} ${patient.firstName}`}</PrivacyBlur> : 'Caricamento paziente…'} · 1 voce di diario{files.length ? ` · ${files.length} allegati` : ''}</p></div> : null}
+                    {proposal ? <div className={composerStyles.saveSummary} role="status"><InkState state="fresh">{isSubmitting ? 'Registrazione in corso' : 'Bozza non registrata'}</InkState><p>{patient ? <PrivacyBlur>{`${patient.lastName} ${patient.firstName}`}</PrivacyBlur> : patientRead.loading ? 'Caricamento paziente…' : 'Paziente non disponibile.'} · 1 voce di diario{files.length ? ` · ${files.length} allegati` : ''}</p></div> : null}
                     <button
                         type="submit"
                         disabled={isSubmitting}
@@ -910,10 +944,34 @@ export default function NewEntryPage() {
                     </Link>
                     <div className={composerStyles.titleRow}>
                         <h1 className="type-page-title">Nuova voce clinica<span aria-hidden="true">.</span></h1>
-                        <p>{patient ? <PrivacyBlur>{`${patient.lastName} ${patient.firstName}`}</PrivacyBlur> : 'Caricamento paziente…'}</p>
+                        <p>{patient ? <PrivacyBlur>{`${patient.lastName} ${patient.firstName}`}</PrivacyBlur> : patientRead.loading ? 'Caricamento paziente…' : 'Paziente non disponibile.'}</p>
                     </div>
                 </header>
-                {entryForm}
+                <div className={composerStyles.layout} data-reading-quadro={isReadingQuadro}>
+                    <aside className={composerStyles.quadro} aria-label="Quadro durante la scrittura">
+                        <div className={composerStyles.columnHeading}>
+                            <h2 ref={quadroHeadingRef} tabIndex={-1}>Quadro</h2>
+                            <button type="button" className={`mf-button-text ${composerStyles.resumeDraft}`} onClick={resumeDraft}>Riprendi la bozza</button>
+                        </div>
+                        {patientRead.loading ? <p role="status">Lettura del Quadro…</p>
+                            : patientRead.error ? <p role="alert">Quadro non disponibile: impossibile leggere il paziente.</p>
+                                : !patient ? <p role="alert">Paziente non disponibile. Il Quadro non può essere letto.</p>
+                                    : <PatientSynopticSheet
+                                        problems={{ data: Array.isArray(patient.diagnoses) ? patient.diagnoses : [], loading: false, error: null }}
+                                        therapies={{ ...activeTherapies, data: quadroTherapies }}
+                                        measures={measuresRead}
+                                        checkups={checkupsRead}
+                                    />}
+                    </aside>
+                    <div className={composerStyles.writingColumn} ref={writingRef}>
+                        <div className={composerStyles.columnHeading}>
+                            <h2>Diario</h2>
+                            <button type="button" className={`mf-button-text ${composerStyles.consultQuadro}`} onClick={consultQuadro}>Consulta il Quadro</button>
+                        </div>
+                        {entryForm}
+                        {recentDiary}
+                    </div>
+                </div>
             </div>
         );
     }
