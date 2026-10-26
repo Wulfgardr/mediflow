@@ -850,6 +850,9 @@ impl ClinicalApp {
     }
 
     fn next_presentation_epoch(&mut self) {
+        if matches!(self.ambulatories, Load::Loading) {
+            self.ambulatories = Load::Idle;
+        }
         self.read_timer = None;
         self.read_state_commands.clear();
         self.ai_preferences.reset();
@@ -1720,6 +1723,18 @@ impl ClinicalApp {
                 self.message = Some(("Sessione bloccata. Un salvataggio delle sedi era in corso: rileggi l’elenco dopo l’accesso.".into(),false));
             } else if ai_pending {
                 self.message = Some(("Sessione bloccata. Un salvataggio AI era in corso: rileggi le preferenze dopo l’accesso.".into(), false));
+            }
+            return;
+        }
+        if action == Discard::Reload
+            && self.area == Area::Settings
+            && self.ambulatory_management.active
+        {
+            if !self.ambulatory_management.is_saving()
+                && !matches!(self.ambulatories, Load::Loading)
+            {
+                self.ambulatory_management.rebase = true;
+                self.load_ambulatories(cx);
             }
             return;
         }
