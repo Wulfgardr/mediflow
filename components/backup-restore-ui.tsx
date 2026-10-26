@@ -214,7 +214,8 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
                 <div className="mf-alert mf-alert-warning mt-2 mb-4 p-4 flex gap-3 text-sm">
                     <AlertTriangle className="w-5 h-5 flex-shrink-0" />
                     <p>
-                        Caricare un backup <strong>cancellerà TUTTI i dati attuali</strong> e li sostituirà con il contenuto del backup.
+                        Il ripristino <strong>sostituirà pazienti, voci, allegati e gli altri dati del formato portabile</strong> con quelli del file.
+                        Account e chiavi restano invariati. Lo storico protetto delle operazioni viene conservato.
                         Il file viene verificato prima della scrittura e rifiutato se il manifest non coincide.
                     </p>
                 </div>
@@ -240,8 +241,9 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
                         <div className="flex items-start gap-2 text-sm font-semibold">
                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                             <p>
-                                ATTENZIONE: <strong>TUTTI i dati attuali verranno cancellati</strong> e sostituiti con
-                                quelli del backup. L&apos;operazione non è reversibile. Le altre schede verranno ricaricate;
+                                ATTENZIONE: <strong>I dati del formato portabile verranno sostituiti</strong> con quelli del file selezionato.
+                                Account e chiavi restano invariati. Lo storico protetto delle operazioni viene conservato.
+                                L&apos;operazione non è reversibile. Le altre schede verranno ricaricate;
                                 i dispositivi abbinati dovranno essere abbinati e sincronizzati di nuovo.
                             </p>
                         </div>
