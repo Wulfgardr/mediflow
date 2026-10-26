@@ -161,6 +161,7 @@ test('access and profile settings preserve form drafts and denied outcomes', asy
         try {
             const siblingGoto = sibling.goto.bind(sibling);
             sibling.goto = (url, options) => siblingGoto(new URL(url, baseURL!).href, options);
+            await protect(sibling, baseURL!);
             await bootstrapUnlockedSession(sibling, '1234'); await page.bringToFront();
             await page.evaluate(() => window.dispatchEvent(new Event('focus')));
             await expect(profile.getByRole('status')).toContainText('La sessione è cambiata');
