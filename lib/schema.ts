@@ -588,3 +588,12 @@ export const therapyStatusCommands = sqliteTable('therapy_status_commands', {
     reason: text('reason'), committedAt: integer('committed_at').notNull(), resultVersion: integer('result_version'),
     resultEndDate: integer('result_end_date'), auditEventId: text('audit_event_id'), auditSnapshot: text('audit_snapshot'),
 });
+
+export const ambulatoryDestructiveCommands = sqliteTable('ambulatory_destructive_commands', {
+    commandId: text('command_id').primaryKey().notNull(), protocol: text('protocol').notNull(), operation: text('operation').notNull(),
+    originalArchiveGeneration: text('original_archive_generation').notNull(), originalScopeId: text('original_scope_id').notNull(),
+    ambulatoryId: text('ambulatory_id').notNull(), expectedVersion: integer('expected_version').notNull(), planDigest: text('plan_digest').notNull(),
+    actorRef: text('actor_ref').notNull(), deviceId: text('device_id').notNull(), devicePlatform: text('device_platform').notNull(),
+    deviceTokenHash: text('device_token_hash').notNull(), outcome: text('outcome').notNull(), reason: text('reason'),
+    committedAt: integer('committed_at').notNull(), resultJson: text('result_json'), auditSnapshots: text('audit_snapshots'),
+});
