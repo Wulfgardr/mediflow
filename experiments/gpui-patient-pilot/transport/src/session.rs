@@ -59,6 +59,16 @@ pub struct AmbulatoryCommandContext {
     purpose: crate::ambulatory_command_transport::AmbulatoryCommandPurpose,
 }
 impl AmbulatoryCommandContext {
+    /// Adds a local revocation fence; this can only withdraw the existing context.
+    pub fn bind_revocation_epoch(&mut self, epoch: &'static AtomicU64) -> Result<()> {
+        self.context.bind_revocation_epoch(epoch)
+    }
+    pub fn check(&self) -> Result<()> {
+        self.context.check()
+    }
+    pub fn revocation_epoch_current(&self) -> bool {
+        self.context.revocation_epoch_current()
+    }
     pub fn cancel(&self) {
         self.context.cancel();
     }
@@ -262,6 +272,10 @@ impl RuntimeSession {
             return Err(error);
         }
         result
+    }
+
+    pub fn can_prepare_ambulatory_command(&self) -> bool {
+        self.ensure_open().is_ok() && self.admit_ambulatory_command().is_ok()
     }
 
     pub fn ambulatory_command_context(
