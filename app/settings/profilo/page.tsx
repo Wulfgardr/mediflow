@@ -3,18 +3,19 @@
 // WUL-297 Profilo: moved from the monolithic settings page.
 
 import { useState, useEffect, useRef } from 'react';
-import { Save, User } from 'lucide-react';
+import { Save } from 'lucide-react';
+import { Disclosure } from '@/components/disclosure';
+import styles from '@/components/settings/account-pages.module.css';
 import { useSecurity } from '@/components/security-provider';
 import { AccountProfileEditor, type ProfileEditorState } from '@/lib/security/account-profile-editor';
 import { captureClientAccountAuthority, observeArchiveGeneration, subscribeClientAccountAuthority } from '@/lib/security/client-auth-api';
 import { WorkProfileSettings } from '@/components/work-profile-onboarding';
+import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 import {
-    SETTINGS_CARD_CLASS,
     SETTINGS_INPUT_CLASS,
     SETTINGS_LABEL_CLASS,
     SETTINGS_PRIMARY_BUTTON_CLASS,
     SETTINGS_SECONDARY_BUTTON_CLASS,
-    SettingsSectionIntro,
 } from '@/components/settings/settings-ui';
 
 export default function SettingsProfilePage() {
@@ -39,29 +40,20 @@ export default function SettingsProfilePage() {
         return () => { unsubscribe(); owner.dispose(); editor.current = null; };
     }, [userId]);
     const profile = state.draft;
+    const [workProfileOpen, setWorkProfileOpen] = useState(false);
+    useRuntimeTwinPendingForm(state.current !== null
+        && (profile.doctorName !== (state.current.displayName ?? '')
+            || profile.clinicName !== (state.current.ambulatoryName ?? '')));
 
     return (
-        <section className="space-y-4" data-testid="settings-profile-section">
-            <SettingsSectionIntro
-                kicker="Generale"
-                title="Profilo"
-                description="Identità mostrata nei documenti generati: intestazione, ricette e referti."
-            />
-
-            <div className={SETTINGS_CARD_CLASS}>
-                {/* WUL-229: header icon disc + ink copy mapped to MediFlow tokens */}
-                <div className="mb-5 flex items-start gap-3">
-                    <div className="rounded-2xl p-2" style={{ background: 'color-mix(in srgb, var(--lume-ink) 6%, transparent)', color: 'var(--lume-ink)' }}>
-                        <User className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                        <p className="section-kicker">Profilo</p>
-                        <h2 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Nome medico e ambulatorio</h2>
-                        <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Mostrati in intestazione, ricette e referti generati.</p>
-                    </div>
-                </div>
-
-                <div className="space-y-4">
+        <section className={styles.page} data-testid="settings-profile-section">
+            <header className={styles.intro}>
+                <h2>Profilo</h2>
+                <p>Identità mostrata nei documenti generati: intestazione, ricette e referti.</p>
+            </header>
+            <section className={styles.section} aria-labelledby="settings-account-profile-title" aria-busy={state.busy}>
+                <h3 id="settings-account-profile-title" className={styles.heading}>Nome medico e ambulatorio</h3>
+                <div className={styles.form}>
                     <div>
                         <label htmlFor="doctor-name" className={SETTINGS_LABEL_CLASS}>
                             Nome medico
@@ -98,15 +90,17 @@ export default function SettingsProfilePage() {
                         />
                     </div>
 
-                    {state.message && <p role="status" className="text-sm">{state.message}</p>}
+                    {state.busy && !state.current && <p role="status" className={styles.feedback}>Caricamento del profilo…</p>}
+                    {state.message && <p role="status" className={styles.feedback}>{state.message}</p>}
                     {state.current && state.message && <p className="text-sm">
                         Valori salvati: {state.current.displayName || 'Nome medico vuoto'} · {state.current.ambulatoryName || 'Nome ambulatorio vuoto'}
                     </p>}
-                    <div className="flex flex-wrap gap-3 pt-2">
+                    <div className={styles.actions}>
                         <button
                             onClick={() => void editor.current?.save()}
                             disabled={state.busy || state.requiresRead || !state.current}
-                            className={SETTINGS_PRIMARY_BUTTON_CLASS}
+                            className={workProfileOpen ? SETTINGS_SECONDARY_BUTTON_CLASS : SETTINGS_PRIMARY_BUTTON_CLASS}
+                            data-settings-primary={!workProfileOpen ? true : undefined}
                         >
                             <Save className="w-4 h-4" />
                             {state.busy ? 'Attendi...' : 'Salva profilo'}
@@ -115,8 +109,11 @@ export default function SettingsProfilePage() {
                             className={SETTINGS_SECONDARY_BUTTON_CLASS}>Rileggi profilo mantenendo la bozza</button>
                     </div>
                 </div>
-            </div>
-            <WorkProfileSettings />
+            </section>
+            <Disclosure title="Il tuo modo di lavorare" headingLevel={3} className={styles.section}
+                open={workProfileOpen} onOpenChange={setWorkProfileOpen}>
+                <WorkProfileSettings showHeading={false} />
+            </Disclosure>
         </section>
     );
 }

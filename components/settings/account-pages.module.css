@@ -1,0 +1,74 @@
+.page {
+    min-width: 0;
+    max-width: 64rem;
+    color: var(--lume-ink);
+    font: var(--type-body);
+}
+.intro { margin-bottom: 1.25rem; }
+.page.page .intro h2,
+.page.page .heading {
+    margin: 0;
+    color: var(--lume-ink-muted);
+    font: var(--type-section);
+    font-variant-caps: all-small-caps;
+    letter-spacing: 0.05em;
+}
+.intro p, .copy {
+    max-width: 70ch;
+    margin: 0.5rem 0 0;
+    color: var(--lume-ink-muted);
+    font: var(--type-meta);
+    overflow-wrap: anywhere;
+}
+.page .section {
+    padding: 1.25rem 0;
+    border: 0;
+    border-bottom: 1px solid var(--lume-rule);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+.page .section > :first-child { min-width: 0; }
+.page .section :global([data-disclosure-control]) { font: var(--type-strong); }
+.form { display: grid; gap: 1rem; max-width: 44rem; min-width: 0; }
+.form > .copy:first-child { margin-top: 0; }
+.form input { width: 100%; min-width: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; margin-top: 0.25rem; }
+.page .actions > button { min-height: var(--lume-control-height, 44px); white-space: normal; }
+.row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem 2rem;
+    padding: 1rem 0;
+    min-width: 0;
+}
+.row > * { min-width: 0; }
+.strong { margin: 0; font: var(--type-strong); overflow-wrap: anywhere; }
+.feedback { margin: 0; font: var(--type-body); overflow-wrap: anywhere; }
+.feedback :global(p) { margin: 0.5rem 0; }
+.preference {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid var(--lume-rule);
+    border-radius: 0;
+    background: transparent;
+    color: var(--lume-ink);
+    text-align: left;
+    font: var(--type-body);
+}
+.preference:focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: 2px; }
+.preference:hover { background: var(--lume-surface-field); }
+.preference > :last-child { font: var(--type-strong); }
+@media (max-width: 640px) {
+    .row { grid-template-columns: minmax(0, 1fr); gap: 0.75rem; }
+    .row > button { justify-self: start; }
+    .preference { grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; }
+}
+
+.row > span:first-child { display: grid; gap: 0.25rem; }
+.row > span > .copy { margin-top: 0; }
+.row > input[type="radio"] { width: 1.125rem; height: 1.125rem; accent-color: var(--lume-ink-fresh); }
+.row:has(input:focus-visible) { outline: 2px solid var(--lume-ink-fresh); outline-offset: 2px; }
+.heading + .form { margin-top: 1rem; }
+.row:has(> input[type='radio']) { grid-template-columns: minmax(0, 1fr) auto; }

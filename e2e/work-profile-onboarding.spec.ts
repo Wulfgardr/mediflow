@@ -74,6 +74,7 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await page.setViewportSize({ width: 1440, height: 960 });
 
     await page.goto('/settings/profilo');
+    await page.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click();
     await expect(panel.getByText(/Profilo salvato:/)).toContainText('Entrambi');
     // Independent cookie/control owners use ordinary login; no session material is copied.
     const sibling = await browser.newPage();
@@ -81,6 +82,7 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     // Let the existing auth bootstrap/lock fence settle before the login gesture.
     await sibling.waitForLoadState('networkidle');
     await unlockIfNeeded(sibling, process.env.E2E_PIN || '1234');
+    await sibling.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click();
     await expect(sibling.getByTestId('work-profile-onboarding')).toHaveAttribute('aria-busy', 'false');
     await panel.getByRole('button', { name: 'Cambia profilo di lavoro' }).click();
     await expect(panel.getByRole('heading', { name: 'Anteprima del profilo' })).toBeVisible();
@@ -99,6 +101,7 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true }).getByRole('link', { name: 'Pazienti', exact: true })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' })).toBeVisible();
     await page.goto('/settings/profilo');
+    await page.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click();
     await panel.getByRole('button', { name: 'Ripristina la scelta precedente' }).click();
     expect((await read()).active.profile).toBe('interactive');
     await panel.getByRole('button', { name: 'Conferma ripristino del profilo' }).click();
@@ -152,6 +155,7 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await expect(page.getByRole('heading', { name: /Stato operativo/, level: 1 })).toBeVisible();
     await expect(page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true })).toHaveAttribute('aria-current', 'page');
     await page.goto('/settings/profilo');
+    await page.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click();
     await expect(panel.getByText(/Profilo salvato:/)).toContainText('Agent');
     await page.screenshot({ path: test.info().outputPath('saved-profile.png'), fullPage: true });
     expect(pageErrors).toEqual([]);
