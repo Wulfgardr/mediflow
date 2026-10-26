@@ -53,6 +53,7 @@ const BACKUP_TABLES = {
     physicianReviewAttestations: 'physician_review_attestations',
     headlessSoapActiveRoleAttestations: 'headless_soap_active_role_attestations',
     headlessSoapEntryCommits: 'headless_soap_entry_commits',
+    therapyStatusCommands: 'therapy_status_commands',
     prostheticPrescriptions: 'prosthetic_prescriptions',
     serviceCatalogEntries: 'service_catalog_entries',
     servicePrescriptionItems: 'service_prescription_items',
@@ -135,6 +136,11 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
         await Promise.all(columns.map(async (column) => [column, await seal(`${table}.${column}`)])),
     );
     const now = 1_783_000_000;
+    insertRow(db, 'therapy_status_commands', { command_id: '51111111-1111-4111-8111-111111111111', protocol: 'therapy.status.change.v1',
+        archive_generation: (db.prepare('SELECT generation FROM archive_generation WHERE id=1').get() as {generation:string}).generation,
+        actor_ref: actorRef, patient_id: 'synthetic-historical-patient', therapy_id: 'synthetic-unreceived-therapy', expected_version: 1,
+        target: null, outcome: 'closed', reason: null, committed_at: now, result_version: null, result_end_date: null, audit_event_id: null, audit_snapshot: null });
+
 
     insertRow(db, 'ambulatories', { id: 'w7-amb-primary', name: 'Ambulatorio sintetico W7', address: 'fixture locale', type: 'synthetic', is_default: 1, version: 3, created_at: now });
     insertRow(db, 'ambulatories', { id: 'w7-amb-secondary', name: 'Ambulatorio sintetico secondario', type: 'synthetic', is_default: 0, version: 2, created_at: now + 1 });

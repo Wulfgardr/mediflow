@@ -92,7 +92,10 @@ const data = path.join(output, 'synthetic-data');
 fs.mkdirSync(data);
 const testEnv = { MEDIFLOW_DATA_DIR: data };
 run('code-current', process.execPath, ['scripts/run-strip-types.mjs', '--test', '--test-reporter=tap',
-  'lib/therapy-status-confirmation.test.ts', 'lib/therapy-required-audit.test.ts'],
+  'lib/therapy-status-confirmation.test.ts', 'lib/therapy-required-audit.test.ts',
+  'lib/therapy-status-command.test.ts', 'lib/therapy-status-command-http.test.ts', 'lib/therapy-status-command-client.test.ts',
+  'lib/therapy-status-command-confirmation.test.ts', 'lib/therapy-status-command-process.test.ts',
+  'lib/therapy-status-command-backup.test.ts'],
 (status, log) => status === 0 && /# fail 0/.test(log), testEnv);
 const source = fs.readFileSync(path.join(root, 'lib/therapy-status-confirmation.ts'), 'utf8');
 const tests = fs.readFileSync(path.join(root, 'lib/therapy-status-confirmation.test.ts'), 'utf8');

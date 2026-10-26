@@ -1,6 +1,14 @@
-# Cambio di stato della terapia: modello e verifica finita
+# Cambio di stato della terapia: modello legacy e prove del comando durevole
 
-Il primo gesto apre una conferma sul paziente, sulla terapia e sulla versione
+Il TLC in questa directory conserva il modello ADR0156 del percorso PUT legacy,
+ora raggiunto dalla UI soltanto per recuperare marker precedenti. Il consumer
+ordinario di TherapyManager usa invece ADR0168 e il controller durevole:
+`verify:therapy-status` esegue anche i suoi test causali e le gare/crash SQLite.
+Il test di composizione controlla il consumer reale e impedisce di ripristinare
+implicitamente una PUT dal nuovo controller. Le proprietà del nuovo ledger non
+sono una prova TLA né un'estensione implicita degli invarianti legacy sottostanti.
+
+Il primo gesto legacy apre una conferma sul paziente, sulla terapia e sulla versione
 mostrati. Solo la conferma può iniziare una PUT CAS. Se il browser interrompe
 l'attesa, il server può ancora scrivere: una GET alla vecchia versione non
 basta per consentire un nuovo intento.

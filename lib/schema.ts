@@ -579,3 +579,12 @@ export const prostheticsCatalogDocuments = sqliteTable('prosthetics_catalog_docu
     id: text('id').primaryKey().notNull(), sourceId: text('source_id').notNull(), name: text('name').notNull(), sha256: text('sha256').notNull(),
     size: integer('size').notNull(), page: text('page'), bytes: blob('bytes', { mode: 'buffer' }).notNull(), operationKey: text('operation_key').notNull(),
 });
+
+export const therapyStatusCommands = sqliteTable('therapy_status_commands', {
+    commandId: text('command_id').primaryKey().notNull(),
+    protocol: text('protocol').notNull(), archiveGeneration: text('archive_generation').notNull(),
+    actorRef: text('actor_ref').notNull(), patientId: text('patient_id').notNull(), therapyId: text('therapy_id').notNull(),
+    expectedVersion: integer('expected_version').notNull(), target: text('target'), outcome: text('outcome').notNull(),
+    reason: text('reason'), committedAt: integer('committed_at').notNull(), resultVersion: integer('result_version'),
+    resultEndDate: integer('result_end_date'), auditEventId: text('audit_event_id'), auditSnapshot: text('audit_snapshot'),
+});

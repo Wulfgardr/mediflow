@@ -1,3 +1,5 @@
+import { assertTherapyCommandPredecessorRecoverySchema } from './therapy-status-command-recovery-schema';
+import { captureTherapyStatusCommands, preserveTherapyStatusCommands } from './therapy-status-command-backup';
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
@@ -17,12 +19,13 @@ function quote(identifier: string): string { return '"' + identifier.replaceAll(
 function validateCandidate(file: string, prepareReplacement = false): Database.Database {
     const probe = new Database(file, { readonly: true, fileMustExist: true });
     try {
-        if (probe.pragma('user_version', { simple: true }) !== CURRENT_SQLITE_SCHEMA_VERSION
+        if (![4, CURRENT_SQLITE_SCHEMA_VERSION].includes(Number(probe.pragma('user_version', { simple: true })))
             || probe.pragma('integrity_check', { simple: true }) !== 'ok'
             || (probe.pragma('foreign_key_check') as unknown[]).length !== 0) fail();
+        if (probe.pragma('user_version', { simple: true }) === 4) assertTherapyCommandPredecessorRecoverySchema(probe);
     } finally { probe.close(); }
     const candidate = openVersionedSqliteDatabase(file, undefined, { prepareReplacement });
-    try { validateRecoveryAuditSchema(candidate); return candidate; }
+    try { validateRecoveryAuditSchema(candidate); captureTherapyStatusCommands(candidate); return candidate; }
     catch (error) { candidate.close(); throw error; }
 }
 
@@ -107,13 +110,14 @@ export async function restoreRecoveryBackup(options: {
         fs.writeFileSync(source, bytes, { flag: 'wx', mode: 0o600 });
         bytes.fill(0);
         const verifierHash = await hashAccessVerifier(recovered.verifier);
-        const candidate = validateCandidate(source, true);
+        const accountProbe = new Database(source, { readonly: true, fileMustExist: true });
         try {
-            const account = candidate.prepare(`SELECT recovery_wrapped_master_key, recovery_salt, recovery_verifier_hash
+            const account = accountProbe.prepare(`SELECT recovery_wrapped_master_key, recovery_salt, recovery_verifier_hash
                 FROM users WHERE username = ? AND role = 'admin' AND encrypted_master_key LIKE 'v3:%'`).get(options.kit.username) as Record<string, unknown> | undefined;
             if (!account || account.recovery_wrapped_master_key !== options.kit.wrappedMasterKey
                 || account.recovery_salt !== options.kit.salt || account.recovery_verifier_hash !== verifierHash) fail();
-        } finally { candidate.close(); }
+        } finally { accountProbe.close(); }
+        validateCandidate(source, true).close();
         assertEmptyDestination(destination);
         let archiveGeneration = '';
         await runWithSqliteMaintenance(destination, { timeoutMs: 1000 }, async () => {
@@ -129,10 +133,11 @@ export async function restoreRecoveryBackup(options: {
             const current = openVersionedSqliteDatabase(destination);
             let installed: Database.Database | undefined;
             try {
+                const therapyCommands = captureTherapyStatusCommands(current);
                 await replaceSqliteDatabase({ sourcePath: source, destPath: destination, connection: current,
                     prepareReplacement: staging => {
                         const replacement = validateCandidate(staging, true);
-                        try { replacement.transaction(() => {
+                        try { preserveTherapyStatusCommands(therapyCommands, replacement); replacement.transaction(() => {
                             archiveGeneration = rotateSqliteArchiveGeneration(replacement);
                             replacement.prepare('DELETE FROM archive_session_generations').run();
                         }).immediate(); } finally { replacement.close(); }
