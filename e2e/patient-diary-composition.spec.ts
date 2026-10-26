@@ -50,11 +50,20 @@ test('Diario paziente: prosa, provenienza e storico senza cambiare Scale o Timel
                 await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
                 if (size.startsWith('zoom-')) await zoom.setZoom(size === 'zoom-200' ? 2 : 4); else await page.setViewportSize({ width: Number(size), height: 1000 });
                 await page.evaluate(theme => { document.documentElement.classList.toggle('dark', theme === 'grafite'); document.documentElement.classList.toggle('light', theme === 'giorno'); }, theme);
-                await anchor.evaluate(element => element.scrollIntoView({ block: 'center' }));
+                if (!baseline && ['conferma', 'ripristino'].includes(state)) {
+                    const modal = page.getByRole('dialog');
+                    const origin = state === 'conferma' ? modal.getByRole('textbox', { name: /^Motivazione eliminazione/u }) : modal.getByRole('button', { name: 'Chiudi', exact: true });
+                    await expect.poll(() => modal.evaluate(element => { const box = element.getBoundingClientRect(); return box.top >= -1 && box.bottom <= innerHeight + 1; }), { message: `${state} ${theme} ${size}: dialogo entro viewport` }).toBe(true);
+                    await origin.focus(); await page.keyboard.press('Tab'); await expect(anchor).toBeFocused();
+                    expect(await modal.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+                } else await anchor.evaluate(element => element.scrollIntoView({ block: 'center' }));
                 if (!baseline) await assertNoHorizontalOverflow(page, [{ label: 'pagina', selector: 'document' }, { label: 'Diario', selector: '#diario' }]);
                 if (!baseline && ['azioni', 'conferma', 'ripristino'].includes(state)) await assertNotClippedInViewport(anchor, state);
                 if (!baseline && ['conferma', 'ripristino'].includes(state)) {
-                    expect(await anchor.evaluate(element => { const box = element.getBoundingClientRect(); const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2); return element === hit || element.contains(hit); })).toBe(true);
+                    await expect.poll(() => anchor.evaluate(element => { const box = element.getBoundingClientRect(); const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2); return element === hit || element.contains(hit); }), { message: `${state} ${theme} ${size}: comando raggiungibile` }).toBe(true);
+                    if (state === 'conferma' && size === 'zoom-400') {
+                        expect(await page.getByRole('dialog').evaluate(element => element.scrollHeight > element.clientHeight && element.scrollTop > 0)).toBe(true);
+                    }
                 }
                 if (!baseline && state === 'azioni') {
                     for (const item of await anchor.getByRole('menuitem').all()) {
