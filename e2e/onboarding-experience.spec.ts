@@ -229,8 +229,10 @@ async function profileSettings(page: Page) {
     await page.goto('/settings/profilo');
     const panel = page.getByTestId('work-profile-onboarding');
     const lock = page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true });
-    await expect(panel.or(lock).first()).toBeVisible();
-    await unlockPassphrase(page);
+    const settings = page.getByTestId('settings-profile-section');
+    await expect(settings.or(lock).first()).toBeVisible();
+    if (await lock.isVisible()) await unlockPassphrase(page);
+    await settings.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click();
     await expect(panel).toBeVisible();
     await expect(panel).toHaveAttribute('aria-busy', 'false');
 }

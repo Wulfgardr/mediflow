@@ -99,8 +99,11 @@ test('ordinary PIN and manual onboarding preserve default B without comparison c
   expect(workspace!.y).toBe(0);
   expect(workspace!.height).toBe(960);
   await page.goto('/settings/profilo');
+  const settings = page.getByTestId('settings-profile-section');
+  await expect(settings.getByRole('heading', { name: 'Il tuo modo di lavorare', exact: true })).toBeVisible();
+  await settings.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click();
   const profile = page.getByTestId('work-profile-onboarding');
-  await expect(profile.getByRole('heading', { name: 'Il tuo modo di lavorare' })).toBeVisible();
+  await expect(profile).toBeVisible();
   await profile.getByRole('link', { name: 'Apri la cartella manualmente' }).click();
   // The unconfigured work profile keeps its existing Agenda entry. Layout B
   // changes the patient record entry, not the onboarding/start-area contract.
