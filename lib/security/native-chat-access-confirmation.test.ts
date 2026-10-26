@@ -48,7 +48,7 @@ test.after(() => { sessions.clearAllSessions(); dbServer.$client.close(); fs.rmS
 test('PIN confirmation uses the existing native cell and returns no bearer or new session', async () => {
     const value = session();
     assert.equal(await confirmNativeChatAccessPin(value, pin), 'confirmed');
-    assert.equal(nativeChatAccessEligibility(value), 'eligible');
+    assert.equal(await nativeChatAccessEligibility(value), 'eligible');
     assert.equal(sessions.getSession(value.id), value);
     assert.equal(await confirmNativeChatAccessPin({ ...value }, pin), 'denied');
     assert.equal(await confirmNativeChatAccessPin(sessions.createSession(user) as never, pin), 'denied');
@@ -61,7 +61,7 @@ test('PIN lockout shares the persistent host attempt budget and cannot create or
     for (let i = 0; i < 4; i++) assert.equal(await confirmNativeChatAccessPin(value, '0000'), 'denied');
     assert.equal(await confirmNativeChatAccessPin(value, '0000'), 'locked');
     assert.equal(await confirmNativeChatAccessPin(value, pin), 'locked');
-    assert.equal(nativeChatAccessEligibility(value), 'locked', 'biometrics cannot bypass a host PIN lockout');
+    assert.equal(await nativeChatAccessEligibility(value), 'locked', 'biometrics cannot bypass a host PIN lockout');
     const direct = await verifyHostCredentials({ username: user.username, pin });
     assert.equal(direct.kind, 'denied');
     if (direct.kind === 'denied') assert.equal(direct.failureClass, 'locked');

@@ -11,7 +11,7 @@ export async function GET(request: Request): Promise<Response> {
         const session = await requirePairedNativeSession(request);
         if (session && !new URL(request.url).search
             && request.headers.get('x-mediflow-archive-generation') === archiveGenerationForSession(session)) {
-            status = nativeChatAccessEligibility(session);
+            status = await nativeChatAccessEligibility(session);
         }
     } catch { status = 'denied'; }
     return Response.json({ status }, { status: status === 'eligible' ? 200 : status === 'locked' ? 423 : 403,
