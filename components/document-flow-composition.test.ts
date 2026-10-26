@@ -3,6 +3,8 @@ import { sourceVariableDeclaration } from '../scripts/test-support/source-struct
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { runInNewContext } from 'node:vm';
+import ts from 'typescript';
 const upload = () => readFile('components/document-upload.tsx', 'utf8');
 
 test('one synthesis composer follows the list rather than being repeated inside source disclosure', async () => {
@@ -99,7 +101,7 @@ test('legacy importer cannot consume and silently discard an unpersisted file', 
 
 test('terminal model display is the existing host receipt, while retry resets rather than generating', async () => {
     const source = await readFile('components/document-synthesis-fabric-review-card.tsx', 'utf8');
-    assert.match(source, /phase !== 'terminal' && <FunctionModelPicker picker=\{picker\}/u);
+    assert.match(source, /\(phase !== 'terminal' \|\| picker\.view\.remote\) && <FunctionModelPicker picker=\{picker\}/u);
     assert.match(source, /providerBindingReceipt\.model/u);
     assert.match(source, /publication\.citations\.map/u);
     assert.match(source, /onClick=\{cancelPreview\}[\s\S]*Prepara un nuovo tentativo/u);
@@ -121,4 +123,23 @@ test('collapsed document metadata does not manufacture empty counts on pending o
     assert.match(source, /const \{ data: attachments, error: attachmentsError \} = useLiveQueryState/u);
     assert.match(source, /count=\{attachmentsError \|\| attachments === undefined \? undefined/u);
     assert.match(source, /summary=\{attachmentsError \? 'Conteggio non disponibile/u);
+});
+
+test('the actual synthesis picker condition keeps remote terminal recovery reachable and hides the local terminal selector', async () => {
+    const source = await readFile('components/document-synthesis-fabric-review-card.tsx', 'utf8');
+    const ast = ts.createSourceFile('document-synthesis.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const conditions: string[] = [];
+    function visit(node: ts.Node) {
+        if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+            && ts.isJsxSelfClosingElement(node.right) && node.right.tagName.getText(ast) === 'FunctionModelPicker') conditions.push(node.left.getText(ast));
+        ts.forEachChild(node, visit);
+    }
+    visit(ast); assert.equal(conditions.length, 1);
+    for (const [phase, remote, visible] of [
+        ['idle', undefined, true], ['confirm', undefined, true], ['terminal', undefined, false],
+        ['terminal', { completed: true }, true], ['terminal', { error: 'expired' }, true],
+    ] as const) {
+        const condition = runInNewContext(conditions[0]!, { phase, picker: { view: { remote } } });
+        assert.equal(Boolean(condition), visible, `${phase}/${remote ? 'remote' : 'local'} picker visibility`);
+    }
 });
