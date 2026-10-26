@@ -135,7 +135,7 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules#quadro$`));
   await openPatientSection(page, 'quadro');
   await expect(page.locator('#quadro #patient-insight')).toHaveCount(0);
-  await expect(page.getByTestId('patient-insight-proposal-summary')).toContainText('Nessuna proposta da rivedere');
+  await expect(page.getByTestId('patient-proposals-summary')).toContainText('Nessuna proposta da rivedere');
   await openPatientSection(page, 'attenzione');
   const insightDisclosure = page.locator('#patient-insight');
   await expect(insightDisclosure.locator(':scope > div > [data-disclosure-control]')).toHaveAttribute('aria-expanded', 'false');
@@ -200,16 +200,16 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
   );
   expect(postGestureMutations).toEqual(['POST /api/ai/patient-insight/preview']);
   await openPatientSection(page, 'quadro');
-  await expect(page.getByTestId('patient-insight-proposal-summary')).toContainText('1 proposta da rivedere');
+  await expect(page.getByTestId('patient-proposals-summary')).toContainText('1 proposta da rivedere');
   await expect(proposal).not.toBeVisible();
   await expect(page.locator('#quadro [data-testid="patient-insight-review-proposal"]')).toHaveCount(0);
-  await page.getByTestId('patient-insight-proposal-summary').getByRole('link').click();
+  await page.getByTestId('patient-proposals-summary').getByRole('link', { name: 'Patient Insight', exact: true }).click();
   await expect(proposal).toBeVisible();
   expect(previewCalls).toBe(1);
   await insightDisclosure.getByRole('button', { name: 'Riusa predefinito', exact: true }).click();
   await expect(proposal).toHaveCount(0);
   await openPatientSection(page, 'quadro');
-  await expect(page.getByTestId('patient-insight-proposal-summary')).toContainText('Nessuna proposta da rivedere');
+  await expect(page.getByTestId('patient-proposals-summary')).toContainText('Nessuna proposta da rivedere');
   expect(previewCalls).toBe(1);
 });
 

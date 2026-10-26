@@ -105,8 +105,8 @@ test('[E2E fixture] smart import kill switch disables analysis on patient detail
     await reviewRow.locator('[data-disclosure-control]').click();
     await expect(reviewRow.getByText('Smart Import è disattivato localmente', { exact: false })).toBeVisible();
 
-    await openPatientSection(page, 'quadro');
-    await page.getByText('Proposte dalle fonti cliniche · Smart Import', { exact: true }).click();
+    await openPatientSection(page, 'documenti');
+    await page.locator('#smart-import').getByRole('button', { name: 'Proposte', exact: true }).click();
     const fabricCard = page.getByTestId('fabric-preview-card');
     await expect(fabricCard).toContainText('Raccogli dalle fonti della cartella');
     await expect(fabricCard.getByRole('button', { name: 'Prepara proposta' })).toBeDisabled();
