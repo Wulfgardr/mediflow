@@ -45,6 +45,9 @@ macOS 27.2. Treatment Reasoning resta ATHENA/MLX locale; I-3b definisce il
 filone riutilizzabile e condiziona le celle remote. Le decisioni ancora aperte
 sono nominate nel contratto; U0 e pilota chiuso non attestano il completamento
 della release.
+La [prima analisi I-3b](./analysis/2026-10-26-athena-method.md) ricostruisce
+metodo, fonti e runner ATHENA con REA e prove locali; distingue l'estrazione
+equivalente del builder dal probe Fabric negato e dalla qualità I-7 aperta.
 Il [censimento GPUI G-0](./analysis/2026-10-23-gpui-census.md) confronta la
 base `0a1980f32` con le 66 righe di parità, tutte le route Web e Punto
 d'inchiostro. Assegna i residui alle unità G-1–9, distingue il pilota
