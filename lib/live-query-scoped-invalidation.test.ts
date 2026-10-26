@@ -65,7 +65,7 @@ test('subscriptions observe their latest scope and can unsubscribe', () => {
 
 test('composite mutations retain every required invalidation', () => {
     const serviceSource = readFileSync('components/service-prescription-manager.tsx', 'utf8');
-    const deleteBlock = sourceBetween(serviceSource, 'const deleteItem', 'const headerActions');
+    const deleteBlock = sourceBetween(serviceSource, '    const deleteItem = async', '\n    };\n');
     assert.doesNotMatch(deleteBlock, /servicePrescriptionItems\.delete/);
     assert.match(deleteBlock, /try\s*\{[\s\S]*servicePrescriptions\.delete[\s\S]*\}\s*catch \(error\) \{[^}]*notifyDbChange\('service_prescriptions'\);[^}]*throw error;\s*\}\s*finally\s*\{[^}]*notifyDbChange\('service_prescription_items'\);\s*\}/);
 

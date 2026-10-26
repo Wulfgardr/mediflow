@@ -14,6 +14,8 @@ verifica dello stato successivo.
 
 ## Decisioni richiamate
 
+- [0166-athena-method-runner-boundary.md](./0166-athena-method-runner-boundary.md): **Proposed (2026-10-26)**; I-3b/WUL-790, metodo Fabric separato dal runner locale con byte conservati; ammissione delle venue remote subordinata ad ADR accettato e qualità I-7.
+
 - [0162-local-computer-use-executor.md](./0162-local-computer-use-executor.md): **Proposed (2026-10-23)**; filone CU, esecutore locale, confini privacy per client, autorità dell’atto e riconciliazione senza duplicati; solo documentazione, nessuna ammissione clinica.
 
 - [0160-mediflow-in-desktop-chat.md](./0160-mediflow-in-desktop-chat.md): **Proposed (2026-10-22, secondo round)**; WUL-788, canali per host dopo R/L, Touch ID/PIN nativi, mapping di sessione, importazione, Fabric, viste, prestazioni e pubblicazione; ammissione clinica distinta.
