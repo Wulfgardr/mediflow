@@ -176,14 +176,15 @@ export function createProductService(options: {
             && context === ownedContext && consent.remainingMs() > 0 && localQualified() && owned.boundaryQualified() });
     }
     function watchHost(owned: QualifiedExecutionHost) {
+        const watchedContext = context, watchedSignal = controller.signal;
         unsubscribe = owned.transport.subscribe((method, raw) => {
-            if (controller.signal.aborted || disposed) return;
+            if (watchedSignal.aborted || disposed || host !== owned || context !== watchedContext) return;
             // Login notifications do not prove account identity. After handoff ANY
             // account change withdraws product admission rather than switching it.
             if (method === 'account/updated' && plan !== null) { withdraw('revoked'); return; }
             if (method === 'account/rateLimits/updated') {
                 try { quota.notice(raw); if (plan !== null) limits = quota.snapshot(); }
-                catch (error) { if (error instanceof ExecutionError && error.denial) updateReceipt({ denial: receipt.denial ?? error.denial }); withdraw(errorCode(error)); }
+                catch (error) { if (error instanceof ExecutionError && error.denial) updateReceipt({ denial: receipt.denial ?? error.denial }, watchedContext); withdraw(errorCode(error)); }
             }
         }, code => withdraw(code));
     }
@@ -310,7 +311,7 @@ export function createProductService(options: {
             expiry = setTimeout(() => withdraw('consent_stale'), consent.remainingMs()); expiry.unref?.();
             watcher = setInterval(() => {
                 if (disposed || controller.signal.aborted) return;
-                try { guard(); } catch (error) { if (error instanceof ExecutionError && error.denial) updateReceipt({ denial: receipt.denial ?? error.denial }); withdraw(errorCode(error)); }
+                try { guard(); } catch (error) { withdraw(errorCode(error)); }
             }, 50); watcher.unref?.();
             return snapshot();
         }
@@ -320,7 +321,7 @@ export function createProductService(options: {
         if (['read', 'models'].includes(operation) && !['connected', 'ready'].includes(state)) throw new ProductError('invalid_state');
         if (operation === 'generate' && state !== 'ready') throw new ProductError('invalid_state');
         busy = true; const expectedEpoch = ++epoch;
-        const localSignal = controller.signal;
+        const localSignal = controller.signal, operationContext = context;
         const abort = () => { if (epoch === expectedEpoch) withdraw('canceled', 'canceled'); };
         signal?.addEventListener('abort', abort, { once: true });
         let reject!: (error: ProductError) => void;
@@ -377,7 +378,7 @@ export function createProductService(options: {
             const response = await Promise.race([work, interrupted]); guard(expectedEpoch); return response;
         } catch (error) {
             const code = errorCode(error);
-            if ((error instanceof ExecutionError || error instanceof ProductError) && error.denial) updateReceipt({ denial: receipt.denial ?? error.denial });
+            if ((error instanceof ExecutionError || error instanceof ProductError) && error.denial) updateReceipt({ denial: receipt.denial ?? error.denial }, operationContext);
             if (code !== 'login_pending' && epoch === expectedEpoch) withdraw(code);
             throw new ProductError(code, error instanceof ExecutionError || error instanceof ProductError ? error.denial : null);
         } finally {
