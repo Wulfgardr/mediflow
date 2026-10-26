@@ -1,21 +1,20 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
+import { PatientSheetMenu } from '@/components/patient-sheet-menu';
+import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import { Disclosure } from '@/components/disclosure';
 import { formatCountLabel } from '@/lib/format-count';
 import styles from './clinical-register.module.css';
-import { type FormEvent, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
-    CalendarCheck,
     CalendarClock,
-    CheckCircle2,
-    ClipboardList,
     FileText,
     ListChecks,
     LoaderCircle,
+    MoreHorizontal,
     Plus,
     Stethoscope,
-    Trash2,
-    XCircle,
 } from 'lucide-react';
 import {
     db,
@@ -38,6 +37,7 @@ import {
 type Props = {
     patientId: string;
     embedded?: boolean;
+    surfaceClassName?: string;
 };
 
 type FormState = {
@@ -192,12 +192,21 @@ function childServiceCodeForDraft(
     return draft.serviceCode ?? inheritedServiceCode;
 }
 
-export default function ServicePrescriptionManager({ patientId, embedded = false }: Props) {
+export default function ServicePrescriptionManager({ patientId, embedded = false, surfaceClassName = 'patient-detail-section' }: Props) {
     const confirm = useConfirm();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState<FormState>(() => emptyForm());
+    const formId = useId();
+    const creationRef = useRef<HTMLButtonElement>(null);
+    const formRef = useRef<HTMLFormElement>(null);
+    const wasFormOpen = useRef(false);
+    useEffect(() => {
+        if (isFormOpen) formRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+        else if (wasFormOpen.current) creationRef.current?.focus();
+        wasFormOpen.current = isFormOpen;
+    }, [isFormOpen]);
 
     /* the conditional form's open state is the pending-form signal. */
     useRuntimeTwinPendingForm(isFormOpen);
@@ -408,45 +417,19 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
         }
     };
 
-    const headerActions = (
-        <>
-            <span className="apple-chip">{formatCountLabel(prescriptions?.length ?? 0, 'prestazione', 'prestazioni')}</span>
-            <span className="apple-chip">{formatCountLabel(prescriptionItems?.length ?? 0, 'voce', 'voci')}</span>
-            <span className="apple-chip">{formatCountLabel(openCount, 'aperta', 'aperte')}</span>
-            <span className="apple-chip">{formatCountLabel(reportCount, 'referto', 'referti')}</span>
-            <button
-                type="button"
-                onClick={() => setIsFormOpen((value) => !value)}
-                className="ui-btn-primary h-10 px-4 text-sm font-semibold"
-            >
-                <Plus className="h-4 w-4" />
-                Nuova prestazione
-            </button>
-        </>
-    );
-
-    return (
-        <section id={embedded ? undefined : 'prestazioni'} className={styles.register}>
-            {embedded ? (
-                <div className="mb-4 flex flex-wrap items-center justify-end gap-2">{headerActions}</div>
-            ) : (
-                <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                        <p className="section-kicker">Prestazioni</p>
-                        <h2 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
-                            <Stethoscope className="h-5 w-5 text-[color:var(--lume-accent)]" />
-                            Prestazioni prescritte
-                        </h2>
-                        <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--lume-ink-muted)]">
-                            Visite, esami, imaging, riabilitazione e screening richiesti. Non sono terapie farmacologiche.
-                        </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">{headerActions}</div>
-                </div>
-            )}
+    const count = prescriptions === undefined ? undefined : formatCountLabel(prescriptions.length, 'prestazione', 'prestazioni');
+    const newButton = <Button ref={creationRef} variant="text" aria-expanded={isFormOpen} aria-controls={formId}
+        onClick={() => setIsFormOpen(value => !value)}>Nuova prestazione</Button>;
+    const content = (
+        <section className={styles.register}>
+            {!embedded && <header className={styles.therapyHeading}><h2>Prestazioni prescritte <span>{count}</span></h2>{newButton}</header>}
+            {prescriptions && prescriptions.length > 0 ? <p className={styles.muted}>
+                {prescriptionItems !== undefined ? <>{formatCountLabel(prescriptionItems.length, 'voce', 'voci')} · </> : null}
+                {formatCountLabel(openCount, 'aperta', 'aperte')} · {formatCountLabel(reportCount, 'referto', 'referti')}
+            </p> : null}
 
             {isFormOpen && (
-                <form
+                <form id={formId} ref={formRef} aria-label="Nuova prestazione"
                     onSubmit={handleSubmit}
                     className={styles.form}
                 >
@@ -667,12 +650,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
             )}
 
             {!prescriptions ? <p role="status" className={styles.empty}>Caricamento prescrizioni…</p> : prescriptions.length === 0 ? (
-                <div className={styles.empty}>
-                    <ClipboardList className="mx-auto mb-2 h-5 w-5 text-[color:var(--lume-ink-muted)]" aria-hidden />
-                    <p className="text-sm text-[color:var(--lume-ink-muted)]">
-                        Nessuna prestazione prescritta registrata. Aggiungi visite, esami o riabilitazione quando vuoi seguirne stato ed esito.
-                    </p>
-                </div>
+                <p className={styles.empty}>Nessuna prestazione prescritta registrata.</p>
             ) : (
                 <div className="min-w-0">
                     <table className={`${styles.table} ${styles.therapyTable}`}><thead><tr><th>Prestazione</th><th className={styles.secondaryColumn}>Prescritta il</th><th>Stato</th><th>Azioni</th></tr></thead><tbody>
@@ -685,6 +663,9 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                         const canCancel = item.status !== 'cancelled' && item.status !== 'performed' && item.status !== 'report_received';
                         const priority = item.priority ?? 'unknown';
                         const childItems = itemsByPrescription.get(item.id) ?? [];
+                        const primaryAction = canBook ? { label: 'Segna prenotata', run: () => void markBooked(item) }
+                            : canPerform ? { label: 'Segna eseguita', run: () => void markPerformed(item) }
+                                : canReceiveReport ? { label: 'Referto ricevuto', run: () => void markReportReceived(item) } : null;
                         return <tr key={item.id}>
                             <td><strong>{item.serviceName}</strong><small>{categoryLabel(item.category)}{childItems.length > 0 ? ` · ${formatCountLabel(childItems.length, 'voce', 'voci')}` : ''}</small>
                                 <Disclosure className={styles.recordDetails} title="Dettagli, referti e documenti">
@@ -787,58 +768,16 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 {item.source === 'document_review' && <small>Da documento</small>}{item.source === 'legacy_therapy_cleanup' && <small>Da pulizia diario</small>}
                             </td>
                             <td>
-                                    <div className={styles.controls}>
-                                        {canBook && (
-                                            <button
-                                                type="button"
-                                                className="ui-btn-secondary h-9 px-3 text-xs"
-                                                onClick={() => void markBooked(item)}
-                                            >
-                                                <CalendarClock className="h-4 w-4" />
-                                                Segna prenotata
-                                            </button>
-                                        )}
-                                        {canPerform && (
-                                            <button
-                                                type="button"
-                                                className="ui-btn-secondary h-9 px-3 text-xs"
-                                                onClick={() => void markPerformed(item)}
-                                            >
-                                                <CalendarCheck className="h-4 w-4" />
-                                                Segna eseguita
-                                            </button>
-                                        )}
-                                        {canReceiveReport && (
-                                            <button
-                                                type="button"
-                                                className="ui-btn-secondary h-9 px-3 text-xs"
-                                                onClick={() => void markReportReceived(item)}
-                                            >
-                                                <CheckCircle2 className="h-4 w-4" />
-                                                Referto ricevuto
-                                            </button>
-                                        )}
-                                        {canCancel && (
-                                            <button
-                                                type="button"
-                                                className="ui-btn-secondary h-9 px-3 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
-                                                onClick={() => void cancelItem(item)}
-                                            >
-                                                <XCircle className="h-4 w-4" />
-                                                Annulla
-                                            </button>
-                                        )}
-                                        {isClosed && (
-                                            <button
-                                                type="button"
-                                                className="ui-btn-secondary h-9 px-3 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
-                                                onClick={() => void deleteItem(item)}
-                                                aria-label="Elimina voce"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
-                                        )}
-                                    </div>
+                                <div className={styles.therapyActions}>
+                                    {primaryAction ? <Button variant="text" onClick={primaryAction.run}>{primaryAction.label}</Button> : null}
+                                    <PatientSheetMenu label={`Azioni prestazione ${item.serviceName}`}
+                                        trigger={props => <Button {...props} variant="icon" aria-label={`Azioni prestazione ${item.serviceName}`}><MoreHorizontal size={16} aria-hidden /></Button>}>
+                                        {canPerform && canBook ? <button type="button" role="menuitem" onClick={() => void markPerformed(item)}>Segna eseguita</button> : null}
+                                        {canReceiveReport && (canBook || canPerform) ? <button type="button" role="menuitem" onClick={() => void markReportReceived(item)}>Referto ricevuto</button> : null}
+                                        {canCancel ? <button type="button" role="menuitem" onClick={() => void cancelItem(item)}>Annulla prestazione</button> : null}
+                                        {isClosed ? <button type="button" role="menuitem" onClick={() => void deleteItem(item)}>Elimina prestazione</button> : null}
+                                    </PatientSheetMenu>
+                                </div>
 
                             </td>
                         </tr>;
@@ -848,4 +787,8 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
             )}
         </section>
     );
+    return embedded ? <CollapsibleSection id="prestazioni" title="Prestazioni prescritte" count={count}
+        defaultOpen={isFormOpen} headerAction={newButton} surfaceClassName={`${surfaceClassName} ${styles.therapySection}`} keepMounted>
+        {content}
+    </CollapsibleSection> : content;
 }
