@@ -1,5 +1,8 @@
 'use client';
 
+import { InkState } from '@/components/ui/ink-state';
+import type { PatientSmartImportProjectionCaptureInput } from '@/lib/domain/documents/patient-smart-import-projection-capture';
+import styles from './patient-smart-import.module.css';
 import { Disclosure } from '@/components/disclosure';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ChoiceField } from '@/components/choice-field';
@@ -10,13 +13,18 @@ import type { SmartImportPreviewWireRoot } from '@/lib/smart-import-preview-wire
 import { SmartImportContextProposalBrowserAdapterError, type SmartImportContextProposal, type SmartImportAmbulatoryChoice } from '@/lib/security/smart-import-patient-context-browser-adapter';
 import disclosure from '@/components/patient-disclosure.module.css';
 
-export function PatientSmartImportFabricPreviewCard({ patientId, captureInput, enabled }: { patientId: string; captureInput: unknown; enabled: boolean }) {
+export function PatientSmartImportFabricPreviewCard({ patientId, captureInput, enabled, onProposalChange }: {
+    patientId: string;
+    captureInput: PatientSmartImportProjectionCaptureInput;
+    enabled: boolean;
+    onProposalChange?: (capture: PatientSmartImportProjectionCaptureInput | null) => void;
+}) {
     const picker = useFunctionModelPicker('smart_import', patientId, captureInput, enabled);
     const [controller] = useState(() => createSmartImportReviewBrowserController({ fetch: picker.client.fetch }));
     const generation = useRef(0); const handler = useRef(false);
     const [proposal, setProposal] = useState<SmartImportContextProposal | null>(null);
     const [ambulatory, setAmbulatory] = useState<SmartImportAmbulatoryChoice | null>(null); const [confirmed, setConfirmed] = useState(false);
-    const [result, setResult] = useState<SmartImportPreviewWireRoot | null>(null); const [error, setError] = useState<string | null>(null); const [phase, setPhase] = useState<'idle' | 'loading' | 'confirm' | 'running' | 'terminal'>('idle');
+    const [result, setResult] = useState<{ wire: SmartImportPreviewWireRoot; capture: PatientSmartImportProjectionCaptureInput } | null>(null); const [error, setError] = useState<string | null>(null); const [phase, setPhase] = useState<'idle' | 'loading' | 'confirm' | 'running' | 'terminal'>('idle');
     const reset = () => { generation.current += 1; handler.current = false; controller.reset(); setProposal(null); setAmbulatory(null); setConfirmed(false); setResult(null); setError(null); setPhase('idle'); };
     const resetFromContext = useEffectEvent(reset);
     const resetFromChoice = useEffectEvent(() => { if (phase === 'running') reset(); else { setResult(null); setConfirmed(false); } });
@@ -32,11 +40,15 @@ export function PatientSmartImportFabricPreviewCard({ patientId, captureInput, e
     };
     const run = async () => {
         if (phase !== 'confirm' || !proposal || !ambulatory || !confirmed || handler.current || !enabled) return; handler.current = true; const token = ++generation.current; const currentProposal = proposal; setPhase('running'); setError(null);
-        try { const modelToken = await picker.client.begin(); const value = await controller.run({ patientId, proposal: currentProposal, ambulatory, captureInput }, true); if (token !== generation.current || !picker.client.isCurrent(modelToken)) return; setResult(value); setProposal(null); setAmbulatory(null); setConfirmed(false); setPhase('terminal'); }
+        try { const modelToken = await picker.client.begin(); const value = await controller.run({ patientId, proposal: currentProposal, ambulatory, captureInput }, true); if (token !== generation.current || !picker.client.isCurrent(modelToken)) return; setResult({ wire: value, capture: captureInput }); setProposal(null); setAmbulatory(null); setConfirmed(false); setPhase('terminal'); }
         catch { if (token !== generation.current) return; setProposal(null); setConfirmed(false); setError('Anteprima non disponibile. Scegli Ricomincia per ripartire.'); setPhase('terminal'); }
         finally { if (token === generation.current) handler.current = false; }
     };
-    const preview = picker.active ? result?.preview : undefined;
+    const preview = picker.active && result?.capture === captureInput ? result.wire.preview : undefined;
+    useEffect(() => {
+        onProposalChange?.(preview?.status === 'available' ? captureInput : null);
+        return () => onProposalChange?.(null);
+    }, [captureInput, onProposalChange, preview?.status]);
     return (
         <section className={`${disclosure.synthesis} space-y-4`} aria-label="Importazione assistita" data-testid="fabric-preview-card">
             <p>Raccogli dalle fonti della cartella una proposta di diagnosi, terapie e prestazioni da rivedere.</p>
@@ -65,10 +77,20 @@ export function PatientSmartImportFabricPreviewCard({ patientId, captureInput, e
                     <div className="mt-3 space-y-3">
                         {preview?.status === 'available' && (
                             <>
-                                <div>
+                                <div className={styles.proposal} data-testid="smart-import-review-proposal">
+                                    <h4><InkState state="pencil">Proposta · da rivedere</InkState></h4>
                                     <p>0 scritture · applicazione non consentita</p>
                                     <PrivacyBlur intensity="sm">{preview.proposal.summary}</PrivacyBlur>
                                     <p>{preview.proposal.diagnoses.length} diagnosi · {preview.proposal.therapies.length} terapie · {preview.proposal.servicePrescriptions.length} prestazioni</p>
+                                </div>
+                                <div>
+                                    <h4>Fonti raccolte per la proposta</h4>
+                                    <ul className={styles.sources}>
+                                        {result!.capture.sources.map(source => <li key={source.originKey}>
+                                            <a href={source.kind === 'patient-notes' ? '#quadro' : source.kind === 'clinical-entry' ? '#diario' : '#documenti'}>{source.label}</a>
+                                        </li>)}
+                                    </ul>
+                                    <p>Confronta la proposta con le fonti prima di registrare dati nella cartella.</p>
                                 </div>
                                 <p>Modello usato: {preview.receipt.provider} · {preview.receipt.model}</p>
                                 <Disclosure className={disclosure.disclosure} title="Dettagli di verifica">

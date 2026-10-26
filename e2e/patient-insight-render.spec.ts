@@ -93,6 +93,8 @@ test('patient insight renders stored markdown as read-only history without fallb
   await page.goto(`/patients/${patientId}/modules`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
   await openPatientSection(page, 'quadro');
+  await expect(page.getByTestId('patient-proposals-summary')).toContainText('Nessuna proposta da rivedere');
+  await openPatientSection(page, 'attenzione');
   const insightDisclosure = page.locator('#patient-insight');
   await insightDisclosure.locator(':scope > div > [data-disclosure-control]').click();
   await expect(insightDisclosure.locator(':scope > div > [data-disclosure-control]')).toHaveAttribute('aria-expanded', 'true');
@@ -109,5 +111,6 @@ test('patient insight renders stored markdown as read-only history without fallb
   await expect(historicalSummary).toContainText('Mobilita ridotta con ausilio per la deambulazione.');
   await expect(historicalSummary).toContainText('Verificare avanzamento della FKT domiciliare.');
   await expect(page.getByTestId('patient-insight-review-proposal')).toHaveCount(0);
+  await expect(historicalSummary.locator('[data-ink="pencil"]')).toHaveCount(0);
   await expect(page.getByText('Insight AI declassato per supporto insufficiente o incoerente nel contesto locale.')).toHaveCount(0);
 });

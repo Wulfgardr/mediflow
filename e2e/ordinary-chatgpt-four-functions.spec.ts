@@ -47,7 +47,7 @@ test('Patient Insight ordinary ChatGPT: consent, catalog, review-only source pro
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
   const patientId = await createPatient(page, 'Insight');
-  await page.goto(`/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'quadro');
+  await page.goto(`/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'attenzione');
   const disclosure = page.locator('#patient-insight'); await disclosure.locator(':scope > div > [data-disclosure-control]').click();
   const controls = await selectOrdinaryChatGpt(disclosure);
   remote.arm(); await disclosure.getByRole('button', { name: 'Avvia supporto' }).click();
@@ -79,8 +79,8 @@ test('Smart Import ordinary ChatGPT: selected context returns a source-linked pr
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'enabled');
   const patientId = await createPatient(page, 'Smart', 'Diagnosi sintetica in revisione.');
-  await page.goto(`/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'quadro');
-  await page.getByText('Proposte dalle fonti cliniche · Smart Import', { exact: true }).click();
+  await page.goto(`/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'documenti');
+  await page.locator('#smart-import').getByRole('button', { name: 'Proposte', exact: true }).click();
   const card = page.getByTestId('fabric-preview-card');
   await card.getByRole('button', { name: 'Prepara proposta' }).click();
   await card.getByRole('combobox', { name: 'Ambulatorio per questa proposta' }).selectOption(AMBULATORY.id);
@@ -210,7 +210,7 @@ test('ordinary ChatGPT preparation closes on patient-context navigation before c
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
   const patientId = await createPatient(page, 'Cancel');
-  await page.goto(`/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'quadro');
+  await page.goto(`/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'attenzione');
   const disclosure = page.locator('#patient-insight'); await disclosure.locator(':scope > div > [data-disclosure-control]').click();
   const controls = await selectOrdinaryChatGpt(disclosure);
   remote.arm(); await disclosure.getByRole('button', { name: 'Avvia supporto' }).click();
