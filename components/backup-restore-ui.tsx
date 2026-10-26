@@ -178,6 +178,7 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
                     <br />
                     <span className="font-semibold text-[color:var(--lume-signal-warning)]">Nota:</span> il restore copre le collezioni esportabili via API locale; i dati non validi vengono rifiutati prima della scrittura.
                 </p>
+                <div className={composition.actions}>
                 <button
                     onClick={handleExport}
                     disabled={isLoading}
@@ -198,6 +199,7 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
                         className="sr-only"
                     />
                 </label>
+                </div>
                 <p className="mt-4 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
                     <strong>Verificare</strong> controlla formato, integrità e chiave senza toccare i dati.{' '}
                     <strong>Provare un ripristino</strong> è un passo diverso: la prova sintetica ripristina un backup in un archivio
@@ -292,7 +294,7 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
                     }`}>
                     {status.type === 'success' && <CheckCircle className="w-5 h-5" />}
                     {status.type === 'error' && <AlertTriangle className="w-5 h-5" />}
-                    <div className="space-y-3" data-testid="backup-outcome">
+                    <div className="space-y-3" data-testid="backup-outcome" role={status.type === 'error' ? 'alert' : 'status'}>
                         {status.title && <p className="font-semibold">{status.title}</p>}
                         <p className="font-medium">{status.message}</p>
                         {status.nextStep && <p className="text-sm">{status.nextStep}</p>}
