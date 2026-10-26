@@ -42,6 +42,16 @@ pub struct RuntimeSession {
     inner: Arc<SessionInner>,
     context: RequestContext,
 }
+#[derive(Clone)]
+pub struct FirstAmbulatoryContext {
+    owner: Weak<SessionInner>,
+    context: RequestContext,
+}
+impl FirstAmbulatoryContext {
+    pub fn cancel(&self) {
+        self.context.cancel();
+    }
+}
 struct SessionInner {
     account_context: RequestContext,
     client: RuntimeClient,
@@ -185,6 +195,64 @@ impl CatalogRoute {
 }
 
 impl RuntimeSession {
+    pub fn can_bootstrap_first_ambulatory(&self) -> bool {
+        !self.is_locked()
+            && self.inner.user.role == "admin"
+            && self.inner.client.is_local_bootstrap_origin()
+    }
+
+    pub fn first_ambulatory_context(&self) -> Result<FirstAmbulatoryContext> {
+        self.ensure_open()?;
+        if !self.can_bootstrap_first_ambulatory() {
+            return Err(RuntimeError::Forbidden);
+        }
+        Ok(FirstAmbulatoryContext {
+            owner: Arc::downgrade(&self.inner),
+            context: self.inner.account_context.child(),
+        })
+    }
+
+    pub fn authenticate_first_ambulatory(
+        &self,
+        context: &FirstAmbulatoryContext,
+        draft: crate::FirstAmbulatoryDraft,
+        passphrase: &str,
+    ) -> Result<crate::HostBootstrapSession> {
+        self.ensure_open()?;
+        if !context.owner.ptr_eq(&Arc::downgrade(&self.inner)) {
+            return Err(RuntimeError::ReadRequired);
+        }
+        context.context.check()?;
+        if !self.can_bootstrap_first_ambulatory() {
+            return Err(RuntimeError::Forbidden);
+        }
+        let (pairing, cookie) = self.credentials()?;
+        let result = crate::HostBootstrapSession::authenticate(
+            self.inner
+                .client
+                .with_request_context(context.context.clone()),
+            &self.inner.user,
+            &pairing,
+            &cookie,
+            draft,
+            passphrase,
+        );
+        if let Err(error) = &result
+            && *error == RuntimeError::ArchiveReplaced
+        {
+            self.retire(*error);
+            return result;
+        }
+        if let Err(error) = self.ensure_open().and_then(|()| context.context.check()) {
+            if let Ok(web) = result {
+                web.cancel_local();
+                let _ = web.retire();
+            }
+            return Err(error);
+        }
+        result
+    }
+
     pub fn chat_access_context(&self, scope: &str, patient: &str) -> Result<ChatAccessContext> {
         self.ensure_open()?;
         let intent = self.profile_query_intent();
@@ -2933,6 +3001,30 @@ mod tests {
             Zeroizing::new("a".repeat(64)),
             Zeroizing::new([7; 32]),
         )
+    }
+
+    #[test]
+    fn bootstrap_context_is_bound_to_one_native_session_and_cancelled_before_any_http() {
+        let a = session();
+        let b = session();
+        let context = a.first_ambulatory_context().unwrap();
+        let draft = crate::FirstAmbulatoryDraft::new("Sede inventata".into(), None, None).unwrap();
+        assert!(matches!(
+            b.authenticate_first_ambulatory(&context, draft.clone(), "synthetic secret"),
+            Err(RuntimeError::ReadRequired)
+        ));
+        context.cancel();
+        assert!(matches!(
+            a.authenticate_first_ambulatory(&context, draft.clone(), "synthetic secret"),
+            Err(RuntimeError::ReadRequired)
+        ));
+        let context = a.first_ambulatory_context().unwrap();
+        a.lock();
+        assert!(matches!(
+            a.authenticate_first_ambulatory(&context, draft, "synthetic secret"),
+            Err(RuntimeError::Locked)
+        ));
+        assert!(!session_at("https://example.invalid").can_bootstrap_first_ambulatory());
     }
 
     #[test]
