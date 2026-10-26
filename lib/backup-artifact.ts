@@ -1,3 +1,4 @@
+import { validateTherapyStatusCommandRows } from './therapy-status-command-backup';
 import { types } from 'node:util';
 import { assertBackupAuditSnapshots, backupAuditCoverage, canonicalizeBackupAuditRows, snapshotBackupAudit } from './backup-audit';
 import { assertExemptionImportReceiptRows } from './exemption-import-receipt';
@@ -40,12 +41,13 @@ export const BACKUP_COLLECTIONS = [
     'sissHandoffs',
     'checkups',
     'therapies',
+    'therapyStatusCommands',
     'auditEvents',
 ] as const;
 
 export type BackupCollectionName = (typeof BACKUP_COLLECTIONS)[number];
 export type BackupRecord = Record<string, unknown>;
-type AdditiveBackupCollection = 'prostheticsCatalogSources' | 'prostheticsCatalogDocuments' | 'auditEvents' | 'prostheticsCatalogEntries' | 'prostheticsCatalogReceipts' | 'exemptionImportReceipts' | 'durableReviewCommandStates' | 'durableReviewCommandOperations' | 'headlessSoapEntryCommits';
+type AdditiveBackupCollection = 'therapyStatusCommands' | 'prostheticsCatalogSources' | 'prostheticsCatalogDocuments' | 'auditEvents' | 'prostheticsCatalogEntries' | 'prostheticsCatalogReceipts' | 'exemptionImportReceipts' | 'durableReviewCommandStates' | 'durableReviewCommandOperations' | 'headlessSoapEntryCommits';
 export type BackupDataset = Record<Exclude<BackupCollectionName, AdditiveBackupCollection>, BackupRecord[]>
     & Partial<Record<AdditiveBackupCollection, BackupRecord[]>>;
 
@@ -108,10 +110,15 @@ const LEGACY_WITH_SOURCE_COLLECTION_SETS: readonly (readonly BackupCollectionNam
     ...[BACKUP_COLLECTIONS, ...AUDIT_ERA_LEGACY_COLLECTION_SETS]
         .map(collections => collections.filter(collection => collection !== 'auditEvents')),
 ];
-const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
+const PRE_COMMAND_LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
     ...LEGACY_WITH_SOURCE_COLLECTION_SETS,
     ...[BACKUP_COLLECTIONS, ...LEGACY_WITH_SOURCE_COLLECTION_SETS].map(collections => collections.filter(
         collection => collection !== 'prostheticsCatalogSources' && collection !== 'prostheticsCatalogDocuments')),
+];
+
+const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
+    ...PRE_COMMAND_LEGACY_COLLECTION_SETS,
+    ...[BACKUP_COLLECTIONS, ...PRE_COMMAND_LEGACY_COLLECTION_SETS].map(collections => collections.filter(collection => collection !== 'therapyStatusCommands')),
 ];
 
 const PATIENT_DEPENDENT_COLLECTIONS: readonly BackupCollectionName[] = [
@@ -176,8 +183,8 @@ export interface BackupArtifactManifest {
     checksumAlgorithm: 'sha256';
     checksum: string;
     collections: readonly BackupCollectionName[];
-    recordCounts: Record<Exclude<BackupCollectionName, 'auditEvents'>, number>
-        & Partial<Record<'auditEvents', number>>;
+    recordCounts: Record<Exclude<BackupCollectionName, 'auditEvents' | 'therapyStatusCommands'>, number>
+        & Partial<Record<'auditEvents' | 'therapyStatusCommands', number>>;
 }
 
 export interface BackupArtifact {
@@ -768,6 +775,8 @@ async function assertCollectionReferences(
     catch { throw new BackupArtifactError('invalid-manifest', 'Exemption import receipts are invalid or unsupported.'); }
     try { assertProstheticsCatalogBackup(payload.prostheticsCatalogEntries ?? [], payload.prostheticsCatalogReceipts ?? [], payload.prostheticsCatalogSources ?? [], payload.prostheticsCatalogDocuments ?? [], payload.prostheticPrescriptions ?? []); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Prosthetics catalog or provenance is invalid or unsupported.'); }
+    try { validateTherapyStatusCommandRows(payload.therapyStatusCommands ?? [], payload.auditEvents ?? []); }
+    catch { throw new BackupArtifactError('invalid-manifest', 'Therapy status command ledger or audit is invalid.'); }
     await assertDurableReviewLedger(payload);
     assertDurableReviewAuthorityRows(payload, durableReviewIds, patientIds);
     assertHeadlessSoapActiveRoleAttestationRows(payload, serialized);
@@ -809,6 +818,7 @@ export async function createBackupArtifact(payload: BackupDataset, createdAt = n
         ...currentPayload,
         exemptionImportReceipts: [...(currentPayload.exemptionImportReceipts ?? [])].sort((a, b) => Number(a.id) - Number(b.id)),
         headlessSoapActiveRoleAttestations: sortHeadlessSoapActiveRoleAttestations(currentPayload.headlessSoapActiveRoleAttestations),
+        therapyStatusCommands: validateTherapyStatusCommandRows(currentPayload.therapyStatusCommands ?? [], currentPayload.auditEvents ?? []),
         headlessSoapEntryCommits: sortHeadlessSoapEntryCommits(currentPayload.headlessSoapEntryCommits ?? []),
         ...(backupAuditCoverage(currentPayload) === 'included'
             ? { auditEvents: canonicalizeBackupAuditRows(currentPayload.auditEvents) } : {}),

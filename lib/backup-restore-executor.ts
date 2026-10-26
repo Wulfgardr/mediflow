@@ -1,3 +1,4 @@
+import { planTherapyStatusCommandUnion, insertTherapyStatusCommandUnion } from './therapy-status-command-backup';
 import { eq } from 'drizzle-orm';
 import { assertExemptionImportReceiptRows } from './exemption-import-receipt';
 import { migrateProstheticsSources } from './reference-data/prosthetics-catalog-schema';
@@ -8,6 +9,7 @@ import { clearAllSessions } from './security/server-session';
 import {
     ambulatories,
     auditEvents,
+    therapyStatusCommands,
     attachments,
     checkups,
     conversations,
@@ -115,6 +117,7 @@ const INSERT_ORDER: BackupCollectionName[] = [
 
 const TABLE_LOOKUP = {
     auditEvents,
+    therapyStatusCommands,
     ambulatories,
     headlessSoapEntryCommits,
     attachments,
@@ -151,7 +154,7 @@ type InsertRunner = Pick<typeof dbServer, 'insert'>;
 type InsertableTable = (typeof TABLE_LOOKUP)[BackupCollectionName] | typeof patientsToAmbulatories;
 export type BackupRestoreMutationFence = () => boolean;
 
-export type BackupRestoreBlockedReason = 'durable_review_commands' | 'audit' | 'runtime_fence';
+export type BackupRestoreBlockedReason = 'durable_review_commands' | 'audit' | 'runtime_fence' | 'therapy_status_commands';
 
 /* The restore stopped inside its transaction: the target archive is unchanged. Callers report it as blocked, not as failed. */
 export class BackupRestoreBlockedError extends Error {
@@ -381,6 +384,9 @@ export function restoreBackupArtifact(
         const rows = canonicalizeBackupAuditRows(coverage === 'included' ? artifact.payload.auditEvents
             : headlessSoapRows.map(row => parseHeadlessSoapAuditSnapshot(row.auditSnapshot)));
         if (coverage === 'included') assertBackupAuditSnapshots(rows, headlessSoapRows.map(row => row.auditSnapshot));
+        let therapyCommands;
+        try { therapyCommands = planTherapyStatusCommandUnion(openDbServer(), artifact.payload.therapyStatusCommands ?? [], rows); }
+        catch { throw new BackupRestoreBlockedError('therapy_status_commands', 'therapy status command or audit collision.'); }
         const plan = planBackupAuditRestore(rows);
         const soapAttestations = soapAttestationsWithoutRestoredAuthority(artifact.payload.headlessSoapActiveRoleAttestations ?? []);
         runMutationFence(beforeMutation);
@@ -400,6 +406,7 @@ export function restoreBackupArtifact(
         insertRows(dbServer, patientsToAmbulatories, derivePatientAmbulatoryLinks(artifact.payload.patients));
         if (coverage === 'included') insertBackupAudits(plan);
         restoreHeadlessSoapEntryCommits(headlessSoapRows);
+        insertTherapyStatusCommandUnion(openDbServer(), therapyCommands);
         audit = { coverage, inserted: plan.filter(item => !item.reused).length, reused: plan.filter(item => item.reused).length };
     });
     return { sourceChecksum: backupArtifactInputChecksum(artifact), audit };

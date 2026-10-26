@@ -112,6 +112,7 @@ const basePayload = {
     headlessSoapEntryCommits: [],
     checkups: [],
     therapies: [],
+    therapyStatusCommands: [],
 };
 
 function attachmentCurrentness(overrides: Record<string, unknown> = {}) {

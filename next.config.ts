@@ -83,6 +83,8 @@ const nextConfig: NextConfig = {
       "./lib/sqlite-maintenance-admission.mjs",
       "./lib/sqlite-durability.mjs",
       "./lib/backup-audit.ts",
+      "./lib/therapy-status-command-backup.ts",
+      "./lib/therapy-status-command-contract.ts",
       "./lib/exemption-import-receipt.ts",
       "./lib/exemption-import-contract.ts",
       "./lib/reference-data/prosthetics-catalog-backup.ts",

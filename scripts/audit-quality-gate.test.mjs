@@ -97,7 +97,16 @@ test('therapy required-audit guard follows all eight handlers and rejects detach
         assert.deepEqual(validate(), [], `${mode} ${handler}`);
         const change = (source, before, after) => {
             assert.ok(source.includes(before), before);
-            const mutated = source.replaceAll(before, after);
+            if (operation === 'update' && source.includes('const auditEventId = ') && before === 'writeAuditEventInTransaction(tx, {' && after.startsWith('if (')) {
+                before = 'const auditEventId = writeAuditEventInTransaction(tx, {';
+                after = 'const auditEventId = input.audit.actorRef && writeAuditEventInTransaction(tx, {';
+            } else if (operation === 'update' && source.includes('const auditEventId = ') && before === 'writeAuditEventInTransaction(tx, {' && after.startsWith('return ')) {
+                before = 'const auditEventId = writeAuditEventInTransaction(tx, {';
+                after = 'return { status: 200, value: {} }; const auditEventId = writeAuditEventInTransaction(tx, {';
+            }
+            const creationControl = operation === 'create' && before === 'writeAuditEventInTransaction(tx, {'
+                && (after.startsWith('if (') || after.startsWith('return '));
+            const mutated = creationControl ? source.replace(before, after) : source.replaceAll(before, after);
             assert.equal(ts.createSourceFile('mutant.ts', mutated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
                 .parseDiagnostics.length, 0);
             return mutated;
@@ -117,6 +126,16 @@ test('therapy required-audit guard follows all eight handlers and rejects detach
                 || (before.startsWith('?') && operation !== 'update')) continue;
             assert.notDeepEqual(validate({ coreSource: change(coreSource, before, after) }), [],
                 `${mode} ${handler}: ${before}`);
+        }
+        if (operation === 'update') {
+            for (const [before, after] of [
+                ['updateTherapyOperationInTransaction(tx, input)', 'updateTherapyOperationInTransaction(dbServer, input)'],
+                ['updateTherapyOperationInTransaction(tx, input)', 'updateTherapyOperationInTransaction(tx, { ...input, expectedVersion: 1 })'],
+                ['occurredAt: input.occurredAt', 'occurredAt: new Date()'],
+                ['value: { success: true }, auditEventId', "value: { success: true }, auditEventId: 'forged'"],
+            ]) {
+                assert.notDeepEqual(validate({ coreSource: change(coreSource, before, after) }), [], `${mode} ${handler}: Tx hop ${before}`);
+            }
         }
         const sourceKey = mode === 'network' ? 'bridgeSource' : 'routeSource';
         if (operation === 'create') {

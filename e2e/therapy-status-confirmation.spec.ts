@@ -31,7 +31,7 @@ async function expectConfirmation(page: Page, question: string) {
     await expect(region.locator('.lume-point')).toHaveCount(0);
 }
 
-async function expectUncertainOutcome(page: Page) {
+async function expectUncertainOutcome(page: Page, legacy = false) {
     const region = threshold(page);
     const title = region.getByRole('heading', { name: 'Esito da verificare', exact: true, level: 3 });
     await expect(title).toBeVisible();
@@ -48,7 +48,7 @@ async function expectUncertainOutcome(page: Page) {
     });
     await expect(title).toHaveCSS('color', warningColor);
     await expect(region.locator('.lume-point')).toHaveCount(0);
-    await expect(region.getByText('La registrazione può essere ancora in corso. Il nuovo invio resta bloccato finché la rilettura non ne chiarisce l’esito.', { exact: true })).toBeVisible();
+    await expect(region.getByText(legacy ? 'La registrazione può essere ancora in corso. Il nuovo invio resta bloccato finché la rilettura non ne chiarisce l’esito.' : 'La registrazione può essere ancora in corso. Il nuovo invio resta bloccato. Leggi la ricevuta oppure ritira esplicitamente la richiesta.', { exact: true })).toBeVisible();
     await expect(region.getByText('Ramipril sintetico 5 mg · 1 cp al mattino', { exact: true })).toBeVisible();
     await expect(region.getByText(patientLabel(new Date()), { exact: true })).toBeVisible();
 }
@@ -78,18 +78,20 @@ async function open(page: Page, data: Fixture) {
     await openPatientSection(page, 'terapie');
     await expect(row(page)).toBeVisible();
 }
+const executeRoute = '**/api/therapy-status-commands/*/execute';
 function network(page: Page) {
     const writes: Array<{ id: string; body: { version: number; status: string } }> = [];
+    const commands: Array<{ commandId: string; protocol: string; archiveGeneration: string; patientId: string; therapyId: string; expectedVersion: number; target: string }> = [];
     const events: string[] = [];
     page.on('request', request => {
         const path = new URL(request.url()).pathname;
-        if (['PUT', 'PATCH'].includes(request.method()) && path.startsWith('/api/therapies/')) {
-            writes.push({ id: path.split('/').pop()!, body: request.postDataJSON() });
-            events.push(request.method());
+        if (request.method() === 'POST' && /^\/api\/therapy-status-commands\/[^/]+\/execute$/.test(path)) {
+            const command = request.postDataJSON(); commands.push(command);
+            writes.push({ id: command.therapyId, body: { version: command.expectedVersion, status: command.target } }); events.push('EXECUTE');
         }
         if (request.method() === 'GET' && path === '/api/therapies') events.push('GET');
     });
-    return { writes, events };
+    return { writes, commands, events };
 }
 async function stored(page: Page, data: Fixture) {
     const response = await page.request.get(`/api/therapies?patientId=${data.patientId}`);
@@ -145,7 +147,7 @@ test('second gesture writes once with the shown patient and version; registered 
         expect(writes).toEqual([{ id: data.therapyId, body: expect.objectContaining({ version: 1, status: 'suspended' }) }]);
         release();
         await expect(threshold(page).getByText('Registrata', { exact: true })).toBeVisible();
-        expect(events.indexOf('GET')).toBeGreaterThan(events.indexOf('PUT'));
+        expect(events.indexOf('GET')).toBeGreaterThan(events.indexOf('EXECUTE'));
         expect(await stored(page, data)).toMatchObject({ version: 2, status: 'suspended' });
         expect(writes).toHaveLength(1);
     } finally { release(); }
@@ -161,12 +163,13 @@ test('409 requires readback and a new first gesture and confirmation', async ({ 
     }, data.therapyId);
     expect(concurrent).toBe(200);
     const { writes } = network(page);
-    const rejected = page.waitForResponse(response => response.request().method() === 'PUT' && response.url().endsWith(data.therapyId));
+    const rejected = page.waitForResponse(response => response.request().method() === 'POST' && /therapy-status-commands\/[^/]+\/execute$/.test(new URL(response.url()).pathname));
     await confirm(page).click();
-    expect((await rejected).status()).toBe(409);
-    await expect(threshold(page)).toContainText("La terapia è stata modificata da un'altra postazione. Nulla è stato scritto.");
+    const terminal = await rejected; expect(terminal.status()).toBe(200);
+    expect((await terminal.json()).receipt).toMatchObject({ outcome: 'rejected', reason: 'version_conflict' });
+    await expect(threshold(page)).toContainText('La richiesta è stata rifiutata per una modifica concorrente. Nessun effetto da questo comando.');
     await expect(confirm(page)).toHaveCount(0);
-    await threshold(page).getByRole('button', { name: 'Rileggi la terapia', exact: true }).click();
+
     await expect(threshold(page)).toContainText('Stato attuale: Attiva');
     await expect(threshold(page)).toContainText('2 cp alla sera');
     await expect(confirm(page)).toHaveCount(0);
@@ -187,8 +190,8 @@ for (const applied of [true, false]) {
         const data = await fixture(page);
         await open(page, data);
         const { writes } = network(page);
-        await page.route(`**/api/therapies/${data.therapyId}`, async route => {
-            if (route.request().method() !== 'PUT') return route.continue();
+        await page.route(executeRoute, async route => {
+            if (route.request().method() !== 'POST') return route.continue();
             if (applied) expect((await route.fetch()).status()).toBe(200);
             await route.abort('failed');
         });
@@ -199,12 +202,12 @@ for (const applied of [true, false]) {
         await expect((await action(page, 'Sospendi'))).toBeDisabled();
         await expect((await action(page, 'Concludi', true))).toBeDisabled();
         await threshold(page).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
-        if (applied) await expect(threshold(page).getByText('Terapia riletta', { exact: true })).toBeVisible();
+        if (applied) await expect(threshold(page).getByText('Registrata', { exact: true })).toBeVisible();
         else {
             await expectUncertainOutcome(page);
             await expect((await action(page, 'Sospendi'))).toBeDisabled();
         }
-        await expect(threshold(page).getByText('Registrata', { exact: true })).toHaveCount(0);
+        if (!applied) await expect(threshold(page).getByText('Registrata', { exact: true })).toHaveCount(0);
         await expect(confirm(page)).toHaveCount(0);
         expect(writes).toHaveLength(1);
         expect(await stored(page, data)).toMatchObject({ version: applied ? 2 : 1, status: applied ? 'suspended' : 'active' });
@@ -242,7 +245,7 @@ for (const theme of ['light', 'dark']) for (const width of [390, 1440]) {
         const data = await fixture(page);
         await open(page, data);
         const { writes } = network(page);
-        await page.route(`**/api/therapies/${data.therapyId}`, route => route.request().method() === 'PUT' ? route.abort('failed') : route.continue());
+        await page.route(executeRoute, route => route.request().method() === 'POST' ? route.abort('failed') : route.continue());
         await (await action(page, 'Sospendi')).click();
         await expectConfirmation(page, 'Sospendere Ramipril sintetico 5 mg, 1 cp al mattino?');
         await assertNoHorizontalOverflow(page, [{ label: 'threshold', selector: '[aria-label="Cambio di stato della terapia"]' }]);
@@ -287,13 +290,13 @@ test('suspend, reactivate and complete each require their own confirmation and p
 });
 
 
-test('an ambiguous write survives navigation and reload until an advanced version is read', async ({ page }) => {
+test('an ambiguous command survives reload and unrelated advancement until explicit close denies late execute', async ({ page }) => {
     const data = await fixture(page);
     const other = await fixture(page);
     await open(page, data);
-    const { writes } = network(page);
-    await page.route(`**/api/therapies/${data.therapyId}`, async route => {
-        if (route.request().method() !== 'PUT') return route.continue();
+    const { writes, commands } = network(page);
+    await page.route(executeRoute, async route => {
+        if (route.request().method() !== 'POST') return route.continue();
         await route.abort('failed');
     });
     await (await action(page, 'Sospendi')).click();
@@ -326,11 +329,19 @@ test('an ambiguous write survives navigation and reload until an advanced versio
     });
     expect(late.status()).toBe(200);
     await threshold(page).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
-    await expect(threshold(page).getByText('Terapia riletta', { exact: true })).toBeVisible();
+    await expectUncertainOutcome(page);
+    await threshold(page).getByRole('button', { name: 'Ritira richiesta e verifica', exact: true }).click();
+    await expect(threshold(page)).toContainText('ID richiesta ritirato');
+    const original = commands[0];
+    const denied = await page.request.post(`/api/therapy-status-commands/${original.commandId}/execute`, {
+        headers: { 'x-mediflow-archive-generation': archive.archiveGeneration }, data: original,
+    });
+    expect(denied.status()).toBe(200); expect((await denied.json()).receipt.outcome).toBe('closed');
+    expect(await stored(page, data)).toMatchObject({ version: 2, status: 'suspended' });
     await expect(threshold(page).getByText('Registrata', { exact: true })).toHaveCount(0);
     await expect(threshold(page)).toContainText('Stato attuale: Sospesa');
     await threshold(page).getByRole('button', { name: 'Torna alla scheda', exact: true }).click();
-    await page.unroute(`**/api/therapies/${data.therapyId}`);
+    await page.unroute(executeRoute);
     await (await action(page, 'Riattiva')).click();
     await confirm(page).click();
     await expect(threshold(page).getByText('Registrata', { exact: true })).toBeVisible();
@@ -347,7 +358,7 @@ test('a second tab inherits the unresolved barrier and cannot confirm its older 
     await (await action(other, 'Concludi')).click();
     const a = network(page);
     const b = network(other);
-    await page.route(`**/api/therapies/${data.therapyId}`, route => route.request().method() === 'PUT' ? route.abort('failed') : route.continue());
+    await page.route(executeRoute, route => route.request().method() === 'POST' ? route.abort('failed') : route.continue());
     await (await action(page, 'Sospendi')).click();
     await confirm(page).click();
     await expectUncertainOutcome(page);
@@ -363,19 +374,20 @@ test('a second tab inherits the unresolved barrier and cannot confirm its older 
     await other.close();
 });
 
-test('an authoritative HTTP rejection is distinct from a lost response', async ({ page }) => {
+test('an HTTP error without a terminal receipt remains unknown until explicit close', async ({ page }) => {
     const data = await fixture(page);
     await open(page, data);
     const { writes } = network(page);
-    await page.route(`**/api/therapies/${data.therapyId}`, route => route.request().method() === 'PUT'
+    await page.route(executeRoute, route => route.request().method() === 'POST'
         ? route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'Synthetic validation rejection' }) }) : route.continue());
     await (await action(page, 'Sospendi')).click();
     await confirm(page).click();
-    await expect(threshold(page).getByText('Modifica non registrata', { exact: true })).toBeVisible();
-    await expect(threshold(page).getByText('Esito da verificare', { exact: true })).toHaveCount(0);
+    await expectUncertainOutcome(page);
     await expect((await action(page, 'Concludi'))).toBeDisabled();
     await threshold(page).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
-    await expect(threshold(page).getByText('Terapia riletta', { exact: true })).toBeVisible();
+    await expectUncertainOutcome(page);
+    await threshold(page).getByRole('button', { name: 'Ritira richiesta e verifica', exact: true }).click();
+    await expect(threshold(page)).toContainText('ID richiesta ritirato');
     expect(writes).toHaveLength(1);
     expect(await stored(page, data)).toMatchObject({ version: 1, status: 'active' });
 });
@@ -455,9 +467,9 @@ for (const failure of ['corrupt', 'unreadable'] as const) {
             localStorage.setItem(key, value);
         }, { key, value });
         await threshold(page).getByRole('button', { name: 'Ricontrolla disponibilità', exact: true }).click();
-        await expectUncertainOutcome(page);
+        await expectUncertainOutcome(page, true);
         await threshold(page).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
-        await expectUncertainOutcome(page);
+        await expectUncertainOutcome(page, true);
         await expect((await action(page, 'Sospendi'))).toBeDisabled();
         expect(await page.evaluate(key => localStorage.getItem(key), key)).toBe(value);
         expect(writes).toHaveLength(0);
