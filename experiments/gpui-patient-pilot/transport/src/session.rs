@@ -819,7 +819,7 @@ impl RuntimeSession {
         let rows: Vec<Ambulatory> = decode(response.value)?;
         let mut seen = HashSet::new();
         for row in &rows {
-            validate_id(&row.id).map_err(|_| RuntimeError::InvalidResponse)?;
+            validate_scope_id(&row.id).map_err(|_| RuntimeError::InvalidResponse)?;
             valid_wire_version(row.version)?;
             if !seen.insert(row.id.clone()) {
                 return Err(RuntimeError::InvalidResponse);

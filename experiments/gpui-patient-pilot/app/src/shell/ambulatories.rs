@@ -108,6 +108,13 @@ fn parent_allowed(rows: &[Ambulatory], parent: &str, target: Option<&str>) -> bo
         })
 }
 
+fn row_text(id: &str, field: &str, value: impl Into<SharedString>) -> gpui::Text {
+    gpui::Text::new(
+        format!("clinical-workspace-ambulatory-{id}-{field}").into(),
+        value.into(),
+    )
+}
+
 impl ClinicalApp {
     pub(super) fn receive_ambulatories(&mut self, rows: Vec<Ambulatory>, cx: &mut Context<Self>) {
         let choice = selection(
@@ -718,11 +725,11 @@ impl ClinicalApp {
                     let id=row.id.clone(); let edit_id=id.clone();
                     let path=ancestry(rows,&id);
                     let parent_line=path.as_ref().map(|ids| ids.iter().filter_map(|id| rows.iter().find(|r| r.id==*id).map(|r|r.name.as_str())).collect::<Vec<_>>().join(" / ")).unwrap_or_else(|_|"Collegamento tra sedi non valido: verifica sul computer che ospita l’archivio".into());
-                    div().border_t_1().border_color(theme.rule).pt(px(16.)).flex().flex_col().gap(px(8.))
-                        .when(!parent_line.is_empty(),|el| el.child(div().text_color(theme.secondary).child(text!(parent_line))))
-                        .child(text!(format!("{}{}{}",row.name,if row.is_default { " · Predefinita" } else { "" },if row.kind.as_deref()==Some("test") { " · Prova" } else { "" })))
-                        .when_some(row.address.as_ref(),|el,address|el.child(text!(address.clone())))
-                        .when_some(row.description.as_ref(),|el,description|el.child(div().text_color(theme.secondary).child(text!(description.clone()))))
+                    div().id(format!("clinical-workspace-ambulatory-row-{id}")).border_t_1().border_color(theme.rule).pt(px(16.)).flex().flex_col().gap(px(8.))
+                        .when(!parent_line.is_empty(),|el| el.child(div().text_color(theme.secondary).child(row_text(&row.id,"parent-path",parent_line))))
+                        .child(row_text(&row.id,"name",format!("{}{}{}",row.name,if row.is_default { " · Predefinita" } else { "" },if row.kind.as_deref()==Some("test") { " · Prova" } else { "" })))
+                        .when_some(row.address.as_ref(),|el,address|el.child(row_text(&row.id,"address",address.clone())))
+                        .when_some(row.description.as_ref(),|el,description|el.child(div().text_color(theme.secondary).child(row_text(&row.id,"description",description.clone()))))
                         .child(div().flex().flex_wrap().gap(px(12.))
                             .child(self.ambulatory_button(format!("clinical-workspace-ambulatory-select-{id}"),if self.scope.as_deref()==Some(&id) { "Sede corrente" } else { "Lavora in questa sede" },theme,false,!busy && management.draft.is_none()).aria_selected(self.scope.as_deref()==Some(&id)).on_click(cx.listener(move|this,_,_,cx|this.change_scope(&id,cx))))
                             .child(self.ambulatory_button(format!("clinical-workspace-ambulatory-edit-{edit_id}"),"Modifica sede",theme,false,loaded && management.draft.is_none() && self.can_manage_ambulatories()).on_click(cx.listener(move|this,_,_,cx|this.open_ambulatory_editor(Some(&edit_id),cx)))))
@@ -779,6 +786,23 @@ mod tests {
         });
         retained
     }
+    #[test]
+    fn repeated_ambulatory_rows_have_distinct_stable_accessible_text_nodes() {
+        let nodes: Vec<_> = ["a", "b"]
+            .into_iter()
+            .flat_map(|id| {
+                ["name", "address", "description", "parent-path"]
+                    .map(|field| row_text(id, field, "Testo sintetico"))
+            })
+            .collect();
+        let ids: HashSet<_> = nodes.iter().map(|text| text.id().unwrap()).collect();
+        assert_eq!(ids.len(), nodes.len());
+        assert_eq!(
+            row_text("a", "name", "Prima").id(),
+            row_text("a", "name", "Dopo").id()
+        );
+    }
+
     #[test]
     fn initial_default_does_not_become_a_reload_or_scope_loss_fallback() {
         let rows = vec![row("a", 1, false, None), row("b", 1, true, None)];
