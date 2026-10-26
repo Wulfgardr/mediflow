@@ -124,7 +124,7 @@ for (const account of [null, { type: 'apiKey' }, { type: 'chatgptAuthTokens', pl
 for (const [name, limits, code] of [
     ['primary exhausted', { rateLimitsByLimitId: { codex: { primary: { usedPercent: 100 }, secondary: { usedPercent: 0 } } } }, 'quota_exhausted'],
     ['secondary exhausted', { rateLimitsByLimitId: { codex: { primary: { usedPercent: 0 }, secondary: { usedPercent: 101 } } } }, 'quota_exhausted'],
-    ['reached type', { rateLimitsByLimitId: { codex: { ...quota().rateLimitsByLimitId.codex, rateLimitReachedType: 'credits' } } }, 'quota_exhausted'],
+    ['reached type', { rateLimitsByLimitId: { codex: { ...quota().rateLimitsByLimitId.codex, rateLimitReachedType: 'credits' } } }, 'limits_unavailable'],
     ['unknown', {}, 'limits_unavailable'],
     ['missing codex never uses legacy', { rateLimitsByLimitId: {}, rateLimits: quota().rateLimitsByLimitId.codex }, 'limits_unavailable'],
     ['no known window', { rateLimits: { primary: null, secondary: null } }, 'limits_unavailable'],
@@ -291,7 +291,7 @@ test('source identity and hashes validated before transport', () => {
 test('service has only named content/consent/egress imports and no clinical writer or direct IO', () => {
     const code = readFileSync(new URL('./execution-service.ts', import.meta.url), 'utf8');
     const imports = [...code.matchAll(/^import\s+(?!type\b).*?from\s+'([^']+)'/gm)].map(match => match[1]);
-    assert.deepEqual(imports, ['node:crypto', 'node:path', './execution-contract', './execution-transport', './ordinary-preparation',
+    assert.deepEqual(imports, ['node:crypto', 'node:path', './execution-quota', './execution-contract', './execution-transport', './ordinary-preparation',
         '../chatgpt-product/product-consent', './ordinary-egress-chokepoint']);
     assert.doesNotMatch(code, /export\s+(?:async\s+)?function\s+createTaskExecutionService/);
     assert.doesNotMatch(code, /from\s+['"][^'"]*(?:db|server-auth|registry|ollama)[^'"]*['"]/);
@@ -620,4 +620,37 @@ for (const phase of ['start', 'completed-early', 'completed-late'] as const) tes
     assert.equal(transport.closed, 1); assert.equal(transport.calls.filter(call => call.method === 'turn/start').length, 1);
     await assert.rejects(service.generate(request), errorCode('upstream_error'));
     assert.equal(transport.calls.filter(call => call.method === 'turn/start').length, 1);
+});
+
+for (const unlimited of [false, true]) test(`credits ${unlimited ? 'unlimited' : 'available'} allow one explicit turn after included quota without changing authority`, async () => {
+    const { service, transport } = setup();
+    const credits = { hasCredits: !unlimited, unlimited, balance: '321.123' };
+    transport.override = method => method === 'account/rateLimits/read' ? { rateLimitsByLimitId: { codex: { primary: { usedPercent: 100 }, secondary: null, credits, spendControlReached: false, rateLimitReachedType: 'rate_limit_reached' } } } : undefined;
+    const request = await selection(service);
+    assert.equal(transport.calls.filter(x => x.method === 'turn/start').length, 0);
+    transport.onTurn = () => { transport.listener('account/rateLimits/updated', { rateLimits: { credits: null, primary: null, secondary: null } }); transport.final(); transport.complete(); };
+    const result = await service.generate(request); assert.equal(result.clinicalWrites, 0);
+    assert.equal(transport.calls.filter(x => x.method === 'turn/start').length, 1);
+    await assert.rejects(service.generate(request), errorCode('session_expired'));
+});
+
+test('backend usageLimitExceeded remains a terminal denial with a fixed receipt despite available credits', async () => {
+    const { service, transport } = setup();
+    transport.override = method => method === 'account/rateLimits/read' ? { rateLimits: { primary: { usedPercent: 100 }, credits: { hasCredits: true, unlimited: false }, spendControlReached: false, rateLimitReachedType: 'rate_limit_reached' } } : undefined;
+    const request = await selection(service);
+    transport.onTurn = () => { transport.listener('error', { error: { codexErrorInfo: 'usageLimitExceeded', message: 'PRIVATE_UPSTREAM_SENTINEL' } }); transport.final(); transport.complete(); };
+    await assert.rejects(service.generate(request), (error: unknown) => { assert.equal((error as { code: ExecutionCode; denial: unknown }).code, 'quota_exhausted'); assert.deepEqual((error as { code: ExecutionCode; denial: unknown }).denial, { source: 'backend_error', method: 'error', rpcCode: null, backendCode: 'usageLimitExceeded' }); assert.doesNotMatch(JSON.stringify(error), /PRIVATE_UPSTREAM/); return true; });
+    assert.equal(transport.calls.filter(x => x.method === 'turn/start').length, 1);
+});
+
+for (const phase of ['turn/start', 'turn/completed'] as const) test(`backend ${phase} quota failure remains denied with only fixed error metadata`, async () => {
+    const { service, transport } = setup();
+    transport.override = method => {
+        if (method === 'account/rateLimits/read') return { rateLimits: { primary: { usedPercent: 100 }, credits: { hasCredits: true, unlimited: false }, spendControlReached: false, rateLimitReachedType: 'rate_limit_reached' } };
+        if (method === 'turn/start' && phase === 'turn/start') return { turn: { id: 'turn-1', items: [], status: 'failed', error: { codexErrorInfo: 'usageLimitExceeded', message: 'PRIVATE_UPSTREAM_SENTINEL' } } };
+    };
+    transport.onTurn = () => transport.listener('turn/completed', { threadId: 'thread-1', turn: { id: 'turn-1', items: [], status: 'failed', error: { codexErrorInfo: 'usageLimitExceeded', message: 'PRIVATE_UPSTREAM_SENTINEL' } } });
+    const request = await selection(service);
+    await assert.rejects(service.generate(request), (error: unknown) => { const value = error as { code: ExecutionCode; denial: unknown }; assert.equal(value.code, 'quota_exhausted'); assert.deepEqual(value.denial, { source: 'backend_error', method: phase, rpcCode: null, backendCode: 'usageLimitExceeded' }); assert.doesNotMatch(JSON.stringify(error), /PRIVATE_/); return true; });
+    assert.equal(transport.calls.filter(x => x.method === 'turn/start').length, 1);
 });

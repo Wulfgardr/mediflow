@@ -53,6 +53,7 @@ class Peer implements ExecutionTransport {
     calls: { method: ExecutionMethod; params: Record<string, unknown> }[] = [];
     callbacks = new Set<(method: string, value: unknown) => void>();
     closed = 0; connected = true; pendingOutput = ''; modelsAvailable = true; quota = 1;
+    credits?: { hasCredits: boolean; unlimited: boolean };
     onRequest?: (method: ExecutionMethod, params: Record<string, unknown>) => void | Promise<void>;
     closeHook?: () => Promise<void>;
     initialized() { /* fake peer protocol only */ }
@@ -67,7 +68,7 @@ class Peer implements ExecutionTransport {
         if (method === 'account/read') return { account: this.connected ? { type: 'chatgpt', email: 'fixture-only@example.invalid', planType: 'plus' } : null, requiresOpenaiAuth: !this.connected };
         if (method === 'account/login/start') return { type: 'chatgptDeviceCode', loginId: 'fixture-login', userCode: 'FAKE-ONLY', verificationUrl: 'https://auth.openai.com/fixture-never-navigate' };
         if (method === 'model/list') return { data: this.modelsAvailable ? [model] : [], nextCursor: null };
-        if (method === 'account/rateLimits/read') return { rateLimitsByLimitId: { codex: { primary: { usedPercent: this.quota } } } };
+        if (method === 'account/rateLimits/read') return { rateLimitsByLimitId: { codex: { primary: { usedPercent: this.quota }, ...(this.credits ? { credits: this.credits, spendControlReached: false, rateLimitReachedType: this.quota >= 100 ? 'rate_limit_reached' : null } : {}) } } };
         if (method === 'thread/start') return { thread: { id: 'thread-fixture', ephemeral: true, cwd, modelProvider: 'openai', model: params.model, reasoningEffort: 'medium', turns: [] }, model: params.model, modelProvider: 'openai', cwd, reasoningEffort: 'medium', approvalPolicy: 'never', instructionSources: [], sandbox: { type: 'readOnly', networkAccess: false }, serviceTier: 'priority' };
         if (method === 'turn/start') {
             if (this.pendingOutput) this.finish(this.pendingOutput);
@@ -278,4 +279,32 @@ test('ordinary fixture URL exception is exact to one inert response line', async
     assert.equal(isExternalUrlLiteralAllowed('lib/chatgpt-execution/ordinary-product-attempt.ts', url, line), false);
     assert.equal(isExternalUrlLiteralAllowed(path, url + '?changed', line.replace(url, url + '?changed')), false);
     assert.equal(isExternalUrlLiteralAllowed(path, url, line + ' https:' + '//unapproved.invalid'), false);
+});
+
+test('ordinary login preserves startup quota metadata until the authenticated read and exposes only a credit candidate', async () => {
+    const session = owner.issue(), peer = new Peer(); peer.connected = false; peer.quota = 100; peer.credits = { hasCredits: true, unlimited: false };
+    const p = platform(peer), attempt = await createOrdinaryProductAttempt(session as never, p.value as never), selection = new AbortController();
+    try {
+        const disclosure = await attempt.prepare(profiles()[0], 'source-credit-revision', configuration, selection.signal);
+        await attempt.consent({ operation: disclosure.operation, expectedDisclosureRevision: disclosure.revision }); await attempt.loginStart();
+        peer.emit('account/rateLimits/updated', { rateLimits: { primary: { usedPercent: 100 }, rateLimitReachedType: 'rate_limit_reached' } });
+        assert.equal(attempt.snapshot().quota, null);
+        peer.login(); await attempt.loginComplete(); const catalog = await attempt.models();
+        assert.equal(attempt.snapshot().quota?.includedUsage, 'exhausted'); assert.equal(attempt.snapshot().quota?.creditAvailability, 'available');
+        assert.doesNotMatch(JSON.stringify(attempt.snapshot()), /balance|accountId/);
+        await assert.rejects(attempt.generate({ modelOptionId: catalog.choices[0].optionId, expectedCatalogRevision: catalog.revision }));
+        assert.equal(peer.calls.filter(call => call.method === 'thread/start').length, 0, 'credits cannot bypass the existing content admission');
+    } finally { await attempt.dispose(); }
+});
+
+test('a hard quota notice during ordinary login retires the attempt before handoff or model turn', async () => {
+    const session = owner.issue(), peer = new Peer(); peer.connected = false;
+    const p = platform(peer), attempt = await createOrdinaryProductAttempt(session as never, p.value as never), selection = new AbortController();
+    try {
+        const disclosure = await attempt.prepare(profiles()[0], 'source-hard-limit', configuration, selection.signal);
+        await attempt.consent({ operation: disclosure.operation, expectedDisclosureRevision: disclosure.revision }); await attempt.loginStart();
+        peer.emit('account/rateLimits/updated', { rateLimits: { spendControlReached: true } }); peer.login();
+        await assert.rejects(attempt.loginComplete(), (error: unknown) => error instanceof ExecutionError && error.code === 'quota_exhausted');
+        assert.equal(peer.calls.filter(call => call.method === 'thread/start').length, 0);
+    } finally { await attempt.dispose(); }
 });

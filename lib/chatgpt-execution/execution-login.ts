@@ -6,6 +6,7 @@ import { assertExecutionInitialization, executionInitializationParams, expectedE
 import { takeMacLoginTransport } from './execution-mac-qualification';
 import { EXECUTION_CONFIG, EXECUTION_SUBSTRATE } from './execution-sandbox';
 import { MAC_CONFIG_SOURCE } from './execution-mac-config';
+import { readExecutionQuota } from './execution-quota';
 import { ProductError, type ProductLoginChallenge, type ProductLimits } from '../chatgpt-product/product-contract';
 
 const object = (value: unknown): Record<string, unknown> => {
@@ -80,23 +81,7 @@ export function assertExecutionConfig(raw: unknown): void {
     }
     if (Object.hasOwn(config, 'model_provider') && config.model_provider !== null && config.model_provider !== 'openai') throw new ExecutionError('unqualified_boundary');
 }
-export function readExecutionLimits(raw: unknown): ProductLimits {
-    const response = object(raw);
-    const candidate = response.rateLimitsByLimitId == null ? response.rateLimits : object(response.rateLimitsByLimitId).codex;
-    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) throw new ExecutionError('limits_unavailable');
-    const bucket = object(candidate);
-    if (bucket.rateLimitReachedType != null || bucket.spendControlReached === true) throw new ExecutionError('quota_exhausted');
-    const read = (rawWindow: unknown): number | null => {
-        if (rawWindow == null) return null;
-        const used = object(rawWindow).usedPercent;
-        if (typeof used !== 'number' || !Number.isFinite(used) || used < 0) throw new ExecutionError('limits_unavailable');
-        if (used >= 100) throw new ExecutionError('quota_exhausted');
-        return used;
-    };
-    const primaryUsedPercent = read(bucket.primary), secondaryUsedPercent = read(bucket.secondary);
-    if (primaryUsedPercent === null && secondaryUsedPercent === null) throw new ExecutionError('limits_unavailable');
-    return Object.freeze({ primaryUsedPercent, secondaryUsedPercent });
-}
+export function readExecutionLimits(raw: unknown): ProductLimits { return readExecutionQuota(raw); }
 
 export function createExecutionLogin(transport: ExecutionTransport, guard: () => void, changed: (state: 'verifying') => void, fail: (error: ProductError | ExecutionError) => void, executionCwd: string) {
     let loginId: string | undefined;

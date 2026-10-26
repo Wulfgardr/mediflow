@@ -95,6 +95,8 @@ function OrdinaryFunctionControls({ client, view, needsReprepare = false, canRep
     const phase = view.state?.phase;
     return <fieldset aria-label="OpenAI per questa proposta" style={{ border: 0, padding: 0 }}>
         {view.loading && <p role="status">Verifica in corso…</p>}
+        {view.state?.quota && <p role="status">{view.state.quota.includedUsage === 'exhausted'
+            ? 'Quota inclusa esaurita; crediti potenzialmente disponibili.' : 'Quota inclusa osservata disponibile.'} Il singolo tentativo richiede il tuo gesto e resta soggetto alla verifica di OpenAI; non garantisce accesso o disponibilità.</p>}
         {!view.state && !view.completed && !needsReprepare && <>
             <p>Il contesto scelto viene minimizzato e redatto sul computer host. OpenAI riceve il testo redatto solo dopo il consenso. Restano applicabili le condizioni e la conservazione del servizio ChatGPT; non è garantita conservazione zero.</p>
             {view.settings && <label><input type="checkbox" disabled={view.loading} checked={view.settings.enabled} onChange={e => void client.remote.policy(e.target.checked)} /> Consenti OpenAI su questo host (disattivato per default)</label>}
