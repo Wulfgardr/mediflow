@@ -8,6 +8,32 @@ Il test di composizione controlla il consumer reale e impedisce di ripristinare
 implicitamente una PUT dal nuovo controller. Le proprietà del nuovo ledger non
 sono una prova TLA né un'estensione implicita degli invarianti legacy sottostanti.
 
+## Raccordo della copertura al 26 ottobre 2026
+
+`coverage.json.syncCommit` identifica ora la revisione del runtime riesaminata
+`c4ae8c6eab6966e40414457ae3b666ac618154e8`; `legacyModelSyncCommit` conserva
+`64e190438da8287928f0903b9b719c18b329a7ec` come precedente riferimento del modello
+legacy. Le altre impronte coperte restano invariate: il delta rispetto a b806
+cambia soltanto il validatore del predecessore recovery cifrato v4.
+Il confronto ora rifiuta anche tabelle estranee invece di ignorarle. Non cambia
+transizioni, guardie, await, CAS o audit del controller.
+
+`StorageRestored` e `Recover` nel TLC riguardano leggibilità e recupero del
+marker browser, non il ripristino del database o l'ammissione del suo schema.
+Schema, migrazione, cifratura, chiavi e ricevute durevoli restano fuori dal TLC.
+Il pin del validatore è un controllo di deriva con riesame manuale; non rende
+quelle proprietà modellate. `durableProtocolCoverage.recoveryCompatibility`
+registra questo confine e la revisione del confronto.
+
+`code-current` esegue anche gli otto test causali del validatore: ammissione del
+canonico v4 con impronta immutabile e byte invariati; diniego di tabella estranea,
+colonna, indice, trigger, vista, versione falsa e v5 senza ledger. Il test è anche
+in `verificationInputs`. Le prove cifrate del percorso owner restano evidenza
+separata: verificano originale/destinazione e conservazione delle estensioni nel
+backup fisico corrente v5. Il verifier generico non aggiunge quel carico né il
+caso da257MiB. Modello, configurazione, invarianti, limiti, testimoni e mutanti
+TLC restano identici.
+
 Il primo gesto legacy apre una conferma sul paziente, sulla terapia e sulla versione
 mostrati. Solo la conferma può iniziare una PUT CAS. Se il browser interrompe
 l'attesa, il server può ancora scrivere: una GET alla vecchia versione non
