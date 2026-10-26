@@ -51,6 +51,13 @@ const providerOutput = () => ({
     ],
 });
 
+const claimsOutput = () => {
+    const value = providerOutput();
+    const pair = (path: string) => { const binding = value.sourceBindings.find(item => item.claimPath === path)!; return { claim: binding.claim, evidenceRefs: binding.evidenceRefs }; };
+    return { schemaVersion: 'mediflow.treatment-reasoning.claims.v1', task: value.task, summary: pair('summary'), data: { ...value.data,
+        recommendation: pair('data.recommendation'), reasoning: value.data.reasoning.map((_, i) => pair(`data.reasoning.${i}`)), caveats: value.data.caveats.map((_, i) => pair(`data.caveats.${i}`)) } };
+};
+
 type FixtureOptions = Readonly<{
     enabled?: boolean;
     runtimeAvailable?: boolean;
@@ -92,7 +99,7 @@ function fixture(options: FixtureOptions = {}) {
             invoke({ instruction }: Readonly<{ instruction: string }>) {
                 calls.push('invoke');
                 assert.match(instruction, /source_payload_json=/u);
-                return options.providerValue ?? JSON.stringify(providerOutput());
+                return options.providerValue ?? JSON.stringify(claimsOutput());
             },
         }),
         entropy: () => Uint8Array.from({ length: 32 }, (_, index) => index + 1),
@@ -225,4 +232,17 @@ test('portable kill switch blocks before preparing; late revoke, switch-off or s
 test('portable currentness CAS failure never publishes and does not retry', async () => {
     const f = portableFixture({ commit: false }); const result = await f.run(); assert.equal(result.status, 'denied');
     assert.equal(result.code, 'source_stale'); assert.equal(f.calls.filter(x => x === 'invoke').length, 1); assert.equal(f.calls.at(-1), 'abort');
+});
+
+test('a valid claims response arriving after the host retires its context cannot publish or invoke again', async () => {
+    let finish: ((value: string) => void) | undefined;
+    const options = { commit: true, providerValue: new Promise<string>(resolve => { finish = resolve; }) };
+    const current = fixture(options); const operation = await current.service.acquirePreview();
+    const pending = operation.preview({ handle: 'trp_0123456789abcdef0123456789abcdef', requestId: 'request.synthetic.retired' });
+    for (let i = 0; i < 20 && !current.calls.includes('invoke'); i++) await new Promise<void>(resolve => setImmediate(resolve));
+    assert.equal(current.calls.filter(x => x === 'invoke').length, 1);
+    options.commit = false; finish!(JSON.stringify(claimsOutput()));
+    const result = await pending;
+    assert.equal(result.status, 'denied'); assert.equal(result.code, 'source_stale'); assert.equal(result.publication, null);
+    assert.equal(current.calls.filter(x => x === 'invoke').length, 1);
 });

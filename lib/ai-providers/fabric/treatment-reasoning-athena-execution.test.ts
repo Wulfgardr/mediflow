@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 import { TreatmentReasoningAthenaExecutionConfigurationError, createTreatmentReasoningAthenaExecution } from './treatment-reasoning-athena-execution.ts';
+import { athenaClaimsProfileV1 } from './treatment-reasoning-athena-claims-profile.ts';
 import { buildAthenaTreatmentReasoningInstruction } from './treatment-reasoning-athena-method.ts';
 import { buildTreatmentReasoningPrompt, parseTreatmentReasoningResponse, type TreatmentReasoningPromptInput } from '../../treatment-reasoning-contract.ts';
 import type { TreatmentReasoningProjectionAttachment } from './treatment-reasoning-projection.ts';
@@ -22,6 +23,12 @@ const projection = () => Object.freeze({
 const input = () => ({ preview: preview(), evidenceRefs: refs(), projection: projection() });
 const policy = (extra: Record<string, unknown> = {}) => ({ readiness: 'available_unqualified', provider: 'athena_mlx', venue: 'local_process', egress: 'none', credentialClass: 'local_model', model: MODEL, receiptRef: 'receipt_synthetic_01', provenanceRef: 'provenance_synthetic_01', ...extra });
 const output = (extra: Record<string, unknown> = {}) => ({ schemaVersion: 'mediflow.treatment_reasoning.v1', task: 'treatment_reasoning', summary: 'Synthetic review summary.', data: { recommendation: 'Review the bounded evidence before a clinical decision.', keyEvidence: [{ id: 'evidence.synthetic.finding', statement: 'Synthetic source-bound evidence.', evidenceRefs: ['therapy:therapy.synthetic.alpha'] }], reasoning: ['The evidence needs clinician review.'], caveats: ['Synthetic fixture; not a prescription.'], safetyFlags: [{ id: 'safety.synthetic.flag', severity: 'caution', label: 'Review required', rationale: 'The outcome remains review-only.', evidenceRefs: ['entry:entry.synthetic.beta'] }], suggestedActions: [{ id: 'action.synthetic.review', intent: 'review_only', label: 'Review evidence', rationale: 'No clinical write is permitted.', writePolicy: 'review_only', evidenceRefs: ['therapy:therapy.synthetic.alpha'] }], trace: { mode: 'local_model', toolsUsed: ['tool.synthetic.local'], limitations: ['No external lookup.'] } }, sourceBindings: [{ claimPath: 'summary', claim: 'Synthetic review summary.', evidenceRefs: ['therapy:therapy.synthetic.alpha'] }, { claimPath: 'data.recommendation', claim: 'Review the bounded evidence before a clinical decision.', evidenceRefs: ['therapy:therapy.synthetic.alpha'] }, { claimPath: 'data.reasoning.0', claim: 'The evidence needs clinician review.', evidenceRefs: ['therapy:therapy.synthetic.alpha'] }, { claimPath: 'data.caveats.0', claim: 'Synthetic fixture; not a prescription.', evidenceRefs: ['entry:entry.synthetic.beta'] }], ...extra });
+const producerOutput = () => {
+    const value = output();
+    const pair = (path: string) => { const binding = value.sourceBindings.find(item => item.claimPath === path)!; return { claim: binding.claim, evidenceRefs: binding.evidenceRefs }; };
+    return JSON.stringify({ schemaVersion: athenaClaimsProfileV1.id, task: value.task, summary: pair('summary'), data: { ...value.data,
+        recommendation: pair('data.recommendation'), reasoning: value.data.reasoning.map((_, i) => pair(`data.reasoning.${i}`)), caveats: value.data.caveats.map((_, i) => pair(`data.caveats.${i}`)) } });
+};
 const service = (invoke: (value: Readonly<{ instruction: string; signal: Readonly<{ isAborted: () => boolean }> }>) => unknown, host = () => policy(), timeoutMs = 20) => createTreatmentReasoningAthenaExecution({ host: { policy: host, invoke }, timeoutMs });
 type Result = Awaited<ReturnType<ReturnType<typeof service>['execute']>>;
 const denied = (result: Result, code: string) => { const observed = result as unknown as Record<string, unknown>; assert.equal(result.status, 'denied'); assert.equal(result.code, code); assert.equal(observed.value, null); assert.equal(result.sourceBindings, null); assert.equal(observed.attestation, null); assert.equal('envelope' in observed, false); assert.equal('host' in observed, false); assert.equal('fallback' in observed, false); assert.equal(result.writesPerformed, 0); assert.equal(result.applyPolicy, 'none'); };
@@ -45,7 +52,7 @@ test('retains the pre-extraction instruction bytes and legacy parser results acr
         assert.equal(hash(buildTreatmentReasoningPrompt(item)), expected.legacyPromptSha256, item.id);
         assert.equal(hash(JSON.stringify(parseTreatmentReasoningResponse(JSON.stringify(item.expectedResponse), { allowedEvidenceIds: [...evidenceRefs] }))), expected.legacyExpectedParseSha256, item.id);
         let calls = 0;
-        const result = await service(value => { calls += 1; assert.equal(value.instruction, instruction); return null; }, () => policy(), 1_000).execute({
+        const result = await service(value => { calls += 1; assert.equal(value.instruction, athenaClaimsProfileV1.instruction(projection)); return null; }, () => policy(), 1_000).execute({
             preview: Object.freeze({ ...preview(), evidence: Object.freeze({ source: 'host_minimized', count: evidenceRefs.length }) }),
             evidenceRefs: [...evidenceRefs], projection,
         });
@@ -56,9 +63,9 @@ test('retains the pre-extraction instruction bytes and legacy parser results acr
 
 test('runs exactly once as fixed local ATHENA and returns the distinct V2 source-bound review result', async () => {
     const source = readFileSync(new URL('./treatment-reasoning-athena-execution.ts', import.meta.url), 'utf8');
-    assert.match(source, /^import 'server-only';\n/u); assert.match(source, /createTreatmentReasoningAthenaOutputContractV2/u); assert.doesNotMatch(source, /createTreatmentReasoningAthenaOutputContract(?!V2)|fallback/u); assert.doesNotMatch(source, /(?:structuredClone|fetch\(|AIService|https?:\/\/)/u);
+    assert.match(source, /^import 'server-only';\n/u); assert.match(source, /athenaClaimsProfileV1.normalize/u); assert.doesNotMatch(source, /createTreatmentReasoningAthenaOutputContract(?!V2)|fallback/u); assert.doesNotMatch(source, /(?:structuredClone|fetch\(|AIService|https?:\/\/)/u);
     let policyCalls = 0; let calls = 0;
-    const result = await service(({ instruction, signal }) => { calls += 1; assert.equal(signal.isAborted(), false); assert.match(instruction, /evidence_refs=therapy:therapy\.synthetic\.alpha,entry:entry\.synthetic\.beta/u); assert.match(instruction, /Farmaco sintetico 5 mg\./u); assert.match(instruction, /source_revision=source_synthetic_01/u); assert.doesNotMatch(instruction, /caller_question|patientId|provider=/u); return JSON.stringify(output()); }, () => { policyCalls += 1; return policy(); }).execute(input());
+    const result = await service(({ instruction, signal }) => { calls += 1; assert.equal(signal.isAborted(), false); assert.match(instruction, /evidence_refs=therapy:therapy\.synthetic\.alpha,entry:entry\.synthetic\.beta/u); assert.match(instruction, /Farmaco sintetico 5 mg\./u); assert.match(instruction, /source_revision=source_synthetic_01/u); assert.doesNotMatch(instruction, /caller_question|patientId|provider=/u); return producerOutput(); }, () => { policyCalls += 1; return policy(); }).execute(input());
     assert.equal(policyCalls, 1); assert.equal(calls, 1); assert.equal(result.status, 'completed');
     if (result.status === 'completed') { const observed = result as unknown as Record<string, unknown>; const value = observed.value as { schemaVersion: string }; const attestation = observed.attestation as Record<string, unknown>; assert.equal(observed.resultSchema, 'mediflow.ai.treatment-reasoning-athena-output-result.v2'); assert.equal(value.schemaVersion, 'mediflow.treatment_reasoning.v1'); assert.deepEqual(result.sourceBindings.map((item) => item.claimPath), ['summary', 'data.recommendation', 'data.reasoning.0', 'data.caveats.0']); assert.deepEqual(attestation, { schema: 'mediflow.ai.treatment-reasoning-athena-attestation.v1', readiness: 'available_unqualified', provider: 'athena_mlx', venue: 'local_process', egress: 'none', receiptRef: 'receipt_synthetic_01', provenanceRef: 'provenance_synthetic_01' }); assert.equal('envelope' in observed, false); assert.equal('host' in observed, false); assert.equal('fallback' in observed, false); assert.equal(result.writesPerformed, 0); assert.equal(result.applyPolicy, 'none'); assert.equal(Object.isFrozen(result), true); }
 });
@@ -99,7 +106,7 @@ test('does not read ambient Object.prototype.then inside success or any denial p
     const prior = Object.getOwnPropertyDescriptor(Object.prototype, 'then'); let reads = 0;
     Object.defineProperty(Object.prototype, 'then', { configurable: true, get: () => { if ((new Error().stack ?? '').includes('/lib/ai-providers/fabric/treatment-reasoning-athena-execution.ts:')) reads += 1; return undefined; } });
     try {
-        assert.equal((await service(() => output()).execute(input())).status, 'completed');
+        assert.equal((await service(() => producerOutput()).execute(input())).status, 'completed');
         denied(await service(() => output()).execute({}), 'input_invalid');
         denied(await service(() => output(), () => policy({ egress: 'cloud' })).execute(input()), 'host_invalid');
         denied(await service(() => ({ ...output(), provider: 'athena_mlx' })).execute(input()), 'provider_invalid');
