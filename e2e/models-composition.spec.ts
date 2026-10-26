@@ -81,7 +81,7 @@ test('Modelli: letture chiuse, scelta e bozza, gerarchia e attivazione soltanto 
             if (!baseline) {
                 const headings = await region.locator('h2, h3').evaluateAll(elements => elements.filter(element => element.tagName === 'H2' || /^[1-4]\./u.test(element.textContent ?? '')).map(element => ({ text: element.textContent, size: getComputedStyle(element).fontSize })));
                 expect(headings.length).toBeGreaterThanOrEqual(5);
-                expect(headings.every(heading => heading.size === '12px')).toBe(true);
+                expect(headings).toEqual(headings.map(heading => ({ ...heading, size: '12px' })));
                 const controls = await region.locator('button').evaluateAll(elements => elements.filter(element => { const box = element.getBoundingClientRect(); return box.width > 0 && box.height > 0; }).map(element => ({ text: element.textContent, height: element.getBoundingClientRect().height })));
                 expect(controls.every(control => control.height >= 40)).toBe(true);
             }
