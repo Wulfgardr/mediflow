@@ -60,6 +60,15 @@ mod tests {
 
     #[test]
     fn monitor_installation_admits_fresh_auth_but_never_revalidates_old_snapshots() {
+        let during_installation = AtomicU64::new(0);
+        event(&during_installation, false);
+        let observed_lock = during_installation.load(Ordering::Acquire);
+        installed(&during_installation);
+        assert_eq!(during_installation.load(Ordering::Acquire), observed_lock);
+        assert!(!admits_fresh_auth(
+            during_installation.load(Ordering::Acquire)
+        ));
+
         let state = AtomicU64::new(0);
         assert!(!admits_fresh_auth(state.load(Ordering::Acquire)));
         installed(&state);
