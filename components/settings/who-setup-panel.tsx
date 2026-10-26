@@ -1,15 +1,16 @@
 'use client';
 
 /* WUL-672: local Search only; provisioning and activation are host-owned. */
-import { formatCountLabel } from '@/lib/format-count';
 import { useEffect, useMemo, useState } from 'react';
 import { createICDReferenceDataClient, icdClientErrorMessage, icdReadinessMessage, type ICDReadiness, type ICDSearchReceipt } from '@/lib/icd-service';
-import { SETTINGS_CARD_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from './settings-ui';
+import { SETTINGS_SECONDARY_BUTTON_CLASS } from './settings-ui';
+import { Disclosure } from '@/components/disclosure';
+import styles from './repertori-settings.module.css';
 import { WhoEmbeddedCatalog } from './who-embedded-catalog';
 import { WhoLocalSetupGuide } from './who-local-setup-guide';
 import { WhoCodeCheckForm } from '@/components/who-code-check';
 
-export function WhoSetupPanel() {
+export function WhoSetupPanel({ expanded, onExpandedChange }: { expanded?: boolean; onExpandedChange?: (value: boolean) => void } = {}) {
     const [refresh, setRefresh] = useState(0);
     const [state, setState] = useState<{ kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'ready'; readiness: ICDReadiness }>({ kind: 'loading' });
     const [probe, setProbe] = useState<{ kind: 'idle' | 'running' } | { kind: 'error'; message: string; at: string } | { kind: 'done'; receipt: ICDSearchReceipt }>({ kind: 'idle' });
@@ -31,8 +32,12 @@ export function WhoSetupPanel() {
         setRefresh(value => value + 1);
     }
     const canVerify = state.kind === 'ready' && ['configured', 'available', 'unavailable'].includes(state.readiness.status);
-    return <section id="who-setup" className={SETTINGS_CARD_CLASS} aria-labelledby="who-setup-title" data-testid="who-setup-panel">
-        <h2 id="who-setup-title" className="text-lg font-semibold">Terminologia WHO</h2>
+    return <section id="who-setup" className={styles.row} aria-label="Terminologia WHO" data-testid="who-setup-panel">
+        <Disclosure headingLevel={2} open={expanded} onOpenChange={onExpandedChange}
+            title={<span className={styles.title}><span>Terminologia WHO</span><span className={styles.summary}>
+                {state.kind === 'loading' ? 'Lettura della configurazione…' : state.kind === 'error' ? 'Configurazione non leggibile' : 'Configurazione letta · ICD-11 MMS 2026-01'}
+            </span></span>}>
+        <div className={styles.body}>
         <p className="mt-1 text-sm text-[color:var(--lume-ink-muted)]">ICD-11 · MMS 2026-01 · inglese</p>
         <WhoEmbeddedCatalog onChanged={() => setRefresh(value => value + 1)} />
         {state.kind === 'loading' && <p className="mt-4 text-sm" role="status">Lettura della configurazione…</p>}
@@ -51,10 +56,9 @@ export function WhoSetupPanel() {
         </p>}
         {probe.kind === 'error' && <p className="mt-3 text-sm" role="alert">Verifica non riuscita: {probe.message} <time dateTime={probe.at}>{new Date(probe.at).toLocaleTimeString('it-IT')}</time></p>}
         <WhoCodeCheckForm />
-        <details className="mt-5 text-base"><summary className="cursor-pointer font-semibold">Opzionale: servizio locale WHO</summary>
+        <Disclosure title="Opzionale: servizio locale WHO">
         <WhoLocalSetupGuide status={state.kind === 'ready' ? 'catalogState' in state.readiness ? undefined : state.readiness.status : state.kind} onRefresh={() => { setState({ kind: 'loading' }); setRefresh(value => value + 1); }} />
-        <details className="mt-5 text-sm">
-            <summary className="cursor-pointer font-medium">Per chi gestisce il server</summary>
+        <Disclosure title="Per chi gestisce il server">
             <p className="mt-3 leading-6">Il setup host conserva manifesto, consenso, snapshot e prove nella cartella privata MediFlow/WHO. Non espone Docker al Web. Per controllare o riprendere le verifiche del solo servizio creato dalla procedura:</p>
             <pre className="mt-3 whitespace-pre-wrap break-all text-xs leading-5"><code>{'node scripts/who-local-onboarding.mjs status\nnode scripts/who-local-onboarding.mjs qualify'}</code></pre>
             <p className="mt-3 leading-6">La procedura completa è in docs/icd-who-setup.md. La CLI tecnica precedente resta disponibile per deployment gestiti separatamente; le prove di un altro deployment non si ereditano.</p>
@@ -63,7 +67,9 @@ export function WhoSetupPanel() {
                 <div><dt><code>MEDIFLOW_ICD_WHO_LOCAL_IMAGE_DIGEST</code></dt><dd>Digest verificato dell’immagine; non viene scaricata da questa pagina.</dd></div>
                 <div><dt><code>MEDIFLOW_ICD_WHO_LOCAL_DATASET_ID</code></dt><dd>Impronta dello snapshot installato; nessun valore è precompilato.</dd></div>
             </dl>
-        </details>
-        </details>
+        </Disclosure>
+        </Disclosure>
+        </div>
+        </Disclosure>
     </section>;
 }

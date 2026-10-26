@@ -49,7 +49,11 @@ test('real component and routes: preview, acceptance, invalid rows, CAS, lost re
             await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() });
         });
         await page.goto('http://127.0.0.1:48973');
-        await expect(page.getByText('0 voci nel repertorio protesica', { exact: true })).toBeVisible();
+        await expect(page.getByText('0 voci · 0 fonti locali', { exact: true })).toBeVisible();
+        const disclosure = page.getByRole('button', { name: /^Protesica e ausili/u });
+        await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+        await disclosure.click();
+        await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
         const upload = page.getByLabel('File repertorio protesica (.csv)', { exact: true });
         await upload.setInputFiles(file(['DEMO-A']));
         await expect(page.getByText('Anteprima pronta', { exact: true })).toBeVisible();
@@ -57,7 +61,7 @@ test('real component and routes: preview, acceptance, invalid rows, CAS, lost re
         const confirm = page.getByRole('button', { name: 'Conferma importazione protesica', exact: true });
         await expect(confirm).toBeDisabled(); await page.getByRole('checkbox').check(); await confirm.click();
         await expect(page.getByText('Import registrato e stato del repertorio riletto.', { exact: true })).toBeVisible();
-        await expect(page.getByText('1 voce nel repertorio protesica', { exact: true })).toBeVisible();
+        await expect(page.getByText('1 voce · 1 fonte locale', { exact: true })).toBeVisible();
         assert.equal(commits, 1);
         await upload.setInputFiles(file(['DUP', 'DUP']));
         await expect(page.getByText('Import bloccato', { exact: true })).toBeVisible(); await expect(confirm).toHaveCount(0);
@@ -77,7 +81,10 @@ test('real component and routes: preview, acceptance, invalid rows, CAS, lost re
         await confirm.click();
         await expect(page.getByText('Import registrato e stato del repertorio riletto.', { exact: true })).toBeVisible();
         assert.equal((db.prepare('SELECT count(*) n FROM prosthetics_catalog_receipts').get() as { n: number }).n, receipts);
-        await page.reload(); await expect(page.getByText('2 voci nel repertorio protesica', { exact: true })).toBeVisible();
+        await page.reload(); await expect(page.getByText('2 voci · 1 fonte locale', { exact: true })).toBeVisible();
+        await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+        await disclosure.click();
+        await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
         await expect(page.getByLabel('Ricevuta protesica')).toContainText('Fonte inventata');
         await page.getByLabel('Codice, descrizione o codifica', { exact: true }).fill('DEMO-CAS');
         await page.getByRole('button', { name: 'Cerca nel repertorio', exact: true }).click();
@@ -89,7 +96,7 @@ test('real component and routes: preview, acceptance, invalid rows, CAS, lost re
         for (const button of await page.getByRole('button').all()) {
             const box = await button.boundingBox(); if (box) assert.ok(box.height >= 44);
         }
-        assert.equal(await page.getByLabel('Import repertorio protesica', { exact: true }).evaluate(el => getComputedStyle(el).borderRadius), '10px');
+        assert.equal(await page.getByLabel('Import repertorio protesica', { exact: true }).evaluate(el => getComputedStyle(el).borderRadius), '0px');
         assert.deepEqual(errors, []);
     } finally { await browser.close(); }
 });
