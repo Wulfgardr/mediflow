@@ -55,6 +55,7 @@ struct SessionInner {
     profile_reads: Mutex<HashMap<ReadKey, ProfileLease>>,
     profile_selection: Mutex<Option<Arc<ProfileSelection>>>,
     scopes: Mutex<HashSet<String>>,
+    ambulatory_reads: Mutex<HashMap<String, u64>>,
     capabilities: Mutex<HashSet<String>>,
 }
 struct SessionSecrets {
@@ -296,6 +297,7 @@ impl RuntimeSession {
                 profile_reads: Mutex::new(HashMap::new()),
                 profile_selection: Mutex::new(None),
                 scopes: Mutex::new(HashSet::new()),
+                ambulatory_reads: Mutex::new(HashMap::new()),
                 capabilities: Mutex::new(HashSet::new()),
             }),
             context,
@@ -417,6 +419,9 @@ impl RuntimeSession {
         }
         if let Ok(mut profiles) = self.inner.profile_reads.lock() {
             profiles.clear();
+        }
+        if let Ok(mut rows) = self.inner.ambulatory_reads.lock() {
+            rows.clear();
         }
         if let Ok(mut scopes) = self.inner.scopes.lock() {
             scopes.clear();
@@ -906,14 +911,91 @@ impl RuntimeSession {
         let response =
             self.read_json(None, &["api", "v1", "network", "ambulatories"], JSON_LIMIT)?;
         let rows: Vec<Ambulatory> = decode(response.value)?;
+        let mut seen = HashSet::new();
         for row in &rows {
             validate_scope_id(&row.id).map_err(|_| RuntimeError::InvalidResponse)?;
             valid_wire_version(row.version)?;
+            if !seen.insert(row.id.clone()) {
+                return Err(RuntimeError::InvalidResponse);
+            }
         }
+        let mut reads = self
+            .inner
+            .ambulatory_reads
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?;
         self.check_read_epoch(response.epoch)?;
         *self.inner.scopes.lock().map_err(|_| RuntimeError::Locked)? =
             rows.iter().map(|row| row.id.clone()).collect();
+        *reads = rows
+            .iter()
+            .map(|row| (row.id.clone(), row.version))
+            .collect();
         Ok(rows)
+    }
+
+    pub fn save_ambulatory(
+        &self,
+        scope: &str,
+        target: Option<(&str, u64)>,
+        draft: &crate::AmbulatoryDraft,
+    ) -> Result<crate::AmbulatoryMutationReceipt> {
+        self.ensure_open()?;
+        draft.validate()?;
+        if !self.can_write(crate::AMBULATORY_WRITE_CAPABILITY) {
+            return Err(RuntimeError::Forbidden);
+        }
+        if let Some((id, version)) = target {
+            validate_id(id)?;
+            validate_version(version)?;
+            if version == MAX_SAFE_VERSION || draft.parent_id.as_deref() == Some(id) {
+                return Err(RuntimeError::InvalidInput);
+            }
+        }
+        let _guard = self.begin_write()?;
+        let mut reads = self
+            .inner
+            .ambulatory_reads
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?;
+        if let Some((id, version)) = target
+            && reads.get(id) != Some(&version)
+        {
+            return Err(RuntimeError::ReadRequired);
+        }
+        if draft
+            .parent_id
+            .as_ref()
+            .is_some_and(|id| !reads.contains_key(id))
+        {
+            return Err(RuntimeError::ReadRequired);
+        }
+        reads.clear();
+        drop(reads);
+        let mut body = serde_json::to_value(draft).map_err(|_| RuntimeError::InvalidInput)?;
+        let value = if let Some((id, version)) = target {
+            body["version"] = json!(version);
+            self.request(
+                Method::PUT,
+                &["api", "v1", "network", "ambulatories", id],
+                &[],
+                Some(scope),
+                Some(&body),
+                true,
+                JSON_LIMIT,
+            )?
+        } else {
+            self.request(
+                Method::POST,
+                &["api", "v1", "network", "ambulatories"],
+                &[],
+                Some(scope),
+                Some(&body),
+                true,
+                JSON_LIMIT,
+            )?
+        };
+        crate::ambulatories::parse_receipt(value, target)
     }
 
     pub fn list_patients(&self, scope: &str, archived: bool) -> Result<Vec<PatientSummary>> {
@@ -6167,6 +6249,164 @@ mod tests {
         seen.recv_timeout(Duration::from_secs(5)).unwrap();
         worker.join().unwrap();
         assert_eq!(result, Err(RuntimeError::InvalidResponse));
+    }
+    fn ambulatory_draft() -> crate::AmbulatoryDraft {
+        crate::AmbulatoryDraft {
+            name: "Studio sintetico".into(),
+            address: Some("Via di prova".into()),
+            description: None,
+            parent_id: None,
+            kind: "test".into(),
+            is_default: true,
+        }
+    }
+    #[test]
+    fn ambulatory_put_consumes_the_exact_read_and_keeps_conflict_and_restore_distinct() {
+        for (status, body, expected) in [
+            (
+                200,
+                json!({"success":true,"version":2,"affectedAmbulatories":[{"id":"scope-a","version":2}]}),
+                None,
+            ),
+            (
+                409,
+                json!({"code":"VERSION_CONFLICT"}),
+                Some(RuntimeError::Conflict),
+            ),
+            (
+                409,
+                json!({"code":"ARCHIVE_REPLACED"}),
+                Some(RuntimeError::ArchiveReplaced),
+            ),
+            (
+                200,
+                json!({"success":true,"version":99}),
+                Some(RuntimeError::Indeterminate),
+            ),
+        ] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            session
+                .inner
+                .capabilities
+                .lock()
+                .unwrap()
+                .insert(crate::AMBULATORY_WRITE_CAPABILITY.into());
+            let worker = thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                assert!(read_request(&mut stream).starts_with("GET /api/v1/network/ambulatories "));
+                send_reply(
+                    &mut stream,
+                    r#"[{"id":"scope-a","name":"Prima","version":1,"isDefault":true}]"#,
+                );
+                let (mut stream, _) = listener.accept().unwrap();
+                let identity = read_request(&mut stream);
+                assert!(identity.starts_with("GET /api/v1/network/identity "));
+                assert!(identity.contains("x-mediflow-expected-ambulatory-id: scope-a"));
+                send_reply(
+                    &mut stream,
+                    r#"{"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}}"#,
+                );
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with("PUT /api/v1/network/ambulatories/scope-a "));
+                assert!(request.contains("x-mediflow-expected-ambulatory-id: scope-a"));
+                assert!(request.contains("x-mediflow-archive-generation: synthetic-generation"));
+                let sent: Value =
+                    serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+                assert_eq!(sent["version"], 1);
+                assert_eq!(sent["isDefault"], true);
+                assert_eq!(sent["type"], "test");
+                send_status_reply(&mut stream, status, &body.to_string());
+                listener
+            });
+            session.list_ambulatories().unwrap();
+            assert_eq!(
+                session.save_ambulatory("scope-a", Some(("scope-a", 2)), &ambulatory_draft()),
+                Err(RuntimeError::ReadRequired)
+            );
+            let result =
+                session.save_ambulatory("scope-a", Some(("scope-a", 1)), &ambulatory_draft());
+            if let Some(expected) = expected {
+                assert_eq!(result, Err(expected));
+            } else {
+                assert_eq!(result.unwrap().version, 2);
+            }
+            assert_eq!(
+                session
+                    .save_ambulatory("scope-a", Some(("scope-a", 1)), &ambulatory_draft())
+                    .unwrap_err(),
+                if expected == Some(RuntimeError::ArchiveReplaced) {
+                    assert_eq!(
+                        session.retirement_error(),
+                        Some(RuntimeError::ArchiveReplaced)
+                    );
+                    RuntimeError::Locked
+                } else {
+                    RuntimeError::ReadRequired
+                }
+            );
+            let listener = worker.join().unwrap();
+            listener.set_nonblocking(true).unwrap();
+            assert!(
+                listener.accept().is_err(),
+                "write retried without a new read"
+            );
+        }
+    }
+    #[test]
+    fn ambulatory_create_requires_an_admitted_scope_and_uses_only_the_existing_port() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        assert_eq!(
+            session.save_ambulatory("scope-a", None, &ambulatory_draft()),
+            Err(RuntimeError::Forbidden)
+        );
+        session
+            .inner
+            .capabilities
+            .lock()
+            .unwrap()
+            .insert(crate::AMBULATORY_WRITE_CAPABILITY.into());
+        assert_eq!(
+            session.save_ambulatory("unadmitted", None, &ambulatory_draft()),
+            Err(RuntimeError::Forbidden)
+        );
+        let worker = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            read_request(&mut stream);
+            send_reply(
+                &mut stream,
+                r#"[{"id":"scope-a","name":"Prima","version":1,"isDefault":true}]"#,
+            );
+            let (mut stream, _) = listener.accept().unwrap();
+            assert!(read_request(&mut stream).starts_with("GET /api/v1/network/identity "));
+            send_reply(
+                &mut stream,
+                r#"{"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}}"#,
+            );
+            let (mut stream, _) = listener.accept().unwrap();
+            let request = read_request(&mut stream);
+            assert!(request.starts_with("POST /api/v1/network/ambulatories "));
+            assert!(!request.contains("/clear"));
+            send_status_reply(
+                &mut stream,
+                201,
+                r#"{"success":true,"id":"new-scope","version":1,"affectedAmbulatories":[{"id":"scope-a","version":2},{"id":"new-scope","version":1}]}"#,
+            );
+            listener
+        });
+        session.list_ambulatories().unwrap();
+        let receipt = session
+            .save_ambulatory("scope-a", None, &ambulatory_draft())
+            .unwrap();
+        assert_eq!(receipt.id, "new-scope");
+        assert_eq!(receipt.affected.len(), 2);
+        assert!(
+            !session.inner.scopes.lock().unwrap().contains("new-scope"),
+            "receipt must not select or admit a scope"
+        );
+        worker.join().unwrap();
     }
 
     #[test]

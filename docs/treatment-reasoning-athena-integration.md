@@ -9,6 +9,13 @@ Program boundary:
 
 ## Stato corrente
 
+La [ricostruzione I-3b del 26 ottobre](./analysis/2026-10-26-athena-method.md)
+e [ADR 0166 Proposed](./adr/0166-athena-method-runner-boundary.md) separano il
+metodo Fabric dal runner senza cambiare l'istruzione locale. La prova del
+refactor conserva i byte sui due casi esistenti; il probe reale del prompt
+Fabric produce invece output fuori contratto, negato dal validatore V2.
+Il preflight legacy non qualifica quel percorso né la qualità I-7.
+
 Treatment Reasoning aiuta a rivedere un trattamento attraverso un'anteprima
 locale, senza assumere il ruolo di prescrittore. Nel percorso MLX del candidato
 0.8.5 descritto qui, Intelligence Fabric usa ATHENA-R1-Qwen3-8B solo quando
