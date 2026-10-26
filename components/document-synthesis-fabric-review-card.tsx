@@ -4,7 +4,7 @@
 import { Disclosure } from '@/components/disclosure';
 import styles from './clinical-register.module.css';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
-import { FileSearch, Loader2, RotateCcw, ShieldCheck } from 'lucide-react';
+import { FileSearch, Loader2, RotateCcw } from 'lucide-react';
 
 import { ChoiceField } from '@/components/choice-field';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
@@ -130,7 +130,6 @@ function DocumentSynthesisFabricReviewCardSession({
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h4 className="flex items-center gap-2 font-semibold text-[color:var(--lume-ink)]">
-                        <ShieldCheck className="h-4 w-4 text-[color:var(--lume-accent)]" aria-hidden="true" />
                         Sintesi da rivedere
                     </h4>
                     <p className="mt-1 text-[color:var(--lume-ink-muted)]">
@@ -224,7 +223,7 @@ function DocumentSynthesisFabricReviewCardSession({
                 <div className="mt-4 grid min-w-0 gap-4" data-testid="document-synthesis-fabric-result">
                     {/* summary, sources and receipt share the document reading plane. */}
                     <div className={styles.proposalRow}>
-                        <p className="font-semibold text-[color:var(--lume-ink)]">Riepilogo da rivedere</p>
+                        <p className="font-semibold text-[color:var(--lume-ink-pencil)]">Nuova proposta · da rivedere</p>
                         <p className="mt-2 break-words text-[color:var(--lume-ink)]">
                             <PrivacyBlur intensity="sm">{publication.output.summary}</PrivacyBlur>
                         </p>

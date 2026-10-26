@@ -264,4 +264,36 @@ test('Document Synthesis Fabric mostra una proposta con verifica, provenienza e 
     preview: { previewHandle: PREVIEW_HANDLE },
   });
   expect(forbiddenWrites).toEqual([]);
+
+  const nextName = 'seconda-fonte-sintetica.txt';
+  const saved = page.waitForResponse(response => response.request().method() === 'POST'
+    && new URL(response.url()).pathname === '/api/attachments');
+  await page.locator('#documenti input[type="file"]').setInputFiles({ name: nextName,
+    mimeType: 'text/plain', buffer: Buffer.from('Seconda fonte sintetica, senza dati reali.') });
+  expect((await saved).ok()).toBe(true);
+  await card.getByRole('button', { name: 'Chiudi proposta', exact: true }).click();
+  const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
+  const aborted: string[] = [];
+  page.on('requestfailed', request => {
+    if (new URL(request.url()).pathname === '/api/ai/document-synthesis/preview') aborted.push(request.failure()?.errorText ?? '');
+  });
+  await page.route('**/api/ai/document-synthesis/preview', async route => {
+    calls.preview += 1; entered.resolve(); await release.promise;
+    await route.fulfill({ status: 200, json: previewResponse() }).catch(() => undefined);
+  });
+  await card.getByRole('button', { name: 'Genera proposta', exact: true }).click();
+  await card.getByLabel('Ambulatorio per questa proposta').selectOption({ index: 1 });
+  await card.getByRole('checkbox').check();
+  await card.getByRole('button', { name: 'Conferma e genera proposta', exact: true }).click();
+  try {
+    await entered.promise;
+    await page.getByRole('button', { name: `Visualizza ${nextName}`, exact: true }).click();
+    await expect.poll(() => aborted).toEqual(['net::ERR_ABORTED']);
+  } finally { release.resolve(); }
+  await expect(card).toHaveCount(0);
+  await expect(page.getByTestId('document-synthesis-fabric-result')).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: 'Documento da sintetizzare', exact: true }).locator('option:checked')).toHaveText(nextName);
+  await expect(page.getByTestId('document-preview-text')).toHaveText('Seconda fonte sintetica, senza dati reali.');
+  expect(calls).toEqual({ capture: 2, extraction: 0, ingest: 2, preview: 2, legacy: 0 });
+  expect(forbiddenWrites).toEqual([]);
 });
