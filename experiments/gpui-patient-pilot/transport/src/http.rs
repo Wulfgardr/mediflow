@@ -9,7 +9,7 @@ use reqwest::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{net::IpAddr, sync::OnceLock, time::Duration};
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 pub(crate) const JSON_LIMIT: usize = 8 * 1024 * 1024;
 pub(crate) const DOCUMENT_LIMIT: usize = 24 * 1024 * 1024;
@@ -370,6 +370,72 @@ impl RuntimeClient {
         ))
     }
 
+    pub(crate) fn bootstrap_raw(
+        &self,
+        method: Method,
+        path: &[&str],
+        headers: HeaderMap,
+        body: Option<&Value>,
+        mutation: bool,
+    ) -> Result<RawResponse> {
+        if !self.is_local_bootstrap_origin() {
+            return Err(RuntimeError::Forbidden);
+        }
+        let encoded = body
+            .map(serde_json::to_vec)
+            .transpose()
+            .map_err(|_| RuntimeError::InvalidInput)?
+            .map(Zeroizing::new);
+        if encoded.as_ref().is_some_and(|v| v.len() > 4096) {
+            return Err(RuntimeError::TooLarge);
+        }
+        http_runtime().block_on(self.context.run(
+            async {
+                let mut request = self
+                    .http
+                    .request(method, self.endpoint(path, &[])?)
+                    .headers(headers)
+                    .header("origin", self.origin.origin().ascii_serialization())
+                    .header("sec-fetch-site", "same-origin")
+                    .header("content-type", "application/json");
+                if let Some(body) = encoded {
+                    request = request.body(body.to_vec());
+                }
+                let response = request.send().await.map_err(|_| uncertain(mutation))?;
+                let raw = read_response_body(response, AUTH_LIMIT, mutation).await?;
+                if (300..400).contains(&raw.status) {
+                    return Err(RuntimeError::Rejected(raw.status));
+                }
+                if !(200..300).contains(&raw.status) {
+                    if raw.status == 409
+                        && matches!(conflict_code(&raw.body), ConflictCode::ArchiveReplaced)
+                    {
+                        return Err(RuntimeError::ArchiveReplaced);
+                    }
+                    return Err(match raw.status {
+                        401 => RuntimeError::Rejected(401),
+                        403 => RuntimeError::Forbidden,
+                        404 => RuntimeError::Missing,
+                        409 => RuntimeError::Conflict,
+                        n => RuntimeError::Rejected(n),
+                    });
+                }
+                Ok(raw)
+            },
+            mutation,
+        ))
+    }
+
+    pub(crate) fn is_local_bootstrap_origin(&self) -> bool {
+        self.origin.host_str().is_some_and(|host| {
+            host == "localhost"
+                || host
+                    .trim_matches(['[', ']'])
+                    .parse::<IpAddr>()
+                    .is_ok_and(|ip| ip.is_loopback())
+        })
+    }
+
     fn endpoint(&self, path: &[&str], query: &[(&str, &str)]) -> Result<Url> {
         for segment in path {
             validate_id(segment)?;
@@ -574,10 +640,605 @@ fn classify_status(status: u16, mutation: bool) -> RuntimeError {
     }
 }
 
+#[derive(Clone, Serialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FirstAmbulatoryDraft {
+    pub id: String,
+    pub name: String,
+    pub address: Option<String>,
+    pub description: Option<String>,
+}
+impl FirstAmbulatoryDraft {
+    pub fn new(name: String, address: Option<String>, description: Option<String>) -> Result<Self> {
+        let draft = Self {
+            id: bootstrap_uuid()?,
+            name,
+            address,
+            description,
+        };
+        draft.validate()?;
+        Ok(draft)
+    }
+    fn validate(&self) -> Result<()> {
+        let id = self.id.as_bytes();
+        if id.len() != 36
+            || ![8, 13, 18, 23].into_iter().all(|i| id[i] == b'-')
+            || id[14] != b'4'
+            || !matches!(id[19], b'8' | b'9' | b'a' | b'b')
+            || !id.iter().enumerate().all(|(i, b)| {
+                [8, 13, 18, 23].contains(&i) || b.is_ascii_digit() || (b'a'..=b'f').contains(b)
+            })
+        {
+            return Err(RuntimeError::InvalidInput);
+        }
+        let text = |v: &str, n| {
+            !v.is_empty()
+                && v.trim() == v
+                && v.encode_utf16().count() <= n
+                && !v.chars().any(|c| c <= '\u{1f}' || c == '\u{7f}')
+        };
+        if !text(&self.name, 200)
+            || self.address.as_ref().is_some_and(|v| !text(v, 500))
+            || self.description.as_ref().is_some_and(|v| !text(v, 2000))
+        {
+            return Err(RuntimeError::InvalidInput);
+        }
+        Ok(())
+    }
+}
+
+/// A separate, short-lived Web P3 transport. It is never a paired session.
+pub struct HostBootstrapSession {
+    client: RuntimeClient,
+    draft: FirstAmbulatoryDraft,
+    generation: String,
+    reference: Zeroizing<String>,
+    control: Zeroizing<String>,
+    cookie: Zeroizing<String>,
+    sent: std::sync::atomic::AtomicBool,
+}
+impl HostBootstrapSession {
+    pub(crate) fn authenticate(
+        client: RuntimeClient,
+        user: &RuntimeUser,
+        pairing: &PairingCredentials,
+        native_cookie: &str,
+        draft: FirstAmbulatoryDraft,
+        passphrase: &str,
+    ) -> Result<Self> {
+        draft.validate()?;
+        if !client.is_local_bootstrap_origin() || user.role != "admin" {
+            return Err(RuntimeError::Forbidden);
+        }
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "x-mediflow-paired-client-id",
+            sensitive_header(&pairing.id)?,
+        );
+        headers.insert(
+            "x-mediflow-paired-client-token",
+            sensitive_header(&pairing.token)?,
+        );
+        headers.insert(
+            COOKIE,
+            sensitive_header(&cookie_header(native_cookie, None)?)?,
+        );
+        headers.insert(
+            "x-mediflow-archive-generation",
+            sensitive_header(&user.archive_generation)?,
+        );
+        let mut value = serde_json::to_value(&draft).map_err(|_| RuntimeError::InvalidInput)?;
+        value["operation"] = serde_json::json!("first-ambulatory.create.v1");
+        let opened = client.bootstrap_raw(
+            Method::POST,
+            &["api", "auth", "ambulatory-bootstrap", "begin"],
+            headers,
+            Some(&value),
+            false,
+        )?;
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
+        struct Open {
+            operation: String,
+            contract_version: u64,
+            reference: String,
+            archive_generation: String,
+            expires_at: u64,
+        }
+        let open: Open =
+            serde_json::from_slice(&opened.body).map_err(|_| RuntimeError::InvalidResponse)?;
+        if open.operation != "first-ambulatory.create.v1"
+            || open.contract_version != 1
+            || open.archive_generation != user.archive_generation
+            || open.reference.len() != 64
+            || !open
+                .reference
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            || open.expires_at == 0
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        let control = bootstrap_cookie(&opened.headers, "mediflow_auth_control", 32, 256)?;
+        let mut host = Self {
+            client,
+            draft,
+            generation: open.archive_generation,
+            reference: Zeroizing::new(open.reference),
+            control,
+            cookie: Zeroizing::new(String::new()),
+            sent: std::sync::atomic::AtomicBool::new(false),
+        };
+        let login = (|| {
+            let checked = host.client.bootstrap_raw(
+                Method::GET,
+                &["api", "auth", "check"],
+                host.headers()?,
+                None,
+                false,
+            )?;
+            let check: Value =
+                serde_json::from_slice(&checked.body).map_err(|_| RuntimeError::InvalidResponse)?;
+            if check["status"] != "ok"
+                || check["isSetup"] != true
+                || check["archiveGeneration"] != host.generation
+                || check["unlock"]["credential"] != "passphrase"
+                || check["unlock"]["kdfVersion"] != 3
+            {
+                return Err(RuntimeError::UnsupportedUnlock);
+            }
+            let salt = check["unlock"]["salt"]
+                .as_str()
+                .ok_or(RuntimeError::InvalidResponse)?;
+            let material = crypto::derive_v3(passphrase, salt)?;
+            let mut headers = host.headers()?;
+            let etag = checked
+                .headers
+                .get("etag")
+                .and_then(|v| v.to_str().ok())
+                .ok_or(RuntimeError::InvalidResponse)?;
+            if etag.len() < 34
+                || etag.len() > 258
+                || !etag.starts_with('"')
+                || !etag.ends_with('"')
+                || !etag[1..etag.len() - 1]
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
+            {
+                return Err(RuntimeError::InvalidResponse);
+            }
+            headers.insert("if-match", sensitive_header(etag)?);
+            headers.insert("idempotency-key", sensitive_header(&bootstrap_uuid()?)?);
+            let mut body =
+                serde_json::json!({"username":user.username,"verifier":&*material.verifier});
+            let logged = host.client.bootstrap_raw(
+                Method::POST,
+                &["api", "auth", "login"],
+                headers,
+                Some(&body),
+                true,
+            );
+            if let Some(Value::String(verifier)) = body.get_mut("verifier") {
+                verifier.zeroize();
+            }
+            let logged = logged?;
+            host.cookie = session_cookie(&logged.headers)?;
+            #[derive(Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Login {
+                success: bool,
+                id: String,
+                username: String,
+                role: String,
+                archive_generation: String,
+            }
+            let admitted: Login =
+                serde_json::from_slice(&logged.body).map_err(|_| RuntimeError::InvalidResponse)?;
+            if !admitted.success
+                || admitted.id != user.id
+                || admitted.username != user.username
+                || admitted.role != "admin"
+                || admitted.archive_generation != host.generation
+            {
+                return Err(RuntimeError::InvalidResponse);
+            }
+            Ok(())
+        })();
+        if let Err(error) = login {
+            let _ = host.retire();
+            return Err(error);
+        }
+        Ok(host)
+    }
+    fn headers(&self) -> Result<HeaderMap> {
+        let mut headers = HeaderMap::new();
+        let cookie = Zeroizing::new(if self.cookie.is_empty() {
+            format!("mediflow_auth_control={}", *self.control)
+        } else {
+            format!(
+                "mediflow_session={}; mediflow_auth_control={}",
+                *self.cookie, *self.control
+            )
+        });
+        headers.insert(COOKIE, sensitive_header(&cookie)?);
+        headers.insert(
+            "x-mediflow-bootstrap-reference",
+            sensitive_header(&self.reference)?,
+        );
+        headers.insert(
+            "x-mediflow-archive-generation",
+            sensitive_header(&self.generation)?,
+        );
+        Ok(headers)
+    }
+    pub fn commit(&self) -> Result<()> {
+        if self.sent.swap(true, std::sync::atomic::Ordering::AcqRel) {
+            return Err(RuntimeError::ReadRequired);
+        }
+        let raw = self.client.bootstrap_raw(
+            Method::POST,
+            &["api", "auth", "ambulatory-bootstrap"],
+            self.headers()?,
+            Some(&serde_json::json!({"operation":"first-ambulatory.create.v1","confirm":true})),
+            true,
+        )?;
+        let value: Value =
+            serde_json::from_slice(&raw.body).map_err(|_| RuntimeError::Indeterminate)?;
+        if raw.status != 201
+            || value
+                != serde_json::json!({"operation":"first-ambulatory.create.v1","contractVersion":1,"archiveGeneration":self.generation,"success":true,"id":self.draft.id,"version":1,"affectedAmbulatories":[{"id":self.draft.id,"version":1}]})
+        {
+            return Err(RuntimeError::Indeterminate);
+        }
+        Ok(())
+    }
+    /// Observed state only; this does not attribute a previous commit to this attempt.
+    pub fn readback(&self) -> Result<String> {
+        let raw = self.client.bootstrap_raw(
+            Method::GET,
+            &["api", "auth", "ambulatory-bootstrap"],
+            self.headers()?,
+            None,
+            false,
+        )?;
+        let value: Value =
+            serde_json::from_slice(&raw.body).map_err(|_| RuntimeError::InvalidResponse)?;
+        if value
+            != serde_json::json!({"operation":"first-ambulatory.read.v1","contractVersion":1,"archiveGeneration":self.generation,"id":self.draft.id,"name":self.draft.name,"address":self.draft.address,"description":self.draft.description,"parentId":null,"type":"live","isDefault":true,"version":1})
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        Ok(self.draft.id.clone())
+    }
+    pub fn cancel_local(&self) {
+        self.client.context.cancel();
+    }
+    pub fn retire(&self) -> Result<()> {
+        let raw = self
+            .client
+            .with_request_context(RequestContext::default())
+            .bootstrap_raw(
+                Method::POST,
+                &["api", "auth", "ambulatory-bootstrap", "retire"],
+                self.headers()?,
+                Some(&serde_json::json!({"operation":"first-ambulatory.retire.v1"})),
+                false,
+            )?;
+        if raw.status == 204 && raw.body.is_empty() {
+            Ok(())
+        } else {
+            Err(RuntimeError::InvalidResponse)
+        }
+    }
+}
+fn bootstrap_cookie(
+    headers: &HeaderMap,
+    name: &str,
+    min: usize,
+    max: usize,
+) -> Result<Zeroizing<String>> {
+    let mut found = None;
+    for value in headers.get_all(SET_COOKIE) {
+        let first = value
+            .to_str()
+            .map_err(|_| RuntimeError::InvalidResponse)?
+            .split(';')
+            .next()
+            .unwrap_or("");
+        if let Some((key, value)) = first.split_once('=')
+            && key == name
+        {
+            if found.is_some()
+                || value.len() < min
+                || value.len() > max
+                || !value
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
+            {
+                return Err(RuntimeError::InvalidResponse);
+            }
+            found = Some(Zeroizing::new(value.to_owned()));
+        }
+    }
+    found.ok_or(RuntimeError::InvalidResponse)
+}
+fn bootstrap_uuid() -> Result<String> {
+    let mut bytes = [0u8; 16];
+    getrandom::fill(&mut bytes).map_err(|_| RuntimeError::Crypto)?;
+    bytes[6] = (bytes[6] & 15) | 64;
+    bytes[8] = (bytes[8] & 63) | 128;
+    let hex: String = bytes.iter().map(|v| format!("{v:02x}")).collect();
+    Ok(format!(
+        "{}-{}-{}-{}-{}",
+        &hex[..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..]
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::io::Read;
+
+    fn bootstrap_request(stream: &mut std::net::TcpStream) -> String {
+        let mut all = Vec::new();
+        let mut byte = [0];
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        while !all.ends_with(b"\r\n\r\n") {
+            stream.read_exact(&mut byte).unwrap();
+            all.push(byte[0]);
+            assert!(all.len() < 16384);
+        }
+        let head = String::from_utf8(all.clone()).unwrap();
+        let n = head
+            .lines()
+            .find_map(|v| {
+                v.to_ascii_lowercase()
+                    .strip_prefix("content-length: ")
+                    .and_then(|v| v.trim().parse::<usize>().ok())
+            })
+            .unwrap_or(0);
+        let mut body = vec![0; n];
+        stream.read_exact(&mut body).unwrap();
+        all.extend(body);
+        String::from_utf8(all).unwrap()
+    }
+    fn bootstrap_reply(stream: &mut std::net::TcpStream, status: u16, body: &Value, headers: &str) {
+        use std::io::Write;
+        let body = if status == 204 {
+            String::new()
+        } else {
+            body.to_string()
+        };
+        stream.write_all(format!("HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n{headers}\r\n{body}",body.len()).as_bytes()).unwrap();
+    }
+    fn bootstrap_observation(draft: &FirstAmbulatoryDraft) -> Value {
+        serde_json::json!({"operation":"first-ambulatory.read.v1","contractVersion":1,"archiveGeneration":"generation","id":draft.id,"name":draft.name,"address":draft.address,"description":draft.description,"parentId":null,"type":"live","isDefault":true,"version":1})
+    }
+    fn bootstrap_test_session(url: String, draft: FirstAmbulatoryDraft) -> HostBootstrapSession {
+        HostBootstrapSession {
+            client: RuntimeClient::new(RuntimeConfig {
+                base_url: url,
+                tls_pin_sha256: None,
+            })
+            .unwrap(),
+            draft,
+            generation: "generation".into(),
+            reference: Zeroizing::new("f".repeat(64)),
+            control: Zeroizing::new("b".repeat(64)),
+            cookie: Zeroizing::new("d".repeat(64)),
+            sent: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+    #[test]
+    fn bootstrap_authentication_has_separate_cookies_exact_origin_and_existing_web_p3_login() {
+        use std::{net::TcpListener, thread};
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let client = RuntimeClient::new(RuntimeConfig {
+            base_url: url.clone(),
+            tls_pin_sha256: None,
+        })
+        .unwrap();
+        let draft = FirstAmbulatoryDraft::new("Sede inventata".into(), None, None).unwrap();
+        let sent = draft.clone();
+        let worker = thread::spawn(move || {
+            for step in 0..4 {
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = bootstrap_request(&mut stream);
+                let lower = request.to_lowercase();
+                assert!(lower.contains(&format!("origin: {url}\r\n")));
+                assert!(lower.contains("sec-fetch-site: same-origin"));
+                if step == 0 {
+                    assert!(request.starts_with("POST /api/auth/ambulatory-bootstrap/begin "));
+                    assert!(
+                        lower.contains(&format!("cookie: mediflow_session={}", "a".repeat(64)))
+                    );
+                    assert!(lower.contains("x-mediflow-paired-client-token:"));
+                    let body: Value =
+                        serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+                    assert_eq!(body["id"], sent.id);
+                    bootstrap_reply(
+                        &mut stream,
+                        200,
+                        &serde_json::json!({"operation":"first-ambulatory.create.v1","contractVersion":1,"reference":"f".repeat(64),"archiveGeneration":"generation","expiresAt":1900000000000u64}),
+                        &format!(
+                            "Set-Cookie: mediflow_auth_control={}; Path=/; HttpOnly\r\nETag: \"{}\"\r\n",
+                            "b".repeat(64),
+                            "c".repeat(64)
+                        ),
+                    );
+                } else if step == 1 {
+                    assert!(request.starts_with("GET /api/auth/check "));
+                    assert!(!lower.contains("mediflow_session="));
+                    assert!(!lower.contains("x-mediflow-paired-client-token:"));
+                    bootstrap_reply(
+                        &mut stream,
+                        200,
+                        &serde_json::json!({"status":"ok","isSetup":true,"archiveGeneration":"generation","unlock":{"credential":"passphrase","kdfVersion":3,"salt":"AwMDAwMDAwMDAwMDAwMDAw=="}}),
+                        &format!("ETag: \"{}\"\r\n", "c".repeat(64)),
+                    );
+                } else if step == 2 {
+                    assert!(request.starts_with("POST /api/auth/login "));
+                    assert!(!lower.contains("mediflow_session="));
+                    assert!(lower.contains("if-match:"));
+                    assert!(lower.contains("idempotency-key:"));
+                    let body: Value =
+                        serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+                    assert_eq!(body.as_object().unwrap().len(), 2);
+                    assert!(body["verifier"].as_str().is_some_and(|v| !v.is_empty()));
+                    assert!(!request.contains("Synthetic scales fixture passphrase"));
+                    bootstrap_reply(
+                        &mut stream,
+                        200,
+                        &serde_json::json!({"success":true,"id":"operator","username":"synthetic","role":"admin","archiveGeneration":"generation"}),
+                        &format!(
+                            "Set-Cookie: mediflow_session={}; Path=/; HttpOnly\r\n",
+                            "d".repeat(64)
+                        ),
+                    );
+                } else {
+                    assert!(request.starts_with("POST /api/auth/ambulatory-bootstrap/retire "));
+                    assert!(lower.contains(&format!("mediflow_session={}", "d".repeat(64))));
+                    assert!(!lower.contains(&format!("mediflow_session={}", "a".repeat(64))));
+                    bootstrap_reply(&mut stream, 204, &Value::Null, "");
+                }
+            }
+        });
+        let user = RuntimeUser {
+            id: "operator".into(),
+            username: "synthetic".into(),
+            display_name: None,
+            role: "admin".into(),
+            archive_generation: "generation".into(),
+        };
+        let flow = HostBootstrapSession::authenticate(
+            client,
+            &user,
+            &PairingCredentials::new("synthetic-device", "x".repeat(64)).unwrap(),
+            &"a".repeat(64),
+            draft,
+            "Synthetic scales fixture passphrase",
+        )
+        .unwrap();
+        flow.cancel_local();
+        assert_eq!(flow.retire(), Ok(()));
+        worker.join().unwrap();
+    }
+    #[test]
+    fn bootstrap_lost_response_never_resends_and_readback_is_only_observed_state() {
+        use std::{net::TcpListener, thread};
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let draft = FirstAmbulatoryDraft::new("Sede inventata".into(), None, None).unwrap();
+        let observed = draft.clone();
+        let worker = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            assert!(
+                bootstrap_request(&mut stream).starts_with("POST /api/auth/ambulatory-bootstrap ")
+            );
+            drop(stream);
+            let (mut stream, _) = listener.accept().unwrap();
+            assert!(
+                bootstrap_request(&mut stream).starts_with("GET /api/auth/ambulatory-bootstrap ")
+            );
+            bootstrap_reply(&mut stream, 200, &bootstrap_observation(&observed), "");
+            listener
+        });
+        let flow = bootstrap_test_session(url.clone(), draft.clone());
+        assert_eq!(flow.commit(), Err(RuntimeError::Indeterminate));
+        assert_eq!(flow.commit(), Err(RuntimeError::ReadRequired));
+        let fresh = bootstrap_test_session(url, draft.clone());
+        assert_eq!(fresh.readback(), Ok(draft.id));
+        let listener = worker.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(listener.accept().is_err());
+    }
+    #[test]
+    fn bootstrap_readback_divergence_and_redirect_never_confirm_or_follow() {
+        use std::{net::TcpListener, thread};
+        for redirect in [false, true] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let url = format!("http://{}", listener.local_addr().unwrap());
+            let draft = FirstAmbulatoryDraft::new("Sede inventata".into(), None, None).unwrap();
+            let observed = draft.clone();
+            let worker = thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                bootstrap_request(&mut stream);
+                let mut body = bootstrap_observation(&observed);
+                body["version"] = serde_json::json!(2);
+                bootstrap_reply(
+                    &mut stream,
+                    if redirect { 302 } else { 200 },
+                    &body,
+                    "Location: http://127.0.0.1:1/leak\r\n",
+                );
+            });
+            let flow = bootstrap_test_session(url, draft);
+            assert_eq!(
+                flow.readback(),
+                Err(if redirect {
+                    RuntimeError::Rejected(302)
+                } else {
+                    RuntimeError::InvalidResponse
+                })
+            );
+            worker.join().unwrap();
+        }
+        let remote = RuntimeClient::new(RuntimeConfig {
+            base_url: "https://example.invalid".into(),
+            tls_pin_sha256: None,
+        })
+        .unwrap();
+        assert!(!remote.is_local_bootstrap_origin());
+        assert_eq!(
+            remote
+                .bootstrap_raw(
+                    Method::GET,
+                    &["api", "auth", "check"],
+                    HeaderMap::new(),
+                    None,
+                    false
+                )
+                .err(),
+            Some(RuntimeError::Forbidden)
+        );
+    }
+    #[test]
+    fn bootstrap_cancel_after_dispatch_is_indeterminate_and_cannot_rearm() {
+        use std::{
+            net::TcpListener,
+            sync::{Arc, mpsc},
+            thread,
+        };
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let (started, receive) = mpsc::channel();
+        let (release, wait) = mpsc::channel();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            bootstrap_request(&mut stream);
+            started.send(()).unwrap();
+            wait.recv_timeout(Duration::from_secs(5)).unwrap();
+        });
+        let flow = Arc::new(bootstrap_test_session(
+            url,
+            FirstAmbulatoryDraft::new("Sede inventata".into(), None, None).unwrap(),
+        ));
+        let pending = flow.clone();
+        let call = thread::spawn(move || pending.commit());
+        receive.recv_timeout(Duration::from_secs(5)).unwrap();
+        flow.cancel_local();
+        assert_eq!(call.join().unwrap(), Err(RuntimeError::Indeterminate));
+        assert_eq!(flow.commit(), Err(RuntimeError::ReadRequired));
+        release.send(()).unwrap();
+        server.join().unwrap();
+    }
     fn synthetic_conflict(path: &[&str], mutation: bool, body: &str, framing: &str) -> Result<()> {
         use std::{io::Write, net::TcpListener, thread};
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();

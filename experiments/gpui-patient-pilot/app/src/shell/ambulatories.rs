@@ -1,12 +1,14 @@
 use super::*;
 use mediflow_runtime_client::{
     AMBULATORY_WRITE_CAPABILITY, AmbulatoryDraft, AmbulatoryMutationReceipt,
+    FirstAmbulatoryContext, FirstAmbulatoryDraft, HostBootstrapSession,
 };
 
 pub(super) struct Management {
     pub(super) active: bool,
     pub(super) draft: Option<Editor>,
     pub(super) initial_scope: bool,
+    bootstrap: Option<BootstrapEditor>,
     focus_editor: bool,
     pub(super) rebase: bool,
     commands: HashMap<String, ScrollTarget>,
@@ -19,6 +21,7 @@ impl Default for Management {
             active: false,
             draft: None,
             initial_scope: true,
+            bootstrap: None,
             focus_editor: false,
             rebase: false,
             commands: HashMap::new(),
@@ -37,11 +40,40 @@ impl Management {
                 });
             }
         }
+        if let Some(editor) = self.bootstrap.take() {
+            if let Some(context) = editor.context {
+                context.cancel();
+            }
+            if let Some(web) = editor.web {
+                web.cancel_local();
+                cx.background_executor()
+                    .spawn(async move {
+                        let _ = web.retire();
+                    })
+                    .detach();
+            }
+            for field in editor.fields {
+                field.editor.update(cx, |input, cx| input.retire(cx));
+            }
+        }
         *self = Self::default();
     }
     pub(super) fn is_saving(&self) -> bool {
         self.draft.as_ref().is_some_and(|draft| draft.saving)
+            || self.bootstrap.as_ref().is_some_and(|editor| editor.busy)
     }
+}
+
+struct BootstrapEditor {
+    fields: Vec<Field>,
+    payload: Option<FirstAmbulatoryDraft>,
+    context: Option<FirstAmbulatoryContext>,
+    web: Option<std::sync::Arc<HostBootstrapSession>>,
+    busy: bool,
+    attempted: bool,
+    observed: Option<String>,
+    message: String,
+    _subscriptions: Vec<Subscription>,
 }
 
 pub(super) struct Editor {
@@ -118,6 +150,285 @@ fn row_text(id: &str, field: &str, value: impl Into<SharedString>) -> gpui::Text
 }
 
 impl ClinicalApp {
+    fn open_first_ambulatory(&mut self, cx: &mut Context<Self>) {
+        if self.ambulatory_management.bootstrap.is_some() {
+            return;
+        }
+        if !self
+            .session
+            .as_ref()
+            .is_some_and(RuntimeSession::can_bootstrap_first_ambulatory)
+            || !self.ambulatories.ready().is_some_and(Vec::is_empty)
+        {
+            return;
+        }
+        let mut fields: Vec<_> = [
+            ("bootstrap-name", "Nome della prima sede", false),
+            ("bootstrap-address", "Indirizzo", false),
+            ("bootstrap-description", "Descrizione", false),
+            (
+                "bootstrap-passphrase",
+                "Passphrase per predisporre la sede",
+                true,
+            ),
+        ]
+        .into_iter()
+        .map(|(id, label, secret)| {
+            Field::new(id, label, "", false, secret, self.theme, cx)
+                .with_scroll(&self.area_scroll, cx)
+        })
+        .collect();
+        let subscriptions = fields
+            .iter_mut()
+            .map(|field| cx.subscribe(&field.editor, |_, _, _: &InputChanged, cx| cx.notify()))
+            .collect();
+        self.ambulatory_management.bootstrap=Some(BootstrapEditor{fields,payload:None,context:None,web:None,busy:false,attempted:false,observed:None,message:"Accedi come lo stesso amministratore. La sede sarà operativa e predefinita, senza sede superiore.".into(),_subscriptions:subscriptions});
+        self.ambulatory_management.focus_editor = true;
+        cx.notify();
+    }
+
+    fn cancel_first_ambulatory(&mut self, cx: &mut Context<Self>) {
+        let Some(editor) = &mut self.ambulatory_management.bootstrap else {
+            return;
+        };
+        if let Some(context) = editor.context.take() {
+            context.cancel();
+        }
+        if let Some(web) = editor.web.take() {
+            web.cancel_local();
+            cx.background_executor()
+                .spawn(async move {
+                    let _ = web.retire();
+                })
+                .detach();
+        }
+        editor.busy = false;
+        editor.observed = None;
+        editor.fields[3]
+            .editor
+            .update(cx, |input, cx| input.set_content("", cx));
+        editor.message="Richiesta ritirata qui. Il ritiro remoto non è attestato. Un invio già partito resta da verificare; ID e bozza sono conservati.".into();
+        self.next_epoch();
+        cx.notify();
+    }
+
+    fn authenticate_first_ambulatory(&mut self, cx: &mut Context<Self>) {
+        let Some(session) = self.session.clone() else {
+            return;
+        };
+        let Some(editor) = &mut self.ambulatory_management.bootstrap else {
+            return;
+        };
+        if editor.busy {
+            return;
+        }
+        editor.observed = None;
+        let passphrase = Zeroizing::new(editor.fields[3].value(cx));
+        editor.fields[3]
+            .editor
+            .update(cx, |input, cx| input.set_content("", cx));
+        let nullable = |value: String| {
+            let value = value.trim().to_owned();
+            (!value.is_empty()).then_some(value)
+        };
+        let payload = if editor.attempted {
+            editor.payload.clone().ok_or(RuntimeError::ReadRequired)
+        } else {
+            FirstAmbulatoryDraft::new(
+                editor.fields[0].value(cx).trim().to_owned(),
+                nullable(editor.fields[1].value(cx)),
+                nullable(editor.fields[2].value(cx)),
+            )
+            .map(|mut draft| {
+                if let Some(previous) = &editor.payload {
+                    draft.id = previous.id.clone();
+                }
+                draft
+            })
+        };
+        let payload = match payload {
+            Ok(value) => value,
+            Err(error) => {
+                editor.message = ui_error(error);
+                cx.notify();
+                return;
+            }
+        };
+        if passphrase.is_empty() {
+            editor.message = "Inserisci la passphrase dell’amministratore corrente.".into();
+            cx.notify();
+            return;
+        }
+        let context = match session.first_ambulatory_context() {
+            Ok(value) => value,
+            Err(error) => {
+                editor.message = ui_error(error);
+                cx.notify();
+                return;
+            }
+        };
+        if let Some(old) = editor.context.replace(context.clone()) {
+            old.cancel();
+        }
+        if let Some(web) = editor.web.take() {
+            web.cancel_local();
+            cx.background_executor()
+                .spawn(async move {
+                    let _ = web.retire();
+                })
+                .detach();
+        }
+        editor.payload = Some(payload.clone());
+        editor.busy = true;
+        editor.message = "Accesso amministrativo dedicato in corso…".into();
+        let epoch = self.epoch;
+        let authority = self.account_profile.generation;
+        let task = cx.background_executor().spawn(async move {
+            session
+                .authenticate_first_ambulatory(&context, payload, &passphrase)
+                .map(std::sync::Arc::new)
+        });
+        cx.spawn(async move|this,cx|{
+            let mut pending=Some(task.await);
+            let _=this.update(cx,|this,cx|{
+                let error=pending.as_ref().and_then(|v|v.as_ref().err()).copied();
+                if this.check_callback(authority,error,cx)!=CallbackState::Current || this.epoch!=epoch{return;}
+                let Some(editor)=&mut this.ambulatory_management.bootstrap else{return;};
+                editor.busy=false;
+                match pending.take().unwrap(){Ok(web)=>{editor.web=Some(web);editor.message=if editor.attempted{"Accesso dedicato verificato. Puoi rileggere la sede, senza ripetere l’invio."}else{"Accesso dedicato verificato. Controlla la sede e conferma la creazione."}.into();},Err(error)=>editor.message=format!("{} La bozza è conservata; nessun ritiro remoto è attestato.",ui_error(error))}
+                cx.notify();
+            });
+            if let Some(Ok(web))=pending{web.cancel_local();cx.background_executor().spawn(async move{let _=web.retire();}).detach();}
+        }).detach();
+        cx.notify();
+    }
+
+    fn verify_first_ambulatory(&mut self, commit: bool, cx: &mut Context<Self>) {
+        let Some(editor) = &mut self.ambulatory_management.bootstrap else {
+            return;
+        };
+        if editor.busy || (commit && editor.attempted) {
+            return;
+        }
+        let Some(web) = editor.web.clone() else {
+            return;
+        };
+        if commit {
+            editor.attempted = true;
+        }
+        editor.observed = None;
+        editor.busy = true;
+        editor.message = if commit {
+            "Creazione e rilettura in corso…"
+        } else {
+            "Rilettura della sede in corso…"
+        }
+        .into();
+        self.run(
+            move || {
+                if commit {
+                    web.commit()?;
+                }
+                web.readback()
+            },
+            move |this, result, cx| this.receive_first_ambulatory_verification(commit, result, cx),
+            cx,
+        );
+        cx.notify();
+    }
+
+    fn receive_first_ambulatory_verification(
+        &mut self,
+        commit: bool,
+        result: Result<String, RuntimeError>,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(editor) = &mut self.ambulatory_management.bootstrap else {
+            return;
+        };
+        editor.busy = false;
+        match result {
+            Ok(id) => {
+                editor.observed = Some(id);
+                editor.message=if commit{"Creazione accettata e sede riletta. Verifica e scegli la sede nel collegamento in uso."}else{"La sede corrisponde ai dati della bozza. La sola rilettura non conferma l’esito dell’invio precedente."}.into();
+            }
+            Err(error) => {
+                editor.observed = None;
+                editor.message = format!(
+                    "{} ID e bozza conservati. Accedi di nuovo prima di riconciliare; nessun reinvio automatico.",
+                    ui_error(error)
+                );
+                if let Some(web) = editor.web.take() {
+                    web.cancel_local();
+                    cx.background_executor()
+                        .spawn(async move {
+                            let _ = web.retire();
+                        })
+                        .detach();
+                }
+            }
+        }
+    }
+
+    fn select_first_ambulatory(&mut self, cx: &mut Context<Self>) {
+        let (Some(session), Some(editor)) = (
+            self.session.clone(),
+            self.ambulatory_management.bootstrap.as_mut(),
+        ) else {
+            return;
+        };
+        if editor.busy || editor.observed.is_none() {
+            return;
+        }
+        let Some(payload) = editor.payload.clone() else {
+            return;
+        };
+        editor.busy = true;
+        self.run(move||{let rows=session.list_ambulatories()?;if !rows.iter().any(|row|row.id==payload.id && row.version==1 && row.name==payload.name && row.address==payload.address && row.description==payload.description && row.parent_id.is_none() && row.kind.as_deref()==Some("live") && row.is_default){return Err(RuntimeError::Conflict);}Ok((rows,payload.id))},|this,result,cx|{
+            match result{Ok((rows,id))=>{if let Some(mut editor)=this.ambulatory_management.bootstrap.take(){if let Some(context)=editor.context.take(){context.cancel();}
+if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().spawn(async move{let _=web.retire();}).detach();}for field in editor.fields{field.editor.update(cx,|input,cx|input.retire(cx));}}this.receive_ambulatories(rows,cx);this.change_scope(&id,cx);this.ambulatory_management.message=Some(("Sede verificata e selezionata. Il ritiro remoto dell’accesso dedicato non è attestato.".into(),false));},Err(error)=>if let Some(editor)=&mut this.ambulatory_management.bootstrap{editor.busy=false;editor.observed=None;editor.message=format!("{} La sede non è stata selezionata.",ui_error(error));}}
+        },cx);
+    }
+
+    fn first_ambulatory_view(&self, cx: &Context<Self>) -> Div {
+        let theme = self.theme;
+        let Some(editor) = &self.ambulatory_management.bootstrap else {
+            return div().child(
+                self.ambulatory_button(
+                    "bootstrap-open",
+                    "Predisponi la prima sede su questo Mac…",
+                    theme,
+                    true,
+                    self.session
+                        .as_ref()
+                        .is_some_and(RuntimeSession::can_bootstrap_first_ambulatory),
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.open_first_ambulatory(cx))),
+            );
+        };
+        let identity = self
+            .session
+            .as_ref()
+            .map(|session| {
+                format!(
+                    "Amministratore: {} · Collegamento: {}",
+                    session.user().username,
+                    session.base_url()
+                )
+            })
+            .unwrap_or_default();
+        div().flex().flex_col().gap(px(12.)).child(heading("bootstrap-title","Prima sede",theme)).child(text!(identity).with_id("bootstrap-identity"))
+            .child(text!("Questa operazione richiede un accesso amministrativo dedicato. L’indirizzo locale non attesta dove termini un eventuale proxy.").with_id("bootstrap-boundary"))
+            .children(editor.fields.iter().enumerate().map(|(index,field)|div().flex().flex_col().gap(px(4.)).child(text!(field.label).with_id(("bootstrap-field-label",index))).child(field.editor.clone())))
+            .when_some(editor.payload.as_ref(),|el,payload|el.child(text!(format!("ID conservato: {}",payload.id)).with_id("bootstrap-id")))
+            .child(notice("bootstrap-message",editor.message.clone(),theme,false))
+            .child(self.ambulatory_button("bootstrap-auth","Accedi per predisporre la sede",theme,false,!editor.busy).on_click(cx.listener(|this,_,_,cx|this.authenticate_first_ambulatory(cx))))
+            .child(self.ambulatory_button("bootstrap-confirm","Crea la prima sede",theme,true,!editor.busy && editor.web.is_some() && !editor.attempted).on_click(cx.listener(|this,_,_,cx|this.verify_first_ambulatory(true,cx))))
+            .child(self.ambulatory_button("bootstrap-read","Verifica l’esito precedente",theme,false,!editor.busy && editor.web.is_some() && editor.attempted).on_click(cx.listener(|this,_,_,cx|this.verify_first_ambulatory(false,cx))))
+            .child(self.ambulatory_button("bootstrap-select","Verifica e usa questa sede",theme,true,!editor.busy && editor.observed.is_some()).on_click(cx.listener(|this,_,_,cx|this.select_first_ambulatory(cx))))
+            .child(self.ambulatory_button("bootstrap-cancel","Ritira la richiesta qui",theme,false,true).on_click(cx.listener(|this,_,_,cx|this.cancel_first_ambulatory(cx))))
+    }
+
     pub(super) fn receive_ambulatories(&mut self, rows: Vec<Ambulatory>, cx: &mut Context<Self>) {
         let choice = selection(
             &rows,
@@ -257,6 +568,19 @@ impl ClinicalApp {
         cx.notify();
     }
 
+    fn empty_ambulatory_list_message(&self) -> &'static str {
+        if self
+            .ambulatory_management
+            .bootstrap
+            .as_ref()
+            .is_some_and(|editor| editor.attempted)
+        {
+            "L’elenco precedente non è aggiornato. Rileggi le sedi per verificarlo."
+        } else {
+            "Nessuna sede presente nell’archivio."
+        }
+    }
+
     fn can_manage_ambulatories(&self) -> bool {
         self.scope.is_some()
             && self.ambulatories.ready().is_some()
@@ -338,9 +662,15 @@ impl ClinicalApp {
         if self.ambulatory_management.focus_editor {
             if let Some(field) = self
                 .ambulatory_management
-                .draft
+                .bootstrap
                 .as_ref()
-                .and_then(|draft| draft.fields.first())
+                .and_then(|editor| editor.fields.first())
+                .or_else(|| {
+                    self.ambulatory_management
+                        .draft
+                        .as_ref()
+                        .and_then(|draft| draft.fields.first())
+                })
             {
                 field.editor.update(cx, |input, cx| input.focus(window, cx));
                 if let Some(target) = &field.scroll_target {
@@ -348,6 +678,20 @@ impl ClinicalApp {
                 }
             }
             self.ambulatory_management.focus_editor = false;
+        }
+        if let Some(editor) = &self.ambulatory_management.bootstrap {
+            for (index, field) in editor.fields.iter().enumerate() {
+                field.editor.update(cx, |input, cx| {
+                    input.configure(
+                        theme,
+                        editor.busy || (index < 3 && (editor.web.is_some() || editor.attempted)),
+                        cx,
+                    )
+                });
+                if let Some(target) = &field.scroll_target {
+                    target.reveal_if_focused(window, cx);
+                }
+            }
         }
         let mut ids: Vec<String> = ["back", "reread"]
             .into_iter()
@@ -367,6 +711,11 @@ impl ClinicalApp {
                 .map(|suffix| format!("clinical-workspace-ambulatory-{suffix}")),
             )
             .collect();
+        ids.extend(
+            ["open", "auth", "confirm", "read", "select", "cancel"]
+                .into_iter()
+                .map(|suffix| format!("bootstrap-{suffix}")),
+        );
         if let Some(rows) = self.ambulatories.ready() {
             for row in rows {
                 for action in ["select", "edit", "parent"] {
@@ -448,6 +797,9 @@ impl ClinicalApp {
             .is_some_and(|s| s.can_write(AMBULATORY_WRITE_CAPABILITY))
         {
             view = view.child(notice("clinical-workspace-ambulatories-readonly", "Questo accesso consente di scegliere una sede. Per modificarle serve l’autorizzazione del computer che ospita l’archivio.", theme, false));
+        }
+        if management.bootstrap.is_some() || self.ambulatories.ready().is_some_and(Vec::is_empty) {
+            view = view.child(self.first_ambulatory_view(cx));
         }
         if let Some(editor) = &management.draft {
             let editable = !busy && editor.accepted.is_none();
@@ -727,7 +1079,7 @@ impl ClinicalApp {
             )),
             Load::Ready(rows) if rows.is_empty() => view.child(notice(
                 "clinical-workspace-ambulatories-empty",
-                "Nessuna sede presente nell’archivio.",
+                self.empty_ambulatory_list_message(),
                 theme,
                 false,
             )),
@@ -804,6 +1156,239 @@ mod tests {
         });
         retained
     }
+    fn bootstrap_draft(
+        app: &mut ClinicalApp,
+        cx: &mut Context<ClinicalApp>,
+    ) -> Vec<Entity<TextInput>> {
+        let fields: Vec<_> = [
+            ("bootstrap-name", "Nome", "Sede inventata", false),
+            ("bootstrap-address", "Indirizzo", "Via inventata", false),
+            (
+                "bootstrap-description",
+                "Descrizione",
+                "Bozza conservata",
+                false,
+            ),
+            (
+                "bootstrap-passphrase",
+                "Passphrase",
+                "Passphrase sintetica riservata",
+                true,
+            ),
+        ]
+        .into_iter()
+        .map(|(id, label, value, secret)| {
+            Field::new(id, label, value, false, secret, app.theme, cx)
+                .with_scroll(&app.area_scroll, cx)
+        })
+        .collect();
+        let retained = fields.iter().map(|field| field.editor.clone()).collect();
+        app.ambulatory_management.active = true;
+        app.ambulatory_management.bootstrap = Some(BootstrapEditor {
+            fields,
+            payload: Some(
+                FirstAmbulatoryDraft::new(
+                    "Sede inventata".into(),
+                    Some("Via inventata".into()),
+                    Some("Bozza conservata".into()),
+                )
+                .unwrap(),
+            ),
+            context: None,
+            web: None,
+            busy: true,
+            attempted: true,
+            observed: None,
+            message: "Invio in corso".into(),
+            _subscriptions: vec![],
+        });
+        retained
+    }
+    #[gpui::test]
+    fn bootstrap_cancel_preserves_stable_id_and_draft_without_rearming_and_navigation_keeps_it(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            app.area = Area::Settings;
+            bootstrap_draft(app, cx);
+            let id = app
+                .ambulatory_management
+                .bootstrap
+                .as_ref()
+                .unwrap()
+                .payload
+                .as_ref()
+                .unwrap()
+                .id
+                .clone();
+            let epoch = app.epoch;
+            app.ambulatory_management
+                .bootstrap
+                .as_mut()
+                .unwrap()
+                .observed = Some(id.clone());
+            app.cancel_first_ambulatory(cx);
+            let editor = app.ambulatory_management.bootstrap.as_ref().unwrap();
+            assert!(editor.attempted);
+            assert!(!editor.busy);
+            assert!(editor.web.is_none());
+            assert!(editor.observed.is_none());
+            assert_eq!(editor.payload.as_ref().unwrap().id, id);
+            assert_eq!(editor.fields[0].value(cx), "Sede inventata");
+            assert!(editor.fields[3].value(cx).is_empty());
+            assert_ne!(app.epoch, epoch);
+            app.navigate(Area::Agenda, cx);
+            app.navigate(Area::Settings, cx);
+            assert_eq!(
+                app.ambulatory_management
+                    .bootstrap
+                    .as_ref()
+                    .unwrap()
+                    .payload
+                    .as_ref()
+                    .unwrap()
+                    .id,
+                id
+            );
+            app.verify_first_ambulatory(true, cx);
+            assert!(!app.ambulatory_management.bootstrap.as_ref().unwrap().busy);
+        });
+    }
+    #[gpui::test]
+    fn bootstrap_failed_reread_retires_the_previous_observation_and_keeps_its_draft(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            bootstrap_draft(app, cx);
+            let id = app
+                .ambulatory_management
+                .bootstrap
+                .as_ref()
+                .unwrap()
+                .payload
+                .as_ref()
+                .unwrap()
+                .id
+                .clone();
+            app.receive_first_ambulatory_verification(false, Ok(id.clone()), cx);
+            assert_eq!(
+                app.ambulatory_management
+                    .bootstrap
+                    .as_ref()
+                    .unwrap()
+                    .observed
+                    .as_deref(),
+                Some(id.as_str())
+            );
+            for error in [
+                RuntimeError::Rejected(401),
+                RuntimeError::Conflict,
+                RuntimeError::InvalidResponse,
+            ] {
+                app.ambulatory_management
+                    .bootstrap
+                    .as_mut()
+                    .unwrap()
+                    .observed = Some(id.clone());
+                app.receive_first_ambulatory_verification(false, Err(error), cx);
+                let editor = app.ambulatory_management.bootstrap.as_ref().unwrap();
+                assert!(editor.observed.is_none());
+                assert!(editor.attempted);
+                assert_eq!(editor.payload.as_ref().unwrap().id, id);
+                assert_eq!(editor.fields[0].value(cx), "Sede inventata");
+            }
+        });
+    }
+
+    #[gpui::test]
+    fn bootstrap_attempt_never_presents_the_pre_dispatch_empty_list_as_current(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            bootstrap_draft(app, cx);
+            app.ambulatories = Load::Ready(vec![]);
+            app.ambulatory_management
+                .bootstrap
+                .as_mut()
+                .unwrap()
+                .attempted = false;
+            assert_eq!(
+                app.empty_ambulatory_list_message(),
+                "Nessuna sede presente nell’archivio."
+            );
+            app.ambulatory_management
+                .bootstrap
+                .as_mut()
+                .unwrap()
+                .attempted = true;
+            let outdated = "L’elenco precedente non è aggiornato. Rileggi le sedi per verificarlo.";
+            assert_eq!(app.empty_ambulatory_list_message(), outdated);
+            let id = app
+                .ambulatory_management
+                .bootstrap
+                .as_ref()
+                .unwrap()
+                .payload
+                .as_ref()
+                .unwrap()
+                .id
+                .clone();
+            app.receive_first_ambulatory_verification(true, Ok(id.clone()), cx);
+            assert_eq!(app.empty_ambulatory_list_message(), outdated);
+            for error in [RuntimeError::Indeterminate, RuntimeError::Conflict] {
+                app.receive_first_ambulatory_verification(false, Err(error), cx);
+                assert_eq!(app.empty_ambulatory_list_message(), outdated);
+                assert!(app.ambulatories.ready().unwrap().is_empty());
+                assert_eq!(
+                    app.ambulatory_management
+                        .bootstrap
+                        .as_ref()
+                        .unwrap()
+                        .payload
+                        .as_ref()
+                        .unwrap()
+                        .id,
+                    id
+                );
+            }
+            let registered = row(&id, 2, true, None);
+            app.ambulatory_management.initial_scope = false;
+            app.receive_ambulatories(vec![registered], cx);
+            assert_eq!(app.ambulatories.ready().unwrap()[0].version, 2);
+            assert!(app.scope.is_none());
+        });
+    }
+
+    #[gpui::test]
+    fn bootstrap_restore_retires_retained_fields_and_first_field_focus_is_real(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let retained = cx.update_window_entity(&view, |app, window, cx| {
+            app.area = Area::Settings;
+            let retained = bootstrap_draft(app, cx);
+            app.ambulatory_management.focus_editor = true;
+            app.prepare_ambulatory_management(app.theme, window, cx);
+            assert!(retained[0].read(cx).focus_handle(cx).is_focused(window));
+            app.save_error(RuntimeError::ArchiveReplaced, cx);
+            assert!(app.ambulatory_management.bootstrap.is_none());
+            retained
+        });
+        for input in retained {
+            input.read_with(cx, |input, _| {
+                assert!(input.value().is_empty());
+                assert!(input.read_only);
+            });
+        }
+    }
+
     #[test]
     fn repeated_ambulatory_rows_have_distinct_stable_accessible_text_nodes() {
         let nodes: Vec<_> = ["a", "b"]

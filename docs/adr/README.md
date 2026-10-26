@@ -150,3 +150,5 @@ prima porzione di lavoro verificabile:
 - [ADR 0164 — Ricevuta di ritiro dell’autorità native](0164-native-inference-authority-retirement.md): recupero circoscritto oltre la sessione; chiusura fisica distinta.
 
 - [ADR 0165 — Canale di accesso della chat alla sessione GPUI](0165-native-chat-access-channel.md): confine peer, conferma nativa e concessione monouso C4a.
+
+- [ADR 0167 — Prima sede da GPUI](0167-first-ambulatory-host-bootstrap.md): Web P3 amministrativa dedicata, operatore coincidente e creazione atomica senza scope paired.
