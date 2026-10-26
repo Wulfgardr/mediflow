@@ -9,7 +9,7 @@ import { differenceInYears } from 'date-fns';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { Accessibility, Activity, ChevronRight, FileText, Pill, Plus, ShieldCheck, Stethoscope } from 'lucide-react';
+import { Accessibility, Activity, ChevronRight, FileText, Pill, Plus, ShieldCheck } from 'lucide-react';
 
 import { PluginLocalUiNavigation, PluginPrescribingGuide } from '@/components/plugin-local-ui-navigation';
 import { PatientClinicalSupport, PatientInsightSummary } from '@/components/patient-clinical-support';
@@ -726,18 +726,7 @@ export default function PatientDetailPage() {
                             observations={observations} attachments={attachments} />
                     </TherapyManager>
 
-                    <CollapsibleSection
-                        id="prestazioni"
-                        kicker="Prestazioni"
-                        title="Prestazioni prescritte"
-                        icon={Stethoscope}
-                        count={prestazioniCount !== undefined ? String(prestazioniCount) : undefined}
-                        summary={prestazioniCount === 0 ? 'Nessuna prestazione prescritta.' : undefined}
-                        surfaceClassName={workspaceStyles.clinicalSection}
-                        keepMounted
-                    >
-                        <ServicePrescriptionManager patientId={id} embedded />
-                    </CollapsibleSection>
+                    <ServicePrescriptionManager patientId={id} embedded surfaceClassName={workspaceStyles.clinicalSection} />
 
                     <ObservationManager patientId={id} embedded prefill={observationPrefill}
                         surfaceClassName={workspaceStyles.clinicalSection} />
