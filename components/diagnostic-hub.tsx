@@ -131,7 +131,9 @@ export default function DiagnosticHub() {
                             <div><h4>{check.name}</h4><p>{check.description}</p></div>
                         </div>
                         <div className={styles.checkResult} role={res.status === 'error' ? 'alert' : 'status'}>
-                            {res.status === 'ok' && <span>{res.latency}ms</span>}
+                            {res.status === 'idle' && <p>Non ancora verificato</p>}
+                            {res.status === 'running' && <p>Verifica in corso</p>}
+                            {res.status === 'ok' && <p>Risposta ricevuta in {res.latency} ms</p>}
                             {res.message && <p data-status={res.status}>{res.message}</p>}
                         </div>
                         <button type="button" onClick={() => runCheck(check)} disabled={res.status === 'running'}

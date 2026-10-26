@@ -1,10 +1,19 @@
 .page { display: grid; gap: 24px; min-width: 0; color: var(--lume-ink); }
-.intro h2 { margin: 0; font-size: 0.9375rem; line-height: 1.5; font-weight: 600; }
+.page.page .intro h2,
+.page.page .heading,
+.page.page .section:global([data-disclosure]) > div:first-child h3,
+.page.page .section:global([data-disclosure]) > div:first-child :global([data-disclosure-control]) {
+    margin: 0;
+    color: var(--lume-ink-muted);
+    font: var(--type-section);
+    font-variant-caps: all-small-caps;
+    letter-spacing: 0.05em;
+}
 .page p { margin: 0; }
 .intro p, .section > p, .definition, .updateValues { font-size: 0.875rem; line-height: 1.6; max-width: 64ch; }
 .intro p { margin-top: 8px; color: var(--lume-ink-muted); }
 .section { min-width: 0; border-top: 1px solid var(--lume-rule); padding: 24px 0; display: grid; gap: 16px; }
-.heading, .detailLabel { margin: 0; font-size: 0.75rem; line-height: 1.5; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.detailLabel { margin: 0; font: var(--type-section); font-variant-caps: all-small-caps; letter-spacing: 0.05em; }
 .recordStatus { font-size: 0.8125rem; line-height: 1.5; font-weight: 600; }
 .definition { margin: 0; }
 .definition dt { font-weight: 600; }
