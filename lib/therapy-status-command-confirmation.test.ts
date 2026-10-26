@@ -77,5 +77,12 @@ for (const stop of ['lock', 'patient', 'timeout'] as const) test(`late execute c
     await pending; await turn(); if (stop !== 'patient') assert.equal(f.state()?.phase, 'uncertain'); assert(f.journal.get(therapy.patientId)); assert(owner.blocked); assert.equal(f.calls(), 1);
 });
 test('storage unavailable denies before transport', async () => {
-    const f = fixture(), owner = f.make(); owner.begin(therapy, 'completed', 'Inventato'); f.setUnavailable(); await owner.confirm(); assert.equal(f.calls(), 0); assert(owner.blocked);
+    const f = fixture(), owner = f.make(); owner.begin(therapy, 'completed', 'Inventato'); f.setUnavailable(); await owner.confirm(); assert.equal(f.calls(), 0); assert(owner.blocked); assert.equal(f.state()?.phase, 'unavailable'); assert.equal(f.state()?.newAttemptNotSent, true);
+});
+
+test('second tab prompt is retired by the shared pending marker before another confirmation', async () => {
+    const f = fixture(), a = f.make(), b = f.make();
+    a.begin(therapy, 'suspended', 'A'); b.begin(therapy, 'completed', 'B'); await a.confirm();
+    await b.recover([therapy], 'B'); assert.equal(f.state()?.phase, 'uncertain');
+    assert.equal(f.state()?.target, undefined); await b.confirm(); assert.equal(f.calls(), 1);
 });

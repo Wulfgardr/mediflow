@@ -719,7 +719,9 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                             <p className="type-body">{statusConfirmation.patientLabel}</p>
                         </> : statusConfirmation.phase === 'uncertain' ? <>
                             <h3 className={`type-threshold ${styles.statusWarning}`}><span aria-hidden="true">▲</span> Esito da verificare</h3>
-                            <p className="type-body">La registrazione può essere ancora in corso. Il nuovo invio resta bloccato. Leggi la ricevuta oppure ritira esplicitamente la richiesta.</p>
+                            <p className="type-body">{statusConfirmation.legacy
+                                ? 'La registrazione può essere ancora in corso. Il nuovo invio resta bloccato finché la rilettura non ne chiarisce l’esito.'
+                                : 'La registrazione può essere ancora in corso. Il nuovo invio resta bloccato. Leggi la ricevuta oppure ritira esplicitamente la richiesta.'}</p>
                             <p className="type-body">{statusConfirmation.original?.drugName ?? 'Terapia'} · {statusConfirmation.original?.dosage}</p>
                             <p className="type-body">{statusConfirmation.patientLabel}</p>
                         </> : <>
