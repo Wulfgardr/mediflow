@@ -248,6 +248,14 @@ vecchio processo. La superficie dedicata usa gli stati esistenti `held`,
 attribuiscono al nuovo tentativo le risorse precedenti; gli stati più precisi
 dell'owner ancora vivo restano invariati.
 
+Il blocco dovuto alla prenotazione di un altro tentativo è una proiezione
+corrente, separata dalla ricevuta di cleanup propria. Status, cancel e logout
+senza risorse proprie non la rendono una ricevuta persistente non confermata.
+Il drain legge lo stato locale della closure proprietaria; la proiezione del
+hold esterno non altera una ricevuta storica già confermata. La scomparsa del
+hold non conferma invece il cleanup ignoto delle risorse proprie, che resta
+negato finché la stessa custodia non fornisce la prova richiesta.
+
 La verifica è negativa e non rimuove file, non cerca processi, non adotta
 credenziali e non avvia il runtime. Nessun percorso, PID o identificatore di
 risorsa precedente arriva al browser. Prepare e il riarmo ordinario restano

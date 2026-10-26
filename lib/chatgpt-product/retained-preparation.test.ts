@@ -227,3 +227,118 @@ test('the dedicated cleanup receipt is confirmed only after the original prepara
     const ordinary = await ordinaryFunctionCommand(web(a.session), 'status', {}, new AbortController().signal);
     assert.deepEqual(await ordinary.json(), { schema: 'mediflow.chatgpt-ordinary-flow.v1', phase: 'closed', attemptId: null, cleanupConfirmed: true });
 });
+
+function productPair(t: TestContext, options: { bFirst?: boolean; bCleanupUnknown?: boolean } = {}) {
+    const a = session(t), b = session(t);
+    let current = web(b.session), releaseA!: () => void, calls = 0;
+    const gate = new Promise<void>(done => { releaseA = done; });
+    const m = createMacProductPlatformManager({ assets, reservationDirectory: () => directory,
+        async prepare() {
+            const call = ++calls;
+            const belongsToA = options.bFirst ? call === 2 : call === 1;
+            if (belongsToA) await gate;
+            const clean = !options.bCleanupUnknown || belongsToA;
+            throw new MacQualificationFailure('readback', clean ? cleanAudit : {
+                ...cleanAudit, cleanupComplete: false, ownedTreeCeased: false, resourcesRetained: true,
+            }, clean ? null : '/synthetic/retained');
+        } });
+    const root = createChatGptProduct({ resolveSession: async () => current, platform: () => m.createPlatform() });
+    const request = (operation: 'prepare' | 'cancel' | 'logout' | 'status') => root.handle(new Request('http://localhost:3987' + PRODUCT_NAMESPACE + operation, {
+        method: operation === 'status' ? 'GET' : 'POST', headers: { origin: 'http://localhost:3987', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' },
+        ...(operation === 'status' ? {} : { body: '{}' }),
+    }), operation);
+    const settle = () => new Promise<void>(done => setImmediate(done));
+    const status = async () => {
+        const response = await request('status'); assert.equal(response.status, 200);
+        return (await response.json() as ProductResponse).snapshot;
+    };
+    let aWork: Promise<Response> | undefined;
+    const startA = async () => {
+        current = web(a.session); aWork = request('prepare');
+        const expected = options.bFirst ? 2 : 1;
+        for (let i = 0; i < 20 && calls < expected; i++) await settle();
+        assert.equal(calls, expected); assert.equal(lstatSync(hold).isFile(), true);
+        current = web(b.session);
+    };
+    const closeA = async () => {
+        releaseA(); assert.equal((await aWork!).status, 503); await settle();
+        assert.throws(() => lstatSync(hold), { code: 'ENOENT' });
+    };
+    t.after(async () => { releaseA(); await aWork; root.dispose(); await settle(); });
+    return { request, status, startA, closeA, settle, calls: () => calls };
+}
+for (const operation of ['status', 'cancel', 'logout'] as const) test(`B never prepared: ${operation} during A cannot make B cleanup sticky after A's original clean closure`, async t => {
+    const f = productPair(t);
+    await f.startA();
+    assert.equal((await f.status()).receipt.cleanup, 'unconfirmed');
+    if (operation !== 'status') { assert.equal((await f.request(operation)).status, 200); await f.settle(); }
+    await f.closeA();
+    const available = await f.status();
+    assert.equal(available.preparation.state, 'not_prepared');
+    assert.equal(available.receipt.cleanup, 'not_observed');
+    const before = f.calls();
+    assert.equal((await f.request('prepare')).status, 503, 'B reaches the synthetic issuer, which deliberately fails cleanly');
+    assert.equal(f.calls(), before + 1);
+});
+test('B historical clean receipt survives observing and canceling during a later hold of A', async t => {
+    const f = productPair(t, { bFirst: true });
+    assert.equal((await f.request('prepare')).status, 503); await f.settle();
+    assert.equal((await f.request('cancel')).status, 200); await f.settle();
+    const historical = (await f.status()).receipt; assert.equal(historical.cleanup, 'confirmed');
+    await f.startA();
+    assert.equal((await f.status()).receipt.cleanup, 'unconfirmed');
+    assert.equal((await f.request('cancel')).status, 200); await f.settle();
+    await f.closeA();
+    assert.deepEqual((await f.status()).receipt, historical);
+    const before = f.calls(); assert.equal((await f.request('prepare')).status, 503); assert.equal(f.calls(), before + 1);
+});
+test('B own unknown cleanup stays blocked even if its hold disappears without its custody proof', async t => {
+    const f = productPair(t, { bFirst: true, bCleanupUnknown: true });
+    assert.equal((await f.request('prepare')).status, 503); await f.settle();
+    assert.equal((await f.status()).receipt.cleanup, 'unconfirmed');
+    rmSync(hold); // Fixture simulates disappearance, not an observed cleanup.
+    const before = f.calls();
+    for (const operation of ['status', 'cancel', 'logout'] as const) {
+        assert.equal((await f.request(operation)).status, 200); await f.settle();
+        const unknown = await f.status();
+        assert.equal(unknown.preparation.state, 'blocked'); assert.equal(unknown.receipt.cleanup, 'unconfirmed');
+        assert.equal((await f.request('prepare')).status, 409);
+    }
+    assert.equal(f.calls(), before);
+});
+
+test('ordinary disposal reads its own closed closure while another manager owns the live hold', async t => {
+    const context = session(t);
+    const { createOrdinaryProductAttempt } = await import('../chatgpt-execution/ordinary-product-attempt.ts');
+    const own = createMacProductPlatformManager({ assets, reservationDirectory: () => directory,
+        async prepare() { throw new MacQualificationFailure('readback', cleanAudit, null); } }).createPlatform();
+    await assert.rejects(own.prepare!(new AbortController().signal, 300000));
+    assert.equal(own.preparation!().state, 'closed');
+    let release!: () => void;
+    const pending = new Promise<void>(done => { release = done; });
+    const foreign = createMacProductPlatformManager({ assets, reservationDirectory: () => directory,
+        async prepare() { await pending; throw new MacQualificationFailure('readback', cleanAudit, null); } }).createPlatform();
+    const work = foreign.prepare!(new AbortController().signal, 300000); void work.catch(() => {});
+    t.after(async () => { release(); await work.catch(() => {}); });
+    assert.equal(own.preparation!().state, 'blocked');
+    const before = identity();
+    const attempt = await createOrdinaryProductAttempt(web(context.session), own);
+    assert.deepEqual(await attempt.dispose(), { cleanupConfirmed: true });
+    assert.deepEqual(identity(), before);
+    assert.equal(foreign.preparation!().state, 'preparing');
+    release(); await assert.rejects(work, MacQualificationFailure);
+});
+test('ordinary disposal cannot confirm its own unknown closure from a missing hold', async t => {
+    const context = session(t);
+    const { createOrdinaryProductAttempt } = await import('../chatgpt-execution/ordinary-product-attempt.ts');
+    const own = createMacProductPlatformManager({ assets, reservationDirectory: () => directory,
+        async prepare() { throw new MacQualificationFailure('readback', {
+            ...cleanAudit, cleanupComplete: false, ownedTreeCeased: false, resourcesRetained: true,
+        }, '/synthetic/retained'); } }).createPlatform();
+    await assert.rejects(own.prepare!(new AbortController().signal, 300000));
+    rmSync(hold); // Fixture removes only its synthetic marker, without an audit of cessation.
+    const attempt = await createOrdinaryProductAttempt(web(context.session), own);
+    assert.deepEqual(await attempt.dispose(), { cleanupConfirmed: false });
+    assert.equal(own.preparation!().state, 'blocked');
+    await assert.rejects(own.prepare!(new AbortController().signal, 300000));
+});

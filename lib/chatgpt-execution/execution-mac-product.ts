@@ -115,6 +115,7 @@ export function createMacProductPlatformManager(options: {
         return Object.freeze({
             snapshot: () => reviewed?.snapshot() ?? executionPlatformSnapshot(),
             preparation,
+            ownedPreparation: () => projection,
             close,
             async prepare(signal: AbortSignal, lifetimeMs: number) {
                 if (reserved || pending || !['not_prepared', 'closed'].includes(preparation().state)) throw new ExecutionError('busy');

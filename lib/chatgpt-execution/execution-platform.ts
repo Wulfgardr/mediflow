@@ -13,6 +13,8 @@ export type ProductExecutionPlatform = Readonly<{
     /** Optional only for legacy server-side test adapters; production Mac always prepares. */
     prepare?(signal: AbortSignal, lifetimeMs: number): Promise<void>;
     preparation?(): ProductPreparation;
+    /** Local closure state only; excludes reservations belonging to other attempts. */
+    ownedPreparation?(): ProductPreparation;
     close?(): Promise<void>;
     create(signal: AbortSignal): Promise<QualifiedExecutionHost>;
 }>;
