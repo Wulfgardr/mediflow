@@ -153,6 +153,13 @@ l'interfaccia respira di più o di meno insieme: nel banco è il controllo
 | Ombra | Solo sotto il piano: `0 18px 44px -26px` nero al 45% più un bordo di 1 px al 6% |
 | Punto | 0,44 em; 0,24 em quando chiude un titolo o il nome |
 
+Nel client Rust/GPUI per Mac i controlli adottano raggio 12 e il piano 20,
+con rientro esterno di 8 nelle finestre compatte (azzerato al forte
+ingrandimento del testo). Pulsanti, campi e scelte di modulo condividono
+la geometria; le righe cliniche conservano i filetti. Il fuoco dei pulsanti
+e dei campi si disegna all'interno, senza modificare ingombro o ritorni a
+capo. Il client SwiftUI mantiene le proprie misure native.
+
 Con queste misure a 1440 × 900 l'elenco mostra 14 pazienti e la scheda mostra
 insieme quadro e diario.
 
@@ -422,6 +429,16 @@ stati del linguaggio; la sua simulazione non certifica il comportamento
 del Web o del client nativo. Il client GPUI corrente registra un solo
 elemento per operazione e non implementa l'ascolto; i conteggi multipli
 e In ascolto restano nel contratto comune senza introdurre nuove scritture.
+
+**Bozze con campi di testo ingranditi.** Se la soglia essenziale supera un
+terzo del piano, contenuto e comandi della bozza scorrono nello stesso piano.
+Il campo multilinea offre almeno tre righe alla dimensione corrente, con
+scorrimento interno per i testi più lunghi. Tab porta i comandi in vista;
+la revisione riporta alla soglia di conferma. Questa composizione evita di
+ridurre il testo a una sola riga fra le barre fisse. Conferma, scarto,
+valutazioni Scale e recupero di un invio conservano le disposizioni descritte
+sopra. Lo scorrimento usa direttamente il comportamento GPUI della
+piattaforma; non introduce interpolazioni o animazioni nei gesti ripetuti.
 
 #### Conflitto: rileggere senza perdere la bozza
 

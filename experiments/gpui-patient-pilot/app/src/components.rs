@@ -31,7 +31,7 @@ pub fn button(
         .min_w_0()
         .max_w_full()
         .min_h(px(44.))
-        .px(px(12.))
+        .px(px(14.))
         .py(px(8.))
         .flex()
         .items_center()
@@ -46,6 +46,8 @@ pub fn button(
         })
         .bg(if primary && enabled {
             theme.fresh
+        } else if !enabled {
+            theme.shade
         } else {
             theme.paper
         })
@@ -59,10 +61,11 @@ pub fn button(
         .when(enabled, |el| {
             el.cursor_pointer()
                 .hover(move |style| style.bg(if primary { theme.fresh } else { theme.hover }))
+                .active(move |style| style.bg(if primary { theme.ink } else { theme.selected }))
                 .focus(move |style| {
                     style
                         .border_color(if primary { theme.ink } else { theme.fresh })
-                        .border_2()
+                        .shadow(vec![theme.focus_ring(primary)])
                 })
         })
         .when(!label.is_empty(), |el| el.child(control_label(label)))
@@ -94,10 +97,30 @@ pub fn tab(id: &'static str, label: &'static str, selected: bool, theme: Theme) 
                 TypeRole::Body
             },
         )
-        .text_color(if selected { theme.ink } else { theme.secondary })
-        .bg(if selected { theme.paper } else { theme.shade })
-        .border_b_2()
-        .border_color(if selected { theme.fresh } else { theme.shade })
+        .rounded(px(theme.control_radius))
+        .text_color(if selected {
+            theme.fresh
+        } else {
+            theme.secondary
+        })
+        .bg(if selected {
+            theme.selected
+        } else {
+            theme.shade
+        })
+        .border_2()
+        .border_color(if selected {
+            theme.selected
+        } else {
+            theme.shade
+        })
+        .hover(move |style| {
+            style.bg(if selected {
+                theme.selected
+            } else {
+                theme.hover
+            })
+        })
         .focus(move |style| style.border_color(theme.fresh).bg(theme.selected))
         .child(control_label(label.into()))
 }
@@ -186,6 +209,7 @@ pub fn notice(
             theme.strong_rule
         })
         .bg(theme.paper)
+        .rounded(px(theme.control_radius))
         .text_color(if error {
             theme.critical
         } else {
@@ -304,6 +328,8 @@ pub fn writing_status(
         .accessibility_id(id)
         .role(Role::Status)
         .aria_label(ink.word())
+        .min_w_0()
+        .max_w_full()
         .flex()
         .items_center()
         .gap(px(8.))
@@ -380,6 +406,10 @@ pub fn number_line(
 fn writing_word(ink: WritingInk, surface: WritingSurface, theme: Theme) -> Stateful<Div> {
     div()
         .id("writing-ink-word")
+        .flex_1()
+        .min_w_0()
+        .max_w_full()
+        .whitespace_normal()
         .text_color(ink.color(surface, theme))
         .child(text!(ink.word()))
         .when(ink == WritingInk::Pencil, |el| {
