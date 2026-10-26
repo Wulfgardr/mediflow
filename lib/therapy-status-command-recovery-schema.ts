@@ -15,7 +15,7 @@ export function assertTherapyCommandPredecessorRecoverySchema(probe: Database.Da
         if (createHash('sha256').update(JSON.stringify(expected)).digest('hex') !== V4_SCHEMA_SHA256)
             throw new Error('Recovery v4 contract drift');
         if (probe.prepare("SELECT 1 FROM sqlite_schema WHERE type='view' OR name='therapy_status_commands' LIMIT 1").get()
-            || schemaDifferences(expected, schemaSnapshot(probe)).some(({ table }) => table in expected))
+            || schemaDifferences(expected, schemaSnapshot(probe)).length > 0)
             throw new Error('Recovery v4 schema incompatible');
     } finally { canonical.close(); }
 }

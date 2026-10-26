@@ -76,5 +76,7 @@ isolata deve corrispondere integralmente al contratto canonico v4 della base
 `therapy_status_commands` dal canonico corrente e deve uguagliare l'impronta
 SHA-256 fissata nel validatore: modifiche future non assorbono drift implicitamente.
 Solo quella copia può migrare a5 e deve poi superare l'ammissione completa.
-Altre versioni, colonne/indici/trigger alterati e un v5 privo di ledger sono
-rifiutati. Il backup originale resta immutato e la destinazione resta vuota/bootstrap.
+Altre versioni, tabelle o viste estranee, colonne/indici/trigger alterati e un v5 privo di ledger sono
+rifiutati. Il confronto riguarda ogni tabella del predecessore, non solo quelle già note.
+Questa ammissione canonica del predecessore v4 è distinta dal backup fisico corrente v5,
+che continua a conservare intenzionalmente anche le estensioni non registrate. Il backup originale resta immutato e la destinazione resta vuota/bootstrap.
