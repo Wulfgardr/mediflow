@@ -1162,6 +1162,7 @@ impl ClinicalApp {
         self.next_epoch();
         self.focus_after_render = true;
         self.scope = Some(id.to_owned());
+        self.message = None;
         self.global_patients = Load::Idle;
         self.agenda = Load::Idle;
         self.global_entries = Load::Idle;
