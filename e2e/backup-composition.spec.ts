@@ -67,12 +67,12 @@ test('Backup: composizione, tastiera, bozza di conferma e verifica senza riprist
             await expect(destination).toHaveValue(`${process.env.MEDIFLOW_DATA_DIR}/bozza-destinazione-inventata`); await expect(page.getByLabel('Orario', { exact: true })).toHaveValue('04:30');
         }
         const verify = page.getByTestId('backup-verify-input');
-        if (!baseline || causal) { await verify.focus(); await expect(verify).toBeFocused(); const chooser = page.waitForEvent('filechooser'); await page.keyboard.press('Enter'); const selected = await chooser; expect(selected.isMultiple()).toBe(false); await selected.setFiles([]); }
+        if (!baseline || causal) { await verify.focus(); await expect(verify).toBeFocused(); const chooser = page.waitForEvent('filechooser', { timeout: 10_000 }); await page.keyboard.press('Space'); const selected = await chooser; expect(selected.isMultiple()).toBe(false); await selected.setFiles([]); }
         const artifact = await (await page.request.get('/api/system/backup-restore')).text();
         await verify.setInputFiles({ name: 'backup-inventato.mediflow', mimeType: 'application/json', buffer: Buffer.from(artifact) });
         const outcome = page.getByTestId('backup-outcome'); await expect(outcome).toContainText('Backup verificato'); await expect(outcome).toContainText('Verificato non significa provato');
         const restore = page.getByText('Seleziona file .mediflow v1', { exact: true }).locator('input');
-        if (!baseline) { await restore.focus(); await expect(restore).toBeFocused(); const chooser = page.waitForEvent('filechooser'); await page.keyboard.press('Enter'); await (await chooser).setFiles([]); }
+        if (!baseline) { await restore.focus(); await expect(restore).toBeFocused(); const chooser = page.waitForEvent('filechooser', { timeout: 10_000 }); await page.keyboard.press('Space'); await (await chooser).setFiles([]); }
         await restore.setInputFiles({ name: 'backup-inventato.mediflow', mimeType: 'application/json', buffer: Buffer.from(artifact) });
         const panel = page.getByTestId('restore-confirmation-panel'), keyword = page.getByTestId('restore-confirmation-input'), submit = page.getByTestId('restore-confirmation-submit');
         await expect(panel).toBeVisible(); await expect(submit).toBeDisabled(); await keyword.fill('RIPRI'); await expect(submit).toBeDisabled();
@@ -92,7 +92,7 @@ test('Backup: composizione, tastiera, bozza di conferma e verifica senza riprist
         await capture('esito-non-confermato');
         failRead = true; await page.getByRole('button', { name: 'Rileggi stato', exact: true }).click();
         await expect(page.getByText('Stato sintetico indisponibile', { exact: true })).toBeVisible(); await expect(save).toBeDisabled();
-        if (!baseline) { await expect(destination).toBeHidden(); await expect(page.getByText('Pianificazione non disponibile', { exact: true })).toBeVisible(); }
+        if (!baseline) { await expect(destination).toBeHidden(); await expect(region.getByRole('alert').filter({ hasText: 'Pianificazione non disponibile' })).toBeVisible(); }
         await capture('lettura-indisponibile'); failRead = false;
         await page.getByRole('button', { name: 'Rileggi stato', exact: true }).click(); await expect(destination).toHaveValue(schedule.state.config.destinationDir); await expect(save).toBeEnabled();
         expect(schedulerPosts).toHaveLength(1); expect(forbidden).toEqual([]); expect(errors).toEqual([]);
