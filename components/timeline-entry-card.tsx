@@ -104,7 +104,7 @@ function EntryAttachments({ attachmentIds, onView }: { attachmentIds: string[], 
                         </div>
                         <div className="min-w-0 flex-1">
                             <p className="text-xs font-semibold truncate">{file.name}</p>
-                            <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>{file.summarySnapshot ? 'Analisi IA disponibile' : 'Allegato'}</p>
+                            <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Allegato</p>
                         </div>
                     </button>
                 ))}
