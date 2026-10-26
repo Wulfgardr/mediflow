@@ -15,6 +15,33 @@ pub(super) struct ChatAccess {
     message: Option<String>,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui::EntityInputHandler;
+
+    #[gpui::test]
+    fn confirmation_pin_is_unavailable_to_native_surrounding_text_services(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (app, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let editor = app.read_with(cx, |app, _| app.chat_access.pin.clone());
+        cx.update_window_entity(&editor, |input, window, cx| {
+            input.set_content("2468", cx);
+            let mut actual = Some(0..4);
+            assert!(
+                input
+                    .text_for_range(0..4, &mut actual, window, cx)
+                    .is_none()
+            );
+            assert_eq!(actual, None);
+            input.set_content("", cx);
+            assert!(input.value().is_empty());
+        });
+    }
+}
+
 impl ChatAccess {
     pub(super) fn new(theme: Theme, cx: &mut Context<ClinicalApp>) -> Self {
         Self {
@@ -23,7 +50,15 @@ impl ChatAccess {
             patient: String::new(),
             archive: String::new(),
             pin: cx.new(|cx| {
-                TextInput::new("chat-access-pin", "PIN di conferma", "PIN", true, theme, cx)
+                TextInput::new(
+                    "chat-access-pin",
+                    "PIN di conferma",
+                    "PIN",
+                    false,
+                    theme,
+                    cx,
+                )
+                .secret()
             }),
             task: None,
             message: None,
@@ -181,9 +216,9 @@ impl ClinicalApp {
             .p(px(20.)).border_1().border_color(theme.rule)
             .flex().flex_col().gap(px(12.))
             .child(heading("native-chat-access-title", "Consenti l’accesso alla chat?", theme))
-            .child(div().child(format!("App richiedente: {app}")))
-            .child(div().child(format!("Archivio: {}", self.chat_access.archive)))
-            .child(div().child(format!("Paziente: {}", self.chat_access.patient)))
+            .child(text!(format!("App richiedente: {app}")).with_id("native-chat-access-app"))
+            .child(text!(format!("Archivio: {}", self.chat_access.archive)).with_id("native-chat-access-archive"))
+            .child(text!(format!("Paziente: {}", self.chat_access.patient)).with_id("native-chat-access-patient"))
             .child(notice("native-chat-access-operation", "Una verifica monouso dell’accesso. Nessun contenuto clinico viene restituito. La richiesta scade dopo 30 secondi.", theme, false))
             .when_some(self.chat_access.message.clone(), |el, message| el.child(notice("native-chat-access-error", message, theme, true)))
             .child(button("native-chat-access-touch-id", "Conferma con Touch ID", theme, true, enabled)

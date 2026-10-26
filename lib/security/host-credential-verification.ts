@@ -210,6 +210,20 @@ export async function verifyHostCredentials(
     return verify(readCredential(input, ['pin']), 'confirmation', dependencies);
 }
 
+/** Reads only account/lockout eligibility; it authenticates no gesture and issues no authority. */
+export async function readHostConfirmationEligibility(
+    principal: Readonly<{ id: string; username: string; role: string }>,
+): Promise<'eligible' | 'denied' | 'locked'> {
+    try {
+        const db = await database({});
+        const account = await db.select({ username: users.username, role: users.role,
+            failedLoginAttempts: users.failedLoginAttempts, firstFailedLoginAt: users.firstFailedLoginAt,
+            lockedUntil: users.lockedUntil }).from(users).where(eq(users.id, principal.id)).get();
+        if (!account || account.username !== principal.username || (account.role ?? 'user') !== principal.role) return 'denied';
+        return isLockoutActive(account, new Date()) ? 'locked' : 'eligible';
+    } catch { return 'denied'; }
+}
+
 /**
  * For the surfaces that open a session. Takes { username, pin } or { username, verifier } and accepts
  * only the kind the account unlocks with; the other kind is denied without being compared or counted.
