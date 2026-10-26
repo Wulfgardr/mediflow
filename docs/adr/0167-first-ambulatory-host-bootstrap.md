@@ -106,8 +106,10 @@ dell'archivio, e richiede il gesto esplicito «Crea la prima sede».
 Il registro è process-local, massimo 128 preparazioni, senza espulsione di
 preparazioni vive per ammetterne altre. A capacità esaurita si nega l'apertura.
 Scadenza/restart negano commit e readback; non attestano il ritiro remoto.
-I dati sono eliminati dopo ritiro attestato o scadenza del ciclo di controllo
-dell'owner. Nessun rinnovo o ricostruzione automatica dal client.
+La correlazione è eliminata soltanto dopo il ritiro esatto attestato o il
+restart del processo. Anche le preparazioni scadute occupano capacità finché
+il ritiro non è attestato: la scadenza non dimostra che l'autorità Web sia
+terminata. Nessuna espulsione, rinnovo o ricostruzione automatica dal client.
 
 ### Conferma e transazione
 
@@ -129,9 +131,10 @@ Sotto il medesimo `IMMEDIATE` del core `createAmbulatory`, prima di ogni DML:
    relativo evento `ambulatory.created` con attore Web reale. Nessun secondo
    insert, audit successivo al commit, default demotion o relink di pazienti.
 
-Un callback server derivato dalle autorità originali porta i controlli nella
-transazione: non è fornibile dal DTO HTTP. I writer host/paired ordinari
-mantengono il loro contratto. Errori audit/DML annullano l'intera mutazione.
+La composizione server porta i controlli delle autorità originali nella
+transazione esterna `IMMEDIATE`; il core create vi entra come savepoint,
+senza rilasciare l'esclusione del writer. Questi controlli non sono fornibili
+dal DTO HTTP. I writer host/paired ordinari mantengono il loro contratto. Errori audit/DML annullano l'intera mutazione.
 
 Successo `201`: `operation`, `contractVersion`, `archiveGeneration`, `id`,
 `version: 1`, `success: true`, `affectedAmbulatories` con la sola sede creata. Un nuovo invio
