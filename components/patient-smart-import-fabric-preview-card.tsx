@@ -13,13 +13,6 @@ import type { SmartImportPreviewWireRoot } from '@/lib/smart-import-preview-wire
 import { SmartImportContextProposalBrowserAdapterError, type SmartImportContextProposal, type SmartImportAmbulatoryChoice } from '@/lib/security/smart-import-patient-context-browser-adapter';
 import disclosure from '@/components/patient-disclosure.module.css';
 
-export function PatientSmartImportSummary({ hasProposal }: { hasProposal: boolean }) {
-    return <div className={styles.summary} data-testid="smart-import-proposal-summary">
-        <span>Smart Import · {hasProposal ? '1 proposta da rivedere' : 'Nessuna proposta da rivedere'}</span>
-        <a href="#smart-import">Vai alle fonti e alle proposte</a>
-    </div>;
-}
-
 export function PatientSmartImportFabricPreviewCard({ patientId, captureInput, enabled, onProposalChange }: {
     patientId: string;
     captureInput: PatientSmartImportProjectionCaptureInput;

@@ -65,7 +65,7 @@ test('patient insight kill switch disables generation on patient detail', async 
   // route (/modules), not the cockpit "Quadro" landing at /patients/:id.
   await page.goto(`/patients/${patientId}/modules`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
-  await openPatientSection(page, 'quadro');
+  await openPatientSection(page, 'attenzione');
   const insightDisclosure = page.locator('#patient-insight');
   await insightDisclosure.locator(':scope > div > [data-disclosure-control]').click();
   await expect(insightDisclosure.locator(':scope > div > [data-disclosure-control]')).toHaveAttribute('aria-expanded', 'true');
