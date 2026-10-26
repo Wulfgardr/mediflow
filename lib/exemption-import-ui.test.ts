@@ -31,7 +31,7 @@ const inventedFile = (codes: string[]) => ({ name: 'inventato-ui.txt', mimeType:
 test('UI selects, previews without writing, confirms, rereads, reports invalid rows/conflicts and retries a lost response', async () => {
     const bundle = await build({
         stdin: { contents: "import React from 'react'; import { createRoot } from 'react-dom/client'; import Manager from './components/settings/exemption-db-manager'; createRoot(document.getElementById('root')).render(React.createElement(Manager));", resolveDir: process.cwd(), loader: 'tsx' },
-        bundle: true, write: false, platform: 'browser', format: 'iife', define: { 'process.env.NODE_ENV': '"production"' },
+        bundle: true, write: false, outfile: 'exemptions-ui.js', platform: 'browser', format: 'iife', define: { 'process.env.NODE_ENV': '"production"' },
     });
     const browser = await chromium.launch({ headless: true });
     try {
@@ -43,10 +43,13 @@ test('UI selects, previews without writing, confirms, rereads, reports invalid r
             const req = route.request(), url = new URL(req.url());
             if (url.origin !== 'http://127.0.0.1:48969') { await route.abort(); return; }
             if (url.pathname === '/') {
-                await route.fulfill({ contentType: 'text/html', body: '<html lang="it"><body><div id="root"></div><script src="/bundle.js"></script></body></html>' }); return;
+                await route.fulfill({ contentType: 'text/html', body: '<html lang="it"><head><link rel="stylesheet" href="/bundle.css"></head><body><div id="root"></div><script src="/bundle.js"></script></body></html>' }); return;
             }
             if (url.pathname === '/bundle.js') {
-                await route.fulfill({ contentType: 'text/javascript', body: bundle.outputFiles[0].text }); return;
+                await route.fulfill({ contentType: 'text/javascript', body: bundle.outputFiles.find(file => file.path.endsWith('.js'))!.text }); return;
+            }
+            if (url.pathname === '/bundle.css') {
+                await route.fulfill({ contentType: 'text/css', body: bundle.outputFiles.find(file => file.path.endsWith('.css'))!.text }); return;
             }
             const request = syntheticExemptionRequest(req.url(), { method: req.method(), headers: req.headers(), body: req.method() === 'POST' ? req.postData() : undefined });
             let response: Response;
@@ -58,7 +61,11 @@ test('UI selects, previews without writing, confirms, rereads, reports invalid r
             await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() });
         });
         await page.goto('http://127.0.0.1:48969');
-        await expect(page.getByText('0 codici nel repertorio', { exact: true })).toBeVisible();
+        await expect(page.getByText('0 codici · ultima lettura locale', { exact: true })).toBeVisible();
+        const disclosure = page.getByRole('button', { name: /^Esenzioni/u });
+        await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+        await disclosure.click();
+        await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
         const upload = page.getByLabel('File esenzioni (.txt o .csv delimitato da |)', { exact: true });
         await upload.setInputFiles(inventedFile(['ZZ_UI_1']));
         await expect(page.getByText('Anteprima pronta', { exact: true })).toBeVisible();
@@ -70,7 +77,7 @@ test('UI selects, previews without writing, confirms, rereads, reports invalid r
         await confirm.click();
         await expect(page.getByText('Import registrato e stato del repertorio riletto.', { exact: true })).toBeVisible();
         await expect(page.getByLabel('Ricevuta import')).toContainText('Rilettura confermata.');
-        await expect(page.getByText('1 codice nel repertorio', { exact: true })).toBeVisible();
+        await expect(page.getByText('1 codice · ultima lettura locale', { exact: true })).toBeVisible();
         await expect(page.getByLabel('Ricevuta import')).toContainText('1 codice applicato: 1 nuovo, 0 aggiornati.');
         assert.equal(commits, 1);
         await upload.setInputFiles(inventedFile(['ZZ_DUP', 'ZZ_DUP']));

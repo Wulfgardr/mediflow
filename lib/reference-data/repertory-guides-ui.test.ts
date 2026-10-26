@@ -82,6 +82,12 @@ const isRead = (route: Route) => new URL(route.request().url()).pathname === '/a
 async function viewCatalog(page: Page, version: string) {
     await expect(page.getByTestId('aifa-catalog-guide')).toContainText(version);
 }
+async function openAifaCatalog(page: Page) {
+    const disclosure = page.getByRole('button', { name: /^Farmaci AIFA/u });
+    await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+    await disclosure.click();
+    await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+}
 
 test('AIFA UI: no write on mount, abort, explicit read recovery, successful update and no blind repeat after failed readback', { timeout: 30_000 }, async () => {
     const started = process.hrtime.bigint();
@@ -97,7 +103,8 @@ test('AIFA UI: no write on mount, abort, explicit read recovery, successful upda
         catalog = status('synthetic-new', 4); await route.fulfill({ json: catalog });
     });
     try {
-        const p = f.page; const update = p.getByRole('button', { name: 'Aggiorna ora', exact: true });
+        const p = f.page; await openAifaCatalog(p);
+        const update = p.getByRole('button', { name: 'Aggiorna ora', exact: true });
         await viewCatalog(p, 'synthetic-old'); await expect(p.getByTestId('aifa-remote-notice')).toContainText('14 ottobre 2026'); await expect(update).toBeEnabled(); assert.equal(updates, 0); assert.equal(reads, 1);
         traceAifa('initial-read-done', started);
         traceAifa('held-update-click-start', started);
@@ -136,8 +143,8 @@ test('AIFA UI: manual CSV reselect after declined confirmation; failed clear pre
         imports++; await route.fulfill({ status: 500, json: { error: 'unexpected write' } });
     });
     try {
-        const p = f.page; await viewCatalog(p, 'synthetic-old');
-        await p.getByText('Carica un CSV già scaricato', { exact: true }).click();
+        const p = f.page; await openAifaCatalog(p); await viewCatalog(p, 'synthetic-old');
+        await p.getByRole('button', { name: 'Carica un CSV già scaricato', exact: true }).click();
         await p.getByLabel('Versione dataset (caricamento manuale)', { exact: true }).fill('synthetic-manual');
         await p.getByLabel('Data di scarico', { exact: true }).fill('2026-09-01');
         const upload = p.getByLabel('Carica file CSV AIFA', { exact: true });
