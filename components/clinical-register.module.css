@@ -75,7 +75,7 @@
 .patientSummary dt { color: var(--lume-ink-muted); font-size: 0.75rem; margin-top: 12px; }
 .patientSummary dd { margin: 4px 0 0; overflow-wrap: anywhere; }
 .documentLayout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: start; }
-.documentRail { min-width: 0; }
+.documentRail { min-width: 0; container-type: inline-size; }
 .documentOriginal { min-width: 0; position: sticky; top: 16px; }
 .documentOriginal > h3 { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--lume-rule-strong); font: 600 0.75rem/1.5 var(--lume-font-sans); text-transform: uppercase; letter-spacing: .05em; }
 .upload { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; min-height: 44px; padding-block: 12px; border-bottom: 1px solid var(--lume-rule); cursor: pointer; }
@@ -85,6 +85,17 @@
 .documentRow[data-selected='true'] { background: var(--lume-surface-selected); }
 .documentName { margin: 0; font: 600 0.875rem/1.5 var(--lume-font-sans); }
 .documentActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.sourceChoice { display: grid; gap: 12px; margin-block: 20px; }
+.documentArchive { margin-top: 28px; padding-top: 8px; border-top: 1px solid var(--lume-rule-strong); }
+.documentTable :is(th,td):last-child { width: 47%; }
+@container (max-width: 700px) {
+ .documentTable thead { display: none; }
+ .documentTable, .documentTable tbody, .documentTable tr, .documentTable td { display: block; width: 100%; }
+ .documentTable tr { padding-block: 12px; border-bottom: 1px solid var(--lume-rule); }
+ .documentTable :is(th,td):last-child { width: 100%; }
+ .documentTable td { border: 0; padding: 0; }
+ .documentActions { gap: 4px 12px; margin-top: 4px; }
+}
 .inlineViewer { border: 1px solid var(--lume-rule-strong); background: var(--lume-surface-canvas); }
 .inlineViewer header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px; border-bottom: 1px solid var(--lume-rule); }
 .inlineViewer h3 { margin: 0; font: 600 0.875rem/1.5 var(--lume-font-sans); overflow-wrap: anywhere; }
