@@ -177,3 +177,36 @@ test('Indice Impostazioni: diniego reale, ricevuta positiva e riconciliazione no
         expect(errors).toEqual([]);
     } finally { responseGate.release(); await zoom.close(); }
 });
+
+test('Indice Impostazioni: tastiera e bersagli in compatto e zoom reale', async ({ baseURL }) => {
+    test.setTimeout(90_000); requireSynthetic(baseURL);
+    const zoom = await openBrowserZoomFixture(baseURL!), page = zoom.page;
+    await protect(page, baseURL!);
+    const writes: string[] = [];
+    page.on('request', request => { if (request.method() === 'PUT' && new URL(request.url()).pathname === '/api/settings/network.mode') writes.push(request.url()); });
+    try {
+        await bootstrapUnlockedSession(page, '1234'); await page.goto('/settings');
+        const action = page.getByTestId('settings-network-mode-action'); await expect(action).toBeEnabled();
+        const details = page.getByRole('button', { name: 'Dettagli della connessione', exact: true });
+        const diagnostic = page.getByRole('link', { name: 'Apri diagnostica', exact: true });
+        const directory = process.env.SETTINGS_INDEX_SCREENSHOTS;
+        for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', '320', 'zoom-200', 'zoom-400']) {
+            await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
+            if (size.startsWith('zoom-')) await zoom.setZoom(size === 'zoom-200' ? 2 : 4); else await page.setViewportSize({ width: Number(size), height: 1000 });
+            await page.getByRole('button', { name: theme === 'giorno' ? 'Tema Chiaro' : 'Tema Scuro', exact: true }).click();
+            await details.focus(); await expect(details).toBeFocused(); await page.keyboard.press('Enter'); await expect(details).toHaveAttribute('aria-expanded', 'true');
+            await page.keyboard.press('Enter'); await expect(details).toHaveAttribute('aria-expanded', 'false');
+            await page.keyboard.press('Tab'); await expect(action).toBeFocused();
+            await page.keyboard.press('Tab'); await expect(diagnostic).toBeFocused();
+            await diagnostic.evaluate(element => element.scrollIntoView({ block: 'center' }));
+            expect(await diagnostic.evaluate(element => { const box = element.getBoundingClientRect(), hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2); return { height: box.height, width: box.width, reachable: hit === element || element.contains(hit) }; })).toMatchObject({ reachable: true });
+            const minimum = await page.evaluate(() => innerWidth <= 700 || matchMedia('(pointer: coarse)').matches ? 44 : 40);
+            const box = await diagnostic.boundingBox(); expect(box!.height).toBeGreaterThanOrEqual(minimum); expect(box!.width).toBeGreaterThanOrEqual(44);
+            await assertNoHorizontalOverflow(page, [{ label: 'pagina', selector: 'document' }]);
+            if (directory) { await mkdir(directory, { recursive: true }); await page.screenshot({ path: `${directory}/${theme}-${size}-tastiera.png`, animations: 'disabled' }); }
+        }
+        const appearance = page.getByRole('link', { name: 'Apri aspetto', exact: true });
+        await appearance.focus(); await page.keyboard.press('Enter'); await expect(page).toHaveURL(/\/settings\/aspetto$/u);
+        expect(writes).toEqual([]);
+    } finally { await zoom.close(); }
+});
