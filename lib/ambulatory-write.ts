@@ -253,43 +253,7 @@ export function deleteAmbulatory(context: AmbulatoryCoreContext, id: string, exp
     const authorizeCommit = requireCommitGuard(context, surface);
     const parsedVersion = parseExpectedVersion(expectedVersion);
     if (parsedVersion === null) return { status: 400, value: { error: 'Version is required' } };
-    return dbServer.transaction((tx): AmbulatoryMutationResponse => {
-        const denial = commitDenial(tx, authorizeCommit);
-        if (denial) return denial;
-        const existing = selectAmbulatory(tx, id);
-        if (!existing) return { status: 404, value: { error: 'Not found' } };
-        if (existing.version !== parsedVersion) return { status: 409, value: buildAmbulatoryVersionConflictPayload(parsedVersion, id, conflictSnapshot(existing)) };
-        const linkedPrimaryPatient = tx.select({ id: patients.id }).from(patients)
-            .where(and(eq(patients.ambulatoryId, id), activePatients())).get();
-        const linkedPatientAssignment = tx.select({ patientId: patientsToAmbulatories.patientId }).from(patientsToAmbulatories)
-            .where(eq(patientsToAmbulatories.ambulatoryId, id)).get();
-        if (linkedPrimaryPatient || linkedPatientAssignment) {
-            return { status: 409, value: { error: 'Ambulatory still has linked patients. Move/unassign patients before deletion.' } };
-        }
-        const childAmbulatory = tx.select({ id: ambulatories.id }).from(ambulatories)
-            .where(eq(ambulatories.parentId, id)).limit(1).get();
-        if (childAmbulatory) {
-            return { status: 409, value: { error: 'Ambulatory still has child ambulatories. Move them before deletion.' } };
-        }
-        let fallback: AmbulatoryRow | undefined;
-        if (existing.isDefault) {
-            fallback = tx.select().from(ambulatories).where(ne(ambulatories.id, id)).orderBy(desc(ambulatories.createdAt)).get();
-            if (!fallback) return { status: 409, value: { error: 'Cannot delete the last ambulatory' } };
-        }
-        const affectedRows: Array<{ id: string; version: number }> = [];
-        if (fallback) {
-            const promoted = tx.update(ambulatories).set({ isDefault: true, version: fallback.version + 1 })
-                .where(and(eq(ambulatories.id, fallback.id), eq(ambulatories.version, fallback.version))).run();
-            if (promoted.changes !== 1) throw new Error('Ambulatory fallback promotion did not update exactly one row');
-            auditDefaultChange(tx, context, surface, fallback.id, fallback.version + 1);
-            affectedRows.push({ id: fallback.id, version: fallback.version + 1 });
-        }
-        const deleted = tx.delete(ambulatories).where(and(eq(ambulatories.id, id), eq(ambulatories.version, parsedVersion))).run();
-        if (deleted.changes !== 1) throw new Error('Ambulatory delete did not remove exactly one row');
-        writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'ambulatory.deleted', 'ambulatory', id,
-            { resourceVersion: parsedVersion }));
-        return { status: 200, value: { success: true, affectedAmbulatories: affectedRows } };
-    }, { behavior: 'immediate' });
+    return dbServer.transaction((tx): AmbulatoryMutationResponse => deleteAmbulatoryInTransaction(tx, context, id, parsedVersion, surface, authorizeCommit), { behavior: 'immediate' });
 }
 
 export async function clearAmbulatory(
@@ -303,41 +267,86 @@ export async function clearAmbulatory(
     if (parsedVersion === null) return { status: 400, value: { error: 'Version is required' } };
     if (context.session.role !== 'admin') return { status: 403, value: { error: 'Forbidden' } };
     try {
-        return dbServer.transaction((tx): AmbulatoryMutationResponse => {
-            const denial = commitDenial(tx, authorizeCommit);
-            if (denial) return denial;
-            const target = selectAmbulatory(tx, ambulatoryId);
-            if (!target) return { status: 404, value: { error: 'Ambulatory not found' } };
-            if (target.version !== parsedVersion) return { status: 409, value: buildAmbulatoryVersionConflictPayload(parsedVersion, ambulatoryId, conflictSnapshot(target)) };
-            if (target.type !== 'test') return { status: 403, value: { error: 'Safety Check: Cannot clear a LIVE ambulatory' } };
-            if (!canIncrementVersion(target.version)) return { status: 409,
-                value: buildAmbulatoryVersionConflictPayload(parsedVersion, ambulatoryId, conflictSnapshot(target)) };
-            const guarded = tx.update(ambulatories).set({ version: target.version + 1 })
-                .where(and(eq(ambulatories.id, ambulatoryId), eq(ambulatories.version, parsedVersion))).run();
-            if (guarded.changes !== 1) throw new Error('Test-container version guard did not update exactly one row');
-            const result = clearTestContainerByMembership(tx, ambulatoryId);
-            for (const patient of result.clearedPatients) {
-                writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'patient.deleted', 'patient', patient.id,
-                    { reasonCode: TEST_CONTAINER_CLEAR_REASON, resourceVersion: patient.version }));
-            }
-            for (const patient of result.unlinkedPatients) {
-                writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'patient.updated', 'patient', patient.id,
-                    { changedFields: ['ambulatoryMemberships'], resourceVersion: patient.version, flags: ['membership:unassigned'] }));
-            }
-            writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'ambulatory.cleared', 'ambulatory', ambulatoryId,
-                { resourceVersion: target.version + 1 }));
-            return {
-                status: 200,
-                value: {
-                    success: true, message: 'Test container cleared', version: target.version + 1,
-                    clearedPatients: result.clearedPatients.length,
-                    preservedLivePatients: result.preservedLivePatientIds.length,
-                    removedMembershipRows: result.removedMembershipRows,
-                },
-            };
-        }, { behavior: 'immediate' });
+        return dbServer.transaction((tx): AmbulatoryMutationResponse => clearAmbulatoryInTransaction(tx, context, ambulatoryId, parsedVersion, surface, authorizeCommit), { behavior: 'immediate' });
     } catch (error) {
         if (error instanceof VersionExhaustedError) return { status: 409, value: { error: 'Patient version cannot advance safely' } };
         throw error;
     }
+}
+
+export function deleteAmbulatoryInTransaction(tx: Tx, context: AmbulatoryCoreContext, id: string, parsedVersion: number,
+    surface: 'host' | 'network', authorizeCommit: NetworkPatientCommitGuard | undefined): AmbulatoryMutationResponse {
+    if (authorizeCommit !== requireCommitGuard(context, surface)) throw new TypeError('Ambulatory Tx authority differs from its admitted context');
+    const denial = commitDenial(tx, authorizeCommit);
+    if (denial) return denial;
+    const existing = selectAmbulatory(tx, id);
+    if (!existing) return { status: 404, value: { error: 'Not found' } };
+    if (existing.version !== parsedVersion) return { status: 409, value: buildAmbulatoryVersionConflictPayload(parsedVersion, id, conflictSnapshot(existing)) };
+    const linkedPrimaryPatient = tx.select({ id: patients.id }).from(patients)
+        .where(and(eq(patients.ambulatoryId, id), activePatients())).get();
+    const linkedPatientAssignment = tx.select({ patientId: patientsToAmbulatories.patientId }).from(patientsToAmbulatories)
+        .where(eq(patientsToAmbulatories.ambulatoryId, id)).get();
+    if (linkedPrimaryPatient || linkedPatientAssignment) {
+        return { status: 409, value: { error: 'Ambulatory still has linked patients. Move/unassign patients before deletion.' } };
+    }
+    const childAmbulatory = tx.select({ id: ambulatories.id }).from(ambulatories)
+        .where(eq(ambulatories.parentId, id)).limit(1).get();
+    if (childAmbulatory) {
+        return { status: 409, value: { error: 'Ambulatory still has child ambulatories. Move them before deletion.' } };
+    }
+    let fallback: AmbulatoryRow | undefined;
+    if (existing.isDefault) {
+        fallback = tx.select().from(ambulatories).where(ne(ambulatories.id, id)).orderBy(desc(ambulatories.createdAt)).get();
+        if (!fallback) return { status: 409, value: { error: 'Cannot delete the last ambulatory' } };
+    }
+    const affectedRows: Array<{ id: string; version: number }> = [];
+    if (fallback) {
+        const promoted = tx.update(ambulatories).set({ isDefault: true, version: fallback.version + 1 })
+            .where(and(eq(ambulatories.id, fallback.id), eq(ambulatories.version, fallback.version))).run();
+        if (promoted.changes !== 1) throw new Error('Ambulatory fallback promotion did not update exactly one row');
+        auditDefaultChange(tx, context, surface, fallback.id, fallback.version + 1);
+        affectedRows.push({ id: fallback.id, version: fallback.version + 1 });
+    }
+    const deleted = tx.delete(ambulatories).where(and(eq(ambulatories.id, id), eq(ambulatories.version, parsedVersion))).run();
+    if (deleted.changes !== 1) throw new Error('Ambulatory delete did not remove exactly one row');
+    writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'ambulatory.deleted', 'ambulatory', id,
+        { resourceVersion: parsedVersion }));
+    return { status: 200, value: { success: true, affectedAmbulatories: affectedRows } };
+}
+
+export function clearAmbulatoryInTransaction(tx: Tx, context: AmbulatoryCoreContext, ambulatoryId: string, parsedVersion: number,
+    surface: 'host' | 'network', authorizeCommit: NetworkPatientCommitGuard | undefined): AmbulatoryMutationResponse {
+    if (authorizeCommit !== requireCommitGuard(context, surface)) throw new TypeError('Ambulatory Tx authority differs from its admitted context');
+    if (context.session.role !== 'admin') return { status: 403, value: { error: 'Forbidden' } };
+    const denial = commitDenial(tx, authorizeCommit);
+    if (denial) return denial;
+    const target = selectAmbulatory(tx, ambulatoryId);
+    if (!target) return { status: 404, value: { error: 'Ambulatory not found' } };
+    if (target.version !== parsedVersion) return { status: 409, value: buildAmbulatoryVersionConflictPayload(parsedVersion, ambulatoryId, conflictSnapshot(target)) };
+    if (target.type !== 'test') return { status: 403, value: { error: 'Safety Check: Cannot clear a LIVE ambulatory' } };
+    if (!canIncrementVersion(target.version)) return { status: 409,
+        value: buildAmbulatoryVersionConflictPayload(parsedVersion, ambulatoryId, conflictSnapshot(target)) };
+    const guarded = tx.update(ambulatories).set({ version: target.version + 1 })
+        .where(and(eq(ambulatories.id, ambulatoryId), eq(ambulatories.version, parsedVersion))).run();
+    if (guarded.changes !== 1) throw new Error('Test-container version guard did not update exactly one row');
+    const result = clearTestContainerByMembership(tx, ambulatoryId);
+    for (const patient of result.clearedPatients) {
+        writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'patient.deleted', 'patient', patient.id,
+            { reasonCode: TEST_CONTAINER_CLEAR_REASON, resourceVersion: patient.version }));
+    }
+    for (const patient of result.unlinkedPatients) {
+        writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'patient.updated', 'patient', patient.id,
+            { changedFields: ['ambulatoryMemberships'], resourceVersion: patient.version, flags: ['membership:unassigned'] }));
+    }
+    writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'ambulatory.cleared', 'ambulatory', ambulatoryId,
+        { resourceVersion: target.version + 1 }));
+    return {
+        status: 200,
+        value: {
+            success: true, message: 'Test container cleared', version: target.version + 1,
+            clearedPatients: result.clearedPatients.length,
+            preservedLivePatients: result.preservedLivePatientIds.length,
+            removedMembershipRows: result.removedMembershipRows,
+        },
+    };
 }

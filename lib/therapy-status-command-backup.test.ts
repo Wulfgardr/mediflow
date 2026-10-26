@@ -71,9 +71,9 @@ test('raw replacement preserves postbackup applied and closed rows in staging wi
     validateTherapyStatusCommandRows(before, readTherapyCommandAudits(installed!));
     installed!.close();
 });
-test('v4 to v5 migration adds ledger once and preserves original snapshot', () => {
+test('v4 to current migration adds ledgers once and preserves original snapshot', () => {
     const root = mkdtempSync(join(tmpdir(), 'mediflow-command-migrate-')), file = join(root, 'medical.db');
-    const before = openVersionedSqliteDatabase(file); before.exec('DROP TABLE therapy_status_commands; PRAGMA user_version=4;'); before.close();
+    const before = openVersionedSqliteDatabase(file); before.exec('DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands; PRAGMA user_version=4;'); before.close();
     const after = openVersionedSqliteDatabase(file);
     assert.equal(after.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
     assert.deepEqual(readTherapyStatusCommandRows(after), []); after.close();
@@ -92,7 +92,7 @@ test('JSON command collision blocks before fence or any archive mutation', async
 });
 test('failed v4 migration rolls back ledger DDL and version', () => {
     const root = mkdtempSync(join(tmpdir(), 'mediflow-command-migration-fault-')), file = join(root, 'medical.db');
-    const old = openVersionedSqliteDatabase(file); old.exec('DROP TABLE therapy_status_commands; PRAGMA user_version=4;'); old.close();
+    const old = openVersionedSqliteDatabase(file); old.exec('DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands; PRAGMA user_version=4;'); old.close();
     assert.throws(() => openVersionedSqliteDatabase(file, name => {
         const connection = new Database(name), execute = connection.exec.bind(connection);
         connection.exec = source => { const result = execute(source); if (source.includes('therapy_status_commands_no_update')) throw new Error('SYNTHETIC_MIGRATION_FAULT'); return result; };

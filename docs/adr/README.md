@@ -154,3 +154,5 @@ prima porzione di lavoro verificabile:
 - [ADR 0167 — Prima sede da GPUI](0167-first-ambulatory-host-bootstrap.md): Web P3 amministrativa dedicata, operatore coincidente e creazione atomica senza scope paired.
 
 - [ADR0168 — Comando durevole stato terapia](0168-durable-therapy-status-command.md): C-5a/G-6, receipt/tombstone, tempo host e conservazione attraverso restore; consumer chat escluso.
+
+- [ADR0169 — Clear/delete ambulatori nominati](0169-gpui-ambulatory-destructive-commands.md): piano host congelato, doppia autorità e terminali durevoli; consumer GPUI da completare.

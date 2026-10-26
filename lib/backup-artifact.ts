@@ -1,3 +1,4 @@
+import { validateAmbulatoryCommandRows } from './ambulatory-destructive-command-backup';
 import { validateTherapyStatusCommandRows } from './therapy-status-command-backup';
 import { types } from 'node:util';
 import { assertBackupAuditSnapshots, backupAuditCoverage, canonicalizeBackupAuditRows, snapshotBackupAudit } from './backup-audit';
@@ -42,12 +43,13 @@ export const BACKUP_COLLECTIONS = [
     'checkups',
     'therapies',
     'therapyStatusCommands',
+    'ambulatoryDestructiveCommands',
     'auditEvents',
 ] as const;
 
 export type BackupCollectionName = (typeof BACKUP_COLLECTIONS)[number];
 export type BackupRecord = Record<string, unknown>;
-type AdditiveBackupCollection = 'therapyStatusCommands' | 'prostheticsCatalogSources' | 'prostheticsCatalogDocuments' | 'auditEvents' | 'prostheticsCatalogEntries' | 'prostheticsCatalogReceipts' | 'exemptionImportReceipts' | 'durableReviewCommandStates' | 'durableReviewCommandOperations' | 'headlessSoapEntryCommits';
+type AdditiveBackupCollection = 'ambulatoryDestructiveCommands' | 'therapyStatusCommands' | 'prostheticsCatalogSources' | 'prostheticsCatalogDocuments' | 'auditEvents' | 'prostheticsCatalogEntries' | 'prostheticsCatalogReceipts' | 'exemptionImportReceipts' | 'durableReviewCommandStates' | 'durableReviewCommandOperations' | 'headlessSoapEntryCommits';
 export type BackupDataset = Record<Exclude<BackupCollectionName, AdditiveBackupCollection>, BackupRecord[]>
     & Partial<Record<AdditiveBackupCollection, BackupRecord[]>>;
 
@@ -116,9 +118,14 @@ const PRE_COMMAND_LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionNam
         collection => collection !== 'prostheticsCatalogSources' && collection !== 'prostheticsCatalogDocuments')),
 ];
 
-const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
+const PRE_AMBULATORY_COMMAND_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
     ...PRE_COMMAND_LEGACY_COLLECTION_SETS,
     ...[BACKUP_COLLECTIONS, ...PRE_COMMAND_LEGACY_COLLECTION_SETS].map(collections => collections.filter(collection => collection !== 'therapyStatusCommands')),
+];
+
+const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
+    ...PRE_AMBULATORY_COMMAND_COLLECTION_SETS,
+    ...[BACKUP_COLLECTIONS, ...PRE_AMBULATORY_COMMAND_COLLECTION_SETS].map(collections => collections.filter(collection => collection !== 'ambulatoryDestructiveCommands')),
 ];
 
 const PATIENT_DEPENDENT_COLLECTIONS: readonly BackupCollectionName[] = [
@@ -183,8 +190,8 @@ export interface BackupArtifactManifest {
     checksumAlgorithm: 'sha256';
     checksum: string;
     collections: readonly BackupCollectionName[];
-    recordCounts: Record<Exclude<BackupCollectionName, 'auditEvents' | 'therapyStatusCommands'>, number>
-        & Partial<Record<'auditEvents' | 'therapyStatusCommands', number>>;
+    recordCounts: Record<Exclude<BackupCollectionName, 'auditEvents' | 'therapyStatusCommands' | 'ambulatoryDestructiveCommands'>, number>
+        & Partial<Record<'auditEvents' | 'therapyStatusCommands' | 'ambulatoryDestructiveCommands', number>>;
 }
 
 export interface BackupArtifact {
@@ -777,6 +784,8 @@ async function assertCollectionReferences(
     catch { throw new BackupArtifactError('invalid-manifest', 'Prosthetics catalog or provenance is invalid or unsupported.'); }
     try { validateTherapyStatusCommandRows(payload.therapyStatusCommands ?? [], payload.auditEvents ?? []); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Therapy status command ledger or audit is invalid.'); }
+    try { validateAmbulatoryCommandRows(payload.ambulatoryDestructiveCommands ?? [], payload.auditEvents ?? []); }
+    catch { throw new BackupArtifactError('invalid-manifest', 'Ambulatory command ledger or audit is invalid.'); }
     await assertDurableReviewLedger(payload);
     assertDurableReviewAuthorityRows(payload, durableReviewIds, patientIds);
     assertHeadlessSoapActiveRoleAttestationRows(payload, serialized);
@@ -818,6 +827,7 @@ export async function createBackupArtifact(payload: BackupDataset, createdAt = n
         ...currentPayload,
         exemptionImportReceipts: [...(currentPayload.exemptionImportReceipts ?? [])].sort((a, b) => Number(a.id) - Number(b.id)),
         headlessSoapActiveRoleAttestations: sortHeadlessSoapActiveRoleAttestations(currentPayload.headlessSoapActiveRoleAttestations),
+        ambulatoryDestructiveCommands: validateAmbulatoryCommandRows(currentPayload.ambulatoryDestructiveCommands ?? [], currentPayload.auditEvents ?? []),
         therapyStatusCommands: validateTherapyStatusCommandRows(currentPayload.therapyStatusCommands ?? [], currentPayload.auditEvents ?? []),
         headlessSoapEntryCommits: sortHeadlessSoapEntryCommits(currentPayload.headlessSoapEntryCommits ?? []),
         ...(backupAuditCoverage(currentPayload) === 'included'

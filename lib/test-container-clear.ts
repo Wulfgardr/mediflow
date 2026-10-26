@@ -32,11 +32,7 @@ type TestContainerClearRunner = Pick<BetterSQLite3Database, 'select' | 'update' 
 //    with deletionReason='test-container-clear', children left intact;
 // 4. every join row of the cleared container is removed.
 // Run inside dbServer.transaction so a mid-flight failure rolls back atomically.
-export function clearTestContainerByMembership(
-    runner: TestContainerClearRunner,
-    ambulatoryId: string,
-    now: Date = new Date()
-): TestContainerClearResult {
+export function inspectTestContainerByMembership(runner: Pick<TestContainerClearRunner, 'select'>, ambulatoryId: string) {
     const memberIds = [...new Set(
         runner
             .select({ patientId: patientsToAmbulatories.patientId })
@@ -82,6 +78,16 @@ export function clearTestContainerByMembership(
     const remainingPatients = remainingIds.length === 0 ? [] : runner
         .select({ id: patients.id, version: patients.version }).from(patients)
         .where(inArray(patients.id, remainingIds)).all();
+    return { memberIds, liveMemberIds: [...liveMemberIds], activeTestOnly, remainingPatients };
+}
+
+export function clearTestContainerByMembership(
+    runner: TestContainerClearRunner,
+    ambulatoryId: string,
+    now: Date = new Date()
+): TestContainerClearResult {
+    const { memberIds, liveMemberIds: liveIds, activeTestOnly, remainingPatients } = inspectTestContainerByMembership(runner, ambulatoryId);
+    const liveMemberIds = new Set(liveIds);
     // Preflight all patients before the helper's first write. The caller may already
     // have guarded the container: throw to roll that write back as well.
     if ([...activeTestOnly, ...remainingPatients].some(patient => !canIncrementVersion(patient.version))) {
