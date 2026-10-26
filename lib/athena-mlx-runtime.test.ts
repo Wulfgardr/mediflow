@@ -105,3 +105,26 @@ test('athena mlx accepts only an explicit executable local runner override', () 
         else process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN = previous;
     }
 });
+
+test('claims runner exposes intact stdout to the strict decoder while legacy sanitation stays unchanged', async t => {
+    const { generateWithAthenaMlx, generateWithAthenaMlxClaims } = await import('./athena-mlx-runtime');
+    const { athenaClaimsProfileV1 } = await import('./ai-providers/fabric/treatment-reasoning-athena-claims-profile');
+    const modelDir = makeTempModelDir(); t.after(() => fs.rmSync(modelDir, { recursive: true, force: true }));
+    writeFixtureFiles(modelDir, ['config.json', 'tokenizer.json', 'model.safetensors']);
+    const runner = path.join(modelDir, 'mlx_lm.generate');
+    fs.writeFileSync(runner, '#!/bin/sh\n/bin/cat > /dev/null\n/bin/cat "'+path.join(modelDir, 'stdout')+'"\n', { mode: 0o700 });
+    const previous = process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN;
+    process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN = runner;
+    t.after(() => { if (previous === undefined) delete process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN; else process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN = previous; });
+    const pair = { claim: 'Revisione sintetica.', evidenceRefs: ['source.synthetic'] };
+    const clean = JSON.stringify({ schemaVersion: athenaClaimsProfileV1.id, task: 'treatment_reasoning', summary: pair, data: { recommendation: pair, keyEvidence: [], reasoning: [], caveats: [], safetyFlags: [], suggestedActions: [], trace: { mode: 'local_model', toolsUsed: [], limitations: [] } } });
+    const raw = ' ' + clean + '\nmx.metal.device_info is deprecated\n';
+    fs.writeFileSync(path.join(modelDir, 'stdout'), raw);
+    const options = { prompt: 'Synthetic boundary test', modelDir, timeoutMs: 1000 };
+    const result = await generateWithAthenaMlxClaims(options);
+    assert.equal(result.content, raw);
+    const config = { allowedEvidenceRefs: ['source.synthetic'], attestation: { schema: 'mediflow.ai.treatment-reasoning-athena-attestation.v1', readiness: 'available_unqualified', provider: 'athena_mlx', venue: 'local_process', egress: 'none', receiptRef: 'receipt.synthetic', provenanceRef: 'provenance.synthetic' } };
+    assert.equal(athenaClaimsProfileV1.normalize(clean, config).status, 'accepted');
+    assert.equal(athenaClaimsProfileV1.normalize(result.content, config).status, 'denied');
+    assert.equal((await generateWithAthenaMlx(options)).content, clean);
+});
