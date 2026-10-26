@@ -9,6 +9,9 @@ Questo ADR propone il contratto del nuovo client. Non modifica il prodotto,
 non ammette dati reali e non attesta funzionamento, anonimato o conformità.
 Secondo round del 22 ottobre: recepisce le decisioni e le prove sintetiche
 riportate sotto. Queste prove non qualificano dati reali o nuove scritture.
+Aggiornamento del 26 ottobre: registra D3 e le durate iniziali D4 approvate
+da Leonardo il 25 ottobre in [WUL-788](https://linear.app/wulfgardr/issue/WUL-788).
+L'ADR resta Proposed; budget, implementazione e relativa accettazione restano distinti.
 
 ## Problema e contesto
 
@@ -42,6 +45,12 @@ Le fonti di decisione sono la ricognizione «MediFlow nella chat — WUL-788» d
   con anteprima, conferma nella vista e verifica nativa.
 - **Scelto:** corrispondenze pseudonimo → nome soltanto per la sessione;
   vecchie chat e riavvii restano a pseudonimi. Nessuna persistenza del mapping.
+- **Scelto il 25 ottobre (D3):** nomi soltanto nella finestra nativa MediFlow;
+  nella chat restano pseudonimi e le corrispondenze vivono soltanto in RAM.
+- **Approvato per la prima qualifica sintetica il 25 ottobre (D4):** una sola
+  operazione per autorizzazione, 30 secondi per confermarla, blocco della vista
+  dopo 5 minuti d'inattività, senza rinnovo automatico. Restano da fissare i
+  budget di prestazione dopo baseline e da accettare l'implementazione.
 - **Richiesto:** importazione da documenti, Fabric completo, catalogo di viste,
   opzione di chat temporanea, prestazioni con budget e pubblicazione per terzi.
 
@@ -96,29 +105,39 @@ parte fidata.
 
 R misura la vista inline nel client reale; L la lettura diretta da loopback.
 I rapporti del 22 ottobre riguardano il demo sintetico alla revisione
-`328a0df5833ecaa4563193a772c524fad6c04727`, non il broker proposto qui.
+`328a0df5833ecaa4563193a772c524fad6c04727`; l'addendum del 25 ottobre su
+[WUL-788](https://linear.app/wulfgardr/issue/WUL-788) riguarda il demo 0.1.0
+alla revisione `8c343bc2949fc90c663c374bcd8719ab3933cbe2`. Nessuno dei due
+qualifica il broker proposto qui.
 
 | Superficie provata | Esito | Conseguenza per il disegno |
 | --- | --- | --- |
 | Codex nell'app ChatGPT desktop 26.1016.61520 (21421) | R PASS con difetti, checklist completata manualmente da Leonardo; L FAIL | Origine `codex-sandbox://`: il percorso diretto con il validatore corrente è impraticabile. Vista pseudonimizzata via canale host da qualificare; ricomposizione nativa. |
 | Codex CLI 0.163.0 | PASS, una chiamata demo e ricevuta, exit 0 | Prova del telecomando testuale, non di R o L. |
 | Claude Desktop 3.1623.1 | R FAIL; L non verificato | Demo e controllo ufficiale `@modelcontextprotocol/server-map@2.0.3` eseguono il tool ma producono zero `resources/read`. Limite del percorso host osservato; resta la UI nativa. |
+| Claude Desktop 3.1623.4, 25 ottobre 2026 | R PASS e L PASS sul demo sintetico | Rendering inline e lettura autorizzata della sentinella in RAM osservati; Blocca rimuove il contenuto e il rientro nella stessa vista trova l'autorizzazione assente. Ricreazione del frame non provata. Non qualifica broker/prodotto, riservatezza verso l'host, prestazioni o Claude Desktop 3.6556.2. |
 
-Su Claude la prova A/B non distingue build, account e bridge locale; non
-dimostra un difetto del solo HTML MediFlow. Su Codex non sono qualificati
+Su Claude la prova A/B storica e il successivo PASS non identificano quale
+cambiamento di build, account o bridge locale abbia risolto il precedente
+FAIL; non dimostrano un difetto del solo HTML MediFlow. Su Codex non sono qualificati
 CSP/CORS/LNA effettivi né la causa di rete precisa. Non si estende il verdetto
 a tutte le versioni future e non si allenta il validatore per ottenere L.
-I difetti R residui sono salto della chat in fondo al clic, ricevuta JSON
-visibile, fasce grigie laterali e fluidità da misurare. R PASS non chiude tali
-difetti e non prova la revoca di una sessione clinica, assente nel demo.
+I difetti R residui della prova Codex nell'app ChatGPT desktop
+26.1016.61520 (21421), il 22 ottobre sul demo
+`328a0df5833ecaa4563193a772c524fad6c04727`, sono salto della chat in fondo al
+clic, ricevuta JSON visibile, fasce grigie laterali e fluidità da misurare.
+Quel R PASS non chiude tali difetti e non prova la revoca di una sessione
+clinica, assente nel demo; non sono rilievi attribuiti alla prova Claude del 25 ottobre.
 
-**Raccomandazione:** ricomporre identità e documenti soltanto nella UI nativa;
+**Direzione scelta con D3:** ricomporre identità e documenti soltanto nella UI nativa;
 nei desktop capaci di R, usare viste pseudonimizzate e risposte in chat
 alimentate dal broker. È un percorso dal plugin con passaggi nativi espliciti,
-ancora incompleto rispetto a nomi e operazioni interamente inline. Su Claude
-il telecomando rimane il ripiego finché una nuova prova reale non supera R.
+ancora da implementare e provare nel prodotto. Su Claude il PASS del demo
+permette di proseguire la qualifica inline; il telecomando conserva il proprio
+perimetro e non sostituisce quella prova.
 
-L'alternativa per i nomi inline è un tool con `_meta.ui.visibility: ["app"]`
+L'ipotesi storica per i nomi inline, fuori dalla scelta D3 e subordinata a
+una nuova decisione di trattamento, è un tool con `_meta.ui.visibility: ["app"]`
 e risultato riservato alla vista, attraverso l'host. La
 [specifica MCP Apps, draft consultato](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx)
 definisce questa visibilità e il bridge; il
@@ -353,12 +372,11 @@ della cartella previsto da ADR 0143, né si elimina lo storico clinico.
 
 ### Percorso verso la vista e qualificazione del canale
 
-Solo in una futura configurazione ammessa con L positivo la vista può
-richiedere una proiezione già ricomposta al componente locale autorizzato.
-La mappa e le chiavi non le
-vengono consegnate. Il modello riceve separatamente solo la proiezione
-pseudonimizzata; il nome reale viene inserito nella vista dopo la lettura
-locale, senza tornare attraverso risultati tool o aggiornamenti del contesto.
+Con D3 la vista nella chat riceve soltanto la proiezione pseudonimizzata;
+nomi e ricomposizione si mostrano nella finestra nativa MediFlow. Mappa e
+chiavi non vengono consegnate al renderer della chat. Un L positivo qualifica
+il solo percorso di trasporto provato: non autorizza l'inserimento dei nomi
+nella vista inline.
 
 `ui://` non attribuisce origine localhost al renderer. Occorre qualificare
 CSP, CORS, Local Network Access, origine effettiva, autenticazione del servizio
@@ -367,15 +385,15 @@ non sono da soli credenziali. Un'origine opaca o `null` non giustifica una
 allowlist generica. Non si rimuovono i controlli della Web UI, non si aprono
 porte LAN/tunnel e non si introduce un proxy generico verso il runtime.
 
-Nel percorso raccomandato attuale la vista conserva soltanto pseudonimi e
-la ricomposizione si mostra nella finestra MediFlow locale: alternativa
-da implementare e provare, incompleta rispetto a WUL-788. Per recuperare i nomi inline
-si può valutare un bridge app-only con consegna riservata alla vista, provando
-il percorso reale su ogni host. In ChatGPT `_meta` è documentato come nascosto
+Il percorso scelto conserva soltanto pseudonimi nella chat e mostra la
+ricomposizione nella finestra nativa MediFlow; implementazione e prove restano
+aperte. Un eventuale bridge di nomi richiede una nuova decisione di trattamento
+e relative prove; non è un ripiego autorizzato da D3 o dal PASS del demo.
+In ChatGPT `_meta` è documentato come nascosto
 al modello, ma visibile all'host; app-only limita la disponibilità del tool,
 non dimostra segretezza del risultato. Nessun trasporto così ottenuto può
-essere registrato come L positivo. Se non è dimostrabile l'esclusione dei
-nomi dal modello, la ricomposizione inline rimane disabilitata.
+essere registrato come L positivo. Nel perimetro scelto la ricomposizione
+dei nomi inline rimane disabilitata.
 
 ## Autorità della vista
 
@@ -409,8 +427,11 @@ ricaricamento della vista richiedono una nuova associazione; in mancanza di
 segnale affidabile di chiusura, la lease breve scade comunque lato owner.
 Risposte tardive sono scartate; dati ricomposti e anteprime vengono rimossi
 alla revoca. Non si promette la cancellazione di copie già acquisite dall'host.
-Durate e rinnovo sono da fissare; nessun rinnovo implicito prolunga la
-sessione MediFlow. I marker di scritture già partite sopravvivono al ritiro
+Per la prima qualifica sintetica D4 approva una sola operazione per
+autorizzazione, 30 secondi per confermarla e blocco della vista dopo 5 minuti
+d'inattività, senza rinnovo automatico. La decisione fissa i valori da provare,
+non attesta l'implementazione né approva i budget di prestazione.
+I marker di scritture già partite sopravvivono al ritiro
 come metadati di recupero, senza concedere nuove autorizzazioni.
 
 ### Touch ID e PIN nativi: decisione acquisita, non attestazione clinica
@@ -876,19 +897,25 @@ review del codice futuro, pubblicazione e ammissione clinica restano separate.
 
 ## Decisioni ancora aperte per Leonardo
 
-Le scelte Touch ID/PIN **nativi**, prima scrittura **stato terapia** e mapping
-**solo di sessione** sono chiuse; non si richiedono nuovamente. Restano:
+Le scelte Touch ID/PIN **nativi**, prima scrittura **stato terapia**, mapping
+**solo di sessione** e D3 **nomi solo nella finestra nativa** sono acquisite.
+Anche le durate D4 per la prima qualifica sintetica sono approvate, senza
+attestare implementazione o budget. La numerazione resta quella del
+[registro 0.9.1](../releases/0.9.1-contract.md#decisioni-e-dipendenze-esterne):
 
 1. Fissare versioni minime OS/app/host e hardware compatibile, nel profilo Mac
    con Touch ID previsto; lo sblocco rapido a freddo resta escluso dal primo incremento.
 2. Scegliere fasce d'età e criteri per età/date precise, con limiti di utilità
    e riconoscibilità; nominare account/workspace e trattamenti ammessi prima
    di dati reali, compresi screenshot, strumenti host, memoria e retention.
-3. Accettare la raccomandazione di ricomposizione soltanto nativa. Un eventuale
-   futuro bridge di nomi richiede una decisione separata sul trattamento da
-   parte dell'host e relative prove; non è il ripiego già autorizzato.
-4. Approvare nel contratto attuativo durate/rinnovo delle concessioni e i
-   budget proposti dopo la baseline. La sessione effimera non è in discussione.
+3. **D3 decisa il 25 ottobre:** nomi solo nella finestra nativa MediFlow,
+   pseudonimi nella chat e corrispondenze solo in RAM per la sessione. Restano
+   da accettare implementazione e prove; un futuro bridge di nomi richiede
+   una decisione separata sul trattamento da parte dell'host e relative prove.
+4. **D4 parzialmente fissata il 25 ottobre:** per la prima qualifica sintetica,
+   una sola operazione per autorizzazione, 30 secondi per confermarla, blocco
+   dopo 5 minuti d'inattività, nessun rinnovo automatico. Restano aperti i
+   budget proposti dopo baseline e l'accettazione dell'implementazione.
 5. Scegliere, dopo la verifica di idoneità, i canali pubblici e il perimetro
    dichiarabile; il responsabile del deployment decide l'ammissione clinica
    e contrattuale. Il desiderio di pubblicare non prova l'approvazione store.
