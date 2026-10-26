@@ -174,3 +174,45 @@ test('Quadro in scrittura distingue lettura, errore e paziente non disponibile',
         await expect(page.getByTestId('progressive-entry-composer').locator('header')).toContainText('Paziente non disponibile.');
     } finally { release(); }
 });
+
+for (const status of [401, 403, 503, 200]) test(`Nuova voce: lettura precedente ${status} rispetta disponibilità e autorità`, async ({ page, baseURL }) => {
+    if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw new Error('Runtime e archivio sintetici isolati richiesti');
+    await page.route('**/api/siss/session-status', route => route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } }));
+    await bootstrapUnlockedSession(page, '1234');
+    const patientId = await page.evaluate(async () => {
+        const response = await fetch('/api/patients', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ firstName: 'Lettura', lastName: 'Sintetica', taxCode: `H16${crypto.randomUUID().replaceAll('-', '').slice(0, 13).toUpperCase()}`, birthDate: '1980-01-01', diagnoses: [] }) });
+        if (!response.ok) throw new Error(`Synthetic patient: ${response.status}`);
+        return (await response.json()).id as string;
+    });
+    let reads = 0;
+    const writes: string[] = [], errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('request', request => { if (request.method() === 'POST' && /\/api\/(entries|attachments)$/u.test(new URL(request.url()).pathname)) writes.push(request.url()); });
+    await page.route('**/api/entries?**', route => {
+        if (new URL(route.request().url()).searchParams.get('patientId') !== patientId) return route.continue();
+        reads++;
+        return route.fulfill({ status, json: status === 200 ? [] : { error: 'Lettura sintetica indisponibile' } });
+    });
+    await page.goto(`/patients/${patientId}/entries/new`);
+    const history = page.getByRole('region', { name: 'Ultime voci registrate', exact: true });
+    if (status === 401 || status === 403) {
+        await expect(page.getByLabel('MediFlow lock screen')).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Rinnova accesso', exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Sblocca', exact: true })).toBeDisabled();
+        await expect(page.getByRole('textbox', { name: 'Resoconto clinico', exact: true })).toHaveCount(0);
+        await expect(history).toHaveCount(0);
+    } else {
+        await expect(history).toBeVisible();
+        await expect(page.getByLabel('MediFlow lock screen')).toHaveCount(0);
+        if (status === 503) {
+            await expect(history.getByRole('alert')).toHaveText('Voci precedenti non disponibili.');
+            await expect(history).not.toContainText('Nessuna voce recente');
+        } else {
+            await expect(history).toContainText('Nessuna voce recente');
+            await expect(history.getByRole('alert')).toHaveCount(0);
+        }
+    }
+    expect(reads).toBeGreaterThan(0);
+    expect(writes).toEqual([]);
+    expect(errors).toEqual([]);
+});
