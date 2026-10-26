@@ -5,7 +5,8 @@ import { useState } from 'react';
 import { CheckCircle, XCircle, Loader2, Play, Server, Database, Activity, Globe } from 'lucide-react';
 import { getICDReadiness, icdReadinessMessage } from '@/lib/icd-service';
 import { checkAuthHealthRequest } from '@/lib/security/client-auth-api';
-import { cn } from '@/lib/utils'; // Assuming cn exists, else use template literals
+import { SETTINGS_PRIMARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
+import styles from '@/components/settings/evidence-pages.module.css';
 
 interface ServiceCheck {
     id: string;
@@ -22,9 +23,9 @@ export default function DiagnosticHub() {
     const checks: ServiceCheck[] = [
         {
             id: 'db',
-            name: 'Database (SQLite)',
+            name: 'Controllo autenticazione',
             icon: <Database className="w-4 h-4" />,
-            description: 'Verifica lettura/scrittura su database locale',
+            description: 'Verifica la risposta del controllo di autenticazione.',
             checkFn: async () => {
                 const start = performance.now();
                 // We use auth/check as a proxy for DB health since it reads from DB
@@ -39,9 +40,9 @@ export default function DiagnosticHub() {
         },
         {
             id: 'ai',
-            name: 'AI Neural Engine',
+            name: 'Provider AI',
             icon: <Activity className="w-4 h-4" />,
-            description: 'Verifica connettività al provider AI (Ollama)',
+            description: 'Controlla l’elenco dei modelli del provider configurato, senza generare contenuti.',
             checkFn: async () => {
                 const start = performance.now();
                 // Dynamically import to ensure client-side execution
@@ -66,7 +67,7 @@ export default function DiagnosticHub() {
             id: 'icd',
             name: 'ICD-11 WHO',
             icon: <Globe className="w-4 h-4" />,
-            description: 'Readiness WHO governata, senza ricerca diagnostica implicita',
+            description: 'Controlla disponibilità e configurazione, senza eseguire ricerche.',
             checkFn: async () => {
                 const start = performance.now();
                 const readiness = await getICDReadiness();
@@ -80,9 +81,9 @@ export default function DiagnosticHub() {
         },
         {
             id: 'api',
-            name: 'Next.js API Routes',
+            name: 'Impostazioni AI',
             icon: <Server className="w-4 h-4" />,
-            description: 'Risposta endpoint base',
+            description: 'Controlla la risposta alla richiesta delle impostazioni del provider AI.',
             checkFn: async () => {
                 const start = performance.now();
                 const res = await fetch('/api/settings/aiProvider'); // Simple GET
@@ -111,75 +112,35 @@ export default function DiagnosticHub() {
     };
 
     return (
-        <div className="mf-section lume-focal space-y-6 p-6 md:p-7">
-            <div className="flex items-center justify-between">
-                <div>
-                    <p className="section-kicker">Servizi locali</p>
-                    <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--lume-ink)' }}>
-                        <Activity className="w-5 h-5 text-indigo-500" />
-                        Diagnostica di Sistema
-                    </h2>
-                    <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Verifica lo stato dei sottosistemi.</p>
-                </div>
-                <button
-                    onClick={runAll}
-                    disabled={isRunningAll}
-                    className="ui-btn-primary lume-press px-5 py-2.5 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    {isRunningAll ? <Loader2 className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+        <div className={styles.checks}>
+            <header className={styles.checkHeader}>
+                <p>Verifica lo stato dei sottosistemi.</p>
+                <button onClick={runAll} disabled={isRunningAll} className={SETTINGS_PRIMARY_BUTTON_CLASS} data-settings-primary="true">
+                    {isRunningAll ? <Loader2 aria-hidden="true" /> : <Play aria-hidden="true" />}
                     Esegui Test Completo
                 </button>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3">
+            </header>
+            <ul className={styles.checkList}>
                 {checks.map(check => {
                     const res = results[check.id] || { status: 'idle' };
-                    return (
-                        <div key={check.id} className="group flex items-center justify-between gap-4 rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4 transition-colors hover:border-[color:var(--lume-accent)]">
-                            <div className="flex items-center gap-4">
-                                <div className={cn(
-                                    "p-2 rounded-lg transition-colors",
-                                    res.status === 'ok' ? "bg-green-100 text-green-600" :
-                                        res.status === 'error' ? "bg-red-100 text-red-600" :
-                                            res.status === 'running' ? "bg-indigo-50 text-indigo-600" :
-                                                "bg-gray-100 text-gray-500"
-                                )}>
-                                    {res.status === 'running' ? <Loader2 className="w-4 h-4" /> :
-                                        res.status === 'ok' ? <CheckCircle className="w-4 h-4" /> :
-                                            res.status === 'error' ? <XCircle className="w-4 h-4" /> :
-                                                check.icon}
-                                </div>
-                                <div>
-                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>{check.name}</p>
-                                    <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>{check.description}</p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                                {res.status === 'ok' && (
-                                    <span className="lume-registro rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs text-green-600 dark:border-green-500/20 dark:bg-green-900/10 dark:text-green-300">
-                                        {res.latency}ms
-                                    </span>
-                                )}
-                                {res.status === 'error' && (
-                                    <span className="text-xs text-red-500 font-medium max-w-[150px] truncate" title={res.message}>
-                                        {res.message}
-                                    </span>
-                                )}
-                                <button
-                                    onClick={() => runCheck(check)}
-                                    disabled={res.status === 'running'}
-                                    className="rounded-full bg-indigo-50 p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 transition-colors dark:bg-indigo-900/10 dark:text-indigo-300 dark:hover:bg-indigo-900/20"
-                                    aria-label={`Esegui singolo test: ${check.name}`}
-                                    title="Esegui singolo test"
-                                >
-                                    <Play className="w-3 h-3" />
-                                </button>
-                            </div>
+                    return <li key={check.id} className={styles.checkRow} data-diagnostic-check={check.id}>
+                        <div className={styles.checkIdentity}>
+                            <span className={styles.checkIcon} data-status={res.status} aria-hidden="true">
+                                {res.status === 'running' ? <Loader2 /> : res.status === 'ok' ? <CheckCircle /> : res.status === 'error' ? <XCircle /> : check.icon}
+                            </span>
+                            <div><h4>{check.name}</h4><p>{check.description}</p></div>
                         </div>
-                    );
+                        <div className={styles.checkResult} role={res.status === 'error' ? 'alert' : 'status'}>
+                            {res.status === 'ok' && <span>{res.latency}ms</span>}
+                            {res.message && <p data-status={res.status}>{res.message}</p>}
+                        </div>
+                        <button type="button" onClick={() => runCheck(check)} disabled={res.status === 'running'}
+                            className={styles.checkAction} aria-label={`Esegui singolo test: ${check.name}`} title="Esegui singolo test">
+                            <Play aria-hidden="true" />
+                        </button>
+                    </li>;
                 })}
-            </div>
+            </ul>
         </div>
     );
 }
