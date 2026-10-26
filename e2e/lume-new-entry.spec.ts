@@ -259,7 +259,7 @@ test('nuova voce Lume espone stato, focus, errori e salvataggio senza affidarsi 
       .locator(':scope > details').filter({ has: page.locator('summary').filter({ hasText: 'Consulta cartella' }) });
     await context.locator(':scope > summary').click();
     await expect(context).toHaveAttribute('open', '');
-    const recentEntries = context.getByRole('region', { name: 'Ultime voci registrate', exact: true });
+    const recentEntries = page.getByRole('region', { name: 'Ultime voci registrate', exact: true });
     await expect(recentEntries.locator('summary')).toHaveText(/ · Visita ambulatoriale$/);
   } finally {
     await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
