@@ -115,16 +115,19 @@ qualifica il broker proposto qui.
 | Codex nell'app ChatGPT desktop 26.1016.61520 (21421) | R PASS con difetti, checklist completata manualmente da Leonardo; L FAIL | Origine `codex-sandbox://`: il percorso diretto con il validatore corrente è impraticabile. Vista pseudonimizzata via canale host da qualificare; ricomposizione nativa. |
 | Codex CLI 0.163.0 | PASS, una chiamata demo e ricevuta, exit 0 | Prova del telecomando testuale, non di R o L. |
 | Claude Desktop 3.1623.1 | R FAIL; L non verificato | Demo e controllo ufficiale `@modelcontextprotocol/server-map@2.0.3` eseguono il tool ma producono zero `resources/read`. Limite del percorso host osservato; resta la UI nativa. |
-| Claude Desktop 3.1623.4, 25 ottobre 2026 | R PASS e L PASS sul demo sintetico | Rendering inline e lettura autorizzata della sentinella in RAM osservati; Blocca rimuove il contenuto e la nuova apertura non eredita l'autorizzazione. Non qualifica broker/prodotto, riservatezza verso l'host, prestazioni o Claude Desktop 3.6556.2. |
+| Claude Desktop 3.1623.4, 25 ottobre 2026 | R PASS e L PASS sul demo sintetico | Rendering inline e lettura autorizzata della sentinella in RAM osservati; Blocca rimuove il contenuto e il rientro nella stessa vista trova l'autorizzazione assente. Ricreazione del frame non provata. Non qualifica broker/prodotto, riservatezza verso l'host, prestazioni o Claude Desktop 3.6556.2. |
 
 Su Claude la prova A/B storica e il successivo PASS non identificano quale
 cambiamento di build, account o bridge locale abbia risolto il precedente
 FAIL; non dimostrano un difetto del solo HTML MediFlow. Su Codex non sono qualificati
 CSP/CORS/LNA effettivi né la causa di rete precisa. Non si estende il verdetto
 a tutte le versioni future e non si allenta il validatore per ottenere L.
-I difetti R residui sono salto della chat in fondo al clic, ricevuta JSON
-visibile, fasce grigie laterali e fluidità da misurare. R PASS non chiude tali
-difetti e non prova la revoca di una sessione clinica, assente nel demo.
+I difetti R residui della prova Codex nell'app ChatGPT desktop
+26.1016.61520 (21421), il 22 ottobre sul demo
+`328a0df5833ecaa4563193a772c524fad6c04727`, sono salto della chat in fondo al
+clic, ricevuta JSON visibile, fasce grigie laterali e fluidità da misurare.
+Quel R PASS non chiude tali difetti e non prova la revoca di una sessione
+clinica, assente nel demo; non sono rilievi attribuiti alla prova Claude del 25 ottobre.
 
 **Direzione scelta con D3:** ricomporre identità e documenti soltanto nella UI nativa;
 nei desktop capaci di R, usare viste pseudonimizzate e risposte in chat
@@ -133,7 +136,8 @@ ancora da implementare e provare nel prodotto. Su Claude il PASS del demo
 permette di proseguire la qualifica inline; il telecomando conserva il proprio
 perimetro e non sostituisce quella prova.
 
-L'alternativa per i nomi inline è un tool con `_meta.ui.visibility: ["app"]`
+L'ipotesi storica per i nomi inline, fuori dalla scelta D3 e subordinata a
+una nuova decisione di trattamento, è un tool con `_meta.ui.visibility: ["app"]`
 e risultato riservato alla vista, attraverso l'host. La
 [specifica MCP Apps, draft consultato](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx)
 definisce questa visibilità e il bridge; il
