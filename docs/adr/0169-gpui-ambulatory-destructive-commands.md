@@ -1,7 +1,7 @@
 # ADR 0169: clear e delete ambulatori da GPUI tramite comandi host nominati
 
 Date: 2026-10-26
-Status: Proposed — disegno tecnico sintetico; nessuna qualifica o GO clinico
+Status: Accepted — disegno tecnico sintetico; nessuna qualifica o GO clinico
 Refs WUL-771; ADR0161, ADR0167 e ADR0168.
 
 Solo `ambulatory.clear-test.v1` e `ambulatory.delete.v1`, nessuna amministrazione paired generica. Preparazione RAM e login WebP3 dedicato successivo, stesso amministratore e dispositivo autenticati correnti. Nessun riuso del grant bootstrap o C4a. Profilo iniziale di qualifica: preparazione5min e challenge30s dal completamento auth; una operazione, nessun rinnovo. Non è un budget prestazionale o un GO clinico.
