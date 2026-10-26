@@ -3,7 +3,11 @@ import { scaleHistoryNotice } from '@/lib/scale-history'; // MF085-002
 
 import { it } from 'date-fns/locale';
 import { ClinicalEntry, Attachment, db } from '@/lib/db';
-import { FileText, Stethoscope, Activity, Trash2, AlertCircle, Undo, Phone, Home, Building2, Paperclip } from 'lucide-react';
+import { FileText, Stethoscope, Activity, Trash2, AlertCircle, Undo, Phone, Home, Building2, Paperclip, MoreHorizontal } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { PatientSheetMenu } from '@/components/patient-sheet-menu';
+import { InkState } from '@/components/ui/ink-state';
+import { readPatientDiaryMetadata } from '@/lib/patient-diary-metadata';
 import { ClinicalRichTextContent } from '@/components/clinical-rich-text-content';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useLiveQuery } from '@/lib/live-query';
@@ -33,6 +37,13 @@ const TYPE_LABELS: Record<string, string> = {
     'remote': 'Remoto',
     'note': 'Nota',
     'scale': 'Scala'
+};
+
+const PATIENT_TYPE_LABELS: Record<string, string> = {
+    'phone': 'Telefonata',
+    'exam': 'Esame',
+    'hospitalization': 'Ricovero',
+    'access': 'Accesso'
 };
 
 function firstMetadataText(metadata: unknown, keys: string[]): string | undefined {
@@ -104,6 +115,7 @@ function EntryAttachments({ attachmentIds, onView }: { attachmentIds: string[], 
 
 interface TimelineEntryCardProps {
     entry: TimelineEntryData;
+    patientDiary?: boolean;
     active?: boolean;
     position?: number;
     setSize?: number;
@@ -115,6 +127,7 @@ interface TimelineEntryCardProps {
 
 export function TimelineEntryCard({
     entry,
+    patientDiary = false,
     active = false,
     position,
     setSize,
@@ -124,13 +137,24 @@ export function TimelineEntryCard({
     onViewAttachment,
 }: TimelineEntryCardProps) {
     const { proposal } = useRuntimeTwinDesign();
+    const diaryPresentation = proposal && patientDiary;
     const isDeleted = !!entry.deletedAt;
     const Icon = TYPE_ICONS[entry.type] || FileText;
-    const presentation = presentEntry(entry);
+    const diaryMetadata = diaryPresentation ? readPatientDiaryMetadata(entry.metadata) : null;
+    const metadataUnreadable = diaryMetadata?.state === 'unreadable';
+    const workflowStatus = firstMetadataText(diaryMetadata?.value, ['workflowStatus', 'status'])?.toLocaleLowerCase('it-IT');
+    const stateRecognized = !workflowStatus || ['draft', 'bozza', 'signed', 'firmata', 'registered', 'registrata'].includes(workflowStatus);
+    const settingLabel = entry.setting === 'home' ? 'Assistenza domiciliare' : entry.setting === 'hospital' ? 'Ospedale' : entry.setting === 'ambulatory' ? 'Ambulatorio' : undefined;
+    const basePresentation = presentEntry(diaryMetadata ? { ...entry, metadata: diaryMetadata.value } : entry);
+    const stateKnown = isDeleted || (!metadataUnreadable && stateRecognized);
+    const presentation = { ...basePresentation,
+        source: metadataUnreadable ? 'Non leggibile' : basePresentation.source,
+        stateLabel: isDeleted ? basePresentation.stateLabel : metadataUnreadable ? 'Stato non leggibile' : !stateRecognized ? 'Stato non riconosciuto' : basePresentation.stateLabel,
+    };
 
     return (
         <article
-            className={`group relative pl-8 outline-none ${proposal ? twin.entry : ''} ${isDeleted ? 'opacity-60 grayscale' : ''}`}
+            className={`group relative pl-8 outline-none ${proposal ? twin.entry : ''} ${diaryPresentation ? twin.patientEntry : ''} ${isDeleted ? 'opacity-60 grayscale' : ''}`}
             data-active={active ? 'true' : 'false'}
             data-lume-entry-state={presentation.draft ? 'draft' : 'settled'}
             aria-current={active ? 'true' : undefined}
@@ -147,6 +171,11 @@ export function TimelineEntryCard({
                 tone={isDeleted ? 'critical' : 'accent'}
             />}
 
+            {diaryPresentation ? <time className={twin.margin} dateTime={new Date(entry.date).toISOString()}>
+                <span>{format(new Date(entry.date), 'dd MMM yyyy', { locale: it })}</span>
+                <span>{format(new Date(entry.date), 'HH:mm', { locale: it })}</span>
+            </time> : null}
+
             {/* Content */}
             <div className={`rounded-[var(--lume-radius-card)] p-5 group-focus-visible:shadow-[var(--lume-focus-ring)] ${isDeleted ? 'border border-[color:var(--lume-signal-critical)] bg-[color:var(--lume-surface-field)]' : active && !proposal ? 'lume-focal' : 'bg-[color:var(--lume-surface-field)]'}`}>
                 <div className={`flex justify-between items-start mb-3 ${proposal ? twin.header : ''}`}>
@@ -156,16 +185,17 @@ export function TimelineEntryCard({
                         </div>}
                         <div className={proposal ? twin.identity : undefined}>
                             <span className="block text-xs font-semibold uppercase" style={{ color: isDeleted ? 'var(--lume-signal-critical)' : 'var(--lume-accent)' }}>
-                                {TYPE_LABELS[entry.type] || (proposal && entry.type === 'phone' ? 'Telefonata' : entry.type)}
+                                {TYPE_LABELS[entry.type] || (diaryPresentation ? PATIENT_TYPE_LABELS[entry.type] : undefined) || (proposal && entry.type === 'phone' ? 'Telefonata' : entry.type)}
                                 {entry.patientName && <span className="ml-1 font-normal normal-case" style={{ color: 'var(--lume-ink-muted)' }}> - <PrivacyBlur>{entry.patientName}</PrivacyBlur></span>}
                             </span>
                             <div className="lume-registro mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
-                                <span className="rounded-md border border-[color:var(--lume-border-color)] px-1.5 py-0.5 font-semibold uppercase">
+                                {!diaryPresentation ? <span className="rounded-md border border-[color:var(--lume-border-color)] px-1.5 py-0.5 font-semibold uppercase">
                                     {presentation.stateLabel}
-                                </span>
-                                <span className="lume-registro">{format(new Date(entry.date), 'dd MMMM yyyy HH:mm', { locale: it })}</span>
-                                <span>{proposal ? '' : 'Fonte: '}{presentation.source}</span>
-                                {presentation.author ? <span>Autore: {presentation.author}</span> : null}
+                                </span> : null}
+                                {!diaryPresentation ? <span className="lume-registro">{format(new Date(entry.date), 'dd MMMM yyyy HH:mm', { locale: it })}</span> : null}
+                                {diaryPresentation && settingLabel && settingLabel !== presentation.source ? <span>{settingLabel}</span> : null}
+                                <span>{proposal && !diaryPresentation ? '' : 'Fonte: '}{presentation.source}</span>
+                                {presentation.author && !diaryPresentation ? <span>Autore: {presentation.author}</span> : null}
                                 {!proposal && entry.setting && (
                                     <span className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 ${entry.setting === 'home' ? 'border-[color:var(--lume-signal-warning)] text-[color:var(--lume-signal-warning)]' : 'border-[color:var(--lume-signal-success)] text-[color:var(--lume-signal-success)]'}`}>
                                         {entry.setting === 'home' ? <Home className="w-3 h-3" /> : <Building2 className="w-3 h-3" />}
@@ -176,6 +206,13 @@ export function TimelineEntryCard({
                         </div>
                     </div>
 
+                    {diaryPresentation ? <div className="shrink-0">
+                        {isDeleted ? onRestore && <Button variant="text" onClick={() => onRestore(entry)} aria-label="Ripristina voce clinica"><Undo size={16} aria-hidden />Ripristina</Button>
+                            : onDelete && <PatientSheetMenu label={`Azioni voce ${entry.title || 'clinica'}`}
+                                trigger={props => <Button {...props} variant="icon" aria-label={`Azioni voce ${entry.title || 'clinica'}`}><MoreHorizontal size={16} aria-hidden /></Button>}>
+                                <button type="button" role="menuitem" onClick={() => onDelete(entry)}>Elimina voce clinica con motivazione</button>
+                            </PatientSheetMenu>}
+                    </div> : <>
                     {/* Actions */}
                     <div className="flex items-center gap-2">
                         {isDeleted ? (
@@ -202,6 +239,8 @@ export function TimelineEntryCard({
                             )
                         )}
                     </div>
+                    </>}
+
                 </div>
 
                 {/* Deleted Reason Banner */}
@@ -219,12 +258,21 @@ export function TimelineEntryCard({
                     </div>
                 )}
 
+                {diaryPresentation && entry.title ? <h4 className={twin.entryTitle}><PrivacyBlur>{entry.title}</PrivacyBlur></h4> : null}
+
                 {/* Main Text Content */}
                 <div style={{ color: presentation.draft ? 'var(--lume-ink-muted)' : 'var(--lume-ink)' }}>
                     <PrivacyBlur>
                         <ClinicalRichTextContent content={entry.content} className="prose prose-sm max-w-none prose-p:leading-relaxed dark:prose-invert" />
                     </PrivacyBlur>
                 </div>
+
+                {diaryPresentation ? <div className={twin.registration}>
+                    {stateKnown ? <InkState state={presentation.draft ? 'fresh' : 'dry'}>{presentation.stateLabel}</InkState> : <span>{presentation.stateLabel}</span>}
+                    {presentation.author ? <span>Autore: {presentation.author}</span> : null}
+                </div> : null}
+
+                {metadataUnreadable ? <p className={twin.metadataNotice} role="status">Metadati della voce non leggibili. Autore, fonte e stato non verificabili.</p> : null}
 
                 {/* Attachments List */}
                 {entry.attachments && entry.attachments.length > 0 && !isDeleted && onViewAttachment && (
