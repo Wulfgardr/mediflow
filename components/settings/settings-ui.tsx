@@ -16,7 +16,7 @@ const PROPOSAL_INTRO_COPY: Record<string, string> = {
     Profilo: 'Nome usato nei documenti.',
     Aspetto: 'Tema, movimento e accessibilità.',
     Ambulatori: 'Sedi e contesti di lavoro.',
-    Accesso: 'PIN e sessione.',
+    Accesso: 'Passphrase, PIN e blocco della sessione.',
     'Backup e ripristino': 'Pianificazione e ripristino dei backup locali.',
     'Evidenze e conformità': 'Evidenze tecniche, non una certificazione.',
     Repertori: 'Farmaci AIFA, esenzioni e WHO ICD-11.',

@@ -3,17 +3,17 @@
 // WUL-297 Accesso: PIN rotation moved from the monolithic settings page.
 
 import { useState } from 'react';
-import { KeyRound, Lock, Shield } from 'lucide-react';
+import { Lock, Shield } from 'lucide-react';
+import { Disclosure } from '@/components/disclosure';
+import styles from '@/components/settings/account-pages.module.css';
 import { cn } from '@/lib/utils';
 import { useSecurity } from '@/components/security-provider';
 import { PassphraseAccessForm } from '@/components/recovery-kit';
 import {
-    SETTINGS_CARD_CLASS,
     SETTINGS_INPUT_CLASS,
     SETTINGS_LABEL_CLASS,
     SETTINGS_PRIMARY_BUTTON_CLASS,
     SETTINGS_SECONDARY_BUTTON_CLASS,
-    SettingsSectionIntro,
 } from '@/components/settings/settings-ui';
 
 export default function SettingsAccessPage() {
@@ -22,6 +22,7 @@ export default function SettingsAccessPage() {
     const passphrase = unlockCredential === 'passphrase';
     const [pinForm, setPinForm] = useState({ currentPin: '', newPin: '', confirmPin: '' });
     const [isChangingPin, setIsChangingPin] = useState(false);
+    const [openForm, setOpenForm] = useState<'passphrase' | 'pin' | null>('passphrase');
     const [pinFeedback, setPinFeedback] = useState<null | { tone: 'success' | 'error'; message: string }>(null);
 
     const handleChangePin = async () => {
@@ -48,165 +49,70 @@ export default function SettingsAccessPage() {
     };
 
     return (
-        <section className="space-y-4" data-testid="settings-access-section">
-            <SettingsSectionIntro
-                kicker="Dati e sicurezza"
-                title="Accesso"
-                description={passphrase
-                    ? 'Sblocco con passphrase, PIN di conferma e controllo della sessione.'
-                    : 'Accesso PIN transitorio: adotta una passphrase per proteggere l’archivio.'}
-            />
+        <section className={styles.page} data-testid="settings-access-section">
+            <header className={styles.intro}>
+                <h2>Accesso</h2>
+                <p>Passphrase, PIN e blocco della sessione.</p>
+            </header>
 
-            {!passphrase && <div className={`${SETTINGS_CARD_CLASS} space-y-4`}>
-                <h2 className="font-semibold">Passa dal PIN alla passphrase</h2>
-                <p>Il PIN attuale è una protezione transitoria. La passphrase aprirà l’archivio; il PIN resterà solo per le conferme. I backup e le copie Time Machine precedenti non vengono ripuliti. Dopo un ricaricamento, usa Rinnova accesso e inserisci di nuovo il PIN prima di preparare il kit.</p>
-                <PassphraseAccessForm mode="adopt" onPrepare={preparePassphraseChange} />
-            </div>}
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {passphrase ? (
-                <div className={SETTINGS_CARD_CLASS} data-testid="settings-access-passphrase">
-                    <div className="mb-5 flex items-start gap-3">
-                        <div className="rounded-2xl p-2" style={{ background: 'color-mix(in srgb, var(--lume-ink) 6%, transparent)', color: 'var(--lume-ink)' }}>
-                            <KeyRound className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="section-kicker">Sicurezza</p>
-                            <h2 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Sblocco con passphrase</h2>
-                            <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
-                                Questo archivio si sblocca con la passphrase. Il PIN resta per le conferme di revisione e di ruolo: non apre l’archivio.
-                            </p>
-                        </div>
-                    </div>
-                    <div className="mf-section">
-                        <p className="text-xs leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
-                            Il cambio aggiorna passphrase e kit di recupero. Il PIN di conferma rimane separato e invariato.
-                        </p>
-                        <PassphraseAccessForm mode="change" onPrepare={preparePassphraseChange} />
-                    </div>
+            <Disclosure title={passphrase ? 'Sblocco con passphrase' : 'Passa dal PIN alla passphrase'} headingLevel={3}
+                className={styles.section} open={openForm === 'passphrase'}
+                onOpenChange={open => setOpenForm(open ? 'passphrase' : null)}>
+                <div className={styles.form} data-testid={passphrase ? 'settings-access-passphrase' : 'settings-access-adopt'}>
+                    {passphrase ? <>
+                        <p className={styles.copy}>Questo archivio si sblocca con la passphrase. Il PIN resta per le conferme di revisione e di ruolo: non apre l’archivio.</p>
+                        <p className={styles.copy}>Il cambio aggiorna passphrase e kit di recupero. Il PIN di conferma rimane separato e invariato.</p>
+                    </> : <p className={styles.copy}>Il PIN attuale è una protezione transitoria. La passphrase aprirà l’archivio; il PIN resterà solo per le conferme. I backup e le copie Time Machine precedenti non vengono ripuliti. Dopo un ricaricamento, usa Rinnova accesso e inserisci di nuovo il PIN prima di preparare il kit.</p>}
+                    <PassphraseAccessForm mode={passphrase ? 'change' : 'adopt'} onPrepare={preparePassphraseChange} />
                 </div>
-                ) : (
-                <div className={SETTINGS_CARD_CLASS}>
-                    {/* WUL-229: security card icon switches to MediFlow warning tone */}
-                    <div className="mb-5 flex items-start gap-3">
-                        <div className="rounded-2xl p-2" style={{ background: 'color-mix(in srgb, var(--lume-ink) 6%, transparent)', color: 'var(--lume-ink)' }}>
-                            <KeyRound className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="section-kicker">Sicurezza</p>
-                            <h2 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Cambio PIN</h2>
-                            <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Ruota il PIN senza toccare la master key: i dati clinici restano leggibili.</p>
-                        </div>
+            </Disclosure>
+
+            {!passphrase && <Disclosure title="Cambio PIN" headingLevel={3} className={styles.section}
+                open={openForm === 'pin'} onOpenChange={open => setOpenForm(open ? 'pin' : null)}>
+                <div className={styles.form} aria-busy={isChangingPin}>
+                    <p className={styles.copy}>Cambia il PIN mantenendo accessibili i dati clinici.</p>
+                    <div>
+                        <label htmlFor="current-pin" className={SETTINGS_LABEL_CLASS}>PIN attuale</label>
+                        <input id="current-pin" name="currentPin" type="password" inputMode="numeric"
+                            value={pinForm.currentPin} onChange={e => setPinForm({ ...pinForm, currentPin: e.target.value })}
+                            placeholder="Inserisci il PIN attuale" autoComplete="current-password" spellCheck={false} className={SETTINGS_INPUT_CLASS} />
                     </div>
-
-                    <div className="space-y-4">
-                        <div>
-                            <label htmlFor="current-pin" className={SETTINGS_LABEL_CLASS}>
-                                PIN attuale
-                            </label>
-                            <input
-                                id="current-pin"
-                                name="currentPin"
-                                type="password"
-                                inputMode="numeric"
-                                value={pinForm.currentPin}
-                                onChange={(e) => setPinForm({ ...pinForm, currentPin: e.target.value })}
-                                placeholder="Inserisci il PIN attuale"
-                                autoComplete="current-password"
-                                spellCheck={false}
-                                className={SETTINGS_INPUT_CLASS}
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="new-pin" className={SETTINGS_LABEL_CLASS}>
-                                Nuovo PIN
-                            </label>
-                            <input
-                                id="new-pin"
-                                name="newPin"
-                                type="password"
-                                inputMode="numeric"
-                                value={pinForm.newPin}
-                                onChange={(e) => setPinForm({ ...pinForm, newPin: e.target.value })}
-                                placeholder="4-8 caratteri"
-                                autoComplete="new-password"
-                                spellCheck={false}
-                                className={SETTINGS_INPUT_CLASS}
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="confirm-pin" className={SETTINGS_LABEL_CLASS}>
-                                Conferma nuovo PIN
-                            </label>
-                            <input
-                                id="confirm-pin"
-                                name="confirmPin"
-                                type="password"
-                                inputMode="numeric"
-                                value={pinForm.confirmPin}
-                                onChange={(e) => setPinForm({ ...pinForm, confirmPin: e.target.value })}
-                                placeholder="Ripeti il nuovo PIN"
-                                autoComplete="new-password"
-                                spellCheck={false}
-                                className={SETTINGS_INPUT_CLASS}
-                            />
-                        </div>
-
-                        {pinFeedback && (
-                            // WUL-229: PIN feedback now uses the mf-alert tone primitives
-                            <div className={cn('mf-alert text-xs', pinFeedback.tone === 'success' ? 'mf-alert-success' : 'mf-alert-critical')}>
-                                {pinFeedback.message}
-                            </div>
-                        )}
-
-                        <div className="pt-2">
-                            <button
-                                onClick={handleChangePin}
-                                disabled={isChangingPin}
-                                className={SETTINGS_PRIMARY_BUTTON_CLASS}
-                            >
-                                <Shield className="w-4 h-4" />
-                                {isChangingPin ? 'Aggiornamento...' : 'Aggiorna PIN'}
-                            </button>
-                        </div>
+                    <div>
+                        <label htmlFor="new-pin" className={SETTINGS_LABEL_CLASS}>Nuovo PIN</label>
+                        <input id="new-pin" name="newPin" type="password" inputMode="numeric"
+                            value={pinForm.newPin} onChange={e => setPinForm({ ...pinForm, newPin: e.target.value })}
+                            placeholder="4-8 caratteri" autoComplete="new-password" spellCheck={false} className={SETTINGS_INPUT_CLASS} />
                     </div>
-                </div>
-                )}
-
-                {/* WUL-297: sessione locale corrente, con blocco immediato. */}
-                <div className={SETTINGS_CARD_CLASS}>
-                    <div className="mb-5 flex items-start gap-3">
-                        <div className="rounded-2xl p-2" style={{ background: 'color-mix(in srgb, var(--lume-ink) 6%, transparent)', color: 'var(--lume-ink)' }}>
-                            <Lock className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="section-kicker">Sessione</p>
-                            <h2 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Sessione corrente</h2>
-                            <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
-                                Una sola sessione attiva su questa postazione. Il blocco richiede {passphrase ? 'la passphrase' : 'il PIN'} al prossimo accesso.
-                            </p>
-                        </div>
+                    <div>
+                        <label htmlFor="confirm-pin" className={SETTINGS_LABEL_CLASS}>Conferma nuovo PIN</label>
+                        <input id="confirm-pin" name="confirmPin" type="password" inputMode="numeric"
+                            value={pinForm.confirmPin} onChange={e => setPinForm({ ...pinForm, confirmPin: e.target.value })}
+                            placeholder="Ripeti il nuovo PIN" autoComplete="new-password" spellCheck={false} className={SETTINGS_INPUT_CLASS} />
                     </div>
-
-                    <div className="space-y-4">
-                        <div className="mf-section">
-                            <p className="section-kicker">Operatore</p>
-                            <p className="mt-2 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>{user?.displayName || 'Admin'}</p>
-                            <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>{user?.ambulatoryName || 'Ambulatorio non impostato'}</p>
-                        </div>
-
-                        <button
-                            type="button"
-                            onClick={() => lock()}
-                            className={SETTINGS_SECONDARY_BUTTON_CLASS}
-                        >
-                            <Lock className="h-4 w-4" />
-                            {passphrase ? 'Blocca sessione adesso' : 'Rinnova accesso'}
+                    {pinFeedback && <div role="status" className={cn('mf-alert text-xs', pinFeedback.tone === 'success' ? 'mf-alert-success' : 'mf-alert-critical')}>
+                        {pinFeedback.message}
+                    </div>}
+                    <div className={styles.actions}>
+                        <button onClick={handleChangePin} disabled={isChangingPin} className={SETTINGS_PRIMARY_BUTTON_CLASS}>
+                            <Shield className="w-4 h-4" />{isChangingPin ? 'Aggiornamento...' : 'Aggiorna PIN'}
                         </button>
                     </div>
                 </div>
-            </div>
+            </Disclosure>}
+
+            <section className={styles.section} aria-labelledby="settings-current-session-title">
+                <h3 id="settings-current-session-title" className={styles.heading}>Sessione corrente</h3>
+                <div className={styles.row}>
+                    <div>
+                        <p className={styles.strong}>{user?.displayName || 'Admin'}</p>
+                        <p className={styles.copy}>{user?.ambulatoryName || 'Ambulatorio non impostato'}</p>
+                        <p className={styles.copy}>Una sola sessione attiva su questa postazione. Il blocco richiede {passphrase ? 'la passphrase' : 'il PIN'} al prossimo accesso.</p>
+                    </div>
+                    <button type="button" onClick={() => lock()} className={SETTINGS_SECONDARY_BUTTON_CLASS}>
+                        <Lock className="h-4 w-4" />{passphrase ? 'Blocca sessione adesso' : 'Rinnova accesso'}
+                    </button>
+                </div>
+            </section>
         </section>
     );
 }
