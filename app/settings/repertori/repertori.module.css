@@ -1,0 +1,5 @@
+.page { min-width: 0; color: var(--lume-ink); font: var(--type-body); }
+.intro { margin-bottom: 28px; }
+.intro h2 { margin: 0 0 8px; }
+.intro p { max-width: 64ch; color: var(--lume-ink-muted); }
+.rows { min-width: 0; display: grid; }
