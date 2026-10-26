@@ -266,6 +266,11 @@ export function deleteAmbulatory(context: AmbulatoryCoreContext, id: string, exp
         if (linkedPrimaryPatient || linkedPatientAssignment) {
             return { status: 409, value: { error: 'Ambulatory still has linked patients. Move/unassign patients before deletion.' } };
         }
+        const childAmbulatory = tx.select({ id: ambulatories.id }).from(ambulatories)
+            .where(eq(ambulatories.parentId, id)).limit(1).get();
+        if (childAmbulatory) {
+            return { status: 409, value: { error: 'Ambulatory still has child ambulatories. Move them before deletion.' } };
+        }
         let fallback: AmbulatoryRow | undefined;
         if (existing.isDefault) {
             fallback = tx.select().from(ambulatories).where(ne(ambulatories.id, id)).orderBy(desc(ambulatories.createdAt)).get();
