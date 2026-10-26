@@ -1,10 +1,9 @@
-/* real authenticated reads and lock; only response delivery is delayed. */
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession, unlockIfNeeded } from './utils';
 import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
-test('locking retires the pending model footer read before its response or fallback', async ({ page }) => {
+test('archived summaries do not attribute the current model, before or after locking', async ({ page }) => {
     const pin = process.env.E2E_PIN || '1234';
     await bootstrapUnlockedSession(page, pin);
     const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
@@ -18,8 +17,6 @@ test('locking retires the pending model footer read before its response or fallb
     const baseline = await page.request.get(`/api/patients/${patient.id}`);
     expect(baseline.status()).toBe(200);
     const { version } = await baseline.json() as { version: number };
-    // persisted insights belong to the versioned update contract;
-    // patient creation intentionally does not accept this field.
     const updated = await page.request.put(`/api/patients/${patient.id}`, { headers: archiveHeaders, data: {
         version, documentInsights: JSON.stringify([{
             id: marker, date: new Date().toISOString(), fileName: 'Evidenza sintetica',
@@ -30,66 +27,42 @@ test('locking retires the pending model footer read before its response or fallb
     const reread = await page.request.get(`/api/patients/${patient.id}`);
     expect(reread.status()).toBe(200);
     expect((await reread.json()).documentInsights).toContain(marker);
-    let received = () => {};
-    const arrival = new Promise<void>(resolve => { received = resolve; });
-    let release = () => {};
-    const delivery = new Promise<void>(resolve => { release = resolve; });
     const reads: string[] = [];
-    const aborted: string[] = [];
-    const errors: Array<{ text: string; url: string; locked: boolean }> = [];
-    let locked = false;
-    const lateReads: string[] = [];
+    const errors: string[] = [];
     page.on('console', message => {
-        if (message.type() === 'error') errors.push({ text: message.text(), url: message.location().url, locked });
+        if (message.type() === 'error') errors.push(message.text());
     });
-    page.on('pageerror', error => errors.push({ text: error.message, url: '', locked }));
+    page.on('pageerror', error => errors.push(error.message));
     page.on('request', request => {
         const pathname = new URL(request.url()).pathname;
-        if (pathname === '/api/auth/lock' && request.method() === 'POST') locked = true;
         if (pathname === '/api/settings/aiModel' || pathname === '/api/settings/aiModel_clinical') {
             reads.push(pathname);
-            if (locked) lateReads.push(pathname);
         }
-    });
-    page.on('requestfailed', request => {
-        if (new URL(request.url()).pathname === '/api/settings/aiModel_clinical') aborted.push(request.failure()?.errorText ?? '');
-    });
-    await page.route('**/api/settings/aiModel_clinical', async route => {
-        const response = await route.fetch();
-        expect([200, 404]).toContain(response.status());
-        received();
-        await delivery;
-        await route.fulfill({ response });
     });
     try {
         await page.goto(`/patients/${patient.id}/modules#documenti`);
-        await arrival;
+        await page.getByRole('button', { name: 'Sintesi archiviate · 1', exact: true }).click();
+        const archive = page.getByTestId('document-insights-archive');
+        await archive.getByRole('button').filter({ hasText: 'Evidenza sintetica' }).click();
+        await expect(archive.getByText('Nessun dato reale.', { exact: true })).toBeVisible();
+        await expect(archive).toContainText('Il modello usato per ciascuna sintesi non è registrato nell’archivio.');
+        await expect(archive).not.toContainText('Modello configurato ora:');
+        await page.waitForLoadState('networkidle');
+        expect(reads).toEqual([]);
         const confirmed = page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/lock');
         await page.getByRole('button', { name: 'Blocca', exact: true }).click();
         expect((await confirmed).status()).toBe(200);
         await expect(page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true })).toBeVisible();
-        // Development StrictMode can retire the first hook lifetime and mount the
-        // replacement before the lock. Both reads are real pending page reads:
-        // locking must abort every one, without a legacy fallback or a late read.
-        const readsAtLock = [...reads];
-        expect(readsAtLock).not.toHaveLength(0);
-        expect(readsAtLock).toEqual(readsAtLock.map(() => '/api/settings/aiModel_clinical'));
-        await expect.poll(() => aborted).toEqual(readsAtLock.map(() => 'net::ERR_ABORTED'));
-        release();
+        await expect(archive).toHaveCount(0);
         await page.waitForLoadState('networkidle');
-        expect(reads).toEqual(readsAtLock);
-        expect(lateReads).toEqual([]);
+        expect(reads).toEqual([]);
         expect(errors).toEqual([]);
-        await page.unrouteAll({ behavior: 'wait' });
-        locked = false;
         await unlockIfNeeded(page, pin);
         await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
         await page.waitForLoadState('networkidle');
+        expect(reads).toEqual([]);
         expect(errors).toEqual([]);
     } finally {
-        release();
-        await page.unrouteAll({ behavior: 'wait' });
-        // Preserve a failed fixture for triage; remove only after ordinary unlock.
         if (await page.getByRole('navigation', { name: 'Navigazione principale', exact: true }).isVisible()) {
             const current = await page.request.get(`/api/patients/${patient.id}`);
             expect(current.status()).toBe(200);
