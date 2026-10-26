@@ -67,6 +67,7 @@ test('access and profile settings preserve form drafts and denied outcomes', asy
     test.setTimeout(120_000); requireSynthetic(baseURL);
     const zoom = await openBrowserZoomFixture(baseURL!), page = zoom.page;
     const errors: string[] = [];
+    const releaseGates: Array<() => void> = [];
     page.on('pageerror', error => errors.push(error.message));
     await protect(page, baseURL!);
     const go = async (path: string) => { await page.goto(new URL(path, baseURL!).href); await unlockIfNeeded(page, '1234'); };
@@ -99,7 +100,7 @@ test('access and profile settings preserve form drafts and denied outcomes', asy
         await expect(page.getByRole('button', { name: 'Cambio PIN', exact: true })).toBeFocused();
         await expect(page.locator('#new-pin')).toHaveValue('5678');
         let pinPosts = 0, releasePin!: () => void;
-        const pinGate = new Promise<void>(resolve => { releasePin = resolve; });
+        const pinGate = new Promise<void>(resolve => { releasePin = resolve; releaseGates.push(resolve); });
         await page.route('**/api/auth/change-pin', async route => {
             pinPosts++; await pinGate;
             await route.fulfill({ status: 403, json: { error: 'Diniego sintetico cambio PIN' } });
@@ -112,17 +113,17 @@ test('access and profile settings preserve form drafts and denied outcomes', asy
         await page.unroute('**/api/auth/change-pin');
         await page.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
         await expect(page.getByLabel('MediFlow lock screen', { exact: true })).toBeVisible();
-        await unlockIfNeeded(page, '1234');
+        await test.step('ordinary unlock after Access lock', () => unlockIfNeeded(page, '1234'));
 
         let releaseRead!: () => void;
-        const readGate = new Promise<void>(resolve => { releaseRead = resolve; });
+        const readGate = new Promise<void>(resolve => { releaseRead = resolve; releaseGates.push(resolve); });
         let holdRead = true, failRead = false;
         await page.route('**/api/auth/profile', async route => {
             if (route.request().method() !== 'GET') return route.continue();
             if (holdRead) await readGate;
             return failRead ? route.fulfill({ status: 503, json: { error: 'Lettura sintetica indisponibile' } }) : route.continue();
         });
-        await go('/settings/profilo');
+        await test.step('navigate to Profile and ordinary unlock', () => go('/settings/profilo'));
         const profile = page.getByTestId('settings-profile-section'), name = page.getByLabel('Nome medico', { exact: true });
         const save = page.getByRole('button', { name: 'Salva profilo', exact: true });
         await expect(profile.getByRole('status').filter({ hasText: 'Caricamento del profilo…' })).toBeVisible();
@@ -177,7 +178,7 @@ test('access and profile settings preserve form drafts and denied outcomes', asy
         await page.getByRole('link', { name: 'Profilo', exact: true }).click(); await expect(name).toHaveValue('Bozza W19 inventata non salvata');
 
         expect(errors).toEqual([]);
-    } finally { await zoom.close(); }
+    } finally { for (const release of releaseGates) release(); await page.unrouteAll({ behavior: 'ignoreErrors' }); await zoom.close(); }
 });
 
 
