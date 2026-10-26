@@ -1320,6 +1320,7 @@ fn g1a2_old_authority_callback_preserves_new_session_form_and_writer_fence(
 fn enlarged_draft_keeps_a_readable_editor_and_reaches_review_in_the_same_scroll(
     cx: &mut gpui::TestAppContext,
 ) {
+    cx.update(bind_keys);
     let host = Host::new();
     let (app, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
     open(&app, &host, cx);
@@ -1356,6 +1357,7 @@ fn enlarged_draft_keeps_a_readable_editor_and_reaches_review_in_the_same_scroll(
             draw(cx);
             cx.simulate_keystrokes("tab");
             draw(cx);
+            cx.update(|window, cx| assert!(app.read(cx).form_actions[1].focus.is_focused(window)));
             let review = cx.debug_bounds("clinical-workspace-review-save").unwrap();
             assert!(
                 review.top() >= viewport.top()
