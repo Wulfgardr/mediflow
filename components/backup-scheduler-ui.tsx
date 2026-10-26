@@ -1,8 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle, Clock3, FolderArchive, RefreshCw, Save } from 'lucide-react';
+import { AlertTriangle, CheckCircle, FolderArchive, RefreshCw, Save } from 'lucide-react';
 import styles from '@/components/settings/settings-lume.module.css';
+import { Disclosure } from './disclosure';
+import { ViewState } from './ui/view-state';
+import composition from './settings/backup-composition.module.css';
 
 type BackupSchedulerResponse = {
     supported: boolean;
@@ -60,7 +63,7 @@ const INPUT_CLASS = 'mf-input mt-1 p-3';
 const PRIMARY_BUTTON_CLASS = 'ui-btn-primary lume-press px-5 py-2.5 disabled:cursor-not-allowed disabled:opacity-50';
 const SECONDARY_BUTTON_CLASS = 'mf-btn-secondary lume-press px-4 py-2.5 disabled:cursor-not-allowed disabled:opacity-50';
 
-export default function BackupSchedulerUI() {
+export default function BackupSchedulerUI({ primary = true }: { primary?: boolean }) {
     const [status, setStatus] = useState<BackupSchedulerResponse | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -236,17 +239,13 @@ export default function BackupSchedulerUI() {
     const schedulingUnsupported = Boolean(status && !status.supported);
 
     return (
-        <div className={styles.backupSchedule}>
+        <div className={composition.scheduler}>
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <p className="section-kicker">Continuità operativa</p>
-                    <h3 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--lume-ink)' }}>
-                        <Clock3 className="w-5 h-5 text-[color:var(--lume-ink-secondary)]" />
-                        Backup automatico notturno
-                    </h3>
-                    <p className="mt-2 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
-                        Schedulazione cross-platform: LaunchAgent su macOS, Task Scheduler su Windows, systemd-timer o cron su Linux. Il runner headless locale e lo stesso ovunque.
-                    </p>
+                    <p>Imposta orario, cartella e numero di copie da conservare.</p>
+                    <Disclosure title="Dettagli della pianificazione">
+                        <p>Schedulazione cross-platform: LaunchAgent su macOS, Task Scheduler su Windows, systemd-timer o cron su Linux. Il runner headless locale e lo stesso ovunque.</p>
+                    </Disclosure>
                 </div>
                 {status && (
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${status.installed ? 'graphite-chip-tone-success' : 'graphite-chip-tone-muted'}`}>
@@ -255,6 +254,9 @@ export default function BackupSchedulerUI() {
                 )}
             </div>
 
+            {isLoading ? <ViewState state="loading" title="Lettura della pianificazione…" />
+                : !status ? <ViewState state="unavailable" title="Pianificazione non disponibile" detail={message?.text}
+                    action={{ label: 'Rileggi stato', onClick: () => void load() }} /> : null}
             {status?.observationMessage && <p role="alert" className="text-sm text-[color:var(--lume-signal-warning)]">{status.observationMessage}</p>}
             {!isLoading && schedulingUnsupported && (
                 <div className="mf-alert mf-alert-warning px-3 py-2 text-sm">
@@ -262,7 +264,7 @@ export default function BackupSchedulerUI() {
                 </div>
             )}
 
-            <div className={styles.backupFields}>
+            <div className={composition.fields} hidden={!status}>
                 <label className={styles.backupField}>
                     <span>Attiva backup notturno</span>
                     <input
@@ -309,18 +311,19 @@ export default function BackupSchedulerUI() {
                 </label>
             </div>
 
-            <div className={styles.supportingCopy}>
-                La retention automatica e limitata ai file `mediflow-backup-v1-*.mediflow` e ai `.tmp` orfani nella cartella configurata. Nessun allegato clinico o file arbitrario viene toccato.
-            </div>
+            <Disclosure title="Quali file vengono rimossi">
+                <p>La retention automatica e limitata ai file `mediflow-backup-v1-*.mediflow` e ai `.tmp` orfani nella cartella configurata. Nessun allegato clinico o file arbitrario viene toccato.</p>
+            </Disclosure>
 
             <div className={styles.backupActions}>
-                <button type="button" onClick={() => void load()} disabled={isLoading || isSaving || isRunning} className={SECONDARY_BUTTON_CLASS}>
+                {status ? <button type="button" onClick={() => void load()} disabled={isLoading || isSaving || isRunning} className={SECONDARY_BUTTON_CLASS}>
                     <RefreshCw className="w-4 h-4" /> Rileggi stato
-                </button>
+                </button> : null}
                 <button
                     onClick={save}
                     disabled={isSaving || isLoading || !status || status.installed === null || schedulingUnsupported}
-                    className={PRIMARY_BUTTON_CLASS}
+                    className={primary ? PRIMARY_BUTTON_CLASS : SECONDARY_BUTTON_CLASS}
+                    data-backup-primary={primary || undefined}
                 >
                     {isSaving ? <RefreshCw className="w-4 h-4" /> : <Save className="w-4 h-4" />}
                     Salva schedulazione
@@ -356,7 +359,7 @@ export default function BackupSchedulerUI() {
             </div>
 
             {lastRun && (
-                <div className="mf-section mf-section-tight space-y-1 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
+                <Disclosure title="Ultima esecuzione e pulizia">
                     <p><strong>Ultimo run:</strong> {lastRun.lastRunAt ?? 'mai eseguito'}</p>
                     <p><strong>Esito:</strong> {lastRun.lastRunStatus ?? 'n/d'}</p>
                     {lastRun.lastRunMessage && <p><strong>Messaggio:</strong> {lastRun.lastRunMessage}</p>}
@@ -368,7 +371,7 @@ export default function BackupSchedulerUI() {
                         </p>
                     )}
                     {status?.plistPath && <p><strong>LaunchAgent:</strong> <code>{status.plistPath}</code></p>}
-                </div>
+                </Disclosure>
             )}
 
             {retentionPreview && (
@@ -391,7 +394,7 @@ export default function BackupSchedulerUI() {
                 </div>
             )}
 
-            {message && (
+            {message && status && (
                 <div role={message.type === 'error' ? 'alert' : 'status'} className={`mf-alert px-4 py-3 flex items-center gap-2 text-sm ${
                     message.type === 'success'
                         ? 'mf-alert-success'

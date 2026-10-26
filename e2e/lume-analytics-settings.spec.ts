@@ -235,7 +235,7 @@ async function verifySettings(page: Page, viewCase: ViewCase): Promise<void> {
   })));
   expect(primaryCounts).toEqual([
     { section: 'system-status', primary: 1 },
-    { section: 'appearance-preview', primary: 1 },
+    { section: 'appearance-preview', primary: 0 },
   ]);
 
   const networkValue = page.getByTestId('settings-network-mode-value');
