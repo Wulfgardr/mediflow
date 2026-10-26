@@ -18,7 +18,7 @@ typedef struct {
     uint32_t host_hash_length;
 } MFChatPeer;
 
-extern void MFAmbulatoryWindowLockEvent(int isUnlocked);
+extern void MFAmbulatoryWindowLockEvent(int permitsFreshAuth);
 
 static atomic_uint_fast64_t lockEpoch = 0;
 static atomic_bool screenLocked = false;
@@ -65,6 +65,9 @@ void MFChatInstallLockObserver(void) {
         [[[NSWorkspace sharedWorkspace] notificationCenter] addObserverForName:NSWorkspaceSessionDidResignActiveNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
             (void)note; atomic_fetch_add(&lockEpoch, 1);
             MFAmbulatoryWindowLockEvent(0);
+        }];
+        [[[NSWorkspace sharedWorkspace] notificationCenter] addObserverForName:NSWorkspaceSessionDidBecomeActiveNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+            (void)note; MFAmbulatoryWindowLockEvent(1);
         }];
     });
 }
