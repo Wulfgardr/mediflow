@@ -16,7 +16,7 @@ async function protect(page: Page, baseURL: string) {
 
 async function capture(page: Page, zoom: Awaited<ReturnType<typeof openBrowserZoomFixture>>, route: string, target: Locator) {
     const directory = process.env.SETTINGS_ACCOUNT_SCREENSHOTS;
-    if (!directory) return;
+    if (!directory || (route === 'accesso' && process.env.SETTINGS_ACCOUNT_KEEP_ACCESS_GALLERY === '1')) return;
     await mkdir(directory, { recursive: true });
     const surfaces = [];
     for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', '320', 'zoom-200', 'zoom-400']) {
@@ -63,8 +63,8 @@ async function stateCapture(page: Page, zoom: Awaited<ReturnType<typeof openBrow
     await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
 }
 
-test('account settings preserve form drafts, denied outcomes, theme selection and keyboard focus', async ({ baseURL }) => {
-    test.setTimeout(240_000); requireSynthetic(baseURL);
+test('access and profile settings preserve form drafts and denied outcomes', async ({ baseURL }) => {
+    test.setTimeout(120_000); requireSynthetic(baseURL);
     const zoom = await openBrowserZoomFixture(baseURL!), page = zoom.page;
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -114,26 +114,6 @@ test('account settings preserve form drafts, denied outcomes, theme selection an
         await expect(page.getByLabel('MediFlow lock screen', { exact: true })).toBeVisible();
         await unlockIfNeeded(page, '1234');
 
-        let passphrasePosts = 0;
-        await page.route('**/api/auth/passphrase', route => { passphrasePosts++; return route.abort(); });
-        await page.route('**/api/auth/check', async route => {
-            const response = await route.fetch();
-            await route.fulfill({ response, json: { ...await response.json(),
-                unlock: { credential: 'passphrase', kdfVersion: 3, salt: 'AAAAAAAAAAAAAAAAAAAAAA==' } } });
-        });
-        const checked = page.waitForResponse(response => response.url().endsWith('/api/auth/check'));
-        await page.evaluate(() => window.dispatchEvent(new Event('focus'))); await checked;
-        const passphrase = page.getByTestId('settings-access-passphrase');
-        await expect(passphrase).toBeVisible();
-        await expect(access.getByRole('button', { name: 'Aggiorna PIN', exact: true })).toHaveCount(0);
-        await page.getByLabel('Passphrase attuale', { exact: true }).fill('Passphrase corrente inventata');
-        await page.getByRole('button', { name: 'Sblocco con passphrase', exact: true }).click();
-        await page.getByRole('button', { name: 'Sblocco con passphrase', exact: true }).click();
-        await expect(page.getByLabel('Passphrase attuale', { exact: true })).toHaveValue('Passphrase corrente inventata');
-        await stateCapture(page, zoom, 'accesso-passphrase-render-mock', passphrase.locator('p').first());
-        expect(passphrasePosts).toBe(0);
-        await page.unroute('**/api/auth/check'); await page.unroute('**/api/auth/passphrase');
-
         let releaseRead!: () => void;
         const readGate = new Promise<void>(resolve => { releaseRead = resolve; });
         let holdRead = true, failRead = false;
@@ -150,6 +130,17 @@ test('account settings preserve form drafts, denied outcomes, theme selection an
         holdRead = false; releaseRead(); await expect(name).toBeEnabled();
         await expect(profile.getByRole('status')).toHaveCount(0);
         await capture(page, zoom, 'profilo', name);
+        const back = page.getByRole('link', { name: 'Torna alle impostazioni', exact: true });
+        await back.click(); await expect(page).toHaveURL(new URL('/settings', baseURL!).href);
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        await page.getByRole('link', { name: 'Profilo', exact: true }).click(); await expect(name).toBeEnabled();
+        const keepDraft = async () => {
+            await back.focus(); await page.keyboard.press('Enter');
+            const dialog = page.getByRole('dialog', { name: 'Lasciare la compilazione?', exact: true });
+            await expect(dialog).toBeVisible();
+            await dialog.getByRole('button', { name: 'Continua a scrivere', exact: true }).click();
+            await expect(back).toBeFocused(); await expect(name).toHaveValue('Bozza W19 inventata non salvata');
+        };
         await name.fill('Bozza W19 inventata non salvata');
         await page.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click();
         const activity = page.getByRole('radio', { name: 'Consultare e compilare cartelle', exact: true });
@@ -162,12 +153,79 @@ test('account settings preserve form drafts, denied outcomes, theme selection an
         failRead = true; await page.getByRole('button', { name: 'Rileggi profilo mantenendo la bozza', exact: true }).click();
         await expect(profile.getByRole('status')).toContainText('Lettura non riuscita.'); await expect(save).toBeDisabled();
         await expect(name).toHaveValue('Bozza W19 inventata non salvata'); await stateCapture(page, zoom, 'profilo-lettura-negata', profile.getByRole('status'));
+        await keepDraft();
         failRead = false; await page.getByRole('button', { name: 'Rileggi profilo mantenendo la bozza', exact: true }).click();
-        await expect(save).toBeEnabled();
-        await page.getByRole('link', { name: 'Torna alle impostazioni', exact: true }).click();
-        await page.getByRole('link', { name: 'Profilo', exact: true }).click(); await expect(name).toHaveValue('Bozza W19 inventata non salvata');
+        await expect(save).toBeEnabled(); await keepDraft();
         await page.unroute('**/api/auth/profile');
+        const sibling = await page.context().newPage();
+        try {
+            const siblingGoto = sibling.goto.bind(sibling);
+            sibling.goto = (url, options) => siblingGoto(new URL(url, baseURL!).href, options);
+            await bootstrapUnlockedSession(sibling, '1234'); await page.bringToFront();
+            await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+            await expect(profile.getByRole('status')).toContainText('La sessione è cambiata');
+            await expect(save).toBeDisabled(); await keepDraft();
+        } finally { await sibling.close(); }
+        await page.getByRole('button', { name: 'Rileggi profilo mantenendo la bozza', exact: true }).click(); await expect(save).toBeEnabled();
+        await save.click(); await expect(profile.getByRole('status')).toHaveText('Profilo aggiornato.');
+        await back.click(); await expect(page).toHaveURL(new URL('/settings', baseURL!).href); await expect(page.getByRole('dialog')).toHaveCount(0);
+        await page.getByRole('link', { name: 'Profilo', exact: true }).click(); await expect(name).toHaveValue('Bozza W19 inventata non salvata');
+        await name.fill('Bozza W19 da abbandonare'); await back.click();
+        await page.getByRole('dialog').getByRole('button', { name: 'Esci senza salvare', exact: true }).click();
+        await expect(page).toHaveURL(new URL('/settings', baseURL!).href);
+        await page.getByRole('link', { name: 'Profilo', exact: true }).click(); await expect(name).toHaveValue('Bozza W19 inventata non salvata');
 
+        expect(errors).toEqual([]);
+    } finally { await zoom.close(); }
+});
+
+
+test('passphrase account presentation consumes a declared auth-check mock without changing credentials', async ({ page, baseURL }) => {
+    requireSynthetic(baseURL); await protect(page, baseURL!);
+    await bootstrapUnlockedSession(page, '1234'); await page.goto('/settings/accesso'); await unlockIfNeeded(page, '1234');
+    await page.bringToFront(); await page.waitForLoadState('networkidle');
+    expect(await page.evaluate(() => document.visibilityState)).toBe('visible');
+    let passphrasePosts = 0, mockChecks = 0;
+    await page.route('**/api/auth/passphrase', route => { passphrasePosts++; return route.abort(); });
+    await page.route('**/api/auth/check', async route => {
+        const response = await route.fetch(); mockChecks++;
+        await route.fulfill({ response, json: { ...await response.json(),
+            unlock: { credential: 'passphrase', kdfVersion: 3, salt: 'AAAAAAAAAAAAAAAAAAAAAA==' } } });
+    });
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect.poll(() => mockChecks).toBe(1);
+    const access = page.getByTestId('settings-access-section'), passphrase = page.getByTestId('settings-access-passphrase');
+    await expect(passphrase).toBeVisible();
+    await expect(access.getByRole('button', { name: 'Aggiorna PIN', exact: true })).toHaveCount(0);
+    await page.getByLabel('Passphrase attuale', { exact: true }).fill('Passphrase corrente inventata');
+    await page.getByRole('button', { name: 'Sblocco con passphrase', exact: true }).click();
+    await page.getByRole('button', { name: 'Sblocco con passphrase', exact: true }).click();
+    await expect(page.getByLabel('Passphrase attuale', { exact: true })).toHaveValue('Passphrase corrente inventata');
+    const directory = process.env.SETTINGS_ACCOUNT_SCREENSHOTS;
+    if (directory) {
+        await mkdir(directory, { recursive: true });
+        for (const width of [1440, 390]) {
+            await page.setViewportSize({ width, height: 1000 });
+            await passphrase.locator('p').first().evaluate(element => element.scrollIntoView({ block: 'center' }));
+            await page.screenshot({ path: `${directory}/accesso-passphrase-render-mock-${width}.png`, fullPage: false, animations: 'disabled' });
+        }
+        await writeFile(`${directory}/passphrase-render-mock-receipt.json`, JSON.stringify({ mockChecks, passphrasePosts,
+            scope: 'Rendering and mounted draft only; synthetic PIN archive unchanged, no passphrase credential or wrapping qualification' }));
+    }
+    expect(passphrasePosts).toBe(0);
+});
+
+
+test('appearance settings preserve selection and keyboard focus', async ({ baseURL }) => {
+    test.setTimeout(120_000); requireSynthetic(baseURL);
+    const zoom = await openBrowserZoomFixture(baseURL!), page = zoom.page;
+    const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+    await protect(page, baseURL!);
+    const go = async (path: string) => { await page.goto(new URL(path, baseURL!).href); await unlockIfNeeded(page, '1234'); };
+    try {
+        const originalGoto = page.goto.bind(page);
+        page.goto = (url, options) => originalGoto(new URL(url, baseURL!).href, options);
+        await bootstrapUnlockedSession(page, '1234');
         await go('/settings/aspetto');
         const appearance = page.getByTestId('settings-appearance-section');
         const dark = appearance.getByRole('button', { name: 'Tema Scuro', exact: true });
