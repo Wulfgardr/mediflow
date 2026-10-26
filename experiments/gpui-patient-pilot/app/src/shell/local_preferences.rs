@@ -89,6 +89,14 @@ impl LocalPreferencesStore {
         }
     }
 
+    pub(super) fn ambulatory_command_directory(&self) -> Option<PathBuf> {
+        let parent = self.path.as_ref()?.parent()?;
+        let canonical = parent
+            .canonicalize()
+            .unwrap_or_else(|_| parent.to_path_buf());
+        Some(canonical.join("ambulatory-command-recovery"))
+    }
+
     pub fn load(&self) -> (LocalPreferences, bool) {
         let Some(path) = &self.path else {
             return (
