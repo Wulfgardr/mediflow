@@ -5,6 +5,8 @@ mod account_profile;
 mod ai_preferences;
 mod ai_status;
 mod analytics;
+#[cfg(unix)]
+mod chat_access;
 mod document_details;
 mod local_preferences;
 mod local_settings;
@@ -368,6 +370,8 @@ struct StoredPairing {
 }
 
 pub struct ClinicalApp {
+    #[cfg(unix)]
+    chat_access: chat_access::ChatAccess,
     session: Option<RuntimeSession>,
     request_context: RequestContext,
     pairing: Option<StoredPairing>,
@@ -660,6 +664,8 @@ impl ClinicalApp {
         let threshold_menu_scroll = ScrollHandle::new();
         let threshold_region_scroll = ScrollHandle::new();
         let mut app = Self {
+            #[cfg(unix)]
+            chat_access: chat_access::ChatAccess::new(theme, cx),
             session: None,
             request_context: RequestContext::default(),
             pairing: None,
@@ -758,7 +764,11 @@ impl ClinicalApp {
             profile_query_intent: None,
             _subscriptions: vec![subscription, global_subscription, reference_subscription],
         };
+        #[cfg(unix)]
+        app.start_chat_access(cx);
         let quit = cx.on_app_quit(|this, cx| {
+            #[cfg(unix)]
+            this.chat_access.retire(cx);
             this.request_context.cancel();
             this.retire_form(cx);
             this.pairing.take();
@@ -777,6 +787,8 @@ impl ClinicalApp {
         });
         app._subscriptions.push(quit);
         let release = cx.on_release(|this, cx| {
+            #[cfg(unix)]
+            this.chat_access.retire(cx);
             this.request_context.cancel();
             this.retire_form(cx);
             this.pairing.take();
@@ -1054,6 +1066,8 @@ impl ClinicalApp {
     }
 
     fn disconnect(&mut self, cx: &mut Context<Self>) {
+        #[cfg(unix)]
+        self.chat_access.retire(cx);
         self.analytics.reset(cx);
         self.scales.reset(cx);
         self.account_profile.reset(self.theme, cx);
@@ -6034,7 +6048,13 @@ impl Render for ClinicalApp {
                 _ => {}
             }
         }
-        let content = if !connected {
+        #[cfg(unix)]
+        let chat_access = self.chat_access_view(cx);
+        #[cfg(not(unix))]
+        let chat_access: Option<Stateful<Div>> = None;
+        let content = if let Some(access) = chat_access {
+            access.into_any_element()
+        } else if !connected {
             self.login_view(layout, cx).into_any_element()
         } else if self
             .form
