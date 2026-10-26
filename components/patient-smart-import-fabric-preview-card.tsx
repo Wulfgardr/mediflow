@@ -29,7 +29,7 @@ export function PatientSmartImportFabricPreviewCard({ patientId, captureInput, e
     const resetFromContext = useEffectEvent(reset);
     const resetFromChoice = useEffectEvent(() => { if (phase === 'running') reset(); else { setResult(null); setConfirmed(false); } });
     useEffect(() => () => { generation.current += 1; controller.reset(); }, [controller]);
-    useEffect(() => { resetFromContext(); }, [controller, patientId, captureInput, picker.active, picker.view.blocked]);
+    useEffect(() => { resetFromContext(); }, [controller, patientId, captureInput, picker.active, picker.view.blocked, picker.view.preparationRevision]);
     useEffect(() => { resetFromChoice(); }, [picker.view.choice]);
     const load = async () => {
         if (phase !== 'idle' || handler.current || !enabled) return; handler.current = true; const token = ++generation.current; setPhase('loading'); setError(null);

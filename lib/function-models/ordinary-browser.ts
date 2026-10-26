@@ -65,6 +65,7 @@ export function createOrdinaryBrowser(functionId: OrdinaryFunction, transport: t
     const empty = (): OrdinaryBrowserView => ({ loading: false, error: null, settings: null, state: null, disclosure: null, challenge: null, catalog: null, choice: '', completed: false });
     let view = empty(), generation = 0, pending: { resolve(value: Response): void; reject(error: Error): void } | undefined;
     let lifetime: ReturnType<typeof setTimeout> | undefined;
+    let retirement: Promise<void> = Promise.resolve();
     const emit = (patch: Partial<OrdinaryBrowserView>) => { view = Object.freeze({ ...view, ...patch }); changed(view); };
     async function fetchValue(operation: string, value?: unknown, signal?: AbortSignal): Promise<unknown> {
         const response = await transport(PREFIX + operation, { method: value === undefined ? 'GET' : 'POST', credentials: 'same-origin', cache: 'no-store',
@@ -76,8 +77,8 @@ export function createOrdinaryBrowser(functionId: OrdinaryFunction, transport: t
     function cancel() {
         const id = view.state?.attemptId; generation++; clearTimeout(lifetime);
         pending?.reject(failure('revoked')); pending = undefined;
-        if (id) void transport(PREFIX + 'cancel', { method: 'POST', credentials: 'same-origin', cache: 'no-store', keepalive: true,
-            headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ attemptId: id }) }).catch(() => {});
+        if (id) retirement = transport(PREFIX + 'cancel', { method: 'POST', credentials: 'same-origin', cache: 'no-store', keepalive: true,
+            headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ attemptId: id }), signal: AbortSignal.timeout(15000) }).then(() => {}, () => {});
         view = empty(); changed(view);
     }
     async function read() {
@@ -87,6 +88,22 @@ export function createOrdinaryBrowser(functionId: OrdinaryFunction, transport: t
         catch { if (token === generation) emit({ loading: false, error: 'Configurazione OpenAI non verificata. Rileggi prima di procedere.' }); }
     }
     return Object.freeze({ getSnapshot: () => view, read, cancel,
+        async reprepare() {
+            cancel(); const token = generation; emit({ loading: true });
+            try {
+                await retirement;
+                if (token !== generation) throw failure('revoked');
+                const status = ordinaryWireObject(await fetchValue('status', undefined, AbortSignal.timeout(15000)), ['schema', 'phase', 'attemptId', 'cleanupConfirmed']);
+                if (token !== generation) throw failure('revoked');
+                if (!status || status.schema !== ORDINARY_FLOW_SCHEMA || status.phase !== 'closed' || status.attemptId !== null || status.cleanupConfirmed !== true) throw failure('cleanup_unconfirmed');
+                const settings = parseOrdinaryBrowserSettings(await fetchValue('settings', undefined, AbortSignal.timeout(15000)));
+                if (token !== generation) throw failure('revoked');
+                emit({ settings, loading: false });
+            } catch (error) {
+                if (token === generation) emit({ loading: false, settings: null, error: 'Nuova preparazione non verificata. Riprova dopo la chiusura del tentativo precedente e la verifica della sessione.' });
+                throw error;
+            }
+        },
         async policy(enabled: boolean) {
             if (!view.settings || view.loading || view.state) throw failure('invalid_state');
             const token = generation; emit({ loading: true, error: null });
