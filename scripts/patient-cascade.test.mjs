@@ -1,6 +1,6 @@
 // WUL-306 (ADR 0066): anti-drift guard for PATIENT_CHILD_TABLES (WUL-316 pattern).
-// Every table that carries a patientId column, whether defined in lib/schema.ts or
-// created via raw SQL in lib/db-server.ts, MUST be covered by the canonical cascade.
+// Clinical patient children must be covered; the exact ADR0168 terminal ledger
+// retains historical bindings after patient purge and must never enter the cascade.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import ts from 'typescript';
+import { ensureTherapyStatusCommandSchema } from '../lib/therapy-status-command-schema.ts';
 
 const ROOT_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 
@@ -48,7 +49,8 @@ function collectSchemaTables(sourceFile) {
       const hasPatientId = columnsArg
         ? columnsArg.getText(sourceFile).includes("'patient_id'")
         : false;
-      tables.push({ exportName: node.name.text, sqlName, hasPatientId });
+      const hasReferences = columnsArg ? /\breferences\b/u.test(columnsArg.getText(sourceFile)) : false;
+      tables.push({ exportName: node.name.text, sqlName, hasPatientId, hasReferences });
     }
     ts.forEachChild(node, visit);
   }
@@ -89,20 +91,36 @@ function extractCascadeEntries(sourceFile) {
   });
 }
 
-test('every schema table with a patientId column is covered by PATIENT_CHILD_TABLES', () => {
-  const schemaTables = collectSchemaTables(parseSource('lib/schema.ts'));
+function assertCascadeSchemaCoverage(schemaTables, cascadeEntries) {
+  const terminal = schemaTables.filter(table => table.exportName === 'therapyStatusCommands' && table.sqlName === 'therapy_status_commands');
+  assert.equal(terminal.length, 1, 'the exact ADR0168 terminal ledger must exist once');
+  assert.equal(terminal[0].hasPatientId, true);
+  assert.equal(terminal[0].hasReferences, false, 'historical command bindings must not reference patient/therapy rows');
   const required = schemaTables
-    .filter((table) => table.hasPatientId)
+    .filter((table) => table.hasPatientId && table !== terminal[0])
     .map((table) => table.exportName)
     .sort();
-
-  const cascadeEntries = extractCascadeEntries(parseSource('lib/patient-cascade.ts'));
   const covered = cascadeEntries.map((entry) => entry.tableExport).sort();
-
+  assert.equal(covered.includes('therapyStatusCommands'), false, 'terminal ledger must survive patient purge');
   assert.deepEqual(covered, required);
+}
+
+test('every patientId table is classified as a clinical child or the exact preserved terminal ledger', () => {
+  assertCascadeSchemaCoverage(collectSchemaTables(parseSource('lib/schema.ts')), extractCascadeEntries(parseSource('lib/patient-cascade.ts')));
 });
 
-test('a bootstrapped DB has no patient_id table outside the canonical cascade', () => {
+test('unclassified patient tables and a cascaded or foreign-key-bound terminal ledger still fail closed', () => {
+  const source = fs.readFileSync(path.join(ROOT_DIR, 'lib/schema.ts'), 'utf8');
+  const cascade = extractCascadeEntries(parseSource('lib/patient-cascade.ts'));
+  const tables = collectSchemaTables(parseSource('lib/schema.ts'));
+  const mutated = ts.createSourceFile('schema-negative.ts', `${source}\nexport const unclassifiedPatientChildren = sqliteTable('unclassified_patient_children', { patientId: text('patient_id') });`, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  assert.throws(() => assertCascadeSchemaCoverage(collectSchemaTables(mutated), cascade), /unclassifiedPatientChildren/);
+  assert.throws(() => assertCascadeSchemaCoverage(tables, [...cascade, { name: 'therapyStatusCommands', tableExport: 'therapyStatusCommands' }]), /terminal ledger must survive/);
+  assert.throws(() => assertCascadeSchemaCoverage(tables.map(table => table.exportName === 'therapyStatusCommands' ? { ...table, hasReferences: true } : table), cascade), /must not reference/);
+  assert.throws(() => assertCascadeSchemaCoverage(tables.map(table => table.exportName === 'therapyStatusCommands' ? { ...table, sqlName: 'renamed_terminal' } : table), cascade), /exact ADR0168/);
+});
+
+test('a bootstrapped DB classifies patient_id tables and gives the preserved ledger no foreign keys', () => {
   const schemaTables = collectSchemaTables(parseSource('lib/schema.ts'));
   const sqlNameByExport = new Map(schemaTables.map((table) => [table.exportName, table.sqlName]));
   const cascadeSqlNames = new Set(
@@ -135,6 +153,9 @@ test('a bootstrapped DB has no patient_id table outside the canonical cascade', 
     for (const statement of createStatements) {
       sqlite.exec(statement);
     }
+    ensureTherapyStatusCommandSchema(sqlite);
+    assert.equal(cascadeSqlNames.has('therapy_status_commands'), false);
+    assert.deepEqual(sqlite.pragma('foreign_key_list(therapy_status_commands)'), []);
 
     const tableNames = sqlite
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
@@ -145,6 +166,7 @@ test('a bootstrapped DB has no patient_id table outside the canonical cascade', 
       if (tableName === 'patients') continue;
       const columns = sqlite.prepare(`PRAGMA table_info(${tableName})`).all().map((column) => column.name);
       if (!columns.includes('patient_id')) continue;
+      if (tableName === 'therapy_status_commands') continue;
       assert.ok(
         cascadeSqlNames.has(tableName),
         `Table '${tableName}' has a patient_id column but is missing from PATIENT_CHILD_TABLES (lib/patient-cascade.ts)`,
