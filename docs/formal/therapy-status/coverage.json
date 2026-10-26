@@ -1,5 +1,5 @@
 {
-  "syncCommit": "64e190438da8287928f0903b9b719c18b329a7ec",
+  "syncCommit": "c4ae8c6eab6966e40414457ae3b666ac618154e8",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -32,13 +32,21 @@
   },
   "files": {
     "lib/therapy-status-confirmation.ts": "33eebc3197e988f3f1c134f1ac8499da1de95171e21d0ac7e3396c2a202c6486",
-    "components/therapy-manager.tsx": "c7e6938901de141995627d68cfba1ba9813ed5e6dee030d5fbe8af348360978a",
+    "components/therapy-manager.tsx": "5d03f0779b6928f788a07c921f0719845169f768f1ce63adb0c81fe8d10cfbab",
     "lib/db.ts": "8d04d071d6a7b41e35d71823f34409f83fb2657d0b13cad84700428535b68423",
     "lib/security/client-auth-api.ts": "17ece5579f18496dc6dcbca8c7d4340441b453aa517e7250b169ae2d68aae2a0",
-    "lib/therapy-write-operation.ts": "51893e79ab167926bf286136779e4c94e587aedbc9dd04ce200152fcd19b5a00",
+    "lib/therapy-write-operation.ts": "f72e2fe81427c5b74a87db7fe79fc96f372553eff6e1ca0b6badf3fd0cd1f3ee",
     "app/api/therapies/[id]/route.ts": "3f4765cd55a13360965fae38bced33cec5cc69403dd0bbfd6d67417c5c40e4e2",
     "app/api/therapies/route.ts": "e13c48abb76cb0461eb1a9c1f23cf8724ec9cf34d32a7bd54909e58d4e251dac",
-    "lib/locked-field-guard.ts": "8b5d037d1967e1c9ccb08d617fba9cdffa15eee0b9773ed048319b93bcd155a5"
+    "lib/locked-field-guard.ts": "8b5d037d1967e1c9ccb08d617fba9cdffa15eee0b9773ed048319b93bcd155a5",
+    "lib/therapy-status-command-service.ts": "44eee72121c2165eb2a62d7fd5e94dd5ef4db864482ae14c4f6ed40831874b6b",
+    "lib/therapy-status-command-confirmation.ts": "f2445977f0d0cac518ff0ad7939f75a616053504083c9e3d3a2d13c37526a0a9",
+    "lib/therapy-status-command-contract.ts": "3432124d9b5f8b3113265d9779fa12e1411e508b0964cfd2e1bc532f49f4a7fe",
+    "lib/therapy-status-command-client.ts": "c2b1b43b0caaee0c12ca5b784b19bf1caaf6f3685c31739e29b1ce22428331a9",
+    "lib/therapy-status-command-http.ts": "e48bafce3eb7b8bd280ea04c7afd5624cc73c5afee1d3e3abac04f4c19a8b955",
+    "lib/therapy-status-command-backup.ts": "2f63951192b92749658de3ae289fb7cc16cccd1a90202342e8bd949b98271f64",
+    "lib/therapy-status-command-schema.ts": "98c0aba0a361ef83655a632be41a257f8b9e99a950591113683a8094e26f4c87",
+    "lib/therapy-status-command-recovery-schema.ts": "875b647218eaea2ac4d154746db20023f74b2914cc4e1e07dd13fa56b749182f"
   },
   "verificationInputs": [
     "docs/formal/therapy-status/",
@@ -50,6 +58,27 @@
     "package.json",
     "package-lock.json",
     ".nvmrc",
-    ".github/workflows/web-core.yml"
-  ]
+    ".github/workflows/web-core.yml",
+    "lib/therapy-status-command.test.ts",
+    "lib/therapy-status-command-http.test.ts",
+    "lib/therapy-status-command-process.test.ts",
+    "lib/therapy-status-command-confirmation.test.ts",
+    "lib/therapy-status-command-backup.test.ts",
+    "lib/therapy-status-command-client.test.ts",
+    "lib/therapy-status-command-recovery-schema.test.ts",
+    "e2e/therapy-status-confirmation.spec.ts",
+    "e2e/therapy-composition.spec.ts"
+  ],
+  "durableProtocolCoverage": {
+    "adr": "0168",
+    "baseRevision": "3828bb17d4883b28a646c16af10f9505fddded38",
+    "proof": "causal controller/client/HTTP tests and real SQLite crashes/races/restore; TLC remains legacy ADR0156",
+    "recoveryCompatibility": {
+      "reviewedRevision": "c4ae8c6eab6966e40414457ae3b666ac618154e8",
+      "contract": "ADR0168 exact canonical v4 predecessor; current v5 physical extensions unchanged",
+      "proof": "8 causal canonical/drift tests in code-current; encrypted recovery owner evidence remains separate",
+      "outsideTlc": "schema, migration, encryption, keys and durable receipts are not modeled by TherapyStatus.tla"
+    }
+  },
+  "legacyModelSyncCommit": "64e190438da8287928f0903b9b719c18b329a7ec"
 }

@@ -51,6 +51,7 @@ function run(name, executable, args, expected, env = {}) {
   const log = `${runResult.stdout || ''}${runResult.stderr || ''}`;
   fs.writeFileSync(path.join(output, `${name}.log`), log);
   if (runResult.error || !expected(runResult.status, log)) {
+    process.stderr.write(log.slice(-12000) + '\n');
     throw new Error(`${name} failed (exit ${runResult.status}, ${runResult.error?.message || 'unexpected result'}). Inspect ${path.join(output, `${name}.log`)}`);
   }
   const counts = /([\d,]+) states generated, ([\d,]+) distinct states found, ([\d,]+) states left on queue/.exec(log);
@@ -92,7 +93,10 @@ const data = path.join(output, 'synthetic-data');
 fs.mkdirSync(data);
 const testEnv = { MEDIFLOW_DATA_DIR: data };
 run('code-current', process.execPath, ['scripts/run-strip-types.mjs', '--test', '--test-reporter=tap',
-  'lib/therapy-status-confirmation.test.ts', 'lib/therapy-required-audit.test.ts'],
+  'lib/therapy-status-confirmation.test.ts', 'lib/therapy-required-audit.test.ts',
+  'lib/therapy-status-command.test.ts', 'lib/therapy-status-command-http.test.ts', 'lib/therapy-status-command-client.test.ts',
+  'lib/therapy-status-command-confirmation.test.ts', 'lib/therapy-status-command-process.test.ts',
+  'lib/therapy-status-command-backup.test.ts', 'lib/therapy-status-command-recovery-schema.test.ts'],
 (status, log) => status === 0 && /# fail 0/.test(log), testEnv);
 const source = fs.readFileSync(path.join(root, 'lib/therapy-status-confirmation.ts'), 'utf8');
 const tests = fs.readFileSync(path.join(root, 'lib/therapy-status-confirmation.test.ts'), 'utf8');

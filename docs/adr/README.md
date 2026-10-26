@@ -152,3 +152,5 @@ prima porzione di lavoro verificabile:
 - [ADR 0165 — Canale di accesso della chat alla sessione GPUI](0165-native-chat-access-channel.md): confine peer, conferma nativa e concessione monouso C4a.
 
 - [ADR 0167 — Prima sede da GPUI](0167-first-ambulatory-host-bootstrap.md): Web P3 amministrativa dedicata, operatore coincidente e creazione atomica senza scope paired.
+
+- [ADR0168 — Comando durevole stato terapia](0168-durable-therapy-status-command.md): C-5a/G-6, receipt/tombstone, tempo host e conservazione attraverso restore; consumer chat escluso.
