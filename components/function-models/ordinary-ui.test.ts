@@ -63,6 +63,17 @@ test('digest disclosure is identity + bytes + proposal-only, never raw prepared 
     assert.equal(text(nodes(tree).find(n => n.type === 'button' && n.props['data-disclosure-control'])!.props.children), 'Identità del contesto preparato');
 });
 
+test('a terminal remote result exposes explicit fresh preparation, without automatic execution', () => {
+    const component = loadComponent('./function-model-picker.tsx', 'OrdinaryFunctionControls');
+    let resets = 0;
+    const tree = component({ client: { reprepareRemote: () => { resets++; }, remote: {} },
+        view: { loading: false, error: null, state: null, completed: true }, needsReprepare: true, canReprepare: true });
+    const button = nodes(tree).find(node => node.type === 'button' && text(node.props.children) === 'Nuova preparazione');
+    assert.ok(button, 'The completed message must provide its explicit recovery gesture.');
+    assert.equal(button.props.disabled, false); assert.equal(resets, 0);
+    (button.props.onClick as () => void)(); assert.equal(resets, 1);
+});
+
 test('explicit OpenAI configuration previews only the shared switch with unavailable ATHENA', () => {
     const component = loadComponent('./function-preferences-panel.tsx', 'PreferenceCard', ['chatgpt_subscription', true, null]);
     let command: unknown;
