@@ -47,7 +47,7 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
     const zoom = await openBrowserZoomFixture(baseURL!), page = zoom.page;
     const fixture = await installSettingsEvidenceMocks(page, baseURL!);
     const directory = process.env.SETTINGS_EVIDENCE_SCREENSHOTS;
-    const frames: unknown[] = [], errors: string[] = [];
+    const frames: unknown[] = [], sectionTitles: unknown[] = [], errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
     const capture = async (name: string, target: Locator) => {
         await target.scrollIntoViewIfNeeded();
@@ -57,7 +57,7 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
             const root = getComputedStyle(document.documentElement);
             return { text: element.textContent, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
                 viewport: { width: innerWidth, height: innerHeight }, centerHit: hit === element || element.contains(hit),
-                clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, textOverflow: style.textOverflow,
+                clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, textOverflow: style.textOverflow, fontSize: style.fontSize,
                 palette: { classes: document.documentElement.className, storage: localStorage.getItem('mediflow-theme'),
                     ink: root.getPropertyValue('--lume-ink'), surface: root.getPropertyValue('--lume-surface-field'),
                     foreground: style.color, background: getComputedStyle(document.body).backgroundColor } };
@@ -66,6 +66,10 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
         frames.push({ name, ...probe });
         if (directory) { await mkdir(directory, { recursive: true }); await page.screenshot({ path: `${directory}/${name}.png`, fullPage: false, animations: 'disabled' }); }
         return probe;
+    };
+    const sectionTitle = async (heading: Locator) => {
+        await expect(heading).toHaveCSS('font-size', '12px');
+        sectionTitles.push(await heading.evaluate(element => ({ text: element.textContent, fontSize: getComputedStyle(element).fontSize, caps: getComputedStyle(element).fontVariantCaps })));
     };
     const gallery = async (route: string, target: Locator) => {
         if (!directory) return;
@@ -82,6 +86,7 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
             }, theme);
             await assertNoHorizontalOverflow(page, [{ label: route, selector: 'document' }]);
             const probe = await capture(`${route}-${theme}-${size}`, target);
+            expect(probe.fontSize).toBe('12px');
             expect(probe.palette.storage).toBe(theme === 'giorno' ? 'light' : 'dark');
             expect(probe.palette.classes).toMatch(new RegExp(`\\b${theme === 'giorno' ? 'light' : 'dark'}\\b`));
             if (size === '1440') palettes.set(theme, probe.palette.foreground);
@@ -89,13 +94,14 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
         expect(palettes.get('giorno')).not.toBe(palettes.get('grafite'));
         await zoom.setZoom(1); await page.setViewportSize({ width: 1440, height: 1000 });
     };
-    let releaseRead: (() => void) | undefined;
+    let releaseRead: (() => void) | undefined, releaseWho: (() => void) | undefined;
     try {
         await bootstrapUnlockedSession(page, '1234');
         await page.goto('/settings/compliance');
         const compliance = page.getByTestId('settings-compliance-section');
         await expect(compliance).toBeVisible();
         await gallery('compliance', compliance.getByRole('heading', { name: 'Evidenze e conformità', exact: true }));
+        for (const heading of await compliance.getByRole('heading').all()) await sectionTitle(heading);
         const records = compliance.locator('[data-testid^="compliance-evidence-"]');
         await expect(records).toHaveCount(6);
         for (const record of await records.all()) {
@@ -115,19 +121,36 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
         await expect(page.getByTestId('diagnostic-service-icd')).toContainText('Disattivato');
         const updates = page.getByTestId('settings-update-awareness-panel');
         await expect(updates).toContainText('0.9.1-synthetic-next');
+        for (const name of ['Diagnostica', 'Servizi della postazione', 'Aggiornamenti']) await sectionTitle(diagnostics.getByRole('heading', { name, exact: true }));
         await gallery('diagnostica', diagnostics.getByRole('heading', { name: 'Diagnostica', exact: true }));
         await expect(diagnostics.getByRole('button', { name: 'Esegui Test Completo', exact: true })).toHaveCount(0);
         await expect(diagnostics.locator('[data-diagnostic-check]')).toHaveCount(4);
         const checks = diagnostics.getByRole('button', { name: 'Diagnostica di Sistema', exact: true });
         await checks.focus(); await checks.press('Enter'); await expect(checks).toBeFocused();
+        await sectionTitle(diagnostics.getByRole('heading', { name: 'Diagnostica di Sistema', exact: true }));
+        await sectionTitle(checks);
         await expect(diagnostics.locator('[data-settings-primary="true"]:visible')).toHaveCount(1);
         const who = diagnostics.locator('[data-diagnostic-check="icd"]');
+        await expect(who.getByRole('status')).toHaveText('Non ancora verificato');
         await who.getByRole('button', { name: 'Esegui singolo test: ICD-11 WHO', exact: true }).click();
         await expect(who.getByRole('alert')).toHaveText('Servizio WHO ICD-11 disattivato.');
         await capture('who-error', who.getByRole('alert'));
         expect(await who.getByRole('alert').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
         await checks.click(); await checks.click();
         await expect(who.getByRole('alert')).toHaveText('Servizio WHO ICD-11 disattivato.');
+        fixture.state.who = 'available';
+        const whoPending = new Promise<void>(resolve => { releaseWho = resolve; });
+        const holdWho = async (route: import('@playwright/test').Route) => { await whoPending; await route.fallback(); };
+        await page.route('**/api/icd/proxy', holdWho);
+        const whoAction = who.getByRole('button', { name: 'Esegui singolo test: ICD-11 WHO', exact: true });
+        await whoAction.click();
+        await expect(who.getByRole('status')).toHaveText('Verifica in corso');
+        await expect(whoAction).toBeDisabled();
+        releaseWho!();
+        await expect(who.getByRole('status')).toContainText(/Risposta ricevuta in \d+ ms/);
+        await expect(whoAction).toBeEnabled();
+        await page.unroute('**/api/icd/proxy', holdWho);
+
         fixture.state.update = 'error';
         const denied = page.waitForResponse(response => new URL(response.url()).pathname === '/api/system/update-awareness' && response.status() === 503);
         await updates.getByRole('button', { name: 'Aggiorna stato', exact: true }).click(); await denied;
@@ -153,10 +176,10 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
         await expect(updates).toContainText('Avviso rimandato per questa versione.');
         expect(errors).toEqual([]); expect(fixture.blocked).toEqual([]);
     } finally {
-        releaseRead?.();
+        releaseRead?.(); releaseWho?.();
         try {
-            await test.info().attach('settings-evidence-observations.json', { body: JSON.stringify({ frames, errors, calls: fixture.calls, allBlocked: fixture.blocked }), contentType: 'application/json' });
-            if (directory) { await mkdir(directory, { recursive: true }); await writeFile(`${directory}/surfaces.json`, JSON.stringify({ frames, errors, calls: fixture.calls, allBlocked: fixture.blocked }, null, 2)); }
+            await test.info().attach('settings-evidence-observations.json', { body: JSON.stringify({ frames, sectionTitles, errors, calls: fixture.calls, allBlocked: fixture.blocked }), contentType: 'application/json' });
+            if (directory) { await mkdir(directory, { recursive: true }); await writeFile(`${directory}/surfaces.json`, JSON.stringify({ frames, sectionTitles, errors, calls: fixture.calls, allBlocked: fixture.blocked }, null, 2)); }
         } finally { await page.unrouteAll({ behavior: 'ignoreErrors' }); await zoom.close(); }
     }
 });
