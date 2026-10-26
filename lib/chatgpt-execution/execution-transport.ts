@@ -107,7 +107,10 @@ export function createStdioExecutionTransport(child: ChildProcessWithoutNullStre
                 httpStatus: status ? Number(status[1]) : null, tls: /tls|certificate|trust/iu.test(prose),
                 network: /network|connect|proxy|tunnel|sending request/iu.test(prose), device: /device/iu.test(prose),
                 experimental: /experimental/iu.test(prose), permission: /permission|not permitted|access denied/iu.test(prose) });
-            request.reject(new ExecutionError('upstream_error'));
+            const data = error.data && typeof error.data === 'object' && !Array.isArray(error.data) ? error.data as Record<string, unknown> : {};
+            const backendCode = data.codexErrorInfo === 'usageLimitExceeded' ? 'usageLimitExceeded' as const : null;
+            request.reject(new ExecutionError(backendCode ? 'quota_exhausted' : 'upstream_error', Object.freeze({ source: 'rpc_error', method: request.method,
+                rpcCode: Number.isSafeInteger(error.code) && (error.code as number) >= -32768 && (error.code as number) <= -32000 ? error.code as number : null, backendCode })));
         } else request.resolve(message.result);
     }
     child.stdout.on('data', (chunk: Buffer) => {

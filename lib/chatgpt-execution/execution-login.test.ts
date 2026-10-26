@@ -68,7 +68,7 @@ for (const url of ['http://auth.openai.com/fixture', 'https://other.invalid/fixt
     await assert.rejects(login.start(), denied);
 });
 test('known quota window is not a missing-window zero; absent codex bucket never uses fallback', () => {
-    assert.deepEqual(readExecutionLimits({ rateLimitsByLimitId: { codex: { primary: null, secondary: { usedPercent: 5 } } } }), { primaryUsedPercent: null, secondaryUsedPercent: 5 });
+    assert.deepEqual(readExecutionLimits({ rateLimitsByLimitId: { codex: { primary: null, secondary: { usedPercent: 5 } } } }), { primaryUsedPercent: null, secondaryUsedPercent: 5, includedUsage: 'available', creditAvailability: 'not_reported' });
     assert.throws(() => readExecutionLimits({ rateLimitsByLimitId: {}, rateLimits: { primary: { usedPercent: 0 } } }), denied);
     assert.throws(() => readExecutionLimits({ rateLimits: { primary: { usedPercent: 1 }, rateLimitReachedType: 'blocked' } }), denied);
 });
@@ -189,3 +189,9 @@ for (const [field, value] of [['platformOs', 'unqualified-os'], ['platformFamily
         assert.deepEqual(transport.calls.map(call => call.method), ['initialize']);
     });
 }
+
+test('included quota exhausted with usable credits admits only a credit candidate', () => {
+    const result = readExecutionLimits({ rateLimitsByLimitId: { codex: { primary: { usedPercent: 100 }, secondary: null,
+        credits: { hasCredits: true, unlimited: false, balance: '123.45' }, spendControlReached: false, rateLimitReachedType: 'rate_limit_reached' } } });
+    assert.deepEqual(result, { primaryUsedPercent: 100, secondaryUsedPercent: null, includedUsage: 'exhausted', creditAvailability: 'available' });
+});

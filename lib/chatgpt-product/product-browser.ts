@@ -1,3 +1,5 @@
+import { parseExecutionDenial } from '../chatgpt-execution/execution-contract';
+import { parseExecutionQuotaView } from '../chatgpt-execution/quota-view';
 /* browser-only controller; no authority, automatic inference or storage. */
 import { PRODUCT_NAMESPACE, PRODUCT_OPERATION, PRODUCT_DATA_CLASS, ProductError,
     type ProductResponse, type ProductSnapshot, type ProductLoginChallenge, type ProductOperation, type ProductRequest } from './product-contract';
@@ -49,17 +51,14 @@ function parse(value: unknown, operation: ProductOperation): ProductResponse {
         || new Set(sources.map(source => source.id)).size !== sources.length
         || sources.reduce((sum, source) => sum + (source.text as string).length, 0) > 64000) throw new Error('invalid_response');
     for (const field of ['consentExpiresAt', 'loginExpiresAt']) if (row[field] !== null && (typeof row[field] !== 'number' || !Number.isSafeInteger(row[field]) || (row[field] as number) <= 0)) throw new Error('invalid_response');
-    const receipt = object(row.receipt);
+    const receipt = object(row.receipt); parseExecutionDenial(receipt.denial);
     if (typeof receipt.localAuthorityWithdrawn !== 'boolean' || typeof receipt.egressWithdrawalRequested !== 'boolean'
         || !['not_attempted', 'attempted', 'acknowledged'].includes(String(receipt.interruption))
         || !['not_attempted', 'confirmed', 'unconfirmed'].includes(String(receipt.remoteLogout))
         || receipt.escapedDescendants !== 'not_attested' || receipt.globalRemoteRevocation !== 'not_claimed'
         || receipt.secureErase !== 'not_claimed' || receipt.quotaRefund !== 'not_claimed'
         || ['leaderExit', 'ownedGroupCessation', 'cleanup'].some(field => !['not_observed', 'confirmed', 'unconfirmed'].includes(String(receipt[field])))) throw new Error('invalid_response');
-    if (row.limits !== null) {
-        const limits = object(row.limits);
-        for (const field of ['primaryUsedPercent', 'secondaryUsedPercent']) if (limits[field] !== null && (typeof limits[field] !== 'number' || !Number.isFinite(limits[field]) || (limits[field] as number) < 0 || (limits[field] as number) >= 100)) throw new Error('invalid_response');
-    }
+    if (row.limits !== null) parseExecutionQuotaView(row.limits);
     if (row.catalog != null) {
         const catalog = object(row.catalog);
         if (!['ready', 'generating'].includes(String(row.state)) || !uuid(catalog.revision) || !Array.isArray(catalog.choices)

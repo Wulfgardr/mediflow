@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { executionQuotaMessage } from '@/lib/chatgpt-execution/quota-view';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useSecurity } from '@/components/security-provider';
 import { createProductBrowser } from '@/lib/chatgpt-product/product-browser';
@@ -86,7 +87,7 @@ export function ChatGptSynthesisCard({ active }: { active: boolean }) {
                 <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!!view.busy} onClick={() => invoke('read')}>Aggiorna account e quota</button>
                 <button type="button" className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={!!view.busy} onClick={() => invoke('models')}>Leggi modelli disponibili</button>
             </div> : null}
-            {snapshot.limits ? <p>Quota osservata: finestra primaria {snapshot.limits.primaryUsedPercent === null ? 'non disponibile' : `${snapshot.limits.primaryUsedPercent}% usato`}; secondaria {snapshot.limits.secondaryUsedPercent === null ? 'non disponibile' : `${snapshot.limits.secondaryUsedPercent}% usato`}. Non garantisce la quota futura.</p> : null}
+            {snapshot.limits ? <p>Quota osservata: finestra primaria {snapshot.limits.primaryUsedPercent === null ? 'non disponibile' : `${snapshot.limits.primaryUsedPercent}% usato`}; secondaria {snapshot.limits.secondaryUsedPercent === null ? 'non disponibile' : `${snapshot.limits.secondaryUsedPercent}% usato`}. {executionQuotaMessage(snapshot.limits)}</p> : null}
             {snapshot.catalog ? <fieldset className={styles.step}>
                 <legend>Scegli il modello per questa prova</legend>
                 <label htmlFor="execution-choice">Modello e livello di ragionamento (effort)</label>
@@ -117,6 +118,7 @@ export function ChatGptSynthesisCard({ active }: { active: boolean }) {
                         <dt>Interruzione turno</dt><dd>{snapshot.receipt.interruption}</dd><dt>Uscita leader</dt><dd>{snapshot.receipt.leaderExit}</dd>
                         <dt>Cessazione gruppo posseduto</dt><dd>{snapshot.receipt.ownedGroupCessation}</dd><dt>Discendenti usciti dal gruppo</dt><dd>Non attestati da questa ricevuta</dd>
                         <dt>Cleanup</dt><dd>{snapshot.receipt.cleanup}</dd><dt>Logout remoto</dt><dd>{snapshot.receipt.remoteLogout}</dd></dl>
+                    {snapshot.receipt.denial ? <p>Origine del diniego: <code>{snapshot.receipt.denial.source}</code> · metodo <code>{snapshot.receipt.denial.method}</code> · codice RPC {snapshot.receipt.denial.rpcCode ?? 'non osservato'} · classificazione backend {snapshot.receipt.denial.backendCode ?? 'non osservata'}.</p> : null}
                     <p>La cancellazione locale non attesta revoca remota globale, cancellazione sicura dei supporti o rimborso quota.</p>
                 </div>
             </details>
