@@ -7,6 +7,7 @@ pub(super) struct Management {
     pub(super) active: bool,
     pub(super) draft: Option<Editor>,
     pub(super) initial_scope: bool,
+    focus_editor: bool,
     pub(super) rebase: bool,
     commands: HashMap<String, ScrollTarget>,
     message: Option<(String, bool)>,
@@ -18,6 +19,7 @@ impl Default for Management {
             active: false,
             draft: None,
             initial_scope: true,
+            focus_editor: false,
             rebase: false,
             commands: HashMap::new(),
             message: None,
@@ -250,6 +252,7 @@ impl ClinicalApp {
             _subscriptions: subscriptions,
         });
         self.ambulatory_management.message = None;
+        self.ambulatory_management.focus_editor = true;
         self.area_scroll.set_offset(gpui::point(px(0.), px(0.)));
         cx.notify();
     }
@@ -331,6 +334,20 @@ impl ClinicalApp {
     ) {
         if !self.ambulatory_management.active || self.area != Area::Settings {
             return;
+        }
+        if self.ambulatory_management.focus_editor {
+            if let Some(field) = self
+                .ambulatory_management
+                .draft
+                .as_ref()
+                .and_then(|draft| draft.fields.first())
+            {
+                field.editor.update(cx, |input, cx| input.focus(window, cx));
+                if let Some(target) = &field.scroll_target {
+                    target.scroll_to(window, cx);
+                }
+            }
+            self.ambulatory_management.focus_editor = false;
         }
         let mut ids: Vec<String> = ["back", "reread"]
             .into_iter()
@@ -742,6 +759,7 @@ impl ClinicalApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpui::Focusable;
     fn row(id: &str, version: u64, default: bool, parent: Option<&str>) -> Ambulatory {
         Ambulatory {
             id: id.into(),
@@ -830,6 +848,22 @@ mod tests {
         let cycle = vec![row("a", 1, false, Some("b")), row("b", 1, false, Some("a"))];
         assert!(ancestry(&cycle, "a").is_err());
     }
+    #[gpui::test]
+    fn entering_the_editor_moves_focus_from_the_row_to_the_first_field(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        cx.update_window_entity(&view, |app, window, cx| {
+            app.area = Area::Settings;
+            let input = stage(app, Some(row("a", 1, false, None)), cx);
+            app.ambulatory_management.focus_editor = true;
+            app.prepare_ambulatory_management(app.theme, window, cx);
+            assert!(input.read(cx).focus_handle(cx).is_focused(window));
+            assert!(!app.ambulatory_management.focus_editor);
+        });
+    }
+
     #[gpui::test]
     fn conflict_preserves_draft_and_only_explicit_reread_updates_the_base(
         cx: &mut gpui::TestAppContext,
