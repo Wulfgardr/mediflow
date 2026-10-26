@@ -6,6 +6,8 @@ mod ai_preferences;
 mod ai_status;
 mod analytics;
 mod document_details;
+mod local_preferences;
+mod local_settings;
 #[cfg(test)]
 mod notes_recovery_tests;
 #[cfg(test)]
@@ -57,6 +59,8 @@ use account_profile::AccountProfile;
 use ai_preferences::AiPreferences;
 use ai_status::AiRuntimeObservation;
 use analytics::AnalyticsArea;
+use local_preferences::{LocalPreferences, LocalPreferencesStore};
+use local_settings::{PreferenceChange, PreferenceIssue};
 use scales::{ScaleArea, ScaleAssessment};
 use therapy_picker::TherapySelection;
 use view_state::{ReadLoad, ReadObject, ViewState, ViewStateKind};
@@ -75,7 +79,8 @@ actions!(
         Review,
         Escape,
         Refresh,
-        Lock
+        Lock,
+        Privacy
     ]
 );
 
@@ -104,6 +109,7 @@ fn key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new("secondary-r", Refresh, None),
         KeyBinding::new("secondary-l", Lock, None),
         KeyBinding::new("secondary-shift-l", Lock, None),
+        KeyBinding::new("secondary-shift-p", Privacy, None),
     ]
 }
 
@@ -428,6 +434,11 @@ pub struct ClinicalApp {
     dark: bool,
     text_scale: f32,
     increased_contrast: bool,
+    privacy_shield: bool,
+    local_preferences: LocalPreferencesStore,
+    preferences_issue: Option<PreferenceIssue>,
+    privacy_scroll: ScrollHandle,
+    privacy_commands: [ScrollTarget; 3],
     theme: Theme,
     focus: FocusHandle,
     review_focus: FocusHandle,
@@ -496,14 +507,26 @@ fn confirmation_heading(question: String, theme: Theme) -> Stateful<Div> {
 
 impl ClinicalApp {
     pub fn new(server: String, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let dark = matches!(
+        Self::with_local_preferences(server, LocalPreferencesStore::system(), window, cx)
+    }
+
+    fn with_local_preferences(
+        server: String,
+        local_preferences: LocalPreferencesStore,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let (preferences, failed) = local_preferences.load();
+        let dark = preferences.dark_override.unwrap_or(matches!(
             window.appearance(),
             WindowAppearance::Dark | WindowAppearance::VibrantDark
-        );
-        let theme = Theme::for_dark(dark);
+        ));
+        let theme =
+            Theme::for_dark(dark).sized(preferences.text_scale, preferences.increased_contrast);
         let login_scroll = ScrollHandle::new();
         let profile_scroll = ScrollHandle::new();
         let area_scroll = ScrollHandle::new();
+        let privacy_scroll = ScrollHandle::new();
         let directory_scroll = ScrollHandle::new();
         let review_focus = cx.focus_handle().tab_stop(true);
         let mut form_actions: [ScrollTarget; 8] =
@@ -699,10 +722,15 @@ impl ClinicalApp {
             discard: None,
             message: None,
             verified: None,
-            dark_override: None,
+            dark_override: preferences.dark_override,
             dark,
-            text_scale: 1.,
-            increased_contrast: false,
+            text_scale: preferences.text_scale,
+            increased_contrast: preferences.increased_contrast,
+            privacy_shield: preferences.privacy_shield,
+            local_preferences,
+            preferences_issue: failed.then_some(PreferenceIssue::Read),
+            privacy_commands: std::array::from_fn(|_| ScrollTarget::new(&privacy_scroll, cx)),
+            privacy_scroll,
             theme,
             focus: cx.focus_handle(),
             review_focus,
@@ -771,6 +799,8 @@ impl ClinicalApp {
             window.focus(&this.focus, cx);
         });
         app._subscriptions.push(focus_lost);
+        let appearance_changed = cx.observe_window_appearance(window, |_, _, cx| cx.notify());
+        app._subscriptions.push(appearance_changed);
         window.focus(&app.focus, cx);
         app
     }
@@ -2830,7 +2860,8 @@ impl ClinicalApp {
             .child(div().min_w_0().max_w_full().flex().flex_wrap().items_center().justify_between().gap(px(12.))
                 .child(self.brand(true))
                 .child(button("clinical-workspace-login-theme", if self.dark { "Giorno" } else { "Grafite" }, theme, false, true)
-                    .on_click(cx.listener(|this, _, _, cx| { this.dark_override = Some(!this.dark); cx.notify(); }))))
+                    .on_click(cx.listener(|this, _, _, cx| this.change_local_preference(PreferenceChange::Appearance(Some(!this.dark)), cx)))))
+            .child(self.local_preferences_status(cx))
             .child(div().flex().flex_col().gap(px(8.))
                 .child(heading("clinical-workspace-connect-heading", if paired { "Accedi al tuo archivio" } else { "Collega questo dispositivo" }, theme))
                 .child(div().text_color(theme.secondary).type_role(theme, TypeRole::Body)
@@ -5368,7 +5399,7 @@ impl ClinicalApp {
                 .child(div().flex().flex_wrap().gap(px(8.))
                     .children([(None, "clinical-workspace-system-theme", "Sistema"), (Some(false), "clinical-workspace-day-theme", "Giorno"), (Some(true), "clinical-workspace-night-theme", "Grafite")]
                         .into_iter().map(|(value, id, label)| tab(id, label, self.dark_override == value, theme)
-                            .on_click(cx.listener(move |this, _, _, cx| { this.dark_override = value; cx.notify(); }))))))
+                            .on_click(cx.listener(move |this, _, _, cx| this.change_local_preference(PreferenceChange::Appearance(value), cx)))))))
             .child(div().flex().flex_col().gap(px(12.))
                 .child(section("clinical-workspace-text-scale-heading", "DIMENSIONE DEL TESTO", theme))
                 .child(div().text_color(theme.secondary).child(text!("La pagina passa a una sola colonna quando serve più spazio per leggere.")))
@@ -5376,10 +5407,19 @@ impl ClinicalApp {
                     .children([(1., "100%"), (1.25, "125%"), (1.5, "150%"), (2., "200%"), (3., "300%"), (4., "400%")].into_iter().map(|(scale, label)| {
                         button(format!("clinical-workspace-text-scale-{}", (scale * 100.) as u32), label, theme, false, true)
                             .aria_selected(self.text_scale == scale).when(self.text_scale == scale, |el| el.bg(theme.selected).border_color(theme.fresh))
-                            .on_click(cx.listener(move |this, _, _, cx| { this.text_scale = scale; cx.notify(); }))
+                            .on_click(cx.listener(move |this, _, _, cx| this.change_local_preference(PreferenceChange::TextScale(scale), cx)))
                     }))))
             .child(button("clinical-workspace-increased-contrast", if self.increased_contrast { "Contrasto dei filetti: aumentato" } else { "Aumenta il contrasto dei filetti" }, theme, false, true)
-                .on_click(cx.listener(|this, _, _, cx| { this.increased_contrast = !this.increased_contrast; cx.notify(); })))
+                .on_click(cx.listener(|this, _, _, cx| this.change_local_preference(PreferenceChange::Contrast(!this.increased_contrast), cx))))
+            .child(self.local_preferences_status(cx))
+            .child(div().border_t_1().border_color(theme.rule).pt(px(24.)).flex().flex_col().gap(px(12.))
+                .child(section("clinical-workspace-privacy-heading", "Privacy", theme))
+                .child(div().text_color(theme.secondary).child(text!("Copre questa finestra e conserva la bozza. L’accesso resta aperto finché non scegli Blocca. Puoi oscurare e mostrare i contenuti anche con Ctrl/Cmd + Maiusc + P.")))
+                .child(button("clinical-workspace-privacy-cover", "Oscura contenuti", theme, false, true)
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.change_local_preference(PreferenceChange::Privacy(true), cx);
+                        window.focus(&this.focus, cx);
+                    }))))
             .child(button("clinical-workspace-ai-preferences-open", "Preferenze funzioni AI…", theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.area_scroll.set_offset(gpui::point(px(0.), px(0.)));
@@ -5873,6 +5913,10 @@ fn record_header(theme: Theme, leading: Div, trailing: Div) -> Div {
 
 impl Render for ClinicalApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.prepare_local_appearance(window);
+        if self.privacy_shield {
+            return self.privacy_view(cx);
+        }
         if std::mem::take(&mut self.focus_after_render) {
             let focus = if self.discard.is_none()
                 && self.form.as_ref().is_some_and(|form| {
@@ -5897,17 +5941,6 @@ impl Render for ClinicalApp {
             if let Some(target) = &field.scroll_target {
                 target.scroll_to(window, cx);
             }
-        }
-        self.dark = self.dark_override.unwrap_or_else(|| {
-            matches!(
-                window.appearance(),
-                WindowAppearance::Dark | WindowAppearance::VibrantDark
-            )
-        });
-        self.theme = Theme::for_dark(self.dark).sized(self.text_scale, self.increased_contrast);
-        #[cfg(test)]
-        if let Some(body) = self.test_body_size {
-            self.theme.scale = body * self.text_scale / Theme::for_dark(false).body();
         }
         let theme = self.theme;
         if self.ai_preferences.active {
@@ -6105,6 +6138,10 @@ impl Render for ClinicalApp {
                 }
             }))
             .on_action(cx.listener(|this, _: &Lock, _, cx| this.request_discard(Discard::Lock, cx)))
+            .on_action(cx.listener(|this, _: &Privacy, window, cx| {
+                this.change_local_preference(PreferenceChange::Privacy(true), cx);
+                window.focus(&this.focus, cx);
+            }))
             .size_full()
             .flex()
             .flex_col()
