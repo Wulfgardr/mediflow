@@ -75,7 +75,7 @@ function DocumentSynthesisFabricReviewCardSession({
 
     const resetFromContext = useEffectEvent(reset);
     const resetFromChoice = useEffectEvent(() => { if (phase === 'running') reset(); else { setPreview(null); setConfirmed(false); } });
-    useEffect(() => { resetFromContext(); }, [picker.active, picker.view.blocked]);
+    useEffect(() => { resetFromContext(); }, [picker.active, picker.view.blocked, picker.view.preparationRevision]);
     useEffect(() => { resetFromChoice(); }, [picker.view.choice]);
 
     const load = async () => {
@@ -168,8 +168,7 @@ function DocumentSynthesisFabricReviewCardSession({
                 )}
             </div>
 
-            {/* The result reports the executed model, not a new selectable configuration. */}
-            {phase !== 'terminal' && <FunctionModelPicker picker={picker} />}
+            {(phase !== 'terminal' || picker.view.remote) && <FunctionModelPicker picker={picker} />}
             {phase === 'confirm' && proposal && (
                 <div className="mt-4 grid gap-4 text-sm leading-relaxed">
                     <div className="grid min-w-0 gap-1 break-words">
