@@ -99,3 +99,13 @@ test('accepts only intact string stdout, without evaluating objects, proxies or 
     for (const value of [producer(), Object.create(null), hostile, getter, null, [], undefined]) assert.equal(profile.normalize(value, config).status, 'denied');
     assert.equal(reads, 0);
 });
+
+test('declares trace array types explicitly and rejects the observed scalar limitations without coercion', () => {
+    const instruction = profile.instruction({ sourceRevision: 'source.synthetic', evidenceRefs: ['source.synthetic'], sources: [] });
+    assert.match(instruction, /trace.limitations è obbligatoriamente un array di stringhe/u);
+    assert.match(instruction, /trace.toolsUsed è un array vuoto/u);
+    const value = producer(); value.data.trace.limitations = 'Nessuna ricerca esterna.';
+    deny(value);
+    value.data.trace.limitations = ['Nessuna ricerca esterna.'];
+    assert.equal(decode(value).status, 'accepted');
+});
