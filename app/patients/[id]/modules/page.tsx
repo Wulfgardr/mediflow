@@ -9,7 +9,7 @@ import { differenceInYears } from 'date-fns';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { Accessibility, Activity, ChevronRight, FileText, Pill, Plus, Stethoscope } from 'lucide-react';
+import { Activity, ChevronRight, FileText, Pill, Plus } from 'lucide-react';
 
 import { PluginLocalUiNavigation, PluginPrescribingGuide } from '@/components/plugin-local-ui-navigation';
 import { PatientClinicalSupport, PatientProposalsSummary } from '@/components/patient-clinical-support';
@@ -722,34 +722,12 @@ export default function PatientDetailPage() {
                             observations={observations} attachments={attachments} />
                     </TherapyManager>
 
-                    <CollapsibleSection
-                        id="prestazioni"
-                        kicker="Prestazioni"
-                        title="Prestazioni prescritte"
-                        icon={Stethoscope}
-                        count={prestazioniCount !== undefined ? String(prestazioniCount) : undefined}
-                        summary={prestazioniCount === 0 ? 'Nessuna prestazione prescritta.' : undefined}
-                        surfaceClassName={workspaceStyles.clinicalSection}
-                        keepMounted
-                    >
-                        <ServicePrescriptionManager patientId={id} embedded />
-                    </CollapsibleSection>
+                    <ServicePrescriptionManager patientId={id} embedded surfaceClassName={workspaceStyles.clinicalSection} />
 
                     <ObservationManager patientId={id} embedded prefill={observationPrefill}
                         surfaceClassName={workspaceStyles.clinicalSection} />
 
-                    <CollapsibleSection
-                        id="protesica"
-                        kicker="Protesica"
-                        title="Diario ausili e prescrizioni"
-                        icon={Accessibility}
-                        count={protesicaCount !== undefined ? String(protesicaCount) : undefined}
-                        summary={protesicaCount === 0 ? 'Nessuna voce protesica registrata.' : undefined}
-                        surfaceClassName={workspaceStyles.clinicalSection}
-                        keepMounted
-                    >
-                        <ProstheticPrescriptionManager patientId={id} embedded />
-                    </CollapsibleSection>
+                    <ProstheticPrescriptionManager patientId={id} embedded surfaceClassName={workspaceStyles.clinicalSection} />
 
                     <CollapsibleSection
                         id="siss"

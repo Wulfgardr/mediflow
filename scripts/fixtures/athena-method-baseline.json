@@ -1,0 +1,22 @@
+{
+  "sourceRevision": "08ccf32a7d408bab30cbae610a4d6fea05d48803",
+  "thresholds": {
+    "instructionByteChanges": 0,
+    "legacyPromptByteChanges": 0,
+    "parserResultChanges": 0
+  },
+  "cases": [
+    {
+      "id": "tr-metformin-ckd-synthetic",
+      "legacyPromptSha256": "bd4382885ec83974df9d3a28020c99b12f2fe211d0a52dae2193805efb9a77e4",
+      "fabricInstructionSha256": "06ddb69d57f57a3d27102b4d43b4ecf16be56d69df84105700fdbef2e271f42d",
+      "legacyExpectedParseSha256": "b0133bd746d037800edaae05fa367274d47ff9fa475d42777a21e91c39e2a8d7"
+    },
+    {
+      "id": "tr-nsaid-anticoagulant-synthetic",
+      "legacyPromptSha256": "f29f881c912c926dc47049f09c2e3c4ea74f528be2434a91d66a17b38e3613f7",
+      "fabricInstructionSha256": "3e4a373c3fd68f3a392a497e9217f59abff52332f3e3d671597c70537c905a4a",
+      "legacyExpectedParseSha256": "867dfb6b155d8024f9ab43eeded8142cdc9352625decfae3eb791ec5df5bff23"
+    }
+  ]
+}
