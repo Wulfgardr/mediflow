@@ -90,7 +90,7 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
     useEffect(() => {
         abortControllerRef.current?.abort(); setPreview(null); setGeneration({ patientKey, active: false });
         return () => abortControllerRef.current?.abort();
-    }, [patientKey, picker.active, picker.view.choice, picker.view.blocked]);
+    }, [patientKey, picker.active, picker.view.choice, picker.view.blocked, picker.view.preparationRevision]);
 
     const generateInsight = async () => {
         if (!enabled) {

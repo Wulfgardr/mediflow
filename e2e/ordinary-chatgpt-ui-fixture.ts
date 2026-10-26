@@ -22,21 +22,23 @@ export function remoteMetadata(id: OrdinaryFunction) {
 export async function installOrdinaryChatGptTransport(page: Page, id: OrdinaryFunction, wire: WireFactory) {
   let enabled = false;
   let phase: 'needs_consent' | 'consented' | 'awaiting_login' | 'connected' | 'ready' = 'needs_consent';
-  const attemptId = `synthetic-${id}-attempt`;
+  let attempt = 0, live = false;
+  const attemptId = () => `synthetic-${id}-attempt-${attempt}`;
+  const catalog = () => ({ ...CATALOG, revision: `${CATALOG.revision}-${attempt}`, choices: CATALOG.choices.map(choice => ({ ...choice, optionId: attempt === 1 ? OPTION : `${OPTION}-${attempt}` })) });
   const operations: string[] = [];
   const previews: unknown[] = [];
   const clinicalWrites: string[] = [];
   const providerRequests: string[] = [];
   let recording = false;
-  const state = () => ({ schema: ORDINARY_FLOW_SCHEMA, attemptId, functionId: id, phase, expiresAt: Date.now() + 120_000 });
+  const state = () => ({ schema: ORDINARY_FLOW_SCHEMA, attemptId: attemptId(), functionId: id, phase, expiresAt: Date.now() + 120_000 });
   const settings = () => ({ schema: 'mediflow.chatgpt-ordinary-settings.v1', revision: REVISION, enabled,
     retention: 'chatgpt_service_terms_apply', preferences: Object.fromEntries(IDS.map(key => [key, { use: 'local', model: null, effort: null }])),
     lanes: Object.fromEntries(IDS.map(key => [key, 'enabled'])) });
-  const disclosure = { schema: 'mediflow.chatgpt-ordinary-disclosure.v1', revision: 'synthetic-disclosure-current', operation: id,
+  const disclosure = () => ({ schema: 'mediflow.chatgpt-ordinary-disclosure.v1', revision: `synthetic-disclosure-${attempt}`, operation: id,
     profileVersion: 'mediflow.ordinary-redacted-profile.v1', contextRevision: 'synthetic-host-context',
-    attemptRevision: 'synthetic-host-attempt', qualificationRevision: 'synthetic-host-qualification',
+    attemptRevision: `synthetic-host-attempt-${attempt}`, qualificationRevision: 'synthetic-host-qualification',
     sourceSha256: `sha256_${'a'.repeat(64)}`, payloadSha256: 'b'.repeat(64), payloadBytes: 100,
-    egress: ['auth.openai.com:443', 'chatgpt.com:443'], proposalOnly: true, clinicalWrites: 0 };
+    egress: ['auth.openai.com:443', 'chatgpt.com:443'], proposalOnly: true, clinicalWrites: 0 });
   page.on('request', request => {
     const url = new URL(request.url());
     if (['auth.openai.com', 'chatgpt.com'].includes(url.hostname)) providerRequests.push(url.hostname);
@@ -50,25 +52,27 @@ export async function installOrdinaryChatGptTransport(page: Page, id: OrdinaryFu
     const operation = path.slice('/api/settings/ai/chatgpt/ordinary/'.length);
     operations.push(operation);
     if (operation === 'settings') return fulfill(route, settings());
+    if (operation === 'status') return fulfill(route, { schema: ORDINARY_FLOW_SCHEMA, phase: 'closed', attemptId: null, cleanupConfirmed: !live });
     const body = route.request().postDataJSON() as Record<string, unknown>;
     if (operation === 'policy') {
       expect(body).toEqual({ expectedRevision: REVISION, enabled: true, retention: 'chatgpt_service_terms_apply' });
       enabled = true; return fulfill(route, settings());
     }
-    expect(body.attemptId).toBe(attemptId);
+    expect(body.attemptId).toBe(attemptId());
     if (operation === 'consent') {
-      expect(body.expectedDisclosureRevision).toBe(disclosure.revision); phase = 'consented'; return fulfill(route, state());
+      expect(body.expectedDisclosureRevision).toBe(disclosure().revision); phase = 'consented'; return fulfill(route, state());
     }
     if (operation === 'login/start') {
-      phase = 'awaiting_login'; return fulfill(route, { ...state(), challenge: { verificationUrl: 'https://auth.openai.com/device', userCode: 'SYNTHETIC-ONLY' } });
+      phase = 'awaiting_login'; return fulfill(route, { ...state(), challenge: { verificationUrl: 'https://auth.openai.com/device', userCode: `SYNTHETIC-ONLY-${attempt}` } });
     }
     if (operation === 'login/complete') { phase = 'connected'; return fulfill(route, state()); }
-    if (operation === 'models') { phase = 'ready'; return fulfill(route, { ...state(), catalog: CATALOG }); }
+    if (operation === 'models') { phase = 'ready'; return fulfill(route, { ...state(), catalog: catalog() }); }
     if (operation === 'generate') {
-      expect(body).toEqual({ attemptId, modelOptionId: OPTION, expectedCatalogRevision: CATALOG.revision });
+      expect(body).toEqual({ attemptId: attemptId(), modelOptionId: catalog().choices[0].optionId, expectedCatalogRevision: catalog().revision });
+      live = false;
       return fulfill(route, wire());
     }
-    if (operation === 'cancel') return fulfill(route, { schema: ORDINARY_FLOW_SCHEMA, phase: 'closed', cleanupConfirmed: true });
+    if (operation === 'cancel') { live = false; return fulfill(route, { schema: ORDINARY_FLOW_SCHEMA, phase: 'closed', cleanupConfirmed: true }); }
     throw new Error(`Unexpected synthetic ordinary operation: ${operation}`);
   });
   await page.route(`**/api/ai/${id.replaceAll('_', '-')}/preview`, async route => {
@@ -77,35 +81,38 @@ export async function installOrdinaryChatGptTransport(page: Page, id: OrdinaryFu
       schema: ORDINARY_SELECTION_SCHEMA, expectedPreferenceRevision: REVISION,
     });
     previews.push(route.request().postDataJSON());
-    return fulfill(route, { ...state(), disclosure }, 202);
+    attempt++; live = true; phase = 'needs_consent';
+    return fulfill(route, { ...state(), disclosure: disclosure() }, 202);
   });
-  return { operations, previews, clinicalWrites, arm: () => { recording = true; },
-    assertCompleted: () => {
-      expect(previews).toHaveLength(1);
-      expect(operations.filter(value => ['consent', 'login/start', 'login/complete', 'models', 'generate'].includes(value))).toEqual([
+  return { operations, previews, clinicalWrites, option: () => catalog().choices[0].optionId, arm: () => { recording = true; },
+    assertCompleted: (count = 1) => {
+      expect(previews).toHaveLength(count);
+      expect(operations.filter(value => ['consent', 'login/start', 'login/complete', 'models', 'generate'].includes(value))).toEqual(Array.from({ length: count }, () => [
         'consent', 'login/start', 'login/complete', 'models', 'generate',
-      ]);
+      ]).flat());
       expect(operations).toContain('policy');
-      expect(operations.filter(value => value === 'generate')).toHaveLength(1);
+      expect(operations.filter(value => value === 'generate')).toHaveLength(count);
       expect(clinicalWrites).toEqual([]);
       expect(providerRequests).toEqual([]);
     } };
 }
 
-export async function selectOrdinaryChatGpt(scope: Locator) {
+export async function selectOrdinaryChatGpt(scope: Locator, policyAlreadyEnabled = false) {
   await scope.getByRole('button', { name: 'Cambia', exact: true }).click();
   await scope.getByRole('combobox', { name: 'Modello per questa proposta' }).selectOption('chatgpt_subscription');
   await scope.getByRole('button', { name: 'Cambia', exact: true }).click();
   const controls = scope.getByRole('group', { name: 'OpenAI per questa proposta' });
   await expect(controls.getByRole('checkbox', { name: /Consenti OpenAI/u })).toBeVisible();
-  await expect(controls.getByRole('checkbox', { name: /Consenti OpenAI/u })).not.toBeChecked();
-  await controls.getByRole('checkbox', { name: /Consenti OpenAI/u }).click();
+  if (!policyAlreadyEnabled) {
+    await expect(controls.getByRole('checkbox', { name: /Consenti OpenAI/u })).not.toBeChecked();
+    await controls.getByRole('checkbox', { name: /Consenti OpenAI/u }).click();
+  }
   await expect(controls.getByRole('checkbox', { name: /Consenti OpenAI/u })).toBeChecked();
   await expect(controls).toContainText('Usa l’azione di proposta della funzione');
   return controls;
 }
 
-export async function finishOrdinaryChatGpt(controls: Locator) {
+export async function finishOrdinaryChatGpt(controls: Locator, option = OPTION) {
   await expect(controls).toContainText('Contesto preparato e redatto: 100 byte.');
   await controls.getByRole('button', { name: 'Consenti per questo contesto' }).click();
   await controls.getByRole('button', { name: 'Avvia accesso dedicato ChatGPT' }).click();
@@ -113,6 +120,6 @@ export async function finishOrdinaryChatGpt(controls: Locator) {
   // The official URL is fixture data only: never open the link or authenticate.
   await controls.getByRole('button', { name: 'Ho completato: verifica accesso' }).click();
   await controls.getByRole('button', { name: 'Leggi catalogo di questo processo' }).click();
-  await controls.getByRole('combobox', { name: 'Modello e ragionamento correnti' }).selectOption(OPTION);
+  await controls.getByRole('combobox', { name: 'Modello e ragionamento correnti' }).selectOption(option);
   await controls.getByRole('button', { name: 'Genera questa proposta' }).click();
 }
