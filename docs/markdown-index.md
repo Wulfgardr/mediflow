@@ -495,3 +495,5 @@ di ciascuna proposta e il limite di autorità dell’host.
 - `plugins/mediflow-local-ui/skills/local-ui/SKILL.md`
 
 [ADR 0164 — Ricevuta di ritiro dell’autorità native](adr/0164-native-inference-authority-retirement.md): recupero dei medesimi owner dopo revoca della sessione; cleanup fisico distinto.
+
+[ADR 0165 — Canale di accesso della chat alla sessione GPUI](adr/0165-native-chat-access-channel.md): protocollo C4a senza contenuti clinici, proposta e prove richieste.
