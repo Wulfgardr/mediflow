@@ -1098,70 +1098,67 @@ impl ClinicalApp {
                     .on_click(cx.listener(|this, _, _, cx| this.authorize_ambulatory_command(cx))),
                 );
         }
-        if dialog.phase == Phase::Confirm && !dialog.mode.recovery() {
-            if let Some(preview) = &dialog.preview {
-                view = view.child(section(
-                    "ambulatory-command-preview",
-                    formatted(
-                        "anteprima",
-                        "titolo",
-                        &[("ambulatorio", preview.target.name.clone())],
-                    ),
-                    theme,
-                ));
-                if let Some(counts) = &preview.counts {
-                    for (key, count) in [
-                        ("cestino", counts.tombstoned_patients),
-                        ("scollegati", counts.unlinked_patients),
-                        ("preservate", counts.preserved_live_patients),
-                    ] {
-                        view = view.child(
-                            text!(formatted(
-                                "anteprima",
-                                key,
-                                &[("conteggio", count.to_string())]
-                            ))
-                            .with_id(format!("ambulatory-command-count-{key}")),
-                        );
-                    }
-                } else {
-                    view = view.child(
-                        text!(copy("anteprima", "delete"))
-                            .with_id("ambulatory-command-delete-effect"),
-                    );
-                }
-                if let Some(fallback) = &preview.fallback {
+        if dialog.phase == Phase::Confirm
+            && !dialog.mode.recovery()
+            && let Some(preview) = &dialog.preview
+        {
+            view = view.child(section(
+                "ambulatory-command-preview",
+                formatted(
+                    "anteprima",
+                    "titolo",
+                    &[("ambulatorio", preview.target.name.clone())],
+                ),
+                theme,
+            ));
+            if let Some(counts) = &preview.counts {
+                for (key, count) in [
+                    ("cestino", counts.tombstoned_patients),
+                    ("scollegati", counts.unlinked_patients),
+                    ("preservate", counts.preserved_live_patients),
+                ] {
                     view = view.child(
                         text!(formatted(
                             "anteprima",
-                            "predefinito",
-                            &[("nome", fallback.name.clone())]
+                            key,
+                            &[("conteggio", count.to_string())]
                         ))
-                        .with_id("ambulatory-command-fallback"),
+                        .with_id(format!("ambulatory-command-count-{key}")),
                     );
                 }
-                view = view
-                    .child(self.field_view(
-                        &dialog.fields[1],
-                        "ambulatory-command-confirmation-field",
-                        cx,
-                    ))
-                    .child(
-                        self.ambulatory_button(
-                            "ambulatory-command-confirm",
-                            copy("azioni", "conferma"),
-                            theme,
-                            true,
-                            !dialog.busy
-                                && !dialog.attempted
-                                && dialog.fields[1].value(cx)
-                                    == dialog.mode.operation().confirmation(),
-                        )
-                        .on_click(
-                            cx.listener(|this, _, _, cx| this.confirm_ambulatory_command(cx)),
-                        ),
-                    );
+            } else {
+                view = view.child(
+                    text!(copy("anteprima", "delete")).with_id("ambulatory-command-delete-effect"),
+                );
             }
+            if let Some(fallback) = &preview.fallback {
+                view = view.child(
+                    text!(formatted(
+                        "anteprima",
+                        "predefinito",
+                        &[("nome", fallback.name.clone())]
+                    ))
+                    .with_id("ambulatory-command-fallback"),
+                );
+            }
+            view = view
+                .child(self.field_view(
+                    &dialog.fields[1],
+                    "ambulatory-command-confirmation-field",
+                    cx,
+                ))
+                .child(
+                    self.ambulatory_button(
+                        "ambulatory-command-confirm",
+                        copy("azioni", "conferma"),
+                        theme,
+                        true,
+                        !dialog.busy
+                            && !dialog.attempted
+                            && dialog.fields[1].value(cx) == dialog.mode.operation().confirmation(),
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.confirm_ambulatory_command(cx))),
+                );
         }
         if let Some(terminal) = terminal {
             if terminal.historical() {

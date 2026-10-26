@@ -342,7 +342,7 @@ test('named HTTP transport rejects cross-origin, cross-site, plain text, anonymo
     const body = { purpose: 'execute', command: { operation: 'ambulatory.clear-test.v1', originalScopeId: 'scope', ambulatoryId: 'target', expectedVersion: 1 } };
     const headers = { ...Object.fromEntries(native.request.headers), origin, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json', 'x-mediflow-expected-ambulatory-id': 'scope' };
     const before = snapshot();
-    for (const patch of [{ origin: 'http://other.invalid' }, { 'sec-fetch-site': 'cross-site' }, { 'content-type': 'text/plain' }]) {
+    for (const patch of [{ origin: 'http://localhost:31998' }, { 'sec-fetch-site': 'cross-site' }, { 'content-type': 'text/plain' }]) {
         const req = new Request(`${origin}/api/auth/ambulatory-commands/begin`, { method: 'POST', headers: { ...headers, ...patch }, body: JSON.stringify(body) });
         assert.equal((await ambulatoryDestructiveHttp(req, 'begin')).status, 403); assert.equal(req.bodyUsed, false);
     }
