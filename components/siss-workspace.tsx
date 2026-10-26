@@ -1,7 +1,7 @@
 'use client';
 
 /* presentation only; export/share retain the chart's existing gates. */
-import { Disclosure } from '@/components/disclosure';
+import { Button } from '@/components/ui/button';
 import { Download, Share2 } from 'lucide-react';
 import SissPatientContextPanel from '@/components/siss-patient-context-panel';
 import SissHandoffDiary from '@/components/siss-handoff-diary';
@@ -19,24 +19,21 @@ export default function SissWorkspace({ patientId, patientTaxCode, canShareFhirF
     return (
         <div className={styles.workspace}>
             <section aria-label="Export FHIR">
-                <h3 className={styles.heading}>File della cartella</h3>
+                <h3 className={styles.heading}>Esportazione locale</h3>
                 <p className={styles.caption}>Export locale FHIR R4. Il file non viene inviato al FSE.</p>
                 <div className={styles.actions}>
-                    <button type="button" className={styles.control} onClick={onExportFhir}>
-                        <Download size={18} aria-hidden="true" />Esporta
-                    </button>
+                    <Button variant="secondary" onClick={onExportFhir}>
+                        <Download size={18} aria-hidden="true" />Esporta FHIR
+                    </Button>
                     {canShareFhirFile && (
-                        <button type="button" className={styles.control} onClick={() => void onShareFhir()}>
-                            <Share2 size={18} aria-hidden="true" />Condividi
-                        </button>
+                        <Button variant="secondary" onClick={() => void onShareFhir()}>
+                            <Share2 size={18} aria-hidden="true" />Condividi file
+                        </Button>
                     )}
                 </div>
             </section>
             <SissPatientContextPanel patientId={patientId} patientTaxCode={patientTaxCode} embedded />
-            <Disclosure className={styles.disclosure} title="Diario dei passaggi">
-                <p className={styles.caption}>Registro locale: l’atto regionale si svolge nel portale ufficiale.</p>
-                <div className={styles.diary}><SissHandoffDiary patientId={patientId} embedded /></div>
-            </Disclosure>
+            <div className={styles.diary}><SissHandoffDiary patientId={patientId} embedded /></div>
         </div>
     );
 }
