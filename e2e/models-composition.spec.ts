@@ -11,8 +11,9 @@ async function installClosedMocks(page: Page, baseURL: string) {
     const calls: Array<{ path: string; method: string; body?: unknown; target?: string }> = [], blocked: string[] = [], writes: unknown[] = [];
     let releaseSettings: () => void = () => {};
     const settingsGate = new Promise<void>(resolve => { releaseSettings = resolve; });
-    const state = { holdSettings: false, catalog: 'present' as 'present' | 'empty' | 'error', settingsFailed: false, failSave: false, version: 0, activated: false };
+    const state = { holdSettings: false, accountWaiting: false, catalog: 'present' as 'present' | 'empty' | 'error', settingsFailed: false, failSave: false, version: 0, activated: false };
     const onboarding = () => ({ provider: 'ollama', credentialClass: 'local_model', model: config.get('aiModel_clinical'), state: state.activated ? 'available_unqualified' : 'missing', revision: (state.activated ? 'b' : 'a').repeat(64), version: state.version, receipt: state.activated ? `receipt_${'b'.repeat(32)}` : null, canActivate: true, inference: 'not_run', qualification: 'not_assessed' });
+    const accountStatus = () => ({ state: state.accountWaiting ? 'awaiting_login' : 'disconnected', notice: null, plan: null, loginExpiresAt: state.accountWaiting ? 2_000_000_000_000 : null, actions: state.accountWaiting ? ['cancel_login'] : ['connect'], inferenceEnabled: false, executionBlock: 'data_boundary_unqualified' });
     await page.route('**/*', async route => {
         const request = route.request(), url = new URL(request.url()), path = url.pathname, method = request.method();
         if (url.origin !== new URL(baseURL).origin) { blocked.push(request.url()); return route.abort(); }
@@ -21,8 +22,10 @@ async function installClosedMocks(page: Page, baseURL: string) {
         if (path === '/api/siss/session-status') return route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } });
         if (path.startsWith('/api/settings/ai/chatgpt/')) {
             record();
+            if (method === 'POST' && path === '/api/settings/ai/chatgpt/login/start') { state.accountWaiting = true; return route.fulfill({ json: { status: accountStatus(), authUrl: 'https://auth.openai.com/oauth/authorize?state=synthetic-fixture' } }); }
+            if (method === 'POST' && path === '/api/settings/ai/chatgpt/login/cancel') { state.accountWaiting = false; return route.fulfill({ json: { status: accountStatus() } }); }
             if (path !== '/api/settings/ai/chatgpt/status' || method !== 'GET') { blocked.push(`${method} ${path}`); return route.abort(); }
-            return route.fulfill({ json: { state: 'disconnected', notice: null, plan: null, loginExpiresAt: null, actions: ['connect'], inferenceEnabled: false, executionBlock: 'data_boundary_unqualified' } });
+            return route.fulfill({ json: accountStatus() });
         }
         if (path === '/api/settings' || path.startsWith('/api/settings/')) {
             const body = method === 'GET' ? undefined : request.postDataJSON();
@@ -110,7 +113,14 @@ test('Modelli: letture chiuse, scelta e bozza, gerarchia e attivazione soltanto 
         await expect(page.getByRole('button', { name: 'Verifica e attiva locale', exact: true })).toBeEnabled();
         const primaryBackground = await save.evaluate(element => getComputedStyle(element).backgroundColor);
         const primaries = await region.locator('button, a').evaluateAll((elements, background) => elements.filter(element => { const box = element.getBoundingClientRect(); return box.width > 0 && box.height > 0 && getComputedStyle(element).backgroundColor === background; }).map(element => element.textContent?.trim()), primaryBackground);
-        expect(primaries).toHaveLength(baseline && !causal ? 3 : 1); await capture('account'); await account.click();
+        expect(primaries).toHaveLength(baseline && !causal ? 3 : 1); await capture('account');
+        await page.getByRole('button', { name: 'Collega ChatGPT', exact: true }).click();
+        const officialLink = page.getByRole('link', { name: 'Apri accesso ufficiale', exact: true }); await expect(officialLink).toBeVisible();
+        await expect(officialLink).toHaveAttribute('href', 'https://auth.openai.com/oauth/authorize?state=synthetic-fixture');
+        const pendingPrimaries = await region.locator('button, a').evaluateAll((elements, background) => elements.filter(element => { const box = element.getBoundingClientRect(); return box.width > 0 && box.height > 0 && getComputedStyle(element).backgroundColor === background; }).map(element => element.textContent?.trim()), primaryBackground);
+        expect(pendingPrimaries).toHaveLength(baseline ? 3 : 1);
+        await expect(region).toContainText('il tuo consenso sul contenuto esatto da trasmettere a OpenAI');
+        await page.getByRole('button', { name: 'Annulla accesso', exact: true }).click(); await expect(page.getByRole('button', { name: 'Collega ChatGPT', exact: true })).toBeVisible(); await account.click();
         mock.state.catalog = 'error';
         for (const id of ['clinical', 'reasoning']) await selector(id).getByRole('button', { name: 'Aggiorna modelli installati', exact: true }).click();
         await expect(selector('clinical').getByRole('status')).toContainText('Impossibile leggere'); await expect(selector('clinical')).not.toContainText('Nessun modello installato'); await capture('errore');

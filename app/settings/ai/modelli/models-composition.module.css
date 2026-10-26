@@ -30,14 +30,14 @@
     padding-block: 12px;
     border-top: 1px solid var(--lume-rule);
 }
-.page.page [data-models-auxiliary] button:not([data-disclosure-control]) {
+.page.page [data-models-auxiliary] :is(button:not([data-disclosure-control]), a[target='_blank']) {
     min-height: 40px;
     border: 1px solid var(--lume-rule-strong);
     background: transparent;
     color: var(--lume-ink);
     box-shadow: none;
 }
-.page [data-models-auxiliary] button:focus-visible {
+.page [data-models-auxiliary] :is(button, a[target='_blank']):focus-visible {
     outline: 2px solid var(--lume-accent);
     outline-offset: 2px;
 }
@@ -52,7 +52,7 @@
     overflow-wrap: anywhere;
 }
 @media (max-width: 700px) {
-    .page.page [data-models-auxiliary] button:not([data-disclosure-control]) {
+    .page.page [data-models-auxiliary] :is(button:not([data-disclosure-control]), a[target='_blank']) {
         min-height: 44px;
     }
 }
