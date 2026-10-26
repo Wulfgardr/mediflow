@@ -105,6 +105,23 @@ for (const surface of ['host', 'paired'] as const) {
             assert.equal((await update(surface, authority, 'c', { parentId: 'b', version: 1 })).status, 200);
         }
     });
+    for (const emptyIdRow of [false, true]) {
+        for (const operation of ['create', 'update'] as const) {
+            test(`${surface}: ${operation} rejects empty ancestor id ${emptyIdRow ? 'in a cycle' : 'without a row'}`, async () => {
+                const parents: Record<string, string | null> = { a: '', c: null };
+                if (emptyIdRow) parents[''] = 'a';
+                const authority = seed(parents);
+                const before = snapshot();
+                const denied = operation === 'create'
+                    ? await create(surface, authority, { id: 'new', name: 'Synthetic new', parentId: 'a', isDefault: true })
+                    : await update(surface, authority, 'c', { parentId: 'a', isDefault: true, version: 1 });
+                observations.push({ surface, case: 'empty-ancestor', operation, emptyIdRow, before, denied, after: snapshot() });
+                assert.equal(denied.status, 400);
+                assert.equal(denied.value.error, 'Parent ambulatory hierarchy is invalid');
+                assert.deepEqual(snapshot(), before);
+            });
+        }
+    }
     test(`${surface}: valid reparenting and create retain exact receipt, readback and audit versions`, async () => {
         const authority = seed({ a: null, b: 'a', c: null });
         const before = snapshot();
