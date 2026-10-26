@@ -8,7 +8,6 @@ import { bindSyntheticArchiveSessions } from '../../lib/security/web-auth-lifecy
 import { NETWORK_PAIRING_STATE_KEY, serializeNetworkPairingState } from '../../lib/network-pairing-model';
 import { currentArchiveGeneration } from '../../lib/security/archive-session-generation';
 import { clearAllSessions } from '../../lib/security/server-session';
-import { prepareNetworkPatientCommitGuard } from '../../lib/network-patient-commit-authority';
 import type { ServerSession } from '../../lib/security/server-session';
 
 const [surface, operation, gate] = process.argv.slice(2);
@@ -22,6 +21,7 @@ const { dbServer, openDbServer } = load('../../lib/db-server.ts') as typeof impo
 const { settings } = load('../../lib/schema.ts') as typeof import('../../lib/schema');
 const host = load('../../lib/ambulatory-write.ts') as typeof import('../../lib/ambulatory-write');
 const paired = load('../../lib/network-ambulatory-write.ts') as typeof import('../../lib/network-ambulatory-write');
+const { prepareNetworkPatientCommitGuard } = load('../../lib/network-patient-commit-authority.ts') as typeof import('../../lib/network-patient-commit-authority');
 openDbServer();
 const authority = syntheticNetworkPatientAuthority(dbServer, 'scope');
 authority.pairedClient.grantedCapabilities.push(paired.NETWORK_AMBULATORY_WRITE_CAPABILITY);
