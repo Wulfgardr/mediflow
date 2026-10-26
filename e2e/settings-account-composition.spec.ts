@@ -78,6 +78,11 @@ test('account settings preserve form drafts, denied outcomes, theme selection an
         const access = page.getByTestId('settings-access-section');
         const primary = access.locator('button[class*="primaryAction"]:visible');
         await expect(primary).toHaveCount(1);
+        await page.getByRole('button', { name: 'Cambio PIN', exact: true }).click();
+        for (const id of ['current-pin', 'new-pin', 'confirm-pin']) await expect(page.locator(`#${id}`)).toHaveValue('');
+        await expect(access.getByRole('status')).toHaveCount(0);
+        await capture(page, zoom, 'accesso', page.locator('#current-pin'));
+        await page.getByRole('button', { name: 'Passa dal PIN alla passphrase', exact: true }).click();
         await page.locator('#access-adopt-secret').fill('1234');
         await page.locator('#access-adopt-new').fill('Passphrase W19 inventata');
         await page.locator('#access-adopt-confirm').fill('Conferma diversa inventata');
@@ -105,10 +110,29 @@ test('account settings preserve form drafts, denied outcomes, theme selection an
         expect(pinPosts).toBe(1);
         await stateCapture(page, zoom, 'accesso-diniego', access.getByRole('status'));
         await page.unroute('**/api/auth/change-pin');
-        await capture(page, zoom, 'accesso', page.locator('#current-pin'));
         await page.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
         await expect(page.getByLabel('MediFlow lock screen', { exact: true })).toBeVisible();
         await unlockIfNeeded(page, '1234');
+
+        let passphrasePosts = 0;
+        await page.route('**/api/auth/passphrase', route => { passphrasePosts++; return route.abort(); });
+        await page.route('**/api/auth/check', async route => {
+            const response = await route.fetch();
+            await route.fulfill({ response, json: { ...await response.json(),
+                unlock: { credential: 'passphrase', kdfVersion: 3, salt: 'AAAAAAAAAAAAAAAAAAAAAA==' } } });
+        });
+        const checked = page.waitForResponse(response => response.url().endsWith('/api/auth/check'));
+        await page.evaluate(() => window.dispatchEvent(new Event('focus'))); await checked;
+        const passphrase = page.getByTestId('settings-access-passphrase');
+        await expect(passphrase).toBeVisible();
+        await expect(access.getByRole('button', { name: 'Aggiorna PIN', exact: true })).toHaveCount(0);
+        await page.getByLabel('Passphrase attuale', { exact: true }).fill('Passphrase corrente inventata');
+        await page.getByRole('button', { name: 'Sblocco con passphrase', exact: true }).click();
+        await page.getByRole('button', { name: 'Sblocco con passphrase', exact: true }).click();
+        await expect(page.getByLabel('Passphrase attuale', { exact: true })).toHaveValue('Passphrase corrente inventata');
+        await stateCapture(page, zoom, 'accesso-passphrase-render-mock', passphrase.locator('p').first());
+        expect(passphrasePosts).toBe(0);
+        await page.unroute('**/api/auth/check'); await page.unroute('**/api/auth/passphrase');
 
         let releaseRead!: () => void;
         const readGate = new Promise<void>(resolve => { releaseRead = resolve; });
@@ -124,6 +148,8 @@ test('account settings preserve form drafts, denied outcomes, theme selection an
         await expect(profile.getByRole('status').filter({ hasText: 'Caricamento del profilo…' })).toBeVisible();
         await expect(name).toBeDisabled(); await stateCapture(page, zoom, 'profilo-caricamento', profile.getByRole('status'));
         holdRead = false; releaseRead(); await expect(name).toBeEnabled();
+        await expect(profile.getByRole('status')).toHaveCount(0);
+        await capture(page, zoom, 'profilo', name);
         await name.fill('Bozza W19 inventata non salvata');
         await page.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click();
         const activity = page.getByRole('radio', { name: 'Consultare e compilare cartelle', exact: true });
@@ -137,7 +163,7 @@ test('account settings preserve form drafts, denied outcomes, theme selection an
         await expect(profile.getByRole('status')).toContainText('Lettura non riuscita.'); await expect(save).toBeDisabled();
         await expect(name).toHaveValue('Bozza W19 inventata non salvata'); await stateCapture(page, zoom, 'profilo-lettura-negata', profile.getByRole('status'));
         failRead = false; await page.getByRole('button', { name: 'Rileggi profilo mantenendo la bozza', exact: true }).click();
-        await expect(save).toBeEnabled(); await capture(page, zoom, 'profilo', name);
+        await expect(save).toBeEnabled();
         await page.getByRole('link', { name: 'Torna alle impostazioni', exact: true }).click();
         await page.getByRole('link', { name: 'Profilo', exact: true }).click(); await expect(name).toHaveValue('Bozza W19 inventata non salvata');
         await page.unroute('**/api/auth/profile');
