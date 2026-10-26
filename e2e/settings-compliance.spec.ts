@@ -28,7 +28,11 @@ test('Compliance settings renders the technical evidence inventory without a leg
   const records = surface.locator('[data-testid^="compliance-evidence-"]');
   await expect(records).toHaveCount(EVIDENCE_RECORD_IDS.length);
   for (const id of EVIDENCE_RECORD_IDS) {
-    await expect(surface.getByTestId(`compliance-evidence-${id}`)).toBeVisible();
+    const record = surface.getByTestId(`compliance-evidence-${id}`);
+    await expect(record).toBeVisible();
+    await expect(record.locator('[data-compliance-status]')).toBeVisible();
+    await expect(record.locator('dd').first()).toBeVisible();
+    await record.getByRole('button', { name: 'Evidenze, responsabile e fonti', exact: true }).click();
   }
 
   const dataProtection = surface.getByTestId('compliance-evidence-data_protection_by_design');
@@ -81,5 +85,7 @@ test('Compliance settings renders the technical evidence inventory without a leg
   })).toHaveAttribute('href', 'https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai');
   await expect(legalApplicability.locator('a[target="_blank"][rel="noopener noreferrer"]')).toHaveCount(3);
 
-  await expect(surface.locator('form, input, select, textarea, button, [role="switch"], [contenteditable="true"]')).toHaveCount(0);
+  await expect(surface.getByRole('button')).toHaveCount(6);
+  await expect(surface.locator('[data-disclosure-control]')).toHaveCount(6);
+  await expect(surface.locator('form, input, select, textarea, [role="switch"], [contenteditable="true"]')).toHaveCount(0);
 });
