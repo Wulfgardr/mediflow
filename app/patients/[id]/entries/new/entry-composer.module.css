@@ -1,8 +1,9 @@
 /* WUL-676: scoped composition for the runtime-twin writing sheet. */
 .page {
+    container-type: inline-size;
     box-sizing: border-box;
     width: 100%;
-    max-width: 900px;
+    max-width: 1400px;
     min-width: 0;
     margin-inline: auto;
     padding: 24px 20px 48px;
@@ -184,3 +185,23 @@
 .saveSummary p { margin-top: 4px; font-size: 0.8125rem; color: var(--lume-ink-muted); }
 .saveButton { border-radius: 10px; }
 @media (max-width: 680px) { .actions { margin-inline: -16px; margin-bottom: -16px; padding: 16px; } .saveButton { min-height: 44px; } }
+
+.layout { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 32px; align-items: start; }
+.quadro, .writingColumn { min-width: 0; }
+.quadro :global(time) { white-space: nowrap; }
+.columnHeading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
+.columnHeading h2 { margin: 0; color: var(--lume-ink); font: var(--type-section); text-transform: uppercase; letter-spacing: .05em; }
+.columnHeading h2:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 4px; }
+.page .layout .columnHeading .consultQuadro, .page .layout .columnHeading .resumeDraft { display: none; min-height: 44px; }
+.previousEntries { margin-top: 28px; color: var(--lume-ink-muted); }
+.previousEntries h2 { margin: 0 0 12px; font: var(--type-section); text-transform: uppercase; letter-spacing: .05em; }
+.previousEntries p { font: var(--type-prose); white-space: pre-wrap; overflow-wrap: anywhere; }
+@container (max-width: 1000px) {
+    .layout { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    .writingColumn { grid-row: 1; }
+    .quadro { grid-row: 2; }
+    .page .layout .columnHeading .consultQuadro { display: inline-flex; }
+    .layout[data-reading-quadro='true'] .writingColumn { display: none; }
+    .layout[data-reading-quadro='true'] .quadro { grid-row: 1; }
+    .page .layout[data-reading-quadro='true'] .columnHeading .resumeDraft { display: inline-flex; }
+}
