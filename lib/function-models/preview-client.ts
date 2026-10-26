@@ -3,9 +3,9 @@ import { createOrdinaryBrowser, type OrdinaryBrowserView } from './ordinary-brow
 /* a request-local model selection, never clinical authority or persistence. */
 import { api, parsePreferences, ModelUiError, errorText } from './browser';
 import type { FunctionModelPreferences, FunctionModelId, FunctionModelChoice } from './browser';
-export type PickerView = Readonly<{ dto: FunctionModelPreferences | null; choice: FunctionModelChoice | null; loading: boolean; error: string | null; blocked: boolean; consumed: boolean; remote?: OrdinaryBrowserView }>;
+export type PickerView = Readonly<{ dto: FunctionModelPreferences | null; choice: FunctionModelChoice | null; loading: boolean; error: string | null; blocked: boolean; consumed: boolean; preparationRevision: number; remote?: OrdinaryBrowserView }>;
 export function createModelPreviewClient(functionId: FunctionModelId, request: typeof fetch = globalThis.fetch) {
-    let view: PickerView = { dto: null, choice: null, loading: false, error: null, blocked: false, consumed: false };
+    let view: PickerView = { dto: null, choice: null, loading: false, error: null, blocked: false, consumed: false, preparationRevision: 0 };
     let generation = 0; let transport = new AbortController(); let active = false; let lease: { generation: number; choice: FunctionModelChoice | null; remote?: boolean } | null = null;
     const listeners = new Set<() => void>(); const emit = (next: Partial<PickerView>) => { view = { ...view, ...next }; listeners.forEach(fn => fn()); };
     let remoteMode = false;
@@ -22,10 +22,23 @@ export function createModelPreviewClient(functionId: FunctionModelId, request: t
     };
     return {
         getSnapshot: () => view, subscribe: (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; },
-        reset(enabled = false) { active = enabled; remoteMode = false; abort(); view = { dto: null, choice: null, loading: false, error: null, blocked: !enabled, consumed: false }; listeners.forEach(fn => fn()); },
-        cancel() { abort(); emit({ choice: null, blocked: true, error: 'Scelta annullata. Rileggi e conferma il modello prima di generare.' }); },
+        reset(enabled = false) { active = enabled; remoteMode = false; abort(); view = { dto: null, choice: null, loading: false, error: null, blocked: !enabled, consumed: false, preparationRevision: view.preparationRevision }; listeners.forEach(fn => fn()); },
+        cancel() { abort(); emit({ choice: null, loading: false, blocked: true, error: 'Scelta annullata. Rileggi e conferma il modello prima di generare.' }); },
         read, remote,
         chooseRemote() { if (!active) return; abort(); remoteMode = true; emit({ choice: null, blocked: false, consumed: false, error: null, remote: remote.getSnapshot() }); void remote.read(); },
+        async reprepareRemote() {
+            const observed = remote.getSnapshot();
+            if (!active || !remoteMode || functionId === 'treatment_reasoning' || view.loading || observed.loading || observed.state
+                || !(view.consumed || observed.completed || observed.error)) return;
+            abort(); const token = generation;
+            emit({ dto: null, choice: null, blocked: true, loading: true, error: null, preparationRevision: view.preparationRevision + 1 });
+            try {
+                await remote.reprepare(); current(token);
+                emit({ loading: false, blocked: false, consumed: false, remote: remote.getSnapshot() });
+            } catch (error) {
+                if (token === generation) emit({ loading: false, blocked: true, error: errorText(error) });
+            }
+        },
         choose(id: string) {
             remoteMode = false; abort(); const { remote: _remoteView, ...localView } = view; view = localView; void _remoteView; const dto = view.dto; const f = dto?.functions.find(f => f.id === functionId);
             const selected = f?.options.find(o => o.modelOptionId === (id || f.defaultModelOptionId));
@@ -36,7 +49,7 @@ export function createModelPreviewClient(functionId: FunctionModelId, request: t
         },
         async begin() {
             if (remoteMode) {
-                if (!active || view.consumed) throw new ModelUiError('stale');
+                if (!active || view.blocked || view.loading || view.consumed || remote.getSnapshot().loading) throw new ModelUiError('stale');
                 abort(false); const token = generation; await remote.read(); current(token);
                 const observed = remote.getSnapshot();
                 if (observed.error || !observed.settings?.enabled || !isAiLaneEnabledValue(observed.settings.lanes[functionId])) throw new ModelUiError('stale');
