@@ -201,6 +201,27 @@ versione del 409; «Salva profilo» resta disabilitato finché «Rileggi profilo
 mantenendo la bozza» aggiorna la base senza toccare la bozza. Un esito incerto
 conserva la bozza e richiede la stessa rilettura esplicita prima di un nuovo invio.
 
+Aspetto, dimensione del testo, contrasto e oscuramento della finestra si
+conservano sul computer. «Sistema» segue anche i successivi cambi di aspetto
+del sistema operativo; Giorno e Grafite restano scelte esplicite. Il file
+`preferences.json` contiene soltanto queste scelte e una versione del formato:
+su macOS vive in `~/Library/Application Support/MediFlow GPUI`, su Windows in
+`%LOCALAPPDATA%\MediFlow GPUI`, su Linux in `$XDG_CONFIG_HOME/mediflow-gpui`
+(oppure `~/.config/mediflow-gpui`). Non contiene dati clinici, account,
+credenziali o indirizzi dell'archivio. Ogni modifica sostituisce atomicamente
+il file; se fallisce, la scelta resta nella finestra con un errore e un
+comando esplicito per riprovare. Un file non leggibile o non valido non viene
+riscritto all'apertura: la finestra parte coperta e segnala il problema.
+
+«Oscura contenuti» e Ctrl/Cmd+Maiusc+P sostituiscono l'intera superficie con
+la schermata privacy, conservando la bozza in memoria. «Mostra contenuti»
+o lo stesso tasto ripristinano la superficie; «Blocca l'accesso» riusa invece
+il blocco ordinario, che ritira sessione e bozze. L'oscuramento è una copertura
+visiva, non un blocco di sicurezza né una protezione dagli screenshot o
+dall'accesso del sistema operativo. Se rimane attivo, copre anche la prossima
+apertura dell'app. I test GPUI usano la piattaforma sintetica e uno store in
+memoria per default; solo le prove di persistenza creano file temporanei propri.
+
 «Preferenze funzioni AI» apre una sottopagina GPUI sul contratto nativo v1
 esistente: GET/POST `/api/v1/network/ai/functions` e POST `/preview`. Serve
 un operatore amministratore e l'autorizzazione esplicita dell'host per quel
@@ -242,6 +263,7 @@ non li qualifica come supportati dal contratto paired v2.
 | Esc | Torna dalla revisione alla bozza o chiude una richiesta di scarto. |
 | Ctrl+R / Cmd+R | Rilegge, rispettando l'eventuale bozza. |
 | Ctrl+Maiusc+L / Cmd+Maiusc+L | Blocca immediatamente la sessione. |
+| Ctrl+Maiusc+P / Cmd+Maiusc+P | Oscura o mostra la finestra, conservando la bozza. |
 | Invio nell'editor | Inserisce una riga. |
 | Ctrl/Cmd+A, C, X, V, Z, Maiusc+Z | Selezione, appunti e annulla/ripeti per il testo ordinario. |
 
