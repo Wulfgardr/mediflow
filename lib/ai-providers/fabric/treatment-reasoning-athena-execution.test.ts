@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 import { TreatmentReasoningAthenaExecutionConfigurationError, createTreatmentReasoningAthenaExecution } from './treatment-reasoning-athena-execution.ts';
+import { buildAthenaTreatmentReasoningInstruction } from './treatment-reasoning-athena-method.ts';
+import { buildTreatmentReasoningPrompt, parseTreatmentReasoningResponse, type TreatmentReasoningPromptInput } from '../../treatment-reasoning-contract.ts';
+import type { TreatmentReasoningProjectionAttachment } from './treatment-reasoning-projection.ts';
 
 const MODEL = 'mims-harvard/ATHENA-R1-Qwen3-8B';
 const refs = () => ['therapy:therapy.synthetic.alpha', 'entry:entry.synthetic.beta'];
@@ -21,6 +25,34 @@ const output = (extra: Record<string, unknown> = {}) => ({ schemaVersion: 'medif
 const service = (invoke: (value: Readonly<{ instruction: string; signal: Readonly<{ isAborted: () => boolean }> }>) => unknown, host = () => policy(), timeoutMs = 20) => createTreatmentReasoningAthenaExecution({ host: { policy: host, invoke }, timeoutMs });
 type Result = Awaited<ReturnType<ReturnType<typeof service>['execute']>>;
 const denied = (result: Result, code: string) => { const observed = result as unknown as Record<string, unknown>; assert.equal(result.status, 'denied'); assert.equal(result.code, code); assert.equal(observed.value, null); assert.equal(result.sourceBindings, null); assert.equal(observed.attestation, null); assert.equal('envelope' in observed, false); assert.equal('host' in observed, false); assert.equal('fallback' in observed, false); assert.equal(result.writesPerformed, 0); assert.equal(result.applyPolicy, 'none'); };
+
+test('retains the pre-extraction instruction bytes and legacy parser results across the complete existing synthetic corpus', async () => {
+    const corpus = JSON.parse(readFileSync(new URL('../../../scripts/fixtures/treatment-reasoning-corpus.json', import.meta.url), 'utf8')) as (TreatmentReasoningPromptInput & { id: string; expectedResponse: unknown })[];
+    const baseline = JSON.parse(readFileSync(new URL('../../../scripts/fixtures/athena-method-baseline.json', import.meta.url), 'utf8')) as { cases: { id: string; legacyPromptSha256: string; fabricInstructionSha256: string; legacyExpectedParseSha256: string }[] };
+    const hash = (value: string) => createHash('sha256').update(value).digest('hex');
+    assert.deepEqual(corpus.map(item => item.id), baseline.cases.map(item => item.id));
+    for (const [index, item] of corpus.entries()) {
+        const expected = baseline.cases[index];
+        const evidenceRefs = Object.freeze(item.sources.map(source => source.id));
+        const projection: TreatmentReasoningProjectionAttachment = Object.freeze({
+            schemaVersion: 'mediflow.ai.treatment-reasoning-projection-attachment.v1', capability: 'treatment_reasoning',
+            patientRevision: 1, sourceRevision: `source_${item.id}`, capturedAt: '2026-10-26T13:00:00.000Z',
+            therapyRefs: Object.freeze(item.sources.filter(source => source.sourceKind === 'therapy').map(source => source.id)), evidenceRefs,
+            sources: Object.freeze(item.sources.map(source => Object.freeze({ id: source.id, sourceKind: source.sourceKind, label: source.label, excerpt: source.excerpt ?? null, date: source.date ?? null }))),
+        });
+        const instruction = buildAthenaTreatmentReasoningInstruction(projection);
+        assert.equal(hash(instruction), expected.fabricInstructionSha256, item.id);
+        assert.equal(hash(buildTreatmentReasoningPrompt(item)), expected.legacyPromptSha256, item.id);
+        assert.equal(hash(JSON.stringify(parseTreatmentReasoningResponse(JSON.stringify(item.expectedResponse), { allowedEvidenceIds: [...evidenceRefs] }))), expected.legacyExpectedParseSha256, item.id);
+        let calls = 0;
+        const result = await service(value => { calls += 1; assert.equal(value.instruction, instruction); return null; }, () => policy(), 1_000).execute({
+            preview: Object.freeze({ ...preview(), evidence: Object.freeze({ source: 'host_minimized', count: evidenceRefs.length }) }),
+            evidenceRefs: [...evidenceRefs], projection,
+        });
+        denied(result, 'provider_invalid');
+        assert.equal(calls, 1);
+    }
+});
 
 test('runs exactly once as fixed local ATHENA and returns the distinct V2 source-bound review result', async () => {
     const source = readFileSync(new URL('./treatment-reasoning-athena-execution.ts', import.meta.url), 'utf8');
