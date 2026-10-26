@@ -3098,6 +3098,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "chrono-tz",
+ "getrandom 0.3.4",
  "gpui",
  "gpui_platform",
  "iana-time-zone",
