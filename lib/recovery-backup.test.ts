@@ -246,14 +246,15 @@ test(`initialized destination rejects ${mutation} without changing any bytes`, a
     } finally { f.cleanup(); }
 });
 
-for (const alteration of ['none', 'column', 'index', 'trigger', 'wrong-version', 'v5-missing-ledger'] as const)
+for (const alteration of ['none', 'column', 'index', 'trigger', 'extra-table', 'wrong-version', 'v5-missing-ledger'] as const)
 test(`therapy command predecessor encrypted v4 recovery ${alteration}`, async () => {
     const f = await fixture();
     try {
         const oldFile = path.join(path.dirname(f.source), 'v4-snapshot.db');
         fs.writeFileSync(oldFile, f.snapshot);
         const old = new Database(oldFile);
-        old.exec('DROP TABLE therapy_status_commands; PRAGMA user_version=4;');
+        old.exec('DROP TABLE synthetic_extension; DROP TABLE therapy_status_commands; PRAGMA user_version=4;');
+        if (alteration === 'extra-table') old.exec('CREATE TABLE synthetic_extension(value TEXT)');
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN synthetic_drift TEXT');
         if (alteration === 'index') old.exec('CREATE INDEX synthetic_drift ON therapies(status)');
         if (alteration === 'trigger') old.exec("CREATE TRIGGER synthetic_drift BEFORE UPDATE ON therapies BEGIN SELECT RAISE(IGNORE); END");
