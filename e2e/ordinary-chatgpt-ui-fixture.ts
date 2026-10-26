@@ -19,10 +19,10 @@ export function remoteMetadata(id: OrdinaryFunction) {
     preprocessing: ['context_minimization', 'layer1_redaction', 'layer2_redaction', 'envelope_validation'], receipt } };
 }
 
-export async function installOrdinaryChatGptTransport(page: Page, id: OrdinaryFunction, wire: WireFactory) {
+export async function installOrdinaryChatGptTransport(page: Page, id: OrdinaryFunction, wire: WireFactory, options: Readonly<{ firstLifetimeMs?: number }> = {}) {
   let enabled = false;
   let phase: 'needs_consent' | 'consented' | 'awaiting_login' | 'connected' | 'ready' = 'needs_consent';
-  let attempt = 0, live = false;
+  let attempt = 0, live = false, expiresAt = 0;
   const attemptId = () => `synthetic-${id}-attempt-${attempt}`;
   const catalog = () => ({ ...CATALOG, revision: `${CATALOG.revision}-${attempt}`, choices: CATALOG.choices.map(choice => ({ ...choice, optionId: attempt === 1 ? OPTION : `${OPTION}-${attempt}` })) });
   const operations: string[] = [];
@@ -30,7 +30,7 @@ export async function installOrdinaryChatGptTransport(page: Page, id: OrdinaryFu
   const clinicalWrites: string[] = [];
   const providerRequests: string[] = [];
   let recording = false;
-  const state = () => ({ schema: ORDINARY_FLOW_SCHEMA, attemptId: attemptId(), functionId: id, phase, expiresAt: Date.now() + 120_000 });
+  const state = () => ({ schema: ORDINARY_FLOW_SCHEMA, attemptId: attemptId(), functionId: id, phase, expiresAt });
   const settings = () => ({ schema: 'mediflow.chatgpt-ordinary-settings.v1', revision: REVISION, enabled,
     retention: 'chatgpt_service_terms_apply', preferences: Object.fromEntries(IDS.map(key => [key, { use: 'local', model: null, effort: null }])),
     lanes: Object.fromEntries(IDS.map(key => [key, 'enabled'])) });
@@ -44,7 +44,7 @@ export async function installOrdinaryChatGptTransport(page: Page, id: OrdinaryFu
     if (['auth.openai.com', 'chatgpt.com'].includes(url.hostname)) providerRequests.push(url.hostname);
     if (!recording || !['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method())) return;
     const path = url.pathname;
-    if (/^\/api\/(?:patients|entries|therapies|observations|attachments)(?:\/|$)/u.test(path)) clinicalWrites.push(`${request.method()} ${path}`);
+    if (/^\/api\/(?:patients|entries|therapies|observations|attachments)(?:\/|$)/u.test(path) && !path.endsWith('/local-extraction')) clinicalWrites.push(`${request.method()} ${path}`);
   });
   const fulfill = (route: import('@playwright/test').Route, value: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) });
   await page.route('**/api/settings/ai/chatgpt/ordinary/**', async route => {
@@ -82,11 +82,12 @@ export async function installOrdinaryChatGptTransport(page: Page, id: OrdinaryFu
     });
     previews.push(route.request().postDataJSON());
     attempt++; live = true; phase = 'needs_consent';
+    expiresAt = Date.now() + (attempt === 1 ? options.firstLifetimeMs ?? 120_000 : 120_000);
     return fulfill(route, { ...state(), disclosure: disclosure() }, 202);
   });
   return { operations, previews, clinicalWrites, option: () => catalog().choices[0].optionId, arm: () => { recording = true; },
-    assertCompleted: (count = 1) => {
-      expect(previews).toHaveLength(count);
+    assertCompleted: (count = 1, previewCount = count) => {
+      expect(previews).toHaveLength(previewCount);
       expect(operations.filter(value => ['consent', 'login/start', 'login/complete', 'models', 'generate'].includes(value))).toEqual(Array.from({ length: count }, () => [
         'consent', 'login/start', 'login/complete', 'models', 'generate',
       ]).flat());
