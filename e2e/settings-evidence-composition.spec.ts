@@ -157,7 +157,7 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
         await expect(updates.getByRole('alert')).toContainText('Impossibile aggiornare lo stato. È mostrato l’ultimo valore letto.');
         await expect(updates.getByRole('alert')).toContainText('Errore: HTTP 503');
         await expect(updates).toContainText('0.9.1-synthetic-next');
-        await capture('update-reread-503', updates.getByRole('alert'));
+        await capture('update-reread-503', updates);
         await expect(updates.getByRole('link', { name: 'Apri aggiornamento', exact: true })).not.toHaveClass(/ui-btn-primary/);
         fixture.state.update = 'absent';
         const pending = new Promise<void>(resolve => { releaseRead = resolve; });
