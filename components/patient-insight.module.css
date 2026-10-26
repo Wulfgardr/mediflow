@@ -1,0 +1,5 @@
+.section { min-width: 0; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--lume-rule); }
+.section > h3 { margin: 0; font: 600 0.875rem/1.5 var(--lume-font-sans); }
+.summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 20px; margin-block: 24px 0; padding-block: 12px; border-top: 1px solid var(--lume-rule); font: var(--type-body); color: var(--lume-ink-muted); }
+.summary a { color: var(--lume-ink); }
+.proposal { border-inline-start: 1px dashed var(--lume-ink-pencil); padding-inline-start: 16px; overflow-wrap: anywhere; }
