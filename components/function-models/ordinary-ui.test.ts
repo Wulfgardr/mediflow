@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { mountContract } from '../settings/settings-presentation.test-support.ts';
 
@@ -26,7 +27,7 @@ function loadComponent(file: string, exportName: string, state: unknown[] = []) 
         throw new Error(`Unexpected UI import: ${id}`);
     };
     // Only the exact local component bytes above are evaluated; no user text.
-    new Function('require', 'exports', outputText)(scopedRequire, exports);
+    runInNewContext(outputText, { require: scopedRequire, exports }, { filename: file });
     return (props: Record<string, unknown>) => {
         assert.equal(typeof exports.TestComponent, 'function');
         return exports.TestComponent!(props);
@@ -78,7 +79,7 @@ test('explicit OpenAI configuration previews only the shared switch with unavail
     const component = loadComponent('./function-preferences-panel.tsx', 'PreferenceCard', ['chatgpt_subscription', true, null]);
     let command: unknown;
     const tree = component({ row: { id: 'treatment_reasoning', enabled: false, defaultSource: 'host_configuration', defaultModelOptionId: null,
-        bindingState: 'unsupported', options: [] }, activationSupported: true, disabled: false, account: null, preview: (value: unknown) => { command = value; } });
+        bindingState: 'unsupported', options: [] }, activationSupported: true, disabled: false, account: null, preview: (value: unknown) => { command = structuredClone(value); } });
     assert.match(text(tree), /OpenAI · abbonamento ChatGPT/u);
     assert.match(text(tree), /interruttore condiviso/u); assert.doesNotMatch(text(tree), /Modello locale predefinito/u);
     const button = nodes(tree).find(n => n.type === 'button' && n.props.children === 'Anteprima modifica')!;
@@ -93,7 +94,7 @@ test('a changed local default is saved even while its function is off', () => {
     let command: unknown;
     const tree = component({ row: { id: 'patient_insight', enabled: false, defaultSource: 'host_configuration', defaultModelOptionId: modelOptionId,
         bindingState: 'current', options: [{ modelOptionId, label: 'Modello sintetico', provider: 'ollama', state: 'unavailable' }] },
-    activationSupported: true, disabled: false, account: null, preview: (value: unknown) => { command = value; } });
+    activationSupported: true, disabled: false, account: null, preview: (value: unknown) => { command = structuredClone(value); } });
     const button = nodes(tree).find(n => n.type === 'button' && n.props.children === 'Anteprima modifica')!;
     (button.props.onClick as () => void)();
     assert.deepEqual(command, { action: 'set', functionId: 'patient_insight', enabled: false, defaultModelOptionId: modelOptionId });
@@ -104,7 +105,7 @@ test('switching off without changing the model preserves the local binding', () 
     const component = loadComponent('./function-preferences-panel.tsx', 'PreferenceCard', ['local', false, modelOptionId]);
     let command: unknown;
     const tree = component({ row: { id: 'patient_insight', enabled: true, defaultSource: 'saved_preference', defaultModelOptionId: modelOptionId,
-        bindingState: 'stale', options: [] }, activationSupported: true, disabled: false, account: null, preview: (value: unknown) => { command = value; } });
+        bindingState: 'stale', options: [] }, activationSupported: true, disabled: false, account: null, preview: (value: unknown) => { command = structuredClone(value); } });
     const button = nodes(tree).find(n => n.type === 'button' && n.props.children === 'Anteprima modifica')!;
     (button.props.onClick as () => void)();
     assert.deepEqual(command, { action: 'set_activation', functionId: 'patient_insight', enabled: false });
