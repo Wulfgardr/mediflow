@@ -21,8 +21,10 @@ export function useFunctionModelPicker(functionId: FunctionModelId, context: unk
         return () => { window.removeEventListener('pagehide', hide); window.removeEventListener('pageshow', show); }; }, [client, active]);
     const row = view.dto?.functions.find(f => f.id === functionId);
     const selected = row?.options.find(o => o.modelOptionId === (view.choice?.modelOptionId ?? row.defaultModelOptionId));
-    const canGenerate = view.remote ? active && !view.consumed && !view.remote.loading && !view.remote.completed && view.remote.settings?.enabled === true && isAiLaneEnabledValue(view.remote.settings.lanes[functionId]) : active && !view.blocked && !view.loading && !view.consumed && (!row || (row.enabled && (view.choice !== null || row.bindingState === 'current') && selected?.state === 'available_unqualified'));
-    return { client, view, active, functionId, canGenerate, selected };
+    const canGenerate = view.remote ? active && !view.blocked && !view.loading && !view.consumed && !view.remote.loading && !view.remote.completed && view.remote.settings?.enabled === true && isAiLaneEnabledValue(view.remote.settings.lanes[functionId]) : active && !view.blocked && !view.loading && !view.consumed && (!row || (row.enabled && (view.choice !== null || row.bindingState === 'current') && selected?.state === 'available_unqualified'));
+    const needsReprepare = !!view.remote && !view.remote.state && (view.consumed || view.remote.completed || !!view.remote.error);
+    const canReprepare = active && functionId !== 'treatment_reasoning' && needsReprepare && !view.loading && !view.remote?.loading;
+    return { client, view, active, functionId, canGenerate, selected, needsReprepare, canReprepare };
 }
 export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useFunctionModelPicker> }) {
     const { client, view, active, functionId } = picker;
@@ -82,20 +84,20 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
                 {!needsRefresh && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading} onClick={() => void client.read()}>Rileggi modelli</button>}
             </div>
             </Disclosure>
-        {view.remote && <OrdinaryFunctionControls client={client} view={view.remote} />}
+        {view.remote && <OrdinaryFunctionControls client={client} view={view.remote} needsReprepare={picker.needsReprepare} canReprepare={picker.canReprepare} />}
         {!view.remote && functionId === 'treatment_reasoning' && <TreatmentReasoningPortableSetup option={selected?.provider === 'athena_transformers' ? selected : f?.options.find(o => o.provider === 'athena_transformers')} />}
 
     </div>;
 }
 
 /** The same picker owns the interaction; proposals return to the original card. */
-function OrdinaryFunctionControls({ client, view }: { client: ReturnType<typeof createModelPreviewClient>; view: OrdinaryBrowserView }) {
+function OrdinaryFunctionControls({ client, view, needsReprepare = false, canReprepare = false }: { client: ReturnType<typeof createModelPreviewClient>; view: OrdinaryBrowserView; needsReprepare?: boolean; canReprepare?: boolean }) {
     const phase = view.state?.phase;
     return <fieldset aria-label="OpenAI per questa proposta" style={{ border: 0, padding: 0 }}>
         {view.loading && <p role="status">Verifica in corso…</p>}
         {view.state?.quota && <p role="status">{view.state.quota.includedUsage === 'exhausted'
             ? 'Quota inclusa esaurita; crediti potenzialmente disponibili.' : 'Quota inclusa osservata disponibile.'} Il singolo tentativo richiede il tuo gesto e resta soggetto alla verifica di OpenAI; non garantisce accesso o disponibilità.</p>}
-        {!view.state && !view.completed && <>
+        {!view.state && !view.completed && !needsReprepare && <>
             <p>Il contesto scelto viene minimizzato e redatto sul computer host. OpenAI riceve il testo redatto solo dopo il consenso. Restano applicabili le condizioni e la conservazione del servizio ChatGPT; non è garantita conservazione zero.</p>
             {view.settings && <label><input type="checkbox" disabled={view.loading} checked={view.settings.enabled} onChange={e => void client.remote.policy(e.target.checked)} /> Consenti OpenAI su questo host (disattivato per default)</label>}
             <button type="button" disabled={view.loading} onClick={() => void client.remote.read()}>Rileggi configurazione OpenAI</button>
@@ -124,6 +126,10 @@ function OrdinaryFunctionControls({ client, view }: { client: ReturnType<typeof 
         </>}
         {(view.state || view.loading) && <button type="button" onClick={() => client.cancel()}>Annulla e chiudi preparazione</button>}
         {view.completed && <p>Risultato restituito alla funzione. Il processo è chiuso: una nuova proposta richiede nuova preparazione.</p>}
+        {needsReprepare && <div>
+            <p>Riparti verificando la chiusura precedente e le impostazioni correnti. Contesto, consenso, accesso e modello saranno verificati di nuovo; nessun invio automatico.</p>
+            <button type="button" disabled={!canReprepare} onClick={() => void client.reprepareRemote()}>Nuova preparazione</button>
+        </div>}
         {view.error && <p role="alert">{view.error}</p>}
     </fieldset>;
 }
