@@ -129,6 +129,13 @@ test('new policy denial and unconfirmed cleanup stay blocked without preparing o
     }
 });
 
+test('a context-model reset preserves the monotonic preparation revision instead of reopening consumer recovery', async t => {
+    const h = harness('document_synthesis'); t.after(() => h.client.reset(false)); await h.select(); await h.complete();
+    await h.client.reprepareRemote(); assert.equal(h.client.getSnapshot().preparationRevision, 1);
+    h.client.reset(true); assert.equal(h.client.getSnapshot().preparationRevision, 1);
+    assert.equal(h.client.getSnapshot().remote, undefined);
+});
+
 test('cancelled generation that ignores abort cannot publish into the fresh preparation', async t => {
     const h = harness('document_synthesis'); t.after(() => h.client.reset(false)); await h.select(); const first = await h.start(); await h.ready();
     h.holdGenerate(); const generating = h.client.remote.action('generate'); await until(h.generateHeld);

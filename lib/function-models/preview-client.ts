@@ -22,7 +22,7 @@ export function createModelPreviewClient(functionId: FunctionModelId, request: t
     };
     return {
         getSnapshot: () => view, subscribe: (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; },
-        reset(enabled = false) { active = enabled; remoteMode = false; abort(); view = { dto: null, choice: null, loading: false, error: null, blocked: !enabled, consumed: false, preparationRevision: 0 }; listeners.forEach(fn => fn()); },
+        reset(enabled = false) { active = enabled; remoteMode = false; abort(); view = { dto: null, choice: null, loading: false, error: null, blocked: !enabled, consumed: false, preparationRevision: view.preparationRevision }; listeners.forEach(fn => fn()); },
         cancel() { abort(); emit({ choice: null, blocked: true, error: 'Scelta annullata. Rileggi e conferma il modello prima di generare.' }); },
         read, remote,
         chooseRemote() { if (!active) return; abort(); remoteMode = true; emit({ choice: null, blocked: false, consumed: false, error: null, remote: remote.getSnapshot() }); void remote.read(); },
