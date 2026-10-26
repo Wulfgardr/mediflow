@@ -1,11 +1,9 @@
 'use client';
 
-import { CalendarClock, FileText, ScanText, Stethoscope } from 'lucide-react';
-
-/* WUL-678: substrate rows share the node center with the chronological axis. */
 import { compactClinicalRichText } from '@/lib/clinical-rich-text';
 import type { Checkup, ClinicalEntry, DocumentInsight } from '@/lib/db';
-import { LumeFilo, LumeFiloNodo } from '@/components/ui/lume-filo';
+import { InkState } from '@/components/ui/ink-state';
+import styles from './clinical-river-timeline.module.css';
 
 interface ClinicalRiverTimelineProps {
     entries: ClinicalEntry[];
@@ -94,25 +92,19 @@ function formatDate(date: Date) {
 }
 
 function getItemPresentation(kind: RiverItem['kind']) {
-    if (kind === 'checkup') {
-        return {
-            icon: CalendarClock,
-            tint: 'text-[color:var(--lume-accent)]',
-            label: 'Follow-up',
-        };
-    }
-    if (kind === 'document') {
-        return {
-            icon: ScanText,
-            tint: 'text-[color:var(--lume-ink)]',
-            label: 'Evidenza',
-        };
-    }
-    return {
-        icon: Stethoscope,
-        tint: 'text-[color:var(--lume-accent)]',
-        label: 'Clinico',
-    };
+    if (kind === 'checkup') return { label: 'Follow-up', href: '#follow-up' };
+    if (kind === 'document') return { label: 'Sintesi archiviata', href: '#document-insights' };
+    return { label: 'Diario', href: '#diario' };
+}
+
+function HistoryAccess() {
+    return <nav className={styles.history} aria-label="Storia completa del paziente">
+        <a className={`mf-button-text ${styles.diaryLink}`} href="#diario">Apri il Diario</a>
+        <span className={styles.otherHistory}>
+            <a className="mf-button-text" href="#follow-up">Controlli</a>
+            <a className="mf-button-text" href="#documenti">Documenti</a>
+        </span>
+    </nav>;
 }
 
 export function ClinicalRiverTimeline({
@@ -126,65 +118,36 @@ export function ClinicalRiverTimeline({
         entries.filter((entry) => !entry.deletedAt).length + checkups.length + documentInsights.length;
     const hiddenCount = Math.max(totalAvailable - items.length, 0);
 
-    if (items.length === 0) {
-        return (
-            <div className="py-4 text-sm text-[color:var(--lume-ink-muted)]">
-                Nessun evento recente: visite, documenti e controlli compariranno qui.
-            </div>
-        );
-    }
-
     return (
-        <div className="space-y-4">
-            <div className="relative space-y-3" role="feed" aria-label="Timeline clinica del paziente">
-                <LumeFilo
-                    variant="spina"
-                    nodeCount={items.length}
-                    anchorSelector="[data-lume-river-node]"
-                    className="absolute left-[15.5px] w-px" tone="muted"
-                />
-                {items.map((item, index) => {
-                    const presentation = getItemPresentation(item.kind);
-                    const Icon = presentation.icon;
-
-                    return (
-                        <div key={item.id} className="grid grid-cols-[28px_minmax(0,1fr)] gap-4">
-                            <div className="relative flex h-8 w-8 items-center justify-center">
-                                <LumeFiloNodo tone="muted" data-lume-river-node className="absolute inset-0 h-8 w-8" />
-                                <Icon className={`relative z-10 h-4 w-4 ${presentation.tint}`} />
-                            </div>
-                            <article
-                                className="border-b border-[color:var(--lume-border-color)] px-0 pb-4 pt-1 outline-none focus-visible:shadow-[var(--lume-focus-ring)]"
-                                aria-posinset={index + 1}
-                                aria-setsize={items.length}
-                                tabIndex={0}
-                            >
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
-                                        {item.typeLabel ?? presentation.label}
-                                    </span>
-                                    <span className="lume-registro inline-flex items-center gap-1 text-xs text-[color:var(--lume-ink-muted)]">
-                                        <FileText className="h-3.5 w-3.5" />
-                                        {formatDate(item.date)}
-                                    </span>
-                                </div>
-                                <h3 className="mt-2 text-base font-semibold text-[color:var(--lume-ink)]">{item.title}</h3>
-                                {item.summary ? (
-                                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
-                                        {item.summary}
-                                    </p>
-                                ) : null}
-                            </article>
-                        </div>
-                    );
-                })}
-            </div>
-
-            {hiddenCount > 0 ? (
-                <p className="pl-[44px] text-xs text-[color:var(--lume-ink-muted)]">
-                    Mostrati gli ultimi {items.length} eventi di {totalAvailable}. La cronologia completa è nel diario e nei documenti del paziente.
-                </p>
-            ) : null}
+        <div className={styles.timeline}>
+            <HistoryAccess />
+            {items.length === 0 ? (
+                <p className={styles.notice}>Nessun evento recente: visite, documenti e controlli compariranno qui.</p>
+            ) : (
+                <>
+                    <div className={styles.feed} role="feed" aria-label="Timeline clinica del paziente">
+                        {items.map((item, index) => {
+                            const presentation = getItemPresentation(item.kind);
+                            return (
+                                <article key={item.id} className={styles.item} aria-posinset={index + 1} aria-setsize={items.length}>
+                                    <time className={styles.date} dateTime={Number.isNaN(item.date.getTime()) ? undefined : item.date.toISOString()}>{formatDate(item.date)}</time>
+                                    <div className={styles.content}>
+                                        <div className={styles.origin}>
+                                            {item.kind === 'document' ? <InkState state="pencil">Sintesi archiviata · da rivedere</InkState>
+                                                : <span>{presentation.label}{item.typeLabel ? ` · ${item.typeLabel}` : ''}</span>}
+                                        </div>
+                                        <h3 className={styles.title}>
+                                            <a href={presentation.href} aria-label={`Apri ${item.title} · ${presentation.label}`}>{item.title}</a>
+                                        </h3>
+                                        {item.kind !== 'entry' && item.summary ? <p className={styles.summary}>{item.summary}</p> : null}
+                                    </div>
+                                </article>
+                            );
+                        })}
+                    </div>
+                    {hiddenCount > 0 ? <p className={styles.notice}>Anteprima: {items.length} eventi di {totalAvailable}. La storia completa resta nelle rispettive sezioni.</p> : null}
+                </>
+            )}
         </div>
     );
 }
