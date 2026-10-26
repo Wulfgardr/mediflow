@@ -736,8 +736,9 @@ fn confirmation_full_plane_preserves_keyboard_order_inside_the_complete_shell(
     view.read_with(cx, |app, _| {
         assert!(app.form.as_ref().unwrap().state == FormState::Draft)
     });
-    let bar = cx.debug_bounds("threshold-bar").unwrap();
-    assert!(bar.top() >= region.top() && bar.bottom() <= region.bottom());
+    let content = cx.debug_bounds("threshold-scroll").unwrap();
+    assert_eq!(content.size.height, region.size.height);
+    assert!(view.read_with(cx, |app, _| app.threshold_scrolls_with_content.get()));
     assert!(
         host.writes().is_empty(),
         "layout and keyboard navigation must not write"
@@ -922,7 +923,7 @@ pub(super) fn assert_minimum_geometry(
 }
 
 #[gpui::test]
-fn threshold_minimum_shell_geometry_and_keyboard_region(cx: &mut gpui::TestAppContext) {
+fn threshold_minimum_shell_drafts_scroll_to_their_commands(cx: &mut gpui::TestAppContext) {
     cx.update(bind_keys);
     let host = Host::new();
     let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
@@ -934,8 +935,6 @@ fn threshold_minimum_shell_geometry_and_keyboard_region(cx: &mut gpui::TestAppCo
                 app.form = None;
                 app.text_scale = 4.;
                 app.test_body_size = Some(body);
-                app.threshold_region_scroll
-                    .set_offset(gpui::point(px(0.), px(0.)));
                 if kind == FormKind::PatientNew {
                     app.stage_fields(kind, patient_forms::fields(None), None, cx);
                 } else {
@@ -946,126 +945,26 @@ fn threshold_minimum_shell_geometry_and_keyboard_region(cx: &mut gpui::TestAppCo
                 cx.notify();
             });
             draw(cx);
-            assert_minimum_geometry(&view, cx, kind.title(), body);
-            let (node, bounds) = rendered_command::node("threshold-recovery-region");
-            let title = match kind {
-                FormKind::Notes => "Note",
-                FormKind::Therapy => "Terapia",
-                _ => "Nuova anagrafica",
-            };
-            assert_eq!(node.role(), Role::Region);
-            assert_eq!(node.label(), Some(format!("{title}, Bozza").as_str()));
-            assert_eq!(
-                bounds,
-                cx.debug_bounds("threshold-recovery-region").unwrap()
+            let content = cx.debug_bounds("threshold-scroll").unwrap();
+            assert!(
+                content.size.height >= px(500.),
+                "{} base={body}: {content:?}",
+                kind.title()
             );
-            let editor = view.read_with(cx, |app, _| {
-                app.form.as_ref().unwrap().fields[0].editor.clone()
+            assert!(view.read_with(cx, |app, _| app.threshold_scrolls_with_content.get()));
+            cx.update_window_entity(&view, |app, window, cx| {
+                window.focus(&app.form_actions[0].focus, cx);
+                app.reveal_focused(window, cx);
             });
-            cx.update_window_entity(&editor, |input, window, cx| input.focus(window, cx));
             draw(cx);
-            for _ in 0..60 {
-                cx.simulate_keystrokes("tab");
-                draw(cx);
-                let reached = cx.update(|window, cx| {
-                    let app = view.read(cx);
-                    assert!(
-                        !app.threshold_menu_focus.is_focused(window)
-                            && !app.form_actions[1].focus.is_focused(window),
-                        "content must reach region before commands"
-                    );
-                    app.threshold_region_focus.is_focused(window)
-                });
-                if reached {
-                    break;
-                }
-            }
-            cx.update(|window, cx| {
-                assert!(
-                    view.read(cx).threshold_region_focus.is_focused(window),
-                    "content → region"
-                )
-            });
-            let initial = view.read_with(cx, |app, _| app.threshold_region_scroll.offset().y);
-            cx.simulate_keystrokes("down");
-            draw(cx);
-            let moved = view.read_with(cx, |app, _| app.threshold_region_scroll.offset().y);
-            assert!(moved < initial, "down scrolls region");
-            cx.simulate_keystrokes("up");
-            draw(cx);
-            assert!(view.read_with(cx, |app, _| app.threshold_region_scroll.offset().y) > moved);
-            cx.simulate_keystrokes("end");
-            draw(cx);
-            let end = view.read_with(cx, |app, _| app.threshold_region_scroll.offset().y);
-            assert!(end < moved);
-            cx.simulate_keystrokes("home");
-            draw(cx);
-            assert_eq!(
-                view.read_with(cx, |app, _| app.threshold_region_scroll.offset().y),
-                px(0.)
-            );
-            cx.simulate_keystrokes("pagedown");
-            draw(cx);
-            assert!(view.read_with(cx, |app, _| app.threshold_region_scroll.offset().y) < px(0.));
-            cx.simulate_keystrokes("pageup");
-            draw(cx);
-            assert_eq!(
-                view.read_with(cx, |app, _| app.threshold_region_scroll.offset().y),
-                px(0.)
-            );
             cx.simulate_keystrokes("tab");
             draw(cx);
-            cx.update(|window, cx| {
-                assert!(
-                    view.read(cx).threshold_menu_focus.is_focused(window),
-                    "region → menu"
-                )
-            });
-            let menu = cx.debug_bounds("threshold-other-actions").unwrap();
-            let region = cx.debug_bounds("threshold-recovery-region").unwrap();
+            cx.update(|window, cx| assert!(view.read(cx).form_actions[1].focus.is_focused(window)));
+            let command = cx.debug_bounds("clinical-workspace-review-save").unwrap();
             assert!(
-                menu.top() >= region.top() && menu.top() < region.bottom(),
-                "reveal_focused: {menu:?} in {region:?}"
-            );
-            cx.simulate_keystrokes("tab");
-            draw(cx);
-            cx.update(|window, cx| {
-                assert!(
-                    view.read(cx).form_actions[1].focus.is_focused(window),
-                    "menu → primary"
-                )
-            });
-            assert_minimum_geometry(&view, cx, kind.title(), body);
-            cx.simulate_keystrokes("shift-tab");
-            draw(cx);
-            cx.simulate_keystrokes("enter");
-            cx.simulate_event(gpui::KeyUpEvent {
-                keystroke: gpui::Keystroke::parse("enter").unwrap(),
-            });
-            draw(cx);
-            assert!(view.read_with(cx, |app, _| app.threshold_menu_open.get()));
-            let popup = cx.debug_bounds("threshold-other-actions-menu").unwrap();
-            assert!(
-                popup.top() >= px(0.)
-                    && popup.bottom() <= px(640.)
-                    && popup.left() >= px(0.)
-                    && popup.right() <= px(390.)
-            );
-            view.read_with(cx, |app, _| {
-                app.threshold_region_scroll
-                    .set_offset(gpui::point(px(0.), px(0.)))
-            });
-            draw(cx);
-            cx.simulate_keystrokes("escape");
-            draw(cx);
-            cx.update(|window, cx| {
-                assert!(!view.read(cx).threshold_menu_open.get());
-                assert!(view.read(cx).threshold_menu_focus.is_focused(window));
-            });
-            let menu = cx.debug_bounds("threshold-other-actions").unwrap();
-            assert!(
-                menu.top() >= region.top() && menu.top() < region.bottom(),
-                "Esc reveals trigger"
+                command.top() >= content.top() && command.bottom() <= content.bottom(),
+                "{} base={body}: {command:?}",
+                kind.title()
             );
         }
     }
@@ -1141,6 +1040,7 @@ fn threshold_all_primary_labels_fit_three_lines_in_minimum_shell(cx: &mut gpui::
                     draw(cx);
                     cx.update_window_entity(&view, |app, window, cx| {
                         window.focus(&app.form_actions[command.id_and_action().1].focus, cx);
+                        app.reveal_focused(window, cx);
                     });
                     draw(cx);
                     cx.update(|window, cx| {
@@ -1167,6 +1067,14 @@ fn threshold_all_primary_labels_fit_three_lines_in_minimum_shell(cx: &mut gpui::
                     let content = cx.debug_bounds("threshold-scroll").unwrap();
                     let bar = cx.debug_bounds("threshold-bar").unwrap();
                     let region = cx.debug_bounds("threshold-recovery-region");
+                    if view.read_with(cx, |app, _| app.threshold_scrolls_with_content.get()) {
+                        assert!(content.size.height >= px(500.), "{context}: {content:?}");
+                        assert!(
+                            primary.top() >= content.top() && primary.bottom() <= content.bottom(),
+                            "{context}: {primary:?}"
+                        );
+                        continue;
+                    }
                     let remaining_region = 640.
                         - f32::from(content.top())
                         - (body * 4. * 1.5).ceil()
@@ -1406,4 +1314,66 @@ fn g1a2_old_authority_callback_preserves_new_session_form_and_writer_fence(
             .can_write("network.replica.write-patient-profile")
     );
     assert!(fresh.writes().is_empty());
+}
+
+#[gpui::test]
+fn enlarged_draft_keeps_a_readable_editor_and_reaches_review_in_the_same_scroll(
+    cx: &mut gpui::TestAppContext,
+) {
+    let host = Host::new();
+    let (app, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+    open(&app, &host, cx);
+    for dark in [false, true] {
+        for (width, scale) in [390., 768., 1440.]
+            .into_iter()
+            .flat_map(|width| [1., 2., 4.].map(|scale| (width, scale)))
+        {
+            cx.simulate_resize(gpui::size(px(width), px(640.)));
+            app.update(cx, |app, cx| {
+                app.text_scale = scale;
+                app.dark_override = Some(dark);
+                app.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
+                cx.notify();
+            });
+            draw(cx);
+            let viewport = cx.debug_bounds("threshold-scroll").unwrap();
+            assert!(
+                scale < 4. || viewport.size.height >= px(400.),
+                "draft needs room to read: {width}/{scale}/{dark}: {viewport:?}"
+            );
+            let editor = cx
+                .debug_bounds("clinical-workspace-form-field-0-scroll-target")
+                .unwrap();
+            let line = app.read_with(cx, |app, _| app.theme.role(TypeRole::Prose).line_height);
+            assert!(
+                f32::from(editor.size.height) >= 3. * line,
+                "at least three prose lines: {editor:?}"
+            );
+            cx.update_window_entity(&app, |app, window, cx| {
+                window.focus(&app.form_actions[0].focus, cx);
+                app.reveal_focused(window, cx);
+            });
+            draw(cx);
+            cx.simulate_keystrokes("tab");
+            draw(cx);
+            let review = cx.debug_bounds("clinical-workspace-review-save").unwrap();
+            assert!(
+                review.top() >= viewport.top()
+                    && review.bottom()
+                        <= if app.read_with(cx, |app, _| app.threshold_scrolls_with_content.get()) {
+                            viewport.bottom()
+                        } else {
+                            px(640.)
+                        },
+                "review reached by Tab: {review:?}"
+            );
+            app.read_with(cx, |app, cx| {
+                assert_eq!(app.form.as_ref().unwrap().fields[0].value(cx), DRAFT)
+            });
+        }
+    }
+    assert!(
+        host.writes().is_empty(),
+        "navigation must not register the draft"
+    );
 }

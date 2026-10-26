@@ -1,6 +1,6 @@
 //! Punto d'inchiostro, read directly from the repository's design tokens.
 
-use gpui::{FontFeatures, FontWeight, Hsla, Styled, px, rgb};
+use gpui::{BoxShadow, FontFeatures, FontWeight, Hsla, Styled, px, rgb};
 use serde_json::Value;
 
 pub const VOICE: &str = "Newsreader";
@@ -70,10 +70,8 @@ impl Theme {
             critical: color("signal", "critical"),
             threshold: color("surface", "threshold"),
             threshold_text: color("ink", "threshold"),
-            control_radius: if cfg!(target_os = "ios") {
+            control_radius: if cfg!(any(target_os = "ios", target_os = "macos")) {
                 12.
-            } else if cfg!(target_os = "macos") {
-                8.
             } else if cfg!(target_os = "windows") {
                 4.
             } else {
@@ -82,7 +80,7 @@ impl Theme {
             paper_radius: if cfg!(target_os = "ios") {
                 18.
             } else if cfg!(target_os = "macos") {
-                12.
+                20.
             } else if cfg!(target_os = "windows") {
                 8.
             } else {
@@ -108,6 +106,12 @@ impl Theme {
         } else {
             14.
         })
+    }
+
+    pub fn focus_ring(self, primary: bool) -> BoxShadow {
+        BoxShadow::new(px(0.), px(0.), if primary { self.ink } else { self.fresh })
+            .spread_radius(px(1.))
+            .inset()
     }
 
     fn size(self, points: f32) -> f32 {
