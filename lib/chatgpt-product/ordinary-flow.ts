@@ -78,12 +78,12 @@ function snapshot(entry: Entry): OrdinaryFlowState {
     const state = entry.attempt?.snapshot();
     return Object.freeze({ schema: ORDINARY_FLOW_SCHEMA, attemptId: entry.id, functionId: entry.functionId,
         phase: entry.publishing ? 'generating' : state?.state === 'completed' ? 'generating' : ((state?.state === 'empty' ? 'preparing' : state?.state) ?? 'preparing') as OrdinaryFlowState['phase'],
-        expiresAt: Math.floor(Math.min(entry.expiresAt, state?.expiresAt ?? Infinity)) });
+        quota: state?.quota ?? null, expiresAt: Math.floor(Math.min(entry.expiresAt, state?.expiresAt ?? Infinity)) });
 }
 function reply(value: unknown, status = 200) { return Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } }); }
 export function ordinaryFailure(error: unknown): Response {
     const code = error instanceof ProductError || error instanceof ExecutionError ? error.code : 'upstream_error';
-    return reply({ error: 'OpenAI non disponibile per questa operazione. Nessun provider alternativo e stato usato.', code },
+    return reply({ error: 'OpenAI non disponibile per questa operazione. Nessun provider alternativo e stato usato.', code, receipt: { denial: error instanceof ProductError || error instanceof ExecutionError ? error.denial : null } },
         code === 'session_expired' ? 401 : ['invalid_request'].includes(code) ? 400 : ['busy', 'catalog_stale', 'model_unavailable', 'revoked'].includes(code) ? 409 : 503);
 }
 /** Binds only a genuine, opaque host capture; never a callback or client source. */

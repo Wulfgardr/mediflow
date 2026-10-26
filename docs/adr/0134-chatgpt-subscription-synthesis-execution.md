@@ -674,3 +674,47 @@ in questa riqualifica; non si trasferiscono le prove del precedente OS.
 Produzione resta `HELD` nella prova C2, senza modifica alle condizioni di
 HOLD, consenso, annullamento, proposta o ammissione clinica. Il percorso I-4
 con account e generazioni rimane una verifica distinta.
+
+## Emendamento: quota inclusa, crediti e dinieghi osservati
+
+La quota inclusa esaurita non equivale sempre a impossibilità di eseguire una
+richiesta autorizzata. Il protocollo CLI0.153.4 distingue il tipo generico
+`rate_limit_reached`, crediti disponibili/unlimited, spend control e quattro
+limiti workspace. Il saldo non è denaro o credito API e non prova condivisione,
+eleggibilità o accesso al modello.
+
+Il classificatore unico legge almeno una finestra valida e conserva per il
+processo i metadati di quota. Un uso incluso>=100 o il tipo generico ammettono
+soltanto il singolo tentativo esplicito già autorizzato se i flag credits sono
+validi e usabili e spendControlReached è esplicitamente false. Le altre
+precondizioni di account corrente, catalogo, contesto, consenso, confine e
+invio rimangono obbligatorie. Nessun reset, acquisto, modifica sharing, APIkey,
+upgrade CLI, ripiego o rinnovo automatico.
+
+Spend control attivo, i quattro limiti workspace, errore effettivo backend
+usageLimitExceeded e dati ignoti/malformati restano dinieghi. Un monitor ritirato
+non viene riaperto da crediti successivi. Le notifiche sparse non cancellano
+metadati con null. Un full snapshot negativo resta negativo anche se incrocia
+una notifica positiva; harddeny e perdita dei crediti durante la lettura non
+vengono cancellati dalla risposta tardiva. Le notifiche di startup rimangono
+nell'owner dello stesso processo fino al passaggio al servizio di esecuzione;
+nessuna snapshot da un altro account concede autorità.
+
+La UI distingue quota inclusa da crediti potenzialmente disponibili, senza
+saldo grezzo o promessa di entitlement. La ricevuta del diniego può contenere
+solo origine fissa, metodo ufficiale, codice JSON-RPC effettivamente osservato
+nell'intervallo standard e classificazione backend nota; nessuna prosa upstream,
+identificativo account, credenziale o contenuto delle fonti. Un preflight locale
+ha rpcCode null e non viene presentato come inferenza rifiutata dal backend.
+
+Questo delta corregge i controlli preventivi e conserva i vincoli esistenti.
+I test sono sintetici e il test del wire RPC usa un peer Node inventato. Non
+sono una nuova generazione reale, prova di sharing o ammissione clinica; la
+qualifica successiva sul processo confinato deve distinguere lettura, tentativo,
+risposta backend e ricevuta. I-4 non si chiude con il solo saldo o con questi test.
+
+Le proiezioni ordinarie aggiungono soltanto quota opzionale e ricevuta di errore
+minimizzata. Lo schema supplementare native-ordinary-v1 documenta gli stessi
+metadati additivi; richieste, grant, output clinico, parser e commit restano
+invariati. La decodifica nativa degli stati esistenti continua a ignorare i
+campi opzionali non presentati, senza attribuire loro autorità.

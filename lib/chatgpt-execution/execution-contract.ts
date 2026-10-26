@@ -3,7 +3,7 @@ export type ExecutionCode = 'unqualified_boundary' | 'session_expired' | 'not_co
     | 'model_unavailable' | 'model_mismatch' | 'invalid_request' | 'invalid_output' | 'tool_use_denied'
     | 'timeout' | 'process_exited' | 'protocol_error' | 'upstream_error';
 export class ExecutionError extends Error {
-    constructor(readonly code: ExecutionCode) { super(code); this.name = 'ExecutionError'; }
+    constructor(readonly code: ExecutionCode, readonly denial: ExecutionDenial | null = null) { super(code); this.name = 'ExecutionError'; }
 }
 export type SupportedChatGptPlan = 'plus' | 'pro' | 'prolite';
 export function isSupportedChatGptPlan(value: unknown): value is SupportedChatGptPlan {
@@ -12,6 +12,20 @@ export function isSupportedChatGptPlan(value: unknown): value is SupportedChatGp
 export const EXECUTION_METHODS = ['initialize', 'account/login/start', 'account/login/cancel', 'account/read',
     'account/logout', 'model/list', 'account/rateLimits/read', 'config/read', 'thread/start', 'turn/start', 'turn/interrupt'] as const;
 export type ExecutionMethod = typeof EXECUTION_METHODS[number];
+export type ExecutionDenial = Readonly<{ source: 'limits_snapshot' | 'limits_notice' | 'rpc_error' | 'backend_error';
+    method: ExecutionMethod | 'account/rateLimits/updated' | 'error' | 'turn/completed'; rpcCode: number | null;
+    backendCode: 'usageLimitExceeded' | null }>;
+export function parseExecutionDenial(raw: unknown): ExecutionDenial | null {
+    if (raw === null || raw === undefined) return null;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('invalid_response');
+    const value = raw as Record<string, unknown>;
+    if (Object.keys(value).length !== 4 || !['limits_snapshot', 'limits_notice', 'rpc_error', 'backend_error'].includes(String(value.source))
+        || ![...EXECUTION_METHODS, 'account/rateLimits/updated', 'error', 'turn/completed'].includes(String(value.method))
+        || value.rpcCode !== null && (typeof value.rpcCode !== 'number' || !Number.isSafeInteger(value.rpcCode) || value.rpcCode < -32768 || value.rpcCode > -32000)
+        || value.backendCode !== null && value.backendCode !== 'usageLimitExceeded') throw new Error('invalid_response');
+    return Object.freeze({ source: value.source, method: value.method, rpcCode: value.rpcCode, backendCode: value.backendCode }) as ExecutionDenial;
+}
+
 export type ExecutionDrainObservation = Readonly<{
     closing: boolean; leaderExited: boolean; ownedGroupCeased: boolean | null; ownedTreeCeased?: boolean | null;
 }>;
