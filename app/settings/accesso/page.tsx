@@ -70,7 +70,7 @@ export default function SettingsAccessPage() {
             {!passphrase && <Disclosure title="Cambio PIN" headingLevel={3} className={styles.section}
                 open={openForm === 'pin'} onOpenChange={open => setOpenForm(open ? 'pin' : null)}>
                 <div className={styles.form} aria-busy={isChangingPin}>
-                    <p className={styles.copy}>Ruota il PIN senza toccare la master key: i dati clinici restano leggibili.</p>
+                    <p className={styles.copy}>Cambia il PIN mantenendo accessibili i dati clinici.</p>
                     <div>
                         <label htmlFor="current-pin" className={SETTINGS_LABEL_CLASS}>PIN attuale</label>
                         <input id="current-pin" name="currentPin" type="password" inputMode="numeric"
