@@ -13,6 +13,7 @@ fn installed(state: &AtomicU64) {
     });
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn event(state: &AtomicU64, reason: u64, blocked: bool) {
     let _ = state.fetch_update(Ordering::AcqRel, Ordering::Acquire, |previous| {
         let flags = (previous & FLAGS & !reason) | if blocked { reason } else { 0 };
