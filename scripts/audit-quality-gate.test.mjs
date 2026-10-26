@@ -104,7 +104,9 @@ test('therapy required-audit guard follows all eight handlers and rejects detach
                 before = 'const auditEventId = writeAuditEventInTransaction(tx, {';
                 after = 'return { status: 200, value: {} }; const auditEventId = writeAuditEventInTransaction(tx, {';
             }
-            const mutated = source.replaceAll(before, after);
+            const creationControl = operation === 'create' && before === 'writeAuditEventInTransaction(tx, {'
+                && (after.startsWith('if (') || after.startsWith('return '));
+            const mutated = creationControl ? source.replace(before, after) : source.replaceAll(before, after);
             assert.equal(ts.createSourceFile('mutant.ts', mutated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
                 .parseDiagnostics.length, 0);
             return mutated;
