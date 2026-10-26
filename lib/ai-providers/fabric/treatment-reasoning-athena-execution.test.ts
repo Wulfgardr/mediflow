@@ -108,3 +108,12 @@ test('does not read ambient Object.prototype.then inside success or any denial p
     } finally { if (prior) Object.defineProperty(Object.prototype, 'then', prior); else delete (Object.prototype as { then?: unknown }).then; }
     assert.equal(reads, 0);
 });
+
+
+test('ordinary ATHENA composition selects only the existing direct-V2 method and sanitized runner', () => {
+    const root = readFileSync(new URL('./treatment-reasoning-production-root.ts', import.meta.url), 'utf8');
+    const execution = readFileSync(new URL('./treatment-reasoning-athena-execution.ts', import.meta.url), 'utf8');
+    assert.match(root, /return generateWithAthenaMlx\(\{ prompt: input.instruction/u);
+    assert.doesNotMatch(root, /generateWithAthenaMlxClaims|athena-claims-profile/u);
+    assert.doesNotMatch(execution, /athenaClaimsProfile|athena-claims-profile/u);
+});

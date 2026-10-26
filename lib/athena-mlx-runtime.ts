@@ -174,7 +174,7 @@ function sanitizeMlxOutput(value: string): string {
         .trim();
 }
 
-export async function generateWithAthenaMlx(options: AthenaMlxGenerateOptions): Promise<AthenaMlxGenerateResult> {
+async function generate(options: AthenaMlxGenerateOptions, intactStdout: boolean): Promise<AthenaMlxGenerateResult> {
     const modelDir = options.modelDir || defaultAthenaMlxModelDir();
     const artifact = describeAthenaMlxModelArtifact(modelDir);
     const artifactKind = artifact.artifactKind;
@@ -261,7 +261,7 @@ export async function generateWithAthenaMlx(options: AthenaMlxGenerateOptions): 
             }
 
             resolve({
-                content: sanitizeMlxOutput(stdout),
+                content: intactStdout ? stdout : sanitizeMlxOutput(stdout),
                 latencyMs: Number((performance.now() - start).toFixed(1)),
                 modelDir,
                 model: ATHENA_R1_QWEN3_8B_MODEL_ID,
@@ -275,4 +275,13 @@ export async function generateWithAthenaMlx(options: AthenaMlxGenerateOptions): 
         });
         child.stdin.end(options.prompt);
     });
+}
+
+export function generateWithAthenaMlx(options: AthenaMlxGenerateOptions): Promise<AthenaMlxGenerateResult> {
+    return generate(options, false);
+}
+
+/** Diagnostic-only claims runner; ordinary execution uses generateWithAthenaMlx. */
+export function generateWithAthenaMlxClaims(options: AthenaMlxGenerateOptions): Promise<AthenaMlxGenerateResult> {
+    return generate(options, true);
 }
