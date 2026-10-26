@@ -51,6 +51,7 @@ function run(name, executable, args, expected, env = {}) {
   const log = `${runResult.stdout || ''}${runResult.stderr || ''}`;
   fs.writeFileSync(path.join(output, `${name}.log`), log);
   if (runResult.error || !expected(runResult.status, log)) {
+    process.stderr.write(log.slice(-12000) + '\n');
     throw new Error(`${name} failed (exit ${runResult.status}, ${runResult.error?.message || 'unexpected result'}). Inspect ${path.join(output, `${name}.log`)}`);
   }
   const counts = /([\d,]+) states generated, ([\d,]+) distinct states found, ([\d,]+) states left on queue/.exec(log);

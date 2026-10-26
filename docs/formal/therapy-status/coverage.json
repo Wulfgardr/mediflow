@@ -32,7 +32,7 @@
   },
   "files": {
     "lib/therapy-status-confirmation.ts": "33eebc3197e988f3f1c134f1ac8499da1de95171e21d0ac7e3396c2a202c6486",
-    "components/therapy-manager.tsx": "da54d138d618e443728dc63a0271e21f3d59213ef6e14f576f1aef943dd3737a",
+    "components/therapy-manager.tsx": "5d03f0779b6928f788a07c921f0719845169f768f1ce63adb0c81fe8d10cfbab",
     "lib/db.ts": "8d04d071d6a7b41e35d71823f34409f83fb2657d0b13cad84700428535b68423",
     "lib/security/client-auth-api.ts": "17ece5579f18496dc6dcbca8c7d4340441b453aa517e7250b169ae2d68aae2a0",
     "lib/therapy-write-operation.ts": "f72e2fe81427c5b74a87db7fe79fc96f372553eff6e1ca0b6badf3fd0cd1f3ee",
@@ -40,7 +40,7 @@
     "app/api/therapies/route.ts": "e13c48abb76cb0461eb1a9c1f23cf8724ec9cf34d32a7bd54909e58d4e251dac",
     "lib/locked-field-guard.ts": "8b5d037d1967e1c9ccb08d617fba9cdffa15eee0b9773ed048319b93bcd155a5",
     "lib/therapy-status-command-service.ts": "44eee72121c2165eb2a62d7fd5e94dd5ef4db864482ae14c4f6ed40831874b6b",
-    "lib/therapy-status-command-confirmation.ts": "d9c0aed168f6b93b426f1506fe61eb10a52e64a5f67a5d8ec36d896e755badcb",
+    "lib/therapy-status-command-confirmation.ts": "f2445977f0d0cac518ff0ad7939f75a616053504083c9e3d3a2d13c37526a0a9",
     "lib/therapy-status-command-contract.ts": "3432124d9b5f8b3113265d9779fa12e1411e508b0964cfd2e1bc532f49f4a7fe",
     "lib/therapy-status-command-client.ts": "c2b1b43b0caaee0c12ca5b784b19bf1caaf6f3685c31739e29b1ce22428331a9",
     "lib/therapy-status-command-http.ts": "e48bafce3eb7b8bd280ea04c7afd5624cc73c5afee1d3e3abac04f4c19a8b955",
@@ -64,7 +64,9 @@
     "lib/therapy-status-command-process.test.ts",
     "lib/therapy-status-command-confirmation.test.ts",
     "lib/therapy-status-command-backup.test.ts",
-    "lib/therapy-status-command-client.test.ts"
+    "lib/therapy-status-command-client.test.ts",
+    "e2e/therapy-status-confirmation.spec.ts",
+    "e2e/therapy-composition.spec.ts"
   ],
   "durableProtocolCoverage": {
     "adr": "0168",

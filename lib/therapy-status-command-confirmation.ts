@@ -69,10 +69,11 @@ export function createDurableTherapyStatusConfirmation<T extends StatusTherapy>(
     };
     const valid = (item: T) => item.patientId === ports.patientId && Number.isSafeInteger(item.version) && item.version! > 0
         && getLockedFields(item).length === 0 && [item.drugName, item.dosage, item.status].every(value => !isEncryptedFieldValue(value) && !isLockedDataPlaceholder(value));
-    const unavailable = (reason: 'journal' | 'admission' | 'therapy', label = state?.patientLabel ?? '') => publish({ phase: 'unavailable', reason, patientLabel: label, conflict: false, newAttemptNotSent: true });
+    const unavailable = (reason: 'journal' | 'admission' | 'therapy', label = state?.patientLabel ?? '', newAttemptNotSent = true) => publish({ phase: 'unavailable', reason, patientLabel: label, conflict: false, newAttemptNotSent });
     async function finish(response: TherapyCommandResponse, command: TherapyStatusCommand, token: number, signal: AbortSignal) {
         if (late(token, signal)) return;
         if (response.outcome === 'unknown') { publish({ ...state!, phase: 'uncertain', writePending: false }); return; }
+        publish({ ...state!, phase: 'reading', writePending: false });
         const items = await ports.read(signal);
         if (late(token, signal)) return;
         const item = items.find(value => value.id === command.therapyId);
@@ -85,7 +86,7 @@ export function createDurableTherapyStatusConfirmation<T extends StatusTherapy>(
     async function inspect(items: T[], patientLabel: string) {
         if (!live || !ports.isCurrent() || busy) return;
         if (state && ['writing', 'reading'].includes(state.phase) && state.command) publish({ ...state, phase: 'uncertain', writePending: false });
-        if (state) return;
+        if (legacyMode) { legacy.recover(items, patientLabel); return; }
         const token = epoch, signal = ports.signal();
         try {
             if (await ports.legacy.inspect(ports.patientId)) {
@@ -93,9 +94,9 @@ export function createDurableTherapyStatusConfirmation<T extends StatusTherapy>(
                 legacyMode = true; legacy.recover(items, patientLabel); return;
             }
             const command = await ports.journal.inspect(ports.patientId);
-            if (!current(token, signal) || !command || state) return;
+            if (!current(token, signal) || !command || state?.command?.commandId === command.commandId) return;
             publish({ phase: 'uncertain', command, original: items.find(item => item.id === command.therapyId), patientLabel, conflict: false });
-        } catch { if (current(token, signal)) unavailable('journal', patientLabel); }
+        } catch { if (current(token, signal)) unavailable('journal', patientLabel, false); }
     }
     async function resolve(operation: 'receipt' | 'close') {
         if (legacyMode) { if (operation === 'receipt') await legacy.reread(); return; }
@@ -141,15 +142,20 @@ export function createDurableTherapyStatusConfirmation<T extends StatusTherapy>(
             catch { busy = false; unavailable('admission'); return; }
             publish({ ...context, phase: 'writing', command, writePending: true });
             let timer: ReturnType<typeof setTimeout> | undefined;
+            let sent = false;
             const request = new AbortController();
             const abort = () => request.abort(); signal.addEventListener('abort', abort, { once: true });
             try {
                 if (!await ports.journal.claim(command)) { if (current(token, signal)) unavailable('admission'); return; }
                 if (late(token, signal)) return;
+                sent = true;
                 const response = await Promise.race([ports.request('execute', { ...command, target: context.target }, request.signal),
                     new Promise<never>((_, reject) => { timer = setTimeout(() => { request.abort(); reject(new Error('Unconfirmed command')); }, ports.timeoutMs ?? 15000); })]);
                 await finish(response, command, token, signal);
-            } catch { if (owns(token)) publish({ ...context, command, phase: 'uncertain', writePending: false }); }
+            } catch { if (owns(token)) {
+                if (!sent) unavailable('admission');
+                else publish({ ...context, command, phase: 'uncertain', writePending: false });
+            } }
             finally { clearTimeout(timer); signal.removeEventListener('abort', abort); busy = false; }
         },
         reread: () => resolve('receipt'),
