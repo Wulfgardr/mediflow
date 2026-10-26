@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "MediFlow native Apple ordinary OpenAI supplemental contract",
-    "version": "0.8.6-native-ordinary.3",
+    "version": "0.8.6-native-ordinary.4",
     "description": "Supplement to the canonical v1 spec, not a reconstruction of files absent from the supplied snapshot. ADR0134 / ADR0076 paired Apple adapter; computation remains on the qualified host. Source/logic candidate, not OS qualification, release or clinical apply."
   },
   "paths": {
@@ -1000,7 +1000,7 @@
             "const": "current_patient_insight"
           }
         },
-        "description": "Selettore passivo. Le fonti sono acquisite e ricostruite esclusivamente dall’Application Service host; nessun testo o proiezione dal client."
+        "description": "Selettore passivo. Le fonti sono acquisite e ricostruite esclusivamente dall\u2019Application Service host; nessun testo o proiezione dal client."
       },
       "NativeSmartImportInput": {
         "type": "object",
@@ -1014,7 +1014,7 @@
             "const": "current_smart_import"
           }
         },
-        "description": "Selettore passivo. Le fonti sono acquisite e ricostruite esclusivamente dall’Application Service host; nessun testo o proiezione dal client."
+        "description": "Selettore passivo. Le fonti sono acquisite e ricostruite esclusivamente dall\u2019Application Service host; nessun testo o proiezione dal client."
       },
       "NativeTreatmentReasoningInput": {
         "type": "object",
@@ -1028,7 +1028,7 @@
             "const": "current_treatment_reasoning"
           }
         },
-        "description": "Selettore passivo. Le fonti sono acquisite e ricostruite esclusivamente dall’Application Service host; nessun testo o proiezione dal client."
+        "description": "Selettore passivo. Le fonti sono acquisite e ricostruite esclusivamente dall\u2019Application Service host; nessun testo o proiezione dal client."
       },
       "NativeDocumentSynthesisInput": {
         "type": "object",
@@ -1062,6 +1062,25 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128
+          },
+          "receipt": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "denial"
+            ],
+            "properties": {
+              "denial": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/NativeOrdinaryDenialObservation"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
           }
         }
       },
@@ -1501,7 +1520,7 @@
             }
           }
         ],
-        "description": "Ingress esatto per functionId, massimo 4096 byte UTF-8; ulteriori vincoli runtime: stringhe ben formate, limiti UTF-16, soli oggetti ordinari enumerabili senza proxy/accessor/simboli. Nessuna autorità di sorgente dal DTO."
+        "description": "Ingress esatto per functionId, massimo 4096 byte UTF-8; ulteriori vincoli runtime: stringhe ben formate, limiti UTF-16, soli oggetti ordinari enumerabili senza proxy/accessor/simboli. Nessuna autorit\u00e0 di sorgente dal DTO."
       },
       "NativeOrdinaryState": {
         "type": "object",
@@ -1551,6 +1570,16 @@
           },
           "acquisition": {
             "$ref": "#/components/schemas/NativeOrdinaryAcquisition"
+          },
+          "quota": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NativeOrdinaryQuotaObservation"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "allOf": [
@@ -2473,6 +2502,120 @@
             "const": "not_attested"
           }
         }
+      },
+      "NativeOrdinaryQuotaObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "primaryUsedPercent",
+          "secondaryUsedPercent",
+          "includedUsage",
+          "creditAvailability"
+        ],
+        "properties": {
+          "primaryUsedPercent": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "secondaryUsedPercent": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "includedUsage": {
+            "type": "string",
+            "enum": [
+              "available",
+              "exhausted"
+            ]
+          },
+          "creditAvailability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable",
+              "not_reported"
+            ]
+          }
+        },
+        "description": "Observation only; at least one window is required. Exhausted included usage requires potentially usable credits; no balance, account identity or entitlement is exposed."
+      },
+      "NativeOrdinaryDenialObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source",
+          "method",
+          "rpcCode",
+          "backendCode"
+        ],
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "limits_snapshot",
+              "limits_notice",
+              "rpc_error",
+              "backend_error"
+            ]
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "initialize",
+              "account/login/start",
+              "account/login/cancel",
+              "account/read",
+              "account/logout",
+              "model/list",
+              "account/rateLimits/read",
+              "config/read",
+              "thread/start",
+              "turn/start",
+              "turn/interrupt",
+              "account/rateLimits/updated",
+              "error",
+              "turn/completed"
+            ]
+          },
+          "rpcCode": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -32768,
+                "maximum": -32000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "backendCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "usageLimitExceeded"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "description": "Fixed denial metadata only. A local preflight has null rpcCode; no upstream prose, account identity, secret or source contents."
       }
     }
   }

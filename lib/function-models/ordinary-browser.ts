@@ -1,3 +1,4 @@
+import { parseExecutionQuotaView } from '../chatgpt-execution/quota-view';
 import { isAiLaneEnabledValue } from '../ai-lane-kill-switch';
 /* same preview output; no account/clinical material in browser storage. */
 import { ordinaryWireObject, ORDINARY_FLOW_SCHEMA, ORDINARY_SELECTION_SCHEMA, type OrdinaryFunction, type OrdinaryFlowState } from '../chatgpt-product/ordinary-wire';
@@ -48,7 +49,7 @@ function parseState(value: unknown, functionId: OrdinaryFunction): OrdinaryFlowS
     const v = value as Record<string, unknown>;
     if (v.schema !== ORDINARY_FLOW_SCHEMA || v.functionId !== functionId || !text(v.attemptId) || !['preparing','needs_consent','consented','awaiting_login','connected','ready','generating','closed'].includes(v.phase as string)
         || !Number.isSafeInteger(v.expiresAt) || (v.expiresAt as number) <= Date.now()) throw failure();
-    return Object.freeze({ schema: ORDINARY_FLOW_SCHEMA, functionId, attemptId: v.attemptId, phase: v.phase, expiresAt: v.expiresAt }) as OrdinaryFlowState;
+    return Object.freeze({ schema: ORDINARY_FLOW_SCHEMA, functionId, attemptId: v.attemptId, phase: v.phase, expiresAt: v.expiresAt, quota: v.quota == null ? null : parseExecutionQuotaView(v.quota) }) as OrdinaryFlowState;
 }
 function parseDisclosure(value: unknown, state: OrdinaryFlowState): OrdinaryContentDisclosure {
     const x = ordinaryWireObject(value, ['schema','revision','operation','profileVersion','contextRevision','attemptRevision','qualificationRevision','sourceSha256','payloadSha256','payloadBytes','egress','proposalOnly','clinicalWrites']);

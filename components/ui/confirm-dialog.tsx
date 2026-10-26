@@ -81,7 +81,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                         aria-labelledby={titleId}
                         aria-describedby={options.message ? messageId : undefined}
                         tabIndex={-1}
-                        className="mf-modal-shell lume-overlay-shadow relative w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-[var(--lume-dur-fuoco)]"
+                        className="mf-modal-shell lume-overlay-shadow relative w-full max-w-md max-h-[calc(100dvh-2.5rem)] overflow-y-auto animate-in fade-in zoom-in-95 duration-[var(--lume-dur-fuoco)]"
                     >
                         {/* WUL-678: danger retains its signal; ordinary confirmations have no decorative stripe. */}
                         {isDanger ? <div aria-hidden className="h-1.5 w-full" style={{ background: 'var(--lume-signal-critical)' }} /> : null}

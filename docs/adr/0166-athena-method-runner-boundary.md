@@ -68,3 +68,70 @@ dopo non dimostra che la corsia generi una proposta valida.
 Resta necessario qualificare separatamente runner, tokenizer, artifact,
 isolamento di rete e ciclo di vita sulla destinazione. I flag offline del
 runner e l'identità nominale del modello non bastano.
+
+## Emendamento proposto: profilo produttore MLX claim+refs
+
+La prova successiva alla prima tranche ha negato tutti e quattro i risultati
+Fabric dei due tentativi diagnostici: il modello duplicava i claim nei
+`sourceBindings` e non manteneva i binding per ogni reasoning/caveat aggiunto.
+Il diniego V2 era corretto. Ridurre le cardinalità o allentare il validatore
+non risolve il contratto fra produttore e host.
+
+La sola diagnostica MLX può nominare il profilo interno
+`mediflow.treatment-reasoning.claims.v1`. Istruzione e decoder vivono nella
+stessa coppia privata versionata, senza selezione dal chiamante. Il produttore
+restituisce root esatta `schemaVersion, task, summary, data`; summary,
+recommendation e ogni reasoning/caveat sono `{claim,evidenceRefs}`. Gli altri
+campi conservano le forme V2, incluso trace obbligatorio con `toolsUsed: []`:
+nessun tool è stato eseguito. Il decoder specifico nega ogni lista non vuota,
+senza modificare V2 condiviso. Mancanti, extra,
+metadati di autorità e vecchi formati sono negati, senza autodetection.
+
+Il mapper copia ogni testo e lista di riferimenti e costruisce soltanto i
+percorsi `summary`, `data.recommendation`, `data.reasoning.i` e
+`data.caveats.i`. Nessuna deduzione di fonte, aggiunta, deduplicazione,
+normalizzazione, repair o secondo tentativo. Dopo la costruzione esegue il
+medesimo validatore V2, poi richiede uguaglianza strutturale completa tra
+contenuti/binding mappati e normalizzati: anche statement, label, rationale e
+limitations che richiederebbero pulizia sono negati. I claim hanno limite
+effettivo400, imposto dai binding V2; reasoning/caveats conservano8+8 voci e
+fino18 binding. Riferimenti duplicati nella stessa lista sono negati; lo
+stesso riferimento su claim diversi è ammesso. Un riferimento esistente non
+prova supporto semantico della conclusione: resta il gate qualità I-7.
+
+Questo è un cambiamento dell'ABI privata del produttore, non equivalenza del
+prompt647. Il profilo non è ammesso nella corsia ordinaria: executor e root
+production conservano prompt direttoV2, parser e runner precedenti, anche
+quando il kill switch sia già attivo. Una risposta claims strutturalmente
+valida non viene pubblicata dalla corsia ordinaria. La diagnostica non emette
+publication e non abilita nuove venue; l'ammissione richiede qualifica I-7
+e una decisione esplicita successiva.
+Il percorso portable mantiene l'istruzione direttaV2 originale;
+legacy e venue remote mantengono prompt e parser propri. Le API, publication,
+attestazioni host, revisione, lease/CAS e zero scritture restano invariati.
+Condivisa è soltanto la primitiva di singola invocazione e timeout, senza
+rinnovo, retry o fallback.
+
+Il profilo richiede una stringa stdout integra, al massimo64000 unità di
+stringa JavaScript (non byteUTF8), prima di `scanJsonObject`. Lo scanner copre
+l'intero input, chiavi duplicate anche escaped, profondità/nodi e numeri
+finiti. Solo dopo viene interpretato il JSON, con prototipi ordinari come
+richiesto daV2. Oggetti preinterpretati, proxy e getter non entrano nel decoder.
+Non si estraggono sottostringhe da markdown o `<think>`.
+
+La sola diagnostica del profilo usa il runner nominato
+`generateWithAthenaMlxClaims`, che conserva tutti i byte UTF8 decodificati di
+stdout, comprese righe inattese di deprecazione. Il runner legacy conserva
+il filtro precedente. Argomenti, artifact, decoding, attesa, timeout,
+attestazione e verifiche di scelta restano gli stessi. La validazione non
+attesta l'arresto fisico di un processo già in corso dopo revoca.
+
+Le prove storiche distinguono il corpus diagnostico dai due casi tecnici
+fissati prima del nuovo profilo. Il candidato è stato congelato prima della
+loro esecuzione: un solo run per caso, senza retry selettivi.
+Questi due casi tecnici sono stati esposti prima dell'esecuzione e non sono
+una verifica cieca né sono riutilizzabili come holdout I-7. Gli output
+diagnostici hanno mostrato conclusioni terapeutiche non sostenute dalle fonti;
+la qualità resta non accettata. Un eventuale parserPASS non chiude I-7,
+non accetta questo ADR e non ammette alcuna nuova venue remota. I tentativi
+falliti restano conservati fuori da Git.

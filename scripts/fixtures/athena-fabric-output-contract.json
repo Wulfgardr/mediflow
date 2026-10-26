@@ -1,0 +1,29 @@
+{
+  "allowedEvidenceRefs": ["therapy.synthetic.alpha", "observation.synthetic.beta"],
+  "rejectedReviewShape": {
+    "review": {
+      "coherence": true,
+      "actions": [{ "actionLabel": "Rivedere il caso sintetico", "sourceBindings": [{ "sourceId": "observation.synthetic.beta" }] }]
+    }
+  },
+  "expectedOutput": {
+    "schemaVersion": "mediflow.treatment_reasoning.v1",
+    "task": "treatment_reasoning",
+    "summary": "Il caso sintetico richiede revisione delle fonti disponibili.",
+    "data": {
+      "recommendation": "Rivedere il piano con il medico; le fonti non autorizzano modifiche automatiche.",
+      "keyEvidence": [{ "id": "evidence.synthetic.one", "statement": "È presente una terapia nella fonte sintetica.", "evidenceRefs": ["therapy.synthetic.alpha"] }],
+      "reasoning": ["Le fonti descrivono terapia e osservazione, senza una linea guida allegata."],
+      "caveats": ["Manca una fonte per stabilire soglie o alternative terapeutiche."],
+      "safetyFlags": [{ "id": "safety.synthetic.one", "severity": "caution", "label": "Revisione richiesta", "rationale": "Il caso sintetico è incompleto.", "evidenceRefs": ["observation.synthetic.beta"] }],
+      "suggestedActions": [{ "id": "action.synthetic.one", "intent": "review_only", "label": "Rivedere le fonti", "rationale": "Non applicare modifiche alla cartella.", "writePolicy": "review_only", "evidenceRefs": ["therapy.synthetic.alpha"] }],
+      "trace": { "mode": "local_model", "toolsUsed": [], "limitations": ["Sole fonti fornite dall’host."] }
+    },
+    "sourceBindings": [
+      { "claimPath": "summary", "claim": "Il caso sintetico richiede revisione delle fonti disponibili.", "evidenceRefs": ["therapy.synthetic.alpha"] },
+      { "claimPath": "data.recommendation", "claim": "Rivedere il piano con il medico; le fonti non autorizzano modifiche automatiche.", "evidenceRefs": ["therapy.synthetic.alpha"] },
+      { "claimPath": "data.reasoning.0", "claim": "Le fonti descrivono terapia e osservazione, senza una linea guida allegata.", "evidenceRefs": ["therapy.synthetic.alpha", "observation.synthetic.beta"] },
+      { "claimPath": "data.caveats.0", "claim": "Manca una fonte per stabilire soglie o alternative terapeutiche.", "evidenceRefs": ["observation.synthetic.beta"] }
+    ]
+  }
+}

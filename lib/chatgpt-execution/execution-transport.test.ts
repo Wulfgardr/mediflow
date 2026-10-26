@@ -36,6 +36,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
     if (mode === 'hang') return;
     if (mode === 'malformed-error') return send({ id: request.id, error: 'PRIVATE_PROVIDER_SENTINEL' });
     if (mode === 'diagnostic') return send({ id: request.id, error: { code: -32603, message: 'PRIVATE_PROVIDER_SENTINEL https://auth.openai.com/private?token=PRIVATE_PROVIDER_SENTINEL 503 TLS certificate network device experimental permission denied' } });
+    if (mode === 'usage-error') return send({ id: request.id, error: { code: -32000, message: 'PRIVATE_PROVIDER_SENTINEL', data: { codexErrorInfo: 'usageLimitExceeded', token: 'PRIVATE_PROVIDER_SENTINEL' } } });
     if (mode === 'error') {
         process.stderr.write('PRIVATE_PROVIDER_SENTINEL\n');
         return send({ id: request.id, error: { code: -32000, message: 'PRIVATE_PROVIDER_SENTINEL', data: { token: 'PRIVATE_PROVIDER_SENTINEL' } } });
@@ -309,4 +310,14 @@ test('preparation diagnostic keeps only an allowlisted local stage', () => {
     assert.doesNotMatch(JSON.stringify(events), /PRIVATE_|path|source/u);
     reportExecutionDiagnostic(observe, { ...input, stage: 'PRIVATE_PROVIDER_SENTINEL' } as unknown as import('./execution-transport').ExecutionDiagnostic);
     assert.equal(events.length, 1);
+});
+
+test('a real JSON-RPC error frame keeps only the actual bounded code and fixed quota classification', async t => {
+    const { transport } = fixture(t);
+    await assert.rejects(transport.request('turn/start', { mode: 'usage-error' }), (error: unknown) => {
+        assert.ok(error instanceof ExecutionError);
+        assert.equal(error.code, 'quota_exhausted');
+        assert.deepEqual(error.denial, { source: 'rpc_error', method: 'turn/start', rpcCode: -32000, backendCode: 'usageLimitExceeded' });
+        assert.doesNotMatch(JSON.stringify(error), /PRIVATE_|message.*PRIVATE|token/); return true;
+    });
 });

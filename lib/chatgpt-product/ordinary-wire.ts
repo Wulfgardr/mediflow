@@ -44,6 +44,7 @@ export function parseOrdinaryRemoteProvenance(value: unknown, receipt: OrdinaryR
 export const ORDINARY_FLOW_SCHEMA = 'mediflow.chatgpt-ordinary-flow.v1' as const;
 export const ORDINARY_SELECTION_SCHEMA = 'mediflow.function-model-chatgpt-choice.v1' as const;
 export type OrdinaryFlowState = Readonly<{ schema: typeof ORDINARY_FLOW_SCHEMA; attemptId: string; functionId: OrdinaryFunction;
+    quota?: import('../chatgpt-execution/quota-view').ExecutionQuotaView | null;
     phase: 'preparing' | 'needs_consent' | 'consented' | 'awaiting_login' | 'connected' | 'ready' | 'generating' | 'closed'; expiresAt: number }>;
 
 export type OrdinaryEmptyFlowStatus = Readonly<{ schema: typeof ORDINARY_FLOW_SCHEMA; attemptId: null } & (
