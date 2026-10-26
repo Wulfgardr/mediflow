@@ -178,6 +178,7 @@ test('[E2E fixture] Smart Import exposes only the Fabric review preview and neve
   await openPatientSection(page, 'quadro');
   await expect(page.locator('#quadro')).toBeVisible();
   await expect(page.locator('#quadro [data-testid="fabric-preview-card"]')).toHaveCount(0);
+  await expect(page.getByTestId('smart-import-proposal-summary')).toContainText('Nessuna proposta da rivedere');
   await openPatientSection(page, 'documenti');
   await page.locator('#smart-import').getByRole('button', { name: 'Proposte', exact: true }).click();
 
@@ -221,6 +222,8 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
     let fail = false;
     try {
       if (zoom) page = zoom.page;
+      const runtimeErrors: string[] = [];
+      page.on('pageerror', error => runtimeErrors.push(error.message));
       const { calls } = await installSmartImportFixture(page, { beforePreview: async () => { entered.resolve(); await release.promise; }, fail: () => fail });
       await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
       await page.route('**/api/ambulatories', route => route.fulfill({ json: [{ id: 'ambulatory.synthetic', name: 'Ambulatorio di prova', address: '', version: 1 }] }));
@@ -275,7 +278,9 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
         const source = card.getByRole('link', { name: 'Note paziente', exact: true });
         await source.scrollIntoViewIfNeeded(); await source.focus(); await assertNotClippedInViewport(source, 'Fonte Note paziente');
         if (directory) await page.screenshot({ path: `${directory}/${theme}-${size}-fonti.png`, animations: 'disabled' });
-        await openPatientSection(page, 'quadro');
+        await page.keyboard.press('Enter');
+        await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules#quadro$`));
+        await expect(page.locator('#quadro')).toBeVisible();
         await expect(card).not.toBeVisible();
         const summary = page.getByTestId('smart-import-proposal-summary');
         await expect(summary).toContainText('1 proposta da rivedere');
@@ -289,6 +294,11 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
       await generate.click();
       await expect(card).toContainText('Anteprima non disponibile.'); await capture('errore');
       expect(calls.legacyApply).toBe(0);
+      if (!baseline) {
+        await openPatientSection(page, 'quadro');
+        await expect(page.getByTestId('smart-import-proposal-summary')).toContainText('Nessuna proposta da rivedere');
+      }
+      expect(runtimeErrors).toEqual([]);
       await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'disabled');
       await page.reload(); await openPatientSection(page, baseline ? 'quadro' : 'documenti'); await toggle.click();
       await expect(prepare).toBeDisabled(); await capture('spenta');
