@@ -121,6 +121,11 @@ test('Repertori Impostazioni: dati, lettura pendente e negata senza servizi este
     };
     try {
         await bootstrapUnlockedSession(page, '1234'); await page.goto('/settings/repertori');
+        if (!baseline) {
+            const heading = section.getByRole('heading', { name: 'Repertori', level: 2, exact: true });
+            await expect(heading).toHaveCSS('font-size', '12px');
+            await expect(heading).toHaveCSS('letter-spacing', '0.6px');
+        }
         await expect(section).toBeVisible(); await capture('lettura-pendente');
         state = 'ready'; release();
         await expect(section).toContainText('3 codici'); await expect(section).toContainText('2 voci');
