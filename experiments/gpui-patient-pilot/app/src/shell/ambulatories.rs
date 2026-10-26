@@ -203,6 +203,7 @@ impl ClinicalApp {
                 .detach();
         }
         editor.busy = false;
+        editor.observed = None;
         editor.fields[3]
             .editor
             .update(cx, |input, cx| input.set_content("", cx));
@@ -221,6 +222,7 @@ impl ClinicalApp {
         if editor.busy {
             return;
         }
+        editor.observed = None;
         let passphrase = Zeroizing::new(editor.fields[3].value(cx));
         editor.fields[3]
             .editor
@@ -314,6 +316,7 @@ impl ClinicalApp {
         if commit {
             editor.attempted = true;
         }
+        editor.observed = None;
         editor.busy = true;
         editor.message = if commit {
             "Creazione e rilettura in corso…"
@@ -321,11 +324,50 @@ impl ClinicalApp {
             "Rilettura della sede in corso…"
         }
         .into();
-        self.run(move||{if commit{web.commit()?;}web.readback()},move|this,result,cx|{
-            let Some(editor)=&mut this.ambulatory_management.bootstrap else{return;};editor.busy=false;
-            match result{Ok(id)=>{editor.observed=Some(id);editor.message=if commit{"Creazione accettata e sede riletta. Verifica e scegli la sede nel collegamento in uso."}else{"La sede corrisponde ai dati della bozza. La sola rilettura non conferma l’esito dell’invio precedente."}.into();},Err(error)=>{editor.message=format!("{} ID e bozza conservati. Accedi di nuovo prima di riconciliare; nessun reinvio automatico.",ui_error(error));if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().spawn(async move{let _=web.retire();}).detach();}}}
-        },cx);
+        self.run(
+            move || {
+                if commit {
+                    web.commit()?;
+                }
+                web.readback()
+            },
+            move |this, result, cx| this.receive_first_ambulatory_verification(commit, result, cx),
+            cx,
+        );
         cx.notify();
+    }
+
+    fn receive_first_ambulatory_verification(
+        &mut self,
+        commit: bool,
+        result: Result<String, RuntimeError>,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(editor) = &mut self.ambulatory_management.bootstrap else {
+            return;
+        };
+        editor.busy = false;
+        match result {
+            Ok(id) => {
+                editor.observed = Some(id);
+                editor.message=if commit{"Creazione accettata e sede riletta. Verifica e scegli la sede nel collegamento in uso."}else{"La sede corrisponde ai dati della bozza. La sola rilettura non conferma l’esito dell’invio precedente."}.into();
+            }
+            Err(error) => {
+                editor.observed = None;
+                editor.message = format!(
+                    "{} ID e bozza conservati. Accedi di nuovo prima di riconciliare; nessun reinvio automatico.",
+                    ui_error(error)
+                );
+                if let Some(web) = editor.web.take() {
+                    web.cancel_local();
+                    cx.background_executor()
+                        .spawn(async move {
+                            let _ = web.retire();
+                        })
+                        .detach();
+                }
+            }
+        }
     }
 
     fn select_first_ambulatory(&mut self, cx: &mut Context<Self>) {
@@ -1169,11 +1211,17 @@ mod tests {
                 .id
                 .clone();
             let epoch = app.epoch;
+            app.ambulatory_management
+                .bootstrap
+                .as_mut()
+                .unwrap()
+                .observed = Some(id.clone());
             app.cancel_first_ambulatory(cx);
             let editor = app.ambulatory_management.bootstrap.as_ref().unwrap();
             assert!(editor.attempted);
             assert!(!editor.busy);
             assert!(editor.web.is_none());
+            assert!(editor.observed.is_none());
             assert_eq!(editor.payload.as_ref().unwrap().id, id);
             assert_eq!(editor.fields[0].value(cx), "Sede inventata");
             assert!(editor.fields[3].value(cx).is_empty());
@@ -1195,6 +1243,54 @@ mod tests {
             assert!(!app.ambulatory_management.bootstrap.as_ref().unwrap().busy);
         });
     }
+    #[gpui::test]
+    fn bootstrap_failed_reread_retires_the_previous_observation_and_keeps_its_draft(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            bootstrap_draft(app, cx);
+            let id = app
+                .ambulatory_management
+                .bootstrap
+                .as_ref()
+                .unwrap()
+                .payload
+                .as_ref()
+                .unwrap()
+                .id
+                .clone();
+            app.receive_first_ambulatory_verification(false, Ok(id.clone()), cx);
+            assert_eq!(
+                app.ambulatory_management
+                    .bootstrap
+                    .as_ref()
+                    .unwrap()
+                    .observed
+                    .as_deref(),
+                Some(id.as_str())
+            );
+            for error in [
+                RuntimeError::Rejected(401),
+                RuntimeError::Conflict,
+                RuntimeError::InvalidResponse,
+            ] {
+                app.ambulatory_management
+                    .bootstrap
+                    .as_mut()
+                    .unwrap()
+                    .observed = Some(id.clone());
+                app.receive_first_ambulatory_verification(false, Err(error), cx);
+                let editor = app.ambulatory_management.bootstrap.as_ref().unwrap();
+                assert!(editor.observed.is_none());
+                assert!(editor.attempted);
+                assert_eq!(editor.payload.as_ref().unwrap().id, id);
+                assert_eq!(editor.fields[0].value(cx), "Sede inventata");
+            }
+        });
+    }
+
     #[gpui::test]
     fn bootstrap_restore_retires_retained_fields_and_first_field_focus_is_real(
         cx: &mut gpui::TestAppContext,
