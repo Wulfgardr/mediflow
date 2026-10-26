@@ -158,18 +158,56 @@ for (const route of ['modelli', 'funzioni'] as const) {
   });
 }
 
-test('AI settings stay unavailable when the initial configuration cannot be read', async ({ page }) => {
+test('AI settings stay unavailable when the initial configuration cannot be read', async ({ page, baseURL }) => {
+  const blockedRequests: string[] = [];
+  await page.route('**/*', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (!baseURL || url.origin !== new URL(baseURL).origin) {
+      blockedRequests.push(request.url());
+      return route.abort();
+    }
+    if (url.pathname === '/api/plugin-local-ui/pairing' && request.method() === 'GET') {
+      return route.fulfill({ json: { available: false, pending: [], active: [] } });
+    }
+    if (url.pathname === '/api/system/ai-rollout-readiness' && request.method() === 'GET') {
+      return route.fulfill({ json: { lanes: [], localControls: [] } });
+    }
+    if (url.pathname === '/api/settings/ai/chatgpt/status' && request.method() === 'GET') {
+      return route.fulfill({ json: {
+        state: 'disconnected', notice: null, plan: null, loginExpiresAt: null,
+        actions: ['connect'], inferenceEnabled: false, executionBlock: 'data_boundary_unqualified',
+      } });
+    }
+    if (url.pathname === '/api/ai/models' && request.method() === 'GET') {
+      return route.fulfill({ json: { models: [] } });
+    }
+    if (url.pathname === '/api/ai/local-provider/onboarding' && request.method() === 'GET') {
+      return route.fulfill({ json: {
+        provider: 'ollama', credentialClass: 'local_model', model: null, state: 'missing',
+        revision: 'a'.repeat(64), version: 0, receipt: null, canActivate: false,
+        inference: 'not_run', qualification: 'not_assessed',
+      } });
+    }
+    if (url.pathname.startsWith('/api/') && /(?:ai|ollama|mlx|model|provider|download|runtime)/iu.test(url.pathname)
+      && !url.pathname.startsWith('/api/settings/')) {
+      blockedRequests.push(`${request.method()} ${url.pathname}`);
+      return route.abort();
+    }
+    return route.continue();
+  });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await page.route('**/api/settings/aiModelDefaultVersion', (request) => request.fulfill({
     status: 500, json: { error: 'Synthetic settings read failure' },
   }));
   await page.goto('/settings/ai/modelli');
-  await expect(page.getByText(
-    'Impossibile leggere le impostazioni. Ricarica questa pagina prima di modificarle.',
-    { exact: true },
-  )).toBeVisible();
+  const readFailure = page.getByTestId('settings-ai-models-section').getByRole('alert');
+  await expect(readFailure).toBeVisible();
+  await expect(readFailure).toContainText('Impossibile leggere le impostazioni.');
+  await expect(readFailure.getByText('Ricarica questa pagina prima di modificarle.', { exact: true })).toBeVisible();
   await expect(page.getByTestId('ai-settings-controls')).toHaveAttribute('disabled', '');
   await expect(page.getByRole('button', { name: 'Salva configurazione', exact: true })).toBeDisabled();
   await expect(page.getByTestId('ai-model-selector-clinical')
     .getByRole('button', { name: 'Usa un modello personalizzato' })).toBeDisabled();
+  expect(blockedRequests).toEqual([]);
 });
