@@ -288,3 +288,45 @@ test('ordinary ChatGPT expiry requires explicit new preparation before fresh con
   await expect(page.getByTestId('patient-insight-review-proposal')).toContainText('Proposta sintetica dopo nuova preparazione.');
   remote.assertCompleted(1, 2);
 });
+
+for (const operation of ['status', 'settings'] as const) test(`ordinary ChatGPT cancel during ${operation} recovery leaves explicit new preparation usable`, async ({ page }) => {
+  const remote = await installOrdinaryChatGptTransport(page, 'patient_insight', () => {
+    const request = remote.previews.at(-1) as { capturedAt: string; patientRevision: number };
+    const { receipt, provenance } = remoteMetadata('patient_insight');
+    return { preview: { writesPerformed: 0, apply: 'denied', status: 'available', code: null,
+      proposal: { schemaVersion: 'mediflow.patient-insight.review-proposal.v2', reviewOnly: true,
+        summary: 'Proposta sintetica dopo recupero annullato.', currentState: [], alerts: [], nextSteps: [], gaps: ['Dati sintetici incompleti.'],
+        generatedAt: request.capturedAt, currentness: { selectionEpoch: 1, patientRevision: request.patientRevision,
+          projectionDigest: `sha256_${'d'.repeat(64)}`, capturedAt: request.capturedAt, verifiedAt: request.capturedAt } },
+      receipt, provenance, reviewRef: `review_${'e'.repeat(32)}` } };
+  });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
+  const patientId = await createPatient(page, `CancelRecovery${operation}`);
+  await page.goto(`/patients/${patientId}/modules`); await openPatientSection(page, 'attenzione');
+  const disclosure = page.locator('#patient-insight'); await disclosure.locator(':scope > div > [data-disclosure-control]').click();
+  const controls = await selectOrdinaryChatGpt(disclosure);
+  remote.arm(); await disclosure.getByRole('button', { name: 'Avvia supporto', exact: true }).click();
+  await finishOrdinaryChatGpt(controls);
+  const proposal = page.getByTestId('patient-insight-review-proposal');
+  await expect(proposal).toContainText('Proposta sintetica dopo recupero annullato.');
+  remote.holdRecovery(operation);
+  await controls.getByRole('button', { name: 'Nuova preparazione', exact: true }).click();
+  await expect.poll(remote.recoveryHeld).toBe(true);
+  await controls.getByRole('button', { name: 'Annulla e chiudi preparazione', exact: true }).click();
+  await expect(controls.getByRole('button', { name: 'Nuova preparazione', exact: true })).toBeEnabled();
+  await expect(controls).not.toContainText('Verifica in corso…'); await expect(proposal).toHaveCount(0);
+  await expect(disclosure.getByRole('button', { name: 'Avvia supporto', exact: true })).toBeDisabled();
+  const late = page.waitForResponse(response => response.url().endsWith(`/ordinary/${operation}`));
+  remote.releaseRecovery(); await late;
+  await expect(controls.getByRole('button', { name: 'Nuova preparazione', exact: true })).toBeEnabled();
+  await expect(disclosure.getByRole('button', { name: 'Avvia supporto', exact: true })).toBeDisabled();
+  expect(remote.previews).toHaveLength(1); expect(remote.operations.filter(value => value === 'generate')).toHaveLength(1);
+  await controls.getByRole('button', { name: 'Nuova preparazione', exact: true }).click();
+  await expect(disclosure.getByRole('button', { name: 'Avvia supporto', exact: true })).toBeEnabled();
+  await disclosure.getByRole('button', { name: 'Avvia supporto', exact: true }).click();
+  await expect(controls).toContainText('Contesto preparato e redatto: 100 byte.');
+  await finishOrdinaryChatGpt(controls, remote.option());
+  await expect(proposal).toContainText('Proposta sintetica dopo recupero annullato.');
+  remote.assertCompleted(2);
+});

@@ -30,6 +30,8 @@ export async function installOrdinaryChatGptTransport(page: Page, id: OrdinaryFu
   const clinicalWrites: string[] = [];
   const providerRequests: string[] = [];
   let recording = false;
+  let heldOperation: 'status' | 'settings' | null = null, held = false;
+  let releaseHeld: (() => void) | undefined;
   const state = () => ({ schema: ORDINARY_FLOW_SCHEMA, attemptId: attemptId(), functionId: id, phase, expiresAt });
   const settings = () => ({ schema: 'mediflow.chatgpt-ordinary-settings.v1', revision: REVISION, enabled,
     retention: 'chatgpt_service_terms_apply', preferences: Object.fromEntries(IDS.map(key => [key, { use: 'local', model: null, effort: null }])),
@@ -51,6 +53,10 @@ export async function installOrdinaryChatGptTransport(page: Page, id: OrdinaryFu
     const path = new URL(route.request().url()).pathname;
     const operation = path.slice('/api/settings/ai/chatgpt/ordinary/'.length);
     operations.push(operation);
+    if (operation === heldOperation) {
+      heldOperation = null; held = true;
+      await new Promise<void>(resolve => { releaseHeld = resolve; });
+    }
     if (operation === 'settings') return fulfill(route, settings());
     if (operation === 'status') return fulfill(route, { schema: ORDINARY_FLOW_SCHEMA, phase: 'closed', attemptId: null, cleanupConfirmed: !live });
     const body = route.request().postDataJSON() as Record<string, unknown>;
@@ -85,7 +91,10 @@ export async function installOrdinaryChatGptTransport(page: Page, id: OrdinaryFu
     expiresAt = Date.now() + (attempt === 1 ? options.firstLifetimeMs ?? 120_000 : 120_000);
     return fulfill(route, { ...state(), disclosure: disclosure() }, 202);
   });
-  return { operations, previews, clinicalWrites, option: () => catalog().choices[0].optionId, arm: () => { recording = true; },
+  return { operations, previews, clinicalWrites,
+    holdRecovery: (operation: 'status' | 'settings') => { heldOperation = operation; held = false; },
+    recoveryHeld: () => held, releaseRecovery: () => releaseHeld?.(),
+    option: () => catalog().choices[0].optionId, arm: () => { recording = true; },
     assertCompleted: (count = 1, previewCount = count) => {
       expect(previews).toHaveLength(previewCount);
       expect(operations.filter(value => ['consent', 'login/start', 'login/complete', 'models', 'generate'].includes(value))).toEqual(Array.from({ length: count }, () => [

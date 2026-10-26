@@ -13,6 +13,7 @@ function harness(id: OrdinaryFunction) {
     const calls: { operation: string; body: Record<string, unknown> | null }[] = [];
     let enabled = true, epoch = 0, phase = 'needs_consent', live = false, cleanup = true;
     let error: string | null = null, expires = 120_000;
+    let deferSettings = false, settingsRelease: (() => void) | undefined;
     let deferStatus = false, statusRelease: (() => void) | undefined, deferGenerate = false, generateRelease: (() => void) | undefined;
     const settings = () => ({ schema: 'mediflow.chatgpt-ordinary-settings.v1', revision: `sha256_${String(epoch % 10).repeat(64)}`,
         enabled, retention: 'chatgpt_service_terms_apply',
@@ -23,7 +24,10 @@ function harness(id: OrdinaryFunction) {
         const path = String(input), operation = path.includes('/ordinary/') ? path.split('/ordinary/')[1] : 'preview';
         const body = typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : null;
         calls.push({ operation, body });
-        if (operation === 'settings') return Response.json(settings());
+        if (operation === 'settings') {
+            if (deferSettings) await new Promise<void>(resolve => { settingsRelease = resolve; });
+            return Response.json(settings());
+        }
         if (operation === 'cancel') { live = false; return Response.json({ schema: ORDINARY_FLOW_SCHEMA, phase: 'closed', cleanupConfirmed: cleanup }); }
         if (operation === 'status') {
             if (deferStatus) await new Promise<void>(resolve => { statusRelease = resolve; });
@@ -62,7 +66,8 @@ function harness(id: OrdinaryFunction) {
         select: async () => { client.chooseRemote(); await until(() => !client.remote.getSnapshot().loading); },
         setEnabled: (value: boolean) => { enabled = value; }, setCleanup: (value: boolean) => { cleanup = value; },
         fail: (value: string) => { error = value; }, expireAfter: (value: number) => { expires = value; },
-        holdStatus: () => { deferStatus = true; }, statusHeld: () => !!statusRelease, releaseStatus: () => statusRelease?.(),
+        holdStatus: () => { deferStatus = true; }, statusHeld: () => !!statusRelease, releaseStatus: () => { deferStatus = false; statusRelease?.(); },
+        holdSettings: () => { deferSettings = true; }, settingsHeld: () => !!settingsRelease, releaseSettings: () => { deferSettings = false; settingsRelease?.(); },
         holdGenerate: () => { deferGenerate = true; }, generateHeld: () => !!generateRelease, releaseGenerate: () => generateRelease?.(),
     };
 }
@@ -149,4 +154,32 @@ test('the new recovery cannot activate Treatment Reasoning remote or an inactive
     const h = harness('treatment_reasoning'); t.after(() => h.client.reset(false)); await h.select(); await h.complete();
     const before = h.calls.length; await h.client.reprepareRemote(); assert.equal(h.calls.length, before);
     h.client.reset(false); await h.client.reprepareRemote(); assert.equal(h.calls.length, before);
+});
+
+for (const operation of ['status', 'settings'] as const) test(`cancel during ${operation} recovery clears loading, retires authority and allows explicit recovery`, async t => {
+    const h = harness('patient_insight'); t.after(() => h.client.reset(false)); await h.select(); const first = await h.complete();
+    if (operation === 'status') h.holdStatus(); else h.holdSettings();
+    const recovery = h.client.reprepareRemote(); await until(operation === 'status' ? h.statusHeld : h.settingsHeld);
+    assert.equal(h.client.getSnapshot().loading, true);
+    h.client.cancel();
+    assert.equal(h.client.getSnapshot().loading, false);
+    assert.equal(h.client.getSnapshot().blocked, true); assert.equal(h.client.getSnapshot().choice, null);
+    assert.equal(h.client.isCurrent(first.token), false);
+    await assert.rejects(h.client.begin());
+    const cancelled = h.client.getSnapshot();
+    const remoteCancelled = h.client.remote.getSnapshot();
+    assert.equal(remoteCancelled.settings, null); assert.equal(remoteCancelled.state, null);
+    assert.equal(remoteCancelled.catalog, null); assert.equal(remoteCancelled.disclosure, null); assert.equal(remoteCancelled.challenge, null);
+    if (operation === 'status') h.releaseStatus(); else h.releaseSettings();
+    await recovery;
+    assert.deepEqual(h.client.getSnapshot(), cancelled); assert.deepEqual(h.client.remote.getSnapshot(), remoteCancelled);
+    assert.equal(h.calls.filter(call => call.operation === 'preview').length, 1);
+    assert.equal(h.calls.filter(call => call.operation === 'generate').length, 1);
+    await h.client.reprepareRemote();
+    assert.equal(h.client.getSnapshot().loading, false); assert.equal(h.client.getSnapshot().blocked, false);
+    assert.equal(h.client.getSnapshot().consumed, false); assert.equal(h.client.getSnapshot().preparationRevision, 2);
+    assert.equal(h.client.remote.getSnapshot().settings?.enabled, true);
+    assert.equal(h.client.remote.getSnapshot().state, null);
+    const second = await h.start(); await h.ready(); await h.client.remote.action('generate');
+    assert.deepEqual(await (await second.final).json(), { syntheticResult: 2 });
 });
