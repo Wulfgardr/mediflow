@@ -17,3 +17,26 @@
 
 .entry :global(.prose) { font: var(--type-prose); }
 .entry > div { padding: 16px 0; border-radius: 0; }
+
+.patientDiary { container-type: inline-size; min-width: 0; }
+.patientEntry { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 24px; min-width: 0; }
+.patientEntry > div { min-width: 0; padding: 0; border: 0; background: transparent; }
+.margin { display: flex; flex-direction: column; gap: 4px; padding-top: 2px; color: var(--lume-ink-muted); font: var(--type-meta); font-variant-numeric: tabular-nums; }
+.patientEntry .header { gap: 12px; margin-bottom: 12px; }
+.patientEntry .header > div { min-width: 0; }
+.patientEntry .identity > span { font-size: 0.875rem; }
+.patientEntry .identity > div { color: var(--lume-ink-muted); }
+.patientEntry .header :global([role='menuitem']) { width: 100%; height: auto; min-height: 44px; }
+.patientEntry .header :global(.mf-button-text) { width: auto; height: auto; min-height: 44px; }
+.entryTitle { margin: 0 0 8px; color: var(--lume-ink); font: var(--type-strong); overflow-wrap: anywhere; }
+.patientEntry :global(.prose) { overflow-wrap: anywhere; }
+.metadataNotice { margin-top: 8px; color: var(--lume-ink-muted); font: var(--type-meta); }
+.registration { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 16px; color: var(--lume-ink-muted); font: var(--type-meta); }
+.patientEntry :global(.mf-option-card) { min-height: 44px; padding: 8px 0 !important; border: 0; border-radius: 0 !important; background: transparent; box-shadow: none; }
+.patientEntry :global(.truncate) { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+.patientSection > h3 > div > span { font: var(--type-section); text-transform: uppercase; letter-spacing: .05em; }
+.patientSection > h3 > div > :global(.apple-chip) { font: var(--type-meta); text-transform: none; letter-spacing: 0; }
+@container (max-width: 600px) {
+    .patientEntry { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .margin { flex-direction: row; flex-wrap: wrap; gap: 8px; }
+}
