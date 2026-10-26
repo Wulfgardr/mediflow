@@ -7,7 +7,6 @@ import { AlertTriangle, Trash2, Loader2 } from 'lucide-react';
 import { ApiConflictError, db, DocumentInsight, Patient } from '@/lib/db';
 import ReactMarkdown from 'react-markdown';
 import PrivacyBlur from '@/components/privacy-blur';
-import { useAiModelLabels } from '@/lib/hooks/use-ai-model-labels';
 import { qualityLabel, documentClassLabel } from '@/lib/ai-labels';
 import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
 import { notifyDbChange } from '@/lib/live-query';
@@ -24,8 +23,6 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [busyAction, setBusyAction] = useState<string | 'all' | null>(null);
     const insights = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights);
-    // an empty archive has no model footer and needs no model reads.
-    const modelLabels = useAiModelLabels(Boolean(patient.id) && insights.length > 0);
     const { showToast } = useToast();
     const confirm = useConfirm();
 
@@ -116,7 +113,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
         /* archived summaries share the document plane; only the active row expands. */
         <section className={disclosure.archive} aria-label="Sintesi archiviate" data-testid="document-insights-archive">
             <div className={disclosure.archiveToolbar}>
-                <p className={disclosure.hint}>Rivedi le sintesi insieme al testo sorgente.</p>
+                <p className={disclosure.hint}>Sintesi salvate in precedenza. Il testo sorgente archiviato può differire dall’originale disponibile oggi.</p>
                 {busyAction && <span className={disclosure.hint} role="status">Aggiornamento…</span>}
                 <button
                     type="button"
@@ -204,7 +201,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
 
             <div className={disclosure.archiveFooter}>
                 <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <p>Verifica le sintesi prima di usarle. {modelLabels ? `Modello configurato ora: ${modelLabels.clinical}. ` : ''}Il modello usato per ciascuna sintesi non è registrato nell’archivio.</p>
+                <p>Verifica le sintesi prima di usarle. Il modello usato per ciascuna sintesi non è registrato nell’archivio.</p>
             </div>
         </section>
     );

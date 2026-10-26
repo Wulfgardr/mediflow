@@ -9,6 +9,7 @@ import { Eye, Loader2, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 import DocumentSynthesisFabricReviewCard from '@/components/document-synthesis-fabric-review-card';
+import { ChoiceField } from '@/components/choice-field';
 import disclosure from '@/components/patient-disclosure.module.css';
 import DocumentViewer from '@/components/document-viewer';
 import PrivacyBlur from '@/components/privacy-blur';
@@ -168,6 +169,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     const currentAttachments = listError ? undefined : attachments;
     const selectedAttachment = currentAttachments?.find((file) => file.id === selectedId);
     const viewingFile = currentAttachments?.find((file) => file.id === viewingId);
+    const selectSource = (id: string) => { setSelectedId(id); setViewingId(id || null); };
 
     const onDrop = useCallback(async (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
         const task = uploadQueue.start(acceptedFiles);
@@ -316,7 +318,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                     <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={refreshAttachments} disabled={listLoading}>Riprova elenco</button>
                 </div> : null}
                 {!listError && attachments === undefined ? <p role="status">Caricamento documenti…</p> : null}
-                <table className={styles.table}><thead><tr><th>Documento</th><th>Azioni</th></tr></thead>
+                <table className={`${styles.table} ${styles.documentTable}`}><thead><tr><th>Documento</th><th>Azioni</th></tr></thead>
                 {currentAttachments?.map(file => <tbody key={file.id} data-document-id={file.id}>
                     <tr className={viewingId === file.id ? styles.selected : undefined}><td>
                                 <h4 className={styles.documentName}><PrivacyBlur>{file.name}</PrivacyBlur></h4>
@@ -329,7 +331,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
 
                     </td><td>
                             <div className={styles.documentActions}>
-                                <button type="button" onClick={() => setViewingId(file.id)} disabled={listLoading || deletingId === file.id}
+                                <button type="button" onClick={() => selectSource(file.id)} disabled={listLoading || deletingId === file.id}
                                     className={disclosure.documentAction} data-lume-action="quiet" title="Visualizza" aria-label={`Visualizza ${file.name}`}>
                                     <Eye className="h-4 w-4" aria-hidden="true" />Apri
                                 </button>
@@ -338,7 +340,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                                     <RefreshCw className={cn('h-4 w-4', extractingId === file.id && 'animate-spin')} aria-hidden="true" />Estrai testo
                                 </button>
                                 <button type="button" className={disclosure.documentAction} data-lume-action="quiet" disabled={deletingId === file.id}
-                                    aria-label={`Prepara sintesi di ${file.name}`} onClick={() => { setSelectedId(file.id); setViewingId(file.id); summaryHeading.current?.focus(); }}>Sintesi</button>
+                                    aria-label={`Prepara sintesi di ${file.name}`} onClick={() => { selectSource(file.id); summaryHeading.current?.focus(); }}>Sintesi</button>
                                 <button type="button" onClick={() => handleDelete(file)} disabled={deletingId !== null}
                                     className={`${disclosure.documentAction} ${disclosure.removeAction}`} data-lume-action="quiet" aria-label={`Elimina ${file.name}`}>
                                     <Trash2 className="h-4 w-4" aria-hidden="true" />{deletingId === file.id ? 'Eliminazione…' : 'Elimina'}
@@ -371,20 +373,23 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                 </table>
             </section>
 
-            {Boolean(currentAttachments?.length) || children ? (
+            {Boolean(currentAttachments?.length) || Boolean(selectedId && currentAttachments) ? (
                 <section aria-labelledby={summaryTitleId} data-document-area="summary" className={disclosure.summaries}>
-                    <h3 id={summaryTitleId} ref={summaryHeading} tabIndex={-1}>Sintesi documentale</h3>
+                    <h3 id={summaryTitleId} ref={summaryHeading} tabIndex={-1}>Nuova sintesi</h3>
                     <p className={disclosure.hint}>Scegli una fonte e genera una proposta solo dopo la conferma. Nessun aggiornamento automatico della cartella.</p>
-                    {Boolean(currentAttachments?.length) && <>
-                        <label className="mt-3 grid min-w-0 gap-2">
-                            Documento da sintetizzare
-                            <select className="min-h-11 min-w-0 max-w-full rounded-xl border bg-[color:var(--lume-surface-field)] px-3 py-2"
-                                value={selectedAttachment?.id ?? ''} onChange={(event) => { setSelectedId(event.target.value); setViewingId(event.target.value || null); }}>
+                    <div className={styles.sourceChoice}>
+                        <ChoiceField label="Documento da sintetizzare" value={selectedAttachment?.id ?? ''}
+                            onChange={(event) => selectSource(event.target.value)}
+                            description="Cambiare documento chiude la proposta corrente, senza cancellare l’allegato o le sintesi archiviate.">
                                 <option value="">Scegli un documento</option>
                                 {currentAttachments?.map((file, index) => <option key={file.id} value={file.id}>{isPrivacyMode ? `Documento ${index + 1}` : file.name}</option>)}
-                            </select>
-                        </label>
-                        <p className={disclosure.hint}>Cambiare documento chiude la proposta corrente, senza cancellare l’allegato o le sintesi archiviate.</p>
+                        </ChoiceField>
+                        {!selectedAttachment && <p role="status" className={disclosure.hint}>{listLoading ? 'Rilettura della fonte selezionata…' : selectedId
+                            ? 'La fonte selezionata non è più disponibile nell’elenco. Rileggi l’elenco o scegli un altro documento.'
+                            : 'Scegli un documento per preparare una nuova sintesi.'}</p>}
+                        {selectedId && !selectedAttachment && <button type="button" className={disclosure.documentAction}
+                            data-lume-action="quiet" onClick={refreshAttachments} disabled={listLoading}>Rileggi elenco</button>}
+                    </div>
                         {settingLoading ? <p role="status">Verifica impostazione di sintesi…</p> : settingError ? <div role="alert">
                             <p>Impostazione di sintesi non disponibile. Nessuna generazione consentita.</p>
                             <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={refreshSetting}>Riprova impostazione</button>
@@ -398,10 +403,11 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                             attachmentName={selectedAttachment.name}
                             enabled={documentSynthesisEnabled && deletingId !== selectedAttachment.id}
                         />}
-                    </>}
-                    {children}
                 </section>
             ) : null}
+            {children ? <section data-document-area="archive" aria-label="Archivio delle sintesi" className={styles.documentArchive}>
+                {children}
+            </section> : null}
             </div>
             <aside className={styles.documentOriginal} aria-label="Originale del documento">
                 <h3>Originale</h3>

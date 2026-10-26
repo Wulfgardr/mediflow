@@ -1,6 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import type { FunctionModelPreferences } from '../lib/function-models/browser';
-import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 
 const HEX = Object.freeze({
   session: '1'.repeat(32),
@@ -109,7 +112,7 @@ function availablePreview() {
   };
 }
 
-test('[E2E fixture] Smart Import exposes only the Fabric review preview and never calls legacy apply', async ({ page }) => {
+async function installSmartImportFixture(page: Page, options: { beforePreview?: () => Promise<void>; fail?: () => boolean } = {}) {
   const calls = { context: 0, selectionGet: 0, selectionPost: 0, ingest: 0, preview: 0, legacyApply: 0 };
   let catalogReads = 0;
   await page.route('**/api/settings/ai/functions', async route => {
@@ -149,27 +152,39 @@ test('[E2E fixture] Smart Import exposes only the Fabric review preview and neve
   await page.route('**/api/ai/smart-import/preview', async (route) => {
     calls.preview += 1;
     expect(route.request().method()).toBe('POST');
-    expect(JSON.parse(route.request().headers()['x-mediflow-function-model'] ?? 'null')).toEqual({
+    const modelHeader = route.request().headers()['x-mediflow-function-model'];
+    if (calls.preview === 1) expect(JSON.parse(modelHeader ?? 'null')).toEqual({
       modelOptionId: FIXTURE_MODEL.modelOptionId,
       expectedCatalogRevision: FIXTURE_CATALOG.catalogRevision,
     });
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(availablePreview()) });
+    await options.beforePreview?.();
+    await route.fulfill(options.fail?.() ? { status: 503, json: { error: 'synthetic-unavailable' } } : { status: 200, json: availablePreview() });
   });
   await page.route('**/api/patients/*/smart-import', async (route) => {
     calls.legacyApply += 1;
     await route.abort();
   });
 
+  return { calls, catalogReads: () => catalogReads };
+}
+
+test('[E2E fixture] Smart Import exposes only the Fabric review preview and never calls legacy apply', async ({ page }) => {
+  const { calls, catalogReads } = await installSmartImportFixture(page);
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await page.route('**/api/ambulatories', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 'ambulatory.synthetic', name: 'Ambulatorio di prova', address: '', version: 1 }]) }));
   await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'enabled');
   const patientId = await createPatient(page);
   await page.goto(`/patients/${patientId}/modules#quadro`);
-
   await openPatientSection(page, 'quadro');
-  await page.getByText('Proposte dalle fonti cliniche · Smart Import', { exact: true }).click();
+  await expect(page.locator('#quadro')).toBeVisible();
+  await expect(page.locator('#quadro [data-testid="fabric-preview-card"]')).toHaveCount(0);
+  await expect(page.getByTestId('patient-proposals-summary')).toContainText('Nessuna proposta da rivedere');
+  await openPatientSection(page, 'documenti');
+  await page.locator('#smart-import').getByRole('button', { name: 'Proposte', exact: true }).click();
 
   const card = page.getByTestId('fabric-preview-card');
+  await expect(page.getByTestId('patient-proposals-summary')).toHaveCount(1);
+  expect(calls.preview).toBe(0);
   await expect(card).toContainText('Raccogli dalle fonti della cartella');
   await card.getByRole('button', { name: 'Prepara proposta' }).click();
   await expect(card.getByRole('checkbox')).toBeDisabled();
@@ -194,6 +209,187 @@ test('[E2E fixture] Smart Import exposes only the Fabric review preview and neve
   await card.getByText('Dettagli di verifica', { exact: true }).click();
   await expect(card.getByTestId('smart-import-fabric-disclosure'))
     .toContainText(`${FIXTURE_MODEL.provider} · ${FIXTURE_MODEL.model} · local_process`);
-  expect(catalogReads).toBeGreaterThanOrEqual(2); // Selection read plus pre-generation reread.
+  expect(catalogReads()).toBeGreaterThanOrEqual(2); // Selection read plus pre-generation reread.
   expect(calls).toEqual({ context: 0, selectionGet: 1, selectionPost: 1, ingest: 1, preview: 1, legacyApply: 0 });
+});
+
+for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', '320', 'zoom-200', 'zoom-400']) {
+  test(`Smart Import composizione ${theme} ${size}`, async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+    const baseline = process.env.SMART_IMPORT_BASELINE === '1';
+    const zoom = size.startsWith('zoom-') ? await openBrowserZoomFixture(baseURL!) : undefined;
+    const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
+    let fail = false;
+    try {
+      if (zoom) page = zoom.page;
+      const runtimeErrors: string[] = [];
+      page.on('pageerror', error => runtimeErrors.push(error.message));
+      const { calls } = await installSmartImportFixture(page, { beforePreview: async () => { entered.resolve(); await release.promise; }, fail: () => fail });
+      await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+      await page.route('**/api/ambulatories', route => route.fulfill({ json: [{ id: 'ambulatory.synthetic', name: 'Ambulatorio di prova', address: '', version: 1 }] }));
+      await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'enabled');
+      const patientId = await createPatient(page);
+      await page.goto(`/patients/${patientId}/modules`);
+      await openPatientSection(page, baseline ? 'quadro' : 'documenti');
+      const disclosure = page.locator('#smart-import');
+      const toggle = disclosure.locator(':scope > div > [data-disclosure-control]');
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await toggle.focus(); await page.keyboard.press('Enter');
+      const card = page.getByTestId('fabric-preview-card');
+      await page.setViewportSize({ width: zoom ? 1440 : Number(size), height: 1000 });
+      await page.evaluate(theme => {
+        document.documentElement.classList.toggle('dark', theme === 'grafite');
+        document.documentElement.classList.toggle('light', theme === 'giorno');
+      }, theme);
+      if (zoom) await zoom.setZoom(size === 'zoom-200' ? 2 : 4);
+      const directory = process.env.SMART_IMPORT_CAPTURES;
+      if (directory) await mkdir(directory, { recursive: true });
+      const capture = async (state: string) => {
+        await card.scrollIntoViewIfNeeded();
+        if (!baseline) await assertNoHorizontalOverflow(page, [{ label: 'Smart Import', selector: '#smart-import' }, { label: 'pagina', selector: 'document' }]);
+        if (directory) await page.screenshot({ path: `${directory}/${theme}-${size}-${state}.png`, animations: 'disabled' });
+      };
+      await capture('pronta');
+      await card.getByRole('button', { name: 'Cambia', exact: true }).click();
+      await card.getByRole('combobox', { name: 'Modello per questa proposta', exact: true }).selectOption(FIXTURE_MODEL.modelOptionId);
+      const prepare = card.getByRole('button', { name: 'Prepara proposta', exact: true });
+      await prepare.focus(); await page.keyboard.press('Enter');
+      const generate = card.getByRole('button', { name: 'Conferma e genera proposta', exact: true });
+      await expect(generate).toBeDisabled();
+      await expect(card.getByRole('checkbox')).toBeDisabled();
+      await card.getByRole('button', { name: 'Annulla', exact: true }).click();
+      await expect(prepare).toBeVisible();
+      expect(calls.ingest).toBe(0); expect(calls.preview).toBe(0);
+      await prepare.click();
+      const ambulatory = card.getByRole('combobox', { name: 'Ambulatorio per questa proposta' });
+      await ambulatory.focus(); await expect(ambulatory).toBeFocused(); await ambulatory.selectOption('ambulatory.synthetic');
+      await expect(ambulatory).toHaveValue('ambulatory.synthetic');
+      await expect(generate).toBeDisabled();
+      const consent = card.getByRole('checkbox');
+      await consent.focus(); await page.keyboard.press('Space'); await expect(consent).toBeChecked();
+      await capture('conferma');
+      await generate.click(); await entered.promise;
+      await capture('in-corso'); release.resolve();
+      await expect(card).toContainText('Proposta sintetica da rivedere.');
+      await capture('proposta');
+      if (!baseline) {
+        await expect(card.getByTestId('smart-import-review-proposal').locator('[data-ink="pencil"]')).toBeVisible();
+        await expect(card).toContainText('Fonti raccolte per la proposta');
+        const source = card.getByRole('link', { name: 'Note paziente', exact: true });
+        await source.scrollIntoViewIfNeeded(); await source.focus(); await assertNotClippedInViewport(source, 'Fonte Note paziente');
+        if (directory) await page.screenshot({ path: `${directory}/${theme}-${size}-fonti.png`, animations: 'disabled' });
+        await page.keyboard.press('Enter');
+        await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules#quadro$`));
+        await expect(page.locator('#quadro')).toBeVisible();
+        await expect(card).not.toBeVisible();
+        const summary = page.getByTestId('patient-proposals-summary');
+        await expect(summary).toContainText('1 proposta da rivedere');
+        await summary.getByRole('link', { name: 'Smart Import', exact: true }).click(); await expect(card).toBeVisible();
+        expect(calls.preview).toBe(1);
+      }
+      fail = true;
+      await card.getByRole('button', { name: 'Ricomincia', exact: true }).click();
+      await card.getByRole('button', { name: 'Prepara proposta', exact: true }).click();
+      await ambulatory.selectOption('ambulatory.synthetic'); await consent.check();
+      await generate.click();
+      await expect(card).toContainText('Anteprima non disponibile.'); await capture('errore');
+      expect(calls.legacyApply).toBe(0);
+      if (!baseline) {
+        await openPatientSection(page, 'quadro');
+        await expect(page.getByTestId('patient-proposals-summary')).toContainText('Nessuna proposta da rivedere');
+      }
+      expect(runtimeErrors).toEqual([]);
+      await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'disabled');
+      await page.reload(); await openPatientSection(page, baseline ? 'quadro' : 'documenti'); await toggle.click();
+      await expect(prepare).toBeDisabled(); await capture('spenta');
+      await test.info().attach('surface', { body: JSON.stringify({ theme, size, baseline,
+        revision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+        zoom: zoom ? { mechanism: 'chrome.tabs.setZoom/getZoom', factor: size === 'zoom-200' ? 2 : 4, physicalWidth: 1440, innerWidth: await page.evaluate(() => innerWidth) } : null }), contentType: 'application/json' });
+    } finally { release.resolve(); await zoom?.close(); }
+  });
+}
+
+test('Proposte combinate: un solo conteggio effettivo e due destinazioni senza rigenerare', async ({ baseURL }) => {
+  test.setTimeout(120_000);
+  const zoom = await openBrowserZoomFixture(baseURL!);
+  const page = zoom.page;
+  let insightCalls = 0;
+  try {
+    const { calls } = await installSmartImportFixture(page);
+    const catalog = { ...FIXTURE_CATALOG, functions: FIXTURE_CATALOG.functions.map(row => ({ ...row,
+      enabled: row.id === 'patient_insight' || row.id === 'smart_import' })) };
+    await page.route('**/api/settings/ai/functions', route => route.fulfill({ json: catalog }));
+    await page.route('**/api/ai/patient-insight/preview', route => {
+      insightCalls += 1;
+      const request = route.request().postDataJSON() as { capturedAt: string; patientRevision: number };
+      return route.fulfill({ json: { preview: {
+        writesPerformed: 0, apply: 'denied', status: 'available', code: null,
+        proposal: { schemaVersion: 'mediflow.patient-insight.review-proposal.v2', reviewOnly: true,
+          summary: 'Proposta Insight sintetica combinata. [S1]', currentState: [], alerts: [], nextSteps: [], gaps: [],
+          generatedAt: request.capturedAt, currentness: { selectionEpoch: 7, patientRevision: request.patientRevision,
+            projectionDigest: `sha256_${'a'.repeat(64)}`, capturedAt: request.capturedAt, verifiedAt: request.capturedAt } },
+        receipt: { schemaVersion: 'mediflow.ai.fabric-resolution.v1', capability: 'patient_insight', venue: 'local_process',
+          provider: 'ollama', model: FIXTURE_MODEL.model, egress: 'none' },
+        provenance: { schemaVersion: 'mediflow.ai.fabric-provenance.v1', capability: 'patient_insight', venue: 'local_process',
+          provider: 'ollama', model: FIXTURE_MODEL.model, preprocessing: ['context_minimization', 'envelope_validation'] },
+        reviewRef: `review_${HEX.review}`,
+      } } });
+    });
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    await page.route('**/api/ambulatories', route => route.fulfill({ json: [{ id: 'ambulatory.synthetic', name: 'Ambulatorio di prova', address: '', version: 1 }] }));
+    await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
+    await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'enabled');
+    const patientId = await createPatient(page);
+    await page.goto(`/patients/${patientId}/modules`); await openPatientSection(page, 'quadro');
+    const summary = page.getByTestId('patient-proposals-summary');
+    await expect(summary).toHaveCount(1); await expect(summary).toContainText('Nessuna proposta da rivedere');
+    await expect(summary.getByRole('link')).toHaveCount(2);
+    await summary.getByRole('link', { name: 'Patient Insight', exact: true }).click();
+    const insight = page.locator('#patient-insight');
+    const insightToggle = insight.locator(':scope > div > [data-disclosure-control]');
+    await expect(insightToggle).toHaveAttribute('aria-expanded', 'true');
+    await insight.getByRole('button', { name: 'Cambia', exact: true }).click();
+    await insight.getByRole('combobox', { name: 'Modello per questa proposta' }).selectOption(FIXTURE_MODEL.modelOptionId);
+    await insight.getByRole('button', { name: 'Avvia supporto', exact: true }).click();
+    const insightProposal = insight.getByTestId('patient-insight-review-proposal');
+    await expect(insightProposal).toBeVisible();
+    await openPatientSection(page, 'quadro'); await expect(summary).toContainText('1 proposta da rivedere');
+    await expect(insightProposal).not.toBeVisible();
+    await summary.getByRole('link', { name: 'Smart Import', exact: true }).click();
+    const smart = page.locator('#smart-import');
+    const smartToggle = smart.locator(':scope > div > [data-disclosure-control]');
+    await expect(smartToggle).toHaveAttribute('aria-expanded', 'true');
+    await smart.getByRole('button', { name: 'Cambia', exact: true }).click();
+    await smart.getByRole('combobox', { name: 'Modello per questa proposta' }).selectOption(FIXTURE_MODEL.modelOptionId);
+    await smart.getByRole('button', { name: 'Prepara proposta', exact: true }).click();
+    await smart.getByRole('combobox', { name: 'Ambulatorio per questa proposta' }).selectOption('ambulatory.synthetic');
+    await smart.getByRole('checkbox').check(); await smart.getByRole('button', { name: 'Conferma e genera proposta', exact: true }).click();
+    const smartProposal = smart.getByTestId('smart-import-review-proposal');
+    await expect(smartProposal).toBeVisible();
+    await openPatientSection(page, 'quadro'); await expect(summary).toContainText('2 proposte da rivedere');
+    await expect(summary).toHaveCount(1); await expect(insightProposal).not.toBeVisible(); await expect(smartProposal).not.toBeVisible();
+    await expect(page.locator('#quadro [data-testid$="review-proposal"]')).toHaveCount(0);
+    const directory = process.env.SMART_IMPORT_CAPTURES;
+    for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', '320', 'zoom-200', 'zoom-400']) {
+      await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
+      if (size.startsWith('zoom-')) await zoom.setZoom(size === 'zoom-200' ? 2 : 4);
+      else await page.setViewportSize({ width: Number(size), height: 1000 });
+      await page.evaluate(theme => {
+        document.documentElement.classList.toggle('dark', theme === 'grafite');
+        document.documentElement.classList.toggle('light', theme === 'giorno');
+      }, theme);
+      await summary.scrollIntoViewIfNeeded();
+      await assertNoHorizontalOverflow(page, [{ label: 'pagina', selector: 'document' }, { label: 'Riepilogo proposte', selector: '[data-testid="patient-proposals-summary"]' }]);
+      for (const name of ['Patient Insight', 'Smart Import']) await assertNotClippedInViewport(summary.getByRole('link', { name, exact: true }), name);
+      if (directory) { await mkdir(directory, { recursive: true }); await page.screenshot({ path: `${directory}/${theme}-${size}-riepilogo-combinato.png`, animations: 'disabled' }); }
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
+    await summary.getByRole('link', { name: 'Patient Insight', exact: true }).click();
+    await expect(insightProposal).toBeVisible(); await insight.getByRole('button', { name: 'Riusa predefinito', exact: true }).click();
+    await openPatientSection(page, 'quadro'); await expect(summary).toContainText('1 proposta da rivedere');
+    await summary.getByRole('link', { name: 'Smart Import', exact: true }).click();
+    await expect(smartProposal).toBeVisible(); await smart.getByRole('button', { name: 'Ricomincia', exact: true }).click();
+    await openPatientSection(page, 'quadro'); await expect(summary).toContainText('Nessuna proposta da rivedere');
+    expect(insightCalls).toBe(1); expect(calls.preview).toBe(1); expect(calls.legacyApply).toBe(0);
+  } finally { await zoom.close(); }
 });

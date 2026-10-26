@@ -623,3 +623,54 @@ o l'ammissione all'uso clinico. I test con risposte simulate restano distinti
 dalle prove sul servizio reale. I limiti per piattaforma e la distinzione dal
 plugin con esempi inventati sono nelle
 [limitazioni note](../known-limitations.md#chatgpt-e-plugin-stato-delle-prove).
+
+## Riqualifica sintetica macOS `26B118` — WUL-778 / I-4
+
+Data: 26 ottobre 2026. Il pin OS passa da `26B5112a` a `26B118`
+(macOS 27.2) dopo una nuova prova sul sistema effettivo. Il binario ufficiale
+Codex resta `0.153.4`, SHA-256
+`b973d440acac501fd2594a43e7ca9ce41e0a65b9dfb28d0d7a7837c99e1261e3`.
+Gli asset installati sono stati verificati con i pin esistenti; nessun
+download, sostituto dal runtime di sviluppo o aggiornamento delle dipendenze.
+Restano invariati sorgente del custode, profilo Seatbelt, digest
+`dyld-support.sb`, CA pubbliche, protocollo, limiti e politica di rete.
+
+La sequenza distingue verifica e ammissione. Il C2 canonico con il pin
+precedente si ferma in `sources`, senza avviare il runtime. Prima di cambiare
+il pin, il probe OS usa lo stesso profilo e custode di produzione su risorse
+sintetiche possedute: verifica isolamento, assenza delle policy amministrative
+previste, file descriptor, divieto di fork e IPC, protezioni dei file e rete
+limitata al proxy loopback chiuso. Il custode conferma cessazione e pulizia;
+questo probe non emette autorità. Solo dopo questa osservazione viene cambiato
+il pin e ripetuto `execution-mac-c2.mjs`, con percorsi espliciti del binario,
+del sorgente nativo, della directory schema e della ricevuta C1.
+
+Il C2 sul candidato osserva `24_digests_matched`, initialize, readback con
+layer e custodia corrente. Il run `66a8d5af87e3f6a6e6d007b0301ff0be` si chiude
+con `cleanupComplete: true`, `ownedTreeCeased: true` e
+`resourcesRetained: false`. Le impronte della prova sono:
+
+- initialize: `e6bb4007db260b0da08adc33de718b4c65f2576aa02498d2bd15bda016fa6463`;
+- readback: `870d7e5c2b383994720707784f3e583687e67e04958b1cde9b82f6d9fda80202`;
+- custode compilato: `9d5181b8907394d4399a30dcecb5f2895d8418fec2389d1554fc17049a17ebc6`;
+- compilatore: `178ff35952fbf7651eaab02f8c07929f952b99f9eb54d0b8363080a98ce49029`.
+
+La prova usa Node `24.22.0`, Xcode `27.0` (`27A5194q`) e Apple clang
+`21.0.0` (`clang-2100.3.20.102`). Il launcher TypeScript canonico è identico
+al candidato e carica i moduli relativi dalla worktree verificata; le
+dipendenze già presenti sono usate in sola lettura. Non sono cambiate le
+impostazioni globali della toolchain.
+
+I test mirati di sorgenti, readback, custodia, preparazione/HOLD, proxy e
+installation ID passano: 627 riusciti, tre casi Linux esclusi su macOS.
+I test sintetici di asset e staging passano: 56 riusciti. Questi test non
+sostituiscono la prova OS reale e non concedono autorità.
+
+La ricevuta chiusa è storica: ogni preparazione successiva deve qualificare
+di nuovo il proprio processo. `fullSourceBuildBinding` resta `unqualified`;
+il legame dei tool omessi resta indiretto dal resolver e dagli input
+immutabili. Accesso, account, catalogo e generazioni non sono stati eseguiti
+in questa riqualifica; non si trasferiscono le prove del precedente OS.
+Produzione resta `HELD` nella prova C2, senza modifica alle condizioni di
+HOLD, consenso, annullamento, proposta o ammissione clinica. Il percorso I-4
+con account e generazioni rimane una verifica distinta.
