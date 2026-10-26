@@ -89,3 +89,34 @@ test('a full read denial is recorded as local preflight, never as a backend RPC 
         assert.deepEqual((error as { denial: unknown }).denial, { source: 'limits_snapshot', method: 'account/rateLimits/read', rpcCode: null, backendCode: null }); return true;
     });
 });
+
+for (const beforeRead of [false, true]) {
+    test(`startup replay preserves a reconstructible depletion denial (${beforeRead ? 'before read' : 'pending read'})`, async () => {
+        const monitor = createExecutionQuotaMonitor(); const pending = deferred();
+        const depletion = notice({ credits: { hasCredits: false, unlimited: false } });
+        const recovery = notice({ credits: { hasCredits: true, unlimited: false } });
+        if (beforeRead) { monitor.notice(depletion); monitor.notice(recovery); }
+        const reading = monitor.read(() => pending.promise);
+        if (!beforeRead) { monitor.notice(depletion); monitor.notice(recovery); }
+        assert.equal(monitor.snapshot(), null);
+        const rejected = assert.rejects(reading, code('quota_exhausted'));
+        pending.resolve(full()); await rejected;
+        assert.equal(monitor.snapshot(), null);
+        assert.throws(() => monitor.notice(recovery), code('quota_exhausted'));
+        await assert.rejects(monitor.read(async () => full()), code('quota_exhausted'));
+    });
+
+    test(`startup replay permits unavailable credits while included quota is usable (${beforeRead ? 'before read' : 'pending read'})`, async () => {
+        const monitor = createExecutionQuotaMonitor(); const pending = deferred();
+        const depletion = notice({ credits: { hasCredits: false, unlimited: false } });
+        const recovery = notice({ credits: { hasCredits: true, unlimited: false } });
+        if (beforeRead) { monitor.notice(depletion); monitor.notice(recovery); }
+        const reading = monitor.read(() => pending.promise);
+        if (!beforeRead) { monitor.notice(depletion); monitor.notice(recovery); }
+        assert.equal(monitor.snapshot(), null);
+        pending.resolve(full({ primary: { usedPercent: 20 }, rateLimitReachedType: null }));
+        assert.deepEqual(await reading, { primaryUsedPercent: 20, secondaryUsedPercent: null, includedUsage: 'available', creditAvailability: 'available' });
+        monitor.notice(depletion);
+        assert.deepEqual(monitor.snapshot(), { primaryUsedPercent: 20, secondaryUsedPercent: null, includedUsage: 'available', creditAvailability: 'unavailable' });
+    });
+}
