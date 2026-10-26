@@ -284,3 +284,16 @@ conservano esiti e revisione eseguita, senza copiare qui log o conteggi.
 I limiti di restore/custodia rimangono C15. Differenze nuove rilevate dal censimento
 sono esplicite nella mappa C01 e richiedono destinazione del responsabile, non una
 chiusura o riapertura dedotta dalle etichette storiche delle coorti.
+
+## C-5a / G-6: solo comando stato terapia
+
+La Web compone `therapy.status.change.v1` mediante il medico admin Web corrente,
+con ammissione fisica della projection e controlli host sotto IMMEDIATE.
+`therapy-status-command-service.ts` delega allo stesso nucleo Tx di
+`therapy-write-operation.ts`: CAS, update, audit e receipt committano insieme.
+Read non scrive; close ritira l'ID con target NULL, senza CAS corrente.
+Il tombstone non vale per PUT legacy. Nessuna autorità chat/MCP o AI.
+La policy endDate usa un istante host e differisce dal browser legacy;
+backup e restore conservano union esatta del ledger e audit (ADR0168).
+Prove: `therapy-status-command*.test.ts`, regressioni required-audit, backup
+roundtrip/recovery e `verify:therapy-status` con confini legacy/nuovo separati.

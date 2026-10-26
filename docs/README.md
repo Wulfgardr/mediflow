@@ -62,6 +62,9 @@ e residui clinici consegnati da C04 a C05. Il [roster delle scritture cliniche](
 collega ciascun ingresso a validazione, transazione, audit e prove C05. Il
 [CSV canonico](./clinical-write-surfaces.csv) tiene mutazioni e caller; la
 [mappa autorità C01](./authority-census.md) tiene owner, differenze e disposizioni.
+Il [comando durevole di stato terapia](./therapy-status-command.md) distingue
+execute/read/close del nuovo percorso Web, marker legacy e conservazione delle
+receipt storiche dopo restore (ADR0168); non concede scrittura dalla chat.
 La [matrice dei dati a riposo](./data-at-rest-matrix.md) dice colonna per colonna e
 file per file che cosa si legge senza la chiave, e quali esposizioni restano da decidere in C06.
 

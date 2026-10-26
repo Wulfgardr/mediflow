@@ -1,3 +1,4 @@
+import { ensureTherapyStatusCommandSchema } from './therapy-status-command-schema';
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { normalizeAifaSearchText } from '@/lib/aifa-catalog';
@@ -935,6 +936,7 @@ export function initializeSqliteSchema(sqlite: Database.Database): void {
     sqlite.transaction(() => {
         bootstrapEmptySqliteDatabase(sqlite);
         applySchemaGuards(sqlite);
+        ensureTherapyStatusCommandSchema(sqlite);
         upgradeLegacyAttachmentCurrentness(sqlite);
         sqlite.exec(`CREATE TABLE IF NOT EXISTS archive_generation (
             id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),

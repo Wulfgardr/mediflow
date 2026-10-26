@@ -248,3 +248,11 @@ PR e nella CI collegata, senza duplicare i log in questo elenco.
 Quando cambia un writer, aggiornare la sua riga insieme all'implementazione.
 C05 deve aggiungere al proprio roster anche le operazioni senza eventi e
 collegare le prove per famiglia; C04 non ne dichiara la migrazione conclusa.
+
+## Comando stato terapia durevole (C-5a/G-6)
+
+`lib/therapy-status-command-service.ts` compone il nucleo Tx del writer terapia
+nel proprio IMMEDIATE: `therapy.updated` obbligatorio e snapshot esatto nella
+receipt applied. Nessun audit o update nuovo su replay. Rejected/closed sono
+terminali senza effetto clinico e senza audit clinico fittizio. Web admin corrente,
+nessun consumer chat. Tempo host e conservazione storica secondo ADR0168.

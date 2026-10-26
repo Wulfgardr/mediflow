@@ -480,3 +480,23 @@ test('a missing source audit table stays omitted, while a present empty table is
         db.close();
     } finally { fs.rmSync(work, { recursive: true, force: true }); }
 });
+
+test('scheduled v5 missing therapy command ledger denies instead of exporting an empty history', () => {
+    const work = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-scheduled-ledger-missing-'));
+    try {
+        const file = path.join(work, 'medical.db'), db = new Database(file);
+        db.exec('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT); PRAGMA user_version=5;'); db.close();
+        assert.throws(() => runNode(work, ['scripts/run-scheduled-backup.mjs'], {
+            MEDIFLOW_BACKUP_FORCE: '1', MEDIFLOW_BACKUP_DEST_DIR: path.join(work, 'backups'),
+        }), (error: unknown) => {
+            const result = error as { status?: number; stdout?: string };
+            assert.equal(result.status, 1); assert.match(result.stdout ?? '', /Therapy command ledger unavailable/); return true;
+        });
+        const check = new Database(file, { readonly: true });
+        assert.equal(check.pragma('user_version', { simple: true }), 5);
+        assert.equal(check.prepare("SELECT 1 FROM sqlite_schema WHERE name='therapy_status_commands'").get(), undefined);
+        check.close();
+        const artifacts = fs.existsSync(path.join(work, 'backups')) ? fs.readdirSync(path.join(work, 'backups')).filter(name => name.endsWith('.mediflow')) : [];
+        assert.deepEqual(artifacts, []);
+    } finally { fs.rmSync(work, { recursive: true, force: true }); }
+});

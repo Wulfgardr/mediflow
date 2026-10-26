@@ -155,7 +155,7 @@ for (const status of ['active', 'suspended', 'completed'] as const) for (const c
             }
             if (status !== 'active') {
                 const writes: string[] = [];
-                page.on('request', request => { if (request.method() === 'PUT' && request.url().includes('/api/therapies/')) writes.push(request.url()); });
+                page.on('request', request => { if ((request.method() === 'PUT' && request.url().includes('/api/therapies/')) || (request.method() === 'POST' && /therapy-status-commands\/[^/]+\/execute$/.test(new URL(request.url()).pathname))) writes.push(request.url()); });
                 await first.getByRole('button', { name: 'Riattiva', exact: true }).click();
                 const threshold = section(page).getByRole('region', { name: 'Cambio di stato della terapia' });
                 await expect(threshold).toContainText('Riattivare');

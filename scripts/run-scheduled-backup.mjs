@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { validateTherapyStatusCommandRows } from '../lib/therapy-status-command-backup.ts';
 /* @Codex */
 import { assertExemptionImportReceiptRows } from '../lib/exemption-import-receipt.ts';
 /* @Codex */
@@ -58,6 +59,7 @@ const BACKUP_TABLES = {
   sissHandoffs: 'siss_handoff_events',
   checkups: 'checkups',
   therapies: 'therapies',
+  therapyStatusCommands: 'therapy_status_commands',
   auditEvents: 'audit_events',
 };
 
@@ -170,6 +172,7 @@ export async function serializeBackupArtifact(payload, createdAt = new Date()) {
     canonicalPayload.auditEvents = canonicalizeBackupAuditRows(payload.auditEvents);
     assertBackupAuditSnapshots(canonicalPayload.auditEvents, (payload.headlessSoapEntryCommits ?? []).map(row => row.auditSnapshot));
   }
+  canonicalPayload.therapyStatusCommands = validateTherapyStatusCommandRows(payload.therapyStatusCommands ?? [], canonicalPayload.auditEvents ?? []);
   const collections = Object.keys(BACKUP_TABLES).filter(collection => collection !== 'auditEvents' || Object.hasOwn(payload, 'auditEvents'));
   const payloadSnapshot = normalizeJson(canonicalPayload);
   const checksum = await sha256Hex(stableStringify(payloadSnapshot));
@@ -439,12 +442,14 @@ function buildAssignedAmbulatoryMemberships(patient, rows) {
 
 function buildDataset(db, backupCollections) {
   return db.transaction(() => {
+    const schemaVersion = db.pragma('user_version', { simple: true });
+    if (!hasTable(db, 'therapy_status_commands') && (!Number.isSafeInteger(schemaVersion) || schemaVersion < 0 || schemaVersion > 4)) throw new Error('Therapy command ledger unavailable');
     const dataset = Object.fromEntries(
       backupCollections.filter(collection => collection !== 'auditEvents' || hasTable(db, 'audit_events')).map((collection) => [
         collection,
         hasTable(db, BACKUP_TABLES[collection])
           ? db.prepare(`SELECT * FROM ${BACKUP_TABLES[collection]}`).all().map((row) =>
-            collection === 'prostheticsCatalogDocuments' ? serializeProstheticsDocument(normalizeRowKeys(row)) : collection === 'auditEvents' ? normalizeRowKeys(row) : normalizeRowDates(normalizeRowKeys(row)))
+            collection === 'prostheticsCatalogDocuments' ? serializeProstheticsDocument(normalizeRowKeys(row)) : (collection === 'auditEvents' || collection === 'therapyStatusCommands') ? normalizeRowKeys(row) : normalizeRowDates(normalizeRowKeys(row)))
           : [],
       ]),
     );
