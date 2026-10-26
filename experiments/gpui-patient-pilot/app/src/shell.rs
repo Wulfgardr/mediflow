@@ -4,6 +4,7 @@
 mod account_profile;
 mod ai_preferences;
 mod ai_status;
+mod ambulatories;
 mod analytics;
 mod document_details;
 mod local_preferences;
@@ -381,6 +382,7 @@ pub struct ClinicalApp {
     login_fields: Vec<Field>,
     login_actions: [ScrollTarget; 3],
     ambulatories: Load<Vec<Ambulatory>>,
+    ambulatory_management: ambulatories::Management,
     scope: Option<String>,
     patients: Load<Vec<PatientSummary>>,
     global_patients: Load<Vec<PatientSummary>>,
@@ -673,6 +675,7 @@ impl ClinicalApp {
             focus_first_field: false,
             login_fields,
             ambulatories: Load::Idle,
+            ambulatory_management: ambulatories::Management::default(),
             scope: None,
             patients: Load::Idle,
             global_patients: Load::Idle,
@@ -1057,6 +1060,7 @@ impl ClinicalApp {
         self.analytics.reset(cx);
         self.scales.reset(cx);
         self.account_profile.reset(self.theme, cx);
+        self.ambulatory_management.reset(self.theme, cx);
         self.focus_after_render = true;
         self.focus_search_after_render = false;
         self.patient_targets.clear();
@@ -1119,29 +1123,27 @@ impl ClinicalApp {
         let Some(session) = self.session.clone() else {
             return;
         };
+        if matches!(self.ambulatories, Load::Loading) {
+            return;
+        }
         self.ambulatories = Load::Loading;
         self.run(
             move || session.list_ambulatories(),
             |this, result, cx| match result {
                 Ok(rows) => {
-                    let selected = rows
-                        .iter()
-                        .find(|r| r.is_default)
-                        .or(rows.first())
-                        .map(|r| r.id.clone());
-                    this.ambulatories = Load::Ready(rows);
-                    if let Some(id) = selected {
-                        this.change_scope(&id, cx);
-                    }
+                    this.receive_ambulatories(rows, cx);
                 }
-                Err(error) => this.ambulatories = Load::Failed(ui_error(error)),
+                Err(error) => {
+                    this.ambulatory_management.rebase = false;
+                    this.ambulatories = Load::Failed(ui_error(error));
+                }
             },
             cx,
         );
     }
 
     fn change_scope(&mut self, id: &str, cx: &mut Context<Self>) {
-        if self.form.is_some() {
+        if self.form.is_some() || self.ambulatory_management.draft.is_some() {
             self.message = Some((
                 "Completa o scarta la bozza prima di cambiare ambulatorio.".into(),
                 false,
@@ -1149,6 +1151,15 @@ impl ClinicalApp {
             cx.notify();
             return;
         }
+        if !self
+            .ambulatories
+            .ready()
+            .is_some_and(|rows| rows.iter().any(|row| row.id == id))
+        {
+            return;
+        }
+        self.ambulatory_management.initial_scope = false;
+        self.next_epoch();
         self.focus_after_render = true;
         self.scope = Some(id.to_owned());
         self.global_patients = Load::Idle;
@@ -1314,6 +1325,9 @@ impl ClinicalApp {
     }
 
     fn navigate(&mut self, area: Area, cx: &mut Context<Self>) {
+        if self.ambulatory_management.is_saving() {
+            return;
+        }
         if self.ai_preferences_blocks_navigation(cx) {
             return;
         }
@@ -1693,6 +1707,7 @@ impl ClinicalApp {
     fn request_discard(&mut self, action: Discard, cx: &mut Context<Self>) {
         if action == Discard::Lock {
             let ai_pending = self.ai_preferences.is_saving();
+            let ambulatory_pending = self.ambulatory_management.is_saving();
             let pending = self
                 .form
                 .as_ref()
@@ -1700,6 +1715,8 @@ impl ClinicalApp {
             self.disconnect(cx);
             if pending {
                 self.message = Some(("Sessione bloccata. Una scrittura era in corso: verifica la scheda dopo l'accesso.".into(), false));
+            } else if ambulatory_pending {
+                self.message = Some(("Sessione bloccata. Un salvataggio delle sedi era in corso: rileggi l’elenco dopo l’accesso.".into(),false));
             } else if ai_pending {
                 self.message = Some(("Sessione bloccata. Un salvataggio AI era in corso: rileggi le preferenze dopo l’accesso.".into(), false));
             }
@@ -5382,6 +5399,9 @@ impl ClinicalApp {
     }
 
     fn settings_view(&self, cx: &Context<Self>) -> Div {
+        if self.ambulatory_management.active {
+            return self.ambulatory_management_view(cx);
+        }
         if self.ai_preferences.active {
             return self.ai_preferences_view(cx);
         }
@@ -5393,6 +5413,8 @@ impl ClinicalApp {
             .unwrap_or_default();
         div().w_full().min_w_0().max_w(px(760.)).flex().flex_col().gap(px(28.))
             .child(heading("clinical-workspace-settings-heading", "Impostazioni", theme))
+            .child(button("clinical-workspace-manage-ambulatories", "Gestisci ambulatori…", theme, false, true)
+                .on_click(cx.listener(|this, _, _, cx| { this.ambulatory_management.active = true; this.area_scroll.set_offset(gpui::point(px(0.), px(0.))); this.load_ambulatories(cx); })))
             .child(self.account_profile_view(cx))
             .child(div().flex().flex_col().gap(px(12.))
                 .child(section("clinical-workspace-appearance-heading", "ASPETTO", theme))
@@ -5946,6 +5968,7 @@ impl Render for ClinicalApp {
         if self.ai_preferences.active {
             self.ai_preferences.prepare_render(window, cx);
         }
+        self.prepare_ambulatory_management(theme, window, cx);
         self.account_profile
             .configure(theme, self.account_profile.read_only(), cx);
         self.prepare_read_state_focus(window, cx);

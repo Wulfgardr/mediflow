@@ -5,6 +5,7 @@
 
 mod account_profile;
 mod ai_preferences;
+mod ambulatories;
 mod analytics;
 mod catalogs;
 mod context;
@@ -21,6 +22,7 @@ mod who;
 
 pub use account_profile::*;
 pub use ai_preferences::*;
+pub use ambulatories::*;
 pub use analytics::*;
 pub use catalogs::*;
 pub use context::RequestContext;
