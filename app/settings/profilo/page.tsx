@@ -10,6 +10,7 @@ import { useSecurity } from '@/components/security-provider';
 import { AccountProfileEditor, type ProfileEditorState } from '@/lib/security/account-profile-editor';
 import { captureClientAccountAuthority, observeArchiveGeneration, subscribeClientAccountAuthority } from '@/lib/security/client-auth-api';
 import { WorkProfileSettings } from '@/components/work-profile-onboarding';
+import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 import {
     SETTINGS_INPUT_CLASS,
     SETTINGS_LABEL_CLASS,
@@ -40,6 +41,9 @@ export default function SettingsProfilePage() {
     }, [userId]);
     const profile = state.draft;
     const [workProfileOpen, setWorkProfileOpen] = useState(false);
+    useRuntimeTwinPendingForm(state.current !== null
+        && (profile.doctorName !== (state.current.displayName ?? '')
+            || profile.clinicName !== (state.current.ambulatoryName ?? '')));
 
     return (
         <section className={styles.page} data-testid="settings-profile-section">
