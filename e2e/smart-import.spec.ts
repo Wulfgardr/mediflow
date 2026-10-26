@@ -346,7 +346,9 @@ test('Proposte combinate: un solo conteggio effettivo e due destinazioni senza r
     await expect(summary.getByRole('link')).toHaveCount(2);
     await summary.getByRole('link', { name: 'Patient Insight', exact: true }).click();
     const insight = page.locator('#patient-insight');
-    await insight.locator(':scope > div > [data-disclosure-control]').click();
+    const insightToggle = insight.locator(':scope > div > [data-disclosure-control]');
+    if (await insightToggle.getAttribute('aria-expanded') === 'false') await insightToggle.click();
+    await expect(insightToggle).toHaveAttribute('aria-expanded', 'true');
     await insight.getByRole('button', { name: 'Cambia', exact: true }).click();
     await insight.getByRole('combobox', { name: 'Modello per questa proposta' }).selectOption(FIXTURE_MODEL.modelOptionId);
     await insight.getByRole('button', { name: 'Avvia supporto', exact: true }).click();
@@ -356,7 +358,9 @@ test('Proposte combinate: un solo conteggio effettivo e due destinazioni senza r
     await expect(insightProposal).not.toBeVisible();
     await summary.getByRole('link', { name: 'Smart Import', exact: true }).click();
     const smart = page.locator('#smart-import');
-    await smart.locator(':scope > div > [data-disclosure-control]').click();
+    const smartToggle = smart.locator(':scope > div > [data-disclosure-control]');
+    if (await smartToggle.getAttribute('aria-expanded') === 'false') await smartToggle.click();
+    await expect(smartToggle).toHaveAttribute('aria-expanded', 'true');
     await smart.getByRole('button', { name: 'Cambia', exact: true }).click();
     await smart.getByRole('combobox', { name: 'Modello per questa proposta' }).selectOption(FIXTURE_MODEL.modelOptionId);
     await smart.getByRole('button', { name: 'Prepara proposta', exact: true }).click();
