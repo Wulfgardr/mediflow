@@ -464,14 +464,14 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                 ? 'success'
                 : 'muted';
     const readinessLabel = fseReadiness.loading
-        ? 'Controllo FSE…'
+        ? 'Controllo locale…'
         : validation?.hasErrors
-            ? 'FSE: blocchi'
+            ? 'Controllo locale: blocchi'
             : validation?.hasWarnings
-                ? 'FSE: attenzioni'
+                ? 'Controllo locale: attenzioni'
                 : validation
-                    ? 'FSE pronta'
-                    : 'Controllo FSE non disponibile';
+                    ? 'Controllo locale: pronto'
+                    : 'Controllo locale non disponibile';
     const sessionData = sessionStatus.status;
     const transportLabel = TRANSPORT_MODE_LABEL[summary.transportMode as SissPatientContextTransportMode]
         ?? 'Apertura portali assistita';
@@ -535,7 +535,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
 
             <div className="mt-4">
                 <h3 className={styles.heading}>
-                    Apri un servizio
+                    Passaggio al portale regionale
                 </h3>
                 <div className={styles.services}>
                     {ACTIONS.map((item) => {

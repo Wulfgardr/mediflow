@@ -110,9 +110,21 @@ function validateParent(
     parentId: string | null,
     id: string,
 ): AmbulatoryMutationResponse | null {
-    if (!parentId) return null;
+    if (parentId === null) return null;
     if (parentId === id) return { status: 400, value: { error: 'parentId cannot reference itself' } };
-    if (!selectAmbulatory(tx, parentId)) return { status: 404, value: { error: 'Parent ambulatory not found' } };
+    const visited = new Set<string>();
+    let ancestorId: string | null = parentId;
+    while (ancestorId !== null) {
+        if (ancestorId === '') return { status: 400, value: { error: 'Parent ambulatory hierarchy is invalid' } };
+        if (ancestorId === id) return { status: 400, value: { error: 'parentId cannot reference a descendant' } };
+        if (visited.has(ancestorId)) return { status: 400, value: { error: 'Parent ambulatory hierarchy is invalid' } };
+        visited.add(ancestorId);
+        const ancestor = selectAmbulatory(tx, ancestorId);
+        if (!ancestor) return ancestorId === parentId
+            ? { status: 404, value: { error: 'Parent ambulatory not found' } }
+            : { status: 400, value: { error: 'Parent ambulatory hierarchy is invalid' } };
+        ancestorId = ancestor.parentId;
+    }
     return null;
 }
 
