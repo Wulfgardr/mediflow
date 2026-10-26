@@ -45,7 +45,8 @@ test('Web service prescriptions and items retain the draft on audit failure and 
         faultDb.exec("CREATE TRIGGER synthetic_service_ui_audit BEFORE INSERT ON audit_events WHEN NEW.event_type='service.prescription.created' BEGIN SELECT RAISE(IGNORE); END");
         const failed = page.waitForResponse(r => new URL(r.url()).pathname === '/api/service-prescriptions' && r.request().method() === 'POST');
         await pane.getByRole('button', { name: 'Salva prestazione', exact: true }).click();
-        expect((await failed).status()).toBe(500);
+        const failedResponse = await failed;
+        expect(failedResponse.status(), await failedResponse.text()).toBe(500);
         await expect(pane.getByLabel('Nome prestazione (raggruppa le voci)')).toHaveValue('Controllo sintetico di verifica');
         expect(read()).toEqual(before);
         expect(await http('service-prescriptions')).toHaveLength(0);
@@ -67,7 +68,8 @@ test('Web service prescriptions and items retain the draft on audit failure and 
     expect(await http('service-prescriptions')).toHaveLength(1);
     expect(await http('service-prescription-items')).toHaveLength(2);
     const updated = page.waitForResponse(r => new URL(r.url()).pathname === `/api/service-prescriptions/${parentId}` && r.request().method() === 'PUT');
-    await pane.getByRole('button', { name: 'Segna eseguita', exact: true }).click();
+    await pane.getByRole('button', { name: 'Azioni prestazione Controllo sintetico di verifica', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Segna eseguita', exact: true }).click();
     expect((await updated).status()).toBe(200);
     await expect.poll(() => read().items.every(item => item.status === 'performed' && item.version === 2)).toBe(true);
     const afterUpdate = read();
@@ -79,7 +81,8 @@ test('Web service prescriptions and items retain the draft on audit failure and 
     expect((await http('service-prescription-items')).every(item => item.version === 2 && item.status === 'performed')).toBe(true);
     await page.screenshot({ path: testInfo.outputPath('service-performed.png'), fullPage: false });
     const removed = page.waitForResponse(r => new URL(r.url()).pathname === `/api/service-prescriptions/${parentId}` && r.request().method() === 'DELETE');
-    await pane.getByRole('button', { name: 'Elimina voce', exact: true }).click();
+    await pane.getByRole('button', { name: 'Azioni prestazione Controllo sintetico di verifica', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Elimina prestazione', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Elimina', exact: true }).click();
     expect((await removed).status()).toBe(200);
     await expect(pane.getByText('Controllo sintetico di verifica', { exact: true })).toHaveCount(0);

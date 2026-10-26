@@ -1,9 +1,17 @@
 'use client';
 
-import { type FormEvent, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, ClipboardCheck, LoaderCircle, Plus, Trash2 } from 'lucide-react';
+import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { CheckCircle2, LoaderCircle, MoreHorizontal, Plus } from 'lucide-react';
 import { db, captureSissHandoffWritePrecondition, resolveSissHandoffDraftPrecondition, type SissHandoffWritePrecondition, type SissHandoffEvent, type SissHandoffOutcome } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
+import { Button } from '@/components/ui/button';
+import { PatientSheetMenu } from '@/components/patient-sheet-menu';
+import { CollapsibleSection } from '@/components/kree8/collapsible-section';
+import { Disclosure } from '@/components/disclosure';
+import { formatCountLabel } from '@/lib/format-count';
+import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
+import styles from './clinical-register.module.css';
+import local from './siss-workspace.module.css';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
 type Props = {
@@ -89,6 +97,13 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
         undefined,
         ['siss_handoff_events'],
     );
+
+    const formId = useId();
+    const createRef = useRef<HTMLButtonElement>(null);
+    const formRef = useRef<HTMLFormElement>(null);
+    const closureDraftDirty = Boolean(closureNotes || closureNextAction || closureOutcome !== 'completed');
+    useRuntimeTwinPendingForm(isFormOpen || closureDraftDirty);
+    useEffect(() => { if (isFormOpen) formRef.current?.querySelector<HTMLSelectElement>('select')?.focus(); }, [isFormOpen]);
 
     const pendingHandoff = useMemo(
         () => handoffs?.find((item) => item.outcome === 'started') ?? null,
@@ -188,46 +203,14 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
         }
     };
 
-    const headerActions = (
-        <>
-            <span className="apple-chip">{handoffs?.length ?? 0} passaggi</span>
-            <span className="apple-chip">{handoffs?.filter((item) => item.outcome === 'started').length ?? 0} aperti</span>
-            <button
-                type="button"
-                onClick={() => setIsFormOpen((value) => !value)}
-                className="ui-btn-primary h-10 px-4 text-sm font-semibold"
-            >
-                <Plus className="h-4 w-4" />
-                Registra
-            </button>
-        </>
-    );
-
-    return (
-        <section className={embedded ? '' : 'patient-detail-section rounded-[20px] border p-5 md:p-6'}>
-            {embedded ? (
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                    <p className="section-kicker">Diario portali regionali</p>
-                    <div className="flex flex-wrap items-center gap-2">{headerActions}</div>
-                </div>
-            ) : (
-                <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                        <p className="section-kicker">SISS</p>
-                        <h2 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
-                            <ClipboardCheck className="h-5 w-5 text-[color:var(--lume-accent)]" />
-                            Diario portali regionali
-                        </h2>
-                        <p className="mt-2 max-w-2xl text-sm leading-6 text-[color:var(--lume-ink-muted)]">
-                            Registra il motivo dell&apos;apertura del portale, l&apos;esito e il prossimo passo. Il dato resta locale: l&apos;atto regionale avviene nel portale ufficiale.
-                        </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">{headerActions}</div>
-                </div>
-            )}
-
+    const createButton = <Button ref={createRef} variant="text" disabled={isSaving} aria-expanded={isFormOpen} aria-controls={formId}
+        onClick={() => { setIsFormOpen(value => !value); }}><Plus size={16} aria-hidden />Registra passaggio</Button>;
+    const content = (
+        <section className={styles.register}>
+            {!embedded ? <div className={styles.toolbar}><h2>Diario locale dei passaggi</h2>{createButton}</div> : null}
+            <p className={local.caption}>Registro locale: l’atto regionale e il suo esito si verificano nel portale ufficiale.</p>
             {pendingHandoff ? (
-                <div className="mb-5 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] p-4">
+                <div className={local.pending} aria-label="Chiusura del passaggio aperto">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]">Da chiudere</p>
@@ -239,7 +222,7 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                             ) : null}
                         </div>
                         <select
-                            className="input-field h-10 max-w-44"
+                            className="input-field h-10 max-w-44" aria-label="Esito del passaggio aperto"
                             value={closureOutcome}
                             onChange={(event) => { if (beginClosureDraft()) setClosureOutcome(event.target.value as SissHandoffOutcome); }}
                         >
@@ -258,20 +241,16 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                             <textarea className="input-field min-h-20" value={closureNextAction} onChange={(event) => { if (beginClosureDraft()) setClosureNextAction(event.target.value); }} />
                         </label>
                     </div>
-                    <button
-                        type="button"
-                        disabled={isSaving}
-                        onClick={() => void closePendingHandoff()}
-                        className="mt-3 inline-flex h-10 items-center justify-center gap-2 rounded-[12px] bg-[color:var(--lume-ink)] px-4 text-sm font-semibold text-[color:var(--lume-surface-focal)] transition-colors hover:bg-[color:var(--lume-accent)] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
+                    <Button variant={isFormOpen ? 'secondary' : closureDraftDirty ? 'primary' : 'text'}
+                        disabled={isSaving} onClick={() => void closePendingHandoff()} className="mt-3">
                         {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                         Chiudi passaggio
-                    </button>
+                    </Button>
                 </div>
             ) : null}
 
             {isFormOpen && (
-                <form onSubmit={handleSubmit} className="mb-5 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] p-4">
+                <form id={formId} ref={formRef} onSubmit={handleSubmit} aria-label="Registra passaggio locale" className={styles.form}>
                     <div className="grid gap-3 md:grid-cols-2">
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Modulo
@@ -299,52 +278,45 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                         </label>
                     </div>
                     {error ? <p className="mt-3 text-xs font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{error}</p> : null}
-                    <div className="mt-4 flex justify-end">
-                        <button type="submit" disabled={isSaving} className="ui-btn-primary h-10 px-4 text-sm font-semibold">
+                    <div className="mt-4 flex flex-wrap justify-end gap-3">
+                        <Button variant="secondary" disabled={isSaving} onClick={() => { setIsFormOpen(false); createRef.current?.focus(); }}>Annulla</Button>
+                        <Button type="submit" disabled={isSaving}>
                             {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                             Salva voce
-                        </button>
+                        </Button>
                     </div>
                 </form>
             )}
 
             {error && !isFormOpen ? <p className="mb-3 text-xs font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{error}</p> : null}
 
-            {!handoffs || handoffs.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] px-4 py-6 text-center">
-                    <p className="text-sm text-[color:var(--lume-ink-muted)]">
-                        Nessun passaggio SISS registrato per questo paziente.
-                    </p>
-                </div>
+            {!handoffs ? <p className={styles.empty} role="status">Caricamento del diario locale…</p> : handoffs.length === 0 ? (
+                <p className={styles.empty}>Nessun passaggio SISS registrato per questo paziente.</p>
             ) : (
-                <div className="grid gap-3">
-                    {handoffs.slice(0, 6).map((item) => (
-                        <div key={item.id} className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] px-4 py-3">
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{item.moduleLabel}</p>
-                                    <p className="lume-registro mt-1 text-xs text-[color:var(--lume-ink-muted)]">
-                                        {formatDate(item.startedAt)} · {outcomeLabel(item.outcome)}
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => void deleteItem(item)}
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] text-[color:var(--lume-ink-muted)] transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
-                                    aria-label="Elimina passaggio SISS"
-                                >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                            </div>
-                            {item.reason ? <p className="mt-2 text-xs leading-5 text-[color:var(--lume-ink-muted)]">{item.reason}</p> : null}
-                            {item.notes ? <p className="mt-2 text-sm leading-6 text-[color:var(--lume-ink)]">{item.notes}</p> : null}
-                            {item.nextAction ? (
-                                <p className="mt-2 text-xs font-semibold text-[color:var(--lume-accent)]">Prossimo passo: {item.nextAction}</p>
-                            ) : null}
-                        </div>
-                    ))}
-                </div>
+                <table className={`${styles.table} ${styles.therapyTable}`}>
+                    <thead><tr><th>Passaggio</th><th>Esito dichiarato</th><th>Azioni</th></tr></thead>
+                    <tbody>{handoffs.slice(0, 6).map(item => <tr key={item.id} data-siss-handoff-id={item.id}>
+                        <td><strong>{item.moduleLabel}</strong><small className="lume-registro">{formatDate(item.startedAt)}</small>
+                            <Disclosure title="Dettagli del passaggio">
+                                {item.reason ? <p className="mt-2">{item.reason}</p> : null}
+                                {item.notes ? <p className="mt-2">{item.notes}</p> : null}
+                                {item.nextAction ? <p className="mt-2">Prossimo passo: {item.nextAction}</p> : null}
+                                {!item.reason && !item.notes && !item.nextAction ? <p className={local.caption}>Nessun dettaglio registrato.</p> : null}
+                            </Disclosure>
+                        </td>
+                        <td>{outcomeLabel(item.outcome)}</td>
+                        <td><PatientSheetMenu label={`Azioni passaggio ${item.moduleLabel}`}
+                            trigger={props => <Button {...props} variant="icon" aria-label={`Azioni passaggio ${item.moduleLabel}`}><MoreHorizontal size={16} aria-hidden /></Button>}>
+                            <button type="button" role="menuitem" onClick={() => void deleteItem(item)}>Elimina passaggio SISS</button>
+                        </PatientSheetMenu></td>
+                    </tr>)}</tbody>
+                </table>
             )}
         </section>
     );
+    return embedded ? <CollapsibleSection title="Diario locale dei passaggi"
+        count={handoffs ? formatCountLabel(handoffs.length, 'passaggio', 'passaggi') : undefined}
+        headerAction={createButton} defaultOpen={isFormOpen} keepMounted surfaceClassName={styles.therapySection}>
+        {content}
+    </CollapsibleSection> : content;
 }

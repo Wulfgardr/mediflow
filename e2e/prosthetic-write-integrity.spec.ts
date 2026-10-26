@@ -41,7 +41,7 @@ test('Web creates, records testing, and removes a prosthetic prescription with o
     await page.goto(`/patients/${patientId}/modules`);
     await openPatientSection(page, 'protesica');
     const pane = page.locator('#protesica');
-    await pane.getByRole('button', { name: 'Nuova voce', exact: true }).click();
+    await pane.getByRole('button', { name: 'Nuova voce protesica', exact: true }).click();
     await pane.getByText('Cerca un ausilio nel repertorio', { exact: true }).click();
     await pane.getByLabel('Codice, descrizione o codifica', { exact: true }).fill('DEMO-E2E');
     await pane.getByRole('button', { name: 'Cerca nel repertorio', exact: true }).click();
@@ -82,7 +82,8 @@ test('Web creates, records testing, and removes a prosthetic prescription with o
     expect(updated.events.map(x => JSON.parse(String(x.redacted_metadata)).resourceVersion)).toEqual([1, 2]);
     expect((await http()).find(x => x.id === id)).toMatchObject({ version: 2, status: 'tested' });
     const remove = page.waitForResponse(r => new URL(r.url()).pathname === `/api/prosthetic-prescriptions/${id}` && r.request().method() === 'DELETE');
-    await pane.getByRole('button', { name: 'Elimina Ausilio sintetico di verifica', exact: true }).click();
+    await pane.getByRole('button', { name: 'Azioni voce protesica Ausilio sintetico di verifica', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Elimina voce protesica', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Elimina', exact: true }).click();
     expect((await remove).status()).toBe(200);
     await expect(pane.locator('td > strong').filter({ hasText: /^Ausilio sintetico di verifica$/u })).toHaveCount(0);
