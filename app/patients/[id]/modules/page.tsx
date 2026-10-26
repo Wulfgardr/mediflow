@@ -9,7 +9,7 @@ import { differenceInYears } from 'date-fns';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, ChevronRight, FileText, Pill, Plus, ShieldCheck } from 'lucide-react';
+import { Activity, ChevronRight, Pill, Plus, ShieldCheck } from 'lucide-react';
 
 import { PluginLocalUiNavigation, PluginPrescribingGuide } from '@/components/plugin-local-ui-navigation';
 import { PatientClinicalSupport, PatientProposalsSummary } from '@/components/patient-clinical-support';
@@ -34,6 +34,7 @@ import SissWorkspace from '@/components/siss-workspace';
 import TherapyManager from '@/components/therapy-manager';
 import TreatmentReasoningPanel from '@/components/treatment-reasoning-panel';
 import Timeline from '@/components/timeline';
+import diaryStyles from '@/components/twin-diary.module.css';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 /* WUL-678: scoped to the new-scale targets below. */
@@ -706,13 +707,12 @@ export default function PatientDetailPage() {
                     id="diario"
                     kicker="Diario"
                     title="Diario clinico"
-                    icon={FileText}
                     count={formatCountLabel(nonScaleEntries.length, 'voce', 'voci')}
                     summary={nonScaleEntries.length === 0 ? 'Nessuna voce clinica registrata.' : 'Apri le voci attive del diario.'}
-                    surfaceClassName={workspaceStyles.clinicalSection}
+                    surfaceClassName={`${workspaceStyles.clinicalSection} ${diaryStyles.patientSection}`}
                     keepMounted
                 >
-                    {entries ? <Timeline entries={timelineEntries} /> : <p className={workspaceStyles.mutedText}>Diario in caricamento.</p>}
+                    {entries ? <Timeline entries={timelineEntries} patientDiary /> : <p className={workspaceStyles.mutedText}>Diario in caricamento.</p>}
                 </CollapsibleSection>
 
                     <TherapyManager patientId={id} embedded surfaceClassName={workspaceStyles.clinicalSection}
