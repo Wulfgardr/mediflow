@@ -568,6 +568,19 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
         cx.notify();
     }
 
+    fn empty_ambulatory_list_message(&self) -> &'static str {
+        if self
+            .ambulatory_management
+            .bootstrap
+            .as_ref()
+            .is_some_and(|editor| editor.attempted)
+        {
+            "L’elenco precedente non è aggiornato. Rileggi le sedi per verificarlo."
+        } else {
+            "Nessuna sede presente nell’archivio."
+        }
+    }
+
     fn can_manage_ambulatories(&self) -> bool {
         self.scope.is_some()
             && self.ambulatories.ready().is_some()
@@ -1066,7 +1079,7 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
             )),
             Load::Ready(rows) if rows.is_empty() => view.child(notice(
                 "clinical-workspace-ambulatories-empty",
-                "Nessuna sede presente nell’archivio.",
+                self.empty_ambulatory_list_message(),
                 theme,
                 false,
             )),
@@ -1288,6 +1301,67 @@ mod tests {
                 assert_eq!(editor.payload.as_ref().unwrap().id, id);
                 assert_eq!(editor.fields[0].value(cx), "Sede inventata");
             }
+        });
+    }
+
+    #[gpui::test]
+    fn bootstrap_attempt_never_presents_the_pre_dispatch_empty_list_as_current(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            bootstrap_draft(app, cx);
+            app.ambulatories = Load::Ready(vec![]);
+            app.ambulatory_management
+                .bootstrap
+                .as_mut()
+                .unwrap()
+                .attempted = false;
+            assert_eq!(
+                app.empty_ambulatory_list_message(),
+                "Nessuna sede presente nell’archivio."
+            );
+            app.ambulatory_management
+                .bootstrap
+                .as_mut()
+                .unwrap()
+                .attempted = true;
+            let outdated = "L’elenco precedente non è aggiornato. Rileggi le sedi per verificarlo.";
+            assert_eq!(app.empty_ambulatory_list_message(), outdated);
+            let id = app
+                .ambulatory_management
+                .bootstrap
+                .as_ref()
+                .unwrap()
+                .payload
+                .as_ref()
+                .unwrap()
+                .id
+                .clone();
+            app.receive_first_ambulatory_verification(true, Ok(id.clone()), cx);
+            assert_eq!(app.empty_ambulatory_list_message(), outdated);
+            for error in [RuntimeError::Indeterminate, RuntimeError::Conflict] {
+                app.receive_first_ambulatory_verification(false, Err(error), cx);
+                assert_eq!(app.empty_ambulatory_list_message(), outdated);
+                assert!(app.ambulatories.ready().unwrap().is_empty());
+                assert_eq!(
+                    app.ambulatory_management
+                        .bootstrap
+                        .as_ref()
+                        .unwrap()
+                        .payload
+                        .as_ref()
+                        .unwrap()
+                        .id,
+                    id
+                );
+            }
+            let registered = row(&id, 2, true, None);
+            app.ambulatory_management.initial_scope = false;
+            app.receive_ambulatories(vec![registered], cx);
+            assert_eq!(app.ambulatories.ready().unwrap()[0].version, 2);
+            assert!(app.scope.is_none());
         });
     }
 
