@@ -8,11 +8,19 @@ import disclosure from '@/components/patient-disclosure.module.css';
 import styles from './patient-insight.module.css';
 import { useRuntimeTwinFolder } from '@/components/runtime-twin-design';
 
-export function PatientInsightSummary({ hasProposal }: { hasProposal: boolean }) {
-    return <p className={styles.summary} data-testid="patient-insight-proposal-summary">
-        <span>Patient Insight · {hasProposal ? '1 proposta da rivedere' : 'Nessuna proposta da rivedere'}</span>
-        <a href="#patient-insight" className="mf-button-text">Apri Patient Insight</a>
-    </p>;
+export function PatientProposalsSummary({ hasInsightProposal, hasSmartImportProposal, smartImportAvailable }: {
+    hasInsightProposal: boolean;
+    hasSmartImportProposal: boolean;
+    smartImportAvailable: boolean;
+}) {
+    const count = Number(hasInsightProposal) + Number(hasSmartImportProposal);
+    return <div className={styles.summary} data-testid="patient-proposals-summary">
+        <span>{count === 0 ? 'Nessuna proposta da rivedere' : `${count} ${count === 1 ? 'proposta' : 'proposte'} da rivedere`}</span>
+        <span className={styles.links}>
+            <a href="#patient-insight" className="mf-button-text">Patient Insight</a>
+            {smartImportAvailable ? <a href="#smart-import" className="mf-button-text">Smart Import</a> : null}
+        </span>
+    </div>;
 }
 
 export function PatientClinicalSupport({ patient, stale, onProposalChange }: {

@@ -1,0 +1,3 @@
+.proposal { border-inline-start: 1px dashed var(--lume-ink-pencil); padding-inline-start: 16px; overflow-wrap: anywhere; }
+.sources { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 0; list-style: none; overflow-wrap: anywhere; }
+.sources a { color: var(--lume-ink); text-decoration: underline; text-underline-offset: 3px; }
