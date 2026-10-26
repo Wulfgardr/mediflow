@@ -15,33 +15,6 @@ pub(super) struct ChatAccess {
     message: Option<String>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use gpui::EntityInputHandler;
-
-    #[gpui::test]
-    fn confirmation_pin_is_unavailable_to_native_surrounding_text_services(
-        cx: &mut gpui::TestAppContext,
-    ) {
-        let (app, cx) =
-            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
-        let editor = app.read_with(cx, |app, _| app.chat_access.pin.clone());
-        cx.update_window_entity(&editor, |input, window, cx| {
-            input.set_content("2468", cx);
-            let mut actual = Some(0..4);
-            assert!(
-                input
-                    .text_for_range(0..4, &mut actual, window, cx)
-                    .is_none()
-            );
-            assert_eq!(actual, None);
-            input.set_content("", cx);
-            assert!(input.value().is_empty());
-        });
-    }
-}
-
 impl ChatAccess {
     pub(super) fn new(theme: Theme, cx: &mut Context<ClinicalApp>) -> Self {
         Self {
@@ -230,5 +203,32 @@ impl ClinicalApp {
                 .on_click(cx.listener(|this, _, _, cx| { this.chat_access.retire(cx); cx.notify(); })))
             .when(state != State::Challenge, |el| el.child(notice("native-chat-access-state",
                 if state == State::Approved { "Accesso autorizzato per una sola verifica nella vista chat." } else { "Conferma in corso…" }, theme, false))))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui::EntityInputHandler;
+
+    #[gpui::test]
+    fn confirmation_pin_is_unavailable_to_native_surrounding_text_services(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (app, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let editor = app.read_with(cx, |app, _| app.chat_access.pin.clone());
+        cx.update_window_entity(&editor, |input, window, cx| {
+            input.set_content("2468", cx);
+            let mut actual = Some(0..4);
+            assert!(
+                input
+                    .text_for_range(0..4, &mut actual, window, cx)
+                    .is_none()
+            );
+            assert_eq!(actual, None);
+            input.set_content("", cx);
+            assert!(input.value().is_empty());
+        });
     }
 }

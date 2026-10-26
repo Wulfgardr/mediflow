@@ -278,6 +278,12 @@ mod tests {
                     )
                 } else if first.starts_with("GET /api/auth/native/chat-access-confirmation ") {
                     (200, json!({"status":"eligible"}))
+                } else if first.starts_with("GET /api/v1/network/patient-profile/selection-epoch ")
+                {
+                    (
+                        200,
+                        json!({"contractVersion":1,"selectionEpoch":if current.load(Ordering::Acquire) == 3 {1}else{0}}),
+                    )
                 } else {
                     (503, json!({"status":"denied"}))
                 };
@@ -419,15 +425,15 @@ mod tests {
     #[test]
     #[ignore = "integration requires a real signed Codex or Claude ancestor on macOS; presence result is synthetic"]
     fn native_session_lock_and_host_restore_retire_the_captured_grant() {
-        for restore in [false, true] {
+        for change in [0, 1, 3] {
             let (session, host) = native_session();
             let context = session.chat_access_context("scope-a", "patient-a").unwrap();
             let (request, _remote) = connected();
             assert!(request.lock().unwrap().bind(session.clone(), context));
             let (_, _, attempt) = request.lock().unwrap().begin().unwrap();
             request.lock().unwrap().finish(attempt, true);
-            if restore {
-                host.state.store(1, Ordering::Release);
+            if change != 0 {
+                host.state.store(change, Ordering::Release);
             } else {
                 session.lock();
             }
@@ -446,5 +452,21 @@ mod tests {
         request.withdraw();
         assert!(attempt.biometric().is_err());
         assert_eq!(request.status(), State::Withdrawn);
+    }
+
+    #[test]
+    #[ignore = "integration requires a real signed Codex or Claude ancestor on macOS; presence result is synthetic"]
+    fn eof_retires_an_approved_unconsumed_grant() {
+        let (session, _host) = native_session();
+        let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+        let (request, remote) = connected();
+        assert!(request.lock().unwrap().bind(session, context));
+        let (_, _, attempt) = request.lock().unwrap().begin().unwrap();
+        request.lock().unwrap().finish(attempt, true);
+        assert_eq!(request.lock().unwrap().status(), State::Approved);
+        drop(remote);
+        assert_eq!(request.lock().unwrap().status(), State::Withdrawn);
+        assert_eq!(consume(&request), State::Withdrawn);
+        assert!(request.lock().unwrap().binding.is_none());
     }
 }
