@@ -1,8 +1,9 @@
 'use client';
 
 /* shared AIFA surface; real client functions and existing server authority only. */
-import { useEffect, useId, useRef, useState } from 'react';
-import { AlertTriangle, Database, Server, Upload } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { AlertTriangle, Upload } from 'lucide-react';
+import { Disclosure } from '@/components/disclosure';
 import { importAifaCsv, updateAifaCatalog, getDrugCatalogStatus, clearDrugDatabase } from '@/lib/aifa-importer';
 import { AIFA_CATALOG_DEFAULT_SOURCE_URL } from '@/lib/aifa-catalog';
 import { createAifaUpdateGuide, INITIAL_AIFA_GUIDE_STATE, type AifaGuidePhase } from '@/lib/aifa-update-guide';
@@ -11,12 +12,9 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { semanticSignalSurfaceClass } from '@/components/ui/semantic-signal';
 import { AifaRemoteNotice, useAifaRemoteStatus } from './aifa-remote-notice';
 import type { AifaDownloadProgress } from '@/lib/aifa-catalog-download';
-import { SETTINGS_CARD_CLASS } from './settings-ui';
+import styles from './repertori-settings.module.css';
 
-const AIFA_PANEL_STYLE = { minWidth: 0, border: '1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent)', borderRadius: 'var(--lume-radius-panel)', background: 'var(--lume-surface-focal)', padding: 24 };
 const AIFA_COMMAND_STYLE = { minHeight: 'var(--lume-control-height, 44px)', minWidth: 'var(--lume-control-height, 44px)', borderRadius: 'var(--lume-control-radius, 10px)', fontWeight: 600, gap: 8 };
-const AIFA_ICON_STYLE = { background: 'color-mix(in srgb, var(--lume-accent) 12%, var(--lume-surface-field))', color: 'var(--lume-accent)' };
-const AIFA_STAT_STYLE = { borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)', background: 'var(--lume-surface-field)' };
 const AIFA_UPLOAD_STYLE = { ...AIFA_COMMAND_STYLE, borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)', color: 'var(--lume-ink-muted)' };
 const phaseLabels: Record<AifaGuidePhase, string> = {
     idle: '', updating: 'Scaricamento, validazione e importazione in corso…',
@@ -26,8 +24,7 @@ const phaseLabels: Record<AifaGuidePhase, string> = {
     'confirming-clear': 'In attesa della conferma di svuotamento.', clearing: 'Svuotamento del catalogo in corso…',
 };
 
-export default function AifaCatalogManager() {
-    const titleId = useId();
+export default function AifaCatalogManager({ expanded, onExpandedChange }: { expanded?: boolean; onExpandedChange?: (value: boolean) => void } = {}) {
     const confirm = useConfirm();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const guide = useRef<ReturnType<typeof createAifaUpdateGuide> | null>(null);
@@ -70,14 +67,13 @@ export default function AifaCatalogManager() {
         });
     };
     return (
-        <section className={SETTINGS_CARD_CLASS} style={AIFA_PANEL_STYLE} aria-labelledby={titleId} data-testid="aifa-catalog-guide">
-            <div className="mb-5 flex items-start gap-3">
-                <div className="rounded-2xl p-2" style={AIFA_ICON_STYLE}>
-                    <Database className="h-4 w-4" />
-                </div>
-                <div className="min-w-0">
-                    <p className="section-kicker">Farmaci</p>
-                    <h2 id={titleId} className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Database AIFA offline</h2>
+        <section className={styles.row} aria-label="Catalogo farmaci AIFA" data-testid="aifa-catalog-guide">
+            <Disclosure headingLevel={2} open={expanded} onOpenChange={onExpandedChange}
+                title={<span className={styles.title}><span>Farmaci AIFA</span><span className={styles.summary}>
+                    {state.reading ? 'Lettura dello stato locale…' : busy ? phaseLabels[state.phase] : drugCatalog
+                        ? `${drugCatalog.count.toLocaleString('it-IT')} confezioni · ultima lettura locale` : 'Stato locale non disponibile'}
+                </span></span>}>
+                <div className={styles.body}>
                     <p className="mt-1 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
                         Confezioni con AIC, codici ATC e principi attivi del feed AIFA.{' '}
                         <a
@@ -90,24 +86,10 @@ export default function AifaCatalogManager() {
                             Fonte: AIFA Open Data
                         </a>
                     </p>
-                </div>
-            </div>
-
-            <div className="space-y-4">
-                <div className="flex items-center justify-between rounded-[var(--lume-radius-control)] border p-4" style={AIFA_STAT_STYLE}>
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--lume-ink-muted)' }}>Confezioni indicizzate</p>
-                        <p className="text-lg font-semibold" style={{ color: 'var(--lume-ink)' }}>
-                            {drugCatalog !== null ? drugCatalog.count.toLocaleString('it-IT') : '-'}
-                        </p>
-                    </div>
-                    <Server className="w-8 h-8" style={{ color: 'color-mix(in srgb, var(--lume-ink-muted) 58%, transparent)' }} />
-                </div>
-
                 <AifaRemoteNotice {...remote} disabled={busy} settings />
                 <div className="space-y-2">
-                    <Button onClick={() => void update()} disabled={writeDisabled || !remote.status?.networkAllowed}
-                        className="w-full" style={AIFA_COMMAND_STYLE}>
+                    <Button variant="secondary" onClick={() => void update()} disabled={writeDisabled || !remote.status?.networkAllowed}
+                        style={AIFA_COMMAND_STYLE}>
                         Aggiorna ora
                     </Button>
                     <p className="text-sm leading-6 text-[color:var(--lume-ink-muted)]">
@@ -130,20 +112,19 @@ export default function AifaCatalogManager() {
                 </div>
 
                 {drugCatalog?.manifest ? (
-                    <div className="rounded-[var(--lume-radius-control)] border p-4 text-sm leading-6" style={{ color: 'var(--lume-ink)' }}>
+                    <div className={styles.provenance}>
                         <p className="font-semibold">Ultimo catalogo osservato</p>
                         <p className="mt-1 break-words">
                             Scaricato il {drugCatalog.manifest.downloadedAt} · {drugCatalog.manifest.rowCount.toLocaleString('it-IT')} confezioni
                         </p>
                         <p className="mt-1 break-words">Provenienza del file: <span className="[overflow-wrap:anywhere]">{drugCatalog.manifest.sourceUrl}</span></p>
                         <p className="mt-1">Importato il <time dateTime={drugCatalog.manifest.importedAt}>{new Date(drugCatalog.manifest.importedAt).toLocaleString('it-IT')}</time></p>
-                        <details className="mt-2">
-                            <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">Dettagli provenienza</summary>
+                        <Disclosure title="Dettagli provenienza">
                             <p className="mt-1 [overflow-wrap:anywhere]">Versione di acquisizione: {drugCatalog.manifest.version}</p>
                             <p className="mt-1 [overflow-wrap:anywhere]">File: {drugCatalog.manifest.sourceUrl}</p>
                             <p className="mt-1 break-all">SHA-256 {drugCatalog.manifest.sha256}</p>
                             <p className="mt-1">Il manifest identifica il file importato; non certifica autenticità o licenza dello specifico dataset.</p>
-                        </details>
+                        </Disclosure>
                     </div>
                 ) : drugCatalog?.state === 'unverified' ? (
                     <div className={`rounded-[var(--lume-radius-control)] border p-4 text-sm leading-6 ${semanticSignalSurfaceClass('warning')}`}>
@@ -156,8 +137,7 @@ export default function AifaCatalogManager() {
                 {drugCatalog === null && !state.reading && <p className="text-sm">Stato locale non disponibile.</p>}
 
                 {/* Keep the automatic route first; manual import remains available on demand. */}
-                <details className="rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] p-4">
-                    <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">Carica un CSV già scaricato</summary>
+                <Disclosure className={styles.manual} title="Carica un CSV già scaricato">
                     <p className="mb-4 mt-2 text-sm leading-6 text-[color:var(--lume-ink-muted)]">Usa un file locale e indica la sua provenienza.</p>
                     <div className="space-y-3 rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
                         <div className="grid gap-3 sm:grid-cols-2">
@@ -223,7 +203,7 @@ export default function AifaCatalogManager() {
                             <p className="text-xs text-[color:var(--lume-ink-muted)]">Il catalogo precedente resta disponibile fino al completamento.</p>
                         </div>
                     ) : null}
-                </details>
+                </Disclosure>
 
                 {drugCatalog !== null && drugCatalog.count > 0 && (
                     <Button variant="secondary" style={AIFA_COMMAND_STYLE}
@@ -235,7 +215,8 @@ export default function AifaCatalogManager() {
                         Svuota catalogo
                     </Button>
                 )}
-            </div>
+                </div>
+            </Disclosure>
         </section>
     );
 }
