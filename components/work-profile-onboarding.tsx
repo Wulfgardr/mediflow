@@ -226,11 +226,12 @@ export function WorkProfileOnboarding({ controller }: { controller: WorkProfileC
     );
 }
 
-export function WorkProfileSettings() {
+export function WorkProfileSettings({ showHeading = true }: { showHeading?: boolean } = {}) {
     const controller = useWorkProfile();
     const { state, busy, error, reload } = controller;
-    return <section className={styles.settingsProfile} aria-labelledby="work-profile-title" data-testid="work-profile-onboarding" aria-busy={busy}>
-        <h2 id="work-profile-title">Il tuo modo di lavorare</h2>
+    return <section className={styles.settingsProfile} aria-labelledby={showHeading ? 'work-profile-title' : undefined}
+        aria-label={showHeading ? undefined : 'Il tuo modo di lavorare'} data-testid="work-profile-onboarding" aria-busy={busy}>
+        {showHeading && <h2 id="work-profile-title">Il tuo modo di lavorare</h2>}
         {error && <div role="alert"><p>{error}</p><button type="button" disabled={busy} className={styles.secondaryAction} onClick={() => void reload()}>Rileggi lo stato</button></div>}
         {busy && <p role="status">Lettura o salvataggio del profilo…</p>}
         {state && <ProfileEditor key={`${state.revision}:${controller.snapshotVersion}`} controller={controller} />}
