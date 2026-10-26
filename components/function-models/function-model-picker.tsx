@@ -20,7 +20,7 @@ export function useFunctionModelPicker(functionId: FunctionModelId, context: unk
         window.addEventListener('pagehide', hide); window.addEventListener('pageshow', show);
         return () => { window.removeEventListener('pagehide', hide); window.removeEventListener('pageshow', show); }; }, [client, active]);
     const row = view.dto?.functions.find(f => f.id === functionId);
-    const selected = row?.options.find(o => o.modelOptionId === (view.choice?.modelOptionId ?? row.defaultModelOptionId));
+    const selected = !view.remote ? row?.options.find(o => o.modelOptionId === (view.choice?.modelOptionId ?? row.defaultModelOptionId)) : undefined;
     const canGenerate = view.remote ? active && !view.blocked && !view.loading && !view.consumed && !view.remote.loading && !view.remote.completed && view.remote.settings?.enabled === true && isAiLaneEnabledValue(view.remote.settings.lanes[functionId]) : active && !view.blocked && !view.loading && !view.consumed && (!row || (row.enabled && (view.choice !== null || row.bindingState === 'current') && selected?.state === 'available_unqualified'));
     const needsReprepare = !!view.remote && !view.remote.state && (view.consumed || view.remote.completed || !!view.remote.error);
     const canReprepare = active && functionId !== 'treatment_reasoning' && needsReprepare && !view.loading && !view.remote?.loading;
@@ -32,12 +32,13 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
     const fieldId = useId();
     const f = view.dto?.functions.find(f => f.id === functionId);
     const defaultModel = f?.options.find(o => o.modelOptionId === f.defaultModelOptionId);
-    const selected = f?.options.find(o => o.modelOptionId === (view.choice?.modelOptionId ?? f.defaultModelOptionId));
+    const selected = !view.remote ? f?.options.find(o => o.modelOptionId === (view.choice?.modelOptionId ?? f.defaultModelOptionId)) : undefined;
+    const remoteChoice = view.remote?.catalog?.choices.find(o => o.optionId === view.remote?.choice);
     const blockingStatus = view.remote ? (!active ? 'Sblocca MediFlow.' : !view.remote.settings?.enabled ? 'Consenti OpenAI esplicitamente prima di preparare il contesto.' : 'Account collegato, catalogo disponibile e funzione pronta sono verifiche distinte per ogni tentativo.') : !active ? 'Sblocca MediFlow per scegliere il modello.' : f && !f.enabled ? 'Esperienza spenta nelle impostazioni.'
         : view.loading ? 'Lettura modelli in corso…' : f?.options.length === 0 ? 'Nessun modello configurato.' : f && f.bindingState !== 'current' && !view.choice ? 'Predefinito non attuale: scegli un modello disponibile.'
         : f && selected?.state !== 'available_unqualified' ? 'Modello locale non disponibile.' : null;
-    const confirmDefault = (view.blocked || view.consumed) && !!f?.enabled && f.bindingState === 'current' && defaultModel?.state === 'available_unqualified';
-    const needsRefresh = !!view.error || (active && !!blockingStatus) || (view.blocked && !confirmDefault);
+    const confirmDefault = !view.remote && (view.blocked || view.consumed) && !!f?.enabled && f.bindingState === 'current' && defaultModel?.state === 'available_unqualified';
+    const needsRefresh = !view.remote && (!!view.error || (active && !!blockingStatus) || (view.blocked && !confirmDefault));
     const recoveryStatus = blockingStatus ?? (needsRefresh && !view.error ? 'Rileggi i modelli prima di preparare la proposta.' : null);
     if (f && !f.enabled && !view.remote) return <div className={styles.picker} data-testid={`model-picker-${functionId}`}>
         <p role="status">Esperienza spenta nelle impostazioni. <a href="/settings/ai/funzioni">Apri le funzioni cliniche</a></p>
@@ -62,7 +63,8 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
                 <option value="chatgpt_subscription">OpenAI · abbonamento ChatGPT · prepara</option>
                 {f?.options.map(o => <option key={o.modelOptionId} value={o.modelOptionId} disabled={o.state !== 'available_unqualified'}>{o.label}{o.modelOptionId !== view.choice?.modelOptionId ? ` · ${providerName(o.provider)}` : ''}{o.state === 'unavailable' ? ' · non disponibile' : ''}</option>)}
             </ChoiceField>
-            {selected && <span className={styles.pickerProvider}>{providerName(selected.provider)}<small>{view.choice ? 'Solo questa proposta' : 'Predefinito'}</small></span>}
+            {view.remote ? <span className={styles.pickerProvider}>OpenAI · abbonamento ChatGPT<small>Solo questa proposta</small></span>
+                : selected && <span className={styles.pickerProvider}>{providerName(selected.provider)}<small>{view.choice ? 'Solo questa proposta' : 'Predefinito'}</small></span>}
         </div>
         </div>
         {(recoveryStatus || view.error || confirmDefault) && <div className={styles.pickerRow}>
@@ -78,10 +80,11 @@ export function FunctionModelPicker({ picker }: { picker: ReturnType<typeof useF
         </div>}
             <Disclosure label="Dettagli modello" className={styles.pickerDetails} title="Dettagli">
             <div className={styles.pickerDetailBody}>
-                <p>{selected ? `${selected.label} · ${providerName(selected.provider)}` : 'Il modello viene risolto dalle impostazioni correnti.'}</p>
-                <p>{view.choice ? 'Scelta per una sola proposta; non salvata.' : 'Usa il modello predefinito delle impostazioni.'} {view.consumed ? 'Per ripetere, scegli nuovamente o riusa il predefinito.' : ''}</p>
+                <p>{view.remote ? remoteChoice ? `${remoteChoice.model} · ${remoteChoice.effort} · OpenAI · abbonamento ChatGPT` : 'OpenAI · abbonamento ChatGPT. Modello e ragionamento devono essere scelti dal catalogo corrente dopo l’accesso.'
+                    : selected ? `${selected.label} · ${providerName(selected.provider)}` : 'Il modello viene risolto dalle impostazioni correnti.'}</p>
+                <p>{view.remote ? 'Scelta per questa proposta. Accesso, consenso e disponibilità vengono verificati per ogni preparazione.' : view.choice ? 'Scelta per una sola proposta; non salvata.' : 'Usa il modello predefinito delle impostazioni.'} {!view.remote && view.consumed ? 'Per ripetere, scegli nuovamente o riusa il predefinito.' : ''}</p>
                 <p>La configurazione non prova la disponibilità del modello: viene verificata alla richiesta.</p>
-                {!needsRefresh && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading} onClick={() => void client.read()}>Rileggi modelli</button>}
+                {!view.remote && !needsRefresh && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.loading} onClick={() => void client.read()}>Rileggi modelli</button>}
             </div>
             </Disclosure>
         {view.remote && <OrdinaryFunctionControls client={client} view={view.remote} needsReprepare={picker.needsReprepare} canReprepare={picker.canReprepare} />}
