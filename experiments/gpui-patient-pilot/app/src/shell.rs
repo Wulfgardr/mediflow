@@ -10,7 +10,7 @@ mod analytics;
 #[cfg(unix)]
 mod chat_access;
 mod document_details;
-mod local_preferences;
+pub(crate) mod local_preferences;
 mod local_settings;
 #[cfg(test)]
 mod notes_recovery_tests;
@@ -517,7 +517,7 @@ impl ClinicalApp {
         Self::with_local_preferences(server, LocalPreferencesStore::system(), window, cx)
     }
 
-    fn with_local_preferences(
+    pub(crate) fn with_local_preferences(
         server: String,
         local_preferences: LocalPreferencesStore,
         window: &mut Window,
