@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { spawn } from 'node:child_process';
 import test from 'node:test';
 import { eq } from 'drizzle-orm';
 import { ambulatories, settings } from './schema';
@@ -67,8 +68,48 @@ function update(surface: Surface, authority: ReturnType<typeof seed>, id: string
 function create(surface: Surface, authority: ReturnType<typeof seed>, body: Record<string, unknown>) {
     return surface === 'host' ? host.createAmbulatory(context, body) : paired.createNetworkAmbulatory(authority, body);
 }
+function remove(surface: Surface, authority: ReturnType<typeof seed>, id: string, version: number) {
+    return surface === 'host' ? host.deleteAmbulatory(context, id, version)
+        : paired.deleteNetworkAmbulatory(authority, id, { version });
+}
 
 for (const surface of ['host', 'paired'] as const) {
+    for (const defaultParent of [false, true]) {
+        test(`${surface}: deleting a ${defaultParent ? 'default' : 'nondefault'} parent with children preserves every row and audit`, async () => {
+            const authority = seed({ a: null, b: 'a', c: 'b' });
+            if (defaultParent) assert.equal((await update(surface, authority, 'a', { isDefault: true, version: 1 })).status, 200);
+            const before = snapshot();
+            const denied = await remove(surface, authority, 'a', row('a').version);
+            observations.push({ surface, case: 'delete-parent', defaultParent, before, denied, after: snapshot() });
+            assert.equal(denied.status, 409);
+            assert.equal(denied.value.error, 'Ambulatory still has child ambulatories. Move them before deletion.');
+            assert.deepEqual(snapshot(), before);
+        });
+    }
+    test(`${surface}: leaf deletion and explicit child detach retain the ordinary delete receipt`, async () => {
+        const authority = seed({ a: null, b: 'a', c: null });
+        assert.deepEqual(await remove(surface, authority, 'c', 1), { status: 200, value: { success: true, affectedAmbulatories: [] } });
+        assert.equal((await update(surface, authority, 'b', { parentId: null, version: 1 })).status, 200);
+        const before = snapshot();
+        assert.deepEqual(await remove(surface, authority, 'a', 1), { status: 200, value: { success: true, affectedAmbulatories: [] } });
+        assert.equal(row('a'), undefined);
+        assert.deepEqual(row('b'), { id: 'b', parent_id: null, version: 2, is_default: 0 });
+        const events = (snapshot().audit as Array<Record<string, unknown>>).slice(before.audit.length);
+        assert.equal(events.length, 1);
+        assert.equal(events[0].event_type, 'ambulatory.deleted');
+        assert.equal(events[0].subject_ref, 'a');
+        assert.equal(events[0].source_surface, surface === 'host' ? 'web' : 'native');
+        assert.equal(JSON.parse(String(events[0].redacted_metadata)).resourceVersion, 1);
+    });
+    test(`${surface}: stale parent deletion keeps the existing CAS conflict`, async () => {
+        const authority = seed({ a: null, b: 'a' });
+        const before = snapshot();
+        const denied = await remove(surface, authority, 'a', 9);
+        assert.equal(denied.status, 409);
+        assert.equal(denied.value.code, 'VERSION_CONFLICT');
+        assert.equal(denied.value.currentVersion, 1);
+        assert.deepEqual(snapshot(), before);
+    });
     for (const [first, second] of [['a', 'b'], ['b', 'a']]) {
         test(`${surface}: stale drafts ${first}→${second}/${second}→${first} cannot commit a cycle`, async () => {
             const authority = seed();
@@ -175,6 +216,84 @@ for (const surface of ['host', 'paired'] as const) {
             } finally { sql.exec('DROP TRIGGER synthetic_hierarchy_fault'); }
         }
     });
+}
+
+function contender(surface: Surface, operation: 'create' | 'delete', gate = '') {
+    const child = spawn(process.execPath, ['scripts/run-strip-types.mjs', 'scripts/fixtures/ambulatory-delete-parent-process.ts', surface, operation, gate],
+        { cwd: process.cwd(), env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir }, stdio: ['pipe', 'pipe', 'pipe'] });
+    let stdout = '', stderr = '';
+    let readyResolve!: () => void, attemptResolve!: () => void, heldResolve!: () => void;
+    let readyReject!: (error: Error) => void, attemptReject!: (error: Error) => void, heldReject!: (error: Error) => void;
+    const ready = new Promise<void>((resolve, reject) => { readyResolve = resolve; readyReject = reject; });
+    const attempting = new Promise<void>((resolve, reject) => { attemptResolve = resolve; attemptReject = reject; });
+    const held = new Promise<void>((resolve, reject) => { heldResolve = resolve; heldReject = reject; });
+    const result = new Promise<{ status: number; value: Record<string, unknown>; pid: number; writerHeld: boolean }>((resolve, reject) => {
+        const fail = (error: Error) => { readyReject(error); attemptReject(error); heldReject(error); reject(error); };
+        const timeout = setTimeout(() => { child.kill('SIGTERM'); fail(new Error(`Contender timed out: ${stdout}\n${stderr}`)); }, 15_000);
+        child.stdout.setEncoding('utf8').on('data', (part: string) => {
+            stdout += part;
+            if (stdout.includes('READY\n')) readyResolve();
+            if (stdout.includes('ATTEMPT\n')) attemptResolve();
+            if (stdout.includes('HELD\n')) heldResolve();
+        });
+        child.stderr.setEncoding('utf8').on('data', (part: string) => { stderr += part; });
+        child.on('error', error => { clearTimeout(timeout); fail(error); });
+        child.on('close', code => {
+            clearTimeout(timeout);
+            if (code !== 0) { fail(new Error(`Contender exited ${code}: ${stdout}\n${stderr}`)); return; }
+            try {
+                const line = stdout.split('\n').find(line => line.startsWith('RESULT '));
+                assert.ok(line);
+                heldResolve();
+                resolve(JSON.parse(line.slice(7)));
+            } catch (error) { fail(error as Error); }
+        });
+    });
+    return { child, ready, attempting, held, result, release() { child.stdin.end('GO\n'); } };
+}
+
+for (const surface of ['host', 'paired'] as const) {
+    for (const first of ['create', 'delete'] as const) {
+        test(`${surface}: two SQLite processes ${first}-first never leave an orphan`, { timeout: 25_000 }, async () => {
+            seed({ a: null });
+            const before = snapshot();
+            const gate = join(dataDir, `${surface}-${first}-release`);
+            const second = first === 'create' ? 'delete' : 'create';
+            const racers = [contender(surface, first, gate), contender(surface, second)];
+            try {
+                await Promise.all(racers.map(racer => racer.ready));
+                racers[0].release();
+                await racers[0].held;
+                racers[1].release();
+                await racers[1].attempting;
+                writeFileSync(gate, 'RELEASE');
+                const results = await Promise.all(racers.map(racer => racer.result));
+                assert.equal(results[0].writerHeld, true);
+                assert.equal(results[1].writerHeld, false);
+                const [created, deleted] = first === 'create' ? results : [results[1], results[0]];
+                assert.notEqual(created.pid, deleted.pid);
+                const after = snapshot();
+                observations.push({ surface, case: 'two-process-create-delete', first, created, deleted, before, after });
+                const orphans = sql.prepare('SELECT child.id FROM ambulatories child LEFT JOIN ambulatories parent ON parent.id=child.parent_id WHERE child.parent_id IS NOT NULL AND parent.id IS NULL').all();
+                assert.deepEqual(orphans, []);
+                assert.deepEqual([created.status, deleted.status], first === 'create' ? [201, 409] : [404, 200]);
+                if (first === 'create') {
+                    assert.equal(row('race-child').parent_id, 'a');
+                    assert.equal(row('a').version, 1);
+                } else {
+                    assert.equal(row('a'), undefined);
+                    assert.equal(row('race-child'), undefined);
+                }
+                const events = (after.audit as Array<Record<string, unknown>>).slice(before.audit.length);
+                assert.equal(events.length, 1);
+                assert.equal(events[0].event_type, first === 'create' ? 'ambulatory.created' : 'ambulatory.deleted');
+            } finally {
+                writeFileSync(gate, 'RELEASE');
+                for (const racer of racers) if (racer.child.exitCode === null) racer.child.kill('SIGTERM');
+                await Promise.allSettled(racers.flatMap(racer => [racer.ready, racer.attempting, racer.held, racer.result]));
+            }
+        });
+    }
 }
 
 test('a prepared paired writer rechecks the revoked peer before ancestry and any mutation', async () => {
