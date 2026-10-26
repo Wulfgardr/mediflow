@@ -1,6 +1,7 @@
 'use client';
 
 import { db, Attachment } from '@/lib/db';
+import { Button } from '@/components/ui/button';
 import { Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 import DocumentViewer from './document-viewer';
@@ -13,6 +14,7 @@ import twin from './twin-diary.module.css';
 
 interface TimelineProps {
     entries: TimelineEntryData[];
+    patientDiary?: boolean;
     // Shared clinical history, named for the section that owns it.
     label?: string;
     emptyMessage?: string;
@@ -20,6 +22,7 @@ interface TimelineProps {
 
 export default function Timeline({
     entries,
+    patientDiary = false,
     label = 'Diario clinico del paziente',
     emptyMessage = 'Nessuna voce visibile nel diario clinico.',
 }: TimelineProps) {
@@ -93,7 +96,12 @@ export default function Timeline({
         ? activeEntryId
         : visibleEntries[0]?.id;
 
-    const auditToggle = (
+    const auditToggle = patientDiary && proposal ? (
+        <Button variant="text" aria-pressed={showDeleted} onClick={() => setShowDeleted(value => !value)}>
+            {showDeleted ? <EyeOff size={16} aria-hidden /> : <Eye size={16} aria-hidden />}
+            {showDeleted ? 'Nascondi voci eliminate' : 'Mostra voci eliminate'}
+        </Button>
+    ) : (
         <button
             onClick={() => setShowDeleted(!showDeleted)}
             className="text-xs flex items-center gap-1 text-[color:var(--lume-ink-muted)] transition-colors hover:text-[color:var(--lume-ink)]"
@@ -113,7 +121,7 @@ export default function Timeline({
     }
 
     return (
-        <div className="space-y-6">
+        <div className={patientDiary && proposal ? twin.patientDiary : "space-y-6"}>
             <div className="flex justify-end">{auditToggle}</div>
 
             <div
@@ -131,6 +139,7 @@ export default function Timeline({
                     <TimelineEntryCard
                         key={entry.id}
                         entry={entry}
+                        patientDiary={patientDiary}
                         active={entry.id === resolvedActiveEntryId}
                         position={index + 1}
                         setSize={visibleEntries.length}
