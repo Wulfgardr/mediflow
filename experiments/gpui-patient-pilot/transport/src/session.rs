@@ -118,6 +118,14 @@ pub struct AiPreferencesContext {
     active: Arc<AtomicBool>,
     context: RequestContext,
 }
+
+/// One exact native selection; it contains no serialized session authority.
+#[derive(Clone)]
+pub struct ChatAccessContext {
+    intent: ProfileQueryIntent,
+    scope: String,
+    patient: String,
+}
 impl AiPreferencesContext {
     pub fn cancel(&self) {
         self.context.cancel();
@@ -175,6 +183,64 @@ impl CatalogRoute {
 }
 
 impl RuntimeSession {
+    pub fn chat_access_context(&self, scope: &str, patient: &str) -> Result<ChatAccessContext> {
+        self.ensure_open()?;
+        let intent = self.profile_query_intent();
+        self.profile_target_matches(&intent, scope, patient)?;
+        Ok(ChatAccessContext {
+            intent,
+            scope: scope.into(),
+            patient: patient.into(),
+        })
+    }
+
+    pub fn check_chat_access_context(&self, context: &ChatAccessContext) -> Result<()> {
+        self.ensure_open()?;
+        drop(self.profile_intent_guard(&context.intent)?);
+        self.profile_target_matches(&context.intent, &context.scope, &context.patient)
+    }
+
+    pub fn revalidate_chat_access_context(&self, context: &ChatAccessContext) -> Result<()> {
+        self.check_chat_access_context(context)?;
+        let eligibility = self.request_with_profile_intent(
+            Method::GET,
+            &["api", "auth", "native", "chat-access-confirmation"],
+            &[],
+            Some(&context.scope),
+            None,
+            false,
+            JSON_LIMIT,
+            Some(&context.intent),
+        )?;
+        self.check_chat_access_context(context)?;
+        if eligibility == json!({"status": "eligible"}) {
+            Ok(())
+        } else {
+            Err(RuntimeError::Forbidden)
+        }
+    }
+
+    pub fn confirm_chat_access_pin(&self, context: &ChatAccessContext, pin: &str) -> Result<()> {
+        self.check_chat_access_context(context)?;
+        let body = json!({ "operation": "mediflow.chat.access-status.v1", "pin": pin });
+        let result = self.request_with_profile_intent(
+            Method::POST,
+            &["api", "auth", "native", "chat-access-confirmation"],
+            &[],
+            Some(&context.scope),
+            Some(&body),
+            true,
+            JSON_LIMIT,
+            Some(&context.intent),
+        )?;
+        self.check_chat_access_context(context)?;
+        if result == json!({"status": "confirmed"}) {
+            Ok(())
+        } else {
+            Err(RuntimeError::Forbidden)
+        }
+    }
+
     pub(crate) fn new(
         client: RuntimeClient,
         user: RuntimeUser,
@@ -6073,5 +6139,48 @@ mod tests {
         seen.recv_timeout(Duration::from_secs(5)).unwrap();
         worker.join().unwrap();
         assert_eq!(result, Err(RuntimeError::InvalidResponse));
+    }
+
+    #[test]
+    fn chat_access_context_is_exact_session_and_selection_and_rejects_aba_and_lock() {
+        let a = session();
+        a.select_profile_patient("scope-a", "patient-a").unwrap();
+        let context = a.chat_access_context("scope-a", "patient-a").unwrap();
+        assert_eq!(a.check_chat_access_context(&context), Ok(()));
+        assert_eq!(
+            session().check_chat_access_context(&context),
+            Err(RuntimeError::ReadRequired)
+        );
+        a.select_profile_patient("scope-a", "patient-b").unwrap();
+        a.select_profile_patient("scope-a", "patient-a").unwrap();
+        assert_eq!(
+            a.check_chat_access_context(&context),
+            Err(RuntimeError::ReadRequired)
+        );
+        let current = a.chat_access_context("scope-a", "patient-a").unwrap();
+        a.lock();
+        assert_eq!(
+            a.check_chat_access_context(&current),
+            Err(RuntimeError::Locked)
+        );
+    }
+
+    #[test]
+    fn chat_access_revalidation_observes_the_actual_host_archive_conflict() {
+        let (url, seen, worker) = scoped_response_server(409, r#"{"code":"ARCHIVE_REPLACED"}"#);
+        let a = admitted_session(&url);
+        a.select_profile_patient("scope-a", "patient-a").unwrap();
+        let context = a.chat_access_context("scope-a", "patient-a").unwrap();
+        assert_eq!(
+            a.revalidate_chat_access_context(&context),
+            Err(RuntimeError::ArchiveReplaced)
+        );
+        assert!(a.is_locked());
+        assert!(
+            seen.recv_timeout(Duration::from_secs(5))
+                .unwrap()
+                .starts_with("GET /api/auth/native/chat-access-confirmation ")
+        );
+        worker.join().unwrap();
     }
 }
