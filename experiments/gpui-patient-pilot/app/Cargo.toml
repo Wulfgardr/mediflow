@@ -21,6 +21,7 @@ chrono = "0.4"
 iana-time-zone = "0.1.65"
 zeroize = "1.8"
 base64 = "0.22"
+getrandom = "0.3"
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
