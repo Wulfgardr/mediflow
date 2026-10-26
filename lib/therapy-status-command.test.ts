@@ -98,6 +98,37 @@ test('another authorized physician knowing an unreceived ID can retire it but ca
     assert.throws(() => readTherapyStatusReceipt(session, command), /denied/);
     assert.deepEqual(counts(command).audits, { n: 0 });
 });
+test('patient purge and orphan cleanup preserve applied, rejected and closed historical command bindings', () => {
+    const { purgePatientCascade, purgeOrphanedClinicalRows, PATIENT_CHILD_TABLES } = load('./patient-cascade.ts') as typeof import('./patient-cascade.ts');
+    assert.equal(PATIENT_CHILD_TABLES.some(row => (row.name as string) === 'therapyStatusCommands'), false);
+    assert.deepEqual(sql.pragma('foreign_key_list(therapy_status_commands)'), []);
+    const commands = [fixture(), fixture(), fixture()];
+    executeTherapyStatusCommand(session, { ...commands[0]!, target: 'completed' });
+    const rejected = { ...commands[1]!, expectedVersion: 2 };
+    executeTherapyStatusCommand(session, { ...rejected, target: 'suspended' });
+    closeTherapyStatusCommand(session, commands[2]!);
+    const ledger = sql.prepare('SELECT * FROM therapy_status_commands ORDER BY command_id').all();
+    const audit = sql.prepare('SELECT * FROM audit_events ORDER BY event_id').all();
+    dbServer.transaction(tx => {
+        for (const command of commands) {
+            purgePatientCascade(tx, command.patientId);
+            sql.prepare('DELETE FROM patients WHERE id=?').run(command.patientId);
+        }
+        purgeOrphanedClinicalRows(tx);
+    });
+    for (const command of commands) {
+        assert.equal(sql.prepare('SELECT 1 FROM patients WHERE id=?').get(command.patientId), undefined);
+        assert.equal(sql.prepare('SELECT 1 FROM therapies WHERE id=?').get(command.therapyId), undefined);
+    }
+    assert.deepEqual(sql.prepare('SELECT * FROM therapy_status_commands ORDER BY command_id').all(), ledger);
+    assert.deepEqual(sql.prepare('SELECT * FROM audit_events ORDER BY event_id').all(), audit);
+    for (const [command, outcome] of [[commands[0]!, 'applied'], [rejected, 'rejected'], [commands[2]!, 'closed']] as const) {
+        const result = readTherapyStatusReceipt(session, command);
+        assert.equal(result.outcome, 'terminal');
+        if (result.outcome === 'terminal') assert.equal(result.receipt.outcome, outcome);
+    }
+    assert.deepEqual(sql.pragma('foreign_key_check'), []);
+});
 test('retired real owner projection cannot use a delayed request after lock', () => {
     const command = fixture(), before = counts(command);
     retireSyntheticWebSession(session);
