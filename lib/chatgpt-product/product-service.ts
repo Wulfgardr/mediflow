@@ -5,7 +5,8 @@ import type { WebSessionProjection } from '../security/web-auth-lifecycle-owner-
 import { bindChatGptSyntheticSynthesis } from '../ai-providers/fabric/chatgpt-synthetic-synthesis-binding';
 import type { QualifiedExecutionHost } from '../chatgpt-execution/execution-host';
 import type { ProductExecutionPlatform } from '../chatgpt-execution/execution-platform';
-import { createExecutionLogin, readExecutionLimits } from '../chatgpt-execution/execution-login';
+import { createExecutionQuotaMonitor } from '../chatgpt-execution/execution-quota';
+import { createExecutionLogin } from '../chatgpt-execution/execution-login';
 import { ExecutionError, type SynthesisCatalog, type SynthesisRequest, type SynthesisResult, type ExecutionTransport, type SupportedChatGptPlan } from '../chatgpt-execution/execution-contract';
 import { createProductConsent } from './product-consent';
 import { emptyReceipt, parseProductRequest, ProductError, type ConsentRequest, type ProductCode, type ProductOperation,
@@ -37,6 +38,7 @@ export function createProductService(options: {
     let result: SynthesisResult | null = null;
     let plan: SupportedChatGptPlan | null = null;
     let limits: ProductLimits | null = null;
+    let quota = createExecutionQuotaMonitor();
     let receipt = emptyReceipt();
     let controller = new AbortController();
     let busy = false;
@@ -107,7 +109,7 @@ export function createProductService(options: {
     }
     /** Invalidation is synchronous. Cleanup promises never grant authority back. */
     function withdraw(code: ProductCode, next: ProductState = 'error', deferCleanup = false): () => void {
-        epoch++; state = next; notice = code; busy = false;
+        epoch++; state = next; notice = code; busy = false; quota.retire('revoked');
         clearTimeout(expiry); clearInterval(watcher); expiry = undefined; watcher = undefined;
         catalog = null; result = null; limits = null; plan = null;
         updateReceipt({ localAuthorityWithdrawn: true });
@@ -179,19 +181,9 @@ export function createProductService(options: {
             // Login notifications do not prove account identity. After handoff ANY
             // account change withdraws product admission rather than switching it.
             if (method === 'account/updated' && plan !== null) { withdraw('revoked'); return; }
-            if (method === 'account/rateLimits/updated' && plan !== null) {
-                try {
-                    const data = raw as { rateLimits?: { limitId?: unknown; primary?: { usedPercent?: unknown }; secondary?: { usedPercent?: unknown }; rateLimitReachedType?: unknown; spendControlReached?: unknown } };
-                    const changed = data?.rateLimits;
-                    if (!changed) throw new ExecutionError('limits_unavailable');
-                    if (changed.limitId != null && changed.limitId !== 'codex') return;
-                    if (changed.rateLimitReachedType != null || changed.spendControlReached === true) throw new ExecutionError('quota_exhausted');
-                    for (const window of [changed.primary, changed.secondary]) {
-                        if (window == null) continue;
-                        if (typeof window.usedPercent !== 'number' || !Number.isFinite(window.usedPercent) || window.usedPercent < 0) throw new ExecutionError('limits_unavailable');
-                        if (window.usedPercent >= 100) throw new ExecutionError('quota_exhausted');
-                    }
-                } catch (error) { withdraw(errorCode(error)); }
+            if (method === 'account/rateLimits/updated') {
+                try { quota.notice(raw); if (plan !== null) limits = quota.snapshot(); }
+                catch (error) { if (error instanceof ExecutionError && error.denial) updateReceipt({ denial: receipt.denial ?? error.denial }); withdraw(errorCode(error)); }
             }
         }, code => withdraw(code));
     }
@@ -203,7 +195,7 @@ export function createProductService(options: {
             owned = await platform.create(controller.signal);
             guard(expectedEpoch);
             if (!owned.boundaryQualified()) throw new ProductError('unqualified_boundary');
-            host = wrap(owned, ownedContext); watchHost(host); return host;
+            quota = createExecutionQuotaMonitor(); host = wrap(owned, ownedContext); watchHost(host); return host;
         } catch (error) {
             // A late-created host is drained by its original closure, never by a
             // new request or a mutable global pointer to another child.
@@ -318,7 +310,7 @@ export function createProductService(options: {
             expiry = setTimeout(() => withdraw('consent_stale'), consent.remainingMs()); expiry.unref?.();
             watcher = setInterval(() => {
                 if (disposed || controller.signal.aborted) return;
-                try { guard(); } catch (error) { withdraw(errorCode(error)); }
+                try { guard(); } catch (error) { if (error instanceof ExecutionError && error.denial) updateReceipt({ denial: receipt.denial ?? error.denial }); withdraw(errorCode(error)); }
             }, 50); watcher.unref?.();
             return snapshot();
         }
@@ -359,13 +351,13 @@ export function createProductService(options: {
                 if (operation === 'read') {
                     catalog = null; result = null; limits = null;
                     plan = await login!.read(); guard(expectedEpoch);
-                    limits = readExecutionLimits(await host!.transport.request('account/rateLimits/read')); guard(expectedEpoch);
+                    limits = await quota.read(() => host!.transport.request('account/rateLimits/read')); guard(expectedEpoch);
                     state = 'connected'; return snapshot();
                 }
                 if (operation === 'models') {
                     catalog = null; result = null; limits = null;
                     plan = await login!.read(); guard(expectedEpoch);
-                    limits = readExecutionLimits(await host!.transport.request('account/rateLimits/read')); guard(expectedEpoch);
+                    limits = await quota.read(() => host!.transport.request('account/rateLimits/read')); guard(expectedEpoch);
                     let observed: SynthesisCatalog | undefined;
                     await binding!.catalog(value => { observed = value; return new Response(null); }); guard(expectedEpoch);
                     if (!observed) throw new ExecutionError('protocol_error');
@@ -385,8 +377,9 @@ export function createProductService(options: {
             const response = await Promise.race([work, interrupted]); guard(expectedEpoch); return response;
         } catch (error) {
             const code = errorCode(error);
+            if ((error instanceof ExecutionError || error instanceof ProductError) && error.denial) updateReceipt({ denial: receipt.denial ?? error.denial });
             if (code !== 'login_pending' && epoch === expectedEpoch) withdraw(code);
-            throw new ProductError(code);
+            throw new ProductError(code, error instanceof ExecutionError || error instanceof ProductError ? error.denial : null);
         } finally {
             clearTimeout(deadline); signal?.removeEventListener('abort', abort); localSignal.removeEventListener('abort', stopWaiting);
             if (epoch === expectedEpoch) busy = false;

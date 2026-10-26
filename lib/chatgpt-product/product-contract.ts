@@ -1,5 +1,5 @@
 /* browser-safe. No host, account secret or caller corpus in these DTOs. */
-import type { SynthesisCatalog, SynthesisRequest, SynthesisResult, SynthesisSource, ExecutionCode, SupportedChatGptPlan } from '../chatgpt-execution/execution-contract';
+import type { SynthesisCatalog, SynthesisRequest, SynthesisResult, SynthesisSource, ExecutionCode, ExecutionDenial, SupportedChatGptPlan } from '../chatgpt-execution/execution-contract';
 export const PRODUCT_NAMESPACE = '/api/settings/ai/chatgpt/synthesis/' as const;
 export const PRODUCT_OPERATION = 'synthetic_synthesis' as const;
 export const PRODUCT_DATA_CLASS = 'synthetic_fixture' as const;
@@ -9,7 +9,7 @@ export type ProductOperation = ProductMutation | 'status';
 export type ProductCode = ExecutionCode | 'consent_required' | 'consent_stale' | 'invalid_state' | 'login_pending'
     | 'login_failed' | 'login_expired' | 'logout_unconfirmed' | 'unauthorized' | 'forbidden' | 'method_not_allowed' | 'preparation_unavailable';
 export class ProductError extends Error {
-    constructor(readonly code: ProductCode) { super(code); this.name = 'ProductError'; }
+    constructor(readonly code: ProductCode, readonly denial: ExecutionDenial | null = null) { super(code); this.name = 'ProductError'; }
 }
 export type ProductState = 'preparing' | 'held' | 'needs_consent' | 'consented' | 'starting' | 'awaiting_login' | 'verifying'
     | 'connected' | 'ready' | 'generating' | 'completed' | 'canceled' | 'error';
@@ -29,13 +29,13 @@ export type ConsentRequest = Readonly<{
 export type ProductRequest = ConsentRequest | SynthesisRequest | Readonly<Record<string, never>>;
 export type Observation = 'not_observed' | 'confirmed' | 'unconfirmed';
 export type ProductReceipt = Readonly<{
-    localAuthorityWithdrawn: boolean; interruption: 'not_attempted' | 'attempted' | 'acknowledged';
+    denial?: ExecutionDenial | null; localAuthorityWithdrawn: boolean; interruption: 'not_attempted' | 'attempted' | 'acknowledged';
     egressWithdrawalRequested: boolean; leaderExit: Observation; ownedGroupCessation: Observation;
     escapedDescendants: 'not_attested'; cleanup: Observation;
     remoteLogout: 'not_attempted' | 'confirmed' | 'unconfirmed';
     globalRemoteRevocation: 'not_claimed'; secureErase: 'not_claimed'; quotaRefund: 'not_claimed';
 }>;
-export type ProductLimits = Readonly<{ primaryUsedPercent: number | null; secondaryUsedPercent: number | null }>;
+export type ProductLimits = import('../chatgpt-execution/quota-view').ExecutionQuotaView;
 export type ProductPreparation = Readonly<{
     state: 'not_prepared' | 'preparing' | 'ready' | 'in_use' | 'closing' | 'closed' | 'blocked';
     expiresAt: number | null;
@@ -70,7 +70,7 @@ export function parseProductRequest(operation: ProductOperation, raw: unknown): 
     return Object.freeze({});
 }
 export function emptyReceipt(): ProductReceipt {
-    return Object.freeze({ localAuthorityWithdrawn: false, interruption: 'not_attempted', egressWithdrawalRequested: false,
+    return Object.freeze({ denial: null, localAuthorityWithdrawn: false, interruption: 'not_attempted', egressWithdrawalRequested: false,
         leaderExit: 'not_observed', ownedGroupCessation: 'not_observed', escapedDescendants: 'not_attested', cleanup: 'not_observed',
         remoteLogout: 'not_attempted', globalRemoteRevocation: 'not_claimed', secureErase: 'not_claimed', quotaRefund: 'not_claimed' });
 }
