@@ -1,6 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import type { FunctionModelPreferences } from '../lib/function-models/browser';
-import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 
 const HEX = Object.freeze({
   session: '1'.repeat(32),
@@ -109,7 +112,7 @@ function availablePreview() {
   };
 }
 
-test('[E2E fixture] Smart Import exposes only the Fabric review preview and never calls legacy apply', async ({ page }) => {
+async function installSmartImportFixture(page: Page, options: { beforePreview?: () => Promise<void>; fail?: () => boolean } = {}) {
   const calls = { context: 0, selectionGet: 0, selectionPost: 0, ingest: 0, preview: 0, legacyApply: 0 };
   let catalogReads = 0;
   await page.route('**/api/settings/ai/functions', async route => {
@@ -149,27 +152,38 @@ test('[E2E fixture] Smart Import exposes only the Fabric review preview and neve
   await page.route('**/api/ai/smart-import/preview', async (route) => {
     calls.preview += 1;
     expect(route.request().method()).toBe('POST');
-    expect(JSON.parse(route.request().headers()['x-mediflow-function-model'] ?? 'null')).toEqual({
+    const modelHeader = route.request().headers()['x-mediflow-function-model'];
+    if (calls.preview === 1) expect(JSON.parse(modelHeader ?? 'null')).toEqual({
       modelOptionId: FIXTURE_MODEL.modelOptionId,
       expectedCatalogRevision: FIXTURE_CATALOG.catalogRevision,
     });
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(availablePreview()) });
+    await options.beforePreview?.();
+    await route.fulfill(options.fail?.() ? { status: 503, json: { error: 'synthetic-unavailable' } } : { status: 200, json: availablePreview() });
   });
   await page.route('**/api/patients/*/smart-import', async (route) => {
     calls.legacyApply += 1;
     await route.abort();
   });
 
+  return { calls, catalogReads: () => catalogReads };
+}
+
+test('[E2E fixture] Smart Import exposes only the Fabric review preview and never calls legacy apply', async ({ page }) => {
+  const { calls, catalogReads } = await installSmartImportFixture(page);
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await page.route('**/api/ambulatories', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 'ambulatory.synthetic', name: 'Ambulatorio di prova', address: '', version: 1 }]) }));
   await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'enabled');
   const patientId = await createPatient(page);
   await page.goto(`/patients/${patientId}/modules#quadro`);
-
   await openPatientSection(page, 'quadro');
-  await page.getByText('Proposte dalle fonti cliniche · Smart Import', { exact: true }).click();
+  await expect(page.locator('#quadro')).toBeVisible();
+  await expect(page.locator('#quadro [data-testid="fabric-preview-card"]')).toHaveCount(0);
+  await openPatientSection(page, 'documenti');
+  await page.locator('#smart-import').getByRole('button', { name: 'Proposte', exact: true }).click();
 
   const card = page.getByTestId('fabric-preview-card');
+  await expect(page.getByTestId('smart-import-proposal-summary')).toHaveCount(1);
+  expect(calls.preview).toBe(0);
   await expect(card).toContainText('Raccogli dalle fonti della cartella');
   await card.getByRole('button', { name: 'Prepara proposta' }).click();
   await expect(card.getByRole('checkbox')).toBeDisabled();
@@ -194,6 +208,93 @@ test('[E2E fixture] Smart Import exposes only the Fabric review preview and neve
   await card.getByText('Dettagli di verifica', { exact: true }).click();
   await expect(card.getByTestId('smart-import-fabric-disclosure'))
     .toContainText(`${FIXTURE_MODEL.provider} · ${FIXTURE_MODEL.model} · local_process`);
-  expect(catalogReads).toBeGreaterThanOrEqual(2); // Selection read plus pre-generation reread.
+  expect(catalogReads()).toBeGreaterThanOrEqual(2); // Selection read plus pre-generation reread.
   expect(calls).toEqual({ context: 0, selectionGet: 1, selectionPost: 1, ingest: 1, preview: 1, legacyApply: 0 });
 });
+
+for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', '320', 'zoom-200', 'zoom-400']) {
+  test(`Smart Import composizione ${theme} ${size}`, async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+    const baseline = process.env.SMART_IMPORT_BASELINE === '1';
+    const zoom = size.startsWith('zoom-') ? await openBrowserZoomFixture(baseURL!) : undefined;
+    const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
+    let fail = false;
+    try {
+      if (zoom) page = zoom.page;
+      const { calls } = await installSmartImportFixture(page, { beforePreview: async () => { entered.resolve(); await release.promise; }, fail: () => fail });
+      await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+      await page.route('**/api/ambulatories', route => route.fulfill({ json: [{ id: 'ambulatory.synthetic', name: 'Ambulatorio di prova', address: '', version: 1 }] }));
+      await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'enabled');
+      const patientId = await createPatient(page);
+      await page.goto(`/patients/${patientId}/modules`);
+      await openPatientSection(page, baseline ? 'quadro' : 'documenti');
+      const disclosure = page.locator('#smart-import');
+      const toggle = disclosure.locator(':scope > div > [data-disclosure-control]');
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await toggle.focus(); await page.keyboard.press('Enter');
+      const card = page.getByTestId('fabric-preview-card');
+      await page.setViewportSize({ width: zoom ? 1440 : Number(size), height: 1000 });
+      await page.evaluate(theme => {
+        document.documentElement.classList.toggle('dark', theme === 'grafite');
+        document.documentElement.classList.toggle('light', theme === 'giorno');
+      }, theme);
+      if (zoom) await zoom.setZoom(size === 'zoom-200' ? 2 : 4);
+      const directory = process.env.SMART_IMPORT_CAPTURES;
+      if (directory) await mkdir(directory, { recursive: true });
+      const capture = async (state: string) => {
+        await card.scrollIntoViewIfNeeded();
+        if (!baseline) await assertNoHorizontalOverflow(page, [{ label: 'Smart Import', selector: '#smart-import' }, { label: 'pagina', selector: 'document' }]);
+        if (directory) await page.screenshot({ path: `${directory}/${theme}-${size}-${state}.png`, animations: 'disabled' });
+      };
+      await capture('pronta');
+      await card.getByRole('button', { name: 'Cambia', exact: true }).click();
+      await card.getByRole('combobox', { name: 'Modello per questa proposta', exact: true }).selectOption(FIXTURE_MODEL.modelOptionId);
+      const prepare = card.getByRole('button', { name: 'Prepara proposta', exact: true });
+      await prepare.focus(); await page.keyboard.press('Enter');
+      const generate = card.getByRole('button', { name: 'Conferma e genera proposta', exact: true });
+      await expect(generate).toBeDisabled();
+      await expect(card.getByRole('checkbox')).toBeDisabled();
+      await card.getByRole('button', { name: 'Annulla', exact: true }).click();
+      await expect(prepare).toBeVisible();
+      expect(calls.ingest).toBe(0); expect(calls.preview).toBe(0);
+      await prepare.click();
+      const ambulatory = card.getByRole('combobox', { name: 'Ambulatorio per questa proposta' });
+      await ambulatory.focus(); await expect(ambulatory).toBeFocused(); await ambulatory.selectOption('ambulatory.synthetic');
+      await expect(ambulatory).toHaveValue('ambulatory.synthetic');
+      await expect(generate).toBeDisabled();
+      const consent = card.getByRole('checkbox');
+      await consent.focus(); await page.keyboard.press('Space'); await expect(consent).toBeChecked();
+      await capture('conferma');
+      await generate.click(); await entered.promise;
+      await capture('in-corso'); release.resolve();
+      await expect(card).toContainText('Proposta sintetica da rivedere.');
+      await capture('proposta');
+      if (!baseline) {
+        await expect(card.getByTestId('smart-import-review-proposal').locator('[data-ink="pencil"]')).toBeVisible();
+        await expect(card).toContainText('Fonti raccolte per la proposta');
+        const source = card.getByRole('link', { name: 'Note paziente', exact: true });
+        await source.scrollIntoViewIfNeeded(); await source.focus(); await assertNotClippedInViewport(source, 'Fonte Note paziente');
+        if (directory) await page.screenshot({ path: `${directory}/${theme}-${size}-fonti.png`, animations: 'disabled' });
+        await openPatientSection(page, 'quadro');
+        await expect(card).not.toBeVisible();
+        const summary = page.getByTestId('smart-import-proposal-summary');
+        await expect(summary).toContainText('1 proposta da rivedere');
+        await summary.getByRole('link').click(); await expect(card).toBeVisible();
+        expect(calls.preview).toBe(1);
+      }
+      fail = true;
+      await card.getByRole('button', { name: 'Ricomincia', exact: true }).click();
+      await card.getByRole('button', { name: 'Prepara proposta', exact: true }).click();
+      await ambulatory.selectOption('ambulatory.synthetic'); await consent.check();
+      await generate.click();
+      await expect(card).toContainText('Anteprima non disponibile.'); await capture('errore');
+      expect(calls.legacyApply).toBe(0);
+      await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'disabled');
+      await page.reload(); await openPatientSection(page, baseline ? 'quadro' : 'documenti'); await toggle.click();
+      await expect(prepare).toBeDisabled(); await capture('spenta');
+      await test.info().attach('surface', { body: JSON.stringify({ theme, size, baseline,
+        revision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+        zoom: zoom ? { mechanism: 'chrome.tabs.setZoom/getZoom', factor: size === 'zoom-200' ? 2 : 4, physicalWidth: 1440, innerWidth: await page.evaluate(() => innerWidth) } : null }), contentType: 'application/json' });
+    } finally { release.resolve(); await zoom?.close(); }
+  });
+}
