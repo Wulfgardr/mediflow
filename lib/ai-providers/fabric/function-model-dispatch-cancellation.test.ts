@@ -165,3 +165,53 @@ test('portable catalog digest changes invalidate a prior explicit request rather
     const after = { ...before, portable: portableStatus('revoked', 3) };
     assert.throws(() => resolveFunctionModelDispatch(after, 'treatment_reasoning', { modelOptionId: option.modelOptionId, expectedCatalogRevision: catalog.revision }), /catalog_stale/u);
 });
+
+for (const trigger of ['request', 'internal'] as const) test(`guard combines authenticated request cancellation with the existing internal signal: ${trigger}`, async () => {
+    const settings = fixture(), requestController = new AbortController(), internal = new AbortController();
+    let observed: AbortSignal | undefined, enter!: () => void;
+    const entered = new Promise<void>(done => { enter = done; });
+    const handler = createFunctionModelDispatch({ readSources: () => settings, authenticate: async () => 'synthetic-session' })('patient_insight', async () => {
+        const resolution = localProviderRegistry.resolve({ task: 'clinical', provider: 'ollama', models: { clinical: 'synthetic-clinical:1' }, endpoint: 'http://127.0.0.1:11434', chatTimeoutMs: 1000 });
+        resolution.adapter.chat = async (_messages, signal) => {
+            observed = signal; enter();
+            return new Promise((_, reject) => { signal?.addEventListener('abort', () => reject(new Error('synthetic transport canceled')), { once: true }); });
+        };
+        await guardFunctionModelResolution(resolution).adapter.chat([], internal.signal);
+        return Response.json({ mustNotPublish: true });
+    });
+    const work = handler(request(requestController.signal)); await entered;
+    (trigger === 'request' ? requestController : internal).abort();
+    const aborted = observed?.aborted;
+    // Always settle the synthetic transport even on a signal-composition regression.
+    internal.abort(); requestController.abort();
+    assert.notEqual((await work).status, 200); assert.equal(aborted, true);
+});
+
+test('one request cancellation cannot abort another request transport in the same process', async () => {
+    const settings = fixture(), controllers = [new AbortController(), new AbortController()];
+    const signals: AbortSignal[] = [], releases: (() => void)[] = [];
+    let enter!: () => void, calls = 0;
+    const entered = new Promise<void>(done => { enter = done; });
+    const handler = createFunctionModelDispatch({ readSources: () => settings, authenticate: async () => 'synthetic-session' })('patient_insight', async () => {
+        const resolution = localProviderRegistry.resolve({ task: 'clinical', provider: 'ollama', models: { clinical: 'synthetic-clinical:1' }, endpoint: 'http://127.0.0.1:11434', chatTimeoutMs: 1000 });
+        resolution.adapter.chat = async (_messages, signal) => {
+            assert.ok(signal); const position = calls++; signals[position] = signal;
+            return new Promise((done, reject) => {
+                const stop = () => reject(new Error('synthetic request canceled'));
+                signal.addEventListener('abort', stop, { once: true });
+                releases[position] = () => { signal.removeEventListener('abort', stop); done({ content: 'synthetic', stats: { latency: 0, tokensIn: 0, tokensOut: 0 } }); };
+                if (calls === 2) enter();
+            });
+        };
+        await guardFunctionModelResolution(resolution).adapter.chat([]);
+        return Response.json({ outcome: 'synthetic-current-result' });
+    });
+    const a = handler(request(controllers[0].signal));
+    // Ensure the first registration belongs to A before starting B.
+    for (let n = 0; n < 20 && calls < 1; n++) await Promise.resolve();
+    assert.equal(calls, 1);
+    const b = handler(request(controllers[1].signal)); await entered;
+    controllers[0].abort(); assert.equal(signals[0].aborted, true); assert.equal(signals[1].aborted, false);
+    releases[1](); assert.notEqual((await a).status, 200); assert.equal((await b).status, 200);
+    assert.equal(calls, 2);
+});
