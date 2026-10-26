@@ -142,13 +142,18 @@ export function createProductService(options: {
     function snapshot(): ProductResponse {
         enforceLocalState();
         if (host) observe(host);
+        const preparation = platform.preparation?.() ?? Object.freeze({ state: 'not_prepared', expiresAt: null } as const);
+        if (preparation.state === 'blocked') {
+            if (!attemptDeadline) state = 'held';
+            updateReceipt({ cleanup: 'unconfirmed' });
+        }
         // Legacy server-only adapters still bind their disclosure before grant.
         if (!platform.prepare && !disclosureBound && !pendingCreation && !draining && !host && receipt.cleanup !== 'unconfirmed') {
             qualification = platform.snapshot();
             if (qualification.state === 'qualified') { consent.bind(context, qualification.revision, session.expiresAt - Date.now(), session.expiresAt); disclosureBound = true; }
         }
         const value: ProductSnapshot = Object.freeze({ schema: 'mediflow.chatgpt-product.v1', state, notice,
-            preparation: platform.preparation?.() ?? Object.freeze({ state: 'not_prepared', expiresAt: null }),
+            preparation,
             contextRevision: context, qualification: platform.snapshot(), disclosure: consent.disclosure(),
             authenticatedProcess: plan ? 'dedicated_execution' : 'none', accountControlAdmitsExecution: false, plan,
             consentExpiresAt: consent.expiresAt(), loginExpiresAt: ['starting', 'awaiting_login', 'verifying'].includes(state) ? consent.expiresAt() : null,
@@ -246,7 +251,8 @@ export function createProductService(options: {
         current(); return snapshot();
     }
     async function prepare(signal?: AbortSignal): Promise<ProductResponse> {
-        if (!platform.prepare || !['held', 'canceled', 'error'].includes(state) || host || receipt.cleanup === 'unconfirmed') throw new ProductError('invalid_state');
+        if (!platform.prepare || !['not_prepared', 'closed'].includes(platform.preparation?.().state ?? 'not_prepared')
+            || !['held', 'canceled', 'error'].includes(state) || host || receipt.cleanup === 'unconfirmed') throw new ProductError('invalid_state');
         context = randomUUID(); controller = new AbortController(); receipt = emptyReceipt();
         consent.reset(); disclosureBound = false;
         const expectedEpoch = ++epoch, local = controller;
@@ -303,6 +309,7 @@ export function createProductService(options: {
         const request = parseProductRequest(operation, raw);
         if (operation === 'status') return snapshot();
         if (operation === 'cancel' || operation === 'login/cancel' || operation === 'logout') return stop(operation);
+        if (platform.preparation?.().state === 'blocked') throw new ProductError('invalid_state');
         if (busy || pendingCreation || draining) throw new ProductError('busy');
         if (operation === 'prepare') return prepare(signal);
         if (operation === 'consent') {

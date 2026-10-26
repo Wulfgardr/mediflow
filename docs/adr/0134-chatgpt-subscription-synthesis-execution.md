@@ -234,6 +234,27 @@ creando una nuova sessione o un nuovo backend; non viene rimossa in base
 al solo PID o all'assenza di un processo. La riconciliazione di un arresto
 anomalo resta un'operazione esplicita, non un ripristino automatico.
 
+Dopo la perdita del registro in memoria, lo stato legge soltanto la
+prenotazione persistente. Hold presente, percorso non verificabile o errore
+di osservazione non attestano assenza né cleanup. Lo status ordinario senza
+tentativo risponde con la forma chiusa `{schema, phase: "recovery_required",
+attemptId: null, cleanupConfirmed: false}`; `schema` resta
+`mediflow.chatgpt-ordinary-flow.v1`. Con prenotazione certamente assente resta
+`{schema, phase: "closed", attemptId: null, cleanupConfirmed: true}`: descrive
+l'assenza di una prenotazione pendente, non ricostruisce una ricevuta del
+vecchio processo. La superficie dedicata usa gli stati esistenti `held`,
+`preparation: {state: "blocked", expiresAt: null}` e
+`receipt.cleanup: "unconfirmed"`. Una lettura successiva o un nuovo owner non
+attribuiscono al nuovo tentativo le risorse precedenti; gli stati più precisi
+dell'owner ancora vivo restano invariati.
+
+La verifica è negativa e non rimuove file, non cerca processi, non adotta
+credenziali e non avvia il runtime. Nessun percorso, PID o identificatore di
+risorsa precedente arriva al browser. Prepare e il riarmo ordinario restano
+negati mentre la prenotazione è presente o indeterminabile; cancel e logout
+senza la custodia originale non confermano cleanup. Questa osservazione non
+implementa la riconciliazione dell'arresto anomalo e non amplia l'autorità.
+
 Gli asset pubblici necessari sono risolti nell'installazione del backend,
 senza ricerca in HOME o nelle credenziali dello sviluppatore. Il loro
 ritrovamento non emette qualifica: pin, toolchain, protocollo e custodia sono

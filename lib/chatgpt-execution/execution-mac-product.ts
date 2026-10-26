@@ -23,6 +23,23 @@ export function reportMacProductPreparationDiagnostic(stage: PreparationDiagnost
     hostExecutionDiagnostic({ event: 'preparation_failed', method: null, errorCode: 'upstream_error', rpcCode: null,
         httpStatus: null, tls: false, network: false, device: false, experimental: false, permission: false, stage });
 }
+function reservationDirectory(): string { return join(getDataDir(), 'chatgpt-execution'); }
+/** Negative-only observation. An existing or indeterminate reservation never
+ * proves cessation or gives a new owner access to the previous resources. */
+export function hasUnconfirmedMacProductPreparation(directory: () => string = reservationDirectory): boolean {
+    let path: string, root: ReturnType<typeof lstatSync>;
+    try { path = directory(); } catch { return true; }
+    try { root = lstatSync(path); }
+    catch (error) { return (error as NodeJS.ErrnoException).code !== 'ENOENT'; }
+    if (!root.isDirectory() || root.isSymbolicLink() || root.uid !== process.getuid?.() || (root.mode & 0o077) !== 0) return true;
+    try { lstatSync(join(path, 'mac-preparation.hold')); return true; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return true; }
+    try {
+        const current = lstatSync(path);
+        return current.isSymbolicLink() || current.dev !== root.dev || current.ino !== root.ino
+            || current.uid !== root.uid || current.mode !== root.mode;
+    } catch { return true; }
+}
 /** Kept even when the owning Web session disappears. Never clear a hold merely
  * because a PID is absent, a request ended or this backend restarted. */
 function reserveDirectory(directory: string): () => void {
@@ -57,6 +74,7 @@ export function createMacProductPlatformManager(options: {
     diagnostic?: Parameters<typeof prepareMacProductQualification>[0]['diagnostic'];
 } = {}) {
     let reserved = false;
+    const directory = options.reservationDirectory ?? reservationDirectory;
     const issue = options.prepare ?? prepareMacProductQualification;
     const diagnostic = options.diagnostic ?? hostExecutionDiagnostic;
     return Object.freeze({ createPlatform(): ProductExecutionPlatform {
@@ -69,6 +87,11 @@ export function createMacProductPlatformManager(options: {
         let release: (() => void) | undefined;
         let taken = false;
         const setState = (state: ProductPreparation['state']) => { projection = Object.freeze({ ...projection, state }); };
+        function preparation(): ProductPreparation {
+            if (!release && ['not_prepared', 'closed'].includes(projection.state) && hasUnconfirmedMacProductPreparation(directory))
+                return Object.freeze({ state: 'blocked', expiresAt: null });
+            return projection;
+        }
         function relinquish() {
             if (!release) return;
             try { release(); release = undefined; reserved = false; setState('closed'); }
@@ -91,15 +114,15 @@ export function createMacProductPlatformManager(options: {
         }
         return Object.freeze({
             snapshot: () => reviewed?.snapshot() ?? executionPlatformSnapshot(),
-            preparation: () => projection,
+            preparation,
             close,
             async prepare(signal: AbortSignal, lifetimeMs: number) {
-                if (reserved || pending || !['not_prepared', 'closed'].includes(projection.state)) throw new ExecutionError('busy');
+                if (reserved || pending || !['not_prepared', 'closed'].includes(preparation().state)) throw new ExecutionError('busy');
                 if (signal.aborted || lifetimeMs <= 0) throw new ExecutionError('canceled');
                 // Resolve before reserving; missing installation files cannot leave
                 // a resource hold, and no process is launched by this resolver.
                 const assets = (options.assets ?? resolveInstalledMacExecutionAssets)();
-                release = reserveDirectory((options.reservationDirectory ?? (() => join(getDataDir(), 'chatgpt-execution')))());
+                release = reserveDirectory(directory());
                 reserved = true; taken = false; draining = undefined; prepared = undefined;
                 controller = new AbortController();
                 const local = controller;

@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 import * as owner from '../security/ordinary-session-authority';
 import { acquireOrdinarySessionResourceIdentity } from '../security/ordinary-session-authority';
 import { createOrdinaryProductAttempt } from '../chatgpt-execution/ordinary-product-attempt';
-import { createSharedMacProductPlatform, reportMacProductPreparationDiagnostic } from '../chatgpt-execution/execution-mac-product';
+import { createSharedMacProductPlatform, hasUnconfirmedMacProductPreparation, reportMacProductPreparationDiagnostic } from '../chatgpt-execution/execution-mac-product';
 import { readOrdinaryGovernance } from '../chatgpt-execution/ordinary-governance';
 import { captureOrdinarySettings, readOrdinaryCloudSettings, writeOrdinaryCloudSettings } from './ordinary-settings';
 import { readOrdinaryTaskProfile, type OrdinaryTaskProfile } from '../chatgpt-execution/ordinary-task-profile';
@@ -18,7 +18,7 @@ import type { OrdinaryExecutionResult } from '../chatgpt-execution/execution-ser
 import type { SynthesisCatalog } from '../chatgpt-execution/execution-contract';
 import { ExecutionError } from '../chatgpt-execution/execution-contract';
 import { ProductError } from './product-contract';
-import { ORDINARY_FLOW_SCHEMA, type OrdinaryFunction, type OrdinaryFlowState, type OrdinaryRemoteReceipt, type OrdinaryRemoteProvenance } from './ordinary-wire';
+import { ORDINARY_FLOW_SCHEMA, type OrdinaryFunction, type OrdinaryFlowState, type OrdinaryRemoteReceipt, type OrdinaryRemoteProvenance, type OrdinaryEmptyFlowStatus } from './ordinary-wire';
 
 type Attempt = Awaited<ReturnType<typeof createOrdinaryProductAttempt>>;
 type Entry = {
@@ -168,6 +168,7 @@ export async function beginOrdinaryFunction(request: Request, functionId: Ordina
     if (request.signal.aborted) throw new ProductError('revoked');
     const identity = acquireOrdinarySessionResourceIdentity(session);
     if (!identity) throw new ProductError('session_expired');
+    if (hasUnconfirmedMacProductPreparation()) { owner.releaseResourcePort(identity.port); throw new ExecutionError('busy'); }
     const previous = entries.get(identity.generation);
     if (previous || entries.size >= 16) { owner.releaseResourcePort(identity.port); throw new ProductError('busy'); }
     const authorityExpiry = owner.readResourceExpiresAt(identity.port, session.expiresAt);
@@ -214,7 +215,13 @@ export async function beginOrdinaryFunction(request: Request, functionId: Ordina
 export async function ordinaryFunctionCommand(session: owner.OrdinarySession, operation: string, body: Record<string, unknown>, signal: AbortSignal): Promise<Response> {
     const identity = acquireOrdinarySessionResourceIdentity(session); if (!identity) throw new ProductError('session_expired');
     const entry = entries.get(identity.generation); owner.releaseResourcePort(identity.port);
-    if (operation === 'status' && !entry) return reply({ schema: ORDINARY_FLOW_SCHEMA, phase: 'closed', attemptId: null, cleanupConfirmed: true });
+    if (operation === 'status' && !entry) {
+        const retained = hasUnconfirmedMacProductPreparation();
+        const status: OrdinaryEmptyFlowStatus = retained
+            ? { schema: ORDINARY_FLOW_SCHEMA, phase: 'recovery_required', attemptId: null, cleanupConfirmed: false }
+            : { schema: ORDINARY_FLOW_SCHEMA, phase: 'closed', attemptId: null, cleanupConfirmed: true };
+        return reply(status);
+    }
     if (!entry || (operation !== 'status' && body.attemptId !== entry.id)) throw new ProductError('invalid_state');
     if (operation === 'cancel') return reply({ schema: ORDINARY_FLOW_SCHEMA, phase: 'closed', ...(await close(entry)) });
     if (operation === 'status' && !entry.active) return reply({ schema: ORDINARY_FLOW_SCHEMA, phase: 'closed',
