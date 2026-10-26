@@ -53,6 +53,9 @@ test('Diario paziente: prosa, provenienza e storico senza cambiare Scale o Timel
                 await anchor.evaluate(element => element.scrollIntoView({ block: 'center' }));
                 if (!baseline) await assertNoHorizontalOverflow(page, [{ label: 'pagina', selector: 'document' }, { label: 'Diario', selector: '#diario' }]);
                 if (!baseline && ['azioni', 'conferma', 'ripristino'].includes(state)) await assertNotClippedInViewport(anchor, state);
+                if (!baseline && ['conferma', 'ripristino'].includes(state)) {
+                    expect(await anchor.evaluate(element => { const box = element.getBoundingClientRect(); const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2); return element === hit || element.contains(hit); })).toBe(true);
+                }
                 if (!baseline && state === 'azioni') {
                     for (const item of await anchor.getByRole('menuitem').all()) {
                         await assertNotClippedInViewport(item, 'Azione del diario');
@@ -87,6 +90,9 @@ test('Diario paziente: prosa, provenienza e storico senza cambiare Scale o Timel
         await confirm.getByRole('button', { name: 'Annulla', exact: true }).click(); await expect(row).toBeVisible();
         await openDelete(); await page.getByRole('dialog').getByRole('textbox', { name: /^Motivazione eliminazione/u }).fill('Motivo sintetico di prova W15a'); await page.getByRole('dialog').getByRole('button', { name: 'Elimina', exact: true }).click();
         await expect(row).toHaveCount(0);
+        const deletionNotice = page.getByRole('status').filter({ hasText: 'Voce spostata nel cestino.' });
+        await expect(deletionNotice).toBeVisible();
+        await deletionNotice.getByRole('button', { name: 'Chiudi notifica', exact: true }).click();
         const showDeleted = pane.getByRole('button', { name: baseline ? 'Mostra cestino / audit' : 'Mostra voci eliminate', exact: true }); await showDeleted.click();
         await expect(row).toContainText('Motivo sintetico di prova W15a'); await expect(row).toContainText(PROSE); await capture('cestino', row);
         await row.getByRole('button', { name: 'Ripristina voce clinica', exact: true }).click(); const restore = page.getByRole('dialog'); await capture('ripristino', restore.getByRole('button', { name: 'Annulla', exact: true })); await restore.getByRole('button', { name: 'Ripristina', exact: true }).click();
