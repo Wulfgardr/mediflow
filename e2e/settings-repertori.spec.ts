@@ -1,7 +1,7 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
-import { bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
+import { bootstrapUnlockedSession, assertNoHorizontalOverflow, unlockIfNeeded } from './utils';
 
 function requireSynthetic(baseURL?: string) {
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL
@@ -52,7 +52,8 @@ test('Repertori Impostazioni: dati, lettura pendente e negata senza servizi este
     const capture = async (name: string, selector?: string, target?: Locator) => {
         if (!directory) return;
         await mkdir(directory, { recursive: true });
-        for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', '320', 'zoom-200', 'zoom-400']) {
+        const sizes = process.env.SETTINGS_REPERTORI_ZOOM_ONLY === '1' ? ['zoom-200', 'zoom-400'] : ['1440', '768', '390', '320', 'zoom-200', 'zoom-400'];
+        for (const theme of ['giorno', 'grafite']) for (const size of sizes) {
             await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
             await page.setViewportSize({ width: size.startsWith('zoom') ? 1440 : Number(size), height: 1000 });
             if (size.startsWith('zoom')) await zoom.setZoom(size === 'zoom-200' ? 2 : 4);
@@ -84,12 +85,18 @@ test('Repertori Impostazioni: dati, lettura pendente e negata senza servizi este
                 });
             }
             const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-            surfaces.push({ name, theme, size, overflow, actualWidth: await page.evaluate(() => innerWidth), visibility });
+            const before = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
             if (!baseline) await assertNoHorizontalOverflow(page, [{ label: 'pagina', selector: 'document' }]);
-            await page.screenshot({ path: `${directory}/${name}-${theme}-${size}.png`, fullPage: true, animations: 'disabled', timeout: 10_000 });
+            const png = await page.screenshot({ path: `${directory}/${name}-${theme}-${size}.png`, fullPage: false, animations: 'disabled', timeout: 10_000 });
+            const after = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+            const targetAfter = target ? await target.boundingBox() : null;
+            const image = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+            surfaces.push({ name, theme, size, overflow, before, after, visibility, targetAfter, image });
+            expect(after).toEqual(before); expect(image).toEqual(page.viewportSize());
             if (!baseline && visibility) {
                 expect((visibility as { intersectionRatio: number }).intersectionRatio, `${name} ${theme} ${size}: bersaglio intero nel piano visibile`).toBeGreaterThanOrEqual(0.98);
                 expect((visibility as { centerUncovered: boolean }).centerUncovered, `${name} ${theme} ${size}: nessuna testata sopra il bersaglio`).toBe(true);
+                expect(targetAfter!.y).toBeCloseTo((visibility as { bounds: { top: number } }).bounds.top, 0);
             }
         }
         await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
@@ -107,7 +114,7 @@ test('Repertori Impostazioni: dati, lettura pendente e negata senza servizi este
                 const manager = page.locator(selector);
                 const message = id === 'aifa' ? manager.getByText('Stato locale non disponibile.', { exact: true })
                     : id === 'esenzioni' ? manager.getByText('Conteggio non disponibile. Premi Rileggi stato.', { exact: true })
-                        : id === 'protesica' ? manager.getByText('Accesso al repertorio negato dalla fixture.', { exact: true }) : manager.getByRole('alert').last();
+                        : id === 'protesica' ? manager.getByText('Stato non disponibile. Premi Rileggi stato.', { exact: true }) : manager.getByRole('alert').last();
                 await capture(`${name}-${id}-messaggio`, selector, message);
             }
         }
@@ -141,6 +148,7 @@ test('Repertori Impostazioni: dati, lettura pendente e negata senza servizi este
         await capture('lettura-negata'); await captureManagers('lettura-negata');
         if (!baseline) {
             await page.goto('/settings'); await page.goto('/settings/repertori#who-setup');
+            await unlockIfNeeded(page, '1234');
             await expect(section.getByRole('button', { name: /^Terminologia WHO/u })).toHaveAttribute('aria-expanded', 'true');
             await expect(page.getByTestId('who-embedded-catalog')).toBeVisible(); expect(mutations).toEqual([]);
         }
