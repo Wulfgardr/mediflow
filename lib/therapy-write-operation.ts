@@ -13,10 +13,10 @@ type CreateInput = {
     patientId: string; therapyId: string; values: typeof therapies.$inferInsert; changedFields: string[];
     mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext;
 };
-type UpdateInput = {
+export type TherapyUpdateInput = {
     patientId?: string; therapyId: string; expectedVersion: number;
     values: Partial<typeof therapies.$inferInsert>; changedFields: string[];
-    mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext;
+    mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext; occurredAt?: Date;
 };
 
 function networkScopeContains(tx: Tx, patientId: string, ambulatoryId: string): boolean {
@@ -55,33 +55,35 @@ export function createTherapyOperation(input: CreateInput): Result {
 }
 
 /* a matched UPDATE IGNORE is an integrity fault, not an optimistic 409. */
-export function updateTherapyOperation(input: UpdateInput): Result {
-    return dbServer.transaction((tx): Result => {
-        const existing = input.mode === 'network'
-            ? tx.select({ therapy: therapies }).from(therapies)
-                .innerJoin(patientsToAmbulatories, eq(therapies.patientId, patientsToAmbulatories.patientId))
-                .where(and(eq(therapies.id, input.therapyId), eq(therapies.patientId, input.patientId!),
-                    eq(patientsToAmbulatories.ambulatoryId, input.scopeAmbulatoryId!))).get()?.therapy
-            : tx.select().from(therapies).where(input.mode === 'v1'
-                ? and(eq(therapies.id, input.therapyId), eq(therapies.patientId, input.patientId!))
-                : eq(therapies.id, input.therapyId)).get();
-        if (!existing) return { status: 404, value: { error: 'Not found' } };
-        if (!activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
-        if (existing.version !== input.expectedVersion) return { status: 409,
-            value: buildTherapyVersionConflictPayload(input.expectedVersion, input.therapyId, existing) as unknown as Record<string, unknown> };
+export function updateTherapyOperationInTransaction(tx: Tx, input: TherapyUpdateInput): Result & { auditEventId?: string } {
+    const existing = input.mode === 'network'
+        ? tx.select({ therapy: therapies }).from(therapies)
+            .innerJoin(patientsToAmbulatories, eq(therapies.patientId, patientsToAmbulatories.patientId))
+            .where(and(eq(therapies.id, input.therapyId), eq(therapies.patientId, input.patientId!),
+                eq(patientsToAmbulatories.ambulatoryId, input.scopeAmbulatoryId!))).get()?.therapy
+        : tx.select().from(therapies).where(input.mode === 'v1'
+            ? and(eq(therapies.id, input.therapyId), eq(therapies.patientId, input.patientId!))
+            : eq(therapies.id, input.therapyId)).get();
+    if (!existing) return { status: 404, value: { error: 'Not found' } };
+    if (!activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
+    if (existing.version !== input.expectedVersion) return { status: 409,
+        value: buildTherapyVersionConflictPayload(input.expectedVersion, input.therapyId, existing) as unknown as Record<string, unknown> };
 
-        const changed = tx.update(therapies).set({ ...input.values, version: input.expectedVersion + 1 })
-            .where(and(eq(therapies.id, input.therapyId), eq(therapies.patientId, existing.patientId),
-                eq(therapies.version, input.expectedVersion))).run();
-        if (changed.changes !== 1) throw new Error('Therapy update did not write exactly one row');
-        writeAuditEventInTransaction(tx, {
-            eventType: input.values.deletedAt ? 'therapy.deleted' : 'therapy.updated', outcome: 'success',
-            archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
-            subjectType: 'therapy', subjectRef: input.therapyId,
-            sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
-            redactedMetadata: { changedFields: input.changedFields,
-                resourceVersion: input.expectedVersion + 1, flags: input.audit.flags },
-        });
-        return { status: 200, value: { success: true } };
-    }, { behavior: 'immediate' });
+    const changed = tx.update(therapies).set({ ...input.values, version: input.expectedVersion + 1 })
+        .where(and(eq(therapies.id, input.therapyId), eq(therapies.patientId, existing.patientId),
+            eq(therapies.version, input.expectedVersion))).run();
+    if (changed.changes !== 1) throw new Error('Therapy update did not write exactly one row');
+    const auditEventId = writeAuditEventInTransaction(tx, {
+        eventType: input.values.deletedAt ? 'therapy.deleted' : 'therapy.updated', outcome: 'success', occurredAt: input.occurredAt,
+        archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
+        subjectType: 'therapy', subjectRef: input.therapyId,
+        sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
+        redactedMetadata: { changedFields: input.changedFields,
+            resourceVersion: input.expectedVersion + 1, flags: input.audit.flags },
+    });
+    return { status: 200, value: { success: true }, auditEventId };
+}
+
+export function updateTherapyOperation(input: TherapyUpdateInput): Result {
+    return dbServer.transaction((tx) => updateTherapyOperationInTransaction(tx, input), { behavior: 'immediate' });
 }

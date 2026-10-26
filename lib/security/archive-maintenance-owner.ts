@@ -1,3 +1,4 @@
+import { captureTherapyStatusCommands, preserveTherapyStatusCommands } from '../therapy-status-command-backup';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -120,11 +121,12 @@ export async function runArchiveMaintenanceWebOwner(root: string): Promise<void>
                 let candidate: ReturnType<typeof openVersionedSqliteDatabase> | undefined;
                 try {
                     if (readSqliteArchiveGeneration(current) !== expectedGeneration) throw new Error('archive_generation_changed');
+                    const therapyCommands = captureTherapyStatusCommands(current);
                     await replaceSqliteDatabase({ sourcePath: preparedSource, destPath: target,
                         backupPath: `${target}.bak-${repairBackupTimestamp()}`, connection: current,
                         prepareReplacement: staging => {
                             const replacement = openVersionedSqliteDatabase(staging, undefined, { prepareReplacement: true });
-                            try { replacement.transaction(() => rotateSqliteArchiveGeneration(replacement)).immediate(); }
+                            try { preserveTherapyStatusCommands(therapyCommands, replacement); replacement.transaction(() => rotateSqliteArchiveGeneration(replacement)).immediate(); }
                             finally { replacement.close(); }
                         },
                         reopenConnection: () => { candidate = openVersionedSqliteDatabase(target); return candidate; },

@@ -1107,7 +1107,40 @@ export function validateRequiredDiaryAudit(input) {
 
 /* reuse only the structural proof, not date/cap/idempotency policy. */
 export function validateRequiredTherapyAudit(input) {
-    return validateRequiredClinicalRowAudit(input, 'therapy');
+    if (input.spec.operation !== 'update') return validateRequiredClinicalRowAudit(input, 'therapy');
+    const source = checkedSource(input.spec.ownerFile, input.coreSource);
+    const functions = source.sourceFile.statements.filter(ts.isFunctionDeclaration);
+    const wrappers = functions.filter(node => node.name?.text === 'updateTherapyOperation');
+    const cores = functions.filter(node => node.name?.text === 'updateTherapyOperationInTransaction');
+    const wrapper = wrappers[0], core = cores[0];
+    const tokens = node => sourceTokens(node?.getText(source.sourceFile) ?? '');
+    const expected = sourceTokens("{ return dbServer.transaction((tx) => updateTherapyOperationInTransaction(tx, input), { behavior: 'immediate' }); }");
+    if (wrappers.length !== 1 || cores.length !== 1 || !core.body || !wrapper.body || tokens(wrapper.body) !== expected
+        || core.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword)
+        || core.parameters.length !== 2 || core.parameters[0].name.getText(source.sourceFile) !== 'tx'
+        || core.parameters[1].name.getText(source.sourceFile) !== 'input')
+        return ['therapy update must delegate exactly once to the named synchronous Tx core with the same tx and input'];
+    const statements = [...core.body.statements], auditStatement = statements.at(-2), success = statements.at(-1);
+    const declaration = auditStatement && ts.isVariableStatement(auditStatement)
+        && auditStatement.declarationList.flags === ts.NodeFlags.Const
+        && auditStatement.declarationList.declarations.length === 1 ? auditStatement.declarationList.declarations[0] : null;
+    const audit = declaration?.initializer && unwrap(declaration.initializer);
+    if (!declaration || declaration.name.getText(source.sourceFile) !== 'auditEventId' || !audit || !ts.isCallExpression(audit)
+        || audit.expression.getText(source.sourceFile) !== 'writeAuditEventInTransaction'
+        || tokens(success) !== sourceTokens('return { status: 200, value: { success: true }, auditEventId };'))
+        return ['therapy Tx core must capture one direct required audit and immediately return its identity'];
+    const fields = audit.arguments[1] && unwrap(audit.arguments[1]);
+    const occurredAt = fields && ts.isObjectLiteralExpression(fields)
+        ? fields.properties.filter(node => ts.isPropertyAssignment(node) && node.name.getText(source.sourceFile) === 'occurredAt') : [];
+    if (occurredAt.length !== 1 || tokens(occurredAt[0].initializer) !== sourceTokens('input.occurredAt'))
+        return ['therapy Tx core must forward only its admitted host audit time'];
+    const body = core.body.getText(source.sourceFile)
+        .replace(auditStatement.getText(source.sourceFile), `${audit.getText(source.sourceFile)};`)
+        .replace(occurredAt[0].getText(source.sourceFile) + ',', '');
+    const normalized = input.coreSource.slice(0, wrapper.body.getStart(source.sourceFile))
+        + `{ return dbServer.transaction((tx) => ${body}, { behavior: 'immediate' }); }`
+        + input.coreSource.slice(wrapper.body.end);
+    return validateRequiredClinicalRowAudit({ ...input, coreSource: normalized }, 'therapy');
 }
 
 /* structural proof only; link/currentness/value semantics require real SQLite tests. */

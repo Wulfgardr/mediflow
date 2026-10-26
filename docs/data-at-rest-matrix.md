@@ -7,7 +7,7 @@ read_when:
 
 # Matrice dei dati a riposo
 
-**Versione 10.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
+**Versione 11.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
 criterio 1. Aggiornata il 21 ottobre 2026 per il marker Web di cambio stato
 terapia (ADR 0156); il 13 ottobre 2026 per i permessi del database adottato dalla cartella
 dell’applicazione; l’11 ottobre per credenziali v3 e generazione dell’archivio, recupero cifrato completo e permessi delle copie di riparazione; la prima classificazione era su `main` `bcb7af46a`.
@@ -92,6 +92,11 @@ locali salvano ciò che ricevono.
 
 - In chiaro: `event_id`, `schema_version`, `event_type`, `occurred_at`, `outcome`, `actor_type`, `actor_ref`, `subject_type`, `subject_ref`, `source_surface`, `request_id`, `redacted_metadata`, `created_at`
 - Leggibile senza chiave: tipo di evento, attore, identificativo del soggetto e metadati minimizzati.
+
+### `therapy_status_commands`: terminali durevoli del cambio stato
+
+- In chiaro: `command_id`, `protocol`, `archive_generation`, `actor_ref`, `patient_id`, `therapy_id`, `expected_version`, `target`, `outcome`, `reason`, `committed_at`, `result_version`, `result_end_date`, `audit_event_id`, `audit_snapshot`
+- Leggibile senza chiave: binding originale, stato richiesto/risultato, data e audit minimizzato. Closed ha target NULL. Ledger append-only, incluso nei backup; la conservazione dopo restore non prova lo stato corrente della terapia (ADR0168).
 
 ### `checkups`: controlli programmati
 
@@ -305,6 +310,7 @@ dati nel restore. Conservare i backup come gli altri dati sensibili.
 | Export FHIR del paziente | Dove lo salva il browser. | La scheda decifrata; il nome del file contiene cognome e nome. | Nessuna. | `app/patients/[id]/edit/page.tsx` |
 | Moduli scaricati o condivisi | Dove li salva il browser. | Il modulo compilato, in chiaro. | Nessuna. | `app/patients/[id]/modules/page.tsx` |
 | `localStorage` del browser | Profilo del browser. | Salt, involucro della master key, preferenze dell'interfaccia. | V3: involucro derivato dalla passphrase; profilo transitorio: protezione del PIN. Non contiene la master key v3 in chiaro. | `lib/security/security.ts` |
+| Marker del comando stato terapia nel `localStorage` | Stessa origine/profilo browser. | ID casuale robusto, protocollo, generation, riferimenti opachi paziente/terapia, expectedVersion. Nessun target/nome/dose/credenziale. | Metadati in chiaro. Rimozione dopo receipt terminale e rilettura; assenza receipt resta unknown; close esplicito. Separato dal marker legacy0156. | `lib/therapy-status-command-confirmation.ts` |
 | Marker di cambio stato terapia nel `localStorage` | Stessa origine/profilo browser. | Generazione dell'archivio, riferimenti opachi di paziente e terapia, ID casuale del tentativo, versione attesa ed esito. Nessun nome, farmaco, dose, stato richiesto o credenziale. Rimosso dopo rilettura risolutiva; nessuna scadenza automatica. | Metadati in chiaro, senza cifratura; barriera client secondo ADR 0156, non ricevuta host. | `lib/therapy-status-confirmation.ts` |
 | `sessionStorage` del browser | Profilo del browser, per scheda. | Solo nel profilo PIN transitorio: master key in chiaro e dati dell'utente. Gli account v3 non li persistono e cancellano la precedente sessione. | Il profilo PIN non protegge questa copia; v3 conserva una chiave non estraibile solo in memoria e richiede sblocco dopo reload. | `lib/security/client-security-session.ts`, `components/security-provider.tsx` |
 | Token dell'API locale | `local-api-token` nella directory dati. | Il segreto dei client locali. | File `0600`. | `lib/security/local-api-token.ts` |
