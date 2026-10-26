@@ -28,10 +28,14 @@ pub use catalogs::*;
 pub use context::RequestContext;
 pub use dto::*;
 pub use error::{Result, RuntimeError};
+pub use http::{FirstAmbulatoryDraft, HostBootstrapSession};
 pub use http::{PairingCredentials, RuntimeClient, RuntimeConfig};
 pub use profile_query::{ProfileCurrentness, ProfileProjection};
 pub use scales::*;
-pub use session::{AiPreferencesContext, ChatAccessContext, ProfileQueryIntent, RuntimeSession};
+pub use session::{
+    AiPreferencesContext, ChatAccessContext, FirstAmbulatoryContext, ProfileQueryIntent,
+    RuntimeSession,
+};
 pub use who::{
     WHO_ATTRIBUTION, WhoEntry, WhoReadiness, WhoReadinessStatus, WhoReceipt, WhoSearchResponse,
     WhoSource, normalize_who_query,

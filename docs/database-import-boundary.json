@@ -27,7 +27,8 @@
     "runtime-entry": "Declared runtime/maintenance entry or its local dependencies, outside the Web/lib source roots.",
     "synthetic-support": "Existing synthetic-support source; inclusion is conservative and does not authorize real data access.",
     "territorial-pack-host": "ADR0158: named host territorial configuration owner and local supervisor maintenance admission; no agent operation or generic settings authority.",
-    "host-settings-revocation": "ADR0076: authenticated host settings persistence and monotonic AI revocation in the same transaction; no clinical writer or provider admission."
+    "host-settings-revocation": "ADR0076: authenticated host settings persistence and monotonic AI revocation in the same transaction; no clinical writer or provider admission.",
+    "first-ambulatory-bootstrap": "ADR0167: named first-ambulatory composition uses the outer IMMEDIATE transaction for current Web/paired authority, archive generation, zero-site gate and exact readback; mutation and audit delegate only to the existing createAmbulatory core within that transaction. No new writer, schema or general administrative authority."
   },
   "semantics": {
     "edge": "Exact source path, resolved target, capability, import form, imported symbols and occurrence count. Value imports are conservatively treated as runtime dependencies; explicit type-only imports are not authority.",
@@ -1315,6 +1316,17 @@
       ],
       "count": 1,
       "classification": "reference-data"
+    },
+    {
+      "file": "lib/security/ambulatory-bootstrap-service.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "first-ambulatory-bootstrap"
     },
     {
       "file": "lib/security/archive-generation-test-support.cjs",
