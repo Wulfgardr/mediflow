@@ -865,6 +865,26 @@ mod tests {
     }
 
     #[gpui::test]
+    fn only_a_valid_explicit_scope_choice_clears_the_scope_loss_notice(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            app.area = Area::Settings;
+            app.ambulatory_management.initial_scope = false;
+            app.ambulatories = Load::Ready(vec![row("b", 2, true, None)]);
+            app.message = Some(("Sede corrente non disponibile".into(), true));
+            app.change_scope("not-admitted", cx);
+            assert!(app.scope.is_none());
+            assert!(app.message.is_some());
+            app.change_scope("b", cx);
+            assert_eq!(app.scope.as_deref(), Some("b"));
+            assert!(app.message.is_none());
+        });
+    }
+
+    #[gpui::test]
     fn conflict_preserves_draft_and_only_explicit_reread_updates_the_base(
         cx: &mut gpui::TestAppContext,
     ) {
