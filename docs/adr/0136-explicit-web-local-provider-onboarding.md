@@ -146,3 +146,29 @@ avvio del client e trasporto: non misurano il solo motore. Il precaricamento
 manuale non costituisce un percorso utente a freddo riuscito. La pagina offre
 rilettura dello stato e nuova conferma, senza retry automatico; il limite
 host e tutti i controlli di autorità restano invariati.
+
+## Compatibilità locale Ollama 0.40.6 — WUL-602, 26 ottobre 2026
+
+La versione installata 0.40.6 veniva respinta dopo la sola lettura di
+`/api/version`, prima di inviare un prompt. È ora ammessa puntualmente,
+conservando le versioni precedenti. Le versioni vicine non esaminate,
+le anteprime e i suffissi build della linea 0.40 restano negati.
+
+La prova sintetica usa il binario della distribuzione Ollama 0.40.6,
+SHA-256 `69fcb23ae7b95af30b5184998751f6158df84d0071f930670ee5c22db667c2ff`,
+e il modello già presente `qwen3.5:35b-a3b`, digest
+`3460ffeede5453ead027dbd2f821b12ad0aa3de54630971993babdb2165221f7`.
+Un daemon separato su loopback, con rete in uscita limitata a localhost dal
+sandbox di macOS, ha superato l'attestazione canonica di versione, tags,
+show, precaricamento e processi caricati. L'adapter di produzione ha ripetuto
+l'attestazione per operazione e ha restituito il testo sintetico richiesto.
+Non sono stati scaricati modelli; modello e daemon sono stati arrestati
+al termine della prova.
+
+I test esercitano ammissione puntuale, diniego delle versioni adiacenti e
+dei suffissi, marker remoti in ogni stadio e digest discordante, conservando
+la copertura 0.40.5. La modifica non cambia controlli di località, autorità,
+scadenze o digest. Non promuove `available_unqualified`, non attribuisce una
+garanzia causale al digest e non qualifica UI, latenza, qualità delle funzioni
+generative o uso clinico. La prova riguarda soltanto questo binario e modello;
+una build Homebrew HEAD non è compresa.
