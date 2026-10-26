@@ -11,7 +11,7 @@ import {
     isAiTreatmentReasoningEnabledValue,
 } from '../../ai-treatment-reasoning-kill-switch';
 import {
-    generateWithAthenaMlxClaims,
+    generateWithAthenaMlx,
     isAthenaMlxModelAvailable,
 } from '../../athena-mlx-runtime';
 import { dbServer } from '../../db-server';
@@ -105,7 +105,7 @@ const runtime = Object.freeze({
         const verifyChoice = captureFunctionModelTransportGuard('athena_mlx');
         await verifyChoice();
         if (input.signal.isAborted()) return Promise.reject(new Error('Treatment Reasoning execution cancelled.'));
-        return generateWithAthenaMlxClaims({ prompt: input.instruction, maxTokens: 1_600, timeoutMs: 420_000 })
+        return generateWithAthenaMlx({ prompt: input.instruction, maxTokens: 1_600, timeoutMs: 420_000 })
             .then(async (result) => {
                 await verifyChoice();
                 if (input.signal.isAborted()) throw new Error('Treatment Reasoning execution cancelled.');

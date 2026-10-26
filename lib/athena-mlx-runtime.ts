@@ -281,7 +281,7 @@ export function generateWithAthenaMlx(options: AthenaMlxGenerateOptions): Promis
     return generate(options, false);
 }
 
-/** The strict claims producer must see the complete runner stdout, including unexpected lines. */
+/** Diagnostic-only claims runner; ordinary execution uses generateWithAthenaMlx. */
 export function generateWithAthenaMlxClaims(options: AthenaMlxGenerateOptions): Promise<AthenaMlxGenerateResult> {
     return generate(options, true);
 }

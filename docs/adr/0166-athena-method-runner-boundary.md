@@ -77,12 +77,14 @@ Fabric dei due tentativi diagnostici: il modello duplicava i claim nei
 Il diniego V2 era corretto. Ridurre le cardinalità o allentare il validatore
 non risolve il contratto fra produttore e host.
 
-La composizione MLX nomina ora il profilo interno
+La sola diagnostica MLX può nominare il profilo interno
 `mediflow.treatment-reasoning.claims.v1`. Istruzione e decoder vivono nella
 stessa coppia privata versionata, senza selezione dal chiamante. Il produttore
 restituisce root esatta `schemaVersion, task, summary, data`; summary,
 recommendation e ogni reasoning/caveat sono `{claim,evidenceRefs}`. Gli altri
-campi conservano le forme V2, incluso trace obbligatorio. Mancanti, extra,
+campi conservano le forme V2, incluso trace obbligatorio con `toolsUsed: []`:
+nessun tool è stato eseguito. Il decoder specifico nega ogni lista non vuota,
+senza modificare V2 condiviso. Mancanti, extra,
 metadati di autorità e vecchi formati sono negati, senza autodetection.
 
 Il mapper copia ogni testo e lista di riferimenti e costruisce soltanto i
@@ -98,7 +100,13 @@ stesso riferimento su claim diversi è ammesso. Un riferimento esistente non
 prova supporto semantico della conclusione: resta il gate qualità I-7.
 
 Questo è un cambiamento dell'ABI privata del produttore, non equivalenza del
-prompt647. Il percorso portable mantiene l'istruzione direttaV2 originale;
+prompt647. Il profilo non è ammesso nella corsia ordinaria: executor e root
+production conservano prompt direttoV2, parser e runner precedenti, anche
+quando il kill switch sia già attivo. Una risposta claims strutturalmente
+valida non viene pubblicata dalla corsia ordinaria. La diagnostica non emette
+publication e non abilita nuove venue; l'ammissione richiede qualifica I-7
+e una decisione esplicita successiva.
+Il percorso portable mantiene l'istruzione direttaV2 originale;
 legacy e venue remote mantengono prompt e parser propri. Le API, publication,
 attestazioni host, revisione, lease/CAS e zero scritture restano invariati.
 Condivisa è soltanto la primitiva di singola invocazione e timeout, senza
@@ -111,15 +119,19 @@ finiti. Solo dopo viene interpretato il JSON, con prototipi ordinari come
 richiesto daV2. Oggetti preinterpretati, proxy e getter non entrano nel decoder.
 Non si estraggono sottostringhe da markdown o `<think>`.
 
-Il punto di composizione MLX usa il runner nominato
+La sola diagnostica del profilo usa il runner nominato
 `generateWithAthenaMlxClaims`, che conserva tutti i byte UTF8 decodificati di
 stdout, comprese righe inattese di deprecazione. Il runner legacy conserva
 il filtro precedente. Argomenti, artifact, decoding, attesa, timeout,
 attestazione e verifiche di scelta restano gli stessi. La validazione non
 attesta l'arresto fisico di un processo già in corso dopo revoca.
 
-La qualifica sintetica distingue corpus diagnostico e due holdout congelati
-prima del nuovo profilo. Il candidato viene congelato prima degli holdout;
-una sola esecuzione per caso, senza adattamento ai risultati o retry selettivi.
-Un eventuale parserPASS non chiude I-7, non accetta questo ADR e non ammette
-alcuna nuova venue remota. I tentativi falliti restano conservati fuori daGit.
+Le prove storiche distinguono il corpus diagnostico dai due casi tecnici
+fissati prima del nuovo profilo. Il candidato è stato congelato prima della
+loro esecuzione: un solo run per caso, senza retry selettivi.
+Questi due casi tecnici sono stati esposti prima dell'esecuzione e non sono
+una verifica cieca né sono riutilizzabili come holdout I-7. Gli output
+diagnostici hanno mostrato conclusioni terapeutiche non sostenute dalle fonti;
+la qualità resta non accettata. Un eventuale parserPASS non chiude I-7,
+non accetta questo ADR e non ammette alcuna nuova venue remota. I tentativi
+falliti restano conservati fuori da Git.
