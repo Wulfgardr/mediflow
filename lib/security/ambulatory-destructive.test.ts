@@ -215,6 +215,58 @@ test('manual and scheduled serializers retain exact terminals while JSON restore
     validateAmbulatoryCommandRows(readAmbulatoryCommandRows(sql), captureAmbulatoryCommands(sql).audits);
 });
 
+for (const [mutation, validationError, blockedReason] of [
+    ['result-json', SyntaxError, 'ambulatory_destructive_commands'],
+    ['result-shape', /Invalid ambulatory command receipt/, 'ambulatory_destructive_commands'],
+    ['snapshots-json', SyntaxError, 'ambulatory_destructive_commands'],
+    ['snapshots-shape', /Backup audit collection is invalid/, 'ambulatory_destructive_commands'],
+    ['missing-audit', /Ambulatory command audit binding/, 'ambulatory_destructive_commands'],
+    ['altered-audit', /Ambulatory command audit binding/, 'therapy_status_commands'],
+    ['actor-binding', /Ambulatory command audit binding/, 'therapy_status_commands'],
+    ['request-binding', /Ambulatory command audit binding/, 'therapy_status_commands'],
+    ['version-binding', /Ambulatory command main audit version/, 'therapy_status_commands'],
+] as const) {
+    test(`restore rejects applied command ${mutation} before the mutation fence with the archive unchanged`, async () => {
+        const native = seed(), service = createAmbulatoryDestructiveService(); patient('invalid-backup-patient');
+        const applied = prepare(service, native); assert.equal((applied.execute().value.receipt as Record<string, unknown>).outcome, 'applied');
+        const { captureAmbulatoryCommands, validateAmbulatoryCommandRows } = await import('../ambulatory-destructive-command-backup');
+        const { createEmptyDataset, createBackupArtifact, BackupArtifactError } = await import('../backup-artifact');
+        const { restoreBackupArtifact, BackupRestoreBlockedError } = await import('../backup-restore-executor');
+        const captured = captureAmbulatoryCommands(sql);
+        const original = captured.rows.find(row => row.commandId === applied.marker.commandId); assert.ok(original);
+        const payload = { ...createEmptyDataset(), ambulatoryDestructiveCommands: [structuredClone(original)], auditEvents: structuredClone(captured.audits) };
+        const artifact = await createBackupArtifact(payload);
+        assert.deepEqual(validateAmbulatoryCommandRows(payload.ambulatoryDestructiveCommands, payload.auditEvents), payload.ambulatoryDestructiveCommands);
+        const row = payload.ambulatoryDestructiveCommands[0];
+        const snapshots = JSON.parse(row.auditSnapshots as string) as typeof payload.auditEvents;
+        const main = snapshots.find(audit => audit.eventType === 'ambulatory.cleared'); assert.ok(main);
+        const audit = payload.auditEvents.find(audit => audit.eventId === main.eventId); assert.ok(audit);
+        if (mutation === 'result-json') row.resultJson = '{';
+        else if (mutation === 'result-shape') row.resultJson = JSON.stringify({ ...JSON.parse(row.resultJson as string), targetVersion: 0 });
+        else if (mutation === 'snapshots-json') row.auditSnapshots = '[';
+        else if (mutation === 'snapshots-shape') row.auditSnapshots = '{}';
+        else if (mutation === 'missing-audit') payload.auditEvents = payload.auditEvents.filter(value => value.eventId !== main.eventId);
+        else if (mutation === 'altered-audit') audit.occurredAt += 1;
+        else {
+            if (mutation === 'actor-binding') main.actorRef = audit.actorRef = 'synthetic-other-actor';
+            else if (mutation === 'request-binding') main.requestId = audit.requestId = randomUUID();
+            else {
+                const metadata = JSON.parse(main.redactedMetadata!); metadata.resourceVersion += 1;
+                main.redactedMetadata = audit.redactedMetadata = JSON.stringify(metadata);
+            }
+            row.auditSnapshots = JSON.stringify(snapshots);
+        }
+        const before = snapshot(), generation = currentArchiveGeneration();
+        assert.throws(() => validateAmbulatoryCommandRows(payload.ambulatoryDestructiveCommands, payload.auditEvents), validationError);
+        await assert.rejects(createBackupArtifact(payload), error => error instanceof BackupArtifactError
+            && error.code === 'invalid-manifest' && error.message === 'Ambulatory command ledger or audit is invalid.');
+        let fences = 0;
+        assert.throws(() => restoreBackupArtifact({ ...artifact, payload }, () => { fences++; return true; }),
+            error => error instanceof BackupRestoreBlockedError && error.reason === blockedReason);
+        assert.equal(fences, 0); assert.deepEqual(snapshot(), before); assert.equal(currentArchiveGeneration(), generation);
+    });
+}
+
 test('raw staged replacement preserves local postbackup ledger and its audits while clinical state comes from the snapshot', async () => {
     const native = seed(), service = createAmbulatoryDestructiveService(), flow = prepare(service, native);
     flow.execute();
