@@ -288,7 +288,7 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
             </section>
 
             {status && (
-                <div className={`mf-alert xl:col-span-2 p-4 flex items-center gap-3 ${status.type === 'success' ? 'mf-alert-success' :
+                <div className={`mf-alert p-4 flex items-center gap-3 ${status.type === 'success' ? 'mf-alert-success' :
                         status.type === 'error' ? 'mf-alert-critical' :
                             'mf-alert-info'
                     }`}>
