@@ -1,4 +1,6 @@
 mod appointments;
+#[cfg(unix)]
+mod chat_access;
 mod clinical_text;
 mod components;
 mod demo;
@@ -44,6 +46,19 @@ fn parse_launch(args: impl IntoIterator<Item = String>) -> Result<Launch, &'stat
 }
 
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("--chat-access-stdio") {
+        #[cfg(unix)]
+        if std::env::args().count() == 3 {
+            let path = std::path::PathBuf::from(std::env::args_os().nth(2).unwrap());
+            if chat_access::run_stdio(&path).is_err() {
+                eprintln!("Accesso nativo non disponibile.");
+                std::process::exit(2);
+            }
+            return;
+        }
+        eprintln!("Accesso nativo non supportato o configurazione assente.");
+        std::process::exit(2);
+    }
     let launch = match parse_launch(std::env::args().skip(1)) {
         Ok(launch) => launch,
         Err(message) => {
@@ -52,6 +67,8 @@ fn main() {
         }
     };
     gpui_platform::application().run(move |cx: &mut App| {
+        #[cfg(unix)]
+        chat_access::install_lock_observer();
         let fonts: Vec<Cow<'static, [u8]>> = vec![
             Cow::Borrowed(include_bytes!("../../../../app/fonts/Newsreader-Native-Regular.ttf")),
             Cow::Borrowed(include_bytes!("../../../../app/fonts/Newsreader-Native-Bold.ttf")),

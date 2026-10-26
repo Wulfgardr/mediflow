@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-YZifmS3mzWGQA38ElKqZGxF63pNl99mDkLVpS52sYzY='; style-src 'sha256-PrAHMu6Ei0L74WVOVjD6Qc/y9l40VpegIOso3wx/8g0='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow — accesso nativo</title>
+<style>html{color-scheme:light dark;font:17px system-ui}body{margin:24px;max-width:40rem}h1{font-size:1.4rem;font-weight:500}button{font:inherit;margin:8px 8px 8px 0;padding:10px 16px}p{line-height:1.5}</style></head>
+<body><h1>MediFlow</h1><p>Conferma l’accesso nella finestra MediFlow già sbloccata. Questa vista riceve soltanto l’esito, senza dati clinici.</p>
+<p id="status" role="status" aria-live="polite">Collegamento alla chat…</p>
+<button id="request" disabled>Richiedi accesso</button><button id="consume" disabled>Verifica accesso monouso</button><button id="revoke" disabled>Revoca</button>
+<script>
+(() => {
+    let sequence = 0, ready = false, terminal = false, generation = 0, timer;
+    const pending = new Map(), element = id => document.getElementById(id);
+    const labels = { requested: 'Richiesta inviata alla finestra MediFlow.', challenge: 'Conferma nella finestra MediFlow entro 30 secondi.', approving: 'Conferma nativa in corso…', consuming: 'Verifica dell’accesso in corso…', approved: 'Accesso monouso autorizzato.', consumed: 'Accesso monouso verificato e consumato.', withdrawn: 'Accesso ritirato. Apri una nuova vista per richiederlo di nuovo.' };
+    function rpc(method, params) { return new Promise((resolve, reject) => { const id = ++sequence; const timeout = setTimeout(() => { pending.delete(id); reject(new Error('timeout')); }, 10000); pending.set(id, { resolve, reject, timeout }); window.parent.postMessage({ jsonrpc: '2.0', id, method, params }, '*'); }); }
+    function stop() { terminal = true; generation++; clearTimeout(timer); for (const id of ['request', 'consume', 'revoke'])
+        element(id).disabled = true; }
+    function show(state) { element('status').textContent = labels[state] || labels.withdrawn; element('request').disabled = true; element('consume').disabled = state !== 'approved'; element('revoke').disabled = ['consumed', 'withdrawn'].includes(state); if (['consumed', 'withdrawn'].includes(state))
+        stop(); }
+    async function command(command) { const current = generation; try {
+        const value = await rpc('tools/call', { name: 'mediflow_native_access', arguments: { command } });
+        if (current !== generation)
+            return;
+        const state = value?._meta?.status;
+        if (!Object.hasOwn(labels, state)) {
+            show('withdrawn');
+            return;
+        }
+        show(state);
+        if (!terminal) {
+            timer = setTimeout(() => commandStatus(), 1000);
+        }
+    }
+    catch {
+        show('withdrawn');
+    } }
+    const commandStatus = () => { if (!terminal)
+        command('status'); };
+    window.addEventListener('message', event => { if (event.source !== window.parent || event.data?.jsonrpc !== '2.0')
+        return; const message = event.data; if (!message.method && pending.has(message.id)) {
+        const p = pending.get(message.id);
+        pending.delete(message.id);
+        clearTimeout(p.timeout);
+        message.error ? p.reject(new Error('denied')) : p.resolve(message.result);
+    } if (message.method === 'ui/resource-teardown') {
+        rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'revoke' } }).catch(() => { });
+        stop();
+        window.parent.postMessage({ jsonrpc: '2.0', id: message.id, result: {} }, '*');
+    } });
+    element('request').onclick = () => { if (ready && !terminal) {
+        element('request').disabled = true;
+        command('request');
+    } };
+    element('consume').onclick = () => { clearTimeout(timer); element('consume').disabled = true; command('consume'); };
+    element('revoke').onclick = () => { command('revoke'); stop(); element('status').textContent = labels.withdrawn; };
+    window.addEventListener('pagehide', () => { if (ready)
+        rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'revoke' } }).catch(() => { }); stop(); });
+    rpc('ui/initialize', { protocolVersion: '2026-01-26', appInfo: { name: 'mediflow-native-access', version: '0.1.0' }, appCapabilities: {} }).then(async () => { window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/initialized' }, '*'); const attach = await rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'attach' } }); if (attach?._meta?.status !== 'ready')
+        throw new Error('denied'); ready = true; element('status').textContent = 'MediFlow richiede una conferma nella finestra nativa.'; element('request').disabled = false; requestAnimationFrame(() => window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/size-changed', params: { height: Math.ceil(document.documentElement.scrollHeight) } }, '*')); }).catch(() => show('withdrawn'));
+})();
+</script></body></html>
