@@ -65,9 +65,11 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
         expect(probe.centerHit).toBe(true);
         frames.push({ name, ...probe });
         if (directory) { await mkdir(directory, { recursive: true }); await page.screenshot({ path: `${directory}/${name}.png`, fullPage: false, animations: 'disabled' }); }
+        return probe;
     };
     const gallery = async (route: string, target: Locator) => {
         if (!directory) return;
+        const palettes = new Map<string, string>();
         for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', '320', 'zoom-200', 'zoom-400']) {
             await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
             if (size.startsWith('zoom-')) await zoom.setZoom(size === 'zoom-200' ? 2 : 4);
@@ -79,8 +81,12 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
                 document.documentElement.style.colorScheme = value;
             }, theme);
             await assertNoHorizontalOverflow(page, [{ label: route, selector: 'document' }]);
-            await capture(`${route}-${theme}-${size}`, target);
+            const probe = await capture(`${route}-${theme}-${size}`, target);
+            expect(probe.palette.storage).toBe(theme === 'giorno' ? 'light' : 'dark');
+            expect(probe.palette.classes).toMatch(new RegExp(`\\b${theme === 'giorno' ? 'light' : 'dark'}\\b`));
+            if (size === '1440') palettes.set(theme, probe.palette.foreground);
         }
+        expect(palettes.get('giorno')).not.toBe(palettes.get('grafite'));
         await zoom.setZoom(1); await page.setViewportSize({ width: 1440, height: 1000 });
     };
     let releaseRead: (() => void) | undefined;
@@ -149,6 +155,7 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
     } finally {
         releaseRead?.();
         try {
+            await test.info().attach('settings-evidence-observations.json', { body: JSON.stringify({ frames, errors, calls: fixture.calls, allBlocked: fixture.blocked }), contentType: 'application/json' });
             if (directory) { await mkdir(directory, { recursive: true }); await writeFile(`${directory}/surfaces.json`, JSON.stringify({ frames, errors, calls: fixture.calls, allBlocked: fixture.blocked }, null, 2)); }
         } finally { await page.unrouteAll({ behavior: 'ignoreErrors' }); await zoom.close(); }
     }
