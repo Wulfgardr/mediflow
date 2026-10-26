@@ -121,7 +121,10 @@ export function createExecutionQuotaMonitor() {
                 classify(observed.quota);
                 if (accountId && observed.accountId && accountId !== observed.accountId) throw new ExecutionError('revoked');
                 const next = { ...observed.quota };
-                for (const entry of journal) if (initial || entry.sequence > start) Object.assign(next, entry.patch);
+                for (const entry of journal) if (initial || entry.sequence > start) {
+                    Object.assign(next, entry.patch);
+                    classify(next);
+                }
                 const nextView = classify(next);
                 value = next; view = nextView; accountId ??= observed.accountId; journal = [];
                 return nextView;
