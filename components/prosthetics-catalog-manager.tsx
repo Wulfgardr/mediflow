@@ -6,6 +6,8 @@ import { ProstheticsImportFields } from './prosthetics-import-fields';
 import { ProstheticsSourcesPanel } from './prosthetics-source-documents';
 import { ProstheticsCatalogLookup } from './prosthetics-catalog-manager-lookup';
 import { formatCountLabel } from '@/lib/format-count';
+import { Disclosure } from '@/components/disclosure';
+import styles from './settings/repertori-settings.module.css';
 
 const control = { minHeight: 'var(--lume-control-height, 44px)', borderRadius: 'var(--lume-control-radius, 10px)' };
 function Provenance({ manifest }: { manifest: ProstheticsManifest }) {
@@ -13,12 +15,12 @@ function Provenance({ manifest }: { manifest: ProstheticsManifest }) {
         <p>File: {manifest.sourceName} · {manifest.bytes.toLocaleString('it-IT')} byte</p>
         {manifest.metadata && <><p>Codifica: {manifest.metadata.codeSystem} · Versione: {manifest.metadata.version}</p>
             <p>Fonte: {manifest.metadata.source} · Ambito: {manifest.metadata.scope}</p></>}
-        <details><summary className="cursor-pointer" style={{ minHeight: 'var(--lume-control-height, 44px)', alignContent: 'center' }}>SHA-256 e formato</summary>
+        <Disclosure title="SHA-256 e formato">
             <p className="break-all">SHA-256: {manifest.sha256}</p><p>Formato: {manifest.contract}</p>
-        </details>
+        </Disclosure>
     </div>;
 }
-export default function ProstheticsCatalogManager() {
+export default function ProstheticsCatalogManager({ expanded, onExpandedChange }: { expanded?: boolean; onExpandedChange?: (value: boolean) => void } = {}) {
     const [status, setStatus] = useState<ProstheticsStatus | null>(null);
     const [source, setSource] = useState<ProstheticsSource | null>(null);
     const [preview, setPreview] = useState<ProstheticsPreview | null>(null);
@@ -64,16 +66,19 @@ export default function ProstheticsCatalogManager() {
         try { await reread(signal, result.receipt); }
         catch { if (!signal.aborted) setMessage('Import registrato; rilettura non riuscita. Premi Rileggi stato.'); }
     }
-    return <section aria-label="Import repertorio protesica" className="mf-section lume-focal min-w-0 space-y-5 p-6 md:p-7" style={{ borderRadius: 'var(--lume-control-radius, 10px)' }}>
-        <div><p className="section-kicker">Repertorio locale</p><h2 className="text-lg font-semibold">Protesica e ausili</h2>
-            <p className="text-sm">{status ? `${formatCountLabel(status.count, 'voce', 'voci')} nel repertorio protesica` : 'Conteggio non disponibile'}</p><p className="text-sm">{status ? `${formatCountLabel(status.sourceCount, 'fonte locale', 'fonti locali')}` : ''}</p></div>
+    return <section aria-label="Import repertorio protesica" className={styles.row}>
+        <Disclosure headingLevel={2} open={expanded} onOpenChange={onExpandedChange}
+            title={<span className={styles.title}><span>Protesica e ausili</span><span className={styles.summary}>
+                {busy ? 'Controllo in corso…' : status ? `${formatCountLabel(status.count, 'voce', 'voci')} · ${formatCountLabel(status.sourceCount, 'fonte locale', 'fonti locali')}` : 'Conteggio non disponibile'}
+            </span></span>}>
+        <div className={styles.body}>
         <p className="text-sm leading-6">Carica il repertorio della tua fonte, controlla l’anteprima e conferma l’importazione.</p>
-        <details className="text-sm leading-6"><summary className="cursor-pointer font-semibold" style={{ minHeight: 'var(--lume-control-height, 44px)', alignContent: 'center' }}>Formato CSV e colonne</summary>
+        <Disclosure title="Formato CSV e colonne">
             <p>Verifica provenienza, ambito e validità della fonte e conserva il file originale. La codifica dichiarata nel file non viene convertita in ISO.</p>
             <p>UTF-8, virgola o punto e virgola, LF o CRLF; virgolette doppie per celle con virgole. Nessun a capo nelle celle. Massimo 2 MiB e 20.000 righe. Campi obbligatori senza spazi esterni: codifica, codice, descrizione, versione, fonte e ambito. Le due date sono facoltative, in formato YYYY-MM-DD.</p>
             <p className="mt-2" style={{ overflowWrap: 'anywhere' }}>{PROSTHETICS_COLUMNS.join(',')}</p>
             <p className="mt-2">Un solo sistema di codifica, versione, fonte e ambito per file. Duplicati ed errori bloccano tutto l’import. I codici assenti restano; le prescrizioni salvate non cambiano.</p>
-        </details>
+        </Disclosure>
         <a className="inline-flex items-center border px-4 text-sm font-semibold" style={control} href="/api/prosthetics/catalog/template" download>Scarica template sintetico CSV</a>
         <label className="block space-y-2 text-sm font-normal">File repertorio protesica (.csv)
             <input type="file" accept=".csv,text/csv" disabled={busy} className="block w-full min-w-0 text-sm" style={control} onChange={event => {
@@ -91,11 +96,11 @@ export default function ProstheticsCatalogManager() {
             {preview.changes && <p className="text-sm">Nuove: {preview.changes.inserted}. Aggiornate: {preview.changes.updated}. Contenuto invariato: {preview.changes.unchanged}. La provenienza sarà registrata per tutte le righe.</p>}
             {preview.diagnostics.length > 0 && <ul className="list-disc space-y-2 pl-5 text-sm">{preview.diagnostics.map((item, index) => <li key={index}>Riga {item.row}, {item.column}: {item.message}</li>)}</ul>}
             {preview.diagnosticsTruncated && <p className="text-sm">Mostrati i primi 200 errori. Correggi il file e ripeti l’anteprima.</p>}
-            {preview.sample.length > 0 && <details><summary className="cursor-pointer text-sm font-semibold" style={{ minHeight: 'var(--lume-control-height, 44px)', alignContent: 'center' }}>{preview.sample.length === 1 ? 'Campione: una voce' : `Campione: prime ${preview.sample.length} voci`}</summary>
+            {preview.sample.length > 0 && <Disclosure title={preview.sample.length === 1 ? 'Campione: una voce' : `Campione: prime ${preview.sample.length} voci`}>
                 <ul className="space-y-2 text-sm leading-6" style={{ overflowWrap: 'anywhere' }}>{preview.sample.map((row, index) => <li key={index}><strong>{row.codeSystem} · {row.code}</strong>: {row.description}<br />Date dichiarate: {row.startDate ?? 'non indicata'} / {row.endDate ?? 'non indicata'}</li>)}</ul>
-            </details>}
+            </Disclosure>}
             {preview.valid && <><label className="flex items-start gap-3 py-3 text-sm leading-6" style={{ minHeight: 'var(--lume-control-height, 44px)' }}><input type="checkbox" checked={accepted} disabled={busy} onChange={event => setAccepted(event.target.checked)} style={{ minWidth: 24, height: 24 }} />Ho verificato fonte, versione, ambito e campi. Confermo l’aggiornamento del solo repertorio.</label>
-                <button type="button" disabled={busy || !accepted} className="border px-4 text-sm font-semibold disabled:opacity-50" style={control} onClick={() => void run(commit)}>Conferma importazione protesica</button></>}
+                <button type="button" disabled={busy || !accepted} className="ui-btn-primary px-4 text-sm font-semibold disabled:opacity-50" style={control} onClick={() => void run(commit)}>Conferma importazione protesica</button></>}
         </div>}
         <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className="border px-4 text-sm font-semibold" style={control} onClick={() => void run(signal => reread(signal))}>Rileggi stato</button>
             {source && <button type="button" disabled={busy} className="border px-4 text-sm font-semibold" style={control} onClick={() => void run(signal => makePreview(source, signal))}>Genera nuova anteprima</button>}</div>
@@ -106,5 +111,7 @@ export default function ProstheticsCatalogManager() {
         </div>}
         <ProstheticsSourcesPanel key={`sources:${status?.revision}`} />
         <ProstheticsCatalogLookup key={status?.revision ?? 'unknown'} />
+        </div>
+        </Disclosure>
     </section>;
 }

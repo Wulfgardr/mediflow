@@ -2,14 +2,15 @@
 
 import { formatCountLabel } from '@/lib/format-count';
 import { useEffect, useRef, useState } from 'react';
-import { Database } from 'lucide-react';
+import { Disclosure } from '@/components/disclosure';
+import styles from './repertori-settings.module.css';
 import {
     commitExemptionFile, ExemptionImportClientError, getExemptionImportStatus,
     previewExemptionFile, readExemptionImportSource, type ExemptionImportSource,
 } from '@/lib/exemption-importer';
 import { EXEMPTION_COLUMNS, type ExemptionCatalogStatus, type ExemptionImportPreview, type ExemptionImportReceipt } from '@/lib/exemption-import-contract';
 
-export default function ExemptionDbManager() {
+export default function ExemptionDbManager({ expanded, onExpandedChange }: { expanded?: boolean; onExpandedChange?: (value: boolean) => void } = {}) {
     const [status, setStatus] = useState<ExemptionCatalogStatus | null>(null);
     const [source, setSource] = useState<ExemptionImportSource | null>(null);
     const [preview, setPreview] = useState<ExemptionImportPreview | null>(null);
@@ -63,22 +64,18 @@ export default function ExemptionDbManager() {
     }
 
     return (
-        <section aria-label="Import esenzioni" className="mf-section lume-focal space-y-5 p-6 md:p-7">
-            <div className="flex items-center gap-3">
-                <Database aria-hidden="true" className="h-6 w-6 text-emerald-600" />
-                <div>
-                    <p className="section-kicker">Repertorio amministrativo</p>
-                    <h2 className="text-lg font-semibold">Codifiche Esenzioni</h2>
-                    <p className="text-sm">{status ? `${formatCountLabel(status.count, 'codice', 'codici')} nel repertorio` : 'Conteggio non disponibile'}</p>
-                </div>
-            </div>
+        <section aria-label="Import esenzioni" className={styles.row}>
+            <Disclosure headingLevel={2} open={expanded} onOpenChange={onExpandedChange}
+                title={<span className={styles.title}><span>Esenzioni</span><span className={styles.summary}>
+                    {busy ? 'Controllo in corso…' : status ? `${formatCountLabel(status.count, 'codice', 'codici')} · ultima lettura locale` : 'Conteggio non disponibile'}
+                </span></span>}>
+            <div className={styles.body}>
             <p className="text-sm">Importa un file locale: prima controlli l’anteprima, poi confermi l’aggiornamento. I codici assenti dal file restano nel repertorio e le assegnazioni ai pazienti restano invariate.</p>
-            <details className="text-sm">
-                <summary className="cursor-pointer">Formato richiesto e limiti</summary>
+            <Disclosure title="Formato richiesto e limiti">
                 <p className="mt-2">Un file UTF-8, massimo 2 MiB e 20.000 righe, separatore | e fine riga CRLF. Date YYYYMMDD, flag S/N, null espresso come {'\\N'}. Codici duplicati o righe non valide bloccano tutto il file.</p>
                 <p className="mt-2 break-words">Intestazioni obbligatorie: {EXEMPTION_COLUMNS.join(', ')}.</p>
                 <p className="mt-2">Il repertorio ridotto serve alla ricerca dei codici; non determina eleggibilità o validità prescrittiva. Conserva il file originale.</p>
-            </details>
+            </Disclosure>
             <label className="block space-y-2 text-sm font-medium">
                 <span>File esenzioni (.txt o .csv delimitato da |)</span>
                 <input type="file" accept=".txt,.csv" disabled={busy} className="block w-full min-h-11 text-sm"
@@ -113,11 +110,11 @@ export default function ExemptionDbManager() {
                             <tbody>{preview.sample.map((row) => <tr key={row.line}><td className="p-2">{row.code}</td><td className="p-2">{row.description}</td></tr>)}</tbody>
                         </table>
                     </div>}
-                    <details className="text-xs"><summary>Provenienza e revisione</summary>
+                    <Disclosure title="Provenienza e revisione">
                         <p className="break-all">SHA-256: {preview.manifest.sourceSha256}</p>
                         <p className="break-all">Revisione: {preview.revision}</p>
                         <p>{preview.manifest.parserVersion}; {preview.manifest.policy}</p>
-                    </details>
+                    </Disclosure>
                     {preview.valid && <>
                         <label className="flex items-start gap-2 text-sm">
                             <input type="checkbox" checked={accepted} disabled={busy} className="mt-1 h-5 w-5 shrink-0"
@@ -130,11 +127,11 @@ export default function ExemptionDbManager() {
             )}
             {receipt && <div className="space-y-2 rounded-xl border p-4 text-sm" aria-label="Ricevuta import">
                 <p>{formatCountLabel(receipt.applied, 'codice applicato', 'codici applicati')}: {formatCountLabel(receipt.inserted, 'nuovo', 'nuovi')}, {formatCountLabel(receipt.updated, 'aggiornato', 'aggiornati')}. {verified ? 'Rilettura confermata.' : 'Verifica lo stato con Rileggi stato.'}</p>
-                <details><summary>Ricevuta e hash fonte</summary>
+                <Disclosure title="Ricevuta e hash fonte">
                     <p className="break-all">Operazione: {receipt.operationKey}</p>
                     <p className="break-all">SHA-256: {receipt.manifest.sourceSha256}</p>
                     <p>Registrata: {receipt.committedAt}</p>
-                </details>
+                </Disclosure>
             </div>}
             {message && <p role="status" className="text-sm">{message}</p>}
             <div className="flex flex-wrap gap-3">
@@ -142,6 +139,8 @@ export default function ExemptionDbManager() {
                 <button type="button" className="ui-btn-secondary min-h-11" disabled={busy} onClick={() => void run(() => reread())}>Rileggi stato</button>
             </div>
             {status?.latestReceipt && !receipt && <p className="text-xs">Ultimo import registrato: {status.latestReceipt.committedAt}, {formatCountLabel(status.latestReceipt.applied, 'codice', 'codici')}. La registrazione non attesta l’attualità normativa della fonte.</p>}
+            </div>
+            </Disclosure>
         </section>
     );
 }
