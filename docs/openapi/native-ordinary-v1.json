@@ -18,11 +18,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": [
-          "macos",
-          "ios",
-          "ipados"
-        ],
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "202": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -120,11 +116,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": [
-          "macos",
-          "ios",
-          "ipados"
-        ],
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "200": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -212,11 +204,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": [
-          "macos",
-          "ios",
-          "ipados"
-        ],
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "200": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -307,11 +295,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": [
-          "macos",
-          "ios",
-          "ipados"
-        ],
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "200": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -402,11 +386,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": [
-          "macos",
-          "ios",
-          "ipados"
-        ],
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "200": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -497,11 +477,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": [
-          "macos",
-          "ios",
-          "ipados"
-        ],
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "200": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -592,11 +568,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": [
-          "macos",
-          "ios",
-          "ipados"
-        ],
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "200": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -687,11 +659,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": [
-          "macos",
-          "ios",
-          "ipados"
-        ],
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "200": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -782,11 +750,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": [
-          "macos",
-          "ios",
-          "ipados"
-        ],
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "202": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -904,11 +868,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": [
-          "macos",
-          "ios",
-          "ipados"
-        ],
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "400": {
             "description": "Invalid body/path/method",
