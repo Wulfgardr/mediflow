@@ -181,10 +181,10 @@ async function verifyAnalytics(page: Page, viewCase: ViewCase): Promise<void> {
 
   await setRange(page, 'Età minima', 120);
   await setRange(page, 'Età massima', 120);
-  await expect(page.getByTestId('analytics-primary-value')).toHaveText('0');
+  await expect(page.getByTestId('analytics-primary-value')).toHaveText('0 schede tra 120 e 120 anni');
   await expect(page.getByText('Nessuna scheda attiva con età nota rientra nel filtro corrente.')).toBeVisible();
   await setRange(page, 'Età minima', 0);
-  await expect(page.getByTestId('analytics-primary-value')).not.toHaveText('0');
+  await expect(page.getByTestId('analytics-primary-value')).not.toHaveText(/^0 schede /);
 
   if (viewCase.viewport === 'narrow') await expectNarrowAnalytics(page);
   await page.screenshot({
