@@ -10,6 +10,8 @@ import { ArrowLeft } from 'lucide-react';
 import styles from '@/components/settings/settings-lume.module.css';
 import ink from '@/components/ink-secondary.module.css';
 import navigation from '@/components/settings/settings-navigation.module.css';
+import layoutRecipe from '@/components/ink-layout.module.css';
+import sectionRecipe from '@/components/ink-section.module.css';
 
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import { SettingsNavSidebar } from '@/components/settings/settings-nav-sidebar';
@@ -31,7 +33,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
         >
             {/* <lg: la sidebar collassa in una barra compatta (vedi SettingsNavSidebar). */}
             {/* stable scope for the optional full-runtime design comparison. */}
-            <div data-runtime-settings className={styles.settingsWorkspace + " " + ink.surface + " grid gap-4 lg:grid-cols-[216px_minmax(0,1fr)] lg:items-start lg:gap-6"}>
+            <div data-runtime-settings className={styles.settingsWorkspace + " " + layoutRecipe.columns + " " + sectionRecipe.sections + " " + ink.surface + " grid gap-4 lg:grid-cols-[216px_minmax(0,1fr)] lg:items-start lg:gap-6"}>
                 <aside className={`lg:sticky lg:top-2 ${navigation.indexPane}`}>
                     <SettingsNavSidebar onSearchRequest={openSearch} />
                 </aside>

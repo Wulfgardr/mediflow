@@ -71,10 +71,11 @@ test('tracked workspace still refuses a materialized tracked symlink before copy
   assert.equal(fs.existsSync(path.join(target, included)), false);
 });
 
-test('browser plans retain all four canonical recipes and owned positional outputs without launching browsers', () => {
+test('browser plans retain canonical recipes and owned positional outputs without launching browsers', () => {
   const plan = conditionalGroupPlan(root, 'headless-browser', owned);
   const registry = localTestCommands(root);
-  assert.equal(plan.commands.length, 4);
+  assert.equal(plan.commands.length, 5);
+  assert.ok(plan.commands.some(command => command.label === 'scripts/ink-layout-browser.test.mjs'));
   for (const command of plan.commands) {
     const recipe = registry.find(item => item.id === command.label);
     assert.equal(command.executable, recipe.executable);
@@ -113,7 +114,8 @@ test('Apple default entrypoint is lane-backed and other platforms fail explicitl
 
 test('selection exposes generator artifacts, Cargo targets and eight individually proposed external conditions', () => {
   const selection = collectConditionalLocalSelections(root);
-  assert.equal(selection['conditional:headless-browser'].files.length, 4);
+  assert.equal(selection['conditional:headless-browser'].files.length, 5);
+  assert.ok(selection['conditional:headless-browser'].files.includes('scripts/ink-layout-browser.test.mjs'));
   assert.equal(selection['conditional:fixture-generators'].files.length, 2);
   assert.equal(selection['conditional:research-toolchain'].files.length, 3);
   assert.equal(conditionalGroupPlan(root, 'fixture-generators', owned).artifacts.length, 3);
