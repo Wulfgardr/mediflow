@@ -89,6 +89,7 @@ test('prestazione annullata: totale, stato e dettaglio nominano ciò che contano
     await page.getByRole('navigation', { name: 'Sezioni della vista', exact: true }).getByRole('button', { name: 'Altro', exact: true }).click();
     const menu = page.getByRole('menu', { name: 'Altre sezioni della cartella', exact: true });
     await expect(menu.getByRole('menuitem', { name: 'Clinica 0 diagnosi', exact: true })).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: 'Amministrazione 0 esenzioni', exact: true })).toBeVisible();
     await expect(menu.getByRole('menuitem', { name: 'Prestazioni 1 prestazione totale', exact: true })).toBeVisible();
     await expect(menu.getByRole('menuitem', { name: 'Scale 0 valutazioni', exact: true })).toBeVisible();
     await expect(menu.getByRole('menuitem', { name: 'Diario 0 voci', exact: true })).toBeVisible();
