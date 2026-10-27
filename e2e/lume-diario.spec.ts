@@ -22,6 +22,7 @@ const DIARY_CASES: DiaryCase[] = (['giorno', 'grafite'] as const).flatMap((regis
 
 const FIXTURE_PREFIX = 'Diario Filo sintetico';
 const createdPatientIds: string[] = [];
+const transportEvidence = new WeakMap<Page, { blocked: string[]; errors: string[] }>();
 
 async function createPatient(page: Page): Promise<string> {
   const marker = Date.now().toString().slice(-8);
@@ -312,8 +313,32 @@ async function assertReflowStack(diary: Locator): Promise<void> {
 }
 
 test.describe.serial('Diario globale Lume', () => {
-  test.afterEach(async ({ page }) => {
-    await cleanupCreatedPatients(page);
+  test.beforeEach(async ({ page, baseURL }) => {
+    if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL
+      || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw Error('Owned synthetic archive and loopback required');
+    const origin = new URL(baseURL).origin, evidence = { blocked: [] as string[], errors: [] as string[] };
+    transportEvidence.set(page, evidence); page.on('pageerror', error => evidence.errors.push(error.message));
+    await page.route('**/*', route => {
+      const request = route.request(), url = new URL(request.url()), path = url.pathname;
+      if (url.origin !== origin || /^\/api\/(ai|icd|who|ollama|mlx|providers?|drugs|exemptions|prosthetics)(?:\/|$)/.test(path)
+        || path.startsWith('/api/settings/ai/') || path.startsWith('/api/system/ai-')
+        || (path.startsWith('/api/siss/') && path !== '/api/siss/session-status')
+        || path === '/api/system/native' || path === '/api/auth/reset') {
+        evidence.blocked.push(`${request.method()} ${url.href}`); return route.abort();
+      }
+      if (path === '/api/siss/session-status') return route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } });
+      if (path === '/api/clinical-agenda/candidates') return route.fulfill({ json: { enabled: false,
+        stats: { candidates: 0, parsed: 0, ignored: 0, invalid: 0 }, candidates: [], sources: [] } });
+      return route.continue();
+    });
+  });
+  test.afterEach(async ({ page }, info) => {
+    try { await cleanupCreatedPatients(page); }
+    finally {
+      const evidence = transportEvidence.get(page);
+      await info.attach('diary-transports', { contentType: 'application/json', body: JSON.stringify(evidence) });
+      expect(evidence?.blocked).toEqual([]); expect(evidence?.errors).toEqual([]);
+    }
   });
 
   test('Cronologia coerente con le voci globali preesistenti e ricerca', async ({ page }) => {
