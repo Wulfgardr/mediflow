@@ -460,11 +460,11 @@ export default function PatientDetailPage() {
         { href: '#terapie', label: 'Terapie', meta: workspace ? String(workspace.activeTherapiesCount) : undefined },
         { href: '#prestazioni', label: 'Prestazioni', meta: prestazioniCount !== undefined ? formatCountLabel(prestazioniCount, 'prestazione totale', 'prestazioni totali') : undefined },
         { href: '#protesica', label: 'Protesica', meta: protesicaCount !== undefined ? formatCountLabel(protesicaCount, 'prescrizione', 'prescrizioni') : undefined },
-        { href: '#scale', label: 'Scale', meta: formatCountLabel(scaleEntries.length, 'valutazione', 'valutazioni') },
+        { href: '#scale', label: 'Scale', meta: entries !== undefined ? formatCountLabel(scaleEntries.length, 'valutazione', 'valutazioni') : undefined },
         { href: '#documenti', label: 'Documenti', meta: String(attachmentItems.length) },
         { href: '#siss', label: 'SISS e FSE', meta: sissHandoffCount !== undefined ? formatCountLabel(sissHandoffCount, 'passaggio', 'passaggi') : undefined },
-        { href: '#timeline', label: 'Timeline', meta: formatCountLabel(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length, 'evento', 'eventi') },
-        { href: '#diario', label: 'Diario', meta: formatCountLabel(nonScaleEntries.length, 'voce', 'voci') },
+        { href: '#timeline', label: 'Timeline', meta: entries !== undefined && checkups !== undefined ? formatCountLabel(nonScaleEntries.length + checkups.length + documentInsights.length, 'evento', 'eventi') : undefined },
+        { href: '#diario', label: 'Diario', meta: entries !== undefined ? formatCountLabel(nonScaleEntries.length, 'voce', 'voci') : undefined },
         { href: '#follow-up', label: 'Follow-up', meta: followupRead.count },
     ];
     const workspaceNavGroups = buildPatientModuleRailGroups(workspaceNavItems);
@@ -787,7 +787,7 @@ export default function PatientDetailPage() {
                         title="Scale di valutazione"
                         icon={Activity}
                         surfaceClassName={workspaceStyles.clinicalSection}
-                        count={formatCountLabel(scaleEntries.length, 'valutazione', 'valutazioni')}
+                        count={entries !== undefined ? formatCountLabel(scaleEntries.length, 'valutazione', 'valutazioni') : undefined}
                         summary="Risultati registrati e nuove valutazioni."
                     >
                         {/* Read stored results without rescoring historical instruments. */}
@@ -799,7 +799,7 @@ export default function PatientDetailPage() {
                                     heading="Valutazioni registrate"
                                     emptyMessage="Nessuna valutazione registrata."
                                 />
-                            ) : <p className={workspaceStyles.mutedText}>Valutazioni in caricamento.</p>}
+                            ) : <ViewState state="loading" title="Valutazioni in caricamento." />}
                         </div>
                         {/* WUL-678: one target per scale, with explicit spacing. */}
                         <div className={scaleStyles.quickStart}>
