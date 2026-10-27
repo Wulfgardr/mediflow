@@ -140,27 +140,38 @@ mod tests {
     use super::*;
     #[test]
     fn state_directory_is_explicit_for_connected_and_demo_without_secret_flags() {
+        let state_directory = if cfg!(windows) {
+            r"C:\mediflow-owned"
+        } else {
+            "/private/tmp/mediflow-owned"
+        };
         for prefix in [vec!["--demo"], vec!["--server", "http://127.0.0.1:43181"]] {
             let mut args = prefix;
-            args.extend(["--state-directory", "/private/tmp/mediflow-owned"]);
+            args.extend(["--state-directory", state_directory]);
             assert_eq!(
                 parse_launch(args.into_iter().map(String::from))
                     .unwrap()
                     .state_directory,
-                Some(PathBuf::from("/private/tmp/mediflow-owned"))
+                Some(PathBuf::from(state_directory))
             );
         }
-        for args in [
-            vec!["--state-directory"],
-            vec!["--state-directory", "relative"],
-            vec![
-                "--state-directory",
-                "/private/tmp/a",
-                "--state-directory",
-                "/private/tmp/b",
-            ],
+        for (args, error) in [
+            (vec!["--state-directory"], STATE_DIRECTORY_MISSING),
+            (
+                vec!["--state-directory", "relative"],
+                STATE_DIRECTORY_INVALID,
+            ),
+            (
+                vec![
+                    "--state-directory",
+                    state_directory,
+                    "--state-directory",
+                    state_directory,
+                ],
+                LAUNCH_USAGE,
+            ),
         ] {
-            assert!(parse_launch(args.into_iter().map(String::from)).is_err());
+            assert_eq!(parse_launch(args.into_iter().map(String::from)), Err(error));
         }
     }
     #[test]
