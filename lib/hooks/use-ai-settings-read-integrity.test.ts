@@ -22,7 +22,6 @@ const initialSettings = {
     aiSmartImportKillSwitch: 'disabled', aiTreatmentReasoningKillSwitch: 'disabled',
 };
 
-/* Real hook, ApiTable, parsers and loaders; React scheduling and HTTP are explicit doubles. */
 function harness(events: EventTarget) {
     const states: unknown[] = [], refs: { current: unknown }[] = [], effects: Effect[] = [], pending: (() => void)[] = [];
     let stateIndex = 0, refIndex = 0, effectIndex = 0;
@@ -65,6 +64,7 @@ function harness(events: EventTarget) {
 
 async function scenario(t: TestContext, failure?: { key: string; status: number; gate?: Promise<void> }) {
     const settings = new Map<string, string>(Object.entries(initialSettings));
+    if (failure?.status === 404) settings.delete(failure.key);
     const writes: { key: string; value: string }[] = [];
     const events = new EventTarget();
     const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
