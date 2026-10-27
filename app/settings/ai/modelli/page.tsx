@@ -89,6 +89,7 @@ export default function SettingsAiModelsPage() {
 
             <Disclosure title="Configurazioni consigliate" className={composition.details}>
                 <p>Parti dalla memoria del computer, poi scegli i modelli per le tue attività.</p>
+                <p className={styles.hint}>La configurazione consigliata aggiorna la bozza. Verifica i modelli installati e salva per applicarla.</p>
                 <div className={styles.presets}>
                     {([
                         ['low', 'Leggero · meno di 16 GB', 'Qwen 2.5 7B'],
@@ -103,8 +104,7 @@ export default function SettingsAiModelsPage() {
                         </button>
                     ))}
                 </div>
-                <p className={styles.hint}>Il preset aggiorna la bozza. Verifica i modelli installati e salva per applicarlo.</p>
-                <Disclosure title="Cosa cambia con un preset">
+                <Disclosure title="Cosa cambia con una configurazione consigliata">
                 <dl className={styles.roles}>
                     <div>
                         <dt className="font-semibold">Sintesi e organizzazione</dt>
@@ -115,7 +115,7 @@ export default function SettingsAiModelsPage() {
                         <dd className={styles.hint}>Modello per elaborare e confrontare informazioni testuali. Puoi sceglierne uno diverso nel passo 2.</dd>
                     </div>
                 </dl>
-                <p className={styles.hint}>Il preset sceglie lo stesso modello per i due ruoli, senza scaricarlo o salvarlo. La memoria è un’indicazione orientativa: compatibilità e qualità vanno verificate. OCR e revisione terapeutica ATHENA hanno una configurazione separata.</p>
+                <p className={styles.hint}>La configurazione consigliata sceglie lo stesso modello per i due ruoli, senza scaricarlo o salvarlo. La memoria è un’indicazione orientativa: compatibilità e qualità vanno verificate. OCR e revisione terapeutica ATHENA hanno una configurazione separata.</p>
                 </Disclosure>
             </Disclosure>
 

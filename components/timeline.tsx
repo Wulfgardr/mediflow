@@ -38,7 +38,7 @@ export default function Timeline({
            accessibile e tematizzato, non piu con prompt() nativo. */
         const result = await confirm({
             title: 'Elimina voce clinica',
-            message: "La voce verra spostata nel cestino. Indica la motivazione, richiesta per l'audit clinico.",
+            message: "La voce verrà spostata nel cestino. Indica la motivazione, richiesta per l'audit clinico.",
             tone: 'danger',
             confirmLabel: 'Elimina',
             requireReason: true,

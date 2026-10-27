@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import { InkState } from '@/components/ui/ink-state';
 import type { PatientSmartImportProjectionCaptureInput } from '@/lib/domain/documents/patient-smart-import-projection-capture';
 import styles from './patient-smart-import.module.css';
@@ -81,7 +82,7 @@ export function PatientSmartImportFabricPreviewCard({ patientId, captureInput, e
                                     <h4><InkState state="pencil">Proposta · da rivedere</InkState></h4>
                                     <p>0 scritture · applicazione non consentita</p>
                                     <PrivacyBlur intensity="sm">{preview.proposal.summary}</PrivacyBlur>
-                                    <p>{preview.proposal.diagnoses.length} diagnosi · {preview.proposal.therapies.length} terapie · {preview.proposal.servicePrescriptions.length} prestazioni</p>
+                                    <p>{preview.proposal.diagnoses.length} diagnosi · {formatCountLabel(preview.proposal.therapies.length, 'terapia', 'terapie')} · {formatCountLabel(preview.proposal.servicePrescriptions.length, 'prestazione', 'prestazioni')}</p>
                                 </div>
                                 <div>
                                     <h4>Fonti raccolte per la proposta</h4>

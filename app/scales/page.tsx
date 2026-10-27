@@ -1,6 +1,6 @@
 'use client';
 
-
+import { formatCountLabel } from '@/lib/format-count';
 import { useEffect, useRef, useState } from 'react';
 import {
     Activity,
@@ -146,7 +146,7 @@ export default function ScalesLibraryPage() {
                         </h2>
                         {proposal && <p>Il punteggio verrà registrato nella cartella del paziente.</p>}
                     </div>
-                    <span className={proposal ? styles.catalogCount : 'lume-registro mf-btn-secondary w-fit'}>{SCALE_CATALOG.length} scale {proposal ? 'disponibili' : 'attive'}</span>
+                    <span className={proposal ? styles.catalogCount : 'lume-registro mf-btn-secondary w-fit'}>{formatCountLabel(SCALE_CATALOG.length, proposal ? 'scala disponibile' : 'scala attiva', proposal ? 'scale disponibili' : 'scale attive')}</span>
                 </div>
 
                 <div className="space-y-6">

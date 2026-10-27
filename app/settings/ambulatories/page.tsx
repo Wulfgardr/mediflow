@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { db, Ambulatory } from '@/lib/db';
 import { Plus, Loader2, CornerDownRight } from 'lucide-react';
@@ -159,7 +160,7 @@ export default function AmbulatoryManagerPage() {
                     <button onClick={() => handleAddChild(node.id)} disabled={actionsBlocked} title={`Aggiungi reparto sotto ${node.name}`} aria-label={`Aggiungi reparto sotto ${node.name}`} className={styles.textAction}><Plus size={14} aria-hidden />Aggiungi reparto</button>
                     <PatientSheetMenu label="Azioni" trigger={props => <button {...props} disabled={actionsBlocked} className={styles.menuTrigger} aria-label="Azioni">⋯</button>}>
                         <button role="menuitem" onClick={() => handleActivate(node.id)} disabled={actionsBlocked || node.isDefault}>{node.isDefault ? 'Già predefinita' : 'Usa come predefinita'}</button>
-                        {node.type === 'test' && <button role="menuitem" onClick={() => handleClear(node.id)} aria-label="Svuota ambiente di test" disabled={actionsBlocked}>Svuota</button>}
+                        {node.type === 'test' && <button role="menuitem" onClick={() => handleClear(node.id)} aria-label="Svuota ambiente di test" disabled={actionsBlocked}>Svuota ambiente di test</button>}
                         <button role="menuitem" onClick={() => handleDelete(node.id)} aria-label="Elimina sede" disabled={actionsBlocked}>Elimina sede</button>
                     </PatientSheetMenu>
                 </div>
@@ -220,14 +221,14 @@ export default function AmbulatoryManagerPage() {
             {isLoading ? <ViewState state="loading" title="Caricamento sedi..." detail={ambulatories.length ? 'L’elenco mostrato potrebbe non essere aggiornato.' : undefined} />
                 : readError || actionError ? <ViewState state="error" title={readError || actionError} detail={ambulatories.length ? 'L’elenco mostrato potrebbe non essere aggiornato.' : undefined}
                     action={{ label: 'Riprova', onClick: () => void loadAmbulatories() }} />
-                    : <p className={styles.meta}>{ambulatories.length} sedi configurate.</p>}
+                    : <p className={styles.meta}>{formatCountLabel(ambulatories.length, 'sede configurata', 'sedi configurate')}.</p>}
             {acceptedAction && <p role="status" className={styles.meta}>{acceptedAction}</p>}
             <section id="nuova-sede" className={styles.section}>
                 <header><h3 className={styles.heading}>Nuova sede o reparto</h3>{selectedParent && <p className={styles.meta}><CornerDownRight size={14} aria-hidden />Reparto di: {selectedParent.name}</p>}</header>
                 <div className={styles.fields}>
                     <label className={SETTINGS_LABEL_CLASS}>Nome<input ref={nameInputRef} placeholder="Nome sede o reparto (es. Cardiologia)" value={newName} onChange={e => setNewName(e.target.value)} className={SETTINGS_INPUT_CLASS} /></label>
                     <label className={SETTINGS_LABEL_CLASS}>Indirizzo (opzionale)<input placeholder="Indirizzo (opzionale)" value={newAddress} onChange={e => setNewAddress(e.target.value)} className={SETTINGS_INPUT_CLASS} /></label>
-                    <label className={SETTINGS_LABEL_CLASS}>Ambulatorio superiore<select value={newParentId} onChange={e => setNewParentId(e.target.value)} aria-label="Sede superiore" className={SETTINGS_INPUT_CLASS}>
+                    <label className={SETTINGS_LABEL_CLASS}>Sede superiore<select value={newParentId} onChange={e => setNewParentId(e.target.value)} aria-label="Sede superiore" className={SETTINGS_INPUT_CLASS}>
                         <option value="">Sede principale</option>{ambulatories.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                     </select></label>
                     <label className={SETTINGS_LABEL_CLASS}>Tipo<select value={newType} onChange={e => setNewType(e.target.value as 'live' | 'test')} aria-label="Tipo sede" className={SETTINGS_INPUT_CLASS}><option value="live">Clinico</option><option value="test">Test</option></select></label>
@@ -237,8 +238,8 @@ export default function AmbulatoryManagerPage() {
             <section id="sedi" className={styles.section} aria-busy={isLoading}>
                 <h3 className={styles.heading}>Sedi configurate</h3>
                 <p className={styles.meta}>La sede predefinita viene usata per i nuovi dati quando non scegli un contesto diverso.</p>
-                {ambulatories.length > 0 ? <div role="tree" aria-label="Ambulatori configurati">{buildTree(ambulatories).map(root => renderAmbulatoryNode(root))}</div>
-                    : !isLoading && !readError && !actionError ? <ViewState state="empty" title="Nessun ambulatorio configurato." /> : null}
+                {ambulatories.length > 0 ? <div role="tree" aria-label="Sedi configurate">{buildTree(ambulatories).map(root => renderAmbulatoryNode(root))}</div>
+                    : !isLoading && !readError && !actionError ? <ViewState state="empty" title="Nessuna sede configurata." /> : null}
             </section>
         </section>
     );

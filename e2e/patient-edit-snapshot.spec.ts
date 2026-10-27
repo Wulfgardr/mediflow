@@ -90,7 +90,7 @@ test('partial save keeps draft after live rerender and retries only unconfirmed 
     await page.locator('input[name="checkups.0.title"]').fill('Controllo modificato');
     await page.getByRole('button', { name: 'Aggiorna scheda', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Salvataggio non completato' })).toBeVisible();
-    await expect(page.getByText('1 di 2 operazioni confermate.', { exact: false })).toBeVisible();
+    await expect(page.getByText('1 operazione confermata su 2.', { exact: false })).toBeVisible();
     await expect.poll(() => patientVersionsRead.includes(4)).toBe(true);
     await expect(page.locator('input[name="firstName"]')).toHaveValue('Modificato');
     await expect(page.locator('input[name="firstName"]')).toBeDisabled();

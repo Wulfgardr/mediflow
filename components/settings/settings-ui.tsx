@@ -26,7 +26,7 @@ const PROPOSAL_INTRO_COPY: Record<string, string> = {
     'Governance e rollout': 'Confronto modelli e stato di rilascio.',
     Diagnostica: 'Servizi, architettura e aggiornamenti.',
     Sviluppo: 'Dati demo e app nativa.',
-    'Zona Pericolo': 'Reset della configurazione. Richiede nuovo accesso.',
+    'Zona pericolo': 'Ripristino della configurazione. Richiede una nuova configurazione iniziale.',
 };
 
 export function SettingsSectionIntro({
