@@ -7,6 +7,10 @@ const origin='http://127.0.0.1:48976';
 const entry=`import React from 'react';import {createRoot} from 'react-dom/client';
 import {PatientSheetActionsMenu} from './components/patient-sheet-actions-menu';
 import {PatientSheetMenu} from './components/patient-sheet-menu';
+import {ConfirmProvider,useConfirm} from './components/ui/confirm-dialog';
+function DocumentActions(){const confirm=useConfirm();return <PatientSheetMenu label="Conferma documento" trigger={props=><button {...props}>Altro referto sintetico</button>}>
+<button role="menuitem" tabIndex={-1} onClick={async()=>{await confirm({title:'Eliminare documento sintetico?',tone:'danger'});}}>Elimina referto sintetico</button>
+</PatientSheetMenu>}
 window.calls=[];
 createRoot(document.getElementById('root')).render(<><PatientSheetActionsMenu editHref="/patients/synthetic/edit" canShareFhirFile={true}
  onExportFhir={()=>window.calls.push('export')} onShareFhir={()=>window.calls.push('share')} onReportPdf={()=>window.calls.push('pdf')}
@@ -16,7 +20,7 @@ createRoot(document.getElementById('root')).render(<><PatientSheetActionsMenu ed
  <button role="menuitem" tabIndex={-1}>Prepara sintesi</button>
  <button role="menuitem" tabIndex={-1}>Elimina</button>
  <button role="menuitem" disabled>Non disponibile</button>
-</PatientSheetMenu></>);`;
+</PatientSheetMenu><ConfirmProvider><DocumentActions/></ConfirmProvider></>);`;
 
 test('header actions are an accessible ordered menu with unchanged links and callbacks', {timeout:30000},async t=>{
  assert.ok(process.env.MEDIFLOW_DATA_DIR?.trim());
@@ -71,4 +75,10 @@ test('header actions are an accessible ordered menu with unchanged links and cal
  await page.keyboard.press('ArrowUp');
  await expect(documentMenu.getByRole('menuitem',{name:'Elimina',exact:true})).toBeFocused();
  await page.keyboard.press('Escape');await expect(documentTrigger).toBeFocused();
+ const confirmTrigger=page.getByRole('button',{name:'Altro referto sintetico',exact:true});
+ await confirmTrigger.focus();await page.keyboard.press('ArrowUp');await page.keyboard.press('Enter');
+ const confirmation=page.getByRole('dialog',{name:'Eliminare documento sintetico?',exact:true});
+ await expect(confirmation).toBeVisible();
+ await confirmation.getByRole('button',{name:'Annulla',exact:true}).click();
+ await expect(confirmation).toHaveCount(0);await expect(confirmTrigger).toBeFocused();
 });
