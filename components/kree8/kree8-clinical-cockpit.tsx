@@ -473,7 +473,7 @@ export function Kree8ClinicalCockpit({
         db.therapies.query({ patientId }).toArray(),
         db.checkups.query({ patientId }).toArray(),
         db.observations.query({ patientId }).toArray(),
-        db.attachments.query({ patientId, metadataOnly: true }).toArray(),
+        db.attachments.query({ patientId, metadataOnly: true }).toArray({ signal: db.getSessionReadSignal() }),
       ]);
 
       return buildPatientWorkspace({

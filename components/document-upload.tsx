@@ -161,7 +161,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     }, [uploadQueue]);
 
     const { data: attachments, error: listError, loading: listLoading, refresh: refreshAttachments } = useLiveQueryState(
-        () => db.attachments.query({ patientId, metadataOnly: true }).toArray(),
+        () => db.attachments.query({ patientId, metadataOnly: true }).toArray({ signal: db.getSessionReadSignal() }),
         [patientId], undefined, ['attachments'],
     );
     const { data: killSwitch, error: settingError, loading: settingLoading, refresh: refreshSetting } = useLiveQueryState(
