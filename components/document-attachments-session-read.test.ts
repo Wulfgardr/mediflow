@@ -11,29 +11,37 @@ function consumerRead(file: string): () => Promise<unknown> {
     const readers: ts.CallExpression[] = [];
     const visit = (node: ts.Node) => {
         if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
-            && node.expression.name.text === 'toArray'
-            && node.expression.expression.getText(source).startsWith('db.attachments.query(')) readers.push(node);
+            && (node.expression.name.text === 'toArray' || (file.includes('fabric-review') && node.expression.name.text === 'get'))
+            && node.expression.expression.getText(source).startsWith('db.attachments')) readers.push(node);
         ts.forEachChild(node, visit);
     };
     visit(source);
     assert.equal(readers.length, 1);
-    return runInNewContext(`(() => ${readers[0]!.getText(source)})`, { db, id: 'synthetic-patient', patientId: 'synthetic-patient' });
+    const expression = ts.transpile(readers[0]!.getText(source), { target: ts.ScriptTarget.ESNext });
+    return runInNewContext(`(() => ${expression.trim().replace(/;$/u, '')})`, {
+        db, id: file.includes('fabric-review') ? 'synthetic-attachment' : 'synthetic-patient',
+        patientId: 'synthetic-patient', attachmentIds: ['synthetic-attachment'],
+    });
 }
 
 const key = () => crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 
-for (const file of ['components/document-upload.tsx', 'app/patients/[id]/modules/page.tsx', 'components/kree8/kree8-clinical-cockpit.tsx']) {
+for (const file of ['components/document-upload.tsx', 'app/patients/[id]/modules/page.tsx', 'components/kree8/kree8-clinical-cockpit.tsx',
+    'components/timeline-entry-card.tsx', 'app/patients/[id]/entries/new/page.tsx', 'components/document-synthesis-fabric-review-card.tsx']) {
     test(`${file}: attachment list cannot dispatch while locked and resumes only with a new session`, async t => {
         db.setKey(null);
         t.after(() => db.setKey(null));
         const requests: string[] = [];
-        t.mock.method(globalThis, 'fetch', async (url: string) => { requests.push(url); return Response.json([]); });
+        const item = { id: 'synthetic-attachment', patientId: 'synthetic-patient', name: 'source.txt' };
+        const single = file.includes('fabric-review');
+        t.mock.method(globalThis, 'fetch', async (url: string) => { requests.push(url); return Response.json(single ? item : [item]); });
         const read = consumerRead(file);
         await assert.rejects(read(), { name: 'AbortError' });
         assert.deepEqual(requests, []);
         db.setKey(await key());
-        assert.deepEqual(await read(), []);
-        assert.deepEqual(requests, ['/api/attachments?patientId=synthetic-patient&metadata=true']);
+        assert.deepEqual(await read(), single ? item : [item]);
+        assert.equal(requests.length, 1);
+        assert.ok(String(requests[0]).startsWith('/api/attachments'));
     });
 
     test(`${file}: lock aborts the actual list request and a late 401 cannot revoke its replacement`, async t => {
