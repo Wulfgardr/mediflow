@@ -1,0 +1,32 @@
+.heading,
+:global(:root) .sections .heading,
+:global(:root) .sections :global(section > :is(h2, h3, h4)),
+:global(:root) .sections :global(section > header > :is(h2, h3, h4)),
+:global(:root) .sections :global(section > [data-section-header] > :is(h2, h3, h4)),
+:global(:root) .sections :global(section > :is(h2, h3, h4) [data-disclosure-control]),
+:global(:root) .sections :global(section > header > :is(h2, h3, h4) [data-disclosure-control]) {
+  font-family: var(--lume-font-sans, system-ui, sans-serif);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.count {
+  font-family: var(--lume-font-sans, system-ui, sans-serif);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.summary, :global(:root) .sections .summary {
+  font-family: var(--lume-font-sans, system-ui, sans-serif);
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0;
+  text-transform: none;
+}

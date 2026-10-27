@@ -772,7 +772,7 @@ export default function PatientDetailPage() {
                         ) : null}
                     </DocumentUpload>
                     {smartImportSourceCount > 0 && smartImportFabricCaptureInput ? <section className={disclosure.clinicalSupport} aria-label="Smart Import">
-                        <h3 className="type-body font-semibold">Smart Import</h3>
+                        <h3 className="type-section">Smart Import</h3>
                         <Disclosure id="smart-import" className={disclosure.disclosure} title="Proposte">
                             <PatientSmartImportFabricPreviewCard patientId={patient.id}
                                 captureInput={smartImportFabricCaptureInput}

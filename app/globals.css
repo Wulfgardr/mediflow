@@ -35,7 +35,6 @@
   background-color: color-mix(in srgb, var(--lume-ink) 5%, transparent);
 }
 .mf-listrow:focus-visible {
-  outline: none;
   background-color: var(--lume-surface-focal);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 12%, transparent), 0 0 0 2px var(--lume-accent);
 }
@@ -157,7 +156,7 @@ body {
 .lume-rule-table tbody tr:hover { background: var(--lume-surface-hover); }
 
 body { caret-color: var(--lume-ink-fresh); }
-:focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: 3px; }
+:root :focus-visible:not(h1[tabindex='-1']) { outline: 2px solid var(--lume-ink-fresh); outline-offset: 2px; }
 input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); opacity: 1; }
 
 /* Ensure selected text is readable in dark mode */
@@ -1033,7 +1032,6 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
 :root[data-ui-style='redesign'] .mediflow-mobile-link:focus-visible,
 :root[data-ui-style='redesign'] .siss-action-btn:focus-visible,
 :root[data-ui-style='redesign'] .graphite-mini-btn:focus-visible {
-  outline: none;
   box-shadow: var(--lume-focus-ring);
 }
 
@@ -1073,7 +1071,6 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   padding: 0.7rem 0.95rem;
   font-size: 0.9375rem;
   line-height: 1.4;
-  outline: none;
   box-shadow: none;
   transition: border-color var(--lume-dur-riga) var(--lume-ease), background-color var(--lume-dur-fuoco) var(--lume-ease);
 }
@@ -1152,7 +1149,6 @@ html:root[data-lume] .mf-input.mf-search-input {
   padding: 0.7rem 0.95rem;
   font-size: 0.9375rem;
   line-height: 1.4;
-  outline: none;
   box-shadow: none;
   transition: border-color var(--lume-dur-riga) var(--lume-ease), background-color var(--lume-dur-fuoco) var(--lume-ease);
   min-height: 6rem;
@@ -1398,7 +1394,6 @@ html:root[data-lume] .mf-button-destructive[data-command-confirmation='true']:di
 /* WUL-UIUX: anello di focus da tastiera per le righe dei popover risultati
    (autocomplete). Prima mancava e alcuni consumer azzeravano l'outline. */
 .mf-popover-row:focus-visible {
-  outline: none;
   background-color: var(--lume-surface-focal);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent), 0 0 0 2px var(--lume-accent);
 }
@@ -1539,7 +1534,6 @@ html:root[data-lume] .mf-button-destructive[data-command-confirmation='true']:di
 /* WUL-UIUX: le option-card (scale da 30+ domande) erano operabili da
    tastiera ma senza indicatore di focus visibile. */
 .mf-option-card:focus-visible {
-  outline: none;
   border-color: transparent;
   background-color: var(--lume-surface-focal);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent), 0 0 0 2px var(--lume-accent);
@@ -1629,7 +1623,6 @@ html:root[data-lume] .mf-button-destructive[data-command-confirmation='true']:di
    regola unlayered, dopo le varianti, garantisce l'anello di focus da tastiera su
    tutti i primari, toni inclusi (es. la CTA distruttiva "elimina paziente"). */
 .ui-btn-primary:focus-visible {
-  outline: none;
   box-shadow:
     0 0 0 2px var(--lume-surface-canvas),
     0 0 0 4px var(--lume-accent);
