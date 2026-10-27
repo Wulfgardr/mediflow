@@ -55,10 +55,10 @@ test('preference status distinguishes disabled, configured and unavailable witho
         defaultSource: 'host_configuration', bindingState: 'current', options: [option] };
     for (const [change, state, label] of [
         [{ enabled: false }, 'off', 'Disattivata'],
-        [{}, 'configured', 'Configurata'],
-        [{ bindingState: 'stale' }, 'unavailable', 'Non disponibile'],
-        [{ options: [{ ...option, state: 'unavailable' }] }, 'unavailable', 'Non disponibile'],
-        [{ defaultModelOptionId: null }, 'unavailable', 'Non disponibile'],
+        [{}, 'configured', 'Configurazione locale presente'],
+        [{ bindingState: 'stale' }, 'unavailable', 'Configurazione locale non disponibile'],
+        [{ options: [{ ...option, state: 'unavailable' }] }, 'unavailable', 'Configurazione locale non disponibile'],
+        [{ defaultModelOptionId: null }, 'unavailable', 'Configurazione locale non disponibile'],
     ] as const) {
         const tree = component({ row: { ...row, ...change }, disabled: false, activationSupported: true, account: null, preview() {} });
         const status = nodes(tree).find(node => node.type === 'span' && node.props['data-state']);

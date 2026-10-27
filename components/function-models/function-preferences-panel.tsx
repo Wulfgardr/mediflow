@@ -29,7 +29,7 @@ function PreferenceCard({ row, disabled, account, activationSupported, preview }
     const configurationState = !row.enabled ? 'off' : row.bindingState === 'current' && configuredDefault?.state === 'available_unqualified' ? 'configured' : 'unavailable';
     const warning = model === null && row.defaultSource !== 'host_configuration' ? 'Il modello del computer sarà indicato nell’anteprima.' : row.bindingState === 'stale' ? 'Scelta salvata scaduta: serve una nuova decisione.' : row.bindingState === 'unsupported' ? 'Predefinito non disponibile.' : selected?.state === 'available_unqualified' ? '' : 'Provider locale non disponibile';
     return <article className={styles.card}>
-        <div className={styles.row}><h3>{names[row.id]}</h3><span className={styles.preferenceStatus} data-state={configurationState}>{configurationState === 'off' ? 'Disattivata' : configurationState === 'configured' ? 'Configurata' : 'Non disponibile'}</span></div>
+        <div className={styles.row}><h3>{names[row.id]}</h3><span className={styles.preferenceStatus} data-state={configurationState}>{configurationState === 'off' ? 'Disattivata' : configurationState === 'configured' ? 'Configurazione locale presente' : 'Configurazione locale non disponibile'}</span></div>
         {activationSupported && <ChoiceField label="Canale per questa modifica" aria-label={`Canale per questa modifica · ${names[row.id]}`} value={channel} disabled={disabled} disabledReason="Attendi il completamento della modifica in corso."
                 onChange={e => setChannel(e.target.value === 'chatgpt_subscription' ? 'chatgpt_subscription' : 'local')}>
                 <option value="local">Provider locale · modello predefinito</option>
