@@ -120,7 +120,7 @@ for (const failure of ['counts', 'prosthetics'] as const) test(`Repertori: ${fai
       falseEmpty: await area.getByText('Nessun repertorio disponibile.', { exact: true }).count(),
       falseDisabled: failure === 'prosthetics' ? await row.getByText('Disattivato', { exact: true }).count() : null });
     if (failure === 'prosthetics') await expect(row).toContainText('non verificato');
-    await shot('read-error', failure === 'counts' ? area.getByText('Impossibile leggere i conteggi locali in questa sessione.', { exact: true }) : row);
+    await shot('read-error', failure === 'counts' ? baseline ? area.getByText('Impossibile leggere i conteggi locali in questa sessione.', { exact: true }) : area.getByRole('alert') : row);
     if (baseline) {
       if (failure === 'counts') {
         await expect.soft(area.locator('header').first(), 'Errore di lettura non equivale a zero cataloghi').not.toContainText('0 di 0');
@@ -149,7 +149,7 @@ for (const failure of ['counts', 'prosthetics'] as const) test(`Repertori: ${fai
           document.documentElement.style.colorScheme = value;
         }, theme === 'giorno' ? 'light' : 'dark');
         await assertNoHorizontalOverflow(page, [{ label: 'document', selector: 'document' }, { label: 'Repertori', selector: '[aria-label="Repertori rapidi"]' }]);
-        const target = failure === 'counts' ? area.getByText('Impossibile leggere i conteggi locali in questa sessione.', { exact: true }) : row;
+        const target = failure === 'counts' ? area.getByRole('alert') : row;
         await shot(`read-error-${theme}-${size}`, target);
         colors.set(theme, await target.evaluate(element => getComputedStyle(element).color));
       }
