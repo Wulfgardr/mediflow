@@ -101,6 +101,28 @@ test('la scheda usa la disclosure comune per i contenuti nel flusso', async ({ p
   }
 });
 
+test('i comandi dichiarano solo form montati e mantengono lo stato di apertura coerente', async ({ page }) => {
+  await fixture(page);
+  for (const [section, label] of [['prestazioni', 'Nuova prestazione'], ['protesica', 'Nuova voce protesica'], ['siss', 'Registra passaggio']]) {
+    await openPatientSection(page, section);
+    const trigger = page.getByRole('button', { name: label, exact: true });
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    const target = page.locator(`[id="${await trigger.getAttribute('aria-controls')}"]`);
+    await expect(target).toHaveCount(1);
+    await expect(target).toBeHidden();
+    await expect(target.locator('form')).toHaveCount(0);
+    await trigger.click();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await expect(target).toHaveCount(1);
+    await expect(target).toBeVisible();
+    await trigger.click();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await expect(target).toHaveCount(1);
+    await expect(target).toBeHidden();
+    await expect(target.locator('form')).toHaveCount(0);
+  }
+});
+
 for (const theme of ['giorno', 'grafite']) for (const width of [1440, 768, 390, 720]) {
   test(`cattura disclosure ${theme} ${width === 720 ? 'zoom-200' : width}`, async ({ page }) => {
     // CSS zoom exercises doubled controls and 720 CSS px reflow in a 1440 px viewport.

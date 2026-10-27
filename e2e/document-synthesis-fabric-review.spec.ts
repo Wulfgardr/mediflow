@@ -1,3 +1,4 @@
+import { openDocumentActions } from './utils';
 import { createHash } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 
@@ -182,7 +183,7 @@ async function bootstrapFabricSession(page: Page, pin: string): Promise<void> {
     const pinInputs = page.locator('input[placeholder="••••••"]');
     await pinInputs.nth(0).fill(pin);
     await pinInputs.nth(1).fill(pin);
-    await page.getByRole('button', { name: 'Concludi Setup' }).click();
+    await page.getByRole('button', { name: 'Prepara il kit di recupero' }).click();
   }
   await setupPinLegacyIfNeeded(page, pin);
   await unlockIfNeeded(page, pin);
@@ -240,7 +241,8 @@ test('Document Synthesis Fabric mostra una proposta con verifica, provenienza e 
   const fixture = await createFixture(page);
   attachmentId = fixture.attachmentId;
   await openDocumentArchive(page, fixture.patientId);
-  await page.getByRole('button', { name: `Prepara sintesi di ${fixture.attachmentName}` }).click();
+  await openDocumentActions(page, fixture.attachmentName);
+  await page.getByRole('menuitem', { name: `Prepara sintesi di ${fixture.attachmentName}` }).click();
 
   const card = page.getByTestId(`document-synthesis-fabric-review-${attachmentId}`);
   await expect(card).toContainText('Sintesi da rivedere');

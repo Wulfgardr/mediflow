@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
 
-import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
+import { openDocumentActions, assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
 import { chooserReady, installKeyboardChooserObservation, keyboardChooserDecision, type KeyboardChooserSnapshot } from './anydoc-keyboard-chooser';
 
 const SYNTHETIC_ATTACHMENT_NAME = 'allegato-anydoc-focus-sintetico.pdf';
@@ -218,24 +218,51 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   await expect(viewButton).toBeFocused();
   await page.keyboard.press('Tab');
 
-  let extractButton = page.getByRole('button', { name: `Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}` });
+  const more = page.getByRole('button', { name: `Altro per ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true });
+  await expect(more).toBeFocused();
+  await expect(page.getByRole('menuitem')).toHaveCount(0);
+  await page.keyboard.press('ArrowDown');
+  const menu = page.getByRole('menu', { name: `Azioni documento ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true });
+  let extractButton = menu.getByRole('menuitem', { name: `Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}` });
   await expect(extractButton).toBeFocused();
   await expect(extractButton).toBeVisible();
   await expect(extractButton).toHaveAccessibleName(`Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}`);
   let actionGroup = extractButton.locator('..');
   await page.mouse.move(0, 0);
-  // named document actions remain visible before pointer or keyboard focus.
   await expect(actionGroup).toHaveCSS('opacity', '1');
-
-  await extractButton.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: `Prepara sintesi di ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(menu.getByRole('menuitem', { name: `Elimina ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
+  await expect(menu.getByRole('separator')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(more).toBeFocused();
+  await expect(menu).toHaveCount(0);
+  for (const key of ['Tab', 'Shift+Tab']) {
+    await page.keyboard.press('ArrowDown');
+    await expect(extractButton).toBeFocused();
+    await page.keyboard.press(key);
+    await expect(menu).toHaveCount(0);
+    await expect(more).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await expect(menu.getByRole('menuitem', { name: `Elimina ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
+    await page.keyboard.press('Home');
+    await expect(extractButton).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await expect(menu.getByRole('menuitem', { name: `Elimina ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(extractButton).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(more).toBeFocused();
+  }
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog', { name: 'Eliminare questo documento?' })).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Annulla', exact: true }).click();
+  await expect(more).toBeFocused();
+  await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: `Prepara sintesi di ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: `Elimina ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
-  await page.keyboard.press('Shift+Tab');
-  await page.keyboard.press('Shift+Tab');
-  await expect(extractButton).toBeFocused();
-  await expect(actionGroup).toHaveCSS('opacity', '1');
+  await expect(menu).toHaveCount(0);
   await assertNoHorizontalOverflow(page, [
     { label: 'documento AnyDoc desktop', selector: 'document' },
     { label: 'card allegato AnyDoc desktop', selector: '[data-document-area="list"]' },
@@ -245,7 +272,8 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   // resize the same open document pane, as the user does; reloading
   // would replace the UI whose responsive focus controls are being verified.
   await openPatientSection(page, 'documenti');
-  extractButton = page.getByRole('button', { name: `Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}` });
+  await openDocumentActions(page, SYNTHETIC_ATTACHMENT_NAME);
+  extractButton = page.getByRole('menuitem', { name: `Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}` });
   actionGroup = extractButton.locator('..');
   await page.mouse.move(0, 0);
   await expect(actionGroup).toHaveCSS('opacity', '1');
@@ -363,7 +391,8 @@ test('AnyDoc: il browser usa la route autenticata e mostra solo l’anteprima lo
     && response.request().headers()['x-mediflow-extraction-action'] === 'project'
     && response.url().endsWith(`/api/attachments/${attachment.id}/local-extraction`)
   ));
-  await page.getByRole('button', { name: `Estrai testo localmente da ${attachment.name}` }).click();
+  await openDocumentActions(page, attachment.name);
+  await page.getByRole('menuitem', { name: `Estrai testo localmente da ${attachment.name}` }).click();
 
   const response = await responsePromise;
   expect(response.status()).toBe(200);
