@@ -486,8 +486,9 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
                 self.next_epoch();
                 self.retire_profile_selection();
                 self.patients = Load::Idle;
-                self.global_patients = Load::Idle;
-                self.agenda = Load::Idle;
+                self.global_patients = ReadLoad::Idle;
+                self.agenda = ReadLoad::Idle;
+                self.agenda_flow = agenda_flow::AgendaFlow::default();
                 self.global_entries = Load::Idle;
                 self.patient = PatientData::default();
                 self.core.lock();
