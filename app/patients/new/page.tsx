@@ -287,7 +287,7 @@ export default function NewPatientPage() {
                                     {importMeta.diagnosisCount > 0
                                         ? `${formatCountLabel(importMeta.diagnosisCount, 'Trovata {count} diagnosi candidata', 'Trovate {count} diagnosi candidate', { template: true })}${importMeta.medicationCount > 0 ? `; ${formatCountLabel(importMeta.medicationCount, 'terapia', 'terapie')} da valutare` : ''}: scegli cosa tenere prima di compilare la scheda.`
                                         : importMeta.medicationCount > 0
-                                            ? `${formatCountLabel(importMeta.medicationCount, 'Trovata {count} terapia da valutare', 'Trovate {count} terapie da valutare', { template: true })}: conferma, correggi o escludi prima di portarle nella scheda.`
+                                            ? formatCountLabel(importMeta.medicationCount, 'Trovata {count} terapia da valutare: conferma, correggi o escludi prima di portarla nella scheda.', 'Trovate {count} terapie da valutare: conferma, correggi o escludi prima di portarle nella scheda.', { template: true })
                                             : 'Il documento è stato letto, ma non contiene dati clinici abbastanza strutturati da proporre automaticamente.'}
                                 </p>
                                 {importMeta.quality?.reason && (

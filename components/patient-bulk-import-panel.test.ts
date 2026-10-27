@@ -2,7 +2,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import { formatCountLabel } from '../lib/format-count';
 
 const root = new URL('../', import.meta.url);
 const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
@@ -34,6 +36,30 @@ test('Nuova scheda has the real shell primary action to the import route', () =>
     const source = read('app/patients/new/page.tsx');
     assert.match(source, /primaryAction=\{\{ href: "\/patients\/import", label: "Importa elenco CSV", icon: FileSpreadsheet \}\}/u);
     assert.match(source, /import .*FileSpreadsheet.* from 'lucide-react'/u);
+});
+test('Nuova scheda concorda la frase completa del riepilogo documentale per 0, 1 e più terapie e diagnosi', () => {
+    const name = 'app/patients/new/page.tsx';
+    const source = ts.createSourceFile(name, read(name), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const summary = nodes(source, ts.isJsxExpression).find(node =>
+        node.expression?.getText(source).startsWith('importMeta.diagnosisCount > 0'));
+    assert(summary?.expression);
+    const expression = summary.expression.getText(source);
+    const noData = 'Il documento è stato letto, ma non contiene dati clinici abbastanza strutturati da proporre automaticamente.';
+    for (const [diagnosisCount, medicationCount, expected] of [
+        [0, 0, noData],
+        [0, 1, 'Trovata 1 terapia da valutare: conferma, correggi o escludi prima di portarla nella scheda.'],
+        [0, 2, 'Trovate 2 terapie da valutare: conferma, correggi o escludi prima di portarle nella scheda.'],
+        [1, 0, 'Trovata 1 diagnosi candidata: scegli cosa tenere prima di compilare la scheda.'],
+        [1, 1, 'Trovata 1 diagnosi candidata; 1 terapia da valutare: scegli cosa tenere prima di compilare la scheda.'],
+        [1, 2, 'Trovata 1 diagnosi candidata; 2 terapie da valutare: scegli cosa tenere prima di compilare la scheda.'],
+        [2, 0, 'Trovate 2 diagnosi candidate: scegli cosa tenere prima di compilare la scheda.'],
+        [2, 1, 'Trovate 2 diagnosi candidate; 1 terapia da valutare: scegli cosa tenere prima di compilare la scheda.'],
+        [2, 2, 'Trovate 2 diagnosi candidate; 2 terapie da valutare: scegli cosa tenere prima di compilare la scheda.'],
+    ] as const) {
+        assert.equal(runInNewContext(`(${expression})`, {
+            importMeta: { diagnosisCount, medicationCount }, formatCountLabel,
+        }), expected, `diagnosi=${diagnosisCount}, terapie=${medicationCount}`);
+    }
 });
 test('server route awaits Next cookies and passes an observation, not a session credential', () => {
     const source = read('app/patients/import/page.tsx');
