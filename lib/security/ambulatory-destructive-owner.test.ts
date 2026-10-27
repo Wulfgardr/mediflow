@@ -3,20 +3,20 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 
 test('separate route module evaluations share only the production command owner', () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'mediflow-ambulatory-route-owner-'));
     try {
         const sourcePath = path.resolve('lib/security/ambulatory-destructive-service.ts');
-        const load = createRequire(sourcePath);
+        const packageUrl = import.meta.resolve('drizzle-orm');
         const source = readFileSync(sourcePath, 'utf8').replace(/from (['"])([^'"]+)\1/gu, (match, _quote, specifier: string) => {
             if (specifier.startsWith('node:')) return match;
+            if (!specifier.startsWith('.')) assert.equal(specifier, 'drizzle-orm');
             const target = specifier.startsWith('.')
                 ? `${path.resolve(path.dirname(sourcePath), specifier)}.ts`
-                : load.resolve(specifier);
+                : fileURLToPath(packageUrl);
             return `from ${JSON.stringify(pathToFileURL(target).href)}`;
         }) + '\nexport const moduleEvaluationUrl = import.meta.url;\n';
         const modules = ['begin.mts', 'preview.mts'].map(name => path.join(directory, name));

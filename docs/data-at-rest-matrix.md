@@ -98,6 +98,10 @@ locali salvano ciò che ricevono.
 - In chiaro: `command_id`, `protocol`, `archive_generation`, `actor_ref`, `patient_id`, `therapy_id`, `expected_version`, `target`, `outcome`, `reason`, `committed_at`, `result_version`, `result_end_date`, `audit_event_id`, `audit_snapshot`
 - Leggibile senza chiave: binding originale, stato richiesto/risultato, data e audit minimizzato. Closed ha target NULL. Ledger append-only, incluso nei backup; la conservazione dopo restore non prova lo stato corrente della terapia (ADR0168).
 
+### `ambulatory_destructive_commands`: terminali clear/delete
+
+- In chiaro: `command_id`, `protocol`, `operation`, `original_archive_generation`, `original_scope_id`, `ambulatory_id`, `expected_version`, `plan_digest`, `actor_ref`, `device_id`, `device_platform`, `device_token_hash`, `outcome`, `reason`, `committed_at`, `result_json`, `audit_snapshots`. Sono binding, esiti e snapshot audit minimizzati, inclusi riferimenti paziente quando necessari alla conservazione, senza nomi/testo clinico del piano. Hash dispositivo non è bearer e non è esposto dalla receipt pubblica; resta un identificatore sensibile del binding. Ledger append-only senza FK/CASCADE/TTL, incluso in tutti i backup; applied storico non attesta currentstate.
+
 ### `checkups`: controlli programmati
 
 - Cifrate: `notes`, `deletion_reason`
@@ -390,7 +394,3 @@ cambia una classificazione.
 | 7 | Recupero completo cifrato distinto dall’export portabile, snapshot temporanei e disposizioni verificabili delle esposizioni. |
 | 8 | Copie e istantanee di riparazione `0600`, anche al ritorno; permessi storici e adozione distinti dalla nuova creazione. |
 | 9 | Database adottato dalla cartella dell’applicazione `0600`, come ogni copia fatta attraverso SQLite; restano com'erano gli archivi adottati dalle versioni precedenti. |
-
-### `ambulatory_destructive_commands`: terminali clear/delete
-
-In chiaro: `command_id`, `protocol`, `operation`, `original_archive_generation`, `original_scope_id`, `ambulatory_id`, `expected_version`, `plan_digest`, `actor_ref`, `device_id`, `device_platform`, `device_token_hash`, `outcome`, `reason`, `committed_at`, `result_json`, `audit_snapshots`. Sono binding, esiti e snapshot audit minimizzati, inclusi riferimenti paziente quando necessari alla conservazione, senza nomi/testo clinico del piano. Hash dispositivo non è bearer e non è esposto dalla receipt pubblica; resta un identificatore sensibile del binding. Ledger append-only senza FK/CASCADE/TTL, incluso in tutti i backup; applied storico non attesta currentstate.
