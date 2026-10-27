@@ -57,13 +57,28 @@ async function captureLongNameAt400(page: Page, target: Locator, name: string, f
             throw Error('Name character offset unavailable');
         };
         const characters = Array.from({ length: text.length }, (_, index) => {
-            const start = location(index), range = document.createRange(); range.setStart(start.node, start.offset); range.setEnd(start.node, start.offset + 1);
-            const rect = range.getBoundingClientRect(), inset = Math.min(1, rect.width / 4, rect.height / 4);
-            const points = [[rect.x + rect.width / 2, rect.y + rect.height / 2], [rect.x + inset, rect.y + inset],
-                [rect.right - inset, rect.y + inset], [rect.x + inset, rect.bottom - inset], [rect.right - inset, rect.bottom - inset]]
-                .map(([x, y]) => { const hit = document.elementFromPoint(x, y); return { x, y, hit: hit === element || !!hit && element.contains(hit) }; });
-            return { index, character: text[index], bounds: { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, height: rect.height, width: rect.width },
-                points, visible: rect.top >= 0 && rect.bottom <= innerHeight && rect.left >= 0 && rect.right <= innerWidth && points.every(point => point.hit) };
+            const rangeAt = (startIndex: number, endIndex: number) => {
+                const start = location(startIndex), end = location(endIndex - 1), range = document.createRange();
+                range.setStart(start.node, start.offset); range.setEnd(end.node, end.offset + 1); return range;
+            };
+            const sourceRange = rangeAt(index, index + 1), sourceRect = sourceRange.getBoundingClientRect();
+            const contextualWhitespace = /\s/u.test(text[index]) && (sourceRect.height === 0 || sourceRect.width === 0);
+            const rangeStart = contextualWhitespace ? Math.max(0, index - 1) : index;
+            const rangeEnd = contextualWhitespace ? Math.min(text.length, index + 2) : index + 1;
+            const range = rangeAt(rangeStart, rangeEnd), fragments = [...range.getClientRects()].filter(rect => rect.width > 0 && rect.height > 0);
+            const points = fragments.flatMap(rect => {
+                const inset = Math.min(1, rect.width / 4, rect.height / 4);
+                return [[rect.x + rect.width / 2, rect.y + rect.height / 2], [rect.x + inset, rect.y + inset],
+                    [rect.right - inset, rect.y + inset], [rect.x + inset, rect.bottom - inset], [rect.right - inset, rect.bottom - inset]]
+                    .map(([x, y]) => { const hit = document.elementFromPoint(x, y); return { x, y, hit: hit === element || !!hit && element.contains(hit) }; });
+            });
+            const top = Math.min(...fragments.map(rect => rect.top)), bottom = Math.max(...fragments.map(rect => rect.bottom));
+            const left = Math.min(...fragments.map(rect => rect.left)), right = Math.max(...fragments.map(rect => rect.right));
+            return { index, character: text[index], contextualWhitespace, rangeStart, rangeEnd, rangeText: range.toString(),
+                sourceBounds: { top: sourceRect.top, bottom: sourceRect.bottom, left: sourceRect.left, right: sourceRect.right, width: sourceRect.width, height: sourceRect.height },
+                bounds: { top, bottom, left, right, height: bottom - top, width: right - left },
+                fragments: fragments.map(rect => ({ top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right })), points,
+                visible: fragments.length > 0 && top >= 0 && bottom <= innerHeight && left >= 0 && right <= innerWidth && points.every(point => point.hit) };
         });
         const box = element.getBoundingClientRect(), x = box.x + box.width / 2;
         let top = 0, bottom = innerHeight;
