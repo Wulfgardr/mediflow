@@ -110,12 +110,14 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
             } else await route.continue();
         });
         expect(await clear()).toBe(200);
+        await expect(page.getByText('Impossibile leggere gli ambulatori.', { exact: true })).toBeVisible();
         expect(failedReads).toBe(1);
         await expect(row.getByRole('button', { name: 'Azioni', exact: true })).toBeDisabled();
         await page.unroute('**/api/ambulatories');
         await page.getByRole('button', { name: 'Riprova', exact: true }).click();
         await expect(row.getByRole('button', { name: 'Azioni', exact: true })).toBeEnabled();
         expect(await clear()).toBe(200);
+        await expect(row.getByRole('button', { name: 'Azioni', exact: true })).toBeEnabled();
         expect(actions).toEqual([{ submittedVersion: 1, status: 500 }, { submittedVersion: 1, status: 200 }, { submittedVersion: 2, status: 200 }]);
         const after = read();
         expect(after.ambulatory.version).toBe(3);
