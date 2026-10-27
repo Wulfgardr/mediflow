@@ -10,6 +10,9 @@ pub(super) enum ReadObject {
     Parametri,
     Controlli,
     Profilo,
+    Agenda,
+    NomiPazienti,
+    Documenti,
 }
 
 impl ReadObject {
@@ -21,6 +24,9 @@ impl ReadObject {
             Self::Parametri => "i parametri",
             Self::Controlli => "i controlli",
             Self::Profilo => "il profilo",
+            Self::Agenda => "l’agenda",
+            Self::NomiPazienti => "i nomi dei pazienti",
+            Self::Documenti => "i documenti",
         }
     }
 
@@ -32,6 +38,9 @@ impl ReadObject {
             Self::Parametri => "Lettura dei parametri…",
             Self::Controlli => "Lettura dei controlli…",
             Self::Profilo => "Lettura del profilo…",
+            Self::Agenda => "Lettura dell’agenda…",
+            Self::NomiPazienti => "Lettura dei nomi dei pazienti…",
+            Self::Documenti => "Lettura dei documenti…",
         }
     }
 
@@ -43,6 +52,9 @@ impl ReadObject {
             Self::Parametri => "Nessun parametro registrato.",
             Self::Controlli => "Nessun controllo aperto.",
             Self::Profilo => "Nessun profilo disponibile.",
+            Self::Agenda => "Nessun controllo nell’intervallo applicato.",
+            Self::NomiPazienti => "Nessun nome disponibile.",
+            Self::Documenti => "Nessun documento presente nella scheda.",
         }
     }
 
@@ -62,6 +74,9 @@ impl ReadObject {
             Self::Profilo => {
                 format!("Il profilo è cambiato alle {time} su un'altra postazione.")
             }
+            Self::Agenda | Self::NomiPazienti | Self::Documenti => {
+                format!("I dati sono cambiati alle {time} su un'altra postazione.")
+            }
         }
     }
 
@@ -73,6 +88,9 @@ impl ReadObject {
             Self::Parametri => "I parametri non si sono potuti leggere.",
             Self::Controlli => "I controlli non si sono potuti leggere.",
             Self::Profilo => "Il profilo non si è potuto leggere.",
+            Self::Agenda => "L’agenda non si è potuta leggere.",
+            Self::NomiPazienti => "I nomi dei pazienti non si sono potuti leggere.",
+            Self::Documenti => "I documenti non si sono potuti leggere.",
         }
     }
 }
@@ -84,6 +102,7 @@ pub(super) enum ViewStateKind {
     AttesaLunga { fase: String, elapsed: u64 },
     NonInLinea { copia: Option<String> },
     NonPiuAttuale { ora: String },
+    DaRileggere,
     ArchivioSostituito,
     EsitoDaVerificare,
     Conflitto,
@@ -173,6 +192,7 @@ impl ViewState {
                     ora: evidence.changed_at.unwrap(),
                 }
             }
+            RuntimeError::Conflict | RuntimeError::ReadRequired => ViewStateKind::DaRileggere,
             RuntimeError::Transport => ViewStateKind::NonInLinea {
                 copia: evidence.copy_at,
             },
@@ -188,6 +208,7 @@ impl ViewState {
             | ViewStateKind::AttesaLunga { .. } => ViewTone::Neutro,
             ViewStateKind::NonInLinea { .. }
             | ViewStateKind::NonPiuAttuale { .. }
+            | ViewStateKind::DaRileggere
             | ViewStateKind::EsitoDaVerificare => ViewTone::Attenzione,
             _ => ViewTone::Critico,
         }
@@ -196,7 +217,9 @@ impl ViewState {
     pub(super) fn command(&self) -> Option<ViewCommand> {
         match self.kind {
             ViewStateKind::NonInLinea { .. } | ViewStateKind::Errore => Some(ViewCommand::Riprova),
-            ViewStateKind::NonPiuAttuale { .. } => Some(ViewCommand::Rileggi),
+            ViewStateKind::NonPiuAttuale { .. } | ViewStateKind::DaRileggere => {
+                Some(ViewCommand::Rileggi)
+            }
             ViewStateKind::Conflitto => Some(ViewCommand::RileggiScheda),
             ViewStateKind::EsitoDaVerificare => Some(ViewCommand::RileggiEVerifica),
             _ => None,
@@ -221,6 +244,10 @@ impl ViewState {
                 }),
             ),
             ViewStateKind::NonPiuAttuale { ora } => (self.object.changed(ora), None),
+            ViewStateKind::DaRileggere => (
+                "L’attualità dei dati non è verificata.".into(),
+                Some(format!("Rileggi {} per aggiornare i risultati.", self.object.name())),
+            ),
             ViewStateKind::ArchivioSostituito => (
                 "L'archivio è stato ripristinato da una copia.".into(),
                 Some("Riapri l'archivio prima di continuare.".into()),
@@ -298,6 +325,7 @@ impl ViewState {
 
 pub(super) enum ReadLoad<T> {
     Idle,
+    Interrupted,
     Loading { started: Instant },
     Ready(T),
     Failed(RuntimeError),
@@ -307,6 +335,12 @@ impl<T> ReadLoad<T> {
     pub(super) fn loading() -> Self {
         Self::Loading {
             started: Instant::now(),
+        }
+    }
+
+    pub(super) fn interrupt(&mut self) {
+        if matches!(self, Self::Loading { .. }) {
+            *self = Self::Interrupted;
         }
     }
 
@@ -331,6 +365,7 @@ impl<T> ReadLoad<T> {
     fn state_after(&self, object: ReadObject, now: Instant) -> Option<ViewState> {
         let kind = match self {
             Self::Idle => ViewStateKind::Caricamento,
+            Self::Interrupted => ViewStateKind::DaRileggere,
             Self::Loading { started } => {
                 let elapsed = now.saturating_duration_since(*started).as_secs();
                 if elapsed >= 5 {
@@ -364,6 +399,9 @@ impl ReadObject {
             Self::Parametri => 3,
             Self::Controlli => 4,
             Self::Profilo => 5,
+            Self::Agenda => 6,
+            Self::NomiPazienti => 7,
+            Self::Documenti => 8,
         }
     }
 }
@@ -377,10 +415,13 @@ impl ClinicalApp {
             ReadObject::Parametri => self.patient.observations.state(object),
             ReadObject::Controlli => self.patient.checkups.state(object),
             ReadObject::Profilo => self.account_profile.load.state(object),
+            ReadObject::Agenda => self.agenda.state(object),
+            ReadObject::NomiPazienti => self.global_patients.state(object),
+            ReadObject::Documenti => self.patient.attachments.state(object),
         }
     }
 
-    fn render_read_state(
+    pub(super) fn render_read_state(
         &self,
         id: &'static str,
         state: ViewState,
@@ -447,7 +488,7 @@ impl ClinicalApp {
             PatientSection::Therapies => vec![ReadObject::Terapie],
             PatientSection::Observations => vec![ReadObject::Parametri],
             PatientSection::Checkups => vec![ReadObject::Controlli],
-            PatientSection::Documents => vec![],
+            PatientSection::Documents => vec![ReadObject::Documenti],
         }
     }
 
@@ -484,6 +525,10 @@ impl ClinicalApp {
             || matches!(self.patient.therapies, ReadLoad::Loading { .. })
             || matches!(self.patient.observations, ReadLoad::Loading { .. })
             || matches!(self.patient.checkups, ReadLoad::Loading { .. })
+            || matches!(self.patient.attachments, ReadLoad::Loading { .. })
+            || self.area == Area::Agenda
+                && (matches!(self.agenda, ReadLoad::Loading { .. })
+                    || matches!(self.global_patients, ReadLoad::Loading { .. }))
     }
 
     pub(super) fn watch_patient_reads(&mut self, cx: &mut Context<Self>) {
@@ -514,6 +559,12 @@ impl ClinicalApp {
         // neither a scope nor a selected chart may gate its reread.
         if object == ReadObject::Profilo {
             self.load_account_profile(cx);
+            return;
+        }
+        if matches!(object, ReadObject::Agenda | ReadObject::NomiPazienti) {
+            if matches!(self.area, Area::Agenda | Area::Diary) {
+                self.load_global_area(cx);
+            }
             return;
         }
         if self
@@ -569,7 +620,15 @@ impl ClinicalApp {
             ReadObject::Profilo => {
                 self.load_account_profile(cx);
             }
-            ReadObject::Scheda => unreachable!(),
+            ReadObject::Documenti => {
+                self.patient.attachments = ReadLoad::loading();
+                self.run(
+                    move || session.list_attachments(&scope, &id),
+                    |this, result, _| this.patient.attachments = ReadLoad::from_result(result),
+                    cx,
+                );
+            }
+            ReadObject::Scheda | ReadObject::Agenda | ReadObject::NomiPazienti => unreachable!(),
         }
         self.watch_patient_reads(cx);
         cx.notify();
@@ -856,7 +915,7 @@ mod tests {
             assert_eq!(
                 ViewState::from_read_error(ReadObject::Terapie, error, ReadEvidence::default())
                     .kind,
-                ViewStateKind::Errore
+                ViewStateKind::DaRileggere
             );
             let stale = ViewState::from_read_error(
                 ReadObject::Terapie,
