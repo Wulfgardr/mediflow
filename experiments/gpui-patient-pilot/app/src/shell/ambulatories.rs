@@ -8,6 +8,7 @@ pub(super) struct Management {
     pub(super) active: bool,
     pub(super) draft: Option<Editor>,
     pub(super) initial_scope: bool,
+    pub(super) destructive: super::ambulatory_commands::Commands,
     bootstrap: Option<BootstrapEditor>,
     focus_editor: bool,
     pub(super) rebase: bool,
@@ -21,6 +22,7 @@ impl Default for Management {
             active: false,
             draft: None,
             initial_scope: true,
+            destructive: Default::default(),
             bootstrap: None,
             focus_editor: false,
             rebase: false,
@@ -32,6 +34,7 @@ impl Default for Management {
 
 impl Management {
     pub(super) fn reset(&mut self, theme: Theme, cx: &mut Context<ClinicalApp>) {
+        self.destructive.withdraw(cx);
         if let Some(editor) = &self.draft {
             for field in &editor.fields {
                 field.editor.update(cx, |input, cx| {
@@ -58,9 +61,13 @@ impl Management {
         }
         *self = Self::default();
     }
+    pub(super) fn has_bootstrap(&self) -> bool {
+        self.bootstrap.is_some()
+    }
     pub(super) fn is_saving(&self) -> bool {
         self.draft.as_ref().is_some_and(|draft| draft.saving)
             || self.bootstrap.as_ref().is_some_and(|editor| editor.busy)
+            || self.destructive.is_saving()
     }
 }
 
@@ -151,7 +158,9 @@ fn row_text(id: &str, field: &str, value: impl Into<SharedString>) -> gpui::Text
 
 impl ClinicalApp {
     fn open_first_ambulatory(&mut self, cx: &mut Context<Self>) {
-        if self.ambulatory_management.bootstrap.is_some() {
+        if self.ambulatory_management.bootstrap.is_some()
+            || self.ambulatory_management.destructive.is_open()
+        {
             return;
         }
         if !self
@@ -472,6 +481,7 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
         match choice {
             Selection::Initial(id) => self.change_scope(&id, cx),
             Selection::Lost => {
+                self.withdraw_ambulatory_command_view(cx);
                 self.scope = None;
                 self.next_epoch();
                 self.retire_profile_selection();
@@ -491,7 +501,10 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
     }
 
     fn open_ambulatory_editor(&mut self, id: Option<&str>, cx: &mut Context<Self>) {
-        if self.ambulatory_management.draft.is_some() || !self.can_manage_ambulatories() {
+        if self.ambulatory_management.draft.is_some()
+            || self.ambulatory_management.destructive.is_open()
+            || !self.can_manage_ambulatories()
+        {
             return;
         }
         let target = match id {
@@ -659,6 +672,7 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
         if !self.ambulatory_management.active || self.area != Area::Settings {
             return;
         }
+        self.prepare_ambulatory_command_view(theme, window, cx);
         if self.ambulatory_management.focus_editor {
             if let Some(field) = self
                 .ambulatory_management
@@ -716,9 +730,10 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
                 .into_iter()
                 .map(|suffix| format!("bootstrap-{suffix}")),
         );
+        ids.extend(super::ambulatory_commands::command_button_ids());
         if let Some(rows) = self.ambulatories.ready() {
             for row in rows {
-                for action in ["select", "edit", "parent"] {
+                for action in ["select", "edit", "parent", "clear", "delete"] {
                     ids.push(format!("clinical-workspace-ambulatory-{action}-{}", row.id));
                 }
             }
@@ -747,7 +762,7 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
         }
     }
 
-    fn ambulatory_button(
+    pub(super) fn ambulatory_button(
         &self,
         id: impl Into<SharedString>,
         label: impl Into<SharedString>,
@@ -773,7 +788,7 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
             .child(heading("clinical-workspace-ambulatories-heading", "Ambulatori", theme))
             .child(div().flex().flex_wrap().gap(px(12.))
                 .child(self.ambulatory_button("clinical-workspace-ambulatories-back", "Torna alle Impostazioni", theme, false, !busy)
-                    .on_click(cx.listener(|this, _, _, cx| { if this.ambulatory_management.is_saving() { return; } this.ambulatory_management.active=false; cx.notify(); })))
+                    .on_click(cx.listener(|this, _, _, cx| { if this.ambulatory_management.is_saving() { return; } this.withdraw_ambulatory_command_view(cx); this.ambulatory_management.active=false; cx.notify(); })))
                 .child(self.ambulatory_button("clinical-workspace-ambulatories-reread", "Rileggi le sedi", theme, false, !busy && !matches!(self.ambulatories, Load::Loading))
                     .on_click(cx.listener(|this, _, _, cx| {
                             if this.ambulatory_management.is_saving() || matches!(this.ambulatories,Load::Loading) { return; }
@@ -788,6 +803,7 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
                 *failed,
             ));
         }
+        view = view.child(self.ambulatory_command_view(cx));
         if self.scope.is_none() {
             view = view.child(notice("clinical-workspace-ambulatories-no-scope", "Scegli una sede per continuare. Se l’archivio non contiene sedi, la prima va creata sul computer che lo ospita.", theme, false));
         }
@@ -1048,7 +1064,7 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
                     "Nuova sede",
                     theme,
                     true,
-                    self.can_manage_ambulatories(),
+                    self.can_manage_ambulatories() && !management.destructive.is_open(),
                 )
                 .on_click(cx.listener(|this, _, _, cx| this.open_ambulatory_editor(None, cx))),
             );
@@ -1091,7 +1107,7 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
                     key
                 });
                 view.children(sorted.into_iter().map(|row| {
-                    let id=row.id.clone(); let edit_id=id.clone();
+                    let id=row.id.clone(); let edit_id=id.clone(); let clear_id=id.clone(); let delete_id=id.clone();
                     let path=ancestry(rows,&id);
                     let parent_line=path.as_ref().map(|ids| ids.iter().filter_map(|id| rows.iter().find(|r| r.id==*id).map(|r|r.name.as_str())).collect::<Vec<_>>().join(" / ")).unwrap_or_else(|_|"Collegamento tra sedi non valido: verifica sul computer che ospita l’archivio".into());
                     div().id(format!("clinical-workspace-ambulatory-row-{id}")).border_t_1().border_color(theme.rule).pt(px(16.)).flex().flex_col().gap(px(8.))
@@ -1101,7 +1117,10 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
                         .when_some(row.description.as_ref(),|el,description|el.child(div().text_color(theme.secondary).child(row_text(&row.id,"description",description.clone()))))
                         .child(div().flex().flex_wrap().gap(px(12.))
                             .child(self.ambulatory_button(format!("clinical-workspace-ambulatory-select-{id}"),if self.scope.as_deref()==Some(&id) { "Sede corrente" } else { "Lavora in questa sede" },theme,false,!busy && management.draft.is_none()).aria_selected(self.scope.as_deref()==Some(&id)).on_click(cx.listener(move|this,_,_,cx|this.change_scope(&id,cx))))
-                            .child(self.ambulatory_button(format!("clinical-workspace-ambulatory-edit-{edit_id}"),"Modifica sede",theme,false,loaded && management.draft.is_none() && self.can_manage_ambulatories()).on_click(cx.listener(move|this,_,_,cx|this.open_ambulatory_editor(Some(&edit_id),cx)))))
+                            .child(self.ambulatory_button(format!("clinical-workspace-ambulatory-edit-{edit_id}"),"Modifica sede",theme,false,loaded && management.draft.is_none() && !management.destructive.is_open() && self.can_manage_ambulatories()).on_click(cx.listener(move|this,_,_,cx|this.open_ambulatory_editor(Some(&edit_id),cx))))
+                            .when(self.session.as_ref().is_some_and(RuntimeSession::can_prepare_ambulatory_command), |element| element
+                                .when(row.kind.as_deref()==Some("test"), |element| element.child(self.ambulatory_button(format!("clinical-workspace-ambulatory-clear-{clear_id}"),Self::ambulatory_command_row_label(true),theme,false,loaded && self.can_open_ambulatory_command()).on_click(cx.listener(move|this,_,_,cx|this.open_ambulatory_command(&clear_id,mediflow_runtime_client::AmbulatoryCommandOperation::ClearTest,cx)))))
+                                .child(self.ambulatory_button(format!("clinical-workspace-ambulatory-delete-{delete_id}"),Self::ambulatory_command_row_label(false),theme,false,loaded && self.can_open_ambulatory_command()).on_click(cx.listener(move|this,_,_,cx|this.open_ambulatory_command(&delete_id,mediflow_runtime_client::AmbulatoryCommandOperation::Delete,cx))))))
                 }))
             }
         }

@@ -1,4 +1,5 @@
-import { assertTherapyCommandPredecessorRecoverySchema } from './therapy-status-command-recovery-schema';
+import { assertAmbulatoryCommandPredecessorRecoverySchema } from './ambulatory-destructive-command-recovery-schema';
+import { captureAmbulatoryCommands, preserveAmbulatoryCommands } from './ambulatory-destructive-command-backup';
 import { captureTherapyStatusCommands, preserveTherapyStatusCommands } from './therapy-status-command-backup';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,13 +20,13 @@ function quote(identifier: string): string { return '"' + identifier.replaceAll(
 function validateCandidate(file: string, prepareReplacement = false): Database.Database {
     const probe = new Database(file, { readonly: true, fileMustExist: true });
     try {
-        if (![4, CURRENT_SQLITE_SCHEMA_VERSION].includes(Number(probe.pragma('user_version', { simple: true })))
+        if (![4, 5, CURRENT_SQLITE_SCHEMA_VERSION].includes(Number(probe.pragma('user_version', { simple: true })))
             || probe.pragma('integrity_check', { simple: true }) !== 'ok'
             || (probe.pragma('foreign_key_check') as unknown[]).length !== 0) fail();
-        if (probe.pragma('user_version', { simple: true }) === 4) assertTherapyCommandPredecessorRecoverySchema(probe);
+        if (probe.pragma('user_version', { simple: true }) !== CURRENT_SQLITE_SCHEMA_VERSION) assertAmbulatoryCommandPredecessorRecoverySchema(probe);
     } finally { probe.close(); }
     const candidate = openVersionedSqliteDatabase(file, undefined, { prepareReplacement });
-    try { validateRecoveryAuditSchema(candidate); captureTherapyStatusCommands(candidate); return candidate; }
+    try { validateRecoveryAuditSchema(candidate); captureTherapyStatusCommands(candidate); captureAmbulatoryCommands(candidate); return candidate; }
     catch (error) { candidate.close(); throw error; }
 }
 
@@ -134,10 +135,12 @@ export async function restoreRecoveryBackup(options: {
             let installed: Database.Database | undefined;
             try {
                 const therapyCommands = captureTherapyStatusCommands(current);
+                const ambulatoryCommands = captureAmbulatoryCommands(current);
                 await replaceSqliteDatabase({ sourcePath: source, destPath: destination, connection: current,
                     prepareReplacement: staging => {
                         const replacement = validateCandidate(staging, true);
-                        try { preserveTherapyStatusCommands(therapyCommands, replacement); replacement.transaction(() => {
+                        try { replacement.transaction(() => {
+                            preserveTherapyStatusCommands(therapyCommands, replacement); preserveAmbulatoryCommands(ambulatoryCommands, replacement);
                             archiveGeneration = rotateSqliteArchiveGeneration(replacement);
                             replacement.prepare('DELETE FROM archive_session_generations').run();
                         }).immediate(); } finally { replacement.close(); }

@@ -1,7 +1,10 @@
 use crate::{Result, RuntimeError};
 use futures_util::future::{Either, select, select_all};
 use std::future::Future;
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicU64, Ordering},
+};
 use tokio::sync::watch;
 
 #[derive(Clone)]
@@ -32,6 +35,7 @@ pub struct RequestContext {
     session: Cancellation,
     selections: Vec<Cancellation>,
     file_admission: Arc<Mutex<()>>,
+    revocation_epoch: Option<(&'static AtomicU64, u64)>,
 }
 impl Default for RequestContext {
     fn default() -> Self {
@@ -39,10 +43,20 @@ impl Default for RequestContext {
             session: Cancellation::new(),
             selections: vec![Cancellation::new()],
             file_admission: Arc::new(Mutex::new(())),
+            revocation_epoch: None,
         }
     }
 }
 impl RequestContext {
+    pub(crate) fn bind_revocation_epoch(&mut self, epoch: &'static AtomicU64) -> Result<()> {
+        self.check()?;
+        let observed = epoch.load(Ordering::Acquire);
+        if self.revocation_epoch.is_some() || observed == u64::MAX {
+            return Err(RuntimeError::ReadRequired);
+        }
+        self.revocation_epoch = Some((epoch, observed));
+        self.check()
+    }
     pub fn cancel(&self) {
         let _admission = self
             .file_admission
@@ -60,10 +74,16 @@ impl RequestContext {
             .map_err(|_| RuntimeError::Locked)?;
         self.check()
     }
+    pub(crate) fn revocation_epoch_current(&self) -> bool {
+        self.revocation_epoch
+            .is_none_or(|(epoch, observed)| epoch.load(Ordering::Acquire) == observed)
+    }
     pub fn check(&self) -> Result<()> {
         if self.session.is_cancelled() {
             Err(RuntimeError::Locked)
-        } else if self.selections.iter().any(Cancellation::is_cancelled) {
+        } else if !self.revocation_epoch_current()
+            || self.selections.iter().any(Cancellation::is_cancelled)
+        {
             Err(RuntimeError::ReadRequired)
         } else {
             Ok(())
@@ -76,6 +96,7 @@ impl RequestContext {
             session: self.session.clone(),
             selections,
             file_admission: self.file_admission.clone(),
+            revocation_epoch: self.revocation_epoch,
         }
     }
     pub(crate) fn revoke(&self) {
@@ -94,6 +115,7 @@ impl RequestContext {
             session: self.session.clone(),
             selections: vec![Cancellation::new()],
             file_admission: self.file_admission.clone(),
+            revocation_epoch: self.revocation_epoch,
         }
     }
     pub(crate) async fn run<T>(
@@ -150,6 +172,72 @@ mod tests {
             std::task::Poll::Pending => {
                 panic!("completed response and cancellation were both ready")
             }
+        }
+    }
+
+    #[test]
+    fn os_revocation_is_immediate_for_children_and_cannot_be_rebound() {
+        let epoch = Box::leak(Box::new(AtomicU64::new(3)));
+        let mut context = RequestContext::default();
+        let unrelated = context.clone();
+        context.bind_revocation_epoch(epoch).unwrap();
+        let child = context.child();
+        let account = context.session_scope();
+        assert_eq!(child.check(), Ok(()));
+        epoch.fetch_add(1, Ordering::AcqRel);
+        for withdrawn in [&context, &child, &account] {
+            assert_eq!(withdrawn.check(), Err(RuntimeError::ReadRequired));
+            assert_eq!(
+                withdrawn.admit_file_effect(),
+                Err(RuntimeError::ReadRequired)
+            );
+        }
+        assert_eq!(
+            context.bind_revocation_epoch(epoch),
+            Err(RuntimeError::ReadRequired)
+        );
+        assert_eq!(unrelated.check(), Ok(()));
+        let mut successor = RequestContext::default();
+        successor.bind_revocation_epoch(epoch).unwrap();
+        assert_eq!(successor.check(), Ok(()));
+        assert_eq!(context.check(), Err(RuntimeError::ReadRequired));
+        context.revoke();
+        assert_eq!(context.check(), Err(RuntimeError::Locked));
+    }
+
+    #[test]
+    fn os_revocation_rejects_late_success_and_prevents_operation_start() {
+        for mutation in [false, true] {
+            let epoch = Box::leak(Box::new(AtomicU64::new(0)));
+            let mut context = RequestContext::default();
+            context.bind_revocation_epoch(epoch).unwrap();
+            let (send, receive) = tokio::sync::oneshot::channel();
+            let mut request = Box::pin(context.run(async { receive.await.unwrap() }, mutation));
+            let mut task = std::task::Context::from_waker(futures_util::task::noop_waker_ref());
+            assert!(request.as_mut().poll(&mut task).is_pending());
+            epoch.fetch_add(1, Ordering::AcqRel);
+            send.send(Ok(())).unwrap();
+            assert_eq!(
+                request.as_mut().poll(&mut task),
+                std::task::Poll::Ready(Err(if mutation {
+                    RuntimeError::Indeterminate
+                } else {
+                    RuntimeError::ReadRequired
+                }))
+            );
+            let starts = std::sync::atomic::AtomicUsize::new(0);
+            let mut denied = Box::pin(context.run(
+                async {
+                    starts.fetch_add(1, Ordering::Relaxed);
+                    Ok(())
+                },
+                mutation,
+            ));
+            assert_eq!(
+                denied.as_mut().poll(&mut task),
+                std::task::Poll::Ready(Err(RuntimeError::ReadRequired))
+            );
+            assert_eq!(starts.load(Ordering::Relaxed), 0);
         }
     }
 

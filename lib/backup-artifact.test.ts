@@ -113,6 +113,7 @@ const basePayload = {
     checkups: [],
     therapies: [],
     therapyStatusCommands: [],
+    ambulatoryDestructiveCommands: [],
 };
 
 function attachmentCurrentness(overrides: Record<string, unknown> = {}) {

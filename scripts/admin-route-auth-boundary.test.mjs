@@ -73,7 +73,7 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
                 'observations', 'patients', 'patientsToAmbulatories', 'physicianReviewAttestations',
                 'prostheticPrescriptions', 'prostheticsCatalogEntries', 'prostheticsCatalogReceipts', 'prostheticsCatalogSources', 'prostheticsCatalogDocuments',
                 'serviceCatalogEntries', 'servicePrescriptionItems',
-                'servicePrescriptions', 'sissHandoffEvents', 'therapies', 'therapyStatusCommands',
+                'servicePrescriptions', 'sissHandoffEvents', 'therapies', 'therapyStatusCommands', 'ambulatoryDestructiveCommands',
             ].map((name) => `${name} = Object.freeze({})`).join(', ')};`))}],
             ['@/lib/security/server-auth', ${JSON.stringify(toDataModule("export async function requireSession() { globalThis.sessionCalls = (globalThis.sessionCalls ?? 0) + 1; if (globalThis.sessionMode === 'anonymous') return null; return Object.freeze({ id: 'session.synthetic.restore', userId: 'user.synthetic.restore', role: globalThis.sessionMode ?? 'admin' }); } export function unauthorizedResponse() { return new Response(null, { status: 401 }); } export function forbiddenResponse() { return new Response(null, { status: 403 }); }"))}],
             ['@/lib/security/archive-session-generation', ${JSON.stringify(toDataModule("export function archiveGenerationForSession() { return 'synthetic-generation'; }"))}],

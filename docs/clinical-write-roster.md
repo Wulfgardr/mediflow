@@ -297,3 +297,7 @@ La policy endDate usa un istante host e differisce dal browser legacy;
 backup e restore conservano union esatta del ledger e audit (ADR0168).
 Prove: `therapy-status-command*.test.ts`, regressioni required-audit, backup
 roundtrip/recovery e `verify:therapy-status` con confini legacy/nuovo separati.
+
+## G-2c/G-3d: clear/delete host nominati
+
+`ambulatory.clear-test.v1` e `ambulatory.delete.v1` richiedono la doppia autorità corrente e un piano host immutabile, non un grant paired generico. Core legacy condivisi sincroni, piano/CAS/audit/receipt nella stessa IMMEDIATE; close/read non ricercano la sede corrente e recovery non esegue. Ledger append-only dedicato preservato da restore, receipt pubblica senza pazienti/snapshot audit. [Contratto](ambulatory-destructive-commands.md), ADR0169; consumer GPUI ancora da collegare.
