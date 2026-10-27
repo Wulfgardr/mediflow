@@ -128,6 +128,15 @@ fn hcg1_demo_geometry_keeps_list_filters_and_confirmation_reachable(cx: &mut gpu
                 cx.notify();
             });
             draw(cx);
+            let question = bounds(cx, "threshold-question");
+            let ending = bounds(cx, "threshold-question-ending");
+            let last_word = bounds(cx, "threshold-question-last-word");
+            assert_eq!(last_word.bottom(), question.bottom());
+            assert_eq!(ending.bottom(), last_word.bottom());
+            assert!(
+                last_word.size.width > ending.size.width,
+                "punctuation stays with the recipient"
+            );
             let bar = bounds(cx, "clinical-workspace-save-status");
             let content = bounds(cx, "clinical-workspace-profile-scroll");
             contains(viewport, bar, "confirmation");
