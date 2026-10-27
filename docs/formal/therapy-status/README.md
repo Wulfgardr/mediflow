@@ -165,6 +165,11 @@ statechart, invarianti, limiti, testimoni e mutanti restano invariati.
 Dopo questo riesame sono stati aggiornati manualmente soltanto l'impronta del
 manager e `syncCommit` alla revisione riesaminata; il raccordo non estende le
 proprietà modellate alla presentazione o all'accessibilità dei suggerimenti.
+Il comando completo `npm run verify:therapy-status` è passato su Node 24.21.0:
+TLC corrente con 5.903.794 stati distinti e coda vuota, 3 controlli negativi,
+6 testimoni, 122 test reali, 2 mutazioni del controller rilevate e 29 test del
+controller ripristinato verdi.
+
 
 Il 27 ottobre 2026, PR #684, è stato riesaminato il diff di
 `components/therapy-manager.tsx` fra il precedente `coverage.json.syncCommit`
