@@ -105,6 +105,8 @@
   box-shadow: var(--lume-focus-ring);
 }
 
+.entry:focus-within { z-index: 2; }
+
 .node {
   position: absolute;
   top: 18px;

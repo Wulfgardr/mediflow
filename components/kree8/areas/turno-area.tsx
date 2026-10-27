@@ -96,7 +96,9 @@ function TurnoArea({
         title: 'Pazienti in carico',
         body: patientState.status === 'ready'
           ? `${formatCountLabel(patientState.patients.length, 'scheda pronta', 'schede pronte')} nell’archivio locale.`
-          : 'Preparazione della lista pazienti.',
+          : patientState.status === 'error'
+            ? 'Impossibile aggiornare i dati dei pazienti per l’agenda.'
+            : 'Preparazione della lista pazienti.',
         pill: patientState.status === 'error' ? 'Errore' : 'In carico',
         pillVariant: patientState.status === 'error' ? 'critical' : 'neutral',
         action: 'Vai ai pazienti',
@@ -107,7 +109,7 @@ function TurnoArea({
         body: agendaState.status === 'ready'
           ? 'Passaggi locali e candidati esterni della giornata, da rivedere prima delle visite.'
           : agendaState.status === 'error'
-            ? 'Agenda non disponibile: resta visibile la lista pazienti.'
+            ? patientState.status === 'ready' ? 'Agenda non disponibile: resta visibile la lista pazienti.' : 'Agenda non disponibile.'
             : 'Preparazione degli appuntamenti.',
         pill: agendaState.status === 'error' ? 'Errore' : 'Agenda',
         pillVariant: agendaState.status === 'error' ? 'critical' : 'neutral',
