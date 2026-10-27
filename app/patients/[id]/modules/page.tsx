@@ -455,7 +455,7 @@ export default function PatientDetailPage() {
         { href: '#attenzione', label: 'Attenzione', meta: formatCountLabel(reviewQueueSummary.attentionCount + openLoopCount + Number(hasInsightProposal), 'elemento', 'elementi') },
         { href: '#identita', label: 'Anagrafica' },
         { href: '#clinica', label: 'Clinica', meta: formatCountLabel(diagnosisItems.length, 'diagnosi', 'diagnosi') },
-        { href: '#amministrazione', label: 'Amministrazione' },
+        { href: '#amministrazione', label: 'Amministrazione', meta: formatCountLabel(exemptionCodes.length, 'esenzione', 'esenzioni') },
         { href: '#parametri', label: 'Parametri', meta: workspace ? String(workspace.observationsCount) : undefined },
         { href: '#terapie', label: 'Terapie', meta: workspace ? String(workspace.activeTherapiesCount) : undefined },
         { href: '#prestazioni', label: 'Prestazioni', meta: prestazioniCount !== undefined ? formatCountLabel(prestazioniCount, 'prestazione totale', 'prestazioni totali') : undefined },
