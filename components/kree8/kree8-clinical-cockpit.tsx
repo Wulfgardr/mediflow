@@ -12,12 +12,7 @@ import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useRuntimeWorkspaceArea, useRuntimeWorkspaceCommand } from '@/components/runtime-twin-workspace';
 import { X } from 'lucide-react';
 
-import {
-  db,
-  type Checkup,
-  type ClinicalEntry,
-  type Patient,
-} from '@/lib/db';
+import { db } from '@/lib/db';
 /* WUL-UIUX Fase 7: pipeline dati del Quadro condivisa con la Scheda. */
 import {
   buildPatientWorkspace,
@@ -28,6 +23,7 @@ import {
   type Kree8PatientWorkspace,
 } from '@/lib/patient-workspace';
 import { useLiveQuery, useLiveQueryState } from '@/lib/live-query';
+import { captureClientAccountAuthority, subscribeClientAccountAuthority } from '@/lib/security/client-auth-api';
 import { ThemeToggle } from '@/components/theme-toggle';
 // WUL-297: persistent privacy affordance in the app header.
 import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
@@ -69,6 +65,32 @@ import styles from './kree8-clinical-cockpit-shell.module.css';
 
 export { AREA_ID_VALUES };
 export type { AreaId };
+
+type CockpitSnapshot<T> = { rows: T[]; isCurrent: () => boolean; retainOnRefresh: boolean };
+
+function ambulatoryCookie(): string | null {
+  const values = document.cookie.split(';').map(value => value.trim()).filter(value => value.startsWith('ambulatory_id='));
+  if (values.length > 1) throw new Error('Ambulatory selection ambiguous.');
+  return values[0]?.length > 'ambulatory_id='.length ? values[0] : null;
+}
+
+async function readCockpitRows<T>(
+  read: (options: { signal: AbortSignal; rejectAuthUnavailable: true }) => Promise<T[]>,
+  visibility: { valid: boolean },
+): Promise<CockpitSnapshot<T>> {
+  const signal = db.getSessionReadSignal();
+  const authorityCurrent = captureClientAccountAuthority();
+  const cookie = ambulatoryCookie();
+  const isCurrent = () => {
+    try {
+      return visibility.valid && !signal.aborted && db.getSessionReadSignal() === signal
+        && authorityCurrent() && ambulatoryCookie() === cookie;
+    } catch { return false; }
+  };
+  const rows = await read({ signal, rejectAuthUnavailable: true });
+  if (!isCurrent()) throw new Error('Cockpit read context changed.');
+  return { rows, isCurrent, retainOnRefresh: cookie !== null };
+}
 
 function revealFocusedRailControl(event: FocusEvent<HTMLElement>): void {
   const rail = event.currentTarget;
@@ -115,6 +137,8 @@ function AreaContent({
   onAlignPatient,
   onOpenArea,
   onRetryPatients,
+  onRetryAgenda,
+  onRetryDiary,
 }: {
   area: AreaId;
   filter: StatusFilter;
@@ -132,6 +156,8 @@ function AreaContent({
   onAlignPatient: (patientId: string) => void;
   onOpenArea: (area: AreaId) => void;
   onRetryPatients: () => void;
+  onRetryAgenda: () => void;
+  onRetryDiary: () => void;
 }) {
   switch (area) {
     case 'turno':
@@ -145,6 +171,7 @@ function AreaContent({
           isReview={isReview}
           onSelectPatient={onSelectPatient}
           onOpenArea={onOpenArea}
+          onRetry={onRetryAgenda}
         />
       );
     case 'incarico':
@@ -175,6 +202,7 @@ function AreaContent({
           diaryState={diaryState}
           onOpenArea={onOpenArea}
           onSelectPatient={onSelectPatient}
+          onRetry={isReview ? undefined : onRetryDiary}
         />
       );
     case 'revisione':
@@ -235,11 +263,25 @@ export function Kree8ClinicalCockpit({
       ? { status: 'ready', patients: REVIEW_PATIENT_LIST }
       : { status: 'idle', patients: [] }
   ));
-  const [agendaState, setAgendaState] = useState<Kree8AgendaClientState>(() => (
-    isReview
-      ? { status: 'ready', rows: REVIEW_AGENDA }
-      : { status: 'idle', rows: [] }
-  ));
+  const snapshotVisibility = useRef({ valid: true });
+  const [, invalidateVisibleSnapshots] = useState(0);
+  useEffect(() => {
+    snapshotVisibility.current = { valid: true };
+    const hide = () => {
+      snapshotVisibility.current.valid = false;
+      invalidateVisibleSnapshots(value => value + 1);
+    };
+    const show = () => {
+      if (!snapshotVisibility.current.valid) snapshotVisibility.current = { valid: true };
+    };
+    window.addEventListener('pagehide', hide);
+    window.addEventListener('pageshow', show);
+    return () => {
+      snapshotVisibility.current.valid = false;
+      window.removeEventListener('pagehide', hide);
+      window.removeEventListener('pageshow', show);
+    };
+  }, []);
   const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>(() => (
     isReview ? REVIEW_PATIENT_LIST[0]?.id : initialPatientId
   ));
@@ -364,43 +406,66 @@ export function Kree8ClinicalCockpit({
   }, [liveSchedaHref, proposal, router]);
 
   const {
-    data: livePatientRows,
+    data: patientSnapshot,
     error: livePatientError,
     loading: livePatientLoading,
     refresh: refreshPatients,
-  } = useLiveQueryState<Patient[]>(
-    async () => (isReview ? [] : db.patients.toArray()),
+  } = useLiveQueryState(
+    async () => isReview ? null : readCockpitRows(options => db.patients.toArray(options), snapshotVisibility.current),
     [isReview],
     undefined,
     ['patients', 'patients_to_ambulatories'],
   );
 
-  const liveCheckupRows = useLiveQuery<Checkup[]>(
-    async () => (isReview ? [] : db.checkups.toArray()),
+  const { data: checkupSnapshot, loading: checkupLoading, error: checkupError, refresh: refreshCheckups } = useLiveQueryState(
+    async () => isReview ? null : readCockpitRows(options => db.checkups.toArray(options), snapshotVisibility.current),
     [isReview],
     undefined,
     ['checkups'],
   );
 
-  const liveDiaryRows = useLiveQuery<ClinicalEntry[]>(
-    async () => (isReview ? [] : db.entries.query({ orderBy: 'date', orderDir: 'desc', limit: 50 }).toArray()),
+  const { data: diarySnapshot, loading: diaryLoading, error: diaryError, refresh: refreshDiary } = useLiveQueryState(
+    async () => isReview ? null : readCockpitRows(options => db.entries.query({ orderBy: 'date', orderDir: 'desc', limit: 50 }).toArray(options), snapshotVisibility.current),
     [isReview],
     undefined,
     ['entries'],
   );
 
-  const diaryState = useMemo<Kree8DiaryClientState>(() => {
-    if (isReview) return REVIEW_DIARY_STATE;
-    if (!liveDiaryRows || patientState.status !== 'ready') {
-      return {
-        status: 'loading',
-        entries: [],
-        activeCount: 0,
-        patientCount: 0,
-      };
-    }
-    return buildGlobalDiaryState(liveDiaryRows, patientState.patients);
-  }, [isReview, liveDiaryRows, patientState.patients, patientState.status]);
+  useEffect(() => subscribeClientAccountAuthority(() => {
+    invalidateVisibleSnapshots(value => value + 1);
+    refreshPatients();
+    refreshCheckups();
+    refreshDiary();
+  }), [refreshPatients, refreshCheckups, refreshDiary]);
+
+  const livePatientRows = patientSnapshot?.isCurrent() ? patientSnapshot.rows : undefined;
+  const liveCheckupRows = checkupSnapshot?.isCurrent() ? checkupSnapshot.rows : undefined;
+  const liveDiaryRows = diarySnapshot?.isCurrent() ? diarySnapshot.rows : undefined;
+  const mappedPatients = useMemo(() => (livePatientRows ?? []).map(mapPatientForKree8), [livePatientRows]);
+  const agendaLoading = livePatientLoading || checkupLoading;
+  const agendaError = Boolean(livePatientError || checkupError);
+  const agendaHasSnapshot = Boolean(livePatientRows && liveCheckupRows
+    && (!(agendaLoading || agendaError) || (patientSnapshot?.retainOnRefresh && checkupSnapshot?.retainOnRefresh)));
+  const agendaState: Kree8AgendaClientState = isReview ? { status: 'ready', rows: REVIEW_AGENDA } : {
+    status: agendaLoading ? 'loading' : agendaError ? 'error' : agendaHasSnapshot ? 'ready' : 'loading',
+    rows: agendaHasSnapshot ? mapCheckupsForKree8(liveCheckupRows!, mappedPatients, filter) : [],
+    hasSnapshot: agendaHasSnapshot,
+    canRefresh: Boolean(livePatientRows && liveCheckupRows),
+    patientsUnavailable: Boolean(livePatientError),
+    todayCount: agendaHasSnapshot ? countTodayCheckups(liveCheckupRows!) : undefined,
+    plannedCount: agendaHasSnapshot ? countPlannedCheckups(liveCheckupRows!) : undefined,
+  };
+  const diaryPending = livePatientLoading || diaryLoading;
+  const diaryFailed = Boolean(livePatientError || diaryError);
+  const diaryHasSnapshot = Boolean(livePatientRows && liveDiaryRows
+    && (!(diaryPending || diaryFailed) || (patientSnapshot?.retainOnRefresh && diarySnapshot?.retainOnRefresh)));
+  const diaryState: Kree8DiaryClientState = isReview ? REVIEW_DIARY_STATE : {
+    ...(diaryHasSnapshot ? buildGlobalDiaryState(liveDiaryRows!, mappedPatients) : { entries: [], activeCount: 0, patientCount: 0 }),
+    status: diaryPending ? 'loading' : diaryFailed ? 'error' : diaryHasSnapshot ? 'ready' : 'loading',
+    hasSnapshot: diaryHasSnapshot,
+    canRefresh: Boolean(livePatientRows && liveDiaryRows),
+    patientsUnavailable: Boolean(livePatientError),
+  };
 
   const patientWorkspace = useLiveQuery<Kree8PatientWorkspace | null>(
     async () => {
@@ -458,13 +523,11 @@ export function Kree8ClinicalCockpit({
 
     if (livePatientLoading) {
       setPatientState({ status: 'loading', patients: [] });
-      setAgendaState({ status: 'loading', rows: [] });
       return;
     }
 
     if (livePatientError) {
       setPatientState({ status: 'error', patients: [] });
-      setAgendaState({ status: 'loading', rows: [] });
       return;
     }
 
@@ -478,14 +541,7 @@ export function Kree8ClinicalCockpit({
         return rightTime - leftTime;
       })
       .map(mapPatientForKree8);
-    const checkups = liveCheckupRows ?? [];
     setPatientState({ status: 'ready', patients });
-    setAgendaState({
-      status: liveCheckupRows ? 'ready' : 'loading',
-      rows: mapCheckupsForKree8(checkups, patients),
-      todayCount: countTodayCheckups(checkups),
-      plannedCount: countPlannedCheckups(checkups),
-    });
     setSelectedPatientId((current) => {
       if (current && patients.some((patient) => patient.id === current)) return current;
       if (initialPatientId) return initialPatientId;
@@ -497,7 +553,6 @@ export function Kree8ClinicalCockpit({
     livePatientError,
     livePatientLoading,
     livePatientRows,
-    liveCheckupRows,
   ]);
 
   const patientNavMeta =
@@ -654,6 +709,8 @@ export function Kree8ClinicalCockpit({
                 onAlignPatient={setSelectedPatientId}
                 onOpenArea={openArea}
                 onRetryPatients={refreshPatients}
+                onRetryAgenda={() => { refreshPatients(); refreshCheckups(); }}
+                onRetryDiary={() => { refreshPatients(); refreshDiary(); }}
               />
             </div>
           </main>
