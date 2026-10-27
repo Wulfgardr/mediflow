@@ -1,7 +1,6 @@
 /* WUL-271 Kree8-inspired full-surface MediFlow mockup. Scoped to .shell only. */
 
 .shell {
-  composes: sections from "../ink-section.module.css";
   /* ── local tokens (scoped; no globals touched) ── */
   --surface: var(--lume-surface-field);
   --surface-soft: var(--lume-surface-field);

@@ -1,6 +1,6 @@
 /* WUL-676: the patient workspace replaces the old nested card shell. */
-.patientShell { composes: sections from "../ink-section.module.css"; min-height: 100%; background: var(--lume-surface-focal); color: var(--lume-ink); }
-.patientHeader { composes: plane from "../ink-layout.module.css"; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px var(--ink-plane-inset); }
+.patientShell { min-height: 100%; background: var(--lume-surface-focal); color: var(--lume-ink); }
+.patientHeader { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px var(--ink-plane-inset); }
 .identity { min-width: 0; }
 .identity h1 { margin: 0; letter-spacing: 0; font: var(--type-person); }
 .identity p { margin-top: 6px; font-size: 0.8125rem; color: var(--lume-ink-muted); }
@@ -8,7 +8,7 @@
 /* same command geometry for every action in the patient header. */
 .actions > :is(a, button) { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--lume-control-height, 44px); padding: 10px 14px; border-radius: var(--lume-control-radius, 8px); font-size: 0.875rem; font-weight: 600; line-height: 1.5; }
 
-.patientBody { composes: plane from "../ink-layout.module.css"; padding: 28px var(--ink-plane-inset); }
+.patientBody { padding: 28px var(--ink-plane-inset); }
 .readingPane { max-width: 1160px; margin: 0 auto; }
 .readingPane > div { display: flex; flex-direction: column; gap: 28px; }
 .readingPane :global([data-folder-pane][data-folder-active='false']) { display: none; }
@@ -69,7 +69,7 @@
   --k8-focal: var(--lume-surface-focal);
   --k8-focal-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
 }
-.patientCanvas { composes: container from "../ink-layout.module.css"; min-height: 100%; }
+.patientCanvas { min-height: 100%; }
 
 /* The overview places the existing diary beside the clinical context. */
 .patientBody[data-folder-section='quadro'] .readingPane > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; align-items: start; }

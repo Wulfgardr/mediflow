@@ -1,5 +1,7 @@
 'use client';
 
+import sectionRecipe from '@/components/ink-section.module.css';
+
 /* WUL-272 live Kree8-inspired MediFlow cockpit.
    Renders as the root local web entry in live mode and remains available under
    /mockups/kree8 as a review alias. WUL-273 starts the real-data migration for
@@ -567,7 +569,7 @@ export function Kree8ClinicalCockpit({
 
   return (
     <div
-      className={styles.shell}
+      className={`${styles.shell} ${sectionRecipe.sections}`}
       aria-label={isReview ? 'MediFlow · Kree8 review surface' : 'MediFlow · spazio clinico Kree8'}
       data-testid="lume-frame"
       data-lume-frame-element="shell"

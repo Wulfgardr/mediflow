@@ -13,6 +13,8 @@ import { RuntimeTwinFolderContext, useRuntimeTwinDesign } from '@/components/run
 import styles from './kree8-workspace-shell.module.css';
 import { RuntimeTwinPatientNavigation } from '@/components/runtime-twin-workspace';
 import twin from './twin-patient-shell.module.css';
+import layout from '@/components/ink-layout.module.css';
+import sectionRecipe from '@/components/ink-section.module.css';
 import { PatientHeaderIdentity, type PatientHeaderDetails } from '@/components/patient-header-identity';
 
 export type Kree8WorkspaceNavItem = {
@@ -337,10 +339,10 @@ export function Kree8WorkspaceShell({
 
   return (
     <RuntimeTwinFolderContext.Provider value={folderMode ? folderSection : null}>
-    <div className={folderMode ? twin.patientShell : `${styles.shell} ${isClinical ? styles.clinicalShell : ''} ${overviewMode ? styles.overviewShell : ''}`} ref={rootRef}>
-      <main className={folderMode ? twin.patientCanvas : `${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`} data-folder-section={folderMode ? folderSection : undefined} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
+    <div className={`${sectionRecipe.sections} ${folderMode ? twin.patientShell : `${styles.shell} ${isClinical ? styles.clinicalShell : ''} ${overviewMode ? styles.overviewShell : ''}`}`} ref={rootRef}>
+      <main className={`${layout.container} ${folderMode ? twin.patientCanvas : `${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`}`} data-folder-section={folderMode ? folderSection : undefined} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
         <header
-          className={folderMode ? twin.patientHeader : `${styles.chrome} ${isClinical ? styles.clinicalChrome : ''}`}
+          className={`${layout.plane} ${folderMode ? twin.patientHeader : `${styles.chrome} ${isClinical ? styles.clinicalChrome : ''}`}`}
           data-testid={isClinical ? 'lume-scheda-header' : undefined}
         >
           {folderMode ? <>
@@ -479,7 +481,7 @@ export function Kree8WorkspaceShell({
           </nav>
         ) : null}
 
-        <div key="workspace-body" className={folderMode ? twin.patientBody : `${styles.workspaceBody} ${isClinical ? styles.clinicalBody : ''}`} data-folder-section={folderMode ? folderSection : undefined}>
+        <div key="workspace-body" className={`${layout.plane} ${folderMode ? twin.patientBody : `${styles.workspaceBody} ${isClinical ? styles.clinicalBody : ''}`}`} data-folder-section={folderMode ? folderSection : undefined}>
           {isClinical ? (
             <article
               className={folderMode ? twin.readingPane : styles.clinicalSurface}

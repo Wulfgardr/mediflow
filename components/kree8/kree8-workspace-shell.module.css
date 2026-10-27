@@ -1,7 +1,6 @@
 /* Scoped Kree8 shell for dense patient workspaces. */
 
 .shell {
-  composes: sections from "../ink-section.module.css";
   /* Lume material (WUL-55, F2c): surfaces read from the live giorno/grafite aliases. Structural shell + header
      recede to opaque canvas/chrome; content panels sit on field. Focal + il filo stay reserved for the active
      clinical locus rendered by inner content (Lume 01-lingua ss.1-3), so the shell declares no focal surface of its own. */
@@ -62,7 +61,6 @@
 }
 
 .canvas {
-  composes: container from "../ink-layout.module.css";
   --k8-canvas-pad: 18px;
   height: 100%;
   overflow: auto;
@@ -1122,5 +1120,3 @@
 }
 @media (pointer: fine) and (min-width: 701px) { :global(html[data-runtime-twin-design='proposal']) .headerActionButton { white-space: nowrap; } }
 
-.chrome { composes: plane from "../ink-layout.module.css"; }
-.workspaceBody { composes: plane from "../ink-layout.module.css"; }
