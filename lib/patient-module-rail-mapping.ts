@@ -16,7 +16,7 @@ const PATIENT_MODULE_RAIL_SPEC = [
             { href: '#attenzione', label: 'Attenzione' },
             /* WUL-678: independent patient domains; historical identity hash remains valid. */
             { href: '#identita', label: 'Anagrafica' },
-            { href: '#clinica', label: 'Diagnosi' },
+            { href: '#clinica', label: 'Clinica' },
             { href: '#amministrazione', label: 'Amministrazione' },
             { href: '#parametri', label: 'Parametri' },
         ],
@@ -36,7 +36,7 @@ const PATIENT_MODULE_RAIL_SPEC = [
         label: 'Documenti e prove',
         items: [
             { href: '#documenti', label: 'Documenti' },
-            { href: '#siss', label: 'SISS/FSE' },
+            { href: '#siss', label: 'SISS e FSE' },
         ],
     },
     {
