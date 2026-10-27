@@ -39,7 +39,7 @@ export default function AmbulatoryManagerPage() {
     const loadAmbulatories = async () => {
         setIsLoading(true);
         try {
-            const list = await db.ambulatories.toArray();
+            const list = await db.ambulatories.toArray({ rejectAuthUnavailable: true });
             setAmbulatories(list);
             setReadError('');
             setActionError('');
@@ -91,6 +91,7 @@ export default function AmbulatoryManagerPage() {
         });
         if (!confirmed) return;
         if (typeof target?.version !== 'number') {
+            setActionError('Versione della sede non disponibile. Aggiorna la pagina e riprova.');
             return;
         }
         setAcceptedAction('');

@@ -9,7 +9,7 @@ async function installMaintenanceMocks(page: Page, baseURL: string) {
     const rows = [{ id: '11111111-1111-4111-8111-111111111111', name: 'Ambulatorio Uno inventato', address: 'Via inventata 1', parentId: null, type: 'live', isDefault: true, version: 1, createdAt: '2026-10-27T00:00:00Z' },
         { id: '22222222-2222-4222-8222-222222222222', name: 'Reparto inventato', address: '', parentId: '11111111-1111-4111-8111-111111111111', type: 'test', isDefault: false, version: 1, createdAt: '2026-10-27T00:00:00Z' },
         { id: '33333333-3333-4333-8333-333333333333', name: 'Ambulatorio Due inventato', address: '', parentId: null, type: 'test', isDefault: false, version: 1, createdAt: '2026-10-27T00:00:00Z' }];
-    const state = { holdWrite: null as Promise<void> | null, holdRead: null as Promise<void> | null, readError: false, defaultError: false, failNextRead: false, native: 'ack' as 'ack' | 'error', reset: 'commitfailed' as 'commitfailed' | 'abort', holdNative: null as Promise<void> | null, holdPatient: null as Promise<void> | null };
+    const state = { readStatus: 200 as 200 | 401 | 403, versionAbsent: false, holdWrite: null as Promise<void> | null, holdRead: null as Promise<void> | null, readError: false, defaultError: false, failNextRead: false, native: 'ack' as 'ack' | 'error', reset: 'commitfailed' as 'commitfailed' | 'abort', holdNative: null as Promise<void> | null, holdPatient: null as Promise<void> | null };
     const calls: Array<{
         method: string;
         path: string;
@@ -37,7 +37,8 @@ async function installMaintenanceMocks(page: Page, baseURL: string) {
             if (m === 'GET') {
                 if (state.holdRead)
                     await state.holdRead;
-                return state.readError ? route.fulfill({ status: 503, json: { error: 'SYNTHETIC READ DENIED' } }) : route.fulfill({ json: rows });
+                if (state.readStatus !== 200) return route.fulfill({ status: state.readStatus, json: { error: 'SYNTHETIC AUTH UNAVAILABLE' } });
+                return state.readError ? route.fulfill({ status: 503, json: { error: 'SYNTHETIC READ DENIED' } }) : route.fulfill({ json: state.versionAbsent ? rows.map(row => ({ ...row, version: undefined })) : rows });
             }
             const data = req.postDataJSON() || {};
             if (m === 'POST' && p === '/api/ambulatories') {
@@ -178,6 +179,33 @@ test('Settings maintenance: scopes, canceled effects and uncertain reset', async
         const child = page.getByRole('treeitem').filter({ has: page.getByRole('heading', { name: 'Reparto nuovo inventato', exact: true }) });
         await expect(child).toHaveAttribute('aria-level', '2');
         await expect(child).toContainText('Reparto di Sede nuova inventata');
+        for (const status of [401, 403] as const) {
+            f.state.readStatus = status;
+            const deniedList = page.waitForResponse(response => new URL(response.url()).pathname === '/api/ambulatories' && response.status() === status);
+            await page.goto('/settings/ambulatories');
+            await deniedList;
+            await expect(page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true })).toBeVisible();
+            await expect(page.getByText('Nessun ambulatorio configurato.', { exact: true })).toHaveCount(0);
+            f.state.readStatus = 200;
+            await bootstrapUnlockedSession(page, '1234');
+            await page.goto('/settings/ambulatories');
+            await expect(page.getByRole('treeitem')).toHaveCount(5);
+        }
+        f.state.versionAbsent = true;
+        await page.goto('/settings/ambulatories');
+        await expect(testRow).toBeVisible();
+        await name.fill('Bozza senza versione');
+        const beforeMissingVersion = mutationCount();
+        await rowAction(testRow, 'Svuota ambiente di test');
+        await page.getByRole('dialog').getByRole('button', { name: 'Svuota', exact: true }).click();
+        await expect(page.getByTestId('settings-ambulatories-section').getByRole('alert')).toContainText('Versione della sede non disponibile. Aggiorna la pagina e riprova.');
+        expect(mutationCount()).toBe(beforeMissingVersion);
+        await expect(testRow.getByRole('button', { name: 'Azioni', exact: true })).toBeDisabled();
+        await expect(page.getByRole('button', { name: 'Aggiungi', exact: true })).toBeDisabled();
+        f.state.versionAbsent = false;
+        await page.getByRole('button', { name: 'Riprova', exact: true }).click();
+        await expect(testRow.getByRole('button', { name: 'Azioni', exact: true })).toBeEnabled();
+        await expect(name).toHaveValue('Bozza senza versione');
         f.rows.splice(0);
         f.state.holdRead = new Promise<void>(resolve => releaseRead = resolve);
         await page.reload({ waitUntil: 'domcontentloaded' });
