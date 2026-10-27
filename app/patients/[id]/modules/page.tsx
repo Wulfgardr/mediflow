@@ -130,7 +130,7 @@ export default function PatientDetailPage() {
     const followupRead = projectFollowupReadState({ data: checkups, loading: checkupsLoading, error: checkupsError });
     /* The sheet consumes metadata and stored summaries, not original file bytes. */
     const { data: attachments, error: attachmentsError } = useLiveQueryState(
-        async () => db.attachments.query({ patientId: id, metadataOnly: true }).toArray(),
+        async () => db.attachments.query({ patientId: id, metadataOnly: true }).toArray({ signal: db.getSessionReadSignal() }),
         [id],
         undefined,
         ['attachments'],
