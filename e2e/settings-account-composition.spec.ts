@@ -77,8 +77,11 @@ test('access and profile settings preserve form drafts and denied outcomes', asy
         await bootstrapUnlockedSession(page, '1234');
         await go('/settings/accesso');
         const access = page.getByTestId('settings-access-section');
-        const primary = access.locator('button[class*="primaryAction"]:visible');
+        const primary = access.locator('button:is(.mf-button-primary, [class*="primaryAction"]):visible');
         await expect(primary).toHaveCount(1);
+        await expect(primary).toHaveAccessibleName('Prepara il nuovo kit');
+        await expect(primary).toHaveAttribute('type', 'submit');
+        await expect(access.locator('form').getByRole('button', { name: 'Prepara il nuovo kit', exact: true })).toHaveClass(/\bmf-button-primary\b/u);
         await page.getByRole('button', { name: 'Cambio PIN', exact: true }).click();
         for (const id of ['current-pin', 'new-pin', 'confirm-pin']) await expect(page.locator(`#${id}`)).toHaveValue('');
         await expect(access.getByRole('status')).toHaveCount(0);
@@ -91,6 +94,7 @@ test('access and profile settings preserve form drafts and denied outcomes', asy
         await expect(access.getByRole('button', { name: 'Prepara il nuovo kit', exact: true })).toBeDisabled();
         await page.getByRole('button', { name: 'Cambio PIN', exact: true }).click();
         await expect(primary).toHaveCount(1);
+        await expect(primary).toHaveAccessibleName('Aggiorna PIN');
         await page.locator('#current-pin').fill('1234'); await page.locator('#new-pin').fill('5678'); await page.locator('#confirm-pin').fill('8765');
         await page.getByRole('button', { name: 'Aggiorna PIN', exact: true }).click();
         await expect(access.getByRole('status')).toHaveText('La conferma del nuovo PIN non corrisponde.');
