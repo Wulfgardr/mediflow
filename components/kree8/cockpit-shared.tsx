@@ -108,6 +108,9 @@ type Kree8PatientClientState = {
 type Kree8AgendaClientState = {
   status: Kree8PatientStatus;
   rows: Kree8AgendaRow[];
+  hasSnapshot?: boolean;
+  canRefresh?: boolean;
+  patientsUnavailable?: boolean;
   /* WUL-UIUX: conteggio degli appuntamenti di oggi sull'intero set, non
      limitato alle max 6 righe mostrate. */
   todayCount?: number;
@@ -115,6 +118,66 @@ type Kree8AgendaClientState = {
      slice(0,6), cosi la testata non dichiara solo le righe visibili. */
   plannedCount?: number;
 };
+
+type DiaryEntryState = 'draft' | 'signed' | 'recorded' | 'deleted';
+
+type DiaryEntryPresentation = {
+  author?: string;
+  source: string;
+  state: DiaryEntryState;
+  stateLabel: string;
+};
+
+function metadataRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  if (typeof value !== 'string') return {};
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function firstText(metadata: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function entryPresentation(entry: Kree8DiaryEntry, raw?: ClinicalEntry): DiaryEntryPresentation {
+  if (entry.deleted) {
+    return { source: 'Diario locale', state: 'deleted', stateLabel: 'Eliminata' };
+  }
+
+  const metadata = metadataRecord(raw?.metadata);
+  const workflowState = firstText(metadata, ['workflowStatus', 'status'])?.toLocaleLowerCase('it-IT');
+  const state: DiaryEntryState = workflowState === 'draft' || workflowState === 'bozza'
+    ? 'draft'
+    : workflowState === 'signed' || workflowState === 'firmata'
+      ? 'signed'
+      : 'recorded';
+  const settingSource = raw?.setting === 'home'
+    ? 'Assistenza domiciliare'
+    : raw?.setting === 'hospital'
+      ? 'Ospedale'
+      : raw?.setting === 'ambulatory'
+        ? 'Ambulatorio'
+        : undefined;
+
+  return {
+    author: firstText(metadata, ['authorName', 'author', 'signedBy']),
+    source: firstText(metadata, ['sourceLabel', 'source']) ?? settingSource ?? 'Diario locale',
+    state,
+    stateLabel: state === 'draft' ? 'Bozza' : state === 'signed' ? 'Firmata' : 'Registrata',
+  };
+}
 
 type Kree8DiaryEntry = {
   id: string;
@@ -128,6 +191,8 @@ type Kree8DiaryEntry = {
   preview: string;
   deleted: boolean;
   attachmentCount: number;
+  presentation?: DiaryEntryPresentation;
+  monthLabel?: string;
 };
 
 type Kree8DiaryClientState = {
@@ -135,6 +200,9 @@ type Kree8DiaryClientState = {
   entries: Kree8DiaryEntry[];
   activeCount: number;
   patientCount: number;
+  hasSnapshot?: boolean;
+  canRefresh?: boolean;
+  patientsUnavailable?: boolean;
 };
 
 type Kree8DecisionCard = {
@@ -613,12 +681,13 @@ function buildGlobalDiaryState(
   const mappedEntries = recentEntries.map((entry) => {
     const patient = patientById.get(entry.patientId);
     const deleted = Boolean(entry.deletedAt);
+    const date = entry.date ? new Date(entry.date) : null;
     if (!deleted) {
       activeCount += 1;
     }
     patientIds.add(entry.patientId);
 
-    return {
+    const projection = {
       id: entry.id,
       patientId: entry.patientId,
       patientName: patient?.name ?? 'Paziente non trovato',
@@ -630,6 +699,13 @@ function buildGlobalDiaryState(
       preview: compactClinicalText(entry.content),
       deleted,
       attachmentCount: Array.isArray(entry.attachments) ? entry.attachments.length : 0,
+    };
+    return {
+      ...projection,
+      presentation: entryPresentation(projection, entry),
+      monthLabel: date && Number.isFinite(date.getTime())
+        ? new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' }).format(date)
+        : 'Voci recenti',
     };
   });
 
