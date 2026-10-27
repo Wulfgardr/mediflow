@@ -243,8 +243,9 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                 </Disclosure>
             )}
 
+            <div id={formId} hidden={!isFormOpen}>
             {isFormOpen && (
-                <form id={formId} ref={formRef} aria-label="Nuova voce protesica" onSubmit={handleSubmit} className={styles.form}>
+                <form ref={formRef} aria-label="Nuova voce protesica" onSubmit={handleSubmit} className={styles.form}>
                     <div className="grid gap-3 md:grid-cols-2">
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Data prescrizione
@@ -311,7 +312,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                         </label>
                     </div>
                     {error && <p className="mt-3 text-xs font-medium text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{error}</p>}
-                    <div className="mt-4 flex justify-end gap-2">
+                    <div className="mt-4 flex justify-end gap-3">
                         <button type="button" className="ui-btn-secondary h-10 px-4 text-sm" onClick={() => setIsFormOpen(false)}>Annulla</button>
                         <button type="submit" className="ui-btn-primary h-10 px-4 text-sm" disabled={isSaving}>
                             {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
@@ -320,6 +321,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                     </div>
                 </form>
             )}
+            </div>
 
             {!prescriptions ? <p role="status" className={styles.empty}>Caricamento prescrizioni…</p> : prescriptions.length === 0 ? (
                 <div className={styles.empty}>

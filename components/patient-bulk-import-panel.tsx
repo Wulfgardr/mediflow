@@ -2,7 +2,7 @@
 
 import { formatCountLabel } from '@/lib/format-count';
 /* only preview metadata fetch; patient writes use the existing encrypted client. */
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import { db, type Patient } from '@/lib/db';
 import { useSecurity } from '@/components/security-provider';
 import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
@@ -149,6 +149,9 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
     const session = binding.getSession();
     const [consentRevision, setConsentRevision] = useState<number | null>(null);
     const previewTitle = useRef<HTMLHeadingElement>(null);
+    const fileInput = useRef<HTMLInputElement>(null);
+    const fileId = useId();
+    const [fileName, setFileName] = useState('');
     const resultTitle = useRef<HTMLHeadingElement>(null);
     const busy = ['reading', 'rechecking', 'applying', 'stopping', 'reconciling'].includes(snapshot.phase);
     const unresolved = hasUnresolvedPatientBulkReceipt(snapshot.receipt);
@@ -177,18 +180,26 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
                     <h2 id="bulk-file-title">1. Scegli l’elenco</h2>
                     <p>Compila il modello con nome, cognome e codice fiscale. Data di nascita, indirizzo e telefono sono facoltativi.</p>
                     <p className={styles.muted}>CSV UTF-8, separatore punto e virgola (;), massimo 2 MiB e 500 righe. Per le date usa YYYY-MM-DD.</p>
-                    <div className={styles.actions}>
-                        <a className={styles.secondary} href={templateUrl} download="mediflow-modello-pazienti.csv">Scarica modello CSV</a>
-                        <label className={styles.fileLabel}>
-                            <span>Scegli file CSV</span>
-                            <input type="file" accept=".csv,text/csv" data-testid="patient-bulk-file"
+                    <div className={`${styles.actions} ${styles.fileActions}`}>
+                        <div className={styles.fileLabel}>
+                            <label htmlFor={fileId}>File CSV</label>
+                            <div className={styles.fileControl}>
+                                <button type="button" className="mf-button-secondary" aria-describedby={`${fileId}-status`}
+                                    disabled={busy || unresolved || !session} onClick={() => fileInput.current?.click()}>Scegli file CSV</button>
+                                <span id={`${fileId}-status`} role="status">{fileName || 'Nessun file selezionato'}</span>
+                            </div>
+                            <input ref={fileInput} id={fileId} type="file" hidden accept=".csv,text/csv" data-testid="patient-bulk-file"
                                 disabled={busy || unresolved || !session} onChange={event => {
                                     const file = event.currentTarget.files?.[0];
                                     event.currentTarget.value = '';
                                     setConsentRevision(null);
-                                    if (file) void session?.prepare(file);
+                                    if (file) {
+                                        setFileName(file.name);
+                                        void session?.prepare(file);
+                                    }
                                 }} />
-                        </label>
+                        </div>
+                        <a className="mf-button-secondary" href={templateUrl} download="mediflow-modello-pazienti.csv">Scarica modello CSV</a>
                     </div>
                     {snapshot.ambulatoryName ? <p>Ambulatorio: <strong>{snapshot.ambulatoryName}</strong></p> : null}
                     <details className={styles.disclosure}>

@@ -32,9 +32,10 @@ for (const name of [panelName, 'app/patients/import/page.tsx', 'app/patients/new
         assert.deepEqual((result.diagnostics ?? []).filter(item => item.category === ts.DiagnosticCategory.Error), []);
     });
 }
-test('Nuova scheda has the real shell primary action to the import route', () => {
+test('Nuova scheda keeps CSV import secondary to the form submit', () => {
     const source = read('app/patients/new/page.tsx');
-    assert.match(source, /primaryAction=\{\{ href: "\/patients\/import", label: "Importa elenco CSV", icon: FileSpreadsheet \}\}/u);
+    assert.match(source, /headerActions=\{<Link href="\/patients\/import" className="mf-button-secondary"/u);
+    assert.doesNotMatch(source, /primaryAction=/u);
     assert.match(source, /import .*FileSpreadsheet.* from 'lucide-react'/u);
 });
 test('Nuova scheda concorda la frase completa del riepilogo documentale per 0, 1 e più terapie e diagnosi', () => {
@@ -139,7 +140,7 @@ test('E2E candidate parses and retains the original isolated runtime without aut
     assert.deepEqual((result.diagnostics ?? []).filter(item => item.category === ts.DiagnosticCategory.Error), []);
     assert(source.includes("from './fixtures/isolated-runtime'"));
     assert.doesNotMatch(source, /test\.(skip|fixme|setTimeout)|waitForTimeout|route\.(fulfill|abort)|page\.route\(/u);
-    assert(source.includes("name: 'Concludi Setup'"));
+    assert(source.includes("name: 'Prepara il kit di recupero'"));
     assert(source.includes("name: 'Crea scheda'"));
     assert(source.includes('expect(after.find(item => item.id === before.id)).toEqual(before)'));
 });
