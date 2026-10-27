@@ -7,7 +7,7 @@ type ViewStateProps = Readonly<{
 
 export function ViewState({ state, title, detail, action }: ViewStateProps) {
     const failed = state === 'error' || state === 'unavailable';
-    const titleClassName = state === 'empty' ? 'type-body text-muted'
+    const titleClassName = state === 'empty' ? 'type-body text-[color:var(--lume-ink-muted)]'
         : `type-strong ${state === 'error' ? 'text-[color:var(--lume-signal-critical)]' : state === 'unavailable' ? 'text-[color:var(--lume-signal-warning)]' : 'text-ink'}`;
     return <div className="min-w-0 py-4 type-body" role={failed ? 'alert' : 'status'} data-view-state={state}>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
