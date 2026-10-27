@@ -1,27 +1,30 @@
 'use client';
 
 import { FunctionPreferencesPanel } from '@/components/function-models/function-preferences-panel';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import type { FunctionModelPreferences } from '@/lib/function-models/browser';
 import Link from 'next/link';
 
 // WUL-297 Funzioni cliniche AI: moved from the monolithic settings page.
 
-import { CheckCircle, Save, Sparkles } from 'lucide-react';
-import functionStyles from '@/components/settings/function-status-panel.module.css';
+import { CheckCircle, Save } from 'lucide-react';
+import { Disclosure } from '@/components/disclosure';
+import { ChoiceField } from '@/components/choice-field';
+import styles from './functions-composition.module.css';
 import {
     AI_INSIGHT_MODE_OPTIONS,
 } from '@/lib/ai-insight-settings';
 import { cn } from '@/lib/utils';
 import { useAiSettingsController } from '@/lib/hooks/use-ai-settings-controller';
 import {
-    SETTINGS_CARD_CLASS,
     SETTINGS_INPUT_CLASS,
     SETTINGS_PRIMARY_BUTTON_CLASS,
+    SETTINGS_SECONDARY_BUTTON_CLASS,
     SettingsSectionIntro,
 } from '@/components/settings/settings-ui';
 
 export default function SettingsAiFunctionsPage() {
+    const [hasPreferencesPreview, setHasPreferencesPreview] = useState(false);
     const {
         hardwareProfile,
         aiInsightSettings,
@@ -51,15 +54,16 @@ export default function SettingsAiFunctionsPage() {
     }, [setPatientInsightEnabled, setSmartImportEnabled, setDocumentSynthesisEnabled, setTreatmentReasoningEnabled]);
 
     return (
-        <section className={`space-y-4 ${functionStyles.functionSettings}`} data-testid="settings-ai-functions-section">
+        <section className={styles.page} data-testid="settings-ai-functions-section">
             <SettingsSectionIntro
                 kicker="Intelligenza locale"
                 title="Funzioni cliniche"
-                description="Scegli quali proposte usare. Puoi modificare ogni funzione e salvare le preferenze."
+                description="Scegli quali funzioni usare nella cartella."
             />
+            <p className={styles.distinction}>Le preferenze richiedono anteprima e conferma; i parametri avanzati si salvano separatamente.</p>
 
             {/* per-proposal access stays separate from local model preferences. */}
-            <aside className={SETTINGS_CARD_CLASS} aria-label="ChatGPT e modelli delle funzioni">
+            <aside className={styles.notice} aria-label="ChatGPT e modelli delle funzioni">
                 <p>Le preferenze locali restano sul computer. Per usare OpenAI, scegli il canale nella funzione e prepara una proposta: servono consenso sul contesto redatto, accesso dedicato e verifica dei modelli disponibili per quel tentativo.</p>
                 <Link href="/settings/ai/chatgpt" className="underline">Gestisci OpenAI · ChatGPT</Link>
             </aside>
@@ -69,15 +73,15 @@ export default function SettingsAiFunctionsPage() {
             </p>}
             <fieldset disabled={aiSettingsLoadState !== 'ready'} aria-busy={aiSettingsLoadState === 'loading'}
                 aria-label="Impostazioni delle funzioni locali" data-testid="ai-settings-controls"
-                className="min-w-0 space-y-4 border-0 p-0">
-            <FunctionPreferencesPanel onRead={syncPreferences} />
+                className={styles.controls}>
+            <FunctionPreferencesPanel onRead={syncPreferences} onProposalChange={setHasPreferencesPreview} />
 
-            <div className="space-y-6">
-                <details className={SETTINGS_CARD_CLASS}>
-                    <summary className={functionStyles.advancedSummary}>Lettura e instradamento dei documenti</summary>
+            <section className={styles.advanced} aria-labelledby="functions-advanced-title">
+                <h3 id="functions-advanced-title">Parametri avanzati</h3>
+                <Disclosure title="Lettura e instradamento dei documenti" headingLevel={4}>
+                    <div className={styles.advancedBody}>
                         <div
-                            className="rounded-[18px] border p-4"
-                            style={{ borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 28%, transparent)', background: 'var(--lume-surface-field)' }}
+                            className={styles.advancedRow}
                             data-testid="ocr-unavailable-card"
                         >
                             <div className="flex items-start justify-between gap-3">
@@ -87,15 +91,14 @@ export default function SettingsAiFunctionsPage() {
                                         AnyDoc estrae il testo; sui PDF supportati il percorso locale puo usare Apple Vision per le pagine scansionate. Le immagini singole restano da rivedere manualmente. Questo percorso e separato dal registro OCR di Fabric.
                                     </p>
                                 </div>
-                                <span className="rounded-full border px-2 py-1 text-xs font-semibold uppercase tracking-[0.16em]" style={{ borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}>
+                                <span className={styles.reviewState}>
                                     Revisione richiesta
                                 </span>
                             </div>
                         </div>
 
                         <div
-                            className="rounded-[18px] border p-4"
-                            style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)' }}
+                            className={styles.advancedRow}
                             data-testid="document-router-control-flow-card"
                         >
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -105,21 +108,17 @@ export default function SettingsAiFunctionsPage() {
                                         Decide quando le classi a estrazione certa possono usare la sintesi deterministica invece del modello.
                                     </p>
                                 </div>
-                                <label className="text-xs font-medium" style={{ color: 'var(--lume-ink-muted)' }}>
-                                    Modalita
-                                    <select
+                                    <ChoiceField label="Modalita"
                                         aria-label="Modalita instradamento documentale deterministico"
                                         value={documentRouterControlFlowMode}
                                         onChange={(event) => setDocumentRouterControlFlowMode(event.target.value as typeof documentRouterControlFlowMode)}
-                                        className={`mt-1 min-w-40 ${SETTINGS_INPUT_CLASS}`}
                                     >
                                         <option value="off">Spento</option>
                                         <option value="shadow">Osservazione</option>
                                         <option value="active">Attivo</option>
-                                    </select>
-                                </label>
+                                    </ChoiceField>
                             </div>
-                            <p className="mt-3 rounded-[14px] border px-3 py-2 text-xs leading-5" style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 12%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink-muted)' }}>
+                            <p className={styles.hint}>
                                 {documentRouterControlFlowMode === 'off'
                                     ? 'Spento: il modello analizza tutti i documenti.'
                                     : documentRouterControlFlowMode === 'shadow'
@@ -128,23 +127,19 @@ export default function SettingsAiFunctionsPage() {
                             </p>
                         </div>
 
-                </details>
+                    </div>
+                </Disclosure>
 
                 {/* advanced controls remain available below the function choices. */}
-                <details className={SETTINGS_CARD_CLASS}>
-                    <summary className={functionStyles.advancedSummary}>Regola contesto e lunghezza delle sintesi</summary>
+                <Disclosure title="Regola contesto e lunghezza delle sintesi" headingLevel={4}>
+                    <div className={styles.advancedBody}>
                     {/* WUL-273: Patient Insight runtime settings stay neutral and role-led. */}
-                    <div className="mb-5 flex items-start gap-3">
-                        <div className="rounded-2xl p-2" style={{ background: 'color-mix(in srgb, var(--lume-ink) 6%, transparent)', color: 'var(--lume-ink)' }}>
-                            <Sparkles className="h-4 w-4" />
-                        </div>
+                    <div>
                         <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
                             <div className="min-w-0">
-                                <p className="section-kicker">Quadro paziente</p>
-                                <h3 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Budget contesto e output</h3>
+                                <p className={styles.rowTitle}>Budget contesto e output</p>
                                 <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Quanto contesto leggere e quanto produrre per ogni insight: bilancia velocità e completezza.</p>
                             </div>
-                            <span className="apple-chip whitespace-nowrap">{selectedInsightMode.title}</span>
                         </div>
                     </div>
 
@@ -155,6 +150,7 @@ export default function SettingsAiFunctionsPage() {
                                 <button
                                     key={option.value}
                                     type="button"
+                                    aria-pressed={selected}
                                     onClick={() => setAiInsightSettings((prev) => ({ ...prev, mode: option.value }))}
                                     className={cn('mf-option-card text-left !px-3 !py-3', selected && 'is-active')}
                                     style={selected ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 22%, transparent)', background: 'var(--lume-surface-field)' } : undefined}
@@ -170,22 +166,21 @@ export default function SettingsAiFunctionsPage() {
                     </div>
 
                     <p
-                        className="mt-3 rounded-[14px] border px-3 py-2 text-xs leading-5"
-                        style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 12%, transparent)', background: 'var(--lume-surface-field)', color: 'var(--lume-ink-muted)' }}
+                        className={styles.hint}
                     >
                         {aiInsightSettings.mode === 'full_auto'
                             ? 'MediFlow sceglie automaticamente quante fonti leggere in base al profilo della postazione e alla complessità del caso.'
                             : selectedInsightMode.description}
                     </p>
 
-                    <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                        <div className="mf-section mf-section-tight !rounded-lg px-3 py-2">
+                    <div className={styles.facts}>
+                        <div className={styles.fact}>
                             <span className="block text-xs uppercase tracking-wide" style={{ color: 'var(--lume-ink-muted)' }}>Profilo hardware</span>
                             <span className="font-semibold" style={{ color: 'var(--lume-ink)' }}>
                                 {hardwareProfile === 'low' ? 'Leggero' : hardwareProfile === 'medium' ? 'Bilanciato' : 'Avanzato'}
                             </span>
                         </div>
-                        <div className="mf-section mf-section-tight !rounded-lg px-3 py-2">
+                        <div className={styles.fact}>
                             <span className="block text-xs uppercase tracking-wide" style={{ color: 'var(--lume-ink-muted)' }}>Budget AI</span>
                             <span className="font-semibold" style={{ color: 'var(--lume-ink)' }}>{insightRuntimePreview}</span>
                         </div>
@@ -239,18 +234,19 @@ export default function SettingsAiFunctionsPage() {
                             </label>
                         </div>
                     )}
-                </details>
+                    </div>
+                </Disclosure>
 
                 {/* Save (shared with Modelli e Hardware: persists the whole AI configuration) */}
-                <div className={SETTINGS_CARD_CLASS}>
+                <div className={styles.save}>
                     <div className="flex flex-wrap items-center gap-3">
                         <button
                 onClick={saveAiConfig}
                 disabled={isSavingAi}
-                className={SETTINGS_PRIMARY_BUTTON_CLASS}
+                className={hasPreferencesPreview ? SETTINGS_SECONDARY_BUTTON_CLASS : SETTINGS_PRIMARY_BUTTON_CLASS}
                         >
                 <Save className="w-4 h-4" />
-                {isSavingAi ? 'Salvataggio...' : 'Salva Configurazione'}
+                {isSavingAi ? 'Salvataggio...' : 'Salva parametri avanzati'}
                         </button>
                         <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                 Salva i parametri avanzati. Le preferenze per esperienza si applicano dal pannello in alto.
@@ -258,7 +254,7 @@ export default function SettingsAiFunctionsPage() {
                     </div>
                 </div>
 
-            </div>
+            </section>
             </fieldset>
         </section>
     );
