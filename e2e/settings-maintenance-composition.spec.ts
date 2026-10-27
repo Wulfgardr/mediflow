@@ -90,17 +90,18 @@ test('Settings maintenance: scopes, canceled effects and uncertain reset', async
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR)
         throw Error('Synthetic runtime required');
     const zoom = await openBrowserZoomFixture(baseURL!), page = zoom.page, f = await installMaintenanceMocks(page, baseURL!);
-    const directory = process.env.SETTINGS_MAINTENANCE_SCREENSHOTS, frames: unknown[] = [], errors: string[] = [];
+    const directory = process.env.SETTINGS_MAINTENANCE_SCREENSHOTS, captureDirectory = directory || process.env.SETTINGS_MAINTENANCE_STATE_SCREENSHOTS, frames: unknown[] = [], errors: string[] = [];
     let releaseNative = () => { }, releasePatient = () => { }, releaseRead = () => { }, releaseWrite = () => { };
     page.on('pageerror', e => errors.push(e.message));
-    const shot = async (name: string, target: Locator) => { await target.scrollIntoViewIfNeeded(); const probe = await target.evaluate(e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e), root = getComputedStyle(document.documentElement), hit = document.elementFromPoint(r.x + r.width / 2, r.y + Math.min(20, r.height / 2)); return { text: e.textContent, rect: { x: r.x, y: r.y, width: r.width, height: r.height }, viewport: { width: innerWidth, height: innerHeight }, centerHit: hit === e || e.contains(hit), fontSize: s.fontSize, palette: { ink: root.getPropertyValue('--lume-ink'), surface: root.getPropertyValue('--lume-surface-field'), color: s.color }, active: document.activeElement?.getAttribute('aria-label') || document.activeElement?.textContent }; }); expect(probe.centerHit).toBe(true); frames.push({ name, ...probe }); if (directory) {
-        await mkdir(directory, { recursive: true });
-        await page.screenshot({ path: directory + '/' + name + '.png', fullPage: false, animations: 'disabled' });
+    const shot = async (name: string, target: Locator) => { await target.scrollIntoViewIfNeeded(); const probe = await target.evaluate(e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e), root = getComputedStyle(document.documentElement), hit = document.elementFromPoint(r.x + r.width / 2, r.y + Math.min(20, r.height / 2)); return { text: e.textContent, rect: { x: r.x, y: r.y, width: r.width, height: r.height }, viewport: { width: innerWidth, height: innerHeight }, centerHit: hit === e || e.contains(hit), fontSize: s.fontSize, palette: { ink: root.getPropertyValue('--lume-ink'), surface: root.getPropertyValue('--lume-surface-field'), color: s.color }, active: document.activeElement?.getAttribute('aria-label') || document.activeElement?.textContent }; }); expect(probe.centerHit).toBe(true); frames.push({ name, ...probe }); if (captureDirectory) {
+        await mkdir(captureDirectory, { recursive: true });
+        await page.screenshot({ path: captureDirectory + '/' + name + '.png', fullPage: false, animations: 'disabled' });
     } return probe; };
     const mutationCount = () => f.calls.filter(x => x.method !== 'GET').length;
     const cancel = async (name: string, invoke: () => Promise<void>) => { const n = mutationCount(); await invoke(); const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible(); if (name === 'cleanup-full-cancel') await expect(dialog).toContainText('Elimina tutti i pazienti, inclusi quelli reali, e tutte le voci, terapie, controlli, allegati, conversazioni e messaggi.'); await shot(name, dialog.getByRole('heading')); await dialog.getByRole('button', { name: 'Annulla', exact: true }).click(); await expect(dialog).toHaveCount(0); expect(mutationCount()).toBe(n); };
     const rowAction = async (row: Locator, name: string) => { await row.getByRole('button', { name: 'Azioni', exact: true }).click(); await page.getByRole('menu', { name: 'Azioni', exact: true }).getByRole('menuitem', { name, exact: true }).click(); };
     try {
+        if (!directory && captureDirectory) await page.addInitScript(() => localStorage.setItem('mediflow-theme', 'dark'));
         await bootstrapUnlockedSession(page, '1234');
         for (const route of ['ambulatories', 'sviluppo', 'zona-pericolo']) {
             await page.goto('/settings/' + route);
@@ -276,7 +277,7 @@ test('Settings maintenance: scopes, canceled effects and uncertain reset', async
         await field.press('Enter');
         await expect(reset).toBeDisabled();
         expect(mutationCount()).toBe(n);
-        await expect(page.getByRole('link', { name: 'Accesso', exact: true })).toHaveAttribute('href', '/settings/accesso');
+        await expect(page.getByTestId('settings-danger-zone-section').getByRole('link', { name: 'Accesso', exact: true })).toHaveAttribute('href', '/settings/accesso');
         await shot('reset-commit-failed', page.getByTestId('settings-danger-zone-section').getByRole('alert'));
         await page.reload();
         f.state.reset = 'abort';
@@ -297,9 +298,9 @@ test('Settings maintenance: scopes, canceled effects and uncertain reset', async
         try {
             const observation = { frames, errors, calls: f.calls, allBlocked: f.allBlocked };
             await info.attach('settings-maintenance-observations.json', { body: JSON.stringify(observation), contentType: 'application/json' });
-            if (directory) {
-                await mkdir(directory, { recursive: true });
-                await writeFile(directory + '/surfaces.json', JSON.stringify(observation, null, 2));
+            if (captureDirectory) {
+                await mkdir(captureDirectory, { recursive: true });
+                await writeFile(captureDirectory + '/surfaces.json', JSON.stringify(observation, null, 2));
             }
         }
         finally {
