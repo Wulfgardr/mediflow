@@ -13,6 +13,7 @@
 .header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
 .identity { display: flex; align-items: center; gap: .75rem; min-width: 0; }
 .identity > div { min-width: 0; }
+:global(html[data-runtime-twin-design='proposal']) .identity > div > p:first-child { display: block; }
 .logo { display: block; flex: 0 0 40px; width: 40px; height: 40px; object-fit: contain; background: white; }
 .page .returnLink {
     box-sizing: border-box;
