@@ -8,6 +8,8 @@ Il test di composizione controlla il consumer reale e impedisce di ripristinare
 implicitamente una PUT dal nuovo controller. Le proprietà del nuovo ledger non
 sono una prova TLA né un'estensione implicita degli invarianti legacy sottostanti.
 
+Il recovery cifrato supporta lo schema corrente 6 e i predecessori canonici 4 e 5; le 24 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+
 ## Raccordo della copertura al 26 ottobre 2026
 
 `coverage.json.syncCommit` identifica ora la revisione del runtime riesaminata

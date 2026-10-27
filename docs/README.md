@@ -562,3 +562,5 @@ eseguite dalla decisione 2 e dalla chiusura SEC-2/3 in G-1a.2.
 Il recupero dell’autorità native dopo un nuovo login è circoscritto da
 [ADR 0164](adr/0164-native-inference-authority-retirement.md) e dal
 [contratto OpenAPI dedicato](openapi/native-authority-retirement-v1.json).
+
+Il [contratto clear/delete ambulatori](./ambulatory-destructive-commands.md) distingue anteprima host, conferma nominata e recupero dei terminali; il collegamento GPUI resta una tranche successiva.

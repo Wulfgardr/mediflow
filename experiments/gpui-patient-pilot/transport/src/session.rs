@@ -52,6 +52,27 @@ impl FirstAmbulatoryContext {
         self.context.cancel();
     }
 }
+#[derive(Clone)]
+pub struct AmbulatoryCommandContext {
+    owner: Weak<SessionInner>,
+    context: RequestContext,
+    purpose: crate::ambulatory_command_transport::AmbulatoryCommandPurpose,
+}
+impl AmbulatoryCommandContext {
+    /// Adds a local revocation fence; this can only withdraw the existing context.
+    pub fn bind_revocation_epoch(&mut self, epoch: &'static AtomicU64) -> Result<()> {
+        self.context.bind_revocation_epoch(epoch)
+    }
+    pub fn check(&self) -> Result<()> {
+        self.context.check()
+    }
+    pub fn revocation_epoch_current(&self) -> bool {
+        self.context.revocation_epoch_current()
+    }
+    pub fn cancel(&self) {
+        self.context.cancel();
+    }
+}
 struct SessionInner {
     account_context: RequestContext,
     client: RuntimeClient,
@@ -242,6 +263,110 @@ impl RuntimeSession {
         {
             self.retire(*error);
             return result;
+        }
+        if let Err(error) = self.ensure_open().and_then(|()| context.context.check()) {
+            if let Ok(web) = result {
+                web.cancel_local();
+                let _ = web.retire();
+            }
+            return Err(error);
+        }
+        result
+    }
+
+    pub fn can_prepare_ambulatory_command(&self) -> bool {
+        self.ensure_open().is_ok() && self.admit_ambulatory_command().is_ok()
+    }
+
+    pub fn ambulatory_command_context(
+        &self,
+        intent: crate::AmbulatoryCommandIntent,
+    ) -> Result<AmbulatoryCommandContext> {
+        self.ensure_open()?;
+        intent.validate()?;
+        self.admit_ambulatory_command()?;
+        if !self
+            .inner
+            .scopes
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?
+            .contains(&intent.original_scope_id)
+            || self
+                .inner
+                .ambulatory_reads
+                .lock()
+                .map_err(|_| RuntimeError::Locked)?
+                .get(&intent.ambulatory_id)
+                != Some(&intent.expected_version)
+        {
+            return Err(RuntimeError::ReadRequired);
+        }
+        Ok(AmbulatoryCommandContext {
+            owner: Arc::downgrade(&self.inner),
+            context: self.context.child(),
+            purpose: crate::ambulatory_command_transport::AmbulatoryCommandPurpose::Execute(intent),
+        })
+    }
+    pub fn ambulatory_command_recovery_context(
+        &self,
+        marker: crate::AmbulatoryCommandMarker,
+    ) -> Result<AmbulatoryCommandContext> {
+        self.ensure_open()?;
+        marker.validate()?;
+        self.admit_ambulatory_command()?;
+        Ok(AmbulatoryCommandContext {
+            owner: Arc::downgrade(&self.inner),
+            context: self.inner.account_context.child(),
+            purpose: crate::ambulatory_command_transport::AmbulatoryCommandPurpose::Recover(marker),
+        })
+    }
+    fn admit_ambulatory_command(&self) -> Result<()> {
+        if self.user().role != "admin"
+            || !self.can_write(crate::AMBULATORY_WRITE_CAPABILITY)
+            || !self.inner.client.is_local_bootstrap_origin()
+        {
+            return Err(RuntimeError::Forbidden);
+        }
+        Ok(())
+    }
+    pub fn ambulatory_command_recovery_store(
+        &self,
+        directory: &std::path::Path,
+    ) -> Result<crate::AmbulatoryCommandRecoveryStore> {
+        self.ensure_open()?;
+        self.admit_ambulatory_command()?;
+        let (pairing, _) = self.credentials()?;
+        crate::AmbulatoryCommandRecoveryStore::new(
+            directory,
+            crate::ambulatory_command_recovery::CommandRecoveryBinding {
+                host_origin: self.base_url().into(),
+                actor_id: self.user().id.clone(),
+                device_id: pairing.id.clone(),
+            },
+        )
+    }
+    pub fn prepare_ambulatory_command(
+        &self,
+        context: &AmbulatoryCommandContext,
+    ) -> Result<crate::HostAmbulatoryCommand> {
+        self.ensure_open()?;
+        self.admit_ambulatory_command()?;
+        if !context.owner.ptr_eq(&Arc::downgrade(&self.inner)) {
+            return Err(RuntimeError::ReadRequired);
+        }
+        context.context.check()?;
+        let (pairing, cookie) = self.credentials()?;
+        let result = crate::HostAmbulatoryCommand::prepare(
+            self.inner
+                .client
+                .with_request_context(context.context.clone()),
+            &self.inner.user,
+            &pairing,
+            &cookie,
+            context.purpose.clone(),
+        );
+        if result.as_ref().is_err_and(|error| error.retires_session()) {
+            self.retire(*result.as_ref().err().unwrap());
         }
         if let Err(error) = self.ensure_open().and_then(|()| context.context.check()) {
             if let Ok(web) = result {
@@ -3001,6 +3126,117 @@ mod tests {
             Zeroizing::new("a".repeat(64)),
             Zeroizing::new([7; 32]),
         )
+    }
+
+    fn ambulatory_command_fixture() -> (RuntimeSession, crate::AmbulatoryCommandIntent) {
+        let session = session();
+        session
+            .inner
+            .capabilities
+            .lock()
+            .unwrap()
+            .insert(crate::AMBULATORY_WRITE_CAPABILITY.into());
+        session.inner.scopes.lock().unwrap().insert("scope".into());
+        session
+            .inner
+            .ambulatory_reads
+            .lock()
+            .unwrap()
+            .insert("target".into(), 1);
+        (
+            session,
+            crate::AmbulatoryCommandIntent {
+                operation: crate::AmbulatoryCommandOperation::ClearTest,
+                original_scope_id: "scope".into(),
+                ambulatory_id: "target".into(),
+                expected_version: 1,
+            },
+        )
+    }
+    #[test]
+    fn ambulatory_command_context_binds_exact_native_session_and_withdraws_on_scope_change_or_lock()
+    {
+        let (mut a, intent) = ambulatory_command_fixture();
+        let (b, _) = ambulatory_command_fixture();
+        let context = a.ambulatory_command_context(intent.clone()).unwrap();
+        assert!(matches!(
+            b.prepare_ambulatory_command(&context),
+            Err(RuntimeError::ReadRequired)
+        ));
+        a.renew_requests();
+        assert!(matches!(
+            a.prepare_ambulatory_command(&context),
+            Err(RuntimeError::ReadRequired)
+        ));
+        let context = a.ambulatory_command_context(intent.clone()).unwrap();
+        context.cancel();
+        assert!(matches!(
+            a.prepare_ambulatory_command(&context),
+            Err(RuntimeError::ReadRequired)
+        ));
+        let context = a.ambulatory_command_context(intent).unwrap();
+        a.lock();
+        assert!(matches!(
+            a.prepare_ambulatory_command(&context),
+            Err(RuntimeError::Locked)
+        ));
+    }
+    #[test]
+    fn ambulatory_command_context_denies_missing_version_scope_capability_and_remote_default() {
+        let (session, intent) = ambulatory_command_fixture();
+        for patch in [
+            crate::AmbulatoryCommandIntent {
+                expected_version: 2,
+                ..intent.clone()
+            },
+            crate::AmbulatoryCommandIntent {
+                ambulatory_id: "other".into(),
+                ..intent.clone()
+            },
+            crate::AmbulatoryCommandIntent {
+                original_scope_id: "other".into(),
+                ..intent.clone()
+            },
+        ] {
+            assert!(matches!(
+                session.ambulatory_command_context(patch),
+                Err(RuntimeError::ReadRequired)
+            ));
+        }
+        session.inner.capabilities.lock().unwrap().clear();
+        assert!(matches!(
+            session.ambulatory_command_context(intent.clone()),
+            Err(RuntimeError::Forbidden)
+        ));
+        let remote = session_at("https://example.invalid");
+        assert!(matches!(
+            remote.ambulatory_command_context(intent),
+            Err(RuntimeError::Forbidden)
+        ));
+    }
+    #[test]
+    fn ambulatory_command_recovery_context_needs_no_surviving_target_scope_or_current_version() {
+        let (mut session, _) = ambulatory_command_fixture();
+        let marker = crate::AmbulatoryCommandMarker {
+            protocol: crate::AMBULATORY_COMMAND_PROTOCOL.into(),
+            command_id: "11111111-1111-4111-8111-111111111111".into(),
+            original_archive_generation: "22222222-2222-4222-8222-222222222222".into(),
+            original_scope_id: "deleted-scope".into(),
+            ambulatory_id: "deleted-target".into(),
+            expected_version: 1,
+            operation: crate::AmbulatoryCommandOperation::Delete,
+            plan_digest: "a".repeat(64),
+        };
+        let context = session.ambulatory_command_recovery_context(marker).unwrap();
+        session.inner.scopes.lock().unwrap().clear();
+        session.inner.ambulatory_reads.lock().unwrap().clear();
+        session.renew_requests();
+        assert_eq!(context.context.check(), Ok(()));
+        context.cancel();
+        assert!(matches!(
+            session.prepare_ambulatory_command(&context),
+            Err(RuntimeError::ReadRequired)
+        ));
     }
 
     #[test]

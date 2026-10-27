@@ -54,6 +54,7 @@ const BACKUP_TABLES = {
     headlessSoapActiveRoleAttestations: 'headless_soap_active_role_attestations',
     headlessSoapEntryCommits: 'headless_soap_entry_commits',
     therapyStatusCommands: 'therapy_status_commands',
+    ambulatoryDestructiveCommands: 'ambulatory_destructive_commands',
     prostheticPrescriptions: 'prosthetic_prescriptions',
     serviceCatalogEntries: 'service_catalog_entries',
     servicePrescriptionItems: 'service_prescription_items',
@@ -136,6 +137,11 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
         await Promise.all(columns.map(async (column) => [column, await seal(`${table}.${column}`)])),
     );
     const now = 1_783_000_000;
+    insertRow(db, 'ambulatory_destructive_commands', { command_id: '61111111-1111-4111-8111-111111111111', protocol: 'ambulatory.destructive.v1',
+        operation: 'ambulatory.delete.v1', original_archive_generation: (db.prepare('SELECT generation FROM archive_generation WHERE id=1').get() as {generation:string}).generation,
+        original_scope_id: 'synthetic-original-scope', ambulatory_id: 'synthetic-unreceived-ambulatory', expected_version: 1, plan_digest: 'a'.repeat(64),
+        actor_ref: actorRef, device_id: 'synthetic-paired-client', device_platform: 'macos', device_token_hash: 'b'.repeat(64),
+        outcome: 'closed', reason: null, committed_at: now, result_json: null, audit_snapshots: null });
     insertRow(db, 'therapy_status_commands', { command_id: '51111111-1111-4111-8111-111111111111', protocol: 'therapy.status.change.v1',
         archive_generation: (db.prepare('SELECT generation FROM archive_generation WHERE id=1').get() as {generation:string}).generation,
         actor_ref: actorRef, patient_id: 'synthetic-historical-patient', therapy_id: 'synthetic-unreceived-therapy', expected_version: 1,

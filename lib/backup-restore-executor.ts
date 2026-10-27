@@ -1,3 +1,4 @@
+import { planAmbulatoryCommandUnion, insertAmbulatoryCommandUnion } from './ambulatory-destructive-command-backup';
 import { planTherapyStatusCommandUnion, insertTherapyStatusCommandUnion } from './therapy-status-command-backup';
 import { eq } from 'drizzle-orm';
 import { assertExemptionImportReceiptRows } from './exemption-import-receipt';
@@ -10,6 +11,7 @@ import {
     ambulatories,
     auditEvents,
     therapyStatusCommands,
+    ambulatoryDestructiveCommands,
     attachments,
     checkups,
     conversations,
@@ -118,6 +120,7 @@ const INSERT_ORDER: BackupCollectionName[] = [
 const TABLE_LOOKUP = {
     auditEvents,
     therapyStatusCommands,
+    ambulatoryDestructiveCommands,
     ambulatories,
     headlessSoapEntryCommits,
     attachments,
@@ -154,7 +157,7 @@ type InsertRunner = Pick<typeof dbServer, 'insert'>;
 type InsertableTable = (typeof TABLE_LOOKUP)[BackupCollectionName] | typeof patientsToAmbulatories;
 export type BackupRestoreMutationFence = () => boolean;
 
-export type BackupRestoreBlockedReason = 'durable_review_commands' | 'audit' | 'runtime_fence' | 'therapy_status_commands';
+export type BackupRestoreBlockedReason = 'durable_review_commands' | 'audit' | 'runtime_fence' | 'therapy_status_commands' | 'ambulatory_destructive_commands';
 
 /* The restore stopped inside its transaction: the target archive is unchanged. Callers report it as blocked, not as failed. */
 export class BackupRestoreBlockedError extends Error {
@@ -387,6 +390,9 @@ export function restoreBackupArtifact(
         let therapyCommands;
         try { therapyCommands = planTherapyStatusCommandUnion(openDbServer(), artifact.payload.therapyStatusCommands ?? [], rows); }
         catch { throw new BackupRestoreBlockedError('therapy_status_commands', 'therapy status command or audit collision.'); }
+        let ambulatoryCommands;
+        try { ambulatoryCommands = planAmbulatoryCommandUnion(openDbServer(), artifact.payload.ambulatoryDestructiveCommands ?? [], rows); }
+        catch { throw new BackupRestoreBlockedError('ambulatory_destructive_commands', 'ambulatory command or audit collision.'); }
         const plan = planBackupAuditRestore(rows);
         const soapAttestations = soapAttestationsWithoutRestoredAuthority(artifact.payload.headlessSoapActiveRoleAttestations ?? []);
         runMutationFence(beforeMutation);
@@ -407,6 +413,7 @@ export function restoreBackupArtifact(
         if (coverage === 'included') insertBackupAudits(plan);
         restoreHeadlessSoapEntryCommits(headlessSoapRows);
         insertTherapyStatusCommandUnion(openDbServer(), therapyCommands);
+        insertAmbulatoryCommandUnion(openDbServer(), ambulatoryCommands);
         audit = { coverage, inserted: plan.filter(item => !item.reused).length, reused: plan.filter(item => item.reused).length };
     });
     return { sourceChecksum: backupArtifactInputChecksum(artifact), audit };

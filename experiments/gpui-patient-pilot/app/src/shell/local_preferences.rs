@@ -71,12 +71,38 @@ impl LocalPreferences {
     }
 }
 
-pub(super) struct LocalPreferencesStore {
+pub(crate) struct LocalPreferencesStore {
     path: Option<PathBuf>,
 }
 
 impl LocalPreferencesStore {
-    pub fn system() -> Self {
+    pub(crate) fn from_directory(directory: &Path) -> io::Result<Self> {
+        if !directory.is_absolute() {
+            return Err(io::ErrorKind::InvalidInput.into());
+        }
+        let canonical = directory.canonicalize()?;
+        let metadata = fs::symlink_metadata(directory)?;
+        if canonical.as_os_str() != directory.as_os_str() || !metadata.is_dir() {
+            return Err(io::ErrorKind::InvalidInput.into());
+        }
+        #[cfg(unix)]
+        {
+            unsafe extern "C" {
+                fn geteuid() -> u32;
+            }
+            if !private_directory(&metadata, unsafe { geteuid() }) {
+                return Err(io::ErrorKind::PermissionDenied.into());
+            }
+            Ok(Self {
+                path: Some(directory.join("preferences.json")),
+            })
+        }
+        #[cfg(not(unix))]
+        {
+            Err(io::ErrorKind::Unsupported.into())
+        }
+    }
+    pub(super) fn system() -> Self {
         #[cfg(test)]
         {
             Self { path: None }
@@ -89,7 +115,15 @@ impl LocalPreferencesStore {
         }
     }
 
-    pub fn load(&self) -> (LocalPreferences, bool) {
+    pub(super) fn ambulatory_command_directory(&self) -> Option<PathBuf> {
+        let parent = self.path.as_ref()?.parent()?;
+        let canonical = parent
+            .canonicalize()
+            .unwrap_or_else(|_| parent.to_path_buf());
+        Some(canonical.join("ambulatory-command-recovery"))
+    }
+
+    pub(super) fn load(&self) -> (LocalPreferences, bool) {
         let Some(path) = &self.path else {
             return (
                 LocalPreferences {
@@ -126,7 +160,7 @@ impl LocalPreferencesStore {
         }
     }
 
-    pub fn save(&self, preferences: LocalPreferences) -> io::Result<()> {
+    pub(super) fn save(&self, preferences: LocalPreferences) -> io::Result<()> {
         let bytes = preferences.bytes()?;
         let Some(path) = &self.path else {
             return if cfg!(test) {
@@ -169,6 +203,12 @@ impl LocalPreferencesStore {
         }
         result
     }
+}
+
+#[cfg(unix)]
+fn private_directory(metadata: &fs::Metadata, uid: u32) -> bool {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    metadata.uid() == uid && metadata.permissions().mode() & 0o777 == 0o700
 }
 
 fn regular_file(path: &Path) -> io::Result<()> {
@@ -224,6 +264,38 @@ pub(super) mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn explicit_state_directory_is_owned_private_canonical_and_never_falls_back() {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
+        let fixture = Fixture::new();
+        fs::create_dir(&fixture.0).unwrap();
+        fs::set_permissions(&fixture.0, fs::Permissions::from_mode(0o700)).unwrap();
+        let directory = fixture.0.canonicalize().unwrap();
+        let store = LocalPreferencesStore::from_directory(&directory).unwrap();
+        assert_eq!(
+            store.path.as_deref(),
+            Some(directory.join("preferences.json").as_path())
+        );
+        assert_eq!(
+            store.ambulatory_command_directory(),
+            Some(directory.join("ambulatory-command-recovery"))
+        );
+        let metadata = fs::metadata(&directory).unwrap();
+        assert!(!private_directory(
+            &metadata,
+            metadata.uid().wrapping_add(1)
+        ));
+        assert!(LocalPreferencesStore::from_directory(Path::new("relative")).is_err());
+        assert!(LocalPreferencesStore::from_directory(&directory.join("missing")).is_err());
+        symlink(&directory, directory.join("alias")).unwrap();
+        assert!(LocalPreferencesStore::from_directory(&directory.join("alias")).is_err());
+        fs::set_permissions(&directory, fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(LocalPreferencesStore::from_directory(&directory).is_err());
+        assert!(!directory.join("preferences.json").exists());
+        assert!(!directory.join("ambulatory-command-recovery").exists());
     }
 
     #[test]
