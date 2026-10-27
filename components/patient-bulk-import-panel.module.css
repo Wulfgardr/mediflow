@@ -3,9 +3,9 @@
     color: var(--lume-ink);
     display: grid;
     gap: 24px;
-    max-width: 1100px;
+    max-width: 100%;
     min-width: 0;
-    margin-inline: auto;
+    margin-inline: 0;
     width: 100%;
     overflow-wrap: anywhere;
 }
@@ -40,18 +40,10 @@
     outline-offset: 4px;
 }
 .fileLabel { display: grid; gap: 8px; max-width: 100%; min-width: 0; }
-.fileLabel input { max-width: 100%; width: 100%; min-height: 44px; font: inherit; }
-.fileLabel input::file-selector-button {
-    min-height: 44px;
-    padding: 8px 12px;
-    border: 1px solid var(--lume-rule);
-    border-radius: var(--lume-radius-control);
-    background: var(--lume-surface-field);
-    color: var(--lume-ink);
-    font: inherit;
-    cursor: pointer;
-    margin-right: 8px;
-}
+.fileActions { align-items: end; }
+.fileControl { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-width: 0; }
+.fileControl button { flex-shrink: 0; }
+.fileControl span { overflow-wrap: anywhere; }
 .disclosure summary { cursor: pointer; padding-block: 12px; font-size: 0.875rem; }
 .disclosure p + p { margin-top: 12px; }
 .disclosure dl { margin: 0; display: grid; gap: 4px; }

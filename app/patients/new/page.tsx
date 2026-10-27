@@ -2,6 +2,7 @@
 
 import { formatCountLabel } from '@/lib/format-count';
 import ink from '@/components/ink-secondary.module.css';
+import styles from './new-patient.module.css';
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -231,10 +232,11 @@ export default function NewPatientPage() {
             backLabel="Torna alla lista"
             statusLabel={statusLabel}
             navItems={navItems}
+            navigationClassName={styles.navigation}
             headerActions={<Link href="/patients/import" className="mf-button-secondary"><FileSpreadsheet size={16} aria-hidden="true" />Importa elenco CSV</Link>}
         >
             <div className={`${ink.surface} ${ink.form} ${ink.stack}`}>
-            <section id="documento" className="patient-detail-section mf-section p-6 md:p-8 space-y-5 scroll-mt-40">
+            <section id="documento" className={`${styles.documentSection} space-y-5 scroll-mt-40`}>
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div className="flex items-start gap-4">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]">

@@ -295,3 +295,21 @@ for (const theme of ['giorno', 'grafite']) for (const width of [1440, 390]) {
         }
     });
 }
+
+
+test('Farmaco in Grafite mantiene bordo e focus visibile durante la compilazione', async ({ page }) => {
+    await fixture(page);
+    await page.evaluate(() => {
+        localStorage.setItem('mediflow-theme', 'dark');
+        document.documentElement.classList.remove('light');
+        document.documentElement.classList.add('dark');
+    });
+    await creation(page).click();
+    const drug = section(page).getByRole('combobox', { name: /^Farmaco/ });
+    await drug.focus();
+    await expect(drug).toBeFocused();
+    await expect(drug).toHaveCSS('border-top-width', '1px');
+    await expect(drug).toHaveCSS('border-top-style', 'solid');
+    expect(await drug.evaluate(element => getComputedStyle(element).borderTopColor)).not.toBe('rgba(0, 0, 0, 0)');
+    expect(await drug.evaluate(element => parseFloat(getComputedStyle(element).outlineWidth))).toBeGreaterThanOrEqual(2);
+});
