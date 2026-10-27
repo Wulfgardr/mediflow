@@ -149,3 +149,38 @@ test('Documenti: composizione nei due temi, fonti assenti e viewport compatti', 
     await expect(page.getByText('Runtime Error', { exact: true })).toHaveCount(0);
     expect(errors).toEqual([]);
 });
+
+test('Documenti: Altro mantiene ordine, tastiera e focus dopo la conferma annullata', async ({ page }) => {
+    const { docs, names } = await documents(page);
+    const deletes: string[] = [];
+    page.on('request', request => {
+        if (request.method() === 'DELETE') deletes.push(request.url());
+    });
+    const trigger = docs.getByRole('button', { name: `Altro per ${names[0]}`, exact: true });
+    await trigger.focus();
+    await page.keyboard.press('ArrowDown');
+    const menu = page.getByRole('menu', { name: `Azioni documento ${names[0]}`, exact: true });
+    const items = menu.getByRole('menuitem');
+    await expect(items).toHaveText(['Estrai testo', 'Prepara sintesi', 'Elimina']);
+    await expect(items.first()).toHaveAccessibleName(`Estrai testo localmente da ${names[0]}`);
+    await expect(items.first()).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(items.nth(1)).toHaveAccessibleName(`Prepara sintesi di ${names[0]}`);
+    await expect(items.nth(1)).toBeFocused();
+    await page.keyboard.press('End');
+    await expect(items.last()).toHaveAccessibleName(`Elimina ${names[0]}`);
+    await expect(items.last()).toBeFocused();
+    await expect(menu.getByRole('separator')).toHaveCount(1);
+    await page.keyboard.press('Escape');
+    await expect(trigger).toBeFocused();
+    await expect(menu).toHaveCount(0);
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('Enter');
+    const confirmation = page.getByRole('dialog', { name: 'Eliminare questo documento?', exact: true });
+    await expect(confirmation).toBeVisible();
+    await expect(confirmation.getByRole('button', { name: 'Chiudi', exact: true })).toHaveCSS('border-radius', '10px');
+    await confirmation.getByRole('button', { name: 'Annulla', exact: true }).click();
+    await expect(trigger).toBeFocused();
+    await expect(docs.getByRole('heading', { name: names[0], exact: true })).toBeVisible();
+    expect(deletes).toEqual([]);
+});
