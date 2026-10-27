@@ -273,6 +273,8 @@ npm ci
 
 `nvm use` vale per chi usa nvm; con altri gestori seleziona Node 24.
 La dipendenza nativa `better-sqlite3` deve corrispondere alla versione di Node.
+Su Windows, se PowerShell blocca `npm.ps1` per la execution policy, usa
+`npm.cmd ci`. Nel Prompt dei comandi puoi usare `npm ci`.
 
 | Sistema | Apri nella cartella del progetto |
 | --- | --- |
