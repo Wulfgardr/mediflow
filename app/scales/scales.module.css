@@ -32,3 +32,9 @@
 /* WUL-678: catalogue and patient choice share the workspace plane. */
 .catalogSection, .patientSection { display: grid; gap: 24px; scroll-margin-top: 10rem; }
 .patientSection { padding-top: 24px; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent); }
+
+.patientSearch { display: flex; align-items: center; gap: 12px; }
+.patientSearch > svg { flex: 0 0 16px; width: 16px; height: 16px; }
+.patientSearch > input { min-width: 0; }
+.patientName { display: block; font-size: .875rem; font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+.patientIdentity { display: block; margin-top: 4px; white-space: normal; overflow-wrap: anywhere; }

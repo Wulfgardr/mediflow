@@ -164,6 +164,16 @@ test('Scales library: search pending, error, empty, long identity and stale-term
                 mock.observations.push({ identity });
                 if (baseline) { expect(identity.overflow).toBe('ellipsis'); expect(identity.scroll).toBeGreaterThan(identity.width); }
                 else { expect(identity.whiteSpace).not.toBe('nowrap'); expect(identity.scroll).toBeLessThanOrEqual(identity.width + 1); }
+                if (!baseline) {
+                    const search = section.getByRole('textbox', { name: 'Cerca paziente per nome o codice fiscale', exact: true });
+                    await search.scrollIntoViewIfNeeded();
+                    const inputLayout = await search.evaluate(input => {
+                        const rect = input.getBoundingClientRect(), icon = input.parentElement!.querySelector('svg')!.getBoundingClientRect();
+                        return { textStart: rect.left + parseFloat(getComputedStyle(input).paddingLeft), iconRight: icon.right };
+                    });
+                    mock.observations.push({ inputLayout });
+                    expect(inputLayout.textStart).toBeGreaterThan(inputLayout.iconRight);
+                }
                 mock.state.list = 'pending';
                 await mock.observeRead('/api/patients', 'pending', () => section.getByRole('textbox',
                     { name: 'Cerca paziente per nome o codice fiscale', exact: true }).fill('NessunaCorrispondenza'));
