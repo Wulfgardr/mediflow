@@ -56,7 +56,6 @@ export default function SettingsAiFunctionsPage() {
     return (
         <section className={styles.page} data-testid="settings-ai-functions-section">
             <SettingsSectionIntro
-                kicker="Intelligenza locale"
                 title="Funzioni cliniche"
                 description="Scegli quali funzioni usare nella cartella."
             />

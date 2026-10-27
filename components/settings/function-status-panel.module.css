@@ -4,7 +4,7 @@
 .header h2 { margin: 0; font-size: 0.9375rem; line-height: 1.4; font-weight: 600; }
 .header p, .checkedAt { margin: 4px 0 0; font-size: 0.875rem; line-height: 1.5; color: var(--lume-ink-muted); }
 .group { display: grid; gap: 12px; min-width: 0; }
-.group > h3 { margin: 0; font-size: 0.9375rem; line-height: 1.5; font-weight: 600; }
+.panel > section.group > h3 { margin: 0; font: var(--type-section); font-variant-caps: all-small-caps; letter-spacing: 0.05em; }
 .cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0; margin: 0; list-style: none; }
 .card { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 16px 0; border: 0; border-bottom: 1px solid var(--lume-rule); border-radius: 0; background: transparent; }
 .cardHeader { display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
