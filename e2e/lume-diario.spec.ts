@@ -122,16 +122,25 @@ async function readGlobalWindow(page: Page): Promise<Array<{ date: string }>> {
 }
 
 async function diarySignatures(entries: Locator): Promise<string[]> {
-  return entries.evaluateAll((elements) => elements.map((element) => JSON.stringify([
-    element.querySelector<HTMLAnchorElement>('a[href$="/entries/new"]')?.getAttribute('href'),
-    element.querySelector('h3')?.textContent,
-  ])));
-}
-
-function ownEntries(page: Page, diary: Locator, patientId: string): Locator {
-  return diary.getByTestId('lume-diario-entry').filter({
-    has: page.locator(`a[href="/patients/${patientId}/entries/new"]`),
-  });
+  const signatures: string[] = [];
+  for (const entry of await entries.all()) {
+    const actions = entry.getByRole('button', { name: 'Azioni', exact: true });
+    try {
+      await actions.focus();
+      await actions.press('ArrowDown');
+      const link = entry.getByRole('menuitem', { name: 'Nuova voce', exact: true });
+      await expect(link).toHaveCount(1);
+      await expect(link).toHaveAttribute('href', /\/entries\/new$/);
+      signatures.push(JSON.stringify([
+        await link.getAttribute('href'),
+        await entry.locator('h3').textContent(),
+      ]));
+    } finally {
+      await entry.page().keyboard.press('Escape');
+      await expect(actions).toBeFocused();
+    }
+  }
+  return signatures;
 }
 
 async function captureBaseline(page: Page): Promise<DiaryBaseline> {
@@ -144,14 +153,17 @@ async function captureBaseline(page: Page): Promise<DiaryBaseline> {
 }
 
 async function assertWindowPreserved(
-  page: Page, diary: Locator, patientId: string, ownCount: number, baseline: DiaryBaseline,
+  diary: Locator, patientId: string, ownCount: number, baseline: DiaryBaseline,
 ): Promise<number> {
   const total = Math.min(50, baseline.signatures.length + ownCount);
   const cards = diary.getByTestId('lume-diario-entry');
   await expect(cards).toHaveCount(total);
-  await expect(ownEntries(page, diary, patientId)).toHaveCount(ownCount);
-  const otherCards = cards.filter({ hasNot: page.locator(`a[href="/patients/${patientId}/entries/new"]`) });
-  expect(await diarySignatures(otherCards)).toEqual(baseline.signatures.slice(0, 50 - ownCount));
+  const signatures = await diarySignatures(cards);
+  const ownHref = `/patients/${patientId}/entries/new`;
+  const ownSignatures = signatures.filter(signature => JSON.parse(signature)[0] === ownHref);
+  expect(ownSignatures).toHaveLength(ownCount);
+  const otherSignatures = signatures.filter(signature => JSON.parse(signature)[0] !== ownHref);
+  expect(otherSignatures).toEqual(baseline.signatures.slice(0, 50 - ownCount));
   return total;
 }
 
@@ -197,7 +209,7 @@ async function openDiary(page: Page, diaryCase?: DiaryCase): Promise<Locator> {
   await page.waitForLoadState('domcontentloaded');
   const diary = page.getByTestId('lume-diario');
   await expect(diary).toBeVisible();
-  await assertWindowPreserved(page, diary, patientId, 3, baseline);
+  await assertWindowPreserved(diary, patientId, 3, baseline);
   return diary;
 }
 
@@ -314,7 +326,7 @@ test.describe.serial('Diario globale Lume', () => {
       await expect(diary).not.toContainText('Nessuna voce clinica nel diario locale.');
     }
     const patientId = await createPatient(page);
-    await assertWindowPreserved(page, diary, patientId, 0, baseline);
+    await assertWindowPreserved(diary, patientId, 0, baseline);
     await createEntry(page, patientId, {
       title: `${FIXTURE_PREFIX} 1`,
       date: new Date(baseline.nextDate).toISOString(),
@@ -323,7 +335,7 @@ test.describe.serial('Diario globale Lume', () => {
       author: 'Dr.ssa Demo',
     });
     await page.reload();
-    await assertWindowPreserved(page, diary, patientId, 1, baseline);
+    await assertWindowPreserved(diary, patientId, 1, baseline);
 
     await createEntry(page, patientId, {
       title: `${FIXTURE_PREFIX} 2`,
@@ -343,7 +355,7 @@ test.describe.serial('Diario globale Lume', () => {
     const entries = diary.getByTestId('lume-diario-entry');
     const feed = page.getByRole('feed', { name: 'Diario clinico globale' });
     await expect(feed).toBeVisible();
-    const total = await assertWindowPreserved(page, diary, patientId, 3, baseline);
+    const total = await assertWindowPreserved(diary, patientId, 3, baseline);
 
     await expect(entries.first()).toContainText('Bozza');
     await expect(entries.first()).toContainText('Fonte: Dettatura sintetica');
