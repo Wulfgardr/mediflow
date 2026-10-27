@@ -324,8 +324,8 @@ export default function ObservationManager({
             return;
         }
         const { confirmed } = await confirm({
-            title: 'Eliminare questa misura?',
-            message: 'La misura verra rimossa dai parametri clinici del paziente.',
+            title: `Eliminare la misura «${observation.display}»?`,
+            message: 'La misura verrà rimossa dai parametri clinici del paziente.',
             confirmLabel: 'Elimina',
             tone: 'danger',
         });

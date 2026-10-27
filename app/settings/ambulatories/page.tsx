@@ -171,8 +171,8 @@ export default function AmbulatoryManagerPage() {
 
     const handleDelete = async (id: string) => {
         const { confirmed } = await confirm({
-            title: 'Eliminare la sede?',
-            message: 'Questo potrebbe causare problemi ai pazienti associati.',
+            title: `Eliminare la sede «${ambulatoryById.get(id)?.name ?? "Sede"}»?`,
+            message: 'La sede verrà rimossa. Se contiene pazienti o reparti associati, l’eliminazione sarà bloccata: spostali prima di riprovare.',
             confirmLabel: 'Elimina',
             tone: 'danger'
         });

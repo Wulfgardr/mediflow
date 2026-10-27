@@ -13,6 +13,7 @@ export function useDialogA11y(
     isOpen: boolean,
     dialogRef: RefObject<HTMLElement | null>,
     onClose: () => void,
+    initialFocusRef?: RefObject<HTMLElement | null>,
 ): void {
     const onCloseRef = useRef(onClose);
     useEffect(() => {
@@ -33,7 +34,7 @@ export function useDialogA11y(
                       ),
                   ).filter((el) => el.offsetParent !== null)
                 : [];
-        const initial = focusables().find((el) => el.tagName !== 'BUTTON') ?? focusables()[0] ?? dialog;
+        const initial = initialFocusRef?.current ?? focusables().find((el) => el.tagName !== 'BUTTON') ?? focusables()[0] ?? dialog;
         initial?.focus();
 
         const onKeyDown = (event: KeyboardEvent) => {
@@ -67,5 +68,5 @@ export function useDialogA11y(
                 previous.focus?.();
             }
         };
-    }, [isOpen, dialogRef]);
+    }, [isOpen, dialogRef, initialFocusRef]);
 }

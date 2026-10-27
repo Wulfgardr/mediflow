@@ -212,7 +212,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
         try {
             const attachmentPrecondition = captureAttachmentWritePrecondition(file);
             const { confirmed } = await confirm({
-                title: 'Eliminare questo documento?',
+                title: `Eliminare il documento «${file.name}»?`,
                 message: 'Il documento verrà rimosso dagli allegati del paziente.',
                 confirmLabel: 'Elimina', tone: 'danger',
             });
