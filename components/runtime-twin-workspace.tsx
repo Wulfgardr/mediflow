@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Activity, BookOpen, CalendarDays, ChevronDown, CircleHelp, ClipboardList, FolderOpen, LockKeyhole, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Settings2, Users, X } from 'lucide-react';
 import { db } from '@/lib/db';
+import { currentWorkspaceDestination } from '@/lib/workspace-destination';
 import { useLiveQuery } from '@/lib/live-query';
 import { useSecurity } from '@/components/security-provider';
 import PrivacyBlur from '@/components/privacy-blur';
@@ -61,18 +62,15 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   const [area, setArea] = useState<string | null>(null);
   const [openCommands, setOpenCommands] = useState<CommandHandler>(null);
   const registerCommand = useCallback((handler: CommandHandler) => setOpenCommands(() => handler), []);
-  const destinationIsActive = (href: string) => href.includes('?area=')
-    ? ((pathname === '/' || pathname === '/diary') && href.endsWith(`=${pathname === '/diary' ? 'diario' : area}`))
-      || (href.endsWith('=incarico') && pathname.startsWith('/patients/'))
-    : pathname.startsWith(href);
-  const activeDestination = destinations.find(({ href }) => destinationIsActive(href))
-    ?? (pathname.startsWith('/settings') || (pathname === '/' && area === 'governance')
+  const currentDestinationHref = currentWorkspaceDestination(pathname, area);
+  const activeDestination = destinations.find(({ href }) => href === currentDestinationHref)
+    ?? (currentDestinationHref === '/settings'
       ? { href: '/settings', label: 'Impostazioni' }
       : destinations[0]);
   const directoryReturn = useRef<DirectoryReturn | null>(null);
   const [railOpen, setRailOpen] = useState(true);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
-  const currentInMore = !destinations.slice(0, 3).some(({ href }) => href === activeDestination.href);
+  const currentInMore = currentDestinationHref !== null && !destinations.slice(0, 3).some(({ href }) => href === currentDestinationHref);
   /* one confirmation boundary for the new route shortcuts. Replay the
      actual link once, so its close-tab action and Next navigation stay atomic.
      Browser history and security lock keep their existing owners. */
@@ -118,22 +116,22 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
       <aside className={styles.rail} aria-label="MediFlow">
         <Link href="/?area=incarico" className={styles.brand} aria-label="MediFlow"><strong>MediFlow<span className={styles.brandPoint} aria-hidden="true">.</span></strong></Link>
         <nav aria-label="Navigazione principale" className={styles.navigation}>
-          {destinations.map(({ href, label, icon: Icon }, index) => <Link key={href} href={href} className={index > 2 ? styles.secondaryDestination : undefined} title={label} aria-label={label} aria-current={activeDestination.href === href ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span></Link>)}
+          {destinations.map(({ href, label, icon: Icon }, index) => <Link key={href} href={href} className={index > 2 ? styles.secondaryDestination : undefined} title={label} aria-label={label} aria-current={currentDestinationHref === href ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span></Link>)}
           <details className={styles.mobileMore} onToggle={event => setMobileMoreOpen(event.currentTarget.open)} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
-            <summary aria-current={currentInMore && !mobileMoreOpen ? 'page' : undefined} aria-label={activeDestination.href === '/settings' ? 'Altro · Impostazioni' : undefined}><MoreHorizontal size={20} aria-hidden /><span>Altro</span></summary>
+            <summary aria-current={currentInMore && !mobileMoreOpen ? 'page' : undefined} aria-label={currentDestinationHref === '/settings' ? 'Altro · Impostazioni' : undefined}><MoreHorizontal size={20} aria-hidden /><span>Altro</span></summary>
             <div className={styles.mobileMenu} onClick={event => { if (event.target instanceof Element && event.target.closest('a, button')) event.currentTarget.closest('details')?.removeAttribute('open'); }}>
-              {destinations.slice(3).map(({ href, label, icon: Icon }) => <Link href={href} key={href} aria-current={activeDestination.href === href ? 'page' : undefined}><Icon size={18} aria-hidden /><span>{label}</span></Link>)}
+              {destinations.slice(3).map(({ href, label, icon: Icon }) => <Link href={href} key={href} aria-current={currentDestinationHref === href ? 'page' : undefined}><Icon size={18} aria-hidden /><span>{label}</span></Link>)}
               {openCommands && <button type="button" onClick={event => {
                 event.currentTarget.closest('details')?.querySelector('summary')?.focus();
                 openCommands();
               }}><CircleHelp size={18} aria-hidden /><span>Comandi e aiuto</span></button>}
-              <Link href="/settings" aria-current={activeDestination.href === '/settings' ? 'page' : undefined}><Settings2 size={18} aria-hidden /><span>Impostazioni</span></Link>
+              <Link href="/settings" aria-current={currentDestinationHref === '/settings' ? 'page' : undefined}><Settings2 size={18} aria-hidden /><span>Impostazioni</span></Link>
               <button type="button" onClick={lock}><LockKeyhole size={18} aria-hidden /><span>Blocca</span></button>
             </div>
           </details>
         </nav>
         <div className={styles.railBottom}>
-          <Link href="/settings" aria-label="Impostazioni" title="Impostazioni" aria-current={pathname.startsWith('/settings') || (pathname === '/' && area === 'governance') ? 'page' : undefined}><Settings2 size={17} aria-hidden /><span>Impostazioni</span></Link>
+          <Link href="/settings" aria-label="Impostazioni" title="Impostazioni" aria-current={currentDestinationHref === '/settings' ? 'page' : undefined}><Settings2 size={17} aria-hidden /><span>Impostazioni</span></Link>
           <button type="button" onClick={lock} aria-label="Blocca" title="Blocca"><LockKeyhole size={17} aria-hidden /><span>Blocca</span></button>
         </div>
       </aside>
@@ -143,7 +141,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
             {railOpen ? <PanelLeftClose size={18} aria-hidden /> : <PanelLeftOpen size={18} aria-hidden />}
           </button>
           <nav className={styles.openRecords} aria-label="Cartelle aperte">
-            <Link className={styles.directoryTab} href={activeDestination.href} aria-current={!patientId ? 'page' : undefined}>{activeDestination.label}</Link>
+            <Link className={styles.directoryTab} href={activeDestination.href} aria-current={!patientId && currentDestinationHref !== null ? 'page' : undefined}>{activeDestination.label}</Link>
             {records.map((patient, index) => <span className={styles.recordTab} key={patient.id} data-active={patient.id === patientId}>
               <Link href={`/patients/${patient.id}/modules`} aria-current={patient.id === patientId ? 'page' : undefined}><PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur></Link>
               {patient.id === patientId ? <Link href="/?area=incarico" aria-label={`Chiudi cartella ${index + 1}`} onClick={() => setOpened(value => value.filter(id => id !== patient.id))}><X size={13} aria-hidden /></Link>
