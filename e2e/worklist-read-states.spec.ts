@@ -96,7 +96,8 @@ test('Worklist: observed read states and one primary action', async ({page,baseU
     await page.goto('/?area=incarico');
     await expect.poll(()=>fixture.calls.filter(call=>call.path==='/api/patients').length).toBeGreaterThan(before);
     const pending=worklist.getByRole('status',{name:'Caricamento pazienti',exact:true});await expect(pending).toBeVisible();
-    await check(()=>count.isVisible(),false);await check(()=>lens.isVisible(),false);await gallery('pending',pending);
+    const pendingTarget=baseline?pending:pending.getByText('Caricamento pazienti',{exact:true});await expect(pendingTarget).toBeVisible();
+    await check(()=>count.isVisible(),false);await check(()=>lens.isVisible(),false);await gallery('pending',pendingTarget);
     fixture.state.hold=null;release();expect(await(await failed).finished()).toBeNull();await expect(error).toBeVisible();
     await check(()=>count.isVisible(),false);await check(()=>lens.isVisible(),false);await gallery('error',error);
     fixture.state.status=200;await error.getByRole('button',{name:'Riprova',exact:true}).click();
