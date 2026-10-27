@@ -419,7 +419,7 @@ function IncaricoArea({
                             patientStyles.patientRow,
                             isSelected && patientStyles.patientRowSelected,
                           )}
-                          onClick={() => { onSelectPatient(p.id); if (proposal && (window.matchMedia('(max-width: 850px)').matches || (patientListParentRef.current?.clientWidth ?? Infinity) < 700)) openRecord(p); }}
+                          onClick={() => { onSelectPatient(p.id); if (proposal && window.matchMedia('(max-width: 850px)').matches) openRecord(p); }}
                           onDoubleClick={() => { if (!isReview) openRecord(p); }}
                           role="option"
                           aria-selected={isSelected}

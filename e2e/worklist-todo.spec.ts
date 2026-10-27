@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Request } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
@@ -145,3 +145,54 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
     await zoom.close();
   }
 });
+
+for (const width of [1280, 1440]) {
+  test(`Worklist: selezione a ${width}px conserva il link dell’anteprima fino all’apertura esplicita`, async ({ page, baseURL }) => {
+    if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL
+      || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw Error('Owned synthetic archive required');
+    await page.setViewportSize({ width, height: 1000 });
+    const fixture = await installWorklistTodoFixture(page, baseURL);
+    try {
+      await bootstrapUnlockedSession(page, '1234');
+      await page.goto('/?area=incarico');
+      const rows = page.getByRole('listbox', { name: 'Elenco pazienti in carico', exact: true }).getByRole('option');
+      await expect(rows).toHaveCount(3);
+      if (width === 1280) expect(await rows.first().evaluate(element => element.clientWidth)).toBeLessThan(700);
+      const link = page.getByRole('link', { name: 'Apri scheda paziente', exact: true });
+      await expect(link).toBeVisible();
+      const selectedRead = page.waitForResponse(response => {
+        const url = new URL(response.url());
+        return url.pathname === '/api/checkups' && url.searchParams.get('patientId') === 'B';
+      });
+      await page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true }).fill('Inventata B');
+      await expect(rows).toHaveCount(1);
+      await (await selectedRead).finished();
+      await expect(link).toHaveAttribute('href', '/patients/B/modules');
+      const node = await link.elementHandle();
+      expect(node).not.toBeNull();
+      const navigations: string[] = [];
+      const recordNavigation = (request: Request) => {
+        if (new URL(request.url()).pathname === '/patients/B/modules'
+          && request.headers()['next-router-prefetch'] !== '1') navigations.push(request.url());
+      };
+      page.on('request', recordNavigation);
+      await rows.click();
+      const retained = await node!.evaluate(async element => {
+        for (let frame = 0; frame < 30; frame += 1) {
+          await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+          if (!element.isConnected) return false;
+        }
+        return true;
+      });
+      page.off('request', recordNavigation);
+      expect(navigations).toEqual([]);
+      expect(retained).toBe(true);
+      await link.click();
+      await expect(page).toHaveURL(/\/patients\/B\/modules$/);
+      await expect(page.getByTestId('lume-scheda-header')).toContainText('Inventata B');
+      expect(fixture.blocked).toEqual([]);
+    } finally {
+      await fixture.close();
+    }
+  });
+}
