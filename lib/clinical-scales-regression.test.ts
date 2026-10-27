@@ -291,7 +291,8 @@ test('Writer uses a snapshot and propagates storage failure without retry', asyn
 test('Production form and page are wired to the tested gates, not a parallel reference implementation', () => {
     const page = readFileSync('app/patients/[id]/scales/[scaleId]/page.tsx', 'utf8');
     const form = readFileSync('components/scale-engine.tsx', 'utf8');
-    assert.match(page, /submitScale\(scaleId, result\.answers, submission => db\.entries\.add\(/);
+    assert.match(page, /submitScale\(scaleId, result\.answers, submission => \{[\s\S]*?if \(!canComplete\.current\(identity\)\) throw[\s\S]*?return db\.entries\.add\(/);
+    assert.match(page, /if \(!scaleDef \|\| !canComplete\.current\(identity\)\) return/);
     assert.doesNotMatch(page, /score:\s*result\.score/);
     assert.match(form, /calculateScaleResult\(scale, answers\)/);
     assert.match(form, /disabled=\{!currentAnswerValid \|\| isSubmitting\}/);
