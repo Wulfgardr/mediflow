@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { createCanvas } from '@napi-rs/canvas';
 import { createHash, randomUUID } from 'node:crypto';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { openDocumentActions, bootstrapUnlockedSession, openPatientSection } from './utils';
 import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 import { observeAnyDocProjectResponse } from './anydoc-project-response';
 
@@ -68,7 +68,8 @@ async function openSyntheticAttachment(page: Page, scenario: Scenario, bytes: Bu
   expect(uploaded.data).toMatch(/^ENC:/);
   const id = uploaded.id;
   expect(id).toBeTruthy();
-  await expect(page.getByRole('button', { name: `Estrai testo localmente da ${name}` })).toBeVisible();
+  await openDocumentActions(page, name);
+  await expect(page.getByRole('menuitem', { name: `Estrai testo localmente da ${name}` })).toBeVisible();
   const persistedResponse = await page.request.get(`/api/attachments/${id}`);
   expect(persistedResponse.ok()).toBe(true);
   const persisted = await persistedResponse.json();
@@ -97,7 +98,8 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
         && response.url().endsWith(`/api/attachments/${attachment.id}/local-extraction`)
         && response.request().headers()['x-mediflow-extraction-action'] === 'project');
       void responsePromise.catch(() => {}); // An acquire failure still reports its own assertion.
-      await page.getByRole('button', { name: `Estrai testo localmente da ${attachment.name}` }).click();
+      await openDocumentActions(page, attachment.name);
+      await page.getByRole('menuitem', { name: `Estrai testo localmente da ${attachment.name}` }).click();
       const acquired = await acquirePromise;
       // acquire status stays direct; the unchanged client validates its grant.
       // Observe project bytes passively, without relying on the inspector body cache.
@@ -184,7 +186,8 @@ test('Upload cifrato: annullamento, risposta tardiva, replay e nuovo tentativo',
     } else await route.continue();
   });
   try {
-    await page.getByRole('button', { name: `Estrai testo localmente da ${attachment.name}` }).click();
+    await openDocumentActions(page, attachment.name);
+    await page.getByRole('menuitem', { name: `Estrai testo localmente da ${attachment.name}` }).click();
     await reached.promise;
     await page.getByRole('button', { name: 'Interrompi attesa' }).click();
     release.resolve(); await delivered.promise;
@@ -196,7 +199,8 @@ test('Upload cifrato: annullamento, risposta tardiva, replay e nuovo tentativo',
     expect(replay.status()).toBe(409);
     const retry = page.waitForResponse(response => response.url().endsWith(endpoint)
       && response.request().headers()['x-mediflow-extraction-action'] === 'project');
-    await page.getByRole('button', { name: `Estrai testo localmente da ${attachment.name}` }).click();
+    await openDocumentActions(page, attachment.name);
+    await page.getByRole('menuitem', { name: `Estrai testo localmente da ${attachment.name}` }).click();
     expect((await retry).status()).toBe(200);
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toBeVisible();
     expect(await (await page.request.get(`/api/attachments/${attachment.id}`)).json()).toEqual(attachment.persisted);

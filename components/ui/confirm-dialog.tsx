@@ -97,7 +97,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                                         {options.title}
                                     </h3>
                                 </div>
-                                <button onClick={() => close({ confirmed: false })} className="mf-btn-secondary !p-2 !rounded-full" aria-label="Chiudi">
+                                <button onClick={() => close({ confirmed: false })} className="mf-button-icon" aria-label="Chiudi">
                                     <X className="h-4 w-4" />
                                 </button>
                             </div>

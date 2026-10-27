@@ -245,3 +245,9 @@ export async function waitForUnlockedInteractiveShell(page: Page): Promise<void>
   await page.waitForTimeout(250);
   await expect(lockShell).toHaveCount(0, { timeout: 5_000 });
 }
+
+export async function openDocumentActions(page: Page, documentName: string) {
+  const trigger = page.getByRole('button', { name: `Altro per ${documentName}`, exact: true });
+  if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click();
+  return page.getByRole('menu', { name: `Azioni documento ${documentName}`, exact: true });
+}

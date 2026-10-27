@@ -78,6 +78,6 @@ export function PassphraseAccessForm({ mode, onPrepare }: {
             <input id={`${prefix}-confirm`} className={SETTINGS_INPUT_CLASS} type="password" autoComplete="new-password" spellCheck={false} value={confirm} disabled={busy} onChange={e => setConfirm(e.target.value)} /></div>
         {confirm && !matched && <p role="status">Le passphrase non corrispondono.</p>}
         {error && <p role="alert">{error}</p>}
-        <button className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy || !secret || !checkPassphrase(passphrase).ok || !matched || (mode === 'recover' && !kit)}>{busy ? 'Preparazione…' : 'Prepara il nuovo kit'}</button>
+        <button type="submit" className="mf-button-primary" disabled={busy || !secret || !checkPassphrase(passphrase).ok || !matched || (mode === 'recover' && !kit)}>{busy ? 'Preparazione…' : 'Prepara il nuovo kit'}</button>
     </form>;
 }
