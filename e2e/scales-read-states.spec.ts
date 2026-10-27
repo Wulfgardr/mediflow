@@ -140,7 +140,7 @@ test('Scales library: search pending, error, empty, long identity and stale-term
                 } else {
                     await expect(section.getByRole(mode === 'pending' ? 'status' : 'alert')).toHaveCount(1);
                     if (mode === 'pending') {
-                        await expect(section).toHaveAttribute('aria-busy', 'true');
+                        await expect(section.locator(':scope > div[aria-busy]')).toHaveAttribute('aria-busy', 'true');
                         await expect(section.getByRole('status')).not.toContainText('Nessuna scheda');
                     }
                 }
