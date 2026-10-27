@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, RefreshCw, Scale } from 'lucide-react';
+import { Disclosure } from '@/components/disclosure';
 import { cn } from '@/lib/utils';
 import styles from './ai-utilities.module.css';
 
@@ -134,6 +135,10 @@ export default function AiModelParliamentPanel() {
                 </button>
             </div>
 
+            {state.status === 'idle' || state.status === 'loading' ? (
+                <p role="status" className={styles.muted}>Lettura del report salvato…</p>
+            ) : null}
+
             {state.status === 'missing' ? (
                 <div className={styles.row}>
                     <p>{state.message}</p>
@@ -149,7 +154,10 @@ export default function AiModelParliamentPanel() {
                         <AlertTriangle className={styles.icon} />
                         Report non disponibile
                     </div>
-                    <p>{state.message}</p>
+                    <p className={styles.spaced}>Impossibile leggere il report salvato. Usa «Aggiorna» per riprovare.</p>
+                    <Disclosure title="Dettagli dell’errore per l’assistenza" className={styles.spaced}>
+                        <p>{state.message}</p>
+                    </Disclosure>
                 </div>
             ) : null}
 
