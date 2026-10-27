@@ -1,3 +1,4 @@
+.heading,
 .sections :global(section > :is(h2, h3, h4)),
 .sections :global(section > header > :is(h2, h3, h4)),
 .sections :global(section > [data-section-header] > :is(h2, h3, h4)),
@@ -6,4 +7,16 @@
   font: var(--type-section, 600 0.75rem/1.5 var(--lume-font-sans, system-ui, sans-serif));
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+.count {
+  font: var(--type-meta, 400 0.8125rem/1.5 var(--lume-font-sans, system-ui, sans-serif));
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.summary {
+  font: var(--type-body, 400 0.875rem/1.5 var(--lume-font-sans, system-ui, sans-serif));
+  letter-spacing: 0;
+  text-transform: none;
 }

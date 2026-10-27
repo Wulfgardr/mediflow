@@ -7,6 +7,7 @@ import { useEffect, useId, useState, type ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { DisclosureControl } from '@/components/disclosure';
 import { useRuntimeTwinFolder } from '@/components/runtime-twin-design';
+import sectionRecipe from '@/components/ink-section.module.css';
 
 interface CollapsibleSectionProps {
     id?: string;
@@ -76,13 +77,13 @@ export function CollapsibleSection({
     }, [id]);
 
     const heading = (
-        <h3 className="m-0 px-5 md:px-6">
-            {folderActive ? <div className="flex items-center gap-3 py-5 md:py-6"><span className="mt-1 flex min-w-0 flex-1 items-center gap-2 text-lg font-semibold text-ink">{Icon ? <Icon className="h-5 w-5 text-muted" aria-hidden="true" /> : null}{title}</span>{count !== undefined && count !== '' ? <span className="ml-3 apple-chip">{count}</span> : null}</div>
+        <h3 className={`${sectionRecipe.heading} m-0 px-5 md:px-6`}>
+            {folderActive ? <div className="flex items-center gap-3 py-5 md:py-6"><span className={`${sectionRecipe.heading} mt-1 flex min-w-0 flex-1 items-center gap-2 text-ink`}>{Icon ? <Icon className="h-5 w-5 text-muted" aria-hidden="true" /> : null}{title}</span>{count !== undefined && count !== '' ? <span className={`${sectionRecipe.count} ml-3 apple-chip`}>{count}</span> : null}</div>
                 : <DisclosureControl expanded={expanded} controls={regionId} onToggle={() => setOpen(value => !value)}>
                     {kicker && !folderSection ? <span className="section-kicker">{kicker}</span> : null}
-                    <span className="flex items-center gap-2">{Icon ? <Icon size={20} aria-hidden="true" /> : null}{title}
-                        {count !== undefined && count !== '' ? <span className="apple-chip">{count}</span> : null}</span>
-                    {!expanded && summary ? <span className="block text-sm text-muted">{summary}</span> : null}
+                    <span className={`${sectionRecipe.heading} flex items-center gap-2`}>{Icon ? <Icon size={20} aria-hidden="true" /> : null}{title}
+                        {count !== undefined && count !== '' ? <span className={`${sectionRecipe.count} apple-chip`}>{count}</span> : null}</span>
+                    {!expanded && summary ? <span className={`${sectionRecipe.summary} block text-muted`}>{summary}</span> : null}
                 </DisclosureControl>}
         </h3>
     );
