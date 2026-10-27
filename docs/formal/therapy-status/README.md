@@ -194,6 +194,24 @@ clinica o funzionamento su un'installazione reale.
 
 ## Dal modello al codice
 
+Il 27 ottobre 2026, HC-6, è stato riesaminato il diff completo di
+`components/therapy-manager.tsx` fra il precedente `coverage.json.syncCommit`
+`b55681f6e5d27a55a42ae42c4a1dd9f3ad0a8668` e
+`d44efa7149d5913573a795df99d9522f7a1d7d9f`, insieme ai consumer
+`ViewState`, `CollapsibleSection` e alle ricette CSS delle sezioni.
+Il vuoto usa il componente comune, senza azione aggiunta; il manager lascia
+la propria creazione presso il titolo e rimuove la variante CSS dedicata.
+Il ramo di caricamento, la condizione del vuoto, gli handler e i collegamenti
+alle porte restano identici. I consumer riesaminati non invocano letture o
+scritture nella nuova presentazione. Non cambiano transizioni, guardie,
+confini degli await, CAS, audit, altri writer o assunzioni del modello.
+Le altre superfici coperte conservano le impronte precedenti; modello,
+configurazione, statechart, proprietà, limiti, testimoni e mutanti restano
+invariati. Dopo il riesame sono aggiornati manualmente soltanto l'impronta
+del manager e `syncCommit`. Questo raccordo non estende le proprietà formali
+alla geometria o ai testi degli stati vuoti.
+
+
 Il 27 ottobre 2026, PR #692 (HC-8), è stato riesaminato il diff completo di
 `components/therapy-manager.tsx` fra il precedente `coverage.json.syncCommit`
 `2bf054fabf0b44e943022d8ad0654a2b243f0796` e

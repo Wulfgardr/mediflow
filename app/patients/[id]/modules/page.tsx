@@ -35,7 +35,6 @@ import sissStyles from '@/components/siss-workspace.module.css';
 import TherapyManager from '@/components/therapy-manager';
 import TreatmentReasoningPanel from '@/components/treatment-reasoning-panel';
 import Timeline from '@/components/timeline';
-import diaryStyles from '@/components/twin-diary.module.css';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 /* WUL-678: scoped to the new-scale targets below. */
@@ -710,7 +709,7 @@ export default function PatientDetailPage() {
                     title: 'Diario clinico',
                     count: formatCountLabel(nonScaleEntries.length, 'voce', 'voci'),
                     summary: nonScaleEntries.length === 0 ? 'Nessuna voce clinica registrata.' : 'Apri le voci attive del diario.',
-                    surfaceClassName: `${workspaceStyles.clinicalSection} ${diaryStyles.patientSection}`,
+                    surfaceClassName: workspaceStyles.clinicalSection,
                     keepMounted: true,
                 }} /> : <CollapsibleSection id="diario" title="Diario clinico" surfaceClassName={workspaceStyles.clinicalSection} keepMounted>
                     <ViewState state="loading" title="Diario in caricamento." />
