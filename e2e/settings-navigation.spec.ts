@@ -62,3 +62,21 @@ for (const width of [1440, 768, 390]) test(`Impostazioni: una navigazione e dest
     }
     expect(writes).toEqual([]);
 });
+
+test('Fabric: titolo del piano unico e titoli interni secondo la scala di sezione', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.route('**/api/siss/session-status', route => route.fulfill({ json: { status: 'unavailable', source: 'synthetic', checkpoints: [] } }));
+    await bootstrapUnlockedSession(page, '1234');
+    await page.goto('/settings/ai/fabric');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+    for (const name of ['Sintesi, importazione e revisione del trattamento', 'Lettura dei documenti']) {
+        const heading = page.getByRole('heading', { level: 3, name, exact: true });
+        await expect(heading).toBeVisible();
+        const type = await heading.evaluate(element => {
+            const style = getComputedStyle(element);
+            return { size: Number.parseFloat(style.fontSize), weight: style.fontWeight,
+                spacing: Number.parseFloat(style.letterSpacing), caps: style.fontVariantCaps };
+        });
+        expect(type).toEqual({ size: 12, weight: '600', spacing: 0.6, caps: 'all-small-caps' });
+    }
+});
