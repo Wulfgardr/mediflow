@@ -53,11 +53,18 @@ def build_number(sha):
 
 def validate_destination(path):
     path = path.expanduser().resolve()
-    if "Applications" in path.parts or path == ROOT or ROOT in path.parents:
+    if protected_destination(path):
         raise ValueError("Use a new staging directory outside the repository and Applications")
     if path.exists():
         raise ValueError("Staging directory already exists; previous artifacts are preserved")
     return path
+
+
+def protected_destination(path):
+    normalized = str(path).casefold()
+    source = str(ROOT).casefold()
+    return ("applications" in [part.casefold() for part in path.parts] or
+            normalized == source or normalized.startswith(source + os.sep))
 
 
 def license_files(root):
@@ -141,7 +148,7 @@ def main():
         parser.error("This local candidate requires an Apple Silicon Mac")
     stage = validate_destination(args.staging)
     target = args.target_dir.expanduser().resolve()
-    if "Applications" in target.parts or target == ROOT or ROOT in target.parents:
+    if protected_destination(target):
         parser.error("Cargo target must be outside the repository and Applications")
     if stage == target or stage in target.parents or target in stage.parents:
         parser.error("Staging and Cargo target must be separate directories")
