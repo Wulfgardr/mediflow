@@ -4,7 +4,10 @@
 
 import { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import { SettingsSectionIntro } from '@/components/settings/settings-ui';
+import Link from 'next/link';
+import styles from '@/components/settings/maintenance-pages.module.css';
+import { ViewState } from '@/components/ui/view-state';
+import { SETTINGS_INPUT_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
@@ -13,16 +16,17 @@ const RESET_CONFIRM_KEYWORD = 'RESET';
 export default function SettingsDangerZonePage() {
     const [confirmText, setConfirmText] = useState('');
     const [isResetting, setIsResetting] = useState(false);
+    const [resetOutcome, setResetOutcome] = useState<'sessions_unconfirmed' | 'unknown' | null>(null);
     const { showToast } = useToast();
     const confirm = useConfirm();
     const confirmed = confirmText.trim().toUpperCase() === RESET_CONFIRM_KEYWORD;
 
     const resetOnboarding = async () => {
-        if (!confirmed || isResetting) return;
+        if (!confirmed || isResetting || resetOutcome) return;
         const { confirmed: proceed } = await confirm({
-            title: 'Ripetere la configurazione iniziale?',
-            message: 'Il reset cancella profilo utente e chiavi e riporta la postazione all\'onboarding. I dati dei pazienti restano invariati.',
-            confirmLabel: 'Esegui reset',
+            title: 'Ripristinare la configurazione iniziale?',
+            message: 'Gli account saranno eliminati e sarà necessaria una nuova configurazione iniziale.',
+            confirmLabel: 'Ripristina configurazione',
             tone: 'danger',
         });
         if (!proceed) return;
@@ -32,73 +36,35 @@ export default function SettingsDangerZonePage() {
             if (res.ok) {
                 window.location.href = '/';
             } else {
-                showToast({ tone: 'error', title: 'Errore durante il reset' });
+                const outcome = await res.json().catch(() => null) as { code?: string } | null;
+                if (res.status === 500 && outcome?.code === 'RESET_AUTHORITY_COMMIT_FAILED') setResetOutcome('sessions_unconfirmed');
+                else if (res.status >= 500) setResetOutcome('unknown');
+                else showToast({ tone: 'error', title: 'Errore durante il reset' });
             }
         } catch (e) {
             console.error(e);
-            showToast({ tone: 'error', title: 'Errore di connessione', description: 'Impossibile completare il reset. Riprova.' });
+            setResetOutcome('unknown');
         } finally {
             setIsResetting(false);
         }
     };
 
     return (
-        <section className="space-y-4" data-testid="settings-danger-zone-section">
-            <SettingsSectionIntro
-                kicker="Sistema"
-                title="Zona Pericolo"
-                description="Operazioni che riportano la postazione a uno stato precedente. Richiedono riconfigurazione."
-            />
-
-            {/* Danger Zone */}
-            <div className="rounded-[24px] border border-red-200/60 bg-red-50/60 p-5 md:p-6 dark:border-red-500/20 dark:bg-red-900/10">
-                <div className="mb-5 flex items-start gap-3">
-                    <div className="rounded-xl bg-red-100 p-2 text-red-600 dark:bg-red-500/15 dark:text-red-200">
-                        <AlertTriangle className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <p className="section-kicker">Zona pericolo</p>
-                        <h3 className="mt-1 font-semibold text-slate-900 dark:text-white">Azioni irreversibili</h3>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            Il reset cancella la configurazione operatore e richiede di ripetere la procedura di onboarding da zero.
-                        </p>
-                    </div>
-                </div>
-
-                <div className="space-y-4 rounded-[20px] border border-red-100 bg-white/78 p-4 dark:border-red-900/50 dark:bg-red-950/20">
-                    <div>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-red-100">Reset onboarding</p>
-                        <p className="text-xs text-slate-500 dark:text-red-200/70">
-                            Cancella profilo utente e chiavi e riporta alla configurazione iniziale. I dati dei pazienti restano invariati,
-                            ma dovrai riconfigurare l&apos;accesso.
-                        </p>
-                    </div>
-
-                    {/* WUL-297: conferma esplicita digitando la parola chiave. */}
-                    <label className="block text-xs font-medium text-red-800 dark:text-red-200">
-                        Scrivi <strong>{RESET_CONFIRM_KEYWORD}</strong> per abilitare il reset
-                        <input
-                            type="text"
-                            value={confirmText}
-                            onChange={(e) => setConfirmText(e.target.value)}
-                            placeholder={RESET_CONFIRM_KEYWORD}
-                            autoComplete="off"
-                            spellCheck={false}
-                            data-testid="danger-zone-confirm-input"
-                            className="mt-1 w-full max-w-xs rounded-[12px] border border-red-200 bg-white/90 px-3 py-2 font-sans text-base text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-red-300 dark:border-red-500/30 dark:bg-red-950/30 dark:text-red-100 dark:placeholder:text-red-100/60"
-                        />
-                    </label>
-
-                    <button
-                        onClick={resetOnboarding}
-                        disabled={!confirmed || isResetting}
-                        data-testid="danger-zone-reset-button"
-                        className="inline-flex items-center justify-center gap-2 rounded-full border border-red-300 bg-white px-4 py-2 text-xs font-semibold text-red-600 shadow-sm transition-[border-color,background-color,color] hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-red-600 dark:border-red-500/30 dark:bg-red-950/10 dark:text-red-200 dark:hover:bg-red-600 dark:disabled:hover:bg-red-950/10 dark:disabled:hover:text-red-200"
-                    >
-                        {isResetting ? 'Reset in corso...' : 'Ripeti configurazione iniziale'}
-                    </button>
-                </div>
-            </div>
+        <section className={styles.page} data-testid="settings-danger-zone-section">
+            <header className={styles.intro}><h2>Zona Pericolo</h2><p>Operazioni che riportano la postazione a uno stato precedente. Richiedono riconfigurazione.</p></header>
+            <section className={styles.section}>
+                <h3 className={styles.heading}><AlertTriangle aria-hidden />Ripristina configurazione iniziale</h3>
+                <p>Elimina gli account e richiede una nuova configurazione iniziale.</p>
+                <label className={styles.fieldLabel}><span>Scrivi <strong>{RESET_CONFIRM_KEYWORD}</strong> per abilitare il reset.</span>
+                    <input type="text" value={confirmText} onChange={e => setConfirmText(e.target.value)} placeholder={RESET_CONFIRM_KEYWORD}
+                        autoComplete="off" spellCheck={false} data-testid="danger-zone-confirm-input" className={SETTINGS_INPUT_CLASS} readOnly={isResetting} />
+                </label>
+                {resetOutcome && <div>
+                    <ViewState state="error" title={resetOutcome === 'sessions_unconfirmed' ? 'Reset eseguito, ma la chiusura delle sessioni non è stata confermata.' : 'Esito del reset non confermato. Verifica l’accesso prima di procedere.'} />
+                    <Link href="/settings/accesso" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Accesso</Link>
+                </div>}
+                <div className={styles.actions}><button onClick={resetOnboarding} disabled={!confirmed || isResetting || resetOutcome !== null} data-testid="danger-zone-reset-button" className={SETTINGS_SECONDARY_BUTTON_CLASS}>{isResetting ? 'Reset in corso...' : 'Ripristina configurazione'}</button></div>
+            </section>
         </section>
     );
 }
