@@ -252,6 +252,42 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   expect(consoleErrors).toEqual([]);
 });
 
+test('Documenti: il salvataggio sospeso espone un solo annuncio live', async ({ page }) => {
+  await establishSyntheticSession(page);
+  const patientId = await createSyntheticFixture(page);
+  await openDocumentArchive(page, patientId);
+  await expect(page.getByRole('button', { name: `Visualizza ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeEnabled();
+  let release!: () => void;
+  let observed!: () => void;
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  const blocked = new Promise<void>((resolve) => { observed = resolve; });
+  page.once('close', release);
+  await page.route('**/api/attachments', async (route) => {
+    if (route.request().method() === 'POST') {
+      observed();
+      await pending;
+    }
+    await route.continue();
+  });
+  try {
+    await page.locator('#documenti input[type="file"]').setInputFiles({
+      name: 'annuncio-live-sintetico.txt', mimeType: 'text/plain', buffer: Buffer.from('Documento sintetico.'),
+    });
+    await blocked;
+    const liveRegions = page.locator('[role="status"], [role="alert"], [aria-live="polite"], [aria-live="assertive"]');
+    await expect(liveRegions.filter({ hasText: 'Salvataggio allegati in corso…' })).toHaveCount(1);
+    const status = page.getByRole('status', { name: 'Stato elenco documenti', exact: true });
+    await expect(status).toHaveText('Salvataggio allegati in corso…');
+    await page.getByRole('button', { name: 'Interrompi coda', exact: true }).click();
+    await expect(liveRegions.filter({ hasText: 'Interruzione richiesta. Attesa dell’esito del file già inviato.' })).toHaveCount(1);
+    await expect(status).toHaveText('Interruzione richiesta. Attesa dell’esito del file già inviato.');
+  } finally {
+    release();
+  }
+  await expect(page.getByRole('button', { name: 'Visualizza annuncio-live-sintetico.txt', exact: true })).toBeEnabled();
+  await expect(page.getByText('1 allegato salvato.', { exact: false })).toBeVisible();
+});
+
 for (const leaveStatus of [false, true]) {
   test(`Documenti: dopo la scelta del file ${leaveStatus ? 'rispetta il focus spostato dal medico' : 'mantiene il focus durante la rilettura e apre la nuova riga'}`, async ({ page }) => {
     await establishSyntheticSession(page);
