@@ -87,12 +87,57 @@ for (const area of ['turno', 'diario'] as const) test(`Agenda and global diary: 
   const errorText = area === 'turno' ? 'Agenda non disponibile.' : 'Diario clinico non disponibile.';
   const shot = async (name: string, target: Locator) => {
     await target.scrollIntoViewIfNeeded();
-    const probe = await target.evaluate(element => {
+    const probe = await target.evaluate((element, { inspectStack, tryLift }) => {
       const box = element.getBoundingClientRect(), style = getComputedStyle(element);
       const x = box.x + Math.min(box.width / 2, 50), y = box.y + Math.min(box.height / 2, 15);
       const hit = document.elementFromPoint(x, y);
-      return { text: element.textContent, rect: { x: box.x, y: box.y, width: box.width, height: box.height }, viewport: { width: innerWidth, height: innerHeight }, hit: hit === element || element.contains(hit), fontSize: style.fontSize, color: style.color, palette: getComputedStyle(document.documentElement).getPropertyValue('--lume-ink') };
-    });
+      const describe = (node: Element) => {
+        const rect = node.getBoundingClientRect(), computed = getComputedStyle(node);
+        return { tag: node.tagName, id: node.id, class: node.getAttribute('class'), role: node.getAttribute('role'),
+          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left },
+          position: computed.position, zIndex: computed.zIndex, transform: computed.transform, overflow: computed.overflow,
+          overflowX: computed.overflowX, overflowY: computed.overflowY, pointerEvents: computed.pointerEvents, isolation: computed.isolation };
+      };
+      const ancestors = (node: Element | null) => {
+        const chain = [];
+        for (let current = node; current; current = current.parentElement) chain.push(describe(current));
+        return chain;
+      };
+      const stack = inspectStack ? { point: { x, y }, elementsFromPoint: document.elementsFromPoint(x, y).map(describe), targetAncestors: ancestors(element), hitAncestors: ancestors(hit) } : {};
+      let stackingLift: unknown;
+      const row = element.closest<HTMLElement>('article[data-testid="lume-diario-entry"]');
+      const hitRow = hit?.closest('article[data-testid="lume-diario-entry"]');
+      if (tryLift && row && hitRow && row !== hitRow && row.parentElement === hitRow.parentElement
+        && (row.compareDocumentPosition(hitRow) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+        const previous = row.style.getPropertyValue('z-index'), priority = row.style.getPropertyPriority('z-index');
+        const before = describe(row);
+        let raised: unknown;
+        try {
+          row.style.setProperty('z-index', '2');
+          const liftedHit = document.elementFromPoint(x, y), liftedBox = element.getBoundingClientRect();
+          raised = { row: describe(row), hit: liftedHit ? describe(liftedHit) : null, targetHit: liftedHit === element || element.contains(liftedHit),
+            sameRect: liftedBox.x === box.x && liftedBox.y === box.y && liftedBox.width === box.width && liftedBox.height === box.height };
+        } finally {
+          if (previous) row.style.setProperty('z-index', previous, priority);
+          else row.style.removeProperty('z-index');
+        }
+        const restoredHit = document.elementFromPoint(x, y);
+        stackingLift = { before, raised, restored: { row: describe(row), hit: restoredHit ? describe(restoredHit) : null,
+          targetHit: restoredHit === element || element.contains(restoredHit), styleRestored: row.style.getPropertyValue('z-index') === previous && row.style.getPropertyPriority('z-index') === priority } };
+      }
+      return { text: element.textContent, rect: { x: box.x, y: box.y, width: box.width, height: box.height }, viewport: { width: innerWidth, height: innerHeight }, hit: hit === element || element.contains(hit), fontSize: style.fontSize, color: style.color, palette: getComputedStyle(document.documentElement).getPropertyValue('--lume-ink'),
+        ...stack, ...(stackingLift ? { stackingLift } : {}) };
+    }, { inspectStack: name === 'row-menu', tryLift: name === 'row-menu' && process.env.AGENDA_DIARY_STACKING_PROBE === '1' });
+    if (name === 'row-menu') {
+      observations.push({ rowMenuProbe: probe }); frames.push({ name, ...probe });
+      if (directory) {
+        await mkdir(directory, { recursive: true });
+        await writeFile(`${directory}/${area}-row-menu-probe.json`, JSON.stringify(probe, null, 2));
+        await page.screenshot({ path: `${directory}/${area}-${name}.png`, fullPage: false, animations: 'disabled' });
+      }
+      expect(probe.hit).toBe(true);
+      return probe;
+    }
     expect(probe.hit).toBe(true); frames.push({ name, ...probe });
     if (directory) { await mkdir(directory, { recursive: true }); await page.screenshot({ path: `${directory}/${area}-${name}.png`, fullPage: false, animations: 'disabled' }); }
     return probe;
