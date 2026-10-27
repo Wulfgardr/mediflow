@@ -72,6 +72,7 @@ pub struct TextInput {
     focus_subscription: Option<Subscription>,
     pub read_only: bool,
     multiline: bool,
+    height_limit: Option<Pixels>,
     secret: bool,
     theme: Theme,
     writing_ink: Option<WritingInk>,
@@ -107,6 +108,7 @@ impl TextInput {
             focus_subscription: None,
             read_only: false,
             multiline,
+            height_limit: None,
             secret: false,
             theme,
             writing_ink: None,
@@ -149,6 +151,21 @@ impl TextInput {
     pub fn secret(mut self) -> Self {
         self.secret = true;
         self
+    }
+
+    pub fn height_limit(&self) -> Option<Pixels> {
+        self.height_limit
+    }
+
+    pub fn set_height_limit(&mut self, height: Pixels, cx: &mut Context<Self>) -> bool {
+        let height = height.max(px(40.));
+        if self.height_limit == Some(height) {
+            return false;
+        }
+        self.height_limit = Some(height);
+        self.autoscroll = true;
+        cx.notify();
+        true
     }
 
     pub fn value(&self) -> &str {
@@ -802,6 +819,16 @@ impl Render for TextInput {
                 .map(|r| self.display_index(r.start)..self.display_index(r.end)),
             theme,
         );
+        let minimum_height = px(if self.multiline {
+            (theme.role(TypeRole::Prose).line_height * 3. + 28.).max(160.)
+        } else {
+            40.
+        });
+        let maximum_height = px(if self.multiline {
+            (theme.role(TypeRole::Prose).line_height * 5. + 28.).max(256.)
+        } else {
+            256.
+        });
         gpui::div()
             .id(self.id)
             .accessibility_id(self.id)
@@ -841,19 +868,16 @@ impl Render for TextInput {
             .tab_stop(true)
             .cursor(CursorStyle::IBeam)
             .w_full()
-            .max_h(px(if self.multiline {
-                (theme.role(TypeRole::Prose).line_height * 5. + 28.).max(256.)
-            } else {
-                256.
-            }))
+            .max_h(
+                self.height_limit
+                    .map_or(maximum_height, |height| height.min(maximum_height)),
+            )
             .track_scroll(&self.scroll)
             .overflow_y_scroll()
-            .min_h(px(40.))
-            .when(self.multiline, |el| {
-                el.min_h(px(
-                    (theme.role(TypeRole::Prose).line_height * 3. + 28.).max(160.)
-                ))
-            })
+            .min_h(
+                self.height_limit
+                    .map_or(minimum_height, |height| height.min(minimum_height)),
+            )
             .p(px(if self.multiline { 12. } else { 8. }))
             .border_1()
             .border_color(theme.strong_rule)
