@@ -16,12 +16,18 @@ un errore nel secondo elenco non deve diventare «nessun controllo».
   Parte una sola rilettura collettiva locale nell’intervallo applicato. La copia
   resta visibile con ricerca, selezione, scroll e focus conservati. L’elenco
   annuncia una sola volta «Aggiornamento in corso», anche senza corrispondenze
-  al filtro. Se la lettura fallisce o viene ritirata, lo stato resta a livello
+  al filtro. Da cinque secondi mostra fase e tempo trascorso usando le righe
+  del ViewState comune, anche nel nome accessibile dell’elenco, come richiede
+  [Punto d’inchiostro, Stati di una vista](../design/punto-inchiostro/01-specifica.md#stati-di-una-vista).
+  Se la lettura fallisce o viene ritirata, lo stato resta a livello
   di elenco; «Rileggi» compare solo quando il tentativo è ammesso. Nessun retry
   automatico, nessuna marcatura ripetuta sulle righe.
 - Risposta della rilettura: la selezione resta sulla stessa riga, anche se
   l’ordine cambia. Se la riga non è più visibile, si sceglie quella più vicina
   per data e poi per posizione, oppure nessuna se non restano risultati.
+  La riconciliazione usa l’id del controllo e, quando la ricerca dipende dai
+  nomi, attende entrambe le letture riuscite, in qualunque ordine arrivino.
+  Conserva le righe precedenti per scegliere il ripiego solo sul filtro completo.
   L’elenco annuncia il ripiego. Non si inventano orari di aggiornamento.
 - I retry di Agenda e nomi riguardano soltanto la lettura interessata e non
   ritirano quella riuscita. I comandi degli stati globali ricevono il focus

@@ -5544,10 +5544,20 @@ impl ClinicalApp {
     }
 
     fn agenda_view(&self, compact: bool, cx: &Context<Self>) -> gpui::AnyElement {
+        self.agenda_view_after(compact, std::time::Instant::now(), cx)
+    }
+
+    fn agenda_view_after(
+        &self,
+        compact: bool,
+        now: std::time::Instant,
+        cx: &Context<Self>,
+    ) -> gpui::AnyElement {
         let theme = self.theme;
         let today = chrono::Local::now().date_naive();
         let rows = self.visible_agenda_rows();
-        let status = self.agenda_status();
+        let state = self.agenda_state_after(now);
+        let status = self.agenda_status(state.clone());
         let mut content = div()
             .id("clinical-workspace-agenda-list")
             .accessibility_id("clinical-workspace-agenda-list")
@@ -5557,7 +5567,6 @@ impl ClinicalApp {
             .flex()
             .flex_col()
             .gap(px(28.));
-        let state = self.agenda_state();
         if self.agenda.ready().is_none()
             && let Some(state) = state
         {
@@ -5565,6 +5574,9 @@ impl ClinicalApp {
                 .child(self.render_global_read_state("clinical-workspace-agenda-state", state, cx))
                 .into_any_element();
         }
+        let status_text = text!(status.clone());
+        #[cfg(test)]
+        let status_text = rendered_command::observe_text(status_text);
         let status = div()
             .id("clinical-workspace-agenda-update")
             .accessibility_id("clinical-workspace-agenda-update")
@@ -5575,7 +5587,7 @@ impl ClinicalApp {
             .flex()
             .items_center()
             .gap(px(12.))
-            .child(text!(status))
+            .child(status_text)
             .when(
                 state
                     .as_ref()
