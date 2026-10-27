@@ -46,13 +46,77 @@ async function capture(page: Page, target: Locator, name: string, frames: unknow
     return evidence;
 }
 
+async function captureLongNameAt400(page: Page, target: Locator, name: string, frames: unknown[]) {
+    const expected = `${patient.lastName} ${patient.firstName}`, covered = new Set<number>(), captures: unknown[] = [];
+    const directory = artifactDirectory(); await mkdir(directory, { recursive: true });
+    const inspect = () => target.evaluate(element => {
+        const text = element.textContent ?? '', nodes: Text[] = [], walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node as Text);
+        const location = (offset: number) => {
+            for (const node of nodes) { if (offset < node.length) return { node, offset }; offset -= node.length; }
+            throw Error('Name character offset unavailable');
+        };
+        const characters = Array.from({ length: text.length }, (_, index) => {
+            const start = location(index), range = document.createRange(); range.setStart(start.node, start.offset); range.setEnd(start.node, start.offset + 1);
+            const rect = range.getBoundingClientRect(), inset = Math.min(1, rect.width / 4, rect.height / 4);
+            const points = [[rect.x + rect.width / 2, rect.y + rect.height / 2], [rect.x + inset, rect.y + inset],
+                [rect.right - inset, rect.y + inset], [rect.x + inset, rect.bottom - inset], [rect.right - inset, rect.bottom - inset]]
+                .map(([x, y]) => { const hit = document.elementFromPoint(x, y); return { x, y, hit: hit === element || !!hit && element.contains(hit) }; });
+            return { index, character: text[index], bounds: { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, height: rect.height, width: rect.width },
+                points, visible: rect.top >= 0 && rect.bottom <= innerHeight && rect.left >= 0 && rect.right <= innerWidth && points.every(point => point.hit) };
+        });
+        const box = element.getBoundingClientRect(), x = box.x + box.width / 2;
+        let top = 0, bottom = innerHeight;
+        for (const overlay of document.querySelectorAll<HTMLElement>('body *')) {
+            if (overlay.contains(element) || !['sticky', 'fixed'].includes(getComputedStyle(overlay).position)) continue;
+            const rect = overlay.getBoundingClientRect();
+            if (rect.left > x || rect.right < x || rect.bottom <= 0 || rect.top >= innerHeight) continue;
+            if (rect.top <= innerHeight / 2) top = Math.max(top, rect.bottom); else bottom = Math.min(bottom, rect.top);
+        }
+        for (let owner = element.parentElement; owner; owner = owner.parentElement) {
+            if (owner.scrollHeight <= owner.clientHeight || !/auto|scroll/u.test(getComputedStyle(owner).overflowY)) continue;
+            const rect = owner.getBoundingClientRect();
+            return { text, characters, color: getComputedStyle(element).color, viewport: { width: innerWidth, height: innerHeight }, aperture: { top, bottom },
+                owner: { tag: owner.tagName, scrollTop: owner.scrollTop, maximum: owner.scrollHeight - owner.clientHeight,
+                    x: rect.left + rect.width / 2, y: (Math.max(top, rect.top) + Math.min(bottom, rect.bottom)) / 2 } };
+        }
+        throw Error('Name scroll owner unavailable');
+    });
+    let evidence = await inspect(); expect(evidence.text).toBe(expected);
+    for (let index = 0; index < 4 && covered.size < expected.length; index++) {
+        const first = evidence.characters.find(character => !covered.has(character.index))!;
+        const before = evidence.owner.scrollTop, expectedOffset = Math.max(0, Math.min(evidence.owner.maximum,
+            before + first.bounds.top - evidence.aperture.top - 4));
+        await page.mouse.move(evidence.owner.x, evidence.owner.y);
+        await page.mouse.wheel(0, (expectedOffset - before) * 4);
+        await expect.poll(async () => Math.abs((await inspect()).owner.scrollTop - expectedOffset)).toBeLessThanOrEqual(1);
+        evidence = await inspect();
+        const readable = evidence.characters.filter(character => character.visible);
+        readable.forEach(character => covered.add(character.index));
+        const path = join(directory, `${name}-segment-${index + 1}.png`); await page.screenshot({ path, fullPage: false });
+        const capture = { name: `${name}-segment-${index + 1}`, path, kind: 'name-character-coverage', ...evidence,
+            readableIndices: readable.map(character => character.index), wheel: { zoomFactor: 4, cssDelta: expectedOffset - before,
+                sentDelta: (expectedOffset - before) * 4, before, expectedOffset, observedOffset: evidence.owner.scrollTop } };
+        captures.push(capture); frames.push(capture);
+        await writeFile(join(directory, 'frames.json'), JSON.stringify(frames, null, 2));
+        await writeFile(join(directory, `${name}-coverage.json`), JSON.stringify({ expected, totalCharacters: expected.length,
+            coveredIndices: [...covered].sort((a, b) => a - b), uncoveredIndices: evidence.characters.filter(character => !covered.has(character.index)).map(character => character.index),
+            simultaneousFullNameClaim: false, captures }, null, 2));
+        expect(readable.length, 'Each real scroll must expose name characters').toBeGreaterThan(0);
+    }
+    expect(covered.size, 'Every character, including spaces, readable in at least one measured frame').toBe(expected.length);
+    return evidence;
+}
+
 async function layoutFrames(zoom: Awaited<ReturnType<typeof openBrowserZoomFixture>>, target: Locator, stem: string, frames: unknown[]) {
     const dayColors = new Map<number | string, string>();
     for (const theme of ['giorno', 'grafite']) for (const size of [320, 'zoom-400'] as const) {
         await zoom.page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(size === 320 ? 1 : 4);
         if (size === 320) await zoom.page.setViewportSize({ width: 320, height: 1000 });
         await zoom.page.evaluate(theme => { document.documentElement.classList.toggle('dark', theme === 'grafite'); document.documentElement.dataset.theme = theme; }, theme);
-        const evidence = await capture(zoom.page, target, `${stem}-${theme}-${size}`, frames);
+        const evidence = !baseline && stem === 'search-long-identity' && size === 'zoom-400'
+            ? await captureLongNameAt400(zoom.page, target, `${stem}-${theme}-${size}`, frames)
+            : await capture(zoom.page, target, `${stem}-${theme}-${size}`, frames);
         if (theme === 'giorno') dayColors.set(size, evidence.color); else expect(evidence.color).not.toBe(dayColors.get(size));
     }
     await zoom.page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
