@@ -178,7 +178,6 @@ export default function SettingsAiFabricPage() {
     return (
         <section className="space-y-4" data-testid="settings-ai-fabric-section">
             <SettingsSectionIntro
-                kicker="Funzioni intelligenti"
                 title="Intelligence Fabric"
                 description="Distingui configurazione locale, collegamento account esterno e disponibilità delle funzioni. Collegare un account non ammette un provider."
             />
