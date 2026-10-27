@@ -156,7 +156,7 @@ test('Scales library: search pending, error, empty, long identity and stale-term
                         await mock.observeRead('/api/patients', 'ready', () => section.getByRole('button', { name: 'Riprova', exact: true }).click());
                         await expect(start).toHaveCount(1);
                         await expect(search).toHaveValue('Dimostrativa');
-                        await expect(page.getByRole('button', { name: /ADL \(Indice di Katz\)/u })).toHaveAttribute('aria-pressed', 'true');
+                        await expect(page.locator('#catalogo').getByRole('button', { name: /ADL \(Indice di Katz\)/u })).toHaveAttribute('aria-pressed', 'true');
                         mock.observations.push({ retry: 'search503ToReady', termPreserved: true, scalePreserved: true });
                     }
                 }
