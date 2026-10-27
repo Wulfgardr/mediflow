@@ -35,6 +35,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     const [reason, setReason] = useState('');
     const resolverRef = useRef<((result: ConfirmResult) => void) | null>(null);
     const dialogRef = useRef<HTMLDivElement>(null);
+    const cancelRef = useRef<HTMLButtonElement>(null);
+    const reasonRef = useRef<HTMLTextAreaElement>(null);
     const titleId = useId();
     const messageId = useId();
     const reasonId = useId();
@@ -46,7 +48,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         setReason('');
     }, []);
 
-    useDialogA11y(options !== null, dialogRef, () => close({ confirmed: false }));
+    useDialogA11y(options !== null, dialogRef, () => close({ confirmed: false }), options?.requireReason ? reasonRef : cancelRef);
 
     const confirm = useCallback<ConfirmFn>((opts) => {
         /* WUL-UIUX: se un dialogo e gia aperto, risolvi la Promise pendente
@@ -87,13 +89,13 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                         {isDanger ? <div aria-hidden className="h-1.5 w-full" style={{ background: 'var(--lume-signal-critical)' }} /> : null}
                         <div className="p-6">
                             <div className="mb-4 flex items-start justify-between gap-4">
-                                <div className="flex items-center gap-3">
+                                <div className="flex min-w-0 items-start gap-3">
                                     {isDanger ? (
                                         <span className="rounded-[var(--lume-radius-control)] p-3" style={{ background: 'color-mix(in srgb, var(--lume-signal-critical) 12%, transparent)', color: 'var(--lume-signal-critical)' }}>
                                             <AlertTriangle className="h-5 w-5" />
                                         </span>
                                     ) : null}
-                                    <h3 id={titleId} className="type-threshold text-[color:var(--lume-ink)]">
+                                    <h3 id={titleId} className="type-threshold min-w-0 [overflow-wrap:anywhere] text-[color:var(--lume-ink)]">
                                         {options.title}
                                     </h3>
                                 </div>
@@ -113,6 +115,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                                     </label>
                                     <textarea
                                         id={reasonId}
+                                        ref={reasonRef}
                                         aria-required
                                         value={reason}
                                         onChange={(event) => setReason(event.target.value)}
@@ -123,8 +126,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                                 </div>
                             ) : null}
 
-                            <div className="mt-6 flex flex-wrap justify-end gap-3">
-                                <button type="button" onClick={() => close({ confirmed: false })} className="mf-btn-secondary">
+                            <div className="mt-6 flex flex-wrap justify-end gap-3 [&_button]:max-w-full [&_button]:whitespace-normal">
+                                <button ref={cancelRef} type="button" onClick={() => close({ confirmed: false })} className={isDanger ? "mf-button-primary" : "mf-btn-secondary"}>
                                     {options.cancelLabel ?? 'Annulla'}
                                 </button>
                                 <button
@@ -132,7 +135,6 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                                     disabled={reasonMissing}
                                     onClick={() => close({ confirmed: true, reason: options.requireReason ? reason.trim() : undefined })}
                                     className={isDanger ? "mf-button-destructive px-5 py-2.5" : "ui-btn-primary px-5 py-2.5 disabled:opacity-50"}
-                                    data-command-confirmation={isDanger ? 'true' : undefined}
                                 >
                                     {options.confirmLabel ?? 'Conferma'}
                                 </button>

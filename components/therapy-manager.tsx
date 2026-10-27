@@ -169,7 +169,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
     useEffect(() => {
         if (!therapies || !patient || patient.id !== patientId) return;
         const age = patient.birthDate ? differenceInYears(new Date(), new Date(patient.birthDate)) : NaN;
-        statusChange.recover(therapies, `${patient.firstName} ${patient.lastName}, ${Number.isFinite(age) ? formatCountLabel(age, 'anno', 'anni') : 'età non disponibile'}`);
+        statusChange.recover(therapies, `${patient.lastName} ${patient.firstName}, ${Number.isFinite(age) ? formatCountLabel(age, 'anno', 'anni') : 'età non disponibile'}`);
     }, [therapies, patient, patientId, statusChange]);
 
     useEffect(() => {
@@ -389,7 +389,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
         const therapy = visibleTherapies.find((item) => item.id === id);
         if (!therapy || !patient || patient.id !== patientId) return;
         const age = patient.birthDate ? differenceInYears(new Date(), new Date(patient.birthDate)) : NaN;
-        const patientLabel = `${patient.firstName} ${patient.lastName}, ${Number.isFinite(age) ? formatCountLabel(age, 'anno', 'anni') : 'età non disponibile'}`;
+        const patientLabel = `${patient.lastName} ${patient.firstName}, ${Number.isFinite(age) ? formatCountLabel(age, 'anno', 'anni') : 'età non disponibile'}`;
         statusChange.begin(therapy, status, patientLabel);
     };
 
@@ -402,8 +402,8 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
         }
         statusChange.cancel();
         await deletion.begin(therapy, () => confirm({
-            title: 'Eliminare questo farmaco dalla cartella?',
-            message: 'Usa Elimina solo per errori di inserimento; per una terapia interrotta scegli Sospendi o Concludi.',
+            title: `Eliminare la terapia «${therapy.drugName}»?`,
+            message: 'La terapia verrà spostata nel cestino. Usa Elimina solo per errori di inserimento; per una terapia interrotta scegli Sospendi o Concludi.',
             confirmLabel: 'Elimina',
             tone: 'danger',
             requireReason: true,
@@ -461,11 +461,11 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                         <button type="button" disabled={deleteBusy} onClick={() => deletion.reread()} className={recoveryButtonClassName}>Rileggi terapia</button>
                         {deleteRecovery.phase === 'ready' && (
                             <button type="button" onClick={() => deletion.retry(() => confirm({
-                                title: 'Confermi l’eliminazione della terapia riletta?',
+                                title: `Eliminare la terapia riletta «${deleteRecovery.current?.drugName ?? deleteRecovery.original.drugName}»?`,
                                 message: deleteRecovery.reason
-                                    ? 'Hai confrontato i dati attuali. Il nuovo invio userà la motivazione conservata e riguarderà la terapia appena riletta.'
-                                    : 'Hai confrontato i dati attuali. Indica una nuova motivazione per eliminare la terapia appena riletta.',
-                                confirmLabel: 'Conferma nuovo invio', tone: 'danger',
+                                    ? 'La terapia riletta verrà spostata nel cestino con la motivazione conservata.'
+                                    : 'La terapia riletta verrà spostata nel cestino. Indica una nuova motivazione per eliminarla.',
+                                confirmLabel: 'Elimina terapia riletta', tone: 'danger',
                                 requireReason: !deleteRecovery.reason,
                                 reasonLabel: "Motivazione dell'eliminazione",
                                 reasonPlaceholder: 'Es. inserimento duplicato',
@@ -721,6 +721,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                         {statusConfirmation.phase === 'confirm' ? <>
                             <h3 className="type-threshold">{`${statusConfirmation.target === 'suspended' ? 'Sospendere' : statusConfirmation.target === 'completed' ? 'Concludere' : 'Riattivare'} ${statusConfirmation.original?.drugName ?? 'Terapia'}, ${statusConfirmation.original?.dosage}?`}</h3>
                             <p className="type-body">{statusConfirmation.patientLabel}</p>
+                            <p className="type-body">Stato: {statusConfirmation.original?.status === 'active' ? 'attiva' : statusConfirmation.original?.status === 'suspended' ? 'sospesa' : 'conclusa'} → {statusConfirmation.target === 'active' ? 'attiva' : statusConfirmation.target === 'suspended' ? 'sospesa' : 'conclusa'}. {statusConfirmation.target === 'completed' ? 'Data di conclusione' : 'Data della modifica'}: {format(new Date(), 'dd/MM/yyyy', { locale: it })} (alla registrazione).</p>
                         </> : statusConfirmation.phase === 'uncertain' ? <>
                             <h3 className={`type-threshold ${styles.statusWarning}`}><span aria-hidden="true">▲</span> Esito da verificare</h3>
                             <p className="type-body">{statusConfirmation.legacy
@@ -753,7 +754,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                     </div>
                     <div className={styles.statusActions}>
                         {['confirm', 'registered', 'reviewed'].includes(statusConfirmation.phase) && <button type="button" className="mf-btn-secondary" onClick={() => statusChange.cancel()}>Torna alla scheda</button>}
-                        {statusConfirmation.phase === 'confirm' && <button type="button" className={isAdding ? 'mf-button-secondary' : 'mf-button-primary'} onClick={() => statusChange.confirm()}>Conferma e registra</button>}
+                        {statusConfirmation.phase === 'confirm' && <button type="button" className={isAdding ? 'mf-button-secondary' : 'mf-button-primary'} onClick={() => statusChange.confirm()}>{statusConfirmation.target === 'completed' ? 'Concludi' : statusConfirmation.target === 'suspended' ? 'Sospendi' : 'Riattiva'} {statusConfirmation.original?.drugName ?? 'terapia'}</button>}
                         {statusConfirmation.phase === 'uncertain' && !statusConfirmation.legacy && <button type="button" className="mf-btn-secondary" disabled={statusConfirmation.writePending} onClick={() => statusChange.close()}>Ritira richiesta e verifica</button>}
                         {['conflict', 'rejected', 'uncertain'].includes(statusConfirmation.phase) && <button type="button" className={isAdding ? 'mf-button-secondary' : 'mf-button-primary'} disabled={statusConfirmation.writePending} onClick={() => statusChange.reread()}>{statusConfirmation.conflict ? 'Rileggi la terapia' : 'Rileggi e verifica'}</button>}
                     </div>

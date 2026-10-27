@@ -35,7 +35,7 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
     const leaveDialog = page.getByRole('dialog', { name: 'Lasciare la compilazione?', exact: true });
     await expect(leaveDialog).toBeVisible();
     await expect(page.getByRole('dialog')).toHaveCount(1);
-    await leaveDialog.getByRole('button', { name: 'Continua a scrivere', exact: true }).click();
+    await leaveDialog.getByRole('button', { name: 'Continua la compilazione', exact: true }).click();
     await expect(firstAnswer).toBeChecked();
     await expect(form.getByLabel('Contesto')).toHaveValue('home');
     expect(writes).toBe(0);
