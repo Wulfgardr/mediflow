@@ -47,7 +47,9 @@ test('ricerca a 390: un solo Cancella intero, attivabile e con ritorno al campo'
     const box = await clear.boundingBox();
     expect(box!.width).toBeGreaterThanOrEqual(44);
     expect(box!.height).toBeGreaterThanOrEqual(44);
-    expect(await search.evaluate(input => getComputedStyle(input, '::-webkit-search-cancel-button').appearance)).toBe('none');
+    const field = await search.boundingBox();
+    await page.mouse.click(field!.x + field!.width - 10, field!.y + field!.height / 2);
+    await expect(search).toHaveValue('Persona sintetica inesistente');
     await clear.click();
     await expect(search).toHaveValue('');
     await expect(search).toBeFocused();
