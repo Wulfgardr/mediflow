@@ -416,6 +416,16 @@ export function Kree8ClinicalCockpit({
   const livePatientRows = patientSnapshot?.isCurrent() ? patientSnapshot.rows : undefined;
   const liveCheckupRows = checkupSnapshot?.isCurrent() ? checkupSnapshot.rows : undefined;
   const liveDiaryRows = diarySnapshot?.isCurrent() ? diarySnapshot.rows : undefined;
+  const directoryPatientState: Kree8PatientClientState = (() => {
+    if (isReview || area !== 'incarico') return patientState;
+    if (livePatientLoading) return { status: 'loading', patients: [] };
+    if (livePatientError || (patientSnapshot && !livePatientRows)) return { status: 'error', patients: [] };
+    const currentRows = new Set<object>(livePatientRows);
+    const projectionCurrent = livePatientRows && patientState.status === 'ready'
+      && patientState.patients.length === livePatientRows.length
+      && patientState.patients.every(patient => currentRows.has(patient.raw));
+    return projectionCurrent ? patientState : { status: 'loading', patients: [] };
+  })();
   const mappedPatients = useMemo(() => (livePatientRows ?? []).map(mapPatientForKree8), [livePatientRows]);
   const agendaLoading = livePatientLoading || checkupLoading;
   const agendaError = Boolean(livePatientError || checkupError);
@@ -672,7 +682,7 @@ export function Kree8ClinicalCockpit({
                 area={area}
                 filter={filter}
                 agendaBridge={agendaBridge}
-                patientState={patientState}
+                patientState={directoryPatientState}
                 agendaState={agendaState}
                 diaryState={diaryState}
                 selectedPatient={selectedPatient}
