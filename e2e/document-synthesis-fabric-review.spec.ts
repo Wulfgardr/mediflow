@@ -1,3 +1,4 @@
+import { openDocumentActions } from './utils';
 import { createHash } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 
@@ -240,7 +241,8 @@ test('Document Synthesis Fabric mostra una proposta con verifica, provenienza e 
   const fixture = await createFixture(page);
   attachmentId = fixture.attachmentId;
   await openDocumentArchive(page, fixture.patientId);
-  await page.getByRole('button', { name: `Prepara sintesi di ${fixture.attachmentName}` }).click();
+  await openDocumentActions(page, fixture.attachmentName);
+  await page.getByRole('menuitem', { name: `Prepara sintesi di ${fixture.attachmentName}` }).click();
 
   const card = page.getByTestId(`document-synthesis-fabric-review-${attachmentId}`);
   await expect(card).toContainText('Sintesi da rivedere');

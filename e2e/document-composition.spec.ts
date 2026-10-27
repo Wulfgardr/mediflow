@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow } from './utils';
+import { openDocumentActions, bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow } from './utils';
 
 test.describe.configure({ retries: 0 });
 
@@ -43,7 +43,8 @@ test('Documenti: apertura e scelta della sintesi conservano la stessa fonte, sen
         if (request.method() === 'POST' && /\/api\/ai\/document-synthesis\//u.test(request.url())) generations.push(request.url());
     });
     const source = docs.getByRole('combobox', { name: /^Documento da sintetizzare/u });
-    await docs.getByRole('button', { name: `Prepara sintesi di ${names[0]}`, exact: true }).click();
+    await openDocumentActions(page, names[0]);
+    await docs.getByRole('menuitem', { name: `Prepara sintesi di ${names[0]}`, exact: true }).click();
     await expect(source.locator('option:checked')).toHaveText(names[0]);
     await expect(original.getByTestId('document-preview-text')).toContainText('Originale sintetico A.');
     await docs.getByRole('button', { name: `Visualizza ${names[1]}`, exact: true }).click();
@@ -71,14 +72,16 @@ test('Documenti: storico separato dalla nuova proposta e sorgente archiviata dis
 
 test('Documenti: errore elenco, fonte scomparsa e rilettura non diventano un falso vuoto', async ({ page }) => {
     const { docs, names } = await documents(page);
-    await docs.getByRole('button', { name: `Prepara sintesi di ${names[0]}`, exact: true }).click();
+    await openDocumentActions(page, names[0]);
+    await docs.getByRole('menuitem', { name: `Prepara sintesi di ${names[0]}`, exact: true }).click();
     let mode: 'error' | 'empty' | 'current' = 'error';
     await page.route('**/api/attachments?**', async route => {
         if (route.request().method() !== 'GET' || mode === 'current') return route.continue();
         return mode === 'empty' ? route.fulfill({ status: 200, json: [] })
             : route.fulfill({ status: 503, json: { error: 'synthetic-list-unavailable' } });
     });
-    await docs.getByRole('button', { name: 'Elimina ' + names[1], exact: true }).click();
+    await openDocumentActions(page, names[1]);
+    await docs.getByRole('menuitem', { name: 'Elimina ' + names[1], exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Elimina', exact: true }).click();
     await expect(docs.getByText('Elenco documenti non disponibile. Non è possibile stabilire quali file siano presenti.', { exact: true })).toBeVisible();
     await expect(docs.getByText(/^Nessun documento caricato\./u)).toHaveCount(0);
@@ -97,7 +100,8 @@ test('Documenti: errore elenco, fonte scomparsa e rilettura non diventano un fal
 test('Documenti: nomi e azioni leggibili a 320 punti e testo ingrandito', async ({ page }) => {
     const { docs, names } = await documents(page);
     await page.setViewportSize({ width: 320, height: 800 });
-    await docs.getByRole('button', { name: `Prepara sintesi di ${names[1]}`, exact: true }).click();
+    await openDocumentActions(page, names[1]);
+    await docs.getByRole('menuitem', { name: `Prepara sintesi di ${names[1]}`, exact: true }).click();
     await assertNoHorizontalOverflow(page, [{ label: 'pagina', selector: 'document' }, { label: 'Documenti', selector: '[data-testid="patient-documents"]' }]);
     const row = docs.locator('[data-document-id]').filter({ has: page.getByRole('heading', { name: names[1], exact: true }) });
     const cells = row.locator('tr').first().locator('td');
@@ -115,7 +119,8 @@ test('Documenti: composizione nei due temi, fonti assenti e viewport compatti', 
     const { docs, names } = await documents(page);
     await expect(page).toHaveURL(/\/patients\/[^/]+\/modules#documenti$/u);
     await expect(page).toHaveTitle(/MediFlow/u);
-    await docs.getByRole('button', { name: `Prepara sintesi di ${names[0]}`, exact: true }).click();
+    await openDocumentActions(page, names[0]);
+    await docs.getByRole('menuitem', { name: `Prepara sintesi di ${names[0]}`, exact: true }).click();
     for (const theme of ['giorno', 'grafite']) {
         for (const width of [1440, 768, 390, 320]) {
             await page.setViewportSize({ width, height: 960 });
@@ -134,7 +139,8 @@ test('Documenti: composizione nei due temi, fonti assenti e viewport compatti', 
             }
         }
     }
-    await docs.getByRole('button', { name: 'Elimina ' + names[0], exact: true }).click();
+    await openDocumentActions(page, names[0]);
+    await docs.getByRole('menuitem', { name: 'Elimina ' + names[0], exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Elimina', exact: true }).click();
     await expect(docs.getByRole('heading', { name: names[0], exact: true })).toHaveCount(0);
     await expect(page.getByTestId('document-viewer')).toHaveCount(0);
@@ -142,4 +148,42 @@ test('Documenti: composizione nei due temi, fonti assenti e viewport compatti', 
     await expect(docs.getByRole('combobox', { name: /^Documento da sintetizzare/u })).toHaveValue('');
     await expect(page.getByText('Runtime Error', { exact: true })).toHaveCount(0);
     expect(errors).toEqual([]);
+});
+
+test('Documenti: Altro mantiene ordine, tastiera e focus dopo la conferma annullata', async ({ page }) => {
+    const { docs, names } = await documents(page);
+    const deletes: string[] = [];
+    page.on('request', request => {
+        if (request.method() === 'DELETE') deletes.push(request.url());
+    });
+    const trigger = docs.getByRole('button', { name: `Altro per ${names[0]}`, exact: true });
+    await trigger.focus();
+    await page.keyboard.press('ArrowDown');
+    const menu = page.getByRole('menu', { name: `Azioni documento ${names[0]}`, exact: true });
+    const items = menu.getByRole('menuitem');
+    await expect(items).toHaveText(['Estrai testo', 'Prepara sintesi', 'Elimina']);
+    await expect(items.first()).toHaveAccessibleName(`Estrai testo localmente da ${names[0]}`);
+    await expect(items.first()).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(items.nth(1)).toHaveAccessibleName(`Prepara sintesi di ${names[0]}`);
+    await expect(items.nth(1)).toBeFocused();
+    await page.keyboard.press('End');
+    await expect(items.last()).toHaveAccessibleName(`Elimina ${names[0]}`);
+    await expect(items.last()).toBeFocused();
+    await expect(menu.getByRole('separator')).toHaveCount(1);
+    await page.keyboard.press('Escape');
+    await expect(trigger).toBeFocused();
+    await expect(menu).toHaveCount(0);
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('Enter');
+    const confirmation = page.getByRole('dialog', { name: 'Eliminare questo documento?', exact: true });
+    await expect(confirmation).toBeVisible();
+    await expect(confirmation.getByRole('button', { name: 'Chiudi', exact: true })).toHaveCSS('border-radius', '10px');
+    await confirmation.getByRole('button', { name: 'Annulla', exact: true }).click();
+    await expect(trigger).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await docs.getByRole('button', { name: `Visualizza ${names[0]}`, exact: true }).click();
+    await expect(menu).toHaveCount(0);
+    await expect(docs.getByRole('heading', { name: names[0], exact: true })).toBeVisible();
+    expect(deletes).toEqual([]);
 });

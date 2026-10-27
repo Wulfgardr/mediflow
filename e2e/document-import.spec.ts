@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { openDocumentActions, bootstrapUnlockedSession, openPatientSection } from './utils';
 import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
 const SYNTHETIC_PNG = Buffer.from(
@@ -46,6 +46,7 @@ test('document upload saves its source before any local extraction request', asy
     name: attachmentName, mimeType: 'image/png', buffer: SYNTHETIC_PNG,
   });
   expect((await saved).ok()).toBe(true);
-  await expect(page.getByRole('button', { name: `Estrai testo localmente da ${attachmentName}` })).toBeVisible();
+  await openDocumentActions(page, attachmentName);
+  await expect(page.getByRole('menuitem', { name: `Estrai testo localmente da ${attachmentName}` })).toBeVisible();
   expect(forbiddenRequests).toEqual([]);
 });
