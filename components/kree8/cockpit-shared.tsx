@@ -681,6 +681,7 @@ function buildGlobalDiaryState(
   const mappedEntries = recentEntries.map((entry) => {
     const patient = patientById.get(entry.patientId);
     const deleted = Boolean(entry.deletedAt);
+    const date = entry.date ? new Date(entry.date) : null;
     if (!deleted) {
       activeCount += 1;
     }
@@ -702,7 +703,9 @@ function buildGlobalDiaryState(
     return {
       ...projection,
       presentation: entryPresentation(projection, entry),
-      monthLabel: new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' }).format(new Date(entry.date)),
+      monthLabel: date && Number.isFinite(date.getTime())
+        ? new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' }).format(date)
+        : 'Voci recenti',
     };
   });
 
