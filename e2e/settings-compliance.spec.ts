@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 
 const EVIDENCE_RECORD_IDS = [
@@ -11,6 +11,26 @@ const EVIDENCE_RECORD_IDS = [
 ] as const;
 
 test.describe.configure({ retries: 0 });
+
+const blockedRequests = new WeakMap<Page, string[]>();
+test.beforeEach(async ({ page, baseURL }) => {
+  const origin = new URL(baseURL!).origin;
+  if (new URL(baseURL!).hostname !== '127.0.0.1' || new URL(baseURL!).port === '3000') throw Error('Explicit synthetic loopback runtime required');
+  const blocked: string[] = []; blockedRequests.set(page, blocked);
+  await page.route('**/*', route => {
+    const request = route.request(), url = new URL(request.url());
+    if (url.origin !== origin || url.pathname.startsWith('/api/ai/') || url.pathname.startsWith('/api/icd/')) {
+      blocked.push(`${request.method()} ${request.url()}`); return route.abort();
+    }
+    if (url.pathname === '/api/siss/session-status') return route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } });
+    return route.continue();
+  });
+});
+test.afterEach(async ({ page }, info) => {
+  const allBlocked = blockedRequests.get(page) ?? [];
+  await info.attach('compliance-unexpected-requests.json', { body: JSON.stringify({ allBlocked }), contentType: 'application/json' });
+  expect(allBlocked).toEqual([]);
+});
 
 test('Compliance settings renders the technical evidence inventory without a legal verdict', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
@@ -28,7 +48,11 @@ test('Compliance settings renders the technical evidence inventory without a leg
   const records = surface.locator('[data-testid^="compliance-evidence-"]');
   await expect(records).toHaveCount(EVIDENCE_RECORD_IDS.length);
   for (const id of EVIDENCE_RECORD_IDS) {
-    await expect(surface.getByTestId(`compliance-evidence-${id}`)).toBeVisible();
+    const record = surface.getByTestId(`compliance-evidence-${id}`);
+    await expect(record).toBeVisible();
+    await expect(record.locator('[data-compliance-status]')).toBeVisible();
+    await expect(record.locator('dd').first()).toBeVisible();
+    await record.getByRole('button', { name: 'Evidenze, responsabile e fonti', exact: true }).click();
   }
 
   const dataProtection = surface.getByTestId('compliance-evidence-data_protection_by_design');
@@ -81,5 +105,7 @@ test('Compliance settings renders the technical evidence inventory without a leg
   })).toHaveAttribute('href', 'https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai');
   await expect(legalApplicability.locator('a[target="_blank"][rel="noopener noreferrer"]')).toHaveCount(3);
 
-  await expect(surface.locator('form, input, select, textarea, button, [role="switch"], [contenteditable="true"]')).toHaveCount(0);
+  await expect(surface.getByRole('button')).toHaveCount(6);
+  await expect(surface.locator('[data-disclosure-control]')).toHaveCount(6);
+  await expect(surface.locator('form, input, select, textarea, [role="switch"], [contenteditable="true"]')).toHaveCount(0);
 });
