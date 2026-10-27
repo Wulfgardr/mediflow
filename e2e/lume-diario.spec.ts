@@ -124,24 +124,29 @@ async function readGlobalWindow(page: Page): Promise<Array<{ date: string }>> {
 
 async function diarySignatures(entries: Locator): Promise<string[]> {
   const signatures: string[] = [];
-  for (const entry of await entries.all()) {
-    const actions = entry.getByRole('button', { name: 'Azioni', exact: true });
-    try {
-      await actions.focus();
-      await actions.press('ArrowDown');
-      const link = entry.getByRole('menuitem', { name: 'Nuova voce', exact: true });
-      await expect(link).toHaveCount(1);
-      await expect(link).toHaveAttribute('href', /\/entries\/new$/);
-      signatures.push(JSON.stringify([
-        await link.getAttribute('href'),
-        await entry.locator('h3').textContent(),
-      ]));
-    } finally {
-      await entry.page().keyboard.press('Escape');
-      await expect(actions).toBeFocused();
+  const activeIndex = await entries.evaluateAll(elements => elements.findIndex(element => element.getAttribute('data-active') === 'true'));
+  try {
+    for (const entry of await entries.all()) {
+      const actions = entry.getByRole('button', { name: 'Azioni', exact: true });
+      try {
+        await actions.focus();
+        await actions.press('ArrowDown');
+        const link = entry.getByRole('menuitem', { name: 'Nuova voce', exact: true });
+        await expect(link).toHaveCount(1);
+        await expect(link).toHaveAttribute('href', /\/entries\/new$/);
+        signatures.push(JSON.stringify([
+          await link.getAttribute('href'),
+          await entry.locator('h3').textContent(),
+        ]));
+      } finally {
+        await entry.page().keyboard.press('Escape');
+        await expect(actions).toBeFocused();
+      }
     }
+    return signatures;
+  } finally {
+    if (activeIndex >= 0) await entries.nth(activeIndex).focus();
   }
-  return signatures;
 }
 
 async function captureBaseline(page: Page): Promise<DiaryBaseline> {
