@@ -1,7 +1,7 @@
 /* four real clinical UI journeys with an entirely synthetic HTTP peer. */
 import { createHash } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
+import { openDocumentActions, bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
 import { finishOrdinaryChatGpt, installOrdinaryChatGptTransport, remoteMetadata, selectOrdinaryChatGpt } from './ordinary-chatgpt-ui-fixture';
 import { snapshotTreatmentReasoningProjectionAttachment, type TreatmentReasoningProjectionAttachment } from '../lib/ai-providers/fabric/treatment-reasoning-projection';
 
@@ -154,7 +154,8 @@ test('Document Synthesis ordinary ChatGPT: encrypted fixture, source citation an
   const uploaded = (await saved).request().postDataJSON() as { id: string; data: string };
   expect(uploaded.data).toMatch(/^ENC:/u);
   remote.arm();
-  await page.getByRole('button', { name: `Prepara sintesi di ${fileName}` }).click();
+  await openDocumentActions(page, fileName);
+  await page.getByRole('menuitem', { name: `Prepara sintesi di ${fileName}` }).click();
   const card = page.getByTestId(`document-synthesis-fabric-review-${uploaded.id}`);
   await card.getByRole('button', { name: 'Genera proposta' }).click();
   await card.getByLabel('Ambulatorio per questa proposta').selectOption({ index: 1 });

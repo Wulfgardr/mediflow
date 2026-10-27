@@ -6,10 +6,21 @@ import {build} from 'esbuild';
 const origin='http://127.0.0.1:48976';
 const entry=`import React from 'react';import {createRoot} from 'react-dom/client';
 import {PatientSheetActionsMenu} from './components/patient-sheet-actions-menu';
+import {PatientSheetMenu} from './components/patient-sheet-menu';
+import {ConfirmProvider,useConfirm} from './components/ui/confirm-dialog';
+function DocumentActions(){const confirm=useConfirm();return <PatientSheetMenu label="Conferma documento" trigger={props=><button {...props}>Altro referto sintetico</button>}>
+<button role="menuitem" tabIndex={-1} onClick={async()=>{await confirm({title:'Eliminare documento sintetico?',tone:'danger'});}}>Elimina referto sintetico</button>
+</PatientSheetMenu>}
 window.calls=[];
-createRoot(document.getElementById('root')).render(<PatientSheetActionsMenu editHref="/patients/synthetic/edit" canShareFhirFile={true}
+createRoot(document.getElementById('root')).render(<><PatientSheetActionsMenu editHref="/patients/synthetic/edit" canShareFhirFile={true}
  onExportFhir={()=>window.calls.push('export')} onShareFhir={()=>window.calls.push('share')} onReportPdf={()=>window.calls.push('pdf')}
- leadingActions={[{label:'Accesso assistente',onSelect:()=>{window.calls.push('assistant');const dialog=document.getElementById('dialog');dialog.hidden=false;dialog.focus();}},{label:'Gestisci checkup',onSelect:()=>window.calls.push('checkup')}]}/>);`;
+ leadingActions={[{label:'Accesso assistente',onSelect:()=>{window.calls.push('assistant');const dialog=document.getElementById('dialog');dialog.hidden=false;dialog.focus();}},{label:'Gestisci checkup',onSelect:()=>window.calls.push('checkup')}]}/>
+<PatientSheetMenu label="Azioni documento sintetico" trigger={props=><button {...props}>Altro documento</button>}>
+ <button role="menuitem" disabled>Estrazione in corso</button>
+ <button role="menuitem" tabIndex={-1}>Prepara sintesi</button>
+ <button role="menuitem" tabIndex={-1}>Elimina</button>
+ <button role="menuitem" disabled>Non disponibile</button>
+</PatientSheetMenu><ConfirmProvider><DocumentActions/></ConfirmProvider></>);`;
 
 test('header actions are an accessible ordered menu with unchanged links and callbacks', {timeout:30000},async t=>{
  assert.ok(process.env.MEDIFLOW_DATA_DIR?.trim());
@@ -46,6 +57,30 @@ test('header actions are an accessible ordered menu with unchanged links and cal
   }else await expect(trigger).toBeFocused({timeout:1000});
  }
  await trigger.focus();await page.keyboard.press('ArrowUp');await expect(menu.getByRole('menuitem').last()).toBeFocused();
- await page.keyboard.press('Tab');await expect(menu).toBeHidden();
+ await page.keyboard.press('Tab');await expect(menu).toBeHidden();await expect(trigger).toBeFocused();
  await trigger.click();await page.locator('#outside').click();await expect(menu).toBeHidden();
+ const documentTrigger=page.getByRole('button',{name:'Altro documento',exact:true});
+ await documentTrigger.focus();await page.keyboard.press('ArrowDown');
+ const documentMenu=page.getByRole('menu',{name:'Azioni documento sintetico',exact:true});
+ await expect(documentMenu.getByRole('menuitem',{name:'Prepara sintesi',exact:true})).toBeFocused();
+ await page.keyboard.press('ArrowDown');
+ await expect(documentMenu.getByRole('menuitem',{name:'Elimina',exact:true})).toBeFocused();
+ await page.keyboard.press('ArrowDown');
+ await expect(documentMenu.getByRole('menuitem',{name:'Prepara sintesi',exact:true})).toBeFocused();
+ await page.keyboard.press('End');
+ await expect(documentMenu.getByRole('menuitem',{name:'Elimina',exact:true})).toBeFocused();
+ await page.keyboard.press('Home');
+ await expect(documentMenu.getByRole('menuitem',{name:'Prepara sintesi',exact:true})).toBeFocused();
+ await page.keyboard.press('Escape');await expect(documentTrigger).toBeFocused();
+ await page.keyboard.press('ArrowUp');
+ await expect(documentMenu.getByRole('menuitem',{name:'Elimina',exact:true})).toBeFocused();
+ await page.keyboard.press('Shift+Tab');await expect(documentMenu).toHaveCount(0);await expect(documentTrigger).toBeFocused();
+ await page.keyboard.press('ArrowDown');await expect(documentMenu.getByRole('menuitem',{name:'Prepara sintesi',exact:true})).toBeFocused();
+ await page.keyboard.press('Escape');await expect(documentMenu).toHaveCount(0);await expect(documentTrigger).toBeFocused();
+ const confirmTrigger=page.getByRole('button',{name:'Altro referto sintetico',exact:true});
+ await confirmTrigger.focus();await page.keyboard.press('ArrowUp');await page.keyboard.press('Enter');
+ const confirmation=page.getByRole('dialog',{name:'Eliminare documento sintetico?',exact:true});
+ await expect(confirmation).toBeVisible();
+ await confirmation.getByRole('button',{name:'Annulla',exact:true}).click();
+ await expect(confirmation).toHaveCount(0);await expect(confirmTrigger).toBeFocused();
 });

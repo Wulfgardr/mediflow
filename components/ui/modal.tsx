@@ -108,7 +108,7 @@ export function Modal({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="mf-btn-secondary !rounded-full !p-2"
+                            className="mf-button-icon"
                             aria-label="Chiudi"
                             title="Chiudi"
                         >

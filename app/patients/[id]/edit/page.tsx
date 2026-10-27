@@ -301,7 +301,7 @@ export default function EditPatientPage() {
                                     setActionType('delete');
                                     setIsActionModalOpen(true);
                                 }}
-                                className="ui-btn-primary mf-tone-critical flex-1 px-6 py-3 lg:flex-none"
+                                className="mf-button-destructive flex-1 lg:flex-none"
                             >
                                 <Trash2 className="w-4 h-4" />
                                 Elimina
