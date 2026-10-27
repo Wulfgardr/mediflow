@@ -57,7 +57,7 @@ test('header actions are an accessible ordered menu with unchanged links and cal
   }else await expect(trigger).toBeFocused({timeout:1000});
  }
  await trigger.focus();await page.keyboard.press('ArrowUp');await expect(menu.getByRole('menuitem').last()).toBeFocused();
- await page.keyboard.press('Tab');await expect(menu).toBeHidden();
+ await page.keyboard.press('Tab');await expect(menu).toBeHidden();await expect(trigger).toBeFocused();
  await trigger.click();await page.locator('#outside').click();await expect(menu).toBeHidden();
  const documentTrigger=page.getByRole('button',{name:'Altro documento',exact:true});
  await documentTrigger.focus();await page.keyboard.press('ArrowDown');
@@ -74,7 +74,8 @@ test('header actions are an accessible ordered menu with unchanged links and cal
  await page.keyboard.press('Escape');await expect(documentTrigger).toBeFocused();
  await page.keyboard.press('ArrowUp');
  await expect(documentMenu.getByRole('menuitem',{name:'Elimina',exact:true})).toBeFocused();
- await page.keyboard.press('Shift+Tab');await expect(documentTrigger).toBeFocused();
+ await page.keyboard.press('Shift+Tab');await expect(documentMenu).toHaveCount(0);await expect(documentTrigger).toBeFocused();
+ await page.keyboard.press('ArrowDown');await expect(documentMenu.getByRole('menuitem',{name:'Prepara sintesi',exact:true})).toBeFocused();
  await page.keyboard.press('Escape');await expect(documentMenu).toHaveCount(0);await expect(documentTrigger).toBeFocused();
  const confirmTrigger=page.getByRole('button',{name:'Altro referto sintetico',exact:true});
  await confirmTrigger.focus();await page.keyboard.press('ArrowUp');await page.keyboard.press('Enter');

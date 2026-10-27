@@ -12,6 +12,10 @@ type PatientSheetMenuProps = {
     className?: string;
 };
 
+function menuItems(menu: HTMLDivElement | null) {
+    return Array.from(menu?.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled):not([aria-disabled="true"])') ?? []);
+}
+
 export function PatientSheetMenu({ label, trigger, children, triggerRef: suppliedRef, onOpen, className = '' }: PatientSheetMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
     const ownTriggerRef = useRef<HTMLButtonElement>(null);
@@ -26,11 +30,15 @@ export function PatientSheetMenu({ label, trigger, children, triggerRef: supplie
     const open = (edge: 'first' | 'last' = 'first') => {
         onOpen?.();
         initialFocus.current = edge;
+        if (isOpen) {
+            const candidates = menuItems(menuRef.current);
+            (edge === 'last' ? candidates.at(-1) : candidates[0])?.focus();
+        }
         setIsOpen(true);
     };
     useEffect(() => {
         if (!isOpen) return;
-        const candidates = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled):not([aria-disabled="true"])') ?? []);
+        const candidates = menuItems(menuRef.current);
         const position = () => {
             const menu = menuRef.current, trigger = triggerRef.current;
             if (!menu || !trigger) return;
@@ -60,7 +68,7 @@ export function PatientSheetMenu({ label, trigger, children, triggerRef: supplie
     return <div className={`${styles.actionsMenu} ${className}`} onBlur={event => {
         if (!menuRef.current?.contains(event.relatedTarget) && event.relatedTarget !== triggerRef.current) setIsOpen(false);
     }} onKeyDown={event => {
-        if (isOpen && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
+        if (isOpen && (event.key === 'Escape' || event.key === 'Tab')) { event.preventDefault(); event.stopPropagation(); close(); }
     }}>
         {trigger({ ref: triggerRef, type: 'button', 'aria-expanded': isOpen, 'aria-haspopup': 'menu', 'aria-controls': menuId,
             onClick: () => isOpen ? close() : open(), onKeyDown: event => {
@@ -73,7 +81,7 @@ export function PatientSheetMenu({ label, trigger, children, triggerRef: supplie
                 const item = event.target instanceof Element ? event.target.closest('[role="menuitem"]') : null;
                 if (item) close(item instanceof HTMLButtonElement && event.currentTarget.contains(document.activeElement));
             }} onKeyDown={event => {
-                const candidates = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled):not([aria-disabled="true"])') ?? []);
+                const candidates = menuItems(menuRef.current);
                 const index = candidates.indexOf(document.activeElement as HTMLElement);
                 let next: number | undefined;
                 if (event.key === 'ArrowDown') next = (index + 1) % candidates.length;

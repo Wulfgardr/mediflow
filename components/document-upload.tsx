@@ -340,8 +340,12 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                                 <Button {...props} variant="text" aria-label={`Altro per ${file.name}`}>Altro</Button>
                             </>}>
                                 <button type="button" role="menuitem" tabIndex={-1} onClick={() => handleLocalExtractionPreview(file)} disabled={extractingId !== null || deletingId === file.id}
-                                    className="mf-popover-row" aria-label={`Estrai testo localmente da ${file.name}`}>
-                                    <RefreshCw className={cn('h-4 w-4', extractingId === file.id && 'animate-spin')} aria-hidden="true" />Estrai testo
+                                    className="mf-popover-row" aria-label={`Estrai testo localmente da ${file.name}`}
+                                    aria-describedby={extractingId !== null ? `${uploadHintId}-${file.id}-extraction` : undefined}>
+                                    <RefreshCw className={cn('h-4 w-4 shrink-0', extractingId === file.id && 'animate-spin')} aria-hidden="true" />
+                                    <span className="text-left">Estrai testo
+                                        {extractingId !== null && <span id={`${uploadHintId}-${file.id}-extraction`} className={`block ${disclosure.hint}`}>Attendi la fine dell’estrazione in corso.</span>}
+                                    </span>
                                 </button>
                                 <button type="button" role="menuitem" tabIndex={-1} className="mf-popover-row" disabled={deletingId === file.id}
                                     aria-label={`Prepara sintesi di ${file.name}`} onClick={() => { selectSource(file.id); summaryHeading.current?.focus(); }}>Prepara sintesi</button>
