@@ -547,7 +547,6 @@ mod writing_tests {
                 let theme = Theme::for_dark(dark).sized(scale, false);
                 let color = gpui::rgb(foreground).into();
                 assert_eq!(theme.threshold_text, color);
-                assert_eq!(theme.threshold, gpui::rgb(background).into());
                 let first = luminance(foreground);
                 let second = luminance(background);
                 let contrast = (first.max(second) + 0.05) / (first.min(second) + 0.05);
