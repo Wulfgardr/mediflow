@@ -114,7 +114,7 @@ for (const route of ['modelli', 'funzioni'] as const) {
       await page.goto(`/settings/ai/${route}`);
       await pendingRead;
       const controls = page.getByTestId('ai-settings-controls');
-      const save = page.getByRole('button', { name: route === 'modelli' ? 'Salva configurazione' : 'Salva Configurazione', exact: true });
+      const save = page.getByRole('button', { name: route === 'modelli' ? 'Salva configurazione' : 'Salva parametri avanzati', exact: true });
       await expect(controls).toHaveAttribute('disabled', '');
       await expect(controls).toHaveAttribute('aria-busy', 'true');
       await expect(save).toBeDisabled();
