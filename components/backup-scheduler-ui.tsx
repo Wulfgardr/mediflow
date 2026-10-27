@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle, FolderArchive, RefreshCw, Save } from 'lucide-react';
 import styles from '@/components/settings/settings-lume.module.css';
@@ -222,8 +223,8 @@ export default function BackupSchedulerUI({ primary = true }: { primary?: boolea
             setMessage({
                 type: 'success',
                 text: deletedCount > 0
-                    ? `Retention applicata: rimossi ${deletedCount} file (${formatBytes(deletedBytes)}).`
-                    : 'Retention applicata: nessun file rimosso.',
+                    ? `Conservazione applicata: ${formatCountLabel(deletedCount, 'rimosso {count} file', 'rimossi {count} file', { template: true })} (${formatBytes(deletedBytes)}).`
+                    : 'Conservazione applicata: nessun file rimosso.',
             });
         } catch (error) {
             const text = error instanceof Error ? error.message : 'Pulizia retention fallita.';
@@ -367,7 +368,7 @@ export default function BackupSchedulerUI({ primary = true }: { primary?: boolea
                     {lastRun.lastRetentionAt && (
                         <p>
                             <strong>Ultima retention:</strong> {lastRun.lastRetentionAt}
-                            {' '}({lastRun.lastRetentionMode ?? 'n/d'}, rimossi {lastRun.lastRetentionDeletedCount ?? 0} file, {formatBytes(lastRun.lastRetentionDeletedBytes ?? 0)})
+                            {' '}({lastRun.lastRetentionMode ?? 'n/d'}, {formatCountLabel(lastRun.lastRetentionDeletedCount ?? 0, 'rimosso {count} file', 'rimossi {count} file', { template: true })}, {formatBytes(lastRun.lastRetentionDeletedBytes ?? 0)})
                         </p>
                     )}
                     {status?.plistPath && <p><strong>LaunchAgent:</strong> <code>{status.plistPath}</code></p>}
@@ -376,7 +377,7 @@ export default function BackupSchedulerUI({ primary = true }: { primary?: boolea
 
             {retentionPreview && (
                 <div className="mf-section mf-section-tight space-y-2 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
-                    <p><strong>Anteprima retention:</strong> {retentionPreview.deleteCount} file candidati, {formatBytes(retentionPreview.deleteBytes)} totali.</p>
+                    <p><strong>Anteprima retention:</strong> {formatCountLabel(retentionPreview.deleteCount, 'file candidato', 'file candidati')}, {formatBytes(retentionPreview.deleteBytes)} totali.</p>
                     <p><strong>Policy:</strong> mantieni ultimi {retentionPreview.keepArtifacts} artifact nella cartella {retentionPreview.destinationDir}</p>
                     <p><strong>Inventario:</strong> {retentionPreview.artifactCount} artifact gestiti, {retentionPreview.orphanTempCount} `.tmp` orfani</p>
                     {retentionPreview.items.length > 0 && (
@@ -387,7 +388,7 @@ export default function BackupSchedulerUI({ primary = true }: { primary?: boolea
                                 </p>
                             ))}
                             {retentionPreview.items.length > 5 && (
-                                <p>Altri {retentionPreview.items.length - 5} file non mostrati.</p>
+                                <p>{formatCountLabel(retentionPreview.items.length - 5, 'Un altro file non mostrato.', 'Altri {count} file non mostrati.', { template: true })}</p>
                             )}
                         </div>
                     )}

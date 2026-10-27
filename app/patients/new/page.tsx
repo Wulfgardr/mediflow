@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import ink from '@/components/ink-secondary.module.css';
 
 import { useState } from 'react';
@@ -284,9 +285,9 @@ export default function NewPatientPage() {
                                 </h3>
                                 <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--lume-ink-muted)' }}>
                                     {importMeta.diagnosisCount > 0
-                                        ? `Trovate ${importMeta.diagnosisCount} diagnosi candidate${importMeta.medicationCount > 0 ? ` e ${importMeta.medicationCount} terapie da valutare` : ''}: scegli cosa tenere prima di compilare la scheda.`
+                                        ? `${formatCountLabel(importMeta.diagnosisCount, 'Trovata {count} diagnosi candidata', 'Trovate {count} diagnosi candidate', { template: true })}${importMeta.medicationCount > 0 ? `; ${formatCountLabel(importMeta.medicationCount, 'terapia', 'terapie')} da valutare` : ''}: scegli cosa tenere prima di compilare la scheda.`
                                         : importMeta.medicationCount > 0
-                                            ? `Trovate ${importMeta.medicationCount} terapie da valutare: conferma, correggi o escludi prima di portarle nella scheda.`
+                                            ? `${formatCountLabel(importMeta.medicationCount, 'Trovata {count} terapia da valutare', 'Trovate {count} terapie da valutare', { template: true })}: conferma, correggi o escludi prima di portarle nella scheda.`
                                             : 'Il documento è stato letto, ma non contiene dati clinici abbastanza strutturati da proporre automaticamente.'}
                                 </p>
                                 {importMeta.quality?.reason && (

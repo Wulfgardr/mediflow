@@ -191,7 +191,7 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
           <p className={styles.areaSubtitle}>{isLoading ? 'Lettura locale…' : isError
             ? 'Impossibile leggere i conteggi locali in questa sessione.'
             : catalogState?.indexedCount == null ? 'Totale indicizzato incompleto'
-              : `${availableCatalogs} di ${catalogs.length} cataloghi disponibili · ${catalogState.indexedCount.toLocaleString('it-IT')} voci indicizzate`}</p>
+              : `${availableCatalogs} di ${formatCatalogCount(catalogs.length, 'catalogo disponibile', 'cataloghi disponibili')} · ${formatCatalogCount(catalogState.indexedCount, 'voce indicizzata', 'voci indicizzate')}`}</p>
         </div>
         <div className={styles.headerActions}><Link href="/settings/repertori" className={styles.ghostBtn}><Database size={14} />Gestisci repertori</Link></div>
       </header>

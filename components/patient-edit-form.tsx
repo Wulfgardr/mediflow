@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import styles from './clinical-register.module.css';
 import { useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -114,7 +115,7 @@ export default function PatientEditForm({ initialRecord, onSaved, onReloaded }: 
             {interrupted && (
                 <section role="alert" className="mf-alert mf-alert-warning space-y-3">
                     <h3 className="font-semibold">Salvataggio non completato</h3>
-                    <p>{interrupted.confirmed} di {interrupted.total} operazioni confermate. Il salvataggio non è atomico e le scritture applicate non sono state annullate.</p>
+                    <p>{formatCountLabel(interrupted.confirmed, 'operazione confermata', 'operazioni confermate')} su {interrupted.total}. Le modifiche già registrate non sono state annullate: il salvataggio può essere parziale.</p>
                     <p>{conflict
                         ? 'Un record è cambiato altrove. Rileggi i dati salvati e rivedi le modifiche: non verranno riapplicate con versioni nuove.'
                         : 'L’esito dell’operazione interrotta non è confermato. Il retry mantiene ID e versioni originali e salta le operazioni confermate. Una risposta persa può richiedere la rilettura.'}</p>

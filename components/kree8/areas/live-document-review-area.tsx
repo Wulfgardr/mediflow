@@ -81,7 +81,7 @@ function LiveDocumentReviewArea({
                     <div className={styles.rowMain}>
                       <Sparkles size={14} aria-hidden="true" />
                       <span className={styles.rowTitle}>
-                        {documentInsightCount} sintesi documentali persistite
+                        {formatCountLabel(documentInsightCount, 'sintesi documentale salvata', 'sintesi documentali salvate')}
                       </span>
                     </div>
                     <span className={styles.status}>Da verificare</span>

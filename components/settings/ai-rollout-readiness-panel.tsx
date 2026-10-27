@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, PauseCircle, RefreshCw, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -179,7 +180,7 @@ export default function AiRolloutReadinessPanel() {
                                 </p>
                             </div>
                             <p className={styles.muted} data-testid="ai-rollout-local-control-summary">
-                                {disabledControlsCount} funzioni spente su {localControls.length}
+                                {formatCountLabel(disabledControlsCount, 'funzione spenta', 'funzioni spente')} su {localControls.length}
                             </p>
                         </div>
                         <div className={styles.rows}>

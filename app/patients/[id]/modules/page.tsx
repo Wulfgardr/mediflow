@@ -324,7 +324,7 @@ export default function PatientDetailPage() {
         : birthYear
             ? `Stima da codice fiscale (${birthYear})`
             : 'Non disponibile';
-    const ageLabel = birthYear ? `${calculateAge(birthYear)} anni` : 'Età non disponibile';
+    const ageLabel = birthYear ? formatCountLabel(calculateAge(birthYear), 'anno', 'anni') : 'Età non disponibile';
     const activeEntries = (entries ?? []).filter((entry) => !entry.deletedAt);
     const nonScaleEntries = activeEntries.filter((entry) => entry.type !== 'scale');
     const scaleEntries = activeEntries.filter((entry) => entry.type === 'scale');
@@ -591,7 +591,7 @@ export default function PatientDetailPage() {
             ]}
             patientDetails={{
                 birthDateLabel: patient.birthDate ? birthDateLabel : undefined,
-                ageLabel: patient.birthDate ? `${differenceInYears(new Date(currentTimestampMs), new Date(patient.birthDate))} anni` : undefined,
+                ageLabel: patient.birthDate ? formatCountLabel(differenceInYears(new Date(currentTimestampMs), new Date(patient.birthDate)), 'anno', 'anni') : undefined,
                 taxCode: patient.taxCode || undefined,
             }}
             navGroups={workspaceNavGroups}

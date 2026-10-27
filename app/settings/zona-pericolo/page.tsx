@@ -1,6 +1,6 @@
 'use client';
 
-// WUL-297 Zona Pericolo: isolated surface with explicit typed confirmation.
+// WUL-297 Zona pericolo: isolated surface with explicit typed confirmation.
 
 import { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
@@ -51,7 +51,7 @@ export default function SettingsDangerZonePage() {
 
     return (
         <section className={styles.page} data-testid="settings-danger-zone-section">
-            <header className={styles.intro}><h2>Zona Pericolo</h2><p>Operazioni che riportano la postazione a uno stato precedente. Richiedono riconfigurazione.</p></header>
+            <header className={styles.intro}><h2>Zona pericolo</h2><p>Operazioni che riportano la postazione a uno stato precedente. Richiedono riconfigurazione.</p></header>
             <section className={styles.section}>
                 <h3 className={styles.heading}><AlertTriangle aria-hidden />Ripristina configurazione iniziale</h3>
                 <p>Elimina gli account e richiede una nuova configurazione iniziale.</p>
