@@ -147,7 +147,19 @@ test('Scales library: search pending, error, empty, long identity and stale-term
                 const target = baseline ? section.getByRole('heading', { name: 'Scegli il paziente', exact: true })
                     : section.getByRole(mode === 'pending' ? 'status' : 'alert');
                 await capture(page, target, `search-${mode}-1440`, mock.frames);
-                if (mode === 'error') await layoutFrames(zoom, target, 'search-error', mock.frames);
+                if (mode === 'error') {
+                    await layoutFrames(zoom, target, 'search-error', mock.frames);
+                    if (!baseline) {
+                        const search = section.getByRole('textbox', { name: 'Cerca paziente per nome o codice fiscale', exact: true });
+                        await mock.observeRead('/api/patients', 'error', () => search.fill('Dimostrativa'));
+                        mock.state.list = 'ready';
+                        await mock.observeRead('/api/patients', 'ready', () => section.getByRole('button', { name: 'Riprova', exact: true }).click());
+                        await expect(start).toHaveCount(1);
+                        await expect(search).toHaveValue('Dimostrativa');
+                        await expect(page.getByRole('button', { name: /ADL \(Indice di Katz\)/u })).toHaveAttribute('aria-pressed', 'true');
+                        mock.observations.push({ retry: 'search503ToReady', termPreserved: true, scalePreserved: true });
+                    }
+                }
             } else if (mode === 'empty') {
                 await expect(section.getByText('Nessuna scheda corrisponde alla ricerca.', { exact: true })).toBeVisible();
                 await expect(start).toHaveCount(0);
@@ -207,6 +219,13 @@ test('Patient scales library: pending, failed, absent and ready patient before o
                 : mode === 'ready' ? links.first() : library.getByRole(mode === 'error' ? 'alert' : 'status');
             await capture(page, target, `patient-library-${mode}-1440`, mock.frames);
             if (mode === 'missing') await layoutFrames(zoom, target, 'patient-library-missing', mock.frames);
+            if (!baseline && mode === 'error') {
+                mock.state.patient = 'ready';
+                await mock.observeRead(`/api/patients/${patientId}`, 'ready', () => library.getByRole('button', { name: 'Riprova', exact: true }).click());
+                await expect(links).toHaveCount(5);
+                await expect(library.getByRole('alert')).toHaveCount(0);
+                mock.observations.push({ retry: 'patientLibrary503ToReady', startLinks: await links.count() });
+            }
             mock.release();
         }
     } finally { try { await mock.finish(); } finally { await zoom.close(); } }
@@ -235,7 +254,16 @@ test('Scale runner: patient pending, failure and absence never become a valid fo
             }
             const target = mode === 'ready' ? form.locator('legend h3') : form.getByRole(!baseline && mode === 'error' ? 'alert' : 'status');
             await capture(page, target, `runner-${mode}-1440`, mock.frames);
-            if (mode === 'error') await layoutFrames(zoom, target, 'runner-error', mock.frames);
+            if (mode === 'error') {
+                await layoutFrames(zoom, target, 'runner-error', mock.frames);
+                if (!baseline) {
+                    mock.state.patient = 'ready';
+                    await mock.observeRead(`/api/patients/${patientId}`, 'ready', () => form.getByRole('button', { name: 'Riprova', exact: true }).click());
+                    await expect(form.getByRole('radio').first()).toBeEnabled();
+                    await expect(form.getByRole('alert')).toHaveCount(0);
+                    mock.observations.push({ retry: 'runner503ToReady', formEnabled: true });
+                }
+            }
             mock.release();
         }
     } finally { try { await mock.finish(); } finally { await zoom.close(); } }
