@@ -26,6 +26,8 @@ struct HostState {
     replace_after_successful_put: bool,
     archived: bool,
 }
+type PlannedResponse = (String, std::sync::mpsc::Receiver<(u16, Value)>);
+
 pub(super) struct Host {
     pub(super) session: RuntimeSession,
     socket: std::net::SocketAddr,
@@ -33,6 +35,7 @@ pub(super) struct Host {
     state: Arc<Mutex<HostState>>,
     stop: Arc<AtomicBool>,
     worker: Option<thread::JoinHandle<()>>,
+    responses: Arc<Mutex<std::collections::VecDeque<PlannedResponse>>>,
 }
 impl Host {
     pub(super) fn new() -> Self {
@@ -53,17 +56,36 @@ impl Host {
         let shared = state.clone();
         let stop = Arc::new(AtomicBool::new(false));
         let stopping = stop.clone();
+        let responses = Arc::new(Mutex::new(
+            std::collections::VecDeque::<PlannedResponse>::new(),
+        ));
+        let planned = responses.clone();
         let worker = thread::spawn(move || {
+            let mut workers = Vec::new();
             loop {
                 let (mut stream, _) = listener.accept().unwrap();
                 if stopping.load(Ordering::Acquire) {
                     break;
                 }
+                let captured = captured.clone();
+                let shared = shared.clone();
+                let planned = planned.clone();
+                workers.push(thread::spawn(move || {
                 stream
                     .set_read_timeout(Some(Duration::from_secs(10)))
                     .unwrap();
-                let (route, body) = request(&mut stream);
+                let Some((route, body)) = request(&mut stream) else { return; };
                 captured.lock().unwrap().push((route.clone(), body.clone()));
+                let response = {
+                    let mut planned = planned.lock().unwrap();
+                    planned.iter().position(|(prefix,_)| route.starts_with(prefix)).and_then(|index| planned.remove(index)).map(|(_, response)| response)
+                };
+                if let Some(response) = response {
+                    let (status, body) = response.recv_timeout(Duration::from_secs(15)).expect("planned fixture response released");
+                    let body = body.to_string();
+                    let _ = write!(stream, "HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+                    return;
+                }
                 let mut state = shared.lock().unwrap();
                 let mut status = 200;
                 let response = match route.as_str() {
@@ -107,7 +129,7 @@ impl Host {
                         state.notes = body["notes"].clone();
                         state.version += 1;
                     }
-                    if status == 0 { continue; }
+                    if status == 0 { return; }
                     let response = if state.replaced { json!({"code":"ARCHIVE_REPLACED"}) }
                     else if status == 409 { json!({"code":"VERSION_CONFLICT"}) } else { json!({"success":true}) };
                     if status == 200 && state.replace_after_successful_put { state.replaced = true; }
@@ -120,7 +142,11 @@ impl Host {
                 value => panic!("unexpected fixture route: {value}"),
             }.to_string();
                 drop(state);
-                write!(stream, "HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nSet-Cookie: mediflow_session={}; Path=/; HttpOnly\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}", "a".repeat(64), response.len()).unwrap();
+                let _ = write!(stream, "HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nSet-Cookie: mediflow_session={}; Path=/; HttpOnly\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}", "a".repeat(64), response.len());
+                }));
+            }
+            for worker in workers {
+                worker.join().unwrap();
             }
         });
         let client = RuntimeClient::new(RuntimeConfig {
@@ -143,8 +169,27 @@ impl Host {
             state,
             stop,
             worker: Some(worker),
+            responses,
         }
     }
+    pub(super) fn plan(&self, prefix: &str) -> std::sync::mpsc::Sender<(u16, Value)> {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        self.responses
+            .lock()
+            .unwrap()
+            .push_back((prefix.into(), receiver));
+        sender
+    }
+
+    pub(super) fn routes(&self) -> Vec<String> {
+        self.requests
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(route, _)| route.clone())
+            .collect()
+    }
+
     pub(super) fn replace_archive(&self) {
         self.state.lock().unwrap().identity_replaced = true;
     }
@@ -171,11 +216,11 @@ impl Drop for Host {
         self.worker.take().unwrap().join().unwrap();
     }
 }
-fn request(stream: &mut TcpStream) -> (String, Value) {
+fn request(stream: &mut TcpStream) -> Option<(String, Value)> {
     let mut header = vec![];
     let mut byte = [0];
     while !header.ends_with(b"\r\n\r\n") {
-        stream.read_exact(&mut byte).unwrap();
+        stream.read_exact(&mut byte).ok()?;
         header.push(byte[0]);
         assert!(header.len() < 16384);
     }
@@ -190,8 +235,8 @@ fn request(stream: &mut TcpStream) -> (String, Value) {
         .unwrap_or(0);
     assert!(size < 128 * 1024);
     let mut body = vec![0; size];
-    stream.read_exact(&mut body).unwrap();
-    (
+    stream.read_exact(&mut body).ok()?;
+    Some((
         header
             .lines()
             .next()
@@ -205,7 +250,7 @@ fn request(stream: &mut TcpStream) -> (String, Value) {
         } else {
             serde_json::from_slice(&body).unwrap()
         },
-    )
+    ))
 }
 pub(super) fn draw(cx: &mut gpui::VisualTestContext) {
     for _ in 0..8 {
