@@ -1053,11 +1053,8 @@
 
 /* WUL-676: area headings and anchor navigation share one alignment.
    Only the navigation marks scroll position; data surfaces retain their shape. */
-:global(html[data-runtime-twin-design='proposal']) .overviewShell {
-  --overview-inset: var(--ink-plane-inset);
-}
 :global(html[data-runtime-twin-design='proposal']) .overviewShell .chrome {
-  padding: 28px var(--overview-inset) 20px;
+  padding: 28px var(--ink-plane-inset) 20px;
   border: 0;
 }
 :global(html[data-runtime-twin-design='proposal']) .overviewShell .hero { padding: 0; }
@@ -1080,7 +1077,7 @@
   flex-wrap: nowrap;
   gap: 0 20px;
   min-height: 44px;
-  padding: 4px var(--overview-inset);
+  padding: 4px var(--ink-plane-inset);
   overflow-x: auto;
   scroll-snap-type: none;
   border-bottom: 1px solid var(--k8-line);
@@ -1106,17 +1103,15 @@
   box-shadow: inset 0 -2px var(--lume-ink);
 }
 :global(html[data-runtime-twin-design='proposal']) .overviewShell .workspaceBody {
-  padding: 24px var(--overview-inset) 50px;
+  padding: 24px var(--ink-plane-inset) 50px;
 }
 :global(html[data-runtime-twin-design='proposal']) .overviewShell .workspaceBody :global(section[id]) {
   scroll-margin-top: 60px;
 }
 @media (max-width: 700px) {
-  :global(html[data-runtime-twin-design='proposal']) .overviewShell { --overview-inset: var(--ink-plane-inset); }
   :global(html[data-runtime-twin-design='proposal']) .overviewShell .sectionRail { column-gap: 12px; }
 }
 @media (max-width: 360px) {
   :global(html[data-runtime-twin-design='proposal']) .overviewShell .sectionRail { column-gap: 8px; }
 }
 @media (pointer: fine) and (min-width: 701px) { :global(html[data-runtime-twin-design='proposal']) .headerActionButton { white-space: nowrap; } }
-
