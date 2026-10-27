@@ -1,0 +1,20 @@
+.page, .controls, .advanced, .advancedBody { display: grid; min-width: 0; }
+.page, .controls { gap: 24px; }
+.page p { margin-block: 0; font-size: 0.875rem; line-height: 1.6; overflow-wrap: anywhere; }
+.distinction, .hint { color: var(--lume-ink-muted); }
+.notice { display: grid; gap: 8px; min-width: 0; padding-block: 16px; border-block: 1px solid var(--lume-rule); }
+.notice a { width: fit-content; max-width: 100%; min-height: 44px; align-content: center; overflow-wrap: anywhere; }
+.controls { border: 0; padding: 0; margin: 0; }
+.advanced { gap: 8px; padding-top: 24px; border-top: 1px solid var(--lume-rule); }
+.advanced > h3 { margin: 0; font: var(--type-strong); }
+.advancedBody { gap: 16px; padding-block: 8px 20px; }
+.advancedRow { min-width: 0; padding-block: 12px; border-bottom: 1px solid var(--lume-rule); }
+.advancedRow > div { flex-wrap: wrap; }
+.advancedRow :global([data-choice-field]) { flex: 1 1 180px; max-width: 100%; }
+.reviewState { color: var(--lume-signal-critical); font-size: 0.8125rem; font-weight: 600; }
+.rowTitle { font-weight: 600; }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.fact { min-width: 0; padding-block: 12px; border-block: 1px solid var(--lume-rule); }
+.save { padding-top: 16px; border-top: 1px solid var(--lume-rule); }
+.save button { max-width: 100%; white-space: normal; text-align: center; }
+@media (max-width: 600px) { .facts { grid-template-columns: minmax(0, 1fr); } }
