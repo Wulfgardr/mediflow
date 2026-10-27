@@ -84,7 +84,7 @@
 .documentRow { padding-block: 12px; border-bottom: 1px solid var(--lume-rule); }
 .documentRow[data-selected='true'] { background: var(--lume-surface-selected); }
 .documentName { margin: 0; font: 600 0.875rem/1.5 var(--lume-font-sans); }
-.documentActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.documentActions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
 .sourceChoice { display: grid; gap: 12px; margin-block: 20px; }
 .documentArchive { margin-top: 28px; padding-top: 8px; border-top: 1px solid var(--lume-rule-strong); }
 .documentTable :is(th,td):last-child { width: 47%; }
@@ -94,7 +94,7 @@
  .documentTable tr { padding-block: 12px; border-bottom: 1px solid var(--lume-rule); }
  .documentTable :is(th,td):last-child { width: 100%; }
  .documentTable td { border: 0; padding: 0; }
- .documentActions { gap: 4px 12px; margin-top: 4px; }
+ .documentActions { gap: 12px; margin-top: 4px; }
 }
 .inlineViewer { border: 1px solid var(--lume-rule-strong); background: var(--lume-surface-canvas); }
 .inlineViewer header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px; border-bottom: 1px solid var(--lume-rule); }
@@ -142,7 +142,7 @@
 .statusSummary { flex: 1 1 22rem; min-width: 0; overflow-wrap: anywhere; }
 .statusSummary p { margin-top: 8px; }
 .statusWarning { color: var(--lume-signal-warning); }
-.statusActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.statusActions { display: flex; flex-wrap: wrap; gap: 12px; }
 @media (max-width: 700px) { .statusActions, .statusActions button { width: 100%; } }
 
 .therapyHeading, .therapySection > [data-section-header] { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding-bottom: 12px; border-bottom: 1px solid var(--lume-rule-strong); }

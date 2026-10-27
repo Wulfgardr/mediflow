@@ -8,7 +8,7 @@ import { scopedNotesOpenInput } from './fixtures/scoped-profile-notes-query';
 import { randomUUID } from 'node:crypto';
 import { expect, type Page, type Request, type TestInfo } from '@playwright/test';
 import { parseDocumentSynthesisPreviewWire } from '../lib/ai-providers/fabric/document-synthesis-preview-wire';
-import { openPatientSection } from './utils';
+import { openDocumentActions, openPatientSection } from './utils';
 
 type Options = Readonly<{
     confirmedSyntheticSandbox: true;
@@ -134,7 +134,8 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         await expect(page.locator('iframe, object, embed')).toHaveCount(0);
         await page.getByRole('button', { name: 'Chiudi', exact: true }).click();
         await expect(page.getByTestId('document-viewer')).toHaveCount(0);
-        await first.getByRole('button', { name: `Prepara sintesi di ${names[0]}`, exact: true }).click();
+        await openDocumentActions(page, names[0]);
+        await first.getByRole('menuitem', { name: `Prepara sintesi di ${names[0]}`, exact: true }).click();
         await expect(docs.getByLabel('Documento da sintetizzare')).toHaveValue(firstId!);
         await expect(page.getByTestId('document-preview-text')).toHaveText(files[0].buffer.toString('utf8'));
         expect(detailReads().map((item) => item.path)).toEqual(['/api/attachments/' + firstId, '/api/attachments/' + firstId]);
@@ -193,7 +194,8 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
                 { path: PREFIX + 'preview', bodyKeys: ['previewHandle'] },
             ]);
             await page.screenshot({ path: info.outputPath('document-flow-real-result.png'), fullPage: false });
-            await second.getByRole('button', { name: `Prepara sintesi di ${names[1]}`, exact: true }).click();
+            await openDocumentActions(page, names[1]);
+            await second.getByRole('menuitem', { name: `Prepara sintesi di ${names[1]}`, exact: true }).click();
             await expect(docs.getByTestId('document-synthesis-fabric-result')).toHaveCount(0);
             expect(synthesisCalls()).toHaveLength(3);
         }
@@ -216,12 +218,14 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         const deleteRow = async (name: string, cancelFirst: boolean) => {
             const row = rows.filter({ has: page.getByRole('heading', { name, exact: true }) });
             const before = writes('DELETE').length;
-            await row.getByRole('button', { name: `Elimina ${name}`, exact: true }).click();
+            await openDocumentActions(page, name);
+            await row.getByRole('menuitem', { name: `Elimina ${name}`, exact: true }).click();
             const dialog = page.getByRole('dialog', { name: 'Eliminare questo documento?' });
             if (cancelFirst) {
                 await dialog.getByRole('button', { name: 'Annulla', exact: true }).click();
                 await expect(row).toBeVisible(); expect(writes('DELETE')).toHaveLength(before);
-                await row.getByRole('button', { name: `Elimina ${name}`, exact: true }).click();
+                await openDocumentActions(page, name);
+                await row.getByRole('menuitem', { name: `Elimina ${name}`, exact: true }).click();
             }
             await dialog.getByRole('button', { name: 'Elimina', exact: true }).click();
             await expect(row).toHaveCount(0); expect(writes('DELETE')).toHaveLength(before + 1);

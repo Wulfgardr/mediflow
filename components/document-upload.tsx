@@ -1,6 +1,8 @@
 'use client';
 
 import { formatCountLabel } from '@/lib/format-count';
+import { PatientSheetMenu } from '@/components/patient-sheet-menu';
+import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/disclosure';
 import styles from './clinical-register.module.css';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
@@ -335,16 +337,20 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                                     className={disclosure.documentAction} data-lume-action="quiet" title="Visualizza" aria-label={`Visualizza ${file.name}`}>
                                     <Eye className="h-4 w-4" aria-hidden="true" />Apri
                                 </button>
-                                <button type="button" onClick={() => handleLocalExtractionPreview(file)} disabled={extractingId !== null || deletingId === file.id}
-                                    className={disclosure.documentAction} data-lume-action="quiet" aria-label={`Estrai testo localmente da ${file.name}`}>
-                                    <RefreshCw className={cn('h-4 w-4', extractingId === file.id && 'animate-spin')} aria-hidden="true" />Estrai testo
-                                </button>
-                                <button type="button" className={disclosure.documentAction} data-lume-action="quiet" disabled={deletingId === file.id}
-                                    aria-label={`Prepara sintesi di ${file.name}`} onClick={() => { selectSource(file.id); summaryHeading.current?.focus(); }}>Prepara sintesi</button>
-                                <button type="button" onClick={() => handleDelete(file)} disabled={deletingId !== null}
-                                    className={`${disclosure.documentAction} ${disclosure.removeAction}`} data-lume-action="quiet" aria-label={`Elimina ${file.name}`}>
-                                    <Trash2 className="h-4 w-4" aria-hidden="true" />{deletingId === file.id ? 'Eliminazione…' : 'Elimina'}
-                                </button>
+                                <PatientSheetMenu label={`Azioni documento ${file.name}`} trigger={props =>
+                                    <Button {...props} variant="text" aria-label={`Altro per ${file.name}`}>Altro</Button>}>
+                                    <button type="button" role="menuitem" tabIndex={-1} onClick={() => handleLocalExtractionPreview(file)} disabled={extractingId !== null || deletingId === file.id}
+                                        className="mf-popover-row" aria-label={`Estrai testo localmente da ${file.name}`}>
+                                        <RefreshCw className={cn('h-4 w-4', extractingId === file.id && 'animate-spin')} aria-hidden="true" />Estrai testo
+                                    </button>
+                                    <button type="button" role="menuitem" tabIndex={-1} className="mf-popover-row" disabled={deletingId === file.id}
+                                        aria-label={`Prepara sintesi di ${file.name}`} onClick={() => { selectSource(file.id); summaryHeading.current?.focus(); }}>Prepara sintesi</button>
+                                    <div role="separator" className="my-3 border-t border-[color:var(--lume-rule)]" />
+                                    <button type="button" role="menuitem" tabIndex={-1} onClick={() => handleDelete(file)} disabled={deletingId !== null}
+                                        className="mf-popover-row mf-button-destructive" aria-label={`Elimina ${file.name}`}>
+                                        <Trash2 className="h-4 w-4" aria-hidden="true" />{deletingId === file.id ? 'Eliminazione…' : 'Elimina'}
+                                    </button>
+                                </PatientSheetMenu>
                             </div>
 
                     </td></tr>

@@ -455,7 +455,7 @@ export default function ObservationManager({
                     />
                 </label>
 
-                <div className="md:col-span-2 flex flex-wrap justify-end gap-2">
+                <div className="md:col-span-2 flex flex-wrap justify-end gap-3">
                     <Button variant="secondary" onClick={closeForm} disabled={isSaving}>Annulla</Button>
                     <Button
                         type="submit"
