@@ -141,6 +141,47 @@ test('readiness reread callback keeps the same GET endpoint/cache and error tran
     assert.match(text(harness.render(), false), /non disponibili/i);
 });
 
+function parliament(status: string, payload: unknown = null, globals: Record<string, unknown> = {}) {
+    return mountContract(path('ai-model-parliament-panel'), 'default', {
+        states: { 0: { status, payload, message: 'HTTP 503 synthetic' } }, globals,
+    });
+}
+
+test('Parliament shows one loading state and keeps technical read errors in a closed disclosure', () => {
+    for (const status of ['idle', 'loading']) {
+        const tree = parliament(status).render();
+        assert.equal(flatten(tree).filter(node => node.props.role === 'status').length, 1);
+        assert.match(text(tree, false), /Lettura del report salvato…/);
+        assert.doesNotMatch(text(tree, false), /HTTP 503|Report non disponibile/);
+    }
+    const failed = parliament('error').render();
+    assert.equal(flatten(failed).filter(node => node.props.role === 'alert').length, 1);
+    assert.match(text(failed, false), /Impossibile leggere il report salvato\. Usa «Aggiorna» per riprovare\./);
+    assert.doesNotMatch(text(failed, false), /HTTP 503 synthetic/);
+    assert.match(text(failed), /HTTP 503 synthetic/);
+    const disclosure = find(failed, node => !!node.props['data-disclosure']);
+    assert.equal(find(disclosure, node => node.type === 'button').props['aria-expanded'], false);
+    assert.equal(find(disclosure, node => node.props.hidden === true).props.hidden, true);
+});
+
+test('Parliament reread preserves the GET contract and hides the old report during loading and failure', async () => {
+    const requests: Array<[unknown, unknown]> = [];
+    const payload = { updatedAt: 'synthetic', report: { parliament: { readiness: 'hold', rationale: 'OLD_REPORT_SENTINEL' } } };
+    const harness = parliament('ready', payload, { fetch: async (...args: unknown[]) => {
+        requests.push(args as [unknown, unknown]); return new Response('{}', { status: 503 });
+    } });
+    assert.match(text(harness.render(), false), /OLD_REPORT_SENTINEL/);
+    click(buttons(harness.render())[0]);
+    assert.match(text(harness.render(), false), /Lettura del report salvato…/);
+    assert.doesNotMatch(text(harness.render(), false), /OLD_REPORT_SENTINEL/);
+    await nextTurn();
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0][0], '/api/system/ai-parliament');
+    assert.deepEqual(JSON.parse(JSON.stringify(requests[0][1])), { cache: 'no-store' });
+    assert.match(text(harness.render(), false), /Report non disponibile/);
+    assert.doesNotMatch(text(harness.render(), false), /OLD_REPORT_SENTINEL|HTTP 503/);
+});
+
 function guard(data: AiRolloutGuardPayload | null, model = 'synthetic-model') {
     return mountContract(path('ai-rollout-guard-notice'), 'default', { states: { 0: data },
         props: { selections: [{ roleId: 'clinical', roleLabel: 'clinical-internal-role', model }] },
