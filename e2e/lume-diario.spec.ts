@@ -124,7 +124,11 @@ async function readGlobalWindow(page: Page): Promise<Array<{ date: string }>> {
 
 async function diarySignatures(entries: Locator): Promise<string[]> {
   const signatures: string[] = [];
-  const activeIndex = await entries.evaluateAll(elements => elements.findIndex(element => element.getAttribute('data-active') === 'true'));
+  const sample = await entries.evaluateAll(elements => elements.map(element => ({
+    label: element.getAttribute('aria-labelledby'), title: element.querySelector('h3')?.textContent,
+    active: element.getAttribute('data-active'),
+  })));
+  const activeIndex = sample.findIndex(row => row.active === 'true');
   try {
     for (const entry of await entries.all()) {
       const actions = entry.getByRole('button', { name: 'Azioni', exact: true });
@@ -145,7 +149,20 @@ async function diarySignatures(entries: Locator): Promise<string[]> {
     }
     return signatures;
   } finally {
-    if (activeIndex >= 0) await entries.nth(activeIndex).focus();
+    if (activeIndex >= 0) {
+      await entries.nth(activeIndex).focus();
+      await expect.poll(async () => {
+        const rows = await entries.evaluateAll(elements => elements.map(element => ({
+          label: element.getAttribute('aria-labelledby'), title: element.querySelector('h3')?.textContent,
+          active: element.getAttribute('data-active'), background: getComputedStyle(element).backgroundColor,
+        })));
+        if (!rows.length || rows.length !== sample.length
+          || rows.some((row, index) => row.label !== sample[index].label || row.title !== sample[index].title)
+          || rows[activeIndex].active !== 'true' || rows.filter(row => row.active === 'true').length !== 1) return false;
+        const inactive = rows.filter(row => row.active !== 'true');
+        return inactive.every(row => row.background !== rows[activeIndex].background && row.background === inactive[0].background);
+      }).toBe(true);
+    }
   }
 }
 
