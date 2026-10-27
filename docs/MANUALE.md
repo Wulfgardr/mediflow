@@ -205,8 +205,9 @@ esportabili in un archivio esistente. Non contiene account né involucri delle
 chiavi e non sostituisce il backup completo. Il ripristino sostituisce i dati
 del formato portabile; account e chiavi dell'archivio restano invariati.
 
-La verifica e il ripristino del file portabile lo elaborano interamente in
-memoria: per archivi grandi serve memoria libera sufficiente sul computer.
+La verifica e il ripristino elaborano il file interamente in memoria, sia per il
+backup completo sia per il file portabile: per archivi grandi serve memoria
+libera sufficiente sul computer.
 
 All'apertura su macOS e Linux, MediFlow limita al proprietario l'accesso a
 `medical.db` e ai file di lavoro SQLite `-wal` e `-shm`. Non modifica file
