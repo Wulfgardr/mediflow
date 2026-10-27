@@ -27,7 +27,7 @@ test('initial list errors, refresh errors and empty state are distinct; retry is
     assert.match(source, /Elenco documenti non disponibile/u);
     assert.match(source, /onClick=\{refreshAttachments\} disabled=\{listLoading\}>Riprova elenco/u);
     assert.match(source, /currentAttachments\?\.length === 0 && !listLoading/u);
-    assert.match(source, /!listError && attachments === undefined/u);
+    assert.match(source, /listLoading \? 'Caricamento documenti…'/u);
     assert.match(source, /Estrazione da rivedere · esito non confermato/u);
     assert.match(source, /Un errore di rete o di sessione non indica necessariamente che l’estrazione locale non sia supportata/u);
 });
