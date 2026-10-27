@@ -37,6 +37,22 @@ questo confronto. Modello, statechart, invarianti, limiti e mutanti non cambiano
 `verify:therapy-status` deve completare il modello legacy e i test causali correnti.
 Questa revisione di presentazione non estende la copertura TLC al protocollo durevole.
 
+## Riconciliazione HC-7 e HC-8 del 27 ottobre 2026
+
+Riesaminato il manager risultante dal merge `b55681f6e5d27a55a42ae42c4a1dd9f3ad0a8668` rispetto a entrambi
+i genitori: HC-8 conserva `htmlFor`/`id` del campo Farmaco e il consumer
+`DrugAutocomplete`; HC-7 conserva destinatario cognome/nome, oggetto e
+conseguenza delle eliminazioni, riepilogo e verbo del cambio stato e del
+nuovo invio. Riesaminati i consumer `ConfirmProvider`, `useDialogA11y` e
+`DrugAutocomplete`: focus iniziale e associazione del campo restano separati
+dai callback del controller. Non cambiano transizioni, guardie, confini degli
+await, `begin`/`confirm`/`cancel`/`recover`, CAS, ledger, audit o altri writer.
+Le altre superfici coperte conservano le impronte precedenti. Modello,
+statechart, invarianti, limiti, testimoni e mutanti restano invariati.
+Aggiornati manualmente il pin del manager e `syncCommit` alla revisione
+riesaminata; il raccordo non estende TLC a presentazione e accessibilità.
+Il comando completo `verify:therapy-status` deve essere rieseguito sul risultato.
+
 ## Raccordo della copertura al 26 ottobre 2026
 
 `coverage.json.syncCommit` identifica ora la revisione del runtime riesaminata
