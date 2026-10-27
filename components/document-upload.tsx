@@ -301,8 +301,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                     <p id={uploadHintId} className={styles.uploadHint}>Scegli o trascina fino a 10 file, 25 MB ciascuno. Il caricamento salva gli allegati, senza avviare estrazione o sintesi.</p>
                 </div>
                 {isProcessing && (
-                    <div className="mt-3 flex flex-wrap items-center gap-3" role="status">
-                        <span>{stopRequested ? 'Interruzione richiesta. Attesa dell’esito del file già inviato.' : 'Salvataggio allegati in corso…'}</span>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
                         <button type="button" className={disclosure.documentAction} data-lume-action="quiet" disabled={stopRequested}
                             onClick={() => { uploadQueue.cancel(); setStopRequested(true); }}>Interrompi coda</button>
                         <p className={disclosure.hint}>Un file già inviato può essere salvato; l’interruzione ferma solo lettura e invii successivi.</p>
@@ -326,7 +325,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
             </section>
 
             <p ref={listStatus} role="status" aria-label="Stato elenco documenti" aria-live="polite" aria-atomic="true" tabIndex={isProcessing || listLoading ? 0 : -1}>
-                {isProcessing ? 'Salvataggio allegati in corso…' : listLoading ? 'Caricamento documenti…'
+                {isProcessing ? (stopRequested ? 'Interruzione richiesta. Attesa dell’esito del file già inviato.' : 'Salvataggio allegati in corso…') : listLoading ? 'Caricamento documenti…'
                     : listError ? 'Elenco documenti non disponibile.'
                         : `${formatCountLabel(attachments?.length ?? 0, 'documento caricato', 'documenti caricati')}.`}
             </p>
