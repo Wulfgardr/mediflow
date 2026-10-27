@@ -201,7 +201,7 @@ test('diagnosis-only edit guards navigation and retains the draft after cancella
     await expect(reference).toHaveCount(0);
     await nav().getByRole('link', { name: 'Pazienti', exact: true }).click();
     await expect(leave).toBeVisible();
-    await leave.getByRole('button', { name: 'Continua a scrivere', exact: true }).click();
+    await leave.getByRole('button', { name: 'Continua la compilazione', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`${editPath}$`));
     await expect(diagnosis).toHaveValue(updatedDiagnosis);
     await expect(page.locator('input[name="diagnoses.0.description"]')).toHaveValue(updatedDiagnosis);
@@ -267,7 +267,7 @@ test('entry survives disclosure, cross-tab layout change and cancelled navigatio
   await nav().getByRole('link', { name: 'Pazienti', exact: true }).click();
   const leave = page.getByRole('dialog', { name: 'Lasciare la compilazione?' });
   await expect(leave).toBeVisible();
-  await leave.getByRole('button', { name: 'Continua a scrivere' }).click();
+  await leave.getByRole('button', { name: 'Continua la compilazione' }).click();
   await expect(editor).toContainText(draft);
   const created = page.waitForResponse(response => new URL(response.url()).pathname === '/api/entries' && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Registra nel diario', exact: true }).click();

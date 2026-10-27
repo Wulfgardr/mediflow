@@ -1239,6 +1239,7 @@ html:root[data-lume] :is(.mf-button-primary, .ui-btn-primary, .mf-button-seconda
 
 .mf-button-destructive {
   color: var(--lume-signal-critical);
+  border-color: var(--lume-signal-critical);
 }
 
 .mf-button-destructive:where(:hover):where(:not(:disabled)) {
@@ -1278,7 +1279,9 @@ html:root[data-lume] :is(.mf-button-primary, .ui-btn-primary, .mf-button-destruc
   color: var(--lume-ink-muted);
 }
 
-html:root[data-lume] .mf-button-destructive[data-command-confirmation='true']:disabled {
+html:root[data-lume] .mf-button-destructive:disabled {
+  color: var(--lume-ink-muted);
+  border-color: var(--lume-rule-strong);
   opacity: 1;
 }
 

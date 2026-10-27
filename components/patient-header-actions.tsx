@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useRef,useState,type CSSProperties} from 'react';
 import {PatientSheetActionsMenu} from './patient-sheet-actions-menu';
 import {PatientProfileAccessAction} from './patient-profile-access-action';
 import {IntelligentHostCheckupAction} from './intelligent-host-checkup-action';
@@ -20,17 +20,37 @@ type Props = {
 
 export function PatientHeaderActions({patientId,ambulatoryId,checkups,...actions}:Props) {
     const [panel,setPanel]=useState<'assistant'|'checkup'|null>(null);
+    const [position,setPosition]=useState<CSSProperties>();
     const triggerRef=useRef<HTMLButtonElement>(null);
     const rootRef=useRef<HTMLDivElement>(null);
     useEffect(()=>{
         if(!panel)return;
+        const updatePosition=()=>{
+            const root=rootRef.current;
+            if(!root)return;
+            const anchor=root.getBoundingClientRect();
+            const header=root.closest('header')?.getBoundingClientRect();
+            const top=Math.max(16,(header?.bottom ?? anchor.bottom)+8);
+            const width=Math.min(352,window.innerWidth-32);
+            setPosition({
+                '--patient-panel-top': `${top}px`,
+                '--patient-panel-left': `${Math.max(16,Math.min(anchor.right-width,window.innerWidth-width-16))}px`,
+            } as CSSProperties);
+        };
+        updatePosition();
+        window.addEventListener('resize',updatePosition);
+        window.addEventListener('scroll',updatePosition,true);
         const current=rootRef.current?.querySelector<HTMLElement>('[role="dialog"]:not([hidden])');
         current?.focus();
         const closeOutside=(event:PointerEvent)=>{
             if(!rootRef.current?.contains(event.target as Node))setPanel(null);
         };
         document.addEventListener('pointerdown',closeOutside);
-        return ()=>document.removeEventListener('pointerdown',closeOutside);
+        return ()=>{
+            document.removeEventListener('pointerdown',closeOutside);
+            window.removeEventListener('resize',updatePosition);
+            window.removeEventListener('scroll',updatePosition,true);
+        };
     },[panel]);
     const close=()=>{setPanel(null);triggerRef.current?.focus();};
     return <div ref={rootRef} className={styles.panels} onKeyDown={event=>{
@@ -40,12 +60,13 @@ export function PatientHeaderActions({patientId,ambulatoryId,checkups,...actions
             {label:'Accesso assistente',onSelect:()=>setPanel('assistant')},
             {label:'Gestisci checkup',onSelect:()=>setPanel('checkup')},
         ]}/>
-        <div role="dialog" aria-label="Accesso assistente" tabIndex={-1} hidden={panel!=='assistant'} className={`mf-popover ${styles.panel} print:hidden`}>
+        {panel ? <button type="button" tabIndex={-1} aria-label="Chiudi pannello azioni" style={position} className={styles.panelBackdrop} onClick={close}/> : null}
+        <div style={position} role="dialog" aria-label="Accesso assistente" tabIndex={-1} hidden={panel!=='assistant'} className={`mf-popover ${styles.panel} print:hidden`}>
             <h2 className={styles.panelTitle}>Accesso assistente</h2>
             <PatientProfileAccessAction patientId={patientId} ambulatoryId={ambulatoryId} embedded/>
             <Button variant="text" onClick={close}>Chiudi</Button>
         </div>
-        <div role="dialog" aria-label="Gestisci checkup" tabIndex={-1} hidden={panel!=='checkup'} className={`mf-popover ${styles.panel} print:hidden`}>
+        <div style={position} role="dialog" aria-label="Gestisci checkup" tabIndex={-1} hidden={panel!=='checkup'} className={`mf-popover ${styles.panel} print:hidden`}>
             <h2 className={styles.panelTitle}>Gestisci checkup</h2>
             <IntelligentHostCheckupAction patientId={patientId} ambulatoryId={ambulatoryId} checkups={checkups} embedded/>
             <Button variant="text" onClick={close}>Chiudi</Button>
