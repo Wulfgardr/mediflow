@@ -187,14 +187,27 @@ accesso diretto al database remoto. Non sono app complete distribuite con
 la release sorgente.
 
 **Se mi si rompe il computer?**
-I dati risiedono nel file `medical.db`: usa regolarmente **Esporta Backup**
-e conserva il file in un luogo sicuro, per esempio un disco esterno.
-In caso di guasto, il ripristino richiede di reinstallare MediFlow e recuperare
-backup e PIN.
+Per prepararti a un guasto, vai in **Impostazioni → Backup e ripristino** e
+crea regolarmente un **backup completo cifrato**. È una copia dell'archivio
+SQLite, con account, chiavi protette e storico. Per crearlo usa un account
+amministratore sbloccato con passphrase. Conserva il file `.mediflow-recovery`
+fuori dal computer, insieme al kit di recupero corrispondente. Conserva la
+chiave su carta separatamente. Il backup non recupera originali esterni già
+mancanti.
 
-Verifica e ripristino accettano il backup completo anche quando supera la
-dimensione di un singolo allegato. Il file viene elaborato interamente in
-memoria: per archivi grandi serve memoria libera sufficiente sul computer.
+Su un computer nuovo servono il backup, il kit corrispondente e la sua chiave.
+Segui **Recupero su un computer nuovo** nella schermata Backup e le
+[istruzioni di ripristino](backup-restore-drill.md#backup-completo-dopo-la-perdita-del-computer).
+Verificare il file cifrato non equivale a provare un ripristino.
+
+L'**esportazione portabile** `.mediflow` serve a ripristinare le collezioni
+esportabili in un archivio esistente. Non contiene account né involucri delle
+chiavi e non sostituisce il backup completo. Il ripristino sostituisce i dati
+del formato portabile; account e chiavi dell'archivio restano invariati.
+
+La verifica e il ripristino elaborano il file interamente in memoria, sia per il
+backup completo sia per il file portabile: per archivi grandi serve memoria
+libera sufficiente sul computer.
 
 All'apertura su macOS e Linux, MediFlow limita al proprietario l'accesso a
 `medical.db` e ai file di lavoro SQLite `-wal` e `-shm`. Non modifica file
