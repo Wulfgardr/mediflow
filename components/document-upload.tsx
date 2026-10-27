@@ -116,6 +116,10 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     const [viewingId, setViewingId] = useState<string | null>(null);
     const [selectedId, setSelectedId] = useState('');
     const summaryHeading = useRef<HTMLHeadingElement>(null);
+    const uploadArea = useRef<HTMLElement>(null);
+    const listStatus = useRef<HTMLParagraphElement>(null);
+    const documentActions = useRef(new Map<string, HTMLButtonElement>());
+    const uploadedId = useRef<string | null>(null);
     const [extractingId, setExtractingId] = useState<string | null>(null);
     const [localExtraction, setLocalExtraction] = useState<LocalExtractionState | null>(null);
     const activeExtraction = useRef<{ attachmentId: string; sourceSnapshot: readonly Attachment[] | undefined; controller: AbortController } | null>(null);
@@ -129,7 +133,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
         persist: (file, data) => db.attachments.add({
             id: uuidv4(), patientId, name: file.name, type: file.type, size: file.size,
             path: `uploads/${file.name}`, data, createdAt: new Date(),
-        }),
+        }).then((id) => { uploadedId.current = id; return id; }),
     }));
 
     useEffect(() => {
@@ -171,11 +175,20 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     const viewingFile = currentAttachments?.find((file) => file.id === viewingId);
     const selectSource = (id: string) => { setSelectedId(id); setViewingId(id || null); };
 
+    useEffect(() => {
+        if (isProcessing || listLoading || listError || document.activeElement !== listStatus.current) return;
+        const action = uploadedId.current ? documentActions.current.get(uploadedId.current)
+            : documentActions.current.values().next().value;
+        if (action && !action.disabled) action.focus();
+    }, [attachments, isProcessing, listError, listLoading]);
+
     const onDrop = useCallback(async (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
         const task = uploadQueue.start(acceptedFiles);
         // Rejections belong to this selection, including mixed accepted/rejected drops.
         setFileRejections(rejectionMessages(rejectedFiles));
         if (!task) return;
+        uploadedId.current = null;
+        if (uploadArea.current?.contains(document.activeElement)) listStatus.current?.focus();
         const token = generation.current;
         setIsProcessing(true); setStopRequested(false); setUploadResult(null);
         try {
@@ -271,7 +284,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     return (
         <div className={`${styles.register} ${styles.documentLayout}`} data-testid="patient-documents">
             <div className={styles.documentRail}>
-            <section aria-label="Caricamento documenti" data-document-area="upload">
+            <section ref={uploadArea} aria-label="Caricamento documenti" data-document-area="upload">
                 {currentAttachments?.length === 0 && !listLoading ? (
                     <p className={disclosure.empty}>Nessun documento caricato. Aggiungi un file per consultarlo e, separatamente, richiedere una sintesi.</p>
                 ) : null}
@@ -312,12 +325,16 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                 )}
             </section>
 
+            <p ref={listStatus} role="status" aria-label="Stato elenco documenti" aria-live="polite" aria-atomic="true" tabIndex={isProcessing || listLoading ? 0 : -1}>
+                {isProcessing ? 'Salvataggio allegati in corso…' : listLoading ? 'Caricamento documenti…'
+                    : listError ? 'Elenco documenti non disponibile.'
+                        : `${formatCountLabel(attachments?.length ?? 0, 'documento caricato', 'documenti caricati')}.`}
+            </p>
             <section aria-label="Documenti caricati" data-document-area="list" className={disclosure.documentList} aria-busy={listLoading}>
                 {listError ? <div role="alert">
                     <p>Elenco documenti non disponibile. Non è possibile stabilire quali file siano presenti.</p>
                     <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={refreshAttachments} disabled={listLoading}>Riprova elenco</button>
                 </div> : null}
-                {!listError && attachments === undefined ? <p role="status">Caricamento documenti…</p> : null}
                 <table className={`${styles.table} ${styles.documentTable}`}><thead><tr><th>Documento</th><th>Azioni</th></tr></thead>
                 {currentAttachments?.map(file => <tbody key={file.id} data-document-id={file.id}>
                     <tr className={viewingId === file.id ? styles.selected : undefined}><td>
@@ -332,6 +349,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                     </td><td>
                             <div className={styles.documentActions}>
                                 <button type="button" onClick={() => selectSource(file.id)} disabled={listLoading || deletingId === file.id}
+                                    ref={(button) => { if (button) documentActions.current.set(file.id, button); else documentActions.current.delete(file.id); }}
                                     className={disclosure.documentAction} data-lume-action="quiet" title="Visualizza" aria-label={`Visualizza ${file.name}`}>
                                     <Eye className="h-4 w-4" aria-hidden="true" />Apri
                                 </button>

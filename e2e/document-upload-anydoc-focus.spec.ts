@@ -73,6 +73,24 @@ async function openDocumentArchive(page: Page, patientId: string): Promise<void>
   await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
 }
 
+async function holdAttachmentList(page: Page, patientId: string) {
+  let release!: () => void;
+  let observed!: () => void;
+  const blocked = new Promise<void>((resolve) => { observed = resolve; });
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  page.once('close', release);
+  await page.route('**/api/attachments?**', async (route) => {
+    const url = new URL(route.request().url());
+    if (route.request().method() === 'GET' && url.searchParams.get('patientId') === patientId
+      && url.searchParams.get('metadata') === 'true') {
+      observed();
+      await pending;
+    }
+    await route.continue();
+  });
+  return { blocked, release };
+}
+
 test.describe.configure({ retries: 0 });
 
 test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport stretti', async ({ page }, testInfo) => {
@@ -95,7 +113,9 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   });
 
   const patientId = await createSyntheticFixture(page);
+  const initialList = await holdAttachmentList(page, patientId);
   await openDocumentArchive(page, patientId);
+  await initialList.blocked;
 
   // one accessible chooser opens the native picker and Tab visits the viewer before local extraction.
   const chooser = page.getByRole('button', { name: 'Carica documenti', exact: true });
@@ -170,7 +190,22 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   if (failures.length === 1) throw failures[0];
   if (failures.length > 1) throw new AggregateError(failures, 'AnyDoc keyboard/chooser and cleanup/report failures', { cause: failures[0] });
 
+  const list = page.getByRole('region', { name: 'Documenti caricati', exact: true });
+  const loading = page.getByRole('status', { name: 'Stato elenco documenti', exact: true });
+  try {
+    await expect(list).toHaveAttribute('aria-busy', 'true');
+    await expect(list.getByRole('button', { name: `Visualizza ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toHaveCount(0);
+    await page.keyboard.press('Tab');
+    await expect(loading).toBeFocused();
+    await expect(loading).toHaveText('Caricamento documenti…');
+    await expect(loading).toHaveAttribute('aria-live', 'polite');
+    expect(await loading.evaluate((element) => element.closest('[aria-busy="true"]') === null)).toBe(true);
+    expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
+  } finally {
+    initialList.release();
+  }
   const viewButton = page.getByRole('button', { name: `Visualizza ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true });
+  await expect(viewButton).toBeFocused();
   await expect(viewButton).toBeEnabled();
   await chooser.focus();
   await page.keyboard.press('Tab');
@@ -217,11 +252,58 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   expect(consoleErrors).toEqual([]);
 });
 
+for (const leaveStatus of [false, true]) {
+  test(`Documenti: dopo la scelta del file ${leaveStatus ? 'rispetta il focus spostato dal medico' : 'mantiene il focus durante la rilettura e apre la nuova riga'}`, async ({ page }) => {
+    await establishSyntheticSession(page);
+    const patientId = await createSyntheticFixture(page);
+    await openDocumentArchive(page, patientId);
+    await expect(page.getByRole('button', { name: `Visualizza ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeEnabled();
+    const refreshedList = await holdAttachmentList(page, patientId);
+    const chooser = page.getByRole('button', { name: 'Carica documenti', exact: true });
+    await chooser.focus();
+    const protocol = await page.context().newCDPSession(page);
+    const name = 'nuovo-documento-focus-sintetico.txt';
+    try {
+      const nativeWaiter = page.waitForEvent('filechooser');
+      await protocol.send('Page.setInterceptFileChooserDialog', { enabled: true });
+      await page.keyboard.press('Enter');
+      const nativeChooser = await nativeWaiter;
+      expect(await nativeChooser.element().evaluate((input) => input === document.querySelector('#documenti input[type="file"]'))).toBe(true);
+      const saved = page.waitForResponse((response) => response.request().method() === 'POST'
+        && new URL(response.url()).pathname === '/api/attachments');
+      await nativeChooser.setFiles({ name, mimeType: 'text/plain', buffer: Buffer.from('Documento sintetico per il focus.') });
+      expect((await saved).ok()).toBe(true);
+      await refreshedList.blocked;
+      const list = page.getByRole('region', { name: 'Documenti caricati', exact: true });
+      const loading = page.getByRole('status', { name: 'Stato elenco documenti', exact: true });
+      await expect(list).toHaveAttribute('aria-busy', 'true');
+      await expect(loading).toBeFocused();
+      await expect(loading).toHaveText('Caricamento documenti…');
+      await expect(loading).toHaveAttribute('aria-live', 'polite');
+      expect(await loading.evaluate((element) => element.closest('[aria-busy="true"]') === null)).toBe(true);
+      await expect(page.getByRole('button', { name: `Visualizza ${name}`, exact: true })).toHaveCount(0);
+      expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
+      if (leaveStatus) {
+        await page.keyboard.press('Shift+Tab');
+        await expect(chooser).toBeFocused();
+      }
+      refreshedList.release();
+      const newDocument = page.getByRole('button', { name: `Visualizza ${name}`, exact: true });
+      await expect(newDocument).toBeEnabled();
+      await expect(leaveStatus ? chooser : newDocument).toBeFocused();
+    } finally {
+      refreshedList.release();
+      await protocol.detach();
+    }
+  });
+}
+
 test('AnyDoc: il browser usa la route autenticata e mostra solo l’anteprima locale', async ({ page }) => {
   await establishSyntheticSession(page);
   const patientId = await createSyntheticFixture(page);
   const attachment = await createExtractableRtf(page, patientId);
   await openDocumentArchive(page, patientId);
+  await expect(page.getByTestId('patient-profile-notes')).toContainText('Nessuna nota generale registrata.');
 
   const responsePromise = page.waitForResponse((response) => (
     response.request().method() === 'POST'
