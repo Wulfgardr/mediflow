@@ -14,6 +14,14 @@ pub const MAX_VERSION: u64 = 9_007_199_254_740_991;
 /// A bound for this synthetic client, not a change to the HTTP API contract.
 pub const MAX_NOTES_UTF16: usize = 262_144;
 
+pub fn format_patient_name(first_name: &str, last_name: &str) -> String {
+    [last_name.trim(), first_name.trim()]
+        .into_iter()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PatientProfile {
@@ -29,7 +37,7 @@ pub struct PatientProfile {
 
 impl PatientProfile {
     pub fn display_name(&self) -> String {
-        format!("{} {}", self.first_name, self.last_name)
+        format_patient_name(&self.first_name, &self.last_name)
     }
 
     pub fn matches_query(&self, query: &str) -> bool {

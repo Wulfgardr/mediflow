@@ -99,7 +99,10 @@ impl LocalPreferencesStore {
         }
         #[cfg(not(unix))]
         {
-            Err(io::ErrorKind::Unsupported.into())
+            Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                crate::STATE_DIRECTORY_UNSUPPORTED,
+            ))
         }
     }
     pub(super) fn system() -> Self {
@@ -296,6 +299,18 @@ pub(super) mod tests {
         assert!(LocalPreferencesStore::from_directory(&directory).is_err());
         assert!(!directory.join("preferences.json").exists());
         assert!(!directory.join("ambulatory-command-recovery").exists());
+    }
+
+    #[cfg(not(unix))]
+    #[test]
+    fn explicit_state_directory_reports_platform_support_instead_of_privacy_failure() {
+        let fixture = Fixture::new();
+        fs::create_dir_all(&fixture.0).unwrap();
+        let error = LocalPreferencesStore::from_directory(&fixture.0.canonicalize().unwrap())
+            .err()
+            .expect("explicit directories are unsupported on this platform");
+        assert_eq!(error.kind(), io::ErrorKind::Unsupported);
+        assert_eq!(error.to_string(), crate::STATE_DIRECTORY_UNSUPPORTED);
     }
 
     #[test]

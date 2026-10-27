@@ -594,7 +594,7 @@ mod tests {
                 assert!(
                     node.label()
                         .unwrap()
-                        .starts_with("Apri scheda di Amina Sintetica")
+                        .starts_with("Apri scheda di Sintetica Amina")
                 );
                 assert!(!node.label().unwrap().contains("rileggere"));
                 assert_eq!(
