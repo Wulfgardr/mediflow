@@ -68,7 +68,6 @@ test('il filtro Manuali raggiunge il settimo appuntamento prima del limite di se
     assert.deepEqual(input, before);
 });
 
-// Execute the production pure closure without importing the TSX UI/provider graph.
 const diarySource = ts.createSourceFile('cockpit-shared.tsx', readFileSync(new URL('../components/kree8/cockpit-shared.tsx', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const diaryFunctions = ['metadataRecord', 'firstText', 'entryPresentation', 'compactClinicalText', 'buildGlobalDiaryState'];
 const declarations = diaryFunctions.map(name => {
