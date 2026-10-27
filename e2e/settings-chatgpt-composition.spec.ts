@@ -7,6 +7,7 @@ import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
 const accountTitle = 'Controllo account ChatGPT · separato dalla prova';
 const baseline = process.env.CHATGPT_COMPOSITION_BASELINE === '1';
+const captureDirectory = () => process.env.CHATGPT_COMPOSITION_SCREENSHOTS || test.info().outputPath('screenshots');
 const snapshot: ProductSnapshot = {
     schema: 'mediflow.chatgpt-product.v1', state: 'held', notice: null,
     preparation: { state: 'not_prepared', expiresAt: null },
@@ -22,8 +23,7 @@ const snapshot: ProductSnapshot = {
 };
 
 async function capture(page: Page, target: Locator, name: string, frames: unknown[]) {
-    const directory = process.env.CHATGPT_COMPOSITION_SCREENSHOTS;
-    if (!directory) throw Error('Owned capture directory required');
+    const directory = captureDirectory();
     await target.scrollIntoViewIfNeeded();
     await expect(target).toBeVisible();
     const probe = await target.evaluate(element => {
@@ -122,8 +122,9 @@ test('ChatGPT composition: closed/open account, keyboard and retained child', as
         expect(guard.blocked).toEqual([]); expect(errors).toEqual([]);
         expect(calls.filter(call => call.method !== 'GET').every(call => call.path.endsWith('/synthesis/cancel'))).toBe(true);
     } finally {
-        const directory = process.env.CHATGPT_COMPOSITION_SCREENSHOTS;
-        if (directory) { await mkdir(directory, { recursive: true }); await writeFile(`${directory}/calls.json`, JSON.stringify({ calls, blocked: guard.blocked, uiWrites: guard.mockedUiWrites, errors }, null, 2)); }
+        const directory = captureDirectory();
+        await mkdir(directory, { recursive: true });
+        await writeFile(`${directory}/calls.json`, JSON.stringify({ calls, blocked: guard.blocked, uiWrites: guard.mockedUiWrites, errors }, null, 2));
         await zoom.close();
     }
 });
