@@ -7,12 +7,10 @@
     gap: 8px;
     max-width: 70ch;
 }
+.title { composes: heading from "../../../../components/ink-section.module.css"; }
 .page.page .title,
 .page :global(#local-onboarding-title) {
     margin: 0;
-    font: var(--type-section, 600 0.75rem/1.5 var(--lume-font-sans, system-ui, sans-serif));
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
 }
 .section,
 .page [data-models-auxiliary='local'] > section {
