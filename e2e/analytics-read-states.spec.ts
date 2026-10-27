@@ -120,7 +120,7 @@ for (const scenario of ['initial', 'refresh', 'context'] as const) test(`Analyti
         return null;
       });
       if (scroll) {
-        await page.mouse.move(scroll.x, scroll.y); await page.mouse.wheel(0, scroll.delta);
+        await page.mouse.move(scroll.x, scroll.y); await page.mouse.wheel(0, scroll.delta * (size === 'zoom-400' ? 4 : 1));
         await expect.poll(() => target.evaluate((element, expected) => {
           for (let owner = element.parentElement; owner; owner = owner.parentElement) {
             if (owner.scrollHeight > owner.clientHeight && /auto|scroll/.test(getComputedStyle(owner).overflowY)) return Math.abs(owner.scrollTop - expected);
