@@ -444,7 +444,7 @@
   }
 
   .sectionLink {
-    min-width: 0;
+    min-width: var(--lume-control-height);
     width: 100%;
     justify-content: space-between;
   }

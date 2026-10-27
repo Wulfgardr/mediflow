@@ -580,7 +580,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
 
                                 {/* Quick Suggestions */}
                                 {patient && (
-                                    <div className="flex flex-wrap gap-2 mb-2">
+                                    <div className="flex flex-wrap gap-3 mb-2">
                                         {patient.diagnoses?.map(d => (
                                             <button
                                                 key={d.code}
@@ -650,7 +650,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                                 </div>
                             </div>
                         )}
-                        <div className="flex justify-end pt-2 gap-2">
+                        <div className="flex justify-end pt-2 gap-3">
                             <button type="button" onClick={cancelEditing} disabled={isSaving || isReading} className={quietButtonClassName}>Annulla</button>
                             <Button type="submit" disabled={isSaving || !!recovery || draft?.patientId !== patientId}>
                                 {isSaving ? 'Salvataggio...' : editingId ? 'Aggiorna terapia' : 'Salva terapia'}

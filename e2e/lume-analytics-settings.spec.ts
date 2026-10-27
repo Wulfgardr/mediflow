@@ -148,6 +148,13 @@ async function verifyAnalytics(page: Page, viewCase: ViewCase): Promise<void> {
   const currentSection = sections.locator('a[aria-current="location"]');
   await expect(currentSection).toHaveCount(1);
   await expect(currentSection).toHaveAttribute('href', '#domanda');
+  for (const link of await sections.getByRole('link').all()) {
+    const box = await link.boundingBox();
+    const minimum = viewCase.viewport === 'narrow' ? 44 : 40;
+    expect(box?.width, await link.innerText()).toBeGreaterThanOrEqual(minimum);
+    expect(box?.height, await link.innerText()).toBeGreaterThanOrEqual(minimum);
+  }
+
   await expect(page.locator('[data-lume-analytics-focus="true"]')).toHaveCount(1);
   await expect(page.locator('#indicatori > dl')).toHaveCount(1);
 
