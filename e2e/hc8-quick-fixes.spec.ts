@@ -73,6 +73,7 @@ test('Nuova scheda a 390: tab nella colonna e testo con spazio interno', async (
     }
     await expect(page.locator('#documento')).toHaveCSS('border-radius', '0px');
     await expect(page.locator('#documento')).toHaveCSS('box-shadow', 'none');
+    expect(await page.locator('#documento').evaluate(element => getComputedStyle(element, '::before').opacity)).toBe('0');
 });
 
 test('CSV: selettore italiano da tastiera, stato del file e allineamento alla colonna', async ({ page }) => {

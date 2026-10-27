@@ -199,7 +199,7 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
                                     }
                                 }} />
                         </div>
-                        <a className={styles.secondary} href={templateUrl} download="mediflow-modello-pazienti.csv">Scarica modello CSV</a>
+                        <a className="mf-button-secondary" href={templateUrl} download="mediflow-modello-pazienti.csv">Scarica modello CSV</a>
                     </div>
                     {snapshot.ambulatoryName ? <p>Ambulatorio: <strong>{snapshot.ambulatoryName}</strong></p> : null}
                     <details className={styles.disclosure}>
