@@ -218,6 +218,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
     const deleteItem = async (item: ProstheticPrescription) => {
         const { confirmed } = await confirm({
             title: `Eliminare la voce protesica "${item.description}"?`,
+            message: 'La voce protesica verrà rimossa dalla cartella del paziente.',
             confirmLabel: 'Elimina',
             tone: 'danger'
         });

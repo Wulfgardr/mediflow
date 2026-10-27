@@ -56,14 +56,14 @@ export default function SettingsDangerZonePage() {
                 <h3 className={styles.heading}><AlertTriangle aria-hidden />Ripristina configurazione iniziale</h3>
                 <p>Elimina gli account e richiede una nuova configurazione iniziale.</p>
                 <label className={styles.fieldLabel}><span>Scrivi <strong>{RESET_CONFIRM_KEYWORD}</strong> per abilitare il reset.</span>
-                    <input type="text" value={confirmText} onChange={e => setConfirmText(e.target.value)} placeholder={RESET_CONFIRM_KEYWORD}
+                    <input type="text" value={confirmText} onChange={e => setConfirmText(e.target.value)} placeholder="Digita qui la parola richiesta"
                         autoComplete="off" spellCheck={false} data-testid="danger-zone-confirm-input" className={SETTINGS_INPUT_CLASS} readOnly={isResetting} />
                 </label>
                 {resetOutcome && <div>
                     <ViewState state="error" title={resetOutcome === 'sessions_unconfirmed' ? 'Reset eseguito, ma la chiusura delle sessioni non è stata confermata.' : 'Esito del reset non confermato. Verifica l’accesso prima di procedere.'} />
                     <Link href="/settings/accesso" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Accesso</Link>
                 </div>}
-                <div className={styles.actions}><button onClick={resetOnboarding} disabled={!confirmed || isResetting || resetOutcome !== null} data-testid="danger-zone-reset-button" className={SETTINGS_SECONDARY_BUTTON_CLASS}>{isResetting ? 'Reset in corso...' : 'Ripristina configurazione'}</button></div>
+                <div className={styles.actions}><button onClick={resetOnboarding} disabled={!confirmed || isResetting || resetOutcome !== null} data-testid="danger-zone-reset-button" className="mf-button-destructive">{isResetting ? 'Reset in corso...' : 'Ripristina configurazione'}</button></div>
             </section>
         </section>
     );

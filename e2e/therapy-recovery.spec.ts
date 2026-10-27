@@ -129,7 +129,7 @@ test('a list refresh during editing cannot silently advance the draft version', 
   const otherRow = page.locator('#terapie').getByRole('row').filter({ has: page.getByText('Farmaco sintetico secondario', { exact: true }) });
   await otherRow.getByRole('button', { name: /^Altre azioni/ }).click();
   await otherRow.getByRole('menuitem', { name: 'Sospendi', exact: true }).click();
-  await page.getByRole('button', { name: 'Conferma e registra', exact: true }).click();
+  await page.getByRole('button', { name: 'Sospendi Farmaco sintetico secondario', exact: true }).click();
   expect((await refreshed).status()).toBe(200);
   await expect(page.locator('#terapie').getByText('Dose concorrente 2', { exact: true })).toBeVisible();
   const response = page.waitForResponse(response => response.request().method() === 'PUT' && response.url().endsWith(`/api/therapies/${data.therapyId}`));
@@ -208,7 +208,7 @@ test('changing patient requires deliberate discard and never carries the therapy
   await patients.click();
   const confirmation = page.getByRole('dialog', { name: 'Lasciare la compilazione?', exact: true });
   await expect(confirmation).toBeVisible();
-  await confirmation.getByRole('button', { name: 'Continua a scrivere', exact: true }).click();
+  await confirmation.getByRole('button', { name: 'Continua la compilazione', exact: true }).click();
   await expect(dosage(page)).toHaveValue('Dose della bozza sintetica');
   await expect(note(page)).toHaveValue('Nota sintetica da conservare');
   expect((await records(page, original.patientId)).find(item => item.id === original.therapyId)?.version).toBe(1);
@@ -299,7 +299,7 @@ async function deletionAction(page: Page, drugName = 'Farmaco sintetico principa
 
 async function requestDeletion(page: Page): Promise<void> {
   await (await deletionAction(page)).click();
-  const dialog = page.getByRole('dialog', { name: 'Eliminare questo farmaco dalla cartella?', exact: true });
+  const dialog = page.getByRole('dialog', { name: 'Eliminare la terapia «Farmaco sintetico principale»?', exact: true });
   await dialog.getByRole('textbox', { name: "Motivazione dell'eliminazione" }).fill(deletionReason);
   await dialog.getByRole('button', { name: 'Elimina', exact: true }).click();
 }
@@ -690,7 +690,7 @@ for (const transition of ['patient', 'session', 'unmount'] as const) {
         // Establish a fresh prompt before releasing the old result. It must
         // retain an empty reason and remain cancellable without another DELETE.
         await (await deletionAction(page, 'Farmaco sintetico secondario')).click();
-        const freshPrompt = page.getByRole('dialog', { name: 'Eliminare questo farmaco dalla cartella?', exact: true });
+        const freshPrompt = page.getByRole('dialog', { name: 'Eliminare la terapia «Farmaco sintetico secondario»?', exact: true });
         await expect(freshPrompt.getByRole('textbox', { name: "Motivazione dell'eliminazione" })).toHaveValue('');
         if (held) {
           const pending = held;

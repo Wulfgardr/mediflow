@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import ScaleEngine from '../../components/scale-engine';
-import { ConfirmProvider } from '../../components/ui/confirm-dialog';
+import { ConfirmProvider, useConfirm } from '../../components/ui/confirm-dialog';
 import { RuntimeTwinDesignProvider, useRuntimeTwinDesign } from '../../components/runtime-twin-design';
 import { PatientClinicalSignals } from '../../components/patient-clinical-signals';
 import { PatientIdentityLens } from '../../components/patient-identity-lens';
@@ -31,6 +31,14 @@ function ScaleFixture() {
         }} />}
     </ConfirmProvider></RuntimeTwinDesignProvider>;
 }
+function ConfirmationFixture() {
+    const confirm = useConfirm();
+    const [result, setResult] = useState('Nessuna decisione');
+    return <><button onClick={async () => {
+        const choice = await confirm({ title: 'Eliminare la terapia «Farmaco sintetico»?', message: 'La terapia verrà spostata nel cestino.', tone: 'danger', requireReason: true, confirmLabel: 'Elimina' });
+        setResult(choice.confirmed ? `Eliminazione: ${choice.reason}` : 'Annullata');
+    }}>Apri conferma sintetica</button><output aria-label="Decisione">{result}</output></>;
+}
 function SignalsFixture() {
     const empty = new URLSearchParams(window.location.search).has('empty');
     return <PatientClinicalSignals signals={empty ? [] : [
@@ -52,6 +60,7 @@ function SettingsFixture() {
 function App() {
     const pathname = window.location.pathname;
     if (pathname.startsWith('/settings')) return <SettingsFixture />;
+    if (pathname === '/confirm') return <ConfirmProvider><ConfirmationFixture /></ConfirmProvider>;
     if (pathname === '/signals') return <SignalsFixture />;
     if (pathname === '/identity') return <IdentityFixture />;
     if (pathname === '/synthesis') return <DocumentSynthesisFabricReviewCard patientId="ui06-patient" attachmentId="ui06-attachment" attachmentName="Documento inventato UI06.txt" enabled={!new URLSearchParams(window.location.search).has('disabled')} />;

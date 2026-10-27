@@ -90,7 +90,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
       event.preventDefault(); event.stopImmediatePropagation();
       if (asking) return;
       asking = true;
-      void confirm({ title: 'Lasciare la compilazione?', message: 'È aperta una compilazione. Le modifiche non salvate andranno perse.', confirmLabel: 'Esci senza salvare', cancelLabel: 'Continua a scrivere' }).then(result => {
+      void confirm({ title: 'Lasciare la compilazione?', message: 'È aperta una compilazione. Le modifiche non salvate andranno perse.', confirmLabel: 'Esci senza salvare', cancelLabel: 'Continua la compilazione', tone: 'danger' }).then(result => {
         asking = false;
         if (live && result.confirmed && anchor.isConnected) { approved = anchor; anchor.click(); approved = null; }
       });

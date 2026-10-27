@@ -50,7 +50,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
                 title: 'Lasciare la compilazione?',
                 message: 'È aperta una compilazione. Le modifiche non salvate andranno perse.',
                 confirmLabel: 'Esci senza salvare',
-                cancelLabel: 'Continua a scrivere',
+                cancelLabel: 'Continua la compilazione', tone: 'danger',
             });
             if (!result.confirmed) return;
         }
