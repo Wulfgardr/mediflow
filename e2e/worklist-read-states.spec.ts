@@ -61,7 +61,7 @@ test('Worklist: observed read states and one primary action', async ({page,baseU
   const baseline=process.env.WORKLIST_READ_BASELINE==='1',directory=process.env.WORKLIST_READ_SCREENSHOTS;
   const fixture=await installWorklistFixture(page,baseURL),frames:unknown[]=[],errors:string[]=[];
   const worklist=page.getByTestId('lume-worklist'),lens=page.getByTestId('lume-patient-lens');
-  const count=worklist.locator('header').first().locator('span').first();
+  const count=worklist.locator('header').first().getByText(/^\d+ risultat[oi]$/);
   const error=worklist.getByRole('alert');
   let release=()=>{};
   page.on('pageerror',value=>errors.push(value.message));
