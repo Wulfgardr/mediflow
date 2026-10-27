@@ -183,7 +183,7 @@ async function bootstrapFabricSession(page: Page, pin: string): Promise<void> {
     const pinInputs = page.locator('input[placeholder="••••••"]');
     await pinInputs.nth(0).fill(pin);
     await pinInputs.nth(1).fill(pin);
-    await page.getByRole('button', { name: 'Concludi Setup' }).click();
+    await page.getByRole('button', { name: 'Prepara il kit di recupero' }).click();
   }
   await setupPinLegacyIfNeeded(page, pin);
   await unlockIfNeeded(page, pin);

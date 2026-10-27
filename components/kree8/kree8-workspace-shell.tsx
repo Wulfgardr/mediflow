@@ -50,6 +50,7 @@ type Kree8WorkspaceShellProps = {
   patientDetails?: PatientHeaderDetails;
   statusLabel?: string;
   navItems?: Kree8WorkspaceNavItem[];
+  navigationClassName?: string;
   navGroups?: Kree8WorkspaceNavGroups;
   primaryAction?: { href: string; label: string; icon: LucideIcon };
   headerActions?: ReactNode;
@@ -68,6 +69,7 @@ export function Kree8WorkspaceShell({
   patientDetails,
   statusLabel,
   navItems = [],
+  navigationClassName,
   navGroups,
   primaryAction,
   headerActions,
@@ -410,7 +412,7 @@ export function Kree8WorkspaceShell({
         {folderMode ? <RuntimeTwinPatientNavigation items={renderedNavItems} active={folderSection} /> : renderedNavItems.length > 0 ? (
           <nav
             id={`${railId}-nav`}
-            className={`${styles.sectionRail} ${navGroups ? styles.groupedSectionRail : ''}`}
+            className={`${styles.sectionRail} ${navGroups ? styles.groupedSectionRail : ''} ${navigationClassName ?? ''}`}
             aria-label="Sezioni della vista"
             data-rail-mode={navGroups ? 'grouped' : 'unmapped'}
             data-folder-nav-open={folderNavOpen}

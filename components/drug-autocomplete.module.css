@@ -1,0 +1,2 @@
+:global(html:root[data-lume]) .input.input { border: 1px solid var(--lume-rule-strong); border-radius: var(--lume-radius-control); background: var(--lume-surface-focal); }
+:global(html:root[data-lume]) .input.input:focus, :global(html:root[data-lume]) .input.input:focus-visible { border-color: var(--lume-rule-strong); outline: 2px solid var(--lume-ink-fresh); outline-offset: 2px; box-shadow: none; }
