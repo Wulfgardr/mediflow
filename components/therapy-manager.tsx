@@ -586,7 +586,8 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                                                 key={d.code}
                                                 type="button"
                                                 onClick={() => setSelectedDiagnosis({ code: d.code, title: d.description })}
-                                                className={`${chipClassName} ${selectedDiagnosis?.code === d.code ? 'border-[color:color-mix(in_srgb,var(--lume-ink)_22%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]' : 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)] hover:text-[color:var(--lume-ink)]'}`}
+                                                aria-pressed={selectedDiagnosis?.code === d.code}
+                                                className={chipClassName}
                                             >
                                                 {d.description}
                                             </button>
@@ -594,14 +595,16 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                                         <button
                                             type="button"
                                             onClick={() => setSelectedDiagnosis({ code: 'PREV', title: 'Prevenzione' })}
-                                            className={`${chipClassName} ${selectedDiagnosis?.code === 'PREV' ? 'border-[color:color-mix(in_srgb,var(--lume-ink)_22%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]' : 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)] hover:bg-[color:var(--lume-surface-focal)] hover:text-[color:var(--lume-ink)]'}`}
+                                            aria-pressed={selectedDiagnosis?.code === 'PREV'}
+                                            className={chipClassName}
                                         >
                                             <Shield className="w-3 h-3" /> Prevenzione
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setSelectedDiagnosis(null)}
-                                            className={`${chipClassName} ${!selectedDiagnosis ? 'border-[color:color-mix(in_srgb,var(--lume-ink)_20%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]' : 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)] hover:text-[color:var(--lume-ink)]'}`}
+                                            aria-pressed={!selectedDiagnosis}
+                                            className={chipClassName}
                                         >
                                             <Ban className="w-3 h-3" /> Nessuna
                                         </button>
