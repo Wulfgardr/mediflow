@@ -13,10 +13,8 @@
 .header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
 .identity { display: flex; align-items: center; gap: .75rem; min-width: 0; }
 .identity > div { min-width: 0; }
+:global(html[data-runtime-twin-design='proposal']) .identity > div > p:first-child { display: block; }
 .logo { display: block; flex: 0 0 40px; width: 40px; height: 40px; object-fit: contain; background: white; }
-.identity h1 { margin: 0; font: var(--type-page-title); letter-spacing: -.02em; }
-.identity p { margin-top: .375rem; color: var(--lume-ink-muted, CanvasText); }
-.boundary { max-width: 70ch; }
 .page .returnLink {
     box-sizing: border-box;
     max-width: 100%;
@@ -27,16 +25,7 @@
     text-align: center;
     white-space: normal;
 }
-.account { min-width: 0; border-top: 1px solid var(--lume-border-color, color-mix(in srgb, currentColor 16%, transparent)); }
-.account > summary {
-    box-sizing: border-box;
-    min-height: max(44px, var(--lume-control-height, 44px));
-    padding: .75rem 0;
-    border-radius: var(--lume-radius-control, 12px);
-    font-weight: 600;
-    cursor: pointer;
-}
 .accountBody { display: grid; gap: 1rem; padding-top: .5rem; }
-.page .returnLink:focus-visible, .account > summary:focus-visible { outline: 2px solid var(--lume-accent, Highlight); outline-offset: 3px; }
+.page .returnLink:focus-visible { outline: 2px solid var(--lume-accent, Highlight); outline-offset: 3px; }
 @media (max-width: 560px) { .page .returnLink { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .page .returnLink { transition: none; } }
