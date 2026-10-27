@@ -83,6 +83,9 @@ test('ChatGPT composition: closed/open account, keyboard and retained child', as
         if (!baseline) {
             await expect(page.locator('h1')).toHaveCount(1);
             await expect(page.getByRole('heading', { name: 'OpenAI · ChatGPT', exact: true, level: 2 })).toBeVisible();
+            const service = page.getByText('Servizio esterno · abbonamento personale ChatGPT.', { exact: true });
+            await expect(service).toHaveCount(1);
+            await expect(service).toBeVisible();
         }
         const child = await account.elementHandle();
         if (!child) throw Error('Mounted account required');
