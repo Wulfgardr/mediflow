@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import { build } from 'esbuild';
 import { chromium } from '@playwright/test';
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
+import postcss from 'postcss';
 
 const root = path.resolve(import.meta.dirname, '..');
 
@@ -56,5 +58,29 @@ test('le ricette del piano e delle sezioni funzionano senza il foglio globale', 
         const recordFont = await page.locator('article h3').evaluate(element => getComputedStyle(element).fontSize);
         await page.locator('main > div').evaluate(element => element.classList.remove(globalThis.recipes.section.sections));
         assert.equal(await page.locator('article h3').evaluate(element => getComputedStyle(element).fontSize), recordFont);
+    } finally { await browser.close(); }
+});
+
+test('il focus comune resta visibile sui preset selezionati', async () => {
+    const bundle = await build({ absWorkingDir: root,
+        stdin: { contents: `import styles from './components/settings/guided-local-models.module.css'; globalThis.styles = styles;`, resolveDir: root },
+        bundle: true, write: false, outfile: '/fixture.js', format: 'iife', logLevel: 'silent' });
+    const globalStyles = postcss.parse(await readFile(path.join(root, 'app/globals.css'), 'utf8'));
+    const focus = globalStyles.nodes.find(node => node.type === 'rule' && node.selector.startsWith(':root :focus-visible'));
+    assert.ok(focus);
+    const browser = await chromium.launch({ headless: true });
+    try {
+        const page = await browser.newPage();
+        await page.setContent('<style>:root { --lume-ink-fresh: blue; --lume-accent: blue; }</style>');
+        await page.addStyleTag({ content: focus.toString() });
+        await page.addStyleTag({ content: bundle.outputFiles.find(file => file.path.endsWith('.css')).text });
+        await page.addScriptTag({ content: bundle.outputFiles.find(file => file.path.endsWith('.js')).text });
+        await page.evaluate(() => { document.body.innerHTML = `<div class="${globalThis.styles.surface}"><button class="${globalThis.styles.preset}" aria-pressed="true">Profilo selezionato</button></div>`; });
+        await page.keyboard.press('Tab');
+        const outline = await page.getByRole('button').evaluate(element => {
+            const style = getComputedStyle(element);
+            return [style.outlineWidth, style.outlineStyle, style.outlineOffset];
+        });
+        assert.deepEqual(outline, ['2px', 'solid', '2px']);
     } finally { await browser.close(); }
 });
