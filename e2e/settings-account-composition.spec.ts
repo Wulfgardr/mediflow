@@ -143,7 +143,7 @@ test('access and profile settings preserve form drafts and denied outcomes', asy
             await back.focus(); await page.keyboard.press('Enter');
             const dialog = page.getByRole('dialog', { name: 'Lasciare la compilazione?', exact: true });
             await expect(dialog).toBeVisible();
-            await dialog.getByRole('button', { name: 'Continua a scrivere', exact: true }).click();
+            await dialog.getByRole('button', { name: 'Continua la compilazione', exact: true }).click();
             await expect(back).toBeFocused(); await expect(name).toHaveValue('Bozza W19 inventata non salvata');
         };
         await name.fill('Bozza W19 inventata non salvata');

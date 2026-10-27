@@ -189,8 +189,8 @@ test('eliminazione conserva motivo obbligatorio, ritorno prioritario e un solo i
     const remove = actions.getByRole('menuitem', { name: 'Elimina (inserita per errore)', exact: true });
     await expect(remove).not.toHaveClass(/mf-button-destructive/);
     await remove.click();
-    const dialog = page.getByRole('dialog', { name: 'Eliminare questo farmaco dalla cartella?' });
-    await expect(dialog.getByRole('button', { name: 'Annulla', exact: true })).toHaveClass(/mf-btn-secondary/);
+    const dialog = page.getByRole('dialog', { name: 'Eliminare la terapia «Farmaco sintetico active 1»?' });
+    await expect(dialog.getByRole('button', { name: 'Annulla', exact: true })).toHaveClass(/mf-button-primary/);
     await expect(dialog.getByRole('button').filter({ hasText: /^(Annulla|Elimina)$/ })).toHaveText(['Annulla', 'Elimina']);
     const confirm = dialog.getByRole('button', { name: 'Elimina', exact: true });
     await expect(confirm).toBeDisabled();

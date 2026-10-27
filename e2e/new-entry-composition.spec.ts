@@ -63,7 +63,7 @@ test('Nuova voce: Quadro, bozza unica, uscita protetta e registrazione con fonte
                     }
                 }
                 if (state === 'uscita') {
-                    const cancel = page.getByRole('button', { name: 'Continua a scrivere', exact: true }); await cancel.focus(); await expect(cancel).toBeFocused();
+                    const cancel = page.getByRole('button', { name: 'Continua la compilazione', exact: true }); await cancel.focus(); await expect(cancel).toBeFocused();
                     await expect.poll(() => cancel.evaluate(element => { const box = element.getBoundingClientRect(); const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2); return element === hit || element.contains(hit); })).toBe(true);
                 }
                 if (directory) await page.screenshot({ path: `${directory}/${theme}-${size}-${state}.png`, animations: 'disabled' });
@@ -95,7 +95,7 @@ test('Nuova voce: Quadro, bozza unica, uscita protetta e registrazione con fonte
         }
         await composer.getByRole('link', { name: 'Torna alla scheda paziente', exact: true }).click();
         const dialog = page.getByRole('dialog'); await expect(dialog).toContainText('Le modifiche non salvate andranno perse.'); await capture('uscita', dialog);
-        await page.getByRole('button', { name: 'Continua a scrivere', exact: true }).click(); await expect(editor).toContainText('Resoconto originale sintetico W16.');
+        await page.getByRole('button', { name: 'Continua la compilazione', exact: true }).click(); await expect(editor).toContainText('Resoconto originale sintetico W16.');
         expect(writes).toEqual([]); await expect(reviewed).toBeChecked(); await insert.click(); await expect(editor).toContainText('Testo dettato manualmente W16.');
         await page.getByRole('button', { name: 'Registra nel diario', exact: true }).click(); await expect(page).toHaveURL(new RegExp(`/patients/${fixture.patientId}/modules$`));
         expect(writes.filter(url => url.endsWith('/entries'))).toHaveLength(1); expect(writes.filter(url => url.endsWith('/attachments'))).toHaveLength(1);
@@ -117,7 +117,7 @@ test('Nuova voce: Quadro, bozza unica, uscita protetta e registrazione con fonte
         await zoom.setZoom(4);
         await expect.poll(() => page.getByRole('dialog').evaluate(element => { const box = element.getBoundingClientRect(); return box.top >= -1 && box.bottom <= innerHeight + 1; })).toBe(true);
         const leave = page.getByRole('button', { name: 'Esci senza salvare', exact: true });
-        await page.getByRole('button', { name: 'Continua a scrivere', exact: true }).focus(); await page.keyboard.press('Tab');
+        await page.getByRole('button', { name: 'Continua la compilazione', exact: true }).focus(); await page.keyboard.press('Tab');
         await expect(leave).toBeFocused();
         await expect.poll(() => leave.evaluate(element => { const box = element.getBoundingClientRect(); const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2); return element === hit || element.contains(hit); })).toBe(true);
         await leave.click(); await expect(page).toHaveURL(new RegExp(`/patients/${fixture.patientId}/modules$`));

@@ -402,6 +402,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
     const deleteItem = async (item: ServicePrescription) => {
         const { confirmed } = await confirm({
             title: `Eliminare la prestazione "${item.serviceName}"?`,
+            message: 'La prestazione e le sue voci verranno rimosse dalla cartella del paziente.',
             confirmLabel: 'Elimina',
             tone: 'danger'
         });

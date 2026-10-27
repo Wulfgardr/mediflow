@@ -37,7 +37,7 @@ export default function Timeline({
         /* WUL-UIUX: motivazione obbligatoria raccolta in un dialogo
            accessibile e tematizzato, non piu con prompt() nativo. */
         const result = await confirm({
-            title: 'Elimina voce clinica',
+            title: `Eliminare la voce clinica «${entry.title}»?`,
             message: "La voce verrà spostata nel cestino. Indica la motivazione, richiesta per l'audit clinico.",
             tone: 'danger',
             confirmLabel: 'Elimina',

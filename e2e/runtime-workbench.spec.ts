@@ -71,7 +71,7 @@ test('all thirteen modules remain reachable and a therapy draft survives compari
   await choose('Originale'); await expect(dosage).toHaveValue('Bozza dimostrativa non salvata');
   await choose('A · Postazione'); await expect(dosage).toHaveValue('Bozza dimostrativa non salvata');
   await page.getByRole('navigation', { name: 'Cartelle aperte' }).getByRole('link', { name: 'Sintetica Persona 06', exact: true }).click();
-  await page.getByRole('dialog', { name: 'Lasciare la compilazione?' }).getByRole('button', { name: 'Continua a scrivere' }).click();
+  await page.getByRole('dialog', { name: 'Lasciare la compilazione?' }).getByRole('button', { name: 'Continua la compilazione' }).click();
   await expect(dosage).toHaveValue('Bozza dimostrativa non salvata');
   await page.getByRole('button', { name: 'Chiudi scheda terapia', exact: true }).click();
 });
@@ -92,7 +92,7 @@ test('progressive entry preserves writing through tools, comparison and cancelle
   await page.getByRole('navigation', { name: 'Navigazione principale' }).getByRole('link', { name: 'Pazienti', exact: true }).click();
   const leaveDialog = page.getByRole('dialog', { name: 'Lasciare la compilazione?' });
   await expect(leaveDialog).toBeVisible();
-  await leaveDialog.getByRole('button', { name: 'Continua a scrivere' }).click();
+  await leaveDialog.getByRole('button', { name: 'Continua la compilazione' }).click();
   await expect(editor).toContainText(draft);
   // Deliberate discard closes exactly the test's active tab after confirmation.
   await page.getByRole('navigation', { name: 'Cartelle aperte' }).getByRole('link', { name: 'Chiudi cartella 1', exact: true }).click();

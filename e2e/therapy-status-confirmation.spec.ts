@@ -5,10 +5,10 @@ import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflo
 
 type Fixture = { patientId: string; therapyId: string; secondId: string };
 const birthDate = '1972-04-12T00:00:00.000Z';
-const patientLabel = (now: Date) => `Ada Sintetica, ${differenceInYears(now, new Date(birthDate))} anni`;
+const patientLabel = (now: Date) => `Sintetica Ada, ${differenceInYears(now, new Date(birthDate))} anni`;
 const threshold = (page: Page) => page.getByRole('region', { name: 'Cambio di stato della terapia', exact: true });
 const row = (page: Page, secondary = false) => page.locator('#terapie').getByRole('row').filter({ has: page.getByText(secondary ? 'Farmaco sintetico secondario' : 'Ramipril sintetico 5 mg', { exact: true }) });
-const confirm = (page: Page) => threshold(page).getByRole('button', { name: 'Conferma e registra', exact: true });
+const confirm = (page: Page) => threshold(page).getByRole('button', { name: /^(Sospendi|Concludi|Riattiva) (Ramipril sintetico 5 mg|Farmaco sintetico secondario)$/ });
 
 async function action(page: Page, name: string, secondary = false) {
     const target = row(page, secondary);
@@ -19,10 +19,14 @@ async function action(page: Page, name: string, secondary = false) {
     return target.getByRole('menuitem', { name, exact: true });
 }
 
-async function expectConfirmation(page: Page, question: string) {
+async function expectConfirmation(page: Page, question: string, fromStatus = 'attiva') {
     const region = threshold(page);
     const title = region.getByRole('heading', { name: question, exact: true, level: 3 });
     await expect(title).toBeVisible();
+    const verb = question.startsWith('Sospendere') ? 'Sospendi' : question.startsWith('Concludere') ? 'Concludi' : 'Riattiva';
+    await expect(confirm(page)).toHaveText(`${verb} Ramipril sintetico 5 mg`);
+    await expect(region).toContainText(`Stato: ${fromStatus} → ${verb === 'Sospendi' ? 'sospesa' : verb === 'Concludi' ? 'conclusa' : 'attiva'}.`);
+    await expect(region).toContainText(new Date().toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }));
     await expect(title).toHaveClass(/\btype-threshold\b/);
     await expect(title).toHaveCSS('font-size', '15px');
     await expect(title).toHaveCSS('font-weight', '600');
@@ -106,8 +110,8 @@ test('patient age advances only on the birthday', () => {
     dayBefore.setDate(dayBefore.getDate() - 1);
     const onBirthday = new Date(birthday.getTime());
     onBirthday.setFullYear(onBirthday.getFullYear() + 55);
-    expect(patientLabel(dayBefore)).toBe('Ada Sintetica, 54 anni');
-    expect(patientLabel(onBirthday)).toBe('Ada Sintetica, 55 anni');
+    expect(patientLabel(dayBefore)).toBe('Sintetica Ada, 54 anni');
+    expect(patientLabel(onBirthday)).toBe('Sintetica Ada, 55 anni');
 });
 
 test('first gesture then return to record issues zero writes', async ({ page }) => {
@@ -274,7 +278,7 @@ test('suspend, reactivate and complete each require their own confirmation and p
     ];
     for (const [index, transition] of transitions.entries()) {
         await (await action(page, transition.action)).click();
-        await expectConfirmation(page, `${transition.verb} Ramipril sintetico 5 mg, 1 cp al mattino?`);
+        await expectConfirmation(page, `${transition.verb} Ramipril sintetico 5 mg, 1 cp al mattino?`, index === 1 ? 'sospesa' : index === 3 ? 'conclusa' : 'attiva');
         expect(writes).toHaveLength(index);
         await confirm(page).click();
         await expect(threshold(page).getByText('Registrata', { exact: true })).toBeVisible();

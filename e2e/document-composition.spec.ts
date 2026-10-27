@@ -176,7 +176,7 @@ test('Documenti: Altro mantiene ordine, tastiera e focus dopo la conferma annull
     await expect(menu).toHaveCount(0);
     await page.keyboard.press('ArrowUp');
     await page.keyboard.press('Enter');
-    const confirmation = page.getByRole('dialog', { name: 'Eliminare questo documento?', exact: true });
+    const confirmation = page.getByRole('dialog', { name: `Eliminare il documento «${names[0]}»?`, exact: true });
     await expect(confirmation).toBeVisible();
     await expect(confirmation.getByRole('button', { name: 'Chiudi', exact: true })).toHaveCSS('border-radius', '10px');
     await confirmation.getByRole('button', { name: 'Annulla', exact: true }).click();
