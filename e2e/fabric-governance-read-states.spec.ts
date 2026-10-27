@@ -11,6 +11,7 @@ import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
 const baseline = process.env.FABRIC_GOVERNANCE_BASELINE === '1';
 const supplemental400 = process.env.FABRIC_GOVERNANCE_SUPPLEMENTAL_400 === '1';
+const captureDirectory = () => process.env.FABRIC_GOVERNANCE_SCREENSHOTS || test.info().outputPath('screenshots');
 const status = buildPortableFabricStatusSnapshot({ ollama: () => ({ status: 'denied', reason: 'missing' }),
     athena: () => ({ status: 'denied', reason: 'missing' }) }, { status: () => null, hardware: () => null });
 const observability = { schemaVersion: 'mediflow.ai.fabric-observability.v1', fallback: 'denied_by_contract',
@@ -28,8 +29,7 @@ const parliament = { updatedAt: '2026-10-27T00:00:00.000Z', jsonPath: '/syntheti
 type Scenario = 'pending' | 'status-error' | 'observation-error' | 'unauthorized' | 'forbidden' | 'ready' | 'missing' | 'error';
 
 async function capture(page: Page, target: Locator, name: string, frames: unknown[]) {
-    const directory = process.env.FABRIC_GOVERNANCE_SCREENSHOTS;
-    if (!directory) throw Error('Owned screenshot directory required');
+    const directory = captureDirectory();
     await target.scrollIntoViewIfNeeded();
     await expect(target).toBeVisible();
     const evidence = await target.evaluate(element => {
@@ -211,9 +211,10 @@ for (const [route, scenario] of cases) test(`${route} read state: ${scenario}`, 
         expect(calls.every(call => call.method === 'GET')).toBe(true);
     } finally {
         release();
-        const directory = process.env.FABRIC_GOVERNANCE_SCREENSHOTS;
-        if (directory) { await mkdir(directory, { recursive: true }); await writeFile(`${directory}/${route}-${scenario}-receipt.json`,
-            JSON.stringify({ baseline, route, scenario, calls, observations, frames, blocked: guard.blocked, uiWrites: guard.mockedUiWrites, errors }, null, 2)); }
+        const directory = captureDirectory();
+        await mkdir(directory, { recursive: true });
+        await writeFile(`${directory}/${route}-${scenario}-receipt.json`,
+            JSON.stringify({ baseline, route, scenario, calls, observations, frames, blocked: guard.blocked, uiWrites: guard.mockedUiWrites, errors }, null, 2));
         await zoom.close();
     }
 });
