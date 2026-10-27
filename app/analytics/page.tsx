@@ -3,14 +3,17 @@
 import { formatCountLabel } from '@/lib/format-count';
 import { differenceInYears } from 'date-fns';
 import { AlertTriangle, ShieldCheck } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { RangeInput } from '@/components/range-input';
 import { db } from '@/lib/db';
 import { buildAnalyticsStats, isAnalyticsPatient, normalizeAgeRange } from '@/lib/patient-analytics';
-import { useLiveQuery } from '@/lib/live-query';
+import { useLiveQueryState } from '@/lib/live-query';
+import { subscribeClientAccountAuthority } from '@/lib/security/client-auth-api';
+import { readCockpitRows } from '@/components/kree8/cockpit-read-snapshot';
+import { ViewState } from '@/components/ui/view-state';
 
 import styles from './analytics.module.css';
 
@@ -69,9 +72,37 @@ export default function AnalyticsPage() {
     const navItems = proposal
         ? ANALYTICS_NAV_ITEMS.map(({ href, label }) => ({ href, label: href === '#domanda' ? 'Popolazione' : label }))
         : ANALYTICS_NAV_ITEMS;
-    const patients = useLiveQuery(async () => db.patients
-        .filter(isAnalyticsPatient)
-        .toArray(), [], undefined, ['patients', 'patients_to_ambulatories']);
+    const snapshotVisibility = useRef({ valid: true });
+    const [, invalidateVisibleSnapshot] = useState(0);
+    useEffect(() => {
+        snapshotVisibility.current = { valid: true };
+        const hide = () => {
+            snapshotVisibility.current.valid = false;
+            invalidateVisibleSnapshot(value => value + 1);
+        };
+        const show = () => {
+            if (!snapshotVisibility.current.valid) snapshotVisibility.current = { valid: true };
+        };
+        window.addEventListener('pagehide', hide);
+        window.addEventListener('pageshow', show);
+        return () => {
+            snapshotVisibility.current.valid = false;
+            window.removeEventListener('pagehide', hide);
+            window.removeEventListener('pageshow', show);
+        };
+    }, []);
+    const patientRead = useLiveQueryState(
+        () => readCockpitRows(options => db.patients.filter(isAnalyticsPatient).toArray(options), snapshotVisibility.current),
+        [], undefined, ['patients', 'patients_to_ambulatories'],
+    );
+    const { refresh: refreshPatients } = patientRead;
+    useEffect(() => subscribeClientAccountAuthority(() => {
+        invalidateVisibleSnapshot(value => value + 1);
+        refreshPatients();
+    }), [refreshPatients]);
+    const currentRows = patientRead.data?.isCurrent() ? patientRead.data.rows : undefined;
+    const readFailed = !patientRead.loading && Boolean(patientRead.error || (patientRead.data && !currentRows));
+    const patients = !patientRead.loading && !readFailed ? currentRows : undefined;
     const [ageRange, setAgeRange] = useState<[number, number]>([0, 120]);
     const [auditDays, setAuditDays] = useState(30);
     const [auditSummary, setAuditSummary] = useState<AuditSummary | null>(null);
@@ -127,14 +158,18 @@ export default function AnalyticsPage() {
                 subtitle="Popolazione registrata e audit operativo, senza dati fuori dal dispositivo."
                 backHref="/?area=incarico"
                 backLabel="Torna ai pazienti"
-                statusLabel="Sto leggendo dal Mac..."
+                statusLabel={readFailed ? 'Schede non leggibili' : 'Sto leggendo dal Mac...'}
                 navItems={navItems}
             >
-                <p className={styles.loadingState} role="status">Sto preparando l’analisi locale.</p>
+                {readFailed ? <ViewState state="error" title="Schede non leggibili"
+                    detail="Impossibile leggere le schede. Gli aggregati non sono mostrati. Usa «Riprova» per ripetere la lettura."
+                    action={{ label: 'Riprova', onClick: refreshPatients }} />
+                    : <p className={styles.loadingState} role="status">Sto preparando l’analisi locale.</p>}
             </Kree8WorkspaceShell>
         );
     }
 
+    const populationSummary = `${formatCountLabel(stats.totalInRange, 'scheda', 'schede')} tra ${normalizedAgeRange[0]} e ${normalizedAgeRange[1]} anni`;
     return (
         <Kree8WorkspaceShell
             variant="overview"
@@ -143,9 +178,10 @@ export default function AnalyticsPage() {
             subtitle="Una domanda alla volta sui dati già registrati in questa postazione."
             backHref="/?area=incarico"
             backLabel="Torna ai pazienti"
-            statusLabel={`${formatCountLabel(stats.totalInRange, 'scheda', 'schede')} tra ${normalizedAgeRange[0]} e ${normalizedAgeRange[1]} anni`}
+            statusLabel={populationSummary}
             navItems={navItems}
         >
+            {patients.length === 0 && <ViewState state="empty" title="Nessuna scheda attiva disponibile per l’analisi." />}
             <section
                 id="domanda"
                 className={styles.focusSurface}
@@ -160,7 +196,7 @@ export default function AnalyticsPage() {
                         data-testid="analytics-primary-value"
                         data-lume-register-value="true"
                     >
-                        {stats.totalInRange}
+                        {populationSummary}
                     </p>
                     <p className={styles.mutedNote}>
                         {stats.totalInRange > 0

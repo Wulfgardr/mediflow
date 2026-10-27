@@ -23,7 +23,8 @@ import {
   type Kree8PatientWorkspace,
 } from '@/lib/patient-workspace';
 import { useLiveQuery, useLiveQueryState } from '@/lib/live-query';
-import { captureClientAccountAuthority, subscribeClientAccountAuthority } from '@/lib/security/client-auth-api';
+import { subscribeClientAccountAuthority } from '@/lib/security/client-auth-api';
+import { readCockpitRows } from './cockpit-read-snapshot';
 import { ThemeToggle } from '@/components/theme-toggle';
 // WUL-297: persistent privacy affordance in the app header.
 import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
@@ -65,32 +66,6 @@ import styles from './kree8-clinical-cockpit-shell.module.css';
 
 export { AREA_ID_VALUES };
 export type { AreaId };
-
-type CockpitSnapshot<T> = { rows: T[]; isCurrent: () => boolean; retainOnRefresh: boolean };
-
-function ambulatoryCookie(): string | null {
-  const values = document.cookie.split(';').map(value => value.trim()).filter(value => value.startsWith('ambulatory_id='));
-  if (values.length > 1) throw new Error('Ambulatory selection ambiguous.');
-  return values[0]?.length > 'ambulatory_id='.length ? values[0] : null;
-}
-
-async function readCockpitRows<T>(
-  read: (options: { signal: AbortSignal; rejectAuthUnavailable: true }) => Promise<T[]>,
-  visibility: { valid: boolean },
-): Promise<CockpitSnapshot<T>> {
-  const signal = db.getSessionReadSignal();
-  const authorityCurrent = captureClientAccountAuthority();
-  const cookie = ambulatoryCookie();
-  const isCurrent = () => {
-    try {
-      return visibility.valid && !signal.aborted && db.getSessionReadSignal() === signal
-        && authorityCurrent() && ambulatoryCookie() === cookie;
-    } catch { return false; }
-  };
-  const rows = await read({ signal, rejectAuthUnavailable: true });
-  if (!isCurrent()) throw new Error('Cockpit read context changed.');
-  return { rows, isCurrent, retainOnRefresh: cookie !== null };
-}
 
 function revealFocusedRailControl(event: FocusEvent<HTMLElement>): void {
   const rail = event.currentTarget;
