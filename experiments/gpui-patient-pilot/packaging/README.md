@@ -39,7 +39,20 @@ La build rifiuta `runtime_shaders` e verifica che una libreria Metal
 precompilata sia contenuta nei byte dell'eseguibile. Verifica inoltre che
 le dipendenze dinamiche siano esclusivamente librerie Apple di sistema.
 L'icona viene dal brand Mac esistente, letto senza modificarlo. Font e SVG
-restano incorporati dal codice del client.
+restano incorporati dal codice del client. I due marchi vengono decodificati
+prima del primo paint: il renderer riceve un `RenderImage` pronto, senza
+attendere il caricamento asincrono di `Image`. Il packaging richiede i byte
+di entrambi gli SVG nell'eseguibile copiato e ne verifica la decodifica,
+compreso il cerchio d'inchiostro, prima e dopo la firma:
+
+```bash
+"/percorso/MediFlow GPUI.app/Contents/MacOS/mediflow-gpui-patient-pilot" --verify-bundled-assets
+```
+
+Il comando non apre finestre, non accede all'archivio e usa gli stessi byte
+e la stessa cache decodificata del marchio dell'interfaccia. L'inventario
+`embedded_brand_assets` nel manifest conserva nomi, dimensioni e SHA-256;
+un marchio assente dall'eseguibile impedisce la creazione del manifest.
 
 Il bundle include licenze e inventario del grafo Cargo macOS bloccato,
 comprensivo in via prudenziale delle dipendenze di build/test, licenze Rust,

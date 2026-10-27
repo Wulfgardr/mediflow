@@ -3,7 +3,8 @@
 use crate::theme::Theme;
 use crate::theme::{TypeRole, TypeStyle};
 use gpui::{
-    Div, Image, ImageFormat, Img, Role, SharedString, Stateful, div, img, prelude::*, px, text,
+    Div, Image, ImageFormat, Img, RenderImage, Role, SharedString, Stateful, SvgRenderer, div, img,
+    prelude::*, px, text,
 };
 use std::sync::{Arc, OnceLock};
 
@@ -219,25 +220,49 @@ pub fn notice(
         .child(text!(message))
 }
 
-pub fn brand_icon(dark: bool, size: f32) -> Img {
-    static DAY: OnceLock<Arc<Image>> = OnceLock::new();
-    static NIGHT: OnceLock<Arc<Image>> = OnceLock::new();
-    let image = if dark {
-        NIGHT.get_or_init(|| {
-            Arc::new(Image::from_bytes(
-                ImageFormat::Svg,
-                include_bytes!("../../../../public/brand/mediflow/punto-grafite.svg").to_vec(),
-            ))
-        })
+fn brand_render_image(dark: bool) -> &'static Arc<RenderImage> {
+    static DAY: OnceLock<Arc<RenderImage>> = OnceLock::new();
+    static NIGHT: OnceLock<Arc<RenderImage>> = OnceLock::new();
+    let (cache, bytes): (_, &[u8]) = if dark {
+        (
+            &NIGHT,
+            include_bytes!("../../../../public/brand/mediflow/punto-grafite.svg"),
+        )
     } else {
-        DAY.get_or_init(|| {
-            Arc::new(Image::from_bytes(
-                ImageFormat::Svg,
-                include_bytes!("../../../../public/brand/mediflow/punto-giorno.svg").to_vec(),
-            ))
-        })
+        (
+            &DAY,
+            include_bytes!("../../../../public/brand/mediflow/punto-giorno.svg"),
+        )
     };
-    img(image.clone()).w(px(size)).h(px(size)).flex_shrink_0()
+    cache.get_or_init(|| {
+        Image::from_bytes(ImageFormat::Svg, bytes.to_vec())
+            .to_image_data(SvgRenderer::new(Arc::new(())))
+            .expect("embedded MediFlow brand must decode")
+    })
+}
+
+pub fn verify_bundled_brand_assets() -> serde_json::Value {
+    for dark in [false, true] {
+        let image = brand_render_image(dark);
+        let pixels = image.as_bytes(0).expect("brand must have a frame");
+        let circle = if dark {
+            [239, 236, 233, 255]
+        } else {
+            [26, 22, 20, 255]
+        };
+        assert!(
+            pixels.as_chunks::<4>().0.contains(&circle),
+            "embedded brand must render its ink circle"
+        );
+    }
+    serde_json::json!({"brand_assets": ["punto-giorno.svg", "punto-grafite.svg"], "decoded": true})
+}
+
+pub fn brand_icon(dark: bool, size: f32) -> Img {
+    img(brand_render_image(dark).clone())
+        .w(px(size))
+        .h(px(size))
+        .flex_shrink_0()
 }
 
 /// Copy/export uses the same clinical parser as the rich renderer. Meaningful
@@ -264,6 +289,40 @@ pub fn display_date(value: Option<&str>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn embedded_brand_assets_decode_in_both_themes() {
+        assert_eq!(verify_bundled_brand_assets()["decoded"], true);
+    }
+
+    #[gpui::test]
+    fn brand_is_painted_on_first_frame(cx: &mut gpui::TestAppContext) {
+        struct BrandView(bool);
+        impl gpui::Render for BrandView {
+            fn render(
+                &mut self,
+                _: &mut gpui::Window,
+                _: &mut gpui::Context<Self>,
+            ) -> impl IntoElement {
+                brand_icon(self.0, 28.)
+            }
+        }
+        for dark in [false, true] {
+            let window = cx.add_empty_window();
+            let view = window.update(|_, cx| cx.new(|_| BrandView(dark)));
+            window.draw(
+                gpui::point(px(0.), px(0.)),
+                gpui::size(px(64.), px(64.)),
+                |_, _| view.into_any_element(),
+            );
+            window.update(|window, _| {
+                assert!(
+                    window.has_image_atlas_entry(brand_render_image(dark)),
+                    "brand must be painted without waiting for async asset loading"
+                );
+            });
+        }
+    }
 
     #[test]
     fn clinical_reading_keeps_paragraphs_and_does_not_render_markup() {

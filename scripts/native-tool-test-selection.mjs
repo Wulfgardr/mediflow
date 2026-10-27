@@ -151,6 +151,19 @@ export function collectGpuiPilotSelection(root) {
       scope: 'Synthetic tests and native target compilation; no UI execution or product qualification' } };
 }
 
+export function collectGpuiBundleSelection(root) {
+  const file = `${gpuiDirectory}/scripts/test_bundle_macos.py`;
+  read(root, file);
+  const command = `python3 -m unittest discover -s ${gpuiDirectory}/scripts -p 'test_bundle_macos.py'`;
+  const binding = collectLiteralCiBinding(root, {
+    workflow: gpuiWorkflow, job: 'native-tests', triggers: gpuiTriggers, ciCall: command,
+  });
+  if (binding.jobIf !== null || binding.stepIf !== "runner.os == 'Linux'"
+    || binding.runsOn !== '${{ matrix.os }}'
+    || JSON.stringify(binding.matrix) !== JSON.stringify({ os: ['ubuntu-24.04', 'macos-latest', 'windows-latest'] })) throw new Error('GPUI bundle test CI binding changed');
+  return { files: [file], errors: [], mode: 'conditional', conditional: true, binding };
+}
+
 export function collectGpuiComparisonSelection(root) {
   const command = `node ${gpuiDirectory}/comparison/run.mjs --rust-probe ${gpuiDirectory}/target/release/mediflow-runtime-probe --output-dir comparison-results --samples 5`;
   const suite = { workflow: gpuiWorkflow, job: 'runtime-comparison', triggers: gpuiTriggers };
@@ -245,6 +258,8 @@ export function collectNativeToolSelections(root) {
   if (fs.existsSync(path.join(root, `${gpuiDirectory}/Cargo.toml`))) {
     try { result['cargo:gpui-pilot'] = collectGpuiPilotSelection(root); }
     catch (error) { result['cargo:gpui-pilot'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
+    try { result['python:gpui-bundle'] = collectGpuiBundleSelection(root); }
+    catch (error) { result['python:gpui-bundle'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
     try { result['http:gpui-comparison'] = collectGpuiComparisonSelection(root); }
     catch (error) { result['http:gpui-comparison'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
   }

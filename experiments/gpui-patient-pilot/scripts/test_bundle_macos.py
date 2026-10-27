@@ -37,6 +37,17 @@ class BundleTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 bundle.inventory(root)
 
+    def test_manifest_rejects_missing_embedded_brand(self):
+        with tempfile.TemporaryDirectory() as directory:
+            executable = Path(directory) / "client"
+            assets = bundle.brand_assets()
+            executable.write_bytes(b"executable" + b"".join(data for _, data in assets))
+            self.assertEqual(len(bundle.embedded_brand_inventory(executable)), 2)
+            for name, missing in assets:
+                executable.write_bytes(b"executable" + b"".join(data for _, data in assets if data != missing))
+                with self.assertRaisesRegex(ValueError, name):
+                    bundle.embedded_brand_inventory(executable)
+
     def test_build_number_uses_numeric_apple_components(self):
         self.assertEqual(bundle.build_number("000000" + "0" * 34), "1.0.0")
         self.assertEqual(bundle.build_number("ffffff" + "0" * 34), "1678.72.15")
