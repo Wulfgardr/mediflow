@@ -113,6 +113,8 @@ impl Host {
                     if status == 200 && state.replace_after_successful_put { state.replaced = true; }
                     response
                 }
+                "GET /api/v1/network/patients" => json!([]),
+                value if value.starts_with("GET /api/v1/network/checkups?") => json!([]),
                 "POST /api/auth/native/logout" => json!({"success":true}),
                 value if value.starts_with("GET /api/v1/network/patients/") => json!([]),
                 value => panic!("unexpected fixture route: {value}"),

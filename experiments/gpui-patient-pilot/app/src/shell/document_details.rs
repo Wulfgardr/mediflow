@@ -580,7 +580,7 @@ mod tests {
                 view.update(cx, |app, cx| {
                     app.theme = Theme::for_dark(dark);
                     app.selected_id = Some("synthetic-patient".into());
-                    app.patient.attachments = Load::Ready(vec![attachment.clone()]);
+                    app.patient.attachments = ReadLoad::Ready(vec![attachment.clone()]);
                     app.toggle_document_details("synthetic-document", cx);
                     assert_eq!(
                         app.patient.document_details_id.as_deref(),
@@ -731,7 +731,7 @@ mod tests {
             cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
         view.update(cx, |app, cx| {
             app.selected_id = Some("synthetic-patient".into());
-            app.patient.attachments = Load::Ready(vec![attachment()]);
+            app.patient.attachments = ReadLoad::Ready(vec![attachment()]);
             app.toggle_document_details("missing", cx);
             assert!(app.patient.document_details_id.is_none());
             app.toggle_document_details("synthetic-document", cx);
@@ -749,11 +749,11 @@ mod tests {
             assert!(app.patient.document_details_id.is_none());
             assert!(app.patient.attachments.ready().is_none());
             app.selected_id = Some("synthetic-patient".into());
-            app.patient.attachments = Load::Ready(vec![attachment()]);
+            app.patient.attachments = ReadLoad::Ready(vec![attachment()]);
             app.toggle_document_details("synthetic-document", cx);
             app.run(
                 || Ok(vec![attachment()]),
-                |app, result, _| app.patient.attachments = Load::from_result(result),
+                |app, result, _| app.patient.attachments = ReadLoad::from_result(result),
                 cx,
             );
             app.disconnect(cx);
