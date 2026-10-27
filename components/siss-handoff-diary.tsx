@@ -249,8 +249,9 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                 </div>
             ) : null}
 
+            <div id={formId} hidden={!isFormOpen}>
             {isFormOpen && (
-                <form id={formId} ref={formRef} onSubmit={handleSubmit} aria-label="Registra passaggio locale" className={styles.form}>
+                <form ref={formRef} onSubmit={handleSubmit} aria-label="Registra passaggio locale" className={styles.form}>
                     <div className="grid gap-3 md:grid-cols-2">
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Modulo
@@ -287,6 +288,7 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                     </div>
                 </form>
             )}
+            </div>
 
             {error && !isFormOpen ? <p className="mb-3 text-xs font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{error}</p> : null}
 

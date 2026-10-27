@@ -64,7 +64,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             {step === 1 && (
                 <div className={styles.stack}>
                     <header className={styles.heading}>
-                        <h2>Chi sei?</h2>
+                        <h1>Chi sei?</h1>
                         <p>Il tuo nome e quello dell’ambulatorio compaiono nelle cartelle e nei documenti.</p>
                     </header>
                     <div className={styles.fields}>
@@ -107,7 +107,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             {step === 2 && (
                 <div className={styles.stack}>
                     <header className={styles.heading}>
-                        <h2>Proteggi l’accesso</h2>
+                        <h1>Proteggi l’accesso</h1>
                         <p id="setup-pin-help">La passphrase apre l’archivio: usa da 15 a 128 caratteri. Il PIN separato, da 4 a 64 caratteri, serve solo per le conferme di revisione e di ruolo.</p>
                     </header>
                     <div className={styles.fields}>
