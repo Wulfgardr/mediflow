@@ -118,7 +118,7 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
         sql.exec("CREATE TRIGGER synthetic_ambulatory_ui_audit BEFORE INSERT ON audit_events WHEN NEW.event_type='patient.deleted' BEGIN SELECT RAISE(IGNORE); END");
         expect(await clear()).toBe(500);
         expect(read()).toEqual(before);
-        await expect(page.getByText('Errore durante lo svuotamento', { exact: true })).toBeVisible();
+        await expect(page.getByTestId('settings-ambulatories-section').getByRole('alert')).toContainText('Errore durante lo svuotamento');
         await expect(row.getByRole('button', { name: 'Azioni', exact: true })).toBeDisabled();
         await page.getByRole('button', { name: 'Riprova', exact: true }).click();
         await expect(row.getByRole('button', { name: 'Azioni', exact: true })).toBeEnabled();
@@ -131,7 +131,7 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
             } else await route.continue();
         });
         expect(await clear()).toBe(200);
-        await expect(page.getByText('Impossibile leggere gli ambulatori.', { exact: true })).toBeVisible();
+        await expect(page.getByTestId('settings-ambulatories-section').getByRole('alert')).toContainText('Impossibile leggere gli ambulatori.');
         expect(failedReads).toBe(1);
         await expect(row.getByRole('button', { name: 'Azioni', exact: true })).toBeDisabled();
         await page.unroute('**/api/ambulatories');
