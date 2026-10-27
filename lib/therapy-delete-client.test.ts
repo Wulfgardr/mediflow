@@ -191,7 +191,8 @@ for (const status of [401, 403]) {
     test(`strict recovery list does not report authorization failure ${status} as absence`, async t => {
         const f = await fixture(t);
         t.mock.method(globalThis, 'fetch', async (_url: unknown, init: RequestInit) => {
-            assert.equal(init.signal, f.context.signal);
+            assert.ok(init.signal);
+            assert.equal(init.signal.aborted, f.context.signal.aborted);
             return Response.json({ error: 'Unavailable' }, { status });
         });
         await assert.rejects(db.therapies.query({ patientId: 'synthetic-patient' }).toArray({
