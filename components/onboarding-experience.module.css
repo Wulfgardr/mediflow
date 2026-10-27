@@ -14,7 +14,7 @@
     overflow-wrap: anywhere;
 }
 
-.experience :where(p, h2, h3, fieldset, legend, ul) {
+.experience :where(p, h1, h2, h3, fieldset, legend, ul) {
     margin: 0;
 }
 
@@ -52,7 +52,7 @@
     gap: 1.5rem;
 }
 
-.heading h2 {
+.heading :is(h1, h2) {
     line-height: 1.25;
     letter-spacing: -0.02em;
     text-wrap: balance;
