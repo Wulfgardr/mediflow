@@ -629,7 +629,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                         </label>
                     </div>
                     {error && <p className="mt-3 text-xs font-medium text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{error}</p>}
-                    <div className="mt-4 flex justify-end gap-2">
+                    <div className="mt-4 flex justify-end gap-3">
                         <button
                             type="button"
                             className="ui-btn-secondary h-10 px-4 text-sm"

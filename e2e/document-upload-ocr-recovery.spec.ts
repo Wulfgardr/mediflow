@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { mapAnyDocLocalFailure } from '../lib/domain/documents/anydoc-local-extraction-contract';
 import type { AttachmentExtractionProjectionGrant } from '../lib/domain/documents/attachment-extraction-projection-protocol';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { openDocumentActions, bootstrapUnlockedSession, openPatientSection } from './utils';
 import { observeAnyDocProjectResponse } from './anydoc-project-response';
 import { createAnyDocConsumerDiagnostic } from './anydoc-consumer-diagnostic';
 
@@ -73,11 +73,13 @@ for (const failure of ['engine_absent', 'timeout', 'crash', 'transport_interrupt
           canonicalSource: grant!.canonicalSource }, extraction: body,
       } });
     });
-    const extract = page.getByRole('button', { name: `Estrai testo localmente da ${file.name}` });
+    const extract = page.getByRole('menuitem', { name: `Estrai testo localmente da ${file.name}` });
+    await openDocumentActions(page, file.name);
     await extract.click();
     await expect(page.getByText(/Revisione manuale necessaria/).first()).toBeVisible();
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toHaveCount(0);
     await expect(page.getByRole('button', { name: `Visualizza ${file.name}`, exact: true })).toBeEnabled();
+    await openDocumentActions(page, file.name);
     await expect(extract).toBeEnabled();
     await extract.click();
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toContainText(TEXT);
@@ -101,7 +103,8 @@ for (const input of ['protected', 'corrupt'] as const) {
             && response.request().headers()['x-mediflow-extraction-action'] === 'project'
             && response.url().endsWith(`/api/attachments/${file.id}/local-extraction`));
           void responsePromise.catch(() => {});
-          await page.getByRole('button', { name: `Estrai testo localmente da ${file.name}` }).click();
+          await openDocumentActions(page, file.name);
+          await page.getByRole('menuitem', { name: `Estrai testo localmente da ${file.name}` }).click();
           const response = await responsePromise;
           expect(response.status()).toBe(200);
           const projection = await observed.json(response);
@@ -142,27 +145,34 @@ test('OCR recovery UI: interrupt waiting, ignore late result and recover with a 
     if (attempt === 1) lateDelivered.resolve();
   });
   try {
-    const extract = page.getByRole('button', { name: `Estrai testo localmente da ${file.name}` });
+    const extract = page.getByRole('menuitem', { name: `Estrai testo localmente da ${file.name}` });
+    await openDocumentActions(page, file.name);
     await extract.click(); await ready.promise;
+    await openDocumentActions(page, file.name);
     await expect(extract).toBeDisabled();
     await page.screenshot({ path: testInfo.outputPath('waiting-synthetic.png'), fullPage: true });
     await page.getByRole('button', { name: 'Interrompi attesa', exact: true }).click({ timeout: 3000 });
+    await openDocumentActions(page, file.name);
     await expect(extract).toBeEnabled();
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toHaveCount(0);
     await expect(page.getByText(/Revisione manuale necessaria/).first()).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('interrupted-synthetic.png'), fullPage: true });
+    await openDocumentActions(page, file.name);
     await extract.click();
     await retryReady.promise;
     release.resolve(); await lateDelivered.promise;
+    await openDocumentActions(page, file.name);
     await expect(extract).toBeDisabled();
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toHaveCount(0);
     releaseRetry.resolve();
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toContainText(TEXT);
+    await openDocumentActions(page, file.name);
     await expect(extract).toBeEnabled();
     expect(calls).toBe(2);
     await openArchive(page, file.url);
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toHaveCount(0);
-    await page.getByRole('button', { name: `Estrai testo localmente da ${file.name}` }).click();
+    await openDocumentActions(page, file.name);
+    await page.getByRole('menuitem', { name: `Estrai testo localmente da ${file.name}` }).click();
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toContainText(TEXT);
   } finally { release.resolve(); releaseRetry.resolve(); }
 });
@@ -175,7 +185,8 @@ test('OCR recovery UI: deleting a pending attachment releases the other extracti
   const response = await saved;
   expect(response.ok()).toBe(true);
   await openArchive(page, file.url);
-  const second = page.getByRole('button', { name: 'Estrai testo localmente da synthetic-second.rtf' });
+  const second = page.getByRole('menuitem', { name: 'Estrai testo localmente da synthetic-second.rtf' });
+  await openDocumentActions(page, 'synthetic-second.rtf');
   await expect(second).toBeVisible();
   const ready = Promise.withResolvers<void>(); const release = Promise.withResolvers<void>();
   await page.route(file.endpoint, async (route) => {
@@ -185,11 +196,14 @@ test('OCR recovery UI: deleting a pending attachment releases the other extracti
     await route.fulfill({ response }).catch(() => undefined);
   });
   try {
-    await page.getByRole('button', { name: `Estrai testo localmente da ${file.name}` }).click();
-    await ready.promise; await expect(second).toBeDisabled();
-    await page.getByRole('button', { name: `Elimina ${file.name}`, exact: true }).click();
+    await openDocumentActions(page, file.name);
+    await page.getByRole('menuitem', { name: `Estrai testo localmente da ${file.name}` }).click();
+    await ready.promise; await openDocumentActions(page, 'synthetic-second.rtf'); await expect(second).toBeDisabled();
+    await openDocumentActions(page, file.name);
+    await page.getByRole('menuitem', { name: `Elimina ${file.name}`, exact: true }).click();
     await page.getByRole('button', { name: 'Elimina', exact: true }).click();
-    await expect(page.getByRole('button', { name: `Estrai testo localmente da ${file.name}` })).toHaveCount(0);
+    await expect(page.getByRole('menuitem', { name: `Estrai testo localmente da ${file.name}` })).toHaveCount(0);
+    await openDocumentActions(page, 'synthetic-second.rtf');
     await expect(second).toBeEnabled();
     expect((await page.request.get(`/api/attachments/${file.id}`)).status()).toBe(404);
     release.resolve();

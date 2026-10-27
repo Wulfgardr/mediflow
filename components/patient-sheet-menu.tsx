@@ -31,7 +31,7 @@ export function PatientSheetMenu({ label, trigger, children, triggerRef: supplie
     };
     useEffect(() => {
         if (!isOpen) return;
-        const candidates = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+        const candidates = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled):not([aria-disabled="true"])') ?? []);
         const position = () => {
             const menu = menuRef.current, trigger = triggerRef.current;
             if (!menu || !trigger) return;
@@ -71,7 +71,7 @@ export function PatientSheetMenu({ label, trigger, children, triggerRef: supplie
                 const item = event.target instanceof Element ? event.target.closest('[role="menuitem"]') : null;
                 if (item) close(item instanceof HTMLButtonElement && event.currentTarget.contains(document.activeElement));
             }} onKeyDown={event => {
-                const candidates = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+                const candidates = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled):not([aria-disabled="true"])') ?? []);
                 const index = candidates.indexOf(document.activeElement as HTMLElement);
                 let next: number | undefined;
                 if (event.key === 'ArrowDown') next = (index + 1) % candidates.length;

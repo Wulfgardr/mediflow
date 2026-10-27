@@ -4,6 +4,7 @@ import { formatCountLabel } from '@/lib/format-count';
 import ink from '@/components/ink-secondary.module.css';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import {
     db,
     type ServicePrescriptionCategory,
@@ -230,7 +231,7 @@ export default function NewPatientPage() {
             backLabel="Torna alla lista"
             statusLabel={statusLabel}
             navItems={navItems}
-            primaryAction={{ href: "/patients/import", label: "Importa elenco CSV", icon: FileSpreadsheet }}
+            headerActions={<Link href="/patients/import" className="mf-button-secondary"><FileSpreadsheet size={16} aria-hidden="true" />Importa elenco CSV</Link>}
         >
             <div className={`${ink.surface} ${ink.form} ${ink.stack}`}>
             <section id="documento" className="patient-detail-section mf-section p-6 md:p-8 space-y-5 scroll-mt-40">
