@@ -76,8 +76,30 @@ for (const scenario of ['initial', 'refresh', 'context'] as const) test(`Analyti
   const error = page.getByRole('alert').filter({ hasText: readErrorTitle });
   let release = () => {};
   page.on('pageerror', value => errors.push(value.message));
-  const shot = async (name: string, target: Locator) => {
+  const shot = async (name: string, target: Locator, zoomFactor: 1 | 4 = 1) => {
     await target.scrollIntoViewIfNeeded();
+    if (!baseline) {
+      const scroll = await target.evaluate(element => {
+        for (let owner = element.parentElement; owner; owner = owner.parentElement) {
+          if (owner.scrollHeight <= owner.clientHeight || !/auto|scroll/.test(getComputedStyle(owner).overflowY)) continue;
+          const rect = owner.getBoundingClientRect(), target = element.getBoundingClientRect();
+          const top = Math.max(0, rect.top), bottom = Math.min(innerHeight, rect.bottom);
+          const delta = target.top + target.height / 2 - (top + bottom) / 2;
+          const expected = Math.max(0, Math.min(owner.scrollHeight - owner.clientHeight, owner.scrollTop + delta));
+          return { x: rect.left + rect.width / 2, y: (top + bottom) / 2, delta: expected - owner.scrollTop, expected };
+        }
+        return null;
+      });
+      if (scroll) {
+        await page.mouse.move(scroll.x, scroll.y); await page.mouse.wheel(0, scroll.delta * zoomFactor);
+        await expect.poll(() => target.evaluate((element, expected) => {
+          for (let owner = element.parentElement; owner; owner = owner.parentElement) {
+            if (owner.scrollHeight > owner.clientHeight && /auto|scroll/.test(getComputedStyle(owner).overflowY)) return Math.abs(owner.scrollTop - expected);
+          }
+          return Number.POSITIVE_INFINITY;
+        }, scroll.expected)).toBeLessThanOrEqual(1);
+      }
+    }
     const probe = await target.evaluate(element => {
       const rect = element.getBoundingClientRect(), x = rect.x + Math.min(rect.width / 2, 50), y = rect.y + Math.min(rect.height / 2, 15);
       const hit = document.elementFromPoint(x, y);
@@ -108,27 +130,7 @@ for (const scenario of ['initial', 'refresh', 'context'] as const) test(`Analyti
         document.documentElement.style.colorScheme = value;
       }, theme === 'giorno' ? 'light' : 'dark');
       await assertNoHorizontalOverflow(page, [{ label: 'document', selector: 'document' }]);
-      const scroll = await target.evaluate(element => {
-        for (let owner = element.parentElement; owner; owner = owner.parentElement) {
-          if (owner.scrollHeight <= owner.clientHeight || !/auto|scroll/.test(getComputedStyle(owner).overflowY)) continue;
-          const rect = owner.getBoundingClientRect(), target = element.getBoundingClientRect();
-          const top = Math.max(0, rect.top), bottom = Math.min(innerHeight, rect.bottom);
-          const delta = target.top + target.height / 2 - (top + bottom) / 2;
-          const expected = Math.max(0, Math.min(owner.scrollHeight - owner.clientHeight, owner.scrollTop + delta));
-          return { x: rect.left + rect.width / 2, y: (top + bottom) / 2, delta: expected - owner.scrollTop, expected };
-        }
-        return null;
-      });
-      if (scroll) {
-        await page.mouse.move(scroll.x, scroll.y); await page.mouse.wheel(0, scroll.delta * (size === 'zoom-400' ? 4 : 1));
-        await expect.poll(() => target.evaluate((element, expected) => {
-          for (let owner = element.parentElement; owner; owner = owner.parentElement) {
-            if (owner.scrollHeight > owner.clientHeight && /auto|scroll/.test(getComputedStyle(owner).overflowY)) return Math.abs(owner.scrollTop - expected);
-          }
-          return Number.POSITIVE_INFINITY;
-        }, scroll.expected)).toBeLessThanOrEqual(1);
-      }
-      const probe = await shot(`${name}-${theme}-${size}`, target); colors.set(theme, probe.color);
+      const probe = await shot(`${name}-${theme}-${size}`, target, size === 'zoom-400' ? 4 : 1); colors.set(theme, probe.color);
     }
     expect(colors.get('giorno')).not.toBe(colors.get('grafite'));
     await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
