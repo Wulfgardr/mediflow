@@ -509,7 +509,7 @@
   :global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-runtime-settings] {
     height: 100%;
     grid-template-columns: 272px minmax(0, 1fr);
-    gap: 30px;
+    row-gap: 30px;
   }
   :global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-runtime-settings] > aside {
     position: static;
