@@ -22,7 +22,7 @@ export function RecoveryKitPanel({ prepared, onCommit, onCancel }: {
         URL.revokeObjectURL(url); setSaved(true);
     };
     return <section className={`${SETTINGS_CARD_CLASS} space-y-4`} aria-labelledby="recovery-kit-title" data-testid="recovery-kit">
-        <h2 id="recovery-kit-title" className="text-lg font-semibold">Conserva il nuovo kit prima di continuare</h2>
+        <h1 id="recovery-kit-title" className="text-lg font-semibold">Conserva il nuovo kit prima di continuare</h1>
         <p>Scarica il kit e scrivi questa chiave su carta. Conservali separatamente: insieme permettono di recuperare l’archivio. La chiave non è inclusa nel file.</p>
         <output className="block break-all type-code" aria-label="Chiave di recupero">{prepared.recoveryKey}</output>
         <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={download}>Scarica kit di recupero</button>

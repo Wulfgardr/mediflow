@@ -160,7 +160,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
             </div>
             <aside className={styles.draftSummary} aria-label="Risultato in bozza">
                 <h3>Risultato in bozza</h3>
-                <p className={styles.draftState}>● Fresco · non registrato</p>
+                <p className={styles.draftState}>● Bozza non registrata</p>
                 {draftResult ? <><p className={styles.score}>{draftResult.score}</p><p>{draftResult.interpretation}</p></> : <p>{answeredQuestions.length} risposte su {scale.questions.length}. Il punteggio sarà disponibile a compilazione completa.</p>}
                 <Disclosure className={styles.answerDetails} title={<>Risposte compilate · {answeredQuestions.length}</>}><dl>{answeredQuestions.map(question => <div key={question.id}><dt>{question.text}</dt><dd>{question.options?.find(option => option.value === answers[question.id])?.label ?? String(answers[question.id])}</dd></div>)}</dl></Disclosure>
                 {scale.instrument && <p className={styles.source}>Fonte: {scale.instrument.sourceId} · {scale.instrument.instrumentVersion}</p>}

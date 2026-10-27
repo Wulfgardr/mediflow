@@ -46,7 +46,7 @@ async function setup(page: Page): Promise<void> {
     await page.getByLabel('Conferma passphrase', { exact: true }).fill(PASSPHRASE);
     await page.locator('#setup-pin').fill(PIN);
     await page.locator('#setup-confirm-pin').fill(PIN);
-    await page.getByRole('button', { name: 'Concludi Setup', exact: true }).click();
+    await page.getByRole('button', { name: 'Prepara il kit di recupero', exact: true }).click();
     const kit = page.getByTestId('recovery-kit');
     const activate = kit.getByRole('button', { name: 'Attiva la nuova passphrase', exact: true });
     await expect(activate).toBeDisabled();
