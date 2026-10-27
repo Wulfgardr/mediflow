@@ -31,12 +31,12 @@ async function createAnalyticsFixture(page: Page): Promise<void> {
       address: 'Fixture sintetica analytics',
       phone: '0000000110',
       isAdi: true,
-      diagnoses: [{
+      diagnoses: Array.from({ length: 10 }, (_, index) => ({
         system: 'ICD-11',
-        code: 'QA68',
-        description: 'Rilevazione sintetica analytics',
+        code: `QA68-${index}`,
+        description: `Rilevazione sintetica analytics ${index + 1}`,
         date: '2026-07-17T08:00:00.000Z',
-      }],
+      })),
     },
   });
   expect(response.ok(), `Fixture analytics: HTTP ${response.status()}`).toBe(true);
@@ -159,9 +159,11 @@ async function verifyAnalytics(page: Page, viewCase: ViewCase): Promise<void> {
   await expect(page.locator('#indicatori > dl')).toHaveCount(1);
 
   const downstream = page.locator('#diagnosi');
-  // Align the destination at the top: the compact overview can keep Domanda
-  // visible when Diagnosi is only centered, so its current-section state is valid.
   await downstream.evaluate((element) => element.scrollIntoView({ behavior: 'auto', block: 'start' }));
+  await expect.poll(() => focus.evaluate(element => {
+    const rail = element.closest('main')?.querySelector('nav');
+    return element.getBoundingClientRect().bottom - (rail?.getBoundingClientRect().bottom ?? 0);
+  })).toBeLessThanOrEqual(0);
   await expect(currentSection).toHaveCount(1);
   await expect(currentSection).not.toHaveAttribute('href', '#domanda');
   await focus.evaluate((element) => element.scrollIntoView({ behavior: 'auto', block: 'center' }));
