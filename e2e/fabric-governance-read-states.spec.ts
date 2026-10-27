@@ -150,7 +150,8 @@ for (const [route, scenario] of cases) test(`${route} read state: ${scenario}`, 
                 await expect(target).toBeVisible();
             }
         }
-        await capture(page, target, `${route}-${scenario}-1440`, frames);
+        const captureOpenDiagnostic = route === 'governance' && scenario === 'error' && !baseline;
+        if (!captureOpenDiagnostic) await capture(page, target, `${route}-${scenario}-1440`, frames);
         const visualState = route === 'fabric' ? ['pending', 'status-error', 'unauthorized'].includes(scenario) : ['pending', 'error'].includes(scenario);
         const dayColors = new Map<number | string, string>();
         if (visualState) for (const theme of ['giorno', 'grafite']) for (const size of [320, 'zoom-400'] as const) {
@@ -163,13 +164,19 @@ for (const [route, scenario] of cases) test(`${route} read state: ${scenario}`, 
             else expect(evidence.palette.color, `${route}-${scenario}-${size}: distinct computed theme color`).not.toBe(dayColors.get(size));
             await assertNoHorizontalOverflow(page, [{ label: route, selector: `[data-testid="settings-ai-${route}-section"]` }]);
         }
-        if (route === 'governance' && scenario === 'error' && !baseline) {
+        if (captureOpenDiagnostic) {
+            await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
+            await page.evaluate(() => { document.documentElement.classList.remove('dark'); document.documentElement.dataset.theme = 'giorno'; });
             const diagnostic = surface.getByRole('button', { name: 'Dettagli dell’errore per l’assistenza', exact: true });
             await diagnostic.focus(); await page.keyboard.press('Enter');
             await expect(surface.getByText('HTTP 503', { exact: true })).toBeVisible();
             await expect(diagnostic).toBeFocused();
+            await expect(diagnostic).toHaveAttribute('aria-expanded', 'true');
+            await capture(page, surface.getByText('HTTP 503', { exact: true }), `${route}-${scenario}-1440`, frames);
             await page.keyboard.press('Space');
             await expect(surface.getByText('HTTP 503', { exact: true })).toBeHidden();
+            await expect(diagnostic).toHaveAttribute('aria-expanded', 'false');
+            observations.push({ diagnosticKeyboard: { openedBy: 'Enter', closedBy: 'Space', expandedThenCollapsed: true, focusRetained: true } });
         }
         expect(guard.blocked).toEqual([]); expect(errors).toEqual([]);
         expect(calls.every(call => call.method === 'GET')).toBe(true);
