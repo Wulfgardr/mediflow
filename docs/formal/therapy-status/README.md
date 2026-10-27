@@ -26,8 +26,11 @@ controller: transizioni, guardie, confini degli await e chiamate a
 `begin`/`confirm`/`cancel`/`recover` restano invariati. La stringa del destinatario
 è solo presentazione; ID paziente/terapia, target, versioni e payload non cambiano.
 Controller ADR0168, recupero legacy ADR0156, route, CAS, ledger e audit sono
-identici alla base e conservano le impronte coperte. Anche le conferme di nuovo
-invio dopo conflitto conservano motivo e guardie esistenti.
+identici alla base e conservano le impronte coperte. Il secondo confronto, su `9370053e4` (vedi `coverage.json.syncCommit` per il riferimento
+completo), allinea anche titolo, conseguenza e verbo del nuovo invio dopo conflitto.
+Sono ancora identici callback `deletion.retry`, scelta del motivo conservato o
+nuovo e condizione `requireReason`: cambia soltanto il testo. Anche le conferme
+di nuovo invio conservano motivo e guardie esistenti.
 
 L'impronta del solo componente e `syncCommit` sono aggiornati manualmente dopo
 questo confronto. Modello, statechart, invarianti, limiti e mutanti non cambiano;
