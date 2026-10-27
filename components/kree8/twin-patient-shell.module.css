@@ -1,6 +1,6 @@
 /* WUL-676: the patient workspace replaces the old nested card shell. */
 .patientShell { min-height: 100%; background: var(--lume-surface-focal); color: var(--lume-ink); }
-.patientHeader { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 28px; }
+.patientHeader { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px var(--ink-plane-inset); }
 .identity { min-width: 0; }
 .identity h1 { margin: 0; letter-spacing: 0; font: var(--type-person); }
 .identity p { margin-top: 6px; font-size: 0.8125rem; color: var(--lume-ink-muted); }
@@ -8,7 +8,7 @@
 /* same command geometry for every action in the patient header. */
 .actions > :is(a, button) { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--lume-control-height, 44px); padding: 10px 14px; border-radius: var(--lume-control-radius, 8px); font-size: 0.875rem; font-weight: 600; line-height: 1.5; }
 
-.patientBody { padding: 28px; }
+.patientBody { padding: 28px var(--ink-plane-inset); }
 .readingPane { max-width: 1160px; margin: 0 auto; }
 .readingPane > div { display: flex; flex-direction: column; gap: 28px; }
 .readingPane :global([data-folder-pane][data-folder-active='false']) { display: none; }
@@ -16,17 +16,16 @@
 .patientBody:not([data-folder-section='quadro']):not([data-folder-section='attenzione']) :global(#attenzione) { display: none; }
 .patientBody[data-folder-section='quadro'] :global(#attenzione[data-has-attention='false']) { display: none; }
 .patientBody :global(#attenzione) { order: 2; padding: 18px 0; border-radius: 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 13%, transparent); background: transparent; }
-.patientBody :global(#attenzione h2) { font-size: var(--twin-type-section, 0.9375rem); font-weight: 600; line-height: 1.35; margin: 0 0 12px; }
+.patientBody :global(#attenzione h2) { margin: 0 0 12px; }
 .patientBody :global(#attenzione > div) { margin: 0; }
 .patientBody :global([data-folder-pane]) { padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
 .patientBody :global([data-folder-pane] > h3) { margin-bottom: 20px; }
 .patientBody :global([data-folder-pane] > h3 > div) { padding: 0; border: 0; }
-.patientBody :global([data-folder-pane] > h3 > div > span > span:first-child) { font-size: var(--twin-type-section, 0.9375rem); font-weight: 600; line-height: 1.35; }
 .patientBody :global([data-folder-pane] > h3 > div > span > span[class*='kicker']) { display: none; }
 :global(html[data-twin-composition='stream']) .patientBody { max-width: 1020px; margin: auto; }
 :global(html[data-twin-composition='stream']) .patientHeader { max-width: 1020px; margin: auto; }
 
-@media (max-width: 750px) { .patientHeader { padding: 22px 20px 18px; flex-direction: column; align-items: stretch; gap: 16px; } .actions { justify-content: flex-start; } .patientBody { padding: 24px 20px 40px; } .actions > :is(a,button) { min-height: 44px; } }
+@media (max-width: 750px) { .patientHeader { padding: 22px var(--ink-plane-inset) 18px; flex-direction: column; align-items: stretch; gap: 16px; } .actions { justify-content: flex-start; } .patientBody { padding: 24px var(--ink-plane-inset) 40px; } .actions > :is(a,button) { min-height: 44px; } }
 
 .patientShell {
   --k8-surface: var(--lume-surface-field);
@@ -76,14 +75,13 @@
 .patientBody[data-folder-section='quadro'] :global(#diario) { display: block; }
 .patientBody[data-folder-section='quadro'] :global(#attenzione) { grid-column: 1 / -1; }
 .patientBody :global([data-folder-pane] > h3 > div) { min-height: 36px; border-bottom: 1px solid var(--lume-rule-strong); }
-.patientBody :global([data-folder-pane] > h3 > div > span > span:first-child) { font: 600 0.75rem/1.5 var(--lume-font-sans); text-transform: uppercase; letter-spacing: .05em; }
 .patientBody :global([data-folder-pane] > h3 .apple-chip) { border: 0; background: none; font: 0.8125rem var(--lume-font-sans); color: var(--lume-ink-muted); }
 .patientBody :global([data-folder-pane] > div) { padding-inline: 0; }
 @media (max-width: 1000px) {
  .patientBody[data-folder-section='quadro'] .readingPane > div { display: flex; gap: 28px; }
 }
 @media (max-width: 700px) {
- .patientHeader { padding: 20px 16px; }
+ .patientHeader { padding: 20px var(--ink-plane-inset); }
  .identity h1 { font: var(--type-person-compact); }
- .patientBody { padding: 20px 16px 32px; }
+ .patientBody { padding: 20px var(--ink-plane-inset) 32px; }
 }

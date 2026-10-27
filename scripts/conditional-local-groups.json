@@ -6,7 +6,8 @@
         "components/lock-screen-pin.browser.test.mjs",
         "scripts/chatgpt-account/account-ui-browser.mjs",
         "scripts/function-models/ui-browser.mjs",
-        "tests/ui06/component-browser.test.mjs"
+        "tests/ui06/component-browser.test.mjs",
+        "scripts/ink-layout-browser.test.mjs"
       ],
       "prerequisites": [
         "Node 24 and npm ci dependencies including Playwright, Chromium and esbuild; browser provisioning belongs to the CI lane.",
