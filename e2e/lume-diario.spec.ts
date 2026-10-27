@@ -372,7 +372,14 @@ test.describe.serial('Diario globale Lume', () => {
     const firstEntry = entries.first();
     await firstEntry.getByRole('button', { name: 'Apri quadro', exact: true }).focus();
     await page.keyboard.press('Tab');
-    await expect(firstEntry.getByRole('link', { name: 'Nuova voce', exact: true })).toBeFocused();
+    const actions = firstEntry.getByRole('button', { name: 'Azioni', exact: true });
+    await expect(actions).toBeFocused();
+    await actions.press('ArrowDown');
+    const newEntry = page.getByRole('menu', { name: 'Azioni', exact: true }).getByRole('menuitem', { name: 'Nuova voce', exact: true });
+    await expect(newEntry).toBeFocused();
+    await expect(newEntry).toHaveAttribute('href', `/patients/${patientId}/entries/new`);
+    await page.keyboard.press('Escape');
+    await expect(actions).toBeFocused();
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const motion = await page.evaluate(() => {

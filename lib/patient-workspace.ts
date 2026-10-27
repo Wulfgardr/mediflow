@@ -13,6 +13,7 @@ import type {
   Therapy,
 } from '@/lib/db';
 import type {
+  AgendaFilter,
   AgendaFilterCategory,
   LegacySemanticSignalAlias,
   SemanticSignal,
@@ -152,6 +153,7 @@ export function classifyCheckupPill(checkup: Kree8CheckupSource): Pick<Kree8Agen
 export function mapCheckupsForKree8(
   checkups: Kree8CheckupSource[],
   patients: Kree8Patient[],
+  filter: AgendaFilter = 'all',
 ): Kree8AgendaRow[] {
   const patientById = new Map(patients.map((patient) => [patient.id, patient]));
 
@@ -167,7 +169,9 @@ export function mapCheckupsForKree8(
       if (checkup.status === 'cancelled' || checkup.status === 'completed') return false;
       const date = new Date(checkup.date);
       if (Number.isNaN(date.getTime())) return false;
-      return date.getTime() >= startOfToday.getTime();
+      if (date.getTime() < startOfToday.getTime()) return false;
+      const category = isSameCalendarDay(date, startOfToday) ? 'urgent' : 'manual';
+      return filter === 'all' || filter === category;
     })
     .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime())
     .slice(0, 6)
