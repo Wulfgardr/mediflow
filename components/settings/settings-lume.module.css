@@ -874,7 +874,6 @@
 
 .settingsRows { min-width: 0; margin: 28px 0; padding: 0; border: 0; }
 .settingsRows > legend, .settingsRows > h3 { width: 100%; margin: 0; padding: 0 0 12px; border-bottom: 1px solid var(--lume-rule-strong); font: 600 0.875rem/1.5 var(--lume-font-sans); }
-.settingsWorkspace { composes: columns from "../ink-layout.module.css"; composes: sections from "../ink-section.module.css"; }
 .settingsWorkspace .settingRow { display: flex; align-items: center; justify-content: space-between; gap: 24px; width: 100%; min-height: 64px; padding: 14px 0; border: 0; border-bottom: 1px solid var(--lume-rule); border-radius: 0; background: transparent; color: var(--lume-ink); text-align: left; font: 0.875rem/1.5 var(--lume-font-sans); }
 .settingRow > span:first-child { min-width: 0; display: grid; gap: 4px; }
 .settingRow strong { font-weight: 600; }
