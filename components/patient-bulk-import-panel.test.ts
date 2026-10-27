@@ -140,7 +140,7 @@ test('E2E candidate parses and retains the original isolated runtime without aut
     assert.deepEqual((result.diagnostics ?? []).filter(item => item.category === ts.DiagnosticCategory.Error), []);
     assert(source.includes("from './fixtures/isolated-runtime'"));
     assert.doesNotMatch(source, /test\.(skip|fixme|setTimeout)|waitForTimeout|route\.(fulfill|abort)|page\.route\(/u);
-    assert(source.includes("name: 'Concludi Setup'"));
+    assert(source.includes("name: 'Prepara il kit di recupero'"));
     assert(source.includes("name: 'Crea scheda'"));
     assert(source.includes('expect(after.find(item => item.id === before.id)).toEqual(before)'));
 });

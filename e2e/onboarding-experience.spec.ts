@@ -83,6 +83,8 @@ async function geometry(page: Page, selector: string) {
         { label: 'document', selector: 'document' }, { label: 'first-use surface', selector },
     ]);
     const surface = page.locator(selector);
+    await expect(surface.getByRole('heading', { level: 1 })).toHaveCount(1);
+    await expect(page.locator('h1:visible')).toHaveCount(1);
     const controls = surface.locator('button, a, summary, input:not([type="radio"]), label:has(input[type="radio"])');
     for (const control of await controls.all()) {
         if (!(await control.isVisible())) continue; // Native closed disclosure content is not a target.
@@ -121,6 +123,8 @@ async function unlockPassphrase(page: Page, passphrase = PASSPHRASE) {
 
 async function conserveKit(page: Page) {
     const panel = page.getByTestId('recovery-kit');
+    await expect(panel.getByRole('heading', { level: 1, name: 'Conserva il nuovo kit prima di continuare', exact: true })).toBeVisible();
+    await expect(page.locator('h1:visible')).toHaveCount(1);
     const activate = panel.getByRole('button', { name: 'Attiva la nuova passphrase', exact: true });
     await expect(activate).toBeDisabled();
     const key = await panel.getByLabel('Chiave di recupero', { exact: true }).innerText();
@@ -165,7 +169,7 @@ async function setup(page: Page, info?: TestInfo) {
     await expect(root.locator('#setup-pin-help')).toContainText('da 4 a 64 caratteri');
     const pin = root.getByLabel('PIN di conferma', { exact: true });
     const confirmation = root.getByLabel('Conferma PIN', { exact: true });
-    const submit = root.getByRole('button', { name: 'Concludi Setup', exact: true });
+    const submit = root.getByRole('button', { name: 'Prepara il kit di recupero', exact: true });
     await expect(pin).toHaveAttribute('type', 'password');
     await expect(pin).toHaveAttribute('inputmode', 'text');
     await expect(confirmation).toHaveAttribute('type', 'password');
@@ -209,7 +213,13 @@ async function setup(page: Page, info?: TestInfo) {
 async function guidedPreview(page: Page) {
     const panel = page.getByTestId('work-profile-onboarding');
     await expect(panel.getByRole('button', { name: 'Salva e continua', exact: true })).toBeDisabled();
-    await panel.getByRole('radio', { name: 'Consultare e compilare cartelle', exact: true }).check();
+    const radio = panel.getByRole('radio', { name: 'Consultare e compilare cartelle', exact: true });
+    await expect(radio).not.toBeChecked();
+    await expect(radio).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await focusVisible(page, radio);
+    await radio.check();
+    await expect(radio).toBeChecked();
+    await expect.poll(() => radio.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
     await panel.getByRole('button', { name: 'Salva e continua', exact: true }).click();
     await expect(panel.getByRole('group', { name: 'Come preferisci lavorare?', exact: true })).toBeVisible();
     await panel.getByRole('radio', { name: 'Usare direttamente le schermate', exact: true }).check();

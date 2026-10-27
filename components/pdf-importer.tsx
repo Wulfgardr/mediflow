@@ -15,7 +15,7 @@ interface PdfImporterProps {
  * the selection or imply that an attachment was saved. No callback is invoked. */
 function PdfImporterUnavailable() {
     return (
-        <aside className="mb-8" aria-label="Documenti prima del salvataggio">
+        <aside aria-label="Documenti prima del salvataggio">
             <h3 className="flex items-center gap-2 font-semibold text-[color:var(--lume-ink)]">
                 <FileText className="h-5 w-5" aria-hidden="true" /> Aggiungi documenti dopo il salvataggio
             </h3>

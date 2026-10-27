@@ -1,7 +1,7 @@
 'use client';
 
 import { Search } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -62,6 +62,28 @@ function NavGroups({
 export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () => void }) {
     const pathname = usePathname();
     const stripRef = useRef<HTMLDivElement>(null);
+    const desktopRef = useRef<HTMLDivElement>(null);
+    const [desktopOverflows, setDesktopOverflows] = useState(false);
+    useEffect(() => {
+        const desktop = desktopRef.current;
+        const pane = desktop?.closest('aside');
+        if (!desktop || !pane) return;
+        const revealCurrent = () => {
+            if (!pane.clientHeight || !desktop.clientHeight) return;
+            setDesktopOverflows(pane.scrollHeight > pane.clientHeight + 1);
+            const current = desktop.querySelector<HTMLElement>('[aria-current="page"]');
+            if (!current) return;
+            const item = current.getBoundingClientRect(), viewport = pane.getBoundingClientRect();
+            const hintHeight = desktop.querySelector<HTMLElement>('[data-index-hint]')?.offsetHeight ?? 0;
+            if (item.top < viewport.top + hintHeight) pane.scrollTop += item.top - viewport.top - hintHeight;
+            else if (item.bottom > viewport.bottom) pane.scrollTop += item.bottom - viewport.bottom;
+        };
+        revealCurrent();
+        const observer = new ResizeObserver(revealCurrent);
+        observer.observe(pane);
+        observer.observe(desktop);
+        return () => observer.disconnect();
+    }, [pathname]);
     useEffect(() => {
         const strip = stripRef.current;
         if (!strip) return;
@@ -87,10 +109,13 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
                         className={cn(styles.navItem, active && styles.navItemActive)}>{item.label}</Link>;
                 })}
             </div>
-            <span id="settings-scroll-hint" className={navigation.scrollHint}>Scorri per altre sezioni <span aria-hidden="true">→</span></span>
-            {onSearchRequest && <button type="button" onClick={onSearchRequest} aria-label="Cerca impostazione" data-testid="settings-search-trigger-mobile" className={styles.mobileStripSearch}><Search size={16} aria-hidden="true" />Cerca impostazione</button>}
+            <div className={navigation.mobileTools}>
+                <span id="settings-scroll-hint" className={navigation.scrollHint}>Scorri per altre sezioni <span aria-hidden="true">↔</span></span>
+                {onSearchRequest && <button type="button" onClick={onSearchRequest} aria-label="Cerca impostazione" data-testid="settings-search-trigger-mobile" className={styles.mobileStripSearch}><Search size={16} aria-hidden="true" />Cerca impostazione</button>}
+            </div>
 
-            <div className={styles.desktopSidebar}>
+            <div ref={desktopRef} className={styles.desktopSidebar}>
+                {desktopOverflows && <span data-index-hint className={navigation.desktopScrollHint}>Scorri l’indice <span aria-hidden="true">↕</span></span>}
                 {onSearchRequest ? (
                     <button
                         type="button"

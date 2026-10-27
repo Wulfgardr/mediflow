@@ -14,7 +14,7 @@
     overflow-wrap: anywhere;
 }
 
-.experience :where(p, h2, h3, fieldset, legend, ul) {
+.experience :where(p, h1, h2, h3, fieldset, legend, ul) {
     margin: 0;
 }
 
@@ -52,7 +52,7 @@
     gap: 1.5rem;
 }
 
-.heading h2 {
+.heading :is(h1, h2) {
     line-height: 1.25;
     letter-spacing: -0.02em;
     text-wrap: balance;
@@ -156,7 +156,25 @@
     width: 1.125rem;
     height: 1.125rem;
     margin: 0.2rem 0 0;
-    accent-color: var(--lume-ink-fresh);
+    appearance: none;
+    border: 2px solid var(--lume-ink-muted);
+    border-radius: 50%;
+    background: transparent;
+}
+
+.option input[type='radio']:checked {
+    border-color: var(--lume-ink-fresh);
+    background: var(--lume-ink-fresh);
+    box-shadow: inset 0 0 0 3px var(--lume-surface-focal);
+}
+
+.option input[type='radio']:focus-visible {
+    outline: 2px solid var(--lume-ink-fresh);
+    outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+    .option input[type='radio'] { appearance: auto; }
 }
 
 .optionCopy {

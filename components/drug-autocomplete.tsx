@@ -9,19 +9,21 @@ import {
 } from '@/lib/drug-autocomplete-search';
 import { Search, X, Pill, Database, Activity } from 'lucide-react';
 import Link from 'next/link';
+import styles from './drug-autocomplete.module.css';
 
 interface DrugAutocompleteProps {
     onSelect: (drug: AifaDrug) => void;
+    id?: string;
     placeholder?: string;
     autoFocus?: boolean;
     defaultValue?: string;
 }
 
-const drugInputClassName = 'mf-input mf-search-input h-11 text-sm';
+const drugInputClassName = `mf-input mf-search-input h-11 text-sm ${styles.input}`;
 const drugPopoverClassName = 'absolute z-[100] mt-2 max-h-80 w-full overflow-y-auto rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-2 shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]';
 const drugRowClassName = 'w-full rounded-[var(--lume-radius-control)] px-3 py-3 text-left transition-[background-color] duration-[var(--lume-dur-riga)] hover:bg-[color:var(--lume-surface-focal)] focus:bg-[color:var(--lume-surface-focal)] focus:outline-none';
 
-export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per nome o principio attivo...", autoFocus = false, defaultValue = "" }: DrugAutocompleteProps) {
+export default function DrugAutocomplete({ onSelect, id, placeholder = "Cerca per nome o principio attivo...", autoFocus = false, defaultValue = "" }: DrugAutocompleteProps) {
     const [query, setQuery] = useState(defaultValue);
     const [results, setResults] = useState<AifaDrug[]>([]);
     const [isOpen, setIsOpen] = useState(false);
@@ -130,6 +132,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--lume-ink-muted)' }} />
                 <input
+                    id={id}
                     type="text"
                     role="combobox"
                     aria-expanded={isOpen}

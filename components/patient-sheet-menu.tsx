@@ -70,7 +70,7 @@ export function PatientSheetMenu({ label, trigger, children, triggerRef: supplie
     }} onKeyDown={event => {
         if (isOpen && (event.key === 'Escape' || event.key === 'Tab')) { event.preventDefault(); event.stopPropagation(); close(); }
     }}>
-        {trigger({ ref: triggerRef, type: 'button', 'aria-expanded': isOpen, 'aria-haspopup': 'menu', 'aria-controls': menuId,
+        {trigger({ ref: triggerRef, type: 'button', 'aria-expanded': isOpen, 'aria-haspopup': 'menu', 'aria-controls': isOpen ? menuId : undefined,
             onClick: () => isOpen ? close() : open(), onKeyDown: event => {
                 if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                     event.preventDefault(); open(event.key === 'ArrowUp' ? 'last' : 'first');

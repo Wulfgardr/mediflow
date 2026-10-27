@@ -19,7 +19,7 @@ test('complete backup is encrypted in the browser and verification never claims 
     await page.getByLabel('Conferma passphrase', { exact: true }).fill(phrase);
     await page.locator('#setup-pin').fill('recov1234');
     await page.locator('#setup-confirm-pin').fill('recov1234');
-    await page.getByRole('button', { name: 'Concludi Setup', exact: true }).click();
+    await page.getByRole('button', { name: 'Prepara il kit di recupero', exact: true }).click();
     const kit = page.getByTestId('recovery-kit');
     const recoveryKey = await kit.getByLabel('Chiave di recupero').textContent();
     const kitDownload = page.waitForEvent('download');
