@@ -328,13 +328,14 @@ function IncaricoArea({
       <div className={patientStyles.inboxLayout}>
         <section className={patientStyles.worklistPanel} aria-label={list === 'attivi' ? 'Pazienti in carico' : 'Archivio pazienti'} data-testid="lume-worklist">
           <header className={patientStyles.worklistPanelHeader}>
-            <span className={patientStyles.resultCount}>{visible.length} {visible.length === 1 ? 'risultato' : 'risultati'}</span>
+            {patientStatus === 'ready' ? <span className={patientStyles.resultCount}>{visible.length} {visible.length === 1 ? 'risultato' : 'risultati'}</span> : null}
             <span className={patientStyles.keyboardHint}>↑ ↓ per scorrere · Invio per aprire</span>
           </header>
           <div className={patientStyles.columnHeadings} aria-hidden="true"><span>Paziente</span><span>Età</span><span>Problema principale</span><span>Aggiornato</span><span>Stato</span></div>
           <div style={{ marginTop: 8 }}>
             {patientStatus === 'idle' || patientStatus === 'loading' ? (
               <div className={styles.emptyState} role="status" aria-live="polite" aria-label="Caricamento pazienti">
+                <p>Caricamento pazienti</p>
                 <div className="mf-skeleton h-12" />
                 <div className="mf-skeleton h-12 mt-2" />
                 <div className="mf-skeleton h-12 mt-2" />
@@ -421,7 +422,7 @@ function IncaricoArea({
           </div>
         </section>
 
-        {selected ? (
+        {patientStatus === 'ready' ? selected ? (
           <aside
             className={patientStyles.caseLens}
             key={selected.id}
@@ -459,7 +460,7 @@ function IncaricoArea({
               {selected.summary}
             </p>
             <div className={classNames(patientStyles.caseLensActions, patientStyles.worklistLensActions)}>
-              <Link href={selected.modulesHref} className={styles.primaryBtn} data-lume-action="primary">
+              <Link href={selected.modulesHref} className={styles.ghostBtn} data-lume-action="secondary">
                 <UserSquare2 size={13} />
                 Apri scheda paziente
               </Link>
@@ -517,7 +518,7 @@ function IncaricoArea({
                 : 'Nessun paziente selezionabile in questa vista.'}
             </p>
           </aside>
-        )}
+        ) : null}
       </div>
     </div>
   );
