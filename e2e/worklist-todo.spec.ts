@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { installWorklistTodoFixture } from './fixtures/worklist-todo';
 import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
@@ -47,6 +48,7 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
         const visible = (node: Element) => getComputedStyle(node).display !== 'none' && node.getBoundingClientRect().width > 0;
         return { cssWidth: innerWidth, containerWidth: element.clientWidth,
           columns: [...element.querySelectorAll('[data-worklist-column]')].filter(visible).map(node => node.textContent),
+          columnOverflow: [...element.querySelectorAll('[data-worklist-column]')].filter(visible).map(node => node.scrollWidth - node.clientWidth),
           rows: [...element.querySelectorAll('[data-testid=lume-patient-row]')].map(node => {
             const box = node.getBoundingClientRect(), css = getComputedStyle(node);
             return { text: node.textContent, height: box.height, gap: css.columnGap, padding: css.padding,
@@ -71,6 +73,7 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
         await expect(row('C')).toContainText('Rivalutazione concordata');
         if (frame.containerWidth < 700) expect(frame.columns).toEqual(['Paziente', 'Da fare']);
         expect(frame.primaryCount).toBe(1);
+        for (const overflow of frame.columnOverflow) expect(overflow).toBeLessThanOrEqual(1);
         for (const command of frame.commands) {
           expect(command.height, command.text ?? '').toBeGreaterThanOrEqual(frame.cssWidth <= 700 ? 44 : 40);
           expect(command.width).toBeGreaterThanOrEqual(40);
@@ -86,6 +89,10 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
     if (baseline) return;
     await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
     expect(new Set((frames as { palette: string }[]).map(frame => frame.palette)).size).toBe(2);
+    const allControls = fixture.state.checkups;
+    fixture.state.checkups = allControls.filter(control => control.id !== 'c3');
+    await page.reload(); await expect(row('C')).toContainText('Un altro controllo');
+    fixture.state.checkups = allControls;
     fixture.state.checkupStatus = 503;
     fixture.state.checkupHold = new Promise<void>(resolve => { release = resolve; });
     await page.reload(); await expect(rows).toHaveCount(3);
@@ -119,7 +126,7 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
     expect(errors).toEqual([]); expect(fixture.blocked).toEqual([]);
   } finally {
     release();
-    const receipt = JSON.stringify({ baseline, frames, calls: fixture.calls, blocked: fixture.blocked, errors }, null, 2);
+    const receipt = JSON.stringify({ revision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), baseline, frames, calls: fixture.calls, blocked: fixture.blocked, errors }, null, 2);
     await info.attach('worklist-todo-receipt', { contentType: 'application/json', body: receipt });
     if (directory) await writeFile(`${directory}/receipt.json`, receipt);
     await zoom.close();
