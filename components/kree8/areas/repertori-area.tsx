@@ -136,7 +136,7 @@ function buildLiveCatalogState(
       sub: icdCatalog
         ? `Catalogo WHO incorporato: ${{ ready: 'pronto', absent: 'assente', unverified: 'non verificato' }[icdCatalog.state]}${!icdCatalog.enabled ? ', disattivato dal gestore' : ''}. Inglese. WHO, CC BY-ND 3.0 IGO.${icdReadiness && !('catalogState' in icdReadiness) ? ` Servizio locale opzionale: ${icdReadinessMessage(icdReadiness.status)}` : ''}`
         : 'Stato del catalogo WHO non verificabile.',
-      freshness: icdCatalog?.state === 'ready' || icdReadiness?.status === 'available' ? 'fresh' : icdCatalog?.state === 'unverified' ? 'stale' : 'off',
+      freshness: !icdCatalog ? 'unreadable' : icdCatalog.state === 'ready' || icdReadiness?.status === 'available' ? 'fresh' : icdCatalog.state === 'unverified' ? 'stale' : 'off',
       age: `MMS 2026-01 · Inglese · ${icdCatalog ? { ready: 'Pronto', absent: 'Assente', unverified: 'Non verificato' }[icdCatalog.state] : 'Non verificato'}`,
       href: '/settings/repertori#who-setup',
       actionLabel: 'Gestisci catalogo',
