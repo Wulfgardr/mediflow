@@ -177,9 +177,6 @@ export default function SettingsPage() {
                 </div>
                 <div className={overviewStyles.actions}>
                     <ThemeToggle />
-                    <Link href="/settings/aspetto" className={styles.secondaryAction}>
-                        Apri aspetto<ArrowUpRight aria-hidden="true" />
-                    </Link>
                 </div>
             </section>
             <nav className={overviewStyles.index} aria-labelledby="settings-index-title">
@@ -188,7 +185,7 @@ export default function SettingsPage() {
                     <div className={overviewStyles.group} key={group.id}>
                         <h3 className={overviewStyles.groupTitle}>{group.label}</h3>
                         <ul className={overviewStyles.list}>
-                            {group.items.map(item => (
+                            {group.items.filter(item => item.href !== "/settings").map(item => (
                                 <li key={item.id}>
                                     <Link href={item.href} className={overviewStyles.indexLink}
                                         data-testid={`settings-overview-link-${item.id}`} data-tone={item.tone ?? 'default'}>

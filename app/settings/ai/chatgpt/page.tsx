@@ -12,7 +12,6 @@ export default function ChatGptProductPage() {
             <div className={styles.identity}>
                 <Image className={styles.logo} src="/brand/openai/chatgpt-mark.png" alt="Logo OpenAI" width={40} height={40} unoptimized />
                 <SettingsSectionIntro
-                    kicker="Servizio esterno · abbonamento personale ChatGPT."
                     title="OpenAI · ChatGPT"
                     description="Account collegato non significa modello pronto. La prova richiede un accesso dedicato e una scelta manuale; non usa i modelli locali."
                 />

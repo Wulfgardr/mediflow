@@ -9,6 +9,7 @@ import { usePathname } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import styles from '@/components/settings/settings-lume.module.css';
 import ink from '@/components/ink-secondary.module.css';
+import navigation from '@/components/settings/settings-navigation.module.css';
 
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import { SettingsNavSidebar } from '@/components/settings/settings-nav-sidebar';
@@ -36,7 +37,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
                 </aside>
                 <div className="min-w-0 space-y-8" data-testid="settings-subroute-content">
                     {isSubroute ? (
-                        <Link href="/settings" className={styles.returnLink}>
+                        <Link href="/settings" className={`${styles.returnLink} ${navigation.returnLink}`}>
                             <ArrowLeft size={16} aria-hidden="true" />
                             Torna alle impostazioni
                         </Link>
