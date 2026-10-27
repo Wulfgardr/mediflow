@@ -181,6 +181,9 @@ test('Documenti: Altro mantiene ordine, tastiera e focus dopo la conferma annull
     await expect(confirmation.getByRole('button', { name: 'Chiudi', exact: true })).toHaveCSS('border-radius', '10px');
     await confirmation.getByRole('button', { name: 'Annulla', exact: true }).click();
     await expect(trigger).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await docs.getByRole('button', { name: `Visualizza ${names[0]}`, exact: true }).click();
+    await expect(menu).toHaveCount(0);
     await expect(docs.getByRole('heading', { name: names[0], exact: true })).toBeVisible();
     expect(deletes).toEqual([]);
 });
