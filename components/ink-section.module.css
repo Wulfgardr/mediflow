@@ -1,9 +1,10 @@
 .heading,
-.sections :global(section > :is(h2, h3, h4)),
-.sections :global(section > header > :is(h2, h3, h4)),
-.sections :global(section > [data-section-header] > :is(h2, h3, h4)),
-.sections :global(section > :is(h2, h3, h4) [data-disclosure-control]),
-.sections :global(section > header > :is(h2, h3, h4) [data-disclosure-control]) {
+:global(:root) .sections .heading,
+:global(:root) .sections :global(section > :is(h2, h3, h4)),
+:global(:root) .sections :global(section > header > :is(h2, h3, h4)),
+:global(:root) .sections :global(section > [data-section-header] > :is(h2, h3, h4)),
+:global(:root) .sections :global(section > :is(h2, h3, h4) [data-disclosure-control]),
+:global(:root) .sections :global(section > header > :is(h2, h3, h4) [data-disclosure-control]) {
   font: var(--type-section, 600 0.75rem/1.5 var(--lume-font-sans, system-ui, sans-serif));
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -15,7 +16,7 @@
   text-transform: none;
 }
 
-.summary {
+.summary, :global(:root) .sections .summary {
   font: var(--type-body, 400 0.875rem/1.5 var(--lume-font-sans, system-ui, sans-serif));
   letter-spacing: 0;
   text-transform: none;

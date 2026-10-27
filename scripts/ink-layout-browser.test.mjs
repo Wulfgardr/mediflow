@@ -29,7 +29,7 @@ test('le ricette del piano e delle sezioni funzionano senza il foglio globale', 
                 <header class="${layout.plane} ${workspace.chrome}"><h1>Analisi</h1></header>
                 <div class="${layout.plane} ${workspace.workspaceBody} ${section.sections} ${secondary.surface}">
                     <div data-runtime-settings class="${layout.columns}" style="display:grid"><aside>Indice</aside><div>Contenuto</div></div>
-                    <section><h2>Profilo della popolazione</h2><p>9 schede</p></section>
+                    <section><h2 class="${workspace.sectionTitle}">Profilo della popolazione</h2><p>9 schede</p></section>
                     <section><h3><span class="${section.heading}">Archivio documenti</span><span class="${section.count}">3 file</span></h3><article class="${secondary.record}"><h3>Referto</h3></article></section>
                 </div></main>`;
         });
