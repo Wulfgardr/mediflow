@@ -51,14 +51,26 @@ async function contrast(button: Locator) {
     }
     const style = getComputedStyle(element);
     const opacity = Number(style.opacity);
-    const bg = rgba(style.backgroundColor), fg = rgba(style.color);
+    const bg = rgba(style.backgroundColor), fg = rgba(style.color), border = rgba(style.borderTopColor);
     const fill = blend(bg, backdrop, bg[3]);
     const background = blend(fill, backdrop, opacity);
     const foreground = blend(blend(fg, fill, fg[3]), backdrop, opacity);
+    const borderColor = blend(blend(border, fill, border[3]), backdrop, opacity);
     const luminance = (rgb: number[]) => rgb.map(c => c / 255).map(c => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
       .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
-    const a = luminance(foreground), b = luminance(background);
-    return { ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), color: style.color, backgroundColor: style.backgroundColor, opacity, foreground, background, cursor: style.cursor };
+    const ratio = (front: number[], back: number[]) => {
+      const a = luminance(front), b = luminance(back);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    };
+    const visibleBorder = ['top', 'right', 'bottom', 'left'].every(side =>
+      parseFloat(style.getPropertyValue(`border-${side}-width`)) > 0
+      && !['none', 'hidden'].includes(style.getPropertyValue(`border-${side}-style`)));
+    return {
+      ratio: ratio(foreground, background),
+      boundaryRatio: Math.max(ratio(background, backdrop), visibleBorder ? ratio(borderColor, backdrop) : 1),
+      color: style.color, backgroundColor: style.backgroundColor, borderColor: style.borderTopColor,
+      opacity, foreground, background, cursor: style.cursor,
+    };
   });
 }
 
@@ -88,10 +100,14 @@ for (const theme of ['giorno', 'grafite']) for (const width of [1440, 768]) {
     expect.soft(disabled.cursor).toBe('not-allowed');
     await dialog.getByRole('textbox').fill('Inserimento sintetico errato');
     await expect(confirm).toBeEnabled();
-    await expect.poll(() => confirm.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe(disabled.backgroundColor);
+    const appearance = (state: Awaited<ReturnType<typeof contrast>>) => [state.color, state.borderColor, state.opacity, state.backgroundColor];
+    await expect.poll(async () => appearance(await contrast(confirm))).not.toEqual(appearance(disabled));
+    await expect.poll(async () => (await contrast(confirm)).boundaryRatio).toBeGreaterThanOrEqual(Math.max(3, disabled.boundaryRatio + 1));
     const enabled = await contrast(confirm);
-    expect.soft(enabled.ratio).toBeGreaterThanOrEqual(4.5);
-    expect.soft(enabled.backgroundColor).not.toBe(disabled.backgroundColor);
+    expect.soft(enabled.ratio, JSON.stringify(enabled)).toBeGreaterThanOrEqual(4.5);
+    expect.soft(enabled.boundaryRatio, JSON.stringify(enabled)).toBeGreaterThanOrEqual(3);
+    expect.soft(enabled.boundaryRatio - disabled.boundaryRatio, 'Il contorno abilitato deve risaltare rispetto al disabilitato').toBeGreaterThanOrEqual(1);
+    expect.soft(appearance(enabled)).not.toEqual(appearance(disabled));
     await evidence(page, `real-after-conferma-attiva-${theme}-${width}`, enabled);
     await dialog.getByRole('textbox').fill('   ');
     await expect(confirm).toBeDisabled();
