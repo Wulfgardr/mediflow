@@ -30,7 +30,7 @@ test('le ricette del piano e delle sezioni funzionano senza il foglio globale', 
                 <div class="${layout.plane} ${workspace.workspaceBody} ${section.sections} ${secondary.surface}">
                     <div data-runtime-settings class="${layout.columns}" style="display:grid"><aside>Indice</aside><div>Contenuto</div></div>
                     <section><h2>Profilo della popolazione</h2><p>9 schede</p></section>
-                    <section><h3>Archivio documenti</h3><article class="${secondary.record}"><h3>Referto</h3></article></section>
+                    <section><h3><span class="${section.heading}">Archivio documenti</span><span class="${section.count}">3 file</span></h3><article class="${secondary.record}"><h3>Referto</h3></article></section>
                 </div></main>`;
         });
         assert.equal(await page.locator('[data-runtime-settings]').evaluate(element => getComputedStyle(element).columnGap), '40px');
@@ -47,6 +47,8 @@ test('le ricette del piano e delle sezioni funzionano senza il foglio globale', 
             return [style.fontSize, style.fontWeight, style.letterSpacing, style.textTransform];
         }));
         assert.deepEqual(metrics, [['12px', '600', '0.6px', 'uppercase'], ['12px', '600', '0.6px', 'uppercase']]);
+        assert.equal(await page.getByText('Archivio documenti', {exact: true}).evaluate(element => getComputedStyle(element).fontSize), '12px');
+        assert.equal(await page.getByText('3 file', {exact: true}).evaluate(element => getComputedStyle(element).textTransform), 'none');
         const recordFont = await page.locator('article h3').evaluate(element => getComputedStyle(element).fontSize);
         await page.locator('main > div').evaluate(element => element.classList.remove(globalThis.recipes.section.sections));
         assert.equal(await page.locator('article h3').evaluate(element => getComputedStyle(element).fontSize), recordFont);
