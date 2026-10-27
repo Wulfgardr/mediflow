@@ -35,6 +35,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     const [reason, setReason] = useState('');
     const resolverRef = useRef<((result: ConfirmResult) => void) | null>(null);
     const dialogRef = useRef<HTMLDivElement>(null);
+    const cancelRef = useRef<HTMLButtonElement>(null);
+    const reasonRef = useRef<HTMLTextAreaElement>(null);
     const titleId = useId();
     const messageId = useId();
     const reasonId = useId();
@@ -46,7 +48,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         setReason('');
     }, []);
 
-    useDialogA11y(options !== null, dialogRef, () => close({ confirmed: false }));
+    useDialogA11y(options !== null, dialogRef, () => close({ confirmed: false }), options?.requireReason ? reasonRef : cancelRef);
 
     const confirm = useCallback<ConfirmFn>((opts) => {
         /* WUL-UIUX: se un dialogo e gia aperto, risolvi la Promise pendente
@@ -113,6 +115,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                                     </label>
                                     <textarea
                                         id={reasonId}
+                                        ref={reasonRef}
                                         aria-required
                                         value={reason}
                                         onChange={(event) => setReason(event.target.value)}
@@ -124,7 +127,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                             ) : null}
 
                             <div className="mt-6 flex flex-wrap justify-end gap-3 [&_button]:max-w-full [&_button]:whitespace-normal">
-                                <button type="button" onClick={() => close({ confirmed: false })} className={isDanger ? "mf-button-primary" : "mf-btn-secondary"}>
+                                <button ref={cancelRef} type="button" onClick={() => close({ confirmed: false })} className={isDanger ? "mf-button-primary" : "mf-btn-secondary"}>
                                     {options.cancelLabel ?? 'Annulla'}
                                 </button>
                                 <button
