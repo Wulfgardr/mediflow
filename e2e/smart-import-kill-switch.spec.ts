@@ -51,7 +51,7 @@ test('[E2E fixture] smart import kill switch disables analysis on patient detail
       hasText: /^Impostazioni salvate e rilette\. Nessuna modifica clinica\.$/u,
     })).toBeVisible();
     await expect(killSwitch).toHaveAttribute('aria-checked', 'false');
-    await expect(card.getByText('Spento', { exact: true })).toBeVisible();
+    await expect(card.getByText('Disattivata', { exact: true })).toBeVisible();
     expect(await readEnabled()).toBe(false);
   };
 
