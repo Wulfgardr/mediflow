@@ -11,6 +11,7 @@ pub(super) struct AgendaFlow {
     refresh_origin: Option<AgendaOrigin>,
     refresh_focused: bool,
     reconciliation: Option<String>,
+    previous_rows: Option<Vec<Checkup>>,
     restore: Option<AgendaOrigin>,
 }
 
@@ -37,25 +38,28 @@ impl ClinicalApp {
     }
 
     pub(super) fn agenda_state(&self) -> Option<ViewState> {
+        self.agenda_state_after(std::time::Instant::now())
+    }
+
+    pub(super) fn agenda_state_after(&self, now: std::time::Instant) -> Option<ViewState> {
         self.agenda_flow
             .refresh
             .as_ref()
-            .and_then(|load| load.state(ReadObject::Agenda))
-            .or_else(|| self.agenda.state(ReadObject::Agenda))
+            .and_then(|load| load.state_after(ReadObject::Agenda, now))
+            .or_else(|| self.agenda.state_after(ReadObject::Agenda, now))
     }
 
-    pub(super) fn agenda_status(&self) -> String {
-        if let Some(state) = self.agenda_state() {
-            if matches!(
-                state.kind,
-                ViewStateKind::Caricamento | ViewStateKind::AttesaLunga { .. }
-            ) && self.agenda.ready().is_some()
-            {
-                "Aggiornamento in corso".into()
-            } else if self.agenda.ready().is_some() {
-                format!("Risultati da rileggere. {}", state.lines().0)
-            } else {
-                state.lines().0
+    pub(super) fn agenda_status(&self, state: Option<ViewState>) -> String {
+        if let Some(state) = state {
+            let (first, second) = state.lines();
+            let text = match second {
+                Some(second) => format!("{first} {second}"),
+                None => first,
+            };
+            match (state.kind, self.agenda.ready().is_some()) {
+                (ViewStateKind::Caricamento, true) => "Aggiornamento in corso".into(),
+                (ViewStateKind::AttesaLunga { .. }, _) | (_, false) => text,
+                (_, true) => format!("Risultati da rileggere. {text}"),
             }
         } else {
             self.agenda_flow
@@ -96,7 +100,7 @@ impl ClinicalApp {
                     },
                     move |this, result, _| {
                         if this.agenda_flow.names_request == request {
-                            this.global_patients = ReadLoad::from_result(result);
+                            this.finish_agenda_names_read(result);
                         }
                     },
                     cx,
@@ -106,6 +110,7 @@ impl ClinicalApp {
                 self.agenda_flow.agenda_request += 1;
                 let request = self.agenda_flow.agenda_request;
                 self.agenda_flow.reconciliation = None;
+                self.agenda_flow.previous_rows = None;
                 self.agenda_flow.refresh_origin = self.agenda_flow.restore.clone().or_else(|| {
                     self.agenda_flow.selected.as_ref().map(|row| AgendaOrigin {
                         row: row.clone(),
@@ -141,13 +146,14 @@ impl ClinicalApp {
     }
 
     pub(super) fn visible_agenda_rows(&self) -> Vec<&Checkup> {
+        self.filtered_agenda_rows(self.agenda.ready().map(Vec::as_slice).unwrap_or_default())
+    }
+
+    fn filtered_agenda_rows<'a>(&self, rows: &'a [Checkup]) -> Vec<&'a Checkup> {
         let query = self.global_query.trim().to_lowercase();
         let today = chrono::Local::now().date_naive();
-        let mut rows: Vec<_> = self
-            .agenda
-            .ready()
-            .into_iter()
-            .flatten()
+        let mut rows: Vec<_> = rows
+            .iter()
             .filter(|row| {
                 row.deleted_at.is_none()
                     && (self
@@ -176,62 +182,80 @@ impl ClinicalApp {
         rows
     }
 
+    fn finish_agenda_names_read(&mut self, result: Result<Vec<PatientSummary>, RuntimeError>) {
+        self.global_patients = ReadLoad::from_result(result);
+        self.reconcile_agenda_selection();
+    }
+
     fn finish_agenda_read(&mut self, result: Result<Vec<Checkup>, RuntimeError>) {
         match result {
             Ok(rows) => {
-                let old = self.visible_agenda_rows();
-                let selected = self.agenda_flow.selected.as_ref();
-                let previous = old.iter().position(|row| Some(&row.id) == selected);
-                let date = previous.map(|index| old[index].date.clone());
-                self.agenda = ReadLoad::Ready(rows);
+                let previous = std::mem::replace(&mut self.agenda, ReadLoad::Ready(rows));
+                self.agenda_flow.previous_rows = Some(match previous {
+                    ReadLoad::Ready(rows) => rows,
+                    _ => Vec::new(),
+                });
                 self.agenda_flow.refresh = None;
-                let visible = self.visible_agenda_rows();
-                if selected.is_some() && !visible.iter().any(|row| Some(&row.id) == selected) {
-                    let nearest = visible
-                        .iter()
-                        .enumerate()
-                        .min_by_key(|(index, row)| {
-                            (
-                                date.as_ref()
-                                    .map(|date| {
-                                        let day = |value: &str| {
-                                            chrono::DateTime::parse_from_rfc3339(value)
-                                                .map(|date| {
-                                                    date.with_timezone(&chrono::Local).date_naive()
-                                                })
-                                                .or_else(|_| {
-                                                    chrono::NaiveDate::parse_from_str(
-                                                        value, "%Y-%m-%d",
-                                                    )
-                                                })
-                                                .ok()
-                                        };
-                                        day(&row.date)
-                                            .zip(day(date))
-                                            .map(|(a, b)| (a - b).num_days().abs())
-                                            .unwrap_or(i64::MAX)
-                                    })
-                                    .unwrap_or(0),
-                                index.abs_diff(previous.unwrap_or(0)),
-                            )
-                        })
-                        .map(|(_, row)| row.id.clone());
-                    self.agenda_flow.selected = nearest;
-                    self.agenda_flow.reconciliation = Some(if self.agenda_flow.selected.is_some() { "Il controllo selezionato non è più presente nei risultati. Selezionato il controllo più vicino." } else { "Il controllo selezionato non è più presente nei risultati. Nessun controllo selezionato." }.into());
-                }
-                if let Some(mut origin) = self.agenda_flow.refresh_origin.take() {
-                    origin.row = self.agenda_flow.selected.clone().unwrap_or_default();
-                    if self.agenda_flow.refresh_focused || self.agenda_flow.restore.is_some() {
-                        self.agenda_flow.restore = Some(origin);
-                    } else {
-                        self.area_scroll.set_offset(origin.offset);
-                    }
-                }
+                self.reconcile_agenda_selection();
             }
             Err(error) if self.agenda.ready().is_some() => {
                 self.agenda_flow.refresh = Some(ReadLoad::Failed(error))
             }
             Err(error) => self.agenda = ReadLoad::Failed(error),
+        }
+    }
+
+    fn reconcile_agenda_selection(&mut self) {
+        if !self.global_query.trim().is_empty() && self.global_patients.ready().is_none() {
+            return;
+        }
+        let Some(old_rows) = self.agenda_flow.previous_rows.take() else {
+            return;
+        };
+        let old = self.filtered_agenda_rows(&old_rows);
+        let selected = self.agenda_flow.selected.as_ref();
+        let previous = old.iter().position(|row| Some(&row.id) == selected);
+        let date = old_rows
+            .iter()
+            .find(|row| Some(&row.id) == selected)
+            .map(|row| row.date.clone());
+        let visible = self.visible_agenda_rows();
+        if selected.is_some() && !visible.iter().any(|row| Some(&row.id) == selected) {
+            let nearest = visible
+                .iter()
+                .enumerate()
+                .min_by_key(|(index, row)| {
+                    (
+                        date.as_ref()
+                            .map(|date| {
+                                let day = |value: &str| {
+                                    chrono::DateTime::parse_from_rfc3339(value)
+                                        .map(|date| date.with_timezone(&chrono::Local).date_naive())
+                                        .or_else(|_| {
+                                            chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
+                                        })
+                                        .ok()
+                                };
+                                day(&row.date)
+                                    .zip(day(date))
+                                    .map(|(a, b)| (a - b).num_days().abs())
+                                    .unwrap_or(i64::MAX)
+                            })
+                            .unwrap_or(0),
+                        index.abs_diff(previous.unwrap_or(0)),
+                    )
+                })
+                .map(|(_, row)| row.id.clone());
+            self.agenda_flow.selected = nearest;
+            self.agenda_flow.reconciliation = Some(if self.agenda_flow.selected.is_some() { "Il controllo selezionato non è più presente nei risultati. Selezionato il controllo più vicino." } else { "Il controllo selezionato non è più presente nei risultati. Nessun controllo selezionato." }.into());
+        }
+        if let Some(mut origin) = self.agenda_flow.refresh_origin.take() {
+            origin.row = self.agenda_flow.selected.clone().unwrap_or_default();
+            if self.agenda_flow.refresh_focused || self.agenda_flow.restore.is_some() {
+                self.agenda_flow.restore = Some(origin);
+            } else {
+                self.area_scroll.set_offset(origin.offset);
+            }
         }
     }
 
@@ -857,6 +881,181 @@ mod tests {
                     assert!(app.global_apply_target.focus.is_focused(window));
                 }
             });
+        }
+    }
+
+    #[gpui::test]
+    fn g7b_selection_waits_for_agenda_and_names_in_either_order(cx: &mut gpui::TestAppContext) {
+        let host = Host::new();
+        for names_first in [false, true] {
+            for removed in [false, true] {
+                let (view, cx) =
+                    cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+                view.update(cx, |app, cx| {
+                    install(app, &host, cx);
+                    app.patients = Load::Ready(vec![]);
+                    app.agenda_flow.selected = Some("control-8".into());
+                });
+                draw(cx);
+                let mut values = row_values().as_array().unwrap().clone();
+                if removed {
+                    values.remove(8);
+                    for row in &mut values {
+                        row["date"] = json!("2026-10-30");
+                    }
+                    values[8]["date"] = json!("2026-10-27");
+                } else {
+                    values.reverse();
+                }
+                let names_value = json!([{
+                    "id":"patient-a", "firstName":"Amina", "lastName":"Sintetica",
+                    "taxCode":"SYNTHETIC", "version":1
+                }]);
+                view.update(cx, |app, cx| {
+                    app.global_patients = ReadLoad::loading();
+                    app.agenda_flow.refresh = Some(ReadLoad::loading());
+                    if names_first {
+                        app.finish_agenda_names_read(Ok(serde_json::from_value(
+                            names_value.clone(),
+                        )
+                        .unwrap()));
+                    } else {
+                        app.finish_agenda_read(Ok(
+                            serde_json::from_value(json!(values.clone())).unwrap()
+                        ));
+                    }
+                    cx.notify();
+                });
+                draw(cx);
+                view.read_with(cx, |app, _| {
+                    assert_eq!(app.agenda_flow.selected.as_deref(), Some("control-8"));
+                    assert!(app.agenda_flow.reconciliation.is_none());
+                    assert!(
+                        !app.agenda_status(app.agenda_state())
+                            .contains("non è più presente")
+                    );
+                    if names_first {
+                        assert!(app.global_patients.ready().is_some());
+                        assert!(app.agenda_flow.refresh.is_some());
+                    } else {
+                        assert!(app.global_patients.ready().is_none());
+                        assert!(app.agenda_flow.refresh.is_none());
+                    }
+                });
+                view.update(cx, |app, cx| {
+                    if names_first {
+                        app.finish_agenda_read(Ok(serde_json::from_value(json!(values)).unwrap()));
+                    } else {
+                        app.finish_agenda_names_read(Ok(
+                            serde_json::from_value(names_value).unwrap()
+                        ));
+                    }
+                    cx.notify();
+                });
+                draw(cx);
+                view.read_with(cx, |app, _| {
+                    assert_eq!(app.visible_agenda_rows().len(), if removed { 15 } else { 16 });
+                    assert_eq!(app.agenda_flow.selected.as_deref(), Some(if removed {
+                        "control-9"
+                    } else {
+                        "control-8"
+                    }));
+                    assert_eq!(app.agenda_status(app.agenda_state()), if removed {
+                        "Il controllo selezionato non è più presente nei risultati. Selezionato il controllo più vicino."
+                    } else {
+                        "Agenda letta"
+                    });
+                });
+                assert_eq!(
+                    rendered_command::node("clinical-workspace-agenda-list")
+                        .0
+                        .label(),
+                    Some(if removed {
+                        "Agenda. Il controllo selezionato non è più presente nei risultati. Selezionato il controllo più vicino."
+                    } else {
+                        "Agenda. Agenda letta"
+                    })
+                );
+            }
+        }
+    }
+
+    #[gpui::test]
+    fn g7b_refresh_renders_phase_and_elapsed_time_with_an_injected_clock(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        struct TimedAgenda {
+            app: Entity<ClinicalApp>,
+            now: Instant,
+        }
+        impl Render for TimedAgenda {
+            fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+                self.app
+                    .update(cx, |app, cx| app.agenda_view_after(true, self.now, cx))
+            }
+        }
+        let host = Host::new();
+        let (app, app_cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let started = Instant::now();
+        app.update(app_cx, |app, cx| {
+            install(app, &host, cx);
+            app.agenda_flow.refresh = Some(ReadLoad::Loading { started });
+        });
+        draw(app_cx);
+        let (fixture, cx) = cx.add_window_view(|_, _| TimedAgenda {
+            app: app.clone(),
+            now: started,
+        });
+        for elapsed in [
+            Duration::from_millis(4999),
+            Duration::from_secs(5),
+            Duration::from_secs(12),
+            Duration::from_secs(61),
+        ] {
+            fixture.update(cx, |fixture, cx| {
+                fixture.now = started + elapsed;
+                cx.notify();
+            });
+            rendered_command::take_text_nodes();
+            draw(cx);
+            let status = if elapsed.as_secs() < 5 {
+                "Aggiornamento in corso".to_owned()
+            } else {
+                format!(
+                    "Lettura dell’agenda… L'archivio sta ancora rispondendo, {} s",
+                    elapsed.as_secs()
+                )
+            };
+            assert_eq!(
+                rendered_command::node("clinical-workspace-agenda-list")
+                    .0
+                    .label(),
+                Some(format!("Agenda. {status}").as_str())
+            );
+            let texts = rendered_command::take_text_nodes();
+            assert!(
+                texts
+                    .iter()
+                    .any(|(_, node)| node.value() == Some(status.as_str())),
+                "visible refresh text must include phase and elapsed time: {status}"
+            );
+            assert!(
+                cx.debug_bounds("clinical-workspace-agenda-checkup-control-8")
+                    .is_some()
+            );
+            assert!(
+                cx.debug_bounds("clinical-workspace-agenda-state-command")
+                    .is_none()
+            );
+            app.read_with(cx, |app, _| {
+                assert_eq!(app.agenda.ready().unwrap().len(), 16);
+                assert!(matches!(
+                    app.agenda_flow.refresh,
+                    Some(ReadLoad::Loading { .. })
+                ));
+            });
+            assert!(agenda_calls(&host).is_empty());
         }
     }
 

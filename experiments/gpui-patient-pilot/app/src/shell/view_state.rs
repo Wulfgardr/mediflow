@@ -363,7 +363,7 @@ impl<T> ReadLoad<T> {
         self.state_after(object, Instant::now())
     }
 
-    fn state_after(&self, object: ReadObject, now: Instant) -> Option<ViewState> {
+    pub(super) fn state_after(&self, object: ReadObject, now: Instant) -> Option<ViewState> {
         let kind = match self {
             Self::Idle => ViewStateKind::Caricamento,
             Self::Interrupted => ViewStateKind::DaRileggere,
