@@ -31,7 +31,20 @@ test('zero solo dopo successo; controlli aperti raggruppati senza limite o infer
   assert.equal(data[0].id, 'late');
 });
 
-test('stato sconosciuto o data invalida non diventano un controllo aperto inventato', () => {
-  const result = projectWorklistTodos({ loading: false, error: null, data: [control('unknown', 'a', 'unknown'), control('bad-date', 'b', 'pending', 'invalid')] });
+test('uno stato sconosciuto rende indisponibile la proiezione', () => {
+  const result = projectWorklistTodos({ loading: false, error: null, data: [control('valid'), control('unknown', 'a', 'unknown')] });
   assert.equal(result.status, 'unavailable');
 });
+
+test('una data invalida rende indisponibile anche un insieme con controlli validi', () => {
+  const result = projectWorklistTodos({ loading: false, error: null, data: [control('valid'), control('bad-date', 'a', 'pending', 'invalid')] });
+  assert.equal(result.status, 'unavailable');
+});
+
+for (const date of [null, undefined, 0, true, {}]) {
+  test(`una data assente o di tipo non ammesso (${JSON.stringify(date)}) rende indisponibile la proiezione`, () => {
+    const malformed = { ...control('bad-date'), date } as unknown as ReturnType<typeof control>;
+    const result = projectWorklistTodos({ loading: false, error: null, data: [control('valid'), malformed] });
+    assert.equal(result.status, 'unavailable');
+  });
+}

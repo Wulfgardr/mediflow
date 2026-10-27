@@ -25,6 +25,7 @@ export function projectWorklistTodos(read: {
     const status = parseCheckupStatus(control.status);
     if (!status) return { status: 'unavailable' };
     if (status !== 'pending') continue;
+    if (typeof control.date !== 'string' && !(control.date instanceof Date)) return { status: 'unavailable' };
     if (!Number.isFinite(new Date(control.date).getTime())) return { status: 'unavailable' };
     const current = byPatient.get(control.patientId);
     byPatient.set(control.patientId, {

@@ -57,7 +57,13 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
             const r = node.getBoundingClientRect(), css = getComputedStyle(node);
             return { text: node.textContent, width: r.width, height: r.height, padding: [css.paddingTop, css.paddingRight, css.paddingBottom, css.paddingLeft], gap: css.gap };
           }), primaryCount: document.querySelectorAll('[data-patient-directory] [data-lume-action=primary]').length,
-          palette: getComputedStyle(element).color };
+          emptyTodos: [...document.querySelectorAll('[data-worklist-todo]')].filter(node => node.textContent === 'Nessun controllo aperto').map(node => {
+            const css = getComputedStyle(node);
+            return { color: css.color, weight: css.fontWeight, supportColor: getComputedStyle(document.querySelector('[class*=todoDetail]')!).color };
+          }), age: [...element.querySelectorAll('[class*=recordAge]')].filter(visible).map(node => {
+            const range = document.createRange(); range.selectNodeContents(node);
+            return { lines: range.getClientRects().length, overflow: node.scrollWidth - node.clientWidth };
+          }), palette: getComputedStyle(element).color };
       });
       frames.push({ theme, size, zoom: size === 'zoom-200' ? 2 : 1, ...frame });
       if (directory) {
@@ -73,6 +79,13 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
         await expect(row('C')).toContainText('Rivalutazione concordata');
         if (frame.containerWidth < 700) expect(frame.columns).toEqual(['Paziente', 'Da fare']);
         expect(frame.primaryCount).toBe(1);
+        expect(frame.emptyTodos.length).toBeGreaterThanOrEqual(1);
+        for (const empty of frame.emptyTodos) {
+          expect(empty.weight).toBe('400'); expect(empty.color).toBe(empty.supportColor);
+        }
+        for (const age of frame.age) {
+          expect(age.lines).toBe(1); expect(age.overflow).toBeLessThanOrEqual(1);
+        }
         for (const overflow of frame.columnOverflow) expect(overflow).toBeLessThanOrEqual(1);
         for (const command of frame.commands) {
           expect(command.height, command.text ?? '').toBeGreaterThanOrEqual(frame.cssWidth <= 700 ? 44 : 40);

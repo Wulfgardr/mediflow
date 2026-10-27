@@ -39,7 +39,7 @@ import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 
 function WorklistTodo({ todos, patientId }: { todos: WorklistTodos; patientId: string }) {
   const item = todos.status === 'ready' ? todos.byPatient.get(patientId) : undefined;
-  return <span className={patientStyles.patientTodo} data-worklist-todo={todos.status}>
+  return <span className={`${patientStyles.patientTodo} ${todos.status === 'ready' && !item ? patientStyles.todoEmpty : ''}`} data-worklist-todo={todos.status}>
     {todos.status !== 'ready' ? todos.status === 'loading' ? 'Lettura controlli…' : 'Controlli non disponibili'
       : item ? <><span>{item.next.title || 'Controllo pianificato'}</span><span className={patientStyles.todoDetail}>{formatWorkspaceDate(item.next.date)}</span>{item.count > 1 ? <span className={patientStyles.todoDetail}>{item.count === 2 ? 'Un altro controllo' : `Altri ${item.count - 1} controlli`}</span> : null}</>
         : 'Nessun controllo aperto'}
