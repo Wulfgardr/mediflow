@@ -11,14 +11,14 @@ const row = (page: Page, name = 'Farmaco sintetico active 1') => section(page).g
 const baseline = process.env.THERAPY_COMPOSITION_BASELINE === '1';
 const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 
-async function fixture(page: Page, counts = { active: 0, suspended: 0, completed: 0 }) {
+async function fixture(page: Page, counts = { active: 0, suspended: 0, completed: 0 }, diagnoses: { system: string; code: string; description: string }[] = []) {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-    const patientId = await page.evaluate(async counts => {
+    const patientId = await page.evaluate(async ({ counts, diagnoses }) => {
         for (const key of ['aiPatientInsightKillSwitch', 'aiSmartImportKillSwitch', 'aiDocumentSynthesisKillSwitch', 'aiTreatmentReasoningKillSwitch']) {
             const response = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value: 'disabled' }) });
             if (!response.ok) throw new Error(`Synthetic setting: ${response.status}`);
         }
-        const response = await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firstName: 'Ada sintetica', lastName: 'Composizione', taxCode: `SYN${crypto.randomUUID()}`, birthDate: '1972-04-12' }) });
+        const response = await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firstName: 'Ada sintetica', lastName: 'Composizione', taxCode: `SYN${crypto.randomUUID()}`, birthDate: '1972-04-12', diagnoses }) });
         if (!response.ok) throw new Error(`Synthetic patient: ${response.status}`);
         const { id } = await response.json();
         for (const [status, count] of Object.entries(counts)) for (let index = 1; index <= count; index++) {
@@ -26,7 +26,7 @@ async function fixture(page: Page, counts = { active: 0, suspended: 0, completed
             if (!added.ok) throw new Error(`Synthetic therapy: ${added.status}`);
         }
         return id as string;
-    }, counts);
+    }, { counts, diagnoses });
     await page.goto(`/patients/${patientId}/modules`);
     await openPatientSection(page, 'terapie');
     await expect(register(page).getByRole('status', { name: 'Caricamento terapie' })).toHaveCount(0);
@@ -265,3 +265,29 @@ for (const width of [1440, 390]) test(`campo terapia riserva spazio al bersaglio
     await clear.click({ position: { x: clearBox!.width / 2, y: 2 } });
     await expect(input).toHaveValue('');
 });
+
+for (const theme of ['giorno', 'grafite']) for (const width of [1440, 390]) {
+    test(`suggerimenti terapia mostrano la selezione ${theme} ${width}`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 1000 });
+        await page.addInitScript(value => localStorage.setItem('mediflow-theme', value), theme === 'grafite' ? 'dark' : 'light');
+        await fixture(page, undefined, [{ system: 'ICD-10', code: 'SYN-A2', description: 'Diagnosi sintetica A2' }]);
+        await creation(page).click();
+        const choices = ['Diagnosi sintetica A2', 'Prevenzione', 'Nessuna'].map(name => section(page).getByRole('button', { name, exact: true }));
+        const background = (choice: typeof choices[number]) => choice.evaluate(element => getComputedStyle(element).backgroundColor);
+        const unselectedBackground = await background(choices[0]);
+        for (const [index, choice] of choices.entries()) {
+            await choice.click();
+            await page.mouse.move(0, 0);
+            await section(page).locator('input[name="dosage"]').focus();
+            await expect.poll(() => background(choice)).not.toBe(unselectedBackground);
+            for (const [otherIndex, other] of choices.entries()) {
+                await expect(other).toHaveAttribute('aria-pressed', String(index === otherIndex));
+                if (index !== otherIndex) await expect.poll(() => background(other)).toBe(unselectedBackground);
+            }
+            await assertNoHorizontalOverflow(page, [{ label: 'terapie', selector: '#terapie' }]);
+            const path = test.info().outputPath(`selezione-${index}-${theme}-${width}.png`);
+            await section(page).screenshot({ path, animations: 'disabled' });
+            await test.info().attach(`selezione-${index}-${theme}-${width}`, { path, contentType: 'image/png' });
+        }
+    });
+}

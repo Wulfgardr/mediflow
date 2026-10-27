@@ -1231,6 +1231,12 @@ html:root[data-lume] :is(.mf-button-primary, .ui-btn-primary, .mf-button-seconda
   background-color: var(--lume-surface-hover);
 }
 
+:is(.mf-button-secondary, .mf-btn-secondary, .ui-btn-secondary)[aria-pressed='true'] {
+  border-color: var(--lume-ink-fresh);
+  background-color: var(--lume-surface-selected);
+  color: var(--lume-ink-fresh);
+}
+
 .mf-button-text {
   color: var(--lume-accent);
 }
