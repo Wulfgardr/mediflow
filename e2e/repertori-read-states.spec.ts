@@ -5,7 +5,7 @@ import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
 async function installCatalogFixture(page: Page, baseURL: string) {
   const origin = new URL(baseURL).origin;
-  const state = { countStatus: 200, prostheticsStatus: 200, empty: false, hold: null as Promise<void> | null };
+  const state = { countStatus: 200, prostheticsStatus: 200, whoStatus: 200, whoAvailable: false, empty: false, hold: null as Promise<void> | null };
   const calls: { method: string; path: string; search: string; status: number }[] = [];
   const blocked: string[] = [], uiWrites: unknown[] = [];
   const defaults: Record<string, boolean> = { uiReduceMotion: false, uiReduceTransparency: false };
@@ -40,9 +40,9 @@ async function installCatalogFixture(page: Page, baseURL: string) {
     if (path === '/api/exemptions' && method === 'GET' && url.searchParams.get('count') === '1') return read({ count: state.empty ? 0 : 3 }, state.countStatus);
     if (path === '/api/prosthetics/catalog/status' && method === 'GET') return read({ count: state.empty ? 0 : 2, sourceCount: state.empty ? 0 : 1,
       revision: 'fixture-w20c', latestReceipt: null }, state.prostheticsStatus);
-    if (path === '/api/icd/catalog' && method === 'GET') return read({ state: 'absent', enabled: false, revision: 0, manifest: null, previousAvailable: false, searchEngine: 'fts5' });
+    if (path === '/api/icd/catalog' && method === 'GET') return read({ state: 'absent', enabled: false, revision: 0, manifest: null, previousAvailable: false, searchEngine: 'fts5' }, state.whoStatus);
     if (path === '/api/icd/proxy' && method === 'GET' && !url.search) return read({ schemaVersion: 'mediflow.reference-data.icd11-who-readiness.v1',
-      status: 'disabled', releaseId: '2026-01', language: 'en' });
+      status: state.whoAvailable ? 'available' : 'disabled', releaseId: '2026-01', language: 'en' });
     if (path === '/api/drugs/source' && method === 'POST') return read({ catalog: catalog(), networkAllowed: false, networkPreference: false,
       remote: { outcome: 'unavailable', reason: 'network_disabled', checkedAt: '2026-10-20T12:00:00.000Z' } });
     if (path === '/api/clinical-agenda/candidates' && method === 'GET') return route.fulfill({ json: { enabled: false,
@@ -181,6 +181,51 @@ for (const failure of ['counts', 'prosthetics'] as const) test(`Repertori: ${fai
       if (directory) await writeFile(`${directory}/${failure}-receipt.json`, JSON.stringify({ baseline, failure, observations, frames,
         calls: fixture.calls, blocked: fixture.blocked, uiWrites: fixture.uiWrites, errors }, null, 2));
     } finally { try { await fixture.close(); } finally { await zoom?.close(); } }
+    expect(fixture.blocked).toEqual([]); expect(errors).toEqual([]);
+  }
+});
+
+
+test('Repertori: failed WHO catalog read stays unreadable with an available optional service', async ({ page, baseURL }, info) => {
+  if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL
+    || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw Error('Owned synthetic archive and loopback required');
+  const fixture = await installCatalogFixture(page, baseURL), errors: string[] = [], observations: unknown[] = [];
+  fixture.state.whoStatus = 503; fixture.state.whoAvailable = true;
+  page.on('pageerror', error => errors.push(error.message));
+  const area = page.getByRole('heading', { level: 1, name: /^Repertori/ }).locator('../../..');
+  const row = area.getByRole('button', { name: 'Mostra dettaglio repertorio ICD-11 WHO', exact: true }).locator('..');
+  const shot = async (name: string) => {
+    await row.scrollIntoViewIfNeeded();
+    const probe = await row.evaluate(element => {
+      const box = element.getBoundingClientRect(), x = box.x + Math.min(box.width / 2, 50), y = box.y + Math.min(box.height / 2, 15);
+      const hit = document.elementFromPoint(x, y);
+      return { text: element.textContent, hit: element === hit || element.contains(hit),
+        rect: { x: box.x, y: box.y, width: box.width, height: box.height }, viewport: { width: innerWidth, height: innerHeight } };
+    });
+    observations.push({ name, ...probe }); expect(probe.hit).toBe(true);
+    await page.screenshot({ path: info.outputPath(`who-${name}.png`), fullPage: false, animations: 'disabled' });
+  };
+  try {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await bootstrapUnlockedSession(page, '1234');
+    await page.goto('/?area=repertori');
+    await expect(row).toContainText('Stato non leggibile');
+    await expect(row).not.toContainText('Disattivato'); await expect(row).not.toContainText('Disponibile');
+    await expect(area.locator('header').first()).toContainText('Totale indicizzato incompleto');
+    await row.getByRole('button', { name: /^Mostra dettaglio/ }).click();
+    await expect(area.getByRole('region', { name: 'Dettaglio ICD-11 WHO' })).toContainText('Stato del catalogo WHO non verificabile.');
+    await shot('read-error');
+    fixture.state.whoStatus = 200; fixture.state.whoAvailable = false;
+    await area.getByRole('button', { name: 'Riprova', exact: true }).click();
+    await expect(row).toContainText('Disattivato'); await expect(row).not.toContainText('Stato non leggibile');
+    await expect(area.locator('header').first()).toContainText('17 voci indicizzate');
+    await expect(row.getByRole('button', { name: /^Mostra dettaglio/ })).toHaveAttribute('aria-pressed', 'true');
+    await expect(area.getByRole('region', { name: 'Dettaglio ICD-11 WHO' }).getByRole('link', { name: 'Gestisci catalogo', exact: true })).toHaveAttribute('href', '/settings/repertori#who-setup');
+    await shot('recovered');
+  } finally {
+    try { await info.attach('who-read-receipt', { contentType: 'application/json', body: JSON.stringify({ observations,
+      calls: fixture.calls, blocked: fixture.blocked, uiWrites: fixture.uiWrites, errors }, null, 2) }); }
+    finally { await fixture.close(); }
     expect(fixture.blocked).toEqual([]); expect(errors).toEqual([]);
   }
 });
