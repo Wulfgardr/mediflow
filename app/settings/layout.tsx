@@ -34,7 +34,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
             {/* <lg: la sidebar collassa in una barra compatta (vedi SettingsNavSidebar). */}
             {/* stable scope for the optional full-runtime design comparison. */}
             <div data-runtime-settings className={styles.settingsWorkspace + " " + layoutRecipe.columns + " " + sectionRecipe.sections + " " + ink.surface + " grid gap-4 lg:grid-cols-[216px_minmax(0,1fr)] lg:items-start lg:gap-6"}>
-                <aside className="lg:sticky lg:top-2">
+                <aside className={`lg:sticky lg:top-2 ${navigation.indexPane}`}>
                     <SettingsNavSidebar onSearchRequest={openSearch} />
                 </aside>
                 <div className="min-w-0 space-y-8" data-testid="settings-subroute-content">
