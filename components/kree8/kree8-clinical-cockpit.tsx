@@ -22,6 +22,7 @@ import {
   type Kree8Patient,
   type Kree8PatientWorkspace,
 } from '@/lib/patient-workspace';
+import { projectWorklistTodos, type WorklistTodos } from '@/lib/worklist-todo';
 import { useLiveQuery, useLiveQueryState } from '@/lib/live-query';
 import { subscribeClientAccountAuthority } from '@/lib/security/client-auth-api';
 import { readCockpitRows } from './cockpit-read-snapshot';
@@ -103,6 +104,7 @@ function AreaContent({
   patientState,
   agendaState,
   diaryState,
+  worklistTodos,
   selectedPatient,
   selectedPatientId,
   patientWorkspace,
@@ -114,6 +116,7 @@ function AreaContent({
   onRetryPatients,
   onRetryAgenda,
   onRetryDiary,
+  onRetryTodos,
 }: {
   area: AreaId;
   filter: StatusFilter;
@@ -122,6 +125,7 @@ function AreaContent({
   patientState: Kree8PatientClientState;
   agendaState: Kree8AgendaClientState;
   diaryState: Kree8DiaryClientState;
+  worklistTodos: WorklistTodos;
   selectedPatient?: Kree8Patient | null;
   selectedPatientId?: string;
   patientWorkspace?: Kree8PatientWorkspace | null;
@@ -133,6 +137,7 @@ function AreaContent({
   onRetryPatients: () => void;
   onRetryAgenda: () => void;
   onRetryDiary: () => void;
+  onRetryTodos: () => void;
 }) {
   switch (area) {
     case 'turno':
@@ -154,6 +159,8 @@ function AreaContent({
         <IncaricoArea
           patients={patientState.patients}
           patientStatus={patientState.status}
+          todos={worklistTodos}
+          onRetryTodos={isReview ? undefined : onRetryTodos}
           selectedPatientId={selectedPatientId}
           searchFocusSignal={patientSearchFocusSignal}
           onSelectPatient={onSelectPatient}
@@ -415,6 +422,9 @@ export function Kree8ClinicalCockpit({
 
   const livePatientRows = patientSnapshot?.isCurrent() ? patientSnapshot.rows : undefined;
   const liveCheckupRows = checkupSnapshot?.isCurrent() ? checkupSnapshot.rows : undefined;
+  const worklistTodos = useMemo(() => projectWorklistTodos({
+    data: liveCheckupRows, loading: !isReview && checkupLoading, error: checkupError,
+  }), [liveCheckupRows, isReview, checkupLoading, checkupError]);
   const liveDiaryRows = diarySnapshot?.isCurrent() ? diarySnapshot.rows : undefined;
   const directoryPatientState: Kree8PatientClientState = (() => {
     if (isReview || area !== 'incarico') return patientState;
@@ -685,6 +695,8 @@ export function Kree8ClinicalCockpit({
                 patientState={directoryPatientState}
                 agendaState={agendaState}
                 diaryState={diaryState}
+                worklistTodos={worklistTodos}
+                onRetryTodos={refreshCheckups}
                 selectedPatient={selectedPatient}
                 selectedPatientId={selectedPatientId}
                 patientWorkspace={patientWorkspace}
