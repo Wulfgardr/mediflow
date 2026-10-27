@@ -10,6 +10,7 @@ import { installFunctionsEgressGuard } from './fixtures/settings-functions';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
 const baseline = process.env.FABRIC_GOVERNANCE_BASELINE === '1';
+const supplemental400 = process.env.FABRIC_GOVERNANCE_SUPPLEMENTAL_400 === '1';
 const status = buildPortableFabricStatusSnapshot({ ollama: () => ({ status: 'denied', reason: 'missing' }),
     athena: () => ({ status: 'denied', reason: 'missing' }) }, { status: () => null, hardware: () => null });
 const observability = { schemaVersion: 'mediflow.ai.fabric-observability.v1', fallback: 'denied_by_contract',
@@ -67,6 +68,7 @@ const cases: readonly [route: 'fabric' | 'governance', scenario: Scenario][] = [
 ];
 for (const [route, scenario] of cases) test(`${route} read state: ${scenario}`, async ({ baseURL }) => {
     test.setTimeout(90_000);
+    test.skip(supplemental400 && !(route === 'fabric' && scenario === 'status-error' || route === 'governance' && scenario === 'error'));
     if (!baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000'
         || process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR) throw Error('Owned synthetic loopback required');
     const zoom = await openBrowserZoomFixture(baseURL), page = zoom.page;
@@ -149,6 +151,33 @@ for (const [route, scenario] of cases) test(`${route} read state: ${scenario}`, 
                 target = panel.getByText('Stato confronto: in attesa', { exact: true });
                 await expect(target).toBeVisible();
             }
+        }
+        if (supplemental400) {
+            let dayColor: string | undefined;
+            for (const theme of ['giorno', 'grafite']) {
+                await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(4);
+                await page.evaluate(theme => { document.documentElement.classList.toggle('dark', theme === 'grafite'); document.documentElement.dataset.theme = theme; }, theme);
+                const supplementalTarget = route === 'fabric' ? surface.getByTestId('fabric-error-state').locator('p').nth(1)
+                    : surface.getByRole('button', { name: 'Dettagli dell’errore per l’assistenza', exact: true });
+                const evidence = await capture(page, supplementalTarget,
+                    `${route}-${scenario}-${theme}-zoom-400-${route === 'fabric' ? 'paragraph' : 'diagnostic-control'}`, frames);
+                if (theme === 'giorno') dayColor = evidence.palette.color;
+                else expect(evidence.palette.color).not.toBe(dayColor);
+                if (route === 'governance') {
+                    await supplementalTarget.focus(); await page.keyboard.press('Enter');
+                    await expect(supplementalTarget).toHaveAttribute('aria-expanded', 'true');
+                    await expect(supplementalTarget).toBeFocused();
+                    await expect(surface.getByText('HTTP 503', { exact: true })).toBeVisible();
+                    await page.keyboard.press('Space');
+                    await expect(supplementalTarget).toHaveAttribute('aria-expanded', 'false');
+                    await expect(supplementalTarget).toBeFocused();
+                    await expect(surface.getByText('HTTP 503', { exact: true })).toBeHidden();
+                    observations.push({ diagnosticKeyboard400: { theme, openedBy: 'Enter', closedBy: 'Space', focusRetained: true } });
+                }
+            }
+            expect(guard.blocked).toEqual([]); expect(errors).toEqual([]);
+            expect(calls.every(call => call.method === 'GET')).toBe(true);
+            return;
         }
         const captureOpenDiagnostic = route === 'governance' && scenario === 'error' && !baseline;
         if (!captureOpenDiagnostic) await capture(page, target, `${route}-${scenario}-1440`, frames);
