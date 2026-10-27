@@ -239,10 +239,17 @@ for (const area of ['turno', 'diario'] as const) test(`Agenda and global diary: 
     }
   } finally {
     release();
-    observations.push({ requests: f.calls, mockedUiWrites: f.mockedUiWrites, blocked: f.blocked, errors, contextCases: 'cookie change and synthetic pagehide/pageshow: lifecycle events, not an OS bfcache restoration' });
-    await info.attach('agenda-diary-observations', { body: JSON.stringify({ baseline, area, frames, observations }, null, 2), contentType: 'application/json' });
-    if (directory) { await mkdir(directory, { recursive: true }); await writeFile(`${directory}/${area}-observations.json`, JSON.stringify({ baseline, frames, observations }, null, 2)); }
-    await f.close(); await zoom.close();
+    try {
+      observations.push({ requests: f.calls, mockedUiWrites: f.mockedUiWrites, blocked: f.blocked, errors, contextCases: 'cookie change and synthetic pagehide/pageshow: lifecycle events, not an OS bfcache restoration' });
+      try {
+        await info.attach('agenda-diary-observations', { body: JSON.stringify({ baseline, area, frames, observations }, null, 2), contentType: 'application/json' });
+      } finally {
+        if (directory) { await mkdir(directory, { recursive: true }); await writeFile(`${directory}/${area}-observations.json`, JSON.stringify({ baseline, frames, observations }, null, 2)); }
+      }
+    } finally {
+      try { await f.close(); }
+      finally { await zoom.close(); }
+    }
     expect(f.blocked).toEqual([]); expect(errors).toEqual([]);
   }
 });
