@@ -21,6 +21,15 @@ use std::{borrow::Cow, path::PathBuf};
 
 const STATE_DIRECTORY_MISSING: &str = "Indica una cartella dopo --state-directory.";
 const STATE_DIRECTORY_INVALID: &str = "La cartella deve essere assoluta, già esistente, privata, appartenere all’utente corrente e non contenere collegamenti simbolici nel percorso.";
+const STATE_DIRECTORY_UNSUPPORTED: &str = "L’opzione --state-directory non è supportata su questa piattaforma. Non è possibile usare la cartella indicata per le preferenze e i dati di recupero dell’interfaccia.";
+
+fn state_directory_error(kind: std::io::ErrorKind) -> &'static str {
+    match kind {
+        std::io::ErrorKind::Unsupported => STATE_DIRECTORY_UNSUPPORTED,
+        _ => STATE_DIRECTORY_INVALID,
+    }
+}
+
 const LAUNCH_USAGE: &str = "Uso: --server INDIRIZZO oppure --demo [--state-directory CARTELLA]. La cartella facoltativa contiene preferenze e dati di recupero dell’interfaccia, non l’archivio clinico.";
 
 #[derive(Default, Debug, PartialEq, Eq)]
@@ -91,8 +100,8 @@ fn main() {
         Some(directory) => {
             match shell::local_preferences::LocalPreferencesStore::from_directory(directory) {
                 Ok(store) => Some(store),
-                Err(_) => {
-                    eprintln!("{STATE_DIRECTORY_INVALID}");
+                Err(error) => {
+                    eprintln!("{}", state_directory_error(error.kind()));
                     std::process::exit(2);
                 }
             }
@@ -142,6 +151,21 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn unsupported_state_directory_is_distinct_from_invalid_or_nonprivate_paths() {
+        assert_eq!(
+            state_directory_error(std::io::ErrorKind::Unsupported),
+            STATE_DIRECTORY_UNSUPPORTED
+        );
+        for kind in [
+            std::io::ErrorKind::InvalidInput,
+            std::io::ErrorKind::PermissionDenied,
+            std::io::ErrorKind::NotFound,
+        ] {
+            assert_eq!(state_directory_error(kind), STATE_DIRECTORY_INVALID);
+        }
+    }
+
     #[test]
     fn state_directory_is_explicit_for_connected_and_demo_without_secret_flags() {
         let state_directory = if cfg!(windows) {

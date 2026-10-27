@@ -95,7 +95,7 @@ impl ClinicalApp {
                 Some((
                     session.clone(),
                     session.chat_access_context(scope, &patient.id).ok()?,
-                    format!("{} {}", patient.first_name, patient.last_name),
+                    patient.display_name(),
                     format!(
                         "{} · generazione {}",
                         session.base_url(),

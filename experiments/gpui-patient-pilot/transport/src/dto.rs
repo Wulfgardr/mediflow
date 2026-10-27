@@ -77,7 +77,7 @@ pub struct PatientSummary {
 
 impl PatientSummary {
     pub fn display_name(&self) -> String {
-        format!("{} {}", self.first_name, self.last_name)
+        mediflow_patient_client::format_patient_name(&self.first_name, &self.last_name)
     }
     pub fn matches_query(&self, query: &str) -> bool {
         let query = query.trim().to_lowercase();
@@ -175,7 +175,7 @@ pub enum AiFunctionSwitch {
 
 impl PatientDetail {
     pub fn display_name(&self) -> String {
-        format!("{} {}", self.first_name, self.last_name)
+        mediflow_patient_client::format_patient_name(&self.first_name, &self.last_name)
     }
     pub fn field_locked(&self, name: &str) -> bool {
         self.locked_fields.iter().any(|field| field == name)
@@ -433,4 +433,22 @@ pub struct CheckupDraft {
     pub notes: Option<String>,
     pub status: String,
     pub source: Option<String>,
+}
+
+#[cfg(test)]
+mod patient_name_tests {
+    use super::*;
+
+    #[test]
+    fn list_and_detail_use_the_same_surname_first_patient_name() {
+        let value = serde_json::json!({
+            "id":"synthetic-name", "firstName":"Luca", "lastName":"Conti",
+            "taxCode":"SYNTHETIC", "version":1
+        });
+        let summary: PatientSummary = serde_json::from_value(value.clone()).unwrap();
+        let detail: PatientDetail = serde_json::from_value(value).unwrap();
+        assert_eq!(summary.display_name(), "Conti Luca");
+        assert_eq!(detail.display_name(), "Conti Luca");
+        assert!(summary.matches_query("conti luca"));
+    }
 }

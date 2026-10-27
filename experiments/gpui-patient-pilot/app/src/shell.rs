@@ -4924,12 +4924,18 @@ impl ClinicalApp {
             .as_ref()
             .is_some_and(ScaleAssessment::has_attempt);
         let patient_name = if form.kind == FormKind::PatientNew {
-            form.fields
-                .iter()
-                .take(2)
-                .map(|field| field.value(cx))
-                .collect::<Vec<_>>()
-                .join(" ")
+            mediflow_patient_client::format_patient_name(
+                &form
+                    .fields
+                    .first()
+                    .map(|field| field.value(cx))
+                    .unwrap_or_default(),
+                &form
+                    .fields
+                    .get(1)
+                    .map(|field| field.value(cx))
+                    .unwrap_or_default(),
+            )
         } else {
             self.patient
                 .detail
@@ -5025,8 +5031,8 @@ impl ClinicalApp {
                         ),
                 ),
             FormState::Review => threshold
-                .bg(theme.threshold)
-                .text_color(theme.threshold_text)
+                .bg(theme.paper)
+                .text_color(theme.ink)
                 .child(self.threshold_question.attach_enabled(
                     confirmation_heading(
                         if repeated_scale {
@@ -8393,7 +8399,17 @@ mod tests {
                     .flex_col()
                     .type_role(app.theme, TypeRole::Body)
                     .text_color(app.theme.ink)
-                    .child(app.profile_view(layout, cx))
+                    .child(
+                        if app
+                            .form
+                            .as_ref()
+                            .is_some_and(|form| form.kind == FormKind::PatientNew)
+                        {
+                            app.patient_creation_view(layout, cx)
+                        } else {
+                            app.profile_view(layout, cx)
+                        },
+                    )
             })
         }
     }
@@ -8479,6 +8495,40 @@ mod tests {
     }
 
     #[gpui::test]
+    fn hcg1_new_patient_confirmation_formats_the_entered_fields_and_accessible_recipient(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (root, cx) = cx.add_window_view(|window, cx| {
+            let app = cx.new(|cx| ClinicalApp::new(String::new(), window, cx));
+            app.update(cx, |app, cx| {
+                app.stage_fields(FormKind::PatientNew, patient_forms::fields(None), None, cx);
+                let form = app.form.as_mut().unwrap();
+                form.fields[0]
+                    .editor
+                    .update(cx, |input, cx| input.set_content("Luca", cx));
+                form.fields[1]
+                    .editor
+                    .update(cx, |input, cx| input.set_content("Conti", cx));
+                form.state = FormState::Review;
+            });
+            ThresholdTestPlane { app }
+        });
+        let app = root.read_with(cx, |root, _| root.app.clone());
+        for dark in [false, true] {
+            app.update(cx, |app, cx| {
+                app.theme = Theme::for_dark(dark);
+                cx.notify();
+            });
+            render_clinical_window(cx);
+            let (node, _) = rendered_command::node("clinical-workspace-confirm-save");
+            assert_eq!(
+                node.label(),
+                Some("Conferma e registra nella scheda di Conti Luca")
+            );
+        }
+    }
+
+    #[gpui::test]
     fn threshold_full_plane_detail_returns_to_draft_instead_of_pointing_above(
         cx: &mut gpui::TestAppContext,
     ) {
@@ -8506,7 +8556,7 @@ mod tests {
         let (root, cx) = cx.add_window_view(|window, cx| {
             let app = cx.new(|cx| ClinicalApp::new(String::new(), window, cx));
             app.update(cx, |app, cx| {
-                let patient = serde_json::from_value(serde_json::json!({"id":"synthetic", "firstName":"Moretti", "lastName":"Elena", "taxCode":"SYNTHETIC", "notes":"", "version":1})).unwrap();
+                let patient = serde_json::from_value(serde_json::json!({"id":"synthetic", "firstName":"Elena", "lastName":"Moretti", "taxCode":"SYNTHETIC", "notes":"", "version":1})).unwrap();
                 app.install_patient(patient);
                 let field = Field::new("threshold-fixture-notes", "Note", &"Testo sintetico lungo. ".repeat(180), true, false, app.theme, cx);
                 app.form = Some(Form {kind:FormKind::Notes, fields:vec![field], upload:None, edit:None, patient_original:None, created_id:None, therapy:None, scale:None, state:FormState::Review, _subscriptions:vec![]});
@@ -8638,7 +8688,7 @@ mod tests {
         let (root, cx) = cx.add_window_view(|window, cx| {
             let app = cx.new(|cx| ClinicalApp::new(String::new(), window, cx));
             app.update(cx, |app, _| {
-                app.install_patient(serde_json::from_value(serde_json::json!({"id":"synthetic","firstName":"Moretti","lastName":"Elena","taxCode":"SYNTHETIC","version":1})).unwrap());
+                app.install_patient(serde_json::from_value(serde_json::json!({"id":"synthetic","firstName":"Elena","lastName":"Moretti","taxCode":"SYNTHETIC","version":1})).unwrap());
                 app.form = Some(Form {kind: FormKind::Scale, fields: vec![], upload: None, edit: None, patient_original: None, created_id: None, therapy: None, scale: None, state: FormState::Rejected, _subscriptions: vec![]});
             });
             ThresholdTestPlane { app }
@@ -8692,7 +8742,7 @@ mod tests {
         let (root,cx)=cx.add_window_view(|window,cx| {
             let app=cx.new(|cx|ClinicalApp::new(String::new(),window,cx));
             app.update(cx,|app,cx| {
-                app.install_patient(serde_json::from_value(serde_json::json!({"id":"synthetic","firstName":"Moretti","lastName":"Elena","taxCode":"SYNTHETIC","version":1})).unwrap());
+                app.install_patient(serde_json::from_value(serde_json::json!({"id":"synthetic","firstName":"Elena","lastName":"Moretti","taxCode":"SYNTHETIC","version":1})).unwrap());
                 let field=Field::new("state-fixture","Posologia","Una compressa al mattino",false,false,app.theme,cx).with_scroll(&app.profile_scroll,cx);
                 app.form=Some(Form{kind:FormKind::Therapy,fields:vec![field],upload:None,edit:None,patient_original:None,created_id:None,therapy:None,scale:None,state:FormState::Draft,_subscriptions:vec![]});
             });
