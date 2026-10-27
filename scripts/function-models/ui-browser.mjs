@@ -55,7 +55,9 @@ try {
   assert.ok(geometry.scroll<=width);assert.ok(geometry.cards.every(c=>c.radius==='0px'));assert.ok(geometry.targets.every(h=>h>=40));results.push(geometry);
   await page.screenshot({path:join(output,`preferences-${width}.png`),fullPage:true});
  }
- const first=page.locator('article').first();await first.getByText('Stato e dettagli',{exact:true}).focus();await page.keyboard.press('Enter');await first.getByText(/ChatGPT collegato/).waitFor();
+ const first=page.locator('article').first();const details=first.getByRole('button',{name:'Stato e dettagli · Quadro paziente',exact:true});
+ await details.focus();await expect(details).toBeFocused();await page.keyboard.press('Enter');
+ await expect(details).toHaveAttribute('aria-expanded','true');await expect(details).toBeFocused();await first.getByText(/ChatGPT collegato/).waitFor();
  const select=first.getByLabel('Modello predefinito · Quadro paziente', {exact:true});await select.focus();await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');assert.equal(await select.evaluate(e=>document.activeElement===e),true);
  await page.getByRole('button',{name:'Spegni tutte',exact:true}).click();const proposal=page.getByRole('region',{name:'Anteprima impostazioni'});await proposal.waitFor();await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='Anteprima impostazioni');await page.keyboard.press('Tab');assert.equal(await page.getByRole('button',{name:'Applica alle impostazioni'}).evaluate(e=>document.activeElement===e),true);
  assert.equal(calls.filter(c=>c.path==='/api/settings/ai/functions'&&c.method==='POST').length,0);assert.match(await proposal.innerText(),/spento/);
