@@ -95,8 +95,8 @@ test('la scheda usa la disclosure comune per i contenuti nel flusso', async ({ p
       await expect(content).toHaveCount(1);
       await expect(control.locator('svg.lucide-chevron-right')).toHaveCount(1);
       for (const side of ['top', 'right', 'bottom', 'left']) await expect(control).toHaveCSS(`border-${side}-width`, '0px');
-      expect(await control.evaluate(element => parseFloat(getComputedStyle(element).minHeight))).toBeGreaterThanOrEqual(40);
-      expect(await control.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(40 - 0.5);
+      await expect(control).toHaveCSS('min-height', '44px');
+      expect(await control.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44 - 0.5);
     }
   }
 });
@@ -107,16 +107,19 @@ test('i comandi dichiarano solo form montati e mantengono lo stato di apertura c
     await openPatientSection(page, section);
     const trigger = page.getByRole('button', { name: label, exact: true });
     await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    await expect(trigger).not.toHaveAttribute('aria-controls');
+    const target = page.locator(`[id="${await trigger.getAttribute('aria-controls')}"]`);
+    await expect(target).toHaveCount(1);
+    await expect(target).toBeHidden();
+    await expect(target.locator('form')).toHaveCount(0);
     await trigger.click();
     await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    const target = page.locator(`[id="${await trigger.getAttribute('aria-controls')}"]`);
     await expect(target).toHaveCount(1);
     await expect(target).toBeVisible();
     await trigger.click();
     await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    await expect(trigger).not.toHaveAttribute('aria-controls');
-    await expect(target).toHaveCount(0);
+    await expect(target).toHaveCount(1);
+    await expect(target).toBeHidden();
+    await expect(target.locator('form')).toHaveCount(0);
   }
 });
 

@@ -31,8 +31,8 @@ test('la disclosure mantiene il bersaglio minimo nelle impostazioni', async ({ p
     const controls = page.locator('[data-disclosure-control]:visible');
     await expect(controls.first()).toBeVisible();
     for (const control of await controls.all()) {
-      await expect(control).toHaveCSS('min-height', width <= 700 ? '44px' : '40px');
-      expect(await control.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(width <= 700 ? 44 : 40);
+      await expect(control).toHaveCSS('min-height', '44px');
+      expect(await control.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
     }
   }
   const context = await browser.newContext({ storageState: await page.context().storageState(), hasTouch: true, viewport: { width: 1440, height: 960 } });
