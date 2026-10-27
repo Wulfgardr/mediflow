@@ -1,3 +1,4 @@
+import { formatCountLabel } from '@/lib/format-count';
 import Link from 'next/link';
 import {
   Activity,
@@ -105,7 +106,7 @@ function LiveGovernanceArea({
             <h2 className={styles.panelTitle}>Sessione</h2>
             <PillBadge variant="neutral">attiva</PillBadge>
           </header>
-          <p className={styles.panelSubtitle}>{patientCount} pazienti disponibili in elenco.</p>
+          <p className={styles.panelSubtitle}>{formatCountLabel(patientCount, 'paziente disponibile in elenco', 'pazienti disponibili in elenco')}.</p>
         </section>
         <section className={styles.panel}>
           <header className={styles.panelHeader}>

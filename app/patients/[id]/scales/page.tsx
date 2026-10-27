@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -71,7 +72,7 @@ export default function ScalesPage() {
             backHref={`/patients/${id}/modules#scale`}
             backLabel="Torna alla scheda paziente"
             patientLabel={patient ? `${patient.lastName} ${patient.firstName}` : undefined}
-            statusLabel={`${scales.length} scale disponibili dalla libreria locale.`}
+            statusLabel={`${formatCountLabel(scales.length, 'scala disponibile', 'scale disponibili')} dalla libreria locale.`}
             navItems={[]}
         >
             {/* WUL-678: each instrument is one complete, keyboard-accessible target. */}

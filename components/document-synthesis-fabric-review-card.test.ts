@@ -24,7 +24,7 @@ test('document upload persists the attachment first and never invokes OCR, legac
     assert.match(source, /db\.attachments\.add/u);
     assert.match(source, /requestAnyDocDecryptedLocalExtractionPreview/u);
     assert.doesNotMatch(source, /document-synthesis-service|synthesizeDocument|refreshPatientSummaryIfEnabled|extractPatientDataSmart|extractDocumentTextForSummary|aiModels\.ocr|OCR in corso/u);
-    assert.match(source, /unsupported_local_extraction/u);
+    assert.match(source, /localExtraction.status === 'review_required' && <Disclosure[^>]*><p>Estrazione da rivedere · esito non confermato\.<\/p><p>Un errore di rete o di sessione non indica necessariamente che l’estrazione locale non sia supportata\.<\/p>/u);
     assert.match(source, /review_required/u);
 });
 

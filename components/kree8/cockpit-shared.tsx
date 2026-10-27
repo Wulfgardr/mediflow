@@ -1,3 +1,4 @@
+import { formatCountLabel } from '@/lib/format-count';
 import type * as React from 'react';
 import Link from 'next/link';
 import {
@@ -453,7 +454,7 @@ function calculatePatientAge(value: string | Date | null | undefined): string {
     now.getMonth() > date.getMonth()
     || (now.getMonth() === date.getMonth() && now.getDate() >= date.getDate());
   if (!hasBirthdayPassed) age -= 1;
-  return age >= 0 && age < 130 ? `${age} anni` : 'Età n/d';
+  return age >= 0 && age < 130 ? formatCountLabel(age, 'anno', 'anni') : 'Età n/d';
 }
 
 function maskTaxCode(value: string | null | undefined): string {

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 /* only preview metadata fetch; patient writes use the existing encrypted client. */
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { db, type Patient } from '@/lib/db';
@@ -234,8 +235,8 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
                         {snapshot.phase === 'preview' ? <aside className={styles.confirmation}>
                         <h3>Da aggiungere</h3>
                         <p data-testid="patient-bulk-destination">Destinazione dell’anteprima: <strong>{snapshot.ambulatoryName}</strong>. L’anteprima scade entro 5 minuti; dopo la scadenza seleziona nuovamente il file.</p>
-                        <p data-testid="patient-bulk-preview-count">{eligible} da aggiungere · {snapshot.preview.rows.length - eligible} escluse · {snapshot.preview.rows.length} righe totali</p>
-                            <p>Verranno aggiunte solo le {eligible} righe valide e non duplicate. In caso di errore, le schede già salvate restano presenti.</p>
+                        <p data-testid="patient-bulk-preview-count">{eligible} da aggiungere · {formatCountLabel(snapshot.preview.rows.length - eligible, 'esclusa', 'escluse')} · {formatCountLabel(snapshot.preview.rows.length, 'riga totale', 'righe totali')}</p>
+                            <p>{formatCountLabel(eligible, 'Verrà aggiunta solo {count} riga valida e non duplicata.', 'Verranno aggiunte solo {count} righe valide e non duplicate.', { template: true })} In caso di errore, le schede già salvate restano presenti.</p>
                             <label className={styles.consent}>
                                 <input type="checkbox" checked={reviewed} disabled={eligible === 0}
                                     onChange={event => setConsentRevision(event.currentTarget.checked ? snapshot.previewRevision : null)} />
@@ -244,7 +245,7 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
                             <div className={styles.actions}>
                                 <button type="button" className={styles.primary} disabled={!reviewed || eligible === 0 || !session}
                                     onClick={() => { void session?.confirm(snapshot.previewRevision, reviewed); }}>
-                                    Conferma e aggiungi {eligible} pazienti
+                                    Conferma e aggiungi {formatCountLabel(eligible, 'paziente', 'pazienti')}
                                 </button>
                                 <button type="button" className={styles.secondary} onClick={() => session?.cancel()}>Annulla anteprima</button>
                             </div>

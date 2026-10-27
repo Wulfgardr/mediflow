@@ -151,6 +151,21 @@ clinica o funzionamento su un'installazione reale.
 
 ## Dal modello al codice
 
+Il 27 ottobre 2026, PR #684, è stato riesaminato il diff di
+`components/therapy-manager.tsx` fra il precedente `coverage.json.syncCommit`
+`719509e92f81c15adc1e8abb9beb82740615c27e` e
+`3c3529729a74a7cd0be82ef3290715d0fa5fb7ec`. Cambiano soltanto le due etichette
+dell'età passate a `statusChange.recover` e `statusChange.begin`: il conteggio
+usa `formatCountLabel(age, 'anno', 'anni')` e conserva la guardia
+`Number.isFinite(age)` e il testo per l'età non disponibile. Non cambiano
+transizioni, guardie, confini degli await, CAS, audit, altri writer o assunzioni.
+Modello, statechart, invarianti e limiti restano invariati. Dopo questo riesame
+sono stati aggiornati manualmente soltanto l'impronta del manager e `syncCommit`
+alla revisione riesaminata. Il comando completo `npm run verify:therapy-status`
+è passato su Node 24.22.0: TLC corrente con 5.903.794 stati distinti e coda
+vuota, 3 controlli negativi del modello, 6 testimoni, 122 test reali,
+2 mutazioni del controller e 29 test del controller ripristinato.
+
 Gli stati interni `claiming/admitted` corrispondono alla UI `writing` prima
 dell’invio; `get/removing/publishing` alle fasi della UI `reading`. Il modello
 unisce `conflict/rejected` nel rifiuto autorevole (entrambi impediscono

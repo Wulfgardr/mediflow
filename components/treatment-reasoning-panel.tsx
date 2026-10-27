@@ -40,7 +40,7 @@ type SuggestedAction = TreatmentReasoningPublication['value']['data']['suggested
 type ScopedValue<T> = Readonly<{ contextRevision: string; value: T }>;
 
 const LOCAL_DISABLED_ERROR = 'Treatment Reasoning è disabilitato nel controllo locale. Riattivalo in Impostazioni AI per chiedere una nuova anteprima.';
-const PREVIEW_UNAVAILABLE_ERROR = 'Anteprima non disponibile. Verifica sessione, selezione e il motore scelto; nessun fallback automatico.';
+const PREVIEW_UNAVAILABLE_ERROR = 'Anteprima non disponibile. Controlla la sessione, la selezione e il motore scelto; non viene scelto automaticamente un altro motore.';
 const CONTEXT_UNAVAILABLE_ERROR = 'Impossibile leggere paziente e ambulatori. Controlla la sessione e riprova.';
 const AMBULATORY_MISSING_ERROR = 'Aggiungi un ambulatorio nelle impostazioni, poi riprova.';
 
@@ -367,7 +367,7 @@ export default function TreatmentReasoningPanel({
                     <p className={design.meta}>Receipt, provenienza e currentness</p>
                     <dl className={design.origin}>
                         <div><dt>Servizio utilizzato</dt><dd>{publication.attestation.provider === 'chatgpt_subscription' ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : publication.attestation.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : 'ATHENA Transformers · CPU locale'}</dd></div>
-                        <div><dt>Stato verificato</dt><dd>{publication.attestation.provider === 'chatgpt_subscription' ? 'Consenso sui byte redatti · nessuna ammissione clinica implicita' : publication.attestation.readiness} · {publication.review} · {publication.writesPerformed} scritture</dd></div>
+                        <div><dt>Stato verificato</dt><dd>{publication.attestation.provider === 'chatgpt_subscription' ? 'Consenso sui byte redatti · nessuna ammissione clinica implicita' : publication.attestation.readiness} · {publication.review} · {formatCountLabel(publication.writesPerformed, 'scrittura', 'scritture')}</dd></div>
                         {publication.schemaVersion === 'mediflow.ai.treatment-reasoning-publication.v2' && <div><dt>Motore e artefatto attestati</dt><dd>{publication.attestation.model} · {publication.attestation.platform} · ammissione {publication.attestation.admissionRevision}<br />SHA-256 {publication.attestation.artifactDigest}</dd></div>}
                         <div><dt>Contesto acquisito</dt><dd>{formatDateTime(publication.capturedAt)}</dd></div>
                         <div><dt>Revisione delle fonti</dt><dd><code>{publication.sourceRevision}</code></dd></div>

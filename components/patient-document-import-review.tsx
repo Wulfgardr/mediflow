@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import styles from './clinical-register.module.css';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -145,10 +146,10 @@ export default function PatientDocumentImportReview({
                                 Confidenza import {Math.round(localDraft.confidence * 100)}%
                             </span>
                             <span className={styles.muted}>
-                                {counters.fields} campi · {counters.diagnoses} diagnosi · {counters.medications} terapie · {counters.servicePrescriptions} prestazioni
+                                {formatCountLabel(counters.fields, 'campo', 'campi')} · {counters.diagnoses} diagnosi · {formatCountLabel(counters.medications, 'terapia', 'terapie')} · {formatCountLabel(counters.servicePrescriptions, 'prestazione', 'prestazioni')}
                             </span>
                             <span className={styles.muted}>
-                                {importDecision.summary.structuredDiagnosisCount} diagnosi pronte · {importDecision.summary.structuredTherapyCount} terapie pronte · {importDecision.summary.servicePrescriptionProposalCount} prestazioni proposte · {importDecision.summary.noteOnlyTherapyCount} note da ricontrollare
+                                {formatCountLabel(importDecision.summary.structuredDiagnosisCount, 'diagnosi pronta', 'diagnosi pronte')} · {formatCountLabel(importDecision.summary.structuredTherapyCount, 'terapia pronta', 'terapie pronte')} · {formatCountLabel(importDecision.summary.servicePrescriptionProposalCount, 'prestazione proposta', 'prestazioni proposte')} · {formatCountLabel(importDecision.summary.noteOnlyTherapyCount, 'nota da ricontrollare', 'note da ricontrollare')}
                             </span>
                         </div>
                     </div>

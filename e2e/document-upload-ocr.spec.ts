@@ -145,7 +145,7 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
           });
           expect(result.receipt.ocrProvenance.receiptSetSha256).toMatch(/^[a-f0-9]{64}$/);
           await expect(preview).toContainText('Testo OCR locale · da rivedere');
-          await expect(preview).toContainText(`OCR: 1 pagine su ${scenario === 'mixed' ? 2 : 1}`);
+          await expect(preview).toContainText(`OCR: 1 pagina su ${scenario === 'mixed' ? 2 : 1}`);
         }
         if (scenario === 'mixed') {
           expect(result.markdown).toMatch(/## Pagina 1[\s\S]*PRIMA PAGINA TESTUALE[\s\S]*## Pagina 2[\s\S]*ULTIMA PAGINA SCANSIONATA/);

@@ -1,3 +1,4 @@
+import { formatCountLabel } from '../../lib/format-count';
 /* WUL-684: JSX structure and callback contracts on synthetic snapshots.
    These tests do not attest browser rendering, React effects, keyboard or zoom. */
 import assert from 'node:assert/strict';
@@ -96,7 +97,7 @@ function payload() {
     })) };
 }
 function readiness(status = 'ready', data: unknown = payload(), globals: Record<string, unknown> = {}) {
-    return mountContract(path('ai-rollout-readiness-panel'), 'default', { states: { 0: { status, payload: data, message: 'HTTP 503 synthetic' } }, globals });
+    return mountContract(path('ai-rollout-readiness-panel'), 'default', { states: { 0: { status, payload: data, message: 'HTTP 503 synthetic' } }, globals, imports: { '@/lib/format-count': { formatCountLabel } } });
 }
 
 test('readiness preserves counts and codes while observation and non-disabled state never imply clinical readiness', () => {

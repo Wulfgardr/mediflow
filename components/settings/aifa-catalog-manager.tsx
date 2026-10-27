@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 /* shared AIFA surface; real client functions and existing server authority only. */
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Upload } from 'lucide-react';
@@ -71,7 +72,7 @@ export default function AifaCatalogManager({ expanded, onExpandedChange }: { exp
             <Disclosure headingLevel={2} open={expanded} onOpenChange={onExpandedChange}
                 title={<span className={styles.title}><span>Farmaci AIFA</span><span className={styles.summary}>
                     {state.reading ? 'Lettura dello stato locale…' : busy ? phaseLabels[state.phase] : drugCatalog
-                        ? `${drugCatalog.count.toLocaleString('it-IT')} confezioni · ultima lettura locale` : 'Stato locale non disponibile'}
+                        ? `${formatCountLabel(drugCatalog.count, 'confezione', 'confezioni')} · ultima lettura locale` : 'Stato locale non disponibile'}
                 </span></span>}>
                 <div className={styles.body}>
                     <p className="mt-1 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
@@ -115,7 +116,7 @@ export default function AifaCatalogManager({ expanded, onExpandedChange }: { exp
                     <div className={styles.provenance}>
                         <p className="font-semibold">Ultimo catalogo osservato</p>
                         <p className="mt-1 break-words">
-                            Scaricato il {drugCatalog.manifest.downloadedAt} · {drugCatalog.manifest.rowCount.toLocaleString('it-IT')} confezioni
+                            Scaricato il {drugCatalog.manifest.downloadedAt} · {formatCountLabel(drugCatalog.manifest.rowCount, 'confezione', 'confezioni')}
                         </p>
                         <p className="mt-1 break-words">Provenienza del file: <span className="[overflow-wrap:anywhere]">{drugCatalog.manifest.sourceUrl}</span></p>
                         <p className="mt-1">Importato il <time dateTime={drugCatalog.manifest.importedAt}>{new Date(drugCatalog.manifest.importedAt).toLocaleString('it-IT')}</time></p>

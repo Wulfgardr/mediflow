@@ -116,8 +116,8 @@ for (const scenario of ['success', 'partial', 'first failure'] as const) {
 
 test('UI uses confirmed results and incomplete messages; errors never reload or expose stacks', () => {
     const source = fs.readFileSync('components/data-seeder.tsx', 'utf8');
-    assert.match(source, /Generati \$\{result.count\} pazienti/);
-    assert.match(source, /Eliminati \$\{result.deleted\} pazienti/);
+    assert.match(source, /description: formatCountLabel\(result.count, 'Generato \{count\} paziente di test\.', 'Generati \{count\} pazienti di test\.', \{ template: true \}\)/);
+    assert.match(source, /\$\{formatCountLabel\(result.deleted, 'Eliminato \{count\} paziente', 'Eliminati \{count\} pazienti', \{ template: true \}\)\} e completata la pulizia dei dati collegati\./);
     const catches = [...source.matchAll(/catch \(e\) \{([\s\S]*?)\} finally/g)];
     assert.equal(catches.length, 2);
     for (const [, handler] of catches) {
@@ -140,5 +140,5 @@ test('full reset returns no inferred count and the UI selects its generic succes
     assert.deepEqual(calls, ['/api/entries', '/api/therapies', '/api/checkups', '/api/attachments',
         '/api/patients', '/api/conversations', '/api/messages']);
     const source = fs.readFileSync('components/data-seeder.tsx', 'utf8');
-    assert.match(source, /description: result.mode === 'full'\s*\? 'Reset totale completato\.'\s*:\s*`Eliminati \$\{result.deleted\}/);
+    assert.match(source, /description: result.mode === 'full'\s*\? 'Reset totale completato\.'\s*:\s*`\$\{formatCountLabel\(result.deleted, 'Eliminato \{count\} paziente', 'Eliminati \{count\} pazienti', \{ template: true \}\)\} e completata la pulizia dei dati collegati\.`/);
 });

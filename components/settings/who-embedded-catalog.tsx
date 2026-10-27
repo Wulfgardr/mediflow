@@ -1,4 +1,6 @@
 'use client';
+
+import { formatCountLabel } from '@/lib/format-count';
 import { useEffect, useRef, useState } from 'react';
 import { getICDCatalogStatus } from '@/lib/icd-service';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -36,7 +38,7 @@ export function WhoEmbeddedCatalog({ onChanged }: { onChanged(): void }) {
         const accepted = await confirm({ title: action === 'preview' ? 'Scaricare il catalogo WHO?' : action === 'activate' ? 'Attivare il catalogo verificato?' : 'Ripristinare il catalogo precedente?',
             message: action === 'preview'
                 ? 'Scarica la SimpleTabulation MMS 2026-01 inglese da icdcdn.who.int. Non invia dati clinici. Licenza CC BY-ND 3.0 IGO, attribuzione WHO. Il catalogo in uso resta disponibile; l’attivazione richiede una seconda conferma.'
-                : action === 'activate' ? `Attiva ${preview?.manifest.categories.toLocaleString('it-IT')} categorie della release 2026-01 in inglese. La versione precedente resta ripristinabile. Non modifica le diagnosi salvate.`
+                : action === 'activate' ? `Attiva ${preview ? formatCountLabel(preview.manifest.categories, 'categoria', 'categorie') : ''} della release 2026-01 in inglese. La versione precedente resta ripristinabile. Non modifica le diagnosi salvate.`
                     : 'Torna alla versione precedente del catalogo. Non modifica le diagnosi salvate.',
             confirmLabel: action === 'preview' ? 'Scarica anteprima' : action === 'activate' ? 'Attiva catalogo' : 'Ripristina catalogo' });
         if (!accepted.confirmed || !mounted.current || active.current) return;
@@ -62,7 +64,7 @@ export function WhoEmbeddedCatalog({ onChanged }: { onChanged(): void }) {
     return <div className="mt-4 space-y-3 text-base font-normal" data-testid="who-embedded-catalog">
         <h3 className="text-base font-semibold">Catalogo WHO incorporato</h3>
         <p>Stato: {label}{status && !status.enabled ? ' · Disattivato dal gestore' : ''} · MMS 2026-01 · Inglese</p>
-        {status?.manifest && <p>{status.manifest.categories.toLocaleString('it-IT')} categorie con codice disponibili senza rete, Docker o credenziali.</p>}
+        {status?.manifest && <p>{formatCountLabel(status.manifest.categories, 'categoria con codice disponibile', 'categorie con codice disponibili')} senza rete, Docker o credenziali.</p>}
         {status?.state === 'absent' && <p>Il catalogo non è incluso in questa distribuzione. Per cercare senza Docker serve prima un’acquisizione confermata.</p>}
         {status?.state === 'unverified' && <p>Il catalogo non ha superato i controlli. La ricerca incorporata non è disponibile.</p>}
         <p className="text-sm text-[color:var(--lume-ink-muted)]">{WHO_EMBEDDED_ATTRIBUTION}. Dati WHO separati dalla licenza del software. Solo categorie e titoli inglesi, senza sinonimi o postcoordinazione.</p>
@@ -74,7 +76,7 @@ export function WhoEmbeddedCatalog({ onChanged }: { onChanged(): void }) {
         </div>
         {busy && <p role="status">Operazione WHO in corso…</p>}
         {preview && <div className="space-y-2 border-t border-[color:var(--lume-border-color)] pt-3">
-            <p>Anteprima: {preview.manifest.categories.toLocaleString('it-IT')} categorie · {preview.manifest.rows.toLocaleString('it-IT')} righe · {preview.manifest.withoutCode.toLocaleString('it-IT')} righe senza codice escluse · {preview.manifest.bytes.toLocaleString('it-IT')} byte.</p>
+            <p>Anteprima: {formatCountLabel(preview.manifest.categories, 'categoria', 'categorie')} · {formatCountLabel(preview.manifest.rows, 'riga', 'righe')} · {formatCountLabel(preview.manifest.withoutCode, 'riga senza codice esclusa', 'righe senza codice escluse')} · {preview.manifest.bytes.toLocaleString('it-IT')} byte.</p>
             <details className="text-sm"><summary>Impronta del file verificato</summary><p className="break-all">SHA-256: <code>{preview.manifest.sha256}</code></p></details>
             <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => void run('activate')}>Attiva catalogo verificato</button>
         </div>}
