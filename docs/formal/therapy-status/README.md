@@ -10,6 +10,32 @@ sono una prova TLA né un'estensione implicita degli invarianti legacy sottostan
 
 Il recovery cifrato supporta lo schema corrente 6 e i predecessori canonici 4 e 5; le 24 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
+## Riconciliazione delle letture di sessione con HC-7 del 27 ottobre 2026
+
+Riesaminato il risultato dell'unione di #696 (`32ea06c6b10fa29c51418704a6133aef4f4b7a09`)
+con `main` dopo #694 (`45caae3de3723bc4fd230532de3435aab12b04a7`),
+rispetto a entrambi i genitori e ai rispettivi `syncCommit` precedenti.
+`lib/db.ts` è identico alla head approvata di #696: conserva acquisizione,
+composizione e controllo del segnale nei lettori `get`/`toArray`, query clonate
+e collegamento delle tabelle all'owner. `components/therapy-manager.tsx` è
+identico a `main`: conserva destinatario, riepiloghi, verbi e callback HC-7.
+Le letture rigorose del manager e il loro segnale restano quelli già riesaminati.
+
+Il confronto dei consumer `SecurityProvider`, `ConfirmProvider` e
+`useDialogA11y` conferma che il ritiro delle letture e il filtro dei dinieghi
+rimangono separati da focus, conferma e annullamento. Nessuna transizione,
+guardia, posizione degli await, chiamata ai controller, CAS, ledger, audit o
+writer cambia per questa riconciliazione. In `document-upload.tsx` si combinano
+il lettore di #696 e il titolo nominativo HC-7; gli scrittori restano invariati.
+Modello, invarianti, limiti, testimoni e mutanti non cambiano; gli AbortSignal
+restano fuori dalla copertura TLC e sotto i test causali del client.
+
+Dopo questo riesame scritto vengono ricalcolate le impronte dei file risultanti,
+conservando anche la copertura dell'helper e degli input causali di #696.
+`syncCommit` identifica il commit di merge del runtime riesaminato; il comando
+completo `npm run verify:therapy-status` verifica il risultato senza estendere
+le proprietà del modello alla presentazione o al protocollo durevole.
+
 ## Riesame HC-7 del 27 ottobre 2026
 
 Confrontato `components/therapy-manager.tsx` fra la base `c4ddf2e35` e
@@ -193,6 +219,32 @@ universale, audit/cifratura completi, correttezza dell'app intera, qualificazion
 clinica o funzionamento su un'installazione reale.
 
 ## Dal modello al codice
+
+Il 27 ottobre 2026, PR #696, è stato riesaminato il diff di `lib/db.ts`
+fra `f44fff7fcbdc2708a15958c0123c09ff1ac4b0b4` e
+`09166e707572ccf1d15008da244f7bd320de0851`. `ApiTable.get` e `toArray`
+acquisiscono il segnale della sessione della richiesta, lo compongono con
+l'eventuale segnale del chiamante e verificano la validità prima e dopo
+risposta, JSON e decifratura. `count` delega alla stessa lettura; i costruttori
+e le query clonate conservano il riferimento all'owner della sessione.
+Il consumer TherapyManager continua a usare le letture rigorose e il segnale
+del suo contesto. Una lettura ritirata resta un errore: non prova assenza,
+registrazione o autorizzazione a riprovare una scrittura.
+
+Il confronto dei metodi conferma identici tutti i writer di ApiTable e
+`MedicalApiClient.setKey`; non cambiano controller, marker, CAS, audit o
+writer host. Il ritiro del client continua a non annullare un commit host.
+`GetFailure` astrae già la lettura negata o non disponibile; sessioni,
+microtask e composizione degli AbortSignal restano fuori dal TLC e sono
+verificati dai test causali del client. Modello, invarianti, limiti,
+configurazioni, testimoni e mutanti rimangono identici. Dopo il riesame
+sono stati aggiornati l'impronta di `lib/db.ts` e `syncCommit`; la nuova
+dipendenza `lib/api-table-response.ts` entra nel controllo di deriva insieme
+agli input dei suoi test causali. Questo pin non amplia le proprietà TLC.
+Il comando completo `npm run verify:therapy-status` è passato su Node 24.22.0:
+TLC corrente con 5.903.794 stati distinti e coda vuota, 3 controlli negativi,
+6 testimoni, test reali del controller/HTTP, 2 mutazioni del controller
+rilevate e controller ripristinato verde.
 
 Il 27 ottobre 2026, PR #692 (HC-8), è stato riesaminato il diff completo di
 `components/therapy-manager.tsx` fra il precedente `coverage.json.syncCommit`

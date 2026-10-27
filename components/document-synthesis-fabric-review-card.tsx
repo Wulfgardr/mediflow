@@ -43,7 +43,7 @@ function DocumentSynthesisFabricReviewCardSession({
     const [controller] = useState(() => createDocumentSynthesisReviewBrowserController({
         fetch: picker.client.fetch,
         readAttachment: async (id) => {
-            const source = await db.attachments.get(id);
+            const source = await db.attachments.get(id, { signal: db.getSessionReadSignal() });
             return source?.patientId === patientId ? source : null;
         },
     }));
