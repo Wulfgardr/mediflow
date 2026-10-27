@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Request } from '@playwright/test';
 
 import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
 import { chooserReady, installKeyboardChooserObservation, keyboardChooserDecision, type KeyboardChooserSnapshot } from './anydoc-keyboard-chooser';
@@ -59,6 +59,11 @@ async function createExtractableRtf(page: Page, patientId: string): Promise<Read
   const uploaded = response.request().postDataJSON() as { id: string; patientId: string; data: string };
   expect(uploaded.patientId).toBe(patientId);
   expect(uploaded.data).toMatch(/^ENC:/u);
+  // Cold webpack compilation of the detail route reloads the in-memory grant broker.
+  // Compile it before acquisition; the browser still performs its own authenticated read.
+  const detail = await page.request.get(`/api/attachments/${uploaded.id}`);
+  expect(detail.status()).toBe(200);
+  expect((await detail.json() as { data: string }).data).toBe(uploaded.data);
   return { id: uploaded.id, name };
 }
 
@@ -261,9 +266,11 @@ test('Documenti: il salvataggio sospeso espone un solo annuncio live', async ({ 
   let observed!: () => void;
   const pending = new Promise<void>((resolve) => { release = resolve; });
   const blocked = new Promise<void>((resolve) => { observed = resolve; });
+  const writes: Request[] = [];
   page.once('close', release);
   await page.route('**/api/attachments', async (route) => {
     if (route.request().method() === 'POST') {
+      writes.push(route.request());
       observed();
       await pending;
     }
@@ -286,6 +293,7 @@ test('Documenti: il salvataggio sospeso espone un solo annuncio live', async ({ 
   }
   await expect(page.getByRole('button', { name: 'Visualizza annuncio-live-sintetico.txt', exact: true })).toBeEnabled();
   await expect(page.getByText('1 allegato salvato.', { exact: false })).toBeVisible();
+  expect(writes).toHaveLength(1);
 });
 
 for (const leaveStatus of [false, true]) {
@@ -334,13 +342,22 @@ for (const leaveStatus of [false, true]) {
   });
 }
 
-test('AnyDoc: il browser usa la route autenticata e mostra solo l’anteprima locale', async ({ page }) => {
+test('AnyDoc: il browser usa la route autenticata e mostra solo l’anteprima locale', async ({ page }, testInfo) => {
   await establishSyntheticSession(page);
   const patientId = await createSyntheticFixture(page);
+  const writes: Request[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/attachments') writes.push(request);
+  });
   const attachment = await createExtractableRtf(page, patientId);
   await openDocumentArchive(page, patientId);
   await expect(page.getByTestId('patient-profile-notes')).toContainText('Nessuna nota generale registrata.');
 
+  const extractionActions: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === `/api/attachments/${attachment.id}/local-extraction`)
+      extractionActions.push(request.headers()['x-mediflow-extraction-action']);
+  });
   const responsePromise = page.waitForResponse((response) => (
     response.request().method() === 'POST'
     && response.request().headers()['x-mediflow-extraction-action'] === 'project'
@@ -364,6 +381,13 @@ test('AnyDoc: il browser usa la route autenticata e mostra solo l’anteprima lo
   await expect(preview.locator('pre')).toBeVisible();
   await expect(preview).toContainText(SYNTHETIC_RTF_TEXT);
   await expect(page.getByText('review_required · unsupported_local_extraction', { exact: false })).toHaveCount(0);
+  expect(writes).toHaveLength(1);
+  expect(writes[0].postDataJSON().id).toBe(attachment.id);
+  expect(extractionActions).toEqual(['acquire', 'project']);
+  await testInfo.attach('anydoc-single-submission', {
+    body: Buffer.from(JSON.stringify({ attachmentWrites: writes.length, extractionActions, projectStatus: response.status() })),
+    contentType: 'application/json',
+  });
 });
 
 // native options must conceal filenames while preserving source identity.

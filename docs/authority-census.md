@@ -66,6 +66,23 @@ La mappa non afferma che una ricerca testuale dimostri assenza di consumatori
 esterni. Gli export non collegati restano censiti come tali; restore, bootstrap
 e script di fixture sono classificati qui sotto, non eliminati dall'analisi.
 
+### Aggiornare il guard dei writer allegati
+
+Il guard confronta percorso, tipo di scrittura, fingerprint AST e numero di
+occorrenze con `CONTRACT`; il fingerprint comprende anche l'espressione che
+contiene la chiamata. Prima di aggiornarlo, confrontare base e head e registrare
+nella PR ordine, parametri, currentness, errori e numero di scritture. Consultare
+[ADR0099](./adr/0099-ocr-document-locator-and-source-currentness.md) e la
+[classificazione D-01/D-02](./clinical-write-roster.md). Un cambiamento del
+fingerprint non dimostra da solo un cambiamento della scrittura.
+
+Solo dopo questa verifica, usare `node scripts/check-attachment-currentness-writers.mjs
+--inventory` per leggere l'impronta osservata e modificare manualmente le sole
+righe riesaminate. Conservare conteggio e disposizione quando la semantica è
+invariata; nuovi writer richiedono classificazione e prove proprie. Non rigenerare
+il contratto dall'inventario. Eseguire `npm run check:attachment-currentness-writers`,
+`npm run test:attachment-currentness-writers` e lo step CI `npm run test:portable-local`.
+
 ## Altre autorità: owner e fonte da consultare
 
 | Responsabilità | Owner / ingresso corrente | Confine e fonte unica del dettaglio |
