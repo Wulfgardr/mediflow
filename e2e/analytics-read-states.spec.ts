@@ -1,8 +1,10 @@
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { bootstrapUnlockedSession, unlockIfNeeded } from './utils';
+import { assertNoHorizontalOverflow, bootstrapUnlockedSession, unlockIfNeeded } from './utils';
+import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
 const readErrorTitle = 'Schede non leggibili';
+const readErrorDetail = 'Impossibile leggere le schede. Gli aggregati non sono mostrati. Usa «Riprova» per ripetere la lettura.';
 const noAnalyticsPatients = 'Nessuna scheda attiva disponibile per l’analisi.';
 
 async function installAnalyticsFixture(page: Page, baseURL: string) {
@@ -60,11 +62,13 @@ async function installAnalyticsFixture(page: Page, baseURL: string) {
   return { state, calls, blocked, uiWrites, known, missingAge, archived, otherScope, close: () => page.unroute('**/*', handler) };
 }
 
-for (const scenario of ['initial', 'refresh', 'context'] as const) test(`Analytics ${scenario}: scoped read states`, async ({ page, baseURL }, info) => {
+for (const scenario of ['initial', 'refresh', 'context'] as const) test(`Analytics ${scenario}: scoped read states`, async ({ page: ownedPage, baseURL }, info) => {
   if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL
     || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw Error('Owned synthetic archive and loopback required');
   const baseline = process.env.ANALYTICS_READ_BASELINE === '1';
   test.skip(baseline && scenario === 'context', 'Context scenario is candidate qualification, not a baseline claim.');
+  const zoom = !baseline && scenario === 'initial' ? await openBrowserZoomFixture(baseURL) : null;
+  const page = zoom?.page ?? ownedPage;
   const fixture = await installAnalyticsFixture(page, baseURL);
   const errors: string[] = [], frames: unknown[] = [], observations: unknown[] = [];
   const directory = process.env.ANALYTICS_READ_SCREENSHOTS;
@@ -78,11 +82,41 @@ for (const scenario of ['initial', 'refresh', 'context'] as const) test(`Analyti
       const rect = element.getBoundingClientRect(), x = rect.x + Math.min(rect.width / 2, 50), y = rect.y + Math.min(rect.height / 2, 15);
       const hit = document.elementFromPoint(x, y);
       return { text: element.textContent, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-        viewport: { width: innerWidth, height: innerHeight }, hit: element === hit || element.contains(hit) };
+        viewport: { width: innerWidth, height: innerHeight }, hit: element === hit || element.contains(hit),
+        color: getComputedStyle(element).color, palette: getComputedStyle(document.documentElement).getPropertyValue('--lume-ink') };
     });
     frames.push({ name, ...probe });
     if (directory) { await mkdir(directory, { recursive: true }); await page.screenshot({ path: `${directory}/${scenario}-${name}.png`, fullPage: false, animations: 'disabled' }); }
     expect(probe.hit).toBe(true);
+    if (!baseline) {
+      expect(probe.rect.x).toBeGreaterThanOrEqual(-1); expect(probe.rect.y).toBeGreaterThanOrEqual(-1);
+      expect(probe.rect.x + probe.rect.width).toBeLessThanOrEqual(probe.viewport.width + 1);
+      expect(probe.rect.y + probe.rect.height).toBeLessThanOrEqual(probe.viewport.height + 1);
+    }
+    return probe;
+  };
+  const narrowShots = async (name: string, target: Locator) => {
+    if (!zoom) return;
+    const colors = new Map<string, string>();
+    for (const theme of ['giorno', 'grafite']) for (const size of ['320', 'zoom-400']) {
+      await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
+      await page.setViewportSize({ width: size === '320' ? 320 : 1440, height: 1000 });
+      if (size === 'zoom-400') await zoom.setZoom(4);
+      await page.evaluate(value => {
+        localStorage.setItem('mediflow-theme', value);
+        document.documentElement.classList.remove('light', 'dark'); document.documentElement.classList.add(value);
+        document.documentElement.style.colorScheme = value;
+      }, theme === 'giorno' ? 'light' : 'dark');
+      await assertNoHorizontalOverflow(page, [{ label: 'document', selector: 'document' }]);
+      const probe = await shot(`${name}-${theme}-${size}`, target); colors.set(theme, probe.color);
+    }
+    expect(colors.get('giorno')).not.toBe(colors.get('grafite'));
+    await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
+    await page.evaluate(() => {
+      localStorage.setItem('mediflow-theme', 'light');
+      document.documentElement.classList.remove('dark'); document.documentElement.classList.add('light');
+      document.documentElement.style.colorScheme = 'light';
+    });
   };
   const restoreEvent = () => page.evaluate(() => {
     window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
@@ -105,6 +139,8 @@ for (const scenario of ['initial', 'refresh', 'context'] as const) test(`Analyti
     } else {
       await expect(error).toBeVisible(); await expect(primary).not.toBeVisible();
       await shot('error', error);
+      await narrowShots('error-detail', error.getByText(readErrorDetail, { exact: true }));
+      await narrowShots('error-action', error.getByRole('button', { name: 'Riprova', exact: true }));
     }
   };
   try {
@@ -126,6 +162,7 @@ for (const scenario of ['initial', 'refresh', 'context'] as const) test(`Analyti
       await visibleError(initialFailure!); fixture.state.status = 200;
       if (baseline) await page.reload(); else await error.getByRole('button', { name: 'Riprova', exact: true }).click();
       await expect(primary).toBeVisible(); await shot('recovered', primary);
+      await narrowShots('count', primary);
       const minimum = page.getByLabel('Età minima', { exact: true });
       await minimum.focus(); await minimum.press('End'); await expect(minimum).toHaveValue('120');
       if (baseline) await expect(primary).toHaveText('0'); else await expect(primary).toHaveText('0 schede tra 120 e 120 anni');
@@ -175,7 +212,7 @@ for (const scenario of ['initial', 'refresh', 'context'] as const) test(`Analyti
         calls: fixture.calls, blocked: fixture.blocked, uiWrites: fixture.uiWrites, errors, frames, observations };
       await info.attach('analytics-read-receipt', { contentType: 'application/json', body: JSON.stringify(receipt, null, 2) });
       if (directory) { await mkdir(directory, { recursive: true }); await writeFile(`${directory}/${scenario}-receipt.json`, JSON.stringify(receipt, null, 2)); }
-    } finally { await fixture.close(); }
+    } finally { try { await fixture.close(); } finally { await zoom?.close(); } }
     expect(fixture.blocked).toEqual([]); expect(errors).toEqual([]);
   }
 });
