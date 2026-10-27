@@ -5,11 +5,12 @@ mod account_profile;
 mod ai_preferences;
 mod ai_status;
 mod ambulatories;
+mod ambulatory_commands;
 mod analytics;
 #[cfg(unix)]
 mod chat_access;
 mod document_details;
-mod local_preferences;
+pub(crate) mod local_preferences;
 mod local_settings;
 #[cfg(test)]
 mod notes_recovery_tests;
@@ -516,7 +517,7 @@ impl ClinicalApp {
         Self::with_local_preferences(server, LocalPreferencesStore::system(), window, cx)
     }
 
-    fn with_local_preferences(
+    pub(crate) fn with_local_preferences(
         server: String,
         local_preferences: LocalPreferencesStore,
         window: &mut Window,
@@ -772,6 +773,7 @@ impl ClinicalApp {
         let quit = cx.on_app_quit(|this, cx| {
             #[cfg(unix)]
             this.chat_access.retire(cx);
+            this.ambulatory_management.destructive.withdraw(cx);
             this.request_context.cancel();
             this.retire_form(cx);
             this.pairing.take();
@@ -792,6 +794,7 @@ impl ClinicalApp {
         let release = cx.on_release(|this, cx| {
             #[cfg(unix)]
             this.chat_access.retire(cx);
+            this.ambulatory_management.destructive.withdraw(cx);
             this.request_context.cancel();
             this.retire_form(cx);
             this.pairing.take();
@@ -850,6 +853,7 @@ impl ClinicalApp {
     }
 
     fn next_epoch(&mut self) {
+        self.ambulatory_management.destructive.cancel_requests();
         if self.copy_state == Some(documents::CopyState::Reading) {
             self.copy_state = Some(documents::CopyState::Withdrawn);
         }
@@ -1175,6 +1179,7 @@ impl ClinicalApp {
         {
             return;
         }
+        self.withdraw_ambulatory_command_view(cx);
         self.ambulatory_management.initial_scope = false;
         self.next_epoch();
         self.focus_after_render = true;
@@ -1359,6 +1364,7 @@ impl ClinicalApp {
             self.show_other = false;
             self.directory = true;
             if self.area != area {
+                self.withdraw_ambulatory_command_view(cx);
                 self.scales.reset(cx);
                 self.analytics.reset(cx);
                 self.retire_profile_selection();
@@ -5444,7 +5450,7 @@ impl ClinicalApp {
         div().w_full().min_w_0().max_w(px(760.)).flex().flex_col().gap(px(28.))
             .child(heading("clinical-workspace-settings-heading", "Impostazioni", theme))
             .child(button("clinical-workspace-manage-ambulatories", "Gestisci ambulatori…", theme, false, true)
-                .on_click(cx.listener(|this, _, _, cx| { this.ambulatory_management.active = true; this.area_scroll.set_offset(gpui::point(px(0.), px(0.))); this.load_ambulatories(cx); })))
+                .on_click(cx.listener(|this, _, _, cx| { this.ambulatory_management.active = true; this.area_scroll.set_offset(gpui::point(px(0.), px(0.))); this.load_ambulatories(cx); this.load_ambulatory_command_recovery(cx); })))
             .child(self.account_profile_view(cx))
             .child(div().flex().flex_col().gap(px(12.))
                 .child(section("clinical-workspace-appearance-heading", "ASPETTO", theme))

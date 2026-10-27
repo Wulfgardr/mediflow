@@ -1,3 +1,4 @@
+import { captureAmbulatoryCommands, preserveAmbulatoryCommands } from '../ambulatory-destructive-command-backup';
 import { captureTherapyStatusCommands, preserveTherapyStatusCommands } from '../therapy-status-command-backup';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -122,11 +123,12 @@ export async function runArchiveMaintenanceWebOwner(root: string): Promise<void>
                 try {
                     if (readSqliteArchiveGeneration(current) !== expectedGeneration) throw new Error('archive_generation_changed');
                     const therapyCommands = captureTherapyStatusCommands(current);
+                    const ambulatoryCommands = captureAmbulatoryCommands(current);
                     await replaceSqliteDatabase({ sourcePath: preparedSource, destPath: target,
                         backupPath: `${target}.bak-${repairBackupTimestamp()}`, connection: current,
                         prepareReplacement: staging => {
                             const replacement = openVersionedSqliteDatabase(staging, undefined, { prepareReplacement: true });
-                            try { preserveTherapyStatusCommands(therapyCommands, replacement); replacement.transaction(() => rotateSqliteArchiveGeneration(replacement)).immediate(); }
+                            try { replacement.transaction(() => { preserveTherapyStatusCommands(therapyCommands, replacement); preserveAmbulatoryCommands(ambulatoryCommands, replacement); rotateSqliteArchiveGeneration(replacement); }).immediate(); }
                             finally { replacement.close(); }
                         },
                         reopenConnection: () => { candidate = openVersionedSqliteDatabase(target); return candidate; },

@@ -47,7 +47,7 @@ impl PairingCredentials {
 #[derive(Clone)]
 pub struct RuntimeClient {
     http: Client,
-    context: RequestContext,
+    pub(crate) context: RequestContext,
     origin: Url,
     base_url: String,
 }
@@ -370,7 +370,7 @@ impl RuntimeClient {
         ))
     }
 
-    pub(crate) fn bootstrap_raw(
+    pub(crate) fn dedicated_web_raw(
         &self,
         method: Method,
         path: &[&str],
@@ -463,7 +463,7 @@ fn http_runtime() -> &'static tokio::runtime::Runtime {
     })
 }
 
-fn sensitive_header(value: &str) -> Result<HeaderValue> {
+pub(crate) fn sensitive_header(value: &str) -> Result<HeaderValue> {
     let mut header = HeaderValue::from_str(value).map_err(|_| RuntimeError::InvalidInput)?;
     header.set_sensitive(true);
     Ok(header)
@@ -484,7 +484,7 @@ pub(crate) fn cookie_header(cookie: &str, scope: Option<&str>) -> Result<Zeroizi
 
 /// Exact encodeURIComponent byte set, consumed by Next RequestCookies through
 /// decodeURIComponent. Encode delimiters and '%' once; preserve the opaque ID.
-fn encode_cookie_value(value: &str) -> String {
+pub(crate) fn encode_cookie_value(value: &str) -> String {
     const HEX: &[u8; 16] = b"0123456789ABCDEF";
     let mut encoded = String::with_capacity(value.len());
     for byte in value.bytes() {
@@ -504,7 +504,7 @@ fn encode_cookie_value(value: &str) -> String {
     encoded
 }
 
-fn session_cookie(headers: &HeaderMap) -> Result<Zeroizing<String>> {
+pub(crate) fn session_cookie(headers: &HeaderMap) -> Result<Zeroizing<String>> {
     let mut found = None;
     for header in headers.get_all(SET_COOKIE) {
         let header = header.to_str().map_err(|_| RuntimeError::InvalidResponse)?;
@@ -651,7 +651,7 @@ pub struct FirstAmbulatoryDraft {
 impl FirstAmbulatoryDraft {
     pub fn new(name: String, address: Option<String>, description: Option<String>) -> Result<Self> {
         let draft = Self {
-            id: bootstrap_uuid()?,
+            id: operation_uuid()?,
             name,
             address,
             description,
@@ -729,7 +729,7 @@ impl HostBootstrapSession {
         );
         let mut value = serde_json::to_value(&draft).map_err(|_| RuntimeError::InvalidInput)?;
         value["operation"] = serde_json::json!("first-ambulatory.create.v1");
-        let opened = client.bootstrap_raw(
+        let opened = client.dedicated_web_raw(
             Method::POST,
             &["api", "auth", "ambulatory-bootstrap", "begin"],
             headers,
@@ -759,7 +759,7 @@ impl HostBootstrapSession {
         {
             return Err(RuntimeError::InvalidResponse);
         }
-        let control = bootstrap_cookie(&opened.headers, "mediflow_auth_control", 32, 256)?;
+        let control = control_cookie(&opened.headers, "mediflow_auth_control", 32, 256)?;
         let mut host = Self {
             client,
             draft,
@@ -769,81 +769,10 @@ impl HostBootstrapSession {
             cookie: Zeroizing::new(String::new()),
             sent: std::sync::atomic::AtomicBool::new(false),
         };
-        let login = (|| {
-            let checked = host.client.bootstrap_raw(
-                Method::GET,
-                &["api", "auth", "check"],
-                host.headers()?,
-                None,
-                false,
-            )?;
-            let check: Value =
-                serde_json::from_slice(&checked.body).map_err(|_| RuntimeError::InvalidResponse)?;
-            if check["status"] != "ok"
-                || check["isSetup"] != true
-                || check["archiveGeneration"] != host.generation
-                || check["unlock"]["credential"] != "passphrase"
-                || check["unlock"]["kdfVersion"] != 3
-            {
-                return Err(RuntimeError::UnsupportedUnlock);
-            }
-            let salt = check["unlock"]["salt"]
-                .as_str()
-                .ok_or(RuntimeError::InvalidResponse)?;
-            let material = crypto::derive_v3(passphrase, salt)?;
-            let mut headers = host.headers()?;
-            let etag = checked
-                .headers
-                .get("etag")
-                .and_then(|v| v.to_str().ok())
-                .ok_or(RuntimeError::InvalidResponse)?;
-            if etag.len() < 34
-                || etag.len() > 258
-                || !etag.starts_with('"')
-                || !etag.ends_with('"')
-                || !etag[1..etag.len() - 1]
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
-            {
-                return Err(RuntimeError::InvalidResponse);
-            }
-            headers.insert("if-match", sensitive_header(etag)?);
-            headers.insert("idempotency-key", sensitive_header(&bootstrap_uuid()?)?);
-            let mut body =
-                serde_json::json!({"username":user.username,"verifier":&*material.verifier});
-            let logged = host.client.bootstrap_raw(
-                Method::POST,
-                &["api", "auth", "login"],
-                headers,
-                Some(&body),
-                true,
-            );
-            if let Some(Value::String(verifier)) = body.get_mut("verifier") {
-                verifier.zeroize();
-            }
-            let logged = logged?;
-            host.cookie = session_cookie(&logged.headers)?;
-            #[derive(Deserialize)]
-            #[serde(rename_all = "camelCase")]
-            struct Login {
-                success: bool,
-                id: String,
-                username: String,
-                role: String,
-                archive_generation: String,
-            }
-            let admitted: Login =
-                serde_json::from_slice(&logged.body).map_err(|_| RuntimeError::InvalidResponse)?;
-            if !admitted.success
-                || admitted.id != user.id
-                || admitted.username != user.username
-                || admitted.role != "admin"
-                || admitted.archive_generation != host.generation
-            {
-                return Err(RuntimeError::InvalidResponse);
-            }
-            Ok(())
-        })();
+        let (cookie, login) = authenticate_web_p3(&host.client, user, host.headers()?, passphrase);
+        if let Some(cookie) = cookie {
+            host.cookie = cookie;
+        }
         if let Err(error) = login {
             let _ = host.retire();
             return Err(error);
@@ -875,7 +804,7 @@ impl HostBootstrapSession {
         if self.sent.swap(true, std::sync::atomic::Ordering::AcqRel) {
             return Err(RuntimeError::ReadRequired);
         }
-        let raw = self.client.bootstrap_raw(
+        let raw = self.client.dedicated_web_raw(
             Method::POST,
             &["api", "auth", "ambulatory-bootstrap"],
             self.headers()?,
@@ -894,7 +823,7 @@ impl HostBootstrapSession {
     }
     /// Observed state only; this does not attribute a previous commit to this attempt.
     pub fn readback(&self) -> Result<String> {
-        let raw = self.client.bootstrap_raw(
+        let raw = self.client.dedicated_web_raw(
             Method::GET,
             &["api", "auth", "ambulatory-bootstrap"],
             self.headers()?,
@@ -917,7 +846,7 @@ impl HostBootstrapSession {
         let raw = self
             .client
             .with_request_context(RequestContext::default())
-            .bootstrap_raw(
+            .dedicated_web_raw(
                 Method::POST,
                 &["api", "auth", "ambulatory-bootstrap", "retire"],
                 self.headers()?,
@@ -931,7 +860,91 @@ impl HostBootstrapSession {
         }
     }
 }
-fn bootstrap_cookie(
+pub(crate) fn authenticate_web_p3(
+    client: &RuntimeClient,
+    user: &RuntimeUser,
+    headers: HeaderMap,
+    passphrase: &str,
+) -> (Option<Zeroizing<String>>, Result<()>) {
+    let mut cookie = None;
+    let login = (|| {
+        let checked = client.dedicated_web_raw(
+            Method::GET,
+            &["api", "auth", "check"],
+            headers.clone(),
+            None,
+            false,
+        )?;
+        let check: Value =
+            serde_json::from_slice(&checked.body).map_err(|_| RuntimeError::InvalidResponse)?;
+        if check["status"] != "ok"
+            || check["isSetup"] != true
+            || check["archiveGeneration"] != user.archive_generation
+            || check["unlock"]["credential"] != "passphrase"
+            || check["unlock"]["kdfVersion"] != 3
+        {
+            return Err(RuntimeError::UnsupportedUnlock);
+        }
+        let salt = check["unlock"]["salt"]
+            .as_str()
+            .ok_or(RuntimeError::InvalidResponse)?;
+        let material = crypto::derive_v3(passphrase, salt)?;
+        let mut headers = headers.clone();
+        let etag = checked
+            .headers
+            .get("etag")
+            .and_then(|v| v.to_str().ok())
+            .ok_or(RuntimeError::InvalidResponse)?;
+        if etag.len() < 34
+            || etag.len() > 258
+            || !etag.starts_with('"')
+            || !etag.ends_with('"')
+            || !etag[1..etag.len() - 1]
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        headers.insert("if-match", sensitive_header(etag)?);
+        headers.insert("idempotency-key", sensitive_header(&operation_uuid()?)?);
+        let mut body = serde_json::json!({"username":user.username,"verifier":&*material.verifier});
+        let logged = client.dedicated_web_raw(
+            Method::POST,
+            &["api", "auth", "login"],
+            headers,
+            Some(&body),
+            true,
+        );
+        if let Some(Value::String(verifier)) = body.get_mut("verifier") {
+            verifier.zeroize();
+        }
+        let logged = logged?;
+        cookie = Some(session_cookie(&logged.headers)?);
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Login {
+            success: bool,
+            id: String,
+            username: String,
+            role: String,
+            archive_generation: String,
+        }
+        let admitted: Login =
+            serde_json::from_slice(&logged.body).map_err(|_| RuntimeError::InvalidResponse)?;
+        if !admitted.success
+            || admitted.id != user.id
+            || admitted.username != user.username
+            || admitted.role != "admin"
+            || admitted.archive_generation != user.archive_generation
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        Ok(())
+    })();
+    (cookie, login)
+}
+
+pub(crate) fn control_cookie(
     headers: &HeaderMap,
     name: &str,
     min: usize,
@@ -962,7 +975,7 @@ fn bootstrap_cookie(
     }
     found.ok_or(RuntimeError::InvalidResponse)
 }
-fn bootstrap_uuid() -> Result<String> {
+pub(crate) fn operation_uuid() -> Result<String> {
     let mut bytes = [0u8; 16];
     getrandom::fill(&mut bytes).map_err(|_| RuntimeError::Crypto)?;
     bytes[6] = (bytes[6] & 15) | 64;
@@ -1198,7 +1211,7 @@ mod tests {
         assert!(!remote.is_local_bootstrap_origin());
         assert_eq!(
             remote
-                .bootstrap_raw(
+                .dedicated_web_raw(
                     Method::GET,
                     &["api", "auth", "check"],
                     HeaderMap::new(),

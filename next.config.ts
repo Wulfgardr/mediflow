@@ -85,6 +85,8 @@ const nextConfig: NextConfig = {
       "./lib/backup-audit.ts",
       "./lib/therapy-status-command-backup.ts",
       "./lib/therapy-status-command-contract.ts",
+      "./lib/ambulatory-destructive-command-backup.ts",
+      "./lib/ambulatory-destructive-command-contract.ts",
       "./lib/exemption-import-receipt.ts",
       "./lib/exemption-import-contract.ts",
       "./lib/reference-data/prosthetics-catalog-backup.ts",

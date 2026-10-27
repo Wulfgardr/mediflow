@@ -87,6 +87,17 @@ async function fixture(paddingBytes = 0) {
         'completed', 'applied', NULL, 1783000000, 2, 1783000000, ?, ?)`).run(statusCommand, readSqliteArchiveGeneration(db), actor, statusAudit.eventId, JSON.stringify(statusAudit));
     db.prepare(`INSERT INTO therapy_status_commands VALUES ('41111111-1111-4111-8111-111111111111', 'therapy.status.change.v1', ?, ?, 'synthetic-patient',
         'synthetic-unreceived-therapy', 1, NULL, 'closed', NULL, 1783000000, NULL, NULL, NULL, NULL)`).run(readSqliteArchiveGeneration(db), actor);
+    const ambulatoryAudit = { eventId: '61111111-1111-4111-8111-111111111111', schemaVersion: 1, eventType: 'ambulatory.cleared',
+        occurredAt: 1783000000, outcome: 'success', actorType: 'user', actorRef: actor, subjectType: 'ambulatory', subjectRef: 'synthetic-historical-ambulatory',
+        sourceSurface: 'web', requestId: '51111111-1111-4111-8111-111111111111', redactedMetadata: JSON.stringify({ resourceVersion: 2 }), createdAt: 1783000000 };
+    db.prepare('INSERT INTO audit_events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(...Object.values(ambulatoryAudit));
+    const insertAmbulatory = db.prepare(`INSERT INTO ambulatory_destructive_commands VALUES (?, 'ambulatory.destructive.v1', 'ambulatory.clear-test.v1', ?,
+        'synthetic-original-scope', 'synthetic-historical-ambulatory', 1, ?, ?, 'synthetic-paired-client', 'ios', ?, ?, ?, 1783000000, ?, ?)`);
+    const result = JSON.stringify({ targetVersion: 2, affectedAmbulatories: [{ id: 'synthetic-historical-ambulatory', version: 2 }],
+        clear: { tombstonedPatients: 0, unlinkedPatients: 0, preservedLivePatients: 0, removedMembershipRows: 0 } });
+    insertAmbulatory.run(ambulatoryAudit.requestId, readSqliteArchiveGeneration(db), 'a'.repeat(64), actor, digest('synthetic-paired-token'), 'applied', null, result, JSON.stringify([ambulatoryAudit]));
+    insertAmbulatory.run('71111111-1111-4111-8111-111111111111', readSqliteArchiveGeneration(db), 'b'.repeat(64), actor, digest('synthetic-paired-token'), 'closed', null, null, null);
+    insertAmbulatory.run('81111111-1111-4111-8111-111111111111', readSqliteArchiveGeneration(db), 'c'.repeat(64), actor, digest('synthetic-paired-token'), 'rejected', 'plan_changed', null, null);
     const snapshot = createRecoverySnapshot(db, actor);
     const resident = await crypto.subtle.importKey('raw', await crypto.subtle.exportKey('raw', key), 'AES-GCM', false, ['encrypt', 'decrypt']);
     const artifact = await encryptRecoveryBackup(snapshot, resident);
@@ -253,7 +264,7 @@ test(`therapy command predecessor encrypted v4 recovery ${alteration}`, async ()
         const oldFile = path.join(path.dirname(f.source), 'v4-snapshot.db');
         fs.writeFileSync(oldFile, f.snapshot);
         const old = new Database(oldFile);
-        old.exec('DROP TABLE synthetic_extension; DROP TABLE therapy_status_commands; PRAGMA user_version=4;');
+        old.exec('DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands; PRAGMA user_version=4;');
         if (alteration === 'extra-table') old.exec('CREATE TABLE synthetic_extension(value TEXT)');
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN synthetic_drift TEXT');
         if (alteration === 'index') old.exec('CREATE INDEX synthetic_drift ON therapies(status)');
@@ -277,10 +288,40 @@ test(`therapy command predecessor encrypted v4 recovery ${alteration}`, async ()
                 assert.deepEqual(result.patients, expected.patients);
                 assert.deepEqual(result.durable_review_command_operations, expected.durable_review_command_operations);
                 assert.deepEqual((result.audit_events as unknown[]).slice(0, -1), expected.audit_events);
-                assert.equal(installed.pragma('user_version', { simple: true }), 5);
+                assert.equal(installed.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
             } finally { installed.close(); }
         }
         assert.equal(digest(fs.readFileSync(oldFile)), before);
         assert.equal(digest(await decryptRecoveryBackup(artifact, f.key)), before);
+    } finally { f.cleanup(); }
+});
+
+for (const alteration of ['none', 'column', 'index', 'trigger', 'extra-table', 'v5-missing-therapy-ledger', 'v6-missing-ambulatory-ledger'] as const)
+test(`ambulatory command encrypted predecessor v5 recovery ${alteration}`, async () => {
+    const f = await fixture();
+    try {
+        const oldFile = path.join(f.root, 'canonical5.db'); fs.writeFileSync(oldFile, f.snapshot);
+        const old = new Database(oldFile);
+        old.exec('DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
+        if (alteration === 'extra-table') old.exec('CREATE TABLE synthetic_extension(value TEXT)');
+        if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN synthetic_drift TEXT');
+        if (alteration === 'index') old.exec('CREATE INDEX synthetic_drift ON therapies(status)');
+        if (alteration === 'trigger') old.exec('CREATE TRIGGER synthetic_drift BEFORE UPDATE ON therapies BEGIN SELECT RAISE(IGNORE); END');
+        if (alteration === 'v5-missing-therapy-ledger') old.exec('DROP TABLE therapy_status_commands');
+        if (alteration === 'v6-missing-ambulatory-ledger') old.pragma('user_version=6');
+        old.pragma('wal_checkpoint(TRUNCATE)'); old.pragma('journal_mode=DELETE'); const expected = contents(old); old.close();
+        const original = fs.readFileSync(oldFile), before = digest(original), artifact = await encryptRecoveryBackup(original, f.key);
+        if (alteration !== 'none') { await assert.rejects(f.restore({ artifact })); assert.equal(fs.existsSync(f.destination), false); }
+        else {
+            await f.restore({ artifact }); const restored = openVersionedSqliteDatabase(f.destination);
+            try {
+                const actual = contents(restored);
+                assert.deepEqual(actual.ambulatory_destructive_commands, []);
+                for (const key of ['users','patients','therapy_status_commands','durable_review_command_operations']) assert.deepEqual(actual[key], expected[key]);
+                assert.deepEqual((actual.audit_events as unknown[]).slice(0, -1), expected.audit_events);
+                assert.equal(restored.pragma('user_version', { simple: true }), 6);
+            } finally { restored.close(); }
+        }
+        assert.equal(digest(fs.readFileSync(oldFile)), before); assert.equal(digest(await decryptRecoveryBackup(artifact, f.key)), before);
     } finally { f.cleanup(); }
 });

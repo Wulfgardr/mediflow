@@ -56,8 +56,7 @@ for (const [handler, mode, operation, route] of cases) {
                     'let result; try { result = clearTestContainerByMembership(tx, ambulatoryId); } catch (error) { ' + catchGuard + ' throw error; }'),
                 core.replace('const result = clearTestContainerByMembership(tx, ambulatoryId);',
                     'if (true) return { status: 409, value: {} }; const result = clearTestContainerByMembership(tx, ambulatoryId);'),
-                core.replaceAll('return dbServer.transaction((tx): AmbulatoryMutationResponse => {',
-                    'return dbServer.transaction(async (tx): AmbulatoryMutationResponse => {'),
+                core.replace('export function clearAmbulatoryInTransaction', 'export async function clearAmbulatoryInTransaction'),
                 core.replace(catchGuard, 'const VersionExhaustedError = Error; ' + catchGuard),
             ];
             for (const mutant of mutations) {
@@ -74,5 +73,22 @@ for (const [handler, mode, operation, route] of cases) {
         const routeMutant = routeSource.replace(spec.serviceExport + '(', 'unapprovedWrite(');
         assert.notEqual(routeMutant, routeSource);
         assert.notDeepEqual(check(core, adapter, routeMutant), []);
+    });
+}
+
+for (const operation of ['clear', 'delete']) {
+    test(`named ${operation} Tx core cannot change binding, duplicate dispatch or become async`, () => {
+        const spec = ambulatoryAuditContract(operation === 'clear' ? 'POST' : 'DELETE', 'host', operation);
+        const routeSource = fs.readFileSync(operation === 'clear' ? 'app/api/ambulatories/clear/route.ts' : 'app/api/ambulatories/[id]/route.ts', 'utf8');
+        const name = `${operation}AmbulatoryInTransaction`;
+        const id = operation === 'clear' ? 'ambulatoryId' : 'id';
+        const call = `${name}(tx, context, ${id}, parsedVersion, surface, authorizeCommit)`;
+        const check = source => validateRequiredAmbulatoryAudit({ spec, routeSource, coreSource: source, clearSource: clear });
+        assert.deepEqual(check(core), []);
+        for (const mutant of [core.replace(call, call.replace('tx, context', 'dbServer, context')),
+            core.replace(call, call.replace('parsedVersion, surface', '0, surface')),
+            core.replace(call, `(${call}, ${call})`), core.replace(`export function ${name}`, `export async function ${name}`),
+            core.replace(call, `other${name}(tx, context, ${id}, parsedVersion, surface, authorizeCommit)`),
+        ]) { assert.notEqual(mutant, core); assert.notDeepEqual(check(mutant), []); }
     });
 }

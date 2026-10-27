@@ -35,3 +35,6 @@ scripts/windows-launcher-bootstrap/build.ps1 text eol=lf
 scripts/prepare-windows-launcher-bootstrap.mjs text eol=lf
 lib/therapy-status-command-backup.ts text eol=lf
 lib/therapy-status-command-contract.ts text eol=lf
+
+lib/ambulatory-destructive-command-backup.ts text eol=lf
+lib/ambulatory-destructive-command-contract.ts text eol=lf

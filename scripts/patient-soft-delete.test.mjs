@@ -19,13 +19,6 @@ function read(relativePath) {
     return fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
 }
 
-function handlerSource(source, handlerName) {
-    const start = source.indexOf(`export async function ${handlerName}`);
-    assert.notEqual(start, -1, `Expected ${handlerName} handler`);
-    const next = source.indexOf('\nexport async function ', start + 1);
-    return source.slice(start, next === -1 ? source.length : next);
-}
-
 function matchingNodes(root, predicate) {
     const nodes = [];
     const visit = (node) => { if (predicate(node)) nodes.push(node); ts.forEachChild(node, visit); };
@@ -326,8 +319,14 @@ test('primary patient list reads exclude soft-deleted patients', () => {
 // column (WUL-300 constraint), never as a hard delete.
 test('ambulatories/clear is membership-based, soft-deletes and stays test-only', () => {
     const routeSource = read('app/api/ambulatories/clear/route.ts');
-    const writeSource = read('lib/ambulatory-write.ts');
-    const clearServiceSource = handlerSource(writeSource, 'clearAmbulatory');
+    const writeFile = checkedSource(read('lib/ambulatory-write.ts'));
+    const wrapper = exportedFunction(writeFile, 'clearAmbulatory');
+    const core = exportedFunction(writeFile, 'clearAmbulatoryInTransaction');
+    const clearServiceSource = `${wrapper.getText()}\n${core.getText()}`;
+
+    assertSyntax(tryStatements(wrapper)[0],
+        "return dbServer.transaction((tx): AmbulatoryMutationResponse => clearAmbulatoryInTransaction(tx, context, ambulatoryId, parsedVersion, surface, authorizeCommit), { behavior: 'immediate' });",
+        'clear wrapper must invoke the exact clear core in its synchronous IMMEDIATE transaction');
 
     assert.match(routeSource, /clearAmbulatory\(\{ request, session \}, ambulatoryId, body\.version\)/, 'clear route must delegate to the ambulatory write service');
     assert.doesNotMatch(clearServiceSource, /\.delete\(patients\)/, 'clear must never hard-delete patients');
@@ -386,6 +385,7 @@ const UNFILTERED_PATIENTS_READ_ALLOWLIST = [
     // Clear's remaining selected members include existing tombstones: bump membership authority
     // without rewriting lifecycle fields (test-container-clear's tombstoned-member oracle).
     ['lib/test-container-clear.ts', 'runner .select({ id: patients.id, version: patients.version }).from(patients) .where(inArray(patients.id, remainingIds)).all()', 1],
+    ['lib/ambulatory-destructive-command-plan.ts', 'tx.select({ id: patients.id, version: patients.version, deletedAt: patients.deletedAt, deletionReason: patients.deletionReason }).from(patients) .where(inArray(patients.id, clear.memberIds)).all()', 1],
     ['lib/patient-cascade.ts', 'runner.select({ id: patients.id }).from(patients)', 2],
 ];
 
@@ -566,6 +566,15 @@ test('AST allowlist consumes fingerprints and rejects stale, substituted, or dup
     assert.doesNotThrow(() => assertAllowlistedPatientReads(baseline, allowlist));
     assert.throws(() => assertAllowlistedPatientReads(unfilteredPatientReads(path, 'db.select({ id: patients.id }).from(patients).get();'), allowlist));
     assert.throws(() => assertAllowlistedPatientReads(unfilteredPatientReads(path, 'db.select().from(patients).get(); db.select().from(patients).get();'), allowlist));
+    assert.throws(() => assertAllowlistedPatientReads([], allowlist));
+    const planEntry = UNFILTERED_PATIENTS_READ_ALLOWLIST.find(([file]) => file === 'lib/ambulatory-destructive-command-plan.ts');
+    assert.ok(planEntry);
+    const planReads = unfilteredPatientReads(planEntry[0], read(planEntry[0]));
+    assert.doesNotThrow(() => assertAllowlistedPatientReads(planReads, [planEntry]));
+    assert.throws(() => assertAllowlistedPatientReads([], [planEntry]));
+    assert.throws(() => assertAllowlistedPatientReads([...planReads, ...planReads], [planEntry]));
+    assert.throws(() => assertAllowlistedPatientReads(unfilteredPatientReads(planEntry[0],
+        read(planEntry[0]).replace('inArray(patients.id, clear.memberIds)', 'inArray(patients.id, otherIds)')), [planEntry]));
 });
 
 test('AST guard follows a local immutable predicate without accepting aliases, mutation, or shadowing', () => {
