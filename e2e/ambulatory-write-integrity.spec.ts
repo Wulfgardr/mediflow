@@ -81,7 +81,8 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
         const row = page.getByRole('treeitem').filter({ has: page.getByRole('heading', { name: new RegExp(name) }) });
         const actions: Array<{ submittedVersion: number; status: number }> = [];
         const clear = async () => {
-            await row.getByRole('button', { name: 'Svuota ambiente di test', exact: true }).click();
+            await row.getByRole('button', { name: 'Azioni', exact: true }).click();
+            await page.getByRole('menu', { name: 'Azioni', exact: true }).getByRole('menuitem', { name: 'Svuota ambiente di test', exact: true }).click();
             const dialog = page.getByRole('dialog');
             await expect(dialog).toContainText('saranno spostati nel Cestino');
             await expect(dialog).toContainText('sedi operative resteranno disponibili');
@@ -91,15 +92,16 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
             const result = await response;
             actions.push({ submittedVersion: result.request().postDataJSON().version as number, status: result.status() });
             await expect(dialog).toHaveCount(0);
-            await expect(row.getByRole('button', { name: 'Svuota ambiente di test', exact: true })).toBeEnabled();
             return result.status();
         };
         sql.exec("CREATE TRIGGER synthetic_ambulatory_ui_audit BEFORE INSERT ON audit_events WHEN NEW.event_type='patient.deleted' BEGIN SELECT RAISE(IGNORE); END");
         expect(await clear()).toBe(500);
         expect(read()).toEqual(before);
         await expect(page.getByText('Errore durante lo svuotamento', { exact: true })).toBeVisible();
+        await expect(row.getByRole('button', { name: 'Azioni', exact: true })).toBeDisabled();
+        await page.getByRole('button', { name: 'Riprova', exact: true }).click();
+        await expect(row.getByRole('button', { name: 'Azioni', exact: true })).toBeEnabled();
         sql.exec('DROP TRIGGER synthetic_ambulatory_ui_audit');
-        // the genuine accepted POST must remain current if its list reread fails.
         let failedReads = 0;
         await page.route('**/api/ambulatories', async route => {
             if (route.request().method() === 'GET') {
@@ -109,7 +111,10 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
         });
         expect(await clear()).toBe(200);
         expect(failedReads).toBe(1);
+        await expect(row.getByRole('button', { name: 'Azioni', exact: true })).toBeDisabled();
         await page.unroute('**/api/ambulatories');
+        await page.getByRole('button', { name: 'Riprova', exact: true }).click();
+        await expect(row.getByRole('button', { name: 'Azioni', exact: true })).toBeEnabled();
         expect(await clear()).toBe(200);
         expect(actions).toEqual([{ submittedVersion: 1, status: 500 }, { submittedVersion: 1, status: 200 }, { submittedVersion: 2, status: 200 }]);
         const after = read();

@@ -4,7 +4,8 @@
 
 import { useState } from 'react';
 import DataSeeder from '@/components/data-seeder';
-import { SettingsSectionIntro } from '@/components/settings/settings-ui';
+import styles from '@/components/settings/maintenance-pages.module.css';
+import { SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 
 export default function SettingsDevelopmentPage() {
     const [nativeLaunchState, setNativeLaunchState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -24,48 +25,18 @@ export default function SettingsDevelopmentPage() {
     };
 
     return (
-        <section className="space-y-4" data-testid="settings-development-section">
-            <SettingsSectionIntro
-                kicker="Sistema"
-                title="Sviluppo"
-                description="Strumenti per collaudo e manutenzione: dati dimostrativi e avvio della shell nativa."
-            />
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="mf-section flex flex-col justify-between">
-                    <div className="mb-3">
-                        <p className="section-kicker">Sviluppo</p>
-                        <h4 className="mt-1 text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Dati dimostrativi</h4>
-                        <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Genera pazienti e documenti sintetici per verificare la postazione.</p>
-                    </div>
-                    <div className="flex items-center justify-end">
-                        <DataSeeder />
-                    </div>
+        <section className={styles.page} data-testid="settings-development-section">
+            <header className={styles.intro}><h2>Sviluppo</h2><p>Strumenti per collaudo e manutenzione: dati dimostrativi e avvio della shell nativa.</p></header>
+            <DataSeeder />
+            <section className={styles.section} aria-labelledby="native-launch-title">
+                <h3 id="native-launch-title" className={styles.heading}>Applicazione nativa</h3>
+                <p>Avvia la shell nativa quando disponibile sul sistema.</p>
+                <div className={styles.actions}>
+                    <button onClick={openNativeApp} disabled={nativeLaunchState === 'loading'} className={SETTINGS_SECONDARY_BUTTON_CLASS}>{nativeLaunchState === 'loading' ? 'Avvio in corso...' : 'Apri applicazione nativa'}</button>
+                    {nativeLaunchState === 'success' && <p role="status">Richiesta di apertura inviata.</p>}
+                    {nativeLaunchState === 'error' && <p role="alert">Impossibile inviare la richiesta di apertura.</p>}
                 </div>
-
-                <div className="mf-section flex flex-col justify-between">
-                    <div className="mb-3">
-                        <p className="section-kicker">Desktop</p>
-                        <h4 className="mt-1 text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>App nativa macOS</h4>
-                        <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Avvia la shell nativa quando disponibile sul sistema.</p>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                        <button
-                            onClick={openNativeApp}
-                            disabled={nativeLaunchState === 'loading'}
-                            className="mf-btn-secondary lume-press disabled:text-[color:var(--lume-ink-muted)]"
-                        >
-                            {nativeLaunchState === 'loading' ? 'Avvio in corso...' : 'Apri app nativa'}
-                        </button>
-                        {nativeLaunchState === 'success' && (
-                            <span className="text-xs" style={{ color: 'var(--lume-signal-success)' }}>Aperta</span>
-                        )}
-                        {nativeLaunchState === 'error' && (
-                            <span className="text-xs text-red-600">Errore</span>
-                        )}
-                    </div>
-                </div>
-            </div>
+            </section>
         </section>
     );
 }
