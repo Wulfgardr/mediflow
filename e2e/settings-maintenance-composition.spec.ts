@@ -98,7 +98,7 @@ test('Settings maintenance: scopes, canceled effects and uncertain reset', async
         await page.screenshot({ path: directory + '/' + name + '.png', fullPage: false, animations: 'disabled' });
     } return probe; };
     const mutationCount = () => f.calls.filter(x => x.method !== 'GET').length;
-    const cancel = async (name: string, invoke: () => Promise<void>) => { const n = mutationCount(); await invoke(); const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible(); await shot(name, dialog.getByRole('heading')); await dialog.getByRole('button', { name: 'Annulla', exact: true }).click(); await expect(dialog).toHaveCount(0); expect(mutationCount()).toBe(n); };
+    const cancel = async (name: string, invoke: () => Promise<void>) => { const n = mutationCount(); await invoke(); const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible(); if (name === 'cleanup-full-cancel') await expect(dialog).toContainText('Elimina tutti i pazienti, inclusi quelli reali, e tutte le voci, terapie, controlli, allegati, conversazioni e messaggi.'); await shot(name, dialog.getByRole('heading')); await dialog.getByRole('button', { name: 'Annulla', exact: true }).click(); await expect(dialog).toHaveCount(0); expect(mutationCount()).toBe(n); };
     const rowAction = async (row: Locator, name: string) => { await row.getByRole('button', { name: 'Azioni', exact: true }).click(); await page.getByRole('menu', { name: 'Azioni', exact: true }).getByRole('menuitem', { name, exact: true }).click(); };
     try {
         await bootstrapUnlockedSession(page, '1234');
@@ -230,6 +230,7 @@ test('Settings maintenance: scopes, canceled effects and uncertain reset', async
         await cancel('seed-cancel', () => seeder.getByRole('button', { name: 'Genera', exact: true }).click());
         await cancel('cleanup-test-cancel', () => seeder.getByRole('button', { name: 'Elimina', exact: true }).click());
         await seeder.getByRole('checkbox', { name: 'Eliminazione estesa', exact: true }).check();
+        await expect(seeder).toContainText('Elimina tutti i pazienti, inclusi quelli reali, e tutte le voci, terapie, controlli, allegati, conversazioni e messaggi.');
         await cancel('cleanup-full-cancel', () => seeder.getByRole('button', { name: 'Elimina', exact: true }).click());
         await toggle.click();
         await toggle.click();
