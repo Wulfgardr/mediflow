@@ -1,21 +1,33 @@
 [
   {
-    "file": "accesskit-0.24.1-LICENSE.chromium",
+    "file": "accesskit-0.24.1-NOTICES.txt",
     "package": "accesskit@0.24.1",
-    "sha256": "845022e0c1db1abb41a6ba4cd3c4b674ec290f3359d9d3c78ae558d4c0ed9308",
-    "url": "https://raw.githubusercontent.com/AccessKit/accesskit/a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969/LICENSE.chromium"
+    "sha256": "a89b149682be570a8f9bfb7808aff160d792ca3ffbcbd42e1f12a8ff8d5f24a4",
+    "urls": [
+      "https://raw.githubusercontent.com/AccessKit/accesskit/a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969/LICENSE-APACHE",
+      "https://raw.githubusercontent.com/AccessKit/accesskit/a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969/LICENSE-MIT",
+      "https://raw.githubusercontent.com/AccessKit/accesskit/a55d3e1a18bb9ef0e4bccc9083fb13c3e0ad8969/LICENSE.chromium"
+    ]
   },
   {
-    "file": "accesskit-0.24.1-LICENSE.chromium",
+    "file": "accesskit_consumer-0.38.0-NOTICES.txt",
     "package": "accesskit_consumer@0.38.0",
-    "sha256": "845022e0c1db1abb41a6ba4cd3c4b674ec290f3359d9d3c78ae558d4c0ed9308",
-    "url": "https://raw.githubusercontent.com/AccessKit/accesskit/c88605b96d04431f9c3c792464a0f2f253480e94/LICENSE.chromium"
+    "sha256": "a89b149682be570a8f9bfb7808aff160d792ca3ffbcbd42e1f12a8ff8d5f24a4",
+    "urls": [
+      "https://raw.githubusercontent.com/AccessKit/accesskit/c88605b96d04431f9c3c792464a0f2f253480e94/LICENSE-APACHE",
+      "https://raw.githubusercontent.com/AccessKit/accesskit/c88605b96d04431f9c3c792464a0f2f253480e94/LICENSE-MIT",
+      "https://raw.githubusercontent.com/AccessKit/accesskit/c88605b96d04431f9c3c792464a0f2f253480e94/LICENSE.chromium"
+    ]
   },
   {
-    "file": "accesskit-0.24.1-LICENSE.chromium",
+    "file": "accesskit_macos-0.26.3-NOTICES.txt",
     "package": "accesskit_macos@0.26.3",
-    "sha256": "845022e0c1db1abb41a6ba4cd3c4b674ec290f3359d9d3c78ae558d4c0ed9308",
-    "url": "https://raw.githubusercontent.com/AccessKit/accesskit/c88605b96d04431f9c3c792464a0f2f253480e94/LICENSE.chromium"
+    "sha256": "a89b149682be570a8f9bfb7808aff160d792ca3ffbcbd42e1f12a8ff8d5f24a4",
+    "urls": [
+      "https://raw.githubusercontent.com/AccessKit/accesskit/c88605b96d04431f9c3c792464a0f2f253480e94/LICENSE-APACHE",
+      "https://raw.githubusercontent.com/AccessKit/accesskit/c88605b96d04431f9c3c792464a0f2f253480e94/LICENSE-MIT",
+      "https://raw.githubusercontent.com/AccessKit/accesskit/c88605b96d04431f9c3c792464a0f2f253480e94/LICENSE.chromium"
+    ]
   },
   {
     "file": "block-0.1.6-LICENSE.txt",
@@ -43,34 +55,49 @@
     "url": "https://raw.githubusercontent.com/madsmtm/objc2/8852b424193ca41602281b3d7540d7c8ed51e49a/LICENSE.md"
   },
   {
-    "file": "lyon-1.0.19-LICENSE-APACHE",
+    "file": "lyon-1.0.19-NOTICES.txt",
     "package": "lyon@1.0.19",
-    "sha256": "216486f29671a4262efe32af6d84a75bef398127f8c5f369b5c8305983887a06",
-    "url": "https://raw.githubusercontent.com/nical/lyon/56219c95c658d4f39de7b190d98e57d5773ba241/LICENSE-APACHE"
+    "sha256": "b4328df90caba43589a54b5a4baf49e7e21f4d69a9a4fb0f46fc46370fdc64cb",
+    "urls": [
+      "https://raw.githubusercontent.com/nical/lyon/56219c95c658d4f39de7b190d98e57d5773ba241/LICENSE-APACHE",
+      "https://raw.githubusercontent.com/nical/lyon/56219c95c658d4f39de7b190d98e57d5773ba241/LICENSE-MIT"
+    ]
   },
   {
-    "file": "lyon-1.0.19-LICENSE-APACHE",
+    "file": "lyon_algorithms-1.0.21-NOTICES.txt",
     "package": "lyon_algorithms@1.0.21",
-    "sha256": "216486f29671a4262efe32af6d84a75bef398127f8c5f369b5c8305983887a06",
-    "url": "https://raw.githubusercontent.com/nical/lyon/994526f2766c7e9bc5bb16687232fd7e8999dbdf/LICENSE-APACHE"
+    "sha256": "b4328df90caba43589a54b5a4baf49e7e21f4d69a9a4fb0f46fc46370fdc64cb",
+    "urls": [
+      "https://raw.githubusercontent.com/nical/lyon/994526f2766c7e9bc5bb16687232fd7e8999dbdf/LICENSE-APACHE",
+      "https://raw.githubusercontent.com/nical/lyon/994526f2766c7e9bc5bb16687232fd7e8999dbdf/LICENSE-MIT"
+    ]
   },
   {
-    "file": "lyon-1.0.19-LICENSE-APACHE",
+    "file": "lyon_geom-1.0.19-NOTICES.txt",
     "package": "lyon_geom@1.0.19",
-    "sha256": "216486f29671a4262efe32af6d84a75bef398127f8c5f369b5c8305983887a06",
-    "url": "https://raw.githubusercontent.com/nical/lyon/56219c95c658d4f39de7b190d98e57d5773ba241/LICENSE-APACHE"
+    "sha256": "b4328df90caba43589a54b5a4baf49e7e21f4d69a9a4fb0f46fc46370fdc64cb",
+    "urls": [
+      "https://raw.githubusercontent.com/nical/lyon/56219c95c658d4f39de7b190d98e57d5773ba241/LICENSE-APACHE",
+      "https://raw.githubusercontent.com/nical/lyon/56219c95c658d4f39de7b190d98e57d5773ba241/LICENSE-MIT"
+    ]
   },
   {
-    "file": "lyon-1.0.19-LICENSE-APACHE",
+    "file": "lyon_path-1.0.19-NOTICES.txt",
     "package": "lyon_path@1.0.19",
-    "sha256": "216486f29671a4262efe32af6d84a75bef398127f8c5f369b5c8305983887a06",
-    "url": "https://raw.githubusercontent.com/nical/lyon/56219c95c658d4f39de7b190d98e57d5773ba241/LICENSE-APACHE"
+    "sha256": "b4328df90caba43589a54b5a4baf49e7e21f4d69a9a4fb0f46fc46370fdc64cb",
+    "urls": [
+      "https://raw.githubusercontent.com/nical/lyon/56219c95c658d4f39de7b190d98e57d5773ba241/LICENSE-APACHE",
+      "https://raw.githubusercontent.com/nical/lyon/56219c95c658d4f39de7b190d98e57d5773ba241/LICENSE-MIT"
+    ]
   },
   {
-    "file": "lyon-1.0.19-LICENSE-APACHE",
+    "file": "lyon_tessellation-1.0.22-NOTICES.txt",
     "package": "lyon_tessellation@1.0.22",
-    "sha256": "216486f29671a4262efe32af6d84a75bef398127f8c5f369b5c8305983887a06",
-    "url": "https://raw.githubusercontent.com/nical/lyon/b456b143215a1942a617c4672776b68b9a30feee/LICENSE-APACHE"
+    "sha256": "b4328df90caba43589a54b5a4baf49e7e21f4d69a9a4fb0f46fc46370fdc64cb",
+    "urls": [
+      "https://raw.githubusercontent.com/nical/lyon/b456b143215a1942a617c4672776b68b9a30feee/LICENSE-APACHE",
+      "https://raw.githubusercontent.com/nical/lyon/b456b143215a1942a617c4672776b68b9a30feee/LICENSE-MIT"
+    ]
   },
   {
     "file": "malloc_buf-0.0.6-LICENSE",
@@ -269,9 +296,12 @@
     "url": "https://raw.githubusercontent.com/DioxusLabs/taffy/45a56299d366ddb383e593a1f0372158d00e8530/LICENSE"
   },
   {
-    "file": "zune-inflate-0.2.54-LICENSE.md",
+    "file": "zune-inflate-0.2.54-NOTICES.txt",
     "package": "zune-inflate@0.2.54",
-    "sha256": "e870d7fd7819a9f0453c62798cb52ae95d148a8c91dc2de1d983f997143c72de",
-    "url": "https://raw.githubusercontent.com/etemesi254/zune-image/69502ce83fdfecdd0beefd677e2abb3781b29d98/LICENSE.md"
+    "sha256": "e88a1e81f91b701cc112830c75a3ebe5676c8a13db2c069055a0c8cffef1a2d7",
+    "urls": [
+      "https://raw.githubusercontent.com/etemesi254/zune-image/69502ce83fdfecdd0beefd677e2abb3781b29d98/LICENSE-ZLIB",
+      "https://raw.githubusercontent.com/etemesi254/zune-image/69502ce83fdfecdd0beefd677e2abb3781b29d98/LICENSE.md"
+    ]
   }
 ]
