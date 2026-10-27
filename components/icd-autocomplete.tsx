@@ -186,7 +186,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                     onChange={handleSearch}
                     onKeyDown={handleKeyDown}
                     placeholder="Cerca diagnosi (ICD-11 Official - English)"
-                    className="mf-input mf-input-sm icd-autocomplete-input"
+                    className="mf-input mf-input-sm mf-search-input icd-autocomplete-input"
                     aria-expanded={isOpen && results.length > 0}
                     aria-controls={listboxId}
                     aria-autocomplete="list"
@@ -216,7 +216,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                             if (onChange) onChange({ code: '', description: '', system: 'ICD-11' });
                             if (onSelect) onSelect('', '');
                         }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2"
+                        className="mf-button-icon absolute right-0 top-1/2 -translate-y-1/2"
                         style={{ color: 'var(--lume-ink-muted)' }}
                         aria-label="Cancella ricerca"
                     >

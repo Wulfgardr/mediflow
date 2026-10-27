@@ -1,0 +1,968 @@
+{
+  "review": "https://github.com/Wulfgardr/mediflow/pull/686#pullrequestreview-5668372766",
+  "previousHead": "4689de55a2005fbe9a4a68cf5b902e226a262410",
+  "reviewedRuntime": "2bf054fabf0b44e943022d8ad0654a2b243f0796",
+  "measuredRevision": "e459124801698d797d6ad750b40d3ea40e03abe4",
+  "scope": "A1/A2 only; follow-up changes after measuredRevision contain evidence only",
+  "formal": {
+    "syncCommit": "2bf054fabf0b44e943022d8ad0654a2b243f0796",
+    "coveredFilesMatched": 17,
+    "managerPresentationOnly": true,
+    "normalizedManagerComparison": {
+      "base": "3c3529729a74a7cd0be82ef3290715d0fa5fb7ec",
+      "reviewed": "2bf054fabf0b44e943022d8ad0654a2b243f0796",
+      "ignoredPresentation": [
+        "JSX className",
+        "JSX aria-pressed",
+        "quietButtonClassName initializer",
+        "recoveryButtonClassName initializer",
+        "chipClassName initializer"
+      ],
+      "equal": true,
+      "normalizedSha256": "a4242c47a9153081c76954f8ae6851a211007816029c4560614b21139870b1e9"
+    },
+    "fullVerifier": "pass",
+    "distinctStates": 5903794,
+    "queuedStates": 0,
+    "negativeModelControls": 3,
+    "reachabilityWitnesses": 6,
+    "realTestsPassed": 122,
+    "codeMutantsDetected": 2,
+    "restoredControllerTestsPassed": 29
+  },
+  "selection": {
+    "state": "aria-pressed",
+    "recipe": "shared secondary with Lume surface.selected and ink.fresh",
+    "baseline": "4 failures on identical selected/unselected computed backgrounds",
+    "corrected": "4 passed, three consecutive selections per case; pointer outside and focus on dosage",
+    "matrix": {
+      "themes": [
+        "giorno",
+        "grafite"
+      ],
+      "widths": [
+        1440,
+        390
+      ]
+    },
+    "capturesTaken": 12,
+    "capturesCommitted": [
+      {
+        "file": "terapie-selezione-giorno-1440.png",
+        "sha256": "2f3a2b9090e157c6be0d30df01e2b30d9a7fffd7735c33ac4e091d975fa51f3b"
+      },
+      {
+        "file": "terapie-selezione-giorno-390.png",
+        "sha256": "a7364c24d4d26dc85d5715630a62f88b060aab98a334d65ce63abb7f68a478fc"
+      },
+      {
+        "file": "terapie-selezione-grafite-1440.png",
+        "sha256": "4de05b7a66e7d8eac21ab870dc727bdaf8b771aa517eeeacf14c1ce0c913c6a8"
+      },
+      {
+        "file": "terapie-selezione-grafite-390.png",
+        "sha256": "cadc0af168732c0f5a8c4a352a24a05642e25cb7af69ad12ed5ab7e2185e15c6"
+      }
+    ]
+  },
+  "comparison": {
+    "instrument_comparable": true,
+    "instrument_differences": [],
+    "comparable": 36,
+    "score_delta": 3.171,
+    "measured_improvement_without_regression": true,
+    "accepted": false,
+    "unknown_prevents_acceptance": true,
+    "by_criterion": {
+      "A11Y-01": {
+        "before": {
+          "fail": 14,
+          "pass": 22
+        },
+        "after": {
+          "pass": 36
+        },
+        "defect_penalty_delta": -223.03,
+        "changed_cases": 14
+      },
+      "A11Y-02": {
+        "before": {
+          "fail": 15,
+          "pass": 21
+        },
+        "after": {
+          "fail": 15,
+          "pass": 21
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "A11Y-03": {
+        "before": {
+          "pass": 36
+        },
+        "after": {
+          "pass": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "A11Y-04": {
+        "before": {
+          "pass": 36
+        },
+        "after": {
+          "pass": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "A11Y-05": {
+        "before": {
+          "pass": 36
+        },
+        "after": {
+          "pass": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "AI-01": {
+        "before": {
+          "pass": 30,
+          "not_measurable_by_dom": 6
+        },
+        "after": {
+          "pass": 30,
+          "not_measurable_by_dom": 6
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "AI-02": {
+        "before": {
+          "not_measurable_by_dom": 36
+        },
+        "after": {
+          "not_measurable_by_dom": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "CHOICE-01": {
+        "before": {
+          "fail": 12,
+          "not_measurable_by_dom": 24
+        },
+        "after": {
+          "fail": 12,
+          "not_measurable_by_dom": 24
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "CHOICE-02": {
+        "before": {
+          "unknown": 36
+        },
+        "after": {
+          "unknown": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "CMD-01": {
+        "before": {
+          "pass": 36
+        },
+        "after": {
+          "pass": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "CMD-02": {
+        "before": {
+          "pass": 30,
+          "fail": 6
+        },
+        "after": {
+          "pass": 30,
+          "fail": 6
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "CMD-03": {
+        "before": {
+          "pass": 36
+        },
+        "after": {
+          "pass": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "CMD-04": {
+        "before": {
+          "pass": 12,
+          "not_measurable_by_dom": 6,
+          "fail": 18
+        },
+        "after": {
+          "pass": 12,
+          "not_measurable_by_dom": 6,
+          "fail": 18
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "CMD-05": {
+        "before": {
+          "unknown": 18,
+          "pass": 6,
+          "fail": 12
+        },
+        "after": {
+          "pass": 18,
+          "unknown": 6,
+          "fail": 12
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 12
+      },
+      "CMD-06": {
+        "before": {
+          "pass": 36
+        },
+        "after": {
+          "pass": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "DISC-01": {
+        "before": {
+          "pass": 30,
+          "not_applicable": 6
+        },
+        "after": {
+          "pass": 30,
+          "not_applicable": 6
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "DISC-02": {
+        "before": {
+          "pass": 30,
+          "not_measurable_by_dom": 6
+        },
+        "after": {
+          "pass": 30,
+          "not_measurable_by_dom": 6
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "FLOW-01": {
+        "before": {
+          "not_measurable_by_dom": 36
+        },
+        "after": {
+          "not_measurable_by_dom": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "FLOW-02": {
+        "before": {
+          "not_measurable_by_dom": 30,
+          "pass": 6
+        },
+        "after": {
+          "not_measurable_by_dom": 30,
+          "pass": 6
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "FLOW-03": {
+        "before": {
+          "not_measurable_by_dom": 36
+        },
+        "after": {
+          "not_measurable_by_dom": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "GEO-01": {
+        "before": {
+          "not_applicable": 12,
+          "pass": 24
+        },
+        "after": {
+          "not_applicable": 12,
+          "pass": 24
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "GEO-02": {
+        "before": {
+          "fail": 4,
+          "pass": 26,
+          "not_applicable": 6
+        },
+        "after": {
+          "pass": 30,
+          "not_applicable": 6
+        },
+        "defect_penalty_delta": -16,
+        "changed_cases": 4
+      },
+      "GEO-03": {
+        "before": {
+          "pass": 14,
+          "fail": 22
+        },
+        "after": {
+          "pass": 14,
+          "fail": 22
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "GEO-04": {
+        "before": {
+          "pass": 36
+        },
+        "after": {
+          "pass": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "LANG-01": {
+        "before": {
+          "not_measurable_by_dom": 36
+        },
+        "after": {
+          "not_measurable_by_dom": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "NAV-01": {
+        "before": {
+          "pass": 36
+        },
+        "after": {
+          "pass": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "NAV-02": {
+        "before": {
+          "pass": 36
+        },
+        "after": {
+          "pass": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "NAV-03": {
+        "before": {
+          "not_applicable": 36
+        },
+        "after": {
+          "not_applicable": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "SEC-01": {
+        "before": {
+          "not_applicable": 36
+        },
+        "after": {
+          "not_applicable": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "SEC-02": {
+        "before": {
+          "pass": 36
+        },
+        "after": {
+          "pass": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "SEC-03": {
+        "before": {
+          "pass": 30,
+          "not_measurable_by_dom": 6
+        },
+        "after": {
+          "pass": 30,
+          "not_measurable_by_dom": 6
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "STATE-01": {
+        "before": {
+          "not_measurable_by_dom": 36
+        },
+        "after": {
+          "not_measurable_by_dom": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "STATE-02": {
+        "before": {
+          "not_measurable_by_dom": 36
+        },
+        "after": {
+          "not_measurable_by_dom": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "STATE-03": {
+        "before": {
+          "not_measurable_by_dom": 36
+        },
+        "after": {
+          "not_measurable_by_dom": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "TYPE-01": {
+        "before": {
+          "pass": 36
+        },
+        "after": {
+          "pass": 36
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      }
+    },
+    "by_view": {
+      "modifica-terapia": {
+        "before": {
+          "fail": 22,
+          "pass": 114,
+          "not_measurable_by_dom": 48,
+          "unknown": 12,
+          "not_applicable": 14
+        },
+        "after": {
+          "pass": 128,
+          "fail": 14,
+          "not_measurable_by_dom": 48,
+          "unknown": 6,
+          "not_applicable": 14
+        },
+        "defect_penalty_delta": -124.85,
+        "changed_cases": 14
+      },
+      "nuova-terapia": {
+        "before": {
+          "fail": 18,
+          "pass": 118,
+          "not_measurable_by_dom": 48,
+          "unknown": 12,
+          "not_applicable": 14
+        },
+        "after": {
+          "pass": 128,
+          "fail": 14,
+          "not_measurable_by_dom": 48,
+          "unknown": 6,
+          "not_applicable": 14
+        },
+        "defect_penalty_delta": -61.818,
+        "changed_cases": 10
+      },
+      "soglia-elimina-terapia": {
+        "before": {
+          "pass": 103,
+          "not_measurable_by_dom": 72,
+          "unknown": 6,
+          "fail": 9,
+          "not_applicable": 20
+        },
+        "after": {
+          "pass": 103,
+          "not_measurable_by_dom": 72,
+          "unknown": 6,
+          "fail": 9,
+          "not_applicable": 20
+        },
+        "defect_penalty_delta": 0,
+        "changed_cases": 0
+      },
+      "soglia-terapia-concludi": {
+        "before": {
+          "fail": 18,
+          "pass": 114,
+          "not_measurable_by_dom": 54,
+          "unknown": 8,
+          "not_applicable": 16
+        },
+        "after": {
+          "pass": 116,
+          "not_measurable_by_dom": 54,
+          "unknown": 8,
+          "fail": 16,
+          "not_applicable": 16
+        },
+        "defect_penalty_delta": -17.454,
+        "changed_cases": 2
+      },
+      "soglia-terapia-riattiva": {
+        "before": {
+          "fail": 18,
+          "pass": 114,
+          "not_measurable_by_dom": 54,
+          "unknown": 8,
+          "not_applicable": 16
+        },
+        "after": {
+          "pass": 116,
+          "not_measurable_by_dom": 54,
+          "unknown": 8,
+          "fail": 16,
+          "not_applicable": 16
+        },
+        "defect_penalty_delta": -17.454,
+        "changed_cases": 2
+      },
+      "soglia-terapia-sospendi": {
+        "before": {
+          "fail": 18,
+          "pass": 114,
+          "not_measurable_by_dom": 54,
+          "unknown": 8,
+          "not_applicable": 16
+        },
+        "after": {
+          "pass": 116,
+          "not_measurable_by_dom": 54,
+          "unknown": 8,
+          "fail": 16,
+          "not_applicable": 16
+        },
+        "defect_penalty_delta": -17.454,
+        "changed_cases": 2
+      }
+    },
+    "changes": [
+      {
+        "view": [
+          "modifica-terapia",
+          "giorno",
+          390
+        ],
+        "criterion": "A11Y-01",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -37.091,
+        "state": "better"
+      },
+      {
+        "view": [
+          "modifica-terapia",
+          "giorno",
+          390
+        ],
+        "criterion": "CMD-05",
+        "before": "unknown",
+        "after": "pass",
+        "defect_penalty_delta": 0,
+        "state": "better"
+      },
+      {
+        "view": [
+          "modifica-terapia",
+          "giorno",
+          390
+        ],
+        "criterion": "GEO-02",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -4,
+        "state": "better"
+      },
+      {
+        "view": [
+          "modifica-terapia",
+          "giorno",
+          768
+        ],
+        "criterion": "A11Y-01",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -10.667,
+        "state": "better"
+      },
+      {
+        "view": [
+          "modifica-terapia",
+          "giorno",
+          768
+        ],
+        "criterion": "CMD-05",
+        "before": "unknown",
+        "after": "pass",
+        "defect_penalty_delta": 0,
+        "state": "better"
+      },
+      {
+        "view": [
+          "modifica-terapia",
+          "giorno",
+          1440
+        ],
+        "criterion": "A11Y-01",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -10.667,
+        "state": "better"
+      },
+      {
+        "view": [
+          "modifica-terapia",
+          "giorno",
+          1440
+        ],
+        "criterion": "CMD-05",
+        "before": "unknown",
+        "after": "pass",
+        "defect_penalty_delta": 0,
+        "state": "better"
+      },
+      {
+        "view": [
+          "modifica-terapia",
+          "grafite",
+          390
+        ],
+        "criterion": "A11Y-01",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -37.091,
+        "state": "better"
+      },
+      {
+        "view": [
+          "modifica-terapia",
+          "grafite",
+          390
+        ],
+        "criterion": "CMD-05",
+        "before": "unknown",
+        "after": "pass",
+        "defect_penalty_delta": 0,
+        "state": "better"
+      },
+      {
+        "view": [
+          "modifica-terapia",
+          "grafite",
+          390
+        ],
+        "criterion": "GEO-02",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -4,
+        "state": "better"
+      },
+      {
+        "view": [
+          "modifica-terapia",
+          "grafite",
+          768
+        ],
+        "criterion": "A11Y-01",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -10.667,
+        "state": "better"
+      },
+      {
+        "view": [
+          "modifica-terapia",
+          "grafite",
+          768
+        ],
+        "criterion": "CMD-05",
+        "before": "unknown",
+        "after": "pass",
+        "defect_penalty_delta": 0,
+        "state": "better"
+      },
+      {
+        "view": [
+          "modifica-terapia",
+          "grafite",
+          1440
+        ],
+        "criterion": "A11Y-01",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -10.667,
+        "state": "better"
+      },
+      {
+        "view": [
+          "modifica-terapia",
+          "grafite",
+          1440
+        ],
+        "criterion": "CMD-05",
+        "before": "unknown",
+        "after": "pass",
+        "defect_penalty_delta": 0,
+        "state": "better"
+      },
+      {
+        "view": [
+          "nuova-terapia",
+          "giorno",
+          390
+        ],
+        "criterion": "A11Y-01",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -26.909,
+        "state": "better"
+      },
+      {
+        "view": [
+          "nuova-terapia",
+          "giorno",
+          390
+        ],
+        "criterion": "CMD-05",
+        "before": "unknown",
+        "after": "pass",
+        "defect_penalty_delta": 0,
+        "state": "better"
+      },
+      {
+        "view": [
+          "nuova-terapia",
+          "giorno",
+          390
+        ],
+        "criterion": "GEO-02",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -4,
+        "state": "better"
+      },
+      {
+        "view": [
+          "nuova-terapia",
+          "giorno",
+          768
+        ],
+        "criterion": "CMD-05",
+        "before": "unknown",
+        "after": "pass",
+        "defect_penalty_delta": 0,
+        "state": "better"
+      },
+      {
+        "view": [
+          "nuova-terapia",
+          "giorno",
+          1440
+        ],
+        "criterion": "CMD-05",
+        "before": "unknown",
+        "after": "pass",
+        "defect_penalty_delta": 0,
+        "state": "better"
+      },
+      {
+        "view": [
+          "nuova-terapia",
+          "grafite",
+          390
+        ],
+        "criterion": "A11Y-01",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -26.909,
+        "state": "better"
+      },
+      {
+        "view": [
+          "nuova-terapia",
+          "grafite",
+          390
+        ],
+        "criterion": "CMD-05",
+        "before": "unknown",
+        "after": "pass",
+        "defect_penalty_delta": 0,
+        "state": "better"
+      },
+      {
+        "view": [
+          "nuova-terapia",
+          "grafite",
+          390
+        ],
+        "criterion": "GEO-02",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -4,
+        "state": "better"
+      },
+      {
+        "view": [
+          "nuova-terapia",
+          "grafite",
+          768
+        ],
+        "criterion": "CMD-05",
+        "before": "unknown",
+        "after": "pass",
+        "defect_penalty_delta": 0,
+        "state": "better"
+      },
+      {
+        "view": [
+          "nuova-terapia",
+          "grafite",
+          1440
+        ],
+        "criterion": "CMD-05",
+        "before": "unknown",
+        "after": "pass",
+        "defect_penalty_delta": 0,
+        "state": "better"
+      },
+      {
+        "view": [
+          "soglia-terapia-concludi",
+          "giorno",
+          390
+        ],
+        "criterion": "A11Y-01",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -8.727,
+        "state": "better"
+      },
+      {
+        "view": [
+          "soglia-terapia-concludi",
+          "grafite",
+          390
+        ],
+        "criterion": "A11Y-01",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -8.727,
+        "state": "better"
+      },
+      {
+        "view": [
+          "soglia-terapia-riattiva",
+          "giorno",
+          390
+        ],
+        "criterion": "A11Y-01",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -8.727,
+        "state": "better"
+      },
+      {
+        "view": [
+          "soglia-terapia-riattiva",
+          "grafite",
+          390
+        ],
+        "criterion": "A11Y-01",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -8.727,
+        "state": "better"
+      },
+      {
+        "view": [
+          "soglia-terapia-sospendi",
+          "giorno",
+          390
+        ],
+        "criterion": "A11Y-01",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -8.727,
+        "state": "better"
+      },
+      {
+        "view": [
+          "soglia-terapia-sospendi",
+          "grafite",
+          390
+        ],
+        "criterion": "A11Y-01",
+        "before": "fail",
+        "after": "pass",
+        "defect_penalty_delta": -8.727,
+        "state": "better"
+      }
+    ]
+  },
+  "regressions": [],
+  "measurementProvenance": {
+    "baseline": "round-0b, exact terapia subset rescored from preserved captures/probes",
+    "filter": "terapia",
+    "captures": 36,
+    "planned": 36,
+    "unreachable": 0,
+    "instrument": "round-0b tool-source, scorer-source and type-only-equivalent sources; same measurement hashes",
+    "runnerMaintenanceOnly": "automatic APFS snapshot thinning omitted in isolated runner copy; measurement producers and scorer unchanged",
+    "cleanup": {
+      "exit_code": 0,
+      "port_free": true,
+      "worktree_clean": true,
+      "tmp_removed": true,
+      "owned_processes_remaining": []
+    }
+  },
+  "validation": {
+    "node": "24.21.0",
+    "lint": "pass",
+    "typecheck": "pass",
+    "lumeTokens": "pass; allowlist unchanged",
+    "neverRegress": "pass",
+    "claims": "pass",
+    "targetedUnit": {
+      "passed": 83,
+      "failed": 0
+    },
+    "therapyCompositionE2e": {
+      "passed": 31,
+      "failed": 0,
+      "retried": 0
+    },
+    "earlierFullSuiteFailures": "remain documented in PR body; not rerun or claimed resolved by this follow-up"
+  }
+}

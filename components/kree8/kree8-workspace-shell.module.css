@@ -227,7 +227,7 @@
 .attentionNote { display: block; margin: 2px 0 0; color: var(--lume-ink-muted); font-size: 0.75rem; line-height: 1.45; }
 .attentionStatus { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; color: var(--lume-ink-muted); font-size: 0.75rem; white-space: nowrap; }
 .attentionMore { display: inline-block; margin-top: 8px; color: var(--lume-ink-muted); font-size: 0.75rem; font-weight: 600; text-decoration: none; }
-.attentionAction { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--lume-ink-muted); border-radius: 10px; background: var(--lume-surface-focal); color: var(--lume-ink); font: inherit; font-size: 0.75rem; font-weight: 600; text-decoration: none; cursor: pointer; transition: background-color var(--lume-dur-riga) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease); }
+.attentionAction { min-height: var(--lume-control-height); display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--lume-ink-muted); border-radius: 10px; background: var(--lume-surface-focal); color: var(--lume-ink); font: inherit; font-size: 0.75rem; font-weight: 600; text-decoration: none; cursor: pointer; transition: background-color var(--lume-dur-riga) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease); }
 .attentionAction:active { transform: scale(0.97); }
 .clinicalSection,
 .synoptic { padding: 18px 20px; border-top: 1px solid var(--k8-line-strong); }
@@ -298,6 +298,7 @@
 
 .backButton,
 .sectionLink {
+  min-width: var(--lume-control-height);
   border: 1px solid var(--k8-control-border);
   border-radius: 12px;
   background: var(--k8-soft);
@@ -418,7 +419,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 34px;
+  min-height: var(--lume-control-height);
   padding: 7px 11px;
   font-size: 0.75rem;
   font-weight: 600;
@@ -443,7 +444,7 @@
   }
 
   .sectionLink {
-    min-width: 0;
+    min-width: var(--lume-control-height);
     width: 100%;
     justify-content: space-between;
   }
@@ -1037,13 +1038,13 @@
 :global(html[data-runtime-twin-design='proposal']) .shell { position: absolute; inset: 0; padding: 0; }
 :global(html[data-runtime-twin-design='proposal']) .canvas { border: 0; border-radius: 0; padding: 0; gap: 0; background: var(--lume-surface-focal); }
 :global(html[data-runtime-twin-design='proposal']) .chrome { position: relative; top: 0; border-radius: 0; padding: 24px 32px 20px; border: 0; border-bottom: 1px solid var(--k8-line); background: transparent; }
-:global(html[data-runtime-twin-design='proposal']) .chromeTopRow { min-height: 34px; }
+:global(html[data-runtime-twin-design='proposal']) .chromeTopRow { min-height: var(--lume-control-height); }
 :global(html[data-runtime-twin-design='proposal']) .hero { padding: 8px 0 0; }
 :global(html[data-runtime-twin-design='proposal']) .title { line-height: 1.25; font: var(--type-page-title); }
 :global(html[data-runtime-twin-design='proposal']) .brandMark { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .workspaceBody { padding: 26px 32px 50px; }
 /* secondary navigation is a compact link, never a full-width pill. */
-:global(html[data-runtime-twin-design='proposal']) .backButton { flex: 0 0 auto; width: fit-content; min-height: 36px; border: 0; border-radius: 5px; background: transparent; padding: 6px 0; justify-content: flex-start; }
+:global(html[data-runtime-twin-design='proposal']) .backButton { flex: 0 0 auto; width: fit-content; min-height: var(--lume-control-height); border: 0; border-radius: 5px; background: transparent; padding: 6px 0; justify-content: flex-start; }
 /* the workspace already supplies Pazienti and Privacy once. */
 :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chromeTopRow { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chrome { grid-template-columns: minmax(0, 1fr); padding-block: 20px; }
@@ -1086,6 +1087,8 @@
   background: var(--lume-surface-focal);
 }
 :global(html[data-runtime-twin-design='proposal']) .overviewShell .sectionLink {
+  flex-shrink: 0;
+  justify-content: center;
   width: auto;
   min-height: 44px;
   padding: 12px 0;

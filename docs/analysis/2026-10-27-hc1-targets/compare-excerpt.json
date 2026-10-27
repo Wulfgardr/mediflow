@@ -1,0 +1,659 @@
+{
+  "scope": "HC-1: bersagli e geometria dei comandi; dati interamente sintetici",
+  "base": "5aa888498",
+  "before_sha": "b8d9050a8afa24454ef0e66bcee850d90f573353",
+  "measured_sha": "820d17b62b348be7f1511633921252d55ee8492a",
+  "instrument_comparable": true,
+  "rubric_sha256": "46dd1617151b89385c2a7295283711ff39d0a5eb939691a41915df011f8f07f5",
+  "scorer_sha256": "fc57f068e54aa12044e1979426e3f20852ce63e1f70527d66c299c3cdbd4b773",
+  "captures": 588,
+  "views": 98,
+  "coverage": 1.0,
+  "a11y_01": {
+    "before": {
+      "weight": 8,
+      "blocking": true,
+      "pass": 378,
+      "fail": 210,
+      "unknown": 0,
+      "not_applicable": 0,
+      "score": 64.286,
+      "penalty": 5989.724,
+      "count": 646
+    },
+    "after": {
+      "weight": 8,
+      "blocking": true,
+      "pass": 586,
+      "fail": 2,
+      "unknown": 0,
+      "not_applicable": 0,
+      "score": 99.66,
+      "penalty": 18.91,
+      "count": 2
+    },
+    "fail_delta": -208
+  },
+  "measured_improvement_without_regression": true,
+  "regressions": [],
+  "score_before": 9.981,
+  "score_after": 11.317,
+  "score_delta": 1.336,
+  "rubric_fully_accepted": false,
+  "unknown_prevents_full_rubric_acceptance": true,
+  "by_criterion": {
+    "A11Y-01": {
+      "before": {
+        "fail": 210,
+        "pass": 378
+      },
+      "after": {
+        "pass": 586,
+        "fail": 2
+      },
+      "defect_penalty_delta": -5970.814,
+      "changed_cases": 210
+    },
+    "A11Y-02": {
+      "before": {
+        "unknown": 558,
+        "fail": 30
+      },
+      "after": {
+        "unknown": 558,
+        "fail": 30
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "A11Y-03": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "A11Y-04": {
+      "before": {
+        "unknown": 552,
+        "fail": 36
+      },
+      "after": {
+        "unknown": 552,
+        "fail": 36
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "A11Y-05": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "AI-01": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "AI-02": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "CHOICE-01": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "CHOICE-02": {
+      "before": {
+        "unknown": 564,
+        "pass": 18,
+        "fail": 6
+      },
+      "after": {
+        "unknown": 564,
+        "pass": 18,
+        "fail": 6
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "CMD-01": {
+      "before": {
+        "pass": 366,
+        "unknown": 222
+      },
+      "after": {
+        "pass": 366,
+        "unknown": 222
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "CMD-02": {
+      "before": {
+        "pass": 294,
+        "unknown": 222,
+        "fail": 72
+      },
+      "after": {
+        "pass": 294,
+        "unknown": 222,
+        "fail": 72
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "CMD-03": {
+      "before": {
+        "pass": 582,
+        "fail": 6
+      },
+      "after": {
+        "pass": 582,
+        "fail": 6
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "CMD-04": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "CMD-05": {
+      "before": {
+        "unknown": 458,
+        "fail": 66,
+        "pass": 64
+      },
+      "after": {
+        "unknown": 440,
+        "fail": 66,
+        "pass": 82
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 18
+    },
+    "CMD-06": {
+      "before": {
+        "unknown": 582,
+        "fail": 6
+      },
+      "after": {
+        "unknown": 582,
+        "fail": 6
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "DISC-01": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "DISC-02": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "FLOW-01": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "FLOW-02": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "FLOW-03": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "GEO-01": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "GEO-02": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "GEO-03": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "GEO-04": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "LANG-01": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "NAV-01": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "NAV-02": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "NAV-03": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "SEC-01": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "SEC-02": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "SEC-03": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "STATE-01": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "STATE-02": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "STATE-03": {
+      "before": {
+        "unknown": 588
+      },
+      "after": {
+        "unknown": 588
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    },
+    "TYPE-01": {
+      "before": {
+        "unknown": 582,
+        "fail": 6
+      },
+      "after": {
+        "unknown": 582,
+        "fail": 6
+      },
+      "defect_penalty_delta": 0,
+      "changed_cases": 0
+    }
+  },
+  "residual_a11y_cases": [
+    {
+      "case_id": "pazienti-selezione-vuota:giorno:390",
+      "status": "fail",
+      "count": 1,
+      "evidence_path": "probe/pazienti-selezione-vuota-giorno-390.json"
+    },
+    {
+      "case_id": "pazienti-selezione-vuota:grafite:390",
+      "status": "fail",
+      "count": 1,
+      "evidence_path": "probe/pazienti-selezione-vuota-grafite-390.json"
+    }
+  ],
+  "residual_reason": "Comando Cancella della lista nel CSS riservato alla PR #683, escluso dal task.",
+  "examples": [
+    {
+      "view": "analisi",
+      "control": "Età",
+      "theme": "giorno",
+      "viewport_width": 390,
+      "instance": 1,
+      "before": {
+        "width": 20.4,
+        "height": 44
+      },
+      "after": {
+        "width": 44,
+        "height": 44
+      },
+      "probe": "probe/analisi-giorno-390.json"
+    },
+    {
+      "view": "analisi",
+      "control": "Audit",
+      "theme": "giorno",
+      "viewport_width": 390,
+      "instance": 1,
+      "before": {
+        "width": 33.5,
+        "height": 44
+      },
+      "after": {
+        "width": 44,
+        "height": 44
+      },
+      "probe": "probe/analisi-giorno-390.json"
+    },
+    {
+      "view": "modifica-paziente",
+      "control": "Dati",
+      "theme": "giorno",
+      "viewport_width": 390,
+      "instance": 1,
+      "before": {
+        "width": 190,
+        "height": 34
+      },
+      "after": {
+        "width": 190,
+        "height": 44
+      },
+      "probe": "probe/modifica-paziente-giorno-390.json"
+    },
+    {
+      "view": "modifica-paziente",
+      "control": "Azioni",
+      "theme": "giorno",
+      "viewport_width": 390,
+      "instance": 1,
+      "before": {
+        "width": 190,
+        "height": 34
+      },
+      "after": {
+        "width": 190,
+        "height": 44
+      },
+      "probe": "probe/modifica-paziente-giorno-390.json"
+    },
+    {
+      "view": "nuova-voce",
+      "control": "Grassetto",
+      "theme": "giorno",
+      "viewport_width": 390,
+      "instance": 1,
+      "before": {
+        "width": 34,
+        "height": 34
+      },
+      "after": {
+        "width": 44,
+        "height": 44
+      },
+      "probe": "probe/nuova-voce-giorno-390.json"
+    },
+    {
+      "view": "paziente-pieno-scale",
+      "control": "Mostra cestino / audit",
+      "theme": "giorno",
+      "viewport_width": 390,
+      "instance": 1,
+      "before": {
+        "width": 138.7,
+        "height": 18
+      },
+      "after": {
+        "width": 200.1,
+        "height": 44
+      },
+      "probe": "probe/paziente-pieno-scale-giorno-390.json"
+    },
+    {
+      "view": "nuova-voce",
+      "control": "Nome paziente (fixture sintetica)",
+      "theme": "giorno",
+      "viewport_width": 390,
+      "instance": 1,
+      "before": {
+        "width": 81.8,
+        "height": 34
+      },
+      "after": {
+        "width": 81.8,
+        "height": 44
+      },
+      "probe": "probe/nuova-voce-giorno-390.json"
+    },
+    {
+      "view": "paziente-pieno-quadro",
+      "control": "Rivedi e salva le note",
+      "theme": "giorno",
+      "viewport_width": 390,
+      "instance": 1,
+      "before": {
+        "width": 358,
+        "height": 21
+      },
+      "after": {
+        "width": 174.5,
+        "height": 44
+      },
+      "probe": "probe/paziente-pieno-quadro-giorno-390.json"
+    },
+    {
+      "view": "modifica-terapia",
+      "control": "Cancella ricerca",
+      "theme": "giorno",
+      "viewport_width": 390,
+      "instance": 1,
+      "before": {
+        "width": 32,
+        "height": 32
+      },
+      "after": {
+        "width": 44,
+        "height": 44
+      },
+      "probe": "probe/modifica-terapia-giorno-390.json"
+    },
+    {
+      "view": "modifica-terapia",
+      "control": "Cancella ricerca",
+      "theme": "giorno",
+      "viewport_width": 390,
+      "instance": 2,
+      "before": {
+        "width": 16,
+        "height": 16
+      },
+      "after": {
+        "width": 44,
+        "height": 44
+      },
+      "probe": "probe/modifica-terapia-giorno-390.json"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "analisi-prima-390.png",
+      "source_round": "round-0",
+      "sha256": "68e4f0f18a6a13eff4cfb66b02bd7c639a68a57098d858d2472eadee9836252a"
+    },
+    {
+      "file": "analisi-dopo-390.png",
+      "source_round": "round-HC1",
+      "sha256": "08de5c6d3507b3607ba76c9c304b4cfa3cdb1130e2f6f145dc60593f1b1bb34f"
+    },
+    {
+      "file": "nuova-voce-prima-390.png",
+      "source_round": "round-0",
+      "sha256": "3447000fc38a47208170eda017acc710c79cf863bb4df733da23730589b80aae"
+    },
+    {
+      "file": "nuova-voce-dopo-390.png",
+      "source_round": "round-HC1",
+      "sha256": "a4f198ee9b85af342e2d54ac8e5212be0664b1636c8a6a2066d31be15c62964b"
+    }
+  ],
+  "recovery": {
+    "resolved_keyboard_cases": 1,
+    "main_supervisor_exit": "unknown after turn interruption; original receipt preserved",
+    "producer_exit_codes": [
+      null,
+      0
+    ],
+    "coverage_complete": true,
+    "port_free": true,
+    "tmp_removed": true,
+    "owned_processes_remaining": []
+  },
+  "validation": {
+    "node": "v24.21.0",
+    "npm": "12.2.0",
+    "lint": "pass",
+    "typecheck": "pass",
+    "lume_guard": "pass, existing allowlist fingerprints unchanged",
+    "never_regress": "pass",
+    "claims": "pass",
+    "unit": {
+      "tests": 8481,
+      "pass": 8461,
+      "fail": 6,
+      "skipped": 14,
+      "details": "8354 nel comando completo, 127 nei gruppi seriali rimasti dopo il fail-fast; 3 asset C1 Mac non configurati, 3 verifiche packaging sintetico fallite."
+    },
+    "e2e": {
+      "tests": 204,
+      "pass": 185,
+      "fail": 13,
+      "skipped": 5,
+      "flaky": 1,
+      "details": "12 test senza bundle standalone; 1 timeout filechooser AnyDoc con quarantena scaduta; Analisi giorno wide passa al retry."
+    },
+    "build": "fail before compilation: Build input metadata: private file is reachable",
+    "independent_review": "pending"
+  }
+}

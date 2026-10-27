@@ -104,7 +104,7 @@ export default function Timeline({
     ) : (
         <button
             onClick={() => setShowDeleted(!showDeleted)}
-            className="text-xs flex items-center gap-1 text-[color:var(--lume-ink-muted)] transition-colors hover:text-[color:var(--lume-ink)]"
+            className="mf-button-text"
         >
             {showDeleted ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
             {showDeleted ? "Nascondi eliminati" : "Mostra cestino / audit"}

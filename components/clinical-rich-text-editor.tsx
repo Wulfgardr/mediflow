@@ -58,8 +58,7 @@ interface ClinicalRichTextEditorProps {
 }
 
 /* #75: toolbar e canvas usano solo superfici Lume opache. */
-const TOOLBAR_BUTTON_CLASS = 'inline-flex h-10 items-center gap-2 rounded-[var(--lume-radius-control)] border border-transparent px-3 text-sm font-medium text-[color:var(--lume-ink)] transition-[background-color,border-color,color] duration-[var(--lume-dur-riga)] ease-[var(--lume-ease)] hover:border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))] focus-visible:outline-none focus-visible:shadow-[var(--lume-focus-ring)]';
-const TOOLBAR_ICON_BUTTON_CLASS = 'inline-flex h-10 items-center justify-center rounded-[var(--lume-radius-control)] px-3 text-[color:var(--lume-ink-muted)] transition-[background-color,color] duration-[var(--lume-dur-riga)] ease-[var(--lume-ease)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))] hover:text-[color:var(--lume-ink)] focus-visible:outline-none focus-visible:shadow-[var(--lume-focus-ring)]';
+const TOOLBAR_BUTTON_CLASS = 'mf-button-icon';
 
 function updateEditorEmptyState(node: HTMLDivElement | null) {
     if (!node) return;
@@ -151,8 +150,6 @@ export function ClinicalRichTextEditor({
                     </button>
                 ))}
 
-                <div className="mx-1 hidden h-6 w-px bg-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] sm:block" />
-
                 {INLINE_ACTIONS.map(({ command, icon: Icon, label }) => (
                     <button
                         key={command}
@@ -167,11 +164,11 @@ export function ClinicalRichTextEditor({
                     </button>
                 ))}
 
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ml-auto flex items-center gap-3">
                     <button
                         type="button"
                         onClick={() => runCommand('outdent')}
-                        className={TOOLBAR_ICON_BUTTON_CLASS}
+                        className={TOOLBAR_BUTTON_CLASS}
                         aria-label="Riduci rientro"
                         title="Riduci rientro"
                     >
@@ -180,7 +177,7 @@ export function ClinicalRichTextEditor({
                     <button
                         type="button"
                         onClick={() => runCommand('indent')}
-                        className={TOOLBAR_ICON_BUTTON_CLASS}
+                        className={TOOLBAR_BUTTON_CLASS}
                         aria-label="Aumenta rientro"
                         title="Aumenta rientro"
                     >

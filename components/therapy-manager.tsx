@@ -54,9 +54,9 @@ type TherapyRecovery = {
 const fieldLabelClassName = 'section-kicker flex items-center justify-between gap-2 text-xs';
 const inputClassName = 'w-full rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-2.5 text-sm text-[color:var(--lume-ink)] outline-none transition-colors placeholder:text-[color:var(--lume-ink-muted)] focus-visible:border-[color:color-mix(in_srgb,var(--lume-ink)_28%,transparent)] focus-visible:shadow-[var(--lume-focus-ring)] read-only:bg-[color:var(--lume-surface-focal)]';
 const textareaClassName = `${inputClassName} min-h-[88px] resize-y`;
-const quietButtonClassName = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[11px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3 text-xs font-semibold text-[color:var(--lume-ink)] transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-ink)_26%,transparent)] hover:bg-[color:var(--lume-surface-focal)]';
-const recoveryButtonClassName = `${quietButtonClassName.replace('h-9', 'min-h-11')} whitespace-normal py-2 text-left`;
-const chipClassName = 'inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors';
+const quietButtonClassName = 'mf-button-secondary';
+const recoveryButtonClassName = `${quietButtonClassName} whitespace-normal text-left`;
+const chipClassName = 'mf-button-secondary';
 
 export default function TherapyManager({ patientId, embedded = false, before, children, surfaceClassName = '' }: { patientId: string; embedded?: boolean; before?: ReactNode; children?: ReactNode; surfaceClassName?: string }) {
     const [isAdding, setIsAdding] = useState(false);
@@ -492,14 +492,14 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                             onClick={cancelEditing}
                             disabled={isSaving || isReading}
                             aria-label="Chiudi scheda terapia"
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)] transition-colors hover:text-[color:var(--lume-ink)]"
+                            className="mf-button-icon"
                         >
                             <X className="w-4 h-4" />
                         </button>
                     </div>
 
                     <div className="mb-4">
-                        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-[13px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] px-3 text-sm font-semibold text-[color:var(--lume-ink)]">
+                        <label className="mf-choice-target cursor-pointer items-center gap-2 rounded-[13px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] px-3 text-sm font-semibold text-[color:var(--lume-ink)]">
                             <input
                                 type="checkbox"
                                 disabled={isSaving}
@@ -580,13 +580,14 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
 
                                 {/* Quick Suggestions */}
                                 {patient && (
-                                    <div className="flex flex-wrap gap-2 mb-2">
+                                    <div className="flex flex-wrap gap-3 mb-2">
                                         {patient.diagnoses?.map(d => (
                                             <button
                                                 key={d.code}
                                                 type="button"
                                                 onClick={() => setSelectedDiagnosis({ code: d.code, title: d.description })}
-                                                className={`${chipClassName} ${selectedDiagnosis?.code === d.code ? 'border-[color:color-mix(in_srgb,var(--lume-ink)_22%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]' : 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)] hover:text-[color:var(--lume-ink)]'}`}
+                                                aria-pressed={selectedDiagnosis?.code === d.code}
+                                                className={chipClassName}
                                             >
                                                 {d.description}
                                             </button>
@@ -594,14 +595,16 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                                         <button
                                             type="button"
                                             onClick={() => setSelectedDiagnosis({ code: 'PREV', title: 'Prevenzione' })}
-                                            className={`${chipClassName} ${selectedDiagnosis?.code === 'PREV' ? 'border-[color:color-mix(in_srgb,var(--lume-ink)_22%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]' : 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)] hover:bg-[color:var(--lume-surface-focal)] hover:text-[color:var(--lume-ink)]'}`}
+                                            aria-pressed={selectedDiagnosis?.code === 'PREV'}
+                                            className={chipClassName}
                                         >
                                             <Shield className="w-3 h-3" /> Prevenzione
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setSelectedDiagnosis(null)}
-                                            className={`${chipClassName} ${!selectedDiagnosis ? 'border-[color:color-mix(in_srgb,var(--lume-ink)_20%,transparent)] bg-[color:var(--lume-surface-focal)] text-[color:var(--lume-ink)]' : 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)] hover:text-[color:var(--lume-ink)]'}`}
+                                            aria-pressed={!selectedDiagnosis}
+                                            className={chipClassName}
                                         >
                                             <Ban className="w-3 h-3" /> Nessuna
                                         </button>
@@ -650,7 +653,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                                 </div>
                             </div>
                         )}
-                        <div className="flex justify-end pt-2 gap-2">
+                        <div className="flex justify-end pt-2 gap-3">
                             <button type="button" onClick={cancelEditing} disabled={isSaving || isReading} className={quietButtonClassName}>Annulla</button>
                             <Button type="submit" disabled={isSaving || !!recovery || draft?.patientId !== patientId}>
                                 {isSaving ? 'Salvataggio...' : editingId ? 'Aggiorna terapia' : 'Salva terapia'}
