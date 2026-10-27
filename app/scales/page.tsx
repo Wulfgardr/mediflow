@@ -17,7 +17,9 @@ import { useRouter } from 'next/navigation';
 
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
-import { useLiveQuery } from '@/lib/live-query';
+import { useLiveQueryState } from '@/lib/live-query';
+import { readCockpitRows } from '@/components/kree8/cockpit-read-snapshot';
+import { subscribeClientAccountAuthority } from '@/lib/security/client-auth-api';
 import { db } from '@/lib/db';
 import { SCALES } from '@/lib/scale-definitions';
 import styles from './scales.module.css';
@@ -63,22 +65,35 @@ export default function ScalesLibraryPage() {
         : SCALE_NAV_BASE;
     const navItems = proposal ? originalNavItems.map(({ href, label }) => ({ href, label })) : originalNavItems;
 
-    const patients = useLiveQuery(
-        () => {
-            if (!selectedScaleDefinition) return Promise.resolve([]);
-            return db.patients
-                .filter((patient) => {
-                    if (!normalizedSearchTerm) return true;
-                    const haystack = `${patient.firstName} ${patient.lastName} ${patient.taxCode}`.toLowerCase();
-                    return haystack.includes(normalizedSearchTerm);
-                })
-                .limit(8)
-                .toArray();
-        },
-        [normalizedSearchTerm, selectedScaleDefinition],
-        undefined,
-        ['patients', 'patients_to_ambulatories'],
-    );
+    const snapshotVisibility = useRef({ valid: true });
+    const [, invalidateSnapshot] = useState(0);
+    useEffect(() => {
+        snapshotVisibility.current = { valid: true };
+        const hide = () => { snapshotVisibility.current.valid = false; invalidateSnapshot(value => value + 1); };
+        const show = () => { if (!snapshotVisibility.current.valid) snapshotVisibility.current = { valid: true }; };
+        window.addEventListener('pagehide', hide);
+        window.addEventListener('pageshow', show);
+        return () => {
+            snapshotVisibility.current.valid = false;
+            window.removeEventListener('pagehide', hide);
+            window.removeEventListener('pageshow', show);
+        };
+    }, []);
+    const queryKey = `${selectedScale ?? ''}:${normalizedSearchTerm}`;
+    const patientRead = useLiveQueryState(async () => ({
+        key: queryKey,
+        snapshot: await readCockpitRows(options => selectedScaleDefinition ? db.patients
+            .filter(patient => !normalizedSearchTerm || `${patient.firstName} ${patient.lastName} ${patient.taxCode}`.toLowerCase().includes(normalizedSearchTerm))
+            .limit(8).toArray(options) : Promise.resolve([]), snapshotVisibility.current),
+    }), [queryKey], undefined, ['patients', 'patients_to_ambulatories']);
+    const { refresh } = patientRead;
+    useEffect(() => subscribeClientAccountAuthority(() => {
+        invalidateSnapshot(value => value + 1);
+        refresh();
+    }), [refresh]);
+    const currentRead = patientRead.data?.key === queryKey && patientRead.data.snapshot.isCurrent() ? patientRead.data.snapshot : undefined;
+    const readFailed = !patientRead.loading && Boolean(patientRead.error || !currentRead);
+    const patients = !patientRead.loading && !readFailed ? currentRead?.rows : undefined;
 
     useEffect(() => {
         if (!selectedScaleDefinition) return;
@@ -105,7 +120,7 @@ export default function ScalesLibraryPage() {
     };
 
     const handleSelectPatient = (patientId: string) => {
-        if (!selectedScaleDefinition) return;
+        if (!selectedScaleDefinition || patientRead.loading || readFailed || !currentRead?.isCurrent() || !patients?.some(patient => patient.id === patientId)) return;
         router.push(`/patients/${patientId}/scales/${selectedScaleDefinition.id}`);
     };
 
@@ -189,19 +204,22 @@ export default function ScalesLibraryPage() {
                         </button>
                     </div>
 
-                    <div className="relative">
-                        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--lume-ink-muted)' }} />
+                    <div className={styles.patientSearch}>
+                        <Search aria-hidden="true" style={{ color: 'var(--lume-ink-muted)' }} />
                         <input
                             ref={patientSearchRef}
                             value={searchTerm}
                             onChange={(event) => setSearchTerm(event.target.value)}
                             aria-label="Cerca paziente per nome o codice fiscale"
                             placeholder="Cerca per nome o codice fiscale"
-                            className="mf-input pl-11"
+                            className="mf-input"
                         />
                     </div>
 
-                    <div className="grid gap-3">
+                    <div className="grid gap-3" aria-busy={patientRead.loading}>
+                        {patientRead.loading && <p role="status">Lettura delle schede in corso…</p>}
+                        {readFailed && <div><p role="alert">Impossibile leggere le schede. Riprova.</p>
+                            <button type="button" onClick={refresh} className={scaleStyles.control}>Riprova</button></div>}
                         {patients?.map((patient) => (
                             <button
                                 key={patient.id}
@@ -211,10 +229,10 @@ export default function ScalesLibraryPage() {
                                 className={scaleStyles.catalogLink}
                             >
                                 <span className="min-w-0">
-                                    <strong className="block truncate text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>
+                                    <strong className={styles.patientName} style={{ color: 'var(--lume-ink)' }}>
                                         {patient.lastName} {patient.firstName}
                                     </strong>
-                                    <span className="lume-code mt-1 block truncate" style={{ color: 'var(--lume-ink-muted)' }}>{patient.taxCode}</span>
+                                    <span className={`lume-code ${styles.patientIdentity}`} style={{ color: 'var(--lume-ink-muted)' }}>{patient.taxCode}</span>
                                 </span>
                                 <span className="inline-flex shrink-0 items-center gap-2 text-xs font-semibold" style={{ color: 'var(--lume-ink-muted)' }}>
                                     Avvia
