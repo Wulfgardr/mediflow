@@ -464,7 +464,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                                 className="peer h-5 w-5 rounded-md cursor-pointer"
                                 style={{ accentColor: 'var(--lume-accent)' }}
                             />
-                            <label htmlFor="adi" className="font-semibold cursor-pointer select-none" style={{ color: 'var(--lume-ink)' }}>
+                            <label htmlFor="adi" className="mf-choice-target flex-col !items-start justify-center font-semibold cursor-pointer select-none" style={{ color: 'var(--lume-ink)' }}>
                                 Paziente in ADI
                                 <span className="block text-xs font-normal" style={{ color: 'var(--lume-ink-muted)' }}>Assistenza Domiciliare Integrata</span>
                             </label>

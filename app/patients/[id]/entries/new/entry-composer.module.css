@@ -15,7 +15,7 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    min-height: 36px;
+    min-height: var(--lume-control-height);
     color: var(--lume-ink-muted);
     font-size: 0.75rem;
     text-decoration: none;
@@ -77,8 +77,7 @@
 .editorHeading h2 { margin: 0; font-size: 0.875rem; font-weight: 600; }
 .editorHeading p { margin: 0; color: var(--lume-ink-muted); font-size: 0.75rem; }
 .editor { border-radius: 8px; }
-.editor [data-lume-editor-surface="toolbar"] { gap: 2px; padding: 6px; }
-.editor [data-lume-editor-surface="toolbar"] button { width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 5px; }
+.editor [data-lume-editor-surface="toolbar"] { gap: 12px; padding: 6px; }
 .editor [data-lume-editor-surface="toolbar"] button > span { display: none; }
 .editor [data-lume-editor-surface="canvas"] { padding: 18px 20px 12px; }
 /* grow with the note up to a bounded canvas, then scroll the text. */
@@ -97,7 +96,7 @@
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    min-height: 36px;
+    min-height: var(--lume-control-height);
     padding: 6px 9px;
     border: 1px solid transparent;
     border-radius: 10px;
@@ -138,7 +137,7 @@
 .contextList { max-height: 260px; margin: 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; list-style: none; }
 .contextList li { padding: 8px 0; border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 9%, transparent); font-size: 0.8125rem; }
 .contextSource { padding: 7px 0; }
-.contextSource summary { cursor: pointer; font-size: 0.8125rem; overflow-wrap: anywhere; }
+.contextSource summary { min-height: var(--lume-control-height); cursor: pointer; font-size: 0.8125rem; overflow-wrap: anywhere; }
 .contextSource summary:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 3px; }
 .sessionBody { padding: 6px 0 20px; }
 .sessionLayout { display: grid; gap: 16px; min-width: 0; }

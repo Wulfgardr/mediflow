@@ -17,7 +17,7 @@ interface DrugAutocompleteProps {
     defaultValue?: string;
 }
 
-const drugInputClassName = 'mf-input h-11 px-3 py-2.5 pl-9 pr-9 text-sm';
+const drugInputClassName = 'mf-input h-11 px-3 py-2.5 pl-9 pr-12 text-sm';
 const drugPopoverClassName = 'absolute z-[100] mt-2 max-h-80 w-full overflow-y-auto rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-2 shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]';
 const drugRowClassName = 'w-full rounded-[var(--lume-radius-control)] px-3 py-3 text-left transition-[background-color] duration-[var(--lume-dur-riga)] hover:bg-[color:var(--lume-surface-focal)] focus:bg-[color:var(--lume-surface-focal)] focus:outline-none';
 
@@ -157,7 +157,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                     <button
                         type="button"
                         onClick={() => commitDrugAutocompleteQueryChange(drugSearch, setQuery, '')} // WUL-488
-                        className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:var(--lume-surface-focal)] hover:text-[color:var(--lume-ink)]"
+                        className="mf-button-icon absolute right-0 top-1/2 -translate-y-1/2"
                         style={{ color: 'var(--lume-ink-muted)' }}
                         title="Cancella ricerca"
                         aria-label="Cancella ricerca"

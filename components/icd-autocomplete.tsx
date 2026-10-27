@@ -216,7 +216,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                             if (onChange) onChange({ code: '', description: '', system: 'ICD-11' });
                             if (onSelect) onSelect('', '');
                         }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2"
+                        className="mf-button-icon absolute right-0 top-1/2 -translate-y-1/2"
                         style={{ color: 'var(--lume-ink-muted)' }}
                         aria-label="Cancella ricerca"
                     >

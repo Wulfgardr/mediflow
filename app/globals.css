@@ -63,6 +63,7 @@
 :root {
   --background: var(--lume-surface-canvas);
   --foreground: var(--lume-ink);
+  --lume-control-height: 40px;
 
   /* WUL-UIUX: stack tipografico unico, consumato da body e dai module
      css kree8 (shell + cockpit) al posto degli stack duplicati. */
@@ -1063,6 +1064,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
    La si allinea a .mf-input cosi decine di campi rientrano nel sistema. */
 .mf-input,
 .input-field {
+  min-height: var(--lume-control-height);
   width: 100%;
   border-radius: var(--lume-radius-control);
   border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
@@ -1183,8 +1185,8 @@ html:root[data-lume] :is(.mf-button-primary, .ui-btn-primary, .mf-button-seconda
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 40px;
-  min-width: 40px;
+  min-height: var(--lume-control-height);
+  min-width: var(--lume-control-height);
   max-width: 100%;
   height: auto;
   padding: 8px 16px;
@@ -1250,7 +1252,7 @@ html:root[data-lume] :is(.mf-button-primary, .ui-btn-primary, .mf-button-seconda
 
 html:root[data-lume] .mf-button-icon {
   padding: 8px;
-  width: 40px;
+  width: var(--lume-control-height);
   flex-shrink: 0;
 }
 
@@ -1276,11 +1278,14 @@ html:root[data-lume] .mf-button-destructive[data-command-confirmation='true']:di
 }
 
 @media (pointer: coarse), (max-width: 700px) {
-  html:root[data-lume] :is(.mf-button-primary, .ui-btn-primary, .mf-button-secondary, .mf-btn-secondary, .ui-btn-secondary, .mf-button-text, .mf-button-destructive, .mf-button-icon) {
-    min-height: 44px;
-    min-width: 44px;
-  }
-  html:root[data-lume] .mf-button-icon { width: 44px; }
+  :root { --lume-control-height: 44px; }
+}
+
+.mf-choice-target {
+  display: inline-flex;
+  align-items: center;
+  min-width: var(--lume-control-height);
+  min-height: var(--lume-control-height);
 }
 
 /* Penombra opaca per i blocchi di lavoro. */
