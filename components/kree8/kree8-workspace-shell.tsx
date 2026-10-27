@@ -412,7 +412,7 @@ export function Kree8WorkspaceShell({
         {folderMode ? <RuntimeTwinPatientNavigation items={renderedNavItems} active={folderSection} /> : renderedNavItems.length > 0 ? (
           <nav
             id={`${railId}-nav`}
-            className={`${styles.sectionRail} ${navGroups ? styles.groupedSectionRail : ''}`}
+            className={`${layout.plane} ${styles.sectionRail} ${navGroups ? styles.groupedSectionRail : ''}`}
             aria-label="Sezioni della vista"
             data-rail-mode={navGroups ? 'grouped' : 'unmapped'}
             data-folder-nav-open={folderNavOpen}
