@@ -31,3 +31,9 @@
 .pickerProvider { display:grid; gap:2px; font-size:0.8125rem; color:var(--lume-ink-muted); white-space:nowrap; }
 
 .pickerProvider small { font-size:0.75rem; }
+
+.preferences .card h3 { font-size: 0.875rem; line-height: 1.5; }
+.preferences .preferenceStatus { max-width: 100%; font-size: 0.8125rem; line-height: 1.5; overflow-wrap: anywhere; }
+.preferences .preferenceStatus[data-state='off'] { color: var(--lume-ink-muted); }
+.preferences .preferenceStatus[data-state='unavailable'] { color: var(--lume-signal-critical); }
+.preferences :global([data-disclosure]) p { margin-bottom: 8px; }

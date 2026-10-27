@@ -9,6 +9,7 @@ import type { AccountStatus } from '@/lib/chatgpt-account/account-contract';
 import { SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 import styles from './model-picker.module.css';
 import { ChoiceField } from '@/components/choice-field';
+import { Disclosure } from '@/components/disclosure';
 import { TreatmentReasoningPortableSetup } from '../treatment-reasoning-portable-setup';
 type FunctionRow = FunctionModelPreferences['functions'][number];
 function Description({ row }: { row: FunctionRow }) {
@@ -24,9 +25,11 @@ function PreferenceCard({ row, disabled, account, activationSupported, preview }
     const localModelChanged = model !== (row.defaultSource === 'host_configuration' ? null : row.defaultModelOptionId);
     const selected = model === null && row.defaultSource !== 'host_configuration' ? undefined : row.options.find(o => o.modelOptionId === (model ?? row.defaultModelOptionId));
     const computerDefault = row.defaultSource === 'host_configuration' ? row.options.find(o => o.modelOptionId === row.defaultModelOptionId) : undefined;
+    const configuredDefault = row.options.find(o => o.modelOptionId === row.defaultModelOptionId);
+    const configurationState = !row.enabled ? 'off' : row.bindingState === 'current' && configuredDefault?.state === 'available_unqualified' ? 'configured' : 'unavailable';
     const warning = model === null && row.defaultSource !== 'host_configuration' ? 'Il modello del computer sarà indicato nell’anteprima.' : row.bindingState === 'stale' ? 'Scelta salvata scaduta: serve una nuova decisione.' : row.bindingState === 'unsupported' ? 'Predefinito non disponibile.' : selected?.state === 'available_unqualified' ? '' : 'Provider locale non disponibile';
     return <article className={styles.card}>
-        <div className={styles.row}><h3>{names[row.id]}</h3><span>{row.enabled ? 'Attivo' : 'Spento'}</span></div>
+        <div className={styles.row}><h3>{names[row.id]}</h3><span className={styles.preferenceStatus} data-state={configurationState}>{configurationState === 'off' ? 'Disattivata' : configurationState === 'configured' ? 'Configurazione locale presente' : 'Configurazione locale non disponibile'}</span></div>
         {activationSupported && <ChoiceField label="Canale per questa modifica" aria-label={`Canale per questa modifica · ${names[row.id]}`} value={channel} disabled={disabled} disabledReason="Attendi il completamento della modifica in corso."
                 onChange={e => setChannel(e.target.value === 'chatgpt_subscription' ? 'chatgpt_subscription' : 'local')}>
                 <option value="local">Provider locale · modello predefinito</option>
@@ -45,10 +48,10 @@ function PreferenceCard({ row, disabled, account, activationSupported, preview }
             <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={disabled} onClick={() => preview(activationSupported && (remote || (!enabled && !localModelChanged))
                 ? { action: 'set_activation', functionId: row.id, enabled }
                 : { action: 'set', functionId: row.id, enabled, defaultModelOptionId: model })}>Anteprima modifica</button></div>
-        <details><summary>Stato e dettagli</summary><Description row={row} /><p className={styles.hint}>La configurazione non prova la disponibilità del modello: viene verificata alla richiesta.</p><p className={styles.hint}>OpenAI · ChatGPT {account?.state === 'connected' ? 'collegato' : account?.state === 'awaiting_login' || account?.state === 'verifying' ? 'accesso in corso' : account?.state === 'starting' ? 'avvio accesso' : account?.state === 'disconnected' ? 'non collegato' : account?.state === 'error' ? 'errore nel collegamento' : 'stato non disponibile'}. Il collegamento account non abilita la funzione, non concede consenso e non prova la disponibilità del modello.</p></details>
+        <Disclosure title="Stato e dettagli" label={`Stato e dettagli · ${names[row.id]}`}><Description row={row} /><p className={styles.hint}>OpenAI · ChatGPT {account?.state === 'connected' ? 'collegato' : account?.state === 'awaiting_login' || account?.state === 'verifying' ? 'accesso in corso' : account?.state === 'starting' ? 'avvio accesso' : account?.state === 'disconnected' ? 'non collegato' : account?.state === 'error' ? 'errore nel collegamento' : 'stato non disponibile'}. Il collegamento account non abilita la funzione, non concede consenso e non prova la disponibilità del modello.</p></Disclosure>
     </article>;
 }
-export function FunctionPreferencesContent({ active, onRead, session }: { active: boolean; session?: unknown; onRead?: (dto: FunctionModelPreferences) => void }) {
+export function FunctionPreferencesContent({ active, onRead, onProposalChange, session }: { active: boolean; session?: unknown; onRead?: (dto: FunctionModelPreferences) => void; onProposalChange?: (present: boolean) => void }) {
     const [client] = useState(() => createPreferencesClient());
     const view = useSyncExternalStore(client.subscribe, client.getSnapshot, client.getSnapshot);
     const proposalRef = useRef<HTMLDivElement>(null);
@@ -56,6 +59,11 @@ export function FunctionPreferencesContent({ active, onRead, session }: { active
     const errorRef = useRef<HTMLParagraphElement>(null);
     const hadProposal = useRef(false);
     const [account, setAccount] = useState<AccountStatus | null>(null);
+    const hasProposal = active && !!view.proposed;
+    useLayoutEffect(() => {
+        onProposalChange?.(hasProposal);
+        return () => onProposalChange?.(false);
+    }, [hasProposal, onProposalChange]);
     useEffect(() => {
         if (view.busy) return;
         if (view.error) errorRef.current?.focus();
@@ -82,9 +90,10 @@ export function FunctionPreferencesContent({ active, onRead, session }: { active
         }; void read(); return () => { alive = false; clearTimeout(timer); controller?.abort(); };
     }, [active, session]);
     useEffect(() => { const hide = () => client.reset(); window.addEventListener('pagehide', hide); return () => window.removeEventListener('pagehide', hide); }, [client]);
-    return <section className={styles.panel} aria-label="Modelli e preferenze per esperienza" data-testid="function-preferences">
+    return <section className={`${styles.panel} ${styles.preferences}`} aria-label="Modelli e preferenze per esperienza" data-testid="function-preferences">
         <div className={styles.card}>
             <h3 ref={headingRef} tabIndex={-1}>Preferenze per esperienza</h3><p>Scegli i modelli e conferma le modifiche nell’anteprima.</p>
+            <p className={styles.hint}>La configurazione non prova la disponibilità del modello: viene verificata alla richiesta.</p>
             <div className={styles.actions}>
                 {view.dto?.presets.map(preset => <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={view.busy || !!view.proposed || !active} key={preset} onClick={() => void client.preview({ action: 'preset', presetId: preset })}>{preset === 'host_defaults' ? 'Ripristina predefiniti' : 'Spegni tutte'}</button>)}
                 <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!active || view.busy} onClick={() => void client.read()}>Rileggi impostazioni</button>
@@ -103,7 +112,7 @@ export function FunctionPreferencesContent({ active, onRead, session }: { active
         {active && view.dto && <div className={styles.grid}>{view.dto.functions.map(row => <PreferenceCard key={`${view.dto!.revision}:${view.dto!.catalogRevision}:${row.id}`} row={row} account={account} activationSupported={view.dto!.schemaVersion === 'mediflow.function-preferences.v2'} disabled={view.busy || !!view.proposed} preview={action => void client.preview(action)} />)}</div>}
     </section>;
 }
-export function FunctionPreferencesPanel({ onRead }: { onRead?: (dto: FunctionModelPreferences) => void }) {
+export function FunctionPreferencesPanel({ onRead, onProposalChange }: { onRead?: (dto: FunctionModelPreferences) => void; onProposalChange?: (present: boolean) => void }) {
     const { isAuthenticated, isLocked, authRecoveryState, user } = useSecurity();
-    return <FunctionPreferencesContent session={user} active={isAuthenticated && !isLocked && authRecoveryState === 'ready'} onRead={onRead} />;
+    return <FunctionPreferencesContent session={user} active={isAuthenticated && !isLocked && authRecoveryState === 'ready'} onRead={onRead} onProposalChange={onProposalChange} />;
 }

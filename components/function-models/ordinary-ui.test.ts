@@ -48,6 +48,26 @@ function text(value: unknown): string {
     return text(typeof node.type === 'function' ? node.type(node.props) : node.props.children);
 }
 
+test('preference status distinguishes disabled, configured and unavailable without claiming runtime readiness', () => {
+    const component = loadComponent('./function-preferences-panel.tsx', 'PreferenceCard');
+    const option = { modelOptionId: 'model_option_' + 'a'.repeat(32), label: 'Synthetic local model', provider: 'ollama', state: 'available_unqualified' };
+    const row = { id: 'patient_insight', enabled: true, defaultModelOptionId: option.modelOptionId,
+        defaultSource: 'host_configuration', bindingState: 'current', options: [option] };
+    for (const [change, state, label] of [
+        [{ enabled: false }, 'off', 'Disattivata'],
+        [{}, 'configured', 'Configurazione locale presente'],
+        [{ bindingState: 'stale' }, 'unavailable', 'Configurazione locale non disponibile'],
+        [{ options: [{ ...option, state: 'unavailable' }] }, 'unavailable', 'Configurazione locale non disponibile'],
+        [{ defaultModelOptionId: null }, 'unavailable', 'Configurazione locale non disponibile'],
+    ] as const) {
+        const tree = component({ row: { ...row, ...change }, disabled: false, activationSupported: true, account: null, preview() {} });
+        const status = nodes(tree).find(node => node.type === 'span' && node.props['data-state']);
+        assert.equal(status?.props['data-state'], state);
+        assert.equal(text(status), label);
+        assert.doesNotMatch(text(tree), /Pronta|runtime verificato/u);
+    }
+});
+
 test('digest disclosure is identity + bytes + proposal-only, never raw prepared text', () => {
     const component = loadComponent('./function-model-picker.tsx', 'OrdinaryFunctionControls');
     let rawReads = 0;
