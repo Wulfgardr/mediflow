@@ -1,0 +1,16 @@
+.plane {
+  --ink-plane-inset: 28px;
+}
+
+.container {
+  container-type: inline-size;
+}
+
+@container (width < 700px) {
+  .plane { --ink-plane-inset: 16px; }
+}
+
+.columns { column-gap: 40px; }
+@container (700px <= width <= 1000px) {
+  .columns { column-gap: 24px; }
+}
