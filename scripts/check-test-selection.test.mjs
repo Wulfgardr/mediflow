@@ -94,6 +94,25 @@ test('GPUI test selection binds the explicit Cargo targets to every native CI pl
   assert.deepEqual(selection.binding.matrix.os, ['ubuntu-24.04', 'macos-latest', 'windows-latest']);
 });
 
+test('GPUI bundle tests bind to CI and reject a removed, masked or conditional invocation', t => {
+  const key = 'python:gpui-bundle';
+  const call = `python3 -m unittest discover -s ${pilot}/scripts -p 'test_bundle_macos.py'`;
+  const selected = collectNativeToolSelections(sourceRoot)[key];
+  assert.deepEqual(selected.errors, []);
+  assert.deepEqual(selected.files, [`${pilot}/scripts/test_bundle_macos.py`]);
+  for (const [before, replacement] of [[call, 'echo skipped'], [call, `${call} || true`], [`if: runner.os == 'Linux'\n        run: ${call}`, `if: false\n        run: ${call}`]]) {
+    const root = pilotFixture(t);
+    const file = `${pilot}/scripts/test_bundle_macos.py`;
+    mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    writeFileSync(path.join(root, file), 'import unittest');
+    assert.deepEqual(collectNativeToolSelections(root)[key].errors, []);
+    changePilot(root, pilotWorkflow, before, replacement);
+    const selection = collectNativeToolSelections(root)[key];
+    assert.ok(selection.errors.length);
+    assert.deepEqual(selection.files, []);
+  }
+});
+
 test('GPUI runtime comparison binds all adapters and preparer to the actual CI command', t => {
   const selection = collectNativeToolSelections(sourceRoot)['http:gpui-comparison'];
   assert.deepEqual(selection.errors, []);

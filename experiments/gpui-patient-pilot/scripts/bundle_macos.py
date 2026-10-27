@@ -46,6 +46,32 @@ def inventory(bundle):
     return files
 
 
+def brand_assets():
+    return [(f"punto-{appearance}.svg", (ROOT / f"public/brand/mediflow/punto-{appearance}.svg").read_bytes())
+            for appearance in ("giorno", "grafite")]
+
+
+def embedded_brand_inventory(executable):
+    binary = executable.read_bytes()
+    assets = []
+    for name, data in brand_assets():
+        if not data or data not in binary:
+            raise ValueError(f"Missing embedded brand asset: {name}")
+        assets.append({"name": name, "bytes": len(data),
+                       "sha256": hashlib.sha256(data).hexdigest(), "storage": "executable"})
+    return assets
+
+
+def verify_brand_assets(executable):
+    assets = embedded_brand_inventory(executable)
+    result = subprocess.run([str(executable), "--verify-bundled-assets"], cwd=executable.parent,
+                            capture_output=True, text=True, check=True)
+    if json.loads(result.stdout) != {"brand_assets": [asset["name"] for asset in assets],
+                                    "decoded": True}:
+        raise ValueError("Embedded brand decode verification failed")
+    return assets
+
+
 def build_number(sha):
     value = int(sha[:6], 16)
     return f"{1 + value // 10000}.{value // 100 % 100}.{value % 100}"
@@ -215,7 +241,8 @@ def main():
                  "clang": run("xcrun", "clang", "--version").stdout.splitlines()[0],
                  "metal": run("xcrun", "metal", "--version").stdout.strip(),
                  "macos": run("sw_vers").stdout.strip(), "architecture": platform.machine()}
-    provenance = {"source_sha": sha, "source_tree": run("git", "rev-parse", "HEAD^{tree}").stdout.strip(),
+    brand = verify_brand_assets(executable)
+    provenance = {"embedded_brand_assets": brand, "source_sha": sha, "source_tree": run("git", "rev-parse", "HEAD^{tree}").stdout.strip(),
                   "version": version, "build_number": build_number(sha), "configuration": config,
                   "cargo_lock_sha256": digest(WORKSPACE / "Cargo.lock"), "toolchain": toolchain,
                   "metal": {"runtime_shaders": False, "embedded_metallib_sha256": sorted(set(digest(p) for p in embedded_shaders))},
@@ -238,6 +265,7 @@ def main():
         "output": gatekeeper.stdout + gatekeeper.stderr, "expected": "rejected: local ad-hoc candidate"}})
     if gatekeeper.returncode != 3 or "rejected" not in gatekeeper.stderr:
         raise ValueError("Unexpected Gatekeeper verdict; inspect verification.json")
+    verify_brand_assets(executable)
     write_json(stage / "manifest.json", {**provenance, "bundle": bundle.name,
         "nondeterministic_fields": [], "files": inventory(bundle)})
     print(stage / "manifest.json")
