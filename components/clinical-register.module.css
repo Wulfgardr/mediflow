@@ -145,18 +145,11 @@
 .statusActions { display: flex; flex-wrap: wrap; gap: 12px; }
 @media (max-width: 700px) { .statusActions, .statusActions button { width: 100%; } }
 
-.therapyHeading, .therapySection > [data-section-header] { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding-bottom: 12px; border-bottom: 1px solid var(--lume-rule-strong); }
-.therapyHeading h2, .therapySection > [data-section-header] h3 { margin: 0; padding: 0; font: 600 0.75rem/1.5 var(--lume-font-sans); letter-spacing: .05em; text-transform: uppercase; }
-.therapyHeading h2 > span { margin-left: 12px; }
-.therapySection > [data-section-header] h3 > div, .therapySection > [data-section-header] h3 > button { padding: 0; min-height: 44px; font: inherit; }
-.therapySection > [data-section-header] h3 :global(.text-ink) { margin-top: 0; font: inherit; color: var(--lume-ink); }
-.therapySection > [data-section-header] :global(.apple-chip), .therapyHeading h2 > span { padding: 0; border: 0; background: transparent; border-radius: 0; font: 400 0.8125rem/1.5 var(--lume-font-sans); letter-spacing: 0; text-transform: none; color: var(--lume-ink-muted); }
+.therapyHeading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--lume-rule-strong); }
+.therapyHeading h2 { margin: 0; padding: 0; font: 600 0.75rem/1.5 var(--lume-font-sans); letter-spacing: .05em; text-transform: uppercase; }
+.therapyHeading h2 > span { margin-left: 12px; font: 400 0.8125rem/1.5 var(--lume-font-sans); letter-spacing: 0; text-transform: none; color: var(--lume-ink-muted); }
 .therapyActions { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
 @media (min-width: 701px) { .therapyTable :is(th,td):last-child { width: 9rem; } }
-.therapySection > [data-section-header] { padding: 0 0 12px !important; }
-.therapySection > [data-section-header] h3 { min-width: 0; flex: 1 1 22rem; }
-.therapySection > [data-section-header] h3 > div { flex-wrap: wrap; }
-.therapySection > [data-section-header] :global(.apple-chip) { margin-left: 0; white-space: normal; }
 
 .observationHistory :is(th,td):first-child { width: 6rem; }
 .observationHistory :is(th,td):last-child { width: 3rem; }

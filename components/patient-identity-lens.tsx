@@ -1,5 +1,6 @@
 'use client';
 
+import { ViewState } from '@/components/ui/view-state';
 import { formatCountLabel } from '@/lib/format-count';
 import type { ReactNode } from 'react';
 import { Calendar, MapPin, Phone } from 'lucide-react';
@@ -77,7 +78,7 @@ export function PatientIdentityLens({
                                 </li>
                             ))}
                         </ul>
-                    ) : <p>Nessuna diagnosi registrata.</p>}
+                    ) : <ViewState state="empty" title="Nessuna diagnosi registrata." />}
                 </section> : null}
                 {domain === 'amministrazione' ? <section aria-labelledby="patient-administration-title">
                     <h2 id="patient-administration-title">Esenzioni <span className={disclosure.count}>{exemptions.length}</span></h2>
