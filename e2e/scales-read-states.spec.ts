@@ -1,11 +1,15 @@
 import { expect, test, type Page, type Locator, type Response } from '@playwright/test';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { bootstrapUnlockedSession, assertNotClippedInViewport } from './utils';
 import { installFunctionsEgressGuard } from './fixtures/settings-functions';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
 const baseline = process.env.SCALES_READ_BASELINE === '1';
+const visualSupplement = process.env.SCALES_READ_VISUAL_SUPPLEMENT === '1';
+const phase = `${baseline ? 'baseline' : 'candidate'}${visualSupplement ? '-visual-supplement' : ''}`;
+const titleSuffix = visualSupplement ? ' [visual-only supplement]' : '';
 const patientId = '10000000-0000-4000-8000-000000000001';
 const patient = { id: patientId, firstName: 'Sintetica Alessandra Maria Francesca',
     lastName: 'Dimostrativa Cognome composto molto lungo per verifica visiva', taxCode: 'SNTTST80A01H501X',
@@ -13,7 +17,7 @@ const patient = { id: patientId, firstName: 'Sintetica Alessandra Maria Francesc
 type ReadMode = 'ready' | 'pending' | 'error' | 'empty' | 'missing';
 function artifactDirectory() {
     const shared = process.env.SCALES_READ_SCREENSHOTS;
-    return shared ? join(shared, baseline ? 'baseline' : 'candidate', `${test.info().testId.replace(/[^a-zA-Z0-9_-]/gu, '_')}-retry-${test.info().retry}`)
+    return shared ? join(shared, phase, `${test.info().testId.replace(/[^a-zA-Z0-9_-]/gu, '_')}-retry-${test.info().retry}`)
         : test.info().outputPath('screenshots');
 }
 function requireSynthetic(baseURL?: string): asserts baseURL is string {
@@ -21,9 +25,27 @@ function requireSynthetic(baseURL?: string): asserts baseURL is string {
         || process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR) throw Error('Owned synthetic loopback required');
 }
 
-async function capture(page: Page, target: Locator, name: string, frames: unknown[]) {
+async function capture(page: Page, target: Locator, name: string, frames: unknown[], zoomFactor?: 1 | 2) {
     await target.scrollIntoViewIfNeeded();
     await expect(target).toBeVisible();
+    const wheel = zoomFactor ? await target.evaluate(element => {
+        for (let owner = element.parentElement; owner; owner = owner.parentElement) {
+            if (owner.scrollHeight <= owner.clientHeight || !/auto|scroll/u.test(getComputedStyle(owner).overflowY)) continue;
+            const rect = owner.getBoundingClientRect(), box = element.getBoundingClientRect();
+            const top = Math.max(0, rect.top), bottom = Math.min(innerHeight, rect.bottom), before = owner.scrollTop;
+            const expected = Math.max(0, Math.min(owner.scrollHeight - owner.clientHeight, before + box.top + box.height / 2 - (top + bottom) / 2));
+            return { x: rect.left + rect.width / 2, y: (top + bottom) / 2, before, expected, delta: expected - before };
+        }
+        return null;
+    }) : null;
+    if (wheel && zoomFactor) {
+        await page.mouse.move(wheel.x, wheel.y); await page.mouse.wheel(0, wheel.delta * zoomFactor);
+        await expect.poll(() => target.evaluate((element, expected) => {
+            for (let owner = element.parentElement; owner; owner = owner.parentElement)
+                if (owner.scrollHeight > owner.clientHeight && /auto|scroll/u.test(getComputedStyle(owner).overflowY)) return Math.abs(owner.scrollTop - expected);
+            return Number.POSITIVE_INFINITY;
+        }, wheel.expected)).toBeLessThanOrEqual(1);
+    }
     await assertNotClippedInViewport(target, name);
     const evidence = await target.evaluate(element => {
         const rect = element.getBoundingClientRect(), inset = Math.min(8, rect.width / 4, rect.height / 4);
@@ -38,7 +60,7 @@ async function capture(page: Page, target: Locator, name: string, frames: unknow
     });
     const directory = artifactDirectory(); await mkdir(directory, { recursive: true });
     const path = join(directory, `${name}.png`); await page.screenshot({ path, fullPage: false });
-    frames.push({ name, path, ...evidence });
+    frames.push({ name, path, ...evidence, ...(wheel && zoomFactor ? { wheel: { ...wheel, zoomFactor, sentDelta: wheel.delta * zoomFactor } } : {}) });
     await writeFile(join(directory, 'frames.json'), JSON.stringify(frames, null, 2));
     expect(evidence.bounds.top, name).toBeGreaterThanOrEqual(-1);
     expect(evidence.bounds.bottom, name).toBeLessThanOrEqual(evidence.viewport.height + 1);
@@ -138,12 +160,44 @@ async function layoutFrames(zoom: Awaited<ReturnType<typeof openBrowserZoomFixtu
     await zoom.page.evaluate(() => { document.documentElement.classList.remove('dark'); document.documentElement.dataset.theme = 'giorno'; });
 }
 
+type VisualState = 'search-error' | 'search-long-identity' | 'patient-library-missing' | 'runner-error';
+type VisualReuse = { phase: 'baseline' | 'candidate'; state: VisualState; source: string; buildID: string; theme: 'giorno'; format: 1440;
+    path: string; sha256: string; color: string; points: { hit: boolean }[] };
+async function supplementFrames(zoom: Awaited<ReturnType<typeof openBrowserZoomFixture>>, target: Locator,
+    state: VisualState, frames: unknown[], reusedFrames: VisualReuse[]) {
+    if (!visualSupplement) throw Error('Visual-only supplement required');
+    const manifestPath = process.env.SCALES_READ_REUSE_MANIFEST, expectedHash = process.env.SCALES_READ_REUSE_MANIFEST_SHA256;
+    if (!manifestPath || !expectedHash || !process.env.SCALES_READ_EXPECTED_SOURCE) throw Error('Pinned prior frames and source required');
+    const bytes = await readFile(manifestPath);
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(expectedHash);
+    const manifest: { frames: VisualReuse[] } = JSON.parse(bytes.toString());
+    const reuse = manifest.frames.find(frame => frame.phase === (baseline ? 'baseline' : 'candidate') && frame.state === state);
+    if (!reuse) throw Error(`Missing prior Giorno1440 frame: ${state}`);
+    expect(reuse.source).toBe(process.env.SCALES_READ_EXPECTED_SOURCE);
+    expect(reuse.buildID).toBe(process.env.SCALES_READ_EXPECTED_BUILD_ID);
+    expect(reuse.theme).toBe('giorno'); expect(reuse.format).toBe(1440);
+    expect(reuse.points).toHaveLength(5); expect(reuse.points.every(point => point.hit)).toBe(true);
+    expect(createHash('sha256').update(await readFile(reuse.path)).digest('hex')).toBe(reuse.sha256);
+    reusedFrames.push(reuse);
+    const dayColors = new Map<number | string, string>([[1440, reuse.color]]);
+    for (const theme of ['giorno', 'grafite']) for (const size of [1440, 768, 390, 'zoom-200'] as const) {
+        if (theme === 'giorno' && size === 1440) continue;
+        await zoom.page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(size === 'zoom-200' ? 2 : 1);
+        if (typeof size === 'number') await zoom.page.setViewportSize({ width: size, height: 1000 });
+        await zoom.page.evaluate(theme => { document.documentElement.classList.toggle('dark', theme === 'grafite'); document.documentElement.dataset.theme = theme; }, theme);
+        const evidence = await capture(zoom.page, target, `${state}-${theme}-${size}`, frames, size === 'zoom-200' ? 2 : 1);
+        if (theme === 'giorno') dayColors.set(size, evidence.color); else expect(evidence.color).not.toBe(dayColors.get(size));
+    }
+    await zoom.page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
+    await zoom.page.evaluate(() => { document.documentElement.classList.remove('dark'); document.documentElement.dataset.theme = 'giorno'; });
+}
+
 async function installScaleReads(page: Page, baseURL?: string) {
     requireSynthetic(baseURL);
     const guard = await installFunctionsEgressGuard(page, baseURL);
     const state: { list: ReadMode; patient: ReadMode } = { list: 'ready', patient: 'ready' };
     const calls: { sequence: number; path: string; mode: ReadMode }[] = [];
-    const observations: unknown[] = [], errors: string[] = [], frames: unknown[] = [];
+    const observations: unknown[] = [], errors: string[] = [], frames: unknown[] = [], reusedFrames: VisualReuse[] = [];
     const completed: { sequence: number; path: string; status: number; finished: true }[] = [];
     const gates = new Set<() => void>();
     page.on('pageerror', error => errors.push(error.message));
@@ -165,7 +219,7 @@ async function installScaleReads(page: Page, baseURL?: string) {
         await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
     }
     const release = () => { gates.forEach(resolve => resolve()); gates.clear(); };
-    return { state, calls, observations, frames, release,
+    return { state, calls, observations, frames, reusedFrames, release,
         async observeRead(path: string, mode: ReadMode, action: () => Promise<unknown>) {
             const after = calls.length;
             if (mode === 'pending') {
@@ -189,20 +243,36 @@ async function installScaleReads(page: Page, baseURL?: string) {
             gates.forEach(resolve => resolve()); gates.clear();
             const directory = artifactDirectory();
             await mkdir(directory, { recursive: true });
-            await writeFile(`${directory}/read-receipt.json`, JSON.stringify({ baseline, directory, testId: test.info().testId,
+            await writeFile(`${directory}/read-receipt.json`, JSON.stringify({ phase, baseline, visualSupplement, formats: visualSupplement ? [1440, 768, 390, 'zoom-200'] : [320, 'zoom-400'], reusedFrames, directory, testId: test.info().testId,
                 retry: test.info().retry, calls, completed, observations, frames,
                 blocked: guard.blocked, uiWrites: guard.mockedUiWrites, errors }, null, 2));
             expect(guard.blocked).toEqual([]); expect(errors).toEqual([]);
         } };
 }
 
-test('Scales library: search pending, error, empty, long identity and stale-term exclusion', async ({ baseURL }) => {
+test('Scales library: search pending, error, empty, long identity and stale-term exclusion' + titleSuffix, async ({ baseURL }) => {
     test.setTimeout(120_000);
     requireSynthetic(baseURL);
     const zoom = await openBrowserZoomFixture(baseURL), page = zoom.page;
     const mock = await installScaleReads(page, baseURL);
     try {
         await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+        if (visualSupplement) {
+            for (const mode of ['error', 'ready'] as const) {
+                mock.state.list = mode;
+                await mock.observeRead('/api/patients', mode, async () => {
+                    await page.goto('/scales');
+                    await page.locator('#catalogo').getByRole('button', { name: /ADL \(Indice di Katz\)/u }).click();
+                });
+                const section = page.locator('#paziente');
+                const state: VisualState = mode === 'error' ? 'search-error' : 'search-long-identity';
+                const target = mode === 'ready' ? section.getByRole('button', { name: /^Avvia /u }).locator('strong')
+                    : baseline ? section.getByRole('heading', { name: 'Scegli il paziente', exact: true }) : section.getByRole('alert');
+                mock.observations.push({ visualOnly: true, state, baselineDefect: baseline && mode === 'error' ? 'Read error not surfaced' : baseline ? 'Identity truncation' : null });
+                await supplementFrames(zoom, target, state, mock.frames, mock.reusedFrames);
+            }
+            return;
+        }
         for (const mode of ['pending', 'error', 'empty', 'ready'] as const) {
             mock.state.list = mode;
             await mock.observeRead('/api/patients', mode, async () => {
@@ -280,13 +350,21 @@ test('Scales library: search pending, error, empty, long identity and stale-term
     } finally { try { await mock.finish(); } finally { await zoom.close(); } }
 });
 
-test('Patient scales library: pending, failed, absent and ready patient before offering start', async ({ baseURL }) => {
+test('Patient scales library: pending, failed, absent and ready patient before offering start' + titleSuffix, async ({ baseURL }) => {
     test.setTimeout(120_000);
     requireSynthetic(baseURL);
     const zoom = await openBrowserZoomFixture(baseURL), page = zoom.page;
     const mock = await installScaleReads(page, baseURL);
     try {
         await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+        if (visualSupplement) {
+            mock.state.patient = 'missing';
+            await mock.observeRead(`/api/patients/${patientId}`, 'missing', () => page.goto(`/patients/${patientId}/scales`));
+            const target = baseline ? page.getByRole('heading', { name: 'Scale cliniche', exact: true }) : page.locator('#libreria').getByRole('status');
+            mock.observations.push({ visualOnly: true, state: 'patient-library-missing', baselineDefect: baseline ? 'Absent patient still offers start' : null });
+            await supplementFrames(zoom, target, 'patient-library-missing', mock.frames, mock.reusedFrames);
+            return;
+        }
         for (const mode of ['pending', 'error', 'missing', 'ready'] as const) {
             mock.state.patient = mode;
             await mock.observeRead(`/api/patients/${patientId}`, mode, () => page.goto(`/patients/${patientId}/scales`));
@@ -310,13 +388,21 @@ test('Patient scales library: pending, failed, absent and ready patient before o
     } finally { try { await mock.finish(); } finally { await zoom.close(); } }
 });
 
-test('Scale runner: patient pending, failure and absence never become a valid form', async ({ baseURL }) => {
+test('Scale runner: patient pending, failure and absence never become a valid form' + titleSuffix, async ({ baseURL }) => {
     test.setTimeout(120_000);
     requireSynthetic(baseURL);
     const zoom = await openBrowserZoomFixture(baseURL), page = zoom.page;
     const mock = await installScaleReads(page, baseURL);
     try {
         await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+        if (visualSupplement) {
+            mock.state.patient = 'error';
+            await mock.observeRead(`/api/patients/${patientId}`, 'error', () => page.goto(`/patients/${patientId}/scales/adl`));
+            const target = page.locator('#scala').getByRole(baseline ? 'status' : 'alert');
+            mock.observations.push({ visualOnly: true, state: 'runner-error', baselineDefect: baseline ? 'Read error still shown as loading' : null });
+            await supplementFrames(zoom, target, 'runner-error', mock.frames, mock.reusedFrames);
+            return;
+        }
         for (const mode of ['pending', 'error', 'missing', 'ready'] as const) {
             mock.state.patient = mode;
             await mock.observeRead(`/api/patients/${patientId}`, mode, () => page.goto(`/patients/${patientId}/scales/adl`));
