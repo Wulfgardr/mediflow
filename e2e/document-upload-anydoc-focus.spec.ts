@@ -192,6 +192,23 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   await page.keyboard.press('Escape');
   await expect(more).toBeFocused();
   await expect(menu).toHaveCount(0);
+  for (const key of ['Tab', 'Shift+Tab']) {
+    await page.keyboard.press('ArrowDown');
+    await expect(extractButton).toBeFocused();
+    await page.keyboard.press(key);
+    await expect(menu).toHaveCount(0);
+    await expect(more).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await expect(menu.getByRole('menuitem', { name: `Elimina ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
+    await page.keyboard.press('Home');
+    await expect(extractButton).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await expect(menu.getByRole('menuitem', { name: `Elimina ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(extractButton).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(more).toBeFocused();
+  }
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('dialog', { name: 'Eliminare questo documento?' })).toBeVisible();

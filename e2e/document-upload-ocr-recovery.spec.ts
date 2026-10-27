@@ -199,12 +199,18 @@ test('OCR recovery UI: deleting a pending attachment releases the other extracti
     await openDocumentActions(page, file.name);
     await page.getByRole('menuitem', { name: `Estrai testo localmente da ${file.name}` }).click();
     await ready.promise; await openDocumentActions(page, 'synthetic-second.rtf'); await expect(second).toBeDisabled();
+    await expect(second).toHaveAccessibleDescription('Attendi la fine dell’estrazione in corso.');
+    await expect(second.getByText('Attendi la fine dell’estrazione in corso.', { exact: true })).toBeVisible();
+    await page.keyboard.press('Home');
+    await expect(page.getByRole('menuitem', { name: 'Prepara sintesi di synthetic-second.rtf', exact: true })).toBeFocused();
     await openDocumentActions(page, file.name);
     await page.getByRole('menuitem', { name: `Elimina ${file.name}`, exact: true }).click();
     await page.getByRole('button', { name: 'Elimina', exact: true }).click();
     await expect(page.getByRole('menuitem', { name: `Estrai testo localmente da ${file.name}` })).toHaveCount(0);
     await openDocumentActions(page, 'synthetic-second.rtf');
     await expect(second).toBeEnabled();
+    await expect(second).not.toHaveAttribute('aria-describedby');
+    await expect(second).not.toContainText('Attendi la fine dell’estrazione in corso.');
     expect((await page.request.get(`/api/attachments/${file.id}`)).status()).toBe(404);
     release.resolve();
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toHaveCount(0);
