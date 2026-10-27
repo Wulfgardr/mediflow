@@ -75,7 +75,7 @@ for (const view of ['funzioni', 'modelli']) test(`AI settings ${view}: one faile
     await page.goto(`/settings/ai/${view}`);
     const controls = page.getByTestId('ai-settings-controls');
     const error = page.getByText('Impossibile leggere le impostazioni.', { exact: false });
-    const save = controls.getByRole('button', { name: /^Salva configurazione$/iu });
+    const save = controls.getByRole('button', { name: view === 'funzioni' ? 'Salva parametri avanzati' : 'Salva configurazione', exact: true });
     await expect.poll(() => failedReads.length).toBe(1);
     await expect(controls).toHaveAttribute('aria-busy', 'false');
     await test.info().attach('read-integrity-observation', { contentType: 'application/json', body: JSON.stringify({
