@@ -55,6 +55,11 @@
     "owner": "@Wulfgardr"
   },
   {
+    "path": "e2e/fixtures/worklist-todo.ts",
+    "reason": "WUL-787: Synthetic transport helper consumed by e2e/worklist-todo.spec.ts; no standalone test registration.",
+    "owner": "@Wulfgardr"
+  },
+  {
     "path": "e2e/ordinary-chatgpt-ui-fixture.ts",
     "reason": "WUL-729: Synthetic transport and UI helper imported by the four-functions spec.",
     "owner": "@Wulfgardr"
