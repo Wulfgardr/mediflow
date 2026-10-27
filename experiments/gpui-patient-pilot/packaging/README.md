@@ -63,14 +63,24 @@ non li scarica. Per quattro pacchetti che omettono un file di licenza
 di permesso MIT e le dichiarazioni originali di licenza/autori dei metadati
 Cargo, senza inventare anni o titolari di copyright. Il supplemento
 Pathfinder Apache proviene dal repository upstream identificato nell'indice.
-Una dipendenza priva di testo o un supplemento alterato fermano la creazione.
+Per i supplementi objc2 la nota upstream è conservata insieme ai testi
+completi MIT e, dove dichiarate, Zlib/Apache. Ogni directory pacchetto/versione
+include i testi e le dichiarazioni Cargo originali di autori/licenza.
+`../scripts/complete_license_supplements.py` rigenera i testi standard da
+`raw-window-handle@0.6.2` nel grafo bloccato, usando solo la cache Cargo locale;
+`license_texts` nell'indice registra file sorgente, estrazione e hash.
+Una dipendenza priva di un testo completo riconoscibile (concessione e
+condizioni finali), una nota contenente solo rinvii o un supplemento alterato
+fermano la creazione. Il controllo è tecnico, non una valutazione legale.
 
 `verification.json` conserva firma e valutazione Gatekeeper. Lo script
 richiede `codesign --verify --deep --strict` riuscito e firma `adhoc` senza
 TeamIdentifier. Il rifiuto `spctl` è atteso e viene registrato: questo
 candidato non è Developer ID, notarizzato o ammesso alla distribuzione
-pubblica. Il minimo macOS nei metadati riflette il deployment target del
-binario, non una qualifica su altri Mac. Il target 0.9.1 resta il Mac U0.
+pubblica. `minimum_macos` è l'unico valore di configurazione per
+`LSMinimumSystemVersion` e `MACOSX_DEPLOYMENT_TARGET`: deve coincidere con
+il minimo U0 del contratto 0.9.1. La build verifica anche il `minos` Mach-O.
+Il target 0.9.1 resta il Mac U0; altri Mac non sono qualificati.
 
 ## Ripetibilità e prova di avvio
 
