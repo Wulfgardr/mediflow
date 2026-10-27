@@ -335,6 +335,7 @@ function IncaricoArea({
           <div style={{ marginTop: 8 }}>
             {patientStatus === 'idle' || patientStatus === 'loading' ? (
               <div className={styles.emptyState} role="status" aria-live="polite" aria-label="Caricamento pazienti">
+                <p>Caricamento pazienti</p>
                 <div className="mf-skeleton h-12" />
                 <div className="mf-skeleton h-12 mt-2" />
                 <div className="mf-skeleton h-12 mt-2" />
