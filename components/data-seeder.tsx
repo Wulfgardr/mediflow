@@ -78,7 +78,7 @@ export default function DataSeeder() {
         const nukeConfirm = await confirm({
             title: nukeAll ? 'Eliminazione estesa' : 'Elimina dati di test',
             message: nukeAll
-                ? 'Elimina pazienti, voci, terapie, controlli, allegati, conversazioni e messaggi.'
+                ? 'Elimina tutti i pazienti, inclusi quelli reali, e tutte le voci, terapie, controlli, allegati, conversazioni e messaggi.'
                 : 'Elimina i pazienti identificati come test e i dati collegati previsti dalla pulizia.',
             confirmLabel: 'Elimina',
             tone: 'danger'
@@ -117,7 +117,7 @@ export default function DataSeeder() {
                     <div className={styles.actions}><button onClick={handleSeed} disabled={loading || nuking} className={SETTINGS_PRIMARY_BUTTON_CLASS} data-settings-primary="true"><Plus aria-hidden />{loading ? `Generazione... (${progress.current}/${progress.total})` : 'Genera'}</button></div>
                     <section className={styles.section}>
                         <h4 className={styles.heading}>{nukeAll ? 'Eliminazione estesa' : 'Elimina dati di test'}</h4>
-                        <p>{nukeAll ? 'Elimina pazienti, voci, terapie, controlli, allegati, conversazioni e messaggi.' : 'Elimina i pazienti identificati come test e i dati collegati previsti dalla pulizia.'}</p>
+                        <p>{nukeAll ? 'Elimina tutti i pazienti, inclusi quelli reali, e tutte le voci, terapie, controlli, allegati, conversazioni e messaggi.' : 'Elimina i pazienti identificati come test e i dati collegati previsti dalla pulizia.'}</p>
                         <label className={styles.checkLabel}><input type="checkbox" checked={nukeAll} onChange={e => setNukeAll(e.target.checked)} />Eliminazione estesa</label>
                         <div className={styles.actions}><button onClick={handleNuke} disabled={loading || nuking} className={SETTINGS_SECONDARY_BUTTON_CLASS}>{nuking ? 'Eliminazione...' : 'Elimina'}</button></div>
                     </section>
