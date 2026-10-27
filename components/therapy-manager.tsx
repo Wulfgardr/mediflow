@@ -461,11 +461,11 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                         <button type="button" disabled={deleteBusy} onClick={() => deletion.reread()} className={recoveryButtonClassName}>Rileggi terapia</button>
                         {deleteRecovery.phase === 'ready' && (
                             <button type="button" onClick={() => deletion.retry(() => confirm({
-                                title: 'Confermi l’eliminazione della terapia riletta?',
+                                title: `Eliminare la terapia riletta «${deleteRecovery.current?.drugName ?? deleteRecovery.original.drugName}»?`,
                                 message: deleteRecovery.reason
-                                    ? 'Hai confrontato i dati attuali. Il nuovo invio userà la motivazione conservata e riguarderà la terapia appena riletta.'
-                                    : 'Hai confrontato i dati attuali. Indica una nuova motivazione per eliminare la terapia appena riletta.',
-                                confirmLabel: 'Conferma nuovo invio', tone: 'danger',
+                                    ? 'La terapia riletta verrà spostata nel cestino con la motivazione conservata.'
+                                    : 'La terapia riletta verrà spostata nel cestino. Indica una nuova motivazione per eliminarla.',
+                                confirmLabel: 'Elimina terapia riletta', tone: 'danger',
                                 requireReason: !deleteRecovery.reason,
                                 reasonLabel: "Motivazione dell'eliminazione",
                                 reasonPlaceholder: 'Es. inserimento duplicato',
