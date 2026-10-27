@@ -160,7 +160,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     <div className={styles.actions}>
                         <button type="button" onClick={() => setStep(1)} className={styles.secondaryAction}>Indietro</button>
                         <button type="button" onClick={handleSubmit} disabled={!canSubmit || isSubmitting} className={styles.primaryAction}>
-                            {isSubmitting ? 'Salvataggio…' : 'Concludi Setup'}
+                            {isSubmitting ? 'Salvataggio…' : 'Prepara il kit di recupero'}
                         </button>
                     </div>
                 </div>
