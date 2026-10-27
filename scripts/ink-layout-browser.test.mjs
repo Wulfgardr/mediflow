@@ -28,10 +28,12 @@ test('le ricette del piano e delle sezioni funzionano senza il foglio globale', 
             document.body.innerHTML = `<main class="${layout.container} ${workspace.overviewShell}" style="width:1236px">
                 <header class="${layout.plane} ${workspace.chrome}"><h1>Analisi</h1></header>
                 <div class="${layout.plane} ${workspace.workspaceBody} ${section.sections} ${secondary.surface}">
+                    <div data-runtime-settings class="${layout.columns}" style="display:grid"><aside>Indice</aside><div>Contenuto</div></div>
                     <section><h2>Profilo della popolazione</h2><p>9 schede</p></section>
                     <section><h3>Archivio documenti</h3><article class="${secondary.record}"><h3>Referto</h3></article></section>
                 </div></main>`;
         });
+        assert.equal(await page.locator('[data-runtime-settings]').evaluate(element => getComputedStyle(element).columnGap), '40px');
         for (const [width, inset] of [[1236, 28], [596, 16], [390, 16]]) {
             await page.locator('main').evaluate((element, value) => { element.style.width = `${value}px`; }, width);
             const boxes = await page.locator('main > *').evaluateAll(elements => elements.map(element => {
