@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bell, CheckCircle, ExternalLink, RefreshCw } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Bell, CheckCircle, CircleAlert, ExternalLink, RefreshCw } from 'lucide-react';
+import { ViewState } from '@/components/ui/view-state';
+import { SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
+import styles from './evidence-pages.module.css';
 
 type UpdateAwarenessResponse = {
     currentVersion: string; availableVersion: string | null; updateAvailable: boolean;
@@ -12,12 +14,6 @@ type UpdateAwarenessResponse = {
 };
 
 const DISMISSED_VERSION_KEY = 'mediflow-update-dismissed-version';
-const buttonClass = 'mf-btn-secondary lume-press px-3 py-2 text-xs';
-
-function sourceLabel(source: UpdateAwarenessResponse['source']) {
-    return source === 'local-manifest' ? 'manifest locale' : source === 'runtime-env' ? 'runtime locale' : 'nessun manifest';
-}
-
 export default function UpdateAwarenessPanel() {
     const [status, setStatus] = useState<UpdateAwarenessResponse | null>(null);
     const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
@@ -45,7 +41,7 @@ export default function UpdateAwarenessPanel() {
 
     const isDismissed = Boolean(status?.availableVersion && status.availableVersion === dismissedVersion);
     const shouldNotify = Boolean(status?.updateAvailable && !isDismissed);
-    const Icon = shouldNotify ? Bell : CheckCircle;
+    const Icon = error ? CircleAlert : loading || !status ? RefreshCw : shouldNotify ? Bell : CheckCircle;
 
     const dismiss = () => {
         if (!status?.availableVersion) return;
@@ -54,59 +50,31 @@ export default function UpdateAwarenessPanel() {
     };
 
     return (
-        <div
-            className={cn(
-                'mf-section flex min-h-full flex-col justify-between gap-4',
-                shouldNotify
-                    ? 'border-amber-200/70 bg-amber-50/70 dark:border-amber-500/20 dark:bg-amber-900/10'
-                    : 'border-emerald-200/60 bg-emerald-50/50 dark:border-emerald-500/20 dark:bg-emerald-900/10'
-            )}
-            data-testid="settings-update-awareness-panel"
-        >
-            <div className="space-y-3 text-xs leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <p className="section-kicker">Aggiornamenti</p>
-                        <h3 className="mt-1 text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>
-                            {shouldNotify ? 'Nuova versione disponibile' : 'Stato versione'}
-                        </h3>
-                    </div>
-                    <Icon className={cn('h-5 w-5', shouldNotify ? 'text-amber-700' : 'text-emerald-700')} />
-                </div>
-
-                {status ? (
-                    <>
-                        <p>
-                            Installata <b className="lume-registro" style={{ color: 'var(--lume-ink)' }}>{status.currentVersion}</b>
-                            {status.availableVersion ? <> - disponibile <b className="lume-registro" style={{ color: 'var(--lume-ink)' }}>{status.availableVersion}</b></> : null}
-                        </p>
-                        <p>
-                            Canale {status.channel}
-                        </p>
-                        {isDismissed ? <p className="text-xs font-medium">Avviso rimandato per questa versione.</p> : null}
-                        {status.notes[0] ? <p><b style={{ color: 'var(--lume-ink)' }}>{status.changelogTitle || 'Changelog'}:</b> {status.notes[0]}</p> : null}
-                    </>
-                ) : (
-                    <p>{error ? `Errore: ${error}` : 'Lettura stato aggiornamenti...'}</p>
-                )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-                <button onClick={loadStatus} disabled={loading} className={buttonClass}>
-                    <RefreshCw className="h-3.5 w-3.5" />
-                    Aggiorna stato
+        <section className={styles.section} data-testid="settings-update-awareness-panel" aria-labelledby="settings-update-title" aria-busy={loading}>
+            <header className={styles.updateHeader}>
+                <div><h3 id="settings-update-title" className={styles.heading}>Aggiornamenti</h3>
+                    <p className={styles.updateTitle}>{shouldNotify ? 'Nuova versione disponibile' : 'Stato versione'}</p></div>
+                <Icon aria-hidden="true" />
+            </header>
+            {status ? <div className={styles.updateValues}>
+                <p>Versione rilevata <b>{status.currentVersion}</b>
+                    {status.availableVersion ? <> - disponibile <b>{status.availableVersion}</b></> : null}</p>
+                <p>Canale {status.channel}</p>
+                {isDismissed ? <p>Avviso rimandato per questa versione.</p> : null}
+                {status.notes[0] ? <p><b>{status.changelogTitle || 'Changelog'}:</b> {status.notes[0]}</p> : null}
+            </div> : null}
+            {loading ? <ViewState state="loading" title="Lettura stato aggiornamenti..." /> : null}
+            {error ? <ViewState state="error" title={status ? 'Impossibile aggiornare lo stato. È mostrato l’ultimo valore letto.' : `Errore: ${error}`}
+                detail={status ? `Errore: ${error}` : undefined} /> : null}
+            <div className={styles.actions}>
+                <button onClick={loadStatus} disabled={loading} className={SETTINGS_SECONDARY_BUTTON_CLASS}>
+                    <RefreshCw aria-hidden="true" /> Aggiorna stato
                 </button>
-                {status?.updateAvailable && status.updateUrl ? (
-                    <a href={status.updateUrl} target="_blank" rel="noreferrer" className="ui-btn-primary lume-press px-3 py-2 text-xs">
-                        Apri aggiornamento <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                ) : null}
-                {status?.updateAvailable && !isDismissed ? (
-                    <button onClick={dismiss} className="mf-btn-secondary lume-press border-amber-200 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/20 dark:text-amber-200">
-                        Piu tardi
-                    </button>
-                ) : null}
+                {status?.updateAvailable && status.updateUrl ? <a href={status.updateUrl} target="_blank" rel="noreferrer" className={SETTINGS_SECONDARY_BUTTON_CLASS}>
+                    Apri aggiornamento <ExternalLink aria-hidden="true" />
+                </a> : null}
+                {status?.updateAvailable && !isDismissed ? <button onClick={dismiss} className={SETTINGS_SECONDARY_BUTTON_CLASS}>Piu tardi</button> : null}
             </div>
-        </div>
+        </section>
     );
 }
