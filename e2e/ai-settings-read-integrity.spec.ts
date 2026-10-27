@@ -80,13 +80,15 @@ for (const view of ['funzioni', 'modelli']) test(`AI settings ${view}: one faile
     await expect(controls).toHaveAttribute('aria-busy', 'false');
     await test.info().attach('read-integrity-observation', { contentType: 'application/json', body: JSON.stringify({
         view, baselineExpectedFailure: process.env.AI_SETTINGS_BASELINE === '1', failedReads, writes, mockedUiWrites, blocked,
-        errorVisible: await error.isVisible(), controlsDisabled: await controls.isDisabled(), saveDisabled: await save.isDisabled(),
+        errorVisible: await error.isVisible(), controlsDisabled: await controls.evaluate(element => (element as HTMLFieldSetElement).disabled), saveDisabled: await save.isDisabled(),
         syntheticStoredRouter: settings.documentRouterControlFlow,
     }, null, 2) });
     await page.screenshot({ path: test.info().outputPath(`${view}-read-failure.png`), fullPage: true });
     await expect(error).toBeVisible();
-    await expect(controls).toBeDisabled();
+    await expect(controls).toHaveJSProperty('disabled', true);
     await expect(save).toBeDisabled();
+    await save.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: test.info().outputPath(`${view}-save-disabled.png`), fullPage: true });
     expect(failedReads).toEqual(['documentRouterControlFlow']);
     expect(writes).toEqual([]); expect(blocked).toEqual([]);
     expect(settings.documentRouterControlFlow).toBe('active');
