@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Download, Upload, AlertTriangle, CheckCircle, RefreshCw, ShieldCheck } from 'lucide-react';
 import { BackupRestoreBlockedError, BackupRestorePreflightError, exportRawDatabase, importRawDatabase, verifyRawDatabase } from '@/lib/db';
@@ -106,7 +107,7 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
             const created = verified.createdAt ? `, creato il ${new Date(verified.createdAt).toLocaleString('it-IT')}` : '';
             setStatus({
                 type: 'success', title: 'Backup verificato',
-                message: `Formato e integrità sono validi e la chiave sbloccata lo legge: ${verified.records.toLocaleString('it-IT')} record in ${verified.collections} collezioni${created}.`,
+                message: `Formato e integrità sono validi e la chiave sbloccata lo legge: ${verified.records.toLocaleString('it-IT')} record in ${formatCountLabel(verified.collections, 'collezione', 'collezioni')}${created}.`,
                 nextStep: 'Verificato non significa provato: che un backup si ripristini lo dimostra la prova di ripristino, descritta qui sotto.',
             });
         } catch (err) {

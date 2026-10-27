@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import { Disclosure } from '@/components/disclosure';
 
 import { useEffect, useState } from 'react';
@@ -314,7 +315,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
         } catch (error) {
             setFseReadiness({
                 loading: false,
-                error: error instanceof Error ? error.message : 'Errore inatteso nel pre-check FSE',
+                error: error instanceof Error ? error.message : 'Controllo preliminare FSE non riuscito.',
                 validation: null,
             });
         }
@@ -716,9 +717,9 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                                 <dd className="text-right text-xs text-[color:var(--lume-ink-muted)]">
                                     <span className="font-semibold text-[color:var(--lume-ink)]">{validation.therapyMedication.total} record</span>
                                     {' · '}
-                                    <span>{validation.therapyMedication.errorCount} blocchi</span>
+                                    <span>{formatCountLabel(validation.therapyMedication.errorCount, 'blocco', 'blocchi')}</span>
                                     {' · '}
-                                    <span>{validation.therapyMedication.warningCount} attenzioni</span>
+                                    <span>{formatCountLabel(validation.therapyMedication.warningCount, 'avviso', 'avvisi')}</span>
                                 </dd>
                             </div>
                             <div className="graphite-row">
@@ -735,9 +736,9 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                                 <dd className="text-right text-xs text-[color:var(--lume-ink-muted)]">
                                     <span className="font-semibold text-[color:var(--lume-ink)]">{validation.observationVitals.total} record</span>
                                     {' · '}
-                                    <span>{validation.observationVitals.errorCount} blocchi</span>
+                                    <span>{formatCountLabel(validation.observationVitals.errorCount, 'blocco', 'blocchi')}</span>
                                     {' · '}
-                                    <span>{validation.observationVitals.warningCount} attenzioni</span>
+                                    <span>{formatCountLabel(validation.observationVitals.warningCount, 'avviso', 'avvisi')}</span>
                                 </dd>
                             </div>
                         </dl>

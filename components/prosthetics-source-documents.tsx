@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import { Disclosure } from '@/components/disclosure';
 import { useEffect, useState } from 'react';
 import { prostheticsRequest } from '@/lib/reference-data/prosthetics-catalog-client';
@@ -59,7 +60,7 @@ export function ProstheticsSourcesPanel() {
         <h3 className="font-semibold">Fonti e originali</h3>
         <p>Originali conservati in chiaro nell’archivio locale. Allega solo documenti di repertorio privi di dati dei pazienti.</p>
         <button type="button" style={{ minHeight: 'var(--lume-control-height, 44px)' }} className="ui-btn-secondary" onClick={() => void refresh().catch(() => setMessage('Fonti non leggibili. Riprova.'))}>Rileggi fonti</button>
-        <p role="status">{message || (data ? (data.sources.length ? `${data.sources.length} fonti` : 'Nessuna fonte importata.') : 'Lettura delle fonti…')}</p>
+        <p role="status">{message || (data ? (data.sources.length ? formatCountLabel(data.sources.length, 'fonte', 'fonti') : 'Nessuna fonte importata.') : 'Lettura delle fonti…')}</p>
         {data?.sources.map(source => <SourceDocuments key={`${source.id}:${data.revision}`} source={source} revision={data.revision} refresh={refresh} />)}
     </section>;
 }

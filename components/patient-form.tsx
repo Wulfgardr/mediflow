@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import styles from './clinical-register.module.css';
 import PrivacyBlur from './privacy-blur';
 import { useRef, useState } from 'react';
@@ -324,7 +325,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                         <div className="flex justify-between items-center mb-1.5">
                             <label className="mf-field-label mb-0" htmlFor="patient-birthDate">Data di nascita</label>
                             {estimatedAge !== null && (
-                                <span className="apple-chip">Stima età ~{estimatedAge} anni ({estimatedYear})</span>
+                                <span className="apple-chip">Stima età ~{formatCountLabel(estimatedAge, 'anno', 'anni')} ({estimatedYear})</span>
                             )}
                         </div>
                         <input
@@ -526,8 +527,8 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     <dt>Data di nascita</dt><dd className="lume-registro"><PrivacyBlur>{watchedBirthDate ? new Date(watchedBirthDate).toLocaleDateString('it-IT') : 'Non indicata'}</PrivacyBlur></dd>
                     <dt>Telefono</dt><dd><PrivacyBlur>{watch('phone') || 'Non indicato'}</PrivacyBlur></dd>
                     <dt>Indirizzo</dt><dd><PrivacyBlur>{watch('address') || 'Non indicato'}</PrivacyBlur></dd>
-                    <dt>Diagnosi nel modulo</dt><dd>{watch('diagnoses')?.length ?? 0} righe</dd>
-                    <dt>Prossimi passaggi nel modulo</dt><dd>{watch('checkups')?.length ?? 0} righe</dd>
+                    <dt>Diagnosi nel modulo</dt><dd>{formatCountLabel(watch('diagnoses')?.length ?? 0, 'riga', 'righe')}</dd>
+                    <dt>Prossimi passaggi nel modulo</dt><dd>{formatCountLabel(watch('checkups')?.length ?? 0, 'riga', 'righe')}</dd>
                 </dl>
             </aside>
             </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import type { ReactNode } from 'react';
 import { Calendar, MapPin, Phone } from 'lucide-react';
 
@@ -124,7 +125,7 @@ export function PatientIdentityLens({
                         />
                         <StatusGlyph kind="review" label="Percorso clinico" tone="neutral" />
                         {exemptions.length > 0 ? (
-                            <StatusGlyph kind="completed" label={`${exemptions.length} esenzioni`} tone="neutral" />
+                            <StatusGlyph kind="completed" label={`${formatCountLabel(exemptions.length, 'esenzione', 'esenzioni')}`} tone="neutral" />
                         ) : null}
                     </div>
 

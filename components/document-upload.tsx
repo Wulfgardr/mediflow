@@ -1,6 +1,6 @@
-
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import { Disclosure } from '@/components/disclosure';
 import styles from './clinical-register.module.css';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
@@ -298,7 +298,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                 {uploadResult && (
                     <div className="mt-3" role="status">
                         <p>{uploadResult.saved} {uploadResult.saved === 1 ? 'allegato salvato' : 'allegati salvati'}.
-                            {uploadResult.interrupted ? ` Coda interrotta: ${uploadResult.notStarted} file non inviati.` : ''}</p>
+                            {uploadResult.interrupted ? ` Coda interrotta: ${formatCountLabel(uploadResult.notStarted, 'file non inviato', 'file non inviati')}.` : ''}</p>
                         {uploadResult.unconfirmed.length > 0 && <>
                             <p>Salvataggio non confermato per:</p>
                             <ul>{uploadResult.unconfirmed.map((name, index) => <li key={`${index}-${name}`}><PrivacyBlur>{name}</PrivacyBlur></li>)}</ul>
@@ -340,7 +340,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                                     <RefreshCw className={cn('h-4 w-4', extractingId === file.id && 'animate-spin')} aria-hidden="true" />Estrai testo
                                 </button>
                                 <button type="button" className={disclosure.documentAction} data-lume-action="quiet" disabled={deletingId === file.id}
-                                    aria-label={`Prepara sintesi di ${file.name}`} onClick={() => { selectSource(file.id); summaryHeading.current?.focus(); }}>Sintesi</button>
+                                    aria-label={`Prepara sintesi di ${file.name}`} onClick={() => { selectSource(file.id); summaryHeading.current?.focus(); }}>Prepara sintesi</button>
                                 <button type="button" onClick={() => handleDelete(file)} disabled={deletingId !== null}
                                     className={`${disclosure.documentAction} ${disclosure.removeAction}`} data-lume-action="quiet" aria-label={`Elimina ${file.name}`}>
                                     <Trash2 className="h-4 w-4" aria-hidden="true" />{deletingId === file.id ? 'Eliminazione…' : 'Elimina'}
@@ -359,13 +359,13 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                         </div>}
                         {localExtraction?.attachmentId === file.id && localExtraction.status === 'available' && (
                             <Disclosure className={disclosure.disclosure} data-testid="anydoc-local-extraction-preview" title={<>{localExtraction.ocr ? 'Testo OCR locale · da rivedere' : 'Testo estratto localmente · da rivedere'}</>}>
-                                {localExtraction.ocr && <p className={disclosure.hint}>OCR: {localExtraction.ocr.ocrPageCount} pagine su {localExtraction.ocr.pageCount}. Rivedi il testo prima di usarlo.</p>}
+                                {localExtraction.ocr && <p className={disclosure.hint}>OCR: {formatCountLabel(localExtraction.ocr.ocrPageCount, 'pagina', 'pagine')} su {localExtraction.ocr.pageCount}. Rivedi il testo prima di usarlo.</p>}
                                 <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap break-words text-sm"><PrivacyBlur>{localExtraction.markdown}</PrivacyBlur></pre>
                             </Disclosure>
                         )}
                         {localExtraction?.attachmentId === file.id && localExtraction.status !== 'available' && <div className="mt-3" role="status">
                             <p>{localExtraction.status === 'interrupted' ? 'Attesa interrotta. Puoi riprovare con “Estrai testo”.' : 'Testo locale non disponibile. Apri il documento per la revisione manuale o riprova con “Estrai testo”.'}</p>
-                            {localExtraction.status === 'review_required' && <Disclosure className={disclosure.disclosure} title="Dettagli estrazione"><p>review_required · esito non confermato</p><p>Un errore di rete o di sessione non dimostra unsupported_local_extraction.</p></Disclosure>}
+                            {localExtraction.status === 'review_required' && <Disclosure className={disclosure.disclosure} title="Dettagli estrazione"><p>Estrazione da rivedere · esito non confermato.</p><p>Un errore di rete o di sessione non indica necessariamente che l’estrazione locale non sia supportata.</p></Disclosure>}
                         </div>}
 
                     </td></tr>}

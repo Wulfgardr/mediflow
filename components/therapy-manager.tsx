@@ -169,7 +169,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
     useEffect(() => {
         if (!therapies || !patient || patient.id !== patientId) return;
         const age = patient.birthDate ? differenceInYears(new Date(), new Date(patient.birthDate)) : NaN;
-        statusChange.recover(therapies, `${patient.firstName} ${patient.lastName}, ${Number.isFinite(age) ? `${age} anni` : 'età non disponibile'}`);
+        statusChange.recover(therapies, `${patient.firstName} ${patient.lastName}, ${Number.isFinite(age) ? formatCountLabel(age, 'anno', 'anni') : 'età non disponibile'}`);
     }, [therapies, patient, patientId, statusChange]);
 
     useEffect(() => {
@@ -389,7 +389,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
         const therapy = visibleTherapies.find((item) => item.id === id);
         if (!therapy || !patient || patient.id !== patientId) return;
         const age = patient.birthDate ? differenceInYears(new Date(), new Date(patient.birthDate)) : NaN;
-        const patientLabel = `${patient.firstName} ${patient.lastName}, ${Number.isFinite(age) ? `${age} anni` : 'età non disponibile'}`;
+        const patientLabel = `${patient.firstName} ${patient.lastName}, ${Number.isFinite(age) ? formatCountLabel(age, 'anno', 'anni') : 'età non disponibile'}`;
         statusChange.begin(therapy, status, patientLabel);
     };
 

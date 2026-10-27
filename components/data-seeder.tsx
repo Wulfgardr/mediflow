@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import { useState } from 'react';
 import { seedDatabase, nukeTestData, SeederIncompleteError } from '@/lib/seeder';
 import { Plus } from 'lucide-react';
@@ -37,7 +38,7 @@ export default function DataSeeder() {
         console.log("Seeder: Start requested", { patientCount, includeEntries });
         const seedConfirm = await confirm({
             title: 'Genera pazienti di test',
-            message: `Stai per generare ${patientCount} pazienti di test. Procedere?`,
+            message: `Stai per generare ${formatCountLabel(patientCount, 'paziente di test', 'pazienti di test')}. Procedere?`,
             confirmLabel: 'Genera',
             tone: 'danger'
         });
@@ -59,7 +60,7 @@ export default function DataSeeder() {
                 }
             });
             console.log("Seeder: Success", result);
-            showToast({ tone: 'success', title: 'Pazienti di test generati', description: `Generati ${result.count} pazienti di test.` });
+            showToast({ tone: 'success', title: 'Pazienti di test generati', description: formatCountLabel(result.count, 'Generato {count} paziente di test.', 'Generati {count} pazienti di test.', { template: true }) });
             window.setTimeout(() => window.location.reload(), 1200);
         } catch (e) {
             console.error("Seeder Error Caught:", e);
@@ -90,7 +91,7 @@ export default function DataSeeder() {
             const result = await nukeTestData(nukeAll);
             showToast({ tone: 'success', title: 'Eliminazione completata', description: result.mode === 'full'
                 ? 'Reset totale completato.'
-                : `Eliminati ${result.deleted} pazienti e completata la pulizia dei dati collegati.` });
+                : `${formatCountLabel(result.deleted, 'Eliminato {count} paziente', 'Eliminati {count} pazienti', { template: true })} e completata la pulizia dei dati collegati.` });
             window.setTimeout(() => window.location.reload(), 1200);
         } catch (e) {
             console.error(e);

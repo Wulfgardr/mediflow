@@ -209,24 +209,24 @@ export default function AnalyticsPage() {
                     {proposal ? <h2>Fascia d’età</h2> : <p className={styles.sectionLabel}>Filtro quieto</p>}
                     <label>
                         <span>Età minima</span>
-                        <strong className="lume-registro">{ageRange[0]} anni</strong>
+                        <strong className="lume-registro">{formatCountLabel(ageRange[0], 'anno', 'anni')}</strong>
                         <RangeInput
                             min={0}
                             max={120}
                             aria-label="Età minima"
-                            aria-valuetext={`${ageRange[0]} anni`}
+                            aria-valuetext={formatCountLabel(ageRange[0], 'anno', 'anni')}
                             value={ageRange[0]}
                             onChange={(event) => setAgeRange([Number(event.target.value), ageRange[1]])}
                         />
                     </label>
                     <label>
                         <span>Età massima</span>
-                        <strong className="lume-registro">{ageRange[1]} anni</strong>
+                        <strong className="lume-registro">{formatCountLabel(ageRange[1], 'anno', 'anni')}</strong>
                         <RangeInput
                             min={0}
                             max={120}
                             aria-label="Età massima"
-                            aria-valuetext={`${ageRange[1]} anni`}
+                            aria-valuetext={formatCountLabel(ageRange[1], 'anno', 'anni')}
                             value={ageRange[1]}
                             onChange={(event) => setAgeRange([ageRange[0], Number(event.target.value)])}
                         />
@@ -366,7 +366,7 @@ export default function AnalyticsPage() {
                                     <span className="lume-registro" data-lume-register-value="true">
                                         {auditSummary.topEventTypes[0]?.eventType ?? 'Nessun evento'}
                                     </span>
-                                    {auditSummary.topEventTypes[0] ? `, ${auditSummary.topEventTypes[0].count} occorrenze` : ''}
+                                    {auditSummary.topEventTypes[0] ? `, ${formatCountLabel(auditSummary.topEventTypes[0].count, 'occorrenza', 'occorrenze')}` : ''}
                                 </dd>
                             </div>
                         </dl>
