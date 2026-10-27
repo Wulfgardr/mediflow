@@ -151,6 +151,32 @@ clinica o funzionamento su un'installazione reale.
 
 ## Dal modello al codice
 
+Il 27 ottobre 2026, PR #696, è stato riesaminato il diff di `lib/db.ts`
+fra `f44fff7fcbdc2708a15958c0123c09ff1ac4b0b4` e
+`09166e707572ccf1d15008da244f7bd320de0851`. `ApiTable.get` e `toArray`
+acquisiscono il segnale della sessione della richiesta, lo compongono con
+l'eventuale segnale del chiamante e verificano la validità prima e dopo
+risposta, JSON e decifratura. `count` delega alla stessa lettura; i costruttori
+e le query clonate conservano il riferimento all'owner della sessione.
+Il consumer TherapyManager continua a usare le letture rigorose e il segnale
+del suo contesto. Una lettura ritirata resta un errore: non prova assenza,
+registrazione o autorizzazione a riprovare una scrittura.
+
+Il confronto dei metodi conferma identici tutti i writer di ApiTable e
+`MedicalApiClient.setKey`; non cambiano controller, marker, CAS, audit o
+writer host. Il ritiro del client continua a non annullare un commit host.
+`GetFailure` astrae già la lettura negata o non disponibile; sessioni,
+microtask e composizione degli AbortSignal restano fuori dal TLC e sono
+verificati dai test causali del client. Modello, invarianti, limiti,
+configurazioni, testimoni e mutanti rimangono identici. Dopo il riesame
+sono stati aggiornati l'impronta di `lib/db.ts` e `syncCommit`; la nuova
+dipendenza `lib/api-table-response.ts` entra nel controllo di deriva insieme
+agli input dei suoi test causali. Questo pin non amplia le proprietà TLC.
+Il comando completo `npm run verify:therapy-status` è passato su Node 24.22.0:
+TLC corrente con 5.903.794 stati distinti e coda vuota, 3 controlli negativi,
+6 testimoni, test reali del controller/HTTP, 2 mutazioni del controller
+rilevate e controller ripristinato verde.
+
 Il 27 ottobre 2026, PR #692 (HC-8), è stato riesaminato il diff completo di
 `components/therapy-manager.tsx` fra il precedente `coverage.json.syncCommit`
 `2bf054fabf0b44e943022d8ad0654a2b243f0796` e
