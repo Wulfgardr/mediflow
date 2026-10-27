@@ -2,15 +2,13 @@
 
 import { useState } from 'react';
 import { seedDatabase, nukeTestData, SeederIncompleteError } from '@/lib/seeder';
-import { Database, Trash2, Plus, Settings2, FileText, Pill, Stethoscope } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Plus } from 'lucide-react';
+import { Disclosure } from '@/components/disclosure';
+import styles from '@/components/settings/maintenance-pages.module.css';
+import { SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { RangeInput } from '@/components/range-input';
-
-const PANEL_CLASS = 'seeder-panel p-5';
-const SUBSECTION_CLASS = 'seeder-subsection p-4';
-const DANGER_SUBSECTION_CLASS = 'seeder-subsection seeder-subsection-danger';
 
 export default function DataSeeder() {
     const { showToast } = useToast();
@@ -78,10 +76,10 @@ export default function DataSeeder() {
 
     const handleNuke = async () => {
         const nukeConfirm = await confirm({
-            title: nukeAll ? 'Reset totale del database' : 'Elimina dati di test',
+            title: nukeAll ? 'Eliminazione estesa' : 'Elimina dati di test',
             message: nukeAll
-                ? 'Stai per eliminare TUTTO IL DATABASE (pazienti reali e di test). Sei sicuro?'
-                : 'Questo eliminerà i pazienti di test (codice fiscale TEST-...). Procedere?',
+                ? 'Elimina pazienti, voci, terapie, controlli, allegati, conversazioni e messaggi.'
+                : 'Elimina i pazienti identificati come test e i dati collegati previsti dalla pulizia.',
             confirmLabel: 'Elimina',
             tone: 'danger'
         });
@@ -102,184 +100,32 @@ export default function DataSeeder() {
         }
     };
 
-    if (!isOpen) {
-        return (
-            <button
-                onClick={() => setIsOpen(true)}
-                className="inline-flex items-center gap-2 rounded-full border border-amber-200/70 bg-amber-50/85 px-4 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200 dark:hover:bg-amber-900/20"
-            >
-                <Database className="w-4 h-4" />
-                Genera Dati di Prova
-            </button>
-        );
-    }
-
     return (
-        <div className={`${PANEL_CLASS} space-y-4`}>
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="rounded-2xl bg-amber-100/90 p-2.5 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200">
-                        <Settings2 className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700 dark:text-amber-200">Seeder</p>
-                        <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Generatore Dati di Test</h4>
-                    </div>
-                </div>
-                <button
-                    onClick={() => setIsOpen(false)}
-                    className="rounded-full border border-amber-200/70 bg-white/72 px-3 py-2 text-xs font-medium text-amber-700 transition-colors hover:bg-white dark:border-amber-500/20 dark:bg-white/5 dark:text-amber-200"
-                >
-                    Chiudi
-                </button>
-            </div>
-
-            {/* Patient Count Slider */}
-            <div className={`${SUBSECTION_CLASS} space-y-3`}>
-                <label className="flex items-center justify-between text-sm text-slate-700 dark:text-slate-300">
-                    <span>Numero Pazienti</span>
-                    <span className="rounded-full border border-amber-200/70 bg-amber-50/85 px-3 py-1 tabular-nums text-xs font-semibold text-amber-700 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200">{patientCount}</span>
-                </label>
-                <RangeInput
-                    min={1}
-                    max={500}
-                    value={patientCount}
-                    onChange={(e) => setPatientCount(Number(e.target.value))}
-                    className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-amber-200 accent-amber-600 dark:bg-amber-950/40"
-                    title="Numero Pazienti"
-                    aria-label="Seleziona il numero di pazienti da generare"
-                />
-                <div className="flex justify-between text-xs text-amber-500 dark:text-amber-200/70">
-                    <span>1</span>
-                    <span>100</span>
-                    <span>250</span>
-                    <span>500</span>
-                </div>
-            </div>
-
-            {/* Presets */}
-            <button
-                onClick={handleStressTest}
-                className="w-full rounded-full border border-dashed border-amber-300 bg-amber-50/70 px-4 py-2 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200 dark:hover:bg-amber-900/20"
-            >
-                Preset: Stress Test (50 pazienti complessi)
-            </button>
-
-
-
-            {/* Options */}
-            <div className="grid grid-cols-3 gap-2">
-                <label className={cn(
-                    "flex flex-col items-center gap-2 rounded-[20px] border p-3 text-xs transition-colors",
-                    includeEntries
-                        ? "border-amber-300 bg-amber-50/90 text-amber-900 shadow-[0_10px_22px_rgba(217,119,6,0.08)] dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-100"
-                        : "border-white/70 bg-white/72 text-amber-700 dark:border-white/10 dark:bg-white/5 dark:text-amber-200"
-                )}>
-                    <input
-                        type="checkbox"
-                        checked={includeEntries}
-                        onChange={(e) => setIncludeEntries(e.target.checked)}
-                        className="sr-only"
-                    />
-                    <FileText className="w-4 h-4" />
-                    <span>Diario</span>
-                </label>
-
-                <label className={cn(
-                    "flex flex-col items-center gap-2 rounded-[20px] border p-3 text-xs transition-colors",
-                    includeTherapies
-                        ? "border-amber-300 bg-amber-50/90 text-amber-900 shadow-[0_10px_22px_rgba(217,119,6,0.08)] dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-100"
-                        : "border-white/70 bg-white/72 text-amber-700 dark:border-white/10 dark:bg-white/5 dark:text-amber-200"
-                )}>
-                    <input
-                        type="checkbox"
-                        checked={includeTherapies}
-                        onChange={(e) => setIncludeTherapies(e.target.checked)}
-                        className="sr-only"
-                    />
-                    <Pill className="w-4 h-4" />
-                    <span>Terapie</span>
-                </label>
-
-                <label className={cn(
-                    "flex flex-col items-center gap-2 rounded-[20px] border p-3 text-xs transition-colors",
-                    includeConditions
-                        ? "border-amber-300 bg-amber-50/90 text-amber-900 shadow-[0_10px_22px_rgba(217,119,6,0.08)] dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-100"
-                        : "border-white/70 bg-white/72 text-amber-700 dark:border-white/10 dark:bg-white/5 dark:text-amber-200"
-                )}>
-                    <input
-                        type="checkbox"
-                        checked={includeConditions}
-                        onChange={(e) => setIncludeConditions(e.target.checked)}
-                        className="sr-only"
-                    />
-                    <Stethoscope className="w-4 h-4" />
-                    <span>ICD-11</span>
-                </label>
-            </div>
-
-            {/* Progress Bar */}
-            {loading && (
-                <div className={`${SUBSECTION_CLASS} space-y-2`}>
-                    <div className="flex justify-between text-xs text-amber-700 dark:text-amber-200">
-                        <span>Generazione in corso...</span>
-                        <span>{progress.current} / {progress.total}</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-amber-200 dark:bg-amber-950/40">
-                        <div
-                            className="bg-amber-600 h-2 rounded-full transition-[width] duration-150 w-[var(--prog-width)]"
-                            style={{ '--prog-width': `${(progress.current / progress.total) * 100}%` } as React.CSSProperties}
-                        />
-                    </div>
-                </div>
-            )}
-
-            {/* Action Buttons */}
-            <button
-                onClick={handleSeed}
-                disabled={loading || nuking}
-                className="ui-btn-primary lume-press flex w-full justify-center px-4 py-3 text-sm disabled:opacity-50"
-            >
-                <Plus className="w-5 h-5" />
-                {loading ? `Generazione... (${progress.current}/${progress.total})` : 'Genera Pazienti'}
-            </button>
-
-            {/* Danger Zone */}
-            <div className={DANGER_SUBSECTION_CLASS}>
-                <div className="flex flex-col gap-3">
-                    <label className="flex items-center gap-2 cursor-pointer group">
-                        <input
-                            type="checkbox"
-                            checked={nukeAll}
-                            onChange={e => setNukeAll(e.target.checked)}
-                            className="h-4 w-4 rounded border-slate-300 accent-red-500 transition-colors dark:border-white/10 dark:bg-white/5"
-                        />
-                        <span className={`text-xs uppercase font-semibold tracking-[0.18em] transition-colors ${nukeAll ? 'text-red-600 dark:text-red-200' : 'text-slate-400 group-hover:text-red-400 dark:text-slate-500 dark:group-hover:text-red-300'}`}>
-                            Elimina Anche Dati Reali (Reset Totale)
-                        </span>
+        <section className={styles.section} data-testid="settings-data-seeder">
+            <Disclosure title="Generatore di dati di test" headingLevel={3} open={isOpen} onOpenChange={setIsOpen}>
+                <div className={styles.seederForm}>
+                    <p>Genera pazienti e documenti sintetici per verificare la postazione.</p>
+                    <label className={styles.rangeLabel}>Numero Pazienti <span>{patientCount}</span>
+                        <RangeInput min={1} max={500} value={patientCount} onChange={e => setPatientCount(Number(e.target.value))} title="Numero Pazienti" aria-label="Seleziona il numero di pazienti da generare" />
                     </label>
-
-                    <button
-                        onClick={handleNuke}
-                        disabled={loading || nuking}
-                        className={cn(
-                            "flex w-full items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-xs font-semibold transition-[background-color,color,opacity] disabled:opacity-50",
-                            nukeAll
-                                ? "border-red-600 bg-red-600 text-white shadow-[0_16px_30px_rgba(220,38,38,0.22)] hover:bg-red-700"
-                                : "border-red-200 bg-white/85 text-red-600 hover:bg-red-50 dark:border-red-500/20 dark:bg-red-950/10 dark:text-red-200 dark:hover:bg-red-900/20"
-                        )}
-                        title="Elimina i dati"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                        {nuking ? 'Eliminazione...' : (nukeAll ? 'NUKE TOTALE (PERICOLO)' : 'Elimina Dati Test')}
-                    </button>
+                    <button onClick={handleStressTest} className={SETTINGS_SECONDARY_BUTTON_CLASS}>Preset: Stress Test (50 pazienti complessi)</button>
+                    <div className={styles.options}>
+                        <label><input type="checkbox" checked={includeEntries} onChange={e => setIncludeEntries(e.target.checked)} />Diario</label>
+                        <label><input type="checkbox" checked={includeTherapies} onChange={e => setIncludeTherapies(e.target.checked)} />Terapie</label>
+                        <label><input type="checkbox" checked={includeConditions} onChange={e => setIncludeConditions(e.target.checked)} />ICD-11</label>
+                    </div>
+                    <div className={styles.actions}><button onClick={handleSeed} disabled={loading || nuking} className={SETTINGS_PRIMARY_BUTTON_CLASS} data-settings-primary="true"><Plus aria-hidden />{loading ? `Generazione... (${progress.current}/${progress.total})` : 'Genera'}</button></div>
+                    <section className={styles.section}>
+                        <h4 className={styles.heading}>{nukeAll ? 'Eliminazione estesa' : 'Elimina dati di test'}</h4>
+                        <p>{nukeAll ? 'Elimina pazienti, voci, terapie, controlli, allegati, conversazioni e messaggi.' : 'Elimina i pazienti identificati come test e i dati collegati previsti dalla pulizia.'}</p>
+                        <label className={styles.checkLabel}><input type="checkbox" checked={nukeAll} onChange={e => setNukeAll(e.target.checked)} />Eliminazione estesa</label>
+                        <div className={styles.actions}><button onClick={handleNuke} disabled={loading || nuking} className={SETTINGS_SECONDARY_BUTTON_CLASS}>{nuking ? 'Eliminazione...' : 'Elimina'}</button></div>
+                    </section>
+                    <p className={styles.meta}>I pazienti generati avranno codice fiscale che inizia con &quot;TEST-&quot; per distinguerli dai reali.</p>
                 </div>
-            </div>
-
-            <p className="text-center text-xs text-amber-700 dark:text-amber-200/80">
-                I pazienti generati avranno codice fiscale che inizia con &quot;TEST-&quot; per distinguerli dai reali.
-            </p>
-        </div>
+            </Disclosure>
+            {loading && <div role="status" className={styles.progress}><p>Generazione in corso...</p><p>{progress.current} / {progress.total}</p><progress max={progress.total} value={progress.current} aria-label="Generazione in corso..." /></div>}
+            {nuking && <p role="status">Eliminazione...</p>}
+        </section>
     );
 }
