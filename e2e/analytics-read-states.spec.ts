@@ -94,11 +94,14 @@ for (const scenario of ['initial', 'refresh', 'context'] as const) test(`Analyti
     await restoreEvent();
     await expect.poll(() => fixture.calls.filter(call => call.path === '/api/patients').length).toBeGreaterThan(previous);
   };
-  const visibleError = async () => {
+  const failedPatientRead = () => page.waitForResponse(response => new URL(response.url()).pathname === '/api/patients' && response.status() === 503);
+  const visibleError = async (failedResponse: ReturnType<Page['waitForResponse']>) => {
+    const response = await failedResponse;
+    expect(await response.finished()).toBeNull();
     if (baseline) {
+      await expect.soft(error).toBeVisible();
       observations.push({ errorVisible: await error.isVisible(), primaryVisible: await primary.isVisible(), body: await page.locator('main').last().innerText() });
       await shot('failure-observed', await primary.isVisible() ? primary : page.getByText('Sto preparando l’analisi locale.', { exact: true }));
-      await expect.soft(error).toBeVisible();
     } else {
       await expect(error).toBeVisible(); await expect(primary).not.toBeVisible();
       await shot('error', error);
@@ -107,10 +110,20 @@ for (const scenario of ['initial', 'refresh', 'context'] as const) test(`Analyti
   try {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await scope('w21-synthetic-a'); await bootstrapUnlockedSession(page, '1234');
-    if (scenario === 'initial') fixture.state.status = 503;
+    if (scenario === 'initial') {
+      fixture.state.status = 503;
+      fixture.state.hold = new Promise<void>(resolve => { release = resolve; });
+    }
+    const beforeInitialRead = fixture.calls.filter(call => call.path === '/api/patients').length;
+    const initialFailure = scenario === 'initial' ? failedPatientRead() : null;
     await page.goto('/analytics');
     if (scenario === 'initial') {
-      await visibleError(); fixture.state.status = 200;
+      await expect.poll(() => fixture.calls.filter(call => call.path === '/api/patients').length).toBeGreaterThan(beforeInitialRead);
+      expect(fixture.calls.filter(call => call.path === '/api/patients').at(-1)?.status).toBe(503);
+      const loading = page.getByText('Sto preparando l’analisi locale.', { exact: true });
+      await expect(loading).toBeVisible(); await expect(primary).not.toBeVisible(); await shot('pending', loading);
+      fixture.state.hold = null; release();
+      await visibleError(initialFailure!); fixture.state.status = 200;
       if (baseline) await page.reload(); else await error.getByRole('button', { name: 'Riprova', exact: true }).click();
       await expect(primary).toBeVisible(); await shot('recovered', primary);
       const minimum = page.getByLabel('Età minima', { exact: true });
@@ -129,8 +142,8 @@ for (const scenario of ['initial', 'refresh', 'context'] as const) test(`Analyti
     } else if (scenario === 'refresh') {
       await expect(primary).toBeVisible(); const minimum = page.getByLabel('Età minima', { exact: true });
       await minimum.focus(); await minimum.press('ArrowRight'); await expect(minimum).toHaveValue('1');
-      fixture.state.status = 503; await reread();
-      await visibleError(); fixture.state.status = 200;
+      fixture.state.status = 503; const failure = failedPatientRead(); await reread();
+      await visibleError(failure); fixture.state.status = 200;
       if (baseline) await reread();
       else await error.getByRole('button', { name: 'Riprova', exact: true }).click();
       await expect(primary).toBeVisible(); await expect(minimum).toHaveValue('1');
