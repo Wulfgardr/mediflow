@@ -226,7 +226,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
     };
 
     const count = prescriptions === undefined ? undefined : formatCountLabel(prescriptions.length, 'voce', 'voci');
-    const newButton = <Button ref={creationRef} variant="text" aria-expanded={isFormOpen} aria-controls={formId}
+    const newButton = <Button ref={creationRef} variant="text" aria-expanded={isFormOpen} aria-controls={isFormOpen ? formId : undefined}
         onClick={() => setIsFormOpen(value => !value)}>Nuova voce protesica</Button>;
     const content = (
         <section className={styles.register}>

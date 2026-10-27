@@ -71,6 +71,8 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
       : destinations[0]);
   const directoryReturn = useRef<DirectoryReturn | null>(null);
   const [railOpen, setRailOpen] = useState(true);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const currentInMore = !destinations.slice(0, 3).some(({ href }) => href === activeDestination.href);
   /* one confirmation boundary for the new route shortcuts. Replay the
      actual link once, so its close-tab action and Next navigation stay atomic.
      Browser history and security lock keep their existing owners. */
@@ -116,16 +118,16 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
       <aside className={styles.rail} aria-label="MediFlow">
         <Link href="/?area=incarico" className={styles.brand} aria-label="MediFlow"><strong>MediFlow<span className={styles.brandPoint} aria-hidden="true">.</span></strong></Link>
         <nav aria-label="Navigazione principale" className={styles.navigation}>
-          {destinations.map(({ href, label, icon: Icon }, index) => <Link key={href} href={href} className={index > 2 ? styles.secondaryDestination : undefined} title={label} aria-label={label} aria-current={destinationIsActive(href) ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span></Link>)}
-          <details className={styles.mobileMore} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
-            <summary aria-current={activeDestination.href === '/settings' ? 'page' : undefined} aria-label={activeDestination.href === '/settings' ? 'Altro · Impostazioni' : undefined}><MoreHorizontal size={20} aria-hidden /><span>Altro</span></summary>
+          {destinations.map(({ href, label, icon: Icon }, index) => <Link key={href} href={href} className={index > 2 ? styles.secondaryDestination : undefined} title={label} aria-label={label} aria-current={activeDestination.href === href ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span></Link>)}
+          <details className={styles.mobileMore} onToggle={event => setMobileMoreOpen(event.currentTarget.open)} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
+            <summary aria-current={currentInMore && !mobileMoreOpen ? 'page' : undefined} aria-label={activeDestination.href === '/settings' ? 'Altro · Impostazioni' : undefined}><MoreHorizontal size={20} aria-hidden /><span>Altro</span></summary>
             <div className={styles.mobileMenu} onClick={event => { if (event.target instanceof Element && event.target.closest('a, button')) event.currentTarget.closest('details')?.removeAttribute('open'); }}>
-              {destinations.slice(3).map(({ href, label, icon: Icon }) => <Link href={href} key={href}><Icon size={18} aria-hidden /><span>{label}</span></Link>)}
+              {destinations.slice(3).map(({ href, label, icon: Icon }) => <Link href={href} key={href} aria-current={activeDestination.href === href ? 'page' : undefined}><Icon size={18} aria-hidden /><span>{label}</span></Link>)}
               {openCommands && <button type="button" onClick={event => {
                 event.currentTarget.closest('details')?.querySelector('summary')?.focus();
                 openCommands();
               }}><CircleHelp size={18} aria-hidden /><span>Comandi e aiuto</span></button>}
-              <Link href="/settings"><Settings2 size={18} aria-hidden /><span>Impostazioni</span></Link>
+              <Link href="/settings" aria-current={activeDestination.href === '/settings' ? 'page' : undefined}><Settings2 size={18} aria-hidden /><span>Impostazioni</span></Link>
               <button type="button" onClick={lock}><LockKeyhole size={18} aria-hidden /><span>Blocca</span></button>
             </div>
           </details>

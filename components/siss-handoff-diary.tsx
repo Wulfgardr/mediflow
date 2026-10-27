@@ -203,7 +203,7 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
         }
     };
 
-    const createButton = <Button ref={createRef} variant="text" disabled={isSaving} aria-expanded={isFormOpen} aria-controls={formId}
+    const createButton = <Button ref={createRef} variant="text" disabled={isSaving} aria-expanded={isFormOpen} aria-controls={isFormOpen ? formId : undefined}
         onClick={() => { setIsFormOpen(value => !value); }}><Plus size={16} aria-hidden />Registra passaggio</Button>;
     const content = (
         <section className={styles.register}>

@@ -83,6 +83,8 @@ async function geometry(page: Page, selector: string) {
         { label: 'document', selector: 'document' }, { label: 'first-use surface', selector },
     ]);
     const surface = page.locator(selector);
+    await expect(surface.getByRole('heading', { level: 1 })).toHaveCount(1);
+    await expect(page.locator('h1:visible')).toHaveCount(1);
     const controls = surface.locator('button, a, summary, input:not([type="radio"]), label:has(input[type="radio"])');
     for (const control of await controls.all()) {
         if (!(await control.isVisible())) continue; // Native closed disclosure content is not a target.
@@ -121,6 +123,8 @@ async function unlockPassphrase(page: Page, passphrase = PASSPHRASE) {
 
 async function conserveKit(page: Page) {
     const panel = page.getByTestId('recovery-kit');
+    await expect(panel.getByRole('heading', { level: 1, name: 'Conserva il nuovo kit prima di continuare', exact: true })).toBeVisible();
+    await expect(page.locator('h1:visible')).toHaveCount(1);
     const activate = panel.getByRole('button', { name: 'Attiva la nuova passphrase', exact: true });
     await expect(activate).toBeDisabled();
     const key = await panel.getByLabel('Chiave di recupero', { exact: true }).innerText();
