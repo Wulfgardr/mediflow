@@ -22,6 +22,7 @@ const DIARY_CASES: DiaryCase[] = (['giorno', 'grafite'] as const).flatMap((regis
 
 const FIXTURE_PREFIX = 'Diario Filo sintetico';
 const createdPatientIds: string[] = [];
+const transportEvidence = new WeakMap<Page, { blocked: string[]; errors: string[] }>();
 
 async function createPatient(page: Page): Promise<string> {
   const marker = Date.now().toString().slice(-8);
@@ -122,16 +123,47 @@ async function readGlobalWindow(page: Page): Promise<Array<{ date: string }>> {
 }
 
 async function diarySignatures(entries: Locator): Promise<string[]> {
-  return entries.evaluateAll((elements) => elements.map((element) => JSON.stringify([
-    element.querySelector<HTMLAnchorElement>('a[href$="/entries/new"]')?.getAttribute('href'),
-    element.querySelector('h3')?.textContent,
-  ])));
-}
-
-function ownEntries(page: Page, diary: Locator, patientId: string): Locator {
-  return diary.getByTestId('lume-diario-entry').filter({
-    has: page.locator(`a[href="/patients/${patientId}/entries/new"]`),
-  });
+  const signatures: string[] = [];
+  const sample = await entries.evaluateAll(elements => elements.map(element => ({
+    label: element.getAttribute('aria-labelledby'), title: element.querySelector('h3')?.textContent,
+    active: element.getAttribute('data-active'),
+  })));
+  const activeIndex = sample.findIndex(row => row.active === 'true');
+  try {
+    for (const entry of await entries.all()) {
+      const actions = entry.getByRole('button', { name: 'Azioni', exact: true });
+      try {
+        await actions.focus();
+        await actions.press('ArrowDown');
+        const link = entry.getByRole('menuitem', { name: 'Nuova voce', exact: true });
+        await expect(link).toHaveCount(1);
+        await expect(link).toHaveAttribute('href', /\/entries\/new$/);
+        signatures.push(JSON.stringify([
+          await link.getAttribute('href'),
+          await entry.locator('h3').textContent(),
+        ]));
+      } finally {
+        await entry.page().keyboard.press('Escape');
+        await expect(actions).toBeFocused();
+      }
+    }
+    return signatures;
+  } finally {
+    if (activeIndex >= 0) {
+      await entries.nth(activeIndex).focus();
+      await expect.poll(async () => {
+        const rows = await entries.evaluateAll(elements => elements.map(element => ({
+          label: element.getAttribute('aria-labelledby'), title: element.querySelector('h3')?.textContent,
+          active: element.getAttribute('data-active'), background: getComputedStyle(element).backgroundColor,
+        })));
+        if (!rows.length || rows.length !== sample.length
+          || rows.some((row, index) => row.label !== sample[index].label || row.title !== sample[index].title)
+          || rows[activeIndex].active !== 'true' || rows.filter(row => row.active === 'true').length !== 1) return false;
+        const inactive = rows.filter(row => row.active !== 'true');
+        return inactive.every(row => row.background !== rows[activeIndex].background && row.background === inactive[0].background);
+      }).toBe(true);
+    }
+  }
 }
 
 async function captureBaseline(page: Page): Promise<DiaryBaseline> {
@@ -144,14 +176,17 @@ async function captureBaseline(page: Page): Promise<DiaryBaseline> {
 }
 
 async function assertWindowPreserved(
-  page: Page, diary: Locator, patientId: string, ownCount: number, baseline: DiaryBaseline,
+  diary: Locator, patientId: string, ownCount: number, baseline: DiaryBaseline,
 ): Promise<number> {
   const total = Math.min(50, baseline.signatures.length + ownCount);
   const cards = diary.getByTestId('lume-diario-entry');
   await expect(cards).toHaveCount(total);
-  await expect(ownEntries(page, diary, patientId)).toHaveCount(ownCount);
-  const otherCards = cards.filter({ hasNot: page.locator(`a[href="/patients/${patientId}/entries/new"]`) });
-  expect(await diarySignatures(otherCards)).toEqual(baseline.signatures.slice(0, 50 - ownCount));
+  const signatures = await diarySignatures(cards);
+  const ownHref = `/patients/${patientId}/entries/new`;
+  const ownSignatures = signatures.filter(signature => JSON.parse(signature)[0] === ownHref);
+  expect(ownSignatures).toHaveLength(ownCount);
+  const otherSignatures = signatures.filter(signature => JSON.parse(signature)[0] !== ownHref);
+  expect(otherSignatures).toEqual(baseline.signatures.slice(0, 50 - ownCount));
   return total;
 }
 
@@ -197,7 +232,7 @@ async function openDiary(page: Page, diaryCase?: DiaryCase): Promise<Locator> {
   await page.waitForLoadState('domcontentloaded');
   const diary = page.getByTestId('lume-diario');
   await expect(diary).toBeVisible();
-  await assertWindowPreserved(page, diary, patientId, 3, baseline);
+  await assertWindowPreserved(diary, patientId, 3, baseline);
   return diary;
 }
 
@@ -300,8 +335,32 @@ async function assertReflowStack(diary: Locator): Promise<void> {
 }
 
 test.describe.serial('Diario globale Lume', () => {
-  test.afterEach(async ({ page }) => {
-    await cleanupCreatedPatients(page);
+  test.beforeEach(async ({ page, baseURL }) => {
+    if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL
+      || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw Error('Owned synthetic archive and loopback required');
+    const origin = new URL(baseURL).origin, evidence = { blocked: [] as string[], errors: [] as string[] };
+    transportEvidence.set(page, evidence); page.on('pageerror', error => evidence.errors.push(error.message));
+    await page.route('**/*', route => {
+      const request = route.request(), url = new URL(request.url()), path = url.pathname;
+      if (url.origin !== origin || /^\/api\/(ai|icd|who|ollama|mlx|providers?|drugs|exemptions|prosthetics)(?:\/|$)/.test(path)
+        || path.startsWith('/api/settings/ai/') || path.startsWith('/api/system/ai-')
+        || (path.startsWith('/api/siss/') && path !== '/api/siss/session-status')
+        || path === '/api/system/native' || path === '/api/auth/reset') {
+        evidence.blocked.push(`${request.method()} ${url.href}`); return route.abort();
+      }
+      if (path === '/api/siss/session-status') return route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } });
+      if (path === '/api/clinical-agenda/candidates') return route.fulfill({ json: { enabled: false,
+        stats: { candidates: 0, parsed: 0, ignored: 0, invalid: 0 }, candidates: [], sources: [] } });
+      return route.continue();
+    });
+  });
+  test.afterEach(async ({ page }, info) => {
+    try { await cleanupCreatedPatients(page); }
+    finally {
+      const evidence = transportEvidence.get(page);
+      await info.attach('diary-transports', { contentType: 'application/json', body: JSON.stringify(evidence) });
+      expect(evidence?.blocked).toEqual([]); expect(evidence?.errors).toEqual([]);
+    }
   });
 
   test('Cronologia coerente con le voci globali preesistenti e ricerca', async ({ page }) => {
@@ -314,7 +373,7 @@ test.describe.serial('Diario globale Lume', () => {
       await expect(diary).not.toContainText('Nessuna voce clinica nel diario locale.');
     }
     const patientId = await createPatient(page);
-    await assertWindowPreserved(page, diary, patientId, 0, baseline);
+    await assertWindowPreserved(diary, patientId, 0, baseline);
     await createEntry(page, patientId, {
       title: `${FIXTURE_PREFIX} 1`,
       date: new Date(baseline.nextDate).toISOString(),
@@ -323,7 +382,7 @@ test.describe.serial('Diario globale Lume', () => {
       author: 'Dr.ssa Demo',
     });
     await page.reload();
-    await assertWindowPreserved(page, diary, patientId, 1, baseline);
+    await assertWindowPreserved(diary, patientId, 1, baseline);
 
     await createEntry(page, patientId, {
       title: `${FIXTURE_PREFIX} 2`,
@@ -343,7 +402,7 @@ test.describe.serial('Diario globale Lume', () => {
     const entries = diary.getByTestId('lume-diario-entry');
     const feed = page.getByRole('feed', { name: 'Diario clinico globale' });
     await expect(feed).toBeVisible();
-    const total = await assertWindowPreserved(page, diary, patientId, 3, baseline);
+    const total = await assertWindowPreserved(diary, patientId, 3, baseline);
 
     await expect(entries.first()).toContainText('Bozza');
     await expect(entries.first()).toContainText('Fonte: Dettatura sintetica');
@@ -372,7 +431,14 @@ test.describe.serial('Diario globale Lume', () => {
     const firstEntry = entries.first();
     await firstEntry.getByRole('button', { name: 'Apri quadro', exact: true }).focus();
     await page.keyboard.press('Tab');
-    await expect(firstEntry.getByRole('link', { name: 'Nuova voce', exact: true })).toBeFocused();
+    const actions = firstEntry.getByRole('button', { name: 'Azioni', exact: true });
+    await expect(actions).toBeFocused();
+    await actions.press('ArrowDown');
+    const newEntry = page.getByRole('menu', { name: 'Azioni', exact: true }).getByRole('menuitem', { name: 'Nuova voce', exact: true });
+    await expect(newEntry).toBeFocused();
+    await expect(newEntry).toHaveAttribute('href', `/patients/${patientId}/entries/new`);
+    await page.keyboard.press('Escape');
+    await expect(actions).toBeFocused();
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const motion = await page.evaluate(() => {

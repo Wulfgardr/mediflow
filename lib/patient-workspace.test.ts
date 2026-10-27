@@ -46,3 +46,20 @@ test("l'identificatore della riga e quello del controllo, non un indice", () => 
     );
     assert.equal(rows[0].id, 'checkup-xyz');
 });
+
+test('il filtro Manuali raggiunge il settimo appuntamento prima del limite di sei righe', () => {
+    const today = new Date();
+    today.setHours(9, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const input = [
+        ...Array.from({ length: 6 }, (_, index) => checkup(`today-${index}`, 'p1', today)),
+        checkup('tomorrow-seventh', 'p1', tomorrow),
+    ];
+    const before = structuredClone(input);
+    const visible = mapCheckupsForKree8(input, [patient('p1', 'Persona inventata')], 'manual')
+        .filter(row => row.filterCategory === 'manual');
+    assert.deepEqual(visible.map(row => row.id), ['tomorrow-seventh']);
+    assert.equal(mapCheckupsForKree8(input, []).length, 6);
+    assert.deepEqual(input, before);
+});
