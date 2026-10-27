@@ -219,7 +219,7 @@ async function guidedPreview(page: Page) {
     await focusVisible(page, radio);
     await radio.check();
     await expect(radio).toBeChecked();
-    expect(await radio.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+    await expect.poll(() => radio.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
     await panel.getByRole('button', { name: 'Salva e continua', exact: true }).click();
     await expect(panel.getByRole('group', { name: 'Come preferisci lavorare?', exact: true })).toBeVisible();
     await panel.getByRole('radio', { name: 'Usare direttamente le schermate', exact: true }).check();
