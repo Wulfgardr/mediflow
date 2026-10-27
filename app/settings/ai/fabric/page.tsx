@@ -200,12 +200,13 @@ export default function SettingsAiFabricPage() {
             <FunctionStatusPanel />
             {state.kind === 'ready' && state.portable && <PortableTreatmentSection disclosure={state.portable} />}
 
-            <details className={SETTINGS_CARD_CLASS}>
-            <summary className={functionStyles.advancedSummary}>Dettagli tecnici: provider, connessioni e registro</summary>
-
             {state.kind === 'loading' ? <FabricLoadingState /> : null}
             {state.kind === 'unauthorized' ? <FabricErrorState unauthorized /> : null}
             {state.kind === 'error' ? <FabricErrorState /> : null}
+
+            <details className={SETTINGS_CARD_CLASS}>
+            <summary className={functionStyles.advancedSummary}>Dettagli tecnici: provider, connessioni e registro</summary>
+
             {state.kind === 'ready' ? (
                 <div className="space-y-6">
                     <FabricProviderSection snapshot={state.status} />
