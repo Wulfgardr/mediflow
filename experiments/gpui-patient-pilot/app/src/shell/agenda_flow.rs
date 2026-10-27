@@ -5,10 +5,16 @@ pub(super) struct AgendaFlow {
     pub origin: Option<AgendaOrigin>,
     pub selected: Option<String>,
     pub targets: HashMap<String, ScrollTarget>,
-    pub outdated: bool,
+    pub refresh: Option<ReadLoad<()>>,
+    agenda_request: u64,
+    names_request: u64,
+    refresh_origin: Option<AgendaOrigin>,
+    refresh_focused: bool,
+    reconciliation: Option<String>,
     restore: Option<AgendaOrigin>,
 }
 
+#[derive(Clone)]
 pub(super) struct AgendaOrigin {
     row: String,
     offset: gpui::Point<gpui::Pixels>,
@@ -21,12 +27,212 @@ impl ClinicalApp {
         state: ViewState,
         cx: &Context<Self>,
     ) -> Stateful<Div> {
+        let object = state.object;
         state.render(
             id,
             self.theme,
             &self.read_state_focus[state.object.index()],
-            cx.listener(|this, _, _, cx| this.load_global_area(cx)),
+            cx.listener(move |this, _, _, cx| this.retry_global_read_command(object, cx)),
         )
+    }
+
+    pub(super) fn agenda_state(&self) -> Option<ViewState> {
+        self.agenda_flow
+            .refresh
+            .as_ref()
+            .and_then(|load| load.state(ReadObject::Agenda))
+            .or_else(|| self.agenda.state(ReadObject::Agenda))
+    }
+
+    pub(super) fn agenda_status(&self) -> String {
+        if let Some(state) = self.agenda_state() {
+            if matches!(
+                state.kind,
+                ViewStateKind::Caricamento | ViewStateKind::AttesaLunga { .. }
+            ) && self.agenda.ready().is_some()
+            {
+                "Aggiornamento in corso".into()
+            } else if self.agenda.ready().is_some() {
+                format!("Risultati da rileggere. {}", state.lines().0)
+            } else {
+                state.lines().0
+            }
+        } else {
+            self.agenda_flow
+                .reconciliation
+                .clone()
+                .unwrap_or_else(|| "Agenda letta".into())
+        }
+    }
+
+    pub(super) fn retry_global_read_command(&mut self, object: ReadObject, cx: &mut Context<Self>) {
+        if object == ReadObject::Agenda {
+            self.agenda_flow.restore = self.agenda_flow.selected.as_ref().map(|row| AgendaOrigin {
+                row: row.clone(),
+                offset: self.area_scroll.offset(),
+            });
+        }
+        self.retry_global_read(object, cx);
+    }
+
+    pub(super) fn retry_global_read(&mut self, object: ReadObject, cx: &mut Context<Self>) {
+        let (Some(session), Some(scope)) = (self.session.clone(), self.scope.clone()) else {
+            if object == ReadObject::Agenda {
+                self.agenda_flow.refresh = Some(ReadLoad::Interrupted);
+            }
+            cx.notify();
+            return;
+        };
+        match object {
+            ReadObject::NomiPazienti => {
+                self.agenda_flow.names_request += 1;
+                let request = self.agenda_flow.names_request;
+                self.global_patients = ReadLoad::loading();
+                self.run(
+                    move || {
+                        let mut patients = session.list_patients(&scope, false)?;
+                        patients.extend(session.list_patients(&scope, true)?);
+                        Ok(patients)
+                    },
+                    move |this, result, _| {
+                        if this.agenda_flow.names_request == request {
+                            this.global_patients = ReadLoad::from_result(result);
+                        }
+                    },
+                    cx,
+                );
+            }
+            ReadObject::Agenda => {
+                self.agenda_flow.agenda_request += 1;
+                let request = self.agenda_flow.agenda_request;
+                self.agenda_flow.reconciliation = None;
+                self.agenda_flow.refresh_origin = self.agenda_flow.restore.clone().or_else(|| {
+                    self.agenda_flow.selected.as_ref().map(|row| AgendaOrigin {
+                        row: row.clone(),
+                        offset: self.area_scroll.offset(),
+                    })
+                });
+                if self.agenda.ready().is_some() {
+                    self.agenda_flow.refresh = Some(ReadLoad::loading());
+                } else {
+                    self.agenda_flow.refresh = None;
+                    self.agenda = ReadLoad::loading();
+                }
+                let filter = AgendaFilter {
+                    date_from: self.global_interval.from.clone(),
+                    date_to: self.global_interval.to.clone(),
+                    limit: Some(200),
+                    ..Default::default()
+                };
+                self.run(
+                    move || session.list_agenda_with_filter(&scope, &filter),
+                    move |this, result, _| {
+                        if this.agenda_flow.agenda_request == request {
+                            this.finish_agenda_read(result);
+                        }
+                    },
+                    cx,
+                );
+            }
+            _ => return,
+        }
+        self.watch_patient_reads(cx);
+        cx.notify();
+    }
+
+    pub(super) fn visible_agenda_rows(&self) -> Vec<&Checkup> {
+        let query = self.global_query.trim().to_lowercase();
+        let today = chrono::Local::now().date_naive();
+        let mut rows: Vec<_> = self
+            .agenda
+            .ready()
+            .into_iter()
+            .flatten()
+            .filter(|row| {
+                row.deleted_at.is_none()
+                    && (self
+                        .global_patient_name(&row.patient_id)
+                        .to_lowercase()
+                        .contains(&query)
+                        || row.title.to_lowercase().contains(&query)
+                        || !row.locked_fields.iter().any(|field| field == "notes")
+                            && row
+                                .notes
+                                .as_deref()
+                                .unwrap_or_default()
+                                .to_lowercase()
+                                .contains(&query))
+            })
+            .collect();
+        rows.sort_by_key(|row| {
+            (
+                AgendaGroup::ALL
+                    .iter()
+                    .position(|group| *group == agenda_group(&row.status, &row.date, today))
+                    .unwrap(),
+                &row.date,
+            )
+        });
+        rows
+    }
+
+    fn finish_agenda_read(&mut self, result: Result<Vec<Checkup>, RuntimeError>) {
+        match result {
+            Ok(rows) => {
+                let old = self.visible_agenda_rows();
+                let selected = self.agenda_flow.selected.as_ref();
+                let previous = old.iter().position(|row| Some(&row.id) == selected);
+                let date = previous.map(|index| old[index].date.clone());
+                self.agenda = ReadLoad::Ready(rows);
+                self.agenda_flow.refresh = None;
+                let visible = self.visible_agenda_rows();
+                if selected.is_some() && !visible.iter().any(|row| Some(&row.id) == selected) {
+                    let nearest = visible
+                        .iter()
+                        .enumerate()
+                        .min_by_key(|(index, row)| {
+                            (
+                                date.as_ref()
+                                    .map(|date| {
+                                        let day = |value: &str| {
+                                            chrono::DateTime::parse_from_rfc3339(value)
+                                                .map(|date| {
+                                                    date.with_timezone(&chrono::Local).date_naive()
+                                                })
+                                                .or_else(|_| {
+                                                    chrono::NaiveDate::parse_from_str(
+                                                        value, "%Y-%m-%d",
+                                                    )
+                                                })
+                                                .ok()
+                                        };
+                                        day(&row.date)
+                                            .zip(day(date))
+                                            .map(|(a, b)| (a - b).num_days().abs())
+                                            .unwrap_or(i64::MAX)
+                                    })
+                                    .unwrap_or(0),
+                                index.abs_diff(previous.unwrap_or(0)),
+                            )
+                        })
+                        .map(|(_, row)| row.id.clone());
+                    self.agenda_flow.selected = nearest;
+                    self.agenda_flow.reconciliation = Some(if self.agenda_flow.selected.is_some() { "Il controllo selezionato non è più presente nei risultati. Selezionato il controllo più vicino." } else { "Il controllo selezionato non è più presente nei risultati. Nessun controllo selezionato." }.into());
+                }
+                if let Some(mut origin) = self.agenda_flow.refresh_origin.take() {
+                    origin.row = self.agenda_flow.selected.clone().unwrap_or_default();
+                    if self.agenda_flow.refresh_focused || self.agenda_flow.restore.is_some() {
+                        self.agenda_flow.restore = Some(origin);
+                    } else {
+                        self.area_scroll.set_offset(origin.offset);
+                    }
+                }
+            }
+            Err(error) if self.agenda.ready().is_some() => {
+                self.agenda_flow.refresh = Some(ReadLoad::Failed(error))
+            }
+            Err(error) => self.agenda = ReadLoad::Failed(error),
+        }
     }
 
     pub(super) fn open_agenda_patient(&mut self, row: &str, patient: &str, cx: &mut Context<Self>) {
@@ -78,8 +284,8 @@ impl ClinicalApp {
         self.message = None;
         self.focus_after_render = false;
         self.focus_search_after_render = false;
-        self.agenda_flow.outdated = self.agenda.ready().is_some();
         self.agenda_flow.restore = self.agenda_flow.origin.take();
+        self.retry_global_read(ReadObject::Agenda, cx);
         cx.notify();
     }
 
@@ -125,6 +331,21 @@ impl ClinicalApp {
                 window.focus(&self.global_apply_target.focus, cx);
             }
         }
+        if self
+            .agenda_flow
+            .refresh
+            .as_ref()
+            .is_some_and(|load| matches!(load, ReadLoad::Loading { .. }))
+        {
+            self.agenda_flow.refresh_focused = self
+                .agenda_flow
+                .targets
+                .values()
+                .any(|target| target.focus.is_focused(window));
+            if let Some(origin) = &mut self.agenda_flow.refresh_origin {
+                origin.offset = self.area_scroll.offset();
+            }
+        }
     }
 }
 
@@ -132,8 +353,20 @@ impl ClinicalApp {
 mod tests {
     use super::*;
     use crate::shell::notes_recovery_tests::Host;
+    use gpui::Focusable;
     use serde_json::json;
     use std::time::{Duration, Instant};
+
+    fn row_values() -> serde_json::Value {
+        json!((0..16).map(|index| json!({"id":format!("control-{index}"), "patientId":"patient-a", "version":1, "date":"2026-10-27", "title":format!("Controllo sintetico {index}"), "status":"pending"})).collect::<Vec<_>>())
+    }
+
+    fn agenda_calls(host: &Host) -> Vec<String> {
+        host.routes()
+            .into_iter()
+            .filter(|route| route.starts_with("GET /api/v1/network/checkups?"))
+            .collect()
+    }
 
     fn rows() -> Vec<Checkup> {
         (0..16)
@@ -144,6 +377,24 @@ mod tests {
         })).unwrap()
             })
             .collect()
+    }
+
+    fn activate_focused(cx: &mut gpui::VisualTestContext) {
+        cx.update(|window, cx| {
+            let keystroke = gpui::Keystroke::parse("enter").unwrap();
+            window.dispatch_event(
+                gpui::PlatformInput::KeyDown(gpui::KeyDownEvent {
+                    keystroke: keystroke.clone(),
+                    is_held: false,
+                    prefer_character_input: false,
+                }),
+                cx,
+            );
+            window.dispatch_event(
+                gpui::PlatformInput::KeyUp(gpui::KeyUpEvent { keystroke }),
+                cx,
+            );
+        });
     }
 
     fn draw(cx: &mut gpui::VisualTestContext) {
@@ -284,7 +535,10 @@ mod tests {
                     assert!(app.patient.detail.ready().is_some());
                     assert_eq!(app.patient_back_label(), "Torna all’Agenda");
                 });
-                let calls = host.request_count();
+                let calls = agenda_calls(&host).len();
+                host.plan("GET /api/v1/network/checkups?")
+                    .send((200, row_values()))
+                    .unwrap();
                 let back = cx
                     .debug_bounds("clinical-workspace-back-directory")
                     .unwrap();
@@ -301,7 +555,7 @@ mod tests {
                     assert_eq!(app.global_dates[1].value(cx), "2026-10-31");
                     assert_eq!(app.agenda_flow.selected.as_deref(), Some("control-8"));
                     assert_eq!(app.area_scroll.offset(), offset);
-                    assert!(app.agenda_flow.outdated);
+                    assert!(app.agenda_flow.refresh.is_none());
                     assert_eq!(app.agenda.ready().unwrap().len(), 16);
                 });
                 cx.update_window_entity(&view, |app, window, _| {
@@ -313,15 +567,20 @@ mod tests {
                 });
                 let (node, returned_row) =
                     rendered_command::node("clinical-workspace-agenda-checkup-control-8");
-                assert!(node.label().unwrap().contains("dati da rileggere"));
+                assert!(
+                    node.label()
+                        .unwrap()
+                        .starts_with("Apri scheda di Amina Sintetica")
+                );
+                assert!(!node.label().unwrap().contains("rileggere"));
                 assert_eq!(
                     returned_row, row,
                     "return must preserve the row position as well as the scroll offset"
                 );
                 assert_eq!(
-                    host.request_count(),
-                    calls,
-                    "return must not silently reread or write"
+                    agenda_calls(&host).len(),
+                    calls + 1,
+                    "return starts exactly one collective read"
                 );
             }
         }
@@ -352,6 +611,9 @@ mod tests {
                 |app, result, _| app.agenda = ReadLoad::from_result(result),
                 cx,
             );
+            host.plan("GET /api/v1/network/checkups?")
+                .send((200, row_values()))
+                .unwrap();
             app.navigate(Area::Agenda, cx);
             sender.send(()).unwrap();
         });
@@ -361,7 +623,7 @@ mod tests {
             assert!(matches!(app.global_patients, ReadLoad::Interrupted));
             assert!(app.patient.entries.ready().is_none());
             assert_eq!(app.agenda.ready().unwrap().len(), 16);
-            assert!(app.agenda_flow.outdated);
+            assert!(app.agenda_flow.refresh.is_none());
         });
         assert!(
             cx.debug_bounds("clinical-workspace-global-patient-names-command")
@@ -413,7 +675,7 @@ mod tests {
     }
 
     #[gpui::test]
-    fn g7b_explicit_reread_uses_preserved_interval_and_leaving_the_vertical_retires_origin(
+    fn g7b_return_and_retry_send_applied_interval_not_unapplied_date_edits(
         cx: &mut gpui::TestAppContext,
     ) {
         let host = Host::new();
@@ -421,33 +683,405 @@ mod tests {
             cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
         view.update(cx, |app, cx| {
             install(app, &host, cx);
+            app.global_dates[0]
+                .editor
+                .update(cx, |input, cx| input.set_content("2030-01-01", cx));
+            app.global_dates[1]
+                .editor
+                .update(cx, |input, cx| input.set_content("2030-01-31", cx));
             app.open_agenda_patient("control-2", "patient-a", cx);
         });
         cx.run_until_parked();
+        host.plan("GET /api/v1/network/checkups?")
+            .send((503, json!({"error":"unavailable"})))
+            .unwrap();
         view.update(cx, |app, cx| app.return_to_agenda(cx));
         draw(cx);
-        let calls = host.request_count();
+        assert_eq!(agenda_calls(&host).len(), 1);
         let command = cx
-            .debug_bounds("clinical-workspace-global-refresh")
+            .debug_bounds("clinical-workspace-agenda-state-command")
+            .unwrap();
+        host.plan("GET /api/v1/network/checkups?")
+            .send((200, row_values()))
             .unwrap();
         cx.simulate_click(command.center(), gpui::Modifiers::default());
-        cx.run_until_parked();
         draw(cx);
-        view.read_with(cx, |app, _| {
-            assert!(!app.agenda_flow.outdated);
-            assert!(app.agenda.ready().unwrap().is_empty());
-            assert_eq!(app.global_query, "Sintetica");
-            assert_eq!(app.global_interval.from_day, "2026-10-01");
-        });
-        assert!(host.request_count() > calls);
+        let calls = agenda_calls(&host);
+        assert_eq!(calls.len(), 2);
+        let interval = calendar_interval("2026-10-01", "2026-10-31", &chrono::Utc).unwrap();
+        for route in calls {
+            let query: HashMap<_, _> = route
+                .split('?')
+                .nth(1)
+                .unwrap()
+                .split('&')
+                .map(|pair| {
+                    let (key, value) = pair.split_once('=').unwrap();
+                    (key, value.replace("%3A", ":"))
+                })
+                .collect();
+            assert_eq!(query.get("dateFrom"), interval.from.as_ref());
+            assert_eq!(query.get("dateTo"), interval.to.as_ref());
+            assert_eq!(query.get("limit"), Some(&"200".to_owned()));
+        }
         view.update(cx, |app, cx| {
-            install(app, &host, cx);
+            assert!(app.agenda_flow.refresh.is_none());
+            assert_eq!(app.global_query, "Sintetica");
             app.open_agenda_patient("control-2", "patient-a", cx);
             app.navigate(Area::Patients, cx);
             assert!(app.agenda_flow.origin.is_none());
             assert!(app.agenda_flow.selected.is_none());
         });
         cx.run_until_parked();
+    }
+
+    #[gpui::test]
+    fn g7b_refresh_keeps_rows_scroll_and_focus_then_reconciles_visible_selection(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = Host::new();
+        for variant in [
+            "same",
+            "reordered",
+            "removed",
+            "empty",
+            "filtered",
+            "editor",
+            "retry",
+        ] {
+            let (view, cx) =
+                cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+            cx.simulate_resize(gpui::size(px(390.), px(640.)));
+            view.update(cx, |app, cx| {
+                install(app, &host, cx);
+                app.agenda_flow.selected = Some("control-8".into());
+            });
+            draw(cx);
+            cx.update_window_entity(&view, |app, window, cx| {
+                app.agenda_flow.targets["control-8"].scroll_to(window, cx);
+                window.focus(&app.agenda_flow.targets["control-8"].focus, cx);
+                if variant == "editor" {
+                    app.global_search
+                        .update(cx, |input, cx| input.focus(window, cx));
+                }
+            });
+            draw(cx);
+            if variant == "retry" {
+                view.update(cx, |app, cx| {
+                    app.agenda_flow.refresh = Some(ReadLoad::Failed(RuntimeError::Transport));
+                    cx.notify();
+                });
+                draw(cx);
+            }
+            let before = cx
+                .debug_bounds("clinical-workspace-agenda-checkup-control-8")
+                .unwrap();
+            let offset = view.read_with(cx, |app, _| app.area_scroll.offset());
+            let response = host.plan("GET /api/v1/network/checkups?");
+            if variant == "retry" {
+                activate_focused(cx);
+            } else {
+                view.update(cx, |app, cx| app.retry_global_read(ReadObject::Agenda, cx));
+            }
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+            if variant != "retry" {
+                assert_eq!(
+                    cx.debug_bounds("clinical-workspace-agenda-checkup-control-8")
+                        .unwrap(),
+                    before
+                );
+            }
+            assert!(
+                rendered_command::node("clinical-workspace-agenda-list")
+                    .0
+                    .label()
+                    .unwrap()
+                    .contains("Aggiornamento in corso")
+            );
+            let mut values = row_values().as_array().unwrap().clone();
+            match variant {
+                "reordered" => values.reverse(),
+                "removed" => {
+                    values.remove(8);
+                    for row in &mut values {
+                        row["date"] = json!("2026-10-30");
+                    }
+                    values[8]["date"] = json!("2026-10-27");
+                }
+                "empty" => values.clear(),
+                "filtered" => {
+                    for row in &mut values {
+                        row["patientId"] = json!("other");
+                    }
+                }
+                _ => {}
+            }
+            response.send((200, json!(values))).unwrap();
+            draw(cx);
+            view.read_with(cx, |app, _| {
+                let expected = match variant {
+                    "removed" => Some("control-9"),
+                    "empty" | "filtered" => None,
+                    _ => Some("control-8"),
+                };
+                assert_eq!(app.agenda_flow.selected.as_deref(), expected, "{variant}");
+                assert!(app.agenda_flow.refresh.is_none());
+                assert_eq!(
+                    app.agenda_flow.reconciliation.is_some(),
+                    matches!(variant, "removed" | "empty" | "filtered")
+                );
+                if matches!(
+                    variant,
+                    "same" | "reordered" | "removed" | "editor" | "retry"
+                ) {
+                    assert_eq!(app.area_scroll.offset(), offset);
+                }
+            });
+            cx.update_window_entity(&view, |app, window, cx| {
+                if variant == "editor" {
+                    assert!(
+                        app.global_search
+                            .read(cx)
+                            .focus_handle(cx)
+                            .is_focused(window)
+                    );
+                } else if let Some(row) = &app.agenda_flow.selected {
+                    assert!(
+                        app.agenda_flow.targets[row].focus.is_focused(window),
+                        "{variant}"
+                    );
+                } else {
+                    assert!(app.global_apply_target.focus.is_focused(window));
+                }
+            });
+        }
+    }
+
+    #[gpui::test]
+    fn g7b_names_retry_preserves_agenda_and_agenda_retry_preserves_names(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = Host::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            install(app, &host, cx);
+            app.global_patients = ReadLoad::Failed(RuntimeError::Transport);
+        });
+        draw(cx);
+        let start = host.request_count();
+        let command = cx
+            .debug_bounds("clinical-workspace-global-patient-names-command")
+            .unwrap();
+        cx.simulate_click(command.center(), gpui::Modifiers::default());
+        view.read_with(cx, |app, _| {
+            assert_eq!(app.agenda.ready().unwrap().len(), 16)
+        });
+        draw(cx);
+        assert_eq!(agenda_calls(&host).len(), 0);
+        assert_eq!(
+            host.routes()[start..]
+                .iter()
+                .filter(|route| route.as_str() == "GET /api/v1/network/patients")
+                .count(),
+            2
+        );
+        view.update(cx, |app, cx| {
+            install(app, &host, cx);
+            app.retry_global_read(ReadObject::Agenda, cx);
+            assert_eq!(app.global_patients.ready().unwrap().len(), 1);
+        });
+        draw(cx);
+        view.read_with(cx, |app, _| {
+            assert_eq!(app.global_patients.ready().unwrap().len(), 1)
+        });
+        assert_eq!(agenda_calls(&host).len(), 1);
+    }
+
+    #[gpui::test]
+    fn g7b_global_state_commands_receive_focus_without_stealing_an_editor(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = Host::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            install(app, &host, cx);
+            app.agenda = ReadLoad::loading();
+        });
+        draw(cx);
+        for error in [
+            RuntimeError::InvalidResponse,
+            RuntimeError::Transport,
+            RuntimeError::ReadRequired,
+        ] {
+            view.update(cx, |app, cx| {
+                app.agenda = ReadLoad::Failed(error);
+                cx.notify();
+            });
+            draw(cx);
+            cx.update_window_entity(&view, |app, window, _| {
+                assert!(app.read_state_focus[ReadObject::Agenda.index()].is_focused(window))
+            });
+        }
+        view.update(cx, |app, cx| {
+            app.agenda = ReadLoad::loading();
+            cx.notify();
+        });
+        draw(cx);
+        cx.update_window_entity(&view, |app, window, cx| {
+            app.global_search
+                .update(cx, |input, cx| input.focus(window, cx))
+        });
+        view.update(cx, |app, cx| {
+            app.agenda = ReadLoad::Failed(RuntimeError::Transport);
+            cx.notify();
+        });
+        draw(cx);
+        cx.update_window_entity(&view, |app, window, cx| {
+            assert!(
+                app.global_search
+                    .read(cx)
+                    .focus_handle(cx)
+                    .is_focused(window)
+            )
+        });
+        view.update(cx, |app, cx| {
+            install(app, &host, cx);
+            app.global_patients = ReadLoad::loading();
+            app.open_agenda_patient("control-2", "patient-a", cx);
+        });
+        cx.run_until_parked();
+        host.plan("GET /api/v1/network/checkups?")
+            .send((200, row_values()))
+            .unwrap();
+        view.update(cx, |app, cx| app.return_to_agenda(cx));
+        draw(cx);
+        cx.update_window_entity(&view, |app, window, cx| {
+            assert!(app.read_state_focus[ReadObject::NomiPazienti.index()].is_focused(window));
+            super::super::tests::synthetic_notes_form(app, FormState::Draft, cx);
+            app.patient.therapies = ReadLoad::Failed(RuntimeError::Transport);
+            app.global_search
+                .update(cx, |input, cx| input.focus(window, cx));
+        });
+        draw(cx);
+        cx.update_window_entity(&view, |app, window, cx| {
+            assert!(
+                app.global_search
+                    .read(cx)
+                    .focus_handle(cx)
+                    .is_focused(window)
+            )
+        });
+    }
+
+    #[gpui::test]
+    fn g7b_row_is_one_touch_target_and_wide_summary_stays_on_one_line(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = Host::new();
+        for (width, height) in [(390., 640.), (1200., 840.)] {
+            let (view, cx) =
+                cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+            cx.simulate_resize(gpui::size(px(width), px(height)));
+            view.update(cx, |app, cx| install(app, &host, cx));
+            draw(cx);
+            let row = cx
+                .debug_bounds("clinical-workspace-agenda-checkup-control-0")
+                .unwrap();
+            assert!(row.size.height >= px(44.));
+            let name = cx.debug_bounds("agenda-name-control-0").unwrap();
+            let title = cx.debug_bounds("agenda-title-control-0").unwrap();
+            let status = cx.debug_bounds("agenda-status-control-0").unwrap();
+            let date = cx.debug_bounds("agenda-date-control-0").unwrap();
+            if width == 1200. {
+                for bounds in [title, status, date] {
+                    assert!((bounds.center().y - name.center().y).abs() < px(2.));
+                }
+                assert!(date.origin.x > status.origin.x);
+            } else {
+                assert!(title.origin.y > name.origin.y);
+                assert!(status.origin.y > title.origin.y);
+            }
+            cx.update_window_entity(&view, |app, window, cx| {
+                window.focus(&app.agenda_flow.targets["control-0"].focus, cx)
+            });
+            draw(cx);
+            activate_focused(cx);
+            cx.run_until_parked();
+            view.read_with(cx, |app, _| {
+                assert_eq!(app.selected_id.as_deref(), Some("patient-a"))
+            });
+        }
+    }
+
+    #[gpui::test]
+    fn g7b_return_with_read_in_flight_and_interval_change_reject_retired_results(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = Host::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        host.plan("GET /api/v1/network/checkups?")
+            .send((200, json!([])))
+            .unwrap();
+        view.update(cx, |app, cx| {
+            install(app, &host, cx);
+            app.retry_global_read(ReadObject::Agenda, cx);
+        });
+        while cx.dispatcher.tick(true) {}
+        assert_eq!(agenda_calls(&host).len(), 1);
+        view.read_with(cx, |app, _| assert!(app.agenda_flow.refresh.is_some()));
+        host.plan("GET /api/v1/network/checkups?")
+            .send((200, row_values()))
+            .unwrap();
+        view.update(cx, |app, cx| {
+            app.open_agenda_patient("control-3", "patient-a", cx);
+            app.return_to_agenda(cx);
+            assert!(app.agenda_flow.refresh.is_some());
+        });
+        draw(cx);
+        view.read_with(cx, |app, _| {
+            assert_eq!(app.agenda.ready().unwrap().len(), 16);
+            assert!(app.agenda_flow.refresh.is_none());
+        });
+        host.plan("GET /api/v1/network/checkups?")
+            .send((200, json!([])))
+            .unwrap();
+        view.update(cx, |app, cx| app.retry_global_read(ReadObject::Agenda, cx));
+        while cx.dispatcher.tick(true) {}
+        assert_eq!(agenda_calls(&host).len(), 3);
+        host.plan("GET /api/v1/network/checkups?")
+            .send((200, row_values()))
+            .unwrap();
+        view.update(cx, |app, cx| {
+            app.global_dates[0]
+                .editor
+                .update(cx, |input, cx| input.set_content("2026-11-01", cx));
+            app.global_dates[1]
+                .editor
+                .update(cx, |input, cx| input.set_content("2026-11-30", cx));
+            app.apply_global_interval(cx);
+        });
+        while cx.dispatcher.tick(true) {}
+        draw(cx);
+        view.read_with(cx, |app, _| {
+            assert_eq!(app.global_interval.from_day, "2026-11-01");
+            assert_eq!(app.agenda.ready().unwrap().len(), 16);
+        });
+        let expected = calendar_interval("2026-11-01", "2026-11-30", &chrono::Local)
+            .unwrap()
+            .from
+            .unwrap()
+            .replace(':', "%3A");
+        assert!(
+            agenda_calls(&host)
+                .iter()
+                .any(|route| route.contains(&expected))
+        );
     }
 
     #[gpui::test]

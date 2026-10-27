@@ -1,5 +1,6 @@
 use super::*;
 use crate::theme::{TypeRole, TypeStyle};
+use gpui::Focusable;
 use std::time::Instant;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -415,7 +416,7 @@ impl ClinicalApp {
             ReadObject::Parametri => self.patient.observations.state(object),
             ReadObject::Controlli => self.patient.checkups.state(object),
             ReadObject::Profilo => self.account_profile.load.state(object),
-            ReadObject::Agenda => self.agenda.state(object),
+            ReadObject::Agenda => self.agenda_state(),
             ReadObject::NomiPazienti => self.global_patients.state(object),
             ReadObject::Documenti => self.patient.attachments.state(object),
         }
@@ -469,6 +470,14 @@ impl ClinicalApp {
     }
 
     fn visible_read_objects(&self) -> Vec<ReadObject> {
+        if self.form.is_none() && !self.show_other {
+            if self.area == Area::Agenda {
+                return vec![ReadObject::NomiPazienti, ReadObject::Agenda];
+            }
+            if self.area == Area::Diary {
+                return vec![ReadObject::NomiPazienti];
+            }
+        }
         if self.area != Area::Patients || self.show_other {
             return vec![];
         }
@@ -509,10 +518,20 @@ impl ClinicalApp {
                     .map(|state| (object, state))
             })
             .collect();
+        let editing_global = matches!(self.area, Area::Agenda | Area::Diary)
+            && (self
+                .global_search
+                .read(cx)
+                .focus_handle(cx)
+                .is_focused(window)
+                || self
+                    .global_dates
+                    .iter()
+                    .any(|field| field.editor.read(cx).focus_handle(cx).is_focused(window)));
         if let Some((object, _)) = commands
             .iter()
             .find(|command| !self.read_state_commands.contains(command))
-            .filter(|_| !background)
+            .filter(|_| !background && !editing_global)
         {
             window.focus(&self.read_state_focus[object.index()], cx);
         }
@@ -528,6 +547,7 @@ impl ClinicalApp {
             || matches!(self.patient.attachments, ReadLoad::Loading { .. })
             || self.area == Area::Agenda
                 && (matches!(self.agenda, ReadLoad::Loading { .. })
+                    || matches!(self.agenda_flow.refresh, Some(ReadLoad::Loading { .. }))
                     || matches!(self.global_patients, ReadLoad::Loading { .. }))
     }
 
