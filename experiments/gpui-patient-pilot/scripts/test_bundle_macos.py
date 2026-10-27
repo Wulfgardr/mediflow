@@ -11,7 +11,7 @@ class BundleTests(unittest.TestCase):
     def test_staging_preserves_existing_artifacts_and_rejects_installation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for destination in (root, Path.home() / "Applications/candidate", Path("/Applications/candidate"), bundle.ROOT / "output"):
+            for destination in (root, Path.home() / "Applications/candidate", Path("/Applications/candidate"), Path("/APPLICATIONS/candidate"), bundle.ROOT / "output"):
                 with self.assertRaises(ValueError):
                     bundle.validate_destination(destination)
             (root / "redirect").symlink_to(Path.home() / "Applications")
