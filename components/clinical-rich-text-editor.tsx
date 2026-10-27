@@ -59,7 +59,6 @@ interface ClinicalRichTextEditorProps {
 
 /* #75: toolbar e canvas usano solo superfici Lume opache. */
 const TOOLBAR_BUTTON_CLASS = 'mf-button-icon';
-const TOOLBAR_ICON_BUTTON_CLASS = TOOLBAR_BUTTON_CLASS;
 
 function updateEditorEmptyState(node: HTMLDivElement | null) {
     if (!node) return;
@@ -151,8 +150,6 @@ export function ClinicalRichTextEditor({
                     </button>
                 ))}
 
-                <div className="mx-1 hidden h-6 w-px bg-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] sm:block" />
-
                 {INLINE_ACTIONS.map(({ command, icon: Icon, label }) => (
                     <button
                         key={command}
@@ -167,11 +164,11 @@ export function ClinicalRichTextEditor({
                     </button>
                 ))}
 
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ml-auto flex items-center gap-3">
                     <button
                         type="button"
                         onClick={() => runCommand('outdent')}
-                        className={TOOLBAR_ICON_BUTTON_CLASS}
+                        className={TOOLBAR_BUTTON_CLASS}
                         aria-label="Riduci rientro"
                         title="Riduci rientro"
                     >
@@ -180,7 +177,7 @@ export function ClinicalRichTextEditor({
                     <button
                         type="button"
                         onClick={() => runCommand('indent')}
-                        className={TOOLBAR_ICON_BUTTON_CLASS}
+                        className={TOOLBAR_BUTTON_CLASS}
                         aria-label="Aumenta rientro"
                         title="Aumenta rientro"
                     >

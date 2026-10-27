@@ -92,6 +92,13 @@ async function assertEditorComposition(page: Page, viewCase: ViewCase): Promise<
   await expect(editor.locator(':scope > [data-lume-editor-surface]')).toHaveCount(2);
   await expect(toolbar).toBeVisible();
   await expect(canvas).toBeVisible();
+  for (const button of await toolbar.getByRole('button').all()) {
+    const box = await button.boundingBox();
+    const minimum = viewCase.viewport === 'narrow' ? 44 : 40;
+    expect(box?.width, await button.getAttribute('aria-label')).toBeGreaterThanOrEqual(minimum);
+    expect(box?.height, await button.getAttribute('aria-label')).toBeGreaterThanOrEqual(minimum);
+  }
+
 
   const adjacency = await editor.evaluate((root) => {
     const toolbarElement = root.querySelector<HTMLElement>('[data-lume-editor-surface="toolbar"]');
