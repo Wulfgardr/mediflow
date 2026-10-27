@@ -36,5 +36,5 @@
 .patientSearch { display: flex; align-items: center; gap: 12px; }
 .patientSearch > svg { flex: 0 0 16px; width: 16px; height: 16px; }
 .patientSearch > input { min-width: 0; }
-.patientName { display: block; font-size: .875rem; font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+.patientName { display: block; font-size: 0.875rem; font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
 .patientIdentity { display: block; margin-top: 4px; white-space: normal; overflow-wrap: anywhere; }
