@@ -1,6 +1,7 @@
 /* Scoped Kree8 shell for dense patient workspaces. */
 
 .shell {
+  composes: sections from "../ink-section.module.css";
   /* Lume material (WUL-55, F2c): surfaces read from the live giorno/grafite aliases. Structural shell + header
      recede to opaque canvas/chrome; content panels sit on field. Focal + il filo stay reserved for the active
      clinical locus rendered by inner content (Lume 01-lingua ss.1-3), so the shell declares no focal surface of its own. */
@@ -61,6 +62,7 @@
 }
 
 .canvas {
+  composes: container from "../ink-layout.module.css";
   --k8-canvas-pad: 18px;
   height: 100%;
   overflow: auto;
@@ -979,7 +981,7 @@
 :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .title { margin: 0; line-height: 1.2; font: var(--type-page-title); }
 :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .titleMain { font-size: inherit; letter-spacing: -0.03em; }
 :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .subtitle { margin: 4px 0 0; font-size: 0.75rem; }
-:global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-runtime-settings] { grid-template-columns: 252px minmax(0, 1fr); gap: 0; }
+:global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-runtime-settings] { grid-template-columns: 252px minmax(0, 1fr); row-gap: 0; }
 :global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-runtime-settings] > aside { padding: 22px 14px; background: var(--lume-surface-field); border-right: 1px solid var(--k8-line-strong); }
 :global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-testid='settings-subroute-content'] { padding: 36px clamp(24px, 4vw, 64px) 64px; }
 @media (min-width: 1280px) {
@@ -1037,24 +1039,24 @@
 /* the surrounding workbench supplies the sole application frame. */
 :global(html[data-runtime-twin-design='proposal']) .shell { position: absolute; inset: 0; padding: 0; }
 :global(html[data-runtime-twin-design='proposal']) .canvas { border: 0; border-radius: 0; padding: 0; gap: 0; background: var(--lume-surface-focal); }
-:global(html[data-runtime-twin-design='proposal']) .chrome { position: relative; top: 0; border-radius: 0; padding: 24px 32px 20px; border: 0; border-bottom: 1px solid var(--k8-line); background: transparent; }
+:global(html[data-runtime-twin-design='proposal']) .chrome { position: relative; top: 0; border-radius: 0; padding: 24px var(--ink-plane-inset) 20px; border: 0; border-bottom: 1px solid var(--k8-line); background: transparent; }
 :global(html[data-runtime-twin-design='proposal']) .chromeTopRow { min-height: var(--lume-control-height); }
 :global(html[data-runtime-twin-design='proposal']) .hero { padding: 8px 0 0; }
 :global(html[data-runtime-twin-design='proposal']) .title { line-height: 1.25; font: var(--type-page-title); }
 :global(html[data-runtime-twin-design='proposal']) .brandMark { display: none; }
-:global(html[data-runtime-twin-design='proposal']) .workspaceBody { padding: 26px 32px 50px; }
+:global(html[data-runtime-twin-design='proposal']) .workspaceBody { padding: 26px var(--ink-plane-inset) 50px; }
 /* secondary navigation is a compact link, never a full-width pill. */
 :global(html[data-runtime-twin-design='proposal']) .backButton { flex: 0 0 auto; width: fit-content; min-height: var(--lume-control-height); border: 0; border-radius: 5px; background: transparent; padding: 6px 0; justify-content: flex-start; }
 /* the workspace already supplies Pazienti and Privacy once. */
 :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chromeTopRow { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chrome { grid-template-columns: minmax(0, 1fr); padding-block: 20px; }
 :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .hero { padding: 0; }
-@media (max-width: 700px) { :global(html[data-runtime-twin-design='proposal']) .chrome { padding: 20px; } :global(html[data-runtime-twin-design='proposal']) .workspaceBody { padding: 22px 20px; } }
+@media (max-width: 700px) { :global(html[data-runtime-twin-design='proposal']) .chrome { padding: 20px var(--ink-plane-inset); } :global(html[data-runtime-twin-design='proposal']) .workspaceBody { padding: 22px var(--ink-plane-inset); } }
 
 /* WUL-676: area headings and anchor navigation share one alignment.
    Only the navigation marks scroll position; data surfaces retain their shape. */
 :global(html[data-runtime-twin-design='proposal']) .overviewShell {
-  --overview-inset: 32px;
+  --overview-inset: var(--ink-plane-inset);
 }
 :global(html[data-runtime-twin-design='proposal']) .overviewShell .chrome {
   padding: 28px var(--overview-inset) 20px;
@@ -1112,10 +1114,13 @@
   scroll-margin-top: 60px;
 }
 @media (max-width: 700px) {
-  :global(html[data-runtime-twin-design='proposal']) .overviewShell { --overview-inset: 20px; }
+  :global(html[data-runtime-twin-design='proposal']) .overviewShell { --overview-inset: var(--ink-plane-inset); }
   :global(html[data-runtime-twin-design='proposal']) .overviewShell .sectionRail { column-gap: 12px; }
 }
 @media (max-width: 360px) {
   :global(html[data-runtime-twin-design='proposal']) .overviewShell .sectionRail { column-gap: 8px; }
 }
 @media (pointer: fine) and (min-width: 701px) { :global(html[data-runtime-twin-design='proposal']) .headerActionButton { white-space: nowrap; } }
+
+.chrome { composes: plane from "../ink-layout.module.css"; }
+.workspaceBody { composes: plane from "../ink-layout.module.css"; }
