@@ -156,7 +156,7 @@ body {
 .lume-rule-table tbody tr:hover { background: var(--lume-surface-hover); }
 
 body { caret-color: var(--lume-ink-fresh); }
-:root :focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: 2px; }
+:root :focus-visible:not(h1[tabindex='-1']) { outline: 2px solid var(--lume-ink-fresh); outline-offset: 2px; }
 input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); opacity: 1; }
 
 /* Ensure selected text is readable in dark mode */
