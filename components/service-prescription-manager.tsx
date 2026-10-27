@@ -418,7 +418,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
     };
 
     const count = prescriptions === undefined ? undefined : formatCountLabel(prescriptions.length, 'prestazione', 'prestazioni');
-    const newButton = <Button ref={creationRef} variant="text" aria-expanded={isFormOpen} aria-controls={formId}
+    const newButton = <Button ref={creationRef} variant="text" aria-expanded={isFormOpen} aria-controls={isFormOpen ? formId : undefined}
         onClick={() => setIsFormOpen(value => !value)}>Nuova prestazione</Button>;
     const content = (
         <section className={styles.register}>

@@ -60,7 +60,7 @@ export function PatientSheetMenu({ label, trigger, children, triggerRef: supplie
     return <div ref={rootRef} className={`${styles.actionsMenu} ${className}`} onBlur={event => {
         if (!event.currentTarget.contains(event.relatedTarget)) setIsOpen(false);
     }}>
-        {trigger({ ref: triggerRef, type: 'button', 'aria-expanded': isOpen, 'aria-haspopup': 'menu', 'aria-controls': menuId,
+        {trigger({ ref: triggerRef, type: 'button', 'aria-expanded': isOpen, 'aria-haspopup': 'menu', 'aria-controls': isOpen ? menuId : undefined,
             onClick: () => isOpen ? close() : open(), onKeyDown: event => {
                 if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                     event.preventDefault(); open(event.key === 'ArrowUp' ? 'last' : 'first');

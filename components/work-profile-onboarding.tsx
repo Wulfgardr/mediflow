@@ -206,7 +206,7 @@ export function WorkProfileOnboarding({ controller }: { controller: WorkProfileC
     return (
         <section className={`${styles.experience} ${styles.profile}`} aria-labelledby="work-profile-title" data-testid="work-profile-onboarding" aria-busy={busy}>
             <header className={styles.heading}>
-                <h2 id="work-profile-title" className="type-page-title">Il tuo modo di lavorare<span aria-hidden="true">.</span></h2>
+                <h1 id="work-profile-title" className="type-page-title">Il tuo modo di lavorare<span aria-hidden="true">.</span></h1>
                 <p>Scegli da dove iniziare. Puoi usare la cartella senza AI.</p>
                 <nav className={styles.links} aria-label="Percorsi sempre disponibili">
                     <Link className={styles.textAction} href="/?area=turno">Apri la cartella manualmente</Link>
