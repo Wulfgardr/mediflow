@@ -1,24 +1,5 @@
 [
   {
-    "id": "native-filechooser-timeout",
-    "owner": "Leonardo / WUL-729",
-    "diagnosis": "https://linear.app/wulfgardr/issue/WUL-729",
-    "expiresAt": "2026-10-23T00:00:00Z",
-    "reason": "Intermittent on unchanged code; native filechooser timeout, cause unresolved. Reviewed 2026-10-15: failure in PR518 and success in run 38766790431 do not establish a fix. Review by 2026-10-23; explicit release disposition required in WUL-735.",
-    "tests": [
-      {
-        "runner": "playwright",
-        "file": "e2e/document-upload-anydoc-focus.spec.ts",
-        "title": "AnyDoc: le azioni allegato restano visibili al focus e sui viewport stretti",
-        "signature": "^(?:Error: )?page\\.waitForEvent: Test timeout of 45000ms exceeded\\.\\s*=+ logs =+\\s*waiting for event \"filechooser\"\\s*=+\\s*$",
-        "errors": [
-          "^Test timeout of 45000ms exceeded\\.$",
-          "^(?:Error: )?page\\.waitForEvent: Test timeout of 45000ms exceeded\\.\\s*=+ logs =+\\s*waiting for event \"filechooser\"\\s*=+\\s*$"
-        ]
-      }
-    ]
-  },
-  {
     "id": "chromium-no-store-response-abort",
     "owner": "Leonardo / WUL-729",
     "diagnosis": "https://github.com/microsoft/playwright/issues/42742",

@@ -63,14 +63,16 @@ test('parent', async t => {
 });
 
 test('known signatures reject generic timeouts, cleanup errors, other tests and exact expiry', () => {
-  const entries = loadQuarantine();
+  const entries = [{ ...entry('playwright', 'e2e/synthetic.spec.ts'), expiresAt: future }];
   const registered = entries[0].tests[0];
-  const result = { ...registered, errors: ['Test timeout of 45000ms exceeded.',
-    'page.waitForEvent: Test timeout of 45000ms exceeded.\n=========================== logs ===========================\nwaiting for event "filechooser"\n============================================================'] };
+  registered.signature = '^specific failure detail$';
+  registered.errors = ['^known browser failure$', '^specific failure detail$'];
+  const result = { ...registered, errors: ['known browser failure', 'specific failure detail'] };
   const beforeExpiry = Date.parse(entries[0].expiresAt) - 1;
   assert.equal(quarantineFor(result, entries, beforeExpiry)?.id, entries[0].id);
   assert.equal(quarantineFor(result, entries, beforeExpiry + 1), null);
   assert.equal(quarantineFor({ ...result, errors: result.errors.slice(0, 1) }, entries, beforeExpiry), null);
+  assert.equal(quarantineFor({ ...result, errors: ['Test timeout of 45000ms exceeded.'] }, entries, beforeExpiry), null);
   assert.equal(quarantineFor({ ...result, title: 'another test' }, entries, beforeExpiry), null);
   assert.equal(quarantineFor({ ...result, errors: [...result.errors, 'cleanup failed'] }, entries, beforeExpiry), null);
   assert.deepEqual(errorMessages({ code: 'ERR_TEST_FAILURE', cause: new AggregateError([new Error('known browser failure'), new Error('cleanup failed')]) }),
