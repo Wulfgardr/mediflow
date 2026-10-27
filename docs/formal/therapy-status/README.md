@@ -10,6 +10,30 @@ sono una prova TLA né un'estensione implicita degli invarianti legacy sottostan
 
 Il recovery cifrato supporta lo schema corrente 6 e i predecessori canonici 4 e 5; le 24 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
+## Riesame HC-7 del 27 ottobre 2026
+
+Confrontato `components/therapy-manager.tsx` fra la base `c4ddf2e35` e
+`b051f6970`: il delta riguarda titolo/conseguenza della conferma di eliminazione,
+ordine cognome/nome del destinatario e testo della conferma di cambio stato.
+Il riepilogo mostra stato di partenza, destinazione e data corrente; la data
+effettiva resta determinata dall'host al commit. Il verbo del comando identifica
+il farmaco. Il componente comune dà priorità al ritorno nelle conferme distruttive;
+Escape, chiusura e annullamento risolvono ancora `confirmed: false`. Motivazione
+richiesta, trimming e controllo di presenza non cambiano.
+
+Riesaminati `updateStatus`, `handleSoftDelete`, recupero e consumer dei due
+controller: transizioni, guardie, confini degli await e chiamate a
+`begin`/`confirm`/`cancel`/`recover` restano invariati. La stringa del destinatario
+è solo presentazione; ID paziente/terapia, target, versioni e payload non cambiano.
+Controller ADR0168, recupero legacy ADR0156, route, CAS, ledger e audit sono
+identici alla base e conservano le impronte coperte. Anche le conferme di nuovo
+invio dopo conflitto conservano motivo e guardie esistenti.
+
+L'impronta del solo componente e `syncCommit` sono aggiornati manualmente dopo
+questo confronto. Modello, statechart, invarianti, limiti e mutanti non cambiano;
+`verify:therapy-status` deve completare il modello legacy e i test causali correnti.
+Questa revisione di presentazione non estende la copertura TLC al protocollo durevole.
+
 ## Raccordo della copertura al 26 ottobre 2026
 
 `coverage.json.syncCommit` identifica ora la revisione del runtime riesaminata
