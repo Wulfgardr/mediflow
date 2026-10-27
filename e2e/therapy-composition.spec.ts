@@ -245,3 +245,23 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
         } finally { await zoom?.close(); }
     });
 }
+
+for (const width of [1440, 390]) test(`campo terapia riserva spazio al bersaglio di cancellazione ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 960 });
+    await fixture(page);
+    await page.route('**/api/drugs?**', route => route.fulfill({ json: [] }));
+    await creation(page).click();
+    const input = section(page).getByPlaceholder('Cerca per nome o principio attivo...', { exact: true });
+    await input.fill('Ricerca sintetica con nome del farmaco molto lungo');
+    const clear = section(page).getByRole('button', { name: 'Cancella ricerca', exact: true });
+    await expect(clear).toBeVisible();
+    const fieldBox = await input.boundingBox();
+    const clearBox = await clear.boundingBox();
+    const paddingRight = await input.evaluate(element => Number.parseFloat(getComputedStyle(element).paddingRight));
+    const minimum = width <= 700 ? 44 : 40;
+    expect(clearBox?.width).toBeGreaterThanOrEqual(minimum);
+    expect(clearBox?.height).toBeGreaterThanOrEqual(minimum);
+    expect(paddingRight).toBeGreaterThanOrEqual(fieldBox!.x + fieldBox!.width - clearBox!.x + 8);
+    await clear.click({ position: { x: clearBox!.width / 2, y: 2 } });
+    await expect(input).toHaveValue('');
+});

@@ -186,7 +186,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                     onChange={handleSearch}
                     onKeyDown={handleKeyDown}
                     placeholder="Cerca diagnosi (ICD-11 Official - English)"
-                    className="mf-input mf-input-sm icd-autocomplete-input"
+                    className="mf-input mf-input-sm mf-search-input icd-autocomplete-input"
                     aria-expanded={isOpen && results.length > 0}
                     aria-controls={listboxId}
                     aria-autocomplete="list"

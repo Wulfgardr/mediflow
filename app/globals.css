@@ -1118,9 +1118,12 @@ textarea.input-field {
 
 /* WUL-339: ICD autocomplete uses inset icons, so compact input padding
    must not place the typed diagnosis under the search glyph. */
-.icd-autocomplete-input.mf-input-sm {
+html:root[data-lume] .mf-input.mf-search-input {
   padding-left: 2.35rem;
-  padding-right: 2.75rem;
+  padding-right: calc(var(--lume-control-height) + 8px);
+}
+
+.icd-autocomplete-input {
   text-transform: uppercase;
 }
 
