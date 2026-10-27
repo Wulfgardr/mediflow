@@ -428,8 +428,9 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                 {formatCountLabel(openCount, 'aperta', 'aperte')} · {formatCountLabel(reportCount, 'referto', 'referti')}
             </p> : null}
 
+            <div id={formId} hidden={!isFormOpen}>
             {isFormOpen && (
-                <form id={formId} ref={formRef} aria-label="Nuova prestazione"
+                <form ref={formRef} aria-label="Nuova prestazione"
                     onSubmit={handleSubmit}
                     className={styles.form}
                 >
@@ -629,7 +630,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                         </label>
                     </div>
                     {error && <p className="mt-3 text-xs font-medium text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{error}</p>}
-                    <div className="mt-4 flex justify-end gap-2">
+                    <div className="mt-4 flex justify-end gap-3">
                         <button
                             type="button"
                             className="ui-btn-secondary h-10 px-4 text-sm"
@@ -648,6 +649,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                     </div>
                 </form>
             )}
+            </div>
 
             {!prescriptions ? <p role="status" className={styles.empty}>Caricamento prescrizioni…</p> : prescriptions.length === 0 ? (
                 <p className={styles.empty}>Nessuna prestazione prescritta registrata.</p>
