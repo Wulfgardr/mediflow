@@ -117,25 +117,17 @@ export function useAiSettingsController() {
     async function loadAiConfig(isCurrent: () => boolean) {
         try {
             await ensureTextModelDefaultsUpgraded();
-            const safeGet = async (key: string) => {
-                try {
-                    return await db.settings.get(key);
-                } catch {
-                    return undefined;
-                }
-            };
-
-            const hardware = await safeGet('hardwareProfile');
-            const modelClinical = await safeGet('aiModel_clinical');
-            const modelReasoning = await safeGet('aiModel_reasoning');
-            const legacyModel = await safeGet('aiModel');
-            const genericUrl = await safeGet('aiUrl');
-            const legacyUrl = await safeGet('ollamaUrl');
-            const patientInsightKillSwitch = await safeGet(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY);
-            const documentSynthesisKillSwitch = await safeGet(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
-            const smartImportKillSwitch = await safeGet(AI_SMART_IMPORT_KILL_SWITCH_KEY);
-            const treatmentReasoningKillSwitch = await safeGet(AI_TREATMENT_REASONING_KILL_SWITCH_KEY);
-            const documentRouterControlFlow = await safeGet(DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY);
+            const hardware = await db.settings.get('hardwareProfile');
+            const modelClinical = await db.settings.get('aiModel_clinical');
+            const modelReasoning = await db.settings.get('aiModel_reasoning');
+            const legacyModel = await db.settings.get('aiModel');
+            const genericUrl = await db.settings.get('aiUrl');
+            const legacyUrl = await db.settings.get('ollamaUrl');
+            const patientInsightKillSwitch = await db.settings.get(AI_PATIENT_INSIGHT_KILL_SWITCH_KEY);
+            const documentSynthesisKillSwitch = await db.settings.get(AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY);
+            const smartImportKillSwitch = await db.settings.get(AI_SMART_IMPORT_KILL_SWITCH_KEY);
+            const treatmentReasoningKillSwitch = await db.settings.get(AI_TREATMENT_REASONING_KILL_SWITCH_KEY);
+            const documentRouterControlFlow = await db.settings.get(DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY);
 
             let currentUrl = genericUrl?.value;
             if (!currentUrl) currentUrl = legacyUrl?.value;
