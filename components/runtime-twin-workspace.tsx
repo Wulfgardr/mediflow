@@ -118,7 +118,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
         <nav aria-label="Navigazione principale" className={styles.navigation}>
           {destinations.map(({ href, label, icon: Icon }, index) => <Link key={href} href={href} className={index > 2 ? styles.secondaryDestination : undefined} title={label} aria-label={label} aria-current={destinationIsActive(href) ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span></Link>)}
           <details className={styles.mobileMore} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
-            <summary><MoreHorizontal size={20} aria-hidden /><span>Altro</span></summary>
+            <summary aria-current={activeDestination.href === '/settings' ? 'page' : undefined} aria-label={activeDestination.href === '/settings' ? 'Altro · Impostazioni' : undefined}><MoreHorizontal size={20} aria-hidden /><span>Altro</span></summary>
             <div className={styles.mobileMenu} onClick={event => { if (event.target instanceof Element && event.target.closest('a, button')) event.currentTarget.closest('details')?.removeAttribute('open'); }}>
               {destinations.slice(3).map(({ href, label, icon: Icon }) => <Link href={href} key={href}><Icon size={18} aria-hidden /><span>{label}</span></Link>)}
               {openCommands && <button type="button" onClick={event => {

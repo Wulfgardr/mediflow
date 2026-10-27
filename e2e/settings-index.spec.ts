@@ -170,10 +170,10 @@ test('Indice Impostazioni: diniego reale, ricevuta positiva e riconciliazione no
         await expect(overview.getByRole('heading', { level: 1 })).toHaveCount(0);
         await expect(overview.getByRole('heading', { name: 'Postazione', level: 2, exact: true })).toHaveCSS('font-size', '12px');
         await expect(overview.getByRole('heading', { name: 'Aspetto', level: 2, exact: true })).toHaveCSS('font-size', '12px');
-        const appearance = overview.getByRole('link', { name: 'Apri aspetto', exact: true });
+        const appearance = page.locator('a[href="/settings/aspetto"]:visible');
         await appearance.focus(); await expect(appearance).toBeFocused(); await page.keyboard.press('Enter'); await expect(page).toHaveURL(/\/settings\/aspetto$/u);
         await page.goBack(); await expect(value).toContainText('Locale');
-        const profile = page.getByTestId('settings-overview-link-profilo'); await profile.focus(); await page.keyboard.press('Enter'); await expect(page).toHaveURL(/\/settings\/profilo$/u);
+        const profile = page.locator('a[href="/settings/profilo"]:visible'); await profile.focus(); await page.keyboard.press('Enter'); await expect(page).toHaveURL(/\/settings\/profilo$/u);
         expect(errors).toEqual([]);
     } finally { responseGate.release(); await zoom.close(); }
 });
@@ -205,7 +205,7 @@ test('Indice Impostazioni: tastiera e bersagli in compatto e zoom reale', async 
             await assertNoHorizontalOverflow(page, [{ label: 'pagina', selector: 'document' }]);
             if (directory) { await mkdir(directory, { recursive: true }); await page.screenshot({ path: `${directory}/${theme}-${size}-tastiera.png`, animations: 'disabled' }); }
         }
-        const appearance = page.getByRole('link', { name: 'Apri aspetto', exact: true });
+        const appearance = page.locator('a[href="/settings/aspetto"]:visible');
         await appearance.focus(); await page.keyboard.press('Enter'); await expect(page).toHaveURL(/\/settings\/aspetto$/u);
         expect(writes).toEqual([]);
     } finally { await zoom.close(); }

@@ -36,7 +36,7 @@ test('complete backup is encrypted in the browser and verification never claims 
     if (await manual.isVisible()) await manual.click();
     await navigation.locator('summary').filter({ hasText: /^Altro$/u }).click();
     await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();
-    await page.getByTestId('settings-overview-link-backup').click();
+    await page.locator('a[href="/settings/backup"]:visible').click();
     const panel = page.getByRole('region', { name: 'Backup completo di recupero', exact: true });
     await expect(panel).toBeVisible();
     const denied = await page.request.post('/api/system/recovery-backup', { data: {}, headers: {

@@ -131,7 +131,7 @@ test('access and profile settings preserve form drafts and denied outcomes', asy
         holdRead = false; releaseRead(); await expect(name).toBeEnabled();
         await expect(profile.getByRole('status')).toHaveCount(0);
         await capture(page, zoom, 'profilo', name);
-        const back = page.getByRole('link', { name: 'Torna alle impostazioni', exact: true });
+        const back = page.locator('a[href="/settings"]:visible').filter({ hasText: /Torna alle impostazioni|Panoramica/u });
         await back.click(); await expect(page).toHaveURL(new URL('/settings', baseURL!).href);
         await expect(page.getByRole('dialog')).toHaveCount(0);
         await page.getByRole('link', { name: 'Profilo', exact: true }).click(); await expect(name).toBeEnabled();

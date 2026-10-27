@@ -183,7 +183,7 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   await expect(page.getByTestId('settings-overview-section')).toBeVisible();
 
   // WUL-297: the detailed appearance controls still live on the /settings/aspetto route.
-  await page.getByRole('link', { name: 'Apri aspetto', exact: true }).click();
+  await page.locator('a[href="/settings/aspetto"]:visible').click();
   await expect(page).toHaveURL(/\/settings\/aspetto$/);
   await expect(page.getByTestId('settings-nav-sidebar')).toBeVisible();
   await expect(page.getByTestId('settings-appearance-section')).toBeVisible();
