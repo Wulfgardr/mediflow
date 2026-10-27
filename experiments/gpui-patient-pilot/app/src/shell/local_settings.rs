@@ -38,7 +38,12 @@ impl ClinicalApp {
             }
             PreferenceChange::TextScale(_) => return,
             PreferenceChange::Contrast(value) => self.increased_contrast = value,
-            PreferenceChange::Privacy(value) => self.privacy_shield = value,
+            PreferenceChange::Privacy(value) => {
+                if value {
+                    self.withdraw_ambulatory_command_view(cx);
+                }
+                self.privacy_shield = value;
+            }
         }
         self.save_local_preferences(cx);
     }

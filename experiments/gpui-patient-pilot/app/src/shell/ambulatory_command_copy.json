@@ -1,0 +1,61 @@
+{
+  "titoli": {
+    "clear": "Svuota ambulatorio di test",
+    "delete": "Elimina ambulatorio",
+    "recovery": "Recupera esito"
+  },
+  "azioni_riga": {
+    "clear": "Svuota",
+    "delete": "Elimina"
+  },
+  "autorizzazione": {
+    "passphrase": "Inserisci la passphrase per autorizzare questa operazione.",
+    "conferma_clear": "Scrivi SVUOTA per confermare.",
+    "conferma_delete": "Scrivi ELIMINA per confermare."
+  },
+  "anteprima": {
+    "titolo": "Controlla gli effetti su {ambulatorio}",
+    "cestino": "Cartelle da spostare nel Cestino: {conteggio}",
+    "scollegati": "Cartelle da scollegare da questo ambulatorio: {conteggio}",
+    "preservate": "Tra quelle da scollegare, cartelle ordinarie da conservare: {conteggio}",
+    "predefinito": "Il nuovo ambulatorio predefinito sarà {nome}.",
+    "delete": "L’ambulatorio sarà eliminato."
+  },
+  "stati": {
+    "preparazione": "Preparazione in corso…",
+    "autorizzazione": "Autorizzazione in corso…",
+    "anteprima": "Preparazione dell’anteprima…",
+    "invio": "Operazione in corso…",
+    "ignoto": "Esito non disponibile. Autorizza di nuovo l’accesso, poi verifica l’esito o chiudi l’operazione.",
+    "applied": "Operazione completata.",
+    "rejected": "Operazione non eseguita.",
+    "closed": "Operazione chiusa senza esecuzione registrata.",
+    "ritiro_confermato": "Sessione dedicata chiusa.",
+    "ritiro_non_confermato": "Non è stato possibile confermare la chiusura della sessione dedicata. Riprova; le informazioni per il recupero saranno conservate."
+  },
+  "azioni": {
+    "conferma": "Conferma",
+    "verifica": "Verifica esito",
+    "chiusura_operazione": "Chiudi operazione",
+    "chiusura_spiegazione": "Se l’operazione è già stata eseguita, ne vedrai l’esito; la chiusura non annulla quanto già fatto.",
+    "riprova_ritiro": "Riprova a chiudere la sessione",
+    "chiudi": "Chiudi",
+    "chiudi_attesa": "Puoi uscire: le informazioni per recuperare l’esito saranno conservate finché non sarà confermata anche la chiusura della sessione.",
+    "rileggi": "Aggiorna elenco",
+    "annulla": "Annulla",
+    "autorizza": "Autorizza"
+  },
+  "errori": {
+    "storage": "Impossibile preparare il recupero. L’operazione non è stata inviata.",
+    "piano_cambiato": "La situazione è cambiata. Aggiorna l’elenco e prepara una nuova anteprima.",
+    "accesso_scaduto": "L’autorizzazione è scaduta o revocata. Autorizza di nuovo l’accesso.",
+    "risposta_persa": "La risposta non è arrivata. Non ripetere l’operazione: verifica l’esito.",
+    "autorizzazione": "Autorizzazione non riuscita. Verifica l’accesso e riprova.",
+    "ack_locale": "L’esito è noto e la sessione dedicata è chiusa, ma non è stato possibile completare la chiusura del recupero. Le informazioni sono conservate; riprova a chiudere.",
+    "recupero_locale": "Impossibile leggere le informazioni di recupero o sono già in uso. L’esito precedente non è noto: non avviare nuove operazioni. Rendi disponibili le informazioni e riapri il recupero."
+  },
+  "recupero": {
+    "storico": "Questo esito è storico e non descrive necessariamente la situazione attuale. Aggiorna l’elenco.",
+    "sessione_precedente": "Non è possibile confermare la chiusura della sessione precedente."
+  }
+}

@@ -818,7 +818,31 @@ export function ambulatoryAuditContract(handler, mode, operation) {
 }
 
 /* source order and delegation guard; SQLite tests establish actual rollback. */
-export function validateRequiredAmbulatoryAudit({ spec, routeSource, coreSource, adapterSource = null, clearSource = null }) {
+export function validateRequiredAmbulatoryAudit(input) {
+    if (!['clear', 'delete'].includes(input.spec.operation)) return validateInlineAmbulatoryAudit(input);
+    const source = checkedSource(input.spec.ownerFile, input.coreSource);
+    const name = `${input.spec.operation}AmbulatoryInTransaction`;
+    const declarations = source.sourceFile.statements.filter(ts.isFunctionDeclaration);
+    const cores = declarations.filter(node => node.name?.text === name);
+    const owners = declarations.filter(node => node.name?.text === input.spec.coreName);
+    const core = cores[0], owner = owners[0];
+    const args = ['tx', 'context', input.spec.operation === 'clear' ? 'ambulatoryId' : 'id', 'parsedVersion', 'surface', 'authorizeCommit'];
+    const calls = [];
+    const visit = node => { if (ts.isCallExpression(node) && node.expression.getText(source.sourceFile) === name) calls.push(node); ts.forEachChild(node, visit); };
+    if (owner) visit(owner);
+    const call = calls[0], callback = call?.parent;
+    if (cores.length !== 1 || owners.length !== 1 || !core.body || !owner.body
+        || core.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword)
+        || core.parameters.length !== args.length || core.parameters.some((parameter, index) => parameter.name.getText(source.sourceFile) !== args[index])
+        || calls.length !== 1 || !callback || !ts.isArrowFunction(callback) || callback.body !== call
+        || callback.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword)
+        || call.arguments.length !== args.length || call.arguments.some((arg, index) => arg.getText(source.sourceFile) !== args[index]))
+        return ['ambulatory wrapper must delegate exactly once to its named synchronous Tx core with the same admitted arguments'];
+    const normalized = input.coreSource.slice(0, call.getStart(source.sourceFile)) + core.body.getText(source.sourceFile) + input.coreSource.slice(call.end);
+    return validateInlineAmbulatoryAudit({ ...input, coreSource: normalized });
+}
+
+function validateInlineAmbulatoryAudit({ spec, routeSource, coreSource, adapterSource = null, clearSource = null }) {
     const problems = validateDelegatedRouteAudit({
         spec, routeSource, serviceSource: spec.mode === 'network' ? adapterSource ?? '' : coreSource,
     });

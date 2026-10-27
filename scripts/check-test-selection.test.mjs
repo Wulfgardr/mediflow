@@ -57,8 +57,8 @@ test('a deleted file still listed by git is not read as a test', () => {
 const sourceRoot = fileURLToPath(new URL('..', import.meta.url));
 const pilot = 'experiments/gpui-patient-pilot';
 const pilotWorkflow = '.github/workflows/rust-gpui-pilot.yml';
-const pilotFiles = ['client/tests/flow.rs', 'app/src/chat_access/owner.rs', 'app/src/clinical_text.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/shell/account_profile.rs', 'app/src/shell/ambulatories.rs', 'app/src/shell/ai_preferences.rs', 'app/src/shell/ai_status.rs', 'app/src/shell/analytics.rs', 'app/src/shell/chat_access.rs', 'app/src/shell/document_details.rs', 'app/src/shell/local_preferences.rs', 'app/src/shell/local_settings.rs', 'app/src/shell/notes_recovery_tests.rs', 'app/src/shell/rendered_command.rs', 'app/src/shell/scales.rs', 'app/src/shell/therapy_picker.rs', 'app/src/shell/view_state.rs', 'app/src/shell/who_lookup.rs', 'app/src/text_input.rs', 'app/src/theme.rs',
-  'transport/src/account_profile.rs', 'transport/src/ambulatories.rs', 'transport/src/ai_preferences.rs', 'transport/src/analytics.rs', 'transport/src/catalogs.rs', 'transport/src/context.rs', 'transport/src/crypto.rs', 'transport/src/http.rs', 'transport/src/ports.rs', 'transport/src/profile_query.rs', 'transport/src/scales.rs', 'transport/src/session.rs', 'transport/src/who.rs', 'transport/src/bin/mediflow-runtime-probe.rs'].map(file => `${pilot}/${file}`);
+const pilotFiles = ['client/tests/flow.rs', 'app/src/chat_access/owner.rs', 'app/src/clinical_text.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/native_lock.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/shell/account_profile.rs', 'app/src/shell/ambulatories.rs', 'app/src/shell/ai_preferences.rs', 'app/src/shell/ai_status.rs', 'app/src/shell/analytics.rs', 'app/src/shell/chat_access.rs', 'app/src/shell/document_details.rs', 'app/src/shell/local_preferences.rs', 'app/src/shell/local_settings.rs', 'app/src/shell/notes_recovery_tests.rs', 'app/src/shell/rendered_command.rs', 'app/src/shell/scales.rs', 'app/src/shell/therapy_picker.rs', 'app/src/shell/view_state.rs', 'app/src/shell/who_lookup.rs', 'app/src/text_input.rs', 'app/src/theme.rs',
+  'transport/src/account_profile.rs', 'transport/src/ambulatories.rs', 'transport/src/ambulatory_command_recovery.rs', 'transport/src/ambulatory_command_transport.rs', 'transport/src/ambulatory_commands.rs', 'transport/src/ai_preferences.rs', 'transport/src/analytics.rs', 'transport/src/catalogs.rs', 'transport/src/context.rs', 'transport/src/crypto.rs', 'transport/src/http.rs', 'transport/src/ports.rs', 'transport/src/profile_query.rs', 'transport/src/scales.rs', 'transport/src/session.rs', 'transport/src/who.rs', 'transport/src/bin/mediflow-runtime-probe.rs'].map(file => `${pilot}/${file}`);
 const pilotTestCall = `cargo test --manifest-path ${pilot}/Cargo.toml --workspace --all-targets --locked`;
 function pilotFixture(t) {
   const root = mkdtempSync(path.join(tmpdir(), 'mediflow-cargo-selection-'));
@@ -70,10 +70,10 @@ function pilotFixture(t) {
   for (const file of [pilotWorkflow, ...['Cargo.toml', 'rust-toolchain.toml', 'client/Cargo.toml', 'transport/Cargo.toml', 'app/Cargo.toml'].map(file => `${pilot}/${file}`)]) {
     write(file, readFileSync(path.join(sourceRoot, file)));
   }
-  for (const file of [...pilotFiles, `${pilot}/app/src/shell/threshold_actions.rs`, `${pilot}/client/src/lib.rs`, `${pilot}/transport/src/bin/mediflow-runtime-probe.rs`, `${pilot}/Cargo.lock`]) write(file, 'must not execute');
-  write(`${pilot}/app/src/main.rs`, '// synthetic binding fixture\nmod appointments;\n#[cfg(unix)]\nmod chat_access;\nmod clinical_text;\nmod components;\nmod demo;\nmod demo_app;\nmod documents;\nmod editing;\nmod icons;\nmod navigation;\nmod patient_forms;\nmod references;\nmod shell;\nmod text_input;\nmod theme;\nfn main() {}');
-  write(`${pilot}/app/src/shell.rs`, '//! Synthetic shell binding fixture\nmod account_profile;\nmod ai_preferences;\nmod ai_status;\nmod ambulatories;\nmod analytics;\n#[cfg(unix)]\nmod chat_access;\nmod document_details;\nmod local_preferences;\nmod local_settings;\n#[cfg(test)]\nmod notes_recovery_tests;\n#[cfg(test)]\npub(crate) mod rendered_command;\nmod scales;\nmod therapy_picker;\nmod threshold_actions;\nmod view_state;\nmod who_lookup;');
-  write(`${pilot}/transport/src/lib.rs`, '//! Synthetic library binding fixture\n#![forbid(unsafe_code)]\nmod account_profile;\nmod ai_preferences;\nmod ambulatories;\nmod analytics;\nmod catalogs;\nmod context;\nmod crypto;\nmod dto;\nmod error;\nmod http;\nmod ports;\nmod profile_query;\nmod scales;\nmod session;\nmod tls;\nmod who;');
+  for (const file of [...pilotFiles, `${pilot}/app/src/shell/threshold_actions.rs`, `${pilot}/app/src/shell/ambulatory_commands.rs`, `${pilot}/client/src/lib.rs`, `${pilot}/transport/src/bin/mediflow-runtime-probe.rs`, `${pilot}/Cargo.lock`]) write(file, 'must not execute');
+  write(`${pilot}/app/src/main.rs`, '// synthetic binding fixture\nmod appointments;\n#[cfg(unix)]\nmod chat_access;\nmod clinical_text;\nmod components;\nmod demo;\nmod demo_app;\nmod documents;\nmod editing;\nmod icons;\nmod native_lock;\nmod navigation;\nmod patient_forms;\nmod references;\nmod shell;\nmod text_input;\nmod theme;\nfn main() {}');
+  write(`${pilot}/app/src/shell.rs`, '//! Synthetic shell binding fixture\nmod account_profile;\nmod ai_preferences;\nmod ai_status;\nmod ambulatories;\nmod ambulatory_commands;\nmod analytics;\n#[cfg(unix)]\nmod chat_access;\nmod document_details;\npub(crate) mod local_preferences;\nmod local_settings;\n#[cfg(test)]\nmod notes_recovery_tests;\n#[cfg(test)]\npub(crate) mod rendered_command;\nmod scales;\nmod therapy_picker;\nmod threshold_actions;\nmod view_state;\nmod who_lookup;');
+  write(`${pilot}/transport/src/lib.rs`, '//! Synthetic library binding fixture\n#![forbid(unsafe_code)]\nmod account_profile;\nmod ai_preferences;\nmod ambulatories;\nmod ambulatory_command_recovery;\nmod ambulatory_command_transport;\nmod ambulatory_commands;\nmod analytics;\nmod catalogs;\nmod context;\nmod crypto;\nmod dto;\nmod error;\nmod http;\nmod ports;\nmod profile_query;\nmod scales;\nmod session;\nmod tls;\nmod who;');
   for (const file of ['run.mjs', 'prepare-runtime.mjs', 'js-client.mjs', 'compare.mjs', 'verify-vectors.mjs']) {
     write(`${pilot}/comparison/${file}`, readFileSync(path.join(sourceRoot, pilot, 'comparison', file)));
   }
@@ -137,8 +137,8 @@ test('GPUI coverage fails closed when Cargo membership, modules or actual CI inv
     [`${pilot}/app/src/shell.rs`, 'mod analytics;', '// mod analytics;'],
     [`${pilot}/app/src/shell.rs`, 'mod analytics;', '#[cfg(feature = "optional")]\nmod analytics;'],
     [`${pilot}/app/src/shell.rs`, 'mod document_details;', '// mod document_details;'],
-    [`${pilot}/app/src/shell.rs`, 'mod local_preferences;', '// mod local_preferences;'],
-    [`${pilot}/app/src/shell.rs`, 'mod local_preferences;', '#[cfg(feature = "optional")]\nmod local_preferences;'],
+    [`${pilot}/app/src/shell.rs`, 'pub(crate) mod local_preferences;', '// pub(crate) mod local_preferences;'],
+    [`${pilot}/app/src/shell.rs`, 'pub(crate) mod local_preferences;', '#[cfg(feature = "optional")]\npub(crate) mod local_preferences;'],
     [`${pilot}/app/src/shell.rs`, 'mod local_settings;', '// mod local_settings;'],
     [`${pilot}/app/src/shell.rs`, 'mod local_settings;', '#[cfg(feature = "optional")]\nmod local_settings;'],
     [`${pilot}/app/src/shell.rs`, 'mod scales;', '// mod scales;'],
@@ -158,6 +158,12 @@ test('GPUI coverage fails closed when Cargo membership, modules or actual CI inv
     [`${pilot}/transport/src/lib.rs`, 'mod who;', '// mod who;'],
     [`${pilot}/transport/src/lib.rs`, 'mod who;', '#[cfg(feature = "optional")]\nmod who;'],
     [`${pilot}/transport/Cargo.toml`, 'path = "src/lib.rs"', 'path = "src/lib.rs"\ntest = false'],
+    ...[['app/src/main.rs', 'native_lock'], ['app/src/shell.rs', 'ambulatory_commands'],
+      ...['ambulatory_command_recovery', 'ambulatory_command_transport', 'ambulatory_commands'].map(name => ['transport/src/lib.rs', name])]
+      .flatMap(([file, name]) => [
+        [`${pilot}/${file}`, `mod ${name};`, `// mod ${name};`],
+        [`${pilot}/${file}`, `mod ${name};`, `#[cfg(feature = "optional")]\nmod ${name};`],
+      ]),
     [pilotWorkflow, pilotTestCall, pilotTestCall.replace('--workspace ', '')],
     [pilotWorkflow, pilotTestCall, pilotTestCall.replace('--all-targets', '--lib')],
     [pilotWorkflow, pilotTestCall, `${pilotTestCall} || true`],
