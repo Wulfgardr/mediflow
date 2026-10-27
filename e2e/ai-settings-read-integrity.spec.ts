@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Route } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 import { readFunctionModelPreferences } from '../lib/ai-providers/fabric/function-model-preferences';
 
@@ -10,9 +10,28 @@ for (const view of ['funzioni', 'modelli']) test(`AI settings ${view}: one faile
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL
         || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw Error('Owned isolated synthetic runtime required');
     const origin = new URL(baseURL).origin, blocked: string[] = [], writes: string[] = [], failedReads: string[] = [];
+    const mockedUiWrites: { key: string; value: boolean }[] = [];
+    const uiDefaults: Record<string, boolean> = { uiReduceMotion: false, uiReduceTransparency: false };
+    const mockUiPreference = async (route: Route) => {
+        const request = route.request(), path = new URL(request.url()).pathname;
+        const key = path.startsWith('/api/settings/') ? path.slice('/api/settings/'.length) : undefined;
+        if (request.method() === 'GET' && key && Object.hasOwn(uiDefaults, key)) {
+            await route.fulfill({ json: { key, value: uiDefaults[key] } }); return true;
+        }
+        if (request.method() === 'POST' && path === '/api/settings') {
+            const body = request.postDataJSON();
+            if (body && Object.keys(body).length === 2 && Object.hasOwn(uiDefaults, body.key) && body.value === false) {
+                mockedUiWrites.push({ key: body.key, value: false });
+                await route.fulfill({ json: { key: body.key, value: false } }); return true;
+            }
+        }
+        return false;
+    };
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.route('**/*', route => {
+    await page.route('**/*', async route => {
         const request = route.request(), url = new URL(request.url());
+        if (url.origin !== origin) { blocked.push(url.href); return route.abort(); }
+        if (await mockUiPreference(route)) return;
         if (url.origin === origin && url.pathname === '/api/siss/session-status' && request.method() === 'GET')
             return route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } });
         if (url.origin !== origin || forbiddenRuntimePath(url.pathname)
@@ -34,6 +53,7 @@ for (const view of ['funzioni', 'modelli']) test(`AI settings ${view}: one faile
         const request = route.request(), url = new URL(request.url()), path = url.pathname;
         if (url.origin !== origin) { blocked.push(url.href); return route.abort(); }
         if (!path.startsWith('/api/')) return route.continue();
+        if (await mockUiPreference(route)) return;
         if (request.method() !== 'GET') { writes.push(`${request.method()} ${path}`); return route.abort(); }
         if (path === '/api/settings/ai/functions') return route.fulfill({ json: preferences });
         if (path === '/api/settings/ai/chatgpt/status') return route.fulfill({ json: { state: 'disconnected', notice: null, plan: null,
@@ -59,7 +79,7 @@ for (const view of ['funzioni', 'modelli']) test(`AI settings ${view}: one faile
     await expect.poll(() => failedReads.length).toBe(1);
     await expect(controls).toHaveAttribute('aria-busy', 'false');
     await test.info().attach('read-integrity-observation', { contentType: 'application/json', body: JSON.stringify({
-        view, baselineExpectedFailure: process.env.AI_SETTINGS_BASELINE === '1', failedReads, writes, blocked,
+        view, baselineExpectedFailure: process.env.AI_SETTINGS_BASELINE === '1', failedReads, writes, mockedUiWrites, blocked,
         errorVisible: await error.isVisible(), controlsDisabled: await controls.isDisabled(), saveDisabled: await save.isDisabled(),
         syntheticStoredRouter: settings.documentRouterControlFlow,
     }, null, 2) });
