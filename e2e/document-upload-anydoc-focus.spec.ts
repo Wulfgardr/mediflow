@@ -115,6 +115,7 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   // No locator.press/refocus: a later focus loss must remain a failure. Observe
   // the original root/input through the real Enter and the real native picker.
   const observation = await chooser.evaluateHandle(installKeyboardChooserObservation);
+  const chooserProtocol = await page.context().newCDPSession(page);
   let keyboardSnapshot: KeyboardChooserSnapshot | null = null;
   let nativeEvent = false;
   let nativeInputMatches: boolean | null = null;
@@ -130,6 +131,8 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
     expect(initialSnapshot.initial.rootFocused, 'focus changed before Enter').toBe(true);
     const nativeWaiter = page.waitForEvent('filechooser').then((value) => { nativeEvent = true; return value; });
     gesture = (async () => {
+      // Playwright 1.58.2 subscribes without awaiting Chromium's interception acknowledgement.
+      await chooserProtocol.send('Page.setInterceptFileChooserDialog', { enabled: true });
       await page.keyboard.press('Enter');
       const afterEnter: KeyboardChooserSnapshot = await observation.evaluate((probe) => probe.snapshot());
       keyboardSnapshot = afterEnter;
@@ -157,6 +160,7 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
     if (!page.isClosed()) await observation.evaluate((probe) => probe.stop());
   } catch (error) { failures.push(error); }
   try { await observation.dispose(); } catch (error) { failures.push(error); }
+  try { await chooserProtocol.detach(); } catch (error) { failures.push(error); }
   try {
     await testInfo.attach('anydoc-keyboard-chooser', {
       body: Buffer.from(JSON.stringify({ decision, nativeEvent, nativeInputMatches, keyboardSnapshot, browserMessages })),
@@ -166,10 +170,12 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   if (failures.length === 1) throw failures[0];
   if (failures.length > 1) throw new AggregateError(failures, 'AnyDoc keyboard/chooser and cleanup/report failures', { cause: failures[0] });
 
+  const viewButton = page.getByRole('button', { name: `Visualizza ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true });
+  await expect(viewButton).toBeEnabled();
   await chooser.focus();
   await page.keyboard.press('Tab');
 
-  await expect(page.getByRole('button', { name: `Visualizza ${SYNTHETIC_ATTACHMENT_NAME}`, exact: true })).toBeFocused();
+  await expect(viewButton).toBeFocused();
   await page.keyboard.press('Tab');
 
   let extractButton = page.getByRole('button', { name: `Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}` });
