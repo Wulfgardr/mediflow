@@ -345,7 +345,7 @@
   transform: none;
 }
 
-.timelineSection.timelineSection .sectionTitle, .timelineSection .month {
+.timelineSection.timelineSection .sectionTitle, .timelineSection.timelineSection .month {
   font: var(--type-section);
   font-variant-caps: all-small-caps;
 }
