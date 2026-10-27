@@ -25,7 +25,8 @@ import type {
   Kree8PatientStatus,
 } from '../cockpit-shared';
 import type { InboxList, Kree8Patient } from '@/lib/patient-workspace';
-import { parseDiagnosisLabels } from '@/lib/patient-workspace';
+import type { WorklistTodos } from '@/lib/worklist-todo';
+import { formatWorkspaceDate, parseDiagnosisLabels } from '@/lib/patient-workspace';
 import { nextVirtualRowIndex, type VirtualListNavigationKey } from '@/lib/kree8-keyboard-navigation';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
@@ -36,9 +37,20 @@ import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 /* ───────────────────────── Pazienti in carico ───────────────────────── */
 
 
+function WorklistTodo({ todos, patientId }: { todos: WorklistTodos; patientId: string }) {
+  const item = todos.status === 'ready' ? todos.byPatient.get(patientId) : undefined;
+  return <span className={`${patientStyles.patientTodo} ${todos.status === 'ready' && !item ? patientStyles.todoEmpty : ''}`} data-worklist-todo={todos.status}>
+    {todos.status !== 'ready' ? todos.status === 'loading' ? 'Lettura controlli…' : 'Controlli non disponibili'
+      : item ? <><span>{item.next.title || 'Controllo pianificato'}</span><span className={patientStyles.todoDetail}>{formatWorkspaceDate(item.next.date)}</span>{item.count > 1 ? <span className={patientStyles.todoDetail}>{item.count === 2 ? 'Un altro controllo' : `Altri ${item.count - 1} controlli`}</span> : null}</>
+        : 'Nessun controllo aperto'}
+  </span>;
+}
+
 function IncaricoArea({
   patients,
   patientStatus,
+  todos,
+  onRetryTodos,
   selectedPatientId,
   searchFocusSignal,
   onSelectPatient,
@@ -49,6 +61,8 @@ function IncaricoArea({
 }: {
   patients: Kree8Patient[];
   patientStatus: Kree8PatientStatus;
+  todos: WorklistTodos;
+  onRetryTodos?: () => void;
   selectedPatientId?: string;
   searchFocusSignal: number;
   onSelectPatient: (patientId: string) => void;
@@ -323,7 +337,7 @@ function IncaricoArea({
           <button type="button" className={classNames(patientStyles.scopeChip, list === 'archivio' && patientStyles.scopeChipActive)} aria-pressed={list === 'archivio'} onClick={() => setList('archivio')}>Archivio</button>
         </div>
         {isReview ? <select aria-label="Ambito pazienti" value={scope} onChange={event => setScope(event.target.value as InboxScope)}><option value="ambulatorio">Ambulatorio locale</option><option value="network">Rete locale</option><option value="tutti">Tutti gli ambulatori</option></select> : null}
-        <Link href="/patients/new" className={styles.primaryBtn} data-lume-action="primary"><Plus size={16} aria-hidden />Nuova scheda</Link>
+        <Link href="/patients/new" className={classNames(styles.primaryBtn, patientStyles.directoryAction)} data-lume-action="primary"><Plus size={16} aria-hidden />Nuova scheda</Link>
       </header>
       <div className={patientStyles.inboxLayout}>
         <section className={patientStyles.worklistPanel} aria-label={list === 'attivi' ? 'Pazienti in carico' : 'Archivio pazienti'} data-testid="lume-worklist">
@@ -331,7 +345,13 @@ function IncaricoArea({
             {patientStatus === 'ready' ? <span className={patientStyles.resultCount}>{visible.length} {visible.length === 1 ? 'risultato' : 'risultati'}</span> : null}
             <span className={patientStyles.keyboardHint}>↑ ↓ per scorrere · Invio per aprire</span>
           </header>
-          <div className={patientStyles.columnHeadings} aria-hidden="true"><span>Paziente</span><span>Età</span><span>Problema principale</span><span>Aggiornato</span><span>Stato</span></div>
+          <div className={patientStyles.columnHeadings} aria-hidden="true"><span data-worklist-column>Paziente</span><span data-worklist-column>Età</span><span data-worklist-column>Problema principale</span><span data-worklist-column>Aggiornato</span><span data-worklist-column>Da fare</span></div>
+          {patientStatus === 'ready' && todos.status !== 'ready' ? (
+            <div className={patientStyles.todoReadState} role={todos.status === 'loading' ? 'status' : 'alert'}>
+              <span>{todos.status === 'loading' ? 'Lettura dei controlli in corso…' : todos.status === 'error' ? '◆ Impossibile leggere i controlli.' : '▲ La lettura dei controlli non è disponibile.'}</span>
+              {todos.status === 'error' && onRetryTodos ? <button type="button" className={patientStyles.directoryAction} onClick={onRetryTodos}>Riprova controlli</button> : null}
+            </div>
+          ) : null}
           <div style={{ marginTop: 8 }}>
             {patientStatus === 'idle' || patientStatus === 'loading' ? (
               <div className={styles.emptyState} role="status" aria-live="polite" aria-label="Caricamento pazienti">
@@ -411,7 +431,7 @@ function IncaricoArea({
                           <span className={patientStyles.recordAge}>{p.ageLabel}</span>
                           <span className={patientStyles.recordDiagnosis}>{diagnosisDescription || 'Diagnosi non registrata'}</span>
                           <span className={patientStyles.patientWhen} data-testid="lume-patient-when">{p.lastTouch}</span>
-                          <span className={patientStyles.patientStatusText} data-lume-row-part="status">{p.statusLabel}</span>
+                          <WorklistTodo todos={todos} patientId={p.id} />
                         </button>
                       </div>
                     );
@@ -455,12 +475,13 @@ function IncaricoArea({
             <p className={patientStyles.caseLensStatus}>
               {selected.statusLabel}
             </p>
+            <div className={patientStyles.lensTodo}><h3>Da fare</h3><WorklistTodo todos={todos} patientId={selected.id} /></div>
             <p className="lume-code" data-testid="lume-patient-code">{selected.code}</p>
             <p className={patientStyles.caseLensSummary}>
               {selected.summary}
             </p>
             <div className={classNames(patientStyles.caseLensActions, patientStyles.worklistLensActions)}>
-              <Link href={selected.modulesHref} className={styles.ghostBtn} data-lume-action="secondary">
+              <Link href={selected.modulesHref} className={classNames(styles.ghostBtn, patientStyles.directoryAction)} data-lume-action="secondary">
                 <UserSquare2 size={13} />
                 Apri scheda paziente
               </Link>
