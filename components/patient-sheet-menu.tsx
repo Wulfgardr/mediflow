@@ -14,7 +14,6 @@ type PatientSheetMenuProps = {
 
 export function PatientSheetMenu({ label, trigger, children, triggerRef: suppliedRef, onOpen, className = '' }: PatientSheetMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const rootRef = useRef<HTMLDivElement>(null);
     const ownTriggerRef = useRef<HTMLButtonElement>(null);
     const triggerRef = suppliedRef ?? ownTriggerRef;
     const menuRef = useRef<HTMLDivElement>(null);
@@ -47,7 +46,8 @@ export function PatientSheetMenu({ label, trigger, children, triggerRef: supplie
         const observer = new ResizeObserver(position);
         if (menuRef.current) observer.observe(menuRef.current);
         const closeOutside = (event: PointerEvent) => {
-            if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
+            const target = event.target as Node;
+            if (!menuRef.current?.contains(target) && !triggerRef.current?.contains(target)) setIsOpen(false);
         };
         document.addEventListener('pointerdown', closeOutside);
         return () => {
@@ -57,8 +57,10 @@ export function PatientSheetMenu({ label, trigger, children, triggerRef: supplie
             window.removeEventListener('scroll', position, true);
         };
     }, [isOpen, triggerRef]);
-    return <div ref={rootRef} className={`${styles.actionsMenu} ${className}`} onBlur={event => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setIsOpen(false);
+    return <div className={`${styles.actionsMenu} ${className}`} onBlur={event => {
+        if (!menuRef.current?.contains(event.relatedTarget) && event.relatedTarget !== triggerRef.current) setIsOpen(false);
+    }} onKeyDown={event => {
+        if (isOpen && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
     }}>
         {trigger({ ref: triggerRef, type: 'button', 'aria-expanded': isOpen, 'aria-haspopup': 'menu', 'aria-controls': menuId,
             onClick: () => isOpen ? close() : open(), onKeyDown: event => {
@@ -79,7 +81,6 @@ export function PatientSheetMenu({ label, trigger, children, triggerRef: supplie
                 if (event.key === 'Home') next = 0;
                 if (event.key === 'End') next = candidates.length - 1;
                 if (next !== undefined) { event.preventDefault(); candidates[next]?.focus(); }
-                else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
             }}>
             {children}
         </div> : null}

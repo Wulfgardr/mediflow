@@ -74,7 +74,8 @@ test('header actions are an accessible ordered menu with unchanged links and cal
  await page.keyboard.press('Escape');await expect(documentTrigger).toBeFocused();
  await page.keyboard.press('ArrowUp');
  await expect(documentMenu.getByRole('menuitem',{name:'Elimina',exact:true})).toBeFocused();
- await page.keyboard.press('Escape');await expect(documentTrigger).toBeFocused();
+ await page.keyboard.press('Shift+Tab');await expect(documentTrigger).toBeFocused();
+ await page.keyboard.press('Escape');await expect(documentMenu).toHaveCount(0);await expect(documentTrigger).toBeFocused();
  const confirmTrigger=page.getByRole('button',{name:'Altro referto sintetico',exact:true});
  await confirmTrigger.focus();await page.keyboard.press('ArrowUp');await page.keyboard.press('Enter');
  const confirmation=page.getByRole('dialog',{name:'Eliminare documento sintetico?',exact:true});
