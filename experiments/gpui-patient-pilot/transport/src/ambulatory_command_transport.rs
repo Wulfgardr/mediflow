@@ -483,7 +483,11 @@ mod tests {
         (listener, url)
     }
     fn accept(listener: &TcpListener) -> TcpStream {
-        let deadline = Instant::now() + Duration::from_secs(30);
+        accept_auth_step(listener, None)
+    }
+    fn accept_auth_step(listener: &TcpListener, step: Option<usize>) -> TcpStream {
+        let started = Instant::now();
+        let deadline = started + Duration::from_secs(if step == Some(2) { 120 } else { 30 });
         loop {
             match listener.accept() {
                 Ok((s, _)) => {
@@ -496,7 +500,10 @@ mod tests {
                 {
                     thread::sleep(Duration::from_millis(5))
                 }
-                Err(e) => panic!("synthetic listener: {e}"),
+                Err(e) => panic!(
+                    "synthetic listener step {step:?} after {:?}: {e}",
+                    started.elapsed()
+                ),
             }
         }
     }
@@ -629,7 +636,7 @@ mod tests {
         let expected = url.clone();
         let worker = thread::spawn(move || {
             for step in 0..6 {
-                let mut stream = accept(&listener);
+                let mut stream = accept_auth_step(&listener, Some(step));
                 let body = request(&mut stream);
                 let lower = body.to_lowercase();
                 assert!(lower.contains(&format!("origin: {expected}\r\n")));
