@@ -33,7 +33,10 @@ for (const scenario of functionScenarios) test(`Funzioni baseline: ${scenario}`,
             if (scenario === 'off' || scenario === 'configured') for (const toggle of await region(page).getByRole('switch').all()) await expect(toggle).toHaveAttribute('aria-checked', String(scenario === 'configured'));
             if (scenario === 'unavailable') await expect(region(page).getByText(/non disponibile/, { exact: false }).first()).toBeVisible();
             if (!baseline && ['off', 'configured', 'unavailable'].includes(scenario)) {
-                await expect(region(page).locator(`span[data-state="${scenario}"]`)).toHaveCount(4);
+                const status = region(page).locator(`span[data-state="${scenario}"]`);
+                const label = scenario === 'off' ? 'Disattivata' : scenario === 'configured'
+                    ? 'Configurazione locale presente' : 'Configurazione locale non disponibile';
+                await expect(status).toHaveText([label, label, label, label]);
                 await expect(region(page).getByText('La configurazione non prova la disponibilità del modello: viene verificata alla richiesta.', { exact: true })).toBeVisible();
             }
         }
