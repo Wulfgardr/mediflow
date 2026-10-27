@@ -41,7 +41,7 @@ function WorklistTodo({ todos, patientId }: { todos: WorklistTodos; patientId: s
   const item = todos.status === 'ready' ? todos.byPatient.get(patientId) : undefined;
   return <span className={patientStyles.patientTodo} data-worklist-todo={todos.status}>
     {todos.status !== 'ready' ? todos.status === 'loading' ? 'Lettura controlli…' : 'Controlli non disponibili'
-      : item ? <><span>{item.next.title || 'Controllo pianificato'}</span><span className={patientStyles.todoDetail}>{formatWorkspaceDate(item.next.date)}</span>{item.count > 1 ? <span className={patientStyles.todoDetail}>Altri {item.count - 1} {item.count === 2 ? 'controllo' : 'controlli'}</span> : null}</>
+      : item ? <><span>{item.next.title || 'Controllo pianificato'}</span><span className={patientStyles.todoDetail}>{formatWorkspaceDate(item.next.date)}</span>{item.count > 1 ? <span className={patientStyles.todoDetail}>{item.count === 2 ? 'Un altro controllo' : `Altri ${item.count - 1} controlli`}</span> : null}</>
         : 'Nessun controllo aperto'}
   </span>;
 }
