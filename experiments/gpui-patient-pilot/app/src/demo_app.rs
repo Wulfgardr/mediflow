@@ -703,7 +703,7 @@ impl PatientApp {
                     .child(self.button("clinical-workspace-keep-draft", "Mantieni la bozza", Command::KeepDraft, false, true, cx))
                     .child(self.button("clinical-workspace-discard-confirm", if self.discard == Some(DiscardAction::Hide) { "Scarta e nascondi" } else { "Scarta e rileggi" }, Command::Discard, true, true, cx)))))
             .when(review, |el| el.child(div().flex().flex_col().gap(px(12.))
-                .child(div().type_role(theme, TypeRole::Threshold).child(text!(format!("Registrare le note nella scheda di {}?", profile.display_name()))))
+                .child(crate::components::confirmation_heading(format!("Registrare le note nella scheda di {}?", profile.display_name()), theme))
                 .child(div().type_role(theme, TypeRole::Meta).child(text!("1 elemento: note della scheda. La modifica resta solo in memoria.")))
                 .child(div().flex().flex_wrap().gap(px(8.))
                     .child(self.button("clinical-workspace-cancel-review", "Torna alla bozza", Command::Cancel, false, true, cx))
