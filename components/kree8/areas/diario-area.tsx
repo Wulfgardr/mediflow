@@ -4,110 +4,44 @@ import { Fragment, useState } from 'react';
 import Link from 'next/link';
 import {
   Inbox,
+  Ellipsis,
   Paperclip,
   Plus,
   UserSquare2,
 } from 'lucide-react';
 
-import { db, type ClinicalEntry } from '@/lib/db';
-import { useLiveQuery } from '@/lib/live-query';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { PillBadge } from '../cockpit-shared';
+import { ViewState } from '@/components/ui/view-state';
+import { PatientSheetMenu } from '@/components/patient-sheet-menu';
 import type { AreaId, Kree8DiaryClientState, Kree8DiaryEntry } from '../cockpit-shared';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import diaryStyles from './diario-area.module.css';
-
-type DiaryEntryState = 'draft' | 'signed' | 'recorded' | 'deleted';
-
-type DiaryEntryPresentation = {
-  author?: string;
-  source: string;
-  state: DiaryEntryState;
-  stateLabel: string;
-};
-
-function metadataRecord(value: unknown): Record<string, unknown> {
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-  if (typeof value !== 'string') return {};
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : {};
-  } catch {
-    return {};
-  }
-}
-
-function firstText(metadata: Record<string, unknown>, keys: string[]): string | undefined {
-  for (const key of keys) {
-    const value = metadata[key];
-    if (typeof value === 'string' && value.trim()) return value.trim();
-  }
-  return undefined;
-}
-
-function entryPresentation(entry: Kree8DiaryEntry, raw?: ClinicalEntry): DiaryEntryPresentation {
-  if (entry.deleted) {
-    return { source: 'Diario locale', state: 'deleted', stateLabel: 'Eliminata' };
-  }
-
-  const metadata = metadataRecord(raw?.metadata);
-  const workflowState = firstText(metadata, ['workflowStatus', 'status'])?.toLocaleLowerCase('it-IT');
-  const state: DiaryEntryState = workflowState === 'draft' || workflowState === 'bozza'
-    ? 'draft'
-    : workflowState === 'signed' || workflowState === 'firmata'
-      ? 'signed'
-      : 'recorded';
-  const settingSource = raw?.setting === 'home'
-    ? 'Assistenza domiciliare'
-    : raw?.setting === 'hospital'
-      ? 'Ospedale'
-      : raw?.setting === 'ambulatory'
-        ? 'Ambulatorio'
-        : undefined;
-
-  return {
-    author: firstText(metadata, ['authorName', 'author', 'signedBy']),
-    source: firstText(metadata, ['sourceLabel', 'source']) ?? settingSource ?? 'Diario locale',
-    state,
-    stateLabel: state === 'draft' ? 'Bozza' : state === 'signed' ? 'Firmata' : 'Registrata',
-  };
-}
 
 /* issue 105, riferimento 68 */
 function DiarioArea({
   diaryState,
   onOpenArea,
   onSelectPatient,
+  onRetry,
 }: {
   diaryState: Kree8DiaryClientState;
   onOpenArea: (area: AreaId) => void;
   onSelectPatient: (patientId: string) => void;
+  onRetry?: () => void;
 }) {
   const { proposal } = useRuntimeTwinDesign();
   const isLoading = diaryState.status === 'loading' || diaryState.status === 'idle';
+  const hasSnapshot = diaryState.hasSnapshot ?? diaryState.status === 'ready';
   const [query, setQuery] = useState('');
   const [entryType, setEntryType] = useState('Tutte');
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
-  const rawEntries = useLiveQuery<ClinicalEntry[], ClinicalEntry[]>(
-    async () => db.entries.query({ orderBy: 'date', orderDir: 'desc', limit: 50 }).toArray(),
-    [],
-    [],
-    ['entries'],
-  ) ?? [];
-  const rawEntryById = new Map(rawEntries.map((entry) => [entry.id, entry]));
   const entryTypes = ['Tutte', ...new Set(diaryState.entries.map(entry => entry.typeLabel))];
   const visibleEntries = diaryState.entries.filter(entry =>
     (entryType === 'Tutte' || entry.typeLabel === entryType)
     && `${entry.patientName} ${entry.title} ${entry.preview}`.toLocaleLowerCase('it-IT').includes(query.trim().toLocaleLowerCase('it-IT')),
   );
-  const monthLabel = (entry: Kree8DiaryEntry) => {
-    const date = rawEntryById.get(entry.id)?.date;
-    return date ? new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' }).format(new Date(date)) : 'Voci recenti';
-  };
+  const monthLabel = (entry: Kree8DiaryEntry) => entry.monthLabel ?? 'Voci recenti';
   const resolvedActiveId = visibleEntries.some((entry) => entry.id === activeEntryId)
     ? activeEntryId
     : visibleEntries[0]?.id;
@@ -142,32 +76,37 @@ function DiarioArea({
         <input type="search" aria-label="Cerca nel diario" placeholder="Cerca paziente o contenuto" value={query} onChange={event => setQuery(event.target.value)} />
         <div className={diaryStyles.types} aria-label="Tipo di voce">{entryTypes.map(type => <button key={type} type="button" aria-pressed={entryType === type} onClick={() => setEntryType(type)}>{type}</button>)}</div>
       </div>
-      <section className={diaryStyles.timelineSection} aria-labelledby="diario-timeline-title">
+      <section className={diaryStyles.timelineSection} aria-labelledby="diario-timeline-title" aria-busy={isLoading}>
         <header className={diaryStyles.sectionHeader}>
           <div>
             <h2 id="diario-timeline-title" className={diaryStyles.sectionTitle}>Voci recenti</h2>
             {!proposal && <p className={diaryStyles.sectionSubtitle}>Un solo Filo connette le voci che appartengono alla sequenza temporale.</p>}
           </div>
           <span className={proposal ? diaryStyles.count : `${diaryStyles.count} lume-registro`}>
-            {isLoading ? '…' : proposal
+            {!hasSnapshot ? '…' : proposal
               ? `${formatCountLabel(visibleEntries.length, 'voce', 'voci')} · ${formatCountLabel(diaryState.patientCount, 'paziente', 'pazienti')}`
               : `${formatCountLabel(visibleEntries.length, 'voce', 'voci')} · dati locali`}
           </span>
+          {onRetry && diaryState.canRefresh && diaryState.status !== 'error' && <button type="button" className="mf-button-text" disabled={isLoading} onClick={onRetry}>Aggiorna</button>}
         </header>
 
-        {isLoading ? (
-          <p className={diaryStyles.emptyState}>Caricamento diario clinico.</p>
-        ) : visibleEntries.length ? (
+        {isLoading && <ViewState state="loading" title="Caricamento diario clinico."
+          detail={hasSnapshot ? 'Aggiornamento del diario in corso. Sono mostrate le ultime voci lette.' : undefined} />}
+        {diaryState.status === 'error' && <ViewState state="error" title="Diario clinico non disponibile."
+          detail={[hasSnapshot ? 'Impossibile aggiornare il diario. Sono mostrate le ultime voci lette.' : '',
+            diaryState.patientsUnavailable ? 'Impossibile aggiornare i dati dei pazienti per il diario.' : ''].filter(Boolean).join(' ') || undefined}
+          action={onRetry ? { label: 'Riprova', onClick: onRetry } : undefined} />}
+        {visibleEntries.length > 0 ? (
           <div className={diaryStyles.feedViewport}>
             <div
               className={diaryStyles.feed}
               role="feed"
               aria-label="Diario clinico globale"
-              aria-busy="false"
+              aria-busy={isLoading}
               data-testid="lume-diario-feed"
             >
               {visibleEntries.map((entry, index) => {
-                const presentation = entryPresentation(entry, rawEntryById.get(entry.id));
+                const presentation = entry.presentation ?? { source: 'Diario locale', state: entry.deleted ? 'deleted' : 'recorded', stateLabel: entry.deleted ? 'Eliminata' : 'Registrata' };
                 const isActive = entry.id === resolvedActiveId;
                 const titleId = `diario-entry-${index}-title`;
                 const descriptionId = `diario-entry-${index}-description`;
@@ -230,10 +169,12 @@ function DiarioArea({
                           <UserSquare2 size={12} />
                           Apri quadro
                         </button>
-                        <Link href={`${entry.patientHref}/entries/new`} className={styles.ghostBtnSm}>
-                          <Plus size={12} />
-                          Nuova voce
-                        </Link>
+                        <PatientSheetMenu label="Azioni" trigger={props => <button {...props} className={styles.ghostBtnSm} aria-label="Azioni"><Ellipsis size={16} aria-hidden="true" /></button>}>
+                          <Link role="menuitem" href={`${entry.patientHref}/entries/new`} className={styles.ghostBtnSm}>
+                            <Plus size={12} aria-hidden="true" />
+                            Nuova voce
+                          </Link>
+                        </PatientSheetMenu>
                       </span>
                     </div>
                   </article>
@@ -242,9 +183,8 @@ function DiarioArea({
               })}
             </div>
           </div>
-        ) : (
-          <p className={diaryStyles.emptyState}>Nessuna voce clinica nel diario locale.</p>
-        )}
+        ) : diaryState.status === 'ready' ? <ViewState state="empty"
+          title={query.trim() || entryType !== 'Tutte' ? 'Nessuna voce clinica con questo filtro.' : 'Nessuna voce clinica nel diario locale.'} /> : null}
       </section>
     </div>
   );

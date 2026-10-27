@@ -344,3 +344,9 @@
   color: var(--lume-ink);
   transform: none;
 }
+
+.timelineSection.timelineSection .sectionTitle, .timelineSection .month {
+  font: var(--type-section);
+  font-variant-caps: all-small-caps;
+}
+.timelineSection .month { text-transform: none; }
