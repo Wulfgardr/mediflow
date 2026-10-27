@@ -40,7 +40,11 @@ async function capture(page: Page, target: Locator, name: string, frames: unknow
         for (let p = element.parentElement; p; p = p.parentElement)
             if (p.scrollHeight > p.clientHeight && /auto|scroll/u.test(getComputedStyle(p).overflowY))
                 scrollOwners.push({ tag: p.tagName, scrollTop: p.scrollTop });
-        return { rect: { x: r.x, y: r.y, right: r.right, bottom: r.bottom }, viewport: { width: innerWidth, height: innerHeight },
+        const style = getComputedStyle(element), root = document.documentElement;
+        return { theme: root.classList.contains('dark') ? 'grafite' : 'giorno',
+            palette: { color: style.color, background: style.backgroundColor, bodyBackground: getComputedStyle(document.body).backgroundColor,
+                inkToken: getComputedStyle(root).getPropertyValue('--lume-ink').trim() },
+            rect: { x: r.x, y: r.y, right: r.right, bottom: r.bottom }, viewport: { width: innerWidth, height: innerHeight },
             points, scrollOwners, text: element.textContent?.trim().slice(0, 600) };
     });
     await mkdir(directory, { recursive: true });
@@ -53,6 +57,7 @@ async function capture(page: Page, target: Locator, name: string, frames: unknow
     expect(evidence.rect.right, name).toBeLessThanOrEqual(evidence.viewport.width + 1);
     expect(evidence.rect.bottom, name).toBeLessThanOrEqual(evidence.viewport.height + 1);
     expect(evidence.points.every(point => point.hit), `${name}: center and inset corners`).toBe(true);
+    return evidence;
 }
 
 const cases: readonly [route: 'fabric' | 'governance', scenario: Scenario][] = [
@@ -147,11 +152,15 @@ for (const [route, scenario] of cases) test(`${route} read state: ${scenario}`, 
         }
         await capture(page, target, `${route}-${scenario}-1440`, frames);
         const visualState = route === 'fabric' ? ['pending', 'status-error', 'unauthorized'].includes(scenario) : ['pending', 'error'].includes(scenario);
+        const dayColors = new Map<number | string, string>();
         if (visualState) for (const theme of ['giorno', 'grafite']) for (const size of [320, 'zoom-400'] as const) {
             await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(size === 'zoom-400' ? 4 : 1);
             if (size === 320) await page.setViewportSize({ width: 320, height: 1000 });
             await page.evaluate(theme => { document.documentElement.classList.toggle('dark', theme === 'grafite'); document.documentElement.dataset.theme = theme; }, theme);
-            await capture(page, target, `${route}-${scenario}-${theme}-${size}`, frames);
+            const evidence = await capture(page, target, `${route}-${scenario}-${theme}-${size}`, frames);
+            expect(evidence.theme).toBe(theme);
+            if (theme === 'giorno') dayColors.set(size, evidence.palette.color);
+            else expect(evidence.palette.color, `${route}-${scenario}-${size}: distinct computed theme color`).not.toBe(dayColors.get(size));
             await assertNoHorizontalOverflow(page, [{ label: route, selector: `[data-testid="settings-ai-${route}-section"]` }]);
         }
         if (route === 'governance' && scenario === 'error' && !baseline) {
