@@ -8,5 +8,5 @@
   "installation": "~/Applications/MediFlow GPUI.app",
   "update": "manual-bundle-replacement-preserving-previous",
   "icon": "native/MediFlowAppleApp/Assets.xcassets/AppIcon.appiconset/mac-512@2x.png",
-  "minimum_macos": "11.0"
+  "minimum_macos": "27.2"
 }

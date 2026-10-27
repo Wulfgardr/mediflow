@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import platform
 import plistlib
+import re
 import shutil
 import stat
 import subprocess
@@ -77,6 +78,27 @@ def build_number(sha):
     return f"{1 + value // 10000}.{value // 100 % 100}.{value % 100}"
 
 
+def contract_minimum_macos():
+    contract = (ROOT / "docs/releases/0.9.1-contract.md").read_text()
+    match = re.search(r"^\| Versione minima \| macOS ([0-9.]+) su questo target;", contract, re.MULTILINE)
+    if not match:
+        raise ValueError("Missing U0 minimum macOS contract")
+    return match[1]
+
+
+def bundle_info(config, version, sha):
+    if config["minimum_macos"] != contract_minimum_macos():
+        raise ValueError("Configured minimum macOS diverges from U0 contract")
+    return {
+        "CFBundleName": config["name"], "CFBundleDisplayName": config["name"],
+        "CFBundleIdentifier": config["identifier"], "CFBundleExecutable": config["executable"],
+        "CFBundlePackageType": "APPL", "CFBundleIconFile": "MediFlow.icns",
+        "CFBundleShortVersionString": version, "CFBundleVersion": build_number(sha),
+        "LSMinimumSystemVersion": config["minimum_macos"], "NSHighResolutionCapable": True,
+        "MediFlowSourceRevision": sha,
+    }
+
+
 def validate_destination(path):
     path = path.expanduser().resolve()
     if protected_destination(path):
@@ -100,6 +122,25 @@ def license_files(root):
                                              "copyright", "notice", "unlicense")))
 
 
+def has_complete_license_text(paths):
+    sections = (
+        ("permission is hereby granted, free of charge", "use or other dealings in the software"),
+        ("apache license", "end of terms and conditions"),
+        ("redistribution and use in source and binary forms", "even if advised of the possibility of such damage"),
+        ("permission to use, copy, modify", "use or performance of this software"),
+        ("permission is granted to anyone to use this software", "this notice may not be removed or altered"),
+        ("mozilla public license", "exhibit b"),
+        ("this is free and unencumbered software released into the public domain", "for more information, please refer to"),
+        ("unicode license v3", "without prior written authorization of the copyright holder"),
+        ("community data license agreement", "no warranty"),
+    )
+    for path in paths:
+        text = " ".join(path.read_text(errors="replace").lower().split())
+        if any(start in text and end in text for start, end in sections):
+            return True
+    return False
+
+
 def collect_licenses(metadata, destination):
     destination.mkdir()
     supplements = {s["package"]: s for s in
@@ -119,16 +160,27 @@ def collect_licenses(metadata, destination):
         output.mkdir()
         for number, text in enumerate(texts):
             shutil.copyfile(text, output / f"{number:03d}-{text.name}")
-        if not texts:
-            if not supplement:
-                raise ValueError(f"Missing license text for {key}")
+        if not texts and not supplement:
+            raise ValueError(f"Missing license text for {key}")
+        if supplement:
             text = PACKAGING / "licenses" / supplement["file"]
             if digest(text) != supplement["sha256"]:
                 raise ValueError(f"License checksum mismatch for {key}")
             shutil.copyfile(text, output / text.name)
+            for extra in supplement.get("license_texts", []):
+                text = PACKAGING / "licenses" / extra["file"]
+                if digest(text) != extra["sha256"]:
+                    raise ValueError(f"License checksum mismatch for {key}")
+                shutil.copyfile(text, output / text.name)
+            write_json(output / "declaration.json", {
+                "name": package["name"], "version": package["version"],
+                "authors": package.get("authors", []), "license": package["license"],
+            })
+        if not has_complete_license_text(list(output.iterdir())):
+            raise ValueError(f"Missing complete license text for {key}")
         packages.append({"name": package["name"], "version": package["version"],
                          "source": package["source"], "license": package["license"],
-                         "supplement": supplement if not texts else None})
+                         "supplement": supplement})
     for source, name in [
         (ROOT / "LICENSE", "MediFlow-MIT.txt"),
         (WORKSPACE / "NOTICE", "MediFlow-NOTICE.txt"),
@@ -191,6 +243,8 @@ def main():
     for variable in ("CARGO_BUILD_TARGET", "RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER"):
         if os.environ.get(variable):
             parser.error(f"Unset {variable} for the standard local release build")
+    info = bundle_info(config, version, sha)
+    os.environ["MACOSX_DEPLOYMENT_TARGET"] = config["minimum_macos"]
     os.environ["CARGO_TARGET_DIR"] = str(target)
     os.environ["CARGO_INCREMENTAL"] = "0"
     os.environ.setdefault("CARGO_BUILD_JOBS", "3")
@@ -217,16 +271,12 @@ def main():
     macos = bundle / "Contents/MacOS"
     macos.mkdir()
     executable = macos / config["executable"]
+    load_commands = run("xcrun", "vtool", "-show-build", str(binary)).stdout
+    minima = re.findall(r"^\s*minos\s+(\S+)", load_commands, re.MULTILINE)
+    if minima != [config["minimum_macos"]]:
+        raise ValueError(f"Mach-O minimum macOS differs from configuration: {minima}")
     shutil.copyfile(binary, executable)
     executable.chmod(0o755)
-    info = {
-        "CFBundleName": config["name"], "CFBundleDisplayName": config["name"],
-        "CFBundleIdentifier": config["identifier"], "CFBundleExecutable": config["executable"],
-        "CFBundlePackageType": "APPL", "CFBundleIconFile": "MediFlow.icns",
-        "CFBundleShortVersionString": version, "CFBundleVersion": build_number(sha),
-        "LSMinimumSystemVersion": config["minimum_macos"], "NSHighResolutionCapable": True,
-        "MediFlowSourceRevision": sha,
-    }
     (bundle / "Contents/Info.plist").write_bytes(plistlib.dumps(info, sort_keys=True))
     make_icon(ROOT / config["icon"], stage, resources)
     collect_licenses(metadata, resources / "Licenses")
