@@ -224,6 +224,13 @@ impl AmbulatoryCommandRecoveryStore {
         Ok(persisted)
     }
     fn sync_marker(&self) -> Result<()> {
+        #[cfg(windows)]
+        OpenOptions::new()
+            .write(true)
+            .open(&self.path)
+            .and_then(|file| file.sync_all())
+            .map_err(|_| RuntimeError::ReadRequired)?;
+        #[cfg(not(windows))]
         fs::File::open(&self.path)
             .and_then(|file| file.sync_all())
             .map_err(|_| RuntimeError::ReadRequired)?;
