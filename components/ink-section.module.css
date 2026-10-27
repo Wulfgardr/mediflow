@@ -30,3 +30,19 @@
   letter-spacing: 0;
   text-transform: none;
 }
+
+.header,
+:global(:root) .sections .header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--lume-rule-strong);
+}
+.header > :is(h2, h3, h4) { min-width: 0; margin: 0; flex: 1 1 22rem; }
+.header > :global([data-disclosure-control]) { width: 100%; }
+
+.header:is(h3) > div { width: 100%; }

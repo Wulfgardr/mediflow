@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { PatientSheetMenu } from '@/components/patient-sheet-menu';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
+import { ViewState } from '@/components/ui/view-state';
 import { Disclosure } from '@/components/disclosure';
 import { formatCountLabel } from '@/lib/format-count';
 import styles from './clinical-register.module.css';
@@ -418,15 +419,15 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
         }
     };
 
-    const count = prescriptions === undefined ? undefined : formatCountLabel(prescriptions.length, 'prestazione', 'prestazioni');
+    const count = prescriptions === undefined ? undefined : `${formatCountLabel(prescriptions.length, 'prestazione totale', 'prestazioni totali')} · ${formatCountLabel(prescriptions.filter(item => item.status === 'cancelled').length, 'annullata', 'annullate')}`;
     const newButton = <Button ref={creationRef} variant="text" aria-expanded={isFormOpen} aria-controls={formId}
         onClick={() => setIsFormOpen(value => !value)}>Nuova prestazione</Button>;
     const content = (
         <section className={styles.register}>
             {!embedded && <header className={styles.therapyHeading}><h2>Prestazioni prescritte <span>{count}</span></h2>{newButton}</header>}
             {prescriptions && prescriptions.length > 0 ? <p className={styles.muted}>
-                {prescriptionItems !== undefined ? <>{formatCountLabel(prescriptionItems.length, 'voce', 'voci')} · </> : null}
-                {formatCountLabel(openCount, 'aperta', 'aperte')} · {formatCountLabel(reportCount, 'referto', 'referti')}
+                {prescriptionItems !== undefined ? <>{formatCountLabel(prescriptionItems.length, 'voce di dettaglio', 'voci di dettaglio')} · </> : null}
+                {formatCountLabel(openCount, 'prestazione aperta', 'prestazioni aperte')} · {formatCountLabel(reportCount, 'referto ricevuto', 'referti ricevuti')}
             </p> : null}
 
             <div id={formId} hidden={!isFormOpen}>
@@ -652,8 +653,8 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
             )}
             </div>
 
-            {!prescriptions ? <p role="status" className={styles.empty}>Caricamento prescrizioni…</p> : prescriptions.length === 0 ? (
-                <p className={styles.empty}>Nessuna prestazione prescritta registrata.</p>
+            {!prescriptions ? <ViewState state="loading" title="Caricamento prescrizioni…" /> : prescriptions.length === 0 ? (
+                <ViewState state="empty" title="Nessuna prestazione prescritta registrata." />
             ) : (
                 <div className="min-w-0">
                     <table className={`${styles.table} ${styles.therapyTable}`}><thead><tr><th>Prestazione</th><th className={styles.secondaryColumn}>Prescritta il</th><th>Stato</th><th>Azioni</th></tr></thead><tbody>
@@ -791,7 +792,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
         </section>
     );
     return embedded ? <CollapsibleSection id="prestazioni" title="Prestazioni prescritte" count={count}
-        defaultOpen={isFormOpen} headerAction={newButton} surfaceClassName={`${surfaceClassName} ${styles.therapySection}`} keepMounted>
+        defaultOpen={isFormOpen} headerAction={newButton} surfaceClassName={surfaceClassName} keepMounted>
         {content}
     </CollapsibleSection> : content;
 }

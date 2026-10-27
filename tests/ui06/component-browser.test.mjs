@@ -312,3 +312,30 @@ test('shared destructive confirmation keeps the reason guard and cancels through
     await page.getByRole('button', { name: 'Elimina', exact: true }).click();
     await expect(result).toHaveText('Eliminazione: Duplicato sintetico');
 });
+
+for (const width of [1440, 768, 390]) test(`section header, unique creation and distinct read states at ${width}px`, async t => {
+    const page = await pageFor(t, '/sections', { width, height: 960 });
+    const expect = harness.expect;
+    const section = page.locator('#parametri');
+    const header = section.locator('[data-section-header]');
+    await expect(header.getByRole('heading', { name: 'Misure 0 misure', exact: true })).toBeVisible();
+    await expect(header.getByRole('button', { name: 'Nuova misura', exact: true })).toBeVisible();
+    await expect(section.getByRole('button', { name: 'Nuova misura', exact: true })).toHaveCount(1);
+    await expect(section.getByRole('status')).toHaveText('Nessuna misura registrata.');
+    await expect(section.locator('[data-view-state=empty] button')).toHaveCount(0);
+    const state = page.locator('[data-view-state=empty]').filter({ hasText: 'Nessuna terapia registrata.' });
+    const inline = state.getByText('Nessuna terapia registrata.', { exact: true }).locator('..');
+    await expect(inline.getByRole('button', { name: 'Nuova terapia', exact: true })).toBeVisible();
+    await expect(state.getByRole('button')).toHaveClass(/mf-button-text/u);
+    await expect(page.locator('[data-view-state=loading]')).toHaveAttribute('role', 'status');
+    await expect(page.locator('[data-view-state=loading] button')).toHaveCount(0);
+    await expect(page.locator('[data-view-state=error]')).toHaveAttribute('role', 'alert');
+    await expect(page.locator('[data-view-state=error]')).toContainText('◆');
+    await expect(page.locator('[data-view-state=unavailable]')).toHaveAttribute('role', 'alert');
+    await expect(page.locator('[data-view-state=unavailable]')).toContainText('▲');
+    await header.getByRole('button').click();
+    await expect(section.getByLabel('Bozza sintetica')).toHaveValue('');
+    await state.getByRole('button').click();
+    await expect(section.getByLabel('Bozza sintetica')).toHaveValue('terapia sintetica');
+    await noHorizontalOverflow(page);
+});

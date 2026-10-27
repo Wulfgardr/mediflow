@@ -453,20 +453,20 @@ export default function PatientDetailPage() {
        oggetto conserva href, label e meta del caller senza binding inferiti. */
     const workspaceNavItems: Kree8WorkspaceNavItem[] = [
         { href: '#quadro', label: 'Quadro' },
-        { href: '#attenzione', label: 'Attenzione', meta: String(reviewQueueSummary.attentionCount + openLoopCount + Number(hasInsightProposal)) },
+        { href: '#attenzione', label: 'Attenzione', meta: formatCountLabel(reviewQueueSummary.attentionCount + openLoopCount + Number(hasInsightProposal), 'elemento', 'elementi') },
         { href: '#identita', label: 'Anagrafica' },
-        { href: '#clinica', label: 'Diagnosi' },
+        { href: '#clinica', label: 'Clinica', meta: formatCountLabel(diagnosisItems.length, 'diagnosi', 'diagnosi') },
         { href: '#amministrazione', label: 'Amministrazione' },
         { href: '#parametri', label: 'Parametri', meta: workspace ? String(workspace.observationsCount) : undefined },
         { href: '#terapie', label: 'Terapie', meta: workspace ? String(workspace.activeTherapiesCount) : undefined },
-        { href: '#prestazioni', label: 'Prestazioni', meta: prestazioniCount !== undefined ? String(prestazioniCount) : undefined },
-        { href: '#protesica', label: 'Protesica', meta: protesicaCount !== undefined ? String(protesicaCount) : undefined },
-        { href: '#scale', label: 'Scale', meta: String(scaleEntries.length) },
+        { href: '#prestazioni', label: 'Prestazioni', meta: prestazioniCount !== undefined ? formatCountLabel(prestazioniCount, 'prestazione totale', 'prestazioni totali') : undefined },
+        { href: '#protesica', label: 'Protesica', meta: protesicaCount !== undefined ? formatCountLabel(protesicaCount, 'prescrizione', 'prescrizioni') : undefined },
+        { href: '#scale', label: 'Scale', meta: formatCountLabel(scaleEntries.length, 'valutazione', 'valutazioni') },
         { href: '#documenti', label: 'Documenti', meta: String(attachmentItems.length) },
-        { href: '#siss', label: 'SISS/FSE' },
-        { href: '#timeline', label: 'Timeline', meta: String(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length) },
-        { href: '#diario', label: 'Diario', meta: String(nonScaleEntries.length) },
-        { href: '#follow-up', label: 'Follow-up', meta: workspace ? String(workspace.pendingCheckupsCount) : undefined },
+        { href: '#siss', label: 'SISS e FSE', meta: sissHandoffCount !== undefined ? formatCountLabel(sissHandoffCount, 'passaggio', 'passaggi') : undefined },
+        { href: '#timeline', label: 'Timeline', meta: formatCountLabel(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length, 'evento', 'eventi') },
+        { href: '#diario', label: 'Diario', meta: formatCountLabel(nonScaleEntries.length, 'voce', 'voci') },
+        { href: '#follow-up', label: 'Follow-up', meta: followupRead.count },
     ];
     const workspaceNavGroups = buildPatientModuleRailGroups(workspaceNavItems);
 
@@ -704,17 +704,17 @@ export default function PatientDetailPage() {
                     <ClinicalRiverTimeline entries={nonScaleEntries} checkups={checkups ?? []} documentInsights={documentInsights} />
                 </CollapsibleSection>
 
-                <CollapsibleSection
-                    id="diario"
-                    kicker="Diario"
-                    title="Diario clinico"
-                    count={formatCountLabel(nonScaleEntries.length, 'voce', 'voci')}
-                    summary={nonScaleEntries.length === 0 ? 'Nessuna voce clinica registrata.' : 'Apri le voci attive del diario.'}
-                    surfaceClassName={`${workspaceStyles.clinicalSection} ${diaryStyles.patientSection}`}
-                    keepMounted
-                >
-                    {entries ? <Timeline entries={timelineEntries} patientDiary /> : <p className={workspaceStyles.mutedText}>Diario in caricamento.</p>}
-                </CollapsibleSection>
+                {entries ? <Timeline entries={timelineEntries} patientDiary section={{
+                    id: 'diario',
+                    kicker: 'Diario',
+                    title: 'Diario clinico',
+                    count: formatCountLabel(nonScaleEntries.length, 'voce', 'voci'),
+                    summary: nonScaleEntries.length === 0 ? 'Nessuna voce clinica registrata.' : 'Apri le voci attive del diario.',
+                    surfaceClassName: `${workspaceStyles.clinicalSection} ${diaryStyles.patientSection}`,
+                    keepMounted: true,
+                }} /> : <CollapsibleSection id="diario" title="Diario clinico" surfaceClassName={workspaceStyles.clinicalSection} keepMounted>
+                    <ViewState state="loading" title="Diario in caricamento." />
+                </CollapsibleSection>}
 
                     <TherapyManager patientId={id} embedded surfaceClassName={workspaceStyles.clinicalSection}
                         before={<PluginPrescribingGuide />}>
@@ -788,16 +788,16 @@ export default function PatientDetailPage() {
                         title="Scale di valutazione"
                         icon={Activity}
                         surfaceClassName={workspaceStyles.clinicalSection}
-                        count={scaleEntries.length > 0 ? formatCountLabel(scaleEntries.length, 'registrata', 'registrate') : undefined}
+                        count={formatCountLabel(scaleEntries.length, 'valutazione', 'valutazioni')}
                         summary="Risultati registrati e nuove valutazioni."
                     >
                         {/* Read stored results without rescoring historical instruments. */}
                         <div className="mb-8 space-y-4">
-                            <h4 className="text-base font-semibold text-[color:var(--lume-ink)]">Valutazioni registrate</h4>
                             {entries ? (
                                 <Timeline
                                     entries={scaleHistoryEntries}
                                     label="Storico delle scale del paziente"
+                                    heading="Valutazioni registrate"
                                     emptyMessage="Nessuna valutazione registrata."
                                 />
                             ) : <p className={workspaceStyles.mutedText}>Valutazioni in caricamento.</p>}
@@ -829,7 +829,6 @@ export default function PatientDetailPage() {
                     summary={followupRead.summary}
                     surfaceClassName={workspaceStyles.clinicalSection}
                     headerAction={<Link href={`/patients/${id}/edit#pianificazione`} className="mf-button-text">
-                        <Plus className="h-4 w-4" aria-hidden="true" />
                         Aggiungi follow-up
                     </Link>}
                 >

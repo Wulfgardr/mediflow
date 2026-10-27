@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { PatientSheetMenu } from '@/components/patient-sheet-menu';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
+import { ViewState } from '@/components/ui/view-state';
 import { formatCountLabel } from '@/lib/format-count';
 import { Disclosure } from '@/components/disclosure';
 import styles from './clinical-register.module.css';
@@ -665,7 +666,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
             )}
 
             {therapies === undefined ? <div className={styles.loading} role="status" aria-label="Caricamento terapie"><span className="sr-only">Caricamento terapie…</span>{[0,1,2].map(row => <div key={row} className="mf-skeleton" aria-hidden />)}</div> : <>
-                {visibleTherapies.length === 0 && <p className={styles.empty}>Nessuna terapia registrata.</p>}
+                {visibleTherapies.length === 0 && <ViewState state="empty" title="Nessuna terapia registrata." />}
                 {[
                     { title: 'Attive', rows: activeTherapies, status: 'active' },
                     { title: 'Sospese', rows: suspendedTherapies, status: 'suspended' },
@@ -764,7 +765,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
         </section>
     );
     return embedded ? <CollapsibleSection id="terapie" title="Terapie farmacologiche" count={count}
-        defaultOpen={isAdding} headerAction={newButton} surfaceClassName={`${surfaceClassName} ${styles.therapySection}`} keepMounted>
+        defaultOpen={isAdding} headerAction={newButton} surfaceClassName={surfaceClassName} keepMounted>
         <div className="space-y-4">{before}{content}{children}</div>
     </CollapsibleSection> : content;
 }
