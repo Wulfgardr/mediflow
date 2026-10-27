@@ -96,7 +96,7 @@ run('code-current', process.execPath, ['scripts/run-strip-types.mjs', '--test', 
   'lib/therapy-status-confirmation.test.ts', 'lib/therapy-required-audit.test.ts',
   'lib/therapy-status-command.test.ts', 'lib/therapy-status-command-http.test.ts', 'lib/therapy-status-command-client.test.ts',
   'lib/therapy-status-command-confirmation.test.ts', 'lib/therapy-status-command-process.test.ts',
-  'lib/therapy-status-command-backup.test.ts', 'lib/therapy-status-command-recovery-schema.test.ts'],
+  'lib/therapy-status-command-backup.test.ts', 'lib/therapy-status-command-recovery-schema.test.ts', 'lib/ambulatory-destructive-command-recovery.test.ts'],
 (status, log) => status === 0 && /# fail 0/.test(log), testEnv);
 const source = fs.readFileSync(path.join(root, 'lib/therapy-status-confirmation.ts'), 'utf8');
 const tests = fs.readFileSync(path.join(root, 'lib/therapy-status-confirmation.test.ts'), 'utf8');

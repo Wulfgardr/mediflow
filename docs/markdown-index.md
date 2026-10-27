@@ -500,3 +500,6 @@ di ciascuna proposta e il limite di autorità dell’host.
 [ADR 0164 — Ricevuta di ritiro dell’autorità native](adr/0164-native-inference-authority-retirement.md): recupero dei medesimi owner dopo revoca della sessione; cleanup fisico distinto.
 
 [ADR 0165 — Canale di accesso della chat alla sessione GPUI](adr/0165-native-chat-access-channel.md): protocollo C4a senza contenuti clinici, proposta e prove richieste.
+
+- [Comandi clear/delete ambulatori](ambulatory-destructive-commands.md): contratto host e conservazione G-2c/G-3d.
+- [ADR0169](adr/0169-gpui-ambulatory-destructive-commands.md): doppia autorità e snapshot per due comandi amministrativi nominati.

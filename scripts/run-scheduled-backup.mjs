@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { validateAmbulatoryCommandRows } from '../lib/ambulatory-destructive-command-backup.ts';
 import { validateTherapyStatusCommandRows } from '../lib/therapy-status-command-backup.ts';
 /* @Codex */
 import { assertExemptionImportReceiptRows } from '../lib/exemption-import-receipt.ts';
@@ -60,6 +61,7 @@ const BACKUP_TABLES = {
   checkups: 'checkups',
   therapies: 'therapies',
   therapyStatusCommands: 'therapy_status_commands',
+  ambulatoryDestructiveCommands: 'ambulatory_destructive_commands',
   auditEvents: 'audit_events',
 };
 
@@ -172,6 +174,7 @@ export async function serializeBackupArtifact(payload, createdAt = new Date()) {
     canonicalPayload.auditEvents = canonicalizeBackupAuditRows(payload.auditEvents);
     assertBackupAuditSnapshots(canonicalPayload.auditEvents, (payload.headlessSoapEntryCommits ?? []).map(row => row.auditSnapshot));
   }
+  canonicalPayload.ambulatoryDestructiveCommands = validateAmbulatoryCommandRows(payload.ambulatoryDestructiveCommands ?? [], canonicalPayload.auditEvents ?? []);
   canonicalPayload.therapyStatusCommands = validateTherapyStatusCommandRows(payload.therapyStatusCommands ?? [], canonicalPayload.auditEvents ?? []);
   const collections = Object.keys(BACKUP_TABLES).filter(collection => collection !== 'auditEvents' || Object.hasOwn(payload, 'auditEvents'));
   const payloadSnapshot = normalizeJson(canonicalPayload);
@@ -444,12 +447,13 @@ function buildDataset(db, backupCollections) {
   return db.transaction(() => {
     const schemaVersion = db.pragma('user_version', { simple: true });
     if (!hasTable(db, 'therapy_status_commands') && (!Number.isSafeInteger(schemaVersion) || schemaVersion < 0 || schemaVersion > 4)) throw new Error('Therapy command ledger unavailable');
+    if (!hasTable(db, 'ambulatory_destructive_commands') && (!Number.isSafeInteger(schemaVersion) || schemaVersion < 0 || schemaVersion > 5)) throw new Error('Ambulatory command ledger unavailable');
     const dataset = Object.fromEntries(
       backupCollections.filter(collection => collection !== 'auditEvents' || hasTable(db, 'audit_events')).map((collection) => [
         collection,
         hasTable(db, BACKUP_TABLES[collection])
           ? db.prepare(`SELECT * FROM ${BACKUP_TABLES[collection]}`).all().map((row) =>
-            collection === 'prostheticsCatalogDocuments' ? serializeProstheticsDocument(normalizeRowKeys(row)) : (collection === 'auditEvents' || collection === 'therapyStatusCommands') ? normalizeRowKeys(row) : normalizeRowDates(normalizeRowKeys(row)))
+            collection === 'prostheticsCatalogDocuments' ? serializeProstheticsDocument(normalizeRowKeys(row)) : (collection === 'auditEvents' || collection === 'therapyStatusCommands' || collection === 'ambulatoryDestructiveCommands') ? normalizeRowKeys(row) : normalizeRowDates(normalizeRowKeys(row)))
           : [],
       ]),
     );

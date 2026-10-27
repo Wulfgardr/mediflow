@@ -6,6 +6,9 @@
 mod account_profile;
 mod ai_preferences;
 mod ambulatories;
+mod ambulatory_command_recovery;
+mod ambulatory_command_transport;
+mod ambulatory_commands;
 mod analytics;
 mod catalogs;
 mod context;
@@ -23,6 +26,13 @@ mod who;
 pub use account_profile::*;
 pub use ai_preferences::*;
 pub use ambulatories::*;
+pub use ambulatory_command_recovery::{
+    AmbulatoryCommandRecoveryStore, AmbulatoryCommandRetirement, PersistedAmbulatoryCommand,
+};
+pub use ambulatory_command_transport::{
+    AmbulatoryCommandAuthority, AmbulatoryCommandDispatch, HostAmbulatoryCommand,
+};
+pub use ambulatory_commands::*;
 pub use analytics::*;
 pub use catalogs::*;
 pub use context::RequestContext;
@@ -33,8 +43,8 @@ pub use http::{PairingCredentials, RuntimeClient, RuntimeConfig};
 pub use profile_query::{ProfileCurrentness, ProfileProjection};
 pub use scales::*;
 pub use session::{
-    AiPreferencesContext, ChatAccessContext, FirstAmbulatoryContext, ProfileQueryIntent,
-    RuntimeSession,
+    AiPreferencesContext, AmbulatoryCommandContext, ChatAccessContext, FirstAmbulatoryContext,
+    ProfileQueryIntent, RuntimeSession,
 };
 pub use who::{
     WHO_ATTRIBUTION, WhoEntry, WhoReadiness, WhoReadinessStatus, WhoReceipt, WhoSearchResponse,
