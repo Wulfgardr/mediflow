@@ -34,7 +34,6 @@ export async function createHarness() {
         const boundaries = new Map([
             ['next/link', 'FixtureLink as default'], ['next/navigation', 'usePathname'],
             ['@/components/kree8/kree8-workspace-shell', 'Kree8WorkspaceShell'],
-            ['@/components/settings/settings-nav-sidebar', 'SettingsNavSidebar'],
             ['@/components/settings/settings-search', 'SettingsSearchOverlay, useSettingsSearch'],
             ['@/components/privacy-blur', 'FixturePrivacy as default'],
             ['@/components/security-provider', 'useSecurity'],
