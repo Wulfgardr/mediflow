@@ -527,16 +527,17 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                         )}
                         <fieldset disabled={isSaving} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <label className={fieldLabelClassName}>
+                                <label className={fieldLabelClassName} htmlFor={`therapy-drug-${patientId}`}>
                                     <span>Farmaco</span>
                                     {!isGalenic && <span className="inline-flex items-center gap-1 text-xs text-[color:var(--lume-ink-muted)]"><Database className="w-3 h-3" /> Banca dati AIFA</span>}
                                 </label>
 
                                 {isGalenic ? (
-                                    <input {...register('drugName')} className={inputClassName} placeholder="Es. preparazione magistrale..." />
+                                    <input id={`therapy-drug-${patientId}`} {...register('drugName')} className={inputClassName} placeholder="Es. preparazione magistrale..." />
                                 ) : (
                                     <div className="relative">
                                         <DrugAutocomplete
+                                            id={`therapy-drug-${patientId}`}
                                             /* WUL-UIUX: key legata alla riga in modifica: passando da
                                                una terapia all'altra con form aperto, React rimonta il combobox
                                                e rilegge defaultValue (query e useState(defaultValue), letto solo

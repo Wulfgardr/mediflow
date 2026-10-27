@@ -85,17 +85,17 @@ const definitions: Record<string, ScaleDefinition> = {
         description: 'MMSE: definizione locale per screening cognitivo. Edizione e variante italiana non identificate; equivalenza a una versione standardizzata non verificata.',
         questions: [
             // ORIENTAMENTO TEMPORALE (5)
-            { id: 'ot1', text: 'In che anno siamo?', type: 'choice', options: [{ label: 'Erra', value: 0 }, { label: 'Corretto', value: 1 }] },
-            { id: 'ot2', text: 'In che stagione?', type: 'choice', options: [{ label: 'Erra', value: 0 }, { label: 'Corretto', value: 1 }] },
-            { id: 'ot3', text: 'In che mese?', type: 'choice', options: [{ label: 'Erra', value: 0 }, { label: 'Corretto', value: 1 }] },
-            { id: 'ot4', text: 'In che giorno del mese?', type: 'choice', options: [{ label: 'Erra', value: 0 }, { label: 'Corretto', value: 1 }] },
-            { id: 'ot5', text: 'In che giorno della settimana?', type: 'choice', options: [{ label: 'Erra', value: 0 }, { label: 'Corretto', value: 1 }] },
+            { id: 'ot1', text: 'In che anno siamo?', type: 'choice', options: [{ label: 'Errato', value: 0 }, { label: 'Corretto', value: 1 }] },
+            { id: 'ot2', text: 'In che stagione?', type: 'choice', options: [{ label: 'Errato', value: 0 }, { label: 'Corretto', value: 1 }] },
+            { id: 'ot3', text: 'In che mese?', type: 'choice', options: [{ label: 'Errato', value: 0 }, { label: 'Corretto', value: 1 }] },
+            { id: 'ot4', text: 'In che giorno del mese?', type: 'choice', options: [{ label: 'Errato', value: 0 }, { label: 'Corretto', value: 1 }] },
+            { id: 'ot5', text: 'In che giorno della settimana?', type: 'choice', options: [{ label: 'Errato', value: 0 }, { label: 'Corretto', value: 1 }] },
             // ORIENTAMENTO SPAZIALE (5)
-            { id: 'os1', text: 'In che stato siamo?', type: 'choice', options: [{ label: 'Erra', value: 0 }, { label: 'Corretto', value: 1 }] },
-            { id: 'os2', text: 'In che regione?', type: 'choice', options: [{ label: 'Erra', value: 0 }, { label: 'Corretto', value: 1 }] },
-            { id: 'os3', text: 'In che città?', type: 'choice', options: [{ label: 'Erra', value: 0 }, { label: 'Corretto', value: 1 }] },
-            { id: 'os4', text: 'In che luogo siamo (ospedale/casa/studio)?', type: 'choice', options: [{ label: 'Erra', value: 0 }, { label: 'Corretto', value: 1 }] },
-            { id: 'os5', text: 'A che piano siamo?', type: 'choice', options: [{ label: 'Erra', value: 0 }, { label: 'Corretto', value: 1 }] },
+            { id: 'os1', text: 'In che stato siamo?', type: 'choice', options: [{ label: 'Errato', value: 0 }, { label: 'Corretto', value: 1 }] },
+            { id: 'os2', text: 'In che regione?', type: 'choice', options: [{ label: 'Errato', value: 0 }, { label: 'Corretto', value: 1 }] },
+            { id: 'os3', text: 'In che città?', type: 'choice', options: [{ label: 'Errato', value: 0 }, { label: 'Corretto', value: 1 }] },
+            { id: 'os4', text: 'In che luogo siamo (ospedale/casa/studio)?', type: 'choice', options: [{ label: 'Errato', value: 0 }, { label: 'Corretto', value: 1 }] },
+            { id: 'os5', text: 'A che piano siamo?', type: 'choice', options: [{ label: 'Errato', value: 0 }, { label: 'Corretto', value: 1 }] },
             // REGISTRAZIONE (3)
             { id: 'reg1', text: 'Ripete "PALLA"?', type: 'choice', options: [{ label: 'No', value: 0 }, { label: 'Sì', value: 1 }] },
             { id: 'reg2', text: 'Ripete "BANDIERA"?', type: 'choice', options: [{ label: 'No', value: 0 }, { label: 'Sì', value: 1 }] },

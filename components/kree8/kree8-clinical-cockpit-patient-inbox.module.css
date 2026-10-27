@@ -105,11 +105,14 @@
   font-size: 0.8125rem;
 }
 
+.patientSearchField input::-webkit-search-cancel-button { appearance: none; }
+
 .patientSearchField input::placeholder {
   color: var(--lume-ink-muted);
 }
 
 .patientSearchClear {
+  flex: none;
   border: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
   background: transparent;
   color: var(--lume-ink-muted);
@@ -715,7 +718,7 @@
 .directoryToolbar h1 { margin: 0; line-height: 1.1; flex: none; font: var(--type-page-title); }
 .directoryToolbar > a { flex: none; }
 .directoryToolbar .patientSearchField { flex: 1; min-width: 140px; min-height: 40px; border: 1px solid var(--lume-rule-strong); border-radius: 10px; background: var(--lume-surface-focal); padding: 0 12px; }
-.directoryToolbar .patientSearchField input { width: 100%; font-size: 0.875rem; background: transparent; }
+.directoryToolbar .patientSearchField input { flex: 1; width: 0; font-size: 0.875rem; background: transparent; }
 .directoryToolbar .inboxScope { display: flex; gap: 12px; padding: 0; border-radius: 10px; background: var(--lume-surface-canvas); margin: 0; }
 .directoryToolbar .scopeChip { min-height: 40px; padding: 8px 16px; border: 0; border-radius: 8px; font: 0.875rem/1.4 var(--lume-font-sans); }
 .directoryToolbar .scopeChipActive { background: var(--lume-surface-focal); color: var(--lume-ink); font-weight: 600; }

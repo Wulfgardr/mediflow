@@ -2,7 +2,6 @@
 
 import { formatCountLabel } from '@/lib/format-count';
 import { PatientSheetMenu } from '@/components/patient-sheet-menu';
-import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/disclosure';
 import styles from './clinical-register.module.css';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
@@ -337,7 +336,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                                     className={disclosure.documentAction} data-lume-action="quiet" title="Visualizza" aria-label={`Visualizza ${file.name}`}>
                                     <Eye className="h-4 w-4" aria-hidden="true" />Apri
                                 </button>
-                                <Button {...props} variant="text" aria-label={`Altro per ${file.name}`}>Altro</Button>
+                                <button {...props} className={disclosure.documentAction} aria-label={`Altro per ${file.name}`}>Altro</button>
                             </>}>
                                 <button type="button" role="menuitem" tabIndex={-1} onClick={() => handleLocalExtractionPreview(file)} disabled={extractingId !== null || deletingId === file.id}
                                     className="mf-popover-row" aria-label={`Estrai testo localmente da ${file.name}`}
