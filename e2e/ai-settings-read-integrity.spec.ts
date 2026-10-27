@@ -2,13 +2,21 @@ import { expect, test } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 import { readFunctionModelPreferences } from '../lib/ai-providers/fabric/function-model-preferences';
 
+const forbiddenRuntimePath = (path: string) => /^\/api\/(?:ai|icd|who|ollama|mlx|providers?)(?:\/|$)/iu.test(path)
+    || path.startsWith('/api/settings/ai/') || path.startsWith('/api/system/ai-')
+    || path === '/api/system/native' || path === '/api/auth/reset';
+
 for (const view of ['funzioni', 'modelli']) test(`AI settings ${view}: one failed router read blocks saving`, async ({ page, baseURL }) => {
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL
         || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw Error('Owned isolated synthetic runtime required');
     const origin = new URL(baseURL).origin, blocked: string[] = [], writes: string[] = [], failedReads: string[] = [];
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await page.route('**/*', route => {
-        const url = new URL(route.request().url());
-        if (url.origin !== origin || url.pathname.startsWith('/api/ai/') || url.pathname.startsWith('/api/settings/ai/')) {
+        const request = route.request(), url = new URL(request.url());
+        if (url.origin === origin && url.pathname === '/api/siss/session-status' && request.method() === 'GET')
+            return route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } });
+        if (url.origin !== origin || forbiddenRuntimePath(url.pathname)
+            || (url.pathname.startsWith('/api/') && request.method() !== 'GET' && !url.pathname.startsWith('/api/auth/'))) {
             blocked.push(url.href); return route.abort();
         }
         return route.continue();
@@ -41,14 +49,24 @@ for (const view of ['funzioni', 'modelli']) test(`AI settings ${view}: one faile
         if (path === '/api/system/ai-rollout-readiness') return route.fulfill({ json: { lanes: [], localControls: [] } });
         if (path === '/api/plugin-local-ui/pairing') return route.fulfill({ json: { available: false, pending: [], active: [] } });
         if (path === '/api/siss/session-status') return route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } });
-        if (/(?:ai|ollama|mlx|model|provider|download)/iu.test(path)) { blocked.push(path); return route.abort(); }
+        if (forbiddenRuntimePath(path) || /(?:ai|ollama|mlx|model|provider|download)/iu.test(path)) { blocked.push(path); return route.abort(); }
         return route.continue();
     });
     await page.goto(`/settings/ai/${view}`);
-    await expect(page.getByText('Impossibile leggere le impostazioni.', { exact: false })).toBeVisible();
     const controls = page.getByTestId('ai-settings-controls');
+    const error = page.getByText('Impossibile leggere le impostazioni.', { exact: false });
+    const save = controls.getByRole('button', { name: /^Salva configurazione$/iu });
+    await expect.poll(() => failedReads.length).toBe(1);
+    await expect(controls).toHaveAttribute('aria-busy', 'false');
+    await test.info().attach('read-integrity-observation', { contentType: 'application/json', body: JSON.stringify({
+        view, baselineExpectedFailure: process.env.AI_SETTINGS_BASELINE === '1', failedReads, writes, blocked,
+        errorVisible: await error.isVisible(), controlsDisabled: await controls.isDisabled(), saveDisabled: await save.isDisabled(),
+        syntheticStoredRouter: settings.documentRouterControlFlow,
+    }, null, 2) });
+    await page.screenshot({ path: test.info().outputPath(`${view}-read-failure.png`), fullPage: true });
+    await expect(error).toBeVisible();
     await expect(controls).toBeDisabled();
-    await expect(controls.getByRole('button', { name: /^Salva configurazione$/iu })).toBeDisabled();
+    await expect(save).toBeDisabled();
     expect(failedReads).toEqual(['documentRouterControlFlow']);
     expect(writes).toEqual([]); expect(blocked).toEqual([]);
     expect(settings.documentRouterControlFlow).toBe('active');
