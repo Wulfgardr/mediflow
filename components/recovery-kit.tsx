@@ -26,7 +26,7 @@ export function RecoveryKitPanel({ prepared, onCommit, onCancel }: {
         <p>Scarica il kit e scrivi questa chiave su carta. Conservali separatamente: insieme permettono di recuperare l’archivio. La chiave non è inclusa nel file.</p>
         <output className="block break-all type-code" aria-label="Chiave di recupero">{prepared.recoveryKey}</output>
         <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={download}>Scarica kit di recupero</button>
-        <label className="flex items-start gap-2"><input type="checkbox" checked={paper} disabled={busy} onChange={e => setPaper(e.target.checked)} />Ho salvato il kit e scritto la chiave su carta; li conserverò separati.</label>
+        <label className="mf-choice-target gap-2"><input type="checkbox" checked={paper} disabled={busy} onChange={e => setPaper(e.target.checked)} />Ho salvato il kit e scritto la chiave su carta; li conserverò separati.</label>
         <p className="text-sm">La nuova credenziale non è ancora attiva. Backup e copie Time Machine precedenti non vengono ripuliti: possono conservare vecchi dati e credenziali. Questa operazione non sostituisce un backup.</p>
         {error && <p role="alert">{error}</p>}
         <div className="flex flex-wrap gap-3">

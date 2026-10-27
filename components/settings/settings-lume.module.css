@@ -886,14 +886,14 @@
 .settingsWorkspace :global(.mf-section) { padding: 20px 0; border: 0; border-top: 1px solid var(--lume-rule); border-radius: 0; background: transparent; box-shadow: none; }
 .settingsWorkspace :is(div, section, article):is(:global(.rounded-xl), :global(.rounded-2xl), :global(.rounded-lg)):not([role]) { border-radius: 0; box-shadow: none; }
 .settingsWorkspace :global(.section-kicker) { font-size: 0.75rem; letter-spacing: 0; text-transform: none; }
-.settingsWorkspace .navItem, :global(html[data-runtime-twin-design='proposal']) .settingsWorkspace .navItem { min-height: 40px; padding: 8px 10px; border: 0; border-radius: 0; }
+.settingsWorkspace .navItem, :global(html[data-runtime-twin-design='proposal']) .settingsWorkspace .navItem { min-height: var(--lume-control-height); padding: 8px 10px; border: 0; border-radius: 0; }
 .settingsWorkspace .navItemDescription { display: none; }
 .settingsWorkspace .navGroups { gap: 24px; }
 .settingsWorkspace .searchButton { background: transparent; border-radius: 0; padding-inline: 0; }
 .settingsWorkspace .searchButton kbd { display: none; }
 .settingsWorkspace .navItemActive { box-shadow: inset 2px 0 var(--lume-ink-fresh); }
 .settingsWorkspace .navGroupLabel { padding: 0 10px 8px; font-size: 0.75rem; font-weight: 400; }
-@media(pointer:coarse) { .settingsWorkspace .navItem { min-height: 44px; } }
+
 
 .mobileStrip { display: flex; min-width: 0; max-width: 100%; overflow-x: auto; gap: 4px; border-bottom: 1px solid var(--lume-rule); scrollbar-width: thin; }
 .mobileStrip .navItem { flex-shrink: 0; }

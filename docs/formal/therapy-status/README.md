@@ -151,6 +151,26 @@ clinica o funzionamento su un'installazione reale.
 
 ## Dal modello al codice
 
+Il 27 ottobre 2026, PR #686 (A1/A2), è stato riesaminato il diff completo di
+`components/therapy-manager.tsx` fra il precedente `coverage.json.syncCommit`
+`3c3529729a74a7cd0be82ef3290715d0fa5fb7ec` e
+`2bf054fabf0b44e943022d8ad0654a2b243f0796`. Cambiano soltanto classi CSS,
+spaziatura dei comandi e presentazione della selezione dei suggerimenti:
+`aria-pressed` espone la stessa condizione prima usata dalle classi condizionali;
+la ricetta secondaria comune usa i token di selezione Lume. Gli handler dei
+suggerimenti restano identici. Non cambiano transizioni, guardie, confini degli
+await, CAS, audit, altri writer o assunzioni del modello. Tutte le altre
+superfici coperte conservano l'impronta precedente. Modello, configurazione,
+statechart, invarianti, limiti, testimoni e mutanti restano invariati.
+Dopo questo riesame sono stati aggiornati manualmente soltanto l'impronta del
+manager e `syncCommit` alla revisione riesaminata; il raccordo non estende le
+proprietà modellate alla presentazione o all'accessibilità dei suggerimenti.
+Il comando completo `npm run verify:therapy-status` è passato su Node 24.21.0:
+TLC corrente con 5.903.794 stati distinti e coda vuota, 3 controlli negativi,
+6 testimoni, 122 test reali, 2 mutazioni del controller rilevate e 29 test del
+controller ripristinato verdi.
+
+
 Il 27 ottobre 2026, PR #684, è stato riesaminato il diff di
 `components/therapy-manager.tsx` fra il precedente `coverage.json.syncCommit`
 `719509e92f81c15adc1e8abb9beb82740615c27e` e
