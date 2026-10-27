@@ -1,0 +1,12 @@
+{
+  "name": "MediFlow GPUI",
+  "identifier": "dev.mediflow.gpui",
+  "executable": "mediflow-gpui-patient-pilot",
+  "package": "mediflow-gpui-patient-pilot",
+  "composition": "connected-client",
+  "signing": "ad-hoc",
+  "installation": "~/Applications/MediFlow GPUI.app",
+  "update": "manual-bundle-replacement-preserving-previous",
+  "icon": "native/MediFlowAppleApp/Assets.xcassets/AppIcon.appiconset/mac-512@2x.png",
+  "minimum_macos": "27.2"
+}

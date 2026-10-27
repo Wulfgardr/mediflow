@@ -63,6 +63,10 @@ fn parse_launch(args: impl IntoIterator<Item = String>) -> Result<Launch, &'stat
 }
 
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("--verify-bundled-assets") {
+        println!("{}", components::verify_bundled_brand_assets());
+        return;
+    }
     if std::env::args().nth(1).as_deref() == Some("--chat-access-stdio") {
         #[cfg(unix)]
         if std::env::args().count() == 3 {

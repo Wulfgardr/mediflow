@@ -85,6 +85,9 @@ jobs:
           fi
       - name: Check workspace formatting
         run: cargo fmt --manifest-path experiments/gpui-patient-pilot/Cargo.toml --all --check
+      - name: Test bundle staging guards and manifest inventory
+        if: runner.os == 'Linux'
+        run: python3 -m unittest discover -s experiments/gpui-patient-pilot/scripts -p 'test_bundle_macos.py'
       - name: Check native targets with Clippy
         run: cargo clippy --manifest-path experiments/gpui-patient-pilot/Cargo.toml --workspace --all-targets --locked -- -Dwarnings
       # Cargo compiles every native target and runs pure synthetic tests. These
