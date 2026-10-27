@@ -5,7 +5,9 @@
       "id": "scripts/verify-local-operation.mjs",
       "mode": "local",
       "kind": "node-script",
-      "files": ["scripts/verify-local-operation.mjs"],
+      "files": [
+        "scripts/verify-local-operation.mjs"
+      ],
       "prerequisites": "Node 24, npm ci, Java and the SHA-256 pinned TLA+ v1.7.4 / TLC 2.19 jar; local synthetic archives and disposable mutation copies only."
     },
     {
@@ -773,6 +775,15 @@
         "--directory",
         "--run-id"
       ]
+    },
+    {
+      "id": "scripts/ink-layout-browser.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/ink-layout-browser.test.mjs"
+      ],
+      "prerequisites": "Node 24, installed esbuild and Playwright Chromium; isolated CSS recipe fixture with no backend or remote requests."
     }
   ]
 }
