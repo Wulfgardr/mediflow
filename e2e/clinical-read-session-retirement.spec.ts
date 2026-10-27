@@ -4,13 +4,13 @@ import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './
 
 type ClinicalReadGate = {
     captured: boolean; denied: boolean; returned: boolean; status?: number;
-    signal?: AbortSignal; denials: number; caller?: string;
+    signal?: AbortSignal; denials: number; request?: { method: string; url: string };
     dispatch: () => void; deliver: () => void;
 };
 declare global { interface Window { clinicalReadGate: ClinicalReadGate } }
 
-async function installGate(page: Page, consumer: string) {
-    await page.addInitScript(consumer => {
+async function installGate(page: Page, query: Record<string, string>) {
+    await page.addInitScript(query => {
         const original = window.fetch.bind(window);
         let dispatch!: () => void, deliver!: () => void;
         const requestGate = new Promise<void>(resolve => { dispatch = resolve; });
@@ -21,10 +21,12 @@ async function installGate(page: Page, consumer: string) {
         window.addEventListener('mediflow:api-auth-unavailable', () => { state.denials++; });
         window.fetch = async (input, init) => {
             const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href);
-            const caller = new Error().stack ?? '';
-            if (state.captured || url.pathname !== '/api/attachments' || !caller.includes(consumer)) return original(input, init);
+            const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+            const matchesQuery = url.searchParams.size === Object.keys(query).length
+                && Object.entries(query).every(([key, value]) => url.searchParams.get(key) === value);
+            if (state.captured || method !== 'GET' || url.pathname !== '/api/attachments' || !matchesQuery) return original(input, init);
             state.captured = true;
-            state.caller = consumer;
+            state.request = { method, url: url.pathname + url.search };
             state.signal = init?.signal ?? undefined;
             await requestGate;
             const response = await original(input, { ...init, signal: undefined });
@@ -34,7 +36,7 @@ async function installGate(page: Page, consumer: string) {
             state.returned = true;
             return response;
         };
-    }, consumer);
+    }, query);
 }
 
 for (const consumer of ['EntryAttachments', 'NewEntryPage']) test(`${consumer}: a real old 401 preserves the new session and populated attachments`, async ({ page }) => {
@@ -57,11 +59,15 @@ for (const consumer of ['EntryAttachments', 'NewEntryPage']) test(`${consumer}: 
     });
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
-    await installGate(page, consumer);
+    const query: Record<string, string> = consumer === 'NewEntryPage' ? { patientId: fixture.patientId } : {};
+    await installGate(page, query);
     const path = `/patients/${fixture.patientId}/${consumer === 'NewEntryPage' ? 'entries/new' : 'modules'}`;
     await page.goto(path);
     if (consumer === 'EntryAttachments') await openPatientSection(page, 'diario');
     await page.waitForFunction(() => window.clinicalReadGate.captured);
+    expect(await page.evaluate(() => window.clinicalReadGate.request)).toEqual({
+        method: 'GET', url: `/api/attachments${consumer === 'NewEntryPage' ? `?patientId=${fixture.patientId}` : ''}`,
+    });
     const locked = page.waitForResponse(response => response.url().endsWith('/api/auth/lock') && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Blocca', exact: true }).click();
     expect((await locked).status()).toBe(200);
@@ -88,11 +94,16 @@ for (const consumer of ['EntryAttachments', 'NewEntryPage']) test(`${consumer}: 
     await page.waitForFunction(() => window.clinicalReadGate.returned);
     await expect(nav).toBeVisible();
     expect(await page.evaluate(() => window.clinicalReadGate.denials)).toBe(before);
+    if (consumer === 'EntryAttachments') {
+        await expect(page.locator('#diario').getByRole('button', { name: /fonte-sessione-inventata/u })).toBeVisible();
+    } else {
+        await expect(page.getByRole('region', { name: 'Documenti in cartella' })).toContainText('fonte-sessione-inventata.txt');
+    }
     const status = await page.evaluate(async id => (await fetch(`/api/attachments/${id}`)).status, fixture.attachmentId);
     expect(status).toBe(200);
     await test.info().attach('session-read.json', { contentType: 'application/json', body: JSON.stringify(await page.evaluate(() => {
         const gate = window.clinicalReadGate;
-        return { caller: gate.caller, status: gate.status, retired: gate.signal?.aborted, denials: gate.denials };
+        return { request: gate.request, status: gate.status, retired: gate.signal?.aborted, denials: gate.denials };
     })) });
     await page.screenshot({ path: test.info().outputPath(`${consumer}-${randomUUID()}.png`) });
     expect(errors).toEqual([]);
