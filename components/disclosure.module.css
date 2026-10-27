@@ -2,10 +2,7 @@
 .header { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
 .header > :first-child { flex: 1; min-width: 0; }
 .header > :is(h2,h3,h4) { margin: 0; font: inherit; }
-.control[data-disclosure-control] { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; min-height: 40px; padding: 10px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--lume-ink); font: 600 0.9375rem/1.5 var(--lume-font-sans); text-align: left; cursor: pointer; }
-@media (pointer: coarse), (max-width: 700px) {
-    .control[data-disclosure-control] { min-height: 44px; }
-}
+button.control[data-disclosure-control] { box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; min-height: 44px; padding: 10px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--lume-ink); font: 600 0.9375rem/1.5 var(--lume-font-sans); text-align: left; cursor: pointer; }
 .control > svg { flex: none; width: 16px; height: 16px; }
 .expanded { transform: rotate(90deg); }
 .label { flex: 1; min-width: 0; overflow-wrap: anywhere; }

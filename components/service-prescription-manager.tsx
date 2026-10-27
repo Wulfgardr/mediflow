@@ -418,7 +418,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
     };
 
     const count = prescriptions === undefined ? undefined : formatCountLabel(prescriptions.length, 'prestazione', 'prestazioni');
-    const newButton = <Button ref={creationRef} variant="text" aria-expanded={isFormOpen} aria-controls={isFormOpen ? formId : undefined}
+    const newButton = <Button ref={creationRef} variant="text" aria-expanded={isFormOpen} aria-controls={formId}
         onClick={() => setIsFormOpen(value => !value)}>Nuova prestazione</Button>;
     const content = (
         <section className={styles.register}>
@@ -428,8 +428,9 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                 {formatCountLabel(openCount, 'aperta', 'aperte')} · {formatCountLabel(reportCount, 'referto', 'referti')}
             </p> : null}
 
+            <div id={formId} hidden={!isFormOpen}>
             {isFormOpen && (
-                <form id={formId} ref={formRef} aria-label="Nuova prestazione"
+                <form ref={formRef} aria-label="Nuova prestazione"
                     onSubmit={handleSubmit}
                     className={styles.form}
                 >
@@ -648,6 +649,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                     </div>
                 </form>
             )}
+            </div>
 
             {!prescriptions ? <p role="status" className={styles.empty}>Caricamento prescrizioni…</p> : prescriptions.length === 0 ? (
                 <p className={styles.empty}>Nessuna prestazione prescritta registrata.</p>

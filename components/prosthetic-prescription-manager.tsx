@@ -226,7 +226,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
     };
 
     const count = prescriptions === undefined ? undefined : formatCountLabel(prescriptions.length, 'voce', 'voci');
-    const newButton = <Button ref={creationRef} variant="text" aria-expanded={isFormOpen} aria-controls={isFormOpen ? formId : undefined}
+    const newButton = <Button ref={creationRef} variant="text" aria-expanded={isFormOpen} aria-controls={formId}
         onClick={() => setIsFormOpen(value => !value)}>Nuova voce protesica</Button>;
     const content = (
         <section className={styles.register}>
@@ -243,8 +243,9 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                 </Disclosure>
             )}
 
+            <div id={formId} hidden={!isFormOpen}>
             {isFormOpen && (
-                <form id={formId} ref={formRef} aria-label="Nuova voce protesica" onSubmit={handleSubmit} className={styles.form}>
+                <form ref={formRef} aria-label="Nuova voce protesica" onSubmit={handleSubmit} className={styles.form}>
                     <div className="grid gap-3 md:grid-cols-2">
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Data prescrizione
@@ -320,6 +321,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                     </div>
                 </form>
             )}
+            </div>
 
             {!prescriptions ? <p role="status" className={styles.empty}>Caricamento prescrizioni…</p> : prescriptions.length === 0 ? (
                 <div className={styles.empty}>
