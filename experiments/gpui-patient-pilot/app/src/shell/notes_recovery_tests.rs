@@ -619,7 +619,7 @@ fn notes_comparison_explains_replacement_and_keeps_only_the_accessible_field_lab
     let (threshold, label) = notes_form_presentation(&view, cx);
     assert!(cx.debug_bounds("clinical-workspace-field-label").is_some());
     assert_eq!(label, "Note della scheda");
-    assert!(threshold.contains("Amina Sintetica · Note della scheda"));
+    assert!(threshold.contains("Sintetica Amina · Note della scheda"));
     assert!(!threshold.contains("La tua bozza sostituirà il testo registrato ora."));
 
     {
@@ -634,7 +634,7 @@ fn notes_comparison_explains_replacement_and_keeps_only_the_accessible_field_lab
     assert!(cx.debug_bounds("clinical-workspace-field-label").is_none());
     assert_eq!(label, "Note della scheda, la tua bozza");
     assert!(threshold.contains(
-        "Amina Sintetica · Note della scheda. La tua bozza sostituirà il testo registrato ora."
+        "Sintetica Amina · Note della scheda. La tua bozza sostituirà il testo registrato ora."
     ));
 
     let editor = view.read_with(cx, |app, _| {
@@ -644,7 +644,7 @@ fn notes_comparison_explains_replacement_and_keeps_only_the_accessible_field_lab
     cx.simulate_input(CONCURRENT);
     cx.run_until_parked();
     let (threshold, label) = notes_form_presentation(&view, cx);
-    assert!(threshold.contains("Amina Sintetica · Note della scheda"));
+    assert!(threshold.contains("Sintetica Amina · Note della scheda"));
     assert!(!threshold.contains("La tua bozza sostituirà il testo registrato ora."));
     assert!(cx.debug_bounds("clinical-workspace-field-label").is_none());
     assert_eq!(label, "Note della scheda, la tua bozza");
@@ -655,7 +655,7 @@ fn notes_comparison_explains_replacement_and_keeps_only_the_accessible_field_lab
     cx.update_window_entity(&view, |app, window, cx| app.review_form(window, cx));
     let (threshold, label) = notes_form_presentation(&view, cx);
     assert!(threshold.contains(
-        "Amina Sintetica · Note della scheda. La tua bozza sostituirà il testo registrato ora."
+        "Sintetica Amina · Note della scheda. La tua bozza sostituirà il testo registrato ora."
     ));
     assert!(cx.debug_bounds("clinical-workspace-field-label").is_none());
     assert_eq!(label, "Note della scheda, la tua bozza");
@@ -827,7 +827,7 @@ fn threshold_rendered_commands_bind_recipient_order_and_callbacks(cx: &mut gpui:
             ),
             (
                 "clinical-workspace-confirm-save",
-                "Conferma e registra nella scheda di Amina Sintetica",
+                "Conferma e registra nella scheda di Sintetica Amina",
                 second,
             ),
         ] {
@@ -1425,4 +1425,58 @@ fn enlarged_draft_keeps_a_readable_editor_and_reaches_review_in_the_same_scroll(
         host.writes().is_empty(),
         "navigation must not register the draft"
     );
+}
+
+#[gpui::test]
+fn hcg1_connected_confirmation_geometry_and_theme_match_the_recipient(
+    cx: &mut gpui::TestAppContext,
+) {
+    let host = Host::new();
+    let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+    open(&view, &host, cx);
+    cx.update_window_entity(&view, |app, window, cx| app.review_form(window, cx));
+    for dark in [false, true] {
+        for width in [390., 420., 700., 760., 800., 1200.] {
+            let height = if width == 390. { 640. } else { 840. };
+            cx.simulate_resize(gpui::size(px(width), px(height)));
+            view.update(cx, |app, cx| {
+                app.dark_override = Some(dark);
+                cx.notify();
+            });
+            draw(cx);
+            view.update(cx, |app, cx| {
+                let mut panel =
+                    app.threshold(Layout::for_window(width, 1.), ThresholdMode::Complete, cx);
+                assert_eq!(
+                    panel.style().background,
+                    Some(gpui::Fill::from(app.theme.paper))
+                );
+                assert_eq!(panel.text_style().color, Some(app.theme.ink));
+            });
+            let bar = cx.debug_bounds("threshold-bar").unwrap();
+            let content = cx.debug_bounds("threshold-scroll").unwrap();
+            assert!(content.size.height >= px(24.));
+            assert!(
+                content.bottom() <= bar.top() + px(1.),
+                "overlap: {width}/{dark}"
+            );
+            let back = cx.debug_bounds("threshold-back").unwrap();
+            let primary = cx.debug_bounds("clinical-workspace-confirm-save").unwrap();
+            assert!(bar.left() >= px(0.) && bar.right() <= px(width) && bar.bottom() <= px(height));
+            for command in [back, primary] {
+                assert!(command.left() >= bar.left() && command.right() <= bar.right());
+                assert!(command.top() >= bar.top() && command.bottom() <= bar.bottom());
+            }
+            assert!(back.bottom() <= primary.top() || back.right() <= primary.left());
+            let (node, _) = rendered_command::node("clinical-workspace-confirm-save");
+            assert_eq!(
+                node.label(),
+                Some("Conferma e registra nella scheda di Sintetica Amina")
+            );
+            eprintln!(
+                "HC-G1 connected theme={dark} width={width} content={content:?} threshold={bar:?}"
+            );
+        }
+    }
+    assert!(host.writes().is_empty());
 }

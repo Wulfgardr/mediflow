@@ -306,6 +306,10 @@ comandi.
 | Non registrata | Fondo del piano, ✕ critico | Non registrata. Nulla è stato scritto. | La causa. La bozza è intatta: rileggi la scheda e riprova. | Rileggi la scheda, Riprova |
 | In ascolto | Fondo del piano, punto vuoto che respira | In ascolto mm:ss | Ferma l'ascolto prima di registrare. | Registra disattivato |
 
+Nel client GPUI il pannello di conferma conserva il fondo e l'inchiostro del
+piano corrente, anche in Grafite. «Conferma e registra» usa l'inchiostro fresco
+come fondo; «Torna alla bozza» conserva il fondo del piano e il bordo secondario.
+
 #### Testo ingrandito e finestre basse
 
 La soglia resta ancorata in fondo al piano a ogni scala di testo: scorre

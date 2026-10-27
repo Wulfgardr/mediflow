@@ -28,7 +28,6 @@ pub struct Theme {
     pub selected: Hsla,
     pub warning: Hsla,
     pub critical: Hsla,
-    pub threshold: Hsla,
     pub threshold_text: Hsla,
     pub control_radius: f32,
     pub paper_radius: f32,
@@ -68,7 +67,6 @@ impl Theme {
             selected: color("surface", "selected"),
             warning: color("signal", "warning"),
             critical: color("signal", "critical"),
-            threshold: color("surface", "threshold"),
             threshold_text: color("ink", "threshold"),
             control_radius: if cfg!(any(target_os = "ios", target_os = "macos")) {
                 12.
