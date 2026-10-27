@@ -2,19 +2,23 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { db, Ambulatory } from '@/lib/db';
-import { Plus, Trash2, Loader2, CornerDownRight } from 'lucide-react';
+import { Plus, Loader2, CornerDownRight } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import { SettingsSectionIntro } from '@/components/settings/settings-ui';
-import { useToast } from '@/components/ui/toast-provider';
+import { SETTINGS_INPUT_CLASS, SETTINGS_LABEL_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import styles from '@/components/settings/settings-lume.module.css';
+import styles from '@/components/settings/maintenance-pages.module.css';
+import { PatientSheetMenu } from '@/components/patient-sheet-menu';
+import { ViewState } from '@/components/ui/view-state';
 
 export default function AmbulatoryManagerPage() {
-    const { showToast } = useToast();
     const confirm = useConfirm();
     const [ambulatories, setAmbulatories] = useState<Ambulatory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [readError, setReadError] = useState('');
+    const [actionError, setActionError] = useState('');
+    const [acceptedAction, setAcceptedAction] = useState('');
 
     const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -25,6 +29,7 @@ export default function AmbulatoryManagerPage() {
     const [isClearing, setIsClearing] = useState(false);
     // Keep hierarchy rendering linear even when the sede list grows.
     const ambulatoryById = useMemo(() => new Map(ambulatories.map((item) => [item.id, item])), [ambulatories]);
+    const actionsBlocked = isLoading || isCreating || isClearing || isUpdating || Boolean(readError || actionError);
     const selectedParent = newParentId ? ambulatoryById.get(newParentId) : null;
 
     useEffect(() => {
@@ -34,10 +39,13 @@ export default function AmbulatoryManagerPage() {
     const loadAmbulatories = async () => {
         setIsLoading(true);
         try {
-            const list = await db.ambulatories.toArray();
+            const list = await db.ambulatories.toArray({ rejectAuthUnavailable: true });
             setAmbulatories(list);
+            setReadError('');
+            setActionError('');
         } catch (e) {
             console.error("Failed to load ambulatories", e);
+            setReadError('Impossibile leggere gli ambulatori.');
         } finally {
             setIsLoading(false);
         }
@@ -45,6 +53,7 @@ export default function AmbulatoryManagerPage() {
 
     const handleCreate = async () => {
         if (!newName.trim()) return;
+        setAcceptedAction('');
         setIsCreating(true);
         try {
             const newAmbulatory: Ambulatory = {
@@ -58,13 +67,14 @@ export default function AmbulatoryManagerPage() {
                 createdAt: new Date()
             };
             await db.ambulatories.add(newAmbulatory);
+            setAcceptedAction('Ambulatorio creato.');
             setNewName('');
             setNewAddress('');
             setNewParentId('');
             setNewType('live');
             await loadAmbulatories();
         } catch {
-            showToast('Errore durante la creazione', 'error');
+            setActionError('Errore durante la creazione');
             console.error("Errore durante la creazione");
         } finally {
             setIsCreating(false);
@@ -81,9 +91,10 @@ export default function AmbulatoryManagerPage() {
         });
         if (!confirmed) return;
         if (typeof target?.version !== 'number') {
-            showToast('Versione della sede non disponibile. Aggiorna la pagina e riprova.', 'error');
+            setActionError('Versione della sede non disponibile. Aggiorna la pagina e riprova.');
             return;
         }
+        setAcceptedAction('');
         setIsClearing(true);
         try {
             const res = await fetch('/api/ambulatories/clear', {
@@ -98,11 +109,11 @@ export default function AmbulatoryManagerPage() {
                 throw new Error('Missing accepted ambulatory version');
             }
             setAmbulatories(current => current.map(item => item.id === id ? { ...item, version: accepted.version! } : item));
+            setAcceptedAction('Ambiente di test svuotato');
             await loadAmbulatories();
-            showToast('Ambiente di test svuotato', 'success');
         } catch (e) {
             console.error(e);
-            showToast('Errore durante lo svuotamento', 'error');
+            setActionError('Errore durante lo svuotamento');
         } finally {
             setIsClearing(false);
         }
@@ -133,25 +144,27 @@ export default function AmbulatoryManagerPage() {
         return roots;
     };
 
-    const AmbulatoryNode = ({ node, level = 0 }: { node: AmbulatoryNodeData, level?: number }) => {
+    const renderAmbulatoryNode = (node: AmbulatoryNodeData, level = 0): React.ReactNode => {
         const parent = node.parentId ? ambulatoryById.get(node.parentId) : null;
         const relationLabel = parent ? `Reparto di ${parent.name}` : 'Sede principale';
 
-        return <div>
-            <div role="treeitem" aria-selected={node.isDefault} className={styles.siteRow} style={{ paddingInlineStart: level * 20 }}>
+        return <div key={node.id}>
+            <div role="treeitem" aria-selected={node.isDefault} aria-level={level + 1} className={styles.siteRow} style={{ paddingInlineStart: level * 20 }}>
                 <div className={styles.siteIdentity}>
                     <h3>{node.name}</h3>
                     <p>{relationLabel}{node.address && ` · ${node.address}`}</p>
                     <p>{node.isDefault && <strong>Predefinita</strong>}{node.isDefault && node.type === 'test' && ' · '}{node.type === 'test' && <span>Ambiente di test</span>}</p>
                 </div>
                 <div className={styles.siteActions}>
-                    <button onClick={() => handleAddChild(node.id)} title={`Aggiungi reparto sotto ${node.name}`} aria-label={`Aggiungi reparto sotto ${node.name}`}><Plus size={14} aria-hidden />Aggiungi reparto</button>
-                    <button onClick={() => handleActivate(node.id)} disabled={node.isDefault}>{node.isDefault ? 'Già predefinita' : 'Usa come predefinita'}</button>
-                    {node.type === 'test' && <button onClick={() => handleClear(node.id)} title="Svuota ambiente di test" aria-label="Svuota ambiente di test" disabled={isClearing}>Svuota</button>}
-                    <button onClick={() => handleDelete(node.id)} aria-label="Elimina sede"><Trash2 size={16} aria-hidden /></button>
+                    <button onClick={() => handleAddChild(node.id)} disabled={actionsBlocked} title={`Aggiungi reparto sotto ${node.name}`} aria-label={`Aggiungi reparto sotto ${node.name}`} className={styles.textAction}><Plus size={14} aria-hidden />Aggiungi reparto</button>
+                    <PatientSheetMenu label="Azioni" trigger={props => <button {...props} disabled={actionsBlocked} className={styles.menuTrigger} aria-label="Azioni">⋯</button>}>
+                        <button role="menuitem" onClick={() => handleActivate(node.id)} disabled={actionsBlocked || node.isDefault}>{node.isDefault ? 'Già predefinita' : 'Usa come predefinita'}</button>
+                        {node.type === 'test' && <button role="menuitem" onClick={() => handleClear(node.id)} aria-label="Svuota ambiente di test" disabled={actionsBlocked}>Svuota</button>}
+                        <button role="menuitem" onClick={() => handleDelete(node.id)} aria-label="Elimina sede" disabled={actionsBlocked}>Elimina sede</button>
+                    </PatientSheetMenu>
                 </div>
             </div>
-            {node.children.length > 0 && <div role="group">{node.children.map(child => <AmbulatoryNode key={child.id} node={child} level={level + 1} />)}</div>}
+            {node.children.length > 0 && <div role="group">{node.children.map(child => renderAmbulatoryNode(child, level + 1))}</div>}
         </div>;
     };
 
@@ -163,25 +176,32 @@ export default function AmbulatoryManagerPage() {
             tone: 'danger'
         });
         if (!confirmed) return;
+        setAcceptedAction('');
+        setIsUpdating(true);
         try {
             const target = ambulatoryById.get(id);
             if (typeof target?.version !== 'number') throw new Error('Missing ambulatory version');
             await db.ambulatories.delete(id, { version: target?.version });
+            setAcceptedAction('Ambulatorio eliminato.');
             await loadAmbulatories();
         } catch {
-            showToast("Errore durante l'eliminazione", 'error');
-        }
+            setActionError("Errore durante l'eliminazione");
+        } finally { setIsUpdating(false); }
     };
 
     const handleSetDefault = async (id: string) => {
+        setAcceptedAction('');
+        setIsUpdating(true);
         try {
             const target = ambulatoryById.get(id);
             if (typeof target?.version !== 'number') throw new Error('Missing ambulatory version');
             await db.ambulatories.update(id, { isDefault: true, version: target.version });
+            setAcceptedAction('Ambulatorio predefinito aggiornato.');
             await loadAmbulatories();
         } catch (e) {
             console.error(e);
-        }
+            setActionError('Impossibile aggiornare l’ambulatorio predefinito.');
+        } finally { setIsUpdating(false); }
     };
 
     const handleActivate = (id: string) => handleSetDefault(id);
@@ -195,94 +215,31 @@ export default function AmbulatoryManagerPage() {
     };
 
     return (
-        <div className="space-y-6" data-testid="settings-ambulatories-section">
-            <SettingsSectionIntro
-                kicker="Generale"
-                title="Ambulatori"
-                description="Sedi e contesti clinici per il lavoro quotidiano."
-            />
-            <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
-                {isLoading ? 'Caricamento sedi...' : `${ambulatories.length} sedi configurate.`}
-            </p>
-            <section id="nuova-sede" className={styles.siteForm}>
-                <header className={styles.siteFormHeading}>
-                    <h3>Nuova sede o reparto</h3>
-                    {selectedParent && <p><CornerDownRight size={14} aria-hidden />Reparto di: {selectedParent.name}</p>}
-                </header>
-
-                <div className="flex flex-col gap-4">
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <input
-                            ref={nameInputRef}
-                            placeholder="Nome sede o reparto (es. Cardiologia)"
-                            value={newName}
-                            onChange={(e) => setNewName(e.target.value)}
-                            className="mf-input flex-1"
-                        />
-                        <input
-                            placeholder="Indirizzo (opzionale)"
-                            value={newAddress}
-                            onChange={(e) => setNewAddress(e.target.value)}
-                            className="mf-input flex-1"
-                        />
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_160px_auto] md:items-center">
-                        <select
-                            value={newParentId}
-                            onChange={(e) => setNewParentId(e.target.value)}
-                            aria-label="Sede superiore"
-                            className="mf-input min-w-0"
-                        >
-                            <option value="">Sede principale</option>
-                            {ambulatories.map(a => (
-                                <option key={a.id} value={a.id}>{a.name}</option>
-                            ))}
-                        </select>
-                        <select
-                            value={newType}
-                            onChange={(e) => setNewType(e.target.value as 'live' | 'test')}
-                            aria-label="Tipo sede"
-                            className="mf-input min-w-0"
-                        >
-                            <option value="live">Clinico</option>
-                            <option value="test">Test</option>
-                        </select>
-                        <button
-                            onClick={handleCreate}
-                            disabled={!newName || isCreating}
-                            className="ui-btn-primary flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 text-sm whitespace-nowrap min-w-[120px] justify-center"
-                        >
-                            {isCreating ? <Loader2 className="w-4 h-4" /> : <Plus className="w-4 h-4 mr-2" />}
-                            Aggiungi
-                        </button>
-                    </div>
+        <section className={styles.page} data-testid="settings-ambulatories-section">
+            <header className={styles.intro}><h2>Ambulatori</h2><p>Sedi e contesti clinici per il lavoro quotidiano.</p></header>
+            {isLoading ? <ViewState state="loading" title="Caricamento sedi..." detail={ambulatories.length ? 'L’elenco mostrato potrebbe non essere aggiornato.' : undefined} />
+                : readError || actionError ? <ViewState state="error" title={readError || actionError} detail={ambulatories.length ? 'L’elenco mostrato potrebbe non essere aggiornato.' : undefined}
+                    action={{ label: 'Riprova', onClick: () => void loadAmbulatories() }} />
+                    : <p className={styles.meta}>{ambulatories.length} sedi configurate.</p>}
+            {acceptedAction && <p role="status" className={styles.meta}>{acceptedAction}</p>}
+            <section id="nuova-sede" className={styles.section}>
+                <header><h3 className={styles.heading}>Nuova sede o reparto</h3>{selectedParent && <p className={styles.meta}><CornerDownRight size={14} aria-hidden />Reparto di: {selectedParent.name}</p>}</header>
+                <div className={styles.fields}>
+                    <label className={SETTINGS_LABEL_CLASS}>Nome<input ref={nameInputRef} placeholder="Nome sede o reparto (es. Cardiologia)" value={newName} onChange={e => setNewName(e.target.value)} className={SETTINGS_INPUT_CLASS} /></label>
+                    <label className={SETTINGS_LABEL_CLASS}>Indirizzo (opzionale)<input placeholder="Indirizzo (opzionale)" value={newAddress} onChange={e => setNewAddress(e.target.value)} className={SETTINGS_INPUT_CLASS} /></label>
+                    <label className={SETTINGS_LABEL_CLASS}>Ambulatorio superiore<select value={newParentId} onChange={e => setNewParentId(e.target.value)} aria-label="Sede superiore" className={SETTINGS_INPUT_CLASS}>
+                        <option value="">Sede principale</option>{ambulatories.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select></label>
+                    <label className={SETTINGS_LABEL_CLASS}>Tipo<select value={newType} onChange={e => setNewType(e.target.value as 'live' | 'test')} aria-label="Tipo sede" className={SETTINGS_INPUT_CLASS}><option value="live">Clinico</option><option value="test">Test</option></select></label>
                 </div>
+                <div className={styles.actions}><button onClick={handleCreate} disabled={!newName || actionsBlocked} className={SETTINGS_PRIMARY_BUTTON_CLASS} data-settings-primary="true">{isCreating ? <Loader2 aria-hidden /> : <Plus aria-hidden />}Aggiungi</button></div>
             </section>
-
-            <section id="sedi" className={styles.siteRegister}>
-                <div className="mb-5">
-                    <h2 className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Sedi configurate</h2>
-                    <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--lume-ink-muted)' }}>
-                        La sede predefinita viene usata per i nuovi dati quando non scegli un contesto diverso.
-                    </p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                {isLoading ? (
-                    <div className="text-center py-10 text-[color:var(--lume-ink-muted)]">Caricamento...</div>
-                ) : ambulatories.length === 0 ? (
-                    <div className="py-4 text-[color:var(--lume-ink-muted)]">
-                        Nessun ambulatorio configurato.
-                    </div>
-                ) : (
-                    <div role="tree" aria-label="Ambulatori configurati">
-                        {buildTree(ambulatories).map(root => (
-                            <AmbulatoryNode key={root.id} node={root} />
-                        ))}
-                    </div>
-                )}
-                </div>
+            <section id="sedi" className={styles.section} aria-busy={isLoading}>
+                <h3 className={styles.heading}>Sedi configurate</h3>
+                <p className={styles.meta}>La sede predefinita viene usata per i nuovi dati quando non scegli un contesto diverso.</p>
+                {ambulatories.length > 0 ? <div role="tree" aria-label="Ambulatori configurati">{buildTree(ambulatories).map(root => renderAmbulatoryNode(root))}</div>
+                    : !isLoading && !readError && !actionError ? <ViewState state="empty" title="Nessun ambulatorio configurato." /> : null}
             </section>
-        </div>
+        </section>
     );
 }
