@@ -2,4 +2,4 @@
 .navigation.navigation > a { justify-content: flex-start; flex-wrap: wrap; gap: 4px 8px; padding: 8px 16px; border-radius: 10px; min-height: 40px; }
 @media (max-width: 1023px) { .navigation.navigation { padding-inline: 20px; } }
 @media (max-width: 700px), (pointer: coarse) { .navigation.navigation > a { min-height: 44px; } }
-.documentSection.documentSection.documentSection { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.documentSection.documentSection.documentSection { --lume-focal-shadow-opacity: 0; padding: 0; border: 0; border-radius: 0 !important; background: transparent !important; box-shadow: none; }
