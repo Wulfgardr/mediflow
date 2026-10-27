@@ -159,18 +159,38 @@ test('200% CSS text size proxy retains labels, counters and full context (not br
     await noHorizontalOverflow(page);
 });
 
-test('settings subroute has an explicit home destination and preserves child state when search opens', async t => {
-    const page = await pageFor(t, '/settings/ai/fabric'); const expect = harness.expect;
-    const back = page.getByRole('link', { name: 'Torna alle impostazioni', exact: true });
-    await expect(back).toHaveAttribute('href', '/settings');
-    await expect(page.getByRole('link', { name: 'Torna ai pazienti', exact: true })).toHaveAttribute('href', '/?area=incarico');
-    await page.getByRole('textbox', { name: 'Campo locale fixture' }).fill('Bozza locale');
-    await page.getByRole('button', { name: 'Ricerca impostazioni (fixture)' }).click();
-    await expect(page.getByRole('textbox', { name: 'Campo locale fixture' })).toHaveValue('Bozza locale');
-    await page.getByRole('button', { name: 'Chiudi ricerca' }).click();
-    await back.click(); await expect(page).toHaveURL(harness.origin + '/settings');
-    await expect(page.getByRole('link', { name: 'Torna alle impostazioni', exact: true })).toHaveCount(0);
-});
+for (const width of [390, 1023, 1024, 1280]) {
+    test(`settings subroute navigation and child state at ${width}px`, async t => {
+        const page = await pageFor(t, '/settings/ai/fabric', { width, height: 900 });
+        const expect = harness.expect;
+        const back = page.getByRole('link', { name: 'Torna alle impostazioni', exact: true });
+        const sidebar = page.getByTestId('settings-nav-sidebar');
+        const current = sidebar.locator('[aria-current="page"]:visible');
+        await expect(current).toHaveCount(1);
+        await expect(current).toBeVisible();
+        await expect(current).toHaveAttribute('href', '/settings/ai/fabric');
+        if (width < 1024) {
+            await expect(back).toBeVisible();
+            await expect(back).toHaveAttribute('href', '/settings');
+            await expect(page.getByTestId('settings-nav-mobile-ai-fabric')).toBeVisible();
+        } else {
+            await expect(back).toHaveCount(0);
+            await expect(page.getByTestId('settings-nav-ai-fabric')).toBeVisible();
+        }
+        await expect(page.getByRole('link', { name: 'Torna ai pazienti', exact: true })).toHaveAttribute('href', '/?area=incarico');
+        await page.getByRole('textbox', { name: 'Campo locale fixture' }).fill('Bozza locale');
+        await sidebar.getByRole('button', { name: /Cerca impostazione/ }).click();
+        await expect(page.getByRole('textbox', { name: 'Campo locale fixture' })).toHaveValue('Bozza locale');
+        await page.getByRole('button', { name: 'Chiudi ricerca' }).click();
+        if (width < 1024) {
+            await back.click();
+        } else {
+            await sidebar.getByTestId('settings-nav-panoramica').click();
+        }
+        await expect(page).toHaveURL(harness.origin + '/settings');
+        await expect(page.getByRole('link', { name: 'Torna alle impostazioni', exact: true })).toHaveCount(0);
+    });
+}
 
 for (const [domain, present, absent] of [
     ['anagrafica', 'NomeSintetico CognomeSintetico', ['Diagnosi inventata UI06', 'Esenzione inventata UI06']],

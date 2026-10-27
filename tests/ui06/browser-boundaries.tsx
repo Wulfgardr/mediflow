@@ -25,7 +25,6 @@ export function usePathname() { return window.location.pathname; }
 export function Kree8WorkspaceShell({ children, title, backHref, backLabel }: { children: ReactNode; title: string; backHref: string; backLabel: string }) {
     return <main><header><a href={backHref}>{backLabel}</a><h1>{title}</h1></header>{children}</main>;
 }
-export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest: () => void }) { return <button onClick={onSearchRequest}>Ricerca impostazioni (fixture)</button>; }
 export function SettingsSearchOverlay({ open, onClose }: { open: boolean; onClose: () => void }) { return open ? <div role="dialog" aria-label="Ricerca fixture"><button onClick={onClose}>Chiudi ricerca</button></div> : null; }
 export function useSettingsSearch() { const [isSearchOpen, setOpen] = useState(false); return { isSearchOpen, openSearch: () => setOpen(true), closeSearch: () => setOpen(false) }; }
 
