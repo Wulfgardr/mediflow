@@ -33,7 +33,11 @@ test('sezioni vuote: ricetta unica, creazione presso il titolo e Nuova voce stab
     test.setTimeout(180_000);
     const id = await patient(page);
     await page.goto(`/patients/${id}/modules`);
-    for (const width of [1440, 768, 390]) {
+    for (const width of [1440, 768, 390]) for (const theme of ['light', 'dark']) {
+        await page.evaluate(theme => {
+            document.documentElement.classList.toggle('light', theme === 'light');
+            document.documentElement.classList.toggle('dark', theme === 'dark');
+        }, theme);
         await page.setViewportSize({ width, height: 960 });
         for (const [section, title, creation] of [
             ['terapie', 'Nessuna terapia registrata.', 'Nuova terapia'],
@@ -52,6 +56,13 @@ test('sezioni vuote: ricetta unica, creazione presso il titolo e Nuova voce stab
             const message = state.getByText(title, { exact: true });
             await expect(message).toHaveCSS('font-weight', '400');
             await expect(message).toHaveCSS('font-style', 'normal');
+            const muted = await message.evaluate(element => {
+                const sample = document.createElement('span');
+                sample.style.color = 'var(--lume-ink-muted)';
+                element.after(sample);
+                try { return getComputedStyle(sample).color; } finally { sample.remove(); }
+            });
+            await expect(message).toHaveCSS('color', muted);
             expect(await message.evaluate(element => Math.abs(element.getBoundingClientRect().left - element.closest('[data-folder-pane]')!.getBoundingClientRect().left))).toBeLessThanOrEqual(1);
             await expect(state.locator('button,a')).toHaveCount(0);
             if (creation) {
