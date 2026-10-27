@@ -2,6 +2,7 @@
 //! encryption policy, authorization and writes. No clinical data is persisted here.
 
 mod account_profile;
+mod agenda_flow;
 mod ai_preferences;
 mod ai_status;
 mod ambulatories;
@@ -339,7 +340,7 @@ struct PatientData {
     therapies: ReadLoad<Vec<Therapy>>,
     observations: ReadLoad<Vec<Observation>>,
     checkups: ReadLoad<Vec<Checkup>>,
-    attachments: Load<Vec<Attachment>>,
+    attachments: ReadLoad<Vec<Attachment>>,
     document_details_id: Option<String>,
 }
 impl Default for PatientData {
@@ -350,7 +351,7 @@ impl Default for PatientData {
             therapies: ReadLoad::Idle,
             observations: ReadLoad::Idle,
             checkups: ReadLoad::Idle,
-            attachments: Load::Idle,
+            attachments: ReadLoad::Idle,
             document_details_id: None,
         }
     }
@@ -390,8 +391,9 @@ pub struct ClinicalApp {
     ambulatory_management: ambulatories::Management,
     scope: Option<String>,
     patients: Load<Vec<PatientSummary>>,
-    global_patients: Load<Vec<PatientSummary>>,
-    agenda: Load<Vec<Checkup>>,
+    global_patients: ReadLoad<Vec<PatientSummary>>,
+    agenda: ReadLoad<Vec<Checkup>>,
+    agenda_flow: agenda_flow::AgendaFlow,
     global_entries: Load<Vec<Entry>>,
     global_query: String,
     global_search: Entity<TextInput>,
@@ -464,7 +466,7 @@ pub struct ClinicalApp {
     focus_after_render: bool,
     focus_search_after_render: bool,
     profile_scroll: gpui::ScrollHandle,
-    read_state_focus: [FocusHandle; 6],
+    read_state_focus: [FocusHandle; 9],
     read_state_commands: Vec<(ReadObject, ViewState)>,
     read_timer: Option<gpui::Task<()>>,
     epoch: u64,
@@ -685,8 +687,9 @@ impl ClinicalApp {
             ambulatory_management: ambulatories::Management::default(),
             scope: None,
             patients: Load::Idle,
-            global_patients: Load::Idle,
-            agenda: Load::Idle,
+            global_patients: ReadLoad::Idle,
+            agenda: ReadLoad::Idle,
+            agenda_flow: agenda_flow::AgendaFlow::default(),
             global_entries: Load::Idle,
             global_query: String::new(),
             global_search,
@@ -869,6 +872,11 @@ impl ClinicalApp {
         if matches!(self.ambulatories, Load::Loading) {
             self.ambulatories = Load::Idle;
         }
+        self.agenda.interrupt();
+        if let Some(refresh) = &mut self.agenda_flow.refresh {
+            refresh.interrupt();
+        }
+        self.global_patients.interrupt();
         self.read_timer = None;
         self.read_state_commands.clear();
         self.ai_preferences.reset();
@@ -1100,8 +1108,9 @@ impl ClinicalApp {
         self.scope = None;
         self.ambulatories = Load::Idle;
         self.patients = Load::Idle;
-        self.global_patients = Load::Idle;
-        self.agenda = Load::Idle;
+        self.global_patients = ReadLoad::Idle;
+        self.agenda = ReadLoad::Idle;
+        self.agenda_flow = agenda_flow::AgendaFlow::default();
         self.global_entries = Load::Idle;
         self.reference_rows = Load::Idle;
         self.reference_query.clear();
@@ -1185,8 +1194,9 @@ impl ClinicalApp {
         self.focus_after_render = true;
         self.scope = Some(id.to_owned());
         self.message = None;
-        self.global_patients = Load::Idle;
-        self.agenda = Load::Idle;
+        self.global_patients = ReadLoad::Idle;
+        self.agenda = ReadLoad::Idle;
+        self.agenda_flow = agenda_flow::AgendaFlow::default();
         self.global_entries = Load::Idle;
         self.reference_rows = Load::Idle;
         self.drug_count = Load::Idle;
@@ -1305,7 +1315,7 @@ impl ClinicalApp {
         self.patient.therapies = ReadLoad::loading();
         self.patient.observations = ReadLoad::loading();
         self.patient.checkups = ReadLoad::loading();
-        self.patient.attachments = Load::Loading;
+        self.patient.attachments = ReadLoad::loading();
         self.patient.document_details_id = None;
         self.watch_patient_reads(cx);
         let s = session.clone();
@@ -1342,12 +1352,16 @@ impl ClinicalApp {
         );
         self.run(
             move || session.list_attachments(&scope, &id),
-            |this, result, _| this.patient.attachments = Load::from_result(result),
+            |this, result, _| this.patient.attachments = ReadLoad::from_result(result),
             cx,
         );
     }
 
     fn navigate(&mut self, area: Area, cx: &mut Context<Self>) {
+        if area == Area::Agenda && self.agenda_flow.origin.is_some() {
+            self.return_to_agenda(cx);
+            return;
+        }
         if self.ambulatory_management.is_saving() {
             return;
         }
@@ -1360,6 +1374,7 @@ impl ClinicalApp {
                 false,
             ));
         } else {
+            self.agenda_flow = agenda_flow::AgendaFlow::default();
             self.focus_after_render = true;
             self.show_other = false;
             self.directory = true;
@@ -1404,33 +1419,9 @@ impl ClinicalApp {
         };
         self.next_epoch();
         let session = self.session.as_ref().expect("active session").clone();
-        self.global_patients = Load::Loading;
-        let s = session.clone();
-        let a = scope.clone();
-        self.run(
-            move || {
-                let mut patients = s.list_patients(&a, false)?;
-                patients.extend(s.list_patients(&a, true)?);
-                Ok(patients)
-            },
-            |this, result, _| this.global_patients = Load::from_result(result),
-            cx,
-        );
+        self.retry_global_read(ReadObject::NomiPazienti, cx);
         match self.area {
-            Area::Agenda => {
-                self.agenda = Load::Loading;
-                let filter = AgendaFilter {
-                    date_from: self.global_interval.from.clone(),
-                    date_to: self.global_interval.to.clone(),
-                    limit: Some(200),
-                    ..Default::default()
-                };
-                self.run(
-                    move || session.list_agenda_with_filter(&scope, &filter),
-                    |this, result, _| this.agenda = Load::from_result(result),
-                    cx,
-                );
-            }
+            Area::Agenda => self.retry_global_read(ReadObject::Agenda, cx),
             Area::Diary => {
                 self.global_entries = Load::Loading;
                 let filter = GlobalEntryFilter {
@@ -1447,6 +1438,7 @@ impl ClinicalApp {
             }
             _ => {}
         }
+        self.watch_patient_reads(cx);
         cx.notify();
     }
 
@@ -1561,7 +1553,13 @@ impl ClinicalApp {
             && !reveal_fields(&self.global_dates, window, cx)
             && !self.global_apply_target.reveal_if_focused(window, cx)
         {
-            self.global_search_target.reveal_if_focused(window, cx);
+            if !self.global_search_target.reveal_if_focused(window, cx) && self.area == Area::Agenda
+            {
+                self.agenda_flow
+                    .targets
+                    .values()
+                    .any(|target| target.reveal_if_focused(window, cx));
+            }
         } else if self.area == Area::References
             && !self.reference_search_target.reveal_if_focused(window, cx)
         {
@@ -3454,16 +3452,14 @@ impl ClinicalApp {
                     .child(
                         button(
                             "clinical-workspace-back-directory",
-                            "Pazienti",
+                            self.patient_back_label(),
                             theme,
                             false,
                             true,
                         )
+                        .debug_selector(|| "clinical-workspace-back-directory".into())
                         .on_click(cx.listener(|this, _, _, cx| {
-                            this.directory = true;
-                            this.load_patients(cx);
-                            this.focus_after_render = true;
-                            cx.notify();
+                            this.back_from_patient(cx);
                         })),
                     )
                     .child(self.patient_read_hint(
@@ -3538,17 +3534,15 @@ impl ClinicalApp {
                         .child(
                             button(
                                 "clinical-workspace-back-directory",
-                                "Pazienti",
+                                self.patient_back_label(),
                                 theme,
                                 false,
                                 self.form.is_none(),
                             )
+                            .debug_selector(|| "clinical-workspace-back-directory".into())
                             .when(self.form.is_none(), |el| {
                                 el.on_click(cx.listener(|this, _, _, cx| {
-                                    this.directory = true;
-                                    this.load_patients(cx);
-                                    this.focus_after_render = true;
-                                    cx.notify();
+                                    this.back_from_patient(cx);
                                 }))
                             }),
                         ),
@@ -4402,7 +4396,7 @@ impl ClinicalApp {
                     .when(writable, |el| el.on_click(cx.listener(|this, _, _, cx| this.pick_document(cx))))))
             .child(div().text_color(theme.secondary).child(text!("Prima del salvataggio puoi annullare la copia cambiando scheda o bloccando la sessione. Una copia già avviata può completarsi anche dopo il blocco.")))
             .when(self.document_busy, |el| el.child(notice("clinical-workspace-document-operation", "Operazione sul documento in corso…", theme, false)))
-            .when(self.patient.attachments.message().is_some(), |el| el.child(self.load_hint("clinical-workspace-attachments-state", &self.patient.attachments)))
+            .when_some(self.patient.attachments.state(ReadObject::Documenti), |el, state| el.child(self.render_read_state("clinical-workspace-attachments-state", state, cx)))
             .when(self.patient.attachments.ready().is_some_and(Vec::is_empty), |el| el.child(text!("Nessun documento presente nella scheda.")))
             .children(self.patient.attachments.ready().into_iter().flatten().map(|row| {
                 let name = if row.locked_fields.iter().any(|field| field == "name") { "Nome del documento non leggibile".into() } else { row.name.clone() };
@@ -5392,7 +5386,7 @@ impl ClinicalApp {
             return area.child(self.other_view(layout, cx));
         }
         if matches!(self.area, Area::Agenda | Area::Diary) {
-            return area.child(self.global_area_view(cx));
+            return area.child(self.global_area_view(layout, cx));
         }
         if self.area == Area::References {
             return area.child(self.references_view(cx));
@@ -5496,7 +5490,7 @@ impl ClinicalApp {
 }
 
 impl ClinicalApp {
-    fn global_area_view(&self, cx: &Context<Self>) -> Div {
+    fn global_area_view(&self, layout: Layout, cx: &Context<Self>) -> Div {
         let theme = self.theme;
         let agenda = self.area == Area::Agenda;
         let selected = self.area;
@@ -5504,8 +5498,9 @@ impl ClinicalApp {
             .child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
                 .child(heading("clinical-workspace-global-heading", if agenda { "Agenda" } else { "Diario generale" }, theme))
                 .child(div().flex().flex_wrap().gap(px(8.))
-                    .child(button("clinical-workspace-global-refresh", "Rileggi", theme, false, true)
-                        .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Reload, cx))))
+                    .when(!agenda, |el| el.child(button("clinical-workspace-global-refresh", "Rileggi", theme, false, true)
+                        .debug_selector(|| "clinical-workspace-global-refresh".into())
+                        .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Reload, cx)))))
                     .child(button("clinical-workspace-global-current", "Interfaccia corrente…", theme, false, true)
                         .on_click(cx.listener(move |this, _, _, cx| this.open_current(selected.current_path(), cx))))))
             .child(div().flex().flex_wrap().items_center().gap(px(8.))
@@ -5537,54 +5532,100 @@ impl ClinicalApp {
                     .child(self.global_search.clone()),
                 false,
             ))
-            .when(self.global_patients.message().is_some(), |el| el.child(notice("clinical-workspace-global-patient-names",
-                if matches!(self.global_patients, Load::Loading) { "Carico i nomi dei pazienti…" } else { "Alcuni nomi non sono disponibili nell'elenco caricato. Puoi rileggere o aprire la singola scheda." }, theme,
-                matches!(self.global_patients, Load::Failed(_)))))
-            .child(if agenda { self.agenda_view(cx) } else { self.global_diary_view(cx) })
+            .when_some(self.global_patients.state(ReadObject::NomiPazienti), |el, state| {
+                el.child(self.render_global_read_state("clinical-workspace-global-patient-names", state, cx))
+            })
+            .when(agenda && !self.global_query.trim().is_empty() && self.global_patients.ready().is_none(), |el| el.child(notice(
+                "clinical-workspace-agenda-partial-search", "La ricerca per nome è incompleta finché i nomi dei pazienti non sono disponibili. Puoi cercare per titolo del controllo.", theme, false).debug_selector(|| "clinical-workspace-agenda-partial-search".into())))
+            .child(if agenda { self.agenda_view(layout.compact, cx) } else { self.global_diary_view(cx).into_any_element() })
             .child(div().border_t_1().border_color(theme.rule).pt(px(16.)).type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                 .child(text!(if agenda { "La lettura comprende al massimo 200 controlli nell'intervallo applicato, dal meno recente. Altri controlli potrebbero non comparire: restringi l'intervallo per cercarli. La ricerca testuale riguarda soltanto i risultati caricati." }
                     else { "La lettura comprende al massimo le 50 voci più recenti nell'intervallo applicato. Le voci eliminate sono escluse. Per cercare voci meno recenti scegli altre date; la ricerca testuale riguarda soltanto i risultati caricati." })))
     }
 
-    fn agenda_view(&self, cx: &Context<Self>) -> Div {
+    fn agenda_view(&self, compact: bool, cx: &Context<Self>) -> gpui::AnyElement {
+        self.agenda_view_after(compact, std::time::Instant::now(), cx)
+    }
+
+    fn agenda_view_after(
+        &self,
+        compact: bool,
+        now: std::time::Instant,
+        cx: &Context<Self>,
+    ) -> gpui::AnyElement {
         let theme = self.theme;
-        let query = self.global_query.trim().to_lowercase();
         let today = chrono::Local::now().date_naive();
-        let rows: Vec<_> = self
-            .agenda
-            .ready()
-            .into_iter()
-            .flatten()
-            .filter(|row| {
-                row.deleted_at.is_none()
-                    && (self
-                        .global_patient_name(&row.patient_id)
-                        .to_lowercase()
-                        .contains(&query)
-                        || row.title.to_lowercase().contains(&query)
-                        || !row.locked_fields.iter().any(|field| field == "notes")
-                            && row
-                                .notes
-                                .as_deref()
-                                .unwrap_or_default()
-                                .to_lowercase()
-                                .contains(&query))
-            })
-            .collect();
-        let mut content = div().flex().flex_col().gap(px(28.));
-        if self.agenda.message().is_some() {
-            return content.child(self.load_hint("clinical-workspace-agenda-state", &self.agenda));
+        let rows = self.visible_agenda_rows();
+        let state = self.agenda_state_after(now);
+        let status = self.agenda_status(state.clone());
+        let mut content = div()
+            .id("clinical-workspace-agenda-list")
+            .accessibility_id("clinical-workspace-agenda-list")
+            .role(Role::List)
+            .aria_label(format!("Agenda. {status}"))
+            .debug_selector(|| "clinical-workspace-agenda-list".into())
+            .flex()
+            .flex_col()
+            .gap(px(28.));
+        if self.agenda.ready().is_none()
+            && let Some(state) = state
+        {
+            return content
+                .child(self.render_global_read_state("clinical-workspace-agenda-state", state, cx))
+                .into_any_element();
         }
-        if rows.is_empty() {
-            return content.child(
-                div()
-                    .py(px(28.))
-                    .type_role(theme, TypeRole::Strong)
-                    .child(text!("Nessun controllo tra i risultati caricati.")),
+        let status_text = text!(status.clone());
+        #[cfg(test)]
+        let status_text = rendered_command::observe_text(status_text);
+        let status = div()
+            .id("clinical-workspace-agenda-update")
+            .accessibility_id("clinical-workspace-agenda-update")
+            .role(Role::Status)
+            .aria_label(status.clone())
+            .debug_selector(|| "clinical-workspace-agenda-update".into())
+            .min_h(px(44.))
+            .flex()
+            .items_center()
+            .gap(px(12.))
+            .child(status_text)
+            .when(
+                state
+                    .as_ref()
+                    .is_some_and(|state| state.command().is_some()),
+                |el| {
+                    el.child(
+                        button(
+                            "clinical-workspace-agenda-state-command",
+                            "Rileggi",
+                            theme,
+                            false,
+                            true,
+                        )
+                        .debug_selector(|| "clinical-workspace-agenda-state-command".into())
+                        .track_focus(&self.read_state_focus[ReadObject::Agenda.index()])
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.retry_global_read_command(ReadObject::Agenda, cx)
+                        })),
+                    )
+                },
             );
+        content = content.child(status);
+        if rows.is_empty() {
+            return content
+                .child(if self.agenda.ready().is_some_and(Vec::is_empty) {
+                    self.empty_read_state("clinical-workspace-agenda-empty", ReadObject::Agenda, cx)
+                } else {
+                    notice(
+                        "clinical-workspace-agenda-filter-empty",
+                        "Nessun controllo corrisponde alla ricerca tra i risultati caricati.",
+                        theme,
+                        false,
+                    )
+                })
+                .into_any_element();
         }
         for group in AgendaGroup::ALL {
-            let mut grouped: Vec<_> = rows
+            let grouped: Vec<_> = rows
                 .iter()
                 .copied()
                 .filter(|row| agenda_group(&row.status, &row.date, today) == group)
@@ -5592,7 +5633,6 @@ impl ClinicalApp {
             if grouped.is_empty() {
                 continue;
             }
-            grouped.sort_by(|left, right| left.date.cmp(&right.date));
             let count = grouped.len();
             content = content.child(
                 div()
@@ -5616,8 +5656,10 @@ impl ClinicalApp {
                     })
                     .children(grouped.into_iter().map(|row| {
                         let patient_id = row.patient_id.clone();
+                        let checkup_id = row.id.clone();
+                        let target = &self.agenda_flow.targets[&row.id];
                         let name = self.global_patient_name(&patient_id);
-                        div()
+                        let element = div()
                             .id(SharedString::from(format!(
                                 "clinical-workspace-agenda-checkup-{}",
                                 row.id
@@ -5626,14 +5668,23 @@ impl ClinicalApp {
                                 "clinical-workspace-agenda-checkup-{}",
                                 row.id
                             )))
+                            .debug_selector({
+                                let id = row.id.clone();
+                                move || format!("clinical-workspace-agenda-checkup-{id}")
+                            })
                             .role(Role::Button)
                             .aria_label(SharedString::from(format!(
                                 "Apri scheda di {name}, {}, {}",
                                 row.title,
                                 display_date(Some(&row.date))
                             )))
-                            .focusable()
-                            .tab_stop(true)
+                            .track_focus(&target.focus)
+                            .anchor_scroll(Some(target.anchor.clone()))
+                            .aria_selected(self.agenda_flow.selected.as_deref() == Some(&row.id))
+                            .when(
+                                self.agenda_flow.selected.as_deref() == Some(&row.id),
+                                |el| el.bg(theme.selected),
+                            )
                             .cursor_pointer()
                             .min_w_0()
                             .max_w_full()
@@ -5649,24 +5700,67 @@ impl ClinicalApp {
                             .flex()
                             .flex_col()
                             .gap(px(8.))
-                            .child(record_header(
-                                theme,
-                                div().type_role(theme, TypeRole::Strong).child(text!(name)),
-                                div()
-                                    .type_role(theme, TypeRole::Meta)
-                                    .text_color(theme.secondary)
-                                    .child(text!(display_appointment(&row.date))),
-                            ))
                             .child(
                                 div()
-                                    .type_role(theme, TypeRole::Strong)
-                                    .child(text!(row.title.clone())),
-                            )
-                            .child(
-                                div()
-                                    .type_role(theme, TypeRole::Meta)
-                                    .text_color(theme.secondary)
-                                    .child(text!(checkup_status(&row.status))),
+                                    .flex()
+                                    .gap(px(12.))
+                                    .items_center()
+                                    .when(compact, |el| el.flex_col().items_start())
+                                    .child(
+                                        div()
+                                            .id(SharedString::from(format!(
+                                                "agenda-name-{}",
+                                                row.id
+                                            )))
+                                            .debug_selector({
+                                                let id = row.id.clone();
+                                                move || format!("agenda-name-{id}")
+                                            })
+                                            .type_role(theme, TypeRole::Strong)
+                                            .child(text!(name)),
+                                    )
+                                    .child(
+                                        div()
+                                            .id(SharedString::from(format!(
+                                                "agenda-title-{}",
+                                                row.id
+                                            )))
+                                            .debug_selector({
+                                                let id = row.id.clone();
+                                                move || format!("agenda-title-{id}")
+                                            })
+                                            .min_w_0()
+                                            .flex_1()
+                                            .child(text!(row.title.clone())),
+                                    )
+                                    .child(
+                                        div()
+                                            .id(SharedString::from(format!(
+                                                "agenda-status-{}",
+                                                row.id
+                                            )))
+                                            .debug_selector({
+                                                let id = row.id.clone();
+                                                move || format!("agenda-status-{id}")
+                                            })
+                                            .type_role(theme, TypeRole::Meta)
+                                            .text_color(theme.secondary)
+                                            .child(text!(checkup_status(&row.status))),
+                                    )
+                                    .child(
+                                        div()
+                                            .id(SharedString::from(format!(
+                                                "agenda-date-{}",
+                                                row.id
+                                            )))
+                                            .debug_selector({
+                                                let id = row.id.clone();
+                                                move || format!("agenda-date-{id}")
+                                            })
+                                            .type_role(theme, TypeRole::Meta)
+                                            .text_color(theme.secondary)
+                                            .child(text!(display_appointment(&row.date))),
+                                    ),
                             )
                             .when(
                                 row.locked_fields.iter().any(|field| field == "notes"),
@@ -5697,19 +5791,18 @@ impl ClinicalApp {
                                     )
                                 },
                             )
-                            .child(
-                                div()
-                                    .type_role(theme, TypeRole::Meta)
-                                    .text_color(theme.fresh)
-                                    .child(text!("Apri scheda")),
-                            )
                             .on_click(cx.listener(move |this, _, _, cx| {
-                                this.select_patient(&patient_id, true, cx)
-                            }))
+                                this.open_agenda_patient(&checkup_id, &patient_id, cx)
+                            }));
+                        #[cfg(test)]
+                        let element = rendered_command::observe(element);
+                        element
                     })),
             );
         }
-        content
+        #[cfg(test)]
+        let content = rendered_command::observe(content);
+        content.into_any_element()
     }
 
     fn global_diary_view(&self, cx: &Context<Self>) -> Div {
@@ -6007,7 +6100,7 @@ impl Render for ClinicalApp {
         self.prepare_ambulatory_management(theme, window, cx);
         self.account_profile
             .configure(theme, self.account_profile.read_only(), cx);
-        self.prepare_read_state_focus(window, cx);
+
         self.scales.prepare_render(theme, window, cx);
         self.analytics.prepare_render(theme, cx);
         for field in &self.login_fields {
@@ -6065,6 +6158,8 @@ impl Render for ClinicalApp {
         let layout = Layout::for_window(f32::from(window.viewport_size().width), self.text_scale);
         let connected = self.session.is_some();
         self.sync_patient_targets(cx);
+        self.prepare_agenda_return(window, cx);
+        self.prepare_read_state_focus(window, cx);
         if std::mem::take(&mut self.focus_search_after_render)
             && connected
             && self.form.is_none()
@@ -6195,6 +6290,8 @@ impl Render for ClinicalApp {
                     this.show_other = false;
                     this.show_sections = false;
                     cx.notify();
+                } else if this.form.is_none() && this.agenda_flow.origin.is_some() {
+                    this.return_to_agenda(cx);
                 }
             }))
             .on_action(cx.listener(|this, _: &Refresh, _, cx| {
