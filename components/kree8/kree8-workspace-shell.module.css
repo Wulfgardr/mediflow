@@ -207,7 +207,7 @@
 .attentionBand { padding: 20px; background: transparent; }
 .attentionHead,
 .sectionHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.sectionTitle { margin: 3px 0 0; color: var(--lume-ink); font-size: 0.9375rem; font-weight: 600; line-height: 1.3; text-wrap: balance; }
+.sectionTitle { composes: heading from "../ink-section.module.css"; margin: 3px 0 0; color: var(--lume-ink); text-wrap: balance; }
 .sectionCopy,
 .mutedText { margin: 5px 0 0; color: var(--lume-ink-muted); font-size: 0.75rem; line-height: 1.55; }
 .attentionContent { margin-top: 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
@@ -936,14 +936,13 @@
 :global(html[data-runtime-twin-design='proposal']) .clinicalSection > h3 > :is(button, div) { padding: 0 0 20px; border-bottom: 1px solid var(--k8-line-strong); }
 :global(html[data-runtime-twin-design='proposal']) .clinicalSection > h3 > :is(button, div) > span > span { margin-top: 0; font-size: var(--twin-type-section); font-weight: var(--twin-heading-weight); line-height: var(--twin-heading-leading); letter-spacing: -0.02em; }
 :global(html[data-runtime-twin-design='proposal']) .clinicalSection > div { padding-top: 24px !important; }
-:global(html[data-runtime-twin-design='proposal']) .sectionTitle { margin: 0; font-size: var(--twin-type-section); font-weight: var(--twin-heading-weight); line-height: var(--twin-heading-leading); letter-spacing: -0.02em; }
+:global(html[data-runtime-twin-design='proposal']) .sectionTitle { margin: 0; }
 :global(html[data-runtime-twin-design='proposal']) .synopticDetails { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
 :global(html[data-runtime-twin-design='proposal']) .synopticDetails > .synopticDetail { grid-column: 1 / -1; }
 :global(html[data-runtime-twin-design='proposal']) .synopticTherapy { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 12px 0; }
 :global(html[data-runtime-twin-design='proposal']) .synopticDetails .synopticDetail { padding: 0; border: 0; }
 :global(html[data-runtime-twin-design='proposal']) .synopticDetailHeading { margin-bottom: 8px; }
 :global(html[data-runtime-twin-design='proposal']) .attentionBand { padding: 22px; background: var(--lume-surface-field); border-radius: 12px; align-self: start; }
-:global(html[data-runtime-twin-design='proposal']) .attentionBand .sectionTitle { font-size: var(--twin-type-section); }
 :global(html[data-runtime-twin-design='proposal']) .attentionBand .sectionCopy { max-width: 40ch; }
 :global(html[data-runtime-twin-design='proposal']) .attentionBand :global([data-testid^='review-queue-row-']) { display: flex; flex-direction: column; gap: 10px; }
 :global(html[data-runtime-twin-design='proposal']) .attentionBand :global([data-testid^='review-queue-row-'] a) { align-self: flex-start; }
