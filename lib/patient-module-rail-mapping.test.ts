@@ -13,7 +13,7 @@ const canonicalItems = () => [
     { href: '#attenzione', label: 'Attenzione', meta: 'a' },
     // WUL-678: each domain has a real menu target.
     { href: '#identita', label: 'Anagrafica' },
-    { href: '#clinica', label: 'Diagnosi' },
+    { href: '#clinica', label: 'Clinica' },
     { href: '#amministrazione', label: 'Amministrazione' },
     { href: '#parametri', label: 'Parametri', meta: 'p' },
     { href: '#terapie', label: 'Terapie', meta: 't' },
@@ -21,7 +21,7 @@ const canonicalItems = () => [
     { href: '#protesica', label: 'Protesica' },
     { href: '#scale', label: 'Scale' },
     { href: '#documenti', label: 'Documenti', meta: 'd' },
-    { href: '#siss', label: 'SISS/FSE' },
+    { href: '#siss', label: 'SISS e FSE' },
     { href: '#timeline', label: 'Timeline' },
     { href: '#diario', label: 'Diario' },
     { href: '#follow-up', label: 'Follow-up', meta: 'f' },

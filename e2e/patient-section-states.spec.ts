@@ -2,6 +2,8 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow } from './utils';
 
 async function patient(page: Page) {
+    page.on('pageerror', error => console.log(`HC6_PAGE_ERROR ${error.stack ?? error.message}`));
+    page.on('console', message => { if (message.type() === 'error') console.log(`HC6_CONSOLE_ERROR ${message.text()}`); });
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     return page.evaluate(async () => {
         const response = await fetch('/api/patients', {
