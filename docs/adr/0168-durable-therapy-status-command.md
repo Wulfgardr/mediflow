@@ -1,6 +1,6 @@
 # 0168 — Comando durevole per il solo stato della terapia
 
-Stato: Proposed — disegno C-5a/G-6 accettato per implementazione; review indipendente del diff finale e integrazione ancora richieste.
+Stato: Accepted — decisione C-5a/G-6 accettata; qualifica clinica distinta.
 
 ## Decisione
 

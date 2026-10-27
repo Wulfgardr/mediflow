@@ -256,3 +256,7 @@ nel proprio IMMEDIATE: `therapy.updated` obbligatorio e snapshot esatto nella
 receipt applied. Nessun audit o update nuovo su replay. Rejected/closed sono
 terminali senza effetto clinico e senza audit clinico fittizio. Web admin corrente,
 nessun consumer chat. Tempo host e conservazione storica secondo ADR0168.
+
+## Clear/delete ambulatori nominati
+
+`lib/security/ambulatory-destructive-service.ts` ricontrolla paired corrente e WebP3 admin dedicata insieme al piano sotto IMMEDIATE, poi compone i core sincroni di `ambulatory-write.ts`, audit obbligatori e receipt. Replay/closed/rejected non inventano audit clinici. Tutti gli eventi paziente/default e aggregati applicati restano nello snapshot di conservazione server, escluso dalla receipt pubblica (ADR0169).
