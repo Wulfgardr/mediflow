@@ -1,10 +1,31 @@
 /* real settings recovery and currentness with isolated synthetic SQLite. */
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import Database from 'better-sqlite3';
 import { isAbsolute, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession } from './utils';
 import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
+
+const blockedRequests = new WeakMap<Page, string[]>();
+test.beforeEach(async ({ page, baseURL }) => {
+    const origin = new URL(baseURL!).origin;
+    const blocked: string[] = []; blockedRequests.set(page, blocked);
+    await page.route('**/*', route => {
+        const request = route.request(), url = new URL(request.url());
+        if (url.origin !== origin || url.pathname.startsWith('/api/ai/') || url.pathname.startsWith('/api/icd/')
+            || (url.pathname.startsWith('/api/siss/') && url.pathname !== '/api/siss/session-status')
+            || url.pathname === '/api/system/native' || url.pathname === '/api/auth/reset') {
+            blocked.push(`${request.method()} ${request.url()}`); return route.abort();
+        }
+        if (url.pathname === '/api/siss/session-status') return route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } });
+        return route.continue();
+    });
+});
+test.afterEach(async ({ page }, info) => {
+    const allBlocked = blockedRequests.get(page) ?? [];
+    await info.attach('ambulatory-unexpected-requests.json', { body: JSON.stringify({ allBlocked }), contentType: 'application/json' });
+    expect(allBlocked).toEqual([]);
+});
 
 test('ambulatory clear rolls back audit failure, preserves live patients and reloads the accepted version', async ({ page, baseURL }, testInfo) => {
     test.skip(process.env.MF085_SYNTHETIC_E2E !== '1', 'Requires an isolated synthetic server.');
