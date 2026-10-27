@@ -343,6 +343,9 @@ for (const width of [1440, 390]) {
     await reviewedDelete(page).click();
     const confirmation = page.getByRole('dialog', { name: 'Eliminare la terapia riletta «Farmaco sintetico principale»?', exact: true });
     await expect(confirmation).toBeVisible();
+    await expect(confirmation).toContainText('La terapia riletta verrà spostata nel cestino con la motivazione conservata.');
+    await expect(confirmation.getByRole('button', { name: 'Annulla', exact: true })).toHaveClass(/mf-button-primary/);
+    await test.info().attach(`delete-retry-confirmation-${width}px`, { body: await confirmation.screenshot(), contentType: 'image/png' });
     expect(writes).toHaveLength(1);
     const accepted = page.waitForResponse(response => response.request().method() === 'DELETE' && response.url().endsWith(`/api/therapies/${data.therapyId}`));
     await confirmation.getByRole('button', { name: 'Elimina terapia riletta', exact: true }).click();
@@ -406,6 +409,7 @@ test('discarding recovery still requires reread and a new reason before another 
   await deleteRecovery(page).getByRole('button', { name: 'Rileggi terapia', exact: true }).click();
   await deleteRecovery(page).getByRole('button', { name: 'Ho confrontato i dati: indica una nuova motivazione', exact: true }).click();
   const confirmation = page.getByRole('dialog', { name: 'Eliminare la terapia riletta «Farmaco sintetico principale»?', exact: true });
+  await expect(confirmation).toContainText('La terapia riletta verrà spostata nel cestino. Indica una nuova motivazione per eliminarla.');
   await expect(confirmation.getByRole('button', { name: 'Elimina terapia riletta', exact: true })).toBeDisabled();
   expect(writes).toBe(1);
   await confirmation.getByRole('textbox', { name: "Motivazione dell'eliminazione" }).fill('Nuova motivazione sintetica');
