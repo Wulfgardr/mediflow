@@ -10,6 +10,75 @@ sono una prova TLA né un'estensione implicita degli invarianti legacy sottostan
 
 Il recovery cifrato supporta lo schema corrente 6 e i predecessori canonici 4 e 5; le 24 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
+## Riconciliazione delle letture di sessione con HC-7 del 27 ottobre 2026
+
+Riesaminato il risultato dell'unione di #696 (`32ea06c6b10fa29c51418704a6133aef4f4b7a09`)
+con `main` dopo #694 (`45caae3de3723bc4fd230532de3435aab12b04a7`),
+rispetto a entrambi i genitori e ai rispettivi `syncCommit` precedenti.
+`lib/db.ts` è identico alla head approvata di #696: conserva acquisizione,
+composizione e controllo del segnale nei lettori `get`/`toArray`, query clonate
+e collegamento delle tabelle all'owner. `components/therapy-manager.tsx` è
+identico a `main`: conserva destinatario, riepiloghi, verbi e callback HC-7.
+Le letture rigorose del manager e il loro segnale restano quelli già riesaminati.
+
+Il confronto dei consumer `SecurityProvider`, `ConfirmProvider` e
+`useDialogA11y` conferma che il ritiro delle letture e il filtro dei dinieghi
+rimangono separati da focus, conferma e annullamento. Nessuna transizione,
+guardia, posizione degli await, chiamata ai controller, CAS, ledger, audit o
+writer cambia per questa riconciliazione. In `document-upload.tsx` si combinano
+il lettore di #696 e il titolo nominativo HC-7; gli scrittori restano invariati.
+Modello, invarianti, limiti, testimoni e mutanti non cambiano; gli AbortSignal
+restano fuori dalla copertura TLC e sotto i test causali del client.
+
+Dopo questo riesame scritto vengono ricalcolate le impronte dei file risultanti,
+conservando anche la copertura dell'helper e degli input causali di #696.
+`syncCommit` identifica il commit di merge del runtime riesaminato; il comando
+completo `npm run verify:therapy-status` verifica il risultato senza estendere
+le proprietà del modello alla presentazione o al protocollo durevole.
+
+## Riesame HC-7 del 27 ottobre 2026
+
+Confrontato `components/therapy-manager.tsx` fra la base `c4ddf2e35` e
+`b051f6970`: il delta riguarda titolo/conseguenza della conferma di eliminazione,
+ordine cognome/nome del destinatario e testo della conferma di cambio stato.
+Il riepilogo mostra stato di partenza, destinazione e data corrente; la data
+effettiva resta determinata dall'host al commit. Il verbo del comando identifica
+il farmaco. Il componente comune dà priorità al ritorno nelle conferme distruttive;
+Escape, chiusura e annullamento risolvono ancora `confirmed: false`. Motivazione
+richiesta, trimming e controllo di presenza non cambiano.
+
+Riesaminati `updateStatus`, `handleSoftDelete`, recupero e consumer dei due
+controller: transizioni, guardie, confini degli await e chiamate a
+`begin`/`confirm`/`cancel`/`recover` restano invariati. La stringa del destinatario
+è solo presentazione; ID paziente/terapia, target, versioni e payload non cambiano.
+Controller ADR0168, recupero legacy ADR0156, route, CAS, ledger e audit sono
+identici alla base e conservano le impronte coperte. Il secondo confronto, su `9370053e4` (vedi `coverage.json.syncCommit` per il riferimento
+completo), allinea anche titolo, conseguenza e verbo del nuovo invio dopo conflitto.
+Sono ancora identici callback `deletion.retry`, scelta del motivo conservato o
+nuovo e condizione `requireReason`: cambia soltanto il testo. Anche le conferme
+di nuovo invio conservano motivo e guardie esistenti.
+
+L'impronta del solo componente e `syncCommit` sono aggiornati manualmente dopo
+questo confronto. Modello, statechart, invarianti, limiti e mutanti non cambiano;
+`verify:therapy-status` deve completare il modello legacy e i test causali correnti.
+Questa revisione di presentazione non estende la copertura TLC al protocollo durevole.
+
+## Riconciliazione HC-7 e HC-8 del 27 ottobre 2026
+
+Riesaminato il manager risultante dal merge `b55681f6e5d27a55a42ae42c4a1dd9f3ad0a8668` rispetto a entrambi
+i genitori: HC-8 conserva `htmlFor`/`id` del campo Farmaco e il consumer
+`DrugAutocomplete`; HC-7 conserva destinatario cognome/nome, oggetto e
+conseguenza delle eliminazioni, riepilogo e verbo del cambio stato e del
+nuovo invio. Riesaminati i consumer `ConfirmProvider`, `useDialogA11y` e
+`DrugAutocomplete`: focus iniziale e associazione del campo restano separati
+dai callback del controller. Non cambiano transizioni, guardie, confini degli
+await, `begin`/`confirm`/`cancel`/`recover`, CAS, ledger, audit o altri writer.
+Le altre superfici coperte conservano le impronte precedenti. Modello,
+statechart, invarianti, limiti, testimoni e mutanti restano invariati.
+Aggiornati manualmente il pin del manager e `syncCommit` alla revisione
+riesaminata; il raccordo non estende TLC a presentazione e accessibilità.
+Il comando completo `verify:therapy-status` deve essere rieseguito sul risultato.
+
 ## Raccordo della copertura al 26 ottobre 2026
 
 `coverage.json.syncCommit` identifica ora la revisione del runtime riesaminata

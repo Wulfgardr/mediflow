@@ -220,7 +220,7 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
             const before = writes('DELETE').length;
             await openDocumentActions(page, name);
             await row.getByRole('menuitem', { name: `Elimina ${name}`, exact: true }).click();
-            const dialog = page.getByRole('dialog', { name: 'Eliminare questo documento?' });
+            const dialog = page.getByRole('dialog', { name: `Eliminare il documento «${name}»?`, exact: true });
             if (cancelFirst) {
                 await dialog.getByRole('button', { name: 'Annulla', exact: true }).click();
                 await expect(row).toBeVisible(); expect(writes('DELETE')).toHaveLength(before);

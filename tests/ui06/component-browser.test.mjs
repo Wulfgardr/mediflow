@@ -113,10 +113,17 @@ test('cancel dialog retains draft and focus on continue/Escape; exits only after
     await page.getByRole('radio', { name: 'Opzione zero', exact: true }).check();
     const cancel = page.getByRole('button', { name: 'Annulla', exact: true });
     await cancel.click(); await expect(page.getByRole('dialog')).toBeVisible();
-    await page.getByRole('button', { name: 'Continua a scrivere', exact: true }).click();
+    const keep = page.getByRole('button', { name: 'Continua la compilazione', exact: true });
+    await expect(keep).toHaveClass(/mf-button-primary/);
+    await expect(keep).toBeFocused();
+    const discard = page.getByRole('button', { name: 'Esci senza salvare', exact: true });
+    await expect(discard).toHaveClass(/mf-button-destructive/);
+    await expect(discard).not.toHaveAttribute('data-command-confirmation', 'true');
+    await keep.click();
     await expect(page.getByRole('radio', { name: 'Opzione zero', exact: true })).toBeChecked();
     await expect(cancel).toBeFocused();
-    await cancel.click(); await page.keyboard.press('Escape'); await expect(cancel).toBeFocused();
+    await cancel.click(); await expect(keep).toBeFocused(); await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0); await expect(cancel).toBeFocused();
     assert.equal(await page.evaluate(() => window.ui06.scale.cancelled), 0);
     await cancel.click(); await page.getByRole('button', { name: 'Esci senza salvare', exact: true }).click();
     await expect(page.getByText('Compilazione chiusa', { exact: true })).toBeVisible();
@@ -272,4 +279,36 @@ test('security lock unmounts the presentation and does not resurrect a late prev
     await page.evaluate(() => { window.ui06.document.publish(); window.ui06.document.lock(false); });
     await harness.expect(page.getByRole('button', { name: 'Genera proposta', exact: true })).toBeVisible();
     await harness.expect(page.getByTestId('document-synthesis-fabric-result')).toHaveCount(0);
+});
+
+
+test('shared destructive confirmation keeps the reason guard and cancels through every return', async t => {
+    const page = await pageFor(t, '/confirm'); const expect = harness.expect;
+    const trigger = page.getByRole('button', { name: 'Apri conferma sintetica' });
+    const result = page.getByRole('status', { name: 'Decisione' });
+    for (const exit of ['Annulla', 'Chiudi', 'Escape', 'Chiudi sfondo']) {
+        await trigger.click();
+        const dialog = page.getByRole('dialog', { name: 'Eliminare la terapia «Farmaco sintetico»?' });
+        const submit = dialog.getByRole('button', { name: 'Elimina', exact: true });
+        await expect(dialog.getByRole('textbox')).toBeFocused();
+        await expect(dialog).toContainText('La terapia verrà spostata nel cestino.');
+        await expect(dialog.getByRole('button', { name: 'Annulla', exact: true })).toHaveClass(/mf-button-primary/);
+        await expect(submit).toHaveClass(/mf-button-destructive/);
+        await expect(submit).not.toHaveAttribute('data-command-confirmation', 'true');
+        await expect(submit).toBeDisabled();
+        await dialog.getByRole('textbox').fill('   '); await expect(submit).toBeDisabled();
+        if (exit === 'Escape') await page.keyboard.press('Escape');
+        else await page.getByRole('button', { name: exit, exact: true }).click({ position: exit === 'Chiudi sfondo' ? { x: 2, y: 2 } : undefined });
+        await expect(dialog).toHaveCount(0); await expect(trigger).toBeFocused();
+        await expect(result).toHaveText('Annullata');
+    }
+    await trigger.click(); await expect(page.getByRole('textbox')).toHaveValue('');
+    await expect(page.getByRole('textbox')).toBeFocused();
+    await page.getByRole('textbox').fill('  Duplicato sintetico  ');
+    await expect(page.getByRole('textbox')).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(result).toHaveText('Annullata');
+    await page.getByRole('button', { name: 'Elimina', exact: true }).click();
+    await expect(result).toHaveText('Eliminazione: Duplicato sintetico');
 });

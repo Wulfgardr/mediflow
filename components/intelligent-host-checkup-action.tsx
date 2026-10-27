@@ -157,14 +157,20 @@ export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups
       {embedded || open ? (
         <div id={statusId} style={popoverStyle} className={`${embedded ? '' : `mf-popover ${popoverStyles.popover}`} space-y-3 text-sm max-h-[calc(100dvh_-_var(--checkup-popover-top,0.5rem)_-_0.5rem)] overflow-y-auto overscroll-contain [overflow-wrap:anywhere] [&_button]:max-w-full [&_button]:whitespace-normal [&_button]:text-left [&_button]:h-auto`}>
           <p className="font-semibold">Completa o annulla un checkup</p>
+          <ol className="list-decimal space-y-1 pl-5" aria-label="Passi per gestire il checkup">
+            <li>Abilita la gestione con il PIN.</li>
+            <li>{checkupRef ? 'Checkup collegato: copia il codice per l’assistente.' : pendingCheckups.length === 0 ? 'Nessun checkup da completare disponibile.' : 'Scegli il checkup, poi attiva e collega.'}</li>
+            <li>{proposal ? 'Proposta riletta: reinserisci il PIN per confermare.' : 'Incolla il codice ricevuto dall’assistente per abilitare «Rileggi proposta».'}</li>
+          </ol>
           <p>Rivedi la proposta dell’assistente prima di confermare: la conferma con il PIN modifica lo stato del checkup. Non è un controllo del computer.</p>
           <p role="status" aria-live="polite" aria-atomic="true">{message}</p>
+          <p id={`${pinId}-reason`}>{busy ? 'Operazione in corso: attendi prima di un nuovo comando.' : pin.length < 4 ? 'Abilitazione e revoca richiedono il PIN di almeno 4 caratteri.' : 'PIN inserito: puoi abilitare o revocare la gestione.'}</p>
           <label htmlFor={pinId} className="mf-field-label">Reinserisci il PIN per autorizzare</label>
           <input id={pinId} className="mf-input mf-input-sm w-full" type="password" inputMode="text"
             autoComplete="current-password" value={pin} onChange={(event) => setPin(event.target.value)} />
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={actionClass} disabled={busy || pin.length < 4} onClick={enroll}>Abilita gestione checkup</button>
-            <button type="button" className={actionClass} disabled={busy || pin.length < 4} onClick={revokeRole}>Revoca definitivamente la gestione</button>
+            <button type="button" className={actionClass} aria-describedby={`${pinId}-reason`} disabled={busy || pin.length < 4} onClick={enroll}>Abilita gestione checkup</button>
+            <button type="button" className="mf-button-destructive" aria-describedby={`${pinId}-reason`} disabled={busy || pin.length < 4} onClick={revokeRole}>Revoca definitivamente la gestione</button>
           </div>
           <label className="mf-field-label" htmlFor={`${statusId}-checkup`}>Checkup da completare</label>
           <select id={`${statusId}-checkup`} className="mf-input mf-input-sm w-full" value={selectedId}
@@ -175,10 +181,11 @@ export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups
               : null}
             {pendingCheckups.map((item) => <option key={item.id} value={item.id}>{item.title} · versione {item.version ?? 1}</option>)}
           </select>
+          <p id={`${statusId}-selection-reason`}>{!ambulatoryId ? 'Serve un ambulatorio associato alla scheda.' : checkupRef ? 'Checkup già collegato. Chiudi l’operazione prima di cambiarlo.' : !selectedId ? 'Scegli un checkup da completare.' : 'Il collegamento attiva il servizio sul checkup scelto.'} {!checkupRef && !proposalRef ? '«Chiudi operazione» sarà disponibile dopo il collegamento.' : 'Puoi chiudere l’operazione senza revocare la gestione.'}</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={actionClass}
+            <button type="button" className={actionClass} aria-describedby={`${statusId}-selection-reason`}
               disabled={busy || !ambulatoryId || !selectedId || Boolean(checkupRef)} onClick={select}>Attiva e collega checkup</button>
-            <button type="button" className={actionClass} disabled={busy || (!checkupRef && !proposalRef)}
+            <button type="button" className={actionClass} aria-describedby={`${statusId}-selection-reason`} disabled={busy || (!checkupRef && !proposalRef)}
               onClick={revokeOperation}>Chiudi operazione</button>
           </div>
           {checkupRef ? <div className="space-y-1"><p className="mf-field-label">Codice del checkup per l’assistente</p>
@@ -189,7 +196,8 @@ export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups
           <label htmlFor={proposalId} className="mf-field-label">Codice della proposta ricevuta dall’assistente</label>
           <input id={proposalId} className="mf-input mf-input-sm w-full type-code" value={proposalRef}
             onChange={(event) => { setProposalRef(event.target.value); setProposal(null); }} />
-          <button type="button" className={actionClass} disabled={busy || !proposalRef.trim()} onClick={read}>Rileggi proposta</button>
+          <p id={`${proposalId}-reason`}>{proposalRef.trim() ? 'Codice inserito: rileggi la proposta prima di confermare.' : 'Per rileggere serve il codice della proposta ricevuta.'}</p>
+          <button type="button" className={actionClass} aria-describedby={`${proposalId}-reason`} disabled={busy || !proposalRef.trim()} onClick={read}>Rileggi proposta</button>
           {proposal ? <div className="space-y-2 border-t pt-3" data-testid="checkup-host-proposal">
             <p className="font-semibold">{target(proposal.targetStatus)}</p>
             <p>{proposal.resourceTitle}</p>

@@ -180,7 +180,7 @@ test('Misure: menu tastiera e conferma annullata non eliminano record', async ({
     await expect(trigger).toBeFocused();
     await trigger.press('Enter');
     await menu.getByRole('menuitem', { name: 'Elimina misura', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: 'Eliminare questa misura?', exact: true });
+    const dialog = page.getByRole('dialog', { name: 'Eliminare la misura «Pressione sistolica»?', exact: true });
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: 'Annulla', exact: true }).click();
     await expect(trigger).toBeFocused();
@@ -229,7 +229,7 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
                 await page.getByRole('menuitem', { name: 'Elimina misura', exact: true }).click();
             }
             await capture(page, 'conferma', theme, size);
-            await page.getByRole('dialog', { name: 'Eliminare questa misura?', exact: true }).getByRole('button', { name: 'Annulla', exact: true }).click();
+            await page.getByRole('dialog', { name: 'Eliminare la misura «Pressione sistolica»?', exact: true }).getByRole('button', { name: 'Annulla', exact: true }).click();
             if (!baseline) {
                 const geometry = await section(page).evaluate(element => {
                     const table = element.querySelector('aside table')!;
