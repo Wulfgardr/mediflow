@@ -29,6 +29,49 @@ async function alignedHeader(pane: Locator) {
     await expect(header.getByRole('heading').or(header.and(pane.getByRole('heading')))).toHaveCSS('font-size', '12px');
 }
 
+for (const section of ['diario', 'prestazioni'] as const) for (const populated of [false, true]) {
+    test(`${section}: il caricamento conserva intestazione e focus fino al risultato ${populated ? 'pieno' : 'vuoto'}`, async ({ page }) => {
+        test.setTimeout(90_000);
+        const id = await patient(page);
+        const endpoint = section === 'diario' ? 'entries' : 'service-prescriptions';
+        const title = 'Voce sintetica per continuità del focus';
+        if (populated) await page.evaluate(async ({ id, endpoint, title }) => {
+            const response = await fetch(`/api/${endpoint}`, {
+                method: 'POST', headers: { 'content-type': 'application/json' },
+                body: JSON.stringify(endpoint === 'entries'
+                    ? { patientId: id, type: 'visit', date: '2026-10-01T09:00:00Z', title, content: 'Contenuto sintetico.' }
+                    : { id: crypto.randomUUID(), patientId: id, serviceName: title, prescribedAt: '2026-10-01T09:00:00Z', status: 'cancelled' }),
+            });
+            if (!response.ok) throw new Error(`Synthetic ${endpoint}: ${response.status}`);
+        }, { id, endpoint, title });
+        let release!: () => void;
+        const pending = new Promise<void>(resolve => { release = resolve; });
+        await page.route(new RegExp(`/api/${endpoint}(?:\\?.*)?$`), async route => {
+            const patientId = new URL(route.request().url()).searchParams.get('patientId');
+            if (patientId !== null && patientId !== id) return route.continue();
+            await pending;
+            await route.continue();
+        });
+        try {
+            await page.goto(`/patients/${id}/modules`);
+            await openPatientSection(page, section);
+            const pane = page.locator(`#${section}`);
+            await expect(pane.locator('[data-view-state=loading]')).toBeVisible();
+            await expect(pane.locator('[data-view-state=empty]')).toHaveCount(0);
+            const heading = pane.getByRole('heading', { level: 3 });
+            const originalHeading = await heading.elementHandle();
+            expect(originalHeading).not.toBeNull();
+            await expect(heading).toBeFocused();
+            release();
+            await expect(pane.locator('[data-view-state=loading]')).toHaveCount(0);
+            if (populated) await expect(pane).toContainText(title);
+            else await expect(pane.locator('[data-view-state=empty]')).toBeVisible();
+            expect(await originalHeading!.evaluate(element => element.isConnected && document.activeElement === element)).toBe(true);
+            await expect(heading).toBeFocused();
+        } finally { release(); }
+    });
+}
+
 test('sezioni vuote: ricetta unica, creazione presso il titolo e Nuova voce stabile fra destinazioni', async ({ page }) => {
     test.setTimeout(180_000);
     const id = await patient(page);

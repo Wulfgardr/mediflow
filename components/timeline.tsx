@@ -16,7 +16,7 @@ import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import twin from './twin-diary.module.css';
 
 interface TimelineProps {
-    entries: TimelineEntryData[];
+    entries: TimelineEntryData[] | undefined;
     patientDiary?: boolean;
     // Shared clinical history, named for the section that owns it.
     label?: string;
@@ -96,9 +96,7 @@ export default function Timeline({
     };
 
     // Filter logic
-    const visibleEntries = showDeleted
-        ? entries
-        : entries.filter(e => !e.deletedAt);
+    const visibleEntries = (entries ?? []).filter(entry => showDeleted || !entry.deletedAt);
     const resolvedActiveEntryId = visibleEntries.some((entry) => entry.id === activeEntryId)
         ? activeEntryId
         : visibleEntries[0]?.id;
@@ -126,6 +124,7 @@ export default function Timeline({
             {content}
         </>;
 
+    if (entries === undefined) return withHeader(<ViewState state="loading" title="Diario in caricamento." />);
     if (!visibleEntries.length) return withHeader(<ViewState state="empty" title={emptyMessage} />);
 
     return withHeader(
