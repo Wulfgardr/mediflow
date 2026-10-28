@@ -34,7 +34,7 @@ type Props = {
     patientTaxCode: string | null | undefined;
     embedded?: boolean;
     fseReadiness: FseReadinessState;
-    onRefreshFseReadiness: () => Promise<void>;
+    onRefreshFseReadiness: () => void;
 };
 
 type FeedbackState = {
