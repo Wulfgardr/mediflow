@@ -3,7 +3,10 @@
 import { db, Attachment } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Eye, EyeOff } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ComponentProps, type ReactNode } from 'react';
+import { CollapsibleSection } from '@/components/kree8/collapsible-section';
+import { ViewState } from '@/components/ui/view-state';
+import sectionRecipe from '@/components/ink-section.module.css';
 import DocumentViewer from './document-viewer';
 import { TimelineEntryCard, TimelineEntryData } from './timeline-entry-card';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -13,11 +16,13 @@ import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import twin from './twin-diary.module.css';
 
 interface TimelineProps {
-    entries: TimelineEntryData[];
+    entries: TimelineEntryData[] | undefined;
     patientDiary?: boolean;
     // Shared clinical history, named for the section that owns it.
     label?: string;
     emptyMessage?: string;
+    section?: Omit<ComponentProps<typeof CollapsibleSection>, 'children' | 'headerAction'>;
+    heading?: string;
 }
 
 export default function Timeline({
@@ -25,6 +30,8 @@ export default function Timeline({
     patientDiary = false,
     label = 'Diario clinico del paziente',
     emptyMessage = 'Nessuna voce visibile nel diario clinico.',
+    section,
+    heading,
 }: TimelineProps) {
     const { proposal } = useRuntimeTwinDesign();
     const [showDeleted, setShowDeleted] = useState(false);
@@ -89,9 +96,7 @@ export default function Timeline({
     };
 
     // Filter logic
-    const visibleEntries = showDeleted
-        ? entries
-        : entries.filter(e => !e.deletedAt);
+    const visibleEntries = (entries ?? []).filter(entry => showDeleted || !entry.deletedAt);
     const resolvedActiveEntryId = visibleEntries.some((entry) => entry.id === activeEntryId)
         ? activeEntryId
         : visibleEntries[0]?.id;
@@ -111,19 +116,19 @@ export default function Timeline({
         </button>
     );
 
-    if (!visibleEntries.length) {
-        return (
-            <div className="space-y-4">
-                <div className="flex justify-end">{auditToggle}</div>
-                <div className="text-center py-10 italic text-[color:var(--lume-ink-muted)]">{emptyMessage}</div>
-            </div>
-        );
-    }
+    const withHeader = (content: ReactNode) => section
+        ? <CollapsibleSection {...section} headerAction={auditToggle}>{content}</CollapsibleSection>
+        : <>
+            {heading ? <header className={sectionRecipe.header}><h4 className={sectionRecipe.heading}>{heading}</h4>{auditToggle}</header>
+                : <div className="flex justify-end">{auditToggle}</div>}
+            {content}
+        </>;
 
-    return (
+    if (entries === undefined) return withHeader(<ViewState state="loading" title="Diario in caricamento." />);
+    if (!visibleEntries.length) return withHeader(<ViewState state="empty" title={emptyMessage} />);
+
+    return withHeader(
         <div className={patientDiary && proposal ? twin.patientDiary : "space-y-6"}>
-            <div className="flex justify-end">{auditToggle}</div>
-
             <div
                 className={proposal ? twin.diary : 'relative ml-3 space-y-3 pb-8'}
                 role="feed"

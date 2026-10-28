@@ -537,7 +537,7 @@ export default function ObservationManager({
         </div>
     );
     return embedded ? <CollapsibleSection id="parametri" title="Misure" count={count} defaultOpen={formOpen}
-        headerAction={newButton} surfaceClassName={`${surfaceClassName} ${styles.therapySection}`} keepMounted>
+        headerAction={newButton} surfaceClassName={surfaceClassName} keepMounted>
         {content}
     </CollapsibleSection> : content;
 }
