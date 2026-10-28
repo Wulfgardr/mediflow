@@ -16,17 +16,18 @@ async function patient(page: Page) {
 }
 
 async function alignedHeader(pane: Locator) {
-    const header = pane.locator(':scope > [data-section-header], :scope > h3');
-    await expect(header).toHaveCount(1);
-    const boxes = await header.evaluate(element => {
-        const header = element.getBoundingClientRect(), pane = element.parentElement!.getBoundingClientRect();
-        const style = getComputedStyle(element);
+    const heading = pane.getByRole('heading', { level: 3 }).first();
+    await expect(heading).toBeVisible();
+    const boxes = await heading.evaluate(element => {
+        const headerElement = element.closest('[data-section-header]') ?? element;
+        const header = headerElement.getBoundingClientRect(), pane = headerElement.parentElement!.getBoundingClientRect();
+        const style = getComputedStyle(headerElement);
         return { left: header.left - pane.left, right: pane.right - header.right, rule: style.borderBottomWidth };
     });
     expect(Math.abs(boxes.left)).toBeLessThanOrEqual(1);
     expect(Math.abs(boxes.right)).toBeLessThanOrEqual(1);
     expect(boxes.rule).toBe('1px');
-    await expect(header.getByRole('heading').or(header.and(pane.getByRole('heading')))).toHaveCSS('font-size', '12px');
+    await expect(heading).toHaveCSS('font-size', '12px');
 }
 
 for (const section of ['diario', 'prestazioni'] as const) for (const populated of [false, true]) {
