@@ -701,23 +701,53 @@ fn hcg2_theme_track_is_visible(cx: &mut gpui::TestAppContext) {
 }
 
 #[gpui::test]
-fn hcg3_demo_restarts_with_the_saved_theme(cx: &mut gpui::TestAppContext) {
-    let fixture = crate::shell::local_preferences::tests::Fixture::new();
-    let (view, visual) =
-        cx.add_window_view(|window, cx| PatientApp::with_preferences(fixture.store(), window, cx));
-    view.update(visual, |app, _| {
-        app.dark_override = Some(true);
-        app.save_appearance();
-    });
-    let (restarted, visual) =
-        cx.add_window_view(|window, cx| PatientApp::with_preferences(fixture.store(), window, cx));
-    restarted.update(visual, |app, _| {
-        assert_eq!(app.dark_override, Some(true));
-        assert!(app.dark);
-        app.dark_override = Some(false);
-        app.save_appearance();
-    });
-    assert_eq!(fixture.store().load().0.dark_override, Some(false));
+fn hcg3_click_each_appearance_segment_survives_reopening(cx: &mut gpui::TestAppContext) {
+    for (choice, id) in [
+        (None, "clinical-workspace-system-theme"),
+        (Some(false), "clinical-workspace-day-theme"),
+        (Some(true), "clinical-workspace-night-theme"),
+    ] {
+        let fixture = crate::shell::local_preferences::tests::Fixture::new();
+        let initial = if choice == Some(true) {
+            Some(false)
+        } else {
+            Some(true)
+        };
+        fixture
+            .store()
+            .save(crate::shell::local_preferences::LocalPreferences {
+                dark_override: initial,
+                ..Default::default()
+            })
+            .unwrap();
+        let (view, visual) = cx.add_window_view(|window, cx| {
+            PatientApp::with_preferences(fixture.store(), window, cx)
+        });
+        draw(visual);
+        let target = bounds(visual, id).center();
+        visual.simulate_click(target, gpui::Modifiers::default());
+        draw(visual);
+        view.read_with(visual, |app, _| {
+            assert_eq!(app.dark_override, choice, "click {id}")
+        });
+
+        let (reopened, visual) = cx.add_window_view(|window, cx| {
+            PatientApp::with_preferences(fixture.store(), window, cx)
+        });
+        draw(visual);
+        let system_dark = visual.update(|window, _| is_dark(window));
+        reopened.read_with(visual, |app, _| {
+            assert_eq!(app.dark_override, choice, "reopening after click {id}");
+            assert_eq!(
+                app.dark,
+                choice.unwrap_or(system_dark),
+                "effective theme after {id}"
+            );
+        });
+        let (saved, failed) = fixture.store().load();
+        assert!(!failed);
+        assert_eq!(saved.dark_override, choice);
+    }
 }
 
 #[gpui::test]

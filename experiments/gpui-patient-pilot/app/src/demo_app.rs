@@ -363,7 +363,10 @@ impl PatientApp {
                 self.search
                     .update(cx, |editor, cx| editor.focus(window, cx));
             }
-            Command::Appearance(value) => self.dark_override = value,
+            Command::Appearance(value) => {
+                self.dark_override = value;
+                self.save_appearance();
+            }
             Command::Refresh => self.request_reload(DiscardAction::Reload, cx),
             Command::Review => self.review(window, cx),
             Command::Confirm => self.confirm(window, cx),
