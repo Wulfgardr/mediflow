@@ -72,7 +72,7 @@ struct MobileVisitOnlineAdapter: MobileVisitOnlineReading {
             MobileVisitSection(id: "diary", source: "GET /api/v1/network/patients/{id}/entries?limit=100",
                 rows: entries.filter { $0.deletedAt == nil }.map {
                     .init(id: $0.id, version: $0.version,
-                          text: "\($0.date.formatted(date: .numeric, time: .shortened)) · \(field($0.title))\n\(field($0.content))")
+                          text: "\(ClinicalDatePresentation.timestamp.string(from: $0.date)) · \(field($0.title))\n\(field($0.content))")
                 }, limitation: "Massimo 100 voci; allegati esclusi. Le sezioni sono lette in sequenza, non in uno snapshot transazionale.")
         ]
         return MobileVisitDossier(id: UUID(), context: after.context,

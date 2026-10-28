@@ -3,13 +3,7 @@ import SwiftUI
 enum PairedPatientsWorkspaceSupport {
     static let clinicalPreviewCap = HomeBaseClinicalListLimit.boundaryMaximum
 
-    static let birthDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "it_IT")
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter
-    }()
+    static let birthDateFormatter = ClinicalDatePresentation.day
 
     static func age(from birthDate: Date?) -> Int? {
         guard let birthDate else { return nil }
@@ -34,30 +28,15 @@ enum PairedPatientsWorkspaceSupport {
         return "…\(normalized.suffix(6))"
     }
 
-    private static let relativeUpdatedFormatter: RelativeDateTimeFormatter = {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.locale = Locale(identifier: "it_IT")
-        formatter.unitsStyle = .short
-        return formatter
-    }()
+    private static let relativeUpdatedFormatter = ClinicalDatePresentation.relative
 
     static func relativeUpdated(_ date: Date) -> String {
         relativeUpdatedFormatter.localizedString(for: date, relativeTo: Date())
     }
 
-    static let entryDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .short
-        return formatter
-    }()
+    static let entryDateFormatter = ClinicalDatePresentation.timestamp
 
-    private static let therapyDayFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .none
-        return formatter
-    }()
+    private static let therapyDayFormatter = ClinicalDatePresentation.numericDay
 
     static func therapyDateLine(for therapy: HomeBaseTherapySummary) -> String {
         let start = therapyDayFormatter.string(from: therapy.startDate)

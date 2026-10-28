@@ -147,7 +147,7 @@ struct PairedDiaryComposerView: View {
                 Text(latest.lockedFields.contains(.title) ? "Titolo non leggibile" : latest.title)
                     .font(.subheadline.weight(.semibold))
                     .fixedSize(horizontal: false, vertical: true)
-                Text(latest.date, format: .dateTime.day().month(.abbreviated).year().hour().minute())
+                Text(ClinicalDatePresentation.timestamp.string(from: latest.date))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 Text("Tipo: \(PairedDiaryEntryType(rawValue: latest.type)?.title ?? latest.type)")

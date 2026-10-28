@@ -749,7 +749,7 @@ struct AgendaWorkspaceView: View {
                                         .fixedSize(horizontal: false, vertical: true)
                                     Spacer(minLength: 8)
                                     VStack(alignment: .trailing, spacing: 4) {
-                                        Text(row.checkup.date, format: .dateTime.day().month().hour().minute())
+                                        Text(ClinicalDatePresentation.timestamp.string(from: row.checkup.date))
                                             .inkRegister().monospacedDigit()
                                         Text(row.presentation.label).chartMetadata()
                                             .foregroundStyle(pillColor(row.presentation.pill))
@@ -898,7 +898,7 @@ struct GlobalDiaryWorkspaceView: View {
                                 if row.item.deleted { Text("Eliminata").chartMetadata().fontWeight(.semibold) }
                             }
                             Text("\(row.item.patientName) · \(row.item.patientCode)").chartMetadata()
-                            Text("\(row.type) · \(row.date, format: .dateTime.day().month().hour().minute())").chartMetadata()
+                            Text("\(row.type) · \(ClinicalDatePresentation.timestamp.string(from: row.date))").chartMetadata()
                             if row.lockedFields.contains(.content) {
                                 Text("Contenuto cifrato non leggibile con la chiave di questa sessione. La voce esiste sull'home-base.")
                                     .chartMetadata()

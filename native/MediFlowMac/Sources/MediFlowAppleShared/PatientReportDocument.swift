@@ -296,29 +296,11 @@ public enum PatientReportDocument {
         dateTimeFormatter.string(from: date)
     }
 
-    private static let dateOnlyFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "it_IT")
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter
-    }()
+    private static let dateOnlyFormatter = ClinicalDatePresentation.day
 
-    private static let dateTimeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "it_IT")
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter
-    }()
+    private static let dateTimeFormatter = ClinicalDatePresentation.timestamp
 
-    private static let fileDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
+    private static let fileDateFormatter = ClinicalDatePresentation.fileDay
 }
 
 public enum PatientReportPDFRenderer {

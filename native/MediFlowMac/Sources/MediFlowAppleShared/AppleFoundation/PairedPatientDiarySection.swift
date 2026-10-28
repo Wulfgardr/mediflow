@@ -173,7 +173,7 @@ struct PairedPatientDiarySection: View {
                         /* give chronology its own line, preserving the native Registro. */
                         #if os(iOS)
                         // A full year and named month make chronology readable.
-                        Text(entry.date, format: .dateTime.day().month(.abbreviated).year().hour().minute())
+                        Text(ClinicalDatePresentation.timestamp.string(from: entry.date))
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)

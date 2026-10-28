@@ -4,6 +4,26 @@ import XCTest
 // G1 (ADR 0071 parity): the patient-list row now derives an age from the summary
 // birthDate. Lock the boundary logic of the age helper.
 final class PatientSummaryPresentationTests: XCTestCase {
+    func testEntryDateIsItalianRegardlessOfDeviceLanguage() {
+        let formatter = PairedPatientsWorkspaceSupport.entryDateFormatter
+        XCTAssertEqual(formatter.locale.identifier, "it_IT")
+        let copy = formatter.copy() as! DateFormatter
+        copy.timeZone = TimeZone(secondsFromGMT: 0)
+        let date = Date(timeIntervalSince1970: 1750007160)
+        XCTAssertEqual(copy.string(from: date), "15 giu 2025, 17:06")
+    }
+
+    func testClinicalFieldProtectionTakesPrecedenceOverValueAndAbsence() {
+        XCTAssertEqual(PatientChartFieldValue.make("synthetic protected value", isProtected: true), .protected)
+        XCTAssertEqual(PatientChartFieldValue.make(nil, isProtected: true), .protected)
+    }
+
+    func testClinicalFieldDistinguishesMissingFromRecordedContent() {
+        XCTAssertEqual(PatientChartFieldValue.make(nil), .missing)
+        XCTAssertEqual(PatientChartFieldValue.make("  \n"), .missing)
+        XCTAssertEqual(PatientChartFieldValue.make("  Via sintetica 1  "), .recorded("Via sintetica 1"))
+    }
+
     func testAgeIsNilWhenBirthDateAbsent() {
         XCTAssertNil(PairedPatientsWorkspaceView.age(from: nil))
     }

@@ -19,6 +19,15 @@ struct PairedPatientDetailSection: View {
     /// cramped.
 
     var body: some View {
+        #if os(iOS)
+        mobilePatientChart
+        #else
+        desktopPatientChart
+        #endif
+    }
+
+    #if os(macOS)
+    private var desktopPatientChart: some View {
         let exemptions = ExemptionCodesCodec.decode(detail.exemptions)
         let groupSpacing = ClinicalChartMetrics.groupSpacing
         return VStack(alignment: .leading, spacing: groupSpacing) {
@@ -235,6 +244,8 @@ struct PairedPatientDetailSection: View {
         }
     }
 
+    #endif
+
     /* Read-only review signals from this patient's decrypted snapshot.
        Opening the existing Documents section leaves its loading, permissions
        and explicit manual actions with the existing workspace/model. */
@@ -412,6 +423,7 @@ struct PairedPatientDetailSection: View {
             Label("Modifica", systemImage: "pencil")
                 #if os(iOS)
                 .font(.body)
+                .fixedSize(horizontal: true, vertical: false)
                 .padding(.horizontal, 12)
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
@@ -564,13 +576,7 @@ struct PairedPatientDetailSection: View {
 
     /* DOB preserves its stored civil day in every device time zone. */
     private func birthDateText(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "it_IT")
-        formatter.calendar = PairedPatientsWorkspaceModel.patientBirthDateCalendar
-        formatter.timeZone = formatter.calendar.timeZone
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
+        ClinicalDatePresentation.birthDate.string(from: date)
     }
 
     private var patientEditForm: some View {
@@ -925,3 +931,204 @@ struct PairedPatientDetailSection: View {
     }
 
 }
+
+#if os(iOS)
+private extension PairedPatientDetailSection {
+    var mobilePatientChart: some View {
+        let diagnoses = DiagnosesCodec.decode(detail.diagnoses)
+        let exemptions = ExemptionCodesCodec.decode(detail.exemptions)
+        return VStack(alignment: .leading, spacing: 0) {
+            mobilePatientHeader.padding(.bottom, 16)
+            if detail.isArchived == true {
+                PatientChartGroup("Archiviazione") {
+                    PatientChartField(label: "Motivo", value: .make(
+                        detail.archiveReason.map { PairedPatientsWorkspaceModel.PatientArchiveReason(rawValue: $0)?.label ?? $0 },
+                        isProtected: model.isPatientFieldLocked(.archiveReason)))
+                    PatientChartField(label: "Nota", value: .make(detail.archiveNote,
+                        isProtected: model.isPatientFieldLocked(.archiveNote)))
+                }
+                .accessibilityIdentifier("patient-archive-details")
+            }
+            PatientChartGroup("Dati anagrafici") {
+                PatientChartField(label: "Codice fiscale", value: .make(detail.taxCode), isCode: true)
+                PatientChartField(label: "Data di nascita", value: .make(detail.birthDate.map { birthDateText($0) }))
+            }
+            PatientChartGroup("Contatti") {
+                PatientChartField(label: "Indirizzo", value: .make(detail.address,
+                    isProtected: model.isPatientFieldLocked(.address)))
+                PatientChartField(label: "Telefono", value: .make(detail.phone,
+                    isProtected: model.isPatientFieldLocked(.phone)))
+            }
+            PatientChartGroup("Assistenza") {
+                if detail.isAdi == true {
+                    PatientChartField(label: "Modalità", value: .recorded("Assistenza domiciliare integrata"))
+                }
+                PatientChartField(label: "Persona di riferimento", value: .make(detail.caregiver,
+                    isProtected: model.isPatientFieldLocked(.caregiver)))
+                PatientChartField(label: "Ambulatorio", value: .make(ambulatoryName))
+                PatientChartField(label: "Monitoraggio previsto", value: .make(detail.monitoringProfile))
+            }
+            PatientChartGroup(model.isPatientFieldLocked(.diagnoses) ? "Diagnosi" : "Diagnosi · \(diagnoses.count)") {
+                if model.isPatientFieldLocked(.diagnoses) {
+                    Label("Diagnosi protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
+                        .font(.footnote).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("patient-diagnoses-locked")
+                } else if diagnoses.isEmpty {
+                    Text("Nessuna diagnosi registrata.").font(.footnote).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("patient-diagnoses-empty")
+                } else {
+                    ForEach(Array(diagnoses.enumerated()), id: \.offset) { _, diagnosis in
+                        PatientChartField(label: diagnosis.code.isEmpty ? "Diagnosi" : diagnosis.code,
+                            value: .recorded(diagnosis.description), labelIsCode: !diagnosis.code.isEmpty)
+                            .accessibilityLabel(diagnosis.displayText)
+                    }
+                }
+            }
+            .accessibilityIdentifier("patient-detail-diagnoses")
+            mobileReviewOverview
+            PatientChartGroup(model.isPatientFieldLocked(.exemptions) ? "Esenzioni" : "Esenzioni · \(exemptions.count)") {
+                if model.isPatientFieldLocked(.exemptions) {
+                    Label("Esenzioni protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
+                        .font(.footnote).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("patient-exemptions-locked")
+                } else if exemptions.isEmpty {
+                    Text("Nessuna esenzione registrata.").font(.footnote).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("patient-exemptions-empty")
+                } else {
+                    Text(exemptions.joined(separator: ", "))
+                        .font(.system(.body, design: .monospaced))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .accessibilityIdentifier("patient-detail-exemptions")
+            if let reason = cleanedPatientWorkspaceValue(detail.statusReason) {
+                PatientChartGroup("Motivo dello stato") { PatientChartProse(text: reason) }
+            }
+            if model.isPatientFieldLocked(.notes) {
+                PatientChartGroup("Note") {
+                    PatientChartField(label: "Note", value: .protected)
+                }
+            } else if let notes = cleanedPatientWorkspaceValue(detail.notes) {
+                PatientChartGroup("Note") { PatientChartProse(text: notes) }
+            }
+            if let summary = cleanedPatientWorkspaceValue(detail.aiSummary) {
+                PatientChartGroup("Sintesi con IA") { PatientChartProse(text: summary) }
+                    .accessibilityIdentifier("patient-detail-ai-summary")
+            }
+            if let insights = cleanedPatientWorkspaceValue(detail.documentInsights) {
+                PatientChartGroup("Informazioni dai documenti") { PatientChartProse(text: insights) }
+                    .accessibilityIdentifier("patient-detail-document-insights")
+            }
+            DisclosureGroup {
+                mobileChartCounts.padding(.top, 12)
+            } label: {
+                Text("Riepilogo della cartella").font(.headline)
+            }
+            .padding(.vertical, 16)
+            .overlay(alignment: .top) { Divider() }
+            .accessibilityIdentifier("patient-clinical-signals-disclosure")
+            if model.isEditingPatient {
+                Divider()
+                patientEditForm.padding(.top, 16)
+            }
+        }
+    }
+
+    var mobilePatientHeader: some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 10))
+        return VStack(alignment: .leading, spacing: 8) {
+            layout {
+                Text("\(detail.lastName) \(detail.firstName)")
+                    .inkVoice(28)
+                    .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+                    .lineLimit(2)
+                    .accessibilityLabel("\(detail.lastName) \(detail.firstName)")
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("patient-detail-name")
+                HStack(spacing: 12) {
+                    primaryEditAction
+                    patientActionsOverflowMenu
+                }
+            }
+            if detail.isArchived == true {
+                Text("Archiviato").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    var ambulatoryName: String? {
+        guard let id = cleanedPatientWorkspaceValue(detail.ambulatoryId) else { return nil }
+        return model.availableAmbulatories.first { $0.id == id }?.name ?? id
+    }
+
+    @ViewBuilder
+    var mobileReviewOverview: some View {
+        if model.selectedPatient?.id == detail.id {
+            let insights = DocumentInsightsCodec.decode(detail.documentInsights)
+            let summary = PatientReviewQueueProjection.project(
+                patientID: detail.id, insights: insights, followups: model.followupSuggestions,
+                followupsAtLimit: PatientFollowupProjection.project(insights).count >= PatientFollowupProjection.defaultMax,
+                documentReadState: reviewDocumentReadState,
+                documentsPatientID: model.attachmentsPatientId, attachments: model.attachments)
+            if !summary.rows.isEmpty {
+                PatientChartGroup("Da rivedere") {
+                    ForEach(summary.rows) { row in
+                        Button { model.activePatientSection = .documents } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(row.title).font(.body.weight(.semibold))
+                                Text(row.detail).font(.footnote).foregroundStyle(.secondary)
+                            }
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Apre Documenti")
+                        .accessibilityIdentifier("patient-review-\(row.id.rawValue)")
+                    }
+                    if let note = summary.coverageNote {
+                        Text(note).font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityIdentifier("patient-review-queue")
+            }
+        }
+    }
+
+    var mobileChartCounts: some View {
+        let cap = PairedPatientsWorkspaceSupport.clinicalPreviewCap
+        let counts: [(String, ClinicalSignalCount?)] = [
+            ("Diagnosi", model.isPatientFieldLocked(.diagnoses) ? nil : .exact(DiagnosesCodec.decode(detail.diagnoses).count)),
+            ("Terapie attive", .fromLoadedList(count: model.therapies.filter { $0.deletedAt == nil && $0.status == "active" }.count,
+                loadedCount: model.therapies.count, limit: cap)),
+            ("Osservazioni cliniche", .fromLoadedList(count: model.observations.filter { $0.deletedAt == nil }.count,
+                loadedCount: model.observations.count, limit: cap)),
+            ("Diario", .fromLoadedList(count: model.entries.filter { $0.deletedAt == nil }.count,
+                loadedCount: model.entries.count, limit: cap)),
+            ("Scale", .fromLoadedList(count: model.entries.filter { $0.deletedAt == nil && $0.type == "scale" }.count,
+                loadedCount: model.entries.count, limit: cap)),
+            ("Esenzioni", model.isPatientFieldLocked(.exemptions) ? nil : .exact(ExemptionCodesCodec.decode(detail.exemptions).count)),
+        ]
+        return VStack(alignment: .leading, spacing: 12) {
+            ForEach(counts, id: \.0) { label, count in
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(label).font(.body)
+                    Spacer(minLength: 8)
+                    if let count {
+                        Text(count.displayText).font(.body.weight(.semibold)).monospacedDigit()
+                    } else {
+                        Label("Dato protetto", systemImage: "lock.fill").font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            if let next = model.checkups.filter({ $0.deletedAt == nil && $0.status == "pending" && $0.date >= Date() })
+                .min(by: { $0.date < $1.date }) {
+                Text("Prossimo controllo: \(ClinicalDatePresentation.day.string(from: next.date)) · \(next.title)")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityIdentifier("patient-clinical-signals")
+    }
+}
+#endif
