@@ -38,7 +38,7 @@ struct MobileVisitWorkspaceView: View {
                         Button { model.open(note.id); reviewed = false } label: {
                             VStack(alignment: .leading) {
                                 Text(note.label)
-                                Text("Appunto versione \(note.revision) · \(note.updatedAt.formatted(date: .numeric, time: .shortened))")
+                                Text("Appunto versione \(note.revision) · \(ClinicalDatePresentation.timestamp.string(from: note.updatedAt))")
                                     .font(.caption)
                             }
                         }
@@ -161,7 +161,7 @@ struct MobileVisitWorkspaceView: View {
     private func dossierContent(_ dossier: MobileVisitDossier) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(dossier.patientName).font(.headline)
-            Text("Acquisito \(dossier.acquiredAt.formatted(date: .numeric, time: .shortened)) · scade \(dossier.expiresAt.formatted(date: .numeric, time: .shortened))").font(.caption)
+            Text("Acquisito \(ClinicalDatePresentation.timestamp.string(from: dossier.acquiredAt)) · scade \(ClinicalDatePresentation.timestamp.string(from: dossier.expiresAt))").font(.caption)
             Text("Copia storica: variazioni dell’archivio successive all’acquisizione non verificate.")
             ForEach(dossier.sections) { section in
                 VStack(alignment: .leading, spacing: 8) {

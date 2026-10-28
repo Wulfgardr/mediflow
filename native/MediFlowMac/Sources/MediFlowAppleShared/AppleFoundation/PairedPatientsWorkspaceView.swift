@@ -458,6 +458,8 @@ struct PairedPatientsWorkspaceView: View {
                 }
                 .padding(20)
             }
+            .safeAreaPadding(.bottom, 16)
+            .clipped()
             .inkWorkspaceTitle("Pazienti")
             .toolbar { mobileWorklistToolbar }
             .navigationSplitViewColumnWidth(
@@ -532,7 +534,7 @@ struct PairedPatientsWorkspaceView: View {
         ScrollViewReader { scroll in
             ScrollView {
                 VStack(alignment: .leading, spacing: ClinicalChartMetrics.sectionSpacing) {
-                    workspaceFeedbackLine
+                    workspaceFeedbackLine(hidesDemo: true)
                     if let detail = model.selectedPatient, detail.id == presentedPatientID {
                         selectedPatientSections(detail)
                     } else if let profile = model.cachedPatientProfile, profile.id == presentedPatientID {
@@ -547,6 +549,8 @@ struct PairedPatientsWorkspaceView: View {
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .id("mobile-patient-chart-top")
             }
+            .safeAreaPadding(.bottom, 16)
+            .clipped()
             .onChange(of: model.activePatientSection) { _ in
                 scroll.scrollTo("mobile-patient-chart-top", anchor: .top)
             }
@@ -560,14 +564,14 @@ struct PairedPatientsWorkspaceView: View {
                     // One 44pt context row leaves clinical space above
                     // the keyboard. Native compact toolbars cap controls at 36pt.
                     if isWide {
-                        mobileWidePatientHeader(detail)
+                        if model.activePatientSection != .overview { mobileWidePatientHeader(detail) }
                         MobilePatientSectionNavigation(selection: $model.activePatientSection, showsAllSections: true)
                             .padding(.horizontal, 12)
-                    } else if verticalSizeClass == .compact {
+                    } else if verticalSizeClass == .compact && model.activePatientSection != .overview {
                         compactHeightPatientNavigation(detail)
                             .padding(.horizontal, 20)
                     } else {
-                        compactPatientHeader(detail)
+                        if model.activePatientSection != .overview { compactPatientHeader(detail) }
                         patientSectionPicker
                     }
                     Divider()
@@ -645,7 +649,7 @@ struct PairedPatientsWorkspaceView: View {
     private var mobileWorklistStatus: some View {
         if !dynamicTypeSize.isAccessibilitySize {
             mobilePairedStatus
-            workspaceFeedbackLine
+            workspaceFeedbackLine()
         }
     }
 
@@ -792,7 +796,7 @@ struct PairedPatientsWorkspaceView: View {
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: 8) {
                     connectionSetupBanner
-                    workspaceFeedbackLine
+                    workspaceFeedbackLine()
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
@@ -1197,7 +1201,7 @@ struct PairedPatientsWorkspaceView: View {
     /// Errors take precedence over status: if something failed, saying what
     /// succeeded first would bury it.
     @ViewBuilder
-    private var workspaceFeedbackLine: some View {
+    private func workspaceFeedbackLine(hidesDemo: Bool = false) -> some View {
         if let error = model.errorMessage {
             Label(error, systemImage: "exclamationmark.triangle.fill")
                 .chartMetadata()
@@ -1205,7 +1209,7 @@ struct PairedPatientsWorkspaceView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("workspace-error-message")
-        } else if let status = model.statusMessage {
+        } else if let status = model.statusMessage, (!hidesDemo || status != "Dati di test caricati.") {
             Text(status)
                 .font(.caption)
                 .lumeInchiostro(bozza: false)
@@ -1326,9 +1330,6 @@ struct PairedPatientsWorkspaceView: View {
 
     private var patientContents: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("In questa cartella")
-                .font(.headline)
-                .accessibilityHeading(.h2)
             ForEach(populatedPatientSections, id: \.section) { item in
                 patientSectionLink(item.section, status: "\(item.count) caricati")
             }
@@ -1359,13 +1360,13 @@ struct PairedPatientsWorkspaceView: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Label(section.title, systemImage: section.symbolName)
-                        .font(.subheadline.weight(.semibold))
+                        .font(.body.weight(.semibold))
                     Text(status)
-                        .font(.caption)
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
-                Image(systemName: "chevron.right").font(.caption)
+                Image(systemName: "chevron.right").font(.footnote)
             }
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
@@ -1376,9 +1377,17 @@ struct PairedPatientsWorkspaceView: View {
 
     private static var sectionSpacing: CGFloat { ClinicalChartMetrics.sectionSpacing }
 
+    private var activePatientSectionSpacing: CGFloat {
+        #if os(iOS)
+        model.activePatientSection == .overview ? 0 : Self.sectionSpacing
+        #else
+        Self.sectionSpacing
+        #endif
+    }
+
     @ViewBuilder
     private func selectedPatientSections(_ detail: HomeBasePatientDetail) -> some View {
-        VStack(alignment: .leading, spacing: Self.sectionSpacing) {
+        VStack(alignment: .leading, spacing: activePatientSectionSpacing) {
             // Keep only the active clinical section in the reading pane.
             // Drafts and existing action bindings remain owned by the workspace/model.
             switch model.activePatientSection {
@@ -1391,18 +1400,35 @@ struct PairedPatientsWorkspaceView: View {
                 confirmsFHIRExport: $confirmsFHIRExport
             )
             .chartCard()
+            #if os(macOS)
             NativePatientInsightView(workspaceModel: model).chartCard()
             NativeSmartImportView(workspaceModel: model).chartCard()
+            #else
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 20) {
+                    NativePatientInsightView(workspaceModel: model)
+                    Divider()
+                    NativeSmartImportView(workspaceModel: model)
+                }
+                .padding(.top, 12)
+            } label: {
+                Text("Strumenti con IA").font(.headline)
+            }
+            .padding(.vertical, 16)
+            .overlay(alignment: .top) { Divider() }
+            .accessibilityIdentifier("patient-ai-tools-disclosure")
+            #endif
             #if !os(macOS)
             // Patient facts precede optional collection summaries.
             if !populatedPatientSections.isEmpty ||
                 (capabilities.hasCapability("network.replica.readonly-documents") &&
                  (model.attachmentsLoadState != .loaded || !model.attachments.isEmpty)) {
-                DisclosureGroup("Contenuti della cartella") {
+                DisclosureGroup("Altre sezioni della cartella") {
                     patientContents.padding(.top, 12)
                 }
-                .font(.body)
-                .padding(.vertical, 12)
+                .font(.headline)
+                .padding(.vertical, 16)
+                .overlay(alignment: .top) { Divider() }
                 .accessibilityIdentifier("patient-chart-contents-disclosure")
             }
             #endif

@@ -35,6 +35,32 @@ public struct ClinicalDiagnosis: Equatable, Sendable {
     }
 }
 
+public enum StructuredFieldRead<Value: Collection & Sendable>: Sendable {
+    case absent
+    case present(Value)
+    case unreadable
+
+    public var count: Int? {
+        switch self {
+        case .absent: return 0
+        case .present(let values): return values.count
+        case .unreadable: return nil
+        }
+    }
+
+    public var values: Value? {
+        if case .present(let values) = self { return values }
+        return nil
+    }
+
+    public var isUnreadable: Bool {
+        if case .unreadable = self { return true }
+        return false
+    }
+}
+
+extension StructuredFieldRead: Equatable where Value: Equatable {}
+
 public enum DiagnosesCodec {
     private struct Entry: Codable {
         let code: String?
@@ -43,6 +69,16 @@ public enum DiagnosesCodec {
         let date: String?
         let canonicalUri: String?
         let reference: HomeBaseJSONValue?
+    }
+
+    public static func decodeResult(_ raw: String?) -> StructuredFieldRead<[ClinicalDiagnosis]> {
+        guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .absent }
+        guard let data = raw.data(using: .utf8),
+              let entries = try? JSONDecoder().decode([Entry].self, from: data) else { return .unreadable }
+        if entries.isEmpty { return .absent }
+        let values = decode(raw)
+        guard values.count == entries.count else { return .unreadable }
+        return .present(values)
     }
 
     public static func decode(_ raw: String?) -> [ClinicalDiagnosis] {

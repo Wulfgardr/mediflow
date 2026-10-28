@@ -4,6 +4,51 @@ import XCTest
 /// the app launches into the overview and the Liquid Glass tab bar drives the
 /// sections. These exercise the real navigation, not just that it compiles.
 final class MediFlowMobileAppUITests: XCTestCase {
+    func testPatientHeaderHillclimbCaptures() {
+        for (theme, size) in [("Light", ""), ("Dark", ""), ("Light", "accessibility3")] {
+            app.launchEnvironment["MEDIFLOW_APPLE_DEMO"] = "1"
+            app.launchEnvironment["MEDIFLOW_APPLE_DEV_SKIP_KEYCHAIN"] = "1"
+            app.launchEnvironment["MEDIFLOW_APPLE_UITEST_DYNAMIC_TYPE_SIZE"] = size
+            app.launchArguments = ["-AppleInterfaceStyle", theme]
+            app.launch()
+            let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "patient-cell-")).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 15))
+            attachScreenshot(named: "patients-\(theme)-\(size)")
+            row.tap()
+            XCTAssertTrue(app.buttons["edit-patient-button"].waitForExistence(timeout: 10))
+            attachScreenshot(named: "chart-\(theme)-\(size)")
+            app.terminate()
+        }
+    }
+
+    func testPatientChartKeepsIdentityOnce() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "iPhone worklist geometry")
+        app.launchEnvironment["MEDIFLOW_APPLE_DEMO"] = "1"
+        launch()
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "patient-cell-")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        row.tap()
+        XCTAssertTrue(app.buttons["edit-patient-button"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "Ferrari Giulia")).count, 1)
+        XCTAssertFalse(app.staticTexts["Dati di test caricati."].exists)
+    }
+
+    func testPatientHeaderAtAX3KeepsEditOnOneLine() {
+        app.launchEnvironment["MEDIFLOW_APPLE_DEMO"] = "1"
+        launch(dynamicTypeSize: "accessibility3")
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "patient-cell-")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        row.tap()
+        let edit = app.buttons["edit-patient-button"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 10))
+        let name = app.staticTexts["patient-detail-name"]
+        XCTAssertTrue(name.exists)
+        XCTAssertGreaterThanOrEqual(edit.frame.minY, name.frame.maxY)
+        XCTAssertLessThan(edit.frame.height, 80)
+        XCTAssertLessThan(name.frame.height, 150)
+        XCTAssertTrue(edit.isHittable)
+    }
+
     private var app: XCUIApplication!
 
     override func setUpWithError() throws {
@@ -644,19 +689,19 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let first = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(first.waitForExistence(timeout: 20))
         first.tap()
-        XCTAssertTrue(sectionView("patient-workspace-header").waitForExistence(timeout: 5))
+        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 5))
         app.buttons["patient-cell-uitest-2"].tap()
         let release = app.buttons["layout-test-release-patient-selection"]
         XCTAssertTrue(release.waitForExistence(timeout: 5))
         for width in [650, 400, 1000] {
             app.buttons["layout-test-width-\(width)"].tap()
             XCTAssertTrue(sectionView("patient-detail-pending").waitForExistence(timeout: 5))
-            XCTAssertFalse(sectionView("patient-workspace-header").exists)
+            XCTAssertFalse(sectionView("patient-detail-name").exists)
             XCTAssertFalse(sectionView("patient-compact-header-disclosure").exists)
             XCTAssertFalse(sectionView("patient-detail-name").exists)
         }
         release.tap()
-        let header = sectionView("patient-workspace-header")
+        let header = sectionView("patient-detail-name")
         XCTAssertTrue(header.waitForExistence(timeout: 5))
         XCTAssertTrue(header.label.contains("Bianchi Anna"))
     }
@@ -858,7 +903,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(row.isHittable)
         XCTAssertLessThanOrEqual(row.frame.maxY, tabBar.frame.minY)
         row.tap()
-        XCTAssertTrue(sectionView("patient-compact-header-disclosure").waitForExistence(timeout: 10))
+        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10))
     }
 
     /// The scope filter is a segmented control, which truncates instead of
@@ -1248,6 +1293,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         attachScreenshot(named: "issue-145-selected-patient")
 
         if UIDevice.current.userInterfaceIdiom == .phone {
+            openPatientSection(.diary)
             let tree = XCTAttachment(string: app.debugDescription)
             tree.name = "tree-after-selecting-patient"
             tree.lifetime = .keepAlways

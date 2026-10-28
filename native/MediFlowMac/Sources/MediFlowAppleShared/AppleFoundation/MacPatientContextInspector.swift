@@ -30,9 +30,7 @@ struct MacPatientInspectorSnapshot: Equatable {
     init(patient: HomeBasePatientDetail, connectionState: PairedPatientsConnectionState) {
         displayName = "\(patient.lastName) \(patient.firstName)"
         taxCode = PairedPatientsWorkspaceSupport.compactTaxCode(patient.taxCode)
-        birthYear = patient.birthDate.map {
-            String(Calendar(identifier: .gregorian).component(.year, from: $0))
-        } ?? "Non disponibile"
+        birthYear = PairedPatientsWorkspaceSupport.birthYearText(from: patient.birthDate) ?? "Non disponibile"
         recordState = patient.isArchived == true ? "Archiviata" : "Attiva"
         self.connectionState = connectionState.title
     }

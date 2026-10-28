@@ -5,6 +5,16 @@ import XCTest
 final class PatientReportDocumentTests: XCTestCase {
     private let baseDate = Date(timeIntervalSince1970: 1_767_225_600)
 
+    func testReportBirthDateRemainsJanuaryFirstInLosAngeles() throws {
+        let previous = NSTimeZone.default
+        let previousDayZone = ClinicalDatePresentation.day.timeZone
+        NSTimeZone.default = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        ClinicalDatePresentation.day.timeZone = NSTimeZone.default
+        defer { NSTimeZone.default = previous; ClinicalDatePresentation.day.timeZone = previousDayZone }
+        let report = PatientReportDocument.build(patient: makePatient(), entries: [], therapies: [], checkups: [], observations: [], generatedAt: baseDate, referenceDate: baseDate)
+        XCTAssertTrue(report.plainText.contains("Data di nascita: 1 gen 1980"), report.plainText)
+    }
+
     func testCompletePatientBuildsExpectedContentSections() {
         let patient = makePatient(
             diagnoses: DiagnosesCodec.encode([

@@ -78,8 +78,27 @@ public enum PopulationAnalytics {
         range.0 <= range.1 ? range : (range.1, range.0)
     }
 
-    public static func age(at now: Date, from birthDate: Date, calendar: Calendar = .current) -> Int {
-        calendar.dateComponents([.year], from: birthDate, to: now).year ?? 0
+    private static let birthCalendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }()
+
+    /// Both civil dates are Gregorian: birth in UTC, today in the device time zone.
+    /// The supplied calendar contributes only its time zone, never its year or era.
+    /// A February 29 birthday falls on February 28 in non-leap years.
+    public static func age(at now: Date, from birthDate: Date, calendar: Calendar = Calendar(identifier: .gregorian)) -> Int {
+        var todayCalendar = Calendar(identifier: .gregorian)
+        todayCalendar.timeZone = calendar.timeZone
+        let birth = birthCalendar.dateComponents([.year, .month, .day], from: birthDate)
+        let today = todayCalendar.dateComponents([.year, .month, .day], from: now)
+        guard let birthYear = birth.year, let birthMonth = birth.month, let birthDay = birth.day,
+              let todayYear = today.year, let todayMonth = today.month, let todayDay = today.day else { return 0 }
+        let isLeapYear = todayYear.isMultiple(of: 400)
+            || (todayYear.isMultiple(of: 4) && !todayYear.isMultiple(of: 100))
+        let birthdayDay = birthMonth == 2 && birthDay == 29 && !isLeapYear ? 28 : birthDay
+        let birthdayIsAhead = (todayMonth, todayDay) < (birthMonth, birthdayDay)
+        return todayYear - birthYear - (birthdayIsAhead ? 1 : 0)
     }
 
     public static func percent(_ part: Int, total: Int) -> Int {
@@ -98,7 +117,7 @@ public enum PopulationAnalytics {
         for patients: [PopulationPatient],
         ageRange: (Int, Int),
         now: Date,
-        calendar: Calendar = .current
+        calendar: Calendar = Calendar(identifier: .gregorian)
     ) -> PopulationAnalyticsStats {
         let (minimumAge, maximumAge) = normalizeAgeRange(ageRange)
         var ageDistribution = Dictionary(uniqueKeysWithValues: PopulationAgeBucket.allCases.map { ($0, 0) })

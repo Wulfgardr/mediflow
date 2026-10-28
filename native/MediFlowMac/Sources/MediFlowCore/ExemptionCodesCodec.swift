@@ -3,6 +3,21 @@ import Foundation
 
 /* @Codex */
 public enum ExemptionCodesCodec {
+    public static func decodeResult(_ raw: String?) -> StructuredFieldRead<[String]> {
+        guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return .absent }
+        if raw.first == "[" || raw.first == "{" {
+            guard let data = raw.data(using: .utf8),
+                  let entries = try? JSONDecoder().decode([String].self, from: data) else { return .unreadable }
+            if entries.isEmpty { return .absent }
+            let values = normalizedCodes(entries)
+            guard !values.isEmpty, entries.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else { return .unreadable }
+            return .present(values)
+        }
+        let values = decode(raw)
+        guard !values.isEmpty, values.allSatisfy({ $0.range(of: "^[A-Z0-9][A-Z0-9._-]*$", options: .regularExpression) != nil }) else { return .unreadable }
+        return .present(values)
+    }
+
     public static func decode(_ raw: String?) -> [String] {
         guard let raw else { return [] }
 

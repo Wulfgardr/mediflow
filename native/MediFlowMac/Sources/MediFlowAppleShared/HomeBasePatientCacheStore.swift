@@ -37,8 +37,8 @@ struct HomeBasePatientCacheMetadata: Equatable, Sendable {
     var isStale: Bool { expiryReason != nil }
 
     var reviewLine: String {
-        let acquired = cachedAt.formatted(date: .numeric, time: .shortened)
-        let expiry = expiresAt.formatted(date: .numeric, time: .shortened)
+        let acquired = ClinicalDatePresentation.timestamp.string(from: cachedAt)
+        let expiry = ClinicalDatePresentation.timestamp.string(from: expiresAt)
         let reason: String
         switch expiryReason {
         case .ttlExceeded: reason = "Cache scaduta: TTL di consultazione superato. Dati paziente non disponibili."

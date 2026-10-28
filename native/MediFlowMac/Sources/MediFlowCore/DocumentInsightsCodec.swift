@@ -169,6 +169,16 @@ public enum DocumentInsightsCodec {
         let documentDate: String?
     }
 
+    public static func decodeResult(_ raw: String?) -> StructuredFieldRead<[ClinicalDocumentInsight]> {
+        guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .absent }
+        guard let data = raw.data(using: .utf8),
+              let entries = try? JSONDecoder().decode([Entry].self, from: data) else { return .unreadable }
+        if entries.isEmpty { return .absent }
+        let values = decode(raw)
+        guard values.count == entries.count else { return .unreadable }
+        return .present(values)
+    }
+
     public static func decode(_ raw: String?) -> [ClinicalDocumentInsight] {
         guard let raw else { return [] }
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)

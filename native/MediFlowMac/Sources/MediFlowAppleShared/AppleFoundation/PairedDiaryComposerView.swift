@@ -147,7 +147,7 @@ struct PairedDiaryComposerView: View {
                 Text(latest.lockedFields.contains(.title) ? "Titolo non leggibile" : latest.title)
                     .font(.subheadline.weight(.semibold))
                     .fixedSize(horizontal: false, vertical: true)
-                Text(latest.date, format: .dateTime.day().month(.abbreviated).year().hour().minute())
+                Text(ClinicalDatePresentation.timestamp.string(from: latest.date))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 Text("Tipo: \(PairedDiaryEntryType(rawValue: latest.type)?.title ?? latest.type)")
@@ -160,7 +160,9 @@ struct PairedDiaryComposerView: View {
                         .accessibilityIdentifier("homebase-edit-entry-remote-content")
                 }
                 if let references = latest.attachments {
-                    Text("Allegati nella voce corrente: \(HomeBaseEntryAttachmentReferencesCodec.decode(references).count)")
+                    Text(HomeBaseEntryAttachmentReferencesCodec.decodeResult(references).count.map {
+                        "Allegati nella voce corrente: \($0)"
+                    } ?? "Riferimenti agli allegati presenti ma non leggibili su questo dispositivo.")
                         .font(.footnote)
                 } else {
                     Text("Riferimenti agli allegati non disponibili nella lettura corrente.")
