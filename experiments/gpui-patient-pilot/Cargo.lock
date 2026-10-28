@@ -3104,8 +3104,10 @@ dependencies = [
  "iana-time-zone",
  "mediflow-patient-client",
  "mediflow-runtime-client",
+ "raw-window-handle",
  "serde_json",
  "unicode-segmentation",
+ "windows-sys 0.61.2",
  "zeroize",
 ]
 

@@ -1,3 +1,6 @@
+#[cfg(windows)]
+#[path = "windows_private_directory.rs"]
+mod windows_private_directory;
 use std::{
     fs::{self, OpenOptions},
     io::{self, Read, Write},
@@ -8,10 +11,10 @@ use std::{
 use serde_json::{Value, json};
 
 const MAX_BYTES: u64 = 4096;
-pub(super) const TEXT_SCALES: [f32; 6] = [1., 1.25, 1.5, 2., 3., 4.];
+pub(crate) const TEXT_SCALES: [f32; 6] = [1., 1.25, 1.5, 2., 3., 4.];
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(super) struct LocalPreferences {
+pub(crate) struct LocalPreferences {
     pub dark_override: Option<bool>,
     pub text_scale: f32,
     pub increased_contrast: bool,
@@ -82,7 +85,8 @@ impl LocalPreferencesStore {
         }
         let canonical = directory.canonicalize()?;
         let metadata = fs::symlink_metadata(directory)?;
-        if canonical.as_os_str() != directory.as_os_str() || !metadata.is_dir() {
+        if (!cfg!(windows) && canonical.as_os_str() != directory.as_os_str()) || !metadata.is_dir()
+        {
             return Err(io::ErrorKind::InvalidInput.into());
         }
         #[cfg(unix)]
@@ -97,7 +101,14 @@ impl LocalPreferencesStore {
                 path: Some(directory.join("preferences.json")),
             })
         }
-        #[cfg(not(unix))]
+        #[cfg(windows)]
+        {
+            windows_private_directory::verify(directory)?;
+            Ok(Self {
+                path: Some(canonical.join("preferences.json")),
+            })
+        }
+        #[cfg(not(any(unix, windows)))]
         {
             Err(io::Error::new(
                 io::ErrorKind::Unsupported,
@@ -105,7 +116,7 @@ impl LocalPreferencesStore {
             ))
         }
     }
-    pub(super) fn system() -> Self {
+    pub(crate) fn system() -> Self {
         #[cfg(test)]
         {
             Self { path: None }
@@ -118,7 +129,7 @@ impl LocalPreferencesStore {
         }
     }
 
-    pub(super) fn ambulatory_command_directory(&self) -> Option<PathBuf> {
+    pub(crate) fn ambulatory_command_directory(&self) -> Option<PathBuf> {
         let parent = self.path.as_ref()?.parent()?;
         let canonical = parent
             .canonicalize()
@@ -126,7 +137,7 @@ impl LocalPreferencesStore {
         Some(canonical.join("ambulatory-command-recovery"))
     }
 
-    pub(super) fn load(&self) -> (LocalPreferences, bool) {
+    pub(crate) fn load(&self) -> (LocalPreferences, bool) {
         let Some(path) = &self.path else {
             return (
                 LocalPreferences {
@@ -163,7 +174,7 @@ impl LocalPreferencesStore {
         }
     }
 
-    pub(super) fn save(&self, preferences: LocalPreferences) -> io::Result<()> {
+    pub(crate) fn save(&self, preferences: LocalPreferences) -> io::Result<()> {
         let bytes = preferences.bytes()?;
         let Some(path) = &self.path else {
             return if cfg!(test) {
@@ -237,11 +248,13 @@ fn preferences_path() -> Option<PathBuf> {
     let parent = directory("XDG_CONFIG_HOME")
         .or_else(|| directory("HOME").map(|home| home.join(".config")))?
         .join("mediflow-gpui");
+    #[cfg(windows)]
+    windows_private_directory::create(&parent).ok()?;
     Some(parent.join("preferences.json"))
 }
 
 #[cfg(test)]
-pub(super) mod tests {
+pub(crate) mod tests {
     use super::*;
 
     pub struct Fixture(pub PathBuf);
@@ -301,7 +314,7 @@ pub(super) mod tests {
         assert!(!directory.join("ambulatory-command-recovery").exists());
     }
 
-    #[cfg(not(unix))]
+    #[cfg(not(any(unix, windows)))]
     #[test]
     fn explicit_state_directory_reports_platform_support_instead_of_privacy_failure() {
         let fixture = Fixture::new();
@@ -311,6 +324,28 @@ pub(super) mod tests {
             .expect("explicit directories are unsupported on this platform");
         assert_eq!(error.kind(), io::ErrorKind::Unsupported);
         assert_eq!(error.to_string(), crate::STATE_DIRECTORY_UNSUPPORTED);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_state_directory_requires_owner_only_acl_and_persists() {
+        let fixture = Fixture::new();
+        windows_private_directory::create(&fixture.0).unwrap();
+        let store = LocalPreferencesStore::from_directory(&fixture.0).unwrap();
+        let selected = LocalPreferences {
+            dark_override: Some(true),
+            ..Default::default()
+        };
+        store.save(selected).unwrap();
+        store.save(selected).unwrap();
+        assert_eq!(store.load(), (selected, false));
+        let status = std::process::Command::new("icacls")
+            .arg(&fixture.0)
+            .args(["/grant", "*S-1-1-0:(OI)(CI)R"])
+            .status()
+            .unwrap();
+        assert!(status.success());
+        assert!(LocalPreferencesStore::from_directory(&fixture.0).is_err());
     }
 
     #[test]

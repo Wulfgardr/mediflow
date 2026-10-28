@@ -699,3 +699,23 @@ fn hcg2_theme_track_is_visible(cx: &mut gpui::TestAppContext) {
         });
     }
 }
+
+#[gpui::test]
+fn hcg3_demo_restarts_with_the_saved_theme(cx: &mut gpui::TestAppContext) {
+    let fixture = crate::shell::local_preferences::tests::Fixture::new();
+    let (view, visual) =
+        cx.add_window_view(|window, cx| PatientApp::with_preferences(fixture.store(), window, cx));
+    view.update(visual, |app, _| {
+        app.dark_override = Some(true);
+        app.save_appearance();
+    });
+    let (restarted, visual) =
+        cx.add_window_view(|window, cx| PatientApp::with_preferences(fixture.store(), window, cx));
+    restarted.update(visual, |app, _| {
+        assert_eq!(app.dark_override, Some(true));
+        assert!(app.dark);
+        app.dark_override = Some(false);
+        app.save_appearance();
+    });
+    assert_eq!(fixture.store().load().0.dark_override, Some(false));
+}

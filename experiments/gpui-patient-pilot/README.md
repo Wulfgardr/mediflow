@@ -213,6 +213,19 @@ il file; se fallisce, la scelta resta nella finestra con un errore e un
 comando esplicito per riprovare. Un file non leggibile o non valido non viene
 riscritto all'apertura: la finestra parte coperta e segnala il problema.
 
+Su Windows la cartella predefinita viene creata con DACL protetta e accesso
+completo ereditabile solo dall'utente corrente. Una cartella già esistente,
+compresa quella indicata con `--state-directory`, deve appartenere all'utente
+corrente, non attraversare reparse point e non concedere accesso ad altri SID.
+Sono rifiutate anche concessioni a gruppi e ACL con tipi di ACE non verificabili;
+le ACL esistenti non vengono modificate. La demo conserva il tema nello stesso
+store delle preferenze, senza conservare i pazienti inventati o le loro modifiche.
+
+Su Linux l'identificatore della finestra è `dev.mediflow.MediFlow`. Non è presente
+un file `.desktop` nel repository; questo identificatore può essere usato dalle
+regole del compositor e da un futuro launcher.
+
+
 «Oscura contenuti» e Ctrl/Cmd+Maiusc+P sostituiscono l'intera superficie con
 la schermata privacy, conservando la bozza in memoria. «Mostra contenuti»
 o lo stesso tasto ripristinano la superficie; «Blocca l'accesso» riusa invece
@@ -303,7 +316,7 @@ incorporati dal checkout.
 | --- | --- |
 | Linux | C/C++, `pkg-config`, Fontconfig, GLib, Wayland, X11/XCB, xkbcommon; display e renderer compatibile per la finestra. Un font emoji del desktop è necessario per i simboli non contenuti nei font MediFlow. I dialoghi file richiedono una sessione D-Bus e xdg-desktop-portal con un backend del desktop. |
 | macOS | Xcode, strumenti a riga di comando e compilatore Metal. |
-| Windows | Rust MSVC, strumenti C++ e Windows SDK. |
+| Windows | Rust MSVC, strumenti C++ e Windows SDK. Per Windows ARM servono anche LLVM/Clang dei VS Build Tools e `clang-cl` nel PATH (`CC_aarch64_pc_windows_msvc=clang-cl`). |
 
 Su Ubuntu 24.04:
 

@@ -71,6 +71,7 @@ pub struct PatientApp {
     query: String,
     archived: bool,
     show_list: bool,
+    local_preferences: crate::shell::local_preferences::LocalPreferencesStore,
     dark_override: Option<bool>,
     theme: Theme,
     dark: bool,
@@ -83,8 +84,35 @@ pub struct PatientApp {
 }
 
 impl PatientApp {
+    fn save_appearance(&mut self) {
+        let (mut preferences, failed) = self.local_preferences.load();
+        if failed {
+            self.message =
+                Some("Le preferenze non sono leggibili. Il tema non è stato salvato.".into());
+            return;
+        }
+        preferences.dark_override = self.dark_override;
+        if self.local_preferences.save(preferences).is_err() {
+            self.message = Some("Il tema vale in questa finestra, ma non è stato salvato.".into());
+        }
+    }
+
+    #[cfg(test)]
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let dark = is_dark(window);
+        Self::with_preferences(
+            crate::shell::local_preferences::LocalPreferencesStore::system(),
+            window,
+            cx,
+        )
+    }
+
+    pub(crate) fn with_preferences(
+        local_preferences: crate::shell::local_preferences::LocalPreferencesStore,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let (preferences, _) = local_preferences.load();
+        let dark = preferences.dark_override.unwrap_or_else(|| is_dark(window));
         let theme = Theme::for_dark(dark);
         let notes = cx.new(|cx| {
             TextInput::new(
@@ -176,7 +204,8 @@ impl PatientApp {
             query: String::new(),
             archived: false,
             show_list: false,
-            dark_override: None,
+            local_preferences,
+            dark_override: preferences.dark_override,
             theme,
             dark,
             message: None,
@@ -838,6 +867,7 @@ impl Render for PatientApp {
             self.dark = dark;
             self.theme = Theme::for_dark(dark);
         }
+        crate::platform_integration::sync_titlebar(window, dark);
         let theme = self.theme;
         let phase = self.workspace.phase();
         let read_only = !matches!(phase, Phase::Ready | Phase::Saved | Phase::Editing)
