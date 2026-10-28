@@ -271,7 +271,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     });
 
     useEffect(() => {
-        const handleApiAuthUnavailable = () => {
+        const handleApiAuthUnavailable = (event: Event) => {
+            const signal = (event as CustomEvent<{ sessionSignal?: AbortSignal | null }>).detail?.sessionSignal;
+            if (signal && (signal.aborted || signal !== db.getSessionReadSignal())) return;
             ++authorityAttemptGenerationRef.current;
             clearClientAuthority();
             setAuthErrorMessage('Sessione scaduta.');

@@ -23,6 +23,7 @@ import type { HostDocumentOcrQueueReason, DocumentOcrQueueState } from './domain
 import { assertBackupReadableWithKey, BackupRestoreKeyError } from './backup-restore-key-check';
 import {
     buildApiTableFetchErrorMessage,
+    captureApiReadSession,
     isApiTableAuthUnavailableStatus,
     isApiTableUnavailableStatus,
     notifyApiAuthUnavailable,
@@ -277,11 +278,13 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
     private endpoint: string;
     private tableName: string;
     private getMasterKey: () => CryptoKey | null;
+    private getReadSession: () => AbortSignal | null;
 
-    constructor(endpoint: string, tableName: string, getMasterKey: () => CryptoKey | null) {
+    constructor(endpoint: string, tableName: string, getMasterKey: () => CryptoKey | null, getReadSession: () => AbortSignal | null) {
         this.endpoint = endpoint;
         this.tableName = tableName;
         this.getMasterKey = getMasterKey;
+        this.getReadSession = getReadSession;
     }
 
     // --- Dexie Compatibility Query Builder ---
@@ -315,7 +318,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
     private _serverQuery?: ApiTableQuery;
 
     private clone(): ApiTable<T> {
-        const copy = new ApiTable<T>(this.endpoint, this.tableName, this.getMasterKey);
+        const copy = new ApiTable<T>(this.endpoint, this.tableName, this.getMasterKey, this.getReadSession);
         copy._filterFn = this._filterFn;
         copy._limit = this._limit;
         copy._reverse = this._reverse;
@@ -342,25 +345,26 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
     }
 
     async toArray(options?: { signal?: AbortSignal; rejectAuthUnavailable?: boolean }): Promise<T[]> {
-        const signal = options?.signal;
-        signal?.throwIfAborted();
+        const { signal, sessionSignal, assertCurrent } = captureApiReadSession(this.getReadSession, options?.signal);
+        assertCurrent();
         const res = await fetch(this.buildListEndpoint(), { cache: 'no-store', ...(signal ? { signal } : {}) });
-        signal?.throwIfAborted();
+        assertCurrent();
         if (isApiTableAuthUnavailableStatus(res.status)) {
-            notifyApiAuthUnavailable(res.status);
+            notifyApiAuthUnavailable(res.status, sessionSignal);
+            assertCurrent();
             if (options?.rejectAuthUnavailable) throw new Error('Authenticated list unavailable.');
             return [];
         }
         if (!res.ok) throw new Error(`Failed to fetch ${this.endpoint}`);
         const rawJson = await res.json();
-        signal?.throwIfAborted();
+        assertCurrent();
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let data = await Promise.all(rawJson.map(async (item: any) => {
             const revived = this.reviveDates(item);
             return await this.decryptItem(revived);
         }));
-        signal?.throwIfAborted();
+        assertCurrent();
 
         if (this._filterFn) {
             data = data.filter(this._filterFn);
@@ -411,22 +415,21 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
     }
 
     async get(id: string, options?: { signal?: AbortSignal }): Promise<T | undefined> {
-        // opt-in readers can retire both the request and its continuation.
-        const signal = options?.signal;
-        signal?.throwIfAborted();
+        const { signal, sessionSignal, assertCurrent } = captureApiReadSession(this.getReadSession, options?.signal);
+        assertCurrent();
         const res = await fetch(`${this.endpoint}/${id}`, { cache: 'no-store', ...(signal ? { signal } : {}) });
-        signal?.throwIfAborted();
+        assertCurrent();
         if (isApiTableAuthUnavailableStatus(res.status)) {
-            notifyApiAuthUnavailable(res.status);
-            signal?.throwIfAborted();
+            notifyApiAuthUnavailable(res.status, sessionSignal);
+            assertCurrent();
             return undefined;
         }
         if (isApiTableUnavailableStatus(res.status)) return undefined;
         if (!res.ok) throw new Error(buildApiTableFetchErrorMessage(this.endpoint, id, res.status, res.statusText));
         const raw = await res.json();
-        signal?.throwIfAborted();
+        assertCurrent();
         const item = await this.decryptItem(this.reviveDates(raw));
-        signal?.throwIfAborted();
+        assertCurrent();
         return item;
     }
 
@@ -896,26 +899,27 @@ class MedicalApiClient {
 
     constructor() {
         const getKey = () => this.masterKey;
-        this.patients = new ApiTable<Patient, PatientAddOptions>('/api/patients', 'patients', getKey);
-        this.ambulatories = new ApiTable<Ambulatory>('/api/ambulatories', 'ambulatories', getKey);
+        const getReadSession = () => this.sessionReads?.signal ?? null;
+        this.patients = new ApiTable<Patient, PatientAddOptions>('/api/patients', 'patients', getKey, getReadSession);
+        this.ambulatories = new ApiTable<Ambulatory>('/api/ambulatories', 'ambulatories', getKey, getReadSession);
         // ... (existing)
-        this.entries = new ApiTable<ClinicalEntry>('/api/entries', 'entries', getKey);
-        this.therapies = new ApiTable<Therapy>('/api/therapies', 'therapies', getKey);
-        this.observations = new ApiTable<Observation>('/api/observations', 'observations', getKey);
-        this.prostheticPrescriptions = new ApiTable<ProstheticPrescription>('/api/prosthetic-prescriptions', 'prosthetic_prescriptions', getKey);
-        this.servicePrescriptions = new ApiTable<ServicePrescription>('/api/service-prescriptions', 'service_prescriptions', getKey);
-        this.servicePrescriptionItems = new ApiTable<ServicePrescriptionItem>('/api/service-prescription-items', 'service_prescription_items', getKey);
-        this.serviceCatalogEntries = new ApiTable<ServiceCatalogEntry>('/api/service-catalog', 'service_catalog_entries', getKey);
-        this.sissHandoffs = new ApiTable<SissHandoffEvent>('/api/siss-handoffs', 'siss_handoff_events', getKey);
-        this.conversations = new ApiTable<Conversation>('/api/conversations', 'conversations', getKey);
-        this.messages = new ApiTable<Message>('/api/messages', 'messages', getKey);
-        this.checkups = new ApiTable<Checkup>('/api/checkups', 'checkups', getKey);
-        this.attachments = new ApiTable<Attachment>('/api/attachments', 'attachments', getKey);
-        this.drugs = new ApiTable<AifaDrug>('/api/drugs', 'drugs', getKey);
-        this.exemptions = new ApiTable<ExemptionCode>('/api/exemptions', 'exemptions', getKey);
+        this.entries = new ApiTable<ClinicalEntry>('/api/entries', 'entries', getKey, getReadSession);
+        this.therapies = new ApiTable<Therapy>('/api/therapies', 'therapies', getKey, getReadSession);
+        this.observations = new ApiTable<Observation>('/api/observations', 'observations', getKey, getReadSession);
+        this.prostheticPrescriptions = new ApiTable<ProstheticPrescription>('/api/prosthetic-prescriptions', 'prosthetic_prescriptions', getKey, getReadSession);
+        this.servicePrescriptions = new ApiTable<ServicePrescription>('/api/service-prescriptions', 'service_prescriptions', getKey, getReadSession);
+        this.servicePrescriptionItems = new ApiTable<ServicePrescriptionItem>('/api/service-prescription-items', 'service_prescription_items', getKey, getReadSession);
+        this.serviceCatalogEntries = new ApiTable<ServiceCatalogEntry>('/api/service-catalog', 'service_catalog_entries', getKey, getReadSession);
+        this.sissHandoffs = new ApiTable<SissHandoffEvent>('/api/siss-handoffs', 'siss_handoff_events', getKey, getReadSession);
+        this.conversations = new ApiTable<Conversation>('/api/conversations', 'conversations', getKey, getReadSession);
+        this.messages = new ApiTable<Message>('/api/messages', 'messages', getKey, getReadSession);
+        this.checkups = new ApiTable<Checkup>('/api/checkups', 'checkups', getKey, getReadSession);
+        this.attachments = new ApiTable<Attachment>('/api/attachments', 'attachments', getKey, getReadSession);
+        this.drugs = new ApiTable<AifaDrug>('/api/drugs', 'drugs', getKey, getReadSession);
+        this.exemptions = new ApiTable<ExemptionCode>('/api/exemptions', 'exemptions', getKey, getReadSession);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        this.settings = new ApiTable<any>('/api/settings', 'settings', getKey);
-        this.patientsToAmbulatories = new ApiTable<PatientAmbulatory>('/api/patients/assign', 'patients_to_ambulatories', getKey);
+        this.settings = new ApiTable<any>('/api/settings', 'settings', getKey, getReadSession);
+        this.patientsToAmbulatories = new ApiTable<PatientAmbulatory>('/api/patients/assign', 'patients_to_ambulatories', getKey, getReadSession);
     }
 
     async applyPatientSmartImport(

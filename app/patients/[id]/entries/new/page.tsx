@@ -127,7 +127,7 @@ export default function NewEntryPage() {
     const patientEntries = useMemo(() => entriesRead.data ?? [], [entriesRead.data]);
     /* WUL-420 */
     const patientAttachments = useLiveQuery<Attachment[], Attachment[]>(
-        async () => db.attachments.query({ patientId: id }).toArray(),
+        async () => db.attachments.query({ patientId: id }).toArray({ signal: db.getSessionReadSignal() }),
         [id],
         [],
         ['attachments'],

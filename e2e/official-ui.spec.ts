@@ -321,12 +321,46 @@ test('unavailable preference storage is transient and ordinary lock clears open 
   await expect(page.locator('html')).toHaveAttribute('data-twin-composition', 'workbench');
   await page.reload();
   await expect(page.getByRole('radio', { name: 'Barra superiore', exact: true })).toBeChecked();
-  await page.goto(modules());
-  await page.getByRole('button', { name: 'Blocca', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Cartelle aperte' })).toHaveCount(0);
-  await noComparison();
-  await expect(page.getByLabel('PIN operatore', { exact: true })).toBeEnabled();
+  const pending: import('@playwright/test').Request[] = [];
+  const afterLock: string[] = [];
+  const lockConsoleStart = consoleErrors.length;
+  let locked = false;
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const observe = (request: import('@playwright/test').Request) => {
+    const url = new URL(request.url());
+    if (url.pathname === '/api/auth/lock') locked = true;
+    if (locked && url.pathname === '/api/attachments' && request.method() === 'GET') afterLock.push(request.url());
+  };
+  page.on('request', observe);
+  const hold = async (route: import('@playwright/test').Route) => {
+    pending.push(route.request());
+    await gate;
+    await route.continue();
+  };
+  await page.route('**/api/attachments?**', hold);
+  try {
+    await page.goto(modules());
+    await expect(page.getByRole('heading', { name: name(), exact: true })).toBeVisible();
+    await expect.poll(() => pending.length).toBeGreaterThan(0);
+    await page.getByRole('button', { name: 'Blocca', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Cartelle aperte' })).toHaveCount(0);
+    await noComparison();
+    await expect(page.getByLabel('PIN operatore', { exact: true })).toBeEnabled();
+    release();
+    await expect.poll(() => pending.every(request => request.failure()?.errorText === 'net::ERR_ABORTED')).toBe(true);
+    expect(afterLock).toEqual([]);
+    expect(consoleErrors.slice(lockConsoleStart)).toEqual([]);
+  } finally {
+    release();
+    page.off('request', observe);
+    await page.unroute('**/api/attachments?**', hold);
+    await test.info().attach('attachment-lock-reads.json', {
+      body: JSON.stringify({ afterLock, pending: pending.map(request => ({ url: request.url(), failure: request.failure() })),
+        consoleErrors: consoleErrors.slice(lockConsoleStart) }, null, 2), contentType: 'application/json',
+    });
+  }
   await unlockIfNeeded(page, pin);
   await expect(nav()).toBeVisible();
   // Preserve known auth conflict diagnostics; any other console error fails.

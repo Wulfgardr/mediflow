@@ -80,7 +80,7 @@ function EntryAttachments({ attachmentIds, onView }: { attachmentIds: string[], 
     const attachments = useLiveQuery(
         async () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return await db.attachments.filter((a: any) => attachmentIds.includes(a.id)).toArray();
+            return await db.attachments.filter((a: any) => attachmentIds.includes(a.id)).toArray({ signal: db.getSessionReadSignal() });
         },
         [attachmentIds],
         undefined,
