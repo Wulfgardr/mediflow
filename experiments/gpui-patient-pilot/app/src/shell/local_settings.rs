@@ -212,8 +212,10 @@ mod tests {
         cx: &mut gpui::TestAppContext,
     ) {
         let fixture = Fixture::new();
-        fs::create_dir_all(&fixture.0).unwrap();
+        fixture.store().save(Default::default()).unwrap();
         fs::write(fixture.0.join("preferences.json"), b"corrupted").unwrap();
+        #[cfg(windows)]
+        mediflow_local_state::open_read(&fixture.0.join("preferences.json")).unwrap();
         let (view, cx) = cx.add_window_view(|window, cx| {
             ClinicalApp::with_local_preferences(String::new(), fixture.store(), window, cx)
         });
@@ -244,7 +246,11 @@ mod tests {
         cx: &mut gpui::TestAppContext,
     ) {
         let fixture = Fixture::new();
-        fs::create_dir_all(&fixture.0).unwrap();
+        fixture.store().save(Default::default()).unwrap();
+        fs::remove_file(fixture.0.join("preferences.json")).unwrap();
+        #[cfg(windows)]
+        mediflow_local_state::create_directory(&fixture.0.join("preferences.json")).unwrap();
+        #[cfg(not(windows))]
         fs::create_dir(fixture.0.join("preferences.json")).unwrap();
         let (view, cx) = cx.add_window_view(|window, cx| {
             ClinicalApp::with_local_preferences(String::new(), fixture.store(), window, cx)

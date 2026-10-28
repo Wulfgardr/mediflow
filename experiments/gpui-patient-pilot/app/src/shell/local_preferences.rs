@@ -508,6 +508,25 @@ pub(crate) mod tests {
 
     #[cfg(windows)]
     #[test]
+    fn windows_security_r4_rejects_preference_file_with_inherited_dacl() {
+        let fixture = Fixture::new();
+        let store = fixture.store();
+        store.save(LocalPreferences::default()).unwrap();
+        let path = fixture.0.join("preferences.json");
+        let before = fs::read(&path).unwrap();
+        set_windows_dacl(&path, "", false, false);
+        let error = windows_private_directory::open_read(&path).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+        let expected = "L'oggetto di stato Windows richiede una DACL protetta dall'ereditarietà.";
+        assert_eq!(error.to_string(), expected);
+        let (preferences, cause) = store.load_with_error();
+        assert!(preferences.privacy_shield);
+        assert_eq!(cause.as_deref(), Some(expected));
+        assert_eq!(fs::read(&path).unwrap(), before);
+    }
+
+    #[cfg(windows)]
+    #[test]
     fn windows_security_r2_rejects_folder_only_ace() {
         let fixture = Fixture::new();
         windows_private_directory::create_directory(&fixture.0).unwrap();
