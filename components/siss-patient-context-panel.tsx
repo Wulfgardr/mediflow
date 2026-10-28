@@ -5,7 +5,7 @@ import { Disclosure } from '@/components/disclosure';
 
 import { useEffect, useState } from 'react';
 import styles from './siss-workspace.module.css';
-import { Accessibility, BadgePercent, Copy, ExternalLink, FolderOpen, IdCard, ListChecks, LoaderCircle, Pill, RefreshCcw, Search, ShieldAlert, ShieldCheck, SquareMenu, Stethoscope } from 'lucide-react';
+import { BadgePercent, Copy, ExternalLink, IdCard, ListChecks, LoaderCircle, Pill, RefreshCcw, ShieldAlert, ShieldCheck, Stethoscope } from 'lucide-react';
 import { completeSissPortalHandoff, prepareSissPortalWindow } from '@/lib/siss';
 import { copyToClipboard } from '@/lib/clipboard';
 import { buildSissPatientContextSummary, type SissPatientContextAction, type SissPatientContextTransportMode } from '@/lib/siss-patient-context-shared';
@@ -56,7 +56,6 @@ type ContextActionConfig = {
     action: SissPatientContextAction;
     label: string;
     caption: string;
-    icon: typeof ExternalLink;
 };
 
 type BlockedCapabilityConfig = {
@@ -82,31 +81,26 @@ const ACTIONS: ContextActionConfig[] = [
         action: 'prescription.create',
         label: 'Prescrittivo Regionale (PRREG)',
         caption: 'Apri il portale ufficiale del Prescrittivo Regionale (PRREG) con il CF pronto da incollare.',
-        icon: ExternalLink,
     },
     {
         action: 'prosthetics.open',
         label: 'Protesica-RL',
         caption: 'Apri Assistente RL / Protesica-RL con il CF del paziente pronto da incollare.',
-        icon: Accessibility,
     },
     {
         action: 'fse.lookup',
         label: 'FSE',
         caption: 'Apri OpeFseIE con il CF del paziente pronto da incollare.',
-        icon: FolderOpen,
     },
     {
         action: 'registry.lookup',
         label: 'Anagrafe',
         caption: 'Apri Gaia con il CF del paziente pronto da incollare.',
-        icon: Search,
     },
     {
         action: 'menu.open',
         label: 'Menu SISS',
         caption: 'Apri il menu SISS dalla sessione browser attiva.',
-        icon: SquareMenu,
     },
 ];
 
@@ -134,8 +128,8 @@ const BLOCKED_CAPABILITIES: BlockedCapabilityConfig[] = [
 ];
 
 const TRANSPORT_MODE_LABEL: Record<SissPatientContextTransportMode, string> = {
-    'portal-handoff': 'Apertura portali assistita',
-    'certified-api': 'Integrazione regionale certificata',
+    'portal-handoff': 'Le operazioni si svolgono nei portali regionali.',
+    'certified-api': 'Collegamento regionale certificato disponibile.',
 };
 
 /* S2: stessa etichetta usata nel form di TherapyManager per lo stato attivo. */
@@ -465,17 +459,17 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                 ? 'success'
                 : 'muted';
     const readinessLabel = fseReadiness.loading
-        ? 'Controllo locale…'
+        ? 'Controllo dei dati per l’esportazione FSE in corso.'
         : validation?.hasErrors
-            ? 'Controllo locale: blocchi'
+            ? 'Dati da correggere per l’esportazione FSE. Puoi aprire i portali.'
             : validation?.hasWarnings
-                ? 'Controllo locale: attenzioni'
+                ? 'Dati da verificare per l’esportazione FSE.'
                 : validation
-                    ? 'Controllo locale: pronto'
-                    : 'Controllo locale non disponibile';
+                    ? 'Dati pronti per l’esportazione FSE.'
+                    : 'Controllo dei dati per l’esportazione FSE non disponibile.';
     const sessionData = sessionStatus.status;
     const transportLabel = TRANSPORT_MODE_LABEL[summary.transportMode as SissPatientContextTransportMode]
-        ?? 'Apertura portali assistita';
+        ?? TRANSPORT_MODE_LABEL['portal-handoff'];
 
     const formatObservedAt = (value: string | null) => {
         if (!value) return 'Non osservato';
@@ -492,16 +486,15 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
 
     const remoteSignatureCheckpoint = sessionData?.checkpoints.find((checkpoint) => checkpoint.key === 'remote-signature') ?? null;
     const roleSelectionCheckpoint = sessionData?.checkpoints.find((checkpoint) => checkpoint.key === 'role-selection') ?? null;
-    const contextChips = (
-        <>
-            <span className="graphite-chip">{transportLabel}</span>
-            <span className={`graphite-chip ${hasTaxCode ? 'graphite-chip-tone-success' : 'graphite-chip-tone-warning'}`}>
-                {hasTaxCode ? 'CF pronto' : 'CF mancante'}
-            </span>
-            <span className={`graphite-chip graphite-chip-tone-${readinessTone}`}>
+    const contextStatus = (
+        <div className="space-y-2 text-sm text-[color:var(--lume-ink-muted)]">
+            <p>{transportLabel}</p>
+            <p>{hasTaxCode ? 'Codice fiscale disponibile da copiare.' : 'Codice fiscale mancante o non valido.'}</p>
+            <p role={readinessTone === 'critical' || readinessTone === 'warning' ? 'alert' : 'status'}
+                className={readinessTone === 'critical' || readinessTone === 'warning' ? `mf-alert mf-alert-${readinessTone}` : undefined}>
                 {readinessLabel}
-            </span>
-        </>
+            </p>
+        </div>
     );
 
     return (
@@ -509,7 +502,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
             {embedded ? (
                 <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <p className={styles.caption}>L’atto regionale si svolge nel portale ufficiale.</p>
-                    <div className="flex flex-wrap items-center gap-1.5">{contextChips}</div>
+                    {contextStatus}
                 </header>
             ) : (
                 <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -524,7 +517,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                         </p>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-1.5">{contextChips}</div>
+                    {contextStatus}
                 </header>
             )}
 
@@ -540,7 +533,6 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                 </h3>
                 <div className={styles.services}>
                     {ACTIONS.map((item) => {
-                        const Icon = item.icon;
                         const isLoading = activeAction === item.action;
                         const state = summary.actionStates.find((actionState) => actionState.action === item.action);
                         const disabled = Boolean(activeAction) || !state?.available;
@@ -551,11 +543,12 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                                 type="button"
                                 onClick={() => void startFlow(item.action)}
                                 disabled={disabled}
-                                className="siss-action-btn"
+                                className="mf-button-secondary"
+                                aria-label={`Apri ${item.label}, fuori da MediFlow`}
+                                aria-busy={isLoading}
                                 title={item.caption}
                             >
-                                {isLoading ? <LoaderCircle size={18} className="animate-spin" aria-hidden="true" /> : <Icon size={18} aria-hidden="true" />}
-                                <span>Apri {item.label}</span>
+                                <span>{isLoading ? 'Apertura' : 'Apri'} {item.label}</span>
                                 <ExternalLink size={16} aria-hidden="true" />
                             </button>
                         );
@@ -953,7 +946,6 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
             </Disclosure>
 
             <Disclosure className="group mt-4" title={<><span className="flex items-center gap-2">
-                        <ShieldAlert className="h-4 w-4 text-[color:var(--lume-signal-warning)]" />
                         Funzioni non automatiche
                         <span className="graphite-chip graphite-chip-tone-muted">{BLOCKED_CAPABILITIES.length}</span>
                     </span></>}>
