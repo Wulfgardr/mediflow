@@ -63,7 +63,7 @@ test('SISS: diario locale, pre-controllo ed esportazione senza servizi regionali
         for (const mode of ['warning', 'blocked', 'error']) {
             validationMode = mode;
             await pane.getByRole('button', { name: 'Aggiorna controllo FSE locale', exact: true }).click();
-            await expect(pane).toContainText(mode === 'error' ? 'Controllo FSE non disponibile al momento.' : mode === 'blocked' ? (baseline ? 'FSE: blocchi' : 'Dati da correggere per l’esportazione FSE. Puoi aprire i portali.') : (baseline ? 'FSE: attenzioni' : 'Dati da verificare per l’esportazione FSE.'));
+            await expect(pane).toContainText(mode === 'error' ? 'Controllo FSE non disponibile al momento.' : mode === 'blocked' ? (baseline ? 'FSE: blocchi' : 'Dati da correggere per l’esportazione FSE.') : (baseline ? 'FSE: attenzioni' : 'Dati da verificare per l’esportazione FSE.'));
             await capture(`precheck-${mode}`, requirements);
         }
         validationMode = 'clean'; await pane.getByRole('button', { name: 'Aggiorna controllo FSE locale', exact: true }).click();

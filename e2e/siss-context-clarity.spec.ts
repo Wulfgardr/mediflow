@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 
-test('SISS: comandi esterni, stati leggibili, diario e disclosure', async ({ page }) => {
+test('SISS: comandi esterni, stati leggibili, diario e disclosure', async ({ page, baseURL }) => {
+    if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || !['127.0.0.1', 'localhost'].includes(new URL(baseURL).hostname) || new URL(baseURL).port === '3000') throw new Error('Archivio e runtime sintetici isolati richiesti');
     test.setTimeout(120_000);
     await page.route('**/api/siss/session-status', route => route.fulfill({ json: { sessionHealth: 'none', lastModule: null, lastModuleAt: null, checkpoints: [] } }));
     let mode = 'blocked';
@@ -27,11 +28,31 @@ test('SISS: comandi esterni, stati leggibili, diario e disclosure', async ({ pag
             await expect(command).toBeEnabled();
             await expect(command.locator('svg')).toHaveCount(1);
             await expect(command.locator('svg.lucide-external-link')).toHaveCount(1);
+            await expect(command.locator('span').first()).toHaveCSS('text-align', 'left');
         }
-        await expect(pane.getByText('Le operazioni si svolgono nei portali regionali.', { exact: true })).toBeVisible();
-        await expect(pane.getByText('Codice fiscale disponibile da copiare.', { exact: true })).toBeVisible();
-        const warning = pane.getByRole('alert').filter({ hasText: 'Dati da correggere per l’esportazione FSE. Puoi aprire i portali.' });
+        await expect(pane.getByText('Le operazioni si svolgono nei portali regionali.', { exact: true })).toHaveCount(0);
+        const exports = pane.getByRole('region', { name: 'Esportazione locale', exact: true });
+        const portals = pane.getByRole('region', { name: 'Passaggio al portale regionale', exact: true });
+        await expect(exports.getByText('Esportazione locale in formato FHIR R4. Il file non viene inviato al FSE.', { exact: true })).toBeVisible();
+        await expect(portals.getByText('L’atto regionale si svolge nel portale ufficiale.', { exact: true })).toBeVisible();
+        await expect(pane.getByText('L’atto regionale si svolge nel portale ufficiale.', { exact: true })).toHaveCount(1);
+        await expect(portals.getByText('Codice fiscale disponibile da copiare.', { exact: true })).toBeVisible();
+        const warning = exports.getByRole('alert').filter({ hasText: 'Dati da correggere per l’esportazione FSE.' });
+        await expect(pane.getByText(/Puoi aprire i portali/)).toHaveCount(0);
         await expect(warning).toBeVisible();
+        const order = await pane.evaluate(element => {
+            const exportSection = element.querySelector('[aria-label="Esportazione locale"]')!;
+            const portalSection = element.querySelector('[aria-label="Passaggio al portale regionale"]')!;
+            const before = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+            const alert = exportSection.querySelector('[role="alert"]')!;
+            const exportButton = exportSection.querySelector('button')!;
+            const copy = [...portalSection.querySelectorAll('p')];
+            const act = copy.find(p => p.textContent === 'L’atto regionale si svolge nel portale ufficiale.')!;
+            const taxCode = copy.find(p => p.textContent === 'Codice fiscale disponibile da copiare.')!;
+            return [before(alert, exportButton), before(exportSection, portalSection), before(act, taxCode), before(taxCode, portalSection.querySelector('button')!)];
+        });
+        expect(order).toEqual([true, true, true, true]);
+        await expect(pane.getByText('Codice fiscale disponibile da copiare.', { exact: true })).toBeVisible();
         const requirements = pane.getByRole('button', { name: 'Requisiti e controllo locale dei dati', exact: true });
         if (await requirements.getAttribute('aria-expanded') === 'true') await requirements.click();
         await expect(warning).toBeVisible();
@@ -54,7 +75,7 @@ test('SISS: comandi esterni, stati leggibili, diario e disclosure', async ({ pag
     for (const state of ['warning', 'clean', 'unavailable']) {
         mode = state;
         await pane.getByRole('button', { name: 'Aggiorna controllo FSE locale', exact: true }).click();
-        await expect(pane.getByText(state === 'unavailable' ? 'Controllo dei dati per l’esportazione FSE non disponibile.' : state === 'warning' ? 'Dati da verificare per l’esportazione FSE.' : 'Dati pronti per l’esportazione FSE.', { exact: true })).toBeVisible();
+        await expect(pane.getByRole('region', { name: 'Esportazione locale', exact: true }).getByText(state === 'unavailable' ? 'Controllo dei dati per l’esportazione FSE non disponibile.' : state === 'warning' ? 'Dati da verificare per l’esportazione FSE.' : 'Dati pronti per l’esportazione FSE.', { exact: true })).toBeVisible();
     }
     await page.evaluate(async patientId => {
         const now = new Date().toISOString();
