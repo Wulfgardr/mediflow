@@ -217,7 +217,7 @@ for (const theme of ['light', 'dark'] as const) {
           await screenshot(page, 'scheda', theme);
           for (const pane of PANES) {
             await openPatientSection(page, pane);
-            if (pane === 'diario') await expect(page.locator('#diario > h3 .apple-chip')).toHaveText('1 voce');
+            if (pane === 'diario') await expect(page.locator('#diario').getByRole('heading', { level: 3, name: 'Diario clinico 1 voce', exact: true }).getByText('1 voce', { exact: true })).toHaveText('1 voce');
             await expandDetails(page);
             await assertType(page, `scheda-${pane}`, info);
           }

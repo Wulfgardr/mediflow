@@ -169,7 +169,7 @@ export function RuntimeTwinPatientNavigation({ items, active }: { items: readonl
     <PatientSheetMenu label="Altre sezioni della cartella" className={styles.moreSections}
       trigger={props => <button {...props} aria-current={secondary.some(item => item.href === `#${active}`) ? 'location' : undefined}>Altro <ChevronDown size={14} aria-hidden /></button>}>
       {secondary.map(item => <a key={item.href} href={item.href} role="menuitem" tabIndex={-1} className="mf-popover-row"
-        aria-current={active === item.href.slice(1) ? 'location' : undefined}><span>{item.label}</span><small>{item.meta === '0' ? 'Nessun dato' : item.meta}</small></a>)}
+        aria-current={active === item.href.slice(1) ? 'location' : undefined}><span>{item.label}</span>{item.meta !== undefined ? <small>{item.meta}</small> : null}</a>)}
     </PatientSheetMenu>
   </nav>;
 }

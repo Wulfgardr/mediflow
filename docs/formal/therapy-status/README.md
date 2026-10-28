@@ -36,6 +36,26 @@ conservando anche la copertura dell'helper e degli input causali di #696.
 completo `npm run verify:therapy-status` verifica il risultato senza estendere
 le proprietà del modello alla presentazione o al protocollo durevole.
 
+## Riconciliazione HC-6 con #696 del 28 ottobre 2026
+
+Riesaminato il runtime `d7e5e0f4228d5a4e112c5b526f5e212e106c122d`
+rispetto a entrambi i genitori (`3277bc44f7a19a04bce565d6b98122b934238063`
+e `8547541fce58a086cc428c163d046c3561db22a3`). Il manager della terapia
+è identico al primo genitore: cambia ancora soltanto la presentazione del
+vuoto e la ricetta della sezione. `lib/db.ts`, `lib/api-table-response.ts`,
+`SecurityProvider` e `document-upload.tsx` sono identici al secondo genitore.
+La pagina paziente conserva il segnale di sessione della lettura allegati.
+
+Riesaminati anche i consumer `ViewState`, `CollapsibleSection`, i callback del
+manager e i lettori session-scoped: nessuna nuova lettura o scrittura,
+transizione, guardia, confine degli await, CAS, ledger, audit o assunzione
+è introdotta dall'unione. Il ritiro delle letture resta distinto dal vuoto e
+non annulla un commit host. Modello, statechart, proprietà, limiti, testimoni
+e mutanti restano invariati; sessioni e presentazione restano fuori dal TLC.
+Il record conserva le impronte del manager HC-6 e dei lettori #696, con gli
+input causali di questi ultimi; dopo il riesame `syncCommit` identifica il
+runtime combinato. Il comando completo verifica nuovamente questa unione.
+
 ## Riesame HC-7 del 27 ottobre 2026
 
 Confrontato `components/therapy-manager.tsx` fra la base `c4ddf2e35` e
@@ -219,6 +239,23 @@ universale, audit/cifratura completi, correttezza dell'app intera, qualificazion
 clinica o funzionamento su un'installazione reale.
 
 ## Dal modello al codice
+
+Il 27 ottobre 2026, HC-6, è stato riesaminato il diff completo di
+`components/therapy-manager.tsx` fra il precedente `coverage.json.syncCommit`
+`b55681f6e5d27a55a42ae42c4a1dd9f3ad0a8668` e
+`d44efa7149d5913573a795df99d9522f7a1d7d9f`, insieme ai consumer
+`ViewState`, `CollapsibleSection` e alle ricette CSS delle sezioni.
+Il vuoto usa il componente comune, senza azione aggiunta; il manager lascia
+la propria creazione presso il titolo e rimuove la variante CSS dedicata.
+Il ramo di caricamento, la condizione del vuoto, gli handler e i collegamenti
+alle porte restano identici. I consumer riesaminati non invocano letture o
+scritture nella nuova presentazione. Non cambiano transizioni, guardie,
+confini degli await, CAS, audit, altri writer o assunzioni del modello.
+Le altre superfici coperte conservano le impronte precedenti; modello,
+configurazione, statechart, proprietà, limiti, testimoni e mutanti restano
+invariati. Dopo il riesame sono aggiornati manualmente soltanto l'impronta
+del manager e `syncCommit`. Questo raccordo non estende le proprietà formali
+alla geometria o ai testi degli stati vuoti.
 
 Il 27 ottobre 2026, PR #696, è stato riesaminato il diff di `lib/db.ts`
 fra `f44fff7fcbdc2708a15958c0123c09ff1ac4b0b4` e

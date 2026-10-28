@@ -77,12 +77,12 @@ export function CollapsibleSection({
     }, [id]);
 
     const heading = (
-        <h3 className={`${sectionRecipe.heading} m-0 px-5 md:px-6`}>
-            {folderActive ? <div className="flex items-center gap-3 py-5 md:py-6"><span className={`${sectionRecipe.heading} mt-1 flex min-w-0 flex-1 items-center gap-2 text-ink`}>{Icon ? <Icon className="h-5 w-5 text-muted" aria-hidden="true" /> : null}{title}</span>{count !== undefined && count !== '' ? <span className={`${sectionRecipe.count} ml-3 apple-chip`}>{count}</span> : null}</div>
+        <h3 className={`${sectionRecipe.heading} ${headerAction ? '' : sectionRecipe.header}`}>
+            {folderActive ? <div className="flex flex-wrap items-center gap-3"><span className={`${sectionRecipe.heading} flex min-w-0 flex-1 items-center gap-2 text-ink`}>{Icon ? <Icon className="h-5 w-5 text-muted" aria-hidden="true" /> : null}{title}</span>{' '}{count !== undefined && count !== '' ? <span className={sectionRecipe.count}>{count}</span> : null}</div>
                 : <DisclosureControl expanded={expanded} controls={regionId} onToggle={() => setOpen(value => !value)}>
                     {kicker && !folderSection ? <span className="section-kicker">{kicker}</span> : null}
                     <span className={`${sectionRecipe.heading} flex items-center gap-2`}>{Icon ? <Icon size={20} aria-hidden="true" /> : null}{title}
-                        {count !== undefined && count !== '' ? <span className={`${sectionRecipe.count} apple-chip`}>{count}</span> : null}</span>
+                        {count !== undefined && count !== '' ? <span className={sectionRecipe.count}>{count}</span> : null}</span>
                     {!expanded && summary ? <span className={`${sectionRecipe.summary} block text-muted`}>{summary}</span> : null}
                 </DisclosureControl>}
         </h3>
@@ -90,8 +90,8 @@ export function CollapsibleSection({
 
     return (
         <section id={id} data-folder-pane={id} data-folder-active={folderActive} className={`${surfaceClassName} scroll-mt-28 border-0 shadow-none`}>
-            {headerAction ? <div data-section-header className="flex flex-wrap items-center justify-between gap-3">{heading}{headerAction}</div> : heading}
-            <div id={regionId} hidden={!expanded} className="px-5 pb-5 md:px-6 md:pb-6">
+            {headerAction ? <div data-section-header className={sectionRecipe.header}>{heading}{headerAction}</div> : heading}
+            <div id={regionId} hidden={!expanded} className="px-5 py-5 md:px-6 md:py-6">
                 {keepMounted || expanded || visited ? children : null}
             </div>
         </section>

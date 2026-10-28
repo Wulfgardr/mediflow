@@ -1,5 +1,9 @@
 /* @Codex UI06: isolated real-component fixture. It does not start Next.js or any backend. */
 import { useState } from 'react';
+import { ViewState } from '../../components/ui/view-state';
+import { CollapsibleSection } from '../../components/kree8/collapsible-section';
+import { RuntimeTwinFolderContext } from '../../components/runtime-twin-design';
+import sectionRecipe from '../../components/ink-section.module.css';
 import { createRoot } from 'react-dom/client';
 import ScaleEngine from '../../components/scale-engine';
 import { ConfirmProvider, useConfirm } from '../../components/ui/confirm-dialog';
@@ -57,8 +61,25 @@ function SettingsFixture() {
     const [draft, setDraft] = useState('');
     return <SettingsLayout><label>Campo locale fixture<input value={draft} onChange={event => setDraft(event.currentTarget.value)} /></label></SettingsLayout>;
 }
+function SectionsFixture() {
+    const [draft, setDraft] = useState<string | null>(null);
+    return <RuntimeTwinDesignProvider><RuntimeTwinFolderContext.Provider value="parametri">
+        <main className={sectionRecipe.sections}>
+            <CollapsibleSection id="parametri" title="Misure" count="0 misure" keepMounted
+                headerAction={<button onClick={() => setDraft(draft === null ? '' : null)}>Nuova misura</button>}>
+                {draft === null ? <ViewState state="empty" title="Nessuna misura registrata." />
+                    : <label>Bozza sintetica<input value={draft} onChange={event => setDraft(event.currentTarget.value)} /></label>}
+            </CollapsibleSection>
+            <ViewState state="empty" title="Nessuna terapia registrata." action={{ label: 'Nuova terapia', onClick: () => setDraft('terapia sintetica') }} />
+            <ViewState state="loading" title="Lettura delle misure in corso…" />
+            <ViewState state="error" title="Impossibile leggere le misure." />
+            <ViewState state="unavailable" title="La lettura delle misure non è disponibile." />
+        </main>
+    </RuntimeTwinFolderContext.Provider></RuntimeTwinDesignProvider>;
+}
 function App() {
     const pathname = window.location.pathname;
+    if (pathname === '/sections') return <SectionsFixture />;
     if (pathname.startsWith('/settings')) return <SettingsFixture />;
     if (pathname === '/confirm') return <ConfirmProvider><ConfirmationFixture /></ConfirmProvider>;
     if (pathname === '/signals') return <SignalsFixture />;

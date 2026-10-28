@@ -232,7 +232,7 @@
 .clinicalSection,
 .synoptic { padding: 18px 20px; border-top: 1px solid var(--k8-line-strong); }
 .clinicalSection > button { padding: 0 !important; }
-.clinicalSection > div { padding: 16px 0 0 !important; }
+.clinicalSection > div:not([data-section-header]) { padding: 16px 0 0 !important; }
 .clinicalShell .clinicalSurface :global(.apple-chip),
 .clinicalShell .clinicalSurface :global(.graphite-chip) { border: 0 !important; border-radius: var(--lume-control-radius, 0px) !important; background: transparent !important; font-family: var(--lume-font-sans); }
 .emptyState { margin: 10px 0 0; color: var(--lume-ink-muted); font-size: 0.75rem; line-height: 1.55; }
@@ -933,9 +933,7 @@
 :global(html[data-runtime-twin-design='proposal']) .clinicalSection,
 :global(html[data-runtime-twin-design='proposal']) .synoptic,
 :global(html[data-runtime-twin-design='proposal']) .attentionBand { padding: 0; border: 0; scroll-margin-top: 24px; }
-:global(html[data-runtime-twin-design='proposal']) .clinicalSection > h3 > :is(button, div) { padding: 0 0 20px; border-bottom: 1px solid var(--k8-line-strong); }
-:global(html[data-runtime-twin-design='proposal']) .clinicalSection > h3 > :is(button, div) > span > span { margin-top: 0; font-size: var(--twin-type-section); font-weight: var(--twin-heading-weight); line-height: var(--twin-heading-leading); letter-spacing: -0.02em; }
-:global(html[data-runtime-twin-design='proposal']) .clinicalSection > div { padding-top: 24px !important; }
+:global(html[data-runtime-twin-design='proposal']) .clinicalSection > div:not([data-section-header]) { padding-top: 24px !important; }
 :global(html[data-runtime-twin-design='proposal']) .sectionTitle { margin: 0; }
 :global(html[data-runtime-twin-design='proposal']) .synopticDetails { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
 :global(html[data-runtime-twin-design='proposal']) .synopticDetails > .synopticDetail { grid-column: 1 / -1; }
@@ -1009,7 +1007,6 @@
   :global(html[data-runtime-twin-design='proposal']) .clinicalBody { flex: none; overflow: visible; padding: 26px 20px 48px; border: 0; }
   :global(html[data-runtime-twin-design='proposal']) .clinicalStack { gap: 28px; }
   :global(html[data-runtime-twin-design='proposal']) .synopticTherapy { grid-template-columns: minmax(0, 1fr); gap: 3px; }
-  :global(html[data-runtime-twin-design='proposal']) .clinicalSection > h3 > :is(button, div) > span > span { font-size: 0.9375rem; }
   :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chrome { grid-template-columns: minmax(0, 1fr); padding: 18px 20px; gap: 18px; }
 }
 @media (prefers-reduced-motion: reduce) {

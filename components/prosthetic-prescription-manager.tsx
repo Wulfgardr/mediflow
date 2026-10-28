@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { PatientSheetMenu } from '@/components/patient-sheet-menu';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
+import { ViewState } from '@/components/ui/view-state';
 import { formatCountLabel } from '@/lib/format-count';
 import { Disclosure } from '@/components/disclosure';
 
@@ -324,12 +325,8 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
             )}
             </div>
 
-            {!prescriptions ? <p role="status" className={styles.empty}>Caricamento prescrizioni…</p> : prescriptions.length === 0 ? (
-                <div className={styles.empty}>
-                    <p className="text-sm text-[color:var(--lume-ink-muted)]">
-                        Nessuna prescrizione protesica registrata per questo paziente.
-                    </p>
-                </div>
+            {!prescriptions ? <ViewState state="loading" title="Caricamento prescrizioni…" /> : prescriptions.length === 0 ? (
+                <ViewState state="empty" title="Nessuna prescrizione protesica registrata per questo paziente." />
             ) : (
                 <div className="min-w-0">
                     <table className={`${styles.table} ${styles.therapyTable}`}><thead><tr><th>Ausilio</th><th className={styles.secondaryColumn}>Prescritta il</th><th>Stato</th><th>Azioni</th></tr></thead><tbody>
@@ -379,7 +376,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
         </section>
     );
     return embedded ? <CollapsibleSection id="protesica" title="Diario ausili e prescrizioni" count={count}
-        defaultOpen={isFormOpen} headerAction={newButton} surfaceClassName={`${surfaceClassName} ${styles.therapySection}`} keepMounted>
+        defaultOpen={isFormOpen} headerAction={newButton} surfaceClassName={surfaceClassName} keepMounted>
         {content}
     </CollapsibleSection> : content;
 }
