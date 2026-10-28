@@ -105,6 +105,43 @@ final class PopulationAnalyticsTests: XCTestCase {
         XCTAssertEqual(PopulationAnalytics.percent(1, total: 0), 0)
     }
 
+    func testAgeUsesGregorianCivilDaysRegardlessOfDeviceCalendar() {
+        let birth = instant("1986-10-28T20:00:00Z")
+        let leapBirth = instant("2000-02-29T20:00:00Z")
+        for identifier in [Calendar.Identifier.buddhist, .japanese, .islamic] {
+            for zone in ageTimeZones {
+                let gregorian = deviceCalendar(zone)
+                var preferred = Calendar(identifier: identifier)
+                preferred.timeZone = gregorian.timeZone
+                let cases = [(2026, 10, 27, birth, 39), (2026, 10, 28, birth, 40),
+                             (2026, 10, 29, birth, 40), (2025, 2, 27, leapBirth, 24),
+                             (2025, 2, 28, leapBirth, 25), (2024, 2, 28, leapBirth, 23),
+                             (2024, 2, 29, leapBirth, 24)]
+                for (year, month, day, birthDate, expected) in cases {
+                    let now = gregorian.date(from: DateComponents(year: year, month: month, day: day, hour: 0, minute: 1))!
+                    XCTAssertEqual(PopulationAnalytics.age(at: now, from: birthDate, calendar: preferred), expected,
+                        "\(identifier), \(zone), \(year)-\(month)-\(day)")
+                }
+                XCTAssertEqual(PopulationAnalytics.age(at: instant("2026-10-28T19:00:00Z"), from: birth, calendar: preferred), 40,
+                    "Astra: \(identifier), \(zone)")
+            }
+        }
+    }
+
+    func testStatisticsUseTheSameGregorianAgeWithNonGregorianDeviceCalendars() {
+        let patient = PopulationPatient(id: "synthetic", birthDate: instant("1986-10-28T20:00:00Z"), isAdi: false, diagnoses: [])
+        for identifier in [Calendar.Identifier.buddhist, .japanese, .islamic] {
+            for zone in ageTimeZones {
+                var preferred = Calendar(identifier: identifier)
+                preferred.timeZone = TimeZone(identifier: zone)!
+                let stats = PopulationAnalytics.statistics(for: [patient], ageRange: (40, 40),
+                    now: instant("2026-10-28T19:00:00Z"), calendar: preferred)
+                XCTAssertEqual(stats.totalInRange, 1, "\(identifier), \(zone)")
+                XCTAssertEqual(stats.ageDistribution[.nineteenToSixtyFour], 1, "\(identifier), \(zone)")
+            }
+        }
+    }
+
     func testStatisticsExcludeMissingBirthDatesFromRangesButCountThem() {
         let now = date(2026, 7, 9)
         let patients = [
