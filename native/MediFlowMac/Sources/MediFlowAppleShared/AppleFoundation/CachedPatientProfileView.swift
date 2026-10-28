@@ -18,7 +18,7 @@ struct CachedPatientProfileView: View {
             Text("Versione \(profile.version) acquisita dall’home-base. Le altre sezioni della cartella richiedono il collegamento.")
                 .font(.subheadline)
             Divider()
-            field("Data di nascita", profile.birthDate?.formatted(date: .numeric, time: .omitted))
+            field("Data di nascita", profile.birthDate.map { ClinicalDatePresentation.birthDate.string(from: $0) })
             field("Codice fiscale", profile.taxCode)
             field("Indirizzo", profile.address)
             field("Telefono", profile.phone)

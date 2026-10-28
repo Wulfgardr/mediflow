@@ -169,12 +169,7 @@ struct PairedScalesSection: View {
         }
     }
 
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .short
-        return formatter
-    }()
+    private static let dateFormatter = ClinicalDatePresentation.timestamp
 
     private struct ScaleLibraryGroup: Identifiable {
         let area: String

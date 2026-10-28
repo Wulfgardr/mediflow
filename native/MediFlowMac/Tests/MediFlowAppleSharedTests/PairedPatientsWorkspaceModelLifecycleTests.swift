@@ -588,6 +588,28 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(projectionRequests, [true])
     }
 
+    func testUnreadableStructuredPatientFieldsSurviveAnUnrelatedEdit() async throws {
+        let raw = #"[{"code":"I10","description":7}]"#
+        let sealed = try XCTUnwrap(CryptoService.encryptField(raw, masterKey: masterKey))
+        let remote = detail(id: "p1", archived: false, version: 1, encryptedValue: sealed)
+        let source = LifecycleMockDataSource(details: ["p1": remote])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey)
+        await model.loadPatient(summary(id: "p1", archived: false, version: 1))
+        let loaded = await MainActor.run { (model.selectedPatient?.diagnoses, model.isPatientFieldLocked(.diagnoses)) }
+        XCTAssertEqual(loaded.0, raw)
+        XCTAssertFalse(loaded.1, "The key is valid; only the structured schema is unreadable")
+        await model.startEditingPatient()
+        await MainActor.run { model.editPatientFirstName = "Nome aggiornato" }
+        await model.savePatient()
+        let update = await source.lastUpdate
+        let payload = try XCTUnwrap(update?.payload)
+        XCTAssertEqual(payload.firstName, "Nome aggiornato")
+        for field in [payload.diagnoses, payload.exemptions] {
+            guard case .omit = field else { return XCTFail("Unreadable structured data must remain unchanged on the host") }
+        }
+    }
+
     func testLockedPatientFieldsStayEmptyAndAreOmittedFromUpdate() async throws {
         let locked = try XCTUnwrap(CryptoService.encryptField(
             CryptoService.jsonEncode("dato protetto")!, masterKey: SymmetricKey(size: .bits256)))
