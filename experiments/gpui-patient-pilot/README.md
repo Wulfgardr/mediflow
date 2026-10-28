@@ -213,13 +213,22 @@ il file; se fallisce, la scelta resta nella finestra con un errore e un
 comando esplicito per riprovare. Un file non leggibile o non valido non viene
 riscritto all'apertura: la finestra parte coperta e segnala il problema.
 
-Su Windows la cartella predefinita viene creata con DACL protetta e accesso
-completo ereditabile solo dall'utente corrente. Una cartella già esistente,
-compresa quella indicata con `--state-directory`, deve appartenere all'utente
-corrente, non attraversare reparse point e non concedere accesso ad altri SID.
-Sono rifiutate anche concessioni a gruppi e ACL con tipi di ACE non verificabili;
-le ACL esistenti non vengono modificate. La demo conserva il tema nello stesso
-store delle preferenze, senza conservare i pazienti inventati o le loro modifiche.
+Su Windows i percorsi canonici di stato sono ammessi soltanto sotto
+`%LOCALAPPDATA%` o `%USERPROFILE%` dell'utente corrente. Queste radici e la
+normale catena del profilo Windows sono il confine attendibile: non vengono
+ammessi percorsi esterni, neppure se la cartella finale sembra privata.
+La cartella deve appartenere all'utente, avere DACL protetta, accesso completo
+con ereditarietà OI|CI per l'utente e nessuna concessione ad altri SID. Reparse
+point, ACE non supportate e ACL non attestabili vengono rifiutati; le ACL
+esistenti non vengono corrette.
+
+Preferenze, temporanei atomici, file e lock del recupero vengono creati con un
+descrittore esplicito protetto per il solo utente. Prima della lettura vengono
+verificati tipo, proprietario e DACL sull'handle aperto; un file non attestabile
+non viene caricato. Gli errori iniziali conservano la causa ACL nel client e
+nella demo. La politica non attesta profili deliberatamente condivisi o radici
+reindirizzate verso catene gestite da altri utenti. La demo conserva il tema nello
+stesso store senza conservare i pazienti inventati o le loro modifiche.
 
 Su Linux l'identificatore della finestra è `dev.mediflow.MediFlow`. Non è presente
 un file `.desktop` nel repository; questo identificatore può essere usato dalle

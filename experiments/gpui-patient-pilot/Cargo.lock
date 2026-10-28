@@ -3102,6 +3102,7 @@ dependencies = [
  "gpui",
  "gpui_platform",
  "iana-time-zone",
+ "mediflow-local-state",
  "mediflow-patient-client",
  "mediflow-runtime-client",
  "raw-window-handle",
@@ -3109,6 +3110,13 @@ dependencies = [
  "unicode-segmentation",
  "windows-sys 0.61.2",
  "zeroize",
+]
+
+[[package]]
+name = "mediflow-local-state"
+version = "0.1.0"
+dependencies = [
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3130,6 +3138,7 @@ dependencies = [
  "futures-util",
  "getrandom 0.3.4",
  "hkdf",
+ "mediflow-local-state",
  "mediflow-patient-client",
  "pbkdf2",
  "reqwest",

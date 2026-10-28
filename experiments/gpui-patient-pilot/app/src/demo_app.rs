@@ -76,6 +76,7 @@ pub struct PatientApp {
     theme: Theme,
     dark: bool,
     message: Option<String>,
+    preferences_error: Option<String>,
     discard: Option<DiscardAction>,
     show_scenarios: bool,
     scenario: Scenario,
@@ -84,16 +85,26 @@ pub struct PatientApp {
 }
 
 impl PatientApp {
+    fn status_message(&self) -> Option<String> {
+        self.preferences_error
+            .clone()
+            .or_else(|| self.message.clone())
+    }
     fn save_appearance(&mut self) {
-        let (mut preferences, failed) = self.local_preferences.load();
-        if failed {
-            self.message =
-                Some("Le preferenze non sono leggibili. Il tema non è stato salvato.".into());
+        let (mut preferences, error) = self.local_preferences.load_with_error();
+        if let Some(error) = error {
+            self.preferences_error = Some(format!(
+                "Le preferenze non sono leggibili. Il tema non è stato salvato. {error}"
+            ));
             return;
         }
         preferences.dark_override = self.dark_override;
-        if self.local_preferences.save(preferences).is_err() {
-            self.message = Some("Il tema vale in questa finestra, ma non è stato salvato.".into());
+        if let Err(error) = self.local_preferences.save(preferences) {
+            self.preferences_error = Some(format!(
+                "Il tema vale in questa finestra, ma non è stato salvato. {error}"
+            ));
+        } else {
+            self.preferences_error = None;
         }
     }
 
@@ -111,7 +122,7 @@ impl PatientApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let (preferences, _) = local_preferences.load();
+        let (preferences, error) = local_preferences.load_with_error();
         let dark = preferences.dark_override.unwrap_or_else(|| is_dark(window));
         let theme = Theme::for_dark(dark);
         let notes = cx.new(|cx| {
@@ -210,6 +221,8 @@ impl PatientApp {
             theme,
             dark,
             message: None,
+            preferences_error: error
+                .map(|error| format!("Le preferenze non sono state caricate. {error}")),
             discard: None,
             show_scenarios: false,
             scenario: Scenario::Normal,
@@ -218,6 +231,7 @@ impl PatientApp {
         };
         app.select_patient("prova-001", cx);
         app.show_list = true;
+
         window.focus(&app.root_focus, cx);
         app
     }
@@ -923,10 +937,10 @@ impl Render for PatientApp {
                     .child(self.appearance(f32::from(width)-2.*LIST_EDGE,cx).flex_shrink_0())
                     .when(!hide_in_brand && !locked, |el| el.child(self.button("clinical-workspace-hide", if single { "Nascondi" } else { "Nascondi dati" }, Command::Hide, false, true, cx).when(single, |el| el.px(px(6.)))))
                     .when(single && !self.show_list && !locked, |el| el.child(self.button("clinical-workspace-back-list", "Pazienti", Command::ShowList, false, true, cx).when(single, |el| el.px(px(6.)))))))
-            .when(self.message.as_deref().is_some_and(|message| message != error_message(ClientError::NoChanges)), |el| el.child(div().id("clinical-workspace-message").role(Role::Status)
-                .aria_label(SharedString::from(self.message.clone().unwrap_or_default()))
+            .when(self.status_message().as_deref().is_some_and(|message| message != error_message(ClientError::NoChanges)), |el| el.child(div().id("clinical-workspace-message").debug_selector(|| "clinical-workspace-message".into()).role(Role::Status)
+                .aria_label(SharedString::from(self.status_message().unwrap_or_default()))
                 .mx(px(LIST_EDGE)).mb(px(12.)).px(px(12.)).py(px(8.)).bg(theme.paper).border_l_2().border_color(theme.fresh)
-                .child(text!(self.message.clone().unwrap_or_default()))))
+                .child(text!(self.status_message().unwrap_or_default()))))
             .child(div().flex_1().min_h_0().min_w_0().flex().px(px(OUTER_INSET)).pb(px(16.))
                 .when(!locked && (!single || self.show_list), |el| el.child(self.sidebar(compact, cx).when(single, |el| el.w_full())))
                 .when(locked, |el| el.child(div().flex_1().flex().flex_col().items_center().justify_center().gap(px(20.)).bg(theme.paper).rounded(px(theme.paper_radius))

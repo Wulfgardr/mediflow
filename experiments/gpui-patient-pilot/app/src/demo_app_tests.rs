@@ -719,3 +719,29 @@ fn hcg3_demo_restarts_with_the_saved_theme(cx: &mut gpui::TestAppContext) {
     });
     assert_eq!(fixture.store().load().0.dark_override, Some(false));
 }
+
+#[gpui::test]
+fn hcg3_demo_initial_preferences_error_is_visible_and_preserves_the_file(
+    cx: &mut gpui::TestAppContext,
+) {
+    let fixture = crate::shell::local_preferences::tests::Fixture::new();
+    fixture
+        .store()
+        .save(crate::shell::local_preferences::LocalPreferences::default())
+        .unwrap();
+    let path = fixture.0.join("preferences.json");
+    std::fs::write(&path, b"{broken").unwrap();
+    let (view, visual) =
+        cx.add_window_view(|window, cx| PatientApp::with_preferences(fixture.store(), window, cx));
+    draw(visual);
+    assert!(visual.debug_bounds("clinical-workspace-message").is_some());
+    view.update(visual, |app, _| {
+        assert!(
+            app.status_message()
+                .unwrap()
+                .contains("non sono state caricate")
+        );
+        assert_eq!(app.dark_override, None);
+    });
+    assert_eq!(std::fs::read(path).unwrap(), b"{broken");
+}
