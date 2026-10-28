@@ -62,6 +62,7 @@ impl ClinicalApp {
             window.appearance(),
             WindowAppearance::Dark | WindowAppearance::VibrantDark
         ));
+        crate::platform_integration::sync_titlebar(window, self.dark);
     }
 
     fn apply_local_appearance(&mut self, system_dark: bool) {
