@@ -25,9 +25,10 @@ const STATE_DIRECTORY_INVALID: &str = "La cartella deve essere assoluta, già es
 #[cfg(not(windows))]
 const STATE_DIRECTORY_UNSUPPORTED: &str = "L’opzione --state-directory non è supportata su questa piattaforma. Non è possibile usare la cartella indicata per le preferenze e i dati di recupero dell’interfaccia.";
 
-#[cfg(windows)]
+#[cfg(all(windows, test))]
 const STATE_DIRECTORY_UNSUPPORTED: &str = "Le ACL della cartella Windows non sono verificabili: sono ammesse solo ACE standard per l'utente corrente. La cartella non è stata usata per preferenze o recupero dell'interfaccia.";
 
+#[cfg(any(not(windows), test))]
 fn state_directory_error(kind: std::io::ErrorKind) -> &'static str {
     match kind {
         std::io::ErrorKind::Unsupported => STATE_DIRECTORY_UNSUPPORTED,
@@ -106,6 +107,9 @@ fn main() {
             match shell::local_preferences::LocalPreferencesStore::from_directory(directory) {
                 Ok(store) => Some(store),
                 Err(error) => {
+                    #[cfg(windows)]
+                    eprintln!("Impossibile usare la cartella di stato: {error}");
+                    #[cfg(not(windows))]
                     eprintln!("{}", state_directory_error(error.kind()));
                     std::process::exit(2);
                 }

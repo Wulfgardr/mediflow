@@ -67,10 +67,10 @@ function pilotFixture(t) {
     mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     writeFileSync(path.join(root, file), value);
   };
-  for (const file of [pilotWorkflow, ...['Cargo.toml', 'rust-toolchain.toml', 'client/Cargo.toml', 'transport/Cargo.toml', 'app/Cargo.toml'].map(file => `${pilot}/${file}`)]) {
+  for (const file of [pilotWorkflow, ...['Cargo.toml', 'rust-toolchain.toml', 'client/Cargo.toml', 'transport/Cargo.toml', 'app/Cargo.toml', 'state/Cargo.toml'].map(file => `${pilot}/${file}`)]) {
     write(file, readFileSync(path.join(sourceRoot, file)));
   }
-  for (const file of [...pilotFiles, `${pilot}/app/src/shell/threshold_actions.rs`, `${pilot}/app/src/shell/ambulatory_commands.rs`, `${pilot}/client/src/lib.rs`, `${pilot}/transport/src/bin/mediflow-runtime-probe.rs`, `${pilot}/Cargo.lock`]) write(file, 'must not execute');
+  for (const file of [...pilotFiles, `${pilot}/app/src/shell/threshold_actions.rs`, `${pilot}/app/src/shell/ambulatory_commands.rs`, `${pilot}/client/src/lib.rs`, `${pilot}/transport/src/bin/mediflow-runtime-probe.rs`, `${pilot}/Cargo.lock`, `${pilot}/state/src/lib.rs`]) write(file, 'must not execute');
   write(`${pilot}/app/src/main.rs`, '// synthetic binding fixture\nmod appointments;\n#[cfg(unix)]\nmod chat_access;\nmod clinical_text;\nmod components;\nmod demo;\nmod demo_app;\nmod documents;\nmod editing;\nmod icons;\nmod native_lock;\nmod navigation;\nmod patient_forms;\nmod platform_integration;\nmod references;\nmod shell;\nmod text_input;\nmod theme;\nfn main() {}');
   write(`${pilot}/app/src/shell.rs`, '//! Synthetic shell binding fixture\nmod account_profile;\nmod agenda_flow;\nmod ai_preferences;\nmod ai_status;\nmod ambulatories;\nmod ambulatory_commands;\nmod analytics;\n#[cfg(unix)]\nmod chat_access;\nmod document_details;\npub(crate) mod local_preferences;\nmod local_settings;\n#[cfg(test)]\nmod notes_recovery_tests;\n#[cfg(test)]\npub(crate) mod rendered_command;\nmod scales;\nmod therapy_picker;\nmod threshold_actions;\nmod view_state;\nmod who_lookup;');
   write(`${pilot}/transport/src/lib.rs`, '//! Synthetic library binding fixture\n#![forbid(unsafe_code)]\nmod account_profile;\nmod ai_preferences;\nmod ambulatories;\nmod ambulatory_command_recovery;\nmod ambulatory_command_transport;\nmod ambulatory_commands;\nmod analytics;\nmod catalogs;\nmod context;\nmod crypto;\nmod dto;\nmod error;\nmod http;\nmod ports;\nmod profile_query;\nmod scales;\nmod session;\nmod tls;\nmod who;');
@@ -133,7 +133,7 @@ test('GPUI runtime comparison binds all adapters and preparer to the actual CI c
 
 test('GPUI coverage fails closed when Cargo membership, modules or actual CI invocation diverge', t => {
   for (const [file, before, after] of [
-    [`${pilot}/Cargo.toml`, 'members = ["client", "transport", "app"]', 'members = ["client", "app"]'],
+    [`${pilot}/Cargo.toml`, 'members = ["client", "transport", "app", "state"]', 'members = ["client", "app"]'],
     [`${pilot}/client/Cargo.toml`, 'path = "tests/flow.rs"', 'path = "tests/flow.rs"\nharness = false'],
     [`${pilot}/app/Cargo.toml`, 'path = "src/main.rs"', 'path = "src/main.rs"\ntest = false'],
     [`${pilot}/app/src/main.rs`, 'mod demo;', '#[cfg(feature = "optional")]\nmod demo;'],
@@ -177,6 +177,9 @@ test('GPUI coverage fails closed when Cargo membership, modules or actual CI inv
     [`${pilot}/transport/src/lib.rs`, 'mod who;', '// mod who;'],
     [`${pilot}/transport/src/lib.rs`, 'mod who;', '#[cfg(feature = "optional")]\nmod who;'],
     [`${pilot}/transport/Cargo.toml`, 'path = "src/lib.rs"', 'path = "src/lib.rs"\ntest = false'],
+    [`${pilot}/state/Cargo.toml`, 'path = "src/lib.rs"', 'path = "src/lib.rs"\ntest = false'],
+    [`${pilot}/transport/Cargo.toml`, "[target.'cfg(windows)'.dependencies]", "[target.'cfg(unix)'.dependencies]"],
+    [`${pilot}/app/Cargo.toml`, 'mediflow-local-state = { path = "../state" }', 'mediflow-local-state = { path = "../state", optional = true }'],
     ...[['app/src/main.rs', 'native_lock'], ['app/src/shell.rs', 'ambulatory_commands'],
       ...['ambulatory_command_recovery', 'ambulatory_command_transport', 'ambulatory_commands'].map(name => ['transport/src/lib.rs', name])]
       .flatMap(([file, name]) => [

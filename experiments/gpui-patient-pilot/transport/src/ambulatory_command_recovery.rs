@@ -2,7 +2,7 @@ use crate::{AmbulatoryCommandMarker, AmbulatoryCommandTerminal, Result, RuntimeE
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    fs::{self, OpenOptions},
+    fs::{self},
     io::{Read, Write},
     path::{Path, PathBuf},
 };
@@ -64,6 +64,9 @@ impl AmbulatoryCommandRecoveryStore {
         if !directory.is_absolute() {
             return Err(RuntimeError::InvalidInput);
         }
+        #[cfg(windows)]
+        mediflow_local_state::create_directory(directory)
+            .map_err(|_| RuntimeError::ReadRequired)?;
         if !directory.exists() {
             let mut builder = fs::DirBuilder::new();
             builder.recursive(true);
@@ -102,13 +105,19 @@ impl AmbulatoryCommandRecoveryStore {
         })
     }
     fn lock(&self) -> Result<std::fs::File> {
-        let mut options = OpenOptions::new();
+        #[cfg(not(windows))]
+        let mut options = fs::OpenOptions::new();
+        #[cfg(not(windows))]
         options.read(true).write(true).create(true).truncate(false);
         #[cfg(unix)]
         {
             use std::os::unix::fs::OpenOptionsExt;
             options.mode(0o600);
         }
+        #[cfg(windows)]
+        let file = mediflow_local_state::open_lock(&self.lock_path)
+            .map_err(|_| RuntimeError::ReadRequired)?;
+        #[cfg(not(windows))]
         let file = options
             .open(&self.lock_path)
             .map_err(|_| RuntimeError::ReadRequired)?;
@@ -126,6 +135,15 @@ impl AmbulatoryCommandRecoveryStore {
         self.load_unlocked()
     }
     fn load_unlocked(&self) -> Result<Option<AmbulatoryCommandMarker>> {
+        #[cfg(windows)]
+        let file = match mediflow_local_state::open_read(&self.path) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(_) => return Err(RuntimeError::ReadRequired),
+        };
+        #[cfg(windows)]
+        let metadata = file.metadata().map_err(|_| RuntimeError::ReadRequired)?;
+        #[cfg(not(windows))]
         let metadata = match fs::symlink_metadata(&self.path) {
             Ok(value) => value,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -142,9 +160,9 @@ impl AmbulatoryCommandRecoveryStore {
             }
         }
         let mut bytes = Vec::new();
-        fs::File::open(&self.path)
-            .map_err(|_| RuntimeError::ReadRequired)?
-            .take(4097)
+        #[cfg(not(windows))]
+        let file = fs::File::open(&self.path).map_err(|_| RuntimeError::ReadRequired)?;
+        file.take(4097)
             .read_to_end(&mut bytes)
             .map_err(|_| RuntimeError::ReadRequired)?;
         if bytes.len() > 4096 {
@@ -186,14 +204,20 @@ impl AmbulatoryCommandRecoveryStore {
         if bytes.len() > 4096 {
             return Err(RuntimeError::TooLarge);
         }
-        let mut options = OpenOptions::new();
+        #[cfg(not(windows))]
+        let mut options = fs::OpenOptions::new();
+        #[cfg(not(windows))]
         options.write(true).create_new(true);
         #[cfg(unix)]
         {
             use std::os::unix::fs::OpenOptionsExt;
             options.mode(0o600);
         }
-        let mut file = match options.open(&self.path) {
+        #[cfg(windows)]
+        let created = mediflow_local_state::create_file(&self.path);
+        #[cfg(not(windows))]
+        let created = options.open(&self.path);
+        let mut file = match created {
             Ok(file) => file,
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
                 if self.load_unlocked()?.as_ref() == Some(marker) {
@@ -214,6 +238,7 @@ impl AmbulatoryCommandRecoveryStore {
         fs::File::open(self.path.parent().ok_or(RuntimeError::ReadRequired)?)
             .and_then(|file| file.sync_all())
             .map_err(|_| RuntimeError::ReadRequired)?;
+        drop(file);
         let persisted = PersistedAmbulatoryCommand {
             marker: marker.clone(),
             store: self.clone(),
@@ -225,9 +250,7 @@ impl AmbulatoryCommandRecoveryStore {
     }
     fn sync_marker(&self) -> Result<()> {
         #[cfg(windows)]
-        OpenOptions::new()
-            .write(true)
-            .open(&self.path)
+        mediflow_local_state::open_write(&self.path)
             .and_then(|file| file.sync_all())
             .map_err(|_| RuntimeError::ReadRequired)?;
         #[cfg(not(windows))]
@@ -297,7 +320,11 @@ mod tests {
         let mut b = [0; 16];
         getrandom::fill(&mut b).unwrap();
         let name: String = b.iter().map(|byte| format!("{byte:02x}")).collect();
-        let dir = std::env::temp_dir()
+        #[cfg(not(windows))]
+        let root = std::env::temp_dir();
+        #[cfg(windows)]
+        let root = PathBuf::from(std::env::var_os("LOCALAPPDATA").unwrap());
+        let dir = root
             .canonicalize()
             .unwrap()
             .join(format!("mediflow-command-recovery-{name}"));
@@ -430,6 +457,25 @@ mod tests {
         assert_eq!(store.load(), Ok(Some(replacement)));
         fs::remove_dir_all(store.path.parent().unwrap()).unwrap();
     }
+
+    #[cfg(windows)]
+    #[test]
+    fn ambulatory_command_recovery_rejects_marker_with_other_sid_write_access() {
+        let store = store();
+        let marker = marker("11111111-1111-4111-8111-111111111111");
+        store.persist(&marker).unwrap();
+        assert!(
+            std::process::Command::new("icacls")
+                .arg(&store.path)
+                .args(["/grant", "*S-1-5-32-545:W"])
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert_eq!(store.load(), Err(RuntimeError::ReadRequired));
+        fs::remove_dir_all(store.path.parent().unwrap()).unwrap();
+    }
+
     #[cfg(unix)]
     #[test]
     fn ambulatory_command_recovery_denies_symlink_and_shared_hardlink_without_touching_target() {

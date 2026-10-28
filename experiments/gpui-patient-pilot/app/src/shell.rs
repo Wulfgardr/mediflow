@@ -455,6 +455,7 @@ pub struct ClinicalApp {
     privacy_shield: bool,
     local_preferences: LocalPreferencesStore,
     preferences_issue: Option<PreferenceIssue>,
+    preferences_error: Option<String>,
     privacy_scroll: ScrollHandle,
     privacy_commands: [ScrollTarget; 3],
     theme: Theme,
@@ -494,7 +495,8 @@ impl ClinicalApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let (preferences, failed) = local_preferences.load();
+        let (preferences, error) = local_preferences.load_with_error();
+        let failed = error.is_some();
         let dark = preferences.dark_override.unwrap_or(matches!(
             window.appearance(),
             WindowAppearance::Dark | WindowAppearance::VibrantDark
@@ -713,6 +715,7 @@ impl ClinicalApp {
             privacy_shield: preferences.privacy_shield,
             local_preferences,
             preferences_issue: failed.then_some(PreferenceIssue::Read),
+            preferences_error: error,
             privacy_commands: std::array::from_fn(|_| ScrollTarget::new(&privacy_scroll, cx)),
             privacy_scroll,
             theme,

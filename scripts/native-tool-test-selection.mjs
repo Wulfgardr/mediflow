@@ -100,24 +100,33 @@ function exactFields(actual, expected, label) {
 export function cargoGpuiPilotTestCommand(root) {
   const manifest = `${gpuiDirectory}/Cargo.toml`;
   const workspace = gpuiTables(root, manifest, ['[workspace]', '[workspace.package]', '[workspace.dependencies]', '[patch.crates-io]', '[profile.dev]', '[profile.release]']);
-  exactFields(workspace['[workspace]'], { members: '["client", "transport", "app"]', 'default-members': '["client"]', resolver: '"3"' }, 'workspace membership');
+  exactFields(workspace['[workspace]'], { members: '["client", "transport", "app", "state"]', 'default-members': '["client"]', resolver: '"3"' }, 'workspace membership');
   const toolchain = /^"(\d+\.\d+\.\d+)"$/u.exec(workspace['[workspace.package]']?.['rust-version'])?.[1];
   if (!toolchain) throw new Error('Pilot requires an exact Rust version');
   const rust = gpuiTables(root, `${gpuiDirectory}/rust-toolchain.toml`, ['[toolchain]']);
   exactFields(rust['[toolchain]'], { channel: `"${toolchain}"`, profile: '"minimal"', components: '["rustfmt", "clippy"]' }, 'toolchain');
   const client = gpuiTables(root, `${gpuiDirectory}/client/Cargo.toml`, ['[package]', '[lib]', '[dependencies]', '[dev-dependencies]', '[[test]]']);
-  const transport = gpuiTables(root, `${gpuiDirectory}/transport/Cargo.toml`, ['[package]', '[lib]', '[[bin]]', '[dependencies]']);
+  const transport = gpuiTables(root, `${gpuiDirectory}/transport/Cargo.toml`, ['[package]', '[lib]', '[[bin]]', '[dependencies]', "[target.'cfg(windows)'.dependencies]"]);
   const app = gpuiTables(root, `${gpuiDirectory}/app/Cargo.toml`, ['[package]', '[[bin]]', "[target.'cfg(windows)'.dependencies]", '[dependencies]', '[dev-dependencies]']);
   exactFields(app["[target.'cfg(windows)'.dependencies]"], {
     'raw-window-handle': '"0.6"',
+    'mediflow-local-state': '{ path = "../state" }',
     'windows-sys': '{ version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Threading", "Win32_Storage_FileSystem"] }',
   }, 'Windows platform dependencies');
+  exactFields(transport["[target.'cfg(windows)'.dependencies]"], {
+    'mediflow-local-state': '{ path = "../state" }',
+  }, 'transport Windows state boundary');
+  const state = gpuiTables(root, `${gpuiDirectory}/state/Cargo.toml`, ['[package]', '[lib]', "[target.'cfg(windows)'.dependencies]"]);
+  exactFields(state['[lib]'], { path: '"src/lib.rs"' }, 'state library target');
+  exactFields(state["[target.'cfg(windows)'.dependencies]"], {
+    'windows-sys': '{ version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Threading", "Win32_Storage_FileSystem"] }',
+  }, 'state Windows dependencies');
   // Model the actual test-support feature and timezone fixture dependency;
   // accepting this table must not silently accept an optional/disabled harness.
   exactFields(app['[dev-dependencies]'], {
     gpui: '{ workspace = true, features = ["test-support"] }', 'chrono-tz': '"0.10"',
   }, 'app test-support dependencies');
-  for (const [tables, name] of [[client, 'mediflow-patient-client'], [transport, 'mediflow-runtime-client'], [app, 'mediflow-gpui-patient-pilot']]) {
+  for (const [tables, name] of [[client, 'mediflow-patient-client'], [transport, 'mediflow-runtime-client'], [app, 'mediflow-gpui-patient-pilot'], [state, 'mediflow-local-state']]) {
     exactFields(tables['[package]'], { name: `"${name}"`, 'version.workspace': 'true', 'edition.workspace': 'true',
       'rust-version.workspace': 'true', 'license.workspace': 'true', 'publish.workspace': 'true' }, 'package');
   }
@@ -135,7 +144,7 @@ export function cargoGpuiPilotTestCommand(root) {
   if (!/^#!\[forbid\(unsafe_code\)\]\s*mod account_profile;\s*mod ai_preferences;\s*mod ambulatories;\s*mod ambulatory_command_recovery;\s*mod ambulatory_command_transport;\s*mod ambulatory_commands;\s*mod analytics;\s*mod catalogs;\s*mod context;\s*mod crypto;\s*mod dto;\s*mod error;\s*mod http;\s*mod ports;\s*mod profile_query;\s*mod scales;\s*mod session;\s*mod tls;\s*mod who;/u.test(library)) throw new Error('Pilot transport module binding changed');
   const files = ['client/tests/flow.rs', 'client/tests/patient_names.rs', 'app/src/demo_app_tests.rs', 'app/src/chat_access/owner.rs', 'app/src/clinical_text.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/native_lock.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/platform_integration.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/shell/account_profile.rs', 'app/src/shell/agenda_flow.rs', 'app/src/shell/ambulatories.rs', 'app/src/shell/ai_preferences.rs', 'app/src/shell/ai_status.rs', 'app/src/shell/analytics.rs', 'app/src/shell/chat_access.rs', 'app/src/shell/document_details.rs', 'app/src/shell/local_preferences.rs', 'app/src/shell/local_settings.rs', 'app/src/shell/notes_recovery_tests.rs', 'app/src/shell/rendered_command.rs', 'app/src/shell/scales.rs', 'app/src/shell/therapy_picker.rs', 'app/src/shell/view_state.rs', 'app/src/shell/who_lookup.rs', 'app/src/text_input.rs', 'app/src/theme.rs',
     'transport/src/dto.rs', 'transport/src/account_profile.rs', 'transport/src/ambulatories.rs', 'transport/src/ambulatory_command_recovery.rs', 'transport/src/ambulatory_command_transport.rs', 'transport/src/ambulatory_commands.rs', 'transport/src/ai_preferences.rs', 'transport/src/analytics.rs', 'transport/src/catalogs.rs', 'transport/src/context.rs', 'transport/src/crypto.rs', 'transport/src/http.rs', 'transport/src/ports.rs', 'transport/src/profile_query.rs', 'transport/src/scales.rs', 'transport/src/session.rs', 'transport/src/who.rs', 'transport/src/bin/mediflow-runtime-probe.rs'].map(file => `${gpuiDirectory}/${file}`);
-  for (const file of [...files, `${gpuiDirectory}/app/src/shell/threshold_actions.rs`, `${gpuiDirectory}/app/src/shell/ambulatory_commands.rs`, `${gpuiDirectory}/client/src/lib.rs`, `${gpuiDirectory}/transport/src/bin/mediflow-runtime-probe.rs`, `${gpuiDirectory}/Cargo.lock`]) read(root, file);
+  for (const file of [...files, `${gpuiDirectory}/app/src/shell/threshold_actions.rs`, `${gpuiDirectory}/app/src/shell/ambulatory_commands.rs`, `${gpuiDirectory}/client/src/lib.rs`, `${gpuiDirectory}/transport/src/bin/mediflow-runtime-probe.rs`, `${gpuiDirectory}/Cargo.lock`, `${gpuiDirectory}/state/src/lib.rs`]) read(root, file);
   return { files, executable: 'cargo', args: ['test', '--manifest-path', manifest, '--workspace', '--all-targets', '--locked'], toolchain };
 }
 export function collectGpuiPilotSelection(root) {
