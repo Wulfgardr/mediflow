@@ -406,6 +406,9 @@ fn hcg2_container_and_text_axes_are_distinct(cx: &mut gpui::TestAppContext) {
             });
             draw(cx);
             let search = bounds(cx, "demo-search");
+            assert_eq!(LIST_EDGE, 28.);
+            assert_eq!(crate::components::CONTROL_TEXT_INSET, 9.);
+            assert_eq!(search.left(), px(28.));
             for id in [
                 "demo-brand",
                 "demo-list-title",
@@ -422,9 +425,11 @@ fn hcg2_container_and_text_axes_are_distinct(cx: &mut gpui::TestAppContext) {
             assert_eq!(row.right(), search.right());
             let text = view.read_with(cx, |app, cx| app.search.read(cx).text_bounds().unwrap());
             let name = bounds(cx, "demo-patient-name-0");
-            assert!(text.left() > search.left());
+            assert_eq!(text.left(), px(37.));
+            assert_eq!(name.left(), px(37.));
             assert_eq!(name.left(), text.left(), "text axis at {width}/{dark}");
             if let Some(note) = cx.debug_bounds("demo-patient-note-0") {
+                assert_eq!(row.right() - note.right(), px(9.));
                 assert_eq!(row.right() - note.right(), text.left() - search.left());
             }
             eprintln!(
@@ -655,7 +660,10 @@ fn hcg2_appearance_has_track_fill_and_keyboard_only_ring(cx: &mut gpui::TestAppC
         {
             let style = result.borrow();
             let pointer = style.as_ref().unwrap();
-            assert_eq!(pointer.background, Some(Fill::from(theme.paper)));
+            assert_eq!(
+                pointer.background,
+                Some(Fill::from(theme.appearance_selected))
+            );
             assert_ne!(
                 pointer.border_color,
                 Some(theme.fresh),
@@ -672,7 +680,7 @@ fn hcg2_appearance_has_track_fill_and_keyboard_only_ring(cx: &mut gpui::TestAppC
         let keyboard = style.as_ref().unwrap();
         assert_eq!(
             keyboard.background,
-            Some(Fill::from(theme.paper)),
+            Some(Fill::from(theme.appearance_selected)),
             "keyboard focus keeps selection fill"
         );
         assert_eq!(keyboard.border_color, Some(theme.fresh));
@@ -685,7 +693,7 @@ fn hcg2_theme_track_is_visible(cx: &mut gpui::TestAppContext) {
     for dark in [false, true] {
         view.update(cx, |app, cx| {
             app.theme = Theme::for_dark(dark);
-            let mut track = app.appearance(cx);
+            let mut track = app.appearance(334., cx);
             assert_eq!(track.style().border_color, Some(app.theme.strong_rule));
             assert_eq!(track.style().background, Some(Fill::from(app.theme.shade)));
         });

@@ -26,6 +26,8 @@ pub struct Theme {
     pub draft_rule: Hsla,
     pub hover: Hsla,
     pub selected: Hsla,
+    pub appearance_selected: Hsla,
+    pub appearance_selected_text: Hsla,
     pub warning: Hsla,
     pub critical: Hsla,
     pub threshold_text: Hsla,
@@ -65,6 +67,12 @@ impl Theme {
             draft_rule: color("rule", "draft"),
             hover: color("surface", "hover"),
             selected: color("surface", "selected"),
+            appearance_selected: color("ink", "secondary"),
+            appearance_selected_text: if dark {
+                color("surface", "canvas")
+            } else {
+                color("surface", "focal")
+            },
             warning: color("signal", "warning"),
             critical: color("signal", "critical"),
             threshold_text: color("ink", "threshold"),

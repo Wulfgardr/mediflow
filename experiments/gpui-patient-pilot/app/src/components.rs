@@ -20,6 +20,54 @@ pub const APPEARANCE_CHOICES: [(Option<bool>, &str, &str); 3] = [
 
 pub const CONTROL_TEXT_INSET: f32 = 9.;
 
+#[derive(Clone, Copy)]
+pub struct AppearanceLayout {
+    pub stacked: bool,
+    pub width: f32,
+    pub theme: Theme,
+}
+
+pub fn appearance_layout(width: f32, theme: Theme, cx: &gpui::App) -> AppearanceLayout {
+    let width = width.max(1.);
+    let typography = theme.role(TypeRole::Strong);
+    let mut font = gpui::font(typography.family);
+    font.weight = typography.weight;
+    let text_system = gpui::WindowTextSystem::new(cx.text_system().clone());
+    let widths: Vec<f32> = APPEARANCE_CHOICES
+        .iter()
+        .map(|(_, _, label)| {
+            f32::from(
+                text_system
+                    .shape_line(
+                        (*label).into(),
+                        px(typography.size),
+                        &[gpui::TextRun {
+                            len: label.len(),
+                            font: font.clone(),
+                            ..Default::default()
+                        }],
+                        None,
+                    )
+                    .width(),
+            )
+        })
+        .collect();
+    let stacked = widths.iter().sum::<f32>() + 3. * 16. + 4. + 6. > width;
+    let longest = widths.into_iter().fold(0., f32::max);
+    let fit = if stacked {
+        ((width - 6. - 16.) / longest).clamp(0.01, 1.)
+    } else {
+        1.
+    };
+    let mut fitted = theme;
+    fitted.scale *= fit;
+    AppearanceLayout {
+        stacked,
+        width,
+        theme: fitted,
+    }
+}
+
 pub fn appearance_track(id: &'static str, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
@@ -73,11 +121,25 @@ pub fn appearance_segment(
         .rounded(px(theme.control_radius))
         .border_2()
         .border_color(gpui::transparent_black())
-        .bg(if selected { theme.paper } else { theme.shade })
-        .text_color(if selected { theme.ink } else { theme.secondary })
-        .hover(move |style| style.bg(if selected { theme.paper } else { theme.hover }))
+        .bg(if selected {
+            theme.appearance_selected
+        } else {
+            theme.shade
+        })
+        .text_color(if selected {
+            theme.appearance_selected_text
+        } else {
+            theme.secondary
+        })
+        .hover(move |style| {
+            style.bg(if selected {
+                theme.appearance_selected
+            } else {
+                theme.hover
+            })
+        })
         .focus_visible(move |style| style.border_color(theme.fresh))
-        .child(control_label(label.into()))
+        .child(control_label(label.into()).whitespace_nowrap())
 }
 
 pub fn button(
@@ -768,6 +830,43 @@ mod writing_tests {
                     }
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod appearance_contrast_tests {
+    use super::*;
+    fn luminance(color: gpui::Hsla) -> f64 {
+        let c: gpui::Rgba = color.into();
+        let linear = |v: f32| {
+            let v = v as f64;
+            if v <= 0.04045 {
+                v / 12.92
+            } else {
+                ((v + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b)
+    }
+    #[test]
+    fn hcg2_selected_fill_has_three_to_one_contrast() {
+        for dark in [false, true] {
+            let theme = Theme::for_dark(dark);
+            let mut selected =
+                appearance_segment(Some(false), Some(false), "contrast", "Giorno", theme);
+            let mut track = appearance_track("track", theme);
+            let fill = match selected.style().background.clone().unwrap() {
+                gpui::Fill::Color(color) => color.as_solid().unwrap(),
+            };
+            let background = match track.style().background.clone().unwrap() {
+                gpui::Fill::Color(color) => color.as_solid().unwrap(),
+            };
+            let a = luminance(fill);
+            let b = luminance(background);
+            let ratio = (a.max(b) + 0.05) / (a.min(b) + 0.05);
+            eprintln!("HC-G2 selected contrast dark={dark}: {ratio:.4}:1");
+            assert!(ratio >= 3.0);
         }
     }
 }
