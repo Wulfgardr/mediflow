@@ -8,7 +8,7 @@ import styles from './siss-workspace.module.css';
 import { BadgePercent, Copy, ExternalLink, IdCard, ListChecks, LoaderCircle, Pill, RefreshCcw, ShieldAlert, ShieldCheck, Stethoscope } from 'lucide-react';
 import { completeSissPortalHandoff, prepareSissPortalWindow } from '@/lib/siss';
 import { copyToClipboard } from '@/lib/clipboard';
-import { buildSissPatientContextSummary, type SissPatientContextAction, type SissPatientContextTransportMode } from '@/lib/siss-patient-context-shared';
+import { buildSissPatientContextSummary, type SissPatientContextAction } from '@/lib/siss-patient-context-shared';
 import {
     buildExemptionCopyFields,
     buildServicePrescriptionCopyFields,
@@ -33,6 +33,8 @@ type Props = {
     patientId: string;
     patientTaxCode: string | null | undefined;
     embedded?: boolean;
+    fseReadiness: FseReadinessState;
+    onRefreshFseReadiness: () => Promise<void>;
 };
 
 type FeedbackState = {
@@ -64,7 +66,7 @@ type BlockedCapabilityConfig = {
     reason: string;
 };
 
-type FseReadinessState = {
+export type FseReadinessState = {
     loading: boolean;
     error: string | null;
     validation: ValidatePatientExportResponse | null;
@@ -126,11 +128,6 @@ const BLOCKED_CAPABILITIES: BlockedCapabilityConfig[] = [
         reason: 'Da aprire nel portale ufficiale: il percorso certificato per l\'emissione non e ancora collegato.',
     },
 ];
-
-const TRANSPORT_MODE_LABEL: Record<SissPatientContextTransportMode, string> = {
-    'portal-handoff': 'Le operazioni si svolgono nei portali regionali.',
-    'certified-api': 'Collegamento regionale certificato disponibile.',
-};
 
 /* S2: stessa etichetta usata nel form di TherapyManager per lo stato attivo. */
 const THERAPY_STATUS_LABEL = 'Attiva';
@@ -194,14 +191,9 @@ function healthLabel(health: SissSessionHealth, recent: string, stale: string, a
     return absent;
 }
 
-export default function SissPatientContextPanel({ patientId, patientTaxCode, embedded = false }: Props) {
+export default function SissPatientContextPanel({ patientId, patientTaxCode, embedded = false, fseReadiness, onRefreshFseReadiness }: Props) {
     const [activeAction, setActiveAction] = useState<SissPatientContextAction | null>(null);
     const [feedback, setFeedback] = useState<FeedbackState | null>(null);
-    const [fseReadiness, setFseReadiness] = useState<FseReadinessState>({
-        loading: true,
-        error: null,
-        validation: null,
-    });
     const [sessionStatus, setSessionStatus] = useState<SessionStatusState>({
         loading: true,
         error: null,
@@ -278,43 +270,6 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
         await handleCopyField({ key: 'patientTaxCode', label: 'Codice fiscale', value: normalized });
     };
 
-    const refreshFseReadiness = async () => {
-        setFseReadiness((current) => ({
-            loading: true,
-            error: null,
-            validation: current.validation,
-        }));
-
-        try {
-            const response = await fetch(`/api/fse/validate-patient?patientId=${encodeURIComponent(patientId)}`);
-            const payload = await response.json().catch(() => null) as ValidatePatientExportResponse | { error?: string } | null;
-
-            if (!response.ok) {
-                const message = payload && 'error' in payload && typeof payload.error === 'string'
-                    ? payload.error
-                    : 'Pre-check FSE non disponibile';
-                setFseReadiness({
-                    loading: false,
-                    error: message,
-                    validation: null,
-                });
-                return;
-            }
-
-            setFseReadiness({
-                loading: false,
-                error: null,
-                validation: payload as ValidatePatientExportResponse,
-            });
-        } catch (error) {
-            setFseReadiness({
-                loading: false,
-                error: error instanceof Error ? error.message : 'Controllo preliminare FSE non riuscito.',
-                validation: null,
-            });
-        }
-    };
-
     const refreshSessionStatus = async () => {
         setSessionStatus((current) => ({
             loading: true,
@@ -353,7 +308,6 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
     };
 
     useEffect(() => {
-        void refreshFseReadiness();
         void refreshSessionStatus();
     }, [patientId]);
 
@@ -451,26 +405,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
     };
 
     const validation = fseReadiness.validation;
-    const readinessTone: 'success' | 'warning' | 'critical' | 'muted' = validation?.hasErrors
-        ? 'critical'
-        : validation?.hasWarnings
-            ? 'warning'
-            : validation
-                ? 'success'
-                : 'muted';
-    const readinessLabel = fseReadiness.loading
-        ? 'Controllo dei dati per l’esportazione FSE in corso.'
-        : validation?.hasErrors
-            ? 'Dati da correggere per l’esportazione FSE. Puoi aprire i portali.'
-            : validation?.hasWarnings
-                ? 'Dati da verificare per l’esportazione FSE.'
-                : validation
-                    ? 'Dati pronti per l’esportazione FSE.'
-                    : 'Controllo dei dati per l’esportazione FSE non disponibile.';
     const sessionData = sessionStatus.status;
-    const transportLabel = TRANSPORT_MODE_LABEL[summary.transportMode as SissPatientContextTransportMode]
-        ?? TRANSPORT_MODE_LABEL['portal-handoff'];
-
     const formatObservedAt = (value: string | null) => {
         if (!value) return 'Non osservato';
         const date = new Date(value);
@@ -486,25 +421,10 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
 
     const remoteSignatureCheckpoint = sessionData?.checkpoints.find((checkpoint) => checkpoint.key === 'remote-signature') ?? null;
     const roleSelectionCheckpoint = sessionData?.checkpoints.find((checkpoint) => checkpoint.key === 'role-selection') ?? null;
-    const contextStatus = (
-        <div className="space-y-2 text-sm text-[color:var(--lume-ink-muted)]">
-            <p>{transportLabel}</p>
-            <p>{hasTaxCode ? 'Codice fiscale disponibile da copiare.' : 'Codice fiscale mancante o non valido.'}</p>
-            <p role={readinessTone === 'critical' || readinessTone === 'warning' ? 'alert' : 'status'}
-                className={readinessTone === 'critical' || readinessTone === 'warning' ? `mf-alert mf-alert-${readinessTone}` : undefined}>
-                {readinessLabel}
-            </p>
-        </div>
-    );
 
     return (
         <section className={embedded ? styles.panel : `${styles.panel} patient-detail-section border p-5 md:p-6`}>
-            {embedded ? (
-                <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                    <p className={styles.caption}>L’atto regionale si svolge nel portale ufficiale.</p>
-                    {contextStatus}
-                </header>
-            ) : (
+            {!embedded && (
                 <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div className="min-w-0">
                         <p className="section-kicker">SISS / FSE</p>
@@ -512,25 +432,22 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                             <ShieldCheck className="h-4 w-4 text-[color:var(--lume-accent)]" />
                             SISS e FSE
                         </h2>
-                        <p className="mt-1 max-w-2xl text-xs leading-5 text-[color:var(--lume-ink-muted)]">
-                            Apertura assistita dei portali regionali ufficiali. L&apos;atto clinico avviene nel portale: qui prepariamo il codice fiscale e mostriamo lo stato locale.
-                        </p>
                     </div>
 
-                    {contextStatus}
                 </header>
             )}
 
-            {!hasTaxCode && (
-                <p className="mt-2 text-xs font-medium text-[color:var(--lume-signal-warning)]">
-                    Le azioni paziente-specifiche richiedono un codice fiscale valido nel profilo; il Menu SISS resta apribile.
-                </p>
-            )}
-
-            <div className="mt-4">
+            <div role="region" aria-label="Passaggio al portale regionale">
                 <h3 className={styles.heading}>
                     Passaggio al portale regionale
                 </h3>
+                <p className={styles.caption}>L’atto regionale si svolge nel portale ufficiale.</p>
+                <p className={styles.caption}>{hasTaxCode ? 'Codice fiscale disponibile da copiare.' : 'Codice fiscale mancante o non valido.'}</p>
+                {!hasTaxCode && (
+                    <p className={styles.notice}>
+                        Le azioni paziente-specifiche richiedono un codice fiscale valido nel profilo; il Menu SISS resta apribile.
+                    </p>
+                )}
                 <div className={styles.services}>
                     {ACTIONS.map((item) => {
                         const isLoading = activeAction === item.action;
@@ -548,7 +465,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                                 aria-busy={isLoading}
                                 title={item.caption}
                             >
-                                <span>{isLoading ? 'Apertura' : 'Apri'} {item.label}</span>
+                                <span className="text-left">{isLoading ? 'Apertura' : 'Apri'} {item.label}</span>
                                 <ExternalLink size={16} aria-hidden="true" />
                             </button>
                         );
@@ -678,7 +595,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                         </h3>
                         <button
                             type="button"
-                            onClick={() => void refreshFseReadiness()}
+                            onClick={() => void onRefreshFseReadiness()}
                             disabled={fseReadiness.loading}
                             className="graphite-mini-btn"
                             aria-label="Aggiorna controllo FSE locale"
