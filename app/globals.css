@@ -1176,6 +1176,25 @@ html:root[data-lume] .mf-input.mf-search-input {
   background-color: var(--lume-surface-focal);
 }
 
+:root .mf-composite-field > input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+:root input.mf-search-input:focus {
+  outline: none;
+  box-shadow: var(--lume-focus-ring);
+}
+
+@media (forced-colors: active) {
+  :root .mf-composite-field:has(> input:focus),
+  :root input.mf-search-input:focus {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+}
+
 html:root[data-lume] :is(.mf-button-primary, .ui-btn-primary, .mf-button-secondary, .mf-btn-secondary, .ui-btn-secondary, .mf-button-text, .mf-button-destructive, .mf-button-icon) {
   box-sizing: border-box;
   isolation: isolate;
