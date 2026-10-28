@@ -110,11 +110,12 @@ final class PatientSummaryPresentationTests: XCTestCase {
     }
 
     func testAgeFromBirthDateToday() {
-        let today = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        let now = HomeBaseDateCoding.parseISO8601("2026-10-28T19:00:00Z")!
+        let today = Calendar(identifier: .gregorian).dateComponents([.year, .month, .day], from: now)
         var birthCalendar = Calendar(identifier: .gregorian)
         birthCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let birth = birthCalendar.date(from: DateComponents(year: today.year, month: today.month, day: today.day, hour: 20))
-        XCTAssertEqual(PairedPatientsWorkspaceView.age(from: birth), 0)
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.age(from: birth, at: now), 0)
     }
 
     func testAgeIsNilForFutureBirthDate() {
