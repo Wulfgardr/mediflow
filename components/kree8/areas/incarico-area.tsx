@@ -11,6 +11,7 @@ import {
   Search,
   UserSquare2,
   Workflow,
+  X,
 } from 'lucide-react';
 
 import {
@@ -330,7 +331,7 @@ function IncaricoArea({
         <label className={patientStyles.patientSearchField}>
           <Search size={16} aria-hidden="true" />
           <input ref={searchInputRef} type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Cerca per nome, codice fiscale o diagnosi" aria-label="Cerca nella lista pazienti" />
-          {query ? <button type="button" className={patientStyles.patientSearchClear} onClick={() => { setQuery(''); searchInputRef.current?.focus(); }}>Cancella</button> : null}
+          {query ? <button type="button" className="mf-button-icon min-h-11! min-w-11!" aria-label="Cancella la ricerca" title="Cancella la ricerca" onClick={() => { setQuery(''); searchInputRef.current?.focus(); }}><X size={16} aria-hidden="true" /></button> : null}
         </label>
         <div className={patientStyles.inboxScope} aria-label="Stato elenco">
           <button type="button" className={classNames(patientStyles.scopeChip, list === 'attivi' && patientStyles.scopeChipActive)} aria-pressed={list === 'attivi'} onClick={() => setList('attivi')}>Attivi</button>

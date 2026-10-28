@@ -50,7 +50,7 @@ for (const theme of ['light', 'dark']) {
       const search = page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' });
       await search.fill('nessuna corrispondenza sintetica');
       await expect(page.getByText('0 risultati', { exact: true })).toBeVisible();
-      await page.getByRole('button', { name: 'Cancella', exact: true }).click();
+      await page.getByRole('button', { name: 'Cancella la ricerca', exact: true }).click();
       await expect(search).toBeFocused();
       await search.fill(marker);
       await expect(rows).toHaveCount(3);
