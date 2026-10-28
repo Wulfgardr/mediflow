@@ -83,6 +83,11 @@ pub struct TextInput {
 impl EventEmitter<InputChanged> for TextInput {}
 
 impl TextInput {
+    #[cfg(test)]
+    pub fn text_bounds(&self) -> Option<Bounds<Pixels>> {
+        self.layout.as_ref().map(TextLayout::bounds)
+    }
+
     pub fn new(
         id: &'static str,
         label: &'static str,
@@ -878,7 +883,11 @@ impl Render for TextInput {
                 self.height_limit
                     .map_or(minimum_height, |height| height.min(minimum_height)),
             )
-            .p(px(if self.multiline { 12. } else { 8. }))
+            .p(px(if self.multiline {
+                12.
+            } else {
+                crate::components::CONTROL_TEXT_INSET - 1.
+            }))
             .border_1()
             .border_color(theme.strong_rule)
             .rounded(px(theme.control_radius))

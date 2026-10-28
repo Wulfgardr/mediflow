@@ -38,7 +38,7 @@ use mediflow_runtime_client::{
     RuntimeConfig, RuntimeError, RuntimeSession, TerminologyRegistryEntry,
     TerminologyRegistryStatus, Therapy, TherapyDraft,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use zeroize::Zeroizing;
 
@@ -210,6 +210,13 @@ impl ScrollTarget {
             focus: cx.focus_handle().tab_stop(true),
             anchor: ScrollAnchor::for_handle(handle.clone()),
         }
+    }
+    fn group<const N: usize>(handle: &ScrollHandle, cx: &App) -> [Self; N] {
+        let anchor = ScrollAnchor::for_handle(handle.clone());
+        std::array::from_fn(|_| Self {
+            focus: cx.focus_handle().tab_stop(true),
+            anchor: anchor.clone(),
+        })
     }
     fn attach(&self, element: Stateful<Div>) -> Stateful<Div> {
         self.attach_enabled(element, true)
@@ -387,6 +394,8 @@ pub struct ClinicalApp {
     focus_first_field: bool,
     login_fields: Vec<Field>,
     login_actions: [ScrollTarget; 3],
+    login_appearance: [ScrollTarget; 3],
+    settings_appearance: [ScrollTarget; 3],
     ambulatories: Load<Vec<Ambulatory>>,
     ambulatory_management: ambulatories::Management,
     scope: Option<String>,
@@ -434,7 +443,7 @@ pub struct ClinicalApp {
     search: Entity<TextInput>,
     search_target: ScrollTarget,
     directory_scroll: ScrollHandle,
-    patient_targets: HashMap<String, ScrollTarget>,
+    patient_targets: BTreeMap<String, ScrollTarget>,
     form: Option<Form>,
     discard: Option<Discard>,
     message: Option<(String, bool)>,
@@ -636,6 +645,8 @@ impl ClinicalApp {
             pairing: None,
             show_tls_pin: false,
             login_actions: std::array::from_fn(|_| ScrollTarget::new(&login_scroll, cx)),
+            login_appearance: ScrollTarget::group(&login_scroll, cx),
+            settings_appearance: ScrollTarget::group(&area_scroll, cx),
             login_scroll,
             connecting: false,
             document_busy: false,
@@ -690,7 +701,7 @@ impl ClinicalApp {
             search,
             search_target: ScrollTarget::new(&directory_scroll, cx),
             directory_scroll,
-            patient_targets: HashMap::new(),
+            patient_targets: BTreeMap::new(),
             form: None,
             discard: None,
             message: None,
@@ -1470,6 +1481,13 @@ impl ClinicalApp {
                 .any(|target| target.reveal_if_focused(window, cx))
         };
         if self.session.is_none() {
+            if self
+                .login_appearance
+                .iter()
+                .any(|target| target.reveal_if_focused(window, cx))
+            {
+                return;
+            }
             if !reveal_fields(&self.login_fields, window, cx) {
                 self.login_actions
                     .iter()
@@ -1529,6 +1547,13 @@ impl ClinicalApp {
                 self.who.reveal_if_focused(window, cx);
             }
         } else if self.area == Area::Settings {
+            if self
+                .settings_appearance
+                .iter()
+                .any(|target| target.reveal_if_focused(window, cx))
+            {
+                return;
+            }
             if self.ai_preferences.active {
                 self.ai_preferences.reveal_if_focused(window, cx);
             } else {
@@ -1551,7 +1576,7 @@ impl ClinicalApp {
         }
         // Only IDs already present in the visible directory are retained. A row's
         // focus identity survives repaint/filtering until that row leaves the UI.
-        let visible_ids: HashSet<_> = self
+        let visible_ids: BTreeSet<_> = self
             .patients
             .ready()
             .into_iter()
@@ -2159,6 +2184,19 @@ impl ClinicalApp {
         cx.notify();
     }
 
+    fn close_clean_notes(&mut self, cx: &mut Context<Self>) {
+        if self
+            .form
+            .as_ref()
+            .is_some_and(|form| form.kind == FormKind::Notes && form.state == FormState::Draft)
+            && !self.core.is_dirty()
+        {
+            self.finish_discard(Discard::Form, cx);
+        } else {
+            self.request_discard(Discard::Form, cx);
+        }
+    }
+
     fn review_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.discard.is_some() {
             return;
@@ -2187,7 +2225,11 @@ impl ClinicalApp {
         if form.kind == FormKind::Notes
             && let Err(error) = self.core.review()
         {
-            self.message = Some((client_message(error).into(), false));
+            self.message = if error == mediflow_patient_client::ClientError::NoChanges {
+                None
+            } else {
+                Some((client_message(error).into(), false))
+            };
             cx.notify();
             return;
         }
@@ -2862,6 +2904,37 @@ impl ClinicalApp {
             )
     }
 
+    fn appearance(&self, width: f32, login: bool, cx: &Context<Self>) -> Stateful<Div> {
+        let layout = crate::components::appearance_layout(width, self.theme, cx);
+        let targets = if login {
+            &self.login_appearance
+        } else {
+            &self.settings_appearance
+        };
+        crate::components::appearance_track("clinical-workspace-appearance", self.theme)
+            .anchor_scroll(Some(targets[0].anchor.clone()))
+            .when(layout.stacked, |el| el.flex_col().w(px(layout.width)))
+            .children(
+                crate::components::APPEARANCE_CHOICES
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, (value, id, label))| {
+                        crate::components::appearance_segment(
+                            value,
+                            self.dark_override,
+                            id,
+                            label,
+                            layout.theme,
+                        )
+                        .when(layout.stacked, |el| el.w_full().flex_shrink_0())
+                        .track_focus(&targets[index].focus)
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            this.change_local_preference(PreferenceChange::Appearance(value), cx)
+                        }))
+                    }),
+            )
+    }
+
     fn login_view(&self, layout: Layout, cx: &Context<Self>) -> Stateful<Div> {
         let theme = self.theme;
         let paired = self.pairing.is_some();
@@ -2870,8 +2943,7 @@ impl ClinicalApp {
             .flex().flex_col().gap(px(16.))
             .child(div().min_w_0().max_w_full().flex().flex_wrap().items_center().justify_between().gap(px(12.))
                 .child(self.brand(true))
-                .child(button("clinical-workspace-login-theme", if self.dark { "Giorno" } else { "Grafite" }, theme, false, true)
-                    .on_click(cx.listener(|this, _, _, cx| this.change_local_preference(PreferenceChange::Appearance(Some(!this.dark)), cx)))))
+                .child(self.appearance((layout.width-2.*layout.margin).min(640.)-2.*if layout.compact {16.} else {28.},true,cx)))
             .child(self.local_preferences_status(cx))
             .child(div().flex().flex_col().gap(px(8.))
                 .child(heading("clinical-workspace-connect-heading", if paired { "Accedi al tuo archivio" } else { "Collega questo dispositivo" }, theme))
@@ -4878,6 +4950,37 @@ impl ClinicalApp {
                 )
                 .when(!compact, |el| el.child(self.threshold_detail(mode, cx)));
         }
+        if form.kind == FormKind::Notes && form.state == FormState::Draft && !self.core.is_dirty() {
+            return threshold.bg(theme.paper).child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .justify_between()
+                    .gap(px(12.))
+                    .child(
+                        div()
+                            .id("clinical-workspace-clean-notes-status")
+                            .role(Role::Status)
+                            .aria_label("Nessuna modifica da registrare.")
+                            .min_h(px(theme.role(TypeRole::Body).line_height))
+                            .type_role(theme, TypeRole::Body)
+                            .text_color(theme.secondary)
+                            .child(text!("Nessuna modifica da registrare.")),
+                    )
+                    .child(
+                        self.form_actions[0]
+                            .attach(button(
+                                "clinical-workspace-cancel-form",
+                                "Torna alla scheda",
+                                theme,
+                                false,
+                                true,
+                            ))
+                            .on_click(cx.listener(|this, _, _, cx| this.close_clean_notes(cx))),
+                    ),
+            );
+        }
         let review_enabled = form.scale.as_ref().is_none_or(ScaleAssessment::can_prepare);
         let repeated_scale = form
             .scale
@@ -5358,7 +5461,7 @@ impl ClinicalApp {
             return area.child(self.references_view(cx));
         }
         if self.area == Area::Settings {
-            return area.child(self.settings_view(cx));
+            return area.child(self.settings_view(layout, cx));
         }
         if self.area == Area::Scales {
             return area.child(self.scales_view(cx));
@@ -5394,7 +5497,7 @@ impl ClinicalApp {
         area
     }
 
-    fn settings_view(&self, cx: &Context<Self>) -> Div {
+    fn settings_view(&self, layout: Layout, cx: &Context<Self>) -> Div {
         if self.ambulatory_management.active {
             return self.ambulatory_management_view(cx);
         }
@@ -5414,10 +5517,7 @@ impl ClinicalApp {
             .child(self.account_profile_view(cx))
             .child(div().flex().flex_col().gap(px(12.))
                 .child(section("clinical-workspace-appearance-heading", "ASPETTO", theme))
-                .child(div().flex().flex_wrap().gap(px(8.))
-                    .children([(None, "clinical-workspace-system-theme", "Sistema"), (Some(false), "clinical-workspace-day-theme", "Giorno"), (Some(true), "clinical-workspace-night-theme", "Grafite")]
-                        .into_iter().map(|(value, id, label)| tab(id, label, self.dark_override == value, theme)
-                            .on_click(cx.listener(move |this, _, _, cx| this.change_local_preference(PreferenceChange::Appearance(value), cx)))))))
+                .child(self.appearance((layout.width-if layout.compact {0.} else {layout.navigation}-if layout.magnified {0.} else {16.}-2.*layout.margin).min(760.),false,cx)))
             .child(div().flex().flex_col().gap(px(12.))
                 .child(section("clinical-workspace-text-scale-heading", "DIMENSIONE DEL TESTO", theme))
                 .child(div().text_color(theme.secondary).child(text!("La pagina passa a una sola colonna quando serve più spazio per leggere.")))
@@ -7571,6 +7671,241 @@ fn ui_error(error: impl std::fmt::Display) -> String {
 
 #[cfg(test)]
 mod tests {
+
+    #[gpui::test]
+    fn hcg2_patient_focus_registry_has_stable_traversal(cx: &mut gpui::TestAppContext) {
+        cx.update(bind_keys);
+        let host = notes_recovery_tests::Host::new();
+        for _ in 0..12 {
+            let (view, cx) =
+                cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+            cx.simulate_resize(gpui::size(px(1200.), px(840.)));
+            view.update(cx,|app,cx| {
+                app.session=Some(host.session.clone()); app.scope=Some("scope-a".into()); app.directory=true;
+                app.patients=Load::Ready(["c","a","e","b","d"].into_iter().map(|id| serde_json::from_value(serde_json::json!({"id":id,"firstName":format!("Nome {id}"),"lastName":"Inventato","taxCode":format!("TEST-{id}"),"version":1})).unwrap()).collect());
+                app.sync_patient_targets(cx);
+                let allocation:Vec<_>=app.patient_targets.values().map(|target| match gpui::ElementId::from(&target.focus) { gpui::ElementId::FocusHandle(id)=>id,_=>unreachable!() }).collect();
+                assert!(allocation.windows(2).all(|ids|ids[0]<ids[1]),"sync must allocate focus targets in deterministic ID order: {allocation:?}");
+                cx.notify();
+            });
+            render_clinical_window(cx);
+            for filtered in [false, true, false] {
+                view.update(cx, |app, cx| {
+                    app.query = if filtered {
+                        "Nome b".into()
+                    } else {
+                        String::new()
+                    };
+                    cx.notify();
+                });
+                render_clinical_window(cx);
+                let expected = if filtered {
+                    vec!["b"]
+                } else {
+                    vec!["c", "a", "e", "b", "d"]
+                };
+                view.read_with(cx, |app, _| {
+                    assert_eq!(app.patient_targets.len(), expected.len())
+                });
+                cx.update(|window, cx| {
+                    window.activate_window();
+                    let focus = view.read(cx).patient_targets[expected[0]].focus.clone();
+                    window.focus(&focus, cx);
+                });
+                for id in expected.iter().skip(1) {
+                    cx.simulate_keystrokes("tab");
+                    render_clinical_window(cx);
+                    cx.update(|window, cx| {
+                        assert!(
+                            view.read(cx).patient_targets[*id].focus.is_focused(window),
+                            "Tab reaches {id}"
+                        )
+                    });
+                }
+                for id in expected.iter().rev().skip(1) {
+                    cx.simulate_keystrokes("shift-tab");
+                    render_clinical_window(cx);
+                    cx.update(|window, cx| {
+                        assert!(
+                            view.read(cx).patient_targets[*id].focus.is_focused(window),
+                            "Shift+Tab reaches {id}"
+                        )
+                    });
+                }
+            }
+        }
+    }
+
+    #[gpui::test]
+    fn hcg2_connected_clean_shortcut_uses_reserved_status(cx: &mut gpui::TestAppContext) {
+        cx.update(bind_keys);
+        let host = notes_recovery_tests::Host::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            app.select_patient("patient-a", true, cx);
+        });
+        cx.run_until_parked();
+        for width in [390., 800., 1200.] {
+            for dark in [false, true] {
+                cx.simulate_resize(gpui::size(px(width), px(840.)));
+                view.update(cx, |app, cx| {
+                    app.dark_override = Some(dark);
+                    cx.notify();
+                });
+                cx.update_window_entity(&view, |app, window, cx| {
+                    app.open_form(FormKind::Notes, window, cx)
+                });
+                render_clinical_window(cx);
+                view.read_with(cx, |app, _| assert!(!app.core.is_dirty()));
+                let before = [
+                    cx.debug_bounds("threshold-bar"),
+                    cx.debug_bounds("clinical-workspace-form-field-0-scroll-target"),
+                ];
+                cx.simulate_keystrokes(if cfg!(target_os = "macos") {
+                    "cmd-enter"
+                } else {
+                    "ctrl-enter"
+                });
+                render_clinical_window(cx);
+                let after = [
+                    cx.debug_bounds("threshold-bar"),
+                    cx.debug_bounds("clinical-workspace-form-field-0-scroll-target"),
+                ];
+                eprintln!("HC-G2 connected clean {width}/{dark}: {before:?} => {after:?}");
+                assert_eq!(
+                    before, after,
+                    "clean shortcut must not move connected content"
+                );
+                assert!(cx.debug_bounds("clinical-workspace-review-save").is_none());
+                assert!(cx.debug_bounds("clinical-workspace-message").is_none());
+            }
+        }
+    }
+
+    #[gpui::test]
+    fn hcg2_clean_notes_close_rechecks_a_new_draft(cx: &mut gpui::TestAppContext) {
+        let host = notes_recovery_tests::Host::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            app.select_patient("patient-a", true, cx);
+        });
+        cx.run_until_parked();
+        cx.update_window_entity(&view, |app, window, cx| {
+            app.open_form(FormKind::Notes, window, cx)
+        });
+        view.update(cx, |app, cx| {
+            app.core.edit_notes("Nuova bozza sintetica".into()).unwrap();
+            app.close_clean_notes(cx);
+            assert!(matches!(app.discard, Some(Discard::Form)));
+            assert!(app.form.is_some());
+            assert_eq!(app.core.draft_notes(), "Nuova bozza sintetica");
+            app.core.edit_notes("A: note iniziali".into()).unwrap();
+            app.discard = None;
+            app.close_clean_notes(cx);
+            assert!(app.form.is_none());
+        });
+    }
+
+    #[gpui::test]
+    fn hcg2_connected_appearance_stacks_at_400_percent(cx: &mut gpui::TestAppContext) {
+        cx.update(bind_keys);
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        for width in [390., 800., 1200.] {
+            for dark in [false, true] {
+                cx.simulate_resize(gpui::size(px(width), px(640.)));
+                view.update(cx, |app, cx| {
+                    app.login_scroll.set_offset(gpui::point(px(0.), px(0.)));
+                    app.text_scale = 4.;
+                    app.dark_override = Some(dark);
+                    app.privacy_shield = false;
+                    cx.notify();
+                });
+                render_clinical_window(cx);
+                let mut bottom = px(0.);
+                let mut extent = None;
+                let mut line_height = None;
+                let track = cx.debug_bounds("clinical-workspace-appearance").unwrap();
+                for (_, id, label) in crate::components::APPEARANCE_CHOICES {
+                    let segment = cx.debug_bounds(id).unwrap();
+                    let label_id = match label {
+                        "Aspetto di sistema" => "control-label:Aspetto di sistema",
+                        "Giorno" => "control-label:Giorno",
+                        _ => "control-label:Grafite",
+                    };
+                    let label = cx.debug_bounds(label_id).unwrap();
+                    eprintln!("HC-G2 stacked {width}/{dark} {id}: {segment:?} label={label:?}");
+                    assert!(
+                        segment.top() >= bottom,
+                        "three distinct rows, not a compressed horizontal row"
+                    );
+                    bottom = segment.bottom();
+                    if let Some((left, right)) = extent {
+                        assert_eq!((segment.left(), segment.right()), (left, right));
+                    } else {
+                        extent = Some((segment.left(), segment.right()));
+                    }
+                    assert_eq!(segment.left(), track.left() + px(3.));
+                    assert_eq!(segment.right(), track.right() - px(3.));
+                    if let Some(height) = line_height {
+                        assert_eq!(label.size.height, height, "each label stays on one line");
+                    } else {
+                        line_height = Some(label.size.height);
+                    }
+                    assert!(label.left() >= segment.left() && label.right() <= segment.right());
+                    assert!(
+                        label.size.height <= px(84.),
+                        "one line at 400%, not a wrapped label: {label:?}"
+                    );
+                }
+                cx.update(|window, cx| {
+                    window.activate_window();
+                    let focus = view.read(cx).focus.clone();
+                    window.focus(&focus, cx);
+                });
+                for _ in 0..if dark { 3 } else { 2 } {
+                    cx.simulate_keystrokes("tab");
+                    render_clinical_window(cx);
+                }
+                cx.simulate_keystrokes("enter");
+                cx.simulate_event(gpui::KeyUpEvent {
+                    keystroke: gpui::Keystroke::parse("enter").unwrap(),
+                });
+                cx.run_until_parked();
+                render_clinical_window(cx);
+                view.read_with(cx, |app, _| assert_eq!(app.dark_override, Some(dark)));
+                let segment = cx
+                    .debug_bounds(if dark {
+                        "clinical-workspace-night-theme"
+                    } else {
+                        "clinical-workspace-day-theme"
+                    })
+                    .unwrap();
+                let label = cx
+                    .debug_bounds(if dark {
+                        "control-label:Grafite"
+                    } else {
+                        "control-label:Giorno"
+                    })
+                    .unwrap();
+                assert!(segment.top() >= px(0.) && segment.bottom() <= px(640.));
+                assert!(label.top() >= segment.top() && label.bottom() <= segment.bottom());
+                for (_, id, _) in crate::components::APPEARANCE_CHOICES {
+                    let row = cx.debug_bounds(id).unwrap();
+                    assert!(
+                        row.top() >= px(0.) && row.bottom() <= px(640.),
+                        "whole stacked control remains visible after keyboard activation: {id} {row:?}"
+                    );
+                }
+            }
+        }
+    }
     use super::*;
     use gpui::Focusable;
 
