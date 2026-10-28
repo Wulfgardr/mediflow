@@ -5,7 +5,7 @@ use std::{
     fs::{self, File},
     io,
     os::windows::{
-        ffi::OsStrExt,
+        ffi::{OsStrExt, OsStringExt},
         io::{AsRawHandle, FromRawHandle},
     },
     path::{Path, PathBuf},
@@ -62,23 +62,14 @@ fn denied(message: &'static str) -> io::Error {
 
 pub fn trusted_path(path: &Path) -> io::Result<PathBuf> {
     let canonical = path.canonicalize()?;
+    let candidate = final_directory_path(path)?;
     let within_profile = ["LOCALAPPDATA", "USERPROFILE"]
         .into_iter()
         .filter_map(std::env::var_os)
         .map(PathBuf::from)
         .filter(|root| root.is_absolute())
-        .filter_map(|root| root.canonicalize().ok())
-        .any(|root| {
-            let mut components = canonical.components();
-            root.components().all(|part| {
-                components.next().is_some_and(|actual| {
-                    actual
-                        .as_os_str()
-                        .to_string_lossy()
-                        .eq_ignore_ascii_case(&part.as_os_str().to_string_lossy())
-                })
-            })
-        });
+        .filter_map(|root| final_directory_path(&root).ok())
+        .any(|root| candidate.starts_with(root));
     if !within_profile {
         return Err(io::Error::new(
             io::ErrorKind::Unsupported,
@@ -94,6 +85,53 @@ pub fn trusted_path(path: &Path) -> io::Result<PathBuf> {
         }
     }
     Ok(canonical)
+}
+
+fn final_directory_path(path: &Path) -> io::Result<PathBuf> {
+    let handle = unsafe {
+        CreateFileW(
+            wide(path).as_ptr(),
+            FILE_READ_ATTRIBUTES,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            ptr::null(),
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS,
+            ptr::null_mut(),
+        )
+    };
+    if handle == INVALID_HANDLE_VALUE {
+        return Err(io::Error::last_os_error());
+    }
+    let file = unsafe { File::from_raw_handle(handle) };
+    if !file.metadata()?.is_dir() {
+        return Err(io::ErrorKind::NotADirectory.into());
+    }
+    let mut buffer = vec![0u16; 256];
+    loop {
+        let length = unsafe {
+            GetFinalPathNameByHandleW(
+                file.as_raw_handle(),
+                buffer.as_mut_ptr(),
+                buffer.len() as u32,
+                FILE_NAME_NORMALIZED | VOLUME_NAME_GUID,
+            )
+        };
+        if length == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                format!(
+                    "Il percorso finale Windows non è attestabile con il GUID del volume: {}",
+                    io::Error::last_os_error()
+                ),
+            ));
+        }
+        if length as usize >= buffer.len() {
+            buffer.resize(length as usize + 1, 0);
+            continue;
+        }
+        buffer.truncate(length as usize);
+        return Ok(std::ffi::OsString::from_wide(&buffer).into());
+    }
 }
 
 fn descriptor(directory: bool) -> io::Result<Allocation> {
