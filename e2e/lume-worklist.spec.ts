@@ -63,6 +63,8 @@ for (const theme of ['light', 'dark']) {
       }
       await expect(page).toHaveURL(/\/patients\/[^/]+\/modules$/);
       await expect(page.getByTestId('lume-scheda-header').getByRole('heading', { name, exact: true })).toBeVisible();
+      await expect(page.locator('nextjs-portal').filter({ hasText: /Runtime Error|Build Error|Unhandled Runtime/u })).toHaveCount(0);
+      await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' });
       await page.screenshot({ path: test.info().outputPath('scheda.png'), animations: 'disabled' });
       await page.getByRole('navigation', { name: 'Navigazione principale' }).getByRole('link', { name: 'Pazienti', exact: true }).click();
       await expect(search).toHaveValue(marker);
