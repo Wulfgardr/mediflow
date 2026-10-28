@@ -413,23 +413,25 @@ impl PatientApp {
             })
     }
 
-    fn appearance(&self, cx: &mut Context<Self>) -> Stateful<Div> {
-        crate::components::appearance_track("demo-appearance", self.theme).children(
-            crate::components::APPEARANCE_CHOICES
-                .into_iter()
-                .map(|(value, id, label)| {
+    fn appearance(&self, width: f32, cx: &mut Context<Self>) -> Stateful<Div> {
+        let layout = crate::components::appearance_layout(width, self.theme, cx);
+        crate::components::appearance_track("demo-appearance", self.theme)
+            .when(layout.stacked, |el| el.flex_col().w(px(layout.width)))
+            .children(crate::components::APPEARANCE_CHOICES.into_iter().map(
+                |(value, id, label)| {
                     crate::components::appearance_segment(
                         value,
                         self.dark_override,
                         id,
                         label,
-                        self.theme,
+                        layout.theme,
                     )
+                    .when(layout.stacked, |el| el.w_full().flex_shrink_0())
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.command(Command::Appearance(value), window, cx)
                     }))
-                }),
-        )
+                },
+            ))
     }
 
     fn section(&self, id: &'static str, title: &'static str) -> Stateful<Div> {
@@ -887,7 +889,7 @@ impl Render for PatientApp {
                         .type_role(theme, TypeRole::Meta).text_color(theme.secondary).child(text!(if single { "Dati di prova" } else { "Dati di prova · modifiche solo in memoria" }))))
                     .when(hide_in_brand && !locked, |el| el.child(self.button("clinical-workspace-hide", "Nascondi", Command::Hide, false, true, cx).px(px(6.)))))
                 .child(div().flex().flex_wrap().items_center().gap(px(8.))
-                    .child(self.appearance(cx).flex_shrink_0())
+                    .child(self.appearance(f32::from(width)-2.*LIST_EDGE,cx).flex_shrink_0())
                     .when(!hide_in_brand && !locked, |el| el.child(self.button("clinical-workspace-hide", if single { "Nascondi" } else { "Nascondi dati" }, Command::Hide, false, true, cx).when(single, |el| el.px(px(6.)))))
                     .when(single && !self.show_list && !locked, |el| el.child(self.button("clinical-workspace-back-list", "Pazienti", Command::ShowList, false, true, cx).when(single, |el| el.px(px(6.)))))))
             .when(self.message.as_deref().is_some_and(|message| message != error_message(ClientError::NoChanges)), |el| el.child(div().id("clinical-workspace-message").role(Role::Status)

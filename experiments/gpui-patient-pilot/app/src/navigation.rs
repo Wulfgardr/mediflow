@@ -116,6 +116,7 @@ impl PatientSection {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Layout {
+    pub width: f32,
     pub compact: bool,
     pub wide: bool,
     pub magnified: bool,
@@ -133,6 +134,7 @@ impl Layout {
         let compact = effective < 700.;
         let wide = effective > 1000.;
         Self {
+            width,
             compact,
             wide,
             magnified: text_scale >= 2.5 || effective < 360.,
