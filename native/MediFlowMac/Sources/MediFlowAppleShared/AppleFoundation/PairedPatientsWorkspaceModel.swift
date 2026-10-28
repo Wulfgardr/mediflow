@@ -1931,6 +1931,15 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         lockedPatientFields.contains(field)
     }
 
+    func canEditPatientField(_ field: EncryptedPatientField) -> Bool {
+        guard !isPatientFieldLocked(field) else { return false }
+        switch field {
+        case .diagnoses: return !PatientStructuredFields.diagnoses(selectedPatient?.diagnoses).isUnreadable
+        case .exemptions: return !PatientStructuredFields.exemptions(selectedPatient?.exemptions).isUnreadable
+        default: return true
+        }
+    }
+
     func addDiagnosis() {
         addDiagnosis(code: newDiagnosisCode, description: newDiagnosisDescription, system: nil)
         newDiagnosisCode = ""
@@ -2349,7 +2358,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     private func encryptedPatientPatchValue(
         _ text: String?, field: EncryptedPatientField, masterKey: SymmetricKey, structured: Bool = false
     ) -> PatchValue<String> {
-        PatientFieldCrypto.encryptedPatchValue(
+        // A valid key does not prove that this client understands the schema.
+        // Keep unknown structured content on the host during unrelated edits.
+        guard canEditPatientField(field) else { return .omit }
+        return PatientFieldCrypto.encryptedPatchValue(
             text, original: editablePatientFields[field] ?? .absent,
             masterKey: masterKey, structured: structured)
     }
@@ -2425,8 +2437,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             address: editPatientAddress.trimmedOrNil,
             phone: editPatientPhone.trimmedOrNil,
             caregiver: editPatientCaregiver.trimmedOrNil,
-            exemptions: ExemptionCodesCodec.encode(editPatientExemptions),
-            diagnoses: DiagnosesCodec.encode(editPatientDiagnoses, defaultDate: Self.nowISODate()),
+            exemptions: canEditPatientField(.exemptions) ? ExemptionCodesCodec.encode(editPatientExemptions) : current.exemptions,
+            diagnoses: canEditPatientField(.diagnoses) ? DiagnosesCodec.encode(editPatientDiagnoses, defaultDate: Self.nowISODate()) : current.diagnoses,
             monitoringProfile: current.monitoringProfile,
             statusReason: current.statusReason,
             notes: editPatientNotes.trimmedOrNil,

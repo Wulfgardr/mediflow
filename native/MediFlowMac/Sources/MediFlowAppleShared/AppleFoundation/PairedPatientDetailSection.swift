@@ -648,6 +648,9 @@ struct PairedPatientDetailSection: View {
                 Text("Diagnosi")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
+                if !model.isPatientFieldLocked(.diagnoses) && !model.canEditPatientField(.diagnoses) {
+                    unreadableField("Diagnosi")
+                }
                 ForEach(Array(model.editPatientDiagnoses.enumerated()), id: \.offset) { index, diagnosis in
                     HStack {
                         Text(diagnosis.displayText)
@@ -711,13 +714,18 @@ struct PairedPatientDetailSection: View {
                     .accessibilityIdentifier("add-diagnosis-button")
                 }
             }
-            .disabled(model.isPatientFieldLocked(.diagnoses))
+            .disabled(!model.canEditPatientField(.diagnoses))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Esenzioni")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
-                if model.editPatientExemptions.isEmpty {
+                if model.isPatientFieldLocked(.exemptions) {
+                    Label("Esenzioni protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
+                        .font(.footnote).foregroundStyle(.secondary)
+                } else if !model.canEditPatientField(.exemptions) {
+                    unreadableField("Esenzioni")
+                } else if model.editPatientExemptions.isEmpty {
                     Text("Nessuna esenzione")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
@@ -752,7 +760,7 @@ struct PairedPatientDetailSection: View {
                 }
                 exemptionCatalogResultsList
             }
-            .disabled(model.isPatientFieldLocked(.exemptions))
+            .disabled(!model.canEditPatientField(.exemptions))
             }
             .disabled(model.isWorking)
 
