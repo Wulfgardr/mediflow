@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { bootstrapUnlockedSession } from './utils';
 
@@ -16,7 +17,9 @@ for (const width of [768, 1440]) for (const percent of [100, 200]) for (const th
     const field = search.locator('..');
     await page.evaluate(percent => { document.documentElement.style.fontSize = `${16 * percent / 100}px`; }, percent);
     await expect(search).toHaveCSS('font-size', `${14 * percent / 100}px`);
-    await expect(page.getByText('0 risultati', { exact: true })).toBeVisible();
+    const worklist = page.getByTestId('lume-worklist');
+    await expect(worklist.getByText(/^\d+ risultat[oi]$/u)).toBeVisible();
+    const unmatchedQuery = `Assente${randomUUID().replaceAll('-', '')}`;
     const settle = async () => {
       await page.waitForLoadState('networkidle');
       await page.evaluate(async () => { await document.fonts.ready; await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))); });
@@ -41,7 +44,8 @@ for (const width of [768, 1440]) for (const percent of [100, 200]) for (const th
     await evidence('vuoto');
     await search.press('Tab');
     expect(await field.evaluate(node => node.contains(document.activeElement))).toBe(false);
-    await search.fill('Paziente inesistente sintetico');
+    await search.fill(unmatchedQuery);
+    await expect(worklist.getByText('0 risultati', { exact: true })).toBeVisible();
     await evidence('testo');
     expect.soft(states.testo.field).toEqual(states.vuoto.field);
     expect.soft(states.testo.input).toEqual(states.vuoto.input);

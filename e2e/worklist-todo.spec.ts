@@ -5,6 +5,8 @@ import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { installWorklistTodoFixture } from './fixtures/worklist-todo';
 import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
 
+const directoryCommandSelector = '[data-patient-directory] > header :is(a, button):not(.mf-composite-field .mf-button-icon)';
+
 test('Da fare: controlli confermati, letture negative, filtri e ritorno alla riga', async ({ baseURL }, info) => {
   test.setTimeout(180_000);
   if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL
@@ -44,7 +46,7 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
         document.documentElement.style.colorScheme = value;
       }, theme === 'giorno' ? 'light' : 'dark');
       await row('A').scrollIntoViewIfNeeded();
-      const frame = await worklist.evaluate(element => {
+      const frame = await worklist.evaluate((element, commandSelector) => {
         const visible = (node: Element) => getComputedStyle(node).display !== 'none' && node.getBoundingClientRect().width > 0;
         return { cssWidth: innerWidth, containerWidth: element.clientWidth,
           columns: [...element.querySelectorAll('[data-worklist-column]')].filter(visible).map(node => node.textContent),
@@ -53,9 +55,9 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
             const box = node.getBoundingClientRect(), css = getComputedStyle(node);
             return { text: node.textContent, height: box.height, gap: css.columnGap, padding: css.padding,
               radius: css.borderRadius, overflow: node.scrollWidth - node.clientWidth };
-          }), commands: [...document.querySelectorAll('[data-patient-directory] > header a, [data-patient-directory] > header button')].filter(visible).map(node => {
+          }), commands: [...document.querySelectorAll(commandSelector)].filter(visible).map(node => {
             const r = node.getBoundingClientRect(), css = getComputedStyle(node);
-            return { text: node.textContent, width: r.width, height: r.height, padding: [css.paddingTop, css.paddingRight, css.paddingBottom, css.paddingLeft], gap: css.gap };
+            return { text: node.textContent, recipe: node.className, accessibleName: node.getAttribute('aria-label'), insideCompositeField: !!node.closest('.mf-composite-field'), visibility: css.visibility, width: r.width, height: r.height, padding: [css.paddingTop, css.paddingRight, css.paddingBottom, css.paddingLeft], gap: css.gap };
           }), primaryCount: document.querySelectorAll('[data-patient-directory] [data-lume-action=primary]').length,
           emptyTodos: [...document.querySelectorAll('[data-worklist-todo]')].filter(node => node.textContent === 'Nessun controllo aperto').map(node => {
             const css = getComputedStyle(node);
@@ -64,7 +66,7 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
             const range = document.createRange(); range.selectNodeContents(node);
             return { lines: range.getClientRects().length, overflow: node.scrollWidth - node.clientWidth };
           }), palette: getComputedStyle(element).color };
-      });
+      }, directoryCommandSelector);
       frames.push({ theme, size, zoom: size === 'zoom-200' ? 2 : 1, ...frame });
       if (directory) {
         await mkdir(directory, { recursive: true });
@@ -87,10 +89,11 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
           expect(age.lines).toBe(1); expect(age.overflow).toBeLessThanOrEqual(1);
         }
         for (const overflow of frame.columnOverflow) expect(overflow).toBeLessThanOrEqual(1);
+        expect(frame.commands).toHaveLength(3);
         for (const command of frame.commands) {
           expect(command.height, command.text ?? '').toBeGreaterThanOrEqual(frame.cssWidth <= 700 ? 44 : 40);
           expect(command.width).toBeGreaterThanOrEqual(40);
-          expect(command.padding).toEqual(['8px', '16px', '8px', '16px']);
+          expect(command.padding, command.text || command.accessibleName || command.recipe).toEqual(['8px', '16px', '8px', '16px']);
         }
         for (const measured of frame.rows) {
           expect(measured.height).toBeGreaterThanOrEqual(frame.cssWidth <= 700 ? 44 : 40);
@@ -113,6 +116,8 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
     await expect(worklist.getByText('Nessun controllo aperto', { exact: true })).toHaveCount(0);
     const search = page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' });
     await search.fill('Inventata B'); await expect(rows).toHaveCount(1); await expect(search).toBeFocused();
+    await expect(search.locator('..').locator('.mf-button-icon')).toBeVisible();
+    await expect(page.locator(directoryCommandSelector)).toHaveCount(3);
     fixture.state.checkupHold = null; release();
     await expect(worklist.getByRole('alert')).toContainText('Impossibile leggere i controlli');
     await expect(search).toBeFocused(); await expect(rows).toHaveCount(1);
