@@ -798,13 +798,13 @@ impl PatientApp {
             .role(Role::Status).aria_label(status)
             .border_t_1().border_color(if self.workspace.is_dirty() { theme.draft_rule } else { theme.rule })
             .flex_shrink_0().min_w_0().max_w_full().p(px(16.)).bg(background).text_color(foreground).flex().flex_col().gap(px(12.))
-            .child(if no_changes {
+            .child(div().min_h(px(theme.role(TypeRole::Body).line_height)).child(if no_changes {
                 div().text_color(color).type_role(theme, TypeRole::Body).child(text!(status)).into_any_element()
             } else { match phase {
                 Phase::Editing | Phase::Review => crate::components::writing_status("demo-writing-status", crate::components::WritingInk::Fresh, surface, theme).into_any_element(),
                 Phase::Saved => crate::components::writing_status("demo-writing-status", crate::components::WritingInk::Dry, surface, theme).into_any_element(),
                 _ => div().text_color(color).type_role(theme, TypeRole::Body).child(text!(status)).into_any_element(),
-            }})
+            }}))
             .when(self.discard.is_some(), |el| el.child(div().flex().flex_col().gap(px(12.))
                 .child(text!(if self.discard == Some(DiscardAction::Hide) { "Scartare la bozza e nascondere i dati di prova?" } else { "Scartare la bozza e rileggere le note attuali? Puoi prima copiare le note." }))
                 .child(div().flex().flex_wrap().gap(px(8.))
