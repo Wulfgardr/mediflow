@@ -75,17 +75,32 @@ final class PatientSummaryPresentationTests: XCTestCase {
     }
     #endif
 
+    func testPatientAgeUsesCivilDaysForTheAstraCaseAcrossTimeZones() throws {
+        let birth = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("1986-10-28T20:00:00Z"))
+        let now = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("2026-10-28T19:00:00Z"))
+        for zone in ["Europe/Rome", "America/Los_Angeles", "Pacific/Kiritimati"] {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = try XCTUnwrap(TimeZone(identifier: zone))
+            XCTAssertEqual(PairedPatientsWorkspaceSupport.age(from: birth, at: now, calendar: calendar), 40, zone)
+        }
+    }
+
     func testAgeIsNilWhenBirthDateAbsent() {
         XCTAssertNil(PairedPatientsWorkspaceView.age(from: nil))
     }
 
     func testAgeFromBirthDateFortyYearsAgo() {
-        let birth = Calendar.current.date(byAdding: .year, value: -40, to: Date())
-        XCTAssertEqual(PairedPatientsWorkspaceView.age(from: birth), 40)
+        let birth = HomeBaseDateCoding.parseISO8601("1986-10-28T20:00:00Z")
+        let now = HomeBaseDateCoding.parseISO8601("2026-10-28T19:00:00Z")!
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.age(from: birth, at: now), 40)
     }
 
     func testAgeFromBirthDateToday() {
-        XCTAssertEqual(PairedPatientsWorkspaceView.age(from: Date()), 0)
+        let today = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        var birthCalendar = Calendar(identifier: .gregorian)
+        birthCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let birth = birthCalendar.date(from: DateComponents(year: today.year, month: today.month, day: today.day, hour: 20))
+        XCTAssertEqual(PairedPatientsWorkspaceView.age(from: birth), 0)
     }
 
     func testAgeIsNilForFutureBirthDate() {

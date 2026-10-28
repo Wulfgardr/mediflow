@@ -5,10 +5,10 @@ enum PairedPatientsWorkspaceSupport {
 
     static let birthDateFormatter = ClinicalDatePresentation.birthDate
 
-    static func age(from birthDate: Date?) -> Int? {
+    static func age(from birthDate: Date?, at now: Date = Date(), calendar: Calendar = .current) -> Int? {
         guard let birthDate else { return nil }
-        let years = ClinicalDatePresentation.birthDate.calendar.dateComponents([.year], from: birthDate, to: Date()).year
-        guard let years, years >= 0, years < 140 else { return nil }
+        let years = PopulationAnalytics.age(at: now, from: birthDate, calendar: calendar)
+        guard years >= 0, years < 140 else { return nil }
         return years
     }
 

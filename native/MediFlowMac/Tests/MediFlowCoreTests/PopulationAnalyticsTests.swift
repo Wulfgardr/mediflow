@@ -37,6 +37,68 @@ final class PopulationAnalyticsTests: XCTestCase {
         XCTAssertEqual(PopulationAnalytics.age(at: now, from: date(2008, 7, 10), calendar: calendar), 17)
     }
 
+    private let ageTimeZones = ["Europe/Rome", "America/Los_Angeles", "Pacific/Kiritimati"]
+
+    private func deviceCalendar(_ zone: String) -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: zone)!
+        return calendar
+    }
+
+    private func instant(_ value: String) -> Date {
+        HomeBaseDateCoding.parseISO8601(value)!
+    }
+
+    func testAgeUsesUTCBirthDayAndDeviceCivilDayAcrossTimeZones() {
+        let birth = instant("1986-10-28T20:00:00Z")
+        for zone in ageTimeZones {
+            let calendar = deviceCalendar(zone)
+            XCTAssertEqual(PopulationAnalytics.age(at: instant("2026-10-28T19:00:00Z"), from: birth, calendar: calendar), 40, zone)
+            for (day, expected) in [(27, 39), (28, 40), (29, 40)] {
+                for hour in [0, 12, 23] {
+                    let today = calendar.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour, minute: 1))!
+                    XCTAssertEqual(PopulationAnalytics.age(at: today, from: birth, calendar: calendar), expected,
+                        "\(zone), giorno \(day), ora \(hour)")
+                }
+            }
+        }
+    }
+
+    func testUTCBirthDayDoesNotMoveToThePreviousDeviceDay() {
+        let birth = instant("1986-10-28T00:30:00Z")
+        for zone in ageTimeZones {
+            let calendar = deviceCalendar(zone)
+            for (day, expected) in [(27, 39), (28, 40), (29, 40)] {
+                let now = calendar.date(from: DateComponents(year: 2026, month: 10, day: day, hour: 12))!
+                XCTAssertEqual(PopulationAnalytics.age(at: now, from: birth, calendar: calendar), expected, zone)
+            }
+        }
+    }
+
+    func testAgeUsesDeviceTodayWhenTimeZonesDisagreeAtTheSameInstant() {
+        let birth = instant("1986-10-29T20:00:00Z")
+        let now = instant("2026-10-28T19:00:00Z")
+        for (zone, expected) in [("Europe/Rome", 39), ("America/Los_Angeles", 39), ("Pacific/Kiritimati", 40)] {
+            XCTAssertEqual(PopulationAnalytics.age(at: now, from: birth, calendar: deviceCalendar(zone)), expected, zone)
+        }
+    }
+
+    func testFebruary29BirthdayFallsOnFebruary28InNonLeapYears() {
+        // Regola concordata: il 29 febbraio compie gli anni il 28 febbraio negli anni non bisestili.
+        let birth = instant("2000-02-29T20:00:00Z")
+        let cases = [(2025, 2, 27, 24), (2025, 2, 28, 25), (2025, 3, 1, 25),
+                     (2024, 2, 28, 23), (2024, 2, 29, 24), (2024, 3, 1, 24),
+                     (2100, 2, 27, 99), (2100, 2, 28, 100), (2100, 3, 1, 100)]
+        for zone in ageTimeZones {
+            let calendar = deviceCalendar(zone)
+            for (year, month, day, expected) in cases {
+                let today = calendar.date(from: DateComponents(year: year, month: month, day: day, hour: 12))!
+                XCTAssertEqual(PopulationAnalytics.age(at: today, from: birth, calendar: calendar), expected,
+                    "\(zone), \(year)-\(month)-\(day)")
+            }
+        }
+    }
+
     func testPercentRoundsLikeMathRound() {
         XCTAssertEqual(PopulationAnalytics.percent(1, total: 3), 33)
         XCTAssertEqual(PopulationAnalytics.percent(2, total: 3), 67)
