@@ -86,10 +86,7 @@
   padding: 9px 12px;
 }
 
-/* WUL-UIUX: l'input azzera il proprio outline; l'indicatore di focus da
-   tastiera vive sul contenitore, coerente con l'anello condiviso. */
-
-.patientSearchField:focus-within {
+.patientSearchField:focus-within:not(:has(> button:focus)) {
   border-color: var(--lume-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--lume-accent) 36%, transparent);
 }

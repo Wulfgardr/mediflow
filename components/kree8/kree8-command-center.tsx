@@ -184,7 +184,7 @@ export function Kree8CommandCenter({
 
         {mode === 'commands' ? (
           <>
-            <label className={styles.searchField}>
+            <label className={`mf-composite-field ${styles.searchField}`}>
               <Search size={15} aria-hidden="true" />
               <input
                 ref={inputRef}
