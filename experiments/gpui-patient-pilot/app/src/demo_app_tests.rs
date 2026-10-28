@@ -516,3 +516,44 @@ fn hcg2_tab_sequence_repeats_on_fresh_windows(cx: &mut gpui::TestAppContext) {
         }
     }
 }
+
+#[gpui::test]
+fn hcg2_saved_shortcut_keeps_the_reserved_status_height(cx: &mut gpui::TestAppContext) {
+    cx.update(bind_keys);
+    let (view, cx) = cx.add_window_view(PatientApp::new);
+    for width in [390., 800., 1200.] {
+        for dark in [false, true] {
+            cx.simulate_resize(size(px(width), px(840.)));
+            view.update(cx, |app, cx| {
+                app.select_patient("prova-001", cx);
+                app.dark_override = Some(dark);
+                app.workspace
+                    .edit_notes(format!("Nota sintetica {width} {dark}"))
+                    .unwrap();
+                app.workspace.review().unwrap();
+            });
+            cx.update(|window, cx| view.update(cx, |app, cx| app.confirm(window, cx)));
+            draw(cx);
+            view.read_with(cx, |app, _| assert_eq!(app.workspace.phase(), Phase::Saved));
+            let before = [
+                bounds(cx, "demo-profile"),
+                bounds(cx, "clinical-workspace-profile-scroll"),
+                bounds(cx, "clinical-workspace-save-status"),
+            ];
+            cx.simulate_keystrokes(if cfg!(target_os = "macos") {
+                "cmd-enter"
+            } else {
+                "ctrl-enter"
+            });
+            draw(cx);
+            let after = [
+                bounds(cx, "demo-profile"),
+                bounds(cx, "clinical-workspace-profile-scroll"),
+                bounds(cx, "clinical-workspace-save-status"),
+            ];
+            eprintln!("HC-G2 saved {width} dark={dark} before={before:?} after={after:?}");
+            assert_eq!(before, after);
+            assert!(cx.debug_bounds("clinical-workspace-review-save").is_none());
+        }
+    }
+}
