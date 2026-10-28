@@ -550,6 +550,109 @@ pub(crate) mod tests {
 
     #[cfg(windows)]
     #[test]
+    fn windows_security_r3_accepts_different_case_for_the_same_directory() {
+        let fixture = Fixture::new();
+        windows_private_directory::create_directory(&fixture.0).unwrap();
+        let alternate = PathBuf::from(fixture.0.to_str().unwrap().to_ascii_uppercase());
+        let canonical = fixture.0.canonicalize().unwrap();
+        assert_eq!(alternate.canonicalize().unwrap(), canonical);
+        for directory in [alternate, canonical] {
+            let store = LocalPreferencesStore::from_directory(&directory).unwrap();
+            let selected = LocalPreferences {
+                dark_override: Some(true),
+                ..Default::default()
+            };
+            store.save(selected).unwrap();
+            assert_eq!(store.load(), (selected, false));
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_security_r3_rejects_case_sensitive_profile_sibling() {
+        const PARENT: &str = "MEDIFLOW_TEST_CASE_SENSITIVE_PARENT";
+        if let Some(parent) = std::env::var_os(PARENT) {
+            let parent = PathBuf::from(parent);
+            let profile = parent.join("Profile");
+            let outside = parent.join("profile");
+            assert_eq!(
+                PathBuf::from(std::env::var_os("USERPROFILE").unwrap()),
+                profile
+            );
+            assert_eq!(
+                PathBuf::from(std::env::var_os("LOCALAPPDATA").unwrap()),
+                profile
+            );
+            assert_ne!(
+                profile.canonicalize().unwrap(),
+                outside.canonicalize().unwrap()
+            );
+            assert!(!outside.join("profile-only").exists());
+            for directory in [
+                profile.join("state"),
+                profile.join("state").canonicalize().unwrap(),
+            ] {
+                let store = LocalPreferencesStore::from_directory(&directory).unwrap();
+                store.save(LocalPreferences::default()).unwrap();
+                assert_eq!(store.load(), (LocalPreferences::default(), false));
+            }
+            for directory in [
+                outside.join("state"),
+                outside.join("state").canonicalize().unwrap(),
+            ] {
+                let error = LocalPreferencesStore::from_directory(&directory)
+                    .err()
+                    .expect("a distinct case-sensitive sibling is outside the profile");
+                assert_eq!(error.kind(), io::ErrorKind::Unsupported);
+                assert!(error.to_string().contains("profilo"));
+            }
+            return;
+        }
+        let fixture = Fixture::new();
+        windows_private_directory::create_directory(&fixture.0).unwrap();
+        let output = std::process::Command::new("fsutil")
+            .args(["file", "setCaseSensitiveInfo"])
+            .arg(&fixture.0)
+            .arg("enable")
+            .output()
+            .unwrap();
+        println!("{}", String::from_utf8_lossy(&output.stdout));
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        for name in ["Profile", "profile"] {
+            let profile = fixture.0.join(name);
+            fs::create_dir(&profile).unwrap();
+            set_windows_dacl(&profile, "OICI", true, false);
+            let state = profile.join("state");
+            fs::create_dir(&state).unwrap();
+            set_windows_dacl(&state, "OICI", true, false);
+        }
+        fs::write(fixture.0.join("Profile/profile-only"), b"synthetic").unwrap();
+        let profile = fixture.0.join("Profile");
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "shell::local_preferences::tests::windows_security_r3_rejects_case_sensitive_profile_sibling",
+                "--nocapture",
+            ])
+            .env(PARENT, &fixture.0)
+            .env("USERPROFILE", &profile)
+            .env("LOCALAPPDATA", &profile)
+            .output()
+            .unwrap();
+        println!("{}", String::from_utf8_lossy(&output.stdout));
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
     fn windows_security_r2_ambulatory_directory_rejects_unattested_child() {
         let fixture = Fixture::new();
         windows_private_directory::create_directory(&fixture.0).unwrap();
