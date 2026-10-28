@@ -36,6 +36,26 @@ conservando anche la copertura dell'helper e degli input causali di #696.
 completo `npm run verify:therapy-status` verifica il risultato senza estendere
 le proprietà del modello alla presentazione o al protocollo durevole.
 
+## Riconciliazione HC-6 con #696 del 28 ottobre 2026
+
+Riesaminato il runtime `d7e5e0f4228d5a4e112c5b526f5e212e106c122d`
+rispetto a entrambi i genitori (`3277bc44f7a19a04bce565d6b98122b934238063`
+e `8547541fce58a086cc428c163d046c3561db22a3`). Il manager della terapia
+è identico al primo genitore: cambia ancora soltanto la presentazione del
+vuoto e la ricetta della sezione. `lib/db.ts`, `lib/api-table-response.ts`,
+`SecurityProvider` e `document-upload.tsx` sono identici al secondo genitore.
+La pagina paziente conserva il segnale di sessione della lettura allegati.
+
+Riesaminati anche i consumer `ViewState`, `CollapsibleSection`, i callback del
+manager e i lettori session-scoped: nessuna nuova lettura o scrittura,
+transizione, guardia, confine degli await, CAS, ledger, audit o assunzione
+è introdotta dall'unione. Il ritiro delle letture resta distinto dal vuoto e
+non annulla un commit host. Modello, statechart, proprietà, limiti, testimoni
+e mutanti restano invariati; sessioni e presentazione restano fuori dal TLC.
+Il record conserva le impronte del manager HC-6 e dei lettori #696, con gli
+input causali di questi ultimi; dopo il riesame `syncCommit` identifica il
+runtime combinato. Il comando completo verifica nuovamente questa unione.
+
 ## Riesame HC-7 del 27 ottobre 2026
 
 Confrontato `components/therapy-manager.tsx` fra la base `c4ddf2e35` e
