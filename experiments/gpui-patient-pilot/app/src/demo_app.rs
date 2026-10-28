@@ -13,7 +13,7 @@ use mediflow_patient_client::{
 use crate::demo::{DemoService, Scenario};
 use crate::text_input::{InputChanged, TextInput};
 use crate::theme::Theme;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 actions!(
     mediflow_pilot,
@@ -38,8 +38,7 @@ enum DiscardAction {
 enum Command {
     Archive(bool),
     Search,
-    ToggleTheme,
-    SystemTheme,
+    Appearance(Option<bool>),
     Refresh,
     Review,
     Confirm,
@@ -55,13 +54,17 @@ enum Command {
     Scenario(Scenario),
 }
 
+const LIST_INSET: f32 = 16.;
+const OUTER_INSET: f32 = 12.;
+const LEFT_AXIS: f32 = OUTER_INSET + LIST_INSET;
+
 pub struct PatientApp {
     service: DemoService,
     workspace: Workspace,
     notes: Entity<TextInput>,
     search: Entity<TextInput>,
     profile_scroll: ScrollHandle,
-    profile_targets: HashMap<&'static str, (FocusHandle, ScrollAnchor)>,
+    profile_targets: BTreeMap<&'static str, (FocusHandle, ScrollAnchor)>,
     notes_anchor: ScrollAnchor,
     root_focus: FocusHandle,
     review_focus: FocusHandle,
@@ -316,8 +319,7 @@ impl PatientApp {
                 self.search
                     .update(cx, |editor, cx| editor.focus(window, cx));
             }
-            Command::ToggleTheme => self.dark_override = Some(!self.dark),
-            Command::SystemTheme => self.dark_override = None,
+            Command::Appearance(value) => self.dark_override = value,
             Command::Refresh => self.request_reload(DiscardAction::Reload, cx),
             Command::Review => self.review(window, cx),
             Command::Confirm => self.confirm(window, cx),
@@ -411,28 +413,29 @@ impl PatientApp {
             })
     }
 
-    fn theme_label(&self) -> &'static str {
-        if self.dark {
-            "Tema: Grafite"
-        } else {
-            "Tema: Giorno"
-        }
-    }
-
-    fn theme_button(&self, cx: &mut Context<Self>) -> Stateful<Div> {
-        self.button(
-            "clinical-workspace-theme",
-            self.theme_label(),
-            Command::ToggleTheme,
-            false,
-            true,
-            cx,
-        )
-        .aria_label(if self.dark {
-            "Tema Grafite, passa a Giorno"
-        } else {
-            "Tema Giorno, passa a Grafite"
-        })
+    fn appearance(&self, cx: &mut Context<Self>) -> Stateful<Div> {
+        div()
+            .id("demo-appearance")
+            .role(Role::TabList)
+            .aria_label("Aspetto")
+            .flex()
+            .min_w_0()
+            .gap(px(2.))
+            .bg(self.theme.shade)
+            .children(crate::components::APPEARANCE_CHOICES.into_iter().map(
+                |(value, id, label)| {
+                    crate::components::appearance_segment(
+                        value,
+                        self.dark_override,
+                        id,
+                        label,
+                        self.theme,
+                    )
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.command(Command::Appearance(value), window, cx)
+                    }))
+                },
+            ))
     }
 
     fn section(&self, id: &'static str, title: &'static str) -> Stateful<Div> {
@@ -463,7 +466,7 @@ impl PatientApp {
             .flex()
             .flex_col()
             .gap(px(20.))
-            .p(px(16.))
+            .p(px(LIST_INSET))
             .min_h_0()
             .child(
                 div()
@@ -565,7 +568,7 @@ impl PatientApp {
                                     .min_h(px(40.))
                                     .border_b_1()
                                     .border_color(theme.strong_rule)
-                                    .px(px(8.))
+                                    .px(px(0.))
                                     .py(px(8.))
                                     .flex()
                                     .items_center()
@@ -585,6 +588,9 @@ impl PatientApp {
                                     }))
                                     .child(
                                         div()
+                                            .debug_selector(move || {
+                                                format!("demo-patient-name-{index}")
+                                            })
                                             .min_w_0()
                                             .flex_1()
                                             .child(text!(patient.display_name())),
@@ -767,31 +773,38 @@ impl PatientApp {
             theme.paper
         };
         let foreground = theme.ink;
-        let (status, color) = match phase {
-            Phase::Editing => ("Bozza non registrata", theme.fresh),
-            Phase::Review => ("Bozza non registrata", foreground),
-            Phase::Saved => ("Registrata", theme.ink),
-            Phase::Conflict => (
-                "▲ La scheda è stata modificata da un'altra postazione di prova. Bozza intatta.",
-                theme.warning,
-            ),
-            Phase::Indeterminate => (
-                "▲ Esito non confermato. Bozza intatta: rileggi la scheda prima di riprovare.",
-                theme.warning,
-            ),
-            Phase::Submitting => ("Registrazione in corso…", theme.secondary),
-            Phase::Verifying => ("Rilettura delle note…", theme.secondary),
-            _ => ("Nessuna modifica da registrare.", theme.secondary),
+        let no_changes = self.message.as_deref() == Some(error_message(ClientError::NoChanges));
+        let (status, color) = if no_changes {
+            (error_message(ClientError::NoChanges), theme.secondary)
+        } else {
+            match phase {
+                Phase::Editing => ("Bozza non registrata", theme.fresh),
+                Phase::Review => ("Bozza non registrata", foreground),
+                Phase::Saved => ("Registrata", theme.ink),
+                Phase::Conflict => (
+                    "▲ La scheda è stata modificata da un'altra postazione di prova. Bozza intatta.",
+                    theme.warning,
+                ),
+                Phase::Indeterminate => (
+                    "▲ Esito non confermato. Bozza intatta: rileggi la scheda prima di riprovare.",
+                    theme.warning,
+                ),
+                Phase::Submitting => ("Registrazione in corso…", theme.secondary),
+                Phase::Verifying => ("Rilettura delle note…", theme.secondary),
+                _ => ("Nessuna modifica da registrare.", theme.secondary),
+            }
         };
         div().id("clinical-workspace-save-status").debug_selector(|| "clinical-workspace-save-status".into()).accessibility_id("clinical-workspace-save-status")
             .role(Role::Status).aria_label(status)
             .border_t_1().border_color(if self.workspace.is_dirty() { theme.draft_rule } else { theme.rule })
             .flex_shrink_0().min_w_0().max_w_full().p(px(16.)).bg(background).text_color(foreground).flex().flex_col().gap(px(12.))
-            .child(match phase {
+            .child(if no_changes {
+                div().text_color(color).type_role(theme, TypeRole::Body).child(text!(status)).into_any_element()
+            } else { match phase {
                 Phase::Editing | Phase::Review => crate::components::writing_status("demo-writing-status", crate::components::WritingInk::Fresh, surface, theme).into_any_element(),
                 Phase::Saved => crate::components::writing_status("demo-writing-status", crate::components::WritingInk::Dry, surface, theme).into_any_element(),
                 _ => div().text_color(color).type_role(theme, TypeRole::Body).child(text!(status)).into_any_element(),
-            })
+            }})
             .when(self.discard.is_some(), |el| el.child(div().flex().flex_col().gap(px(12.))
                 .child(text!(if self.discard == Some(DiscardAction::Hide) { "Scartare la bozza e nascondere i dati di prova?" } else { "Scartare la bozza e rileggere le note attuali? Puoi prima copiare le note." }))
                 .child(div().flex().flex_wrap().gap(px(8.))
@@ -811,8 +824,8 @@ impl PatientApp {
                 } else { "Dati di prova · modifiche solo in memoria" })))
                 .child(div().flex().flex_wrap().gap(px(8.))
                     .when(self.workspace.is_dirty(), |el| el.child(self.button("clinical-workspace-discard-draft", "Scarta la bozza", Command::Refresh, false, true, cx)))
-                    .child(self.button("clinical-workspace-review-save", "Registra 1 elemento", Command::Review, true,
-                        phase == Phase::Editing && self.workspace.is_dirty() && !profile.is_archived, cx)))))
+                    .when(self.workspace.is_dirty(), |el| el.child(self.button("clinical-workspace-review-save", "Registra 1 elemento", Command::Review, true,
+                        phase == Phase::Editing && !profile.is_archived, cx))))))
     }
 }
 
@@ -865,21 +878,20 @@ impl Render for PatientApp {
             .on_action(cx.listener(|this, _: &PreviousPatient, _, cx| this.step_patient(false, cx)))
             .on_action(cx.listener(|this, _: &NextPatient, _, cx| this.step_patient(true, cx)))
             .size_full().flex().flex_col().bg(theme.shade).text_color(theme.ink).type_role(theme, TypeRole::Body)
-            .child(div().flex_shrink_0().min_w_0().px(px(if single { 16. } else { 28. })).py(px(12.)).flex().flex_wrap().items_center().justify_between().gap(px(12.)).when(single, |el| el.flex_col().items_stretch())
+            .child(div().flex_shrink_0().min_w_0().px(px(LEFT_AXIS)).py(px(12.)).flex().flex_wrap().items_center().justify_between().gap(px(12.)).when(single, |el| el.flex_col().items_stretch())
                 .child(div().flex().flex_col().gap(px(4.))
-                    .child(div().type_role(theme, TypeRole::Brand).child(text!("MediFlow.")))
+                    .child(div().debug_selector(|| "demo-brand".into()).type_role(theme, TypeRole::Brand).child(text!("MediFlow.")))
                     .child(div().id("clinical-workspace-synthetic-label").role(Role::Note).aria_label("Dati di prova. Modifiche solo in memoria.")
                         .type_role(theme, TypeRole::Meta).text_color(theme.secondary).child(text!(if single { "Dati di prova" } else { "Dati di prova · modifiche solo in memoria" }))))
                 .child(div().flex().flex_wrap().gap(px(8.))
+                    .child(self.appearance(cx).flex_shrink_0())
                     .when(single && !self.show_list && !locked, |el| el.child(self.button("clinical-workspace-back-list", "Pazienti", Command::ShowList, false, true, cx).when(single, |el| el.px(px(6.)))))
-                    .child(self.theme_button(cx).when(single, |el| el.px(px(6.))))
-                    .when(self.dark_override.is_some(), |el| el.child(self.button("clinical-workspace-system-theme", if single { "Sistema" } else { "Aspetto di sistema" }, Command::SystemTheme, false, true, cx).when(single, |el| el.px(px(6.)))))
                     .when(!locked, |el| el.child(self.button("clinical-workspace-hide", if single { "Nascondi" } else { "Nascondi dati" }, Command::Hide, false, true, cx).when(single, |el| el.px(px(6.)))))))
-            .when(self.message.is_some(), |el| el.child(div().id("clinical-workspace-message").role(Role::Status)
+            .when(self.message.as_deref().is_some_and(|message| message != error_message(ClientError::NoChanges)), |el| el.child(div().id("clinical-workspace-message").role(Role::Status)
                 .aria_label(SharedString::from(self.message.clone().unwrap_or_default()))
-                .mx(px(28.)).mb(px(12.)).px(px(12.)).py(px(8.)).bg(theme.paper).border_l_2().border_color(theme.fresh)
+                .mx(px(LEFT_AXIS)).mb(px(12.)).px(px(12.)).py(px(8.)).bg(theme.paper).border_l_2().border_color(theme.fresh)
                 .child(text!(self.message.clone().unwrap_or_default()))))
-            .child(div().flex_1().min_h_0().min_w_0().flex().px(px(if single { 16. } else { 12. })).pb(px(16.))
+            .child(div().flex_1().min_h_0().min_w_0().flex().px(px(OUTER_INSET)).pb(px(16.))
                 .when(!locked && (!single || self.show_list), |el| el.child(self.sidebar(compact, cx).when(single, |el| el.w_full())))
                 .when(locked, |el| el.child(div().flex_1().flex().flex_col().items_center().justify_center().gap(px(20.)).bg(theme.paper).rounded(px(theme.paper_radius))
                     .child(div().type_role(theme, TypeRole::PageTitle).child(text!("Dati di prova nascosti")))

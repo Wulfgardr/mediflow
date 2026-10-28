@@ -224,7 +224,7 @@ fn tabbed_profile_controls(cx: &mut gpui::TestAppContext, width: f32, height: f3
             let focus = view.read(cx).root_focus.clone();
             window.focus(&focus, cx);
         });
-        for _ in 0..6 {
+        for _ in 0..7 {
             cx.simulate_keystrokes("tab");
             draw(cx);
         }
@@ -323,37 +323,196 @@ fn hcg1_focus_reveals_last_profile_controls_760(cx: &mut gpui::TestAppContext) {
 }
 
 #[gpui::test]
-fn hcg1_theme_names_current_state_and_preserves_toggle(cx: &mut gpui::TestAppContext) {
+fn hcg2_theme_segments_stay_present(cx: &mut gpui::TestAppContext) {
     let (view, cx) = cx.add_window_view(PatientApp::new);
-    for (dark, label) in [
-        (false, "Tema Giorno, passa a Grafite"),
-        (true, "Tema Grafite, passa a Giorno"),
-    ] {
+    for width in [390., 800., 1200.] {
+        cx.simulate_resize(size(px(width), px(840.)));
+        for appearance in [None, Some(false), Some(true)] {
+            view.update(cx, |app, cx| {
+                app.dark_override = appearance;
+                cx.notify();
+            });
+            draw(cx);
+            let mut right = px(0.);
+            for id in [
+                "clinical-workspace-system-theme",
+                "clinical-workspace-day-theme",
+                "clinical-workspace-night-theme",
+            ] {
+                let segment = bounds(cx, id);
+                assert!(segment.left() >= right);
+                assert!(segment.right() <= px(width));
+                right = segment.right();
+            }
+        }
+    }
+}
+
+#[gpui::test]
+fn hcg2_clean_shortcut_has_no_command_or_layout_shift(cx: &mut gpui::TestAppContext) {
+    cx.update(bind_keys);
+    let (view, cx) = cx.add_window_view(PatientApp::new);
+    for width in [390., 800., 1200.] {
+        for dark in [false, true] {
+            cx.simulate_resize(size(px(width), px(840.)));
+            view.update(cx, |app, cx| {
+                app.select_patient("prova-001", cx);
+                app.dark_override = Some(dark);
+                cx.notify();
+            });
+            draw(cx);
+            let before = [
+                bounds(cx, "demo-profile"),
+                bounds(cx, "clinical-workspace-profile-scroll"),
+                bounds(cx, "clinical-workspace-save-status"),
+            ];
+            cx.simulate_keystrokes(if cfg!(target_os = "macos") {
+                "cmd-enter"
+            } else {
+                "ctrl-enter"
+            });
+            draw(cx);
+            let after = [
+                bounds(cx, "demo-profile"),
+                bounds(cx, "clinical-workspace-profile-scroll"),
+                bounds(cx, "clinical-workspace-save-status"),
+            ];
+            eprintln!("HC-G2 {width} dark={dark} before={before:?} after={after:?}");
+            assert_eq!(before, after, "empty save must not move the layout");
+            assert!(
+                cx.debug_bounds("clinical-workspace-review-save").is_none(),
+                "no save command without a draft"
+            );
+            view.read_with(cx, |app, _| {
+                assert_eq!(
+                    app.message.as_deref(),
+                    Some("Nessuna modifica da registrare.")
+                )
+            });
+        }
+    }
+}
+
+#[gpui::test]
+fn hcg2_left_axis_is_shared(cx: &mut gpui::TestAppContext) {
+    let (view, cx) = cx.add_window_view(PatientApp::new);
+    for width in [390., 800., 1200.] {
+        for dark in [false, true] {
+            cx.simulate_resize(size(px(width), px(840.)));
+            view.update(cx, |app, cx| {
+                app.show_list = true;
+                app.dark_override = Some(dark);
+                cx.notify();
+            });
+            draw(cx);
+            let logo = bounds(cx, "demo-brand").left();
+            let search = bounds(cx, "demo-search").left();
+            let name = bounds(cx, "demo-patient-name-0").left();
+            eprintln!(
+                "HC-G2 width={width} dark={dark} left axis logo={logo:?} search={search:?} name={name:?}"
+            );
+            assert_eq!(logo, search);
+            assert_eq!(logo, name);
+        }
+    }
+}
+
+#[gpui::test]
+fn hcg2_focus_registry_is_stable_across_starts(cx: &mut gpui::TestAppContext) {
+    for _ in 0..12 {
+        let (view, cx) = cx.add_window_view(PatientApp::new);
+        view.read_with(cx, |app, _| {
+            let order: Vec<_> = app.profile_targets.keys().copied().collect();
+            let mut expected = vec![
+                "clinical-workspace-reread",
+                "clinical-workspace-copy-profile",
+                "clinical-workspace-copy-notes",
+                "clinical-workspace-show-scenarios",
+                "clinical-workspace-scenario-normal",
+                "clinical-workspace-scenario-conflict",
+                "clinical-workspace-scenario-rejected",
+                "clinical-workspace-scenario-uncertain",
+                "clinical-workspace-scenario-read",
+            ];
+            expected.sort();
+            assert_eq!(order, expected);
+        });
+    }
+}
+
+#[gpui::test]
+fn hcg2_theme_segments_expose_selection(cx: &mut gpui::TestAppContext) {
+    let (view, cx) = cx.add_window_view(PatientApp::new);
+    for value in [None, Some(false), Some(true)] {
         view.update(cx, |app, cx| {
-            app.dark_override = Some(dark);
+            app.dark_override = value;
             cx.notify();
         });
         draw(cx);
-        view.update(cx, |app, cx| {
-            assert_eq!(
-                app.theme_label(),
-                if dark {
-                    "Tema: Grafite"
-                } else {
-                    "Tema: Giorno"
-                }
-            );
-            let button = app.theme_button(cx);
-            let mut node = gpui::accesskit::Node::new(Role::Button);
-            button.write_a11y_info(&mut node);
-            assert_eq!(node.label(), Some(label));
-        });
-        let target = bounds(cx, "clinical-workspace-theme").center();
-        cx.simulate_click(target, gpui::Modifiers::default());
-        draw(cx);
         view.read_with(cx, |app, _| {
-            assert_eq!(app.dark, !dark);
-            assert_eq!(app.dark_override, Some(!dark));
+            for (choice, id, label) in crate::components::APPEARANCE_CHOICES {
+                let segment = crate::components::appearance_segment(
+                    choice,
+                    app.dark_override,
+                    id,
+                    label,
+                    app.theme,
+                );
+                let mut node = gpui::accesskit::Node::new(Role::Tab);
+                segment.write_a11y_info(&mut node);
+                assert_eq!(node.label(), Some(label));
+                assert_eq!(node.is_selected(), Some(choice == value));
+            }
         });
+        for (choice, id, _) in crate::components::APPEARANCE_CHOICES {
+            let target = bounds(cx, id).center();
+            cx.simulate_click(target, gpui::Modifiers::default());
+            draw(cx);
+            view.read_with(cx, |app, _| assert_eq!(app.dark_override, choice));
+        }
+    }
+}
+
+#[gpui::test]
+fn hcg2_tab_sequence_repeats_on_fresh_windows(cx: &mut gpui::TestAppContext) {
+    cx.update(bind_keys);
+    for _ in 0..12 {
+        let (view, cx) = cx.add_window_view(PatientApp::new);
+        cx.simulate_resize(size(px(390.), px(840.)));
+        view.update(cx, |app, cx| {
+            app.select_patient("prova-001", cx);
+            cx.notify();
+        });
+        cx.update(|window, cx| {
+            window.activate_window();
+            let focus = view.read(cx).root_focus.clone();
+            window.focus(&focus, cx);
+        });
+        draw(cx);
+        for _ in 0..6 {
+            cx.simulate_keystrokes("tab");
+            draw(cx);
+        }
+        for id in [
+            "clinical-workspace-reread",
+            "clinical-workspace-copy-profile",
+            "clinical-workspace-copy-notes",
+            "notes",
+            "clinical-workspace-show-scenarios",
+        ] {
+            if id != "clinical-workspace-reread" {
+                cx.simulate_keystrokes("tab");
+                draw(cx);
+            }
+            cx.update(|window, cx| {
+                let app = view.read(cx);
+                let focus = if id == "notes" {
+                    app.notes.read(cx).focus_handle(cx)
+                } else {
+                    app.profile_targets[id].0.clone()
+                };
+                assert!(focus.is_focused(window), "fresh launch Tab reaches {id}");
+            });
+        }
     }
 }
