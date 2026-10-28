@@ -160,7 +160,9 @@ struct PairedDiaryComposerView: View {
                         .accessibilityIdentifier("homebase-edit-entry-remote-content")
                 }
                 if let references = latest.attachments {
-                    Text("Allegati nella voce corrente: \(HomeBaseEntryAttachmentReferencesCodec.decode(references).count)")
+                    Text(HomeBaseEntryAttachmentReferencesCodec.decodeResult(references).count.map {
+                        "Allegati nella voce corrente: \($0)"
+                    } ?? "Riferimenti agli allegati presenti ma non leggibili su questo dispositivo.")
                         .font(.footnote)
                 } else {
                     Text("Riferimenti agli allegati non disponibili nella lettura corrente.")

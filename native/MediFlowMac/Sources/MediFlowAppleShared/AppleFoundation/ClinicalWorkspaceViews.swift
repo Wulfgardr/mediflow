@@ -390,7 +390,7 @@ struct GlobalDiaryWorkspaceRow: Identifiable, Equatable {
     let item: GlobalDiaryItem
     let date: Date
     let type: String
-    let attachmentCount: Int
+    let attachmentCount: Int?
     /// Which fields this session could not open.
     ///
     /// `GlobalDiaryItem` is built from the decrypted strings, and an unreadable
@@ -431,6 +431,22 @@ final class GlobalDiaryWorkspaceModel: ObservableObject {
     func load() async {
         invalidateReadContext()
         let generation = requestGeneration
+        #if DEBUG
+        if AppleFoundationDemoMode.isDemoDataset, let patient = AppleFoundationDemoMode.patients().first {
+            let entries = PairedPatientsWorkspaceModel.uiTestSeededEntries(patientId: patient.id)
+            rows = entries.map { entry in
+                GlobalDiaryWorkspaceRow(
+                    item: GlobalDiaryItem(id: entry.id, patientId: patient.id,
+                        patientName: "\(patient.lastName) \(patient.firstName)", patientCode: patient.taxCode,
+                        title: entry.title, preview: entry.content ?? "", deleted: false),
+                    date: entry.date, type: entry.type, attachmentCount: 0, lockedFields: [])
+            }
+            activeCount = entries.count
+            patientCount = 1
+            state = .loaded
+            return
+        }
+        #endif
         guard let connection = connectionProvider()?.readRequest else {
             state = .unavailable("Collega l'home-base prima di caricare il diario globale.")
             return
@@ -484,11 +500,8 @@ final class GlobalDiaryWorkspaceModel: ObservableObject {
         }
     }
 
-    private static func attachmentCount(_ attachments: String?) -> Int {
-        guard let attachments,
-              let data = attachments.data(using: .utf8),
-              let values = try? JSONSerialization.jsonObject(with: data) as? [Any] else { return 0 }
-        return values.count
+    private static func attachmentCount(_ attachments: String?) -> Int? {
+        HomeBaseEntryAttachmentReferencesCodec.decodeResult(attachments).count
     }
 }
 
@@ -907,7 +920,11 @@ struct GlobalDiaryWorkspaceView: View {
                             } else {
                                 Text(row.item.preview).chartProse()
                             }
-                            if row.attachmentCount > 0 { Label("\(row.attachmentCount) allegati", systemImage: "paperclip").chartMetadata() }
+                            if let count = row.attachmentCount {
+                                if count > 0 { Label("\(count) allegati", systemImage: "paperclip").chartMetadata() }
+                            } else {
+                                Label("Riferimenti agli allegati presenti ma non leggibili su questo dispositivo.", systemImage: "lock.fill").chartMetadata()
+                            }
                         }
                         .accessibilityIdentifier("clinical-workspace-diary-row-\(row.id)")
                         .padding(.vertical, ClinicalChartMetrics.itemSpacing / 2)

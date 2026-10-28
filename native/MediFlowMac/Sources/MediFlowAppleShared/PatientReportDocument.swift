@@ -76,7 +76,7 @@ public enum PatientReportDocument {
 
         let headerRows = [
             PatientReportLine(primary: "Nome: \(patientName)"),
-            PatientReportLine(primary: "Data di nascita: \(safeDate(patient.birthDate) ?? "Non registrata")"),
+            PatientReportLine(primary: "Data di nascita: \(patient.birthDate.map { ClinicalDatePresentation.birthDate.string(from: $0) } ?? "Non registrata")"),
             PatientReportLine(primary: "Codice fiscale: \(safe(patient.taxCode) ?? "Non disponibile")"),
             PatientReportLine(primary: "Ambulatorio: \(safe(patient.ambulatoryId) ?? "Non registrato")"),
         ]
@@ -85,13 +85,15 @@ public enum PatientReportDocument {
             PatientReportSection(
                 title: "Diagnosi ICD",
                 rows: diagnosisRows(from: patient.diagnoses),
-                emptyMessage: "Nessuna diagnosi registrata."
+                emptyMessage: PatientStructuredFields.diagnoses(patient.diagnoses).isUnreadable
+                    ? PatientStructuredFields.unreadableMessage("Diagnosi") : "Nessuna diagnosi registrata."
             ),
             PatientReportSection(
                 title: "Esenzioni",
-                rows: ExemptionCodesCodec.decode(patient.exemptions)
+                rows: (PatientStructuredFields.exemptions(patient.exemptions).values ?? [])
                     .compactMap { safe($0).map { PatientReportLine(primary: $0) } },
-                emptyMessage: "Nessuna esenzione registrata."
+                emptyMessage: PatientStructuredFields.exemptions(patient.exemptions).isUnreadable
+                    ? PatientStructuredFields.unreadableMessage("Esenzioni") : "Nessuna esenzione registrata."
             ),
             PatientReportSection(
                 title: "Terapie in corso",
@@ -158,7 +160,7 @@ public enum PatientReportDocument {
     }
 
     private static func diagnosisRows(from raw: String?) -> [PatientReportLine] {
-        DiagnosesCodec.decode(raw).compactMap { diagnosis in
+        (PatientStructuredFields.diagnoses(raw).values ?? []).compactMap { diagnosis in
             let code = safe(diagnosis.code)
             let description = safe(diagnosis.description)
             guard code != nil || description != nil else { return nil }

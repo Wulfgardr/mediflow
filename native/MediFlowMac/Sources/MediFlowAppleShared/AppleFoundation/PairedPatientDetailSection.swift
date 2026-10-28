@@ -28,7 +28,8 @@ struct PairedPatientDetailSection: View {
 
     #if os(macOS)
     private var desktopPatientChart: some View {
-        let exemptions = ExemptionCodesCodec.decode(detail.exemptions)
+        let exemptionRead = PatientStructuredFields.exemptions(detail.exemptions)
+        let exemptions = exemptionRead.values ?? []
         let groupSpacing = ClinicalChartMetrics.groupSpacing
         return VStack(alignment: .leading, spacing: groupSpacing) {
             #if !os(macOS)
@@ -137,7 +138,7 @@ struct PairedPatientDetailSection: View {
             // Keep the existing bounded counts available after patient
             // facts, instead of starting every chart with six equally weighted tiles.
             DisclosureGroup("Riepilogo della cartella") {
-                patientSignals(detail, exemptionsCount: exemptions.count)
+                patientSignals(detail)
                     .padding(.top, 12)
             }
             .padding(.vertical, 12)
@@ -149,6 +150,8 @@ struct PairedPatientDetailSection: View {
             if showsAdministration && model.isPatientFieldLocked(.exemptions) {
                 Label("Esenzioni protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
                     .accessibilityIdentifier("patient-exemptions-locked")
+            } else if showsAdministration && exemptionRead.isUnreadable {
+                unreadableField("Esenzioni")
             } else if showsAdministration && !exemptions.isEmpty {
                 ChartGroup("Esenzioni · \(exemptions.count)") {
                     #if os(macOS)
@@ -170,7 +173,7 @@ struct PairedPatientDetailSection: View {
                 .accessibilityIdentifier("patient-detail-exemptions")
             }
             #if os(macOS)
-            if showsAdministration && exemptions.isEmpty && !model.isPatientFieldLocked(.exemptions) {
+            if showsAdministration && exemptionRead.count == 0 && !model.isPatientFieldLocked(.exemptions) {
                 Text("Nessuna esenzione registrata.").chartMetadata()
                     .accessibilityIdentifier("patient-exemptions-empty")
             }
@@ -181,10 +184,13 @@ struct PairedPatientDetailSection: View {
             // with headings that looked like field labels and prose that looked
             // like everything else. The registers are cross-platform now, so the
             // fork has nothing left to say.
-            let diagnoses = DiagnosesCodec.decode(detail.diagnoses)
+            let diagnosisRead = PatientStructuredFields.diagnoses(detail.diagnoses)
+            let diagnoses = diagnosisRead.values ?? []
             if showsClinical && model.isPatientFieldLocked(.diagnoses) {
                 Label("Diagnosi protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
                     .accessibilityIdentifier("patient-diagnoses-locked")
+            } else if showsClinical && diagnosisRead.isUnreadable {
+                unreadableField("Diagnosi")
             } else if showsClinical && !diagnoses.isEmpty {
                 // The diagnoses are the clinical statement of who this patient
                 // is. Set at callout, in the same face and size as an address,
@@ -208,7 +214,7 @@ struct PairedPatientDetailSection: View {
                 .accessibilityIdentifier("patient-detail-diagnoses")
             }
             #if os(macOS)
-            if showsClinical && diagnoses.isEmpty && !model.isPatientFieldLocked(.diagnoses) {
+            if showsClinical && diagnosisRead.count == 0 && !model.isPatientFieldLocked(.diagnoses) {
                 Text("Nessuna diagnosi registrata.").chartMetadata()
                     .accessibilityIdentifier("patient-diagnoses-empty")
             }
@@ -224,7 +230,9 @@ struct PairedPatientDetailSection: View {
             }
             if showsClinical, let documentInsights = cleanedPatientWorkspaceValue(detail.documentInsights) {
                 ChartGroup("Analisi documenti", systemImage: "doc.text.magnifyingglass") {
-                    Text(documentInsights).chartProse()
+                    if DocumentInsightsCodec.decodeResult(detail.documentInsights).isUnreadable {
+                        unreadableField("Informazioni dai documenti")
+                    } else { Text(documentInsights).chartProse() }
                 }
                 .accessibilityIdentifier("patient-detail-document-insights")
             }
@@ -807,6 +815,24 @@ struct PairedPatientDetailSection: View {
     }
 
 
+    private func unreadableField(_ field: String) -> some View {
+        Label(PatientStructuredFields.unreadableMessage(field), systemImage: "lock.fill")
+            .font(.footnote).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier(field == "Diagnosi" ? "patient-diagnoses-unreadable" : (field == "Esenzioni" ? "patient-exemptions-unreadable" : "patient-document-insights-unreadable"))
+    }
+
+    @ViewBuilder
+    private func structuredSignal(_ icon: String, _ count: Int?, _ field: String, locked: Bool) -> some View {
+        if locked {
+            Label("\(field): dato protetto", systemImage: "lock.fill").font(.footnote).foregroundStyle(.secondary)
+        } else if let count {
+            signalTile(icon, .exact(count), field)
+        } else {
+            unreadableField(field)
+        }
+    }
+
     private func signalTile(_ icon: String, _ signal: ClinicalSignalCount, _ label: String) -> some View {
         let layout = dynamicTypeSize >= .accessibility1
             ? AnyLayout(HStackLayout(spacing: 6))
@@ -864,9 +890,10 @@ struct PairedPatientDetailSection: View {
     }
 
     @ViewBuilder
-    private func patientSignals(_ detail: HomeBasePatientDetail, exemptionsCount: Int) -> some View {
+    private func patientSignals(_ detail: HomeBasePatientDetail) -> some View {
         let cap = PairedPatientsWorkspaceSupport.clinicalPreviewCap
-        let problemi = DiagnosesCodec.decode(detail.diagnoses).count
+        let diagnosisRead = PatientStructuredFields.diagnoses(detail.diagnoses)
+        let exemptionRead = PatientStructuredFields.exemptions(detail.exemptions)
         let terapie = model.therapies.filter { $0.deletedAt == nil && $0.status == "active" }.count
         let parametri = model.observations.filter { $0.deletedAt == nil }.count
         let diario = model.entries.filter { $0.deletedAt == nil }.count
@@ -879,7 +906,7 @@ struct PairedPatientDetailSection: View {
                 columns: signalTileColumns,
                 spacing: 8
             ) {
-                signalTile("cross.case", .exact(problemi), "Problemi")
+                structuredSignal("cross.case", diagnosisRead.count, "Diagnosi", locked: model.isPatientFieldLocked(.diagnoses))
                 signalTile(
                     "pills",
                     .fromLoadedList(count: terapie, loadedCount: model.therapies.count, limit: cap),
@@ -900,7 +927,7 @@ struct PairedPatientDetailSection: View {
                     .fromLoadedList(count: scale, loadedCount: model.entries.count, limit: cap),
                     "Scale"
                 )
-                signalTile("seal", .exact(exemptionsCount), "Esenzioni")
+                structuredSignal("seal", exemptionRead.count, "Esenzioni", locked: model.isPatientFieldLocked(.exemptions))
             }
             .accessibilityIdentifier("patient-clinical-signals")
             if let next = nextCheckup {
@@ -924,7 +951,7 @@ struct PairedPatientDetailSection: View {
     }
 
     private func nextFollowUpText(_ next: HomeBaseCheckupSummary) -> some View {
-        Text("Prossimo follow-up: \(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: next.date)) · \(next.title)")
+        Text("Prossimo follow-up: \(ClinicalDatePresentation.day.string(from: next.date)) · \(next.title)")
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -935,8 +962,10 @@ struct PairedPatientDetailSection: View {
 #if os(iOS)
 private extension PairedPatientDetailSection {
     var mobilePatientChart: some View {
-        let diagnoses = DiagnosesCodec.decode(detail.diagnoses)
-        let exemptions = ExemptionCodesCodec.decode(detail.exemptions)
+        let diagnosisRead = PatientStructuredFields.diagnoses(detail.diagnoses)
+        let diagnoses = diagnosisRead.values ?? []
+        let exemptionRead = PatientStructuredFields.exemptions(detail.exemptions)
+        let exemptions = exemptionRead.values ?? []
         return VStack(alignment: .leading, spacing: 0) {
             mobilePatientHeader.padding(.bottom, 16)
             if detail.isArchived == true {
@@ -968,11 +997,13 @@ private extension PairedPatientDetailSection {
                 PatientChartField(label: "Ambulatorio", value: .make(ambulatoryName))
                 PatientChartField(label: "Monitoraggio previsto", value: .make(detail.monitoringProfile))
             }
-            PatientChartGroup(model.isPatientFieldLocked(.diagnoses) ? "Diagnosi" : "Diagnosi · \(diagnoses.count)") {
+            PatientChartGroup((model.isPatientFieldLocked(.diagnoses) || diagnosisRead.isUnreadable) ? "Diagnosi" : "Diagnosi · \(diagnoses.count)") {
                 if model.isPatientFieldLocked(.diagnoses) {
                     Label("Diagnosi protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
                         .font(.footnote).foregroundStyle(.secondary)
                         .accessibilityIdentifier("patient-diagnoses-locked")
+                } else if diagnosisRead.isUnreadable {
+                    unreadableField("Diagnosi")
                 } else if diagnoses.isEmpty {
                     Text("Nessuna diagnosi registrata.").font(.footnote).foregroundStyle(.secondary)
                         .accessibilityIdentifier("patient-diagnoses-empty")
@@ -986,11 +1017,13 @@ private extension PairedPatientDetailSection {
             }
             .accessibilityIdentifier("patient-detail-diagnoses")
             mobileReviewOverview
-            PatientChartGroup(model.isPatientFieldLocked(.exemptions) ? "Esenzioni" : "Esenzioni · \(exemptions.count)") {
+            PatientChartGroup((model.isPatientFieldLocked(.exemptions) || exemptionRead.isUnreadable) ? "Esenzioni" : "Esenzioni · \(exemptions.count)") {
                 if model.isPatientFieldLocked(.exemptions) {
                     Label("Esenzioni protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
                         .font(.footnote).foregroundStyle(.secondary)
                         .accessibilityIdentifier("patient-exemptions-locked")
+                } else if exemptionRead.isUnreadable {
+                    unreadableField("Esenzioni")
                 } else if exemptions.isEmpty {
                     Text("Nessuna esenzione registrata.").font(.footnote).foregroundStyle(.secondary)
                         .accessibilityIdentifier("patient-exemptions-empty")
@@ -1016,7 +1049,11 @@ private extension PairedPatientDetailSection {
                     .accessibilityIdentifier("patient-detail-ai-summary")
             }
             if let insights = cleanedPatientWorkspaceValue(detail.documentInsights) {
-                PatientChartGroup("Informazioni dai documenti") { PatientChartProse(text: insights) }
+                PatientChartGroup("Informazioni dai documenti") {
+                    if DocumentInsightsCodec.decodeResult(detail.documentInsights).isUnreadable {
+                        unreadableField("Informazioni dai documenti")
+                    } else { PatientChartProse(text: insights) }
+                }
                     .accessibilityIdentifier("patient-detail-document-insights")
             }
             DisclosureGroup {
@@ -1099,7 +1136,7 @@ private extension PairedPatientDetailSection {
     var mobileChartCounts: some View {
         let cap = PairedPatientsWorkspaceSupport.clinicalPreviewCap
         let counts: [(String, ClinicalSignalCount?)] = [
-            ("Diagnosi", model.isPatientFieldLocked(.diagnoses) ? nil : .exact(DiagnosesCodec.decode(detail.diagnoses).count)),
+            ("Diagnosi", model.isPatientFieldLocked(.diagnoses) ? nil : PatientStructuredFields.diagnoses(detail.diagnoses).count.map { .exact($0) }),
             ("Terapie attive", .fromLoadedList(count: model.therapies.filter { $0.deletedAt == nil && $0.status == "active" }.count,
                 loadedCount: model.therapies.count, limit: cap)),
             ("Osservazioni cliniche", .fromLoadedList(count: model.observations.filter { $0.deletedAt == nil }.count,
@@ -1108,7 +1145,7 @@ private extension PairedPatientDetailSection {
                 loadedCount: model.entries.count, limit: cap)),
             ("Scale", .fromLoadedList(count: model.entries.filter { $0.deletedAt == nil && $0.type == "scale" }.count,
                 loadedCount: model.entries.count, limit: cap)),
-            ("Esenzioni", model.isPatientFieldLocked(.exemptions) ? nil : .exact(ExemptionCodesCodec.decode(detail.exemptions).count)),
+            ("Esenzioni", model.isPatientFieldLocked(.exemptions) ? nil : PatientStructuredFields.exemptions(detail.exemptions).count.map { .exact($0) }),
         ]
         return VStack(alignment: .leading, spacing: 12) {
             ForEach(counts, id: \.0) { label, count in
@@ -1118,7 +1155,12 @@ private extension PairedPatientDetailSection {
                     if let count {
                         Text(count.displayText).font(.body.weight(.semibold)).monospacedDigit()
                     } else {
-                        Label("Dato protetto", systemImage: "lock.fill").font(.footnote).foregroundStyle(.secondary)
+                        if (label == "Diagnosi" && !model.isPatientFieldLocked(.diagnoses)) ||
+                            (label == "Esenzioni" && !model.isPatientFieldLocked(.exemptions)) {
+                            unreadableField(label)
+                        } else {
+                            Label("Dato protetto", systemImage: "lock.fill").font(.footnote).foregroundStyle(.secondary)
+                        }
                     }
                 }
             }

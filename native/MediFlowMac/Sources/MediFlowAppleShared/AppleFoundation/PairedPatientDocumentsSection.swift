@@ -325,7 +325,11 @@ struct PairedPatientDocumentsSection: View {
 
     private var documentInsightsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if model.documentInsights.isEmpty {
+            if DocumentInsightsCodec.decodeResult(model.selectedPatient?.documentInsights).isUnreadable {
+                Label(PatientStructuredFields.unreadableMessage("Informazioni dai documenti"), systemImage: "lock.fill")
+                    .font(.footnote).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("document-insights-unreadable-state")
+            } else if model.documentInsights.isEmpty {
                 Text("Nessun documento analizzato per questo paziente.")
                     .font(.caption)
                     .foregroundStyle(.secondary)

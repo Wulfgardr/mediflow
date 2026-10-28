@@ -20,6 +20,15 @@ final class MacPatientContextInspectorTests: XCTestCase {
         XCTAssertEqual(snapshot.connectionState, "Cache locale")
     }
 
+    func testBirthYearKeepsJanuaryFirstInLosAngeles() throws {
+        let previous = NSTimeZone.default
+        NSTimeZone.default = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        defer { NSTimeZone.default = previous }
+        let birth = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("1980-01-01T00:00:00.000Z"))
+        let snapshot = MacPatientInspectorSnapshot(patient: syntheticPatient(birthDate: birth), connectionState: .cached)
+        XCTAssertEqual(snapshot.birthYear, "1980")
+    }
+
     func testMissingBirthDateIsReportedInsteadOfInferred() {
         let snapshot = MacPatientInspectorSnapshot(
             patient: syntheticPatient(birthDate: nil),

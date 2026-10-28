@@ -1,4 +1,5 @@
 import XCTest
+import CryptoKit
 @testable import MediFlowAppleShared
 
 // G1 (ADR 0071 parity): the patient-list row now derives an age from the summary
@@ -23,6 +24,56 @@ final class PatientSummaryPresentationTests: XCTestCase {
         XCTAssertEqual(PatientChartFieldValue.make("  \n"), .missing)
         XCTAssertEqual(PatientChartFieldValue.make("  Via sintetica 1  "), .recorded("Via sintetica 1"))
     }
+
+    func testValidKeyWithInvalidDiagnosisSchemaDoesNotClaimAbsence() throws {
+        let key = SymmetricKey(data: Data(repeating: 17, count: 32))
+        let raw = #"[{"code":"I10","description":7}]"#
+        let encrypted = try XCTUnwrap(CryptoService.encryptField(raw, masterKey: key))
+        let resolved = PatientFieldCrypto.resolveStructuredField(encrypted, masterKey: key)
+        XCTAssertFalse(resolved.isLocked)
+        guard case .plaintext(let opened) = resolved else { return XCTFail("Synthetic field must decrypt") }
+        XCTAssertEqual(opened, raw)
+        let read = PatientStructuredFields.diagnoses(opened)
+        XCTAssertTrue(read.isUnreadable)
+        XCTAssertNil(read.count)
+        XCTAssertEqual(PatientStructuredFields.unreadableMessage("Diagnosi"), "Diagnosi presenti ma non leggibili su questo dispositivo.")
+    }
+
+    func testStructuredFieldsKeepAbsencePresenceAndUnreadableDistinct() {
+        XCTAssertEqual(DiagnosesCodec.decodeResult(nil).count, 0)
+        XCTAssertEqual(DiagnosesCodec.decodeResult("[]").count, 0)
+        XCTAssertEqual(DiagnosesCodec.decodeResult(#"[{"code":"I10","description":"Test"}]"#).count, 1)
+        XCTAssertNil(DiagnosesCodec.decodeResult("[{}]").count)
+        XCTAssertNil(ExemptionCodesCodec.decodeResult(#"[{"code":7}]"#).count)
+        XCTAssertEqual(ExemptionCodesCodec.decodeResult("048,C01").count, 2)
+        XCTAssertEqual(ExemptionCodesCodec.decodeResult("[]").count, 0)
+        XCTAssertNil(DocumentInsightsCodec.decodeResult(#"[{"id":"doc","fileName":7}]"#).count)
+        XCTAssertNil(DocumentInsightsCodec.decodeResult("[{}]").count)
+        XCTAssertEqual(DocumentInsightsCodec.decodeResult("[]").count, 0)
+        XCTAssertNil(HomeBaseEntryAttachmentReferencesCodec.decodeResult("[7]").count)
+        XCTAssertEqual(HomeBaseEntryAttachmentReferencesCodec.decodeResult("[]").count, 0)
+        XCTAssertEqual(HomeBaseEntryAttachmentReferencesCodec.decodeResult("[\"synthetic-id\"]").count, 1)
+    }
+
+    func testBirthDateSurfacesStayOnCivilDayInLosAngeles() throws {
+        let previous = NSTimeZone.default
+        let previousDayZone = ClinicalDatePresentation.day.timeZone
+        NSTimeZone.default = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        ClinicalDatePresentation.day.timeZone = NSTimeZone.default
+        defer { NSTimeZone.default = previous; ClinicalDatePresentation.day.timeZone = previousDayZone }
+        let birth = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("1980-01-01T00:00:00.000Z"))
+        XCTAssertEqual(ClinicalDatePresentation.birthDate.string(from: birth), "1 gen 1980", "Scheda and cached profile")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birth), "1 gen 1980", "wide and compact headers")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.birthYearText(from: birth), "1980")
+    }
+
+    #if os(macOS)
+    func testMacTimestampUsesItalianNamedMonthAndFullYear() {
+        let formatter = ClinicalDatePresentation.timestamp.copy() as! DateFormatter
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        XCTAssertEqual(formatter.string(from: Date(timeIntervalSince1970: 1750007160)), "15 giu 2025, 17:06")
+    }
+    #endif
 
     func testAgeIsNilWhenBirthDateAbsent() {
         XCTAssertNil(PairedPatientsWorkspaceView.age(from: nil))

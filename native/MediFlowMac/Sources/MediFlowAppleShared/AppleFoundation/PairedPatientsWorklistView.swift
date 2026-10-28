@@ -487,7 +487,7 @@ struct PairedPatientsWorklistView: View {
                                         .codice()
                                         .foregroundStyle(.secondary)
                                     if let deletedAt = patient.deletedAt {
-                                        Text("Eliminato il \(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: deletedAt))")
+                                        Text("Eliminato il \(ClinicalDatePresentation.day.string(from: deletedAt))")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
