@@ -331,7 +331,7 @@ function IncaricoArea({
         <label className={classNames("mf-composite-field", patientStyles.patientSearchField)}>
           <Search size={16} aria-hidden="true" />
           <input ref={searchInputRef} type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Cerca per nome, codice fiscale o diagnosi" aria-label="Cerca nella lista pazienti" />
-          {query ? <button type="button" className="mf-button-icon min-h-11! min-w-11!" aria-label="Cancella la ricerca" title="Cancella la ricerca" onClick={() => { setQuery(''); searchInputRef.current?.focus(); }}><X size={16} aria-hidden="true" /></button> : null}
+          <button type="button" className={classNames('mf-button-icon h-[44px]! min-h-[44px]! min-w-[44px]!', !query && 'invisible')} aria-label="Cancella la ricerca" title="Cancella la ricerca" aria-hidden={!query || undefined} tabIndex={query ? 0 : -1} onClick={() => { setQuery(''); searchInputRef.current?.focus(); }}><X size={16} aria-hidden="true" /></button>
         </label>
         <div className={patientStyles.inboxScope} aria-label="Stato elenco">
           <button type="button" className={classNames(patientStyles.scopeChip, list === 'attivi' && patientStyles.scopeChipActive)} aria-pressed={list === 'attivi'} onClick={() => setList('attivi')}>Attivi</button>
