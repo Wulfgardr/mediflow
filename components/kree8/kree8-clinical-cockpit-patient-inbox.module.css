@@ -86,10 +86,7 @@
   padding: 9px 12px;
 }
 
-/* WUL-UIUX: l'input azzera il proprio outline; l'indicatore di focus da
-   tastiera vive sul contenitore, coerente con l'anello condiviso. */
-
-.patientSearchField:focus-within {
+.patientSearchField:focus-within:not(:has(> button:focus)) {
   border-color: var(--lume-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--lume-accent) 36%, transparent);
 }
@@ -109,23 +106,6 @@
 
 .patientSearchField input::placeholder {
   color: var(--lume-ink-muted);
-}
-
-.patientSearchClear {
-  flex: none;
-  border: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
-  background: transparent;
-  color: var(--lume-ink-muted);
-  border-radius: 10px;
-  padding: 8px 12px;
-  font: inherit;
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-
-.patientSearchClear:hover {
-  color: var(--lume-ink);
-  background: color-mix(in srgb, var(--lume-accent) 6%, var(--lume-surface-field));
 }
 
 .scopeChip {
@@ -714,7 +694,7 @@
 
 
 /* Punto d'inchiostro: a continuous register with a selected-record inspector. */
-.directoryToolbar { display: flex; align-items: center; gap: 12px; padding: 0 0 20px; }
+.directoryToolbar { container: patient-directory / inline-size; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 0 0 20px; }
 .directoryToolbar h1 { margin: 0; line-height: 1.1; flex: none; font: var(--type-page-title); }
 .directoryToolbar > a { flex: none; }
 .directoryToolbar .patientSearchField { flex: 1; min-width: 140px; min-height: 40px; border: 1px solid var(--lume-rule-strong); border-radius: 10px; background: var(--lume-surface-focal); padding: 0 12px; }
@@ -745,10 +725,10 @@
 .todoEmpty { color: var(--lume-ink-muted); font-weight: 400; }
 .todoDetail { color: var(--lume-ink-muted); }
 .todoReadState { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 16px; font-size: 0.875rem; }
-:global(html[data-runtime-twin-design='proposal']) :is(.directoryToolbar, .worklistLensActions, .todoReadState) .directoryAction, .directoryToolbar .patientSearchClear { min-height: 40px; min-width: 40px; padding: 8px 16px; gap: 12px; font: inherit; line-height: 1.5; white-space: normal; }
+:global(html[data-runtime-twin-design='proposal']) :is(.directoryToolbar, .worklistLensActions, .todoReadState) .directoryAction { min-height: 40px; min-width: 40px; padding: 8px 16px; gap: 12px; font: inherit; line-height: 1.5; white-space: normal; }
 button.directoryAction { background: transparent; border: 1px solid var(--lume-rule-strong); border-radius: 10px; color: var(--lume-ink); cursor: pointer; }
 .lensTodo h3 { margin: 0 0 8px; font: var(--type-section); }
-.directoryAction:focus-visible, .directoryToolbar .patientSearchClear:focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: 2px; }
+.directoryAction:focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: 2px; }
 :global(html[data-runtime-twin-design='proposal']) .caseLens { display: flex; flex-direction: column; gap: 16px; position: static; align-self: stretch; padding: 20px; border: 0; border-left: 1px solid var(--lume-rule); border-radius: 0; background: var(--lume-surface-hover); box-shadow: none; animation: none; }
 .caseLensName {
   font: var(--type-person-preview); }
@@ -775,7 +755,7 @@ button.directoryAction { background: transparent; border: 1px solid var(--lume-r
   .directoryToolbar .patientSearchField { flex-basis: 100%; order: 2; min-height: 44px; }
   .directoryToolbar .inboxScope { order: 3; }
   .directoryToolbar .scopeChip { min-height: 44px; }
-  :global(html[data-runtime-twin-design='proposal']) :is(.directoryToolbar, .worklistLensActions, .todoReadState) .directoryAction, .directoryToolbar .patientSearchClear { min-height: 44px; min-width: 44px; }
+  :global(html[data-runtime-twin-design='proposal']) :is(.directoryToolbar, .worklistLensActions, .todoReadState) .directoryAction { min-height: 44px; min-width: 44px; }
   .keyboardHint { display: none; }
   :global(html[data-runtime-twin-design='proposal']) .patientListViewport { height: calc(100dvh - 320px); }
 }
@@ -787,7 +767,13 @@ button.directoryAction { background: transparent; border: 1px solid var(--lume-r
   .compactDiagnosis { display: block; margin-top: 2px; font-size: 0.8125rem; color: var(--lume-ink-muted); }
 }
 @media (pointer: coarse) {
-  :global(html[data-runtime-twin-design='proposal']) .patientRow, :global(html[data-runtime-twin-design='proposal']) :is(.directoryToolbar, .worklistLensActions, .todoReadState) .directoryAction, .directoryToolbar .patientSearchClear, .directoryToolbar .scopeChip { min-height: 44px; }
+  :global(html[data-runtime-twin-design='proposal']) .patientRow, :global(html[data-runtime-twin-design='proposal']) :is(.directoryToolbar, .worklistLensActions, .todoReadState) .directoryAction, .directoryToolbar .scopeChip { min-height: 44px; }
 }
 
 .patientDiagnosisPill > span { border: 0; border-radius: 0; padding: 0; background: transparent; }
+
+@container patient-directory (max-width: 960px) {
+  .directoryToolbar h1 { flex: 0 0 100%; }
+  .directoryToolbar .patientSearchField { flex-basis: 100%; order: 1; }
+  .directoryToolbar .inboxScope, .directoryToolbar > select, .directoryToolbar > a { order: 2; }
+}
