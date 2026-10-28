@@ -332,7 +332,7 @@ export default function PatientDetailPage() {
     /* WUL-UIUX: il Diario non deve mostrare le compilazioni scala (hanno
        la loro sezione). Manteniamo le voci cancellate per il toggle audit interno
        di Timeline; filtriamo solo il tipo scala, cosi il conteggio del chip torna. */
-    const timelineEntries = (entries ?? []).filter((entry) => entry.type !== 'scale');
+    const timelineEntries = entries?.filter((entry) => entry.type !== 'scale');
     // Proiezione read-only dei follow-up suggeriti dai documenti (nessun auto-write).
     const followupSuggestions = projectFollowupSuggestions(documentInsights);
     const openObservationForm = (loop: OpenLoop) => {
@@ -703,17 +703,15 @@ export default function PatientDetailPage() {
                     <ClinicalRiverTimeline entries={nonScaleEntries} checkups={checkups ?? []} documentInsights={documentInsights} />
                 </CollapsibleSection>
 
-                {entries ? <Timeline entries={timelineEntries} patientDiary section={{
+                <Timeline entries={timelineEntries} patientDiary section={{
                     id: 'diario',
                     kicker: 'Diario',
                     title: 'Diario clinico',
-                    count: formatCountLabel(nonScaleEntries.length, 'voce', 'voci'),
-                    summary: nonScaleEntries.length === 0 ? 'Nessuna voce clinica registrata.' : 'Apri le voci attive del diario.',
+                    count: entries !== undefined ? formatCountLabel(nonScaleEntries.length, 'voce', 'voci') : undefined,
+                    summary: entries !== undefined ? nonScaleEntries.length === 0 ? 'Nessuna voce clinica registrata.' : 'Apri le voci attive del diario.' : undefined,
                     surfaceClassName: workspaceStyles.clinicalSection,
                     keepMounted: true,
-                }} /> : <CollapsibleSection id="diario" title="Diario clinico" surfaceClassName={workspaceStyles.clinicalSection} keepMounted>
-                    <ViewState state="loading" title="Diario in caricamento." />
-                </CollapsibleSection>}
+                }} />
 
                     <TherapyManager patientId={id} embedded surfaceClassName={workspaceStyles.clinicalSection}
                         before={<PluginPrescribingGuide />}>
