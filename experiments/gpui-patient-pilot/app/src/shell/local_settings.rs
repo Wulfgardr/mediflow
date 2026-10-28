@@ -49,10 +49,14 @@ impl ClinicalApp {
     }
 
     fn save_local_preferences(&mut self, cx: &mut Context<Self>) {
-        self.preferences_issue = self
+        self.preferences_error = self
             .local_preferences
             .save(self.visual_preferences())
             .err()
+            .map(|error| error.to_string());
+        self.preferences_issue = self
+            .preferences_error
+            .as_ref()
             .map(|_| PreferenceIssue::Save);
         cx.notify();
     }
@@ -62,6 +66,7 @@ impl ClinicalApp {
             window.appearance(),
             WindowAppearance::Dark | WindowAppearance::VibrantDark
         ));
+        crate::platform_integration::sync_titlebar(window, self.dark);
     }
 
     fn apply_local_appearance(&mut self, system_dark: bool) {
@@ -75,10 +80,10 @@ impl ClinicalApp {
 
     pub(super) fn local_preferences_status(&self, cx: &Context<Self>) -> Div {
         div().flex().flex_col().gap(px(12.)).when_some(self.preferences_issue, |el, issue| {
-            el.child(notice("clinical-workspace-local-preferences-error", match issue {
+            el.child(notice("clinical-workspace-local-preferences-error", format!("{} {}", match issue {
                 PreferenceIssue::Read => "Le preferenze di questa app non sono leggibili. La finestra resta coperta finché scegli Mostra contenuti. Le scelte salvate non sono state cambiate.",
                 PreferenceIssue::Save => "Le scelte valgono in questa finestra, ma non sono state salvate per la prossima apertura. Riprova a salvarle.",
-            }, self.theme, true))
+            }, self.preferences_error.as_deref().unwrap_or("")), self.theme, true))
             .when(issue == PreferenceIssue::Save, |el| el.child(
                 button("clinical-workspace-local-preferences-retry", "Riprova a salvare le scelte", self.theme, false, true)
                     .map(|el| if self.privacy_shield { self.privacy_commands[0].attach(el) } else { el })
@@ -207,8 +212,10 @@ mod tests {
         cx: &mut gpui::TestAppContext,
     ) {
         let fixture = Fixture::new();
-        fs::create_dir_all(&fixture.0).unwrap();
+        fixture.store().save(Default::default()).unwrap();
         fs::write(fixture.0.join("preferences.json"), b"corrupted").unwrap();
+        #[cfg(windows)]
+        mediflow_local_state::open_read(&fixture.0.join("preferences.json")).unwrap();
         let (view, cx) = cx.add_window_view(|window, cx| {
             ClinicalApp::with_local_preferences(String::new(), fixture.store(), window, cx)
         });
@@ -239,7 +246,11 @@ mod tests {
         cx: &mut gpui::TestAppContext,
     ) {
         let fixture = Fixture::new();
-        fs::create_dir_all(&fixture.0).unwrap();
+        fixture.store().save(Default::default()).unwrap();
+        fs::remove_file(fixture.0.join("preferences.json")).unwrap();
+        #[cfg(windows)]
+        mediflow_local_state::create_directory(&fixture.0.join("preferences.json")).unwrap();
+        #[cfg(not(windows))]
         fs::create_dir(fixture.0.join("preferences.json")).unwrap();
         let (view, cx) = cx.add_window_view(|window, cx| {
             ClinicalApp::with_local_preferences(String::new(), fixture.store(), window, cx)
