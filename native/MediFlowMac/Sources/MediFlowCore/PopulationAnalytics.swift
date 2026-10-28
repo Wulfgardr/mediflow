@@ -78,8 +78,24 @@ public enum PopulationAnalytics {
         range.0 <= range.1 ? range : (range.1, range.0)
     }
 
+    private static let birthCalendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }()
+
+    /// Birth is a Gregorian UTC civil date; today follows the device calendar.
+    /// A February 29 birthday falls on February 28 in non-leap years.
     public static func age(at now: Date, from birthDate: Date, calendar: Calendar = .current) -> Int {
-        calendar.dateComponents([.year], from: birthDate, to: now).year ?? 0
+        let birth = birthCalendar.dateComponents([.year, .month, .day], from: birthDate)
+        let today = calendar.dateComponents([.year, .month, .day], from: now)
+        guard let birthYear = birth.year, let birthMonth = birth.month, let birthDay = birth.day,
+              let todayYear = today.year, let todayMonth = today.month, let todayDay = today.day else { return 0 }
+        let isLeapYear = todayYear.isMultiple(of: 400)
+            || (todayYear.isMultiple(of: 4) && !todayYear.isMultiple(of: 100))
+        let birthdayDay = birthMonth == 2 && birthDay == 29 && !isLeapYear ? 28 : birthDay
+        let birthdayIsAhead = (todayMonth, todayDay) < (birthMonth, birthdayDay)
+        return todayYear - birthYear - (birthdayIsAhead ? 1 : 0)
     }
 
     public static func percent(_ part: Int, total: Int) -> Int {
