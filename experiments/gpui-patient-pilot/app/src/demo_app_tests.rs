@@ -394,7 +394,7 @@ fn hcg2_clean_shortcut_has_no_command_or_layout_shift(cx: &mut gpui::TestAppCont
 }
 
 #[gpui::test]
-fn hcg2_left_axis_is_shared(cx: &mut gpui::TestAppContext) {
+fn hcg2_container_and_text_axes_are_distinct(cx: &mut gpui::TestAppContext) {
     let (view, cx) = cx.add_window_view(PatientApp::new);
     for width in [390., 800., 1200.] {
         for dark in [false, true] {
@@ -405,14 +405,34 @@ fn hcg2_left_axis_is_shared(cx: &mut gpui::TestAppContext) {
                 cx.notify();
             });
             draw(cx);
-            let logo = bounds(cx, "demo-brand").left();
-            let search = bounds(cx, "demo-search").left();
-            let name = bounds(cx, "demo-patient-name-0").left();
+            let search = bounds(cx, "demo-search");
+            for id in [
+                "demo-brand",
+                "demo-list-title",
+                "demo-filters",
+                "demo-patient-row-0",
+            ] {
+                assert_eq!(
+                    bounds(cx, id).left(),
+                    search.left(),
+                    "container {id} at {width}/{dark}"
+                );
+            }
+            let row = bounds(cx, "demo-patient-row-0");
+            assert_eq!(row.right(), search.right());
+            let text = view.read_with(cx, |app, cx| app.search.read(cx).text_bounds().unwrap());
+            let name = bounds(cx, "demo-patient-name-0");
+            assert!(text.left() > search.left());
+            assert_eq!(name.left(), text.left(), "text axis at {width}/{dark}");
+            if let Some(note) = cx.debug_bounds("demo-patient-note-0") {
+                assert_eq!(row.right() - note.right(), text.left() - search.left());
+            }
             eprintln!(
-                "HC-G2 width={width} dark={dark} left axis logo={logo:?} search={search:?} name={name:?}"
+                "HC-G2 axes {width}/{dark}: edge={:?}, text={:?}, right inset={:?}",
+                search.left(),
+                text.left(),
+                row.right() - name.right()
             );
-            assert_eq!(logo, search);
-            assert_eq!(logo, name);
         }
     }
 }
@@ -555,5 +575,119 @@ fn hcg2_saved_shortcut_keeps_the_reserved_status_height(cx: &mut gpui::TestAppCo
             assert_eq!(before, after);
             assert!(cx.debug_bounds("clinical-workspace-review-save").is_none());
         }
+    }
+}
+
+#[gpui::test]
+fn hcg2_hide_shares_a_header_row(cx: &mut gpui::TestAppContext) {
+    let (view, cx) = cx.add_window_view(PatientApp::new);
+    for width in [390., 800., 1200.] {
+        for dark in [false, true] {
+            for show_list in [true, false] {
+                cx.simulate_resize(size(px(width), px(840.)));
+                view.update(cx, |app, cx| {
+                    app.show_list = show_list;
+                    app.dark_override = Some(dark);
+                    cx.notify();
+                });
+                draw(cx);
+                let hide = bounds(cx, "clinical-workspace-hide");
+                let brand = bounds(cx, "demo-brand");
+                let theme = bounds(cx, "clinical-workspace-day-theme");
+                assert!(
+                    (hide.top() < brand.bottom() && hide.bottom() > brand.top())
+                        || (hide.top() == theme.top() && hide.bottom() == theme.bottom()),
+                    "hide must share brand or segments row at {width}/{dark}/{show_list}: {hide:?}, {brand:?}, {theme:?}"
+                );
+            }
+        }
+    }
+}
+
+struct AppearanceProbe {
+    theme: Theme,
+    focus: FocusHandle,
+    style: std::rc::Rc<std::cell::RefCell<Option<gpui::Style>>>,
+}
+impl Render for AppearanceProbe {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let theme = self.theme;
+        let focus = self.focus.clone();
+        let result = self.style.clone();
+        gpui::canvas(
+            move |_, window, cx| {
+                let mut segment = crate::components::appearance_segment(
+                    Some(false),
+                    Some(false),
+                    "focus-test",
+                    "Giorno",
+                    theme,
+                )
+                .track_focus(&focus);
+                *result.borrow_mut() = Some(
+                    segment
+                        .interactivity()
+                        .compute_style(None, None, window, cx),
+                );
+            },
+            |_, _, _, _| {},
+        )
+        .size_full()
+    }
+}
+
+#[gpui::test]
+fn hcg2_appearance_has_track_fill_and_keyboard_only_ring(cx: &mut gpui::TestAppContext) {
+    for dark in [false, true] {
+        let theme = Theme::for_dark(dark);
+        let result = std::rc::Rc::new(std::cell::RefCell::new(None));
+        let (view, cx) = cx.add_window_view(|_, cx| AppearanceProbe {
+            theme,
+            focus: cx.focus_handle(),
+            style: result.clone(),
+        });
+        cx.simulate_click(gpui::point(px(1.), px(1.)), gpui::Modifiers::default());
+        cx.update(|window, cx| {
+            let focus = view.read(cx).focus.clone();
+            window.focus(&focus, cx);
+        });
+        draw(cx);
+        {
+            let style = result.borrow();
+            let pointer = style.as_ref().unwrap();
+            assert_eq!(pointer.background, Some(Fill::from(theme.paper)));
+            assert_ne!(
+                pointer.border_color,
+                Some(theme.fresh),
+                "pointer focus must not draw keyboard ring"
+            );
+        }
+        cx.simulate_keystrokes("tab");
+        cx.update(|window, cx| {
+            let focus = view.read(cx).focus.clone();
+            window.focus(&focus, cx);
+        });
+        draw(cx);
+        let style = result.borrow();
+        let keyboard = style.as_ref().unwrap();
+        assert_eq!(
+            keyboard.background,
+            Some(Fill::from(theme.paper)),
+            "keyboard focus keeps selection fill"
+        );
+        assert_eq!(keyboard.border_color, Some(theme.fresh));
+    }
+}
+
+#[gpui::test]
+fn hcg2_theme_track_is_visible(cx: &mut gpui::TestAppContext) {
+    let (view, cx) = cx.add_window_view(PatientApp::new);
+    for dark in [false, true] {
+        view.update(cx, |app, cx| {
+            app.theme = Theme::for_dark(dark);
+            let mut track = app.appearance(cx);
+            assert_eq!(track.style().border_color, Some(app.theme.strong_rule));
+            assert_eq!(track.style().background, Some(Fill::from(app.theme.shade)));
+        });
     }
 }

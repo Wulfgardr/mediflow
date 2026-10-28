@@ -56,7 +56,7 @@ enum Command {
 
 const LIST_INSET: f32 = 16.;
 const OUTER_INSET: f32 = 12.;
-const LEFT_AXIS: f32 = OUTER_INSET + LIST_INSET;
+const LIST_EDGE: f32 = OUTER_INSET + LIST_INSET;
 
 pub struct PatientApp {
     service: DemoService,
@@ -414,16 +414,10 @@ impl PatientApp {
     }
 
     fn appearance(&self, cx: &mut Context<Self>) -> Stateful<Div> {
-        div()
-            .id("demo-appearance")
-            .role(Role::TabList)
-            .aria_label("Aspetto")
-            .flex()
-            .min_w_0()
-            .gap(px(2.))
-            .bg(self.theme.shade)
-            .children(crate::components::APPEARANCE_CHOICES.into_iter().map(
-                |(value, id, label)| {
+        crate::components::appearance_track("demo-appearance", self.theme).children(
+            crate::components::APPEARANCE_CHOICES
+                .into_iter()
+                .map(|(value, id, label)| {
                     crate::components::appearance_segment(
                         value,
                         self.dark_override,
@@ -434,8 +428,8 @@ impl PatientApp {
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.command(Command::Appearance(value), window, cx)
                     }))
-                },
-            ))
+                }),
+        )
     }
 
     fn section(&self, id: &'static str, title: &'static str) -> Stateful<Div> {
@@ -475,6 +469,7 @@ impl PatientApp {
                     .justify_between()
                     .child(
                         div()
+                            .debug_selector(|| "demo-list-title".into())
                             .type_role(theme, TypeRole::PageTitle)
                             .child(text!("Pazienti")),
                     )
@@ -492,6 +487,7 @@ impl PatientApp {
             )
             .child(
                 div()
+                    .debug_selector(|| "demo-filters".into())
                     .flex()
                     .gap(px(8.))
                     .child(
@@ -557,6 +553,7 @@ impl PatientApp {
                             .child(
                                 div()
                                     .id("open")
+                                    .debug_selector(move || format!("demo-patient-row-{index}"))
                                     .role(Role::Button)
                                     .aria_label(SharedString::from(format!(
                                         "Apri la scheda di {}",
@@ -568,7 +565,7 @@ impl PatientApp {
                                     .min_h(px(40.))
                                     .border_b_1()
                                     .border_color(theme.strong_rule)
-                                    .px(px(0.))
+                                    .px(px(crate::components::CONTROL_TEXT_INSET))
                                     .py(px(8.))
                                     .flex()
                                     .items_center()
@@ -604,6 +601,9 @@ impl PatientApp {
                                         |el| {
                                             el.child(
                                                 div()
+                                                    .debug_selector(move || {
+                                                        format!("demo-patient-note-{index}")
+                                                    })
                                                     .type_role(theme, TypeRole::Meta)
                                                     .text_color(theme.secondary)
                                                     .child(text!("Note")),
@@ -859,6 +859,7 @@ impl Render for PatientApp {
         let single = width < px(1000.);
         let profile = self.workspace.selected().cloned();
         let locked = phase == Phase::Locked;
+        let hide_in_brand = width < px(500.);
 
         div().id("clinical-workspace-gpui-pilot").accessibility_id("clinical-workspace-gpui-pilot")
             .role(Role::Application).aria_label("MediFlow, prova pazienti con dati sintetici")
@@ -878,18 +879,20 @@ impl Render for PatientApp {
             .on_action(cx.listener(|this, _: &PreviousPatient, _, cx| this.step_patient(false, cx)))
             .on_action(cx.listener(|this, _: &NextPatient, _, cx| this.step_patient(true, cx)))
             .size_full().flex().flex_col().bg(theme.shade).text_color(theme.ink).type_role(theme, TypeRole::Body)
-            .child(div().flex_shrink_0().min_w_0().px(px(LEFT_AXIS)).py(px(12.)).flex().flex_wrap().items_center().justify_between().gap(px(12.)).when(single, |el| el.flex_col().items_stretch())
-                .child(div().flex().flex_col().gap(px(4.))
+            .child(div().flex_shrink_0().min_w_0().px(px(LIST_EDGE)).py(px(12.)).flex().flex_wrap().items_center().justify_between().gap(px(12.)).when(single, |el| el.flex_col().items_stretch())
+                .child(div().flex().items_start().justify_between().gap(px(8.))
+                    .child(div().flex().flex_col().gap(px(4.))
                     .child(div().debug_selector(|| "demo-brand".into()).type_role(theme, TypeRole::Brand).child(text!("MediFlow.")))
                     .child(div().id("clinical-workspace-synthetic-label").role(Role::Note).aria_label("Dati di prova. Modifiche solo in memoria.")
                         .type_role(theme, TypeRole::Meta).text_color(theme.secondary).child(text!(if single { "Dati di prova" } else { "Dati di prova · modifiche solo in memoria" }))))
-                .child(div().flex().flex_wrap().gap(px(8.))
+                    .when(hide_in_brand && !locked, |el| el.child(self.button("clinical-workspace-hide", "Nascondi", Command::Hide, false, true, cx).px(px(6.)))))
+                .child(div().flex().flex_wrap().items_center().gap(px(8.))
                     .child(self.appearance(cx).flex_shrink_0())
-                    .when(single && !self.show_list && !locked, |el| el.child(self.button("clinical-workspace-back-list", "Pazienti", Command::ShowList, false, true, cx).when(single, |el| el.px(px(6.)))))
-                    .when(!locked, |el| el.child(self.button("clinical-workspace-hide", if single { "Nascondi" } else { "Nascondi dati" }, Command::Hide, false, true, cx).when(single, |el| el.px(px(6.)))))))
+                    .when(!hide_in_brand && !locked, |el| el.child(self.button("clinical-workspace-hide", if single { "Nascondi" } else { "Nascondi dati" }, Command::Hide, false, true, cx).when(single, |el| el.px(px(6.)))))
+                    .when(single && !self.show_list && !locked, |el| el.child(self.button("clinical-workspace-back-list", "Pazienti", Command::ShowList, false, true, cx).when(single, |el| el.px(px(6.)))))))
             .when(self.message.as_deref().is_some_and(|message| message != error_message(ClientError::NoChanges)), |el| el.child(div().id("clinical-workspace-message").role(Role::Status)
                 .aria_label(SharedString::from(self.message.clone().unwrap_or_default()))
-                .mx(px(LEFT_AXIS)).mb(px(12.)).px(px(12.)).py(px(8.)).bg(theme.paper).border_l_2().border_color(theme.fresh)
+                .mx(px(LIST_EDGE)).mb(px(12.)).px(px(12.)).py(px(8.)).bg(theme.paper).border_l_2().border_color(theme.fresh)
                 .child(text!(self.message.clone().unwrap_or_default()))))
             .child(div().flex_1().min_h_0().min_w_0().flex().px(px(OUTER_INSET)).pb(px(16.))
                 .when(!locked && (!single || self.show_list), |el| el.child(self.sidebar(compact, cx).when(single, |el| el.w_full())))
