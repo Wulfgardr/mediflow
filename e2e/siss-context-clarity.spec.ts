@@ -85,3 +85,93 @@ test('SISS: comandi esterni, stati leggibili, diario e disclosure', async ({ pag
     await page.reload(); await openPatientSection(page, 'siss');
     await expect(pane.getByText('1 passaggio registrato', { exact: true })).toBeVisible();
 });
+
+async function readinessPatient(page: import('@playwright/test').Page, scale: boolean) {
+    await page.route('**/api/siss/session-status', route => route.fulfill({ json: { sessionHealth: 'none', lastModule: null, lastModuleAt: null, checkpoints: [] } }));
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    return page.evaluate(async scale => {
+        const patient = await fetch('/api/patients', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ firstName: 'Esportazione', lastName: 'Sintetica', taxCode: `HC10${crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`, birthDate: '1980-01-01T00:00:00Z', diagnoses: [] }) });
+        if (!patient.ok) throw new Error(`Paziente sintetico: ${patient.status}`);
+        const { id } = await patient.json();
+        if (scale) {
+            const entry = await fetch('/api/entries', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: crypto.randomUUID(), patientId: id, date: '2026-10-29T10:00:00Z', type: 'scale', title: 'Scala sintetica', content: 'Valutazione inventata', metadata: { title: 'Scala sintetica', score: 1.5 } }) });
+            if (!entry.ok) throw new Error(`Scala sintetica: ${entry.status}`);
+        }
+        const validation = await fetch(`/api/fse/validate-patient?patientId=${id}`);
+        if (!validation.ok) throw new Error(`Validazione reale: ${validation.status}`);
+        const value = await validation.json();
+        if (value.hasErrors || value.hasWarnings) throw new Error('La fixture richiede terapie e parametri senza rilievi');
+        return id as string;
+    }, scale);
+}
+
+for (const first of ['validation', 'bundle'] as const) {
+    test(`SISS: controlli completi, ${first} termina prima della scala bloccante`, async ({ page, baseURL }) => {
+        test.setTimeout(120_000);
+        if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).port === '3000') throw new Error('Runtime sintetico isolato richiesto');
+        const id = await readinessPatient(page, true);
+        let release!: () => void, observed!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        const completed = new Promise<void>(resolve => { observed = resolve; });
+        await page.route(/\/api\/(entries(?:\?|$)|fse\/validate-patient\?)/, async route => {
+            const validation = new URL(route.request().url()).pathname.includes('validate-patient');
+            if ((first === 'validation') !== validation) await gate;
+            const response = await route.fetch();
+            await route.fulfill({ response });
+            if ((first === 'validation') === validation) observed();
+        });
+        try {
+            await page.goto(`/patients/${id}/modules`); await openPatientSection(page, 'siss');
+            await completed;
+            const exports = page.locator('#siss').getByRole('region', { name: 'Esportazione locale', exact: true });
+            await expect(exports.getByText('Controllo dei dati per l’esportazione FSE in corso.', { exact: true })).toBeVisible();
+            await expect(exports.getByText('Dati pronti per l’esportazione FSE.', { exact: true })).toHaveCount(0);
+            release();
+            const blocked = exports.getByRole('alert').filter({ hasText: 'Dati da correggere per l’esportazione FSE.' });
+            await expect(blocked).toBeVisible();
+            await expect(blocked).toHaveClass(/mf-alert-critical/);
+            await expect(exports.getByText('Dati pronti per l’esportazione FSE.', { exact: true })).toHaveCount(0);
+        } finally { release(); }
+    });
+}
+
+for (const failure of ['http', 'network'] as const) {
+    test(`SISS: errore ${failure} è un avviso e non consente il download`, async ({ page, baseURL }) => {
+        test.setTimeout(120_000);
+        if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).port === '3000') throw new Error('Runtime sintetico isolato richiesto');
+        const id = await readinessPatient(page, false);
+        await page.route('**/api/fse/validate-patient?*', route => failure === 'http' ? route.fulfill({ status: 503, json: { error: 'Controllo sintetico indisponibile' } }) : route.abort('failed'));
+        await page.goto(`/patients/${id}/modules`); await openPatientSection(page, 'siss');
+        const pane = page.locator('#siss');
+        const exports = pane.getByRole('region', { name: 'Esportazione locale', exact: true });
+        const alert = exports.getByRole('alert').filter({ hasText: 'Controllo dei dati per l’esportazione FSE non disponibile.' });
+        await expect(alert).toBeVisible(); await expect(alert).toHaveClass(/mf-alert-critical/);
+        const requirements = pane.getByRole('button', { name: 'Requisiti e controllo locale dei dati', exact: true });
+        if (await requirements.getAttribute('aria-expanded') === 'true') await requirements.click();
+        await expect(alert).toBeVisible();
+        if (failure === 'http' && process.env.SISS_READINESS_SCREENSHOTS) {
+            const { mkdir } = await import('node:fs/promises');
+            await mkdir(process.env.SISS_READINESS_SCREENSHOTS, { recursive: true });
+            for (const theme of ['giorno', 'grafite']) for (const width of [390, 768, 1440]) {
+                await page.setViewportSize({ width, height: 960 });
+                await page.evaluate(theme => { document.documentElement.classList.toggle('dark', theme === 'grafite'); document.documentElement.classList.toggle('light', theme === 'giorno'); }, theme);
+                await exports.scrollIntoViewIfNeeded();
+                await page.screenshot({ path: `${process.env.SISS_READINESS_SCREENSHOTS}/errore-${theme}-${width}.png`, animations: 'disabled' });
+            }
+        }
+        await page.evaluate(() => {
+            const state = window as Window & { __hc10ExportUrls?: number };
+            state.__hc10ExportUrls = 0;
+            const original = URL.createObjectURL;
+            URL.createObjectURL = value => { state.__hc10ExportUrls = (state.__hc10ExportUrls ?? 0) + 1; return original(value); };
+        });
+        let downloads = 0;
+        page.on('download', () => downloads++);
+        await exports.getByRole('button', { name: 'Esporta FHIR', exact: true }).click();
+        await page.getByRole('dialog', { name: 'Esporta FHIR con controllo FSE', exact: true }).getByRole('button', { name: 'Scarica FHIR JSON', exact: true }).click();
+        await expect(page.getByRole('dialog', { name: 'Esporta FHIR con controllo FSE', exact: true })).toBeHidden();
+        expect(await page.evaluate(() => (window as Window & { __hc10ExportUrls?: number }).__hc10ExportUrls)).toBe(0);
+        expect(downloads).toBe(0);
+        await expect(page.getByText("Errore durante l'esportazione.", { exact: true })).toBeVisible();
+    });
+}

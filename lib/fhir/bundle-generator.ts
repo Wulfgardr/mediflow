@@ -10,14 +10,10 @@ export async function generatePatientBundle(
     const patient = await db.patients.get(patientId);
     if (!patient) throw new Error("Patient not found");
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const entries = await db.entries.filter((e: any) => e.patientId === patientId).toArray();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const therapies = await db.therapies.filter((t: any) => t.patientId === patientId).toArray();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const checkups = await db.checkups.filter((c: any) => c.patientId === patientId).toArray();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const observations = await db.observations.filter((o: any) => o.patientId === patientId).toArray();
+    const entries = await db.entries.query({ patientId }).toArray({ rejectAuthUnavailable: true });
+    const therapies = await db.therapies.query({ patientId }).toArray({ rejectAuthUnavailable: true });
+    const checkups = await db.checkups.query({ patientId }).toArray({ rejectAuthUnavailable: true });
+    const observations = await db.observations.query({ patientId }).toArray({ rejectAuthUnavailable: true });
 
     return prepareFhirBundleFromRecords({
         generatedAt: new Date(),
