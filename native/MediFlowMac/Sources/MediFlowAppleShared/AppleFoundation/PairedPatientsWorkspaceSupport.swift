@@ -3,18 +3,18 @@ import SwiftUI
 enum PairedPatientsWorkspaceSupport {
     static let clinicalPreviewCap = HomeBaseClinicalListLimit.boundaryMaximum
 
-    static let birthDateFormatter = ClinicalDatePresentation.day
+    static let birthDateFormatter = ClinicalDatePresentation.birthDate
 
     static func age(from birthDate: Date?) -> Int? {
         guard let birthDate else { return nil }
-        let years = Calendar.current.dateComponents([.year], from: birthDate, to: Date()).year
+        let years = ClinicalDatePresentation.birthDate.calendar.dateComponents([.year], from: birthDate, to: Date()).year
         guard let years, years >= 0, years < 140 else { return nil }
         return years
     }
 
     static func birthYear(from birthDate: Date?) -> Int? {
         guard let birthDate else { return nil }
-        let year = Calendar.current.component(.year, from: birthDate)
+        let year = ClinicalDatePresentation.birthDate.calendar.component(.year, from: birthDate)
         return year > 0 ? year : nil
     }
 

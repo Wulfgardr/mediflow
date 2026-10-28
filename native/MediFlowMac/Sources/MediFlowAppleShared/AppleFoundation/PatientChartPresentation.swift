@@ -14,6 +14,20 @@ enum PatientChartFieldValue: Equatable {
     }
 }
 
+enum PatientStructuredFields {
+    static func diagnoses(_ raw: String?) -> StructuredFieldRead<[ClinicalDiagnosis]> {
+        DiagnosesCodec.decodeResult(raw)
+    }
+
+    static func exemptions(_ raw: String?) -> StructuredFieldRead<[String]> {
+        ExemptionCodesCodec.decodeResult(raw)
+    }
+
+    static func unreadableMessage(_ field: String) -> String {
+        "\(field) presenti ma non leggibili su questo dispositivo."
+    }
+}
+
 #if os(iOS)
 struct PatientChartGroup<Content: View>: View {
     let title: String

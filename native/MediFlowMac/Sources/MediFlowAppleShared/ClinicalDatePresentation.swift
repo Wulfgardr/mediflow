@@ -20,8 +20,10 @@ enum ClinicalDatePresentation {
     }()
     static let birthDate: DateFormatter = {
         let formatter = makeFormatter(dateStyle: .medium)
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
         return formatter
     }()
     static let fileDay: DateFormatter = {

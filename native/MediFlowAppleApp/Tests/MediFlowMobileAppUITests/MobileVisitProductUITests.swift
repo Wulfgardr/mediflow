@@ -26,7 +26,7 @@ final class MobileVisitProductUITests: XCTestCase {
         XCTAssertLessThanOrEqual(row.frame.maxY, tabBar.frame.minY)
         row.tap()
         XCTAssertTrue(app.descendants(matching: .any)
-            .matching(identifier: "patient-compact-header-disclosure").firstMatch.waitForExistence(timeout: 10))
+            .matching(identifier: "patient-detail-name").firstMatch.waitForExistence(timeout: 10))
     }
 
     func testRealAppVisitPreparationOfflineRestartAndOrdinaryRegistration() {
