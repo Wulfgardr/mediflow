@@ -38,7 +38,7 @@ use mediflow_runtime_client::{
     RuntimeConfig, RuntimeError, RuntimeSession, TerminologyRegistryEntry,
     TerminologyRegistryStatus, Therapy, TherapyDraft,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use zeroize::Zeroizing;
 
@@ -434,7 +434,7 @@ pub struct ClinicalApp {
     search: Entity<TextInput>,
     search_target: ScrollTarget,
     directory_scroll: ScrollHandle,
-    patient_targets: HashMap<String, ScrollTarget>,
+    patient_targets: BTreeMap<String, ScrollTarget>,
     form: Option<Form>,
     discard: Option<Discard>,
     message: Option<(String, bool)>,
@@ -690,7 +690,7 @@ impl ClinicalApp {
             search,
             search_target: ScrollTarget::new(&directory_scroll, cx),
             directory_scroll,
-            patient_targets: HashMap::new(),
+            patient_targets: BTreeMap::new(),
             form: None,
             discard: None,
             message: None,
@@ -1551,7 +1551,7 @@ impl ClinicalApp {
         }
         // Only IDs already present in the visible directory are retained. A row's
         // focus identity survives repaint/filtering until that row leaves the UI.
-        let visible_ids: HashSet<_> = self
+        let visible_ids: BTreeSet<_> = self
             .patients
             .ready()
             .into_iter()
@@ -2862,6 +2862,31 @@ impl ClinicalApp {
             )
     }
 
+    fn appearance(&self, cx: &Context<Self>) -> Stateful<Div> {
+        div()
+            .id("clinical-workspace-appearance")
+            .role(Role::TabList)
+            .aria_label("Aspetto")
+            .flex()
+            .min_w_0()
+            .gap(px(2.))
+            .bg(self.theme.shade)
+            .children(crate::components::APPEARANCE_CHOICES.into_iter().map(
+                |(value, id, label)| {
+                    crate::components::appearance_segment(
+                        value,
+                        self.dark_override,
+                        id,
+                        label,
+                        self.theme,
+                    )
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.change_local_preference(PreferenceChange::Appearance(value), cx)
+                    }))
+                },
+            ))
+    }
+
     fn login_view(&self, layout: Layout, cx: &Context<Self>) -> Stateful<Div> {
         let theme = self.theme;
         let paired = self.pairing.is_some();
@@ -2870,8 +2895,7 @@ impl ClinicalApp {
             .flex().flex_col().gap(px(16.))
             .child(div().min_w_0().max_w_full().flex().flex_wrap().items_center().justify_between().gap(px(12.))
                 .child(self.brand(true))
-                .child(button("clinical-workspace-login-theme", if self.dark { "Giorno" } else { "Grafite" }, theme, false, true)
-                    .on_click(cx.listener(|this, _, _, cx| this.change_local_preference(PreferenceChange::Appearance(Some(!this.dark)), cx)))))
+                .child(self.appearance(cx)))
             .child(self.local_preferences_status(cx))
             .child(div().flex().flex_col().gap(px(8.))
                 .child(heading("clinical-workspace-connect-heading", if paired { "Accedi al tuo archivio" } else { "Collega questo dispositivo" }, theme))
@@ -5414,10 +5438,7 @@ impl ClinicalApp {
             .child(self.account_profile_view(cx))
             .child(div().flex().flex_col().gap(px(12.))
                 .child(section("clinical-workspace-appearance-heading", "ASPETTO", theme))
-                .child(div().flex().flex_wrap().gap(px(8.))
-                    .children([(None, "clinical-workspace-system-theme", "Sistema"), (Some(false), "clinical-workspace-day-theme", "Giorno"), (Some(true), "clinical-workspace-night-theme", "Grafite")]
-                        .into_iter().map(|(value, id, label)| tab(id, label, self.dark_override == value, theme)
-                            .on_click(cx.listener(move |this, _, _, cx| this.change_local_preference(PreferenceChange::Appearance(value), cx)))))))
+                .child(self.appearance(cx)))
             .child(div().flex().flex_col().gap(px(12.))
                 .child(section("clinical-workspace-text-scale-heading", "DIMENSIONE DEL TESTO", theme))
                 .child(div().text_color(theme.secondary).child(text!("La pagina passa a una sola colonna quando serve più spazio per leggere.")))
@@ -7571,6 +7592,27 @@ fn ui_error(error: impl std::fmt::Display) -> String {
 
 #[cfg(test)]
 mod tests {
+
+    #[gpui::test]
+    fn hcg2_patient_focus_registry_has_stable_traversal(cx: &mut gpui::TestAppContext) {
+        for ids in [["c", "a", "b"], ["b", "c", "a"], ["a", "b", "c"]] {
+            let (view, cx) =
+                cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+            view.update(cx, |app, cx| {
+                for id in ids {
+                    app.patient_targets
+                        .insert(id.into(), ScrollTarget::new(&app.directory_scroll, cx));
+                }
+                assert_eq!(
+                    app.patient_targets
+                        .keys()
+                        .map(String::as_str)
+                        .collect::<Vec<_>>(),
+                    ["a", "b", "c"]
+                );
+            });
+        }
+    }
     use super::*;
     use gpui::Focusable;
 

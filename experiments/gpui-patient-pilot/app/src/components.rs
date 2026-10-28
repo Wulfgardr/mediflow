@@ -8,6 +8,33 @@ use gpui::{
 };
 use std::sync::{Arc, OnceLock};
 
+pub const APPEARANCE_CHOICES: [(Option<bool>, &str, &str); 3] = [
+    (
+        None,
+        "clinical-workspace-system-theme",
+        "Aspetto di sistema",
+    ),
+    (Some(false), "clinical-workspace-day-theme", "Giorno"),
+    (Some(true), "clinical-workspace-night-theme", "Grafite"),
+];
+
+pub fn appearance_segment(
+    value: Option<bool>,
+    current: Option<bool>,
+    id: &'static str,
+    label: &'static str,
+    theme: Theme,
+) -> Stateful<Div> {
+    tab(id, label, value == current, theme)
+        .debug_selector(move || id.into())
+        .px(px(6.))
+        .when(value == current, |el| {
+            el.bg(theme.paper)
+                .border_color(theme.paper)
+                .text_color(theme.ink)
+        })
+}
+
 pub fn button(
     id: impl Into<SharedString>,
     label: impl Into<SharedString>,
