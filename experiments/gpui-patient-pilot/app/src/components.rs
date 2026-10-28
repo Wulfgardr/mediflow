@@ -18,6 +18,24 @@ pub const APPEARANCE_CHOICES: [(Option<bool>, &str, &str); 3] = [
     (Some(true), "clinical-workspace-night-theme", "Grafite"),
 ];
 
+pub const CONTROL_TEXT_INSET: f32 = 9.;
+
+pub fn appearance_track(id: &'static str, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .debug_selector(move || id.into())
+        .role(Role::TabList)
+        .aria_label("Aspetto")
+        .flex()
+        .min_w_0()
+        .gap(px(2.))
+        .p(px(2.))
+        .border_1()
+        .border_color(theme.strong_rule)
+        .bg(theme.shade)
+        .rounded(px(theme.control_radius))
+}
+
 pub fn appearance_segment(
     value: Option<bool>,
     current: Option<bool>,
@@ -25,14 +43,41 @@ pub fn appearance_segment(
     label: &'static str,
     theme: Theme,
 ) -> Stateful<Div> {
-    tab(id, label, value == current, theme)
+    let selected = value == current;
+    div()
+        .id(id)
+        .accessibility_id(id)
         .debug_selector(move || id.into())
+        .role(Role::Tab)
+        .aria_label(label)
+        .aria_selected(selected)
+        .focusable()
+        .tab_stop(true)
+        .cursor_pointer()
+        .min_w_0()
+        .max_w_full()
+        .min_h(px(44.))
         .px(px(6.))
-        .when(value == current, |el| {
-            el.bg(theme.paper)
-                .border_color(theme.paper)
-                .text_color(theme.ink)
-        })
+        .py(px(8.))
+        .flex()
+        .items_center()
+        .justify_center()
+        .type_role(
+            theme,
+            if selected {
+                TypeRole::Strong
+            } else {
+                TypeRole::Body
+            },
+        )
+        .rounded(px(theme.control_radius))
+        .border_2()
+        .border_color(gpui::transparent_black())
+        .bg(if selected { theme.paper } else { theme.shade })
+        .text_color(if selected { theme.ink } else { theme.secondary })
+        .hover(move |style| style.bg(if selected { theme.paper } else { theme.hover }))
+        .focus_visible(move |style| style.border_color(theme.fresh))
+        .child(control_label(label.into()))
 }
 
 pub fn button(

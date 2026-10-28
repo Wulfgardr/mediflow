@@ -2863,16 +2863,10 @@ impl ClinicalApp {
     }
 
     fn appearance(&self, cx: &Context<Self>) -> Stateful<Div> {
-        div()
-            .id("clinical-workspace-appearance")
-            .role(Role::TabList)
-            .aria_label("Aspetto")
-            .flex()
-            .min_w_0()
-            .gap(px(2.))
-            .bg(self.theme.shade)
-            .children(crate::components::APPEARANCE_CHOICES.into_iter().map(
-                |(value, id, label)| {
+        crate::components::appearance_track("clinical-workspace-appearance", self.theme).children(
+            crate::components::APPEARANCE_CHOICES
+                .into_iter()
+                .map(|(value, id, label)| {
                     crate::components::appearance_segment(
                         value,
                         self.dark_override,
@@ -2883,8 +2877,8 @@ impl ClinicalApp {
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.change_local_preference(PreferenceChange::Appearance(value), cx)
                     }))
-                },
-            ))
+                }),
+        )
     }
 
     fn login_view(&self, layout: Layout, cx: &Context<Self>) -> Stateful<Div> {
