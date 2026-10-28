@@ -89,6 +89,20 @@ final class PatientSummaryPresentationTests: XCTestCase {
         XCTAssertNil(PairedPatientsWorkspaceView.age(from: nil))
     }
 
+    func testPatientAgeRemainsVisibleWithNonGregorianDeviceCalendars() throws {
+        let birth = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("1986-10-28T20:00:00Z"))
+        let now = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("2026-10-28T19:00:00Z"))
+        for identifier in [Calendar.Identifier.buddhist, .japanese, .islamic] {
+            for zone in ["Europe/Rome", "America/Los_Angeles", "Pacific/Kiritimati"] {
+                var preferred = Calendar(identifier: identifier)
+                preferred.timeZone = try XCTUnwrap(TimeZone(identifier: zone))
+                XCTAssertEqual(PairedPatientsWorkspaceSupport.age(from: birth, at: now, calendar: preferred), 40,
+                    "Lista e testata: \(identifier), \(zone)")
+                XCTAssertEqual(PairedPatientsWorkspaceSupport.birthYearText(from: birth), "1986")
+            }
+        }
+    }
+
     func testAgeFromBirthDateFortyYearsAgo() {
         let birth = HomeBaseDateCoding.parseISO8601("1986-10-28T20:00:00Z")
         let now = HomeBaseDateCoding.parseISO8601("2026-10-28T19:00:00Z")!

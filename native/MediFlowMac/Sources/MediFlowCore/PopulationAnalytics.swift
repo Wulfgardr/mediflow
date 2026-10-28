@@ -84,11 +84,14 @@ public enum PopulationAnalytics {
         return calendar
     }()
 
-    /// Birth is a Gregorian UTC civil date; today follows the device calendar.
+    /// Both civil dates are Gregorian: birth in UTC, today in the device time zone.
+    /// The supplied calendar contributes only its time zone, never its year or era.
     /// A February 29 birthday falls on February 28 in non-leap years.
-    public static func age(at now: Date, from birthDate: Date, calendar: Calendar = .current) -> Int {
+    public static func age(at now: Date, from birthDate: Date, calendar: Calendar = Calendar(identifier: .gregorian)) -> Int {
+        var todayCalendar = Calendar(identifier: .gregorian)
+        todayCalendar.timeZone = calendar.timeZone
         let birth = birthCalendar.dateComponents([.year, .month, .day], from: birthDate)
-        let today = calendar.dateComponents([.year, .month, .day], from: now)
+        let today = todayCalendar.dateComponents([.year, .month, .day], from: now)
         guard let birthYear = birth.year, let birthMonth = birth.month, let birthDay = birth.day,
               let todayYear = today.year, let todayMonth = today.month, let todayDay = today.day else { return 0 }
         let isLeapYear = todayYear.isMultiple(of: 400)
@@ -114,7 +117,7 @@ public enum PopulationAnalytics {
         for patients: [PopulationPatient],
         ageRange: (Int, Int),
         now: Date,
-        calendar: Calendar = .current
+        calendar: Calendar = Calendar(identifier: .gregorian)
     ) -> PopulationAnalyticsStats {
         let (minimumAge, maximumAge) = normalizeAgeRange(ageRange)
         var ageDistribution = Dictionary(uniqueKeysWithValues: PopulationAgeBucket.allCases.map { ($0, 0) })
