@@ -151,7 +151,15 @@ impl ClinicalApp {
         else {
             return;
         };
-        let Some(directory) = self.local_preferences.ambulatory_command_directory() else {
+        let directory = match self.local_preferences.ambulatory_command_directory() {
+            Ok(directory) => directory,
+            Err(error) => {
+                self.preferences_error = Some(error.to_string());
+                self.preferences_issue = Some(PreferenceIssue::Read);
+                None
+            }
+        };
+        let Some(directory) = directory else {
             let state = &mut self.ambulatory_management.destructive;
             state.loaded = true;
             state.error = Some(RuntimeError::ReadRequired);

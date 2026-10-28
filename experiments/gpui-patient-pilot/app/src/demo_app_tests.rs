@@ -699,3 +699,79 @@ fn hcg2_theme_track_is_visible(cx: &mut gpui::TestAppContext) {
         });
     }
 }
+
+#[gpui::test]
+fn hcg3_click_each_appearance_segment_survives_reopening(cx: &mut gpui::TestAppContext) {
+    for (choice, id) in [
+        (None, "clinical-workspace-system-theme"),
+        (Some(false), "clinical-workspace-day-theme"),
+        (Some(true), "clinical-workspace-night-theme"),
+    ] {
+        let fixture = crate::shell::local_preferences::tests::Fixture::new();
+        let initial = if choice == Some(true) {
+            Some(false)
+        } else {
+            Some(true)
+        };
+        fixture
+            .store()
+            .save(crate::shell::local_preferences::LocalPreferences {
+                dark_override: initial,
+                ..Default::default()
+            })
+            .unwrap();
+        let (view, visual) = cx.add_window_view(|window, cx| {
+            PatientApp::with_preferences(fixture.store(), window, cx)
+        });
+        draw(visual);
+        let target = bounds(visual, id).center();
+        visual.simulate_click(target, gpui::Modifiers::default());
+        draw(visual);
+        view.read_with(visual, |app, _| {
+            assert_eq!(app.dark_override, choice, "click {id}")
+        });
+
+        let (reopened, visual) = cx.add_window_view(|window, cx| {
+            PatientApp::with_preferences(fixture.store(), window, cx)
+        });
+        draw(visual);
+        let system_dark = visual.update(|window, _| is_dark(window));
+        reopened.read_with(visual, |app, _| {
+            assert_eq!(app.dark_override, choice, "reopening after click {id}");
+            assert_eq!(
+                app.dark,
+                choice.unwrap_or(system_dark),
+                "effective theme after {id}"
+            );
+        });
+        let (saved, failed) = fixture.store().load();
+        assert!(!failed);
+        assert_eq!(saved.dark_override, choice);
+    }
+}
+
+#[gpui::test]
+fn hcg3_demo_initial_preferences_error_is_visible_and_preserves_the_file(
+    cx: &mut gpui::TestAppContext,
+) {
+    let fixture = crate::shell::local_preferences::tests::Fixture::new();
+    fixture
+        .store()
+        .save(crate::shell::local_preferences::LocalPreferences::default())
+        .unwrap();
+    let path = fixture.0.join("preferences.json");
+    std::fs::write(&path, b"{broken").unwrap();
+    let (view, visual) =
+        cx.add_window_view(|window, cx| PatientApp::with_preferences(fixture.store(), window, cx));
+    draw(visual);
+    assert!(visual.debug_bounds("clinical-workspace-message").is_some());
+    view.update(visual, |app, _| {
+        assert!(
+            app.status_message()
+                .unwrap()
+                .contains("non sono state caricate")
+        );
+        assert_eq!(app.dark_override, None);
+    });
+    assert_eq!(std::fs::read(path).unwrap(), b"{broken");
+}

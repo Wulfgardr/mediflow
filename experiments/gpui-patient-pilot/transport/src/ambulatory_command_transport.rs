@@ -586,7 +586,11 @@ mod tests {
     fn store_path(
         flow: &HostAmbulatoryCommand,
     ) -> (AmbulatoryCommandRecoveryStore, std::path::PathBuf) {
-        let directory = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        #[cfg(not(windows))]
+        let root = std::env::temp_dir();
+        #[cfg(windows)]
+        let root = std::path::PathBuf::from(std::env::var_os("LOCALAPPDATA").unwrap());
+        let directory = root.canonicalize().unwrap().join(format!(
             "mediflow-command-transport-{}",
             crate::http::operation_uuid().unwrap()
         ));

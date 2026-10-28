@@ -11,6 +11,7 @@ mod icons;
 mod native_lock;
 mod navigation;
 mod patient_forms;
+mod platform_integration;
 mod references;
 mod shell;
 mod text_input;
@@ -21,8 +22,13 @@ use std::{borrow::Cow, path::PathBuf};
 
 const STATE_DIRECTORY_MISSING: &str = "Indica una cartella dopo --state-directory.";
 const STATE_DIRECTORY_INVALID: &str = "La cartella deve essere assoluta, già esistente, privata, appartenere all’utente corrente e non contenere collegamenti simbolici nel percorso.";
+#[cfg(not(windows))]
 const STATE_DIRECTORY_UNSUPPORTED: &str = "L’opzione --state-directory non è supportata su questa piattaforma. Non è possibile usare la cartella indicata per le preferenze e i dati di recupero dell’interfaccia.";
 
+#[cfg(all(windows, test))]
+const STATE_DIRECTORY_UNSUPPORTED: &str = "Le ACL della cartella Windows non sono verificabili: sono ammesse solo ACE standard per l'utente corrente. La cartella non è stata usata per preferenze o recupero dell'interfaccia.";
+
+#[cfg(any(not(windows), test))]
 fn state_directory_error(kind: std::io::ErrorKind) -> &'static str {
     match kind {
         std::io::ErrorKind::Unsupported => STATE_DIRECTORY_UNSUPPORTED,
@@ -101,6 +107,9 @@ fn main() {
             match shell::local_preferences::LocalPreferencesStore::from_directory(directory) {
                 Ok(store) => Some(store),
                 Err(error) => {
+                    #[cfg(windows)]
+                    eprintln!("Impossibile usare la cartella di stato: {error}");
+                    #[cfg(not(windows))]
                     eprintln!("{}", state_directory_error(error.kind()));
                     std::process::exit(2);
                 }
@@ -125,20 +134,29 @@ fn main() {
         }
         text_input::bind_keys(cx);
         if launch.demo { demo_app::bind_keys(cx); } else { shell::bind_keys(cx); }
-        let bounds = Bounds::centered(None, size(px(1200.), px(840.)), cx);
+        let display = cx.primary_display();
+        let available = display.as_ref().map(|display| display.visible_bounds());
+        let bounds = available.map(platform_integration::initial_bounds)
+            .unwrap_or_else(|| Bounds::centered(None, size(px(1200.), px(840.)), cx));
         let options = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(bounds)),
-            window_min_size: Some(size(px(390.), px(640.))),
+            window_min_size: Some(size(px(390.).min((bounds.size.width - px(32.)).max(px(1.))), px(640.).min((bounds.size.height - px(80.)).max(px(1.))))),
+            app_id: Some("dev.mediflow.MediFlow".into()),
             titlebar: Some(TitlebarOptions { title: Some(if launch.demo { "MediFlow · Dati di prova".into() } else { "MediFlow".into() }), ..Default::default() }),
             ..Default::default()
         };
         let result = if launch.demo {
-            cx.open_window(options, |window, cx| cx.new(|cx| demo_app::PatientApp::new(window, cx))).map(|_| ())
+            cx.open_window(options, |window, cx| {
+                platform_integration::fit_window(window);
+                cx.new(|cx| demo_app::PatientApp::with_preferences(local_preferences.unwrap_or_else(shell::local_preferences::LocalPreferencesStore::system), window, cx))
+            }).map(|_| ())
         } else {
-            cx.open_window(options, |window, cx| cx.new(|cx| match local_preferences {
+            cx.open_window(options, |window, cx| {
+                platform_integration::fit_window(window);
+                cx.new(|cx| match local_preferences {
                 Some(store) => shell::ClinicalApp::with_local_preferences(launch.server, store, window, cx),
                 None => shell::ClinicalApp::new(launch.server, window, cx),
-            })).map(|_| ())
+            }) }).map(|_| ())
         };
         if let Err(error) = result {
             eprintln!("Impossibile aprire la finestra di MediFlow: {error}");

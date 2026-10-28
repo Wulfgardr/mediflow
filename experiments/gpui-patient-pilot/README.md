@@ -213,6 +213,28 @@ il file; se fallisce, la scelta resta nella finestra con un errore e un
 comando esplicito per riprovare. Un file non leggibile o non valido non viene
 riscritto all'apertura: la finestra parte coperta e segnala il problema.
 
+Su Windows i percorsi canonici di stato sono ammessi soltanto sotto
+`%LOCALAPPDATA%` o `%USERPROFILE%` dell'utente corrente. Queste radici e la
+normale catena del profilo Windows sono il confine attendibile: non vengono
+ammessi percorsi esterni, neppure se la cartella finale sembra privata.
+La cartella deve appartenere all'utente, avere DACL protetta, accesso completo
+con ereditarietà OI|CI per l'utente e nessuna concessione ad altri SID. Reparse
+point, ACE non supportate e ACL non attestabili vengono rifiutati; le ACL
+esistenti non vengono corrette.
+
+Preferenze, temporanei atomici, file e lock del recupero vengono creati con un
+descrittore esplicito protetto per il solo utente. Prima della lettura vengono
+verificati tipo, proprietario e DACL sull'handle aperto; un file non attestabile
+non viene caricato. Gli errori iniziali conservano la causa ACL nel client e
+nella demo. La politica non attesta profili deliberatamente condivisi o radici
+reindirizzate verso catene gestite da altri utenti. La demo conserva il tema nello
+stesso store senza conservare i pazienti inventati o le loro modifiche.
+
+Su Linux l'identificatore della finestra è `dev.mediflow.MediFlow`. Non è presente
+un file `.desktop` nel repository; questo identificatore può essere usato dalle
+regole del compositor e da un futuro launcher.
+
+
 «Oscura contenuti» e Ctrl/Cmd+Maiusc+P sostituiscono l'intera superficie con
 la schermata privacy, conservando la bozza in memoria. «Mostra contenuti»
 o lo stesso tasto ripristinano la superficie; «Blocca l'accesso» riusa invece
@@ -303,7 +325,7 @@ incorporati dal checkout.
 | --- | --- |
 | Linux | C/C++, `pkg-config`, Fontconfig, GLib, Wayland, X11/XCB, xkbcommon; display e renderer compatibile per la finestra. Un font emoji del desktop è necessario per i simboli non contenuti nei font MediFlow. I dialoghi file richiedono una sessione D-Bus e xdg-desktop-portal con un backend del desktop. |
 | macOS | Xcode, strumenti a riga di comando e compilatore Metal. |
-| Windows | Rust MSVC, strumenti C++ e Windows SDK. |
+| Windows | Rust MSVC, strumenti C++ e Windows SDK. Per Windows ARM servono anche LLVM/Clang dei VS Build Tools e `clang-cl` nel PATH (`CC_aarch64_pc_windows_msvc=clang-cl`). |
 
 Su Ubuntu 24.04:
 
