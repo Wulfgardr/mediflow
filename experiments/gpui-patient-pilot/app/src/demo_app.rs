@@ -153,6 +153,7 @@ impl PatientApp {
         let profile_scroll = ScrollHandle::new();
         let notes_anchor = ScrollAnchor::for_handle(profile_scroll.clone());
         let mut subscriptions = vec![notes_subscription, search_subscription];
+        subscriptions.push(cx.observe_window_appearance(window, |_, _, cx| cx.notify()));
         let anchor = notes_anchor.clone();
         subscriptions.push(cx.on_focus(
             &notes.read(cx).focus_handle(cx),
