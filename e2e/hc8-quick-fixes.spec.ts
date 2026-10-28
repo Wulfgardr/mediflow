@@ -41,7 +41,7 @@ test('ricerca a 390: un solo Cancella intero, attivabile e con ritorno al campo'
     await page.goto('/?area=incarico');
     const search = page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' });
     await search.fill('Persona sintetica inesistente');
-    const clear = page.getByRole('button', { name: 'Cancella', exact: true });
+    const clear = page.getByRole('button', { name: 'Cancella la ricerca', exact: true });
     await expect(clear).toHaveCount(1);
     await assertNotClippedInViewport(clear, 'Cancella');
     const box = await clear.boundingBox();
