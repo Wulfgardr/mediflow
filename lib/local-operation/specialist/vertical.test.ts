@@ -476,14 +476,26 @@ test('CU-1 censimento: interazioni senza tag o ruolo speciale e delegate sono in
 
 test('CU-1 epoca: timer già accodato resta sospeso dal censimento alla conclusione dell’atto', async t => {
     const f = await fixture(t), cap = await authorized(f);
-    await hostilePage(f, `<script>setTimeout(() => {
-        const d = document.createElement('dialog'); d.open = true;
-        d.innerHTML = '<input name="unreviewedClinical" value="SYNTHETIC_SENTINEL">';
-        document.body.append(d);
-    }, 150); document.currentScript.remove();</script>`);
+    const clock = await f.browser.context.newCDPSession(f.browser.page);
+    const navigate = f.browser.page.goto.bind(f.browser.page);
+    f.browser.page.goto = async (...args) => {
+        const response = await navigate(...args);
+        await clock.send('Emulation.setVirtualTimePolicy', { policy: 'pause' });
+        await f.browser.page.evaluate(() => {
+            setTimeout(() => {
+                const d = document.createElement('dialog'); d.open = true;
+                d.innerHTML = '<input name="unreviewedClinical" value="SYNTHETIC_SENTINEL">';
+                document.body.append(d);
+            }, 150);
+        });
+        return response;
+    };
     let unexpectedBeforeClick = -1;
     await beforeExecutorClick(f, async () => {
-        await new Promise(resolve => setTimeout(resolve, 250));
+        const expired = new Promise<void>(resolve => clock.once('Emulation.virtualTimeBudgetExpired', () => resolve()));
+        await clock.send('Emulation.setVirtualTimePolicy', { policy: 'advance', budget: 250 });
+        await expired;
+        await clock.send('Emulation.setVirtualTimePolicy', { policy: 'advance' });
         unexpectedBeforeClick = await f.browser.page.locator('dialog input').count();
     });
     const result = await f.service.execute(cap).then(value => value.state, () => 'rejected');
