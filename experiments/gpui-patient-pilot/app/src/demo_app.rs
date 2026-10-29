@@ -520,7 +520,7 @@ impl PatientApp {
                         div()
                             .debug_selector(|| "demo-list-title".into())
                             .type_role(theme, TypeRole::PageTitle)
-                            .child(text!("Pazienti")),
+                            .child(crate::title::title("Pazienti", theme)),
                     )
                     .child(
                         div()
@@ -737,7 +737,7 @@ impl PatientApp {
             .child(div().flex_shrink_0().min_w_0().p(px(if compact { 16. } else { 28. })).border_b_1().border_color(theme.rule).flex().flex_wrap().items_center().justify_between().gap(px(16.)).when(compact, |el| el.flex_col().items_stretch())
                 .child(div().flex_1().min_w_0().max_w_full().flex().flex_col().gap(px(8.))
                     .child(div().id("clinical-workspace-patient-name").role(Role::Heading).aria_level(1).aria_label(SharedString::from(profile.display_name()))
-                        .type_role(theme, TypeRole::Person { compact }).child(text!(profile.display_name())))
+                        .type_role(theme, TypeRole::Person { compact }).child(crate::title::title(profile.display_name(), theme)))
                     .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary).child(text!(if profile.is_archived { "Scheda di prova in archivio" } else { "Scheda di prova in carico" }))))
                 .when(!compact, |el| el.child(self.profile_actions(phase, cx))))
             .child(div().id("clinical-workspace-profile-scroll").debug_selector(|| "clinical-workspace-profile-scroll".into()).flex_1().min_h_0().min_w_0().overflow_y_scroll().track_scroll(&self.profile_scroll)
@@ -947,13 +947,13 @@ impl Render for PatientApp {
             .child(div().flex_1().min_h_0().min_w_0().flex().px(px(OUTER_INSET)).pb(px(16.))
                 .when(!locked && (!single || self.show_list), |el| el.child(self.sidebar(compact, cx).when(single, |el| el.w_full())))
                 .when(locked, |el| el.child(div().flex_1().flex().flex_col().items_center().justify_center().gap(px(20.)).bg(theme.paper).rounded(px(theme.paper_radius))
-                    .child(div().type_role(theme, TypeRole::PageTitle).child(text!("Dati di prova nascosti")))
+                    .child(div().type_role(theme, TypeRole::PageTitle).child(crate::title::title("Dati di prova nascosti", theme)))
                     .child(text!("Le schede sintetiche restano in memoria fino alla chiusura."))
                     .child(self.button("clinical-workspace-resume", "Mostra dati di prova", Command::Resume, true, true, cx))))
                 .when(!locked && (!single || !self.show_list), |el| match profile {
                     Some(ref profile) => el.child(self.profile(profile, compact, cx)),
                     None => el.child(div().flex_1().flex().flex_col().items_center().justify_center().gap(px(20.)).p(px(28.)).bg(theme.paper).rounded(px(theme.paper_radius))
-                        .child(div().type_role(theme, TypeRole::PageTitle).child(text!(if phase == Phase::Unavailable { "La scheda non è disponibile" } else { "Seleziona una scheda di prova" })))
+                        .child(div().type_role(theme, TypeRole::PageTitle).child(crate::title::title(if phase == Phase::Unavailable { "La scheda non è disponibile" } else { "Seleziona una scheda di prova" }, theme)))
                         .child(text!(if phase == Phase::Unavailable { "La lettura non è riuscita. Nessun dato viene mostrato come vuoto." } else { "Scegli un paziente dall'elenco per leggere o modificare le note." }))
                         .when(phase == Phase::Unavailable, |el| el.child(self.button("clinical-workspace-retry-read", "Riprova", Command::Refresh, true, true, cx)))),
                 }))

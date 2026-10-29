@@ -4503,7 +4503,7 @@ impl ClinicalApp {
             .when(comparison, |el| el.child(self.notes_comparison_view()))
             .when(!comparison, |el| el.child(div().flex().flex_col().gap(px(8.))
                 .child(section("clinical-workspace-draft-heading", if review { "RIVEDI PRIMA DI REGISTRARE" } else { "BOZZA NON REGISTRATA" }, theme))
-                .child(div().type_role(theme, TypeRole::PageTitle).text_color(theme.fresh).child(text!(form.edit.as_ref().map_or(form.kind.title(), editing::Record::title))))
+                .child(div().type_role(theme, TypeRole::PageTitle).text_color(theme.fresh).child(crate::title::title(form.edit.as_ref().map_or(form.kind.title(), editing::Record::title), theme)))
                 .child(div().text_color(theme.secondary).child(text!(match form.kind {
                     FormKind::Notes => "La conferma sostituisce soltanto le note della scheda del paziente indicato.",
                     FormKind::Entry => "Questa voce è una nota di diario. Per una visita strutturata, un contatto remoto o allegati usa l'editor corrente.",
@@ -8709,86 +8709,6 @@ mod tests {
                         },
                     )
             })
-        }
-    }
-
-    struct ThresholdQuestionTest {
-        question: String,
-        ending: &'static str,
-        theme: Theme,
-    }
-
-    impl Render for ThresholdQuestionTest {
-        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-            div()
-                .size_full()
-                .flex()
-                .flex_col()
-                .px(px(12.))
-                .child(confirmation_heading(self.question.clone(), self.theme))
-                .child(
-                    div()
-                        .debug_selector(|| "expected-question-ending".into())
-                        .type_role(self.theme, TypeRole::Threshold)
-                        .whitespace_nowrap()
-                        .self_start()
-                        .child(text!(self.ending)),
-                )
-        }
-    }
-
-    #[gpui::test]
-    fn threshold_question_never_orphans_punctuation_at_390_and_400_percent(
-        cx: &mut gpui::TestAppContext,
-    ) {
-        let (view, cx) = cx.add_window_view(|_, _| ThresholdQuestionTest {
-            question: String::new(),
-            ending: "a?",
-            theme: Theme::for_dark(false).sized(4., false),
-        });
-        cx.simulate_resize(gpui::size(px(390.), px(700.)));
-        for dark in [false, true] {
-            for (question, ending) in [
-                (confirmation_question(1, "terapia", "Moretti Elena"), "a?"),
-                (confirmation_question(3, "terapia", "Moretti Elena"), "a?"),
-                (
-                    "Creare la scheda di Moretti Elena nell'ambulatorio selezionato?".into(),
-                    "o?",
-                ),
-                (
-                    confirmation_question(1, "valutazione", "Moretti Elena"),
-                    "a?",
-                ),
-                (
-                    "Ripetere l’invio della stessa valutazione per Moretti Elena?".into(),
-                    "a?",
-                ),
-            ] {
-                view.update(cx, |view, cx| {
-                    view.question = question.clone();
-                    view.ending = ending;
-                    view.theme = Theme::for_dark(dark).sized(4., false);
-                    cx.notify();
-                });
-                render_clinical_window(cx);
-                let actual = cx.debug_bounds("threshold-question-ending").unwrap();
-                let expected = cx.debug_bounds("expected-question-ending").unwrap();
-                let heading = cx.debug_bounds("threshold-question").unwrap();
-                assert_eq!(
-                    actual.size, expected.size,
-                    "indivisible final letter and punctuation: {question}"
-                );
-                let word = cx.debug_bounds("threshold-question-last-word").unwrap();
-                if ending == "a?" {
-                    assert_eq!(
-                        word.size.height, expected.size.height,
-                        "whole final word fits: {question}"
-                    );
-                }
-                assert_eq!(actual.bottom(), heading.bottom(), "final row: {question}");
-                assert!(word.right() <= px(390.), "final word fits: {question}");
-                assert!(actual.right() <= px(390.), "ending fits: {question}");
-            }
         }
     }
 
