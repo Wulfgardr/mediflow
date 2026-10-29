@@ -380,7 +380,7 @@ impl Record {
                     aic: row.aic.clone(),
                     atc: row.atc.clone(),
                     active_principle: row.active_principle.clone(),
-                    diagnosis_code: row.diagnosis_code.clone(),
+                    diagnosis_code: row.diagnosis_code.as_ref().map(ToString::to_string),
                     diagnosis_name: row.diagnosis_name.clone(),
                 };
                 if let Some(drug) = selected_drug {
@@ -558,7 +558,7 @@ pub fn therapy_matches(row: &Therapy, draft: &TherapyDraft) -> bool {
         && row.aic == draft.aic
         && row.atc == draft.atc
         && row.active_principle == draft.active_principle
-        && row.diagnosis_code == draft.diagnosis_code
+        && row.diagnosis_code.as_deref() == draft.diagnosis_code.as_deref()
         && row.diagnosis_name == draft.diagnosis_name
 }
 
@@ -992,7 +992,10 @@ mod tests {
         assert!(draft.atc.is_none() && draft.active_principle.is_none());
         assert_eq!(draft.dosage, original.dosage);
         assert_eq!(draft.motivation, original.motivation);
-        assert_eq!(draft.diagnosis_code, original.diagnosis_code);
+        assert_eq!(
+            draft.diagnosis_code.as_deref(),
+            original.diagnosis_code.as_deref()
+        );
         assert_eq!(draft.diagnosis_name, original.diagnosis_name);
         assert_eq!(draft.start_date, original.start_date);
         let mut readback = original.clone();

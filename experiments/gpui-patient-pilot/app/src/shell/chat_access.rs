@@ -108,7 +108,7 @@ impl ClinicalApp {
                     .lock()
                     .is_ok_and(|mut pending| pending.bind(session, context))
                 {
-                    self.chat_access.patient = patient;
+                    self.chat_access.patient = patient.to_string();
                     self.chat_access.archive = archive;
                     self.chat_access.pending = Some(pending);
                 }

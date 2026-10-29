@@ -233,7 +233,7 @@ fn meta_line(id: String, content: String, theme: Theme) -> Stateful<Div> {
         .min_w_0()
         .max_w_full()
         .whitespace_normal()
-        .type_role(theme, TypeRole::Meta)
+        .type_role(theme, crate::theme::TextRole::Meta)
         .text_color(theme.secondary)
         .child(text!(content))
 }

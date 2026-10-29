@@ -10,6 +10,29 @@ use std::ops::Range;
 use std::{cell::RefCell, rc::Rc};
 use unicode_segmentation::UnicodeSegmentation;
 
+pub trait NameInput {
+    fn name_string(self) -> SharedString;
+}
+impl NameInput for mediflow_patient_client::PersonName {
+    fn name_string(self) -> SharedString {
+        self.as_str().to_owned().into()
+    }
+}
+impl NameInput for String {
+    fn name_string(self) -> SharedString {
+        self.into()
+    }
+}
+impl NameInput for &str {
+    fn name_string(self) -> SharedString {
+        self.to_owned().into()
+    }
+}
+impl NameInput for SharedString {
+    fn name_string(self) -> SharedString {
+        self
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SegmentRole {
     ItalianProse,
@@ -23,11 +46,11 @@ pub struct TitleText {
     segments: Vec<(Range<usize>, SegmentRole)>,
 }
 impl TitleText {
-    pub fn name(text: impl Into<SharedString>) -> Self {
-        Self::new(text.into(), SegmentRole::Name)
+    pub fn name(text: impl NameInput) -> Self {
+        Self::new(text.name_string(), SegmentRole::Name)
     }
-    pub fn code(text: impl Into<SharedString>) -> Self {
-        Self::new(text.into(), SegmentRole::Code)
+    pub fn code(text: impl Into<mediflow_patient_client::ClinicalCode>) -> Self {
+        Self::new(text.into().as_str().to_owned().into(), SegmentRole::Code)
     }
     fn new(text: SharedString, role: SegmentRole) -> Self {
         let end = text.len();
@@ -49,11 +72,11 @@ impl TitleText {
     }
     pub fn patient_question(
         prefix: impl Into<SharedString>,
-        name: impl Into<SharedString>,
+        name: impl NameInput,
         suffix: &str,
     ) -> Self {
         Self::from(prefix.into())
-            .append(SegmentRole::Name, name)
+            .append(SegmentRole::Name, name.name_string())
             .append(SegmentRole::ItalianProse, suffix.to_owned())
     }
     pub fn text(&self) -> &str {
@@ -103,9 +126,26 @@ pub fn title(text: impl Into<TitleText>, theme: Theme) -> Title {
     let mut hash = std::collections::hash_map::DefaultHasher::new();
     (location.file(), location.line(), location.column()).hash(&mut hash);
     let id = ElementId::Integer(hash.finish());
-    Title { text, theme, id }
+    Title {
+        text,
+        theme,
+        id,
+        role: None,
+    }
+}
+impl Title {
+    #[cfg(test)]
+    fn test_role(mut self, role: TypeRole) -> Self {
+        self.role = Some(role);
+        self
+    }
+    pub fn with_role(mut self, role: crate::theme::TitleRole) -> Self {
+        self.role = Some(role.into());
+        self
+    }
 }
 pub struct Title {
+    role: Option<TypeRole>,
     text: TitleText,
     theme: Theme,
     id: ElementId,
@@ -386,7 +426,13 @@ impl Element for Title {
         let result = state.clone();
         let text = self.text.clone();
         let theme = self.theme;
-        let style = window.text_style();
+        let mut style = window.text_style();
+        if let Some(role) = self.role {
+            let typography = theme.role(role);
+            style.font_family = typography.family.into();
+            style.font_size = px(typography.size).into();
+            style.font_weight = typography.weight;
+        }
         let preferred = f32::from(style.font_size.to_pixels(window.rem_size()));
         let id =
             window.request_measured_layout(Style::default(), move |known, available, window, _| {
@@ -463,7 +509,7 @@ impl Element for Title {
 #[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
-    use crate::theme::{TypeRole, TypeStyle};
+    use crate::theme::TypeRole;
     use gpui::{Context, Render, TestAppContext, div, prelude::*, size};
 
     struct Fixture {
@@ -474,9 +520,9 @@ mod tests {
     impl Render for Fixture {
         fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
             div().size_full().p(px(20.)).child(
-                crate::components::heading("title-under-test", self.label, self.theme)
+                div()
                     .debug_selector(|| "title-under-test".into())
-                    .type_role(self.theme, self.role),
+                    .child(title(self.label, self.theme).test_role(self.role)),
             )
         }
     }
@@ -671,8 +717,7 @@ mod tests {
                     .debug_selector(|| "protected-title".into())
                     .min_w_0()
                     .max_w_full()
-                    .type_role(self.theme, self.role)
-                    .child(title(self.text.clone(), self.theme)),
+                    .child(title(self.text.clone(), self.theme).test_role(self.role)),
             )
         }
     }

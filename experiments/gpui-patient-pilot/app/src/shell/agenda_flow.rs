@@ -158,6 +158,7 @@ impl ClinicalApp {
                 row.deleted_at.is_none()
                     && (self
                         .global_patient_name(&row.patient_id)
+                        .as_str()
                         .to_lowercase()
                         .contains(&query)
                         || row.title.to_lowercase().contains(&query)

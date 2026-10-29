@@ -2,7 +2,7 @@
 //! editor identity reject old results without invalidating the record's read.
 
 use super::*;
-use crate::theme::{TypeRole, TypeStyle};
+use crate::theme::TypeStyle;
 use gpui::EntityId;
 
 struct DrugChoice {
@@ -474,7 +474,7 @@ impl ClinicalApp {
                     .when(enabled, |el| el.on_click(cx.listener(|this, _, _, cx| {
                         this.close_drug_search(cx); this.focus_after_render = true; this.focus_first_field = true; cx.notify();
                     })))))
-            .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
+            .child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
                 .child(text!("La scelta aggiorna soltanto il farmaco nella bozza. Controlla confezione e dose prima di registrare.")));
         match &search.rows {
             Load::Idle => pane.child(notice("clinical-workspace-drug-search-state", "Inserisci nome, principio attivo o AIC e premi Cerca.", theme, false)),
