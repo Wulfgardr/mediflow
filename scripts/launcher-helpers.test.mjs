@@ -3058,3 +3058,31 @@ test('ordinary reuse across checkouts shares the archive owner before opening We
     const state = await (await fetch(new URL('state', receipt.choiceUrl))).json();
     assert.equal((await fetch(state.url)).status, 200);
 });
+
+
+test('crashed launcher cannot reclaim checkout or archive until the serving generation drains', {timeout:15000}, async t => {
+ const f=launcherCrashFixture(t), old=f.start();const result=await old.next();assert.equal(result.claimed,true);
+ const receiptFile=launcherReceiptFile(f.lock), ownerFile=path.join(path.dirname(receiptFile),'owner.json');
+ const owner=JSON.parse(readFileSync(ownerFile));
+ const {runtimeProcessIdentity}=await import('./runtime-leases.mjs');
+ const web={pid:process.pid,start:runtimeProcessIdentity(process.pid),nonce:crypto.randomUUID()};
+ atomicJson(ownerFile,{...owner,runtime:{kind:process.platform==='win32'?'windows-job':'posix-group',web,...(process.platform==='win32'?{guardian:web}:{pgid:process.pid})}});
+ old.child.kill('SIGKILL');await old.closed;
+ assert.throws(()=>claimLauncher(f.lock,{checkoutPath:repoRoot},{reuseLive:true}),/generazione.*arresto/u);
+ const retired={...web,start:'previous-process-generation'};
+ atomicJson(ownerFile,{...owner,runtime:{kind:process.platform==='win32'?'windows-job':'posix-group',web:retired,...(process.platform==='win32'?{guardian:retired}:{pgid:2147483647})}});
+ const next=claimLauncher(f.lock,{checkoutPath:repoRoot});assert.equal(next.claimed,true);releaseLauncher(next);
+});
+
+test('Web admission publishes serving custody in both checkout and archive locks', {timeout:15000}, async t=>{
+ const f=await ordinaryLauncherFixture(t,'web',['--scelta','web'],false,true);
+ await f.until(()=>f.output().includes('Pronto:'));
+ const archive=spawnSync(process.execPath,['--input-type=module','-e',`import {localUiArchiveLock} from ${JSON.stringify(new URL('./launcher-state.mjs',import.meta.url).href)}; console.log(localUiArchiveLock(${JSON.stringify(f.data)}));`],{env:f.environment,encoding:'utf8'});
+ assert.equal(archive.status,0,archive.stderr);
+ for(const directory of [f.stateFiles.lockDirectory,archive.stdout.trim()]) {
+  const runtime=JSON.parse(readFileSync(path.join(path.dirname(launcherReceiptFile(directory)),'owner.json'))).runtime;
+  assert.equal(runtime.kind,process.platform==='win32'?'windows-job':'posix-group');
+  assert.equal(runtime.web.pid,f.observations().find(event=>event.type==='child-created').pid);
+  assert.equal(typeof runtime.web.start,'string');assert.match(runtime.web.nonce,/^[a-f0-9-]{36}$/u);
+ }
+});

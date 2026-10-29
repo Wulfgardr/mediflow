@@ -58,3 +58,27 @@ I test coprono entrambi gli ordini di avvio ordinario/plugin, più client,
 SIGKILL del client iniziale, identità e nonce falsi, ultima disconnessione, uscita
 Web con discendenti su Windows e riacquisizione dei lock. Il Job Windows richiede
 una verifica sul sistema operativo; i test POSIX non la sostituiscono.
+
+
+## Recupero e tentativi di arresto
+
+Prima di ammettere Web, il launcher pubblica nei due lock la sua generazione
+serviente, poi apre il gate IPC. La morte del launcher non basta per recuperare
+un lock: devono essere terminali anche Web e il suo gruppo POSIX, oppure Web e
+il guardian del Job Windows. Il recupero osserva soltanto la quiescenza; non
+invia segnali ai PID ritrovati su disco. Identità non leggibili e gruppi ancora
+presenti negano il recupero. Su Windows il guardian conserva l'handle del Job
+fino alla conferma di zero processi attivi.
+
+Lo stop esplicito rilascia le sessioni locali e consuma l'eventuale callback idle
+pendente nello stesso turno. Se altri client restano collegati restituisce 409.
+Ogni retry ha un solo produttore di esito. L'observer di uscita del Web agisce
+soltanto sulla propria generazione: l'uscita durante uno switch viene gestita
+dal tentativo di switch già in corso.
+
+`node scripts/recover-local-runtime.mjs /percorso/instance.json` legge una
+ricevuta locale regolare e verifica sul canale privato nonce, identità del
+processo, URL del chooser, checkout e archivio. La richiesta di ispezione non
+acquisisce un lease e non rilascia sessioni. Solo dopo la conferma viene inviato
+il POST all'URL verificato. La ricevuta alterata viene rifiutata prima del POST;
+il possesso del solo PID o la forma di un UUID non autenticano un endpoint.

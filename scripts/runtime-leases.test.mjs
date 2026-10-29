@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -72,4 +73,34 @@ test('disconnect before the lease acknowledgement cannot leave a client register
  await assert.rejects(acquireRuntimeLease(owner.receipt,runtimeProcessIdentity,'plugin',channel),/disconnesso/u);
  owner.releaseInitial();await until(()=>idle===1);assert.equal(owner.active,0);
  await owner.close();await owner.close();
+});
+
+
+test('explicit stop consumes pending idle and each failed retry has one producer', async t => {
+ const directory=temporary(t);let idle=0;
+ const owner=await createRuntimeLeases({directory,identity:runtimeProcessIdentity,initialPlugin:false,onIdle:()=>idle++});t.after(()=>owner.close());
+ owner.releaseManual();
+ assert.equal(owner.requestStop(),true);
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(idle,0,'A queued idle callback must not retry the explicit stop');
+ assert.equal(owner.requestStop(),true);
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(idle,0);
+ await assert.rejects(acquireRuntimeLease(owner.receipt,runtimeProcessIdentity));
+});
+
+test('recovery authenticates the owner and endpoint without acquiring or dropping a lease', async t => {
+ const {verifyRuntimeReceipt}=await import('./runtime-leases.mjs');
+ const directory=temporary(t);let idle=0;
+ const binding={choiceUrl:'http://127.0.0.1:12345/private/',dataDir:directory,checkoutPath:directory};
+ const owner=await createRuntimeLeases({directory,identity:runtimeProcessIdentity,initialPlugin:false,onIdle:()=>idle++,binding});t.after(()=>owner.close());
+ const receipt={pid:owner.receipt.owner.pid,lease:owner.receipt,...binding};
+ await verifyRuntimeReceipt(receipt,runtimeProcessIdentity);
+ assert.equal(owner.active,1);assert.equal(idle,0);
+ for(const forged of [
+  {...receipt,lease:{...owner.receipt,owner:{...owner.receipt.owner,nonce:crypto.randomUUID()}}},
+  {...receipt,choiceUrl:'http://127.0.0.1:54321/other/'},
+  {...receipt,pid:process.pid+1},
+  {...receipt,dataDir:directory+'/other'},
+ ]) await assert.rejects(verifyRuntimeReceipt(forged,runtimeProcessIdentity));
+ assert.equal(owner.active,1);assert.equal(idle,0);
 });
