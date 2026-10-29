@@ -252,7 +252,7 @@ export function collectXcodeUiSelection(root) {
   const end = lines.indexOf(')', 4);
   const filters = lines.slice(4, end);
   if (end < 5 || new Set(filters).size !== filters.length || filters.some(filter => !/^-only-testing:MediFlowMobileAppUITests\/MediFlowMobileAppUITests\/test[A-Za-z0-9_]+$/u.test(filter))) throw new Error('Unsupported Xcode iPad filters');
-  const tail = ['fi', 'xcodebuild test \\', '-project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \\', '-scheme MediFlowMobileApp \\', '-destination "platform=iOS Simulator,id=${{ steps.sim.outputs.id }}" \\', '"${only_testing[@]}" \\', '-retry-tests-on-failure -test-iterations 2 \\', 'CODE_SIGNING_ALLOWED=NO \\', '2>&1 | tee "${RUNNER_TEMP}/xcuitest-${{ matrix.idiom }}.log"'];
+  const tail = ['fi', 'xcodebuild test \\', '-project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \\', '-scheme MediFlowMobileApp \\', '-destination "platform=iOS Simulator,id=${{ steps.sim.outputs.id }}" \\', '"${only_testing[@]}" \\', 'CODE_SIGNING_ALLOWED=NO \\', '2>&1 | tee "${RUNNER_TEMP}/xcuitest-${{ matrix.idiom }}.log"'];
   if (JSON.stringify(lines.slice(end + 1)) !== JSON.stringify(tail)) throw new Error('Xcode UI argv changed');
   const binding = collectLiteralCiBinding(root, { workflow, job: 'ui-tests', ciCall: run.trim() });
   if (generation.stepIndex >= binding.stepIndex) throw new Error('XcodeGen must precede UI invocation');
