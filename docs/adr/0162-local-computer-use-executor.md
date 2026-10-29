@@ -167,6 +167,48 @@ La sequenza completa è nell'analisi. CU-1 deve provare end-to-end sul simulator
 
 Tutte le prove usano dati inventati e portali sintetici. Nessun atto o chiamata applicativa istituzionale, nemmeno di prova, è autorizzato da questo ADR. Nessuna modifica di rete. La documentazione pubblica può essere consultata in sola lettura. Qualificazione del servizio e ammissione clinica richiedono le autorizzazioni e le prove specifiche di Moduli e del programma.
 
+## Profilo browser del simulatore CU-1 (29 ottobre 2026)
+
+Questo profilo riguarda esclusivamente Chromium avviato dall'adapter sintetico. Il processo
+non dispone di un trasporto diretto ammesso: un proxy HTTP locale rifiuta tutte le richieste,
+gli upgrade e CONNECT, senza eccezione loopback. La risoluzione DNS diretta e QUIC sono
+disabilitati; la policy WebRTC `disable_non_proxied_udp` forza il proxy, che non inoltra.
+Non si sostituiscono costruttori JavaScript. Worker, frame e popup condividono il confine
+del processo; i service worker sono bloccati nella configurazione del contesto.
+
+Solo l'intercettore di contesto può soddisfare una richiesta: ammette documenti del frame
+principale, senza redirect, query o fragment, e usa un trasporto host separato dopo la
+verifica della destinazione e dell'autorità correnti. Il trasporto non ritenta. Ogni altro
+canale resta senza inoltro anche se sfugge all'intercettore. Prima di aggiungere cookie o
+valori della pratica si controllano tramite CDP gli argomenti effettivi del browser e si
+esegue una prova STUN con destinatario UDP loopback. Configurazione non verificabile o
+pacchetti ricevuti impediscono l'avvio. La revoca chiude il processo browser, tutti i suoi
+contesti e i trasporti host in corso. La ripresa richiede autorità corrente e un processo nuovo.
+
+Il censimento usa `DOM.getDocument(depth=-1, pierce=true)` e confronta i documenti con
+l'albero dei frame CDP. Visita documenti di ogni pagina/popup, contenuti dei frame,
+shadow root aperti, chiusi e nativi e template. Un sottoalbero incompleto, un documento
+non risolto o un errore dell'automazione produce `unverifiable`; non equivale a un elenco
+vuoto. Il risultato ha un'unione chiusa e l'osservazione viene validata anche al confine
+del servizio. Solo `complete`, senza elementi inattesi, permette di continuare.
+
+La superficie sintetica ha un contratto positivo su tutti gli elementi e attributi,
+non un elenco dei tag interattivi conosciuti. Sono ammessi soltanto gli elementi statici
+previsti e i campi/pulsanti classificati con tipo e collocazione esatti. Ruoli,
+attributi o listener inattesi bloccano anche su elementi personalizzati. I sottoalberi
+nativi vengono attraversati e appartengono al controllo browser che li contiene; non
+sono campi indipendenti della pagina. Le proprietà dei controlli si leggono in un mondo
+isolato CDP. Gli script della pagina vengono sospesi prima del censimento, che si ripete
+prima di ogni POST. Una pagina non verificabile non viene compilata né inviata.
+
+Riferimenti del confine: [proxy Chromium](https://chromium.googlesource.com/chromium/src/+/main/net/docs/proxy.md),
+[policy WebRTC](https://chromeenterprise.google/policies/#WebRtcIPHandling),
+[albero DOM CDP](https://chromedevtools.github.io/devtools-protocol/tot/DOM/#method-getDocument).
+Le prove misurano i destinatari loopback e falsificano separatamente trasporto e censimento.
+Non qualificano altri browser, versioni/configurazioni non verificate, isolamento OS,
+servizi istituzionali o un client con strumenti generici. Stati e transizioni CU restano
+quelli del modello esistente; i nuovi vincoli del browser sono verifiche runtime.
+
 ## Conseguenze e decisioni aperte
 
 Si riusano servizi, redazione, capacità territoriali e autorità native; si aggiungono esecutore, manifest, guard delle uscite e riconciliazione. Il costo maggiore è mantenere adapter affidabili e ambienti effettivamente isolati. Una UI cambiata può sospendere l'automazione; questo limite è preferibile a un atto di cui non si conoscono paziente, contenuto o esito.

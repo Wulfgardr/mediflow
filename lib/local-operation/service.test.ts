@@ -181,7 +181,7 @@ test('CU-1a: errore o audit ignorato prima dell’atto non invia e non registra 
 
 test('CU-1a: UI, paziente, pratica, account e campi ignoti bloccano prima di compilare', async t => {
     for (const value of [{ patientId: 'wrong' }, { practiceId: 'wrong' }, { portalAccountId: 'wrong' }, { uiVersion: 'wrong' },
-        { humanRevision: 99 }, { unclassifiedFields: ['SYNTHETIC_HOSTILE_NEW_FIELD'] }]) {
+        { humanRevision: 99 }, { census: 'unverifiable' }, { census: 'arbitrary' }, { census: undefined }, { unclassifiedFields: ['SYNTHETIC_HOSTILE_NEW_FIELD'] }]) {
         const f = await fixture(t), cap = f.service.create(f.plan.operationId);
         f.setWrongObservation(value); await assert.rejects(f.service.prepare(cap));
         assert.equal(f.traffic.filter(item => item.method === 'POST').length, 0);

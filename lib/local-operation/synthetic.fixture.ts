@@ -76,7 +76,7 @@ export async function syntheticFixture() {
             backgroundContext = ctx;
             await request(ctx, 'observe');
             return { patientId: plan.patientId, practiceId: plan.practiceId, portalAccountId: plan.portalAccountId,
-                uiVersion: plan.uiVersion, humanRevision: context.humanRevision, planDigest: filled, unclassifiedFields: [], ...wrongObservation };
+                uiVersion: plan.uiVersion, humanRevision: context.humanRevision, planDigest: filled, census: 'complete', unclassifiedFields: [], ...wrongObservation };
         },
         async prepare(ctx, values) { await request(ctx, 'prepare', values); filled = planDigest(values); },
         async act(ctx, values) {

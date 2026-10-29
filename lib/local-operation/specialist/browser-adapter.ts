@@ -1,4 +1,6 @@
-import { chromium, request as http, type APIRequestContext, type Page, type BrowserContext } from '@playwright/test';
+import { request as http, type APIRequestContext, type Page, type BrowserContext } from '@playwright/test';
+import { launchConfinedBrowser } from './browser-network.ts';
+import { censusControls } from './browser-census.ts';
 import { deny, planDigest, type LocalOperationAdapter, type LocalOperationPlan, type AdapterContext, type Destination } from '../contract.ts';
 
 export async function createSyntheticSpecialistBrowser(input: {
@@ -7,49 +9,46 @@ export async function createSyntheticSpecialistBrowser(input: {
 }) {
     const origin = input.cookie.url;
     if (!/^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) deny();
-    const browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({ serviceWorkers: 'block', acceptDownloads: false });
-    await context.addCookies([input.cookie]);
-    await context.routeWebSocket('**/*', socket => { void socket.close(); });
-    await context.addInitScript(() => {
-        for (const name of ['Worker', 'SharedWorker', 'RTCPeerConnection', 'WebTransport']) {
-            Object.defineProperty(globalThis, name, { value: class { constructor() { throw new Error('denied'); } }, writable: false, configurable: false });
-        }
-    });
+    let runtime = await launchConfinedBrowser();
+    let context = runtime.context;
     let page = await context.newPage();
     let stopping: Promise<void> = Promise.resolve();
     const transports = new Set<APIRequestContext>();
     let authority: { ctx: AdapterContext; phase: Destination['purpose']; blocked: boolean } | null = null;
-    await context.route('**/*', async route => {
-        const active = authority;
-        try {
-            const request = route.request(), url = new URL(request.url());
-            if (!active || request.resourceType() !== 'document' || request.redirectedFrom() || request.frame() !== page.mainFrame()
-                || url.origin !== origin || url.search || url.hash) deny();
-            const destination: Destination = { origin: url.origin, path: url.pathname,
-                method: request.method() as Destination['method'], purpose: active.phase };
-            active.ctx.authorizeRequest(destination);
-            const transport = await http.newContext();
-            transports.add(transport);
+    async function configure() {
+        await context.addCookies([input.cookie]);
+        await context.routeWebSocket('**/*', socket => { if (authority) authority.blocked = true; void socket.close(); });
+        await context.route('**/*', async route => {
+            const active = authority;
             try {
-                active.ctx.assertCurrent();
-                if (authority !== active) deny();
-                const response = await transport.fetch(request, { maxRedirects: 0, maxRetries: 0 });
-                active.ctx.assertCurrent();
-                if (response.status() >= 300 && response.status() < 400) deny();
-                await route.fulfill({ response });
-            } finally { transports.delete(transport); await transport.dispose(); }
-        } catch { if (active) active.blocked = true; await route.abort('blockedbyclient').catch(() => {}); }
-    });
+                const request = route.request(), url = new URL(request.url());
+                if (!active || request.resourceType() !== 'document' || request.redirectedFrom() || request.frame() !== page.mainFrame()
+                    || url.origin !== origin || url.search || url.hash) deny();
+                const destination: Destination = { origin: url.origin, path: url.pathname,
+                    method: request.method() as Destination['method'], purpose: active.phase };
+                active.ctx.authorizeRequest(destination);
+                const transport = await http.newContext();
+                transports.add(transport);
+                try {
+                    active.ctx.assertCurrent();
+                    if (authority !== active) deny();
+                    const response = await transport.fetch(request, { maxRedirects: 0, maxRetries: 0 });
+                    active.ctx.assertCurrent();
+                    if (response.status() >= 300 && response.status() < 400) deny();
+                    await route.fulfill({ response });
+                } finally { transports.delete(transport); await transport.dispose(); }
+            } catch { if (active) active.blocked = true; await route.abort('blockedbyclient').catch(() => {}); }
+        });
+    }
     function guardPage() {
-        page.on('popup', popup => { void popup.close(); });
         page.on('dialog', dialog => { void dialog.dismiss(); });
         page.on('download', download => { void download.cancel(); });
     }
-    guardPage();
+    await configure(); guardPage();
     async function during<T>(ctx: AdapterContext, phase: Destination['purpose'], action: () => Promise<T>): Promise<T> {
         await stopping;
         ctx.assertCurrent();
+        if (!runtime.browser.isConnected()) { runtime = await launchConfinedBrowser(); context = runtime.context; await configure(); }
         if (page.isClosed()) { page = await context.newPage(); guardPage(); }
         const active = { ctx, phase, blocked: false }; authority = active;
         try { const value = await action(); ctx.assertCurrent(); if (active.blocked) deny(); return value; }
@@ -58,38 +57,37 @@ export async function createSyntheticSpecialistBrowser(input: {
     }
     async function submit(ctx: AdapterContext, phase: 'prepare' | 'act', button: string) {
         return during(ctx, phase, async () => {
+            const observation = await inspectPage();
+            if (observation.unclassifiedFields.length || observation.planDigest !== planDigest(input.plan())) deny();
             await Promise.all([page.waitForURL(url => url.pathname === (phase === 'prepare' ? '/draft' : '/submit')), page.getByRole('button', { name: button, exact: true }).click()]);
             if (phase === 'act') return JSON.parse(await page.locator('body').innerText()) as unknown;
         });
+    }
+    async function inspectPage() {
+        const expected = input.plan(), main = page.locator('main');
+        const census = await censusControls(context, page);
+        if (census.status !== 'complete') deny();
+        const controls = census.controls;
+        const fields = controls.filter(control => control.tag !== 'BUTTON');
+        const buttons = controls.filter(control => control.tag === 'BUTTON');
+        const unknown = [...census.unexpected, ...fields.filter(field => field.tag !== 'INPUT' || field.type !== 'text' || field.editable || !field.placed
+            || !expected.fields.some(item => item.name === field.name)).map(field => field.name || 'unnamed-control')];
+        const expectedButtons = [['Salva bozza', null], ['Emetti prescrizione', '/submit'], ['Invia e firma come medico', '/physician-submit']];
+        const complete = fields.length === expected.fields.length && new Set(fields.map(field => field.name)).size === fields.length
+            && buttons.length === expectedButtons.length && buttons.every((button, index) => button.placed && !button.editable
+                && button.type === 'submit' && !button.name && button.text === expectedButtons[index]![0] && button.action === expectedButtons[index]![1]);
+        const readback = { ...expected, fields: expected.fields.map(field => ({ ...field, value: fields.find(item => item.name === field.name)?.value ?? '' })) };
+        return { patientId: await main.getAttribute('data-patient') ?? '', practiceId: await main.getAttribute('data-practice') ?? '',
+            portalAccountId: await main.getAttribute('data-account') ?? '', uiVersion: await main.getAttribute('data-ui') ?? '',
+            humanRevision: Number(await main.getAttribute('data-human')), census: census.status, unclassifiedFields: complete ? unknown : [...unknown, 'invalid-field-set'],
+            planDigest: fields.every(field => field.value) && complete ? planDigest(readback) : null };
     }
     const adapter: LocalOperationAdapter = {
         version: 'synthetic-prreg-browser-1', protectedFinalAct: true,
         async observe(ctx) {
             return during(ctx, 'observe', async () => {
                 await page.goto(`${origin}/portal`, { waitUntil: 'load' });
-                const expected = input.plan(), main = page.locator('main');
-                const controls = await page.locator('input, textarea, select, button, [contenteditable]:not([contenteditable="false"])').evaluateAll(elements => elements.map(element => {
-                    const control = element as HTMLInputElement;
-                    const form = control.form;
-                    return { name: control.name ?? '', value: control.value ?? '', tag: element.tagName,
-                        type: control.type, editable: (element as HTMLElement).isContentEditable,
-                        placed: !!form && form.parentElement?.tagName === 'MAIN' && document.querySelectorAll('form').length === 1
-                            && form.getAttribute('action') === '/draft' && form.method === 'post',
-                        action: element.getAttribute('formaction'), text: element.textContent?.trim() };
-                }));
-                const fields = controls.filter(control => control.tag !== 'BUTTON');
-                const buttons = controls.filter(control => control.tag === 'BUTTON');
-                const unknown = fields.filter(field => field.tag !== 'INPUT' || field.type !== 'text' || field.editable || !field.placed
-                    || !expected.fields.some(item => item.name === field.name)).map(field => field.name || 'unnamed-control');
-                const expectedButtons = [['Salva bozza', null], ['Emetti prescrizione', '/submit'], ['Invia e firma come medico', '/physician-submit']];
-                const complete = fields.length === expected.fields.length && new Set(fields.map(field => field.name)).size === fields.length
-                    && buttons.length === expectedButtons.length && buttons.every((button, index) => button.placed && !button.editable
-                        && button.type === 'submit' && !button.name && button.text === expectedButtons[index]![0] && button.action === expectedButtons[index]![1]);
-                const readback = { ...expected, fields: expected.fields.map(field => ({ ...field, value: fields.find(item => item.name === field.name)?.value ?? '' })) };
-                return { patientId: await main.getAttribute('data-patient') ?? '', practiceId: await main.getAttribute('data-practice') ?? '',
-                    portalAccountId: await main.getAttribute('data-account') ?? '', uiVersion: await main.getAttribute('data-ui') ?? '',
-                    humanRevision: Number(await main.getAttribute('data-human')), unclassifiedFields: complete ? unknown : [...unknown, 'invalid-field-set'],
-                    planDigest: fields.every(field => field.value) && complete ? planDigest(readback) : null };
+                return inspectPage();
             });
         },
         async prepare(ctx, plan) {
@@ -104,11 +102,11 @@ export async function createSyntheticSpecialistBrowser(input: {
         verifyReceipt: input.verifyReceipt,
         stop() {
             authority = null;
-            stopping = Promise.allSettled([page.close(), ...[...transports].map(transport => transport.dispose())]).then(() => {});
+            stopping = Promise.allSettled([runtime.close(), ...[...transports].map(transport => transport.dispose())]).then(() => {});
         },
     };
-    return Object.freeze({ adapter, get page() { return page; }, context,
-        async close() { adapter.stop(); await browser.close(); },
+    return Object.freeze({ adapter, get page() { return page; }, get context() { return context; },
+        async close() { adapter.stop(); await stopping; await runtime.close(); },
     });
 }
 

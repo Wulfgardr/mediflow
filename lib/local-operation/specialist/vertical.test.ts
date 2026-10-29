@@ -187,7 +187,11 @@ test('CU-1 verticale: risorsa di pagina non classificata sospende prima della co
 test('CU-1 verticale: corsa umana dopo rilettura negata dal confronto atomico del destinatario', async t => {
     const f = await fixture(t), cap = await authorized(f), act = f.browser.adapter.act;
     f.browser.adapter.act = async (ctx, plan) => {
-        await f.browser.page.locator('input[name="clinicalQuestion"]').fill('QUESITO_MODIFICATO_SENTINEL_66');
+        await f.browser.page.route('**/submit', async route => {
+            const values = new URLSearchParams(route.request().postData() ?? '');
+            values.set('clinicalQuestion', 'QUESITO_MODIFICATO_SENTINEL_66');
+            await route.fallback({ postData: values.toString() });
+        });
         return act(ctx, plan);
     };
     await assert.rejects(f.service.execute(cap));
@@ -270,15 +274,22 @@ test('CU-1 regressione: revoca chiude un canale già aperto', async t => {
     const page = f.browser.page, closed = page.waitForEvent('close', { timeout: 1500 }).catch(() => {});
     f.setPack('core'); await closed;
     assert.equal(page.isClosed(), true);
+    await assert.rejects(f.browser.context.newPage(), 'la revoca chiude il contesto intero');
 });
 
-test('CU-1 regressione: worker e trasporti senza manifest non sono istanziabili', async t => {
-    const f = await fixture(t); await authorized(f);
-    const denied = await f.browser.page.evaluate(() => ['Worker', 'SharedWorker', 'RTCPeerConnection', 'WebTransport'].map(name => {
-        try { const Constructor = (globalThis as unknown as Record<string, new (url: string) => unknown>)[name]!;
-            new Constructor('data:text/javascript,postMessage(1)'); return false; } catch { return true; }
-    }));
-    assert.deepEqual(denied, [true, true, true, true]);
+test('CU-1 regressione: worker e service worker restano dietro il confine di rete', async t => {
+    const f = await fixture(t); await hostilePage(f, ''); await authorized(f);
+    const before = f.portal.traffic.length;
+    const result = await f.browser.page.evaluate(async origin => {
+        const source = URL.createObjectURL(new Blob([`fetch(${JSON.stringify(origin + '/portal')}).then(() => postMessage('allowed'), () => postMessage('blocked'))`], { type: 'text/javascript' }));
+        const worker = new Worker(source);
+        const outcome = await new Promise(resolve => { worker.onmessage = event => resolve(event.data); worker.onerror = () => resolve('blocked'); });
+        worker.terminate(); URL.revokeObjectURL(source);
+        const registration = await navigator.serviceWorker.register('/worker.js').then(registration => registration ? 'allowed' : 'blocked', () => 'blocked');
+        return [outcome, registration];
+    }, f.portal.origin);
+    assert.deepEqual(result, ['blocked', 'blocked']);
+    assert.equal(f.portal.traffic.length, before);
 });
 
 test('CU-1 regressione: autorizzazione richiesta anche per documento nel manifest', async t => {
@@ -312,6 +323,7 @@ test('CU-1 regressione: risorsa con URL nel manifest resta un canale non ammesso
     });
     await assert.rejects(f.service.prepare(await f.selectLocal()));
     assert.equal(f.portal.traffic.filter(r => r.method === 'POST').length, 0);
+    assert.equal(f.portal.traffic.filter(r => r.path === '/portal').length, 1, 'il manifest non ammette richieste di risorse');
 });
 
 test('CU-1 regressione: revoca interrompe HTTP già in corso', async t => {
@@ -336,4 +348,117 @@ test('CU-1 regressione: revoca interrompe HTTP già in corso', async t => {
     const closed = await Promise.race([disconnected.then(() => true), new Promise<boolean>(resolve => { const timer = setTimeout(() => resolve(false), 1500); timer.unref(); })]);
     assert.equal(closed, true, 'revoca interrompe HTTP già in corso');
     await observation;
+});
+
+async function hostilePage(f: Fixture, markup: string) {
+    await f.browser.context.route('**/portal', async route => {
+        if (route.request().resourceType() !== 'document') return route.fallback();
+        const response = await route.fetch(), headers = { ...response.headers() }; delete headers['content-security-policy'];
+        await route.fulfill({ response, headers, body: (await response.text()).replace('</main>', `${markup}</main>`) });
+    });
+}
+
+for (const [name, markup] of [
+    ['srcdoc', `<iframe srcdoc='<textarea name="newClinical">SYNTHETIC</textarea>'></iframe>`],
+    ['shadow chiuso', `<div id="closed"></div><script>document.getElementById('closed').attachShadow({mode:'closed'}).innerHTML='<textarea name="newClinical">SYNTHETIC</textarea>'</script>`],
+    ['ruolo arbitrario', '<x-synthetic role="switch" tabindex="0">SYNTHETIC</x-synthetic>'],
+] as const) {
+    test(`CU-1 strutturale: ${name} inatteso blocca prima di ogni POST`, async t => {
+        const f = await fixture(t); await hostilePage(f, markup);
+        await assert.rejects(f.service.prepare(await f.selectLocal()));
+        assert.equal(f.portal.traffic.filter(r => r.method === 'POST').length, 0);
+    });
+}
+
+test('CU-1 strutturale: alias WebRTC non raggiunge UDP fuori manifest', async t => {
+    const { createSocket } = await import('node:dgram');
+    const udp = createSocket('udp4'); let packets = 0; udp.on('message', () => packets++);
+    await new Promise<void>(resolve => udp.bind(0, '127.0.0.1', resolve)); t.after(() => udp.close());
+    const f = await fixture(t); await hostilePage(f, ''); await authorized(f);
+    await f.browser.page.evaluate(async port => {
+        const Peer = (globalThis as unknown as { webkitRTCPeerConnection: typeof RTCPeerConnection }).webkitRTCPeerConnection;
+        const peer = new Peer({ iceServers: [{ urls: `stun:127.0.0.1:${port}` }] });
+        try {
+            peer.createDataChannel('synthetic'); await peer.setLocalDescription(await peer.createOffer());
+            await new Promise(resolve => setTimeout(resolve, 600));
+        } finally { peer.close(); }
+    }, udp.address().port);
+    assert.equal(packets, 0, 'nessun pacchetto UDP fuori manifest');
+});
+
+test('CU-1 strutturale: canale non mediato sconosciuto negato dal confine di rete', async t => {
+    const { createServer } = await import('node:http'); let received = 0;
+    const spy = createServer((_req, res) => { received++; res.end('synthetic'); });
+    await new Promise<void>(resolve => { spy.listen(0, '127.0.0.1', resolve); });
+    t.after(() => new Promise<void>(resolve => { spy.closeAllConnections(); spy.close(() => resolve()); }));
+    const f = await fixture(t); await authorized(f);
+    const address = spy.address(); assert.ok(address && typeof address !== 'string');
+    await f.browser.context.unrouteAll();
+    await f.browser.page.goto(`http://127.0.0.1:${address.port}/unmediated`).catch(() => {});
+    assert.equal(received, 0, 'il trasporto non mediato deve essere irraggiungibile');
+});
+
+test('CU-1 strutturale: contenitore non attraversabile sconosciuto rende il censimento non verificabile', async t => {
+    const f = await fixture(t);
+    const original = f.browser.context.newCDPSession.bind(f.browser.context);
+    f.browser.context.newCDPSession = async target => {
+        const session = await original(target), send = session.send.bind(session);
+        session.send = ((method: string, params: never) => method === 'DOM.getDocument'
+            ? Promise.reject(new Error('synthetic inaccessible boundary')) : send(method as never, params)) as typeof session.send;
+        return session;
+    };
+    await assert.rejects(f.service.prepare(await f.selectLocal()));
+    assert.equal(f.portal.traffic.filter(r => r.method === 'POST').length, 0);
+});
+
+test('CU-1 censimento: attraversa davvero shadow aperti e chiusi senza script o host inattesi', async t => {
+    const { censusControls } = await import('./browser-census.ts');
+    const f = await fixture(t); await authorized(f);
+    for (const mode of ['open', 'closed'] as const) {
+        await f.browser.page.evaluate(mode => {
+            const host = document.createElement('p'); document.body.append(host);
+            host.attachShadow({ mode }).innerHTML = '<x-interactive role="switch" tabindex="0">SYNTHETIC</x-interactive>';
+        }, mode);
+    }
+    const census = await censusControls(f.browser.context, f.browser.page);
+    assert.equal(census.status, 'complete');
+    if (census.status === 'complete') assert.deepEqual(census.unexpected, ['unclassified-element', 'unclassified-element']);
+});
+
+test('CU-1 censimento: documento popup e frame src e srcdoc sono attraversati o non verificabili', async t => {
+    const { censusControls } = await import('./browser-census.ts');
+    const f = await fixture(t); await authorized(f);
+    const popup = await f.browser.context.newPage();
+    await popup.setContent('<input name="popupClinical">');
+    await f.browser.page.evaluate(() => {
+        const frame = document.createElement('iframe'); frame.srcdoc = '<input name="frameClinical">'; document.body.append(frame);
+    });
+    await f.browser.page.frames()[1]!.waitForLoadState();
+    let census = await censusControls(f.browser.context, f.browser.page);
+    assert.equal(census.status, 'complete');
+    if (census.status === 'complete') {
+        const controls = census.controls;
+        assert.ok(['popupClinical', 'frameClinical'].every(name => controls.some(control => control.name === name && !control.placed)));
+    }
+    await f.browser.page.evaluate(() => { const frame = document.createElement('iframe'); frame.src = 'data:text/html,<input name="srcClinical">'; document.body.append(frame); });
+    await f.browser.page.frames().at(-1)!.waitForURL(url => ['data:', 'chrome-error:'].includes(url.protocol));
+    census = await censusControls(f.browser.context, f.browser.page);
+    assert.ok(census.status === 'unverifiable' || census.controls.some(control => control.name === 'srcClinical' && !control.placed));
+    await assert.rejects(f.browser.adapter.prepare({ operationId: f.plan.operationId, attempt: 0, revision: 1,
+        signal: new AbortController().signal, assertCurrent() {}, authorizeRequest() {} }, f.plan));
+    assert.equal(f.portal.traffic.filter(r => r.path === '/submit').length, 0);
+});
+
+test('CU-1 censimento: interazioni senza tag o ruolo speciale e delegate sono inattese', async t => {
+    const { censusControls } = await import('./browser-census.ts');
+    const f = await fixture(t); await authorized(f);
+    await f.browser.page.evaluate(() => {
+        const element = document.createElement('p'); document.body.append(element);
+        element.addEventListener('click', () => {});
+        document.addEventListener('click', () => {});
+        window.addEventListener('click', () => {});
+    });
+    const census = await censusControls(f.browser.context, f.browser.page);
+    assert.equal(census.status, 'complete');
+    if (census.status === 'complete') assert.equal(census.unexpected.filter(value => value === 'unclassified-interaction').length, 3);
 });

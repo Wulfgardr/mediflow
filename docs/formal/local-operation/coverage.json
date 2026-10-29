@@ -1,6 +1,6 @@
 {
   "baseCommit": "17af7eae8c9f55ccd43e670d80a9cb00ec6cdf2d",
-  "scope": "R1 marker and dispatch remain separate model actions. R2 immutable identity, R3 archive/connection/key origin and R5 original approval expiry at HTTP dispatch are runtime regressions, outside TLA. adapter.act may await between marker and dispatch. Hashes identify the reviewed mapping, not equivalence. CU-1 specialistica: callback recordConfirmed nella transazione Record esistente; nessuno stato o transizione aggiunto. Sorgenti, semantica delle prestazioni e browser sono prove runtime, fuori dal modello.",
+  "scope": "R1 marker and dispatch remain separate model actions. R2 immutable identity, R3 archive/connection/key origin and R5 original approval expiry at HTTP dispatch are runtime regressions, outside TLA. adapter.act may await between marker and dispatch. Hashes identify the reviewed mapping, not equivalence. CU-1 specialistica: callback recordConfirmed nella transazione Record esistente; nessuno stato o transizione aggiunto. Sorgenti, semantica delle prestazioni e browser sono prove runtime, fuori dal modello. Seconda correzione CU-1: osservazione validata con censimento complete/unverifiable; nessuno stato o transizione aggiunto. Proxy, configurazione UDP e censimento CDP restano fuori dalle propriet\u00e0 TLA.",
   "tool": {
     "release": "v1.7.4",
     "verifier": "TLC 2.19",
@@ -16,8 +16,8 @@
     "timeoutSeconds": 60
   },
   "files": {
-    "lib/local-operation/contract.ts": "19a58c9bcfa00b02da15cfc3c1c7c00d653d1dbb05057d80e846f64fd6cf1457",
-    "lib/local-operation/service.ts": "265984c916f54a6ec3f74d9b3d9254c7d18c492d6ebd221ca94ea5d6625bf4a2",
+    "lib/local-operation/contract.ts": "e1713a22cfd30aa899ddd8f592eb6304214382a5d7782a81979ae1b9d37e0b47",
+    "lib/local-operation/service.ts": "ffe383220f7b6d0a7d91f1051b8168893120bb1845ecf4e9850a8b6950dc321e",
     "lib/local-operation/sqlite-journal.ts": "6a802461c835c773fd213a514b16d9564ce93f493ca1fb7016e95a5119113a9e",
     "lib/local-operation/host.ts": "211184f97d6f98e4d61f4e026c322cd4eb907204cc17668149d7609ce1b2e44e",
     "lib/local-operation/journal-cipher.ts": "44001319c6928cf124b2102fe999a30622e134204c662ce689134a6895768f8e",
@@ -44,7 +44,7 @@
   ],
   "reviewBaseCommit": "c8beebe1d561c75b45e3902100a7da39529cda8c",
   "lastRun": {
-    "at": "2026-10-23T13:44:32.615Z",
+    "at": "2026-10-29T14:38:06.766Z",
     "generatedStates": 171,
     "distinctStates": 73,
     "automaticUnreachableRejected": true,
