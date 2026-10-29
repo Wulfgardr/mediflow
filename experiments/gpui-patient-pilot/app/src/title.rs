@@ -134,7 +134,7 @@ pub fn title(text: impl Into<TitleText>, theme: Theme) -> Title {
     }
 }
 impl Title {
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "macos"))]
     fn test_role(mut self, role: TypeRole) -> Self {
         self.role = Some(role);
         self
