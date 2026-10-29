@@ -12,7 +12,7 @@ pub const SYSTEM: &str = "Segoe UI Variable";
 #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "windows")))]
 pub const SYSTEM: &str = "sans-serif";
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct Theme {
     pub shade: Hsla,
     pub paper: Hsla,
@@ -245,6 +245,17 @@ impl From<TitleRole> for TypeRole {
     }
 }
 pub trait TypeStyle: Styled + Sized {
+    fn reading_surface(self, theme: Theme) -> Self {
+        self.bg(theme.paper)
+            .text_color(theme.ink)
+            .type_role(theme, TextRole::Body)
+    }
+    fn field_surface(self, theme: Theme) -> Self {
+        self.bg(theme.paper)
+            .border_color(theme.secondary)
+            .text_color(theme.ink)
+    }
+
     fn type_role(self, theme: Theme, role: TextRole) -> Self {
         let typography = theme.role(role.into());
         self.font_family(typography.family)

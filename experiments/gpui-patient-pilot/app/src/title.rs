@@ -454,6 +454,8 @@ impl Element for Title {
             style.font_size = px(typography.size).into();
             style.font_weight = typography.weight;
         }
+        #[cfg(test)]
+        crate::shell::rendered_command::record_ink(self.text.text().to_owned(), style.color);
         let preferred = f32::from(style.font_size.to_pixels(window.rem_size()));
         let id =
             window.request_measured_layout(Style::default(), move |known, available, window, _| {

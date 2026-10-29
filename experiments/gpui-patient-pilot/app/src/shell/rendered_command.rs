@@ -102,8 +102,11 @@ impl gpui::Element for Observed {
     }
 }
 
-pub(crate) fn observe_text(text: gpui::Text) -> gpui::AnyElement {
-    ObservedText(text).into_any_element()
+pub(crate) fn observe_text(text: impl IntoElement) -> gpui::AnyElement {
+    ObservedText(text.into_element(), true).into_any_element()
+}
+pub(crate) fn observe_ink(text: gpui::Text) -> ObservedText<gpui::Text> {
+    ObservedText(text, false)
 }
 
 thread_local! {
@@ -114,18 +117,18 @@ pub(super) fn take_text_nodes() -> Vec<(gpui::GlobalElementId, gpui::accesskit::
     TEXT_NODES.with(|nodes| std::mem::take(&mut *nodes.borrow_mut()))
 }
 
-struct ObservedText(gpui::Text);
+pub(crate) struct ObservedText<E: gpui::Element>(E, bool);
 
-impl gpui::IntoElement for ObservedText {
+impl<E: gpui::Element> gpui::IntoElement for ObservedText<E> {
     type Element = Self;
     fn into_element(self) -> Self {
         self
     }
 }
 
-impl gpui::Element for ObservedText {
-    type RequestLayoutState = <gpui::Text as gpui::Element>::RequestLayoutState;
-    type PrepaintState = <gpui::Text as gpui::Element>::PrepaintState;
+impl<E: gpui::Element> gpui::Element for ObservedText<E> {
+    type RequestLayoutState = <E as gpui::Element>::RequestLayoutState;
+    type PrepaintState = <E as gpui::Element>::PrepaintState;
     fn id(&self) -> Option<gpui::ElementId> {
         gpui::Element::id(&self.0)
     }
@@ -165,11 +168,17 @@ impl gpui::Element for ObservedText {
     ) -> Self::PrepaintState {
         let mut node = gpui::accesskit::Node::new(self.0.a11y_role().expect("accessible text"));
         self.0.write_a11y_info(&mut node);
-        TEXT_NODES.with(|nodes| {
-            nodes
-                .borrow_mut()
-                .push((id.expect("text GlobalElementId").clone(), node));
-        });
+        record_ink(
+            node.value().unwrap_or_default().to_owned(),
+            window.text_style().color,
+        );
+        if self.1 {
+            TEXT_NODES.with(|nodes| {
+                nodes
+                    .borrow_mut()
+                    .push((id.expect("text GlobalElementId").clone(), node));
+            });
+        }
         self.0.prepaint(id, inspector, bounds, state, window, cx)
     }
     fn paint(
@@ -227,4 +236,21 @@ pub(crate) fn assert_unique_texts(
         }
         previous = Some(current);
     }
+}
+
+thread_local! {
+    static INKS: std::cell::RefCell<Vec<(String, gpui::Hsla)>> = const { std::cell::RefCell::new(Vec::new()) };
+    static FIELDS: std::cell::RefCell<Vec<(String, gpui::Hsla, gpui::Hsla, gpui::Hsla)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+pub(crate) fn record_ink(label: String, color: gpui::Hsla) {
+    INKS.with(|v| v.borrow_mut().push((label, color)));
+}
+pub(crate) fn take_inks() -> Vec<(String, gpui::Hsla)> {
+    INKS.with(|v| std::mem::take(&mut *v.borrow_mut()))
+}
+pub(crate) fn record_field(label: String, ink: gpui::Hsla, paper: gpui::Hsla, border: gpui::Hsla) {
+    FIELDS.with(|v| v.borrow_mut().push((label, ink, paper, border)));
+}
+pub(crate) fn take_fields() -> Vec<(String, gpui::Hsla, gpui::Hsla, gpui::Hsla)> {
+    FIELDS.with(|v| std::mem::take(&mut *v.borrow_mut()))
 }

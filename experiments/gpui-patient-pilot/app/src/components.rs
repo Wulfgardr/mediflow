@@ -316,7 +316,12 @@ fn control_label(label: SharedString) -> Div {
         .max_w_full()
         .whitespace_normal()
         .text_center()
-        .child(text!(label))
+        .child({
+            let text = text!(label);
+            #[cfg(test)]
+            let text = crate::shell::rendered_command::observe_ink(text);
+            text
+        })
 }
 
 pub fn heading(
