@@ -41,8 +41,10 @@ final class MobileVisitProductUITests: XCTestCase {
         openVisit(app)
         waitForUIReady(app.buttons["mobile-visit-choose-patient"], in: app)
         app.buttons["mobile-visit-choose-patient"].tap()
-        waitForUIReady(app.buttons["Sintetico Paziente"].firstMatch, in: app)
-        app.buttons["Sintetico Paziente"].firstMatch.tap()
+        choose(menuItem: "Sintetico Paziente", in: app) {
+            let selected = app.staticTexts["Paziente scelto: Sintetico Paziente"]
+            return selected.exists && selected.isHittable
+        }
         waitForUIReady(app.buttons["mobile-visit-prepare"], in: app)
         app.buttons["mobile-visit-prepare"].tap()
         waitForUIReady(app.buttons["Acconsento e preparo il dossier"], in: app)
@@ -123,13 +125,17 @@ final class MobileVisitProductUITests: XCTestCase {
                 let overflow = app.buttons["OverflowBarButtonItem"]
                 XCTAssertTrue(overflow.waitForExistence(timeout: 5))
                 overflow.tap()
-                let menu = tools.isHittable ? tools : app.buttons["Elenco"]
-                XCTAssertTrue(menu.waitForExistence(timeout: 5))
-                menu.tap()
+                choose(menuItem: "Elenco", in: app, opensSubmenu: true, timeout: 5) {
+                    self.presentedMenu(in: app).buttons["mobile-visit-entry"].isHittable
+                }
             }
+            choose(menuItem: "mobile-visit-entry", in: app, timeout: 5) {
+                app.buttons["mobile-visit-close"].exists
+            }
+        } else {
+            waitForUIReady(entry, in: app, timeout: 5)
+            entry.tap()
         }
-        waitForUIReady(entry, in: app, timeout: 5)
-        entry.tap()
     }
 
     private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
