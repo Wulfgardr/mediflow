@@ -817,3 +817,44 @@ test('CU-1 unicità: campi e comandi nominati assenti o duplicati non producono 
         await assert.rejects(f.service.execute(cap)); assert.equal(sends(f), 0); assert.equal(rows(f).length, 0);
     }
 });
+
+for (const phase of ['after-read-body', 'close-token', 'verify-receipt']) {
+    test(`input umano prima della registrazione: ${phase}`, async t => {
+        const f = await specialistFixture(); t.after(() => f.close());
+        const cap = await f.selectLocal(); await f.service.prepare(cap); await f.service.approve(cap);
+        let hits = 0;
+        const intervene = async () => {
+            hits++; await f.browser.page.keyboard.press('Shift');
+            const input = await BrowserInput.observe(f.browser.context, f.browser.page);
+            assert.throws(() => input.assertHealthy(), /unverifiable/, 'input effettivamente rilevato');
+        };
+        if (phase === 'after-read-body') {
+            const input = await BrowserInput.observe(f.browser.context, f.browser.page), read = input.readBody.bind(input);
+            input.readBody = async () => { const value = await read(); await intervene(); return value; };
+        } else if (phase === 'close-token') {
+            const attach = f.browser.context.newCDPSession.bind(f.browser.context); let censusSessions = 0;
+            f.browser.context.newCDPSession = async target => {
+                const session = await attach(target); const actSession = ++censusSessions === 2;
+                if (actSession) {
+                    const detach = session.detach.bind(session);
+                    session.detach = async () => { await intervene(); return detach(); };
+                }
+                return session;
+            };
+        } else {
+            const verify = f.browser.adapter.verifyReceipt;
+            f.browser.adapter.verifyReceipt = async (...args) => { const value = await verify(...args); await intervene(); return value; };
+        }
+        const result = await f.service.execute(cap).then(r => r.state, () => f.service.inspect(f.plan.operationId).state);
+        const sends = f.portal.traffic.filter(r => r.path === '/submit').length;
+        const records = f.db.prepare('SELECT count(*) FROM service_prescriptions WHERE request_reference IS NOT NULL').pluck().get();
+        t.diagnostic(JSON.stringify({ phase, hits, result, sends, records, journal: f.service.inspect(f.plan.operationId).state }));
+        assert.equal(hits, 1); assert.equal(sends, 1);
+        assert.equal(result, 'uncertain', 'input rilevato prima della chiusura deve richiedere riconciliazione');
+        assert.equal(f.service.inspect(f.plan.operationId).state, 'uncertain');
+        await assert.rejects(() => f.service.prepare(cap));
+        await assert.rejects(() => f.service.execute(cap));
+        assert.equal(f.portal.traffic.filter(r => r.path === '/submit').length, 1);
+        assert.equal(records, 0);
+    });
+}
