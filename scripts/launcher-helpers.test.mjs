@@ -991,7 +991,7 @@ test('Windows missing bootstrap fails before launcher state or owner publication
         import assert from 'node:assert/strict';import {registerHooks} from 'node:module';
         registerHooks({load(url,context,next){
             if(url===${JSON.stringify(new URL('./windows-launcher-bootstrap/index.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const loadSystemDirectoryBinding=()=>{throw new Error("BINDING_MISSING");};'};
-            if(url===${JSON.stringify(new URL('./launcher-state.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const prepareLauncherState=()=>{throw new Error("OWNER_STATE_REACHED");};'};
+            if(url===${JSON.stringify(new URL('./launcher-state.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const localUiArchiveLock=()=>{throw new Error("OWNER_STATE_REACHED");}; export const prepareLauncherState=()=>{throw new Error("OWNER_STATE_REACHED");};'};
             return next(url,context);
         }});
         const {main}=await import(${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)});
