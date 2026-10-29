@@ -47,6 +47,10 @@ Il polling dei lease avviene senza acquisire il gate; una lettura apparentemente
 vuota richiede la verifica finale di layout, intent e lease sotto gate prima
 di autorizzare la manutenzione.
 
+Ammissione sincrona, chiusura asincrona e manutenzione usano lo stesso budget
+predefinito di 5 secondi. Un timeout esplicito resta vincolante; la scadenza
+non elimina lease o gate e non sostituisce la verifica sotto gate.
+
 L'intent resta per tutta la callback. Un errore o crash dopo il suo ingresso
 conserva l'intent, perché il modulo non conosce gli effetti del lavoro di
 manutenzione. Il completamento riuscito consente la rimozione verificata e
