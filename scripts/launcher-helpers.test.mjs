@@ -991,7 +991,7 @@ test('Windows missing bootstrap fails before launcher state or owner publication
         import assert from 'node:assert/strict';import {registerHooks} from 'node:module';
         registerHooks({load(url,context,next){
             if(url===${JSON.stringify(new URL('./windows-launcher-bootstrap/index.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const loadSystemDirectoryBinding=()=>{throw new Error("BINDING_MISSING");};'};
-            if(url===${JSON.stringify(new URL('./launcher-state.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const prepareLauncherState=()=>{throw new Error("OWNER_STATE_REACHED");};'};
+            if(url===${JSON.stringify(new URL('./launcher-state.mjs',import.meta.url).href)})return {format:'module',shortCircuit:true,source:'export const localUiArchiveLock=()=>{throw new Error("OWNER_STATE_REACHED");}; export const prepareLauncherState=()=>{throw new Error("OWNER_STATE_REACHED");};'};
             return next(url,context);
         }});
         const {main}=await import(${JSON.stringify(new URL('./mediflow.mjs',import.meta.url).href)});
@@ -1547,7 +1547,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     const observationFile = path.join(directory, 'stop-observation.ndjson'), ownerLoader = path.join(directory, 'owner-loader.mjs');
     const controlRequest = path.join(directory, 'drain-request.json'), controlReply = path.join(directory, 'drain-reply.json');
     const fixtureGeneration = crypto.randomUUID();
-    const simulatedWindowsBootstrap = lifecycle?.platform === 'win32' || process.env.MEDIFLOW_FIXTURE_STOP_DENY_PLATFORM === 'win32';
+    const simulatedWindowsBootstrap = !lifecycle?.job && (lifecycle?.platform === 'win32' || process.env.MEDIFLOW_FIXTURE_STOP_DENY_PLATFORM === 'win32');
     writeFileSync(ownerLoader, String.raw`
             ${simulatedWindowsBootstrap ? windowsBootstrapFixture(source) : ''}
             import fs from 'node:fs'; import cp from 'node:child_process'; import crypto from 'node:crypto';
@@ -1561,6 +1561,17 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 process.stderr.write('FIXTURE_STOP_OBSERVATION ' + JSON.stringify(event) + '\n');
             };
             globalThis[Symbol.for('mediflow.fixture.stop-observation')] = record;
+            globalThis[Symbol.for('mediflow.fixture.windows-job')] = async (child, owner) => {
+                record({type:'simulated-job-created',pid:child.pid});
+                const closed = new Promise(resolve => child.once('close', () => {
+                    record({type:'simulated-job-closed',pid:child.pid}); resolve();
+                }));
+                return {closed, owner:owner.token, async stop() {
+                    if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+                    await closed;
+                }};
+            };
+
             process.kill = (target, signal) => {
                 const child = owned.get(Math.abs(target))?.child;
                 if (!child) return kill(target, signal);
@@ -1575,6 +1586,12 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 }
             };
             cp.spawn = (executable, argv, options) => {
+                if (${Boolean(lifecycle?.job)} && argv.includes(${JSON.stringify(path.join(source,'scripts/windows-runtime-job.ps1'))})) {
+                    const helper = spawn(executable, argv, options);
+                    record({type:'job-helper-created',pid:helper.pid});
+                    helper.once('close',()=>record({type:'job-helper-exit',pid:helper.pid}));
+                    return helper;
+                }
                 if (executable !== process.execPath || ![${JSON.stringify(path.join(source, 'scripts/source-runtime.mjs'))}, ${JSON.stringify(path.join(source, 'node_modules/next/dist/bin/next'))}].includes(argv[0])) throw new Error('FIXTURE_FOREIGN_CHILD_DENIED');
                 const inheritedStderr = options.stdio[2] === 2;
                 const child = spawn(executable, argv, inheritedStderr ? { ...options, stdio: [options.stdio[0], options.stdio[1], 'pipe'] } : options);
@@ -1603,6 +1620,9 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
             }
             syncBuiltinESMExports();
             registerHooks({ load(url, context, next) {
+                if (${lifecycle?.job === 'simulated'} && url === ${JSON.stringify(pathToFileURL(path.join(source,'scripts/windows-runtime-job.mjs')).href)}) {
+                    return {format:'module',shortCircuit:true,source:'export const containWindowsWeb = globalThis[Symbol.for("mediflow.fixture.windows-job")];'};
+                }
                 const result = next(url, context);
                 if (url === ${JSON.stringify(pathToFileURL(path.join(source, 'scripts/mediflow.mjs')).href)}) {
                     record({ type: 'hook-active', url, node: process.version, execPath: process.execPath, uv: process.versions.uv });
@@ -1750,8 +1770,11 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 return result;
             }});`);
     }
-    for (const name of ['mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs']) {
-        const bytes = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
+    for (const name of ['mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job.ps1', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs']) {
+        const rawBytes = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
+        const bytes = name === 'mediflow.mjs' && !lifecycle?.job
+            ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", 'false') : lifecycle?.job === 'simulated' && name === 'mediflow.mjs'
+                ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", "choice === 'web'") : rawBytes;
         writeFileSync(path.join(source, 'scripts', name), name === 'mediflow.mjs' ? bytes.replace('const startOptionalOllama = () => {', 'const startOptionalOllama = () => { process.stderr.write(\"FIXTURE_OLLAMA_START\\n\"); return;') : bytes);
     }
     mkdirSync(path.join(source, 'scripts/windows-launcher-bootstrap'), { recursive: true });
@@ -1778,6 +1801,10 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         import { installLocalUiWebNavigation } from ${JSON.stringify(new URL('./local-ui-web-navigation.mjs', import.meta.url).href)};
         export const verifySourceRuntime = () => ({ identity: ${JSON.stringify(identity)} });
         if (process.argv[1].endsWith('source-runtime.mjs')) {
+            if (process.env.MEDIFLOW_WEB_OWNER_GATE) await new Promise(resolve => {
+                const receive = frame => { if (frame.type === 'mediflow-web-owner-start' && frame.nonce === process.env.MEDIFLOW_WEB_OWNER_GATE) { process.off('message',receive); resolve(); } };
+                process.on('message',receive);
+            });
             fs.appendFileSync(${JSON.stringify(observationFile)}, JSON.stringify({type:'child-runtime',pid:process.pid,node:process.version,execPath:process.execPath,uv:process.versions.uv,actualOS:process.platform,at:Date.now()})+'\\n');
             ${lifecycle?.group ? `
                 setInterval(() => { if(fs.existsSync(${JSON.stringify(groupCleanup)})) process.exit(0); },10);
@@ -1856,7 +1883,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     const socket = createHttpServer();
     await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
     const port = socket.address().port; await new Promise(resolve => socket.close(resolve));
-    const child = spawn(process.execPath, [...fixtureImportArguments(ownerLoader), ...(lifecycle ? fixtureImportArguments(stopLoader) : []), path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), '--senza-browser', ...args], {
+    const child = spawn(process.execPath, [...fixtureImportArguments(ownerLoader), ...(lifecycle && !lifecycle.job ? fixtureImportArguments(stopLoader) : []), path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), '--senza-browser', ...args], {
         env: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home, PORT: String(port) }, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
     const closed = Promise.all([once(child, 'exit'), once(child.stderr, 'close')]).then(([exit]) => exit);
     let resolveTerminal, terminalFailureObserved = false, cleanupTask = null, ownerRecorded = false, launcherClosed = false, drainTask = null;
@@ -2685,16 +2712,14 @@ for (const scenario of ['remove-error', 'pending-launcher']) test(scenario === '
     assert.match(output, /cancelled 0/u);
 });
 
-test('disconnecting the plugin leaves its ordinary runtime alive and usable', { timeout: 12000 }, async t => {
+test('disconnecting the plugin closes its owned runtime', { timeout: 12000 }, async t => {
     const f = await ordinaryLauncherFixture(t, 'web');
     await f.until(() => f.output().includes('Pronto:'));
     assert.equal(await navigateOwnedLocalUiRuntime(f.child, 'history', new AbortController().signal, Date.now() + 5000, f.expected), true);
     f.child.disconnect();
-    const receipt = JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
-    const state = await (await fetch(new URL('state', receipt.choiceUrl), { signal: AbortSignal.timeout(3000) })).json();
-    assert.equal(state.ready, true);
-    assert.equal((await fetch(state.url, { signal: AbortSignal.timeout(3000) })).status, 200);
-    assert.equal(f.child.exitCode, null);
+    await f.waitForTerminal();
+    assert.equal(f.child.exitCode, 0);
+    assert.equal(existsSync(path.join(f.stateFiles.lockDirectory, 'active')), false);
     await assert.rejects(navigateOwnedLocalUiRuntime(f.child, 'search', new AbortController().signal), /navigation_unavailable/);
 });
 
@@ -2841,9 +2866,9 @@ for (const [name, count, controlFault] of [
     ['cancellation during an unverified Web startup sends no navigation frame', 1],
     ['ordinary and plugin startup recover a stale owner before choosing pairing', 4],
     ['IPC cancellation during the Web identity proof cannot dispatch a late intent', 1],
-    ['disconnecting the plugin leaves its ordinary runtime alive and usable', 1],
+    ['IPC rejects replay, expiry, revoked IDs and extra fields without new navigation', 1],
     ['ordinary and plugin startup recover a stale owner before choosing pairing', 4, 'reply-error'],
-    ['disconnecting the plugin leaves its ordinary runtime alive and usable', 1, 'terminal-before-reply'],
+    ['IPC rejects replay, expiry, revoked IDs and extra fields without new navigation', 1, 'terminal-before-reply'],
     ['cancellation during an unverified Web startup sends no navigation frame', 1, 'windows-terminal'],
 ]) test(`unverified stop fails visibly and drains all owned fixtures: ${name}${controlFault ? " (" + controlFault + ")" : ""}`, { timeout: 30000 }, async t => {
     const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-stop-audit-~')));
@@ -2991,4 +3016,110 @@ test('IPC cancellation during the Web identity proof cannot dispatch a late inte
     f.child.send({type:'mediflow-local-ui-cancel',requestId});
     assert.equal(await result, 'denied');
     assert.doesNotMatch(f.output(), /mediflow.local-ui.navigation.v1/);
+});
+
+
+test('Windows launcher frees checkout and archive locks after autonomous Web exit', {skip:process.platform!=='win32',timeout:30000},async t=>{
+    const f=await ordinaryLauncherFixture(t,'web',[],true,true,{},null,{platform:'win32',job:true});
+    await f.until(()=>f.output().includes('Pronto:'));
+    const receipt=JSON.parse(readFileSync(f.runtimePid));
+    assert.ok(receipt.pid>0);
+    process.kill(receipt.pid,'SIGKILL');
+    await f.waitForTerminal();
+    assert.equal(f.child.exitCode,0,f.output());
+    assert.equal(existsSync(path.join(f.stateFiles.lockDirectory,'active')),false);
+    const archive=path.join(path.dirname(path.dirname(f.stateFiles.lockDirectory)),`local-ui-${crypto.createHash('sha256').update(f.data).digest('hex')}`,'launcher');
+    assert.equal(existsSync(path.join(archive,'active')),false);
+    const recovered=claimLauncher(f.stateFiles.lockDirectory,{checkoutPath:f.source});
+    assert.equal(recovered.claimed,true);releaseLauncher(recovered);
+    t.diagnostic(JSON.stringify({web:receipt.pid,launcher:f.child.pid,checkoutReleased:true,archiveReleased:true}));
+});
+
+
+test('chooser reports a retained client lease instead of announcing a completed stop',async t=>{
+    const page=await createChoiceServer({root:repoRoot,state:()=>({ready:true}),choose(){},install(){},stop(){return false;}});
+    t.after(()=>page.close());
+    const endpoint=new URL('stop',page.url);
+    const response=await fetch(endpoint,{method:'POST',headers:{Origin:endpoint.origin,'Content-Type':'application/json'},body:'{}'});
+    assert.equal(response.status,409);assert.match(await response.text(),/altro client/u);
+});
+
+
+test('reusing a checkout with another archive never opens or leases its current Web',async t=>{
+    const f=await ordinaryLauncherFixture(t,'web');await f.until(()=>f.output().includes('Pronto:'));
+    const other=realpathSync(mkdtempSync(path.join(tmpdir(),'mf-other-archive-')));t.after(()=>rmSync(other,{recursive:true,force:true}));
+    const result=spawnSync(process.execPath,[path.join(f.source,'scripts/mediflow.mjs'),'--riusa','--senza-browser'],
+        {env:{...f.environment,MEDIFLOW_DATA_DIR:other},encoding:'utf8',timeout:5000});
+    assert.equal(result.status,1,result.stdout+result.stderr);assert.match(result.stderr,/archivio diverso/u);
+    const receipt=JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
+    const state=await (await fetch(new URL('state',receipt.choiceUrl))).json();
+    assert.equal((await fetch(state.url)).status,200);
+});
+
+test('ordinary reuse across checkouts shares the archive owner before opening Web', async t => {
+    const f = await ordinaryLauncherFixture(t, 'web', [], false);
+    await f.until(() => f.output().includes('Pronto:'));
+    const second = realpathSync(mkdtempSync(path.join(tmpdir(), 'mf-other-checkout-')));
+    t.after(() => rmSync(second, { recursive: true, force: true }));
+    const { cpSync } = await import('node:fs');
+    cpSync(f.source, second, { recursive: true });
+    appendFileSync(path.join(second, 'scripts/source-runtime.mjs'), "\nprocess.once('disconnect', () => process.exit(0));\n");
+    t.diagnostic(JSON.stringify({directory:second,role:'secondary-checkout'}));
+    const result = spawnSync(process.execPath, [path.join(second, 'scripts/mediflow.mjs'), '--scelta', 'web', '--senza-browser'],
+        { env: f.environment, encoding: 'utf8', timeout: 5000 });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout + result.stderr, /già attivo/u);
+    const receipt = JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
+    const state = await (await fetch(new URL('state', receipt.choiceUrl))).json();
+    assert.equal((await fetch(state.url)).status, 200);
+});
+
+
+test('crashed launcher cannot reclaim checkout or archive until the serving generation drains', {timeout:15000}, async t => {
+ const f=launcherCrashFixture(t), old=f.start();const result=await old.next();assert.equal(result.claimed,true);
+ const receiptFile=launcherReceiptFile(f.lock), ownerFile=path.join(path.dirname(receiptFile),'owner.json');
+ const owner=JSON.parse(readFileSync(ownerFile));
+ const {runtimeProcessIdentity}=await import('./runtime-leases.mjs');
+ const web={pid:process.pid,start:runtimeProcessIdentity(process.pid),nonce:crypto.randomUUID()};
+ atomicJson(ownerFile,{...owner,runtime:{kind:process.platform==='win32'?'windows-job':'posix-group',web,...(process.platform==='win32'?{guardian:web}:{pgid:process.pid})}});
+ old.child.kill('SIGKILL');await old.closed;
+ assert.throws(()=>claimLauncher(f.lock,{checkoutPath:repoRoot},{reuseLive:true}),/generazione.*arresto/u);
+ const retired={...web,start:'previous-process-generation'};
+ atomicJson(ownerFile,{...owner,runtime:{kind:process.platform==='win32'?'windows-job':'posix-group',web:retired,...(process.platform==='win32'?{guardian:retired}:{pgid:2147483647})}});
+ const next=claimLauncher(f.lock,{checkoutPath:repoRoot});assert.equal(next.claimed,true);releaseLauncher(next);
+});
+
+test('Web admission publishes serving custody in both checkout and archive locks', {timeout:15000}, async t=>{
+ const f=await ordinaryLauncherFixture(t,'web',['--scelta','web'],false,true);
+ await f.until(()=>f.output().includes('Pronto:'));
+ const archive=spawnSync(process.execPath,['--input-type=module','-e',`import {localUiArchiveLock} from ${JSON.stringify(new URL('./launcher-state.mjs',import.meta.url).href)}; console.log(localUiArchiveLock(${JSON.stringify(f.data)}));`],{env:f.environment,encoding:'utf8'});
+ assert.equal(archive.status,0,archive.stderr);
+ for(const directory of [f.stateFiles.lockDirectory,archive.stdout.trim()]) {
+  const runtime=JSON.parse(readFileSync(path.join(path.dirname(launcherReceiptFile(directory)),'owner.json'))).runtime;
+  assert.equal(runtime.kind,process.platform==='win32'?'windows-job':'posix-group');
+  assert.equal(runtime.web.pid,f.observations().find(event=>event.type==='child-created').pid);
+  assert.equal(typeof runtime.web.start,'string');assert.match(runtime.web.nonce,/^[a-f0-9-]{36}$/u);
+ }
+});
+
+
+test('Windows Job closure during chooser switch keeps the launcher alive and starts the requested mode', {timeout:15000}, async t => {
+    const f = await ordinaryLauncherFixture(t, 'web', ['--scelta','web'], false, true, {}, null,
+        {platform:process.platform,job:'simulated'});
+    await f.until(() => f.output().includes('Pronto:'));
+    const receipt = JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
+    const endpoint = new URL('choose', receipt.choiceUrl);
+    const response = await fetch(endpoint, {method:'POST',headers:{Origin:endpoint.origin,'Content-Type':'application/json'},
+        body:JSON.stringify({choice:'agenti'}),signal:AbortSignal.timeout(1000)});
+    assert.equal(response.status,202); await response.text();
+    await f.until(() => (f.output().match(/Pronto:/gu) ?? []).length === 2 || f.child.exitCode !== null);
+    assert.equal(f.child.exitCode,null,'The retired Windows Job closed the launcher during the switch');
+    assert.equal(f.child.signalCode,null);
+    const events = f.observations(), created = events.filter(event => event.type === 'child-created');
+    assert.equal(created.length,2,f.output());
+    assert.equal(created[1].argv.at(-1),'headless');
+    assert.ok(events.findIndex(event => event.type === 'simulated-job-closed') < events.indexOf(created[1]));
+    const state = await (await fetch(new URL('state',receipt.choiceUrl))).json();
+    assert.equal(state.ready,true); assert.ok(state.url);
+    assert.equal((await fetch(state.url)).status,200);
 });
