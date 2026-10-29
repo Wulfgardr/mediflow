@@ -12,6 +12,8 @@ import { verifySourceRuntime } from './source-runtime.mjs';
 import { initializeWindowsSystemCommand, windowsTaskkillCommand, windowsProcessCreationTimeTicks } from './windows-system-command.mjs';
 import { macDerivedDataDirectory } from './build-input-metadata.mjs';
 import { createChoiceServer } from './mediflow-launcher-page.mjs';
+import { containWindowsWeb } from './windows-runtime-job.mjs';
+import { createRuntimeLeases, acquireRuntimeLease, recordChildOwner, verifyChildOwner, runtimeProcessIdentity } from './runtime-leases.mjs';
 import { prepareLauncherState, localUiArchiveLock } from './launcher-state.mjs';
 import { verifyOwnedWeb } from './local-ui-web-identity.mjs';
 import { pairingDirectory, readPairingRequests, bridgeExistingLocalUi, frames, writeFrame } from './local-ui-pairing-transport.mjs';
@@ -118,7 +120,7 @@ export async function requireFreePort(port) {
   });
 }
 
-function launcherProcessIdentity(pid) {
+export function launcherProcessIdentity(pid) {
   try {
     let value;
     if (process.platform === 'linux') {
@@ -290,7 +292,8 @@ export function claimLauncher(directory, identity, { reuseLive = false } = {}) {
 const terminalOwnedGroups = new WeakSet();
 const confirmedWindowsStops = new WeakSet();
 
-export async function stopOwnedChild(child, graceMs = 8000) {
+export async function stopOwnedChild(child, graceMs = 8000, options = {}) {
+  const ownerRecord = options.ownerRecord ?? null;
   const posix = process.platform !== 'win32';
   if (!child?.pid) return;
   if (!posix && (child.exitCode !== null || child.signalCode !== null)) {
@@ -324,6 +327,7 @@ export async function stopOwnedChild(child, graceMs = 8000) {
     const leaderTerminal = () => child.exitCode !== null || child.signalCode !== null;
     const requireOwnedLeader = () => {
       if (leaderTerminal()) throw new Error('Continuità del gruppo posseduto non verificabile dopo la fine del capogruppo.');
+      if (ownerRecord) verifyChildOwner(ownerRecord);
     };
     const observe = () => {
       if (settled) return;
@@ -359,6 +363,7 @@ export async function stopOwnedChild(child, graceMs = 8000) {
         if (process.platform === 'win32') {
           if (Date.now() >= deadline) { expired(); return; }
           if (leaderTerminal()) throw new Error('Albero del processo già terminale non verificato.');
+          if (ownerRecord) verifyChildOwner(ownerRecord);
           const result = spawnSync(windowsCommand, ['/pid', String(child.pid), '/T', '/F'],
             { stdio: 'ignore', timeout: Math.max(1, deadline - Date.now()), windowsHide: true });
           if (result.error || result.status !== 0) throw result.error || new Error(`taskkill: ${result.status}`);
@@ -418,12 +423,14 @@ export async function main(args = process.argv.slice(2)) {
     catch (error) { releaseLauncher(ownership); throw error; }
     if (!archiveOwnership.claimed) {
       releaseLauncher(ownership);
-      await bridgeExistingLocalUi(pairingDirectory(archiveLock), { dataDir, sourceFingerprint: identity.sourceFingerprint });
+      await acquireRuntimeLease(archiveOwnership.receipt.lease, runtimeProcessIdentity);
+      await bridgeExistingLocalUi(pairingDirectory(archiveLock), { dataDir, sourceFingerprint: identity.sourceFingerprint }, process, options.noBrowser ? () => {} : undefined);
       return;
     }
   }
   const existing = pluginChannel || ownership.claimed ? null : await findExistingInstance(ownership.receipt, identity);
   if (existing) {
+    await acquireRuntimeLease(ownership.receipt.lease, runtimeProcessIdentity, 'manual');
     const url = options.choose ? `${existing.choiceUrl}?scegli=1` : existing.url;
     log(`MediFlow è già attivo da questa cartella: ${url}`);
     if (!options.noBrowser && !needsTextMenu()) openUrl(url);
@@ -432,7 +439,8 @@ export async function main(args = process.argv.slice(2)) {
   const requestsDirectory = pairingDirectory(lockDirectory);
   const archiveRequests = archiveOwnership ? pairingDirectory(archiveOwnership.directory) : null;
   if (pluginChannel && !ownership.claimed) {
-    await bridgeExistingLocalUi(requestsDirectory, { dataDir, sourceFingerprint: identity.sourceFingerprint });
+    await acquireRuntimeLease(ownership.receipt.lease, runtimeProcessIdentity);
+    await bridgeExistingLocalUi(requestsDirectory, { dataDir, sourceFingerprint: identity.sourceFingerprint }, process, options.noBrowser ? () => {} : undefined);
     return;
   }
   if (!ownership.claimed) throw new Error('Un avvio di questa cartella è già in corso. Controlla il terminale e riprova.');
@@ -443,7 +451,13 @@ export async function main(args = process.argv.slice(2)) {
   let terminal = null, useTerminal = false, webSecret = null, instance = null;
   const pairRequests = new Map();
   const ipcStopChildren = new WeakSet();
-  const stopChild = () => stopOwnedChild(child, 8000);
+  let childOwner = null, leases = null, webJob = null;
+  const stopChild = () => {
+    if (child && child.exitCode === null && child.signalCode === null && leases?.external) {
+      throw new Error('MediFlow è ancora utilizzato da un altro client.');
+    }
+    return webJob ? webJob.stop() : stopOwnedChild(child, 8000, { ownerRecord: childOwner });
+  };
   let pairingPoll = null;
   let shutdownTask = null, shutdownComplete = false, ownershipHold = null;
   const question = async prompt => {
@@ -456,6 +470,7 @@ export async function main(args = process.argv.slice(2)) {
     child = spawn(executable, argv, { cwd: ROOT, env, detached: process.platform !== 'win32',
       stdio: ipc ? ['inherit', 'inherit', 'pipe', 'ipc'] : ['ignore', 2, 2] });
     const owned = child;
+    childOwner = recordChildOwner(path.dirname(ownership.receiptFile), owned, runtimeProcessIdentity);
     owned.on('error', error => log(`Avvio non riuscito: ${error.message}`));
     return owned;
   };
@@ -484,6 +499,7 @@ export async function main(args = process.argv.slice(2)) {
         if (stopError) throw stopError;
         await stopChild();
         await chooser?.close();
+        await leases?.close();
         releaseLauncher(ownership);
         if (archiveOwnership) releaseLauncher(archiveOwnership);
         clearInterval(ownershipHold); ownershipHold = null;
@@ -503,7 +519,10 @@ export async function main(args = process.argv.slice(2)) {
     });
     return shutdownTask;
   };
-  const onSignal = () => { void shutdown(); };
+  const onSignal = () => {
+    leases?.releaseInitial(); leases?.releaseManual();
+    if (!leases || closing && !leases.active) void shutdown();
+  };
   const pendingNavigation = new Set();
   const navigationControllers = new Map();
   const rememberNavigation = requestId => {
@@ -572,7 +591,8 @@ export async function main(args = process.argv.slice(2)) {
   const onParentMessage = message => handleNavigation(message, frame => process.send(frame, () => {}), () => process.connected);
   const onDisconnect = () => {
     for (const requestId of pendingNavigation) cancelNavigation(requestId);
-    onSignal();
+    if (pluginChannel && leases) leases.releaseInitial();
+    else onSignal();
   };
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(signal, onSignal);
   if (process.connected) {
@@ -649,12 +669,18 @@ export async function main(args = process.argv.slice(2)) {
       webSecret = choice === 'web' ? crypto.randomBytes(32).toString('hex') : null;
       const env = { ...process.env, ...(webSecret ? { MEDIFLOW_LOCAL_UI_WEB_SECRET: webSecret, MEDIFLOW_LOCAL_UI_INSTANCE: instance } : {}), HOSTNAME: '127.0.0.1', PORT: String(port),
         ...(choice === 'web' ? { MEDIFLOW_PLUGIN_LOCAL_UI: '1' } : {}),
+        ...(choice === 'web' && process.platform === 'win32' ? { MEDIFLOW_WEB_OWNER_GATE: crypto.randomUUID() } : {}),
         MEDIFLOW_APP_REVISION: current.revision, MEDIFLOW_APP_BRANCH: current.branch,
         MEDIFLOW_APP_WORKTREE_HASH: current.worktreeHash, MEDIFLOW_APP_SOURCE_FINGERPRINT: current.sourceFingerprint,
         MEDIFLOW_APP_FINGERPRINT: current.sourceFingerprint };
       const owned = choice === 'sviluppo'
         ? run(process.execPath, [path.join(ROOT, 'node_modules/next/dist/bin/next'), 'dev', '--hostname', '127.0.0.1', '--port', String(port)], true, env)
         : run(process.execPath, [path.join(ROOT, 'scripts/source-runtime.mjs'), choice === 'agenti' ? 'headless' : 'web'], true, env);
+      if (choice === 'web' && process.platform === 'win32') {
+        webJob = await containWindowsWeb(owned, childOwner);
+        void webJob.closed.then(() => { if (!closing) void shutdown(); }, error => { void shutdown(error); });
+        owned.send({ type: 'mediflow-web-owner-start', nonce: env.MEDIFLOW_WEB_OWNER_GATE });
+      }
       owned.on('message', frame => {
         if (!['mediflow-local-ui-pair-approved', 'mediflow-local-ui-pair-revoked'].includes(frame?.type)) return;
         const pair = pairRequests.get(frame.nonce);
@@ -711,7 +737,7 @@ export async function main(args = process.argv.slice(2)) {
     }
     if (closing) return;
     child.once('exit', () => {
-      if (pluginChannel && !closing) { void shutdown(); return; }
+      if (pluginChannel && !closing && !webJob) { void shutdown(); return; }
       if (!closing && attempt === generation) update({ ready: false, busy: false, url: null, step: 'errore', message: 'MediFlow si è arrestato. Controlla i log nel terminale prima di riaprire.' });
     });
     if (!options.reuseOnly && remember && choice !== 'sviluppo') atomicJson(preferencesFile, { schemaVersion: 1, choice });
@@ -721,6 +747,7 @@ export async function main(args = process.argv.slice(2)) {
   };
   const choose = (choice, remember = false) => {
     selectChoice({ explicit: choice, nativeAvailable: !!native, dirty });
+    if (state.ready && leases?.external) throw new Error('MediFlow è ancora utilizzato da un altro client.');
     if (!CHOICES.includes(choice) || state.busy || closing) throw new Error('Attendi il completamento dell’avvio prima di cambiare scelta.');
     void start(choice, remember).catch(async error => {
       if (error.code === 'MEDIFLOW_OWNED_STOP_UNCONFIRMED') { await shutdown(error); return; }
@@ -742,10 +769,14 @@ export async function main(args = process.argv.slice(2)) {
   try {
     chooser = await createChoiceServer({ root: ROOT, state: () => ({ ...state }), choose,
       navigate, cancelNavigation,
-      install: () => installApproval?.(true), stop: shutdown, nativeAvailable: !!native, development: dirty,
+      install: () => installApproval?.(true), stop: () => { leases.releaseInitial(); leases.releaseManual(); if (leases.active) return false; if (closing) return shutdown(); }, nativeAvailable: !!native, development: dirty,
       version: identity.version, folder: path.basename(ROOT) });
+    leases = await createRuntimeLeases({ directory: archiveOwnership?.directory ?? lockDirectory,
+      identity: runtimeProcessIdentity, initialPlugin: pluginChannel, onIdle: shutdown });
     if (closing) { await chooser.close(); return; }
-    atomicJson(ownership.receiptFile, { ...ownership.receipt, dataDir, choiceUrl: chooser.url });
+    const receipt = { ...ownership.receipt, dataDir, choiceUrl: chooser.url, lease: leases.receipt };
+    atomicJson(ownership.receiptFile, receipt);
+    if (archiveOwnership) atomicJson(archiveOwnership.receiptFile, { ...archiveOwnership.receipt, dataDir, choiceUrl: chooser.url, lease: leases.receipt });
     pairingPoll = setInterval(() => {
       if (!state.ready || !state.navigationReady || closing || !child?.connected) return;
       try {
