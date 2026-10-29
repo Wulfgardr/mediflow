@@ -30,6 +30,7 @@ export function readUnlockParameters(value: unknown): UnlockParameters | null {
 }
 
 export type AuthHealthPayload = {
+    localUiLeaseRequired?: boolean;
     archiveGeneration?: string;
     status: 'ok' | 'error';
     isSetup?: boolean;
