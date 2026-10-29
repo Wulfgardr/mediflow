@@ -507,6 +507,7 @@ di ciascuna proposta e il limite di autorità dell’host.
 ## Punti di innesto territoriali, proposta del 29 ottobre 2026
 
 - [adr/0170-territorial-service-extension-points.md](./adr/0170-territorial-service-extension-points.md): ADR Proposed: nove punti di innesto e manifesto dei servizi, estensione di 0158.
+- [adr/0171-local-runtime-ownership-and-client-leases.md](./adr/0171-local-runtime-ownership-and-client-leases.md): ADR proposto: proprietà del runtime locale, lease dei client e recupero verificato.
 - [territorial/lombardia-services-and-prerequisites.md](./territorial/lombardia-services-and-prerequisites.md): Dodici servizi, priorità PRREG/GCM e prerequisiti Ente/Software House ancora aperti.
 - [territorial/italia-generico-paper-test.md](./territorial/italia-generico-paper-test.md): Prova sulla carta del solo profilo nazionale FSE/INI e SAC, senza servizi regionali.
 - [territorial/aria-letter-draft.md](./territorial/aria-letter-draft.md): Bozza non inviata delle domande ad ARIA, senza richiesta di accesso.

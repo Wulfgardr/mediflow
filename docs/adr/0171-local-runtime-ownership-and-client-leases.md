@@ -1,4 +1,4 @@
-# ADR 0170: proprietà del runtime locale e lease dei client
+# ADR 0171: proprietà del runtime locale e lease dei client
 
 Stato: proposto. Parte di WUL-757.
 
