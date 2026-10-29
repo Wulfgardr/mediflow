@@ -9,8 +9,8 @@ final class PatientSummaryPresentationTests: XCTestCase {
         var state = PatientChartReturnState()
         let first = PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 183.5)
         let second = PatientChartReadingAnchor(id: "patient-summary-diary", distanceFromTop: 92)
-        state.record(first, patientID: "patient-a")
-        state.record(second, patientID: "patient-b")
+        state.leave(patientID: "patient-a", category: .scales, anchor: first)
+        state.leave(patientID: "patient-b", category: .diary, anchor: second)
         XCTAssertEqual(state.position(patientID: "patient-a"), first)
         XCTAssertEqual(state.position(patientID: "patient-b"), second)
         XCTAssertNil(state.position(patientID: "patient-c"))
@@ -29,7 +29,7 @@ final class PatientSummaryPresentationTests: XCTestCase {
         for disclosure in PatientChartDisclosure.allCases {
             XCTAssertFalse(state.isExpanded(disclosure, patientID: "patient-a"))
             state.setExpanded(true, disclosure: disclosure, patientID: "patient-a")
-            state.leave(patientID: "patient-a", category: .scales)
+            state.leave(patientID: "patient-a", category: .scales, anchor: PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 200))
             _ = state.returnToChart(patientID: "patient-a")
             XCTAssertTrue(state.isExpanded(disclosure, patientID: "patient-a"))
             XCTAssertFalse(state.isExpanded(disclosure, patientID: "patient-b"))
@@ -40,13 +40,64 @@ final class PatientSummaryPresentationTests: XCTestCase {
 
     func testSummaryReturnFocusIsScopedToPatientAndConsumedOnce() {
         var state = PatientChartReturnState()
-        state.leave(patientID: "patient-a", category: .scales)
-        state.leave(patientID: "patient-b", category: .measures)
+        state.leave(patientID: "patient-a", category: .scales, anchor: PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 200))
+        state.leave(patientID: "patient-b", category: .measures, anchor: PatientChartReadingAnchor(id: "patient-summary-measures", distanceFromTop: 100))
         XCTAssertNil(state.returnToChart(patientID: "patient-c"))
         XCTAssertEqual(state.returnToChart(patientID: "patient-a"),
                        PatientChartSummaryReturn(patientID: "patient-a", category: .scales))
         XCTAssertNil(state.returnToChart(patientID: "patient-a"))
         XCTAssertEqual(state.returnToChart(patientID: "patient-b")?.category, .measures)
+    }
+
+    func testSummaryReturnConsumesItsReadingAnchor() {
+        var state = PatientChartReturnState()
+        state.leave(patientID: "patient-a", category: .scales, anchor: PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 200))
+        XCTAssertNotNil(state.position(patientID: "patient-a"))
+        XCTAssertNotNil(state.returnToChart(patientID: "patient-a"))
+        XCTAssertNil(state.position(patientID: "patient-a"))
+        XCTAssertNil(state.returnToChart(patientID: "patient-a"))
+    }
+
+    func testDiscardedReturnKeepsPatientDisclosuresWithinSession() {
+        var state = PatientChartReturnState()
+        state.setExpanded(true, disclosure: .aiTools, patientID: "patient-a")
+        state.leave(patientID: "patient-a", category: .scales,
+                    anchor: PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 200))
+        state.discardReturns()
+        XCTAssertNil(state.position(patientID: "patient-a"))
+        XCTAssertNil(state.returnToChart(patientID: "patient-a"))
+        XCTAssertTrue(state.isExpanded(.aiTools, patientID: "patient-a"))
+        XCTAssertFalse(state.isExpanded(.aiTools, patientID: "patient-b"))
+    }
+
+    @MainActor func testSessionClosureDiscardsReturnSynchronously() throws {
+        let h = try LockReadHarness(test: self)
+        var state = PatientChartReturnState()
+        state.leave(patientID: "patient-a", category: .scales,
+                    anchor: PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 200))
+        state.setExpanded(true, disclosure: .aiTools, patientID: "patient-a")
+        let observation = h.model.clinicalSessionInvalidationEvents.sink { _ in state.discardReturns(endingSession: true) }
+        h.model.cancelMobileVisitAuthentication()
+        XCTAssertNil(state.position(patientID: "patient-a"))
+        XCTAssertNil(state.returnToChart(patientID: "patient-a"))
+        XCTAssertFalse(state.isExpanded(.aiTools, patientID: "patient-a"))
+        withExtendedLifetime(observation) {}
+    }
+
+    @MainActor func testSessionLockDiscardsReturnBeforeRemoteLogoutResponds() async throws {
+        let h = try LockReadHarness(test: self)
+        var state = PatientChartReturnState()
+        state.leave(patientID: "patient-a", category: .scales,
+                    anchor: PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 200))
+        let observation = h.model.clinicalSessionInvalidationEvents.sink { _ in state.discardReturns(endingSession: true) }
+        let started = h.transport.hold(LockReadFixture.logout)
+        let locking = Task { await h.model.lockSessionNow() }
+        await fulfillment(of: [started], timeout: 5)
+        XCTAssertNil(state.position(patientID: "patient-a"))
+        XCTAssertNil(state.returnToChart(patientID: "patient-a"))
+        try h.transport.release(LockReadFixture.logout, status: 204)
+        await locking.value
+        withExtendedLifetime(observation) {}
     }
 
     func testChartSummaryContainsEachExternalCategoryOnce() {

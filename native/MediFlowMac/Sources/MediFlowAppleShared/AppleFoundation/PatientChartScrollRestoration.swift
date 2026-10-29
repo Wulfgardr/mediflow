@@ -23,6 +23,7 @@ extension EnvironmentValues {
 final class PatientChartScrollMemory: ObservableObject {
     private final class AnchorView { weak var view: UIView?; init(_ view: UIView) { self.view = view } }
     var state = PatientChartReturnState()
+    @Published private(set) var resetGeneration = 0
     var isRestoring = false
     var patientID: String?
     weak var scrollView: UIScrollView?
@@ -46,17 +47,18 @@ final class PatientChartScrollMemory: ObservableObject {
         guard let view = anchors[patientID]?[id]?.view, view.window != nil, view.isDescendant(of: scroll) else { return nil }
         return view.convert(view.bounds, to: scroll)
     }
-    func capture(patientID: String, anchorID: String? = nil) {
-        guard let scroll = scrollView, self.patientID == patientID else { return }
-        let candidates = anchorID.map { [$0] } ?? Array(anchors[patientID, default: [:]].keys)
-        let positions = candidates.compactMap { id -> PatientChartReadingAnchor? in
-            guard let frame = frame(id: id, patientID: patientID, in: scroll) else { return nil }
-            return PatientChartReadingAnchor(id: id,
-                distanceFromTop: frame.minY - scroll.contentOffset.y - scroll.adjustedContentInset.top)
-        }
-        guard let anchor = positions.min(by: { abs($0.distanceFromTop) < abs($1.distanceFromTop) }) else { return }
+    func discardReturn(endingSession: Bool = false) {
+        state.discardReturns(endingSession: endingSession)
         isRestoring = false
-        state.record(anchor, patientID: patientID)
+        resetGeneration &+= 1
+    }
+    func captureSummary(patientID: String, category: PatientChartSummaryCategory) {
+        guard let scroll = scrollView, self.patientID == patientID else { return }
+        let id = "patient-summary-\(category.id)"
+        guard let frame = frame(id: id, patientID: patientID, in: scroll) else { return }
+        state.leave(patientID: patientID, category: category,
+            anchor: PatientChartReadingAnchor(id: id,
+                distanceFromTop: frame.minY - scroll.contentOffset.y - scroll.adjustedContentInset.top))
     }
 }
 
@@ -154,7 +156,6 @@ struct PatientChartScrollRestoration: UIViewRepresentable {
                                 self.scheduleRestore()
                             }
                             self.knownSize = scroll.contentSize
-                            if !config.memory.isRestoring { config.memory.capture(patientID: config.patientID) }
                         },
                         scroll.observe(\.contentSize, options: [.new]) { [weak self] _, _ in self?.geometryChanged() }
                     ]
@@ -186,7 +187,7 @@ struct PatientChartScrollRestoration: UIViewRepresentable {
             guard needsRestore, let config = configuration, config.isCurrent(), let scroll = scrollView else { return }
             scroll.layoutIfNeeded()
             let minimum = -scroll.adjustedContentInset.top
-            guard let anchor = protectedAnchor ?? config.memory.state.position(patientID: config.patientID) else {
+            guard let anchor = protectedAnchor else {
                 scroll.setContentOffset(CGPoint(x: 0, y: minimum), animated: false)
                 finish(config); return
             }
