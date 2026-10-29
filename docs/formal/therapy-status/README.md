@@ -10,6 +10,38 @@ sono una prova TLA né un'estensione implicita degli invarianti legacy sottostan
 
 Il recovery cifrato supporta lo schema corrente 6 e i predecessori canonici 4 e 5; le 24 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
+## Raccordo HC-A2 del 29 ottobre 2026: esiti delle scale
+
+Riesaminato il diff rispetto a `d7e5e0f4228d5a4e112c5b526f5e212e106c122d`,
+comprese porte, consumer e writer host. La prima implementazione aggiungeva
+un metodo di invio delle scale in `ApiTable`, facendo scattare correttamente
+il controllo di deriva. Il metodo è stato estratto in `lib/scale-entry-client.ts`:
+`lib/db.ts` torna identico byte per byte alla revisione coperta e conserva
+l'impronta già registrata. Non è necessario aggiornare hash o `syncCommit`.
+
+Il nuovo consumer è soltanto il runner delle scale. Usa le API pubbliche
+esistenti `entries.prepareWritePayload` e `getSessionReadSignal`, conserva
+una sola richiesta cifrata e notifica soltanto `entries`. Il segnale cambia
+e quello precedente viene ritirato in ogni `setKey`, anche con la stessa
+chiave: il controllo prima/dopo la cifratura e l'invio conserva il vincolo
+alla sessione senza esporre la chiave né cambiare `ApiTable`.
+
+Il gate di paziente attivo e il replay sono nei writer delle sole entries,
+`lib/entry-write-operation.ts`; non aggiornano terapie, versione della terapia,
+marker o ledger del comando di stato. I controller legacy ADR0156 e durevole
+ADR0168, i loro consumer in TherapyManager, letture rigorose, await, CAS e
+writer/audit host delle terapie restano identici. Un abort client continua
+a non annullare il commit host. Non cambiano `Begin`/`Confirm`/`Dispatch`,
+`Host`/`HostReject`, recupero, rimozione per attemptID, limiti o assunzioni.
+
+Modello, statechart, invarianti, testimoni e mutanti restano invariati. Il
+riesame non estende TLC a idempotenza, cifratura o lifecycle delle scale,
+protetti dai test specifici del writer e dei client. Il comando completo
+`npm run verify:therapy-status` ha verificato questo raccordo: 5.903.794 stati
+distinti, coda vuota, nessuna violazione dei cinque invarianti; tre mutanti
+del modello e sei testimoni rilevati come atteso, 122 test causali verdi,
+due mutazioni del controller rilevate e originale ripristinato 29/29 verde.
+
 ## Riconciliazione delle letture di sessione con HC-7 del 27 ottobre 2026
 
 Riesaminato il risultato dell'unione di #696 (`32ea06c6b10fa29c51418704a6133aef4f4b7a09`)

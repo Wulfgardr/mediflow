@@ -5,9 +5,9 @@ import { useLiveQueryState } from '@/lib/live-query';
 import { readCockpitRows } from '@/components/kree8/cockpit-read-snapshot';
 import { subscribeClientAccountAuthority } from '@/lib/security/client-auth-api';
 import type { CockpitSnapshot } from '@/components/kree8/cockpit-read-snapshot';
-import type { Patient } from '@/lib/db';
+import { db, type Patient } from '@/lib/db';
 import localStyles from './runner.module.css';
-import { db, ScaleEntryWriteError, type PreparedScaleEntryCreate } from '@/lib/db';
+import { prepareScaleCreate, ScaleEntryWriteError, type PreparedScaleEntryCreate } from '@/lib/scale-entry-client';
 import { useParams, useRouter } from 'next/navigation';
 import ScaleEngine from '@/components/scale-engine';
 import { SCALES } from '@/lib/scale-definitions';
@@ -99,7 +99,7 @@ function ScaleRunner({ patientId, scaleId }: { patientId: string; scaleId: strin
                 setAnswersLocked(true);
                 if (!pendingWrite.current) {
                     const now = new Date(Math.floor(Date.now() / 1000) * 1000);
-                    pendingWrite.current = db.entries.prepareScaleCreate({
+                    pendingWrite.current = prepareScaleCreate({
                         id: draftEntryId, patientId, date: now, type: 'scale', title: submission.title,
                         setting, content: submission.content, metadata: submission.metadata,
                         createdAt: now, updatedAt: now, attachments: [],

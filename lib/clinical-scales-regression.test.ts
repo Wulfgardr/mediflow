@@ -292,7 +292,7 @@ test('Production form and page are wired to the tested gates, not a parallel ref
     const page = readFileSync('app/patients/[id]/scales/[scaleId]/page.tsx', 'utf8');
     const form = readFileSync('components/scale-engine.tsx', 'utf8');
     assert.match(page, /submitScale\(scaleId, result\.answers, async submission => \{[\s\S]*?if \(!canComplete\.current\(identity\)\) throw/);
-    assert.match(page, /if \(!pendingWrite\.current\)[\s\S]*?db\.entries\.prepareScaleCreate\(/);
+    assert.match(page, /if \(!pendingWrite\.current\)[\s\S]*?prepareScaleCreate\(/);
     assert.match(page, /return \(await pendingWrite\.current\)\.submit\(\)/);
     assert.doesNotMatch(page, /db\.entries\.add\(/);
     assert.match(form, /disabled=\{isSubmitting \|\| answersLocked\}/);

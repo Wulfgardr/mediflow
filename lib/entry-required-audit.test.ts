@@ -610,6 +610,7 @@ test('scale lifecycle gate belongs to the writer transaction, not route admissio
 
 
 test('Web scale facade replays the same encrypted request after a lost committed response', async t => {
+    const { prepareScaleCreate } = load('./scale-entry-client.ts') as typeof import('./scale-entry-client.ts');
     const { db } = load('./db.ts') as typeof import('./db.ts');
     const { generateMasterKey } = load('./security/security.ts') as typeof import('./security/security.ts');
     const ids = seed('web-scale-lost-reply', false);
@@ -622,7 +623,7 @@ test('Web scale facade replays the same encrypted request after a lost committed
         return response;
     });
     try {
-        const prepared = await db.entries.prepareScaleCreate({ id: ids.entryId, patientId: ids.patientId,
+        const prepared = await prepareScaleCreate({ id: ids.entryId, patientId: ids.patientId,
             type: 'scale', title: 'ADL', content: 'Synthetic score 0/6', metadata: { score: 0 },
             date: new Date('2026-05-02T09:00:00.456Z'), createdAt: new Date(), updatedAt: new Date() }, () => true);
         await assert.rejects(prepared.submit(), /lost response/);
@@ -684,3 +685,52 @@ for (const surface of ['web', 'v1', 'network'] as const) {
         });
     }
 }
+
+
+test('scale request cannot cross session retirement during encryption', async t => {
+    const { db } = load('./db.ts') as typeof import('./db.ts');
+    const { prepareScaleCreate } = load('./scale-entry-client.ts') as typeof import('./scale-entry-client.ts');
+    const { generateMasterKey } = load('./security/security.ts') as typeof import('./security/security.ts');
+    const key = await generateMasterKey();
+    db.setKey(key);
+    let requests = 0;
+    t.mock.method(globalThis, 'fetch', async () => { requests++; throw new Error('Unexpected request'); });
+    const encrypt = db.entries.prepareWritePayload.bind(db.entries);
+    t.mock.method(db.entries, 'prepareWritePayload', async (item: Partial<import('./db').ClinicalEntry>) => {
+        const encrypted = await encrypt(item);
+        db.setKey(key);
+        return encrypted;
+    });
+    try {
+        await assert.rejects(prepareScaleCreate({ id: 'synthetic-retired-scale', patientId: 'synthetic-patient',
+            type: 'scale', title: 'ADL', content: 'Synthetic score', date: new Date(), createdAt: new Date(), updatedAt: new Date() }, () => true), /non confermata/);
+        assert.equal(requests, 0);
+    } finally { db.setKey(null); }
+});
+
+test('scale committed response from a retired session cannot publish success or retry', async t => {
+    const { db } = load('./db.ts') as typeof import('./db.ts');
+    const { prepareScaleCreate } = load('./scale-entry-client.ts') as typeof import('./scale-entry-client.ts');
+    const { generateMasterKey } = load('./security/security.ts') as typeof import('./security/security.ts');
+    const ids = seed('scale-retired-reply', false);
+    const key = await generateMasterKey();
+    db.setKey(key);
+    let requests = 0;
+    t.mock.method(globalThis, 'fetch', async (_url: unknown, options: RequestInit) => {
+        requests++;
+        const response = await invoke('web', 'POST', ids, JSON.parse(options.body as string));
+        assert.equal(response.status, 201);
+        db.setKey(key);
+        return response;
+    });
+    try {
+        const prepared = await prepareScaleCreate({ id: ids.entryId, patientId: ids.patientId,
+            type: 'scale', title: 'ADL', content: 'Synthetic score', date: new Date(), createdAt: new Date(), updatedAt: new Date() }, () => true);
+        await assert.rejects(prepared.submit(), /non confermata/);
+        await assert.rejects(prepared.submit(), /non confermata/);
+        assert.equal(requests, 1);
+        const after = readBack(ids.patientId, ids.entryId);
+        assert.equal(after.allPatientEntries.length, 1);
+        assert.equal(after.audit.length, 1);
+    } finally { db.setKey(null); }
+});
