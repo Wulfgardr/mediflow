@@ -173,5 +173,15 @@
     "path": "docs/analysis/2026-10-22-command-roles/real-probe.spec.ts.txt",
     "reason": "WUL-787: Historical manual reproduction source archived as text; not an ordinary suite entrypoint. Current regression coverage is selected from e2e/command-roles-real.spec.ts.",
     "owner": "@Wulfgardr"
+  },
+  {
+    "path": "lib/local-operation/specialist/browser-adapter.ts",
+    "reason": "Adapter del solo simulatore CU-1; usa Chromium come esecutore locale, non registra test. Esercitato da vertical.test.ts e protocol.test.ts.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/local-operation-specialist-demo.mjs",
+    "reason": "Ingresso interattivo della demo CU-1 con conferma nativa; usa Chromium per il portale inventato, non registra test.",
+    "owner": "@Wulfgardr"
   }
 ]

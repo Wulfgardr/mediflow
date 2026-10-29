@@ -1,6 +1,6 @@
 {
   "baseCommit": "17af7eae8c9f55ccd43e670d80a9cb00ec6cdf2d",
-  "scope": "R1 marker and dispatch remain separate model actions. R2 immutable identity, R3 archive/connection/key origin and R5 original approval expiry at HTTP dispatch are runtime regressions, outside TLA. adapter.act may await between marker and dispatch. Hashes identify the reviewed mapping, not equivalence.",
+  "scope": "R1 marker and dispatch remain separate model actions. R2 immutable identity, R3 archive/connection/key origin and R5 original approval expiry at HTTP dispatch are runtime regressions, outside TLA. adapter.act may await between marker and dispatch. Hashes identify the reviewed mapping, not equivalence. CU-1 specialistica: callback recordConfirmed nella transazione Record esistente; nessuno stato o transizione aggiunto. Sorgenti, semantica delle prestazioni e browser sono prove runtime, fuori dal modello.",
   "tool": {
     "release": "v1.7.4",
     "verifier": "TLC 2.19",
@@ -18,8 +18,8 @@
   "files": {
     "lib/local-operation/contract.ts": "19a58c9bcfa00b02da15cfc3c1c7c00d653d1dbb05057d80e846f64fd6cf1457",
     "lib/local-operation/service.ts": "265984c916f54a6ec3f74d9b3d9254c7d18c492d6ebd221ca94ea5d6625bf4a2",
-    "lib/local-operation/sqlite-journal.ts": "27b252ff36a37e9bc1d499c0b83a7833ef260c869c38835f3cac1c687d536566",
-    "lib/local-operation/host.ts": "fd67b633fa3b5db7e1b6d7f93cba96efec2ea26f92d681e99f3abb9279d9e3f7",
+    "lib/local-operation/sqlite-journal.ts": "6a802461c835c773fd213a514b16d9564ce93f493ca1fb7016e95a5119113a9e",
+    "lib/local-operation/host.ts": "211184f97d6f98e4d61f4e026c322cd4eb907204cc17668149d7609ce1b2e44e",
     "lib/local-operation/journal-cipher.ts": "44001319c6928cf124b2102fe999a30622e134204c662ce689134a6895768f8e",
     "lib/local-operation/remote-host.ts": "679cf9966780466b28de1a17b1116bc214cd59b873dba393bab1c900944e4c55",
     "packages/mcp/src/local-operation-server.ts": "d05334130383563da84c36df5aaa5e6ded3e5ad246d88af86d86162628c1421b",
@@ -128,5 +128,6 @@
   },
   "mappedCodeCommit": "e0d591af536068fb5911d64506badf980536df53",
   "integrationBaseCommit": "a12cd01b01cccfe2ab45b590a86dab27ddf46a66",
-  "approvalExpiryReviewBaseCommit": "cec371630c72ff56d5b57c540575d50217a7ceac"
+  "approvalExpiryReviewBaseCommit": "cec371630c72ff56d5b57c540575d50217a7ceac",
+  "specialistIntegrationBaseCommit": "c590c6f3c896c26da23e8e8bcba1ee2c0f1b10cd"
 }

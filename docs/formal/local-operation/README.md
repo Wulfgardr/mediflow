@@ -59,4 +59,6 @@ Il comando esegue baseline, mutanti semantici `UnsafePreparation` e `UnsafeDispa
 
 Le uscite negative devono contenere la violazione semantica attesa, non un errore di parsing. Seguono test sul codice originale e modello ripristinato. Il mutante di preparazione e quello TLA rappresentano lo stesso indebito passaggio; gli altri qualificano i controlli runtime di sessione, uscita, autorità, identità e origine, senza attribuirli al modello TLA. Non si alterano gli originali per costruire i mutanti.
 
-I risultati grezzi rimangono nel dossier locale del run; la PR riporta revisione ed esiti. Questo collegamento qualificato per i casi mutati non dimostra equivalenza generale fra TypeScript e TLA+, né sicurezza dell'intero host o ammissione clinica. L'ADR 0162 resta Proposed e CU-1b rimane necessaria.
+I risultati grezzi rimangono nel dossier locale del run; la PR riporta revisione ed esiti. Questo collegamento qualificato per i casi mutati non dimostra equivalenza generale fra TypeScript e TLA+, né sicurezza dell'intero host o ammissione clinica. L'ADR 0162 resta Proposed; l'accettazione della verticale specialistica rimane distinta dal nucleo.
+
+La verticale [specialistica sintetica CU-1](../../local-operation-specialist.md) collega il writer della prescrizione al callback `recordConfirmed` del journal. Padre, righe e relativi audit condividono la transazione `Record` esistente; non cambiano stati, azioni o bound TLA. I confronti clinici, il browser e le sette nuove falsificazioni restano prove runtime, eseguite con `npm run verify:specialist-operation`.
