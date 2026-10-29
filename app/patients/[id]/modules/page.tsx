@@ -462,7 +462,7 @@ export default function PatientDetailPage() {
         { href: '#protesica', label: 'Protesica', meta: protesicaCount !== undefined ? formatCountLabel(protesicaCount, 'prescrizione', 'prescrizioni') : undefined },
         { href: '#scale', label: 'Scale', meta: entries !== undefined ? formatCountLabel(scaleEntries.length, 'valutazione', 'valutazioni') : undefined },
         { href: '#documenti', label: 'Documenti', meta: String(attachmentItems.length) },
-        { href: '#siss', label: 'SISS e FSE', meta: sissHandoffCount !== undefined ? formatCountLabel(sissHandoffCount, 'passaggio', 'passaggi') : undefined },
+        { href: '#siss', label: 'SISS e FSE', meta: sissHandoffCount !== undefined && sissHandoffCount > 0 ? formatCountLabel(sissHandoffCount, 'passaggio registrato', 'passaggi registrati') : undefined },
         { href: '#timeline', label: 'Timeline', meta: entries !== undefined && checkups !== undefined ? formatCountLabel(nonScaleEntries.length + checkups.length + documentInsights.length, 'evento', 'eventi') : undefined },
         { href: '#diario', label: 'Diario', meta: entries !== undefined ? formatCountLabel(nonScaleEntries.length, 'voce', 'voci') : undefined },
         { href: '#follow-up', label: 'Follow-up', meta: followupRead.count },
@@ -730,7 +730,7 @@ export default function PatientDetailPage() {
                         id="siss"
                         kicker="SISS / FSE"
                         title="SISS e FSE"
-                        count={sissHandoffCount !== undefined ? formatCountLabel(sissHandoffCount, 'passaggio', 'passaggi') : undefined}
+                        count={sissHandoffCount !== undefined && sissHandoffCount > 0 ? formatCountLabel(sissHandoffCount, 'passaggio registrato', 'passaggi registrati') : undefined}
                         summary="Apertura assistita dei portali regionali e diario dei passaggi."
                         surfaceClassName={`${workspaceStyles.clinicalSection} ${sissStyles.section}`}
                     >

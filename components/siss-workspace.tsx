@@ -1,6 +1,8 @@
 'use client';
 
-/* presentation only; export/share retain the chart's existing gates. */
+import { useLiveQueryState } from '@/lib/live-query';
+import { describeFhirExportReadiness, inspectFhirExportReadiness } from '@/lib/fhir/export-readiness';
+import { type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 import { Button } from '@/components/ui/button';
 import { Download, Share2 } from 'lucide-react';
 import SissPatientContextPanel from '@/components/siss-patient-context-panel';
@@ -16,11 +18,30 @@ type Props = {
 };
 
 export default function SissWorkspace({ patientId, patientTaxCode, canShareFhirFile, onExportFhir, onShareFhir }: Props) {
+    const checks = useLiveQueryState(
+        () => inspectFhirExportReadiness(patientId, async () => {
+            const response = await fetch(`/api/fse/validate-patient?patientId=${encodeURIComponent(patientId)}`);
+            if (!response.ok) throw new Error('FSE_VALIDATION_UNAVAILABLE');
+            return await response.json() as ValidatePatientExportResponse;
+        }, async confirm => {
+            const { generatePatientBundle } = await import('@/lib/fhir/bundle-generator');
+            return generatePatientBundle(patientId, confirm);
+        }),
+        [patientId],
+        undefined,
+        ['patients', 'entries', 'therapies', 'checkups', 'observations'],
+    );
+    const fseReadiness = describeFhirExportReadiness(checks, patientId);
+
     return (
         <div className={styles.workspace}>
-            <section aria-label="Export FHIR">
+            <section aria-label="Esportazione locale">
                 <h3 className={styles.heading}>Esportazione locale</h3>
-                <p className={styles.caption}>Export locale FHIR R4. Il file non viene inviato al FSE.</p>
+                <p className={styles.caption}>Esportazione locale in formato FHIR R4. Il file non viene inviato al FSE.</p>
+                <p role={fseReadiness.role}
+                    className={fseReadiness.role === 'alert' ? `mf-alert mf-alert-${fseReadiness.tone} mb-3` : styles.caption}>
+                    {fseReadiness.label}
+                </p>
                 <div className={styles.actions}>
                     <Button variant="secondary" onClick={onExportFhir}>
                         <Download size={18} aria-hidden="true" />Esporta FHIR
@@ -32,7 +53,7 @@ export default function SissWorkspace({ patientId, patientTaxCode, canShareFhirF
                     )}
                 </div>
             </section>
-            <SissPatientContextPanel patientId={patientId} patientTaxCode={patientTaxCode} embedded />
+            <SissPatientContextPanel patientId={patientId} patientTaxCode={patientTaxCode} fseReadiness={fseReadiness} onRefreshFseReadiness={checks.refresh} embedded />
             <div className={styles.diary}><SissHandoffDiary patientId={patientId} embedded /></div>
         </div>
     );

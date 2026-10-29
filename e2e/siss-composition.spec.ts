@@ -63,7 +63,7 @@ test('SISS: diario locale, pre-controllo ed esportazione senza servizi regionali
         for (const mode of ['warning', 'blocked', 'error']) {
             validationMode = mode;
             await pane.getByRole('button', { name: 'Aggiorna controllo FSE locale', exact: true }).click();
-            await expect(pane).toContainText(mode === 'error' ? 'Controllo FSE non disponibile al momento.' : mode === 'blocked' ? (baseline ? 'FSE: blocchi' : 'Controllo locale: blocchi') : (baseline ? 'FSE: attenzioni' : 'Controllo locale: attenzioni'));
+            await expect(pane).toContainText(mode === 'error' ? 'Controllo FSE non disponibile al momento.' : mode === 'blocked' ? (baseline ? 'FSE: blocchi' : 'Dati da correggere per l’esportazione FSE.') : (baseline ? 'FSE: attenzioni' : 'Dati da verificare per l’esportazione FSE.'));
             await capture(`precheck-${mode}`, requirements);
         }
         validationMode = 'clean'; await pane.getByRole('button', { name: 'Aggiorna controllo FSE locale', exact: true }).click();
@@ -103,7 +103,7 @@ test('SISS: diario locale, pre-controllo ed esportazione senza servizi regionali
             await page.keyboard.press('Escape'); await expect(trigger).toBeFocused(); await trigger.click(); await page.getByRole('menuitem', { name: 'Elimina passaggio SISS', exact: true }).click();
         } else await row.getByRole('button', { name: 'Elimina passaggio SISS', exact: true }).click();
         const confirm = page.getByRole('dialog'); await capture('conferma', confirm.getByRole('button', { name: 'Annulla', exact: true })); await confirm.getByRole('button', { name: 'Annulla', exact: true }).click(); await expect(row).toBeVisible();
-        await pane.getByRole('button', { name: 'Apri Menu SISS', exact: true }).click();
+        await pane.getByRole('button', { name: baseline ? 'Apri Menu SISS' : 'Apri Menu SISS, fuori da MediFlow', exact: true }).click();
         await expect(pane.getByRole('button', { name: 'Chiudi passaggio', exact: true })).toBeVisible();
         const closure = pane.getByRole('button', { name: 'Chiudi passaggio', exact: true }).locator('..');
         await closure.getByRole('textbox', { name: 'Cosa va ricordato', exact: true }).fill('Esito dichiarato soltanto locale');
