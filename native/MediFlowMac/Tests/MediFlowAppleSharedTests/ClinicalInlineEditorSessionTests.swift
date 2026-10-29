@@ -71,6 +71,29 @@ final class ClinicalInlineEditorSessionTests: XCTestCase {
     }
     #endif
 
+    func testPublishingInputCannotReenterWithThePreviousDraftAndEraseNativeText() throws {
+        let box = Box("<p></p>")
+        let id = try XCTUnwrap(box.document.blocks.first?.id)
+        let session = ClinicalInlineEditorSession(document: box.binding, blockID: id,
+                                                 controller: ClinicalInlineEditorController())
+        let surface = CompositionSurface()
+        session.attach(surface)
+        box.beforeWrite = { session.synchronize(document: box.binding, enabled: true) }
+        let expected = String(repeating: "Testo sintetico da conservare nel diario. ", count: 20)
+        var typed = ""
+        for character in expected {
+            typed.append(character)
+            surface.attributedContent = NSAttributedString(string: typed, attributes: surface.typingStyle)
+            let writes = surface.storageWrites
+            session.textChanged()
+            XCTAssertEqual(box.document.renderedHTML, "<p>\(typed)</p>")
+            XCTAssertEqual(surface.attributedContent.string, typed)
+            XCTAssertEqual(surface.storageWrites, writes, "Publishing must not rewrite the native text storage")
+        }
+        box.beforeWrite = nil
+        session.detach()
+    }
+
     func testCompositionEchoDoesNotReplaceNativeStorageAndDisabledInputCannotPublish() throws {
         let box = Box("<p>A</p>")
         let id = try XCTUnwrap(box.document.blocks.first?.id)
@@ -105,9 +128,10 @@ final class ClinicalInlineEditorSessionTests: XCTestCase {
 
     @MainActor private final class Box {
         var document: ClinicalRichTextEditorDocument
+        var beforeWrite: (() -> Void)?
         init(_ html: String) { document = .load(html: html) }
         var binding: Binding<ClinicalRichTextEditorDocument> {
-            Binding(get: { self.document }, set: { self.document = $0 })
+            Binding(get: { self.document }, set: { self.beforeWrite?(); self.document = $0 })
         }
     }
 
