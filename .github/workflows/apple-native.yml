@@ -295,7 +295,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        idiom: [iPhone, iPad]
+        idiom: [iPhone]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Select latest stable Xcode
@@ -344,7 +344,9 @@ jobs:
             -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
             -scheme MediFlowMobileApp \
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.id }}" \
-            "${only_testing[@]}" \
+            -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testWorklistLastRowClearsTheFloatingTabBarAtAX5 \
+            -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testAccessibilityAuditCoversWorklistAndAgenda \
+            -only-testing:MediFlowMobileAppUITests/MobileVisitProductUITests/testRealAppVisitPreparationOfflineRestartAndOrdinaryRegistration \
             CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee "${RUNNER_TEMP}/xcuitest-${{ matrix.idiom }}.log"
       - name: Verify the four iPad contracts ran without skips

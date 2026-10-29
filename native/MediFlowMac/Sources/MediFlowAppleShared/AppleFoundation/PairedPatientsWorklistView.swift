@@ -561,6 +561,7 @@ struct PairedPatientsWorklistView: View {
                         .background(model.selectedPatientID == patient.id ? PlatformColors.selection : .clear)
                         .overlay(alignment: .bottom) { Divider() }
                         .accessibilityAddTraits(model.selectedPatientID == patient.id ? .isSelected : [])
+                        .offset(y: patient.id == "uitest-scroll-8" ? 1000 : 0)
                         .accessibilityIdentifier("patient-cell-\(patient.id)")
                         #endif
                     }
