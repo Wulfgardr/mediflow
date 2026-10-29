@@ -2211,7 +2211,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertFalse(app.buttons["submit-scale-button"].exists)
     }
 
-    func testScaleDraftKeepsOriginalPatientWhenSelectionChanges() {
+    func testScaleDraftKeepsOriginalPatientWhenSelectionChanges() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "Il cambio selezione sotto il foglio richiede il workspace iPad; su iPhone il foglio è modale sul percorso compatto.")
         app.launchEnvironment["MEDIFLOW_APPLE_UITEST_PRESENT_SCALE"] = "adl"
         app.launchEnvironment["MEDIFLOW_APPLE_UITEST_OPEN_PATIENT_INDEX"] = "0"
         app.launchEnvironment["MEDIFLOW_APPLE_UITEST_SCALE_SWITCH_PATIENT"] = "1"
