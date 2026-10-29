@@ -23,6 +23,16 @@ final class PatientSummaryPresentationTests: XCTestCase {
         XCTAssertEqual(PairedPatientsWorkspaceSupport.patientMetadata(birthDate: nil, taxCode: ""), "")
     }
 
+    func testHiddenPatientHeaderSurvivesDefaultSiblingPreferences() {
+        var hidden = PatientChartHeaderHiddenKey.defaultValue
+        PatientChartHeaderHiddenKey.reduce(value: &hidden) { true }
+        PatientChartHeaderHiddenKey.reduce(value: &hidden) { false }
+        XCTAssertTrue(hidden)
+        var visible = PatientChartHeaderHiddenKey.defaultValue
+        PatientChartHeaderHiddenKey.reduce(value: &visible) { false }
+        XCTAssertFalse(visible)
+    }
+
     func testEntryDateIsItalianRegardlessOfDeviceLanguage() {
         let formatter = PairedPatientsWorkspaceSupport.entryDateFormatter
         XCTAssertEqual(formatter.locale.identifier, "it_IT")

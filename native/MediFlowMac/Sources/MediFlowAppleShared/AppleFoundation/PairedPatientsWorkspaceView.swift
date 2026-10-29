@@ -1661,5 +1661,5 @@ extension PairedPatientsWorkspaceView {
 
 struct PatientChartHeaderHiddenKey: PreferenceKey {
     static let defaultValue = false
-    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = nextValue() }
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
 }
