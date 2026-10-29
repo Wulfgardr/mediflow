@@ -348,7 +348,7 @@ pub fn section(
         .type_role(theme, TypeRole::Section)
         .text_color(theme.secondary)
         .pb(px(8.))
-        .child(text!(label))
+        .child(crate::title::title(label, theme))
 }
 
 pub fn notice(

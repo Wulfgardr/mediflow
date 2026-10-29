@@ -220,6 +220,7 @@ fn layout_title(
     width: f32,
     system: &WindowTextSystem,
 ) -> TitleLayout {
+    let width = width.max(0.);
     let shape = |text: &str, size: f32| {
         system.shape_line(
             text.to_owned().into(),
@@ -508,6 +509,7 @@ mod tests {
                 TypeRole::Threshold,
             ),
             ("Pazienti", TypeRole::PageTitle),
+            ("DATI ANAGRAFICI", TypeRole::Section),
             ("Scheda", TypeRole::PageTitle),
             ("Impostazioni", TypeRole::PageTitle),
             ("Preferenze funzioni AI", TypeRole::PageTitle),
@@ -635,6 +637,27 @@ mod tests {
             }
         }
     }
+    #[gpui::test]
+    fn provisional_nonpositive_width_preserves_progress(cx: &mut TestAppContext) {
+        let system = WindowTextSystem::new(cx.text_system().clone());
+        let theme = Theme::for_dark(false);
+        let style = TextStyle::default();
+        let text = TitleText::name("Schwarzenegger");
+        for width in [-100., -1., 0., 1.] {
+            let layout = layout_title(&text, &style, theme.body(), theme, width, &system);
+            assert_eq!(
+                layout
+                    .lines
+                    .iter()
+                    .map(|line| line.text.as_ref())
+                    .collect::<String>(),
+                text.text()
+            );
+            assert!(layout.lines.iter().all(|line| !line.text.is_empty()));
+            assert!(layout.lines.len() <= text.text().graphemes(true).count());
+        }
+    }
+
     struct ProtectedFixture {
         text: TitleText,
         theme: Theme,

@@ -2713,7 +2713,7 @@ impl ClinicalApp {
                             .px(px(8.))
                             .type_role(theme, TypeRole::Section)
                             .text_color(theme.secondary)
-                            .child(text!("ACCESSO PERSONALE")),
+                            .child(crate::title::title("ACCESSO PERSONALE", theme)),
                     )
                     .child(
                         div()
@@ -2966,7 +2966,7 @@ impl ClinicalApp {
                             div()
                                 .type_role(theme, TypeRole::Section)
                                 .text_color(theme.secondary)
-                                .child(text!("ARCHIVIO SCELTO")),
+                                .child(crate::title::title("ARCHIVIO SCELTO", theme)),
                         )
                         .child(text!(pairing.client.base_url().to_owned())),
                 )
@@ -3107,7 +3107,7 @@ impl ClinicalApp {
                         div()
                             .type_role(theme, TypeRole::Section)
                             .text_color(theme.secondary)
-                            .child(text!("AMBULATORIO")),
+                            .child(crate::title::title("AMBULATORIO", theme)),
                     )
                     .children(
                         self.ambulatories
@@ -4445,7 +4445,7 @@ impl ClinicalApp {
                 div().id(SharedString::from(format!("clinical-workspace-document-{id}")))
                     .min_w_0().max_w_full()
                     .border_b_1().border_color(theme.rule).py(px(16.)).flex().flex_col().gap(px(8.))
-                    .child(div().min_w_0().max_w_full().type_role(theme, TypeRole::Strong).child(text!(name)))
+                    .child(div().min_w_0().max_w_full().type_role(theme, TypeRole::Strong).child(crate::title::title(crate::title::TitleText::name(name), theme)))
                     .child(div().min_w_0().max_w_full().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
                         .child(text!(format!("{} · {} · {}", row.mime_type, format_size(row.size), display_date(row.created_at.as_deref())))))
                     .child(div().min_w_0().max_w_full().flex().flex_wrap().gap(px(8.))
@@ -5584,7 +5584,7 @@ impl ClinicalApp {
                     .child(button("clinical-workspace-global-current", "Interfaccia corrente…", theme, false, true)
                         .on_click(cx.listener(move |this, _, _, cx| this.open_current(selected.current_path(), cx))))))
             .child(div().flex().flex_wrap().items_center().gap(px(8.))
-                .child(div().type_role(theme, TypeRole::Section).text_color(theme.secondary).child(text!("AMBULATORIO")))
+                .child(div().type_role(theme, TypeRole::Section).text_color(theme.secondary).child(crate::title::title("AMBULATORIO", theme)))
                 .children(self.ambulatories.ready().into_iter().flatten().map(|scope| {
                     let id = scope.id.clone();
                     button(format!("clinical-workspace-global-ambulatory-{id}"), scope.name.clone(), theme, false, true)
@@ -5797,7 +5797,10 @@ impl ClinicalApp {
                                                 move || format!("agenda-name-{id}")
                                             })
                                             .type_role(theme, TypeRole::Strong)
-                                            .child(text!(name)),
+                                            .child(crate::title::title(
+                                                crate::title::TitleText::name(name),
+                                                theme,
+                                            )),
                                     )
                                     .child(
                                         div()
@@ -5972,7 +5975,12 @@ impl ClinicalApp {
                     .gap(px(8.))
                     .child(record_header(
                         theme,
-                        div().type_role(theme, TypeRole::Strong).child(text!(name)),
+                        div()
+                            .type_role(theme, TypeRole::Strong)
+                            .child(crate::title::title(
+                                crate::title::TitleText::name(name),
+                                theme,
+                            )),
                         div()
                             .type_role(theme, TypeRole::Meta)
                             .text_color(theme.secondary)
@@ -7229,7 +7237,7 @@ impl ClinicalApp {
                 })))
             .when(self.ambulatories.message().is_some(), |el| el.child(self.load_hint("clinical-workspace-reference-ambulatories-state", &self.ambulatories)))
             .child(div().flex().flex_wrap().gap(px(8.)).items_center()
-                .child(div().type_role(theme, TypeRole::Section).text_color(theme.secondary).child(text!("AMBULATORIO")))
+                .child(div().type_role(theme, TypeRole::Section).text_color(theme.secondary).child(crate::title::title("AMBULATORIO", theme)))
                 .children(self.ambulatories.ready().into_iter().flatten().map(|scope| {
                     let id = scope.id.clone();
                     button(format!("clinical-workspace-reference-scope-{id}"), scope.name.clone(), theme, false, true)
@@ -9136,5 +9144,146 @@ mod tests {
                 }
             }
         }
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod review706b_callers {
+    use super::*;
+    struct Fixture {
+        app: Entity<ClinicalApp>,
+        mode: u8,
+    }
+    impl Render for Fixture {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            self.app.update(cx, |app, cx| {
+                let content = match self.mode {
+                    0 => app.preview(cx).into_any_element(),
+                    1 => app.agenda_view(true, cx),
+                    2 => app.global_diary_view(cx).into_any_element(),
+                    _ => section("independent-section", "DATI ANAGRAFICI", app.theme)
+                        .into_any_element(),
+                };
+                div()
+                    .size_full()
+                    .type_role(app.theme, TypeRole::Body)
+                    .child(content)
+            })
+        }
+    }
+    fn make_app(window: &mut Window, cx: &mut Context<ClinicalApp>) -> ClinicalApp {
+        let mut app = ClinicalApp::new(String::new(), window, cx);
+        let patient = serde_json::json!({"id":"review706b-patient","firstName":"","lastName":"Schwarzenegger","taxCode":"RSSMRA80A01H501U","version":1});
+        app.install_patient(serde_json::from_value(patient.clone()).unwrap());
+        app.global_patients = ReadLoad::Ready(vec![serde_json::from_value(patient).unwrap()]);
+        app.agenda=ReadLoad::Ready(vec![serde_json::from_value(serde_json::json!({"id":"review706b-control","patientId":"review706b-patient","version":1,"date":"2026-10-27","title":"Controllo sintetico","status":"pending"})).unwrap()]);
+        app.agenda_flow.targets.insert(
+            "review706b-control".into(),
+            ScrollTarget::new(&app.area_scroll, cx),
+        );
+        app.global_entries=Load::Ready(vec![serde_json::from_value(serde_json::json!({"id":"review706b-entry","patientId":"review706b-patient","version":1,"date":"2026-10-27","title":"Nota sintetica","type":"note","content":"Prova"})).unwrap()]);
+        app.theme = Theme::for_dark(false).sized(2., false);
+        app.text_scale = 2.;
+        app
+    }
+    #[gpui::test]
+    fn actual_preview_304(cx: &mut gpui::TestAppContext) {
+        let mut native = gpui::TestAppContext::build_with_text_system(
+            cx.dispatcher.clone(),
+            None,
+            std::sync::Arc::new(gpui_apple::AppleTextSystem::new()),
+        );
+        native.update(|cx| {
+            cx.text_system()
+                .add_fonts(vec![std::borrow::Cow::Borrowed(include_bytes!(
+                    "../../../../app/fonts/Newsreader-Native-Regular.ttf"
+                ))])
+                .unwrap()
+        });
+        let (_, cx) = native.add_window_view(|window, cx| Fixture {
+            app: cx.new(|cx| make_app(window, cx)),
+            mode: 0,
+        });
+        cx.simulate_resize(gpui::size(px(304.), px(900.)));
+        crate::title::take_title_nodes();
+        cx.update(|w, cx| {
+            w.refresh();
+            w.draw(cx).clear(cx);
+        });
+        let nodes = crate::title::take_title_nodes();
+        let (_, node, bounds, glyph_width) = nodes
+            .iter()
+            .find(|(_, n, _, _)| n.value() == Some("Schwarzenegger"))
+            .expect("actual preview uses shared accessible title");
+        println!(
+            "ACTUAL PREVIEW {:?} bounds={bounds:?} glyph={glyph_width:?}",
+            node.value()
+        );
+        assert!(bounds.right() <= px(280.));
+        assert!(*glyph_width <= px(255.));
+        assert!(
+            bounds.size.height
+                <= px(Theme::for_dark(false)
+                    .sized(2., false)
+                    .role(TypeRole::PersonPreview)
+                    .line_height
+                    + 1.)
+        );
+    }
+    #[gpui::test]
+    fn all_actual_callers_use_common_renderer(cx: &mut gpui::TestAppContext) {
+        let mut native = gpui::TestAppContext::build_with_text_system(
+            cx.dispatcher.clone(),
+            None,
+            std::sync::Arc::new(gpui_apple::AppleTextSystem::new()),
+        );
+        let (view, cx) = native.add_window_view(|window, cx| Fixture {
+            app: cx.new(|cx| make_app(window, cx)),
+            mode: 1,
+        });
+        let mut missing = Vec::new();
+        for (mode, label) in [(1, "Agenda"), (2, "Diario generale"), (3, "Sezione")] {
+            view.update(cx, |v, cx| {
+                v.mode = mode;
+                v.app.update(cx, |app, cx| {
+                    app.theme = Theme::for_dark(false).sized(4., false);
+                    app.text_scale = 4.;
+                    cx.notify();
+                });
+                cx.notify();
+            });
+            cx.simulate_resize(gpui::size(px(390.), px(2400.)));
+            crate::title::take_title_nodes();
+            cx.update(|w, cx| {
+                w.refresh();
+                w.draw(cx).clear(cx);
+            });
+            let nodes = crate::title::take_title_nodes();
+            let expected = if mode == 3 {
+                "DATI ANAGRAFICI"
+            } else {
+                "Schwarzenegger"
+            };
+            println!(
+                "ACTUAL CALLER {label}: title nodes={:?}",
+                nodes
+                    .iter()
+                    .map(|(_, n, _, _)| n.value())
+                    .collect::<Vec<_>>()
+            );
+            if mode == 1 {
+                println!(
+                    "AGENDA NAME bounds={:?}",
+                    cx.debug_bounds("agenda-name-review706b-control")
+                );
+            }
+            if !nodes.iter().any(|(_, n, _, _)| n.value() == Some(expected)) {
+                missing.push(label);
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "real callers bypass common renderer: {missing:?}"
+        );
     }
 }

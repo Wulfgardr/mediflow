@@ -197,12 +197,12 @@ impl ClinicalApp {
                                 .child(
                                     div()
                                         .debug_selector(|| "threshold-recovery-title".into())
-                                        .child(text!(title)),
+                                        .child(crate::title::title(title, theme)),
                                 )
                                 .child(
                                     div()
                                         .debug_selector(|| "threshold-recovery-state".into())
-                                        .child(text!(state)),
+                                        .child(crate::title::title(state, theme)),
                                 ),
                         )
                         .child(
@@ -211,9 +211,9 @@ impl ClinicalApp {
                                 .relative()
                                 .min_w_0()
                                 .child({
-                                    let command = button(
+                                    let command = crate::components::title_button(
                                         "threshold-other-actions",
-                                        "Altre azioni",
+                                        crate::title::TitleText::from("Altre azioni"),
                                         theme,
                                         false,
                                         true,
