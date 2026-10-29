@@ -48,7 +48,13 @@ async function runConsumer(consumer: 'modules' | 'editor' | 'share', input: Fhir
     const toasts: unknown[] = [];
     const logs: unknown[] = [];
     const calls = { download: 0, share: 0, objectUrl: 0, confirmations: 0, recordReads: 0 };
-    const table = <T,>(records: T[]) => ({ filter: () => ({ toArray: async () => records }) });
+    const table = <T,>(records: T[]) => ({ query: (params: { patientId: string }) => {
+        assert.equal(params.patientId, input.patient.id);
+        return { toArray: async (options: { rejectAuthUnavailable: boolean }) => {
+            assert.equal(options.rejectAuthUnavailable, true);
+            return records;
+        } };
+    } });
     const db = {
         patients: { get: async () => input.patient },
         entries: { ...table(input.entries), get: async (recordId: string) => {
