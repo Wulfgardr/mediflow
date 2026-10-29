@@ -1867,7 +1867,7 @@ impl ClinicalApp {
         if scale.prepared.is_none() && !scale.has_attempt() {
             questions = questions.child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
                 .child(text!(format!("Domanda {} di {} · {} risposte inserite", scale.question + 1, scale.descriptor.questions.len(), scale.answers.len()))))
-                .child(scale.question_target.attach_enabled(heading("clinical-scale-question", question.text.clone(), theme).type_role(theme, crate::theme::TextRole::Strong), false))
+                .child(scale.question_target.attach_enabled(crate::components::heading_with_role("clinical-scale-question", question.text.clone(), theme, crate::theme::TitleRole::Question), false))
                 .child(div().id("clinical-scale-options").role(Role::Group).aria_label(question.text.clone()).flex().flex_col().gap(px(8.))
                     .children(question.options.iter().enumerate().map(|(index, choice)| {
                         let selected = scale.answers.get(&question.id) == Some(&choice.value);

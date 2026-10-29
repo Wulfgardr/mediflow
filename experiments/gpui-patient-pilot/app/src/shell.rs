@@ -2519,9 +2519,12 @@ impl ClinicalApp {
             return;
         };
         let mut lines = vec![
-            patient.display_name().to_string(),
+            crate::patient_text::copy_name(&patient.display_name()),
             format!("Nascita: {}", display_date(patient.birth_date.as_deref())),
-            format!("Codice fiscale: {}", patient.tax_code),
+            format!(
+                "Codice fiscale: {}",
+                crate::patient_text::copy_code(&patient.tax_code)
+            ),
             "Allergie: dato non disponibile".into(),
         ];
         for (label, field, value) in [
@@ -3246,7 +3249,7 @@ impl ClinicalApp {
                 let selected = self.selected_id.as_deref() == Some(&id);
                 let label = format!(
                     "{}, nascita {}, {}",
-                    patient.display_name(),
+                    crate::title::TitleText::name(patient.display_name()).text(),
                     display_date(patient.birth_date.as_deref()),
                     if patient.is_archived {
                         "archiviato"
@@ -4616,7 +4619,7 @@ impl ClinicalApp {
     ) -> String {
         let mut subject = format!(
             "{} · {}",
-            patient_name,
+            crate::title::TitleText::name(patient_name.clone()).text(),
             form.edit
                 .as_ref()
                 .map_or(form.kind.title(), editing::Record::title)
@@ -5201,7 +5204,12 @@ impl ClinicalApp {
                                         true,
                                     )
                                     .debug_selector(|| "clinical-workspace-confirm-save".into())
-                                    .aria_label(confirmation_command_label(patient_name.as_str())),
+                                    .aria_label(
+                                        confirmation_command_label(
+                                            crate::title::TitleText::name(patient_name.clone())
+                                                .text(),
+                                        ),
+                                    ),
                                 )
                                 .on_click(cx.listener(|this, _, _, cx| this.confirm_form(cx)));
                             #[cfg(test)]
@@ -5783,7 +5791,8 @@ impl ClinicalApp {
                             })
                             .role(Role::Button)
                             .aria_label(SharedString::from(format!(
-                                "Apri scheda di {name}, {}, {}",
+                                "Apri scheda di {}, {}, {}",
+                                crate::title::TitleText::name(name.clone()).text(),
                                 row.title,
                                 display_date(Some(&row.date))
                             )))
@@ -5927,11 +5936,10 @@ impl ClinicalApp {
             .flatten()
             .filter(|row| {
                 row.deleted_at.is_none()
-                    && (self
-                        .global_patient_name(&row.patient_id)
-                        .as_str()
-                        .to_lowercase()
-                        .contains(&query)
+                    && (crate::patient_text::search_name(
+                        &self.global_patient_name(&row.patient_id),
+                    )
+                    .contains(&query)
                         || !row.locked_fields.iter().any(|field| field == "title")
                             && row.title.to_lowercase().contains(&query)
                         || !row.locked_fields.iter().any(|field| field == "content")
@@ -5985,7 +5993,8 @@ impl ClinicalApp {
                     )))
                     .role(Role::Button)
                     .aria_label(SharedString::from(format!(
-                        "Apri diario di {name}: {title}"
+                        "Apri diario di {}: {title}",
+                        crate::title::TitleText::name(name.clone()).text()
                     )))
                     .focusable()
                     .tab_stop(true)
@@ -9199,6 +9208,9 @@ mod review706b_callers {
                     0 => app.preview(cx).into_any_element(),
                     1 => app.agenda_view(true, cx),
                     2 => app.global_diary_view(cx).into_any_element(),
+                    4 => app
+                        .directory_view(Layout::for_window(350., 4.), cx)
+                        .into_any_element(),
                     _ => section("independent-section", "DATI ANAGRAFICI", app.theme)
                         .into_any_element(),
                 };
@@ -9323,5 +9335,47 @@ mod review706b_callers {
             missing.is_empty(),
             "real callers bypass common renderer: {missing:?}"
         );
+    }
+    #[gpui::test]
+    fn actual_directory_name_string_boundary_stays_protected(cx: &mut gpui::TestAppContext) {
+        let mut native = gpui::TestAppContext::build_with_text_system(
+            cx.dispatcher.clone(),
+            None,
+            std::sync::Arc::new(gpui_apple::AppleTextSystem::new()),
+        );
+        let (_, cx) = native.add_window_view(|window, cx| {
+            let app = cx.new(|cx| {
+                let mut app = make_app(window, cx);
+                let source: String = "Elettroencefalografico".to_owned();
+                let patient = serde_json::json!({"id":"string-patient", "firstName":"", "lastName": source,"taxCode":"RSSMRA80A01H501U","version":1});
+                app.patients = Load::Ready(vec![serde_json::from_value(patient).unwrap()]);
+                app.theme = Theme::for_dark(false).sized(4., false); app.text_scale = 4.;
+                app
+            });
+            Fixture { app, mode: 4 }
+        });
+        cx.simulate_resize(gpui::size(px(350.), px(1400.)));
+        crate::title::take_title_nodes();
+        crate::title::take_title_lines();
+        cx.update(|w, cx| {
+            w.refresh();
+            w.draw(cx).clear(cx);
+        });
+        let nodes = crate::title::take_title_nodes();
+        let (_, _, bounds, width) = nodes
+            .iter()
+            .find(|(_, n, _, _)| n.value() == Some("Elettroencefalografico"))
+            .expect("real directory name");
+        assert!(bounds.right() <= px(350.) && *width <= px(350.));
+        let lines = crate::title::take_title_lines();
+        let (_, lines) = lines
+            .iter()
+            .find(|(name, _)| name == "Elettroencefalografico")
+            .unwrap();
+        assert!(
+            !lines.join("").contains('-'),
+            "name string boundary acquired prose hyphenation: {lines:?}"
+        );
+        assert_eq!(lines.join(""), "Elettroencefalografico");
     }
 }

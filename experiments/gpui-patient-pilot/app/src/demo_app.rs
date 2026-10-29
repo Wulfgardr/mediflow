@@ -391,9 +391,9 @@ impl PatientApp {
                 if let Some(profile) = self.workspace.selected() {
                     cx.write_to_clipboard(ClipboardItem::new_string(format!(
                         "DATI DI PROVA\n{}\nData di nascita: {}\nCodice di prova: {}\n\nNote\n{}",
-                        profile.display_name(),
+                        crate::patient_text::copy_name(&profile.display_name()),
                         display_date(profile.birth_date.as_deref()),
-                        profile.tax_code,
+                        crate::patient_text::copy_code(&profile.tax_code),
                         self.workspace.draft_notes()
                     )));
                     self.message = Some("Scheda di prova copiata.".into());
@@ -607,7 +607,8 @@ impl PatientApp {
                                     .role(Role::Button)
                                     .aria_label(SharedString::from(format!(
                                         "Apri la scheda di {}",
-                                        patient.display_name()
+                                        crate::title::TitleText::name(patient.display_name())
+                                            .text()
                                     )))
                                     .focusable()
                                     .tab_stop(true)
@@ -742,11 +743,11 @@ impl PatientApp {
                 }
             })
             .id("clinical-workspace-profile").debug_selector(|| "demo-profile".into()).accessibility_id("clinical-workspace-profile")
-            .role(Role::Main).aria_label(SharedString::from(format!("Scheda di prova di {}", profile.display_name())))
+            .role(Role::Main).aria_label(SharedString::from(format!("Scheda di prova di {}", crate::title::TitleText::name(profile.display_name()).text())))
             .flex_1().min_w_0().min_h_0().flex().flex_col().bg(theme.paper).rounded(px(theme.paper_radius)).overflow_hidden()
             .child(div().flex_shrink_0().min_w_0().p(px(if compact { 16. } else { 28. })).border_b_1().border_color(theme.rule).flex().flex_wrap().items_center().justify_between().gap(px(16.)).when(compact, |el| el.flex_col().items_stretch())
                 .child(div().flex_1().min_w_0().max_w_full().flex().flex_col().gap(px(8.))
-                    .child(div().id("clinical-workspace-patient-name").role(Role::Heading).aria_level(1).aria_label(SharedString::from(profile.display_name().to_string()))
+                    .child(div().id("clinical-workspace-patient-name").role(Role::Heading).aria_level(1).aria_label(SharedString::from(crate::title::TitleText::name(profile.display_name()).text().to_owned()))
                         .child(crate::title::title(crate::title::TitleText::name(profile.display_name()), theme).with_role(crate::theme::TitleRole::Person { compact })))
                     .child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary).child(text!(if profile.is_archived { "Scheda di prova in archivio" } else { "Scheda di prova in carico" }))))
                 .when(!compact, |el| el.child(self.profile_actions(phase, cx))))
@@ -758,7 +759,7 @@ impl PatientApp {
                         .child(self.field("clinical-workspace-first-name", "Nome", profile.first_name.clone(), false))
                         .child(self.field("clinical-workspace-last-name", "Cognome", profile.last_name.clone(), false))
                         .child(self.field("clinical-workspace-birth-date", "Data di nascita", display_date(profile.birth_date.as_deref()), false))
-                        .child(self.field("clinical-workspace-tax-code", "Codice fiscale di prova", profile.tax_code.to_string(), true)))
+                        .child(self.field("clinical-workspace-tax-code", "Codice fiscale di prova", crate::patient_text::edit_code(&profile.tax_code), true)))
                     .child(div().flex_1().min_w_0().flex().flex_col().gap(px(16.))
                         .child(div().flex().items_center().justify_between().gap(px(12.))
                             .child(self.section("clinical-workspace-notes-heading", if phase == Phase::Review { "NOTE DA REGISTRARE" } else { "NOTE DELLA SCHEDA" }))
@@ -874,7 +875,7 @@ impl PatientApp {
                 .child(div().type_role(theme, crate::theme::TextRole::Meta).child(text!("1 elemento: note della scheda. La modifica resta solo in memoria.")))
                 .child(div().flex().flex_wrap().gap(px(8.))
                     .child(self.button("clinical-workspace-cancel-review", "Torna alla bozza", Command::Cancel, false, true, cx))
-                    .child(self.button("clinical-workspace-confirm-save", "Conferma e registra", Command::Confirm, true, true, cx).aria_label(crate::navigation::confirmation_command_label(profile.display_name().as_str())).track_focus(&self.review_focus)))))
+                    .child(self.button("clinical-workspace-confirm-save", "Conferma e registra", Command::Confirm, true, true, cx).aria_label(crate::navigation::confirmation_command_label(crate::title::TitleText::name(profile.display_name()).text())).track_focus(&self.review_focus)))))
             .when(!review && self.discard.is_none(), |el| el.child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
                 .child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary).child(text!(if phase == Phase::Saved {
                     "Le note sono state rilette dopo la registrazione."

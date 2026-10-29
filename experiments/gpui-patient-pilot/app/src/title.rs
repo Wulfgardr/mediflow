@@ -15,7 +15,7 @@ pub trait NameInput {
 }
 impl NameInput for mediflow_patient_client::PersonName {
     fn name_string(self) -> SharedString {
-        self.as_str().to_owned().into()
+        self.into_title_segment().text().to_owned().into()
     }
 }
 impl NameInput for String {
@@ -50,7 +50,10 @@ impl TitleText {
         Self::new(text.name_string(), SegmentRole::Name)
     }
     pub fn code(text: impl Into<mediflow_patient_client::ClinicalCode>) -> Self {
-        Self::new(text.into().as_str().to_owned().into(), SegmentRole::Code)
+        Self::new(
+            text.into().into_title_segment().text().to_owned().into(),
+            SegmentRole::Code,
+        )
     }
     fn new(text: SharedString, role: SegmentRole) -> Self {
         let end = text.len();
@@ -467,6 +470,17 @@ impl Element for Title {
                 gpui::accesskit::Node::new(self.a11y_role().expect("accessible title role"));
             self.write_a11y_info(&mut node);
             let layout = layout.borrow();
+            #[cfg(target_os = "macos")]
+            CAPTURED_LINES.with(|lines| {
+                lines.borrow_mut().push((
+                    self.text.text().to_owned(),
+                    layout
+                        .lines
+                        .iter()
+                        .map(|line| line.text.to_string())
+                        .collect(),
+                ))
+            });
             CAPTURED.with(|nodes| {
                 nodes.borrow_mut().push((
                     id.expect("accessible title ID").clone(),
@@ -1055,5 +1069,70 @@ mod caller_contract_tests {
         }
         assert_eq!(elision_end("O'Shaughnessy"), None);
         assert_eq!(elision_end("l'elettroencefalogramma"), None);
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+thread_local! { static CAPTURED_LINES: RefCell<Vec<(String, Vec<String>)>> = const { RefCell::new(Vec::new()) }; }
+#[cfg(all(test, target_os = "macos"))]
+pub(crate) fn take_title_lines() -> Vec<(String, Vec<String>)> {
+    CAPTURED_LINES.with(|lines| std::mem::take(&mut *lines.borrow_mut()))
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod review706d {
+    use super::*;
+    use crate::theme::{TextRole, TypeStyle};
+    use gpui::{Context, Render, TestAppContext, div, prelude::*};
+    struct OrdinaryHeading;
+    impl Render for OrdinaryHeading {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let theme = Theme::for_dark(false);
+            div().size_full().type_role(theme, TextRole::Body).child(
+                crate::components::heading_with_role(
+                    "review-scale-question",
+                    "Domanda breve",
+                    theme,
+                    crate::theme::TitleRole::Question,
+                ),
+            )
+        }
+    }
+    #[gpui::test]
+    fn ordinary_heading_keeps_requested_strong_role(cx: &mut TestAppContext) {
+        let mut native = TestAppContext::build_with_text_system(
+            cx.dispatcher.clone(),
+            None,
+            std::sync::Arc::new(gpui_apple::AppleTextSystem::new()),
+        );
+        native.update(|cx| {
+            cx.text_system()
+                .add_fonts(vec![std::borrow::Cow::Borrowed(include_bytes!(
+                    "../../../../app/fonts/Newsreader-Native-Regular.ttf"
+                ))])
+                .unwrap()
+        });
+        let (_, cx) = native.add_window_view(|_, _| OrdinaryHeading);
+        cx.simulate_resize(gpui::size(px(800.), px(600.)));
+        take_title_nodes();
+        cx.update(|w, cx| {
+            w.refresh();
+            w.draw(cx).clear(cx);
+        });
+        let nodes = take_title_nodes();
+        let (_, node, bounds, width) = nodes
+            .iter()
+            .find(|(_, n, _, _)| n.value() == Some("Domanda breve"))
+            .unwrap();
+        let expected = Theme::for_dark(false).role(TypeRole::Strong).size * 1.2;
+        println!(
+            "STRONG HEADING original={:?} actual_height={:?} width={width:?} expected_height={expected}",
+            node.value(),
+            bounds.size.height
+        );
+        assert!(
+            (f32::from(bounds.size.height) - expected).abs() < 1.,
+            "Strong override ignored by heading"
+        );
     }
 }
