@@ -183,5 +183,10 @@
     "path": "scripts/local-operation-specialist-demo.mjs",
     "reason": "Ingresso interattivo della demo CU-1 con conferma nativa; usa Chromium per il portale inventato, non registra test.",
     "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/athena-quality/run.ts",
+    "reason": "CLI diagnostica con autoverifica, esercitata da scripts/athena-quality/bench.test.ts; non è una suite node:test.",
+    "owner": "WUL-790"
   }
 ]

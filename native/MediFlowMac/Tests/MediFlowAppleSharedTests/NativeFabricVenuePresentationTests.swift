@@ -1,5 +1,6 @@
 #if os(macOS)
 import AppKit
+import Combine
 import SwiftUI
 import XCTest
 @testable import MediFlowAppleShared
@@ -19,6 +20,14 @@ final class NativeFabricVenuePresentationTests: XCTestCase {
     private func settle(_ host: NSView) async throws {
         try await Task.sleep(nanoseconds: 80_000_000)
         host.layoutSubtreeIfNeeded(); host.displayIfNeeded()
+    }
+    private func waitForPhase(_ phase: NativeOrdinaryModel.Phase, of model: NativeOrdinaryModel,
+                              file: StaticString = #filePath, line: UInt = #line) async {
+        let reached = expectation(description: "Ordinary phase \(phase)")
+        let observation = model.$phase.filter { $0 == phase }.prefix(1).sink { _ in reached.fulfill() }
+        defer { observation.cancel() }
+        await fulfillment(of: [reached], timeout: 5)
+        XCTAssertEqual(model.phase, phase, file: file, line: line)
     }
     private func withMountedDocument(workspaceConsumer: Bool = false, local: NativeFabricModel.Services? = nil,
                                      ordinary: NativeOrdinaryModel.Services? = nil,
@@ -337,6 +346,9 @@ final class NativeFabricVenuePresentationTests: XCTestCase {
 
     func testClinicalSectionRemountRetainsOrdinaryClosureAndExplicitLane() async throws {
         var requests = 0, mayClose = false
+        var pending: CheckedContinuation<NativeOrdinaryResponse, Error>?
+        let closeStarted = expectation(description: "Ordinary cancellation reached the service")
+        defer { pending?.resume(throwing: HomeBaseClientError.transport(.unreachable)) }
         func response(_ phase: String) throws -> NativeOrdinaryResponse {
             try NativeOrdinaryTestFixtures.decode(NativeOrdinaryResponse.self,
                 NativeOrdinaryTestFixtures.response(.documentSynthesis, phase))
@@ -344,28 +356,38 @@ final class NativeFabricVenuePresentationTests: XCTestCase {
         let services = NativeOrdinaryModel.Services(prepare: { _, _ in
             requests += 1; return try response("needs_consent")
         }, command: { _, _ in
-            guard mayClose else { throw HomeBaseClientError.transport(.unreachable) }
+            guard mayClose else {
+                return try await withCheckedThrowingContinuation {
+                    pending = $0
+                    closeStarted.fulfill()
+                }
+            }
             return try response("closed")
         }, status: { _ in try response("closed") })
         try await withMountedDocument(workspaceConsumer: true, ordinary: services) { host, capture in
             try await self.select("A", host, capture)
             try XCTUnwrap(capture.venue).wrappedValue = true; try await self.settle(host)
             let owner = try XCTUnwrap(capture.ordinary)
-            owner.prepare(); try await self.settle(host)
+            owner.prepare(); await self.waitForPhase(.needsConsent, of: owner)
             XCTAssertEqual(owner.phase, .needsConsent)
             capture.workspace?.activePatientSection = .scales; try await self.settle(host)
-            XCTAssertEqual(owner.phase, .blocked)
+            await self.fulfillment(of: [closeStarted], timeout: 5)
+            XCTAssertEqual(owner.phase, .closing)
+            XCTAssertFalse(owner.canPrepare)
+            let close = try XCTUnwrap(pending); pending = nil
+            close.resume(throwing: HomeBaseClientError.transport(.unreachable))
+            await self.waitForPhase(.blocked, of: owner)
             capture.workspace?.activePatientSection = .documents; try await self.settle(host)
             XCTAssertEqual(capture.venue?.wrappedValue, true)
             try XCTUnwrap(capture.venue).wrappedValue = true; try await self.settle(host)
             XCTAssertTrue(capture.ordinary === owner)
             XCTAssertEqual(capture.ordinary?.phase, .blocked)
-            capture.ordinary?.prepare(); try await self.settle(host)
+            owner.prepare()
             XCTAssertEqual(requests, 1)
             mayClose = true
-            capture.ordinary?.verifyClosure(); try await self.settle(host)
+            owner.verifyClosure(); await self.waitForPhase(.idle, of: owner)
             XCTAssertEqual(capture.ordinary?.phase, .idle)
-            capture.ordinary?.prepare(); try await self.settle(host)
+            owner.prepare(); await self.waitForPhase(.needsConsent, of: owner)
             XCTAssertEqual(requests, 2)
         }
     }
