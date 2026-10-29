@@ -1,7 +1,7 @@
 import { request as http, type APIRequestContext, type Page, type BrowserContext } from '@playwright/test';
 import { launchConfinedBrowser } from './browser-network.ts';
 import { CensusToken, type CensusDispatch } from './browser-census.ts';
-import { deny, planDigest, type LocalOperationAdapter, type LocalOperationPlan, type AdapterContext, type Destination } from '../contract.ts';
+import { deny, planDigest, portalAttributes, portalContextSchema, type LocalOperationAdapter, type LocalOperationPlan, type AdapterContext, type Destination } from '../contract.ts';
 
 export async function createSyntheticSpecialistBrowser(input: {
     plan(): LocalOperationPlan; cookie: { name: string; value: string; url: string };
@@ -36,6 +36,10 @@ export async function createSyntheticSpecialistBrowser(input: {
                     if (authority !== active) deny();
                     if (request.method() === 'POST') {
                         if (!active.census) deny();
+                        const values = new URLSearchParams(request.postData() ?? '');
+                        const expected = input.plan();
+                        if ([...values].length !== expected.fields.length || expected.fields.some(field =>
+                            values.getAll(field.name).length !== 1 || values.get(field.name) !== field.value)) deny();
                         active.census.consume();
                         active.ctx.assertCurrent();
                         if (authority !== active || active.blocked) deny();
@@ -70,6 +74,9 @@ export async function createSyntheticSpecialistBrowser(input: {
             try {
                 const observation = await inspectPage(token);
                 if (observation.unclassifiedFields.length || observation.planDigest !== planDigest(input.plan())) deny();
+                token.bind(ctx.snapshot(observation), () => ctx.snapshot(inspectPage(token)));
+                await page.getByRole('button', { name: button, exact: true }).hover();
+                await page.getByRole('button', { name: button, exact: true }).focus();
                 return await token.act(async census => {
                     if (!authority) deny();
                     authority.census = census;
@@ -80,8 +87,8 @@ export async function createSyntheticSpecialistBrowser(input: {
             finally { await token.close(); }
         });
     }
-    async function inspectPage(token: CensusToken) {
-        const expected = input.plan(), main = page.locator('main');
+    function inspectPage(token: CensusToken) {
+        const expected = input.plan();
         const census = token.census;
         if (census.status !== 'complete') deny();
         const controls = census.controls;
@@ -94,9 +101,8 @@ export async function createSyntheticSpecialistBrowser(input: {
             && buttons.length === expectedButtons.length && buttons.every((button, index) => button.placed && !button.editable
                 && button.type === 'submit' && !button.name && button.text === expectedButtons[index]![0] && button.action === expectedButtons[index]![1]);
         const readback = { ...expected, fields: expected.fields.map(field => ({ ...field, value: fields.find(item => item.name === field.name)?.value ?? '' })) };
-        return { patientId: await main.getAttribute('data-patient') ?? '', practiceId: await main.getAttribute('data-practice') ?? '',
-            portalAccountId: await main.getAttribute('data-account') ?? '', uiVersion: await main.getAttribute('data-ui') ?? '',
-            humanRevision: Number(await main.getAttribute('data-human')), census: census.status, unclassifiedFields: complete ? unknown : [...unknown, 'invalid-field-set'],
+        return { ...portalContextSchema.parse(Object.fromEntries(Object.entries(portalAttributes).map(([key, attr]) => [key, census.metadata[attr]]))),
+            humanRevision: Number(census.metadata['data-human']), census: census.status, unclassifiedFields: complete ? unknown : [...unknown, 'invalid-field-set'],
             planDigest: fields.every(field => field.value) && complete ? planDigest(readback) : null };
     }
     const adapter: LocalOperationAdapter = {

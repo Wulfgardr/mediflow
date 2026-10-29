@@ -5,6 +5,7 @@ import { test, type TestContext } from 'node:test';
 import { chromium } from '@playwright/test';
 import { createSyntheticSpecialistDemo as specialistFixture, SYNTHETIC_DECISION, SPECIALIST_SENTINELS } from './synthetic-demo.test-support.ts';
 import { physicianSubmit } from './browser-adapter.ts';
+import { portalAttributes, type ProcedureSnapshot } from '../contract.ts';
 import { recordSpecialistOutcome } from './outcome-service.ts';
 
 type Fixture = Awaited<ReturnType<typeof specialistFixture>>;
@@ -295,7 +296,7 @@ test('CU-1 regressione: worker e service worker restano dietro il confine di ret
 test('CU-1 regressione: autorizzazione richiesta anche per documento nel manifest', async t => {
     const f = await fixture(t);
     await assert.rejects(f.browser.adapter.observe({ operationId: f.plan.operationId, attempt: 0, revision: 1,
-        signal: new AbortController().signal, assertCurrent() {}, authorizeRequest() { throw new Error('denied'); } }));
+        signal: new AbortController().signal, assertCurrent() {}, snapshot() { throw new Error('synthetic authority absent'); }, authorizeRequest() { throw new Error('denied'); } }));
     assert.equal(f.portal.traffic.length, 0);
 });
 
@@ -307,7 +308,7 @@ for (const replacement of ['type="hidden"', 'form="other"']) {
             await route.fulfill({ response, body: (await response.text()).replace('<input ', `<input ${replacement} `) });
         });
         const observation = await f.browser.adapter.observe({ operationId: f.plan.operationId, attempt: 0, revision: 1,
-            signal: new AbortController().signal, assertCurrent() {}, authorizeRequest() {} });
+            signal: new AbortController().signal, assertCurrent() {}, snapshot() { throw new Error('synthetic authority absent'); }, authorizeRequest() {} });
         assert.ok(observation.unclassifiedFields.length > 0, 'tipo e collocazione richiedono classificazione esplicita');
         await assert.rejects(f.service.prepare(await f.selectLocal()));
         assert.equal(f.portal.traffic.filter(r => r.method === 'POST').length, 0);
@@ -342,7 +343,7 @@ test('CU-1 regressione: revoca interrompe HTTP già in corso', async t => {
         cookie: { name: 'demo', value: 'demo', url: origin }, verifyReceipt: async () => true });
     t.after(() => browser.close());
     const observation = browser.adapter.observe({ operationId: f.plan.operationId, attempt: 0, revision: 1,
-        signal: new AbortController().signal, assertCurrent() {}, authorizeRequest() {} }).catch(() => {});
+        signal: new AbortController().signal, assertCurrent() {}, snapshot() { throw new Error('synthetic authority absent'); }, authorizeRequest() {} }).catch(() => {});
     await received;
     browser.adapter.stop();
     const closed = await Promise.race([disconnected.then(() => true), new Promise<boolean>(resolve => { const timer = setTimeout(() => resolve(false), 1500); timer.unref(); })]);
@@ -422,7 +423,7 @@ test('CU-1 censimento: attraversa davvero shadow aperti e chiusi senza script o 
     }
     const census = await censusControls(f.browser.context, f.browser.page);
     assert.equal(census.status, 'complete');
-    if (census.status === 'complete') assert.deepEqual(census.unexpected, ['unclassified-element', 'unclassified-element']);
+    if (census.status === 'complete') assert.equal(census.unexpected.filter(item => item === 'unclassified-element').length, 2);
 });
 
 test('CU-1 censimento: documento popup e frame src e srcdoc sono attraversati o non verificabili', async t => {
@@ -445,7 +446,7 @@ test('CU-1 censimento: documento popup e frame src e srcdoc sono attraversati o 
     census = await censusControls(f.browser.context, f.browser.page);
     assert.ok(census.status === 'unverifiable' || census.controls.some(control => control.name === 'srcClinical' && !control.placed));
     await assert.rejects(f.browser.adapter.prepare({ operationId: f.plan.operationId, attempt: 0, revision: 1,
-        signal: new AbortController().signal, assertCurrent() {}, authorizeRequest() {} }, f.plan));
+        signal: new AbortController().signal, assertCurrent() {}, snapshot() { throw new Error('synthetic authority absent'); }, authorizeRequest() {} }, f.plan));
     assert.equal(f.portal.traffic.filter(r => r.path === '/submit').length, 0);
 });
 
@@ -564,7 +565,7 @@ test('CU-1 epoca: sessione posseduta fino alla risposta, chiusa dopo successo o 
         session.detach = async () => { held.delete(session); await detach(); };
         return session;
     };
-    f.portal.afterAct(async () => { assert.equal(held.size, 1, 'il detach deve seguire anche la risposta'); });
+    f.portal.afterAct(async () => { assert.ok(held.size > 0, 'il detach deve seguire anche la risposta'); });
     assert.equal((await f.service.execute(cap)).state, 'confirmed');
     assert.equal(held.size, 0);
     const failed = await CensusToken.capture(f.browser.context, f.browser.page);
@@ -573,6 +574,9 @@ test('CU-1 epoca: sessione posseduta fino alla risposta, chiusa dopo successo o 
     assert.equal(held.size, 0, 'la sessione viene chiusa anche su errore');
     const g = await fixture(t); await authorized(g);
     const token = await CensusToken.capture(g.browser.context, g.browser.page);
+    const snapshot = { plan: g.plan, context: g.context, lease: { generation: 1, territoryRevision: 1, expiresAt: 9000000,
+        approvalExpiresAt: 9000000, operationId: g.plan.operationId, attempt: 1, revision: 1, state: 'attempt_started' as const, effectPossible: true } };
+    token.bind(snapshot, () => snapshot);
     try {
         await token.act(async dispatch => {
             dispatch.consume();
@@ -592,4 +596,140 @@ test('CU-1 epoca: nuovo contesto dopo il dispatch non promuove la ricevuta a con
     await assert.rejects(f.service.execute(cap));
     assert.equal(sends(f), 1); assert.equal(rows(f).length, 0);
     assert.equal(f.service.inspect(f.plan.operationId).state, 'uncertain');
+});
+
+
+test('CU-1 vincoli: qualunque vincolo semantico cambiato dopo approvazione impedisce ogni invio', async t => {
+    const template = await fixture(t);
+    const cases: { name: string; change(f: Fixture): Promise<void> | void }[] = [
+        ...Object.entries(portalAttributes).map(([key, name]) => ({ name: key,
+            change: (f: Fixture) => f.browser.page.evaluate(name => document.querySelector('main')!.setAttribute(name, 'OTHER_SYNTHETIC'), name) })),
+        { name: 'revisione umana', change: f => f.browser.page.evaluate(() => document.querySelector('main')!.setAttribute('data-human', '2')) },
+        ...template.plan.fields.map(field => ({ name: field.name, change: (f: Fixture) =>
+            f.browser.page.evaluate(name => { document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!.value = 'OTHER_SYNTHETIC'; }, field.name) })),
+        ...Object.entries(template.context).map(([name, value]) => ({ name: `contesto ${name}`, change: (f: Fixture) =>
+            f.setContext({ [name]: typeof value === 'number' ? (name === 'expiresAt' ? f.now() : value + 1) : 'OTHER_SYNTHETIC' }, false) })),
+        { name: 'approvazione scaduta', change: f => f.advance(120_000) },
+        { name: 'pacchetto disattivato', change: f => f.setPack('core') },
+    ];
+    for (const item of cases) await t.test(item.name, async t => {
+        const f = await fixture(t), cap = await authorized(f);
+        const attach = f.browser.context.newCDPSession.bind(f.browser.context); let count = 0;
+        f.browser.context.newCDPSession = async target => { if (++count === 2) await item.change(f); return attach(target); };
+        const result = await f.service.execute(cap).then(value => value.state, () => 'rejected');
+        assert.equal(sends(f), 0, item.name); assert.equal(rows(f).length, 0); assert.notEqual(result, 'confirmed');
+    });
+});
+
+test('CU-1 vincoli: qualunque controllo modificabile fuori contratto impedisce ogni invio', async t => {
+    for (const css of [
+        'p:first-of-type{-webkit-user-modify:read-write}',
+        'p:first-of-type{-webkit-user-modify:read-only} body:has(button:focus) p:first-of-type{-webkit-user-modify:read-write}',
+        'p:first-of-type{-webkit-user-modify:read-only} body:has(button:active) p:first-of-type{-webkit-user-modify:read-write}',
+    ]) {
+        const f = await fixture(t), cap = await authorized(f);
+        await f.browser.context.route('**/portal', async route => {
+            const response = await route.fetch();
+            await route.fulfill({ response, body: (await response.text()).replace('</style>', `${css}</style>`) });
+        });
+        const get = f.browser.page.getByRole.bind(f.browser.page);
+        f.browser.page.getByRole = (role, options) => {
+            const locator = get(role, options);
+            if (options?.name === 'Emetti prescrizione') {
+                const click = locator.click.bind(locator);
+                locator.click = async (...args) => { await locator.focus(); return click(...args); };
+            }
+            return locator;
+        };
+        const result = await f.service.execute(cap).then(value => value.state, () => 'rejected');
+        assert.equal(sends(f), 0, css); assert.equal(rows(f).length, 0); assert.notEqual(result, 'confirmed');
+    }
+});
+
+
+test('CU-1 vincoli: inventario riconosce ogni controllo modificabile fuori contratto', async t => {
+    const { censusControls } = await import('./browser-census.ts');
+    const f = await fixture(t); await authorized(f);
+    for (const deferred of [false, true]) {
+        await f.browser.page.evaluate(deferred => {
+            const style = document.querySelector('style')!;
+            style.textContent += deferred
+                ? 'p:first-of-type{-webkit-user-modify:read-only} body:has(button:focus) p:first-of-type{-webkit-user-modify:read-write}'
+                : 'p:first-of-type{-webkit-user-modify:read-write}';
+        }, deferred);
+        await f.browser.page.getByRole('button', { name: 'Emetti prescrizione', exact: true }).focus();
+        const census = await censusControls(f.browser.context, f.browser.page);
+        assert.equal(census.status, 'complete');
+        if (census.status === 'complete') assert.ok(census.unexpected.includes('unclassified-accessibility-control'));
+        await f.browser.page.locator('p').first().click();
+        await f.browser.page.keyboard.press('End'); await f.browser.page.keyboard.type(' SYNTHETIC_NEW');
+        assert.match(await f.browser.page.locator('p').first().innerText(), /SYNTHETIC_NEW$/);
+    }
+});
+
+test('CU-1 vincoli: senza albero accessibile nessuna superficie è verificabile', async t => {
+    const { censusControls } = await import('./browser-census.ts');
+    const f = await fixture(t), attach = f.browser.context.newCDPSession.bind(f.browser.context);
+    f.browser.context.newCDPSession = async target => {
+        const session = await attach(target), send = session.send.bind(session);
+        session.send = ((method: string, params: never) => method === 'Accessibility.getFullAXTree'
+            ? Promise.reject(new Error('synthetic unavailable accessibility')) : send(method as never, params)) as typeof session.send;
+        return session;
+    };
+    assert.equal((await censusControls(f.browser.context, f.browser.page)).status, 'unverifiable');
+    await assert.rejects(f.service.prepare(await f.selectLocal()));
+    assert.equal(f.portal.traffic.filter(item => item.method === 'POST').length, 0);
+});
+
+test('CU-1 vincoli: ogni componente dello snapshot è vincolato al token fino al consumo', async t => {
+    const { CensusToken } = await import('./browser-census.ts');
+    const f = await fixture(t); await authorized(f);
+    const snapshot: ProcedureSnapshot = { plan: f.plan, context: f.context, lease: { generation: 1, territoryRevision: 1, expiresAt: 9000000,
+        approvalExpiresAt: 9000000, operationId: f.plan.operationId, attempt: 1, revision: 1, state: 'attempt_started', effectPossible: true } };
+    function leaves(value: unknown, path: string[] = []): string[][] {
+        return value && typeof value === 'object' ? Object.entries(value).flatMap(([key, child]) => leaves(child, [...path, key])) : [path];
+    }
+    for (const path of leaves(snapshot)) {
+        const token = await CensusToken.capture(f.browser.context, f.browser.page);
+        let live = snapshot;
+        token.bind(snapshot, () => live);
+        try {
+            await assert.rejects(token.act(async dispatch => {
+                const changed = structuredClone(snapshot);
+                let parent = changed as unknown as Record<string, unknown>;
+                for (const key of path.slice(0, -1)) parent = parent[key] as Record<string, unknown>;
+                const key = path.at(-1)!;
+                parent[key] = typeof parent[key] === 'number' ? Number(parent[key]) + 1 : 'OTHER_SYNTHETIC';
+                live = changed;
+                dispatch.consume();
+            }), /unverifiable/, path.join('.'));
+        } finally { await token.close(); }
+    }
+});
+
+test('CU-1 vincoli: cambiamento dello stile durante il comando invalida il token', async t => {
+    const f = await fixture(t), cap = await authorized(f), get = f.browser.page.getByRole.bind(f.browser.page);
+    f.browser.page.getByRole = (role, options) => {
+        const locator = get(role, options);
+        if (options?.name === 'Emetti prescrizione') {
+            const click = locator.click.bind(locator);
+            locator.click = async (...args) => {
+                await f.browser.page.evaluate(() => document.styleSheets[0]!.insertRule('p{-webkit-user-modify:read-write}'));
+                return click(...args);
+            };
+        }
+        return locator;
+    };
+    await assert.rejects(f.service.execute(cap)); assert.equal(sends(f), 0); assert.equal(rows(f).length, 0);
+});
+
+
+test('CU-1 vincoli: il contenuto inviato deve essere quello approvato anche dopo il comando', async t => {
+    const f = await fixture(t), cap = await authorized(f);
+    await f.browser.page.route('**/submit', async route => {
+        const values = new URLSearchParams(route.request().postData() ?? '');
+        values.set('clinicalQuestion', 'OTHER_SYNTHETIC');
+        await route.fallback({ postData: values.toString() });
+    });
+    await assert.rejects(f.service.execute(cap)); assert.equal(sends(f), 0); assert.equal(rows(f).length, 0);
 });

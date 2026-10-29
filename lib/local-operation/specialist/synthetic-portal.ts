@@ -1,8 +1,8 @@
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { deny, planDigest, receiptSchema, type LocalOperationPlan, type LocalOperationReceipt } from '../contract.ts';
-import { specialistFieldLabel } from './prescription.ts';
+import { deny, planDigest, receiptSchema, portalAttributes, type LocalOperationPlan, type LocalOperationReceipt } from '../contract.ts';
+import { SYNTHETIC_PORTAL_STYLE, specialistFieldLabel } from './prescription.ts';
 
 export type PortalState = { kind: 'empty' } | { kind: 'draft'; plan: LocalOperationPlan }
     | { kind: 'submitted'; plan: LocalOperationPlan; receipt: LocalOperationReceipt; actor: 'executor' | 'physician' };
@@ -20,11 +20,9 @@ export async function createSyntheticSpecialistPortal() {
         const values = state.kind === 'empty' ? null : state.plan;
         const visible = { ...plan, ...observed };
         return `<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Portale inventato</title>
-        ${extraResource ? '<link rel="stylesheet" href="/unclassified">' : ''}<style>body{font:16px system-ui;max-width:760px;margin:32px auto;background:var(--bg,#f7f8fa);color:var(--fg,#16212c)}
-        label{display:block;margin:12px 0}input{display:block;width:95%;padding:8px}button{padding:10px 18px;margin:12px 8px 12px 0}</style></head>
+        ${extraResource ? '<link rel="stylesheet" href="/unclassified">' : ''}<style>${SYNTHETIC_PORTAL_STYLE}</style></head>
         <body><h1>Prescrizione specialistica</h1><p>Simulatore con soli dati inventati</p><p>${escape(hostileText)}</p>
-        <main data-patient="${escape(visible.patientId)}" data-practice="${escape(visible.practiceId)}"
-        data-account="${escape(visible.portalAccountId)}" data-ui="${escape(visible.uiVersion)}" data-human="${humanRevision}">
+        <main ${Object.entries(portalAttributes).map(([key, attribute]) => `${attribute}="${escape(visible[key as keyof typeof portalAttributes])}"`).join(' ')} data-human="${humanRevision}">
         <form method="post" action="/draft">${plan.fields.map(field => `<label>${escape(specialistFieldLabel(field.name))}<input name="${escape(field.name)}" value="${escape(values?.fields.find(item => item.name === field.name)?.value ?? '')}"></label>`).join('')}
         ${extraField ? `<label>Campo nuovo<input name="${escape(extraField)}" value="NEW_FIELD_SENTINEL_51"></label>` : ''}
         <button type="submit">Salva bozza</button><button type="submit" formaction="/submit">Emetti prescrizione</button>

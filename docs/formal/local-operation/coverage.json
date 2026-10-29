@@ -1,6 +1,6 @@
 {
   "baseCommit": "17af7eae8c9f55ccd43e670d80a9cb00ec6cdf2d",
-  "scope": "R1 marker and dispatch remain separate model actions. R2 immutable identity, R3 archive/connection/key origin and R5 original approval expiry at HTTP dispatch are runtime regressions, outside TLA. adapter.act may await between marker and dispatch. Hashes identify the reviewed mapping, not equivalence. CU-1 specialistica: callback recordConfirmed nella transazione Record esistente; nessuno stato o transizione aggiunto. Sorgenti, semantica delle prestazioni e browser sono prove runtime, fuori dal modello. Seconda correzione CU-1: osservazione validata con censimento complete/unverifiable; nessuno stato o transizione aggiunto. Proxy, configurazione UDP e censimento CDP restano fuori dalle proprietà TLA. Terza correzione CU-1: token monouso, epoca DOM e sospensione posseduta fino alla risposta raffinano il guard runtime di Dispatch; nessuno stato persistente o transizione CU aggiunto. La navigazione attesa e il ciclo CDP restano fuori dal modello, coperti da regressioni e mutanti runtime.",
+  "scope": "R1 marker and dispatch remain separate model actions. R2 immutable identity, R3 archive/connection/key origin and R5 original approval expiry at HTTP dispatch are runtime regressions, outside TLA. adapter.act may await between marker and dispatch. Hashes identify the reviewed mapping, not equivalence. CU-1 specialistica: callback recordConfirmed nella transazione Record esistente; nessuno stato o transizione aggiunto. Sorgenti, semantica delle prestazioni e browser sono prove runtime, fuori dal modello. Seconda correzione CU-1: osservazione validata con censimento complete/unverifiable; nessuno stato o transizione aggiunto. Proxy, configurazione UDP e censimento CDP restano fuori dalle propriet\u00e0 TLA. Terza correzione CU-1: token monouso, epoca DOM e sospensione posseduta fino alla risposta raffinano il guard runtime di Dispatch; nessuno stato persistente o transizione CU aggiunto. La navigazione attesa e il ciclo CDP restano fuori dal modello, coperti da regressioni e mutanti runtime. Quinta tornata CU-1: ProcedureSnapshot, verifica AX/computed/CSS dopo focus e consumo sincrono con rilettura locale e controllo POST; solo raffinamento runtime di Dispatch, nessuno stato persistente o azione CU nuova.",
   "tool": {
     "release": "v1.7.4",
     "verifier": "TLC 2.19",
@@ -16,8 +16,8 @@
     "timeoutSeconds": 60
   },
   "files": {
-    "lib/local-operation/contract.ts": "e1713a22cfd30aa899ddd8f592eb6304214382a5d7782a81979ae1b9d37e0b47",
-    "lib/local-operation/service.ts": "ffe383220f7b6d0a7d91f1051b8168893120bb1845ecf4e9850a8b6950dc321e",
+    "lib/local-operation/contract.ts": "91907dd3b2e1f877f0f9932c49ad366dd18f9c36f8b40a3d970ea5f086f215ce",
+    "lib/local-operation/service.ts": "c005b9a569651484531e373e27bd05e6ef9870164f8bec06de26be14c304eec4",
     "lib/local-operation/sqlite-journal.ts": "6a802461c835c773fd213a514b16d9564ce93f493ca1fb7016e95a5119113a9e",
     "lib/local-operation/host.ts": "211184f97d6f98e4d61f4e026c322cd4eb907204cc17668149d7609ce1b2e44e",
     "lib/local-operation/journal-cipher.ts": "44001319c6928cf124b2102fe999a30622e134204c662ce689134a6895768f8e",
@@ -44,7 +44,7 @@
   ],
   "reviewBaseCommit": "c8beebe1d561c75b45e3902100a7da39529cda8c",
   "lastRun": {
-    "at": "2026-10-29T15:08:34.235Z",
+    "at": "2026-10-29T15:58:51.328Z",
     "generatedStates": 171,
     "distinctStates": 73,
     "automaticUnreachableRejected": true,
@@ -129,5 +129,6 @@
   "mappedCodeCommit": "e0d591af536068fb5911d64506badf980536df53",
   "integrationBaseCommit": "a12cd01b01cccfe2ab45b590a86dab27ddf46a66",
   "approvalExpiryReviewBaseCommit": "cec371630c72ff56d5b57c540575d50217a7ceac",
-  "specialistIntegrationBaseCommit": "c590c6f3c896c26da23e8e8bcba1ee2c0f1b10cd"
+  "specialistIntegrationBaseCommit": "c590c6f3c896c26da23e8e8bcba1ee2c0f1b10cd",
+  "fifthReviewBaseCommit": "5f5d6b0b83c5f51765f97be44c577a6dabc6b3d7"
 }

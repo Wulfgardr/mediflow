@@ -1,55 +1,67 @@
 import type { BrowserContext, Page, CDPSession } from '@playwright/test';
 import { z } from 'zod';
+import { portalAttributes, type ProcedureSnapshot } from '../contract.ts';
+import { SYNTHETIC_PORTAL_STYLE } from './prescription.ts';
 
 const controlSchema = z.object({ name: z.string(), value: z.string(), tag: z.string(), type: z.string(), editable: z.boolean(),
     placed: z.boolean(), action: z.string().nullable(), text: z.string() }).strict();
 const censusSchema = z.discriminatedUnion('status', [
-    z.object({ status: z.literal('complete'), controls: z.array(controlSchema), unexpected: z.array(z.string()) }).strict(),
+    z.object({ status: z.literal('complete'), controls: z.array(controlSchema), unexpected: z.array(z.string()), metadata: z.record(z.string(), z.string()) }).strict(),
     z.object({ status: z.literal('unverifiable') }).strict(),
 ]);
 export type ControlCensus = z.infer<typeof censusSchema>;
 
 const passiveAttributes: Record<string, readonly string[]> = {
     HTML: ['lang'], HEAD: [], META: ['charset'], TITLE: [], STYLE: [], BODY: [], H1: [], P: ['role'],
-    MAIN: ['data-patient', 'data-practice', 'data-account', 'data-ui', 'data-human'],
+    MAIN: [...Object.values(portalAttributes), 'data-human'],
     FORM: ['method', 'action'], LABEL: [],
 };
 
 async function collectControls(context: BrowserContext, page: Page, token: CensusToken): Promise<ControlCensus> {
     const controls: z.infer<typeof controlSchema>[] = [], unexpected: string[] = [];
-    const documents = new Set<string>();
+    const documents = new Set<string>(), metadata: Record<string, string> = {};
+    const passiveRoles = new Set(['RootWebArea', 'none', 'generic', 'StaticText', 'InlineTextBox', 'heading', 'paragraph', 'main', 'LabelText', 'status']);
     try {
         const pages = context.pages();
         for (const surface of pages) {
             if (surface !== page) unexpected.push('unclassified-document');
-            const session = await context.newCDPSession(surface);
-            token.own(session, surface);
+            const { session, mainWorlds, worlds } = await token.channel(surface);
             {
-                const mainWorlds = new Map<string, number>();
-                session.on('Runtime.executionContextCreated', ({ context }) => {
-                    const frame = z.object({ isDefault: z.boolean(), frameId: z.string() }).safeParse(context.auxData);
-                    if (frame.success && frame.data.isDefault) mainWorlds.set(frame.data.frameId, context.id);
-                });
-                await session.send('Runtime.enable');
-                await session.send('Page.enable');
-                await session.send('DOM.enable');
-                await session.send('Emulation.setScriptExecutionDisabled', { value: true });
                 const { root } = await session.send('DOM.getDocument', { depth: -1, pierce: true });
                 const { frameTree } = await session.send('Page.getFrameTree');
-                const worlds = new Map<string, number>();
+                const accessibility = new Map<number, { role: string; interactive: boolean }>();
                 async function visit(node: typeof root, nested: boolean, frameId?: string, native = false): Promise<void> {
                     if (node.nodeType === 9) {
                         if (!frameId || !node.children) throw new Error('unverifiable');
                         documents.add(frameId);
+                        const tree = await session.send('Accessibility.getFullAXTree', { frameId });
+                        if (!tree.nodes.length) throw new Error('unverifiable');
+                        for (const accessible of tree.nodes) {
+                            const role = String(accessible.role?.value ?? '');
+                            const interactive = !passiveRoles.has(role) || (accessible.properties ?? []).some(property =>
+                                ['editable', 'focusable', 'settable'].includes(property.name) && !!property.value.value && role !== 'RootWebArea');
+                            if (accessible.backendDOMNodeId) accessibility.set(accessible.backendDOMNodeId, { role, interactive });
+                            else if (interactive && !accessible.ignored && role !== 'InlineTextBox') unexpected.push('unclassified-accessibility-control');
+                        }
                         const mainWorld = mainWorlds.get(frameId);
                         if (!mainWorld) throw new Error('unverifiable');
+                        if (!worlds.has(frameId)) {
+                            const world = await session.send('Page.createIsolatedWorld', { frameId, worldName: 'mediflow-census' });
+                            worlds.set(frameId, world.executionContextId);
+                        }
+                        const styles = await session.send('Runtime.evaluate', { contextId: worlds.get(frameId), returnByValue: true,
+                            expression: `(() => { const expected = new CSSStyleSheet(); expected.replaceSync(${JSON.stringify(SYNTHETIC_PORTAL_STYLE)});
+                                const rules = sheet => JSON.stringify([...sheet.cssRules].map(rule => rule.cssText));
+                                return document.adoptedStyleSheets.length === 0 && document.styleSheets.length === 1
+                                    && [...document.styleSheets].every(sheet => !sheet.disabled && !sheet.href && sheet.media.length === 0
+                                        && rules(sheet) === rules(expected)); })()` });
+                        if (styles.result.value !== true) unexpected.push('unclassified-styles');
                         const window = await session.send('Runtime.evaluate', { expression: 'this', contextId: mainWorld });
                         if (!window.result.objectId) throw new Error('unverifiable');
                         const listeners = await session.send('DOMDebugger.getEventListeners', { objectId: window.result.objectId });
                         if (listeners.listeners.length) unexpected.push('unclassified-interaction');
                         await session.send('Runtime.releaseObject', { objectId: window.result.objectId });
-                        const world = await session.send('Page.createIsolatedWorld', { frameId, worldName: 'mediflow-census' });
-                        worlds.set(frameId, world.executionContextId);
+
                     }
                     if (node.childNodeCount && node.children?.length !== node.childNodeCount) throw new Error('unverifiable');
                     if (node.frameId && node.frameId !== frameId && node.nodeType === 1 && !node.contentDocument) throw new Error('unverifiable');
@@ -67,6 +79,19 @@ async function collectControls(context: BrowserContext, page: Page, token: Censu
                         const listeners = await session.send('DOMDebugger.getEventListeners', { objectId: listenerObject.object.objectId });
                         await session.send('Runtime.releaseObject', { objectId: listenerObject.object.objectId });
                         const allowed = passiveAttributes[node.nodeName];
+                        const state = await session.send('Runtime.callFunctionOn', { objectId: object.objectId, returnByValue: true,
+                            functionDeclaration: `function() { return this.nodeType === 1 ? {
+                                editable: this.isContentEditable === true || ['read-write', 'read-write-plaintext-only'].includes(getComputedStyle(this).webkitUserModify),
+                                focusable: this.tabIndex >= 0, attributes: Object.fromEntries([...this.attributes].map(a => [a.name, a.value]))
+                            } : { editable: false, focusable: false }; }` });
+                        const computed = z.object({ editable: z.boolean(), focusable: z.boolean(), attributes: z.record(z.string(), z.string()).optional() }).parse(state.result.value);
+                        const ax = accessibility.get(node.backendNodeId);
+                        const interactive = computed.editable || computed.focusable || ax?.interactive;
+                        const contracted = (node.nodeName === 'INPUT' && ax?.role === 'textbox' && !computed.editable)
+                            || (node.nodeName === 'BUTTON' && ax?.role === 'button' && !computed.editable);
+                        if (interactive && !contracted) unexpected.push('unclassified-accessibility-control');
+                        if ((node.nodeName === 'INPUT' || node.nodeName === 'BUTTON') && !contracted) unexpected.push('unverifiable-control');
+                        if (node.nodeName === 'MAIN' && !nested && surface === page) Object.assign(metadata, computed.attributes);
                         if (node.nodeName === 'INPUT' || node.nodeName === 'BUTTON') {
                             const result = await session.send('Runtime.callFunctionOn', { objectId: object.objectId, returnByValue: true,
                                 functionDeclaration: `function() { const form = this.form; return { name: this.name || '', value: this.value || '', tag: this.tagName,
@@ -99,21 +124,25 @@ async function collectControls(context: BrowserContext, page: Page, token: Censu
             }
         }
         if (pages.length !== context.pages().length || pages.some(surface => !context.pages().includes(surface)) || !pages.includes(page)) return { status: 'unverifiable' };
-        return censusSchema.parse({ status: 'complete', controls, unexpected });
+        return censusSchema.parse({ status: 'complete', controls, unexpected, metadata });
     } catch { return { status: 'unverifiable' }; }
 }
 
+
+type CensusChannel = { session: CDPSession; mainWorlds: Map<string, number>; worlds: Map<string, number> };
 
 const dispatchAuthority: unique symbol = Symbol('census-dispatch');
 export type CensusDispatch = { readonly [dispatchAuthority]: true; consume(): void };
 
 export class CensusToken {
     #sessions = new Set<CDPSession>();
+    #channels = new Map<Page, CensusChannel>();
     #epoch = 0;
     #observedEpoch = 0;
     #invalid = false;
-    #state: 'observed' | 'armed' | 'dispatched' | 'closed' = 'observed';
+    #state: 'observed' | 'armed' | 'checking' | 'dispatched' | 'closed' = 'observed';
     #census: ControlCensus = { status: 'unverifiable' };
+    #binding?: { expected: string; read(): ProcedureSnapshot };
     readonly #context: BrowserContext;
     readonly #page: Page;
     readonly #newPage = () => { this.#invalid = true; };
@@ -131,7 +160,36 @@ export class CensusToken {
         return token;
     }
     get census(): ControlCensus { return this.#census; }
-    own(session: CDPSession, surface: Page) {
+    bind(snapshot: ProcedureSnapshot, read: () => ProcedureSnapshot) {
+        this.assertObserved();
+        if (this.#state !== 'observed' || this.#binding) throw new Error('unverifiable');
+        this.#binding = { expected: JSON.stringify(snapshot), read };
+    }
+    async channel(surface: Page) {
+        const existing = this.#channels.get(surface);
+        if (existing) return existing;
+        const session = await this.#context.newCDPSession(surface);
+        this.own(session, surface);
+        const channel: CensusChannel = { session, mainWorlds: new Map<string, number>(), worlds: new Map<string, number>() };
+        this.#channels.set(surface, channel);
+        session.on('Runtime.executionContextCreated', ({ context }) => {
+            const frame = z.object({ isDefault: z.boolean(), frameId: z.string() }).safeParse(context.auxData);
+            if (frame.success && frame.data.isDefault) channel.mainWorlds.set(frame.data.frameId, context.id);
+        });
+        await session.send('Runtime.enable');
+        await session.send('Page.enable');
+        await session.send('DOM.enable');
+        await session.send('Accessibility.enable');
+        await session.send('CSS.enable');
+        session.on('CSS.styleSheetChanged', () => { this.#invalid = true; });
+        session.on('CSS.styleSheetAdded', () => { if (this.#state !== 'dispatched') this.#invalid = true; });
+        session.on('CSS.styleSheetRemoved', () => { if (this.#state !== 'dispatched') this.#invalid = true; });
+        await session.send('Animation.enable');
+        await session.send('Animation.setPlaybackRate', { playbackRate: 0 });
+        await session.send('Emulation.setScriptExecutionDisabled', { value: true });
+        return channel;
+    }
+    private own(session: CDPSession, surface: Page) {
         this.#sessions.add(session);
         const changed = () => { this.#epoch++; };
         for (const event of ['DOM.attributeModified', 'DOM.attributeRemoved', 'DOM.characterDataModified',
@@ -155,6 +213,16 @@ export class CensusToken {
     async act<T>(action: (dispatch: CensusDispatch) => Promise<T>): Promise<T> {
         this.assertObserved();
         if (this.#state !== 'observed' || this.#census.status !== 'complete') throw new Error('unverifiable');
+        if (!this.#binding) throw new Error('unverifiable');
+        this.#state = 'checking';
+        const previous = this.#census;
+        this.#census = await collectControls(this.#context, this.#page, this);
+        if (this.#census.status !== 'complete' || this.#census.unexpected.length
+            || JSON.stringify(this.#census) !== JSON.stringify(previous)) throw new Error('unverifiable');
+        const current = this.#binding.read();
+        if (JSON.stringify(current) !== this.#binding.expected) throw new Error('unverifiable');
+        this.assertObserved();
+        if (this.#state !== 'checking') throw new Error('unverifiable');
         this.#state = 'armed';
         const result = await action(Object.freeze({ [dispatchAuthority]: true as const, consume: () => this.dispatch() }));
         this.assertHealthy();
@@ -165,14 +233,20 @@ export class CensusToken {
     private dispatch() {
         if (this.#state !== 'armed') throw new Error('unverifiable');
         this.assertObserved();
+        if (!this.#binding) throw new Error('unverifiable');
+        const current = this.#binding.read();
+        if (JSON.stringify(current) !== this.#binding.expected) throw new Error('unverifiable');
         this.#state = 'dispatched';
     }
     async close() {
         this.#state = 'closed';
         this.#context.off('page', this.#newPage);
         for (const surface of this.#context.pages()) surface.off('close', this.#newPage);
-        await Promise.allSettled([...this.#sessions].map(session => session.detach()));
+        await Promise.allSettled([...this.#sessions].map(async session => {
+            try { await session.send('Animation.setPlaybackRate', { playbackRate: 1 }); } finally { await session.detach(); }
+        }));
         this.#sessions.clear();
+        this.#channels.clear();
     }
 }
 
