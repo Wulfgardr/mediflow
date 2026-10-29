@@ -637,6 +637,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                                    isAdi: false, isArchived: true, version: 1,
                                    updatedAt: base.addingTimeInterval(-7200))
         ]
+        if ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_LONG_WORKLIST"] == "1" {
+            return patients + (1...8).map { index in
+                HomeBasePatientSummary(id: "uitest-scroll-\(index)", firstName: "Paziente",
+                                       lastName: "Sintetico \(index)", birthDate: nil, taxCode: "",
+                                       isAdi: false, isArchived: false, version: 1,
+                                       updatedAt: base.addingTimeInterval(-Double(7200 + index)))
+            }
+        }
         return ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_SINGLE_PATIENT"] == "1"
             ? Array(patients.prefix(1))
             : patients
