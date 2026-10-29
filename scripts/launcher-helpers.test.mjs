@@ -1464,7 +1464,7 @@ test('cold plugin startup forwards ordinary launcher environment and preserves t
             if (url === launcherHelpers) return { format: 'module', shortCircuit: true, source:
                 'export const readProductIdentity = () => ({ worktreeHash: "clean", revision: "aaaaaaaaaaaa" }); export const probeRunningInstance = () => {};'};
             if (url === launcherState) return { format: 'module', shortCircuit: true, source:
-                'export const prepareLauncherState = () => ({ lockDirectory: ' + JSON.stringify(${JSON.stringify(directory)}) + ' });' };
+                'export const localUiArchiveLock = () => ' + JSON.stringify(${JSON.stringify(path.join(directory, 'launcher'))}) + '; export const prepareLauncherState = () => ({ lockDirectory: ' + JSON.stringify(${JSON.stringify(directory)}) + ' });' };
             if (url === 'node:child_process') return { format: 'module', shortCircuit: true, source:
                 'export const spawn = globalThis.captureSpawn;' };
             return nextLoad(url, context);

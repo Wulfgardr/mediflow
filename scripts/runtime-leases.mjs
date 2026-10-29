@@ -54,19 +54,22 @@ export async function createRuntimeLeases({ directory, identity, initialPlugin, 
   const key = crypto.createHash('sha256').update(directory).digest('hex');
   const temporary = process.platform === 'win32' ? null : fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-lease-')));
   const address = process.platform === 'win32' ? `\\\\.\\pipe\\mediflow-lease-${key}` : path.join(temporary, 'ipc');
-  const clients = new Set(), manual = new Set(initialPlugin ? [] : ['owner']);
+  /** @typedef {{kind: 'initial'} | {kind: 'manual'} | {kind: 'plugin', socket: import('node:net').Socket} | {kind: 'ui', expiresAt: number}} Lease */
+  /** @type {Map<unknown, Lease>} */
+  const registry = new Map(initialPlugin ? [['initial', { kind: 'initial' }]] : [['owner', { kind: 'manual' }]]);
+  const clients = new Set();
   /** @type {'accepting' | 'idle-pending' | 'stopping' | 'closed'} */
   let phase = 'accepting';
-  let initial = initialPlugin, idleTask = null, closingTask = null;
+  let idleTask = null, closingTask = null;
   const beginStop = () => {
     clearImmediate(idleTask); idleTask = null; phase = 'stopping';
   };
   const idle = () => {
-    if (initial || clients.size || manual.size || phase !== 'accepting') return;
+    if (registry.size || clients.size || phase !== 'accepting') return;
     phase = 'idle-pending';
     idleTask = setImmediate(() => {
       idleTask = null; phase = 'accepting';
-      if (initial || clients.size || manual.size) return;
+      if (registry.size || clients.size) return;
       beginStop();
       void onIdle();
     });
@@ -76,7 +79,7 @@ export async function createRuntimeLeases({ directory, identity, initialPlugin, 
     clients.add(socket);
     const timer = setTimeout(() => socket.destroy(), 3000);
     socket.on('error', () => {});
-    socket.once('close', () => { clearTimeout(timer); clients.delete(socket); idle(); });
+    socket.once('close', () => { clearTimeout(timer); clients.delete(socket); registry.delete(socket); idle(); });
     let admitted = false;
     jsonLines(socket, frame => {
       if (admitted || !sameOwner(frame.owner, owner) || !['plugin', 'manual', 'inspect'].includes(frame.kind)
@@ -88,26 +91,40 @@ export async function createRuntimeLeases({ directory, identity, initialPlugin, 
         socket.end(JSON.stringify({ owner, binding }) + '\n');
         return;
       }
-      if (frame.kind === 'manual') manual.add(frame.client.nonce);
+      if (frame.kind === 'manual') registry.set(frame.client.nonce, { kind: 'manual' });
+      else registry.set(socket, { kind: 'plugin', socket });
       send(socket, { owner, acquired: true });
     });
   });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(address, resolve); });
   if (temporary) fs.chmodSync(address, 0o600);
+  const expiry = setInterval(() => {
+    for (const [key, lease] of registry) if (lease.kind === 'ui' && lease.expiresAt <= Date.now()) registry.delete(key);
+    idle();
+  }, 250);
+  expiry.unref();
+  const releaseKind = kind => { for (const [key, lease] of registry) if (lease.kind === kind) registry.delete(key); };
   return {
     receipt: { address, owner },
-    releaseInitial() { initial = false; idle(); },
-    releaseManual() { manual.clear(); idle(); },
+    uiLease(id, expiresAt) {
+      if (!['accepting', 'idle-pending'].includes(phase) || typeof id !== 'string' || !/^[a-f0-9]{64}:[a-f0-9-]{36}$/u.test(id)) return false;
+      if (expiresAt === null) { registry.delete(id); idle(); return true; }
+      if (!Number.isSafeInteger(expiresAt) || expiresAt <= Date.now() || expiresAt > Date.now() + 15_000
+        || !registry.has(id) && registry.size >= 256) return false;
+      registry.set(id, { kind: 'ui', expiresAt }); return true;
+    },
+    releaseInitial() { registry.delete('initial'); idle(); },
+    releaseManual() { releaseKind('manual'); idle(); },
     requestStop() {
-      initial = false; manual.clear();
-      if (clients.size) { idle(); return false; }
+      registry.delete('initial'); releaseKind('manual');
+      if (registry.size || clients.size) { idle(); return false; }
       beginStop();
       return true;
     },
-    get external() { return clients.size + [...manual].filter(value => value !== 'owner').length; },
-    get active() { return Number(initial) + manual.size + clients.size; },
+    get external() { return [...registry].filter(([key, lease]) => key !== 'owner' && lease.kind !== 'initial').length + [...clients].filter(socket => !registry.has(socket)).length; },
+    get active() { return registry.size + [...clients].filter(socket => !registry.has(socket)).length; },
     close() {
-      beginStop();
+      beginStop(); clearInterval(expiry); registry.clear();
       for (const socket of clients) socket.destroy();
       return closingTask ??= new Promise(resolve => server.close(() => { phase = 'closed'; if (temporary) fs.rmSync(temporary, { recursive: true, force: true }); resolve(); }));
     },
