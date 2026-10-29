@@ -74,7 +74,7 @@ test('lease spans native open and close; successful maintenance admits the next 
 test('default async close shares the synchronous admission budget under gate contention', async () => {
     const f = fixture();
     const participant = openAdmittedSqlite(f.target);
-    const gate = path.join(store(f.target), 'gate');
+    const gate = path.join(store(path.join(fs.realpathSync(f.dir), 'medical.db')), 'gate');
     fs.mkdirSync(gate);
     let release: ReturnType<typeof setTimeout> | undefined;
     const nativeMkdir = fs.mkdirSync;
@@ -94,6 +94,32 @@ test('default async close shares the synchronous admission budget under gate con
         clearTimeout(release);
         if (fs.existsSync(gate)) fs.rmdirSync(gate);
         await participant.close();
+        f.cleanup();
+    }
+});
+
+test('a maintenance owner in another process excludes a second maintenance callback', async () => {
+    const f = fixture();
+    const w = child(`
+        import path from 'node:path';
+        import { runWithSqliteMaintenance } from './lib/sqlite-maintenance-admission.mjs';
+        await runWithSqliteMaintenance(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db'), {}, async () => {
+            const done = new Promise(resolve => process.once('message', resolve));
+            process.send('MAINTENANCE'); await done;
+        });
+        process.disconnect();
+    `, f.dir);
+    try {
+        assert.equal(await message(w.worker), 'MAINTENANCE');
+        const intent = fs.readFileSync(path.join(store(f.target), 'intent.json'));
+        await assert.rejects(runWithSqliteMaintenance(f.target, {}, () => assert.fail('overlapping maintenance')), /maintenance_pending/);
+        assert.deepEqual(fs.readFileSync(path.join(store(f.target), 'intent.json')), intent);
+        w.worker.send('COMPLETE');
+        assert.equal(await w.terminal, 0, w.output());
+        await runWithSqliteMaintenance(f.target, {}, () => {});
+    } finally {
+        if (w.worker.exitCode === null && w.worker.signalCode === null) w.worker.kill();
+        await Promise.allSettled([w.terminal]);
         f.cleanup();
     }
 });
