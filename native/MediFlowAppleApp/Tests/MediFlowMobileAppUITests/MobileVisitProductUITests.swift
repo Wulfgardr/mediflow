@@ -52,7 +52,15 @@ final class MobileVisitProductUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [stableFrame], timeout: 10), .completed)
         patientOption.tap()
         let selectedPatient = app.staticTexts["Paziente scelto: Sintetico Paziente"]
-        let patientSelected = selectedPatient.waitForExistence(timeout: 30)
+        var patientSelected = selectedPatient.waitForExistence(timeout: 10)
+        // XCUITest can drop a tap on a SwiftUI Menu item (run 40966198006: menu still open,
+        // item hittable, no selection). One more tap is allowed only while the same menu is
+        // still presented, which proves the first tap was not delivered to the app.
+        if !patientSelected, patientOption.exists, patientOption.isHittable {
+            attachUIReadinessDiagnostics(in: app, named: "Menu paziente ancora aperto dopo il primo tap")
+            patientOption.tap()
+            patientSelected = selectedPatient.waitForExistence(timeout: 20)
+        }
         if !patientSelected {
             attachUIReadinessDiagnostics(in: app, named: "Paziente non scelto dopo il tap")
         }
