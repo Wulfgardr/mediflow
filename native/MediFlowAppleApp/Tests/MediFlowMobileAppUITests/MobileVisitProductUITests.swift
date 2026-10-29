@@ -41,10 +41,14 @@ final class MobileVisitProductUITests: XCTestCase {
         openVisit(app)
         waitForUIReady(app.buttons["mobile-visit-choose-patient"], in: app)
         app.buttons["mobile-visit-choose-patient"].tap()
-        choose(menuItem: "Sintetico Paziente", in: app) {
-            let selected = app.staticTexts["Paziente scelto: Sintetico Paziente"]
-            return selected.exists && selected.isHittable
+        waitForUIReady(app.buttons["Sintetico Paziente"].firstMatch, in: app)
+        app.buttons["Sintetico Paziente"].firstMatch.tap()
+        let selectedPatient = app.staticTexts["Paziente scelto: Sintetico Paziente"]
+        let patientSelected = selectedPatient.waitForExistence(timeout: 30)
+        if !patientSelected {
+            attachUIReadinessDiagnostics(in: app, named: "Paziente non scelto dopo il tap")
         }
+        XCTAssertTrue(patientSelected, "La scelta deve confermare il paziente prima di preparare la visita")
         waitForUIReady(app.buttons["mobile-visit-prepare"], in: app)
         app.buttons["mobile-visit-prepare"].tap()
         waitForUIReady(app.buttons["Acconsento e preparo il dossier"], in: app)
@@ -125,17 +129,14 @@ final class MobileVisitProductUITests: XCTestCase {
                 let overflow = app.buttons["OverflowBarButtonItem"]
                 XCTAssertTrue(overflow.waitForExistence(timeout: 5))
                 overflow.tap()
-                choose(menuItem: "Elenco", in: app, opensSubmenu: true, timeout: 5) {
-                    self.presentedMenu(in: app).buttons["mobile-visit-entry"].isHittable
-                }
+                let menu = tools.isHittable ? tools : app.buttons["Elenco"]
+                XCTAssertTrue(menu.waitForExistence(timeout: 5))
+                menu.tap()
             }
-            choose(menuItem: "mobile-visit-entry", in: app, timeout: 5) {
-                app.buttons["mobile-visit-close"].exists
-            }
-        } else {
-            waitForUIReady(entry, in: app, timeout: 5)
-            entry.tap()
         }
+        XCTAssertTrue(entry.waitForExistence(timeout: 5))
+        XCTAssertTrue(entry.isHittable)
+        entry.tap()
     }
 
     private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
