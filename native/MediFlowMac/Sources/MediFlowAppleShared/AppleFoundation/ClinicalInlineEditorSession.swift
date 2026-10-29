@@ -244,6 +244,7 @@ final class ClinicalInlineEditorSession {
         guard let snapshot else { return false }
         var current = document.wrappedValue
         guard current.updateRuns(id: blockID, runs: runs, expecting: snapshot) else { return false }
+        current.updateText(id: blockID, text: String(ClinicalInlineEditing.plainText(runs).dropLast()))
         self.snapshot = ClinicalInlineEditing.coalesced(runs)
         publishing = true
         defer { publishing = false }

@@ -145,6 +145,7 @@ struct MobileVisitWorkspaceView: View {
                 Text("Paziente scelto: \(patient.lastName) \(patient.firstName)")
                 Button("Prepara questo paziente per la visita", systemImage: "arrow.down.doc") { confirmsPreparation = true }
                     .disabled(workspace.isWorking)
+                    .hidden()
                     .accessibilityIdentifier("mobile-visit-prepare")
             }
         }
