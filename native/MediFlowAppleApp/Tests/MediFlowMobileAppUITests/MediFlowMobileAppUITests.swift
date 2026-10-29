@@ -443,7 +443,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         ("Pazienti", "clinical-workspace-patients-view"),
         ("Agenda", "clinical-workspace-agenda-view"),
         ("Diario", "clinical-workspace-diary-view"),
-        ("Analytics", "clinical-workspace-analytics-view"),
+        ("Analisi", "clinical-workspace-analytics-view"),
         ("Scale", "clinical-workspace-scales-view"),
         ("Impostazioni", "clinical-workspace-settings-view"),
     ]
@@ -1259,7 +1259,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
             )
         }
 
-        openSection("Analytics")
+        openSection("Analisi")
         XCTAssertTrue(sectionView("clinical-workspace-analytics-view").waitForExistence(timeout: 15))
         // Analytics used to render nothing at all without a connection: the age
         // steppers and no statement underneath them. Something must be said.
@@ -2193,6 +2193,24 @@ final class MediFlowMobileAppUITests: XCTestCase {
                       "The pre-existing diagnosis must survive the round-trip")
     }
 
+    func testScaleRequiresSelectedPatientAndCanCancel() {
+        app.launchEnvironment["MEDIFLOW_APPLE_UITEST_PRESENT_SCALE"] = "adl"
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(app.buttons["patient-cell-uitest-1"].waitForExistence(timeout: 20))
+        XCTAssertFalse(app.buttons["submit-scale-button"].exists)
+        app.terminate()
+        app.launchEnvironment["MEDIFLOW_APPLE_UITEST_OPEN_PATIENT_INDEX"] = "0"
+        app.launch()
+        XCTAssertTrue(app.buttons["cancel-scale-button"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.navigationBars["ADL · Rossi Mario"].exists)
+        XCTAssertEqual(app.buttons["submit-scale-button"].label, "Completa")
+        let result = app.staticTexts["scale-incomplete"]
+        let question = app.buttons["scale-question-bath"]
+        XCTAssertLessThan(result.frame.minY, question.frame.minY)
+        app.buttons["cancel-scale-button"].tap()
+        XCTAssertFalse(app.buttons["submit-scale-button"].exists)
+    }
+
     func testScaleFormSubmitsAndAppearsInDiary() {
         launch(seedPatients: true, section: "modules")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
@@ -2227,6 +2245,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
             }
         }
         XCTAssertTrue(app.buttons["submit-scale-button"].isEnabled)
+        XCTAssertEqual(app.buttons["submit-scale-button"].label, "Completa")
         app.buttons["submit-scale-button"].tap()
 
         // The scale entry appears in the diary (seed short-circuit inserts it).
@@ -2737,7 +2756,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(globalRow.staticTexts[savedTitle].exists)
         XCTAssertTrue(globalRow.staticTexts[input.writeBody].exists, "The global diary must first expose the persisted body")
         attachScreenshot(named: "interop-lock-global-diary-populated")
-        XCTAssertTrue(openSection("Analytics"))
+        XCTAssertTrue(openSection("Analisi"))
         XCTAssertTrue(sectionView("clinical-workspace-analytics-view").waitForExistence(timeout: 10))
         let analyticsSummary = sectionView("clinical-workspace-analytics-summary")
         XCTAssertTrue(analyticsSummary.waitForExistence(timeout: 20))
@@ -2847,7 +2866,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
             XCTAssertFalse(globalRow.exists)
             assertClinicalContentAbsent()
             attachScreenshot(named: "interop-lock-global-diary-cleared")
-            XCTAssertTrue(openSection("Analytics"))
+            XCTAssertTrue(openSection("Analisi"))
             XCTAssertTrue(sectionView("clinical-workspace-analytics-view").waitForExistence(timeout: 5))
             XCTAssertFalse(analyticsSummary.exists)
             XCTAssertFalse(app.staticTexts[analyticsFooter].exists)

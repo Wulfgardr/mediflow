@@ -175,20 +175,24 @@ struct PairedPatientsWorkspaceView: View {
             #if DEBUG
             // Screenshot/UI-test affordance: auto-present a clinical scale sheet so
             // the live-scored form can be captured. Debug-only, never in release.
-            if ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PRESENT_SCALE"] == "adl" {
+            if ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PRESENT_SCALE"] == "adl",
+               model.selectedPatient != nil {
                 presentingScale = ClinicalScales.adl
             }
             #endif
         }
         .sheet(item: $presentingScale) { scale in
-            ClinicalScaleFormView(
-                definition: scale,
-                onSubmit: { answers in
-                    Task { await model.submitScale(scale, answers: answers) }
-                    presentingScale = nil
-                },
-                onCancel: { presentingScale = nil }
-            )
+            if let patient = model.selectedPatient {
+                ClinicalScaleFormView(
+                    definition: scale,
+                    patientLabel: "\(patient.lastName) \(patient.firstName)",
+                    onSubmit: { answers in
+                        Task { await model.submitScale(scale, answers: answers) }
+                        presentingScale = nil
+                    },
+                    onCancel: { presentingScale = nil }
+                )
+            }
         }
         .sheet(isPresented: $showsConnectionSetup) {
             PairedHomeBaseCredentialsSheet(

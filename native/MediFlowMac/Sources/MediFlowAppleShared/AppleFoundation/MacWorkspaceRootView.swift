@@ -260,9 +260,6 @@ public struct MediFlowMacRootView: View {
             Section("Sistema") {
                 ForEach(Self.systemSections) { destinationRow($0) }
             }
-            Section("Progetto") {
-                ForEach(Self.projectSections) { destinationRow($0) }
-            }
         }
         .listStyle(.sidebar)
         .navigationTitle("MediFlow")
@@ -280,12 +277,9 @@ public struct MediFlowMacRootView: View {
         .accessibilityIdentifier("clinical-workspace-section-\(item.rawValue)-button")
     }
 
-    /// Runtime is the home-base status of this very Mac, so it belongs with the
-    /// app's own settings. Panoramica and Tappe are project-state surfaces and
-    /// stay grouped apart from the clinical work.
     static let referenceSections: [ClinicalWorkspaceSection] = [.repertori]
-    static let systemSections: [ClinicalWorkspaceSection] = [.settings, .host, .runtime]
-    static let projectSections: [ClinicalWorkspaceSection] = [.overview, .milestones]
+    static let systemSections: [ClinicalWorkspaceSection] = [.settings]
+    static let projectSections: [ClinicalWorkspaceSection] = [.host, .runtime, .overview, .milestones]
 
     // MARK: - Detail
 
@@ -368,7 +362,7 @@ public struct MediFlowMacRootView: View {
 /// Exists as its own view purely so it can observe the workspace: the subtitle
 /// has to change when patients load or the connection state moves, and the root
 /// view observes the scene rather than the workspace.
-private struct MacDetailChrome<Content: View>: View {
+struct MacDetailChrome<Content: View>: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
     let section: ClinicalWorkspaceSection
     @ViewBuilder var content: Content
@@ -379,6 +373,10 @@ private struct MacDetailChrome<Content: View>: View {
             .navigationSubtitle(subtitle)
     }
 
+    static func patientCountLabel(_ count: Int) -> String {
+        count == 1 ? "1 paziente caricato in totale" : "\(count) pazienti caricati in totale"
+    }
+
     /// States the connection, and on the patients section the size of what is
     /// actually on screen. The two are never combined: a loaded list under a
     /// "Non caricato" connection state reads as a contradiction.
@@ -387,7 +385,7 @@ private struct MacDetailChrome<Content: View>: View {
         guard section == .patients, count > 0 else {
             return workspaceModel.connectionState.title
         }
-        return count == 1 ? "1 paziente" : "\(count) pazienti"
+        return Self.patientCountLabel(count)
     }
 }
 
@@ -432,10 +430,6 @@ public struct MediFlowMacCommands: Commands {
                 Button(item.title) { navigation?.select(item) }
             }
             Divider()
-            ForEach(MediFlowMacRootView.projectSections) { item in
-                Button(item.title) { navigation?.select(item) }
-            }
-            Divider()
             Button("Aggiorna") {
                 if let workspaceRefresh {
                     workspaceRefresh.perform()
@@ -443,6 +437,12 @@ public struct MediFlowMacCommands: Commands {
             }
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(!(workspaceRefresh?.isEnabled ?? false))
+        }
+
+        CommandMenu("Sviluppo") {
+            ForEach(MediFlowMacRootView.projectSections) { item in
+                Button(item.title) { navigation?.select(item) }
+            }
         }
 
         CommandMenu("Vista") {

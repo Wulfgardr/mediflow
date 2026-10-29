@@ -2,6 +2,7 @@ import SwiftUI
 
 /// MF085-003: unanswered is nil, not the first option or a false toggle.
 struct ClinicalScaleFormView: View {
+    let patientLabel: String
     let definition: ClinicalScaleDefinition
     let onSubmit: ([String: Int]) -> Void
     let onCancel: () -> Void
@@ -9,9 +10,11 @@ struct ClinicalScaleFormView: View {
 
     init(
         definition: ClinicalScaleDefinition,
+        patientLabel: String,
         onSubmit: @escaping ([String: Int]) -> Void,
         onCancel: @escaping () -> Void
     ) {
+        self.patientLabel = patientLabel
         self.definition = definition
         self.onSubmit = onSubmit
         self.onCancel = onCancel
@@ -22,28 +25,16 @@ struct ClinicalScaleFormView: View {
         try? definition.result(from: answers)
     }
 
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     var body: some View {
         NavigationStack {
-            GeometryReader { geometry in
-                let wide = geometry.size.width >= 760 && !dynamicTypeSize.isAccessibilitySize
-                Group {
-                if wide {
-                    HStack(alignment: .top, spacing: 0) {
-                        questions
-                        Divider()
-                        resultPanel.padding(24).frame(width: 280, alignment: .topLeading)
-                    }
-                } else {
-                    questions
-                }
-                }
-                .safeAreaInset(edge: .bottom, spacing: 0) { submissionBar(showsResult: !wide) }
-            }
+            questions
             .background(PlatformColors.chartCardSurface)
-            .navigationTitle(definition.title)
+            .navigationTitle("\(definition.id.uppercased()) · \(patientLabel)")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                ToolbarItem(placement: .confirmationAction) { submitButton }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annulla", action: onCancel)
                         .accessibilityIdentifier("cancel-scale-button")
@@ -54,6 +45,7 @@ struct ClinicalScaleFormView: View {
 
     private var questions: some View {
         List {
+            Section { resultPanel }
             Section {
                 Text(definition.scaleDescription).chartMetadata()
                     .fixedSize(horizontal: false, vertical: true)
@@ -86,7 +78,8 @@ struct ClinicalScaleFormView: View {
                 .font(.body.weight(.semibold)).foregroundStyle(PlatformColors.pencil)
             if let result {
                 Text("\(result.score)/\(definition.maxScore)")
-                    .inkRegister(weight: .semibold)
+                    .font(.largeTitle.weight(.semibold))
+                    .monospacedDigit()
                     .accessibilityIdentifier("scale-score")
                 Text(result.interpretation).inkRegister()
                     .fixedSize(horizontal: false, vertical: true)
@@ -99,38 +92,13 @@ struct ClinicalScaleFormView: View {
         }
     }
 
-    private func submissionBar(showsResult: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Divider()
-            if showsResult {
-                VStack(alignment: .leading, spacing: 12) {
-                    resultPanel
-                    submitButton
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
-            } else {
-                HStack(alignment: .center, spacing: 20) {
-                    Text("Risultato in bozza")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(PlatformColors.pencil)
-                    Spacer(minLength: 8)
-                    submitButton
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
-            }
-        }
-        .background(PlatformColors.chartCardSurface)
-    }
-
     private var submitButton: some View {
-        Button("Invia") {
+        Button("Completa") {
             guard result != nil else { return }
             onSubmit(answers)
         }
         .buttonStyle(.borderedProminent)
+        .tint(PlatformColors.freshInk)
         .disabled(result == nil)
         .accessibilityIdentifier("submit-scale-button")
     }
