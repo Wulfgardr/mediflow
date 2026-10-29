@@ -135,3 +135,12 @@ diagnostici hanno mostrato conclusioni terapeutiche non sostenute dalle fonti;
 la qualità resta non accettata. Un eventuale parserPASS non chiude I-7,
 non accetta questo ADR e non ammette alcuna nuova venue remota. I tentativi
 falliti restano conservati fuori da Git.
+
+## Banco sintetico proposto I-3b/I-7
+
+Il [banco locale](../quality/athena/README.md) versiona corpus, hash e soglie
+ancora proposte e confronta metodo V2 diretto e servizio Fabric con runner MLX
+locale. La misura reale richiede prima la revisione del corpus e l'approvazione
+delle soglie da parte di Leonardo; l'autoverifica deterministica non è prova
+di equivalenza MLX o qualità clinica. Il banco nega nel codice ogni venue
+remota e non cambia lo stato Proposed di questo ADR.
