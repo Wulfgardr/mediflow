@@ -584,6 +584,7 @@ public struct AppleFoundationMobileRootView: View {
                 .accessibilityIdentifier("clinical-workspace-patients-view")
         case .agenda:
             AgendaWorkspaceView(capabilities: capabilitiesStore, workspaceModel: workspaceModel)
+                .hidden()
                 .accessibilityIdentifier("clinical-workspace-agenda-view")
         case .diary:
             GlobalDiaryWorkspaceView(capabilities: capabilitiesStore, workspaceModel: workspaceModel)
