@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.44.0
+  version: 1.45.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -2931,9 +2931,18 @@ paths:
         are excluded from this boundary. Patient admission (not soft-deleted),
         ambulatory scope, mutation and mandatory audit share one transaction;
         an audit failure rolls back the entry. An archived-only patient remains
-        eligible. A repeated explicit entry ID with identical content returns
+        eligible for ordinary diary entries. Scale entries (`type: scale`) require
+        a present, non-archived, non-deleted patient in the same IMMEDIATE
+        transaction; otherwise 409 SCALE_PATIENT_INACTIVE is returned, without
+        entry or audit mutation. A missing or out-of-scope paired patient is
+        uniformly 404 with the same scale code, without disclosing which case
+        occurred. Patient demographics version is not a precondition.
+        A repeated explicit entry ID with identical content returns
         200 without a new mutation or audit, after current patient/scope admission;
-        different content returns 409. A missing or soft-deleted parent returns 404.
+        different content returns 409 (SCALE_IDEMPOTENCY_CONFLICT for scales).
+        Dates are compared at the persisted one-second resolution. Clients must
+        reuse the original sealed fields and date on retries, rather than encrypt
+        again. A missing or soft-deleted parent for ordinary entries returns 404.
         ADR0153 additionally rechecks archive generation, pairing/token, mode,
         capability, original session, current account role and scope inside the
         same IMMEDIATE transaction before duplicate lookup or mutation. Revocation
@@ -2995,9 +3004,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Explicit entry ID conflicts with existing content or identity; no effects.
+          description: Missing or out-of-scope patient; indistinguishable. Scale requests include SCALE_PATIENT_INACTIVE.
           content:
             application/json:
               schema:
@@ -3006,6 +3013,22 @@ paths:
                 properties:
                   error:
                     type: string
+                  code:
+                    type: string
+                    const: SCALE_PATIENT_INACTIVE
+        '409':
+          description: Scale patient inactive or explicit entry ID conflicts with existing content or identity; no effects.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+                    enum: [SCALE_PATIENT_INACTIVE, SCALE_IDEMPOTENCY_CONFLICT]
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -3061,6 +3084,9 @@ paths:
       operationId: updateNetworkPatientEntry
       summary: Update or soft-delete a clinical diary entry through the paired home-base data plane
       description: |
+        Scale results, including conversion to type scale, require a present,
+        non-archived and non-deleted patient within the update/audit transaction.
+        Otherwise 409 SCALE_PATIENT_INACTIVE is returned without effects.
         Updates a clinical diary entry using entry-level optimistic concurrency.
         The route requires a paired client with
         `network.replica.write-clinical-diary`, an active operator session, and
@@ -3068,8 +3094,8 @@ paths:
         delete, remote attachment/document writes, and AI/document-derived
         fields are excluded; soft delete and restore use `deletedAt` and
         `deletionReason`. Parent admission (not soft-deleted), scope, version,
-        mutation and mandatory audit share one transaction. Missing or soft-deleted
-        parents return 404; archived-only parents remain eligible. Restoring an
+        mutation and mandatory audit share one transaction. For ordinary entries,
+        missing or soft-deleted parents return 404; archived-only parents remain eligible. Restoring an
         entry with deletedAt:null does not restore its parent. Audit failure rolls
         back all entry changes and the version increment.
         ADR0153 additionally rechecks archive generation, pairing/token, mode,
@@ -3124,7 +3150,20 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/EntryVersionConflict'
+          description: Entry compare-on-write conflict or inactive scale patient; no effects.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/EntryVersionConflictResponse'
+                  - type: object
+                    required: [error, code]
+                    properties:
+                      error:
+                        type: string
+                      code:
+                        type: string
+                        const: SCALE_PATIENT_INACTIVE
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':

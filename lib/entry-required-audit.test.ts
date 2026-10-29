@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import Database from 'better-sqlite3';
+import { eq } from 'drizzle-orm';
 import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } from './network-patient-authority-test-fixture';
 import { NETWORK_PAIRING_STATE_KEY, serializeNetworkPairingState } from './network-pairing-model';
 import { clearAllSessions } from './security/server-session';
@@ -551,3 +552,135 @@ test('local structured metadata and paired sealed metadata retain normalized rep
     assert.deepEqual(metadata.flags, ['auth:paired-client', 'paired-client:synthetic-paired', 'scope:ambulatory']);
     assert.equal(JSON.stringify(metadata).includes('bWV0YWRhdGF'), false);
 });
+
+for (const surface of ['web', 'v1', 'network'] as const) {
+    for (const state of ['archived', 'deleted', 'missing'] as const) {
+        test(`scale ${surface} rejects ${state} after client read at the shared writer`, async () => {
+            const ids = seed(`scale-${surface}-${state}`, false);
+            const body = { ...validBody(surface, 'POST', ids), type: 'scale' };
+            const read = dbServer.select().from(patients).where(eq(patients.id, ids.patientId)).get();
+            assert.ok(read && !read.isArchived && !read.deletedAt);
+            if (state === 'missing') dbServer.delete(patients).where(eq(patients.id, ids.patientId)).run();
+            else dbServer.update(patients).set(state === 'archived' ? { isArchived: true, version: 2 } : { deletedAt: new Date(), version: 2 })
+                .where(eq(patients.id, ids.patientId)).run();
+            const before = readBack(ids.patientId, ids.entryId);
+            const response = await invoke(surface, 'POST', ids, body);
+            assert.equal(response.status, surface === 'network' && state === 'missing' ? 404 : 409);
+            assert.equal((await response.json()).code, 'SCALE_PATIENT_INACTIVE');
+            assert.deepEqual(readBack(ids.patientId, ids.entryId), before);
+        });
+    }
+    test(`scale ${surface} allows unrelated patient version changes and identical retry`, async () => {
+        const ids = seed(`scale-${surface}-replay`, false);
+        dbServer.update(patients).set({ version: 8 }).where(eq(patients.id, ids.patientId)).run();
+        const body = { ...validBody(surface, 'POST', ids), type: 'scale', date: '2026-05-02T09:00:00.456Z' };
+        const first = await invoke(surface, 'POST', ids, body);
+        assert.equal(first.status, 201);
+        const committed = readBack(ids.patientId, ids.entryId);
+        assert.equal(committed.audit.length, 1);
+        const replay = await invoke(surface, 'POST', ids, body);
+        assert.equal(replay.status, 200);
+        assert.deepEqual(await replay.json(), { id: ids.entryId, version: 1, idempotent: true });
+        assert.deepEqual(readBack(ids.patientId, ids.entryId), committed);
+        const conflict = await invoke(surface, 'POST', ids, { ...body, content: 'ENC:Y2hhbmdlZA==:Y2lwaGVy' });
+        assert.equal(conflict.status, 409);
+        assert.equal((await conflict.json()).code, 'SCALE_IDEMPOTENCY_CONFLICT');
+        assert.deepEqual(readBack(ids.patientId, ids.entryId), committed);
+    });
+}
+
+test('scale lifecycle gate belongs to the writer transaction, not route admission', () => {
+    const ids = seed('scale-writer-race', false);
+    const { prepareEntryCreate } = load('./entry-write-input.ts') as typeof import('./entry-write-input.ts');
+    const { createEntryOperation } = load('./entry-write-operation.ts') as typeof import('./entry-write-operation.ts');
+    const prepared = prepareEntryCreate({ ...validBody('web', 'POST', ids), type: 'scale' }, 'web', ids.patientId);
+    assert.ok(prepared.ok);
+    const result = createEntryOperation({ patientId: ids.patientId, id: prepared.id, values: prepared.values,
+        changedFields: prepared.changedFields, mode: 'web',
+        audit: { archiveGeneration, actorType: 'user', actorRef: 'synthetic-admin', sourceSurface: 'web', flags: ['synthetic:test'] },
+        authorizeCommit: tx => {
+            tx.update(patients).set({ isArchived: true }).where(eq(patients.id, ids.patientId)).run();
+            return null;
+        } });
+    assert.equal(result.status, 409);
+    assert.equal(result.value.code, 'SCALE_PATIENT_INACTIVE');
+    assert.equal(readBack(ids.patientId, ids.entryId).entry, null);
+    assert.equal(readBack(ids.patientId, ids.entryId).audit.length, 0);
+});
+
+
+test('Web scale facade replays the same encrypted request after a lost committed response', async t => {
+    const { db } = load('./db.ts') as typeof import('./db.ts');
+    const { generateMasterKey } = load('./security/security.ts') as typeof import('./security/security.ts');
+    const ids = seed('web-scale-lost-reply', false);
+    const bodies: string[] = [];
+    db.setKey(await generateMasterKey());
+    t.mock.method(globalThis, 'fetch', async (_url: unknown, options: RequestInit) => {
+        bodies.push(options.body as string);
+        const response = await invoke('web', 'POST', ids, JSON.parse(options.body as string));
+        if (bodies.length === 1) { assert.equal(response.status, 201); throw new Error('Synthetic lost response after commit'); }
+        return response;
+    });
+    try {
+        const prepared = await db.entries.prepareScaleCreate({ id: ids.entryId, patientId: ids.patientId,
+            type: 'scale', title: 'ADL', content: 'Synthetic score 0/6', metadata: { score: 0 },
+            date: new Date('2026-05-02T09:00:00.456Z'), createdAt: new Date(), updatedAt: new Date() }, () => true);
+        await assert.rejects(prepared.submit(), /lost response/);
+        const receipt = await prepared.submit();
+        assert.deepEqual(receipt, { id: ids.entryId, alreadyRegistered: true });
+        assert.equal(bodies[0], bodies[1]);
+        const after = readBack(ids.patientId, ids.entryId);
+        assert.equal(after.allPatientEntries.length, 1);
+        assert.equal(after.audit.length, 1);
+        db.setKey(null);
+        await assert.rejects(prepared.submit(), /non confermata/);
+        assert.equal(bodies.length, 2);
+    } finally { db.setKey(null); }
+});
+
+
+test('scale writer refuses a payload targeting another patient', () => {
+    const ids = seed('scale-writer-wrong-patient', false);
+    const other = seed('scale-writer-wrong-target', false, false, true);
+    const { prepareEntryCreate } = load('./entry-write-input.ts') as typeof import('./entry-write-input.ts');
+    const { createEntryOperation } = load('./entry-write-operation.ts') as typeof import('./entry-write-operation.ts');
+    const prepared = prepareEntryCreate({ ...validBody('web', 'POST', ids), type: 'scale' }, 'web', other.patientId);
+    assert.ok(prepared.ok);
+    const result = createEntryOperation({ patientId: ids.patientId, id: prepared.id, values: prepared.values,
+        changedFields: prepared.changedFields, mode: 'web',
+        audit: { archiveGeneration, actorType: 'user', actorRef: 'synthetic-admin', sourceSurface: 'web', flags: ['synthetic:test'] } });
+    assert.equal(result.status, 409);
+    assert.equal(result.value.code, 'SCALE_IDEMPOTENCY_CONFLICT');
+    assert.equal(readBack(other.patientId, ids.entryId).entry, null);
+    assert.equal(readBack(other.patientId, ids.entryId).audit.length, 0);
+});
+
+
+test('paired scale denial does not distinguish missing and out-of-scope patient identities', async () => {
+    const ids = seed('scale-no-disclosure', false);
+    dbServer.delete(patientsToAmbulatories).where(eq(patientsToAmbulatories.patientId, ids.patientId)).run();
+    const body = { ...validBody('network', 'POST', ids), type: 'scale' };
+    const scopedOut = await invoke('network', 'POST', ids, body);
+    dbServer.delete(patients).where(eq(patients.id, ids.patientId)).run();
+    const missing = await invoke('network', 'POST', ids, body);
+    assert.equal(scopedOut.status, 404);
+    assert.equal(missing.status, 404);
+    assert.deepEqual(await scopedOut.json(), await missing.json());
+});
+
+
+for (const surface of ['web', 'v1', 'network'] as const) {
+    for (const state of ['archived', 'deleted'] as const) {
+        test(`scale ${surface} cannot update an existing result under ${state} patient`, async () => {
+            const ids = seed(`scale-update-${surface}-${state}`, true);
+            dbServer.update(entries).set({ type: 'scale' }).where(eq(entries.id, ids.entryId)).run();
+            dbServer.update(patients).set(state === 'archived' ? { isArchived: true } : { deletedAt: new Date() })
+                .where(eq(patients.id, ids.patientId)).run();
+            const before = readBack(ids.patientId, ids.entryId);
+            const response = await invoke(surface, 'PUT', ids, validBody(surface, 'PUT', ids));
+            assert.equal(response.status, 409);
+            assert.equal((await response.json()).code, 'SCALE_PATIENT_INACTIVE');
+            assert.deepEqual(readBack(ids.patientId, ids.entryId), before);
+        });
+    }
+}
