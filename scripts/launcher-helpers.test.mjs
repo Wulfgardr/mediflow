@@ -1764,7 +1764,23 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     const from = text.indexOf('export async function stopOwnedChild'), to = text.indexOf('export function installDesktopEntry',from);
                     if (from < 0 || to < from) throw new Error('FIXTURE_STOP_HELPER_NOT_FOUND');
                     text = text.slice(0,from) + text.slice(from,to).replaceAll('process.platform', ${JSON.stringify(JSON.stringify(lifecycle.platform))}) + text.slice(to);
-                    result.source = text.replace('stopOwnedChild(child, 8000)', ${JSON.stringify(lifecycle.group ? 'stopOwnedChild(child, 600)' : `stopOwnedChild(child, JSON.parse(fs.readFileSync(${JSON.stringify(stopControl)})).failure === null ? 8000 : 60)`)})
+                    const stopCall = 'stopOwnedChild(child, 8000, { ownerRecord: childOwner })';
+                    if (text.split(stopCall).length !== 2) throw new Error('FIXTURE_STOP_BUDGET_NOT_FOUND');
+                    if (!${Boolean(lifecycle.group)}) {
+                        const replaceOnce = (before, after) => {
+                            if (text.split(before).length !== 2) throw new Error('FIXTURE_STOP_CLOCK_NOT_FOUND');
+                            text = text.replace(before, after);
+                        };
+                        let helper = text.slice(from, to).replaceAll('Date.now()', '(fixtureNegative ? 0 : Date.now())');
+                        helper = helper.replace('const ownerRecord = options.ownerRecord ?? null;',
+                            'const fixtureNegative = JSON.parse(fs.readFileSync(' + ${JSON.stringify(JSON.stringify(stopControl))} + ')).failure !== null; const ownerRecord = options.ownerRecord ?? null;');
+                        text = text.slice(0, from) + helper + text.slice(to);
+                        replaceOnce('timer = setTimeout(expired, graceMs);', 'timer = fixtureNegative ? null : setTimeout(expired, graceMs);');
+                        replaceOnce('forceTimer = setTimeout(force, Math.floor(graceMs / 2));', 'forceTimer = fixtureNegative ? null : setTimeout(force, Math.floor(graceMs / 2));');
+                        replaceOnce('process.kill(-child.pid, signal);', "process.kill(-child.pid, signal); if (fixtureNegative) { if (signal === 'SIGTERM') forceTimer = setTimeout(force, 0); else timer = setTimeout(expired, 0); }");
+                        replaceOnce('windowsTreeStopped = true;', 'windowsTreeStopped = true; if (fixtureNegative) timer = setTimeout(expired, 0);');
+                    }
+                    result.source = text.replace(stopCall, ${JSON.stringify(lifecycle.group ? 'stopOwnedChild(child, 600, { ownerRecord: childOwner })' : `stopOwnedChild(child, JSON.parse(fs.readFileSync(${JSON.stringify(stopControl)})).failure === null ? 8000 : 60, { ownerRecord: childOwner })`)})
                         .replace('const finish = cause => {', 'const finish = cause => { if(cause) process.stderr.write("FIXTURE_STOP_CAUSE " + cause.code + " " + cause.message + String.fromCharCode(10));');
                 }
                 return result;
@@ -2137,7 +2153,7 @@ for (const simulatedStopPlatform of ['win32', 'linux']) for (const failure of si
             assert.equal(response.status,202); await response.text();
         }
         await f.until(() => existsSync(f.stopTrace));
-        await new Promise(resolve=>setTimeout(resolve,150));
+        await f.until(() => f.output().includes('Arresto non verificato'));
         const pid = JSON.parse(readFileSync(f.runtimePid)).pid;
         process.kill(pid,0);
         const current = claimLauncher(f.stateFiles.lockDirectory,{checkoutPath:f.source+path.sep},{reuseLive:true});
