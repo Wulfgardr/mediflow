@@ -173,5 +173,10 @@
     "path": "docs/analysis/2026-10-22-command-roles/real-probe.spec.ts.txt",
     "reason": "WUL-787: Historical manual reproduction source archived as text; not an ordinary suite entrypoint. Current regression coverage is selected from e2e/command-roles-real.spec.ts.",
     "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/athena-quality/run.ts",
+    "reason": "CLI diagnostica con autoverifica, esercitata da scripts/athena-quality/bench.test.ts; non è una suite node:test.",
+    "owner": "WUL-790"
   }
 ]
