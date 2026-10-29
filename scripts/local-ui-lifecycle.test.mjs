@@ -51,7 +51,7 @@ async function fixture(t, plugin = true) {
     await until(() => [...owned].every(([pid, start]) => runtimeProcessIdentity(pid) !== start));
     fs.rmSync(data, { recursive: true, force: true });
   });
-  const owner = launch(plugin);
+  const owner = launch(plugin, !plugin && process.platform === 'darwin');
   await until(() => output.includes('Pronto:'), 45000).catch(error => { throw new Error(`${error.message}: ${output}`); });
   const web = table().filter(row => row.ppid === owner.pid && row.command.includes('next-server'));
   assert.equal(web.length, 1); remember(web[0].pid);
@@ -138,7 +138,7 @@ test('real standalone: SIGKILL of source-runtime client preserves another active
   await until(async () => {
     try { const active = path.join(state.lockDirectory, 'active');
       receipt = JSON.parse(fs.readFileSync(path.join(active, fs.readdirSync(active)[0], 'instance.json')));
-      const response = await fetch(new URL('state', receipt.choiceUrl)); const state = await response.json(); url = state.url; return state.ready;
+      const response = await fetch(new URL('state', receipt.choiceUrl), { signal: AbortSignal.timeout(1000) }); const runtimeState = await response.json(); url = runtimeState.url; return runtimeState.ready;
     } catch { return false; }
   }, 45000);
   for (const row of table().filter(row => row.ppid === guardian.pid)) remember(row.pid);
