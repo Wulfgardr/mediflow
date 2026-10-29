@@ -198,8 +198,17 @@ previsti e i campi/pulsanti classificati con tipo e collocazione esatti. Ruoli,
 attributi o listener inattesi bloccano anche su elementi personalizzati. I sottoalberi
 nativi vengono attraversati e appartengono al controllo browser che li contiene; non
 sono campi indipendenti della pagina. Le proprietà dei controlli si leggono in un mondo
-isolato CDP. Gli script della pagina vengono sospesi prima del censimento, che si ripete
-prima di ogni POST. Una pagina non verificabile non viene compilata né inviata.
+isolato CDP. Prima di ogni POST, un token possiede le sessioni CDP e la sospensione degli
+script dal censimento fino alla risposta e alla lettura dell'esito. Nessun detach avviene
+fra censimento e click; su errore si chiude prima la pagina. Il token osserva l'epoca DOM,
+i frame e le navigazioni e viene consumato una sola volta dal guard del POST, nello
+stesso passo sincrono che avvia il trasporto host. Un cambiamento prima del dispatch
+rende il censimento non verificabile. La navigazione principale prodotta dal POST è
+attesa; dialog nativi, nuovi frame, worker, download e nuove pagine durante la fase
+falliscono chiuso anche dopo il dispatch, lasciando incerto un effetto già possibile.
+La sospensione, mantenuta fino alla conclusione, impedisce che timer, microtask o altre
+callback della pagina riaprano l'intervallo fra controllo e uso. Una pagina non
+verificabile non viene compilata né inviata.
 
 Riferimenti del confine: [proxy Chromium](https://chromium.googlesource.com/chromium/src/+/main/net/docs/proxy.md),
 [policy WebRTC](https://chromeenterprise.google/policies/#WebRtcIPHandling),

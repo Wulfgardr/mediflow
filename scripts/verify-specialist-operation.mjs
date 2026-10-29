@@ -54,6 +54,10 @@ try {
     mutate('control-type', 'lib/local-operation/specialist/browser-adapter.ts', "field.type !== 'text' || ", '', 'input noto con type');
     mutate('control-placement', 'lib/local-operation/specialist/browser-adapter.ts', '|| !field.placed', '', 'input noto con form');
     mutate('http-close-on-revoke', 'lib/local-operation/specialist/browser-adapter.ts', '...[...transports].map(transport => transport.dispose())', '', 'revoca interrompe HTTP');
+    mutate('census-epoch', 'lib/local-operation/specialist/browser-census.ts',
+        'this.#epoch !== this.#observedEpoch', 'false', 'qualunque modifica dello stato osservato');
+    mutate('census-suspension', 'lib/local-operation/specialist/browser-census.ts',
+        "await session.send('Emulation.setScriptExecutionDisabled', { value: true });", '', 'timer già accodato');
     run('specialist-restored', suite, 0);
     if (process.env.MEDIFLOW_CU_EVIDENCE) {
         assert.ok(path.isAbsolute(process.env.MEDIFLOW_CU_EVIDENCE));

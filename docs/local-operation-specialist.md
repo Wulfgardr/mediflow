@@ -34,6 +34,15 @@ connessione senza una seconda intercettazione. Il destinatario confronta
 atomicamente bozza, identità e valori prima di emettere la ricevuta HMAC simulata.
 Un errore di navigazione chiude la pagina posseduta prima della ripresa.
 
+Il censimento e l'atto condividono una risorsa CDP: gli script restano sospesi fino
+alla risposta e alla lettura dell'esito. Il token di censimento genera un permesso
+opaco monouso; il guard lo consuma prima del trasporto host, verificando l'epoca DOM
+senza un nuovo intervallo asincrono. Mutazioni, navigazioni inattese e nuovi frame
+invalidano il censimento. Alert, confirm, prompt, beforeunload e nuove pagine durante
+l'atto impediscono la conferma; dopo il possibile invio resta `uncertain`. La
+navigazione principale attesa del form non è un nuovo atto. Il detach segue la
+conclusione oppure la chiusura della pagina in errore.
+
 La superficie Swift `native/LocalOperationDemo/main.swift` mostra selezione e
 rilettura completa in un pannello scorrevole. Solo dopo il gesto Autorizza richiede
 `LocalAuthentication.deviceOwnerAuthentication`, con Touch ID o credenziale di
@@ -92,7 +101,7 @@ appartiene alla transazione `Record` già modellata. Browser, esenzioni, cifratu
 e valori clinici rimangono proprietà runtime, senza attribuirle a TLC.
 
 `verify:specialist-operation` lavora in copie temporanee e deve rifiutare sette
-mutanti: esenzione non applicabile, campo nuovo, guard delle richieste di pagina,
+mutanti, inclusi rimozione del controllo d’epoca e della sospensione: esenzione non applicabile, campo nuovo, guard delle richieste di pagina,
 retry del POST, confronto atomico del destinatario, collegamento del writer e
 audit obbligatorio. Dopo le falsificazioni riesegue il codice originale.
 `MEDIFLOW_CU_EVIDENCE` indica un file JSON assoluto per conservare i risultati;

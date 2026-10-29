@@ -1,6 +1,6 @@
 import { request as http, type APIRequestContext, type Page, type BrowserContext } from '@playwright/test';
 import { launchConfinedBrowser } from './browser-network.ts';
-import { censusControls } from './browser-census.ts';
+import { CensusToken, type CensusDispatch } from './browser-census.ts';
 import { deny, planDigest, type LocalOperationAdapter, type LocalOperationPlan, type AdapterContext, type Destination } from '../contract.ts';
 
 export async function createSyntheticSpecialistBrowser(input: {
@@ -14,8 +14,10 @@ export async function createSyntheticSpecialistBrowser(input: {
     let page = await context.newPage();
     let stopping: Promise<void> = Promise.resolve();
     const transports = new Set<APIRequestContext>();
-    let authority: { ctx: AdapterContext; phase: Destination['purpose']; blocked: boolean } | null = null;
+    let authority: { ctx: AdapterContext; phase: Destination['purpose']; blocked: boolean; census?: CensusDispatch } | null = null;
     async function configure() {
+        for (const surface of context.pages()) guardPage(surface);
+        context.on('page', surface => { if (authority) authority.blocked = true; guardPage(surface); });
         await context.addCookies([input.cookie]);
         await context.routeWebSocket('**/*', socket => { if (authority) authority.blocked = true; void socket.close(); });
         await context.route('**/*', async route => {
@@ -32,6 +34,12 @@ export async function createSyntheticSpecialistBrowser(input: {
                 try {
                     active.ctx.assertCurrent();
                     if (authority !== active) deny();
+                    if (request.method() === 'POST') {
+                        if (!active.census) deny();
+                        active.census.consume();
+                        active.ctx.assertCurrent();
+                        if (authority !== active || active.blocked) deny();
+                    }
                     const response = await transport.fetch(request, { maxRedirects: 0, maxRetries: 0 });
                     active.ctx.assertCurrent();
                     if (response.status() >= 300 && response.status() < 400) deny();
@@ -40,16 +48,17 @@ export async function createSyntheticSpecialistBrowser(input: {
             } catch { if (active) active.blocked = true; await route.abort('blockedbyclient').catch(() => {}); }
         });
     }
-    function guardPage() {
-        page.on('dialog', dialog => { void dialog.dismiss(); });
-        page.on('download', download => { void download.cancel(); });
+    function guardPage(surface: Page) {
+        surface.on('dialog', dialog => { if (authority) authority.blocked = true; void dialog.dismiss().catch(() => {}); });
+        surface.on('download', download => { if (authority) authority.blocked = true; void download.cancel(); });
+        surface.on('worker', () => { if (authority) authority.blocked = true; });
     }
-    await configure(); guardPage();
+    await configure();
     async function during<T>(ctx: AdapterContext, phase: Destination['purpose'], action: () => Promise<T>): Promise<T> {
         await stopping;
         ctx.assertCurrent();
         if (!runtime.browser.isConnected()) { runtime = await launchConfinedBrowser(); context = runtime.context; await configure(); }
-        if (page.isClosed()) { page = await context.newPage(); guardPage(); }
+        if (page.isClosed()) { page = await context.newPage(); }
         const active = { ctx, phase, blocked: false }; authority = active;
         try { const value = await action(); ctx.assertCurrent(); if (active.blocked) deny(); return value; }
         catch (error) { await page.close().catch(() => {}); throw error; }
@@ -57,15 +66,23 @@ export async function createSyntheticSpecialistBrowser(input: {
     }
     async function submit(ctx: AdapterContext, phase: 'prepare' | 'act', button: string) {
         return during(ctx, phase, async () => {
-            const observation = await inspectPage();
-            if (observation.unclassifiedFields.length || observation.planDigest !== planDigest(input.plan())) deny();
-            await Promise.all([page.waitForURL(url => url.pathname === (phase === 'prepare' ? '/draft' : '/submit')), page.getByRole('button', { name: button, exact: true }).click()]);
-            if (phase === 'act') return JSON.parse(await page.locator('body').innerText()) as unknown;
+            const token = await CensusToken.capture(context, page);
+            try {
+                const observation = await inspectPage(token);
+                if (observation.unclassifiedFields.length || observation.planDigest !== planDigest(input.plan())) deny();
+                return await token.act(async census => {
+                    if (!authority) deny();
+                    authority.census = census;
+                    await Promise.all([page.waitForURL(url => url.pathname === (phase === 'prepare' ? '/draft' : '/submit')), page.getByRole('button', { name: button, exact: true }).click()]);
+                    if (phase === 'act') return JSON.parse(await page.locator('body').innerText()) as unknown;
+                });
+            } catch (error) { await page.close().catch(() => {}); throw error; }
+            finally { await token.close(); }
         });
     }
-    async function inspectPage() {
+    async function inspectPage(token: CensusToken) {
         const expected = input.plan(), main = page.locator('main');
-        const census = await censusControls(context, page);
+        const census = token.census;
         if (census.status !== 'complete') deny();
         const controls = census.controls;
         const fields = controls.filter(control => control.tag !== 'BUTTON');
@@ -87,7 +104,8 @@ export async function createSyntheticSpecialistBrowser(input: {
         async observe(ctx) {
             return during(ctx, 'observe', async () => {
                 await page.goto(`${origin}/portal`, { waitUntil: 'load' });
-                return inspectPage();
+                const token = await CensusToken.capture(context, page);
+                try { return await inspectPage(token); } finally { await token.close(); }
             });
         },
         async prepare(ctx, plan) {

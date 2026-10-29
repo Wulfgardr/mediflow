@@ -462,3 +462,134 @@ test('CU-1 censimento: interazioni senza tag o ruolo speciale e delegate sono in
     assert.equal(census.status, 'complete');
     if (census.status === 'complete') assert.equal(census.unexpected.filter(value => value === 'unclassified-interaction').length, 3);
 });
+
+
+test('CU-1 epoca: timer già accodato resta sospeso dal censimento alla conclusione dell’atto', async t => {
+    const f = await fixture(t), cap = await authorized(f);
+    await hostilePage(f, `<script>setTimeout(() => {
+        const d = document.createElement('dialog'); d.open = true;
+        d.innerHTML = '<input name="unreviewedClinical" value="SYNTHETIC_SENTINEL">';
+        document.body.append(d);
+    }, 150); document.currentScript.remove();</script>`);
+    let unexpectedBeforeClick = -1;
+    const getByRole = f.browser.page.getByRole.bind(f.browser.page);
+    f.browser.page.getByRole = (role, options) => {
+        const locator = getByRole(role, options);
+        if (options?.name === 'Emetti prescrizione') {
+            const click = locator.click.bind(locator);
+            locator.click = async (...args) => {
+                await new Promise(resolve => setTimeout(resolve, 250));
+                unexpectedBeforeClick = await f.browser.page.locator('dialog input').count();
+                return click(...args);
+            };
+        }
+        return locator;
+    };
+    const result = await f.service.execute(cap).then(value => value.state, () => 'rejected');
+    assert.equal(result, 'confirmed', 'il percorso stabile deve completare l’atto con script sospesi');
+    assert.equal(sends(f), 1);
+    assert.equal(unexpectedBeforeClick, 0, 'la sospensione deve appartenere all’intera fase');
+});
+
+test('CU-1 epoca: qualunque modifica dello stato osservato invalida l’atto prima del POST', async t => {
+    for (const change of [
+        () => { document.body.append(document.createElement('p')); },
+        () => { document.querySelector('main')!.setAttribute('data-human', '2'); },
+        () => { document.querySelector('h1')!.textContent = 'SYNTHETIC'; },
+        () => { document.body.append(document.createElement('iframe')); },
+        () => { location.hash = 'synthetic-state'; },
+    ]) {
+        const f = await fixture(t), cap = await authorized(f);
+        const getByRole = f.browser.page.getByRole.bind(f.browser.page);
+        f.browser.page.getByRole = (role, options) => {
+            const locator = getByRole(role, options);
+            if (options?.name === 'Emetti prescrizione') {
+                const click = locator.click.bind(locator);
+                locator.click = async (...args) => { await f.browser.page.evaluate(change); return click(...args); };
+            }
+            return locator;
+        };
+        await assert.rejects(f.service.execute(cap), 'un’epoca diversa non autorizza l’atto');
+        assert.equal(sends(f), 0); assert.equal(rows(f).length, 0);
+        assert.equal(f.service.inspect(f.plan.operationId).state, 'uncertain');
+    }
+});
+
+for (const kind of ['alert', 'confirm', 'prompt', 'beforeunload', 'page'] as const) {
+    test(`CU-1 epoca: nuovo contesto ${kind} durante l’atto fallisce chiuso`, async t => {
+        const f = await fixture(t), cap = await authorized(f);
+        let censusSession: Awaited<ReturnType<typeof f.browser.context.newCDPSession>> | undefined;
+        if (kind === 'beforeunload') {
+            await hostilePage(f, '');
+            const attach = f.browser.context.newCDPSession.bind(f.browser.context);
+            f.browser.context.newCDPSession = async target => { censusSession = await attach(target); return censusSession; };
+        }
+        let observed: string | undefined;
+        f.browser.page.on('dialog', dialog => { observed = dialog.type(); });
+        f.browser.context.on('page', () => { observed = 'page'; });
+        const getByRole = f.browser.page.getByRole.bind(f.browser.page);
+        f.browser.page.getByRole = (role, options) => {
+            const locator = getByRole(role, options);
+            if (options?.name === 'Emetti prescrizione') {
+                const click = locator.click.bind(locator);
+                locator.click = async (...args) => {
+                    if (kind === 'page') await f.browser.context.newPage();
+                    else if (kind === 'beforeunload') {
+                        assert.ok(censusSession);
+                        await censusSession.send('Emulation.setScriptExecutionDisabled', { value: false });
+                        await f.browser.page.evaluate(() => { window.onbeforeunload = () => 'SYNTHETIC'; });
+                        await f.browser.page.getByRole('heading').click();
+                        await Promise.all([f.browser.page.waitForEvent('dialog'), f.browser.page.close({ runBeforeUnload: true })]);
+                    } else await f.browser.page.evaluate(kind => { window[kind]('SYNTHETIC'); }, kind);
+                    return click(...args);
+                };
+            }
+            return locator;
+        };
+        await assert.rejects(f.service.execute(cap));
+        assert.equal(sends(f), 0); assert.equal(rows(f).length, 0);
+        assert.equal(observed, kind, 'il contesto nativo deve essere stato effettivamente aperto');
+    });
+}
+
+
+test('CU-1 epoca: sessione posseduta fino alla risposta, chiusa dopo successo o errore e token monouso', async t => {
+    const { CensusToken } = await import('./browser-census.ts');
+    const f = await fixture(t), cap = await authorized(f);
+    const original = f.browser.context.newCDPSession.bind(f.browser.context);
+    const held = new Set<Awaited<ReturnType<typeof original>>>();
+    f.browser.context.newCDPSession = async target => {
+        const session = await original(target), detach = session.detach.bind(session);
+        held.add(session);
+        session.detach = async () => { held.delete(session); await detach(); };
+        return session;
+    };
+    f.portal.afterAct(async () => { assert.equal(held.size, 1, 'il detach deve seguire anche la risposta'); });
+    assert.equal((await f.service.execute(cap)).state, 'confirmed');
+    assert.equal(held.size, 0);
+    const failed = await CensusToken.capture(f.browser.context, f.browser.page);
+    try { await assert.rejects(failed.act(async () => { throw new Error('synthetic failure'); })); }
+    finally { await failed.close(); }
+    assert.equal(held.size, 0, 'la sessione viene chiusa anche su errore');
+    const g = await fixture(t); await authorized(g);
+    const token = await CensusToken.capture(g.browser.context, g.browser.page);
+    try {
+        await token.act(async dispatch => {
+            dispatch.consume();
+            assert.throws(() => dispatch.consume(), /unverifiable/, 'nessun riuso del censimento consumato');
+        });
+        await assert.rejects(token.act(async () => {}));
+    } finally { await token.close(); }
+    const closed = await CensusToken.capture(g.browser.context, g.browser.page); await closed.close();
+    await assert.rejects(closed.act(async () => {}));
+    await assert.rejects(token.act(async () => {}));
+});
+
+
+test('CU-1 epoca: nuovo contesto dopo il dispatch non promuove la ricevuta a conferma', async t => {
+    const f = await fixture(t), cap = await authorized(f);
+    f.portal.afterAct(async () => { await f.browser.context.newPage(); });
+    await assert.rejects(f.service.execute(cap));
+    assert.equal(sends(f), 1); assert.equal(rows(f).length, 0);
+    assert.equal(f.service.inspect(f.plan.operationId).state, 'uncertain');
+});
