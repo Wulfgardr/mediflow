@@ -66,8 +66,23 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
     });
     await page.goto(`/patients/${patient.id}/entries/new`);
     const editor = page.locator('[contenteditable="true"]').first();
+    await expect(editor).toBeVisible();
+    assert.equal(await page.evaluate(() => Object.keys(localStorage).some(key => key.startsWith('mediflow:entry-draft:'))), false);
+    const date = page.getByLabel('Data e ora della voce clinica');
+    const openedAt = await date.inputValue();
     await editor.fill('Resoconto sintetico non registrato 757');
     await until(() => page.evaluate(() => Object.keys(localStorage).some(key => key.startsWith('mediflow:entry-draft:') && localStorage.getItem(key)?.startsWith('ENC:'))));
+    await expect(page.getByTestId('local-draft-status')).toContainText('conservati cifrati');
+    await page.clock.setFixedTime(new Date(Date.now() + 86400000));
+    await page.reload();
+    await expect(editor).toContainText('Resoconto sintetico non registrato 757');
+    assert.notEqual(await date.inputValue(), openedAt, 'Default date must refresh after reopening');
+    const chosenDate = '2026-10-01T09:30';
+    const previousCipher = await page.evaluate(() => Object.entries(localStorage).find(([key]) => key.startsWith('mediflow:entry-draft:'))?.[1]);
+    await date.fill(chosenDate);
+    await until(() => page.evaluate(previous => Object.entries(localStorage).find(([key]) => key.startsWith('mediflow:entry-draft:'))?.[1] !== previous, previousCipher));
+    await page.reload();
+    await expect(date).toHaveValue(chosenDate);
     // Wait for a server acknowledgement from the actual root component.
     await page.waitForResponse(response => response.url().endsWith('/api/plugin-local-ui/lease') && response.status() === 204, { timeout: 10000 });
     const resumed = page.waitForResponse(response => response.url().endsWith('/api/plugin-local-ui/lease')

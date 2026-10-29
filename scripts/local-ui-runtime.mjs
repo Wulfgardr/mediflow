@@ -147,7 +147,7 @@ export async function archiveBrowserPort(dataDir, options) {
     finally { if (server.listening) await new Promise(resolve => server.close(resolve)); }
   };
   if (preferred && reserve(preferred) && await available(preferred)) return preferred;
-  for (const entry of fs.readdirSync(registry).sort()) {
+  for (const entry of preferred ? fs.readdirSync(registry).sort() : []) {
     if (!/^[0-9]+$/u.test(entry)) continue;
     const port = Number(entry);
     if (port >= 1024 && port <= 65535 && owner(port) === archive && await available(port)) return port;
@@ -162,15 +162,21 @@ export async function archiveBrowserPort(dataDir, options) {
   for (let attempt = 0; attempt < 128; attempt++) {
     const server = net.createServer();
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+    let port;
     try {
-      const port = server.address().port;
+      port = server.address().port;
       if (!reserve(port)) continue;
-      if (!preferred) {
-        try { fs.writeFileSync(file, JSON.stringify({ port }), { flag: 'wx', mode: 0o600 }); }
-        catch (error) { if (error.code !== 'EEXIST') throw error; }
-      }
-      return port;
     } finally { await new Promise(resolve => server.close(resolve)); }
+    if (!preferred) {
+      try { fs.writeFileSync(file, JSON.stringify({ port }), { flag: 'wx', mode: 0o600 }); }
+      catch (error) {
+        if (error.code !== 'EEXIST') throw error;
+        const published = read();
+        if (published !== port && owner(port) === archive) fs.unlinkSync(path.join(registry, String(port)));
+        return published;
+      }
+    }
+    return port;
   }
   return unavailable();
 }

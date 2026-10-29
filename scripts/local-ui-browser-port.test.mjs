@@ -68,3 +68,21 @@ test('foreign listener survives fallback; original draft origin returns after it
   await new Promise(resolve => blocker.close(resolve));
   assert.equal(await fresh(a.data, f.options), original, 'Browser draft remains at the original origin');
 });
+test('first concurrent calls for one archive converge on the published port without leaking reservations', async t => {
+  const f = fixture(t), a = f.archive('same');
+  const ports = await Promise.all([archiveBrowserPort(a.data, f.options), archiveBrowserPort(a.data, f.options)]);
+  const published = JSON.parse(fs.readFileSync(a.file, 'utf8')).port;
+  assert.deepEqual(ports, [published, published]);
+  const registry = path.join(path.dirname(path.dirname(a.file)), 'browser-ports');
+  assert.deepEqual(fs.readdirSync(registry), [String(published)]);
+});
+
+test('first concurrent processes for the same archive use one published origin', async t => {
+  const f = fixture(t);
+  for (let run = 0; run < 10; run++) {
+    const a = f.archive(`same-process-${run}`);
+    const ports = await Promise.all([fresh(a.data, f.options), fresh(a.data, f.options)]);
+    const published = JSON.parse(fs.readFileSync(a.file, 'utf8')).port;
+    assert.deepEqual(ports, [published, published]);
+  }
+});
