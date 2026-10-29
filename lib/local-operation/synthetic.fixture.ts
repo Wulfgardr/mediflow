@@ -6,7 +6,7 @@ import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { createSqliteLocalOperationJournal } from './sqlite-journal.ts';
 import { createLocalOperationService } from './service.ts';
-import { deny, planDigest, type LocalOperationAdapter, type LocalOperationPlan, type LocalOperationReceipt,
+import { ClosedObservation, deny, planDigest, type LocalOperationAdapter, type LocalOperationPlan, type LocalOperationReceipt,
     type LiveContext, type AdapterContext, type Destination } from './contract.ts';
 import type { TerritorialPackCapability } from '../territorial-pack-contract.ts';
 
@@ -76,7 +76,7 @@ export async function syntheticFixture() {
             backgroundContext = ctx;
             await request(ctx, 'observe');
             return { patientId: plan.patientId, practiceId: plan.practiceId, portalAccountId: plan.portalAccountId,
-                uiVersion: plan.uiVersion, humanRevision: context.humanRevision, planDigest: filled, unclassifiedFields: [], ...wrongObservation };
+                uiVersion: plan.uiVersion, operatorId: plan.operatorId, humanRevision: context.humanRevision, planDigest: filled, census: 'complete', unclassifiedFields: [], ...wrongObservation };
         },
         async prepare(ctx, values) { await request(ctx, 'prepare', values); filled = planDigest(values); },
         async act(ctx, values) {
@@ -94,6 +94,7 @@ export async function syntheticFixture() {
             const expected = Buffer.from(signature(values)); const actual = Buffer.from(evidence);
             return expected.length === actual.length && timingSafeEqual(expected, actual);
         },
+        async closeObservation(ctx) { return ClosedObservation.close(() => ctx.assertCurrent()); },
         stop() { stopped++; },
     };
     const makeJournal = () => createSqliteLocalOperationJournal(db, {

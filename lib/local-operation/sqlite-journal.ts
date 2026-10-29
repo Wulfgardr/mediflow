@@ -12,6 +12,7 @@ export function createSqliteLocalOperationJournal(db: Database.Database, ports: 
     seal(plaintext: string): string;
     open(ciphertext: string): string;
     actor(): { operatorId: string; sourceSurface: 'native' | 'web' };
+    recordConfirmed?(record: LocalOperationRecord): void;
 }): LocalOperationJournal {
     function readAll() {
         const row = db.prepare('SELECT value FROM settings WHERE key=?').get(LOCAL_OPERATION_JOURNAL_KEY) as { value: string } | undefined;
@@ -35,6 +36,7 @@ export function createSqliteLocalOperationJournal(db: Database.Database, ports: 
                 if (!previous && records.some(item => item.patientId === record.patientId && item.practiceId === record.practiceId
                     && item.procedureId === record.procedureId && item.state !== 'confirmed')) throw new LocalOperationError('conflict');
                 if (previous && ['patientId', 'practiceId', 'procedureId', 'territory', 'installationId', 'archiveGeneration'].some(key => previous[key as keyof LocalOperationRecord] !== record[key as keyof LocalOperationRecord])) throw new LocalOperationError('conflict');
+                if (record.state === 'confirmed' && previous?.state !== 'confirmed') ports.recordConfirmed?.(record);
                 if (index < 0) records.push(record); else records[index] = record;
                 const plaintext = JSON.stringify(journalSchema.parse({ schema: 'mediflow.local-operation.journal.v1', records }));
                 const ciphertext = ports.seal(plaintext);
