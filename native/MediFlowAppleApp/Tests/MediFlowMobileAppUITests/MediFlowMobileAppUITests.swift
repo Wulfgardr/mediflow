@@ -2213,6 +2213,15 @@ final class MediFlowMobileAppUITests: XCTestCase {
                       "The pre-existing diagnosis must survive the round-trip")
     }
 
+    private func waitForScaleControl(_ element: XCUIElement,
+                                     file: StaticString = #filePath, line: UInt = #line) {
+        let ready = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == true AND hittable == true AND enabled == true"),
+            object: element)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 30), .completed,
+                       "Il controllo della scala deve essere pronto prima dell'azione", file: file, line: line)
+    }
+
     func testScaleRequiresSelectedPatientAndCanCancel() {
         app.launchEnvironment["MEDIFLOW_APPLE_UITEST_PRESENT_SCALE"] = "adl"
         launch(seedPatients: true, section: "modules")
@@ -2221,13 +2230,16 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["MEDIFLOW_APPLE_UITEST_OPEN_PATIENT_INDEX"] = "0"
         app.launch()
-        XCTAssertTrue(app.buttons["cancel-scale-button"].waitForExistence(timeout: 20))
+        waitForScaleControl(app.buttons["cancel-scale-button"])
         XCTAssertEqual(app.staticTexts["scale-context-title"].label, "ADL · Rossi Mario")
         XCTAssertEqual(app.buttons["submit-scale-button"].label, "Completa")
         let result = app.staticTexts["scale-incomplete"]
         let question = app.buttons["scale-question-bath"]
+        XCTAssertTrue(result.waitForExistence(timeout: 20))
+        XCTAssertTrue(question.waitForExistence(timeout: 20))
         XCTAssertLessThan(result.frame.minY, question.frame.minY)
         app.buttons["cancel-scale-button"].tap()
+        XCTAssertTrue(app.buttons["cancel-scale-button"].waitForNonExistence(timeout: 15))
         XCTAssertFalse(app.buttons["submit-scale-button"].exists)
     }
 
@@ -2237,18 +2249,26 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.launchEnvironment["MEDIFLOW_APPLE_UITEST_OPEN_PATIENT_INDEX"] = "0"
         app.launchEnvironment["MEDIFLOW_APPLE_UITEST_SCALE_SWITCH_PATIENT"] = "1"
         launch(seedPatients: true, section: "modules")
-        XCTAssertTrue(app.buttons["cancel-scale-button"].waitForExistence(timeout: 20))
+        waitForScaleControl(app.buttons["cancel-scale-button"])
         XCTAssertEqual(app.staticTexts["scale-context-title"].label, "ADL · Rossi Mario")
         for id in ["bath", "dress", "toilet", "transfer", "cont", "feed"] {
             let picker = app.buttons["scale-question-\(id)"]
-            XCTAssertTrue(scrollDown(to: picker))
+            XCTAssertTrue(scrollDown(to: picker, requireHittable: true))
+            waitForScaleControl(picker)
             picker.tap()
+            waitForScaleControl(app.buttons["Dipendente"])
             app.buttons["Dipendente"].tap()
         }
         XCTAssertEqual(app.staticTexts["scale-context-title"].label, "ADL · Rossi Mario")
+        waitForScaleControl(app.buttons["submit-scale-button"])
         app.buttons["submit-scale-button"].tap()
-        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10))
-        XCTAssertEqual(sectionView("patient-detail-name").label, "Bianchi Anna")
+        XCTAssertTrue(app.buttons["cancel-scale-button"].waitForNonExistence(timeout: 20))
+        let changedPatient = sectionView("patient-detail-name")
+        let patientSelected = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == true AND label == %@", "Bianchi Anna"),
+            object: changedPatient)
+        XCTAssertEqual(XCTWaiter.wait(for: [patientSelected], timeout: 30), .completed)
+        XCTAssertEqual(changedPatient.label, "Bianchi Anna")
         openPatientSection(.diary)
         XCTAssertFalse(app.staticTexts["ADL (Indice di Katz)"].exists)
     }
@@ -2265,10 +2285,12 @@ final class MediFlowMobileAppUITests: XCTestCase {
         openPatientSection(.diary)
         // Open the ADL scale form from the diary section header.
         let scaleButton = app.buttons["new-scale-button"]
-        XCTAssertTrue(scrollDown(to: scaleButton), "The scale entry button should be available")
+        XCTAssertTrue(scrollDown(to: scaleButton, requireHittable: true), "The scale entry button should be available")
+        waitForScaleControl(scaleButton)
         scaleButton.tap()
         let adlOption = app.buttons["new-scale-option-adl"]
         XCTAssertTrue(adlOption.waitForExistence(timeout: 5), "The ADL scale option should be available")
+        waitForScaleControl(adlOption)
         adlOption.tap()
 
         // MF085-003: no first-option defaults; explicit zero is a real response.
@@ -2278,20 +2300,24 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertFalse(app.buttons["submit-scale-button"].isEnabled)
         for (index, id) in ["bath", "dress", "toilet", "transfer", "cont", "feed"].enumerated() {
             let picker = app.buttons["scale-question-\(id)"]
-            XCTAssertTrue(scrollDown(to: picker))
+            XCTAssertTrue(scrollDown(to: picker, requireHittable: true))
+            waitForScaleControl(picker)
             picker.tap()
+            waitForScaleControl(app.buttons["Dipendente"])
             app.buttons["Dipendente"].tap()
             if index < 5 {
                 XCTAssertFalse(app.buttons["submit-scale-button"].isEnabled)
                 XCTAssertFalse(app.staticTexts["scale-score"].exists)
             }
         }
+        waitForScaleControl(app.buttons["submit-scale-button"])
         XCTAssertTrue(app.buttons["submit-scale-button"].isEnabled)
         XCTAssertEqual(app.buttons["submit-scale-button"].label, "Completa")
         app.buttons["submit-scale-button"].tap()
+        XCTAssertTrue(app.buttons["cancel-scale-button"].waitForNonExistence(timeout: 20))
 
         // The scale entry appears in the diary (seed short-circuit inserts it).
-        XCTAssertTrue(app.staticTexts["ADL (Indice di Katz)"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["ADL (Indice di Katz)"].waitForExistence(timeout: 30))
     }
 
     func testICDSearchAddsCodedDiagnosis() {
