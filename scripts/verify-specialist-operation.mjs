@@ -110,6 +110,13 @@ try {
         "if (values.length !== 1) throw new Error('unverifiable');", '', 'ogni contenitore o landmark contrattuale');
     mutate('observed-human-input', 'lib/local-operation/specialist/browser-input.ts',
         'for (const type of ${JSON.stringify(events)}) window.addEventListener(type, report, true);', '', 'qualunque input umano non strutturale');
+    mutate('closed-input-summary', 'lib/local-operation/specialist/browser-adapter.ts',
+        "await events.command('probe');\n            return ClosedObservation.close(() => { ctx.assertCurrent(); events.assertHealthy(); });",
+        'return ClosedObservation.close(() => ctx.assertCurrent());', 'input umano prima della registrazione');
+    mutate('premature-input-summary', 'lib/local-operation/service.ts',
+        "if (!correlate(parsed.data, current, plan) || !await ports.adapter.verifyReceipt(ctx, parsed.data)) deny();\n        ctx.assertCurrent();\n        const events = await ports.adapter.closeObservation(ctx);",
+        "const events = await ports.adapter.closeObservation(ctx);\n        if (!correlate(parsed.data, current, plan) || !await ports.adapter.verifyReceipt(ctx, parsed.data)) deny();\n        ctx.assertCurrent();",
+        'input umano prima della registrazione: verify-receipt');
     run('specialist-restored', suite, 0);
     if (process.env.MEDIFLOW_CU_EVIDENCE) {
         assert.ok(path.isAbsolute(process.env.MEDIFLOW_CU_EVIDENCE));

@@ -46,6 +46,11 @@ invalidano il censimento. Alert, confirm, prompt, beforeunload e nuove pagine du
 l'atto impediscono la conferma; dopo il possibile invio resta `uncertain`. La
 navigazione principale attesa del form non è un nuovo atto. Il detach segue la
 conclusione oppure la chiusura della pagina in errore.
+La decisione finale richiede `ClosedObservation`, prodotto dopo il cleanup del token
+e la verifica della ricevuta, con una sonda finale dell'osservatore degli input.
+Un input rilevato fino a questa chiusura lascia `uncertain`, senza registrazione
+né reinvio. Il recupero di `confirmed_pending_recording` usa la chiusura già
+convalidata prima della scrittura del journal, senza riaprire il browser.
 
 La superficie Swift `native/LocalOperationDemo/main.swift` mostra selezione e
 rilettura completa in un pannello scorrevole. Solo dopo il gesto Autorizza richiede

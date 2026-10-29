@@ -3,7 +3,7 @@ import { launchConfinedBrowser } from './browser-network.ts';
 import { BrowserInput } from './browser-input.ts';
 import { unique } from './unique.ts';
 import { CensusToken, type CensusDispatch } from './browser-census.ts';
-import { deny, planDigest, portalAttributes, portalContextSchema, type LocalOperationAdapter, type LocalOperationPlan, type AdapterContext, type Destination } from '../contract.ts';
+import { ClosedObservation, deny, planDigest, portalAttributes, portalContextSchema, type LocalOperationAdapter, type LocalOperationPlan, type AdapterContext, type Destination } from '../contract.ts';
 
 export async function createSyntheticSpecialistBrowser(input: {
     plan(): LocalOperationPlan; cookie: { name: string; value: string; url: string };
@@ -130,6 +130,11 @@ export async function createSyntheticSpecialistBrowser(input: {
             if (!response || response.status() !== 200) deny(); return response.json();
         }),
         verifyReceipt: input.verifyReceipt,
+        async closeObservation(ctx) {
+            const events = await BrowserInput.observe(context, page);
+            await events.command('probe');
+            return ClosedObservation.close(() => { ctx.assertCurrent(); events.assertHealthy(); });
+        },
         stop() {
             authority = null;
             stopping = Promise.allSettled([runtime.close(), ...[...transports].map(transport => transport.dispose())]).then(() => {});

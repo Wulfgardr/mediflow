@@ -1,6 +1,6 @@
 import { observationSchema, deny, LocalOperationError, planDigest, planSchema, receiptSchema, territorialAllows,
     type LocalOperationPlan, type LocalOperationRecord, type LocalOperationPorts, type LiveContext,
-    type LocalOperationReceipt, type AdapterContext, type Observation, type ArchiveAuthority } from './contract.ts';
+    ClosedObservation, type LocalOperationReceipt, type AdapterContext, type Observation, type ArchiveAuthority } from './contract.ts';
 
 export type LocalCapability = Readonly<{ kind: 'local_operation' }>;
 type Binding = { operationId: string; digest: string; context: string; territoryRevision: number;
@@ -169,7 +169,8 @@ export function createLocalOperationService(ports: LocalOperationPorts) {
             && new Set(receipt.parts.map(part => part.id)).size === receipt.parts.length
             && receipt.parts.length === plan.parts.length && plan.parts.every(id => receipt.parts.some(part => part.id === id));
     }
-    function registerOutcome(capability: LocalCapability, receipt: LocalOperationReceipt) {
+    function registerOutcome(capability: LocalCapability, receipt: LocalOperationReceipt, events: ClosedObservation) {
+        events.assertClosed();
         const { current, plan } = check(capability);
         if (!correlate(receipt, current, plan)) deny();
         if (receipt.parts.some(part => part.state !== 'confirmed')) {
@@ -189,7 +190,9 @@ export function createLocalOperationService(ports: LocalOperationPorts) {
         const { current, plan } = check(capability);
         if (!correlate(parsed.data, current, plan) || !await ports.adapter.verifyReceipt(ctx, parsed.data)) deny();
         ctx.assertCurrent();
-        return registerOutcome(capability, parsed.data);
+        const events = await ports.adapter.closeObservation(ctx);
+        ctx.assertCurrent();
+        return registerOutcome(capability, parsed.data, events);
     }
     return Object.freeze({
         create(operationId: string) {
@@ -249,7 +252,9 @@ export function createLocalOperationService(ports: LocalOperationPorts) {
         async reconcile(capability: LocalCapability) {
             const { current, plan } = check(capability);
             if (!current.effectPossible) throw new LocalOperationError('reconciliation_required');
-            if (current.state === 'confirmed_pending_recording' && current.receipt) return registerOutcome(capability, current.receipt);
+            if (current.state === 'confirmed_pending_recording' && current.receipt) {
+                return registerOutcome(capability, current.receipt, ClosedObservation.recover(current));
+            }
             return run(capability, async (ctx, phaseContext) => {
                 observation(await ports.adapter.observe(ctx), plan, true); ctx.assertCurrent();
                 return acceptReceipt(capability, ctx, await ports.adapter.reconcile(phaseContext('reconcile'), plan));

@@ -6,7 +6,7 @@ import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { createSqliteLocalOperationJournal } from './sqlite-journal.ts';
 import { createLocalOperationService } from './service.ts';
-import { deny, planDigest, type LocalOperationAdapter, type LocalOperationPlan, type LocalOperationReceipt,
+import { ClosedObservation, deny, planDigest, type LocalOperationAdapter, type LocalOperationPlan, type LocalOperationReceipt,
     type LiveContext, type AdapterContext, type Destination } from './contract.ts';
 import type { TerritorialPackCapability } from '../territorial-pack-contract.ts';
 
@@ -94,6 +94,7 @@ export async function syntheticFixture() {
             const expected = Buffer.from(signature(values)); const actual = Buffer.from(evidence);
             return expected.length === actual.length && timingSafeEqual(expected, actual);
         },
+        async closeObservation(ctx) { return ClosedObservation.close(() => ctx.assertCurrent()); },
         stop() { stopped++; },
     };
     const makeJournal = () => createSqliteLocalOperationJournal(db, {

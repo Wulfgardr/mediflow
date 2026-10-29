@@ -61,6 +61,20 @@ export type AdapterContext = Readonly<{
     authorizeRequest(destination: Destination): void;
 }>;
 
+export class ClosedObservation {
+    readonly #closed = true;
+    private constructor() { Object.freeze(this); }
+    static close(assertHealthy: () => void): ClosedObservation {
+        assertHealthy();
+        return new ClosedObservation();
+    }
+    static recover(record: LocalOperationRecord): ClosedObservation {
+        if (record.state !== 'confirmed_pending_recording' || !record.receipt) deny();
+        return new ClosedObservation();
+    }
+    assertClosed() { if (!this.#closed) deny(); }
+}
+
 /** Every request, redirect, frame, resource and background task must use authorizeRequest immediately before dispatch. */
 export interface LocalOperationAdapter {
     readonly version: string;
@@ -70,6 +84,7 @@ export interface LocalOperationAdapter {
     act(context: AdapterContext, plan: Readonly<LocalOperationPlan>): Promise<unknown>;
     reconcile(context: AdapterContext, plan: Readonly<LocalOperationPlan>): Promise<unknown>;
     verifyReceipt(context: AdapterContext, receipt: LocalOperationReceipt): Promise<boolean>;
+    closeObservation(context: AdapterContext): Promise<ClosedObservation>;
     stop(): void;
 }
 export interface LocalOperationJournal {
