@@ -316,7 +316,12 @@ fn control_label(label: SharedString) -> Div {
         .max_w_full()
         .whitespace_normal()
         .text_center()
-        .child(text!(label))
+        .child({
+            let text = text!(label);
+            #[cfg(test)]
+            let text = crate::shell::rendered_command::observe_ink(text);
+            text
+        })
 }
 
 pub fn heading(
@@ -359,16 +364,16 @@ pub fn confirmation_heading(
 
 pub fn section(
     id: impl Into<SharedString>,
-    label: impl Into<SharedString>,
+    label: impl Into<crate::title::TitleText>,
     theme: Theme,
 ) -> Stateful<Div> {
     let id = id.into();
-    let label: SharedString = theme.role(TypeRole::Section).label(label.into()).into();
+    let label = label.into().section_label(theme);
     div()
         .id(id.clone())
         .accessibility_id(id)
         .role(Role::Heading)
-        .aria_label(label.clone())
+        .aria_label(label.text().to_owned())
         .min_w_0()
         .max_w_full()
         .whitespace_normal()
@@ -409,7 +414,12 @@ pub fn notice(
             theme.secondary
         })
         .type_role(theme, crate::theme::TextRole::Body)
-        .child(text!(message))
+        .child({
+            let text = text!(message);
+            #[cfg(test)]
+            let text = crate::shell::rendered_command::observe_ink(text);
+            text
+        })
 }
 
 fn brand_render_image(dark: bool) -> &'static Arc<RenderImage> {

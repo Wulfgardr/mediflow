@@ -102,8 +102,11 @@ impl gpui::Element for Observed {
     }
 }
 
-pub(crate) fn observe_text(text: gpui::Text) -> gpui::AnyElement {
-    ObservedText(text).into_any_element()
+pub(crate) fn observe_text(text: impl IntoElement) -> gpui::AnyElement {
+    ObservedText(text.into_element(), true).into_any_element()
+}
+pub(crate) fn observe_ink(text: gpui::Text) -> ObservedText<gpui::Text> {
+    ObservedText(text, false)
 }
 
 thread_local! {
@@ -114,18 +117,18 @@ pub(super) fn take_text_nodes() -> Vec<(gpui::GlobalElementId, gpui::accesskit::
     TEXT_NODES.with(|nodes| std::mem::take(&mut *nodes.borrow_mut()))
 }
 
-struct ObservedText(gpui::Text);
+pub(crate) struct ObservedText<E: gpui::Element>(E, bool);
 
-impl gpui::IntoElement for ObservedText {
+impl<E: gpui::Element> gpui::IntoElement for ObservedText<E> {
     type Element = Self;
     fn into_element(self) -> Self {
         self
     }
 }
 
-impl gpui::Element for ObservedText {
-    type RequestLayoutState = <gpui::Text as gpui::Element>::RequestLayoutState;
-    type PrepaintState = <gpui::Text as gpui::Element>::PrepaintState;
+impl<E: gpui::Element> gpui::Element for ObservedText<E> {
+    type RequestLayoutState = <E as gpui::Element>::RequestLayoutState;
+    type PrepaintState = <E as gpui::Element>::PrepaintState;
     fn id(&self) -> Option<gpui::ElementId> {
         gpui::Element::id(&self.0)
     }
@@ -165,11 +168,13 @@ impl gpui::Element for ObservedText {
     ) -> Self::PrepaintState {
         let mut node = gpui::accesskit::Node::new(self.0.a11y_role().expect("accessible text"));
         self.0.write_a11y_info(&mut node);
-        TEXT_NODES.with(|nodes| {
-            nodes
-                .borrow_mut()
-                .push((id.expect("text GlobalElementId").clone(), node));
-        });
+        if self.1 {
+            TEXT_NODES.with(|nodes| {
+                nodes
+                    .borrow_mut()
+                    .push((id.expect("text GlobalElementId").clone(), node));
+            });
+        }
         self.0.prepaint(id, inspector, bounds, state, window, cx)
     }
     fn paint(
@@ -182,8 +187,11 @@ impl gpui::Element for ObservedText {
         window: &mut Window,
         cx: &mut App,
     ) {
+        let mut node = gpui::accesskit::Node::new(self.0.a11y_role().expect("accessible text"));
+        self.0.write_a11y_info(&mut node);
         self.0
-            .paint(id, inspector, bounds, state, prepaint, window, cx)
+            .paint(id, inspector, bounds, state, prepaint, window, cx);
+        record_ink(node.value().unwrap_or_default().to_owned(), bounds, window);
     }
 }
 
@@ -227,4 +235,138 @@ pub(crate) fn assert_unique_texts(
         }
         previous = Some(current);
     }
+}
+
+thread_local! {
+    static ACTIVE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static INKS: std::cell::RefCell<Vec<InkSample>> = const { std::cell::RefCell::new(Vec::new()) };
+    static FIELDS: std::cell::RefCell<Vec<(String, gpui::Hsla, gpui::Hsla, gpui::Hsla)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+const INK_TAG_SCALE: f32 = 8192.;
+
+pub(crate) struct InkSample {
+    pub label: String,
+}
+pub(crate) struct ContrastProbe;
+impl Drop for ContrastProbe {
+    fn drop(&mut self) {
+        ACTIVE.with(|a| a.set(false));
+    }
+}
+pub(crate) fn begin_inks() -> ContrastProbe {
+    ACTIVE.with(|a| a.set(true));
+    INKS.with(|v| v.borrow_mut().clear());
+    ContrastProbe
+}
+/// Paints a test swatch so GPUI applies the same ancestor opacity as the text.
+pub(crate) fn record_ink(label: String, bounds: gpui::Bounds<gpui::Pixels>, window: &mut Window) {
+    if !ACTIVE.with(|a| a.get()) || label.is_empty() {
+        return;
+    }
+    let bounds = bounds.intersect(&window.content_mask().bounds);
+    if bounds.is_empty() {
+        return;
+    }
+    let tag = INKS.with(|v| {
+        let mut v = v.borrow_mut();
+        v.push(InkSample { label });
+        v.len()
+    });
+    let mut quad = gpui::fill(
+        gpui::Bounds::new(bounds.center(), gpui::size(px(1.), px(1.))),
+        window.text_style().color,
+    );
+    quad.corner_radii.top_left = px(tag as f32 / INK_TAG_SCALE);
+    window.paint_quad(quad);
+}
+pub(crate) fn take_inks() -> Vec<InkSample> {
+    INKS.with(|v| std::mem::take(&mut *v.borrow_mut()))
+}
+pub(crate) fn record_field(label: String, ink: gpui::Hsla, paper: gpui::Hsla, border: gpui::Hsla) {
+    FIELDS.with(|v| v.borrow_mut().push((label, ink, paper, border)));
+}
+pub(crate) fn take_fields() -> Vec<(String, gpui::Hsla, gpui::Hsla, gpui::Hsla)> {
+    FIELDS.with(|v| std::mem::take(&mut *v.borrow_mut()))
+}
+fn over(fg: gpui::Rgba, bg: gpui::Rgba) -> gpui::Rgba {
+    let a = fg.a + bg.a * (1. - fg.a);
+    if a == 0. {
+        return gpui::Rgba {
+            r: 0.,
+            g: 0.,
+            b: 0.,
+            a: 0.,
+        };
+    }
+    let channel = |f, b| (f * fg.a + b * bg.a * (1. - fg.a)) / a;
+    gpui::Rgba {
+        r: channel(fg.r, bg.r),
+        g: channel(fg.g, bg.g),
+        b: channel(fg.b, bg.b),
+        a,
+    }
+}
+pub(crate) fn contrast(a: gpui::Rgba, b: gpui::Rgba) -> f64 {
+    fn lum(c: gpui::Rgba) -> f64 {
+        let linear = |x: f32| {
+            let x = f64::from(x);
+            if x <= 0.04045 {
+                x / 12.92
+            } else {
+                ((x + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b)
+    }
+    let a = lum(a);
+    let b = lum(b);
+    (a.max(b) + 0.05) / (a.min(b) + 0.05)
+}
+pub(crate) fn painted_contrasts(
+    samples: Vec<InkSample>,
+    quads: &[gpui::Quad],
+    scale: f32,
+) -> Vec<(String, f64)> {
+    let tag = |q: &gpui::Quad| (q.corner_radii.top_left.0 / scale * INK_TAG_SCALE).round() as usize;
+    let marker = |q: &gpui::Quad| (1..=samples.len()).contains(&tag(q));
+    samples
+        .iter()
+        .enumerate()
+        .map(|(index, sample)| {
+            let Some(position) = quads.iter().position(|q| tag(q) == index + 1) else {
+                return (sample.label.clone(), 1.);
+            };
+            let point = quads[position].bounds.center();
+            let covers = |q: &gpui::Quad| {
+                q.bounds.contains(&point) && q.content_mask.bounds.contains(&point) && !marker(q)
+            };
+            let color = |q: &gpui::Quad| {
+                q.background
+                    .as_solid()
+                    .expect("contrast probe requires an observed solid surface")
+                    .to_rgb()
+            };
+            let mut bg = gpui::Rgba {
+                r: 0.,
+                g: 0.,
+                b: 0.,
+                a: 0.,
+            };
+            for q in quads[..position].iter().filter(|q| covers(q)) {
+                bg = over(color(q), bg);
+            }
+            assert!(
+                bg.a >= 0.999,
+                "no opaque painted background under {}",
+                sample.label
+            );
+            let mut fg = over(color(&quads[position]), bg);
+            for q in quads[position + 1..].iter().filter(|q| covers(q)) {
+                let c = color(q);
+                bg = over(c, bg);
+                fg = over(c, fg);
+            }
+            (sample.label.clone(), contrast(fg, bg))
+        })
+        .collect()
 }

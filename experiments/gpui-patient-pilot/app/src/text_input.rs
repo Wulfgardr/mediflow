@@ -123,10 +123,7 @@ impl TextInput {
     }
 
     pub fn configure(&mut self, theme: Theme, read_only: bool, cx: &mut Context<Self>) {
-        if self.theme.ink == theme.ink
-            && self.theme.scale == theme.scale
-            && self.read_only == read_only
-        {
+        if self.theme == theme && self.read_only == read_only {
             return;
         }
         self.theme = theme;
@@ -776,6 +773,8 @@ impl Element for InputElement {
         let cursor = input.display_index(input.cursor());
         let caret = input.range.is_empty() && !input.read_only && focus.is_focused(w);
         let fresh = input.theme.fresh;
+        #[cfg(test)]
+        let probe_label = input.label.to_owned();
         w.handle_input(
             &focus,
             ElementInputHandler::new(bounds, self.input.clone()),
@@ -783,6 +782,8 @@ impl Element for InputElement {
         );
         self.text
             .paint(id, inspector, bounds, request, prepaint, w, cx);
+        #[cfg(test)]
+        crate::shell::rendered_command::record_ink(probe_label, bounds, w);
         let layout = self.text.layout().clone();
         if caret && let Some(position) = layout.position_for_index(cursor) {
             w.paint_quad(fill(
@@ -834,7 +835,7 @@ impl Render for TextInput {
         } else {
             256.
         });
-        gpui::div()
+        let element = gpui::div()
             .id(self.id)
             .accessibility_id(self.id)
             .role(if self.secret {
@@ -889,15 +890,13 @@ impl Render for TextInput {
                 crate::components::CONTROL_TEXT_INSET - 1.
             }))
             .border_1()
-            .border_color(theme.strong_rule)
+            .field_surface(theme)
             .rounded(px(theme.control_radius))
-            .bg(theme.paper)
             .focus(|style| {
                 style
                     .border_color(theme.fresh)
                     .shadow(vec![theme.focus_ring(false)])
             })
-            .text_color(theme.ink)
             .when_some(self.writing_ink, |element, ink| {
                 element.writing_ink(ink, WritingSurface::Plane, theme)
             })
@@ -941,7 +940,25 @@ impl Render for TextInput {
                 input: cx.entity(),
                 text: StyledText::new(display).with_highlights(highlights),
                 content: self.content.clone(),
-            })
+            });
+        #[cfg(test)]
+        let mut element = element;
+        #[cfg(test)]
+        crate::shell::rendered_command::record_field(
+            self.label.to_owned(),
+            element.text_style().color.unwrap(),
+            element
+                .style()
+                .background
+                .as_ref()
+                .unwrap()
+                .color()
+                .unwrap()
+                .as_solid()
+                .unwrap(),
+            element.style().border_color.unwrap(),
+        );
+        element
     }
 }
 
@@ -1293,5 +1310,22 @@ mod tests {
             runs.iter().map(|(range, _)| range.len()).sum::<usize>(),
             text.len()
         );
+    }
+}
+
+#[derive(IntoElement)]
+pub struct ThemedInput {
+    input: Entity<TextInput>,
+    theme: Theme,
+}
+pub fn themed(input: Entity<TextInput>, theme: Theme) -> ThemedInput {
+    ThemedInput { input, theme }
+}
+impl RenderOnce for ThemedInput {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        self.input.update(cx, |input, cx| {
+            input.configure(self.theme, input.read_only, cx)
+        });
+        self.input
     }
 }
