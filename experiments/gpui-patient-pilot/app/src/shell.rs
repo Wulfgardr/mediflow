@@ -53,7 +53,7 @@ use crate::editing;
 use crate::icons::{Icon, icon};
 use crate::navigation::{
     Area, CONFIRMATION_COMMANDS, Layout, PatientSection, ThresholdLayout, ThresholdMode,
-    adjacent_patient, confirmation_command_label, confirmation_question,
+    adjacent_patient, confirmation_command_label, confirmation_prefix,
 };
 use crate::patient_forms;
 use crate::references::{ReferenceKind, ReferenceRows};
@@ -3291,11 +3291,12 @@ impl ClinicalApp {
                             .flex()
                             .flex_col()
                             .gap(px(4.))
-                            .child(
-                                div()
-                                    .type_role(theme, TypeRole::Strong)
-                                    .child(text!(patient.display_name())),
-                            )
+                            .child(div().type_role(theme, TypeRole::Strong).child(
+                                crate::title::title(
+                                    crate::title::TitleText::name(patient.display_name()),
+                                    theme,
+                                ),
+                            ))
                             .child(
                                 div()
                                     .type_role(theme, TypeRole::Meta)
@@ -3375,12 +3376,13 @@ impl ClinicalApp {
             .flex_col()
             .gap(px(20.));
         if let Some(patient) = self.patient.detail.ready() {
-            pane = pane
-                .child(
-                    div()
-                        .type_role(theme, TypeRole::PersonPreview)
-                        .child(text!(patient.display_name())),
-                )
+            pane =
+                pane.child(div().type_role(theme, TypeRole::PersonPreview).child(
+                    crate::title::title(
+                        crate::title::TitleText::name(patient.display_name()),
+                        theme,
+                    ),
+                ))
                 .child(div().text_color(theme.secondary).child(text!(format!(
                     "Nascita {}",
                     display_date(patient.birth_date.as_deref())
@@ -3533,7 +3535,7 @@ impl ClinicalApp {
                                 .child(
                                     heading(
                                         "clinical-workspace-patient-name",
-                                        patient.display_name(),
+                                        crate::title::TitleText::name(patient.display_name()),
                                         theme,
                                     )
                                     .type_role(
@@ -5102,20 +5104,29 @@ impl ClinicalApp {
                 .child(self.threshold_question.attach_enabled(
                     confirmation_heading(
                         if repeated_scale {
-                            format!("Ripetere l’invio della stessa valutazione per {patient_name}?")
+                            crate::title::TitleText::patient_question(
+                                "Ripetere l’invio della stessa valutazione per ",
+                                patient_name.clone(),
+                                "?",
+                            )
                         } else if form.kind == FormKind::PatientNew {
-                            format!(
-                                "Creare la scheda di {patient_name} nell'ambulatorio selezionato?"
+                            crate::title::TitleText::patient_question(
+                                "Creare la scheda di ",
+                                patient_name.clone(),
+                                " nell'ambulatorio selezionato?",
                             )
                         } else {
-                            confirmation_question(
-                                1,
-                                if form.edit.is_some() {
-                                    "modifica"
-                                } else {
-                                    form.kind.noun()
-                                },
-                                &patient_name,
+                            crate::title::TitleText::patient_question(
+                                confirmation_prefix(
+                                    1,
+                                    if form.edit.is_some() {
+                                        "modifica"
+                                    } else {
+                                        form.kind.noun()
+                                    },
+                                ),
+                                patient_name.clone(),
+                                "?",
                             )
                         },
                         theme,
@@ -9047,5 +9058,83 @@ mod tests {
         render_clinical_window(cx);
         let bar = cx.debug_bounds("threshold-bar").unwrap();
         assert!(bar.top() >= px(0.) && bar.bottom() == px(700.));
+    }
+    struct ReviewTitleCallers {
+        app: Entity<ClinicalApp>,
+        mode: u8,
+    }
+    impl Render for ReviewTitleCallers {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            self.app.update(cx, |app, cx| {
+                let layout =
+                    Layout::for_window(f32::from(window.viewport_size().width), app.text_scale);
+                let content = match self.mode {
+                    0 => app.login_view(layout, cx).into_any_element(),
+                    1 => app.preview(cx).into_any_element(),
+                    2 => app.profile_view(layout, cx).into_any_element(),
+                    3 => app.form_view(cx).into_any_element(),
+                    5 => app.scales_view(cx).into_any_element(),
+                    6 => app.directory_view(layout, cx).into_any_element(),
+                    _ => app.settings_view(layout, cx).into_any_element(),
+                };
+                div()
+                    .size_full()
+                    .type_role(app.theme, TypeRole::Body)
+                    .child(content)
+            })
+        }
+    }
+    #[gpui::test]
+    fn hcg4_review_real_clinical_callers_keep_accessible_titles(cx: &mut gpui::TestAppContext) {
+        let (root,cx)=cx.add_window_view(|window,cx| {
+            let app=cx.new(|cx| {
+                let mut app=ClinicalApp::new(String::new(),window,cx);
+                let patient=serde_json::from_value(serde_json::json!({"id":"synthetic-title-patient","firstName":"Elena","lastName":"Schwarzenegger","taxCode":"RSSMRA80A01H501U","version":1})).unwrap();
+                app.install_patient(patient);
+                app.patients=Load::Ready(vec![serde_json::from_value(serde_json::json!({"id":"synthetic-title-patient","firstName":"Elena","lastName":"Schwarzenegger","taxCode":"RSSMRA80A01H501U","version":1})).unwrap()]);
+                scales::tests::stage_title_catalog_fixture(&mut app, cx);
+                let therapy=editing::Record::Therapy(serde_json::from_value(serde_json::json!({"id":"synthetic-therapy","patientId":"synthetic-title-patient","drugName":"Prova","dosage":"Prova","status":"active","startDate":"2026-10-29","version":1})).unwrap());
+                app.stage_fields(FormKind::Therapy,therapy.fields(),Some(therapy),cx);app
+            });ReviewTitleCallers {app,mode:0}
+        });
+        for scale in [1., 2., 4.] {
+            for (mode, expected) in [
+                (0, "Collega questo dispositivo"),
+                (1, "Schwarzenegger Elena"),
+                (2, "Schwarzenegger Elena"),
+                (3, "Modifica terapia"),
+                (4, "Impostazioni"),
+                (5, "Schwarzenegger Elena"),
+                (6, "Schwarzenegger Elena"),
+            ] {
+                root.update(cx, |root, cx| {
+                    root.mode = mode;
+                    root.app.update(cx, |app, cx| {
+                        app.text_scale = scale;
+                        app.theme = Theme::for_dark(false).sized(scale, false);
+                        cx.notify();
+                    });
+                    cx.notify();
+                });
+                cx.simulate_resize(gpui::size(px(390.), px(1800.)));
+                crate::title::take_title_nodes();
+                cx.update(|window, cx| {
+                    window.refresh();
+                    window.draw(cx).clear(cx);
+                });
+                let nodes = crate::title::take_title_nodes();
+                assert!(
+                    nodes
+                        .iter()
+                        .any(|(_, node, _, _)| node.value() == Some(expected)),
+                    "caller {mode}: {expected}"
+                );
+                let mut ids = std::collections::HashSet::new();
+                for (id, node, _, _) in nodes {
+                    assert!(ids.insert(id), "duplicate title node");
+                    assert!(node.value().is_some());
+                }
+            }
+        }
     }
 }

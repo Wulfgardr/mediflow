@@ -48,6 +48,18 @@ pub(super) mod tests {
                     "population":"synthetic", "scoring":"synthetic-host-only", "interpretation":"synthetic-host-only",
                     "interpretationVersion":"synthetic-interpretation-v1", "translation":"synthetic", "rights":"synthetic", "reviewGap":"synthetic"}})).collect::<Vec<_>>()})
     }
+    pub(in crate::shell) fn stage_title_catalog_fixture(
+        app: &mut ClinicalApp,
+        cx: &Context<ClinicalApp>,
+    ) {
+        for id in ScaleId::ALL {
+            app.scales.targets.insert(
+                format!("scale-{}", id.as_str()),
+                ScrollTarget::new(&app.area_scroll, cx),
+            );
+        }
+        app.scales.catalog = Load::Ready(serde_json::from_value(catalog_wire()).unwrap());
+    }
     pub(in crate::shell) fn stage_primary_label_fixture(
         app: &mut ClinicalApp,
         cx: &mut Context<ClinicalApp>,
@@ -1603,11 +1615,12 @@ impl ClinicalApp {
                                 "PERSONA SELEZIONATA",
                                 theme,
                             ))
-                            .child(
-                                div()
-                                    .type_role(theme, TypeRole::Strong)
-                                    .child(text!(patient.display_name())),
-                            )
+                            .child(div().type_role(theme, TypeRole::Strong).child(
+                                crate::title::title(
+                                    crate::title::TitleText::name(patient.display_name()),
+                                    theme,
+                                ),
+                            ))
                             .child(text!(format!(
                                 "Nascita: {}",
                                 display_date(patient.birth_date.as_deref())
@@ -1685,13 +1698,14 @@ impl ClinicalApp {
                         .map(|patient| {
                             let id = patient.id.clone();
                             let target = self.scales.targets.get(&format!("patient-{id}"));
-                            let row = button(
+                            let row = crate::components::title_button(
                                 format!("clinical-scale-patient-{id}"),
-                                format!(
-                                    "{} · {}",
-                                    patient.display_name(),
-                                    display_date(patient.birth_date.as_deref())
-                                ),
+                                crate::title::TitleText::name(patient.display_name())
+                                    .append(crate::title::SegmentRole::ItalianProse, " · ")
+                                    .append(
+                                        crate::title::SegmentRole::Code,
+                                        display_date(patient.birth_date.as_deref()),
+                                    ),
                                 theme,
                                 false,
                                 !matches!(self.patient.detail, ReadLoad::Loading { .. }),
@@ -1797,20 +1811,23 @@ impl ClinicalApp {
             && !scale.is_working()
             && !scale.has_attempt()
             && self.discard.is_none();
-        let patient_context = format!(
-            "{} · {}",
+        let patient_context = crate::title::TitleText::name(
             self.patient
                 .detail
                 .ready()
                 .map(PatientDetail::display_name)
                 .unwrap_or_default(),
+        )
+        .append(crate::title::SegmentRole::ItalianProse, " · ")
+        .append(
+            crate::title::SegmentRole::Name,
             self.ambulatories
                 .ready()
                 .into_iter()
                 .flatten()
                 .find(|scope| Some(&scope.id) == self.scope.as_ref())
-                .map(|scope| scope.name.as_str())
-                .unwrap_or("Ambulatorio selezionato")
+                .map(|scope| scope.name.clone())
+                .unwrap_or_else(|| "Ambulatorio selezionato".into()),
         );
         let header = div()
             .min_w_0()
@@ -1834,7 +1851,7 @@ impl ClinicalApp {
             .child(
                 div()
                     .text_color(theme.secondary)
-                    .child(text!(patient_context)),
+                    .child(crate::title::title(patient_context, theme)),
             );
         let question = &scale.descriptor.questions[scale.question];
         let question_index = scale.question;

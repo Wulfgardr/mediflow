@@ -45,6 +45,10 @@ La feature `build_dictionaries` ricostruisce i dizionari con il builder upstream
 Il file prodotto deve avere l'hash indicato sopra prima di sostituire l'asset.
 La rigenerazione è stata eseguita e confrontata byte per byte con l'asset.
 
-Una tabella propria di sole parole note non coprirebbe nomi paziente e titoli
-dinamici. I pattern italiani permettono l'ultimo rimedio anche per parole non
-enumerate, senza aggiungere eccezioni per ogni schermata.
+I pattern non sono un vocabolario: non riconoscono una parola come italiana.
+Il renderer li usa solo per segmenti dichiarati prosa dal chiamante e parole
+presenti nel lessico italiano esplicito dei titoli (`italian_prose` in `title.rs`).
+Nomi, codici, token con cifre o tutto maiuscolo e parole non riconosciute
+non ricevono trattini. Se necessario vanno a capo su confini di grafema.
+Il lessico limita l'ammissibilità; i pattern conservano i punti di divisione
+italiani senza riscrivere un algoritmo di sillabazione generale.

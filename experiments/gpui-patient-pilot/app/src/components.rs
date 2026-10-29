@@ -206,6 +206,26 @@ pub fn button(
         .when(!label.is_empty(), |el| el.child(control_label(label)))
 }
 
+pub fn title_button(
+    id: impl Into<SharedString>,
+    label: crate::title::TitleText,
+    theme: Theme,
+    primary: bool,
+    enabled: bool,
+) -> Stateful<Div> {
+    let accessible = label.text().to_owned();
+    button(id, "", theme, primary, enabled)
+        .aria_label(accessible)
+        .child(
+            div()
+                .flex_auto()
+                .min_w_0()
+                .max_w_full()
+                .text_center()
+                .child(crate::title::title(label, theme)),
+        )
+}
+
 pub fn tab(id: &'static str, label: &'static str, selected: bool, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
@@ -283,13 +303,17 @@ fn control_label(label: SharedString) -> Div {
         .child(text!(label))
 }
 
-pub fn heading(id: &'static str, label: impl Into<SharedString>, theme: Theme) -> Stateful<Div> {
+pub fn heading(
+    id: &'static str,
+    label: impl Into<crate::title::TitleText>,
+    theme: Theme,
+) -> Stateful<Div> {
     let label = label.into();
     div()
         .id(id)
         .accessibility_id(id)
         .role(Role::Heading)
-        .aria_label(label.clone())
+        .aria_label(SharedString::from(label.text().to_owned()))
         .min_w_0()
         .max_w_full()
         .type_role(theme, TypeRole::PageTitle)
@@ -297,7 +321,10 @@ pub fn heading(id: &'static str, label: impl Into<SharedString>, theme: Theme) -
         .child(crate::title::title(label, theme))
 }
 
-pub fn confirmation_heading(question: String, theme: Theme) -> Stateful<Div> {
+pub fn confirmation_heading(
+    question: impl Into<crate::title::TitleText>,
+    theme: Theme,
+) -> Stateful<Div> {
     heading("clinical-workspace-confirm-question", question, theme)
         .debug_selector(|| "threshold-question".into())
         .type_role(theme, TypeRole::Threshold)
