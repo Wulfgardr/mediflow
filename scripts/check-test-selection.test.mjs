@@ -359,6 +359,7 @@ const mobileUiFiles = [
   'MediFlowMobileAppUITests.swift',
   'MobilePairedStatusOverrideUITests.swift',
   'MobileVisitProductUITests.swift',
+  'UIReadiness.swift',
 ].map(file => `native/MediFlowAppleApp/Tests/MediFlowMobileAppUITests/${file}`);
 
 function xcodeFixture(t) {
@@ -372,7 +373,7 @@ function xcodeFixture(t) {
   return root;
 }
 
-test('Xcode mobile UI selects all three Swift files with the reported-retry CI argv', t => {
+test('Xcode mobile UI selects all Swift files and shared readiness support with the reported-retry CI argv', t => {
   const selection = collectNativeToolSelections(xcodeFixture(t))['xcode:mobile-ui'];
   assert.deepEqual(selection.errors, []);
   assert.deepEqual(selection.files, mobileUiFiles);
