@@ -1094,7 +1094,7 @@ struct ClinicalScalesWorkspaceView: View {
     @StateObject private var model: ClinicalScalesCatalogModel
     @State private var query = ""
     @State private var pendingScale: ClinicalScaleDefinition?
-    @State private var selectedScale: ClinicalScaleDefinition?
+    @State private var selectedScale: ClinicalScaleDraft?
     @State private var showsPatientPicker = false
     @State private var readContextID = UUID()
 
@@ -1121,7 +1121,7 @@ struct ClinicalScalesWorkspaceView: View {
             showsPatientPicker = false
         }
         .sheet(isPresented: $showsPatientPicker) { patientPicker }
-        .sheet(item: $selectedScale) { scale in scaleForm(scale) }
+        .sheet(item: $selectedScale) { draft in scaleForm(draft) }
     }
 
     private var catalog: some View {
@@ -1169,14 +1169,11 @@ struct ClinicalScalesWorkspaceView: View {
         }
     }
 
-    @ViewBuilder
-    private func scaleForm(_ scale: ClinicalScaleDefinition) -> some View {
-        if let patient = workspaceModel.selectedPatient {
-            ClinicalScaleFormView(definition: scale, patientLabel: "\(patient.lastName) \(patient.firstName)", onSubmit: { answers in
-                Task { await workspaceModel.submitScale(scale, answers: answers) }
-                selectedScale = nil
-            }, onCancel: { selectedScale = nil })
+    private func scaleForm(_ draft: ClinicalScaleDraft) -> some View {
+        ClinicalScaleFormView(draft: draft) { answers in
+            await workspaceModel.submitScale(draft, answers: answers) ? nil : (workspaceModel.errorMessage ?? "Punteggio non registrato.")
         }
+        .id(draft.id)
     }
 
     private func open(_ patient: HomeBasePatientSummary) async {
@@ -1185,7 +1182,7 @@ struct ClinicalScalesWorkspaceView: View {
         await workspaceModel.loadPatient(patient)
         guard contextID == readContextID, workspaceModel.clinicalWorkspaceConnection != nil,
               workspaceModel.selectedPatient?.id == patient.id else { return }
-        selectedScale = pendingScale
+        selectedScale = pendingScale.flatMap { workspaceModel.makeScaleDraft($0) }
         pendingScale = nil
     }
 }

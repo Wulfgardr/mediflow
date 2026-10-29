@@ -172,6 +172,71 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
         XCTAssertEqual(error, "Carica i documenti del paziente corrente prima di collegarli alla voce.")
     }
 
+    func testEveryScaleDraftKeepsItsPatientAfterSelectionChanges() async throws {
+        for definition in ClinicalScales.all {
+            let a = detail(id: "p1"), b = detail(id: "p2")
+            let source = S7MockDataSource(details: ["p1": a, "p2": b])
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: a)
+            let captured = await model.makeScaleDraft(definition)
+            let draft = try XCTUnwrap(captured)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: b)
+            let saved = await model.submitScale(draft, answers: Dictionary(uniqueKeysWithValues: definition.questions.map { ($0.id, 0) }))
+            let target = await source.lastCreateEntryPatientID
+            let currentEntries = await model.entries
+            XCTAssertTrue(saved, definition.id)
+            XCTAssertEqual(target, "p1", definition.id)
+            XCTAssertEqual(draft.patientID, "p1")
+            XCTAssertEqual(draft.patientVersion, 1)
+            XCTAssertTrue(currentEntries.isEmpty, "La cartella B non deve ricevere le voci di A")
+        }
+    }
+
+    func testScaleDraftRejectsRemovedArchivedDeletedChangedAndWrongPatient() async throws {
+        let a = detail(id: "p1")
+        for state in ["removed", "archived", "deleted", "version", "wrong-id"] {
+            let source = S7MockDataSource(details: ["p1": a])
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: a)
+            let captured = await model.makeScaleDraft(ClinicalScales.adl)
+            let draft = try XCTUnwrap(captured)
+            let changed = detail(id: state == "wrong-id" ? "p2" : "p1",
+                archived: state == "archived", deleted: state == "deleted", version: state == "version" ? 2 : 1)
+            await source.replacePatient(id: "p1", with: state == "removed" ? nil : changed)
+            let saved = await model.submitScale(draft, answers: Dictionary(uniqueKeysWithValues: ClinicalScales.adl.questions.map { ($0.id, 0) }))
+            let calls = await source.createEntryCalls
+            let error = await model.errorMessage
+            XCTAssertFalse(saved, state)
+            XCTAssertEqual(calls, 0, state)
+            XCTAssertNotNil(error, state)
+        }
+    }
+
+    func testScaleDraftCannotMoveToAnotherSession() async throws {
+        let patient = detail(id: "p1")
+        let source = S7MockDataSource(details: ["p1": patient])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        let captured = await model.makeScaleDraft(ClinicalScales.adl)
+        let draft = try XCTUnwrap(captured)
+        await model.configurePairedOnlineForTests(sessionCookie: "sid=changed", masterKey: masterKey, selectedPatient: patient)
+        let saved = await model.submitScale(draft, answers: Dictionary(uniqueKeysWithValues: ClinicalScales.adl.questions.map { ($0.id, 0) }))
+        let calls = await source.createEntryCalls
+        let error = await model.errorMessage
+        XCTAssertFalse(saved)
+        XCTAssertEqual(calls, 0)
+        XCTAssertEqual(error, ClinicalScaleDraftError.connectionChanged.localizedDescription)
+    }
+
+    func testScaleDraftTitleUsesReadableInstrumentName() async throws {
+        let model = await makeModel(source: S7MockDataSource(details: [:]))
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: detail(id: "p1"))
+        let adl = await model.makeScaleDraft(ClinicalScales.adl)
+        let tinetti = await model.makeScaleDraft(ClinicalScales.tinettiPOMA28V1)
+        XCTAssertEqual(adl?.title, "ADL · Rossi Mario")
+        XCTAssertEqual(tinetti?.title, "Tinetti POMA-28 (v1) · Rossi Mario")
+    }
+
     func testSubmitScaleSealsClinicalRichTextFixedPoint() async throws {
         let patient = detail(id: "p1")
         let source = S7MockDataSource(details: ["p1": patient])
@@ -182,7 +247,7 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
         let answers = Dictionary(uniqueKeysWithValues: ClinicalScales.mmse.questions.map { ($0.id, 0) })
         let interpretation = "Punteggio grezzo MMSE: 0/30. Screening cognitivo: il punteggio da solo non conferma né esclude una demenza. Definizione locale: edizione e variante italiana non identificate. Interpretazione clinica richiesta; nessuna correzione normativa applicata."
         let version = "mediflow.mmse.screening-limits.v2"
-        await model.submitScale(ClinicalScales.mmse, answers: answers)
+        await model.submitScale(ClinicalScaleDraft(definition: ClinicalScales.mmse, patient: patient, connectionIdentity: await model.clinicalWorkspaceConnection?.identity), answers: answers)
 
         let createCount = await source.createEntryCalls
         XCTAssertEqual(createCount, 1)
@@ -232,7 +297,7 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
             var invalid = complete
             invalid[first.id] = (first.options.map(\.value).max() ?? 0) + 1
             for answers in [[:], partial, foreign, invalid] {
-                await model.submitScale(definition, answers: answers)
+                await model.submitScale(ClinicalScaleDraft(definition: definition, patient: patient, connectionIdentity: await model.clinicalWorkspaceConnection?.identity), answers: answers)
                 let calls = await source.createEntryCalls
                 let payload = await source.lastCreateEntryPayload
                 let error = await model.errorMessage
@@ -243,7 +308,7 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
                 XCTAssertTrue(entries.isEmpty)
             }
         }
-        await model.submitScale(ClinicalScales.tinetti, answers: [:])
+        await model.submitScale(ClinicalScaleDraft(definition: ClinicalScales.tinetti, patient: patient, connectionIdentity: await model.clinicalWorkspaceConnection?.identity), answers: [:])
         let calls = await source.createEntryCalls
         XCTAssertEqual(calls, 0)
     }
@@ -255,7 +320,7 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
             let model = await makeModel(source: source)
             await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
             let answers = Dictionary(uniqueKeysWithValues: definition.questions.map { ($0.id, 0) })
-            await model.submitScale(definition, answers: answers)
+            await model.submitScale(ClinicalScaleDraft(definition: definition, patient: patient, connectionIdentity: await model.clinicalWorkspaceConnection?.identity), answers: answers)
             let calls = await source.createEntryCalls
             let captured = await source.lastCreateEntryPayload
             let payload = try XCTUnwrap(captured)
@@ -615,13 +680,13 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
         String(decoding: try JSONEncoder().encode(ids), as: UTF8.self)
     }
 
-    private func detail(id: String) -> HomeBasePatientDetail {
+    private func detail(id: String, archived: Bool = false, deleted: Bool = false, version: Int = 1) -> HomeBasePatientDetail {
         HomeBasePatientDetail(
             id: id, firstName: "Mario", lastName: "Rossi", birthDate: nil, taxCode: "RSSMRA80A01H501U",
             address: nil, phone: nil, caregiver: nil, exemptions: nil, diagnoses: nil, monitoringProfile: nil,
-            statusReason: nil, notes: nil, aiSummary: nil, documentInsights: nil, isAdi: false, isArchived: false,
-            version: 1, ambulatoryId: "AMB-1", createdAt: nil, updatedAt: Date(timeIntervalSince1970: 1_750_000_000),
-            deletedAt: nil, deletionReason: nil
+            statusReason: nil, notes: nil, aiSummary: nil, documentInsights: nil, isAdi: false, isArchived: archived,
+            version: version, ambulatoryId: "AMB-1", createdAt: nil, updatedAt: Date(timeIntervalSince1970: 1_750_000_000),
+            deletedAt: deleted ? Date(timeIntervalSince1970: 1) : nil, deletionReason: nil
         )
     }
 
@@ -666,10 +731,12 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
 }
 
 actor S7MockDataSource: HomeBasePatientsDataSource {
-    private let details: [String: HomeBasePatientDetail]
+    private var details: [String: HomeBasePatientDetail]
     private let attachments: [HomeBaseAttachmentSummary]
     private let visitDraft: HomeBaseVisitDraftResponse?
     private let visitDraftDelayNanoseconds: UInt64
+    private(set) var lastCreateEntryPatientID: String?
+    func replacePatient(id: String, with patient: HomeBasePatientDetail?) { details[id] = patient }
     private(set) var lastCreateEntryPayload: HomeBaseEntryCreatePayload?
     private(set) var lastUpdateEntryPayload: HomeBaseEntryUpdatePayload?
     private(set) var createEntryCalls = 0
@@ -791,6 +858,7 @@ actor S7MockDataSource: HomeBasePatientsDataSource {
 
     func createEntry(patientId: String, payload: HomeBaseEntryCreatePayload, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseCreatedResource {
         createEntryCalls += 1
+        lastCreateEntryPatientID = patientId
         lastCreateEntryPayload = payload
         return HomeBaseCreatedResource(id: payload.id, version: 1)
     }
