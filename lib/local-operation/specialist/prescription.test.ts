@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { validateSpecialistDecision } from './prescription.ts';
 
-import { SYNTHETIC_DECISION as decision, SYNTHETIC_CATALOG as catalog } from './synthetic-demo.ts';
+import { SYNTHETIC_DECISION as decision, SYNTHETIC_CATALOG as catalog } from './synthetic-demo.test-support.ts';
 
 test('CU-1 specialistica: conserva scelta, quantità, quesito ed esenzione verificata per riga', () => {
     assert.deepEqual(validateSpecialistDecision(decision, catalog, 1_000_000), decision);

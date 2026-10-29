@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { chromium } from '@playwright/test';
-import { createSyntheticSpecialistDemo as specialistFixture, SYNTHETIC_DECISION, SPECIALIST_SENTINELS } from './synthetic-demo.ts';
+import { createSyntheticSpecialistDemo as specialistFixture, SYNTHETIC_DECISION, SPECIALIST_SENTINELS } from './synthetic-demo.test-support.ts';
 import { physicianSubmit } from './browser-adapter.ts';
 import { recordSpecialistOutcome } from './outcome-service.ts';
 
@@ -210,4 +210,130 @@ test('CU-1 verticale: selezione e approvazione appartengono alla superficie nati
     assert.equal(sends(f), 0);
     f.setConfirmation(async () => { f.setContext({ humanRevision: 2 }); return true; });
     await assert.rejects(f.service.approve(cap)); assert.equal(sends(f), 0);
+});
+
+for (const control of ['<textarea name="newClinicalQuestion">SENTINEL</textarea>', '<select name="newExemption"><option>SENTINEL</option></select>', '<div contenteditable="true">SENTINEL</div>', '<input name="priority" type="hidden">', '<input name="priority" form="other">']) {
+    test(`CU-1 regressione: controllo inatteso ${control} blocca ogni POST`, async t => {
+        const f = await fixture(t);
+        await f.browser.page.route('**/portal', async route => {
+            const response = await route.fetch();
+            await route.fulfill({ response, body: (await response.text()).replace('</main>', `${control}</main>`) });
+        });
+        const cap = await f.selectLocal();
+        await assert.rejects(f.service.prepare(cap));
+        assert.equal(f.portal.traffic.filter(r => r.method === 'POST').length, 0);
+    });
+}
+
+test('CU-1 regressione: WebSocket senza CSP negato e disattivazione chiude la pagina attiva', async t => {
+    const { createServer } = await import('node:http');
+    let upgrades = 0, requests = 0;
+    const spy = createServer((_req, res) => { requests++; res.end(''); });
+    spy.on('upgrade', (_req, socket) => { upgrades++; socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'); });
+    await new Promise<void>(resolve => { spy.listen(0, '127.0.0.1', resolve); });
+    t.after(() => new Promise<void>(resolve => { spy.closeAllConnections(); spy.close(() => resolve()); }));
+    const f = await fixture(t);
+    await f.browser.page.route('**/portal', async route => {
+        const response = await route.fetch(), headers = { ...response.headers() }; delete headers['content-security-policy'];
+        await route.fulfill({ response, headers });
+    });
+    const cap = await authorized(f);
+    await f.browser.page.unroute('**/portal');
+    const address = spy.address(); assert.ok(address && typeof address !== 'string');
+    const outside = `http://127.0.0.1:${address.port}/outside-manifest?REVIEW_CLINICAL_SENTINEL`;
+    await f.browser.page.evaluate(url => new Promise<void>(resolve => {
+        const ws = new WebSocket(url.replace('http:', 'ws:'));
+        ws.onerror = () => resolve(); ws.onclose = () => resolve(); ws.onopen = () => { ws.close(); resolve(); };
+    }), outside);
+    assert.equal(upgrades, 0, 'WebSocket fuori manifest non deve raggiungere il destinatario');
+    await f.browser.page.evaluate(async url => {
+        await Promise.allSettled([fetch(url), new Promise<void>(resolve => { const xhr = new XMLHttpRequest(); xhr.open('GET', url); xhr.onerror = () => resolve(); xhr.onload = () => resolve(); xhr.send(); })]);
+        navigator.sendBeacon(url, 'REVIEW_CLINICAL_SENTINEL');
+        const source = new EventSource(url); source.onerror = () => source.close();
+        try { const worker = new Worker(URL.createObjectURL(new Blob([`fetch(${JSON.stringify(url)})`], { type: 'text/javascript' }))); setTimeout(() => worker.terminate(), 100); } catch {}
+    }, outside);
+    const oldPage = f.browser.page;
+    f.setPack('core');
+    await oldPage.waitForEvent('close');
+    assert.equal(oldPage.isClosed(), true, 'la revoca chiude anche i canali del documento esistente');
+    await assert.rejects(oldPage.evaluate(url => new WebSocket(url.replace('http:', 'ws:')), outside));
+    assert.equal(upgrades, 0); assert.equal(requests, 0);
+    await assert.rejects(f.service.execute(cap));
+});
+
+test('CU-1 regressione: revoca chiude un canale già aperto', async t => {
+    const f = await fixture(t); await authorized(f);
+    await f.browser.page.routeWebSocket('**/*', socket => { socket.onMessage(() => {}); });
+    await f.browser.page.evaluate(() => new Promise<void>(resolve => {
+        const ws = new WebSocket('ws://127.0.0.1:1/test-only-existing-channel'); ws.onopen = () => resolve();
+    }));
+    const page = f.browser.page, closed = page.waitForEvent('close', { timeout: 1500 }).catch(() => {});
+    f.setPack('core'); await closed;
+    assert.equal(page.isClosed(), true);
+});
+
+test('CU-1 regressione: worker e trasporti senza manifest non sono istanziabili', async t => {
+    const f = await fixture(t); await authorized(f);
+    const denied = await f.browser.page.evaluate(() => ['Worker', 'SharedWorker', 'RTCPeerConnection', 'WebTransport'].map(name => {
+        try { const Constructor = (globalThis as unknown as Record<string, new (url: string) => unknown>)[name]!;
+            new Constructor('data:text/javascript,postMessage(1)'); return false; } catch { return true; }
+    }));
+    assert.deepEqual(denied, [true, true, true, true]);
+});
+
+test('CU-1 regressione: autorizzazione richiesta anche per documento nel manifest', async t => {
+    const f = await fixture(t);
+    await assert.rejects(f.browser.adapter.observe({ operationId: f.plan.operationId, attempt: 0, revision: 1,
+        signal: new AbortController().signal, assertCurrent() {}, authorizeRequest() { throw new Error('denied'); } }));
+    assert.equal(f.portal.traffic.length, 0);
+});
+
+for (const replacement of ['type="hidden"', 'form="other"']) {
+    test(`CU-1 regressione: input noto con ${replacement} non è classificato`, async t => {
+        const f = await fixture(t);
+        await f.browser.page.route('**/portal', async route => {
+            const response = await route.fetch();
+            await route.fulfill({ response, body: (await response.text()).replace('<input ', `<input ${replacement} `) });
+        });
+        const observation = await f.browser.adapter.observe({ operationId: f.plan.operationId, attempt: 0, revision: 1,
+            signal: new AbortController().signal, assertCurrent() {}, authorizeRequest() {} });
+        assert.ok(observation.unclassifiedFields.length > 0, 'tipo e collocazione richiedono classificazione esplicita');
+        await assert.rejects(f.service.prepare(await f.selectLocal()));
+        assert.equal(f.portal.traffic.filter(r => r.method === 'POST').length, 0);
+    });
+}
+
+test('CU-1 regressione: risorsa con URL nel manifest resta un canale non ammesso', async t => {
+    const f = await fixture(t);
+    await f.browser.page.route('**/portal', async route => {
+        if (route.request().resourceType() !== 'document') { await route.fallback(); return; }
+        const response = await route.fetch(), headers = { ...response.headers() }; delete headers['content-security-policy'];
+        await route.fulfill({ response, headers, body: (await response.text()).replace('</main>', `<img src="${f.portal.origin}/portal"></main>`) });
+    });
+    await assert.rejects(f.service.prepare(await f.selectLocal()));
+    assert.equal(f.portal.traffic.filter(r => r.method === 'POST').length, 0);
+});
+
+test('CU-1 regressione: revoca interrompe HTTP già in corso', async t => {
+    const { createServer } = await import('node:http');
+    const { createSyntheticSpecialistBrowser } = await import('./browser-adapter.ts');
+    let started!: () => void, ended!: () => void;
+    const received = new Promise<void>(resolve => { started = resolve; });
+    const disconnected = new Promise<void>(resolve => { ended = resolve; });
+    const server = createServer((_req, res) => { res.on('close', ended); started(); });
+    await new Promise<void>(resolve => { server.listen(0, '127.0.0.1', resolve); });
+    t.after(() => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()); }));
+    const address = server.address(); assert.ok(address && typeof address !== 'string');
+    const origin = `http://127.0.0.1:${address.port}`;
+    const f = await fixture(t);
+    const browser = await createSyntheticSpecialistBrowser({ plan: () => f.plan,
+        cookie: { name: 'demo', value: 'demo', url: origin }, verifyReceipt: async () => true });
+    t.after(() => browser.close());
+    const observation = browser.adapter.observe({ operationId: f.plan.operationId, attempt: 0, revision: 1,
+        signal: new AbortController().signal, assertCurrent() {}, authorizeRequest() {} }).catch(() => {});
+    await received;
+    browser.adapter.stop();
+    const closed = await Promise.race([disconnected.then(() => true), new Promise<boolean>(resolve => { const timer = setTimeout(() => resolve(false), 1500); timer.unref(); })]);
+    assert.equal(closed, true, 'revoca interrompe HTTP già in corso');
+    await observation;
 });

@@ -1,6 +1,6 @@
 import { createInterface } from 'node:readline/promises';
 import { chromium } from '@playwright/test';
-import { createSyntheticSpecialistDemo } from '../lib/local-operation/specialist/synthetic-demo.ts';
+import { createSyntheticSpecialistDemo } from '../lib/local-operation/specialist/synthetic-demo.test-support.ts';
 import { createSpecialistNativeSurface } from '../lib/local-operation/specialist/native-surface.ts';
 
 const [mode, executable] = process.argv.slice(2);
