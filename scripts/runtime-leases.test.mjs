@@ -91,8 +91,11 @@ test('explicit stop consumes pending idle and each failed retry has one producer
 test('recovery authenticates the owner and endpoint without acquiring or dropping a lease', async t => {
  const {verifyRuntimeReceipt}=await import('./runtime-leases.mjs');
  const directory=temporary(t);let idle=0;
- const binding={choiceUrl:'http://127.0.0.1:12345/private/',dataDir:directory,checkoutPath:directory};
- const owner=await createRuntimeLeases({directory,identity:runtimeProcessIdentity,initialPlugin:false,onIdle:()=>idle++,binding});t.after(()=>owner.close());
+ const {createChoiceServer}=await import('./mediflow-launcher-page.mjs');
+ let owner;
+ const page=await createChoiceServer({root:directory,state:()=>({runtimeOwner:owner?.receipt.owner}),choose(){},install(){},stop(){}});t.after(()=>page.close());
+ const binding={choiceUrl:page.url,dataDir:directory,checkoutPath:directory};
+ owner=await createRuntimeLeases({directory,identity:runtimeProcessIdentity,initialPlugin:false,onIdle:()=>idle++,binding});t.after(()=>owner.close());
  const receipt={pid:owner.receipt.owner.pid,lease:owner.receipt,...binding};
  await verifyRuntimeReceipt(receipt,runtimeProcessIdentity);
  assert.equal(owner.active,1);assert.equal(idle,0);
@@ -102,5 +105,7 @@ test('recovery authenticates the owner and endpoint without acquiring or droppin
   {...receipt,pid:process.pid+1},
   {...receipt,dataDir:directory+'/other'},
  ]) await assert.rejects(verifyRuntimeReceipt(forged,runtimeProcessIdentity));
+ const other=await createRuntimeLeases({directory:temporary(t),identity:runtimeProcessIdentity,initialPlugin:false,onIdle:()=>{},binding});t.after(()=>other.close());
+ await assert.rejects(verifyRuntimeReceipt({...receipt,lease:other.receipt},runtimeProcessIdentity));
  assert.equal(owner.active,1);assert.equal(idle,0);
 });

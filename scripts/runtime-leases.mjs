@@ -167,4 +167,9 @@ export async function verifyRuntimeReceipt(receipt, identity = runtimeProcessIde
       });
     });
   } finally { socket.destroy(); }
+  const endpoint = new URL('state', receipt.choiceUrl);
+  if (endpoint.protocol !== 'http:' || endpoint.hostname !== '127.0.0.1') return deny();
+  const response = await fetch(endpoint, { signal: AbortSignal.timeout(3000) });
+  if (!response.ok || !sameOwner((await response.json()).runtimeOwner, receipt.lease.owner)) return deny();
 }
+

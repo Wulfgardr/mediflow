@@ -816,7 +816,7 @@ export async function main(args = process.argv.slice(2)) {
     choose(selected, remember);
   };
   try {
-    chooser = await createChoiceServer({ root: ROOT, state: () => ({ ...state }), choose,
+    chooser = await createChoiceServer({ root: ROOT, state: () => ({ ...state, runtimeOwner: leases?.receipt.owner ?? null }), choose,
       navigate, cancelNavigation,
       install: () => installApproval?.(true), stop: () => { if (!leases.requestStop()) return false; void shutdown(); }, nativeAvailable: !!native, development: dirty,
       version: identity.version, folder: path.basename(ROOT) });
