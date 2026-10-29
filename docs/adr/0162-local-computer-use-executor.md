@@ -206,9 +206,30 @@ stesso passo sincrono che avvia il trasporto host. Un cambiamento prima del disp
 rende il censimento non verificabile. La navigazione principale prodotta dal POST è
 attesa; dialog nativi, nuovi frame, worker, download e nuove pagine durante la fase
 falliscono chiuso anche dopo il dispatch, lasciando incerto un effetto già possibile.
-La sospensione, mantenuta fino alla conclusione, impedisce che timer, microtask o altre
-callback della pagina riaprano l'intervallo fra controllo e uso. Una pagina non
-verificabile non viene compilata né inviata.
+La sospensione non è una garanzia universale contro callback già in volo: epoca DOM,
+CSSOM e snapshot restano vincoli indipendenti. Una pagina non verificabile non viene
+compilata né inviata.
+
+Il token lega un unico `ProcedureSnapshot`, derivato dal piano della procedura e dal
+contesto locale: tutte le fonti e i campi del piano, identità risolta, pratica,
+account e operatore, versione UI, revisione umana, generazione e scadenze della lease,
+revisione territoriale, tentativo e revisione del journal. Il servizio valida con lo
+stesso confronto le osservazioni ordinarie e quella posseduta dal token. Dopo hover e
+focus sul comando previsto si rileggono insieme accessibilità, proprietà calcolate e
+valori, prima della navigazione nativa. Il consumo del token rilegge sincronicamente
+piano, contesto e lease dal servizio, confronta per uguaglianza lo snapshot legato e
+verifica il corpo effettivo del POST prima del trasporto. Cambiamenti o dati mancanti
+invalidano la prova; una nuova epoca non approva un nuovo contesto.
+
+L'inventario richiede l'albero di accessibilità completo di ogni documento. Ruolo,
+focusabilità ed editabilità calcolata dal browser devono corrispondere ai controlli
+previsti; il CSS può rendere modificabile anche un elemento statico. L'assenza
+dell'albero produce `unverifiable`. Il CSS della superficie sintetica appartiene al
+contratto positivo e viene confrontato come regole effettive in un mondo isolato,
+non soltanto come testo DOM: fogli aggiuntivi o adottati e regole diverse bloccano.
+Le modifiche CSSOM invalidano il token e le animazioni restano sospese durante la
+lease. Questo impedisce che stati transitori di focus, hover o pressione introducano
+controlli dopo la rilettura senza una mutazione DOM.
 
 Riferimenti del confine: [proxy Chromium](https://chromium.googlesource.com/chromium/src/+/main/net/docs/proxy.md),
 [policy WebRTC](https://chromeenterprise.google/policies/#WebRtcIPHandling),

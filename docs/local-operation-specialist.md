@@ -26,8 +26,9 @@ navigazioni: fetch/XHR, beacon, EventSource e risorse non sono canali autorizzat
 WebSocket sono negati prima della creazione delle pagine; worker e trasporti
 paralleli sono disabilitati. La revoca chiude attivamente il documento e i suoi
 canali, inclusi i trasporti HTTP ancora in corso; una ripresa autorizzata crea una pagina nuova. Il censimento comprende
-input, textarea, select, pulsanti e contenteditable, con tipo e appartenenza al
-form previsti dal contratto. Nessuna clipboard o file
+l'albero accessibile di ogni documento e l'editabilità/focusabilità calcolata dal browser.
+Solo i controlli previsti, con ruolo, tipo e appartenenza al form verificati, sono ammessi.
+Il CSS effettivo è parte del contratto positivo della superficie. Nessuna clipboard o file
 di pagina viene acquisito. L'invio intercettato usa `maxRetries: 0` e
 `maxRedirects: 0`: Chromium può altrimenti ripetere un POST dopo un reset della
 connessione senza una seconda intercettazione. Il destinatario confronta
@@ -37,7 +38,10 @@ Un errore di navigazione chiude la pagina posseduta prima della ripresa.
 Il censimento e l'atto condividono una risorsa CDP: gli script restano sospesi fino
 alla risposta e alla lettura dell'esito. Il token di censimento genera un permesso
 opaco monouso; il guard lo consuma prima del trasporto host, verificando l'epoca DOM
-senza un nuovo intervallo asincrono. Mutazioni, navigazioni inattese e nuovi frame
+insieme allo snapshot completo del piano, contesto e lease del servizio, senza un nuovo intervallo asincrono.
+Dopo hover/focus si ripete il censimento e si confrontano tutti i valori; al trasporto
+il corpo del POST deve coincidere esattamente con i campi approvati. Modifiche CSSOM,
+mutazioni, navigazioni inattese e nuovi frame
 invalidano il censimento. Alert, confirm, prompt, beforeunload e nuove pagine durante
 l'atto impediscono la conferma; dopo il possibile invio resta `uncertain`. La
 navigazione principale attesa del form non è un nuovo atto. Il detach segue la
@@ -100,10 +104,16 @@ La verticale non cambia stati o transizioni: la registrazione della prescrizione
 appartiene alla transazione `Record` già modellata. Browser, esenzioni, cifratura
 e valori clinici rimangono proprietà runtime, senza attribuirle a TLC.
 
-`verify:specialist-operation` lavora in copie temporanee e deve rifiutare sette
-mutanti, inclusi rimozione del controllo d’epoca e della sospensione: esenzione non applicabile, campo nuovo, guard delle richieste di pagina,
-retry del POST, confronto atomico del destinatario, collegamento del writer e
-audit obbligatorio. Dopo le falsificazioni riesegue il codice originale.
+`verify:specialist-operation` lavora in copie temporanee e falsifica separatamente
+sorgenti, censimento, autorità di rete, ciclo del browser, registrazione e audit.
+La quinta tornata include il legame di ogni dato del contesto portale, revisione
+umana, confronto integrale dello snapshot, inventario accessibile/calcolato,
+indisponibilità dell'albero, contratto CSS, modifiche CSSOM e contenuto del POST.
+Dove più difese proteggono lo stesso vincolo, il mutante rimuove insieme quei
+controlli: una guardia ridondante superstite non prova la sensibilità del test.
+Dopo le falsificazioni riesegue il codice originale. `MEDIFLOW_CU_MUTATIONS`
+seleziona etichette di mutazione con un'espressione regolare, per riprendere una
+verifica senza ripetere prove già valide dello stesso codice.
 `MEDIFLOW_CU_EVIDENCE` indica un file JSON assoluto per conservare i risultati;
 `MEDIFLOW_CU_CAPTURE_DIR` conserva catture Giorno/Grafite prima e dopo la riapertura
 della stessa bozza, confrontate byte per byte.

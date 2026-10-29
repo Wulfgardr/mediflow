@@ -98,8 +98,9 @@ export function createLocalOperationService(ports: LocalOperationPorts) {
         const parsed = observationSchema.safeParse(raw);
         if (!parsed.success || parsed.data.census !== 'complete') deny();
         const value = parsed.data, context = localContext(plan);
-        if (value.patientId !== plan.patientId || value.practiceId !== plan.practiceId || value.portalAccountId !== plan.portalAccountId
-            || value.uiVersion !== plan.uiVersion || value.humanRevision !== context.humanRevision
+        const { census: _census, unclassifiedFields: _unknown, planDigest: _digest, humanRevision, ...identity } = value;
+        if (Object.entries(identity).some(([key, value]) => plan[key as keyof LocalOperationPlan] !== value)
+            || humanRevision !== context.humanRevision
             || value.unclassifiedFields.length || (requireContent && value.planDigest !== planDigest(plan))) deny();
     }
     async function run<T>(capability: LocalCapability, action: (observe: AdapterContext, phaseContext: PhaseContext) => Promise<T>): Promise<T> {
@@ -111,21 +112,32 @@ export function createLocalOperationService(ports: LocalOperationPorts) {
         function context(phase: 'observe' | 'prepare' | 'act' | 'reconcile', permit?: DispatchPermit): AdapterContext {
             const marker = permit?.marker ?? current;
             assertCurrent();
-            if (phase === 'act') {
+            function assertDispatch() {
                 const live = check(capability).current;
-                if (live.state !== 'attempt_started' || !live.effectPossible || live.attempt !== marker.attempt
-                    || live.revision !== marker.revision) deny();
+                if (!permit || permit.approvalExpiresAt <= ports.now() || live.state !== 'attempt_started' || !live.effectPossible
+                    || live.attempt !== marker.attempt || live.revision !== marker.revision) deny();
             }
+            if (phase === 'act') assertDispatch();
             return Object.freeze({ operationId: binding.operationId, attempt: marker.attempt, revision: marker.revision,
                 signal: controller.signal, assertCurrent,
+                snapshot(raw) {
+                    assertCurrent();
+                    const live = check(capability);
+                    observation(raw, live.plan, true);
+                    if (permit) assertDispatch();
+                    return freeze({ plan: live.plan, context: { ...live.context }, lease: {
+                        generation, territoryRevision: ports.currentTerritory().revision!, expiresAt: binding.expiresAt,
+                        approvalExpiresAt: permit?.approvalExpiresAt ?? null, operationId: live.current.operationId,
+                        attempt: live.current.attempt, revision: live.current.revision, state: live.current.state, effectPossible: live.current.effectPossible,
+                    } });
+                },
                 authorizeRequest(destination) {
                     assertCurrent();
                     if ((destination.purpose !== phase && destination.purpose !== 'observe')
                         || !plan.destinations.some(allowed => JSON.stringify(allowed) === JSON.stringify(destination))) deny();
                     if (destination.purpose === 'act') {
-                        const live = check(capability).current;
-                        if (!permit || permit.approvalExpiresAt <= ports.now() || actDispatched || live.state !== 'attempt_started' || !live.effectPossible
-                            || live.revision !== marker.revision || live.attempt !== marker.attempt) deny();
+                        assertDispatch();
+                        if (actDispatched) deny();
                         actDispatched = true;
                     }
                 },

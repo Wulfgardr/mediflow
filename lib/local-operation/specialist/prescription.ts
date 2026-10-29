@@ -82,3 +82,5 @@ export function specialistPlan(input: {
             { origin: input.origin, path: '/receipt', method: 'GET', purpose: 'reconcile' },
         ], parts: decision.items.map(item => item.id) });
 }
+
+export const SYNTHETIC_PORTAL_STYLE = 'body{font:16px system-ui;max-width:760px;margin:32px auto;background:var(--bg,#f7f8fa);color:var(--fg,#16212c)}\n        label{display:block;margin:12px 0}input{display:block;width:95%;padding:8px}button{padding:10px 18px;margin:12px 8px 12px 0}';
