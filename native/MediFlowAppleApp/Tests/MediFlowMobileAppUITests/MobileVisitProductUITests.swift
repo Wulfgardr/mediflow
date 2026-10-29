@@ -54,7 +54,7 @@ final class MobileVisitProductUITests: XCTestCase {
         waitForUIReady(app.buttons["Acconsento e preparo il dossier"], in: app)
         app.buttons["Acconsento e preparo il dossier"].tap()
         let note = app.textViews["mobile-visit-note"]
-        waitForUIReady(note, in: app, timeout: 10)
+        XCTAssertTrue(note.waitForExistence(timeout: 10))
         note.tap()
         note.typeText("Appunto solo sintetico conservato senza rete.")
         app.terminate()
@@ -65,7 +65,7 @@ final class MobileVisitProductUITests: XCTestCase {
         app.buttons["mobile-visit-unlock"].tap()
         waitForUIReady(app.buttons["mobile-visit-open-note"].firstMatch, in: app, timeout: 10)
         app.buttons["mobile-visit-open-note"].firstMatch.tap()
-        waitForUIReady(note, in: app, timeout: 5)
+        XCTAssertTrue(note.waitForExistence(timeout: 5))
         XCTAssertEqual(note.value as? String, "Appunto solo sintetico conservato senza rete.")
         let offline = XCTAttachment(screenshot: app.screenshot())
         offline.name = "real-app-synthetic-offline-note"
