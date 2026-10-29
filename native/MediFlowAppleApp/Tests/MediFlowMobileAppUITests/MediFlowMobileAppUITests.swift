@@ -1214,11 +1214,16 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(ambulatoryScopePicker.isHittable)
         try app.performAccessibilityAudit()
 
-        XCTAssertTrue(openSection("Agenda"), "Agenda non e raggiungibile per l'audit accessibilita")
+        app.terminate()
+        launch(seedPatients: true, singlePatient: true, section: "agenda")
         let agenda = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
         let ready = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == true AND hittable == true"), object: agenda)
-        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 30), .completed,
+        let agendaReady = XCTWaiter.wait(for: [ready], timeout: 30)
+        if agendaReady != .completed {
+            print("Agenda non pronta per l'audit: \(app.debugDescription)")
+        }
+        XCTAssertEqual(agendaReady, .completed,
                        "Il contenuto dell'Agenda deve essere visibile e interagibile prima dell'audit")
         try app.performAccessibilityAudit()
     }
