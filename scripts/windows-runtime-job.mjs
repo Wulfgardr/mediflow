@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { windowsTaskkillCommand } from './windows-system-command.mjs';
-import { verifyChildOwner } from './runtime-leases.mjs';
+import { processOwner, runtimeProcessIdentity, verifyChildOwner } from './runtime-leases.mjs';
 
 export async function containWindowsWeb(child, owner) {
   verifyChildOwner(owner);
@@ -44,6 +44,7 @@ export async function containWindowsWeb(child, owner) {
   await ready;
   return {
     closed,
+    owner: processOwner(runtimeProcessIdentity, helper.pid),
     async stop() {
       verifyChildOwner(owner, false);
       if (!drained) helper.stdin.end(owner.token.nonce + '\n');

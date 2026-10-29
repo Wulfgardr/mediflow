@@ -6,6 +6,10 @@ import path from 'node:path';
 import net from 'node:net';
 import { spawn, execFileSync } from 'node:child_process';
 import { prepareLauncherState } from './launcher-state.mjs';
+import crypto from 'node:crypto';
+import { recoverLocalRuntime } from './recover-local-runtime.mjs';
+import { claimLauncher } from './mediflow.mjs';
+import { localUiArchiveLock } from './launcher-state.mjs';
 import { runtimeProcessIdentity } from './runtime-leases.mjs';
 
 const root = process.env.MEDIFLOW_LIFECYCLE_ROOT || process.cwd();
@@ -44,6 +48,7 @@ async function fixture(t, plugin = true) {
     return child;
   };
   t.after(async () => {
+    for (const row of table()) if (children.some(child => child.pid === row.ppid) && !owned.has(row.pid)) remember(row.pid);
     for (const child of children) if (child.connected) child.disconnect();
     for (const child of children) if (!exited(child)) signal(child.pid, 'SIGTERM');
     await pause(1000);
@@ -63,7 +68,7 @@ async function fixture(t, plugin = true) {
     const response = await fetch(endpoint, { method: 'POST', headers: { Origin: endpoint.origin, 'Content-Type': 'application/json' }, body: '{}' });
     assert.equal(response.status, 200); await response.text();
   };
-  return { data, env, owner, web: web[0].pid, launch, signal, remember, stop,
+  return { data, env, receipt, owner, web: web[0].pid, launch, signal, remember, stop,
     url: `http://127.0.0.1:${port}`, output: () => output };
 }
 
@@ -150,4 +155,37 @@ test('real standalone: SIGKILL of source-runtime client preserves another active
   await pause(500); assert.equal((await fetch(url)).status, 200); assert.equal(runtimeProcessIdentity(guardian.pid), owned.get(guardian.pid));
   peer.disconnect(); await until(() => exited(peer) && runtimeProcessIdentity(guardian.pid) === null);
   t.diagnostic(JSON.stringify({ sourceClient: source.pid, guardian: guardian.pid, survivingClient: peer.pid, retainedHttp: 200, finalGuardian: 0 }));
+});
+
+
+test('real standalone: crash recovery waits for incomplete HTTP and the previous Web to drain', {skip:!real,timeout:120000}, async t=>{
+ const f=await fixture(t,false);
+ const socket=net.createConnection(Number(new URL(f.url).port),'127.0.0.1');socket.on('error',()=>{});
+ t.after(()=>socket.destroy());
+ await new Promise(resolve=>socket.once('connect',resolve));socket.write('GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n');
+ await pause(100);f.signal(f.owner.pid,'SIGKILL');await until(()=>exited(f.owner));
+ assert.ok(runtimeProcessIdentity(f.web),'Old Web must still be draining the incomplete HTTP request');
+ const blocked=f.launch(false);await until(()=>exited(blocked));assert.equal(blocked.exitCode,1,f.output());
+ assert.match(f.output(),/generazione precedente.*arresto/u);
+ assert.throws(()=>claimLauncher(localUiArchiveLock(f.data),{checkoutPath:root+'-other'},{reuseLive:true}),/generazione precedente.*arresto/u);
+ assert.ok(runtimeProcessIdentity(f.web));
+ socket.destroy();await until(()=>runtimeProcessIdentity(f.web)===null);
+ const successor=f.launch(false);
+ function prepareReceipt(){const {lockDirectory}=prepareLauncherState(root,{env:f.env});const active=path.join(lockDirectory,'active');return JSON.parse(fs.readFileSync(path.join(active,fs.readdirSync(active)[0],'instance.json')));}
+ await until(async()=>{try{return (await (await fetch(new URL('state',prepareReceipt().choiceUrl))).json()).ready;}catch{return false;}});
+ const nextWeb=table().find(row=>row.ppid===successor.pid&&row.command.includes('next-server'));assert.ok(nextWeb);f.remember(nextWeb.pid);
+ const file=path.join(f.data,'recovery.json');fs.writeFileSync(file,JSON.stringify(prepareReceipt()));
+ assert.equal((await recoverLocalRuntime(file)).status,200);await until(()=>exited(successor)&&runtimeProcessIdentity(nextWeb.pid)===null);
+ t.diagnostic('Crash: both locks denied while old Web drained; new HTTP server admitted only after terminal generation.');
+});
+
+test('real standalone: forged recovery receipts cannot stop a manual Web; valid receipt respects clients', {skip:!real,timeout:120000}, async t=>{
+ const f=await fixture(t,false), file=path.join(f.data,'recovery.json');
+ const forged=structuredClone(f.receipt);forged.pid=process.pid;forged.lease.owner={pid:process.pid,start:runtimeProcessIdentity(process.pid),nonce:crypto.randomUUID()};
+ fs.writeFileSync(file,JSON.stringify(forged));await assert.rejects(recoverLocalRuntime(file));assert.equal((await fetch(f.url)).status,200);
+ fs.writeFileSync(file,JSON.stringify({...f.receipt,choiceUrl:f.receipt.choiceUrl+'altered/'}));await assert.rejects(recoverLocalRuntime(file));assert.equal((await fetch(f.url)).status,200);
+ const client=f.launch(true);await until(()=>client.handshake);
+ fs.writeFileSync(file,JSON.stringify(f.receipt));assert.equal((await recoverLocalRuntime(file)).status,409);assert.equal((await fetch(f.url)).status,200);
+ client.disconnect();await until(()=>exited(client));
+ assert.equal((await recoverLocalRuntime(file)).status,200);await until(()=>exited(f.owner)&&runtimeProcessIdentity(f.web)===null);
 });

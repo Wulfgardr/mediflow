@@ -49,35 +49,45 @@ export function verifyChildOwner(record, live = true) {
     || !sameOwner(JSON.parse(fs.readFileSync(record.file, 'utf8')), record.token)
     || live && record.identity(record.token.pid) !== record.token.start) return deny();
 }
-export async function createRuntimeLeases({ directory, identity, initialPlugin, onIdle }) {
+export async function createRuntimeLeases({ directory, identity, initialPlugin, onIdle, binding = null }) {
   const owner = processOwner(identity);
   const key = crypto.createHash('sha256').update(directory).digest('hex');
   const temporary = process.platform === 'win32' ? null : fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-lease-')));
   const address = process.platform === 'win32' ? `\\\\.\\pipe\\mediflow-lease-${key}` : path.join(temporary, 'ipc');
   const clients = new Set(), manual = new Set(initialPlugin ? [] : ['owner']);
-  let initial = initialPlugin, accepting = true, idleScheduled = false, closingTask = null;
+  /** @type {'accepting' | 'idle-pending' | 'stopping' | 'closed'} */
+  let phase = 'accepting';
+  let initial = initialPlugin, idleTask = null, closingTask = null;
+  const beginStop = () => {
+    clearImmediate(idleTask); idleTask = null; phase = 'stopping';
+  };
   const idle = () => {
-    if (initial || clients.size || manual.size || !accepting || idleScheduled) return;
-    idleScheduled = true;
-    setImmediate(() => {
-      idleScheduled = false;
-      if (initial || clients.size || manual.size || !accepting) return;
-      accepting = false;
+    if (initial || clients.size || manual.size || phase !== 'accepting') return;
+    phase = 'idle-pending';
+    idleTask = setImmediate(() => {
+      idleTask = null; phase = 'accepting';
+      if (initial || clients.size || manual.size) return;
+      beginStop();
       void onIdle();
     });
   };
   const server = net.createServer(socket => {
-    if (!accepting || clients.size >= 256) return socket.destroy();
+    if (!['accepting', 'idle-pending'].includes(phase) || clients.size >= 256) return socket.destroy();
     clients.add(socket);
     const timer = setTimeout(() => socket.destroy(), 3000);
     socket.on('error', () => {});
     socket.once('close', () => { clearTimeout(timer); clients.delete(socket); idle(); });
     let admitted = false;
     jsonLines(socket, frame => {
-      if (admitted || !sameOwner(frame.owner, owner) || !['plugin', 'manual'].includes(frame.kind)
+      if (admitted || !sameOwner(frame.owner, owner) || !['plugin', 'manual', 'inspect'].includes(frame.kind)
         || !frame.client || !Number.isSafeInteger(frame.client.pid) || !/^[a-f0-9-]{36}$/u.test(frame.client.nonce)
         || identity(frame.client.pid) !== frame.client.start) return socket.destroy();
       admitted = true; clearTimeout(timer);
+      if (frame.kind === 'inspect') {
+        clients.delete(socket);
+        socket.end(JSON.stringify({ owner, binding }) + '\n');
+        return;
+      }
       if (frame.kind === 'manual') manual.add(frame.client.nonce);
       send(socket, { owner, acquired: true });
     });
@@ -88,26 +98,23 @@ export async function createRuntimeLeases({ directory, identity, initialPlugin, 
     receipt: { address, owner },
     releaseInitial() { initial = false; idle(); },
     releaseManual() { manual.clear(); idle(); },
+    requestStop() {
+      initial = false; manual.clear();
+      if (clients.size) { idle(); return false; }
+      beginStop();
+      return true;
+    },
     get external() { return clients.size + [...manual].filter(value => value !== 'owner').length; },
     get active() { return Number(initial) + manual.size + clients.size; },
     close() {
-      accepting = false;
+      beginStop();
       for (const socket of clients) socket.destroy();
-      return closingTask ??= new Promise(resolve => server.close(() => { if (temporary) fs.rmSync(temporary, { recursive: true, force: true }); resolve(); }));
+      return closingTask ??= new Promise(resolve => server.close(() => { phase = 'closed'; if (temporary) fs.rmSync(temporary, { recursive: true, force: true }); resolve(); }));
     },
   };
 }
 export async function acquireRuntimeLease(receipt, identity, kind = 'plugin', channel = process) {
-  if (!receipt?.address || !receipt.owner || identity(receipt.owner.pid) !== receipt.owner.start) return deny();
-  if (typeof receipt.address !== 'string') return deny();
-  if (process.platform === 'win32') {
-    if (!receipt.address.startsWith('\\\\.\\pipe\\mediflow-lease-') || !/^[a-f0-9]{64}$/u.test(receipt.address.slice('\\\\.\\pipe\\mediflow-lease-'.length))) return deny();
-  } else {
-    const parent = path.dirname(receipt.address), stat = fs.lstatSync(parent);
-    if (!path.isAbsolute(receipt.address) || path.basename(receipt.address) !== 'ipc'
-      || !stat.isDirectory() || stat.isSymbolicLink() || fs.realpathSync(parent) !== parent
-      || stat.mode & 0o077 || process.getuid && stat.uid !== process.getuid()) return deny();
-  }
+  validateLeaseAddress(receipt, identity);
   const socket = net.createConnection(receipt.address);
   let release;
   await new Promise((resolve, reject) => {
@@ -127,4 +134,37 @@ export async function acquireRuntimeLease(receipt, identity, kind = 'plugin', ch
     });
   });
   return release;
+}
+
+function validateLeaseAddress(receipt, identity) {
+  if (!receipt?.address || !receipt.owner || identity(receipt.owner.pid) !== receipt.owner.start) return deny();
+  if (typeof receipt.address !== 'string') return deny();
+  if (process.platform === 'win32') {
+    if (!receipt.address.startsWith('\\\\.\\pipe\\mediflow-lease-') || !/^[a-f0-9]{64}$/u.test(receipt.address.slice('\\\\.\\pipe\\mediflow-lease-'.length))) return deny();
+  } else {
+    const parent = path.dirname(receipt.address), stat = fs.lstatSync(parent);
+    if (!path.isAbsolute(receipt.address) || path.basename(receipt.address) !== 'ipc'
+      || !stat.isDirectory() || stat.isSymbolicLink() || fs.realpathSync(parent) !== parent
+      || stat.mode & 0o077 || process.getuid && stat.uid !== process.getuid()) return deny();
+  }
+}
+
+export async function verifyRuntimeReceipt(receipt, identity = runtimeProcessIdentity) {
+  if (receipt?.pid !== receipt?.lease?.owner?.pid) return deny();
+  validateLeaseAddress(receipt.lease, identity);
+  const socket = net.createConnection(receipt.lease.address);
+  try {
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => fail(new Error('Ricevuta del runtime non verificata.')), 3000);
+      const fail = error => { clearTimeout(timer); socket.destroy(); reject(error); };
+      socket.once('error', fail);
+      socket.once('close', () => fail(new Error('Verifica della ricevuta interrotta.')));
+      socket.once('connect', () => send(socket, { owner: receipt.lease.owner, client: processOwner(identity), kind: 'inspect' }));
+      jsonLines(socket, frame => {
+        if (!sameOwner(frame.owner, receipt.lease.owner) || !frame.binding
+          || ['choiceUrl', 'dataDir', 'checkoutPath'].some(key => frame.binding[key] !== receipt[key])) return fail(new Error('Ricevuta del runtime non verificata.'));
+        clearTimeout(timer); resolve();
+      });
+    });
+  } finally { socket.destroy(); }
 }
