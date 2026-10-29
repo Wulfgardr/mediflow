@@ -591,9 +591,25 @@ struct PairedPatientsWorkspaceView: View {
                 }
             }
         }
+        .environment(\.patientChartScrollMemory, chartScrollMemory)
+        .environment(\.patientChartPatientID, presentedPatientID)
         .background(PlatformColors.chartCardSurface)
         .navigationTitle(model.activePatientSection == .overview ? "" : model.activePatientSection.title)
         .toolbar {
+            #if DEBUG
+            if AppleFoundationDemoMode.isDemoDataset,
+               ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_CHART_RELOAD"] == "1",
+               model.activePatientSection != .overview {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Ricarica dati inventati") {
+                        if let patient = model.patients.first(where: { $0.id == presentedPatientID }) {
+                            Task { await model.loadPatient(patient) }
+                        }
+                    }
+                    .accessibilityIdentifier("layout-test-reload-chart")
+                }
+            }
+            #endif
             ToolbarItem(placement: .principal) {
                 if model.activePatientSection == .overview, patientChartHeaderHidden,
                    let detail = model.selectedPatient, detail.id == presentedPatientID {
@@ -1425,7 +1441,7 @@ struct PairedPatientsWorkspaceView: View {
     private func openPatientSummary(_ category: PatientChartSummaryCategory, patientID: String) {
         guard model.selectedPatientID == patientID else { return }
         #if os(iOS)
-        chartScrollMemory.capture(patientID: patientID)
+        chartScrollMemory.capture(patientID: patientID, anchorID: "patient-summary-\(category.id)")
         chartScrollMemory.state.leave(patientID: patientID, category: category)
         #endif
         model.activePatientSection = category.destination
@@ -1462,7 +1478,7 @@ struct PairedPatientsWorkspaceView: View {
             NativePatientInsightView(workspaceModel: model).chartCard()
             NativeSmartImportView(workspaceModel: model).chartCard()
             #else
-            DisclosureGroup {
+            DisclosureGroup(isExpanded: chartScrollMemory.disclosure(.aiTools, patientID: detail.id)) {
                 VStack(alignment: .leading, spacing: 20) {
                     NativePatientInsightView(workspaceModel: model)
                     Divider()
@@ -1475,19 +1491,25 @@ struct PairedPatientsWorkspaceView: View {
             .padding(.vertical, 16)
             .overlay(alignment: .top) { Divider() }
             .accessibilityIdentifier("patient-ai-tools-disclosure")
+            .background {
+                PatientChartScrollAnchor(patientID: detail.id, id: "patient-ai-tools-disclosure", memory: chartScrollMemory)
+            }
             #endif
             #if !os(macOS)
             // Patient facts precede optional collection summaries.
             if !populatedPatientSections.isEmpty ||
                 (capabilities.hasCapability("network.replica.readonly-documents") &&
                  (model.attachmentsLoadState != .loaded || !model.attachments.isEmpty)) {
-                DisclosureGroup("Altre sezioni della cartella") {
+                DisclosureGroup("Altre sezioni della cartella", isExpanded: chartScrollMemory.disclosure(.contents, patientID: detail.id)) {
                     patientContents.padding(.top, 12)
                 }
                 .font(.headline)
                 .padding(.vertical, 16)
                 .overlay(alignment: .top) { Divider() }
                 .accessibilityIdentifier("patient-chart-contents-disclosure")
+                .background {
+                    PatientChartScrollAnchor(patientID: detail.id, id: "patient-chart-contents-disclosure", memory: chartScrollMemory)
+                }
             }
             #endif
             case .diary:

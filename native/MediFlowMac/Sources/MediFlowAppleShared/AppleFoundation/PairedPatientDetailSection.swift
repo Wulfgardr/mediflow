@@ -12,6 +12,7 @@ struct PairedPatientDetailSection: View {
     var onOpenSummary: ((PatientChartSummaryCategory) -> Void)? = nil
     var summaryReturn: PatientChartSummaryReturn? = nil
     #if os(iOS)
+    @Environment(\.patientChartScrollMemory) private var scrollMemory
     @AccessibilityFocusState(for: .voiceOver) private var focusedSummaryCategory: PatientChartSummaryCategory?
     #endif
 
@@ -989,7 +990,7 @@ private extension PairedPatientDetailSection {
         let exemptions = exemptionRead.values ?? []
         return VStack(alignment: .leading, spacing: 0) {
             mobilePatientHeader.padding(.bottom, 16)
-            PatientChartGroup((model.isPatientFieldLocked(.diagnoses) || diagnosisRead.isUnreadable) ? "Diagnosi" : "Diagnosi · \(diagnoses.count)") {
+            PatientChartGroup((model.isPatientFieldLocked(.diagnoses) || diagnosisRead.isUnreadable) ? "Diagnosi" : "Diagnosi · \(diagnoses.count)", anchorID: "patient-detail-diagnoses") {
                 if model.isPatientFieldLocked(.diagnoses) {
                     Label("Diagnosi protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -1008,7 +1009,7 @@ private extension PairedPatientDetailSection {
                 }
             }
             .accessibilityIdentifier("patient-detail-diagnoses")
-            PatientChartGroup((model.isPatientFieldLocked(.exemptions) || exemptionRead.isUnreadable) ? "Esenzioni" : "Esenzioni · \(exemptions.count)") {
+            PatientChartGroup((model.isPatientFieldLocked(.exemptions) || exemptionRead.isUnreadable) ? "Esenzioni" : "Esenzioni · \(exemptions.count)", anchorID: "patient-detail-exemptions") {
                 if model.isPatientFieldLocked(.exemptions) {
                     Label("Esenzioni protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -1200,6 +1201,12 @@ private extension PairedPatientDetailSection {
                 .accessibilityLabel(category.accessibilityLabel(count: count))
                 .accessibilityIdentifier("patient-summary-\(category.id)")
                 .accessibilityFocused($focusedSummaryCategory, equals: category)
+                .background {
+                    if let scrollMemory {
+                        PatientChartScrollAnchor(patientID: detail.id,
+                            id: "patient-summary-\(category.id)", memory: scrollMemory)
+                    }
+                }
             }
             if let next = model.checkups.filter({ $0.deletedAt == nil && $0.status == "pending" && $0.date >= Date() })
                 .min(by: { $0.date < $1.date }) {
