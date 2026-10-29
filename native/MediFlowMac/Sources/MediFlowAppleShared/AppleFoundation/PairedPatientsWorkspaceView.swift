@@ -8,6 +8,7 @@ struct PairedPatientsWorkspaceView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.clinicalPatientNavigation) private var linkedPatient
     @Environment(\.clinicalNavigationInteraction) private var navigationInteraction
+    @State private var patientChartHeaderHidden = false
     @State private var navigationInteractionID = UUID()
     private let onShowProject: (() -> Void)?
     @ObservedObject private var model: PairedPatientsWorkspaceModel
@@ -549,6 +550,8 @@ struct PairedPatientsWorkspaceView: View {
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .id("mobile-patient-chart-top")
             }
+            .coordinateSpace(name: "patient-chart-scroll")
+            .onPreferenceChange(PatientChartHeaderHiddenKey.self) { patientChartHeaderHidden = $0 }
             .safeAreaPadding(.bottom, 16)
             .clipped()
             .onChange(of: model.activePatientSection) { _ in
@@ -556,7 +559,18 @@ struct PairedPatientsWorkspaceView: View {
             }
         }
         .background(PlatformColors.chartCardSurface)
-        .navigationTitle(model.activePatientSection.title)
+        .navigationTitle(model.activePatientSection == .overview ? "" : model.activePatientSection.title)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                if model.activePatientSection == .overview, patientChartHeaderHidden,
+                   let detail = model.selectedPatient, detail.id == presentedPatientID {
+                    Text("\(detail.lastName) \(detail.firstName)")
+                        .font(.headline).lineLimit(1).truncationMode(.tail)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityIdentifier("patient-navigation-name")
+                }
+            }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) {
             if let detail = model.selectedPatient, detail.id == presentedPatientID {
@@ -1643,4 +1657,9 @@ extension PairedPatientsWorkspaceView {
     static func parseObservationValue(_ raw: String) -> Double? {
         PairedPatientClinicalSections.parseObservationValue(raw)
     }
+}
+
+struct PatientChartHeaderHiddenKey: PreferenceKey {
+    static let defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = nextValue() }
 }

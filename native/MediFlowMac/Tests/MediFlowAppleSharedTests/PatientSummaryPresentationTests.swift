@@ -5,6 +5,24 @@ import CryptoKit
 // G1 (ADR 0071 parity): the patient-list row now derives an age from the summary
 // birthDate. Lock the boundary logic of the age helper.
 final class PatientSummaryPresentationTests: XCTestCase {
+    func testRelativeDatesUseGregorianCalendar() throws {
+        let date = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("2025-10-29T12:00:00Z"))
+        let now = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("2026-10-29T12:00:00Z"))
+        for identifier in [Calendar.Identifier.gregorian, .buddhist, .japanese, .islamic] {
+            let formatter = ClinicalDatePresentation.makeRelativeFormatter(calendar: Calendar(identifier: identifier))
+            XCTAssertEqual(formatter.calendar.identifier, .gregorian)
+            XCTAssertEqual(formatter.localizedString(for: date, relativeTo: now), "1 anno fa")
+        }
+    }
+
+    func testPatientHeaderMetadataKeepsBirthAgeAndCompactCode() throws {
+        let birth = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("1951-07-20T00:00:00Z"))
+        let now = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("2026-10-29T12:00:00Z"))
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.patientMetadata(birthDate: birth, taxCode: "DEMO00000R0000X", at: now),
+                       "75 anni · nascita 20 lug 1951 · …R0000X")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.patientMetadata(birthDate: nil, taxCode: ""), "")
+    }
+
     func testEntryDateIsItalianRegardlessOfDeviceLanguage() {
         let formatter = PairedPatientsWorkspaceSupport.entryDateFormatter
         XCTAssertEqual(formatter.locale.identifier, "it_IT")
