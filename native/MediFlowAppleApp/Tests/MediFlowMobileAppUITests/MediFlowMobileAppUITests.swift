@@ -2202,7 +2202,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.launchEnvironment["MEDIFLOW_APPLE_UITEST_OPEN_PATIENT_INDEX"] = "0"
         app.launch()
         XCTAssertTrue(app.buttons["cancel-scale-button"].waitForExistence(timeout: 20))
-        XCTAssertTrue(app.navigationBars["ADL · Rossi Mario"].exists)
+        XCTAssertEqual(app.staticTexts["scale-context-title"].label, "ADL · Rossi Mario")
         XCTAssertEqual(app.buttons["submit-scale-button"].label, "Completa")
         let result = app.staticTexts["scale-incomplete"]
         let question = app.buttons["scale-question-bath"]

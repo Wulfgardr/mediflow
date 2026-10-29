@@ -34,6 +34,15 @@ struct ClinicalScaleFormView: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
+                #if os(iOS)
+                ToolbarItem(placement: .principal) {
+                    Text("\(definition.id.uppercased()) · \(patientLabel)")
+                        .font(.headline)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("scale-context-title")
+                }
+                #endif
                 ToolbarItem(placement: .confirmationAction) { submitButton }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annulla", action: onCancel)
