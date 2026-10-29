@@ -75,10 +75,10 @@ ${development ? row('sviluppo', 'Modalità sviluppo', 'Questa cartella ha modifi
 const base=${JSON.stringify(base)};let choosing=new URLSearchParams(location.search).has('scegli');let stopped=false;
 const $=id=>document.getElementById(id),order=['dipendenze','versione','avvio','pronto'];
 const say=(text,error)=>{$('status').textContent=text||'';$('status').classList.toggle('error',!!error);};
-async function action(name,data={}){try{const r=await fetch(base+'/'+name,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});if(!r.ok)say(await r.text(),true);}catch{say('Il lanciatore non risponde. Controlla il terminale.',true);}}
+async function action(name,data={}){try{const r=await fetch(base+'/'+name,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});if(!r.ok){say(await r.text(),true);return false;}return true;}catch{say('Il lanciatore non risponde. Controlla il terminale.',true);return false;}}
 document.querySelectorAll('[data-choice]').forEach(b=>b.addEventListener('click',()=>{choosing=false;action('choose',{choice:b.dataset.choice,remember:$('remember').checked});}));
 $('approve').onclick=()=>action('install');
-$('stop').onclick=async()=>{stopped=true;await action('stop');$('choices').hidden=true;$('steps').hidden=true;$('title').textContent='MediFlow si sta arrestando';say('Puoi chiudere questa scheda quando il terminale conferma l’arresto.');};
+$('stop').onclick=async()=>{if(!await action('stop'))return;stopped=true;$('choices').hidden=true;$('steps').hidden=true;$('title').textContent='MediFlow si sta arrestando';say('Puoi chiudere questa scheda quando il terminale conferma l’arresto.');};
 const minutes=ms=>{const s=Math.max(0,Math.round(ms/1000));return s<60?s+' s':Math.floor(s/60)+' min '+String(s%60).padStart(2,'0')+' s';};
 
 function render(state){const working=(state.busy||state.ready)&&!choosing;
@@ -165,7 +165,9 @@ export async function createChoiceServer({ root, state, choose, install, stop, n
       else if (route === `${base}/choose`) choose(data.choice, data.remember === true);
       else if (route === `${base}/install`) install();
       else if (route === `${base}/stop`) {
-        respond(200, 'Arresto in corso.'); void stop(); return;
+        const accepted = stop();
+        if (accepted === false) return respond(409, 'MediFlow è ancora utilizzato da un altro client.');
+        respond(200, 'Arresto in corso.'); return;
       } else return respond(404, 'Pagina non trovata.');
       respond(202, 'Richiesta accettata.');
     } catch (error) { respond(400, escape(error.message)); }

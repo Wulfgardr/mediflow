@@ -1547,7 +1547,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     const observationFile = path.join(directory, 'stop-observation.ndjson'), ownerLoader = path.join(directory, 'owner-loader.mjs');
     const controlRequest = path.join(directory, 'drain-request.json'), controlReply = path.join(directory, 'drain-reply.json');
     const fixtureGeneration = crypto.randomUUID();
-    const simulatedWindowsBootstrap = lifecycle?.platform === 'win32' || process.env.MEDIFLOW_FIXTURE_STOP_DENY_PLATFORM === 'win32';
+    const simulatedWindowsBootstrap = !lifecycle?.job && (lifecycle?.platform === 'win32' || process.env.MEDIFLOW_FIXTURE_STOP_DENY_PLATFORM === 'win32');
     writeFileSync(ownerLoader, String.raw`
             ${simulatedWindowsBootstrap ? windowsBootstrapFixture(source) : ''}
             import fs from 'node:fs'; import cp from 'node:child_process'; import crypto from 'node:crypto';
@@ -1575,6 +1575,12 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 }
             };
             cp.spawn = (executable, argv, options) => {
+                if (${Boolean(lifecycle?.job)} && argv.includes(${JSON.stringify(path.join(source,'scripts/windows-runtime-job.ps1'))})) {
+                    const helper = spawn(executable, argv, options);
+                    record({type:'job-helper-created',pid:helper.pid});
+                    helper.once('close',()=>record({type:'job-helper-exit',pid:helper.pid}));
+                    return helper;
+                }
                 if (executable !== process.execPath || ![${JSON.stringify(path.join(source, 'scripts/source-runtime.mjs'))}, ${JSON.stringify(path.join(source, 'node_modules/next/dist/bin/next'))}].includes(argv[0])) throw new Error('FIXTURE_FOREIGN_CHILD_DENIED');
                 const inheritedStderr = options.stdio[2] === 2;
                 const child = spawn(executable, argv, inheritedStderr ? { ...options, stdio: [options.stdio[0], options.stdio[1], 'pipe'] } : options);
@@ -1750,8 +1756,10 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 return result;
             }});`);
     }
-    for (const name of ['mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs']) {
-        const bytes = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
+    for (const name of ['mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job.ps1', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs']) {
+        const rawBytes = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
+        const bytes = name === 'mediflow.mjs' && !lifecycle?.job
+            ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", 'false') : rawBytes;
         writeFileSync(path.join(source, 'scripts', name), name === 'mediflow.mjs' ? bytes.replace('const startOptionalOllama = () => {', 'const startOptionalOllama = () => { process.stderr.write(\"FIXTURE_OLLAMA_START\\n\"); return;') : bytes);
     }
     mkdirSync(path.join(source, 'scripts/windows-launcher-bootstrap'), { recursive: true });
@@ -1778,6 +1786,10 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         import { installLocalUiWebNavigation } from ${JSON.stringify(new URL('./local-ui-web-navigation.mjs', import.meta.url).href)};
         export const verifySourceRuntime = () => ({ identity: ${JSON.stringify(identity)} });
         if (process.argv[1].endsWith('source-runtime.mjs')) {
+            if (process.env.MEDIFLOW_WEB_OWNER_GATE) await new Promise(resolve => {
+                const receive = frame => { if (frame.type === 'mediflow-web-owner-start' && frame.nonce === process.env.MEDIFLOW_WEB_OWNER_GATE) { process.off('message',receive); resolve(); } };
+                process.on('message',receive);
+            });
             fs.appendFileSync(${JSON.stringify(observationFile)}, JSON.stringify({type:'child-runtime',pid:process.pid,node:process.version,execPath:process.execPath,uv:process.versions.uv,actualOS:process.platform,at:Date.now()})+'\\n');
             ${lifecycle?.group ? `
                 setInterval(() => { if(fs.existsSync(${JSON.stringify(groupCleanup)})) process.exit(0); },10);
@@ -1856,7 +1868,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     const socket = createHttpServer();
     await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
     const port = socket.address().port; await new Promise(resolve => socket.close(resolve));
-    const child = spawn(process.execPath, [...fixtureImportArguments(ownerLoader), ...(lifecycle ? fixtureImportArguments(stopLoader) : []), path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), '--senza-browser', ...args], {
+    const child = spawn(process.execPath, [...fixtureImportArguments(ownerLoader), ...(lifecycle && !lifecycle.job ? fixtureImportArguments(stopLoader) : []), path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), '--senza-browser', ...args], {
         env: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home, PORT: String(port) }, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
     const closed = Promise.all([once(child, 'exit'), once(child.stderr, 'close')]).then(([exit]) => exit);
     let resolveTerminal, terminalFailureObserved = false, cleanupTask = null, ownerRecorded = false, launcherClosed = false, drainTask = null;
@@ -2989,4 +3001,30 @@ test('IPC cancellation during the Web identity proof cannot dispatch a late inte
     f.child.send({type:'mediflow-local-ui-cancel',requestId});
     assert.equal(await result, 'denied');
     assert.doesNotMatch(f.output(), /mediflow.local-ui.navigation.v1/);
+});
+
+
+test('Windows launcher frees checkout and archive locks after autonomous Web exit', {skip:process.platform!=='win32',timeout:30000},async t=>{
+    const f=await ordinaryLauncherFixture(t,'web',[],true,true,{},null,{platform:'win32',job:true});
+    await f.until(()=>f.output().includes('Pronto:'));
+    const receipt=JSON.parse(readFileSync(f.runtimePid));
+    assert.ok(receipt.pid>0);
+    process.kill(receipt.pid,'SIGKILL');
+    await f.waitForTerminal();
+    assert.equal(f.child.exitCode,0,f.output());
+    assert.equal(existsSync(path.join(f.stateFiles.lockDirectory,'active')),false);
+    const archive=path.join(path.dirname(path.dirname(f.stateFiles.lockDirectory)),`local-ui-${crypto.createHash('sha256').update(f.data).digest('hex')}`,'launcher');
+    assert.equal(existsSync(path.join(archive,'active')),false);
+    const recovered=claimLauncher(f.stateFiles.lockDirectory,{checkoutPath:f.source});
+    assert.equal(recovered.claimed,true);releaseLauncher(recovered);
+    t.diagnostic(JSON.stringify({web:receipt.pid,launcher:f.child.pid,checkoutReleased:true,archiveReleased:true}));
+});
+
+
+test('chooser reports a retained client lease instead of announcing a completed stop',async t=>{
+    const page=await createChoiceServer({root:repoRoot,state:()=>({ready:true}),choose(){},install(){},stop(){return false;}});
+    t.after(()=>page.close());
+    const endpoint=new URL('stop',page.url);
+    const response=await fetch(endpoint,{method:'POST',headers:{Origin:endpoint.origin,'Content-Type':'application/json'},body:'{}'});
+    assert.equal(response.status,409);assert.match(await response.text(),/altro client/u);
 });
