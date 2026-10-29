@@ -32,6 +32,24 @@ Dopo questo riesame sono aggiornati il solo digest di `lib/db.ts` e il
 riferimento del runtime; il comando completo `verify:therapy-status` deve
 verificare modello legacy e test causali senza ampliare la loro copertura.
 
+## Raccordo WUL-757: attivazione esplicita del lease UI
+
+Riesaminato `75393f7d8a3a86f9dc4aa85cd9489719a1c2a379` rispetto a
+`e9e170e4790159ae1f4d10922f7508c4c128981c` e alla precedente head della PR
+`fca91f9517bd1bfb214cd09940aab559ce7e47f6`. Fra i file coperti cambia solo
+`lib/security/client-auth-api.ts`: il tipo `AuthHealthPayload` aggiunge il
+campo opzionale booleano `localUiLeaseRequired`. Il codice eseguibile del
+modulo resta identico: nessuna modifica a richieste HTTP, fence, segnali,
+recupero, transizioni, guardie o posizione degli await.
+
+Il consumer SecurityProvider legge il campo per il solo lease documentale.
+Il controllo delle terapie, i suoi writer, CAS, ledger e audit restano
+identici alla copertura precedente. Anche lo scarto esplicito della bozza
+agisce solo sulla copia cifrata del browser, prima della navigazione, senza
+scritture cliniche. Il confronto non estende TLC a lease o bozze.
+Dopo questo riesame sono aggiornati il digest del solo tipo modificato e
+`syncCommit`; modello, invarianti, limiti, mutanti e testimoni restano invariati.
+
 ## Raccordo HC-A2 del 29 ottobre 2026: esiti delle scale
 
 Riesaminato il diff rispetto a `d7e5e0f4228d5a4e112c5b526f5e212e106c122d`,
