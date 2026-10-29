@@ -1,5 +1,7 @@
 import type { BrowserContext, Page, CDPSession } from '@playwright/test';
 import { z } from 'zod';
+import { unique } from './unique.ts';
+import { BrowserInput } from './browser-input.ts';
 import { portalAttributes, type ProcedureSnapshot } from '../contract.ts';
 import { SYNTHETIC_PORTAL_STYLE } from './prescription.ts';
 
@@ -19,7 +21,8 @@ const passiveAttributes: Record<string, readonly string[]> = {
 
 async function collectControls(context: BrowserContext, page: Page, token: CensusToken): Promise<ControlCensus> {
     const controls: z.infer<typeof controlSchema>[] = [], unexpected: string[] = [];
-    const documents = new Set<string>(), metadata: Record<string, string> = {};
+    const documents = new Set<string>(), contexts: Record<string, string>[] = [];
+    const structure = new Map<string, number[]>();
     const passiveRoles = new Set(['RootWebArea', 'none', 'generic', 'StaticText', 'InlineTextBox', 'heading', 'paragraph', 'main', 'LabelText', 'status']);
     try {
         const pages = context.pages();
@@ -29,7 +32,7 @@ async function collectControls(context: BrowserContext, page: Page, token: Censu
             {
                 const { root } = await session.send('DOM.getDocument', { depth: -1, pierce: true });
                 const { frameTree } = await session.send('Page.getFrameTree');
-                const accessibility = new Map<number, { role: string; interactive: boolean }>();
+                const accessibility = new Map<number, { role: string; interactive: boolean }[]>();
                 async function visit(node: typeof root, nested: boolean, frameId?: string, native = false): Promise<void> {
                     if (node.nodeType === 9) {
                         if (!frameId || !node.children) throw new Error('unverifiable');
@@ -40,11 +43,13 @@ async function collectControls(context: BrowserContext, page: Page, token: Censu
                             const role = String(accessible.role?.value ?? '');
                             const interactive = !passiveRoles.has(role) || (accessible.properties ?? []).some(property =>
                                 ['editable', 'focusable', 'settable'].includes(property.name) && !!property.value.value && role !== 'RootWebArea');
-                            if (accessible.backendDOMNodeId) accessibility.set(accessible.backendDOMNodeId, { role, interactive });
+                            if (accessible.backendDOMNodeId) {
+                                const entries = accessibility.get(accessible.backendDOMNodeId) ?? [];
+                                entries.push({ role, interactive }); accessibility.set(accessible.backendDOMNodeId, entries);
+                            }
                             else if (interactive && !accessible.ignored && role !== 'InlineTextBox') unexpected.push('unclassified-accessibility-control');
                         }
-                        const mainWorld = mainWorlds.get(frameId);
-                        if (!mainWorld) throw new Error('unverifiable');
+                        const mainWorld = unique(mainWorlds.get(frameId) ?? []);
                         if (!worlds.has(frameId)) {
                             const world = await session.send('Page.createIsolatedWorld', { frameId, worldName: 'mediflow-census' });
                             worlds.set(frameId, world.executionContextId);
@@ -72,8 +77,7 @@ async function collectControls(context: BrowserContext, page: Page, token: Censu
                         for (let i = 0; i < attributes.length; i += 2) attrs.set(attributes[i]!, attributes[i + 1]!);
                         const { object } = await session.send('DOM.resolveNode', { backendNodeId: node.backendNodeId, executionContextId: frameId ? worlds.get(frameId) : undefined });
                         if (!object.objectId) throw new Error('unverifiable');
-                        const mainWorld = frameId ? mainWorlds.get(frameId) : undefined;
-                        if (!mainWorld) throw new Error('unverifiable');
+                        const mainWorld = unique(frameId ? mainWorlds.get(frameId) ?? [] : []);
                         const listenerObject = await session.send('DOM.resolveNode', { backendNodeId: node.backendNodeId, executionContextId: mainWorld });
                         if (!listenerObject.object.objectId) throw new Error('unverifiable');
                         const listeners = await session.send('DOMDebugger.getEventListeners', { objectId: listenerObject.object.objectId });
@@ -85,18 +89,24 @@ async function collectControls(context: BrowserContext, page: Page, token: Censu
                                 focusable: this.tabIndex >= 0, attributes: Object.fromEntries([...this.attributes].map(a => [a.name, a.value]))
                             } : { editable: false, focusable: false }; }` });
                         const computed = z.object({ editable: z.boolean(), focusable: z.boolean(), attributes: z.record(z.string(), z.string()).optional() }).parse(state.result.value);
-                        const ax = accessibility.get(node.backendNodeId);
+                        const entries = accessibility.get(node.backendNodeId);
+                        const ax = entries ? unique(entries) : undefined;
+                        if ((node.nodeName === 'INPUT' || node.nodeName === 'BUTTON') && !ax) throw new Error('unverifiable');
                         const interactive = computed.editable || computed.focusable || ax?.interactive;
                         const contracted = (node.nodeName === 'INPUT' && ax?.role === 'textbox' && !computed.editable)
                             || (node.nodeName === 'BUTTON' && ax?.role === 'button' && !computed.editable);
                         if (interactive && !contracted) unexpected.push('unclassified-accessibility-control');
                         if ((node.nodeName === 'INPUT' || node.nodeName === 'BUTTON') && !contracted) unexpected.push('unverifiable-control');
-                        if (node.nodeName === 'MAIN' && !nested && surface === page) Object.assign(metadata, computed.attributes);
+                        if (!nested && surface === page) {
+                            const nodes = structure.get(node.nodeName) ?? []; nodes.push(node.backendNodeId); structure.set(node.nodeName, nodes);
+                            if (node.nodeName === 'MAIN') contexts.push(computed.attributes ?? {});
+                        }
                         if (node.nodeName === 'INPUT' || node.nodeName === 'BUTTON') {
                             const result = await session.send('Runtime.callFunctionOn', { objectId: object.objectId, returnByValue: true,
-                                functionDeclaration: `function() { const form = this.form; return { name: this.name || '', value: this.value || '', tag: this.tagName,
+                                functionDeclaration: `function() { const unique = ${unique.toString()}; const form = this.form; return { name: this.name || '', value: this.value || '', tag: this.tagName,
                                     type: this.type || '', editable: this.isContentEditable === true,
-                                    placed: !!form && form.parentElement?.tagName === 'MAIN' && this.ownerDocument.querySelectorAll('form').length === 1
+                                    placed: !!form && form === unique([...this.ownerDocument.querySelectorAll('form')])
+                                        && form.parentElement === unique([...this.ownerDocument.querySelectorAll('main')])
                                         && form.getAttribute('action') === '/draft' && form.method === 'post',
                                     action: this.getAttribute('formaction'), text: this.textContent.trim() }; }` });
                             const control = controlSchema.parse(result.result.value);
@@ -124,12 +134,17 @@ async function collectControls(context: BrowserContext, page: Page, token: Censu
             }
         }
         if (pages.length !== context.pages().length || pages.some(surface => !context.pages().includes(surface)) || !pages.includes(page)) return { status: 'unverifiable' };
-        return censusSchema.parse({ status: 'complete', controls, unexpected, metadata });
+        for (const control of controls) {
+            unique(controls.filter(candidate => candidate.tag === control.tag
+                && (control.tag === 'BUTTON' ? candidate.text === control.text : candidate.name === control.name)));
+        }
+        for (const tag of ['HTML', 'HEAD', 'META', 'TITLE', 'STYLE', 'BODY', 'MAIN', 'H1', 'FORM']) unique(structure.get(tag) ?? []);
+        return censusSchema.parse({ status: 'complete', controls, unexpected, metadata: unique(contexts) });
     } catch { return { status: 'unverifiable' }; }
 }
 
 
-type CensusChannel = { session: CDPSession; mainWorlds: Map<string, number>; worlds: Map<string, number> };
+type CensusChannel = { session: CDPSession; mainWorlds: Map<string, number[]>; worlds: Map<string, number> };
 
 const dispatchAuthority: unique symbol = Symbol('census-dispatch');
 export type CensusDispatch = { readonly [dispatchAuthority]: true; consume(): void };
@@ -145,14 +160,17 @@ export class CensusToken {
     #binding?: { expected: string; read(): ProcedureSnapshot };
     readonly #context: BrowserContext;
     readonly #page: Page;
+    readonly #input: BrowserInput;
     readonly #newPage = () => { this.#invalid = true; };
 
-    private constructor(context: BrowserContext, page: Page) {
-        this.#context = context; this.#page = page;
+    private constructor(context: BrowserContext, page: Page, input: BrowserInput) {
+        this.#context = context; this.#page = page; this.#input = input;
         context.on('page', this.#newPage);
     }
     static async capture(context: BrowserContext, page: Page): Promise<CensusToken> {
-        const token = new CensusToken(context, page);
+        const input = await BrowserInput.observe(context, page);
+        await input.command('probe');
+        const token = new CensusToken(context, page, input);
         token.#observedEpoch = token.#epoch;
         token.#census = await collectControls(context, page, token);
         try { token.assertObserved(); }
@@ -170,11 +188,18 @@ export class CensusToken {
         if (existing) return existing;
         const session = await this.#context.newCDPSession(surface);
         this.own(session, surface);
-        const channel: CensusChannel = { session, mainWorlds: new Map<string, number>(), worlds: new Map<string, number>() };
+        const channel: CensusChannel = { session, mainWorlds: new Map<string, number[]>(), worlds: new Map<string, number>() };
         this.#channels.set(surface, channel);
         session.on('Runtime.executionContextCreated', ({ context }) => {
             const frame = z.object({ isDefault: z.boolean(), frameId: z.string() }).safeParse(context.auxData);
-            if (frame.success && frame.data.isDefault) channel.mainWorlds.set(frame.data.frameId, context.id);
+            if (frame.success && frame.data.isDefault) {
+                const entries = channel.mainWorlds.get(frame.data.frameId) ?? [];
+                entries.push(context.id); channel.mainWorlds.set(frame.data.frameId, entries);
+            }
+        });
+        session.on('Runtime.executionContextsCleared', () => { if (this.#state !== 'dispatched') this.#invalid = true; });
+        session.on('Runtime.executionContextDestroyed', ({ executionContextId }) => {
+            for (const [frame, entries] of channel.mainWorlds) channel.mainWorlds.set(frame, entries.filter(id => id !== executionContextId));
         });
         await session.send('Runtime.enable');
         await session.send('Page.enable');
@@ -208,6 +233,7 @@ export class CensusToken {
         if (this.#state === 'closed' || this.#epoch !== this.#observedEpoch) throw new Error('unverifiable');
     }
     assertHealthy() {
+        this.#input.assertHealthy();
         if (this.#invalid || this.#page.isClosed()) throw new Error('unverifiable');
     }
     async act<T>(action: (dispatch: CensusDispatch) => Promise<T>): Promise<T> {
@@ -251,6 +277,8 @@ export class CensusToken {
 }
 
 export async function censusControls(context: BrowserContext, page: Page): Promise<ControlCensus> {
-    const token = await CensusToken.capture(context, page);
-    try { return token.census; } finally { await token.close(); }
+    try {
+        const token = await CensusToken.capture(context, page);
+        try { return token.census; } finally { await token.close(); }
+    } catch { return { status: 'unverifiable' }; }
 }

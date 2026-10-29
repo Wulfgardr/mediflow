@@ -50,7 +50,7 @@ try {
     mutate('browser-retry', 'lib/local-operation/specialist/browser-adapter.ts', 'maxRetries: 0', 'maxRetries: 1', 'timeout dopo atto');
     mutateFiles('atomic-recipient', [
         ['lib/local-operation/specialist/synthetic-portal.ts', '!valuesMatch(body, state.plan)', 'false'],
-        ['lib/local-operation/specialist/browser-adapter.ts', "if ([...values].length !== expected.fields.length || expected.fields.some(field =>\n                            values.getAll(field.name).length !== 1 || values.get(field.name) !== field.value)) deny();", ''],
+        ['lib/local-operation/specialist/browser-adapter.ts', "if ([...values].length !== expected.fields.length || expected.fields.some(field =>\n                            unique(values.getAll(field.name)) !== field.value)) deny();", ''],
     ], 'corsa umana');
     mutate('outcome-connection', 'lib/local-operation/sqlite-journal.ts', 'ports.recordConfirmed?.(record)', 'undefined', 'HTML, rilettura');
     mutate('required-audit', 'lib/local-operation/specialist/outcome-service.ts',
@@ -89,7 +89,7 @@ try {
     mutateFiles('snapshot-content', [
         ['lib/local-operation/service.ts', '(requireContent && value.planDigest !== planDigest(plan))', 'false'],
         ['lib/local-operation/specialist/browser-adapter.ts', 'observation.planDigest !== planDigest(input.plan())', 'false'],
-        ['lib/local-operation/specialist/browser-adapter.ts', "if ([...values].length !== expected.fields.length || expected.fields.some(field =>\n                            values.getAll(field.name).length !== 1 || values.get(field.name) !== field.value)) deny();", ''],
+        ['lib/local-operation/specialist/browser-adapter.ts', "if ([...values].length !== expected.fields.length || expected.fields.some(field =>\n                            unique(values.getAll(field.name)) !== field.value)) deny();", ''],
     ], 'qualunque vincolo semantico');
     mutate('snapshot-human-review', 'lib/local-operation/service.ts', 'humanRevision !== context.humanRevision', 'false', 'qualunque vincolo semantico');
     mutate('snapshot-consumption', 'lib/local-operation/specialist/browser-census.ts',
@@ -98,14 +98,18 @@ try {
     mutate('computed-inventory', 'lib/local-operation/specialist/browser-census.ts',
         "if (interactive && !contracted) unexpected.push('unclassified-accessibility-control');", '', 'inventario riconosce ogni controllo');
     mutate('accessibility-unavailable', 'lib/local-operation/specialist/browser-census.ts',
-        "} catch { return { status: 'unverifiable' }; }", "} catch { return { status: 'complete', controls: [], unexpected: [], metadata: {} }; }", 'senza albero accessibile');
+        "return censusSchema.parse({ status: 'complete', controls, unexpected, metadata: unique(contexts) });\n    } catch { return { status: 'unverifiable' }; }", "return censusSchema.parse({ status: 'complete', controls, unexpected, metadata: unique(contexts) });\n    } catch { return { status: 'complete', controls: [], unexpected: [], metadata: {} }; }", 'senza albero accessibile');
     mutate('surface-style-contract', 'lib/local-operation/specialist/browser-census.ts',
         "if (styles.result.value !== true) unexpected.push('unclassified-styles');", '', 'qualunque controllo modificabile');
     mutate('style-epoch', 'lib/local-operation/specialist/browser-census.ts',
         "session.on('CSS.styleSheetChanged', () => { this.#invalid = true; });", '', 'cambiamento dello stile durante');
     mutate('dispatch-content', 'lib/local-operation/specialist/browser-adapter.ts',
-        "if ([...values].length !== expected.fields.length || expected.fields.some(field =>\n                            values.getAll(field.name).length !== 1 || values.get(field.name) !== field.value)) deny();", '',
+        "if ([...values].length !== expected.fields.length || expected.fields.some(field =>\n                            unique(values.getAll(field.name)) !== field.value)) deny();", '',
         'il contenuto inviato deve essere');
+    mutate('unique-page-read', 'lib/local-operation/specialist/unique.ts',
+        "if (values.length !== 1) throw new Error('unverifiable');", '', 'ogni contenitore o landmark contrattuale');
+    mutate('observed-human-input', 'lib/local-operation/specialist/browser-input.ts',
+        'for (const type of ${JSON.stringify(events)}) window.addEventListener(type, report, true);', '', 'qualunque input umano non strutturale');
     run('specialist-restored', suite, 0);
     if (process.env.MEDIFLOW_CU_EVIDENCE) {
         assert.ok(path.isAbsolute(process.env.MEDIFLOW_CU_EVIDENCE));
