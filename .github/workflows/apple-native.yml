@@ -340,15 +340,11 @@ jobs:
               -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testIPadKeepsTheOpenChartAcrossRotation
             )
           fi
-          # -retry-tests-on-failure absorbs transient runner flakes (e.g. the
-          # "Timed out while acquiring background assertion" launch flake) without
-          # masking real failures: a test must pass within the retries.
           xcodebuild test \
             -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
             -scheme MediFlowMobileApp \
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.id }}" \
             "${only_testing[@]}" \
-            -retry-tests-on-failure -test-iterations 2 \
             CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee "${RUNNER_TEMP}/xcuitest-${{ matrix.idiom }}.log"
       - name: Verify the four iPad contracts ran without skips
