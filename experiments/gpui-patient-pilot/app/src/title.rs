@@ -38,6 +38,7 @@ pub enum SegmentRole {
     ItalianProse,
     Name,
     Code,
+    Count,
 }
 
 #[derive(Clone)]
@@ -46,6 +47,26 @@ pub struct TitleText {
     segments: Vec<(Range<usize>, SegmentRole)>,
 }
 impl TitleText {
+    pub fn label(text: impl Into<SharedString>) -> Self {
+        Self::new(text.into(), SegmentRole::ItalianProse)
+    }
+    pub fn with_count(self, count: u64) -> Self {
+        self.append(SegmentRole::ItalianProse, " · ")
+            .append(SegmentRole::Count, count.to_string())
+    }
+    pub fn section_label(self, theme: Theme) -> Self {
+        let mut text = String::new();
+        let mut segments = Vec::new();
+        for (range, role) in self.segments {
+            let start = text.len();
+            text.push_str(&theme.role(TypeRole::Section).label(&self.text[range]));
+            segments.push((start..text.len(), role));
+        }
+        Self {
+            text: text.into(),
+            segments,
+        }
+    }
     pub fn name(text: impl NameInput) -> Self {
         Self::new(text.name_string(), SegmentRole::Name)
     }
@@ -326,7 +347,7 @@ fn layout_title(
         {
             vec![
                 (word[..index].trim_end(), role),
-                (word[index..].trim(), SegmentRole::Code),
+                (word[index..].trim(), SegmentRole::Count),
             ]
         } else {
             vec![(word, role)]
@@ -601,8 +622,9 @@ mod tests {
                 "DATA O STATO DA VERIFICARE",
                 "AUJOURD’HUI ET À VENIR",
             ] {
-                for count in ["1", "20", "200", "2000"] {
-                    let text = TitleText::from(format!("{label} · {count}"));
+                for count in [1, 20, 200, 2000] {
+                    let text = TitleText::label(label).with_count(count);
+                    let count = count.to_string();
                     let layout = layout_title(
                         &text,
                         &style,
@@ -613,7 +635,7 @@ mod tests {
                     );
                     let lines: Vec<_> = layout.lines.iter().map(|l| l.text.as_ref()).collect();
                     assert!(
-                        lines.iter().any(|line| line.ends_with(count)),
+                        lines.iter().any(|line| line.ends_with(count.as_str())),
                         "{label}/{count}: {lines:?}"
                     );
                     assert_eq!(
@@ -1266,5 +1288,21 @@ mod review706d {
             (f32::from(bounds.size.height) - expected).abs() < 1.,
             "Strong override ignored by heading"
         );
+    }
+}
+
+#[cfg(test)]
+mod count_contract_tests {
+    use super::*;
+    #[test]
+    fn hcg5_typed_count_survives_section_case() {
+        let text = TitleText::label("Straße")
+            .with_count(2000)
+            .section_label(Theme::for_dark(false));
+        assert_eq!(text.text(), "STRASSE · 2000");
+        let (range, role) = text.segments.last().unwrap();
+        assert_eq!(*role, SegmentRole::Count);
+        assert_eq!(&text.text[range.clone()], "2000");
+        assert_eq!(text.tokens().last().unwrap().1, SegmentRole::Count);
     }
 }
