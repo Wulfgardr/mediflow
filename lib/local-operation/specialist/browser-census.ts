@@ -1,4 +1,4 @@
-import type { BrowserContext, Page } from '@playwright/test';
+import type { BrowserContext, Page, CDPSession } from '@playwright/test';
 import { z } from 'zod';
 
 const controlSchema = z.object({ name: z.string(), value: z.string(), tag: z.string(), type: z.string(), editable: z.boolean(),
@@ -15,7 +15,7 @@ const passiveAttributes: Record<string, readonly string[]> = {
     FORM: ['method', 'action'], LABEL: [],
 };
 
-export async function censusControls(context: BrowserContext, page: Page): Promise<ControlCensus> {
+async function collectControls(context: BrowserContext, page: Page, token: CensusToken): Promise<ControlCensus> {
     const controls: z.infer<typeof controlSchema>[] = [], unexpected: string[] = [];
     const documents = new Set<string>();
     try {
@@ -23,13 +23,16 @@ export async function censusControls(context: BrowserContext, page: Page): Promi
         for (const surface of pages) {
             if (surface !== page) unexpected.push('unclassified-document');
             const session = await context.newCDPSession(surface);
-            try {
+            token.own(session, surface);
+            {
                 const mainWorlds = new Map<string, number>();
                 session.on('Runtime.executionContextCreated', ({ context }) => {
                     const frame = z.object({ isDefault: z.boolean(), frameId: z.string() }).safeParse(context.auxData);
                     if (frame.success && frame.data.isDefault) mainWorlds.set(frame.data.frameId, context.id);
                 });
                 await session.send('Runtime.enable');
+                await session.send('Page.enable');
+                await session.send('DOM.enable');
                 await session.send('Emulation.setScriptExecutionDisabled', { value: true });
                 const { root } = await session.send('DOM.getDocument', { depth: -1, pierce: true });
                 const { frameTree } = await session.send('Page.getFrameTree');
@@ -93,9 +96,87 @@ export async function censusControls(context: BrowserContext, page: Page): Promi
                     for (const child of tree.childFrames ?? []) verifyFrames(child);
                 }
                 verifyFrames(frameTree);
-            } finally { await session.detach(); }
+            }
         }
         if (pages.length !== context.pages().length || pages.some(surface => !context.pages().includes(surface)) || !pages.includes(page)) return { status: 'unverifiable' };
         return censusSchema.parse({ status: 'complete', controls, unexpected });
     } catch { return { status: 'unverifiable' }; }
+}
+
+
+const dispatchAuthority: unique symbol = Symbol('census-dispatch');
+export type CensusDispatch = { readonly [dispatchAuthority]: true; consume(): void };
+
+export class CensusToken {
+    #sessions = new Set<CDPSession>();
+    #epoch = 0;
+    #observedEpoch = 0;
+    #invalid = false;
+    #state: 'observed' | 'armed' | 'dispatched' | 'closed' = 'observed';
+    #census: ControlCensus = { status: 'unverifiable' };
+    readonly #context: BrowserContext;
+    readonly #page: Page;
+    readonly #newPage = () => { this.#invalid = true; };
+
+    private constructor(context: BrowserContext, page: Page) {
+        this.#context = context; this.#page = page;
+        context.on('page', this.#newPage);
+    }
+    static async capture(context: BrowserContext, page: Page): Promise<CensusToken> {
+        const token = new CensusToken(context, page);
+        token.#observedEpoch = token.#epoch;
+        token.#census = await collectControls(context, page, token);
+        try { token.assertObserved(); }
+        catch { token.#census = { status: 'unverifiable' }; }
+        return token;
+    }
+    get census(): ControlCensus { return this.#census; }
+    own(session: CDPSession, surface: Page) {
+        this.#sessions.add(session);
+        const changed = () => { this.#epoch++; };
+        for (const event of ['DOM.attributeModified', 'DOM.attributeRemoved', 'DOM.characterDataModified',
+            'DOM.childNodeInserted', 'DOM.childNodeRemoved', 'DOM.childNodeCountUpdated', 'DOM.documentUpdated',
+            'DOM.shadowRootPushed', 'DOM.shadowRootPopped', 'DOM.distributedNodesUpdated', 'DOM.inlineStyleInvalidated'] as const) session.on(event, changed);
+        session.on('Page.frameAttached', () => { this.#invalid = true; });
+        session.on('Page.frameDetached', () => { this.#invalid = true; });
+        session.on('Page.frameNavigated', ({ frame }) => { if (this.#state !== 'dispatched' || frame.parentId) this.#invalid = true; });
+        session.on('Page.navigatedWithinDocument', () => { this.#invalid = true; });
+        session.on('Page.javascriptDialogOpening', () => { this.#invalid = true; });
+        session.on('Inspector.detached', () => { this.#invalid = true; });
+        surface.on('close', this.#newPage);
+    }
+    private assertObserved() {
+        this.assertHealthy();
+        if (this.#state === 'closed' || this.#epoch !== this.#observedEpoch) throw new Error('unverifiable');
+    }
+    assertHealthy() {
+        if (this.#invalid || this.#page.isClosed()) throw new Error('unverifiable');
+    }
+    async act<T>(action: (dispatch: CensusDispatch) => Promise<T>): Promise<T> {
+        this.assertObserved();
+        if (this.#state !== 'observed' || this.#census.status !== 'complete') throw new Error('unverifiable');
+        this.#state = 'armed';
+        const result = await action(Object.freeze({ [dispatchAuthority]: true as const, consume: () => this.dispatch() }));
+        this.assertHealthy();
+        if (!this.dispatched()) throw new Error('unverifiable');
+        return result;
+    }
+    private dispatched() { return this.#state === 'dispatched'; }
+    private dispatch() {
+        if (this.#state !== 'armed') throw new Error('unverifiable');
+        this.assertObserved();
+        this.#state = 'dispatched';
+    }
+    async close() {
+        this.#state = 'closed';
+        this.#context.off('page', this.#newPage);
+        for (const surface of this.#context.pages()) surface.off('close', this.#newPage);
+        await Promise.allSettled([...this.#sessions].map(session => session.detach()));
+        this.#sessions.clear();
+    }
+}
+
+export async function censusControls(context: BrowserContext, page: Page): Promise<ControlCensus> {
+    const token = await CensusToken.capture(context, page);
+    try { return token.census; } finally { await token.close(); }
 }
