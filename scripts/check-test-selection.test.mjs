@@ -376,6 +376,15 @@ test('Xcode mobile UI selects all three Swift files with the single-attempt CI a
   const selection = collectNativeToolSelections(xcodeFixture(t))['xcode:mobile-ui'];
   assert.deepEqual(selection.errors, []);
   assert.deepEqual(selection.files, mobileUiFiles);
+  assert.deepEqual(selection.binding.ipadOnlyTesting, [
+    'testProjectSidebarPreservesPatientWorkspaceWidthOnIPad',
+    'testAccessibilityDynamicTypeUsesSinglePatientColumnOnIPad',
+    'testIPadListColumnFollowsTheContainerAcrossRotation',
+    'testScaleDraftKeepsOriginalPatientWhenSelectionChanges',
+    'testScaleRequiresSelectedPatientAndCanCancel',
+    'testScaleFormSubmitsAndAppearsInDiary',
+    'testIPadKeepsTheOpenChartAcrossRotation',
+  ].map(name => `MediFlowMobileAppUITests/MediFlowMobileAppUITests/${name}`));
   assert.deepEqual(checkTestSelection(mobileUiFiles, { 'xcode:mobile-ui': selection }, []).errors, []);
 });
 
