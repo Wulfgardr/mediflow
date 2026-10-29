@@ -16,6 +16,7 @@ mod references;
 mod shell;
 mod text_input;
 mod theme;
+mod title;
 
 use gpui::{App, AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions, px, size};
 use std::{borrow::Cow, path::PathBuf};

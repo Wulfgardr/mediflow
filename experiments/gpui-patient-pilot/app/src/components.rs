@@ -292,50 +292,15 @@ pub fn heading(id: &'static str, label: impl Into<SharedString>, theme: Theme) -
         .aria_label(label.clone())
         .min_w_0()
         .max_w_full()
-        .whitespace_normal()
         .type_role(theme, TypeRole::PageTitle)
         .text_color(theme.ink)
-        .child(text!(label))
+        .child(crate::title::title(label, theme))
 }
 
 pub fn confirmation_heading(question: String, theme: Theme) -> Stateful<Div> {
-    let words: Vec<_> = question.split_inclusive(' ').map(str::to_owned).collect();
-    let last = words.len().saturating_sub(1);
-    div()
-        .id("clinical-workspace-confirm-question")
+    heading("clinical-workspace-confirm-question", question, theme)
         .debug_selector(|| "threshold-question".into())
-        .role(Role::Heading)
-        .aria_label(question)
         .type_role(theme, TypeRole::Threshold)
-        .flex()
-        .flex_wrap()
-        .children(words.into_iter().enumerate().map(|(index, word)| {
-            let mut unit = div().max_w_full().flex_shrink_0();
-            if index == last && word.ends_with('?') {
-                let before_mark = &word[..word.len() - 1];
-                let ending_start = before_mark.char_indices().next_back().map_or(0, |(i, _)| i);
-                unit = unit
-                    .debug_selector(|| "threshold-question-last-word".into())
-                    .flex()
-                    .flex_wrap()
-                    .child(div().max_w_full().flex_shrink_0().child(
-                        text!(&word[..ending_start]).with_id("threshold-question-last-prefix"),
-                    ))
-                    .child(
-                        div()
-                            .whitespace_nowrap()
-                            .flex_shrink_0()
-                            .debug_selector(|| "threshold-question-ending".into())
-                            .child(
-                                text!(&word[ending_start..])
-                                    .with_id("threshold-question-last-ending"),
-                            ),
-                    );
-            } else {
-                unit = unit.child(text!(word).with_id(("threshold-question-word", index)));
-            }
-            unit
-        }))
 }
 
 pub fn section(
