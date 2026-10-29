@@ -564,3 +564,10 @@ Il recupero dell’autorità native dopo un nuovo login è circoscritto da
 [contratto OpenAPI dedicato](openapi/native-authority-retirement-v1.json).
 
 Il [contratto clear/delete ambulatori](./ambulatory-destructive-commands.md) distingue anteprima host, conferma nominata e recupero dei terminali; il collegamento GPUI resta una tranche successiva.
+
+## Punti di innesto territoriali, proposta del 29 ottobre 2026
+
+- [adr/0170-territorial-service-extension-points.md](./adr/0170-territorial-service-extension-points.md): ADR Proposed: nove punti di innesto e manifesto dei servizi, estensione di 0158.
+- [territorial/lombardia-services-and-prerequisites.md](./territorial/lombardia-services-and-prerequisites.md): Dodici servizi, priorità PRREG/GCM e prerequisiti Ente/Software House ancora aperti.
+- [territorial/italia-generico-paper-test.md](./territorial/italia-generico-paper-test.md): Prova sulla carta del solo profilo nazionale FSE/INI e SAC, senza servizi regionali.
+- [territorial/aria-letter-draft.md](./territorial/aria-letter-draft.md): Bozza non inviata delle domande ad ARIA, senza richiesta di accesso.

@@ -156,3 +156,5 @@ prima porzione di lavoro verificabile:
 - [ADR0168 — Comando durevole stato terapia](0168-durable-therapy-status-command.md): C-5a/G-6, receipt/tombstone, tempo host e conservazione attraverso restore; consumer chat escluso.
 
 - [ADR0169 — Clear/delete ambulatori nominati](0169-gpui-ambulatory-destructive-commands.md): piano host congelato, doppia autorità e terminali durevoli; consumer GPUI collegato; qualifica aggregata ancora aperta.
+
+- [ADR 0170: Punti di innesto territoriali](0170-territorial-service-extension-points.md): Proposed; estende 0158 con contratti dei servizi e raccordo WUL-587.
