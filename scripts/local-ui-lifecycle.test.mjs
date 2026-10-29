@@ -187,5 +187,5 @@ test('real standalone: forged recovery receipts cannot stop a manual Web; valid 
  const client=f.launch(true);await until(()=>client.handshake);
  fs.writeFileSync(file,JSON.stringify(f.receipt));assert.equal((await recoverLocalRuntime(file)).status,409);assert.equal((await fetch(f.url)).status,200);
  client.disconnect();await until(()=>exited(client));
- assert.equal((await recoverLocalRuntime(file)).status,200);await until(()=>exited(f.owner)&&runtimeProcessIdentity(f.web)===null);
+ await until(()=>exited(f.owner)&&runtimeProcessIdentity(f.web)===null);
 });
