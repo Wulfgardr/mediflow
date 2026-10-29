@@ -1561,6 +1561,17 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 process.stderr.write('FIXTURE_STOP_OBSERVATION ' + JSON.stringify(event) + '\n');
             };
             globalThis[Symbol.for('mediflow.fixture.stop-observation')] = record;
+            globalThis[Symbol.for('mediflow.fixture.windows-job')] = async (child, owner) => {
+                record({type:'simulated-job-created',pid:child.pid});
+                const closed = new Promise(resolve => child.once('close', () => {
+                    record({type:'simulated-job-closed',pid:child.pid}); resolve();
+                }));
+                return {closed, owner:owner.token, async stop() {
+                    if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+                    await closed;
+                }};
+            };
+
             process.kill = (target, signal) => {
                 const child = owned.get(Math.abs(target))?.child;
                 if (!child) return kill(target, signal);
@@ -1609,6 +1620,9 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
             }
             syncBuiltinESMExports();
             registerHooks({ load(url, context, next) {
+                if (${lifecycle?.job === 'simulated'} && url === ${JSON.stringify(pathToFileURL(path.join(source,'scripts/windows-runtime-job.mjs')).href)}) {
+                    return {format:'module',shortCircuit:true,source:'export const containWindowsWeb = globalThis[Symbol.for("mediflow.fixture.windows-job")];'};
+                }
                 const result = next(url, context);
                 if (url === ${JSON.stringify(pathToFileURL(path.join(source, 'scripts/mediflow.mjs')).href)}) {
                     record({ type: 'hook-active', url, node: process.version, execPath: process.execPath, uv: process.versions.uv });
@@ -1759,7 +1773,8 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     for (const name of ['mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job.ps1', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs']) {
         const rawBytes = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
         const bytes = name === 'mediflow.mjs' && !lifecycle?.job
-            ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", 'false') : rawBytes;
+            ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", 'false') : lifecycle?.job === 'simulated' && name === 'mediflow.mjs'
+                ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", "choice === 'web'") : rawBytes;
         writeFileSync(path.join(source, 'scripts', name), name === 'mediflow.mjs' ? bytes.replace('const startOptionalOllama = () => {', 'const startOptionalOllama = () => { process.stderr.write(\"FIXTURE_OLLAMA_START\\n\"); return;') : bytes);
     }
     mkdirSync(path.join(source, 'scripts/windows-launcher-bootstrap'), { recursive: true });
@@ -3085,4 +3100,26 @@ test('Web admission publishes serving custody in both checkout and archive locks
   assert.equal(runtime.web.pid,f.observations().find(event=>event.type==='child-created').pid);
   assert.equal(typeof runtime.web.start,'string');assert.match(runtime.web.nonce,/^[a-f0-9-]{36}$/u);
  }
+});
+
+
+test('Windows Job closure during chooser switch keeps the launcher alive and starts the requested mode', {timeout:15000}, async t => {
+    const f = await ordinaryLauncherFixture(t, 'web', ['--scelta','web'], false, true, {}, null,
+        {platform:process.platform,job:'simulated'});
+    await f.until(() => f.output().includes('Pronto:'));
+    const receipt = JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
+    const endpoint = new URL('choose', receipt.choiceUrl);
+    const response = await fetch(endpoint, {method:'POST',headers:{Origin:endpoint.origin,'Content-Type':'application/json'},
+        body:JSON.stringify({choice:'agenti'}),signal:AbortSignal.timeout(1000)});
+    assert.equal(response.status,202); await response.text();
+    await f.until(() => (f.output().match(/Pronto:/gu) ?? []).length === 2 || f.child.exitCode !== null);
+    assert.equal(f.child.exitCode,null,'The retired Windows Job closed the launcher during the switch');
+    assert.equal(f.child.signalCode,null);
+    const events = f.observations(), created = events.filter(event => event.type === 'child-created');
+    assert.equal(created.length,2,f.output());
+    assert.equal(created[1].argv.at(-1),'headless');
+    assert.ok(events.findIndex(event => event.type === 'simulated-job-closed') < events.indexOf(created[1]));
+    const state = await (await fetch(new URL('state',receipt.choiceUrl))).json();
+    assert.equal(state.ready,true); assert.ok(state.url);
+    assert.equal((await fetch(state.url)).status,200);
 });

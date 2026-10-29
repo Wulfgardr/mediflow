@@ -495,11 +495,14 @@ export async function main(args = process.argv.slice(2)) {
   const pairRequests = new Map();
   const ipcStopChildren = new WeakSet();
   let childOwner = null, leases = null, webJob = null;
-  const stopChild = () => {
+  const stopChild = async () => {
     if (child && child.exitCode === null && child.signalCode === null && leases?.external) {
       throw new Error('MediFlow è ancora utilizzato da un altro client.');
     }
-    return webJob ? webJob.stop() : stopOwnedChild(child, 8000, { ownerRecord: childOwner });
+    if (webJob) {
+      await webJob.stop();
+      webJob = null;
+    } else await stopOwnedChild(child, 8000, { ownerRecord: childOwner });
   };
   let pairingPoll = null;
   let shutdownTask = null, shutdownComplete = false, ownershipHold = null;
@@ -653,6 +656,11 @@ export async function main(args = process.argv.slice(2)) {
   };
   const start = async (choice, remember) => {
     const attempt = ++generation;
+    const finishGeneration = (jobClosed = false, error = undefined) => {
+      if (closing || attempt !== generation) return;
+      if (jobClosed || (pluginChannel && !webJob)) { void shutdown(error); return; }
+      update({ ready: false, busy: false, url: null, step: 'errore', message: 'MediFlow si è arrestato. Controlla i log nel terminale prima di riaprire.' });
+    };
     update({ busy: true, ready: false, navigationReady: false, url: null, step: 'dipendenze', message: 'Controllo delle dipendenze.' });
     await stopChild();
     if (closing) return;
@@ -726,7 +734,7 @@ export async function main(args = process.argv.slice(2)) {
       }
       if (choice === 'web' && process.platform === 'win32') {
         webJob = await containWindowsWeb(owned, childOwner);
-        void webJob.closed.then(() => { if (!closing) void shutdown(); }, error => { void shutdown(error); });
+        void webJob.closed.then(() => finishGeneration(true), error => finishGeneration(true, error));
         bindRuntimeOwnership([ownership, archiveOwnership], { kind: 'windows-job', web: childOwner.token, guardian: webJob.owner });
       }
       if (choice === 'web') owned.send({ type: 'mediflow-web-owner-start', nonce: env.MEDIFLOW_WEB_OWNER_GATE });
@@ -785,10 +793,7 @@ export async function main(args = process.argv.slice(2)) {
       ipcStopChildren.add(owned);
     }
     if (closing) return;
-    child.once('exit', () => {
-      if (pluginChannel && !closing && !webJob && attempt === generation) { void shutdown(); return; }
-      if (!closing && attempt === generation) update({ ready: false, busy: false, url: null, step: 'errore', message: 'MediFlow si è arrestato. Controlla i log nel terminale prima di riaprire.' });
-    });
+    child.once('exit', () => finishGeneration());
     if (!options.reuseOnly && remember && choice !== 'sviluppo') atomicJson(preferencesFile, { schemaVersion: 1, choice });
     else if (!options.reuseOnly && !remember) atomicJson(preferencesFile, { schemaVersion: 1, choice: null });
     update({ busy: false, ready: true, navigationReady: choice === 'web', url: target, step: 'pronto', message: choice === 'mac' ? 'App per Mac avviata. Lascia aperto il terminale.' : `Pronto: ${target}` });
