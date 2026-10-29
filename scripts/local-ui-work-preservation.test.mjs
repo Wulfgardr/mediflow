@@ -69,6 +69,13 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
     await until(() => page.evaluate(() => Object.keys(localStorage).some(key => key.startsWith('mediflow:entry-draft:') && localStorage.getItem(key)?.startsWith('ENC:'))));
     // Wait for a server acknowledgement from the actual root component.
     await page.waitForResponse(response => response.url().endsWith('/api/plugin-local-ui/lease') && response.status() === 204, { timeout: 10000 });
+    const resumed = page.waitForResponse(response => response.url().endsWith('/api/plugin-local-ui/lease')
+        && response.status() === 204 && response.request().postDataJSON().action === 'renew', { timeout: 10000 });
+    await page.evaluate(() => {
+        window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+        window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+    });
+    await resumed;
     for (const theme of ['light', 'dark']) {
         await page.evaluate(theme => { document.documentElement.classList.remove('light', 'dark'); document.documentElement.classList.add(theme); }, theme);
         if (evidence) await page.screenshot({ path: path.join(evidence, `draft-before-${theme}.png`), fullPage: true });

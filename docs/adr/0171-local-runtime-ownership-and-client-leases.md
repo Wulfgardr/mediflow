@@ -93,7 +93,9 @@ secondi, limitato anche dalla scadenza della sessione Web. Il launcher elimina
 le scadenze ogni 250 ms: connessione HTTP aperta, invio senza risposta e timer
 nel browser non costituiscono conferma. Il Web attende l'ack IPC del launcher.
 La chiusura della pagina prova a rilasciare il lease; il mancato saluto non ne
-impedisce la scadenza. Lock, logout o revoca negano i rinnovi; un lease già
+impedisce la scadenza. Il ritorno dalla cache Indietro/Avanti rinnova con un
+nuovo identificativo: un rilascio tardivo del documento sospeso non può
+cancellare il lease ripreso. Lock, logout o revoca negano i rinnovi; un lease già
 confermato dura al massimo fino alla scadenza. La sospensione del browser o
 il throttling dei suoi timer possono produrre la stessa scadenza.
 
