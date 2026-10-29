@@ -9203,13 +9203,15 @@ mod tests {
     }
 }
 
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(test)]
 mod review706b_callers {
     use super::*;
+    #[cfg(target_os = "macos")]
     struct Fixture {
         app: Entity<ClinicalApp>,
         mode: u8,
     }
+    #[cfg(target_os = "macos")]
     impl Render for Fixture {
         fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             self.app.update(cx, |app, cx| {
@@ -9377,6 +9379,7 @@ mod review706b_callers {
         assert!(failures.is_empty(), "{}", failures.join("\n"));
     }
 
+    #[cfg(target_os = "macos")]
     #[gpui::test]
     fn hcg5_real_page_margins(cx: &mut gpui::TestAppContext) {
         let mut native = gpui::TestAppContext::build_with_text_system(
@@ -9452,6 +9455,7 @@ mod review706b_callers {
         }
     }
 
+    #[cfg(target_os = "macos")]
     #[gpui::test]
     fn actual_preview_304(cx: &mut gpui::TestAppContext) {
         let mut native = gpui::TestAppContext::build_with_text_system(
@@ -9496,6 +9500,7 @@ mod review706b_callers {
                     + 1.)
         );
     }
+    #[cfg(target_os = "macos")]
     #[gpui::test]
     fn all_actual_callers_use_common_renderer(cx: &mut gpui::TestAppContext) {
         let mut native = gpui::TestAppContext::build_with_text_system(
@@ -9552,6 +9557,7 @@ mod review706b_callers {
             "real callers bypass common renderer: {missing:?}"
         );
     }
+    #[cfg(target_os = "macos")]
     #[gpui::test]
     fn actual_directory_name_string_boundary_stays_protected(cx: &mut gpui::TestAppContext) {
         let mut native = gpui::TestAppContext::build_with_text_system(
