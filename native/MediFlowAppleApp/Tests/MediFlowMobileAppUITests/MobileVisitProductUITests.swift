@@ -63,7 +63,7 @@ final class MobileVisitProductUITests: XCTestCase {
         openVisit(app)
         waitForUIReady(app.buttons["mobile-visit-unlock"], in: app)
         app.buttons["mobile-visit-unlock"].tap()
-        waitForUIReady(app.buttons["mobile-visit-open-note"].firstMatch, in: app, timeout: 10)
+        XCTAssertTrue(app.buttons["mobile-visit-open-note"].firstMatch.waitForExistence(timeout: 10))
         app.buttons["mobile-visit-open-note"].firstMatch.tap()
         XCTAssertTrue(note.waitForExistence(timeout: 5))
         XCTAssertEqual(note.value as? String, "Appunto solo sintetico conservato senza rete.")
@@ -80,13 +80,12 @@ final class MobileVisitProductUITests: XCTestCase {
         let review = app.buttons["mobile-visit-review"].firstMatch
         scrollTo(review, in: app)
         review.tap()
-        waitForUIReady(app.secureTextFields["mobile-visit-password"], in: app)
         app.secureTextFields["mobile-visit-password"].tap()
         app.secureTextFields["mobile-visit-password"].typeText(String(Int.random(in: 1000...9999)))
         app.buttons["mobile-visit-authenticate"].tap()
         let consent = app.switches["Ho confrontato le fonti aggiornate e rivisto l’appunto"]
         scrollTo(consent, in: app)
-        waitForUIReady(consent, in: app, timeout: 10)
+        XCTAssertTrue(consent.waitForExistence(timeout: 10))
         consent.tap()
         app.buttons["mobile-visit-import"].tap()
         let diary = app.buttons["patient-section-diary"]
