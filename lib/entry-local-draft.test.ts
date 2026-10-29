@@ -47,3 +47,27 @@ test('text recovers without freezing the default date; explicit date survives', 
     const chosen = await f.create().read();
     assert.equal(restoreEntryDraftDate(chosen!, '2026-10-30T10:00'), draft.entryDate);
 });
+
+test('explicit discard drains pending saves and retires the owner before later writes can restore the draft', async () => {
+    const f = await fixture(), owner = f.create(); await owner.read();
+    const otherScope = f.create({ ...scope, patient: 'other' }); await otherScope.read(); await otherScope.save(draft);
+    const pending = owner.save(draft);
+    const discarded = owner.discard();
+    const late = owner.save({ ...draft, content: 'Late autosave' });
+    await Promise.all([pending, discarded, late]);
+    assert.equal(await f.create().read(), null);
+    assert.deepEqual(await f.create({ ...scope, patient: 'other' }).read(), draft);
+    await owner.save(draft);
+    assert.equal(await f.create().read(), null);
+});
+
+test('failed explicit discard preserves the draft and can be retried after storage recovers', async () => {
+    const f = await fixture(), owner = f.create(); await owner.read(); await owner.save(draft);
+    const remove = f.storage.removeItem;
+    f.storage.removeItem = () => { throw new Error('Synthetic storage failure'); };
+    await assert.rejects(owner.discard(), /Synthetic storage failure/);
+    assert.deepEqual(await f.create().read(), draft);
+    f.storage.removeItem = remove;
+    await owner.discard();
+    assert.equal(await f.create().read(), null);
+});

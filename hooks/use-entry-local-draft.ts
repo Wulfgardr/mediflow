@@ -33,6 +33,6 @@ export function useEntryLocalDraft(patient: string, value: EntryLocalDraft, rest
         void owner.save(value).then(() => { if (current === revision.current) { setSaved(entryDraftToPersist(value) !== null); setError(''); } })
             .catch(() => { if (current === revision.current) setError('Bozza automatica non conservata. Mantieni aperta questa schermata e registra il resoconto.'); });
     }, [owner, value, state]);
-    const clear = async () => { if (owner) { await owner.save(null); owner.dispose(); } };
+    const clear = async () => { if (owner) { await owner.discard(); } };
     return { state, saved, error, clear, hasDraft: entryDraftToPersist(value) !== null };
 }

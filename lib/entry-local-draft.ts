@@ -27,6 +27,20 @@ export function createEntryLocalDraft(scope: Scope, storage: Pick<Storage, 'getI
     const key = `mediflow:entry-draft:v1:${JSON.stringify(scope)}`;
     let observed: string | null = null, tail = Promise.resolve(), disposed = false;
     const exclusive = async <T>(work: () => Promise<T>): Promise<T> => await locks.request(key, work) as T;
+    const save = (draft: EntryLocalDraft | null, retire = false) => {
+        const task = tail.then(() => exclusive(async () => {
+            if (disposed) return;
+            if (storage.getItem(key) !== observed) throw new Error('La bozza è cambiata in un’altra scheda. Il testo resta in questa schermata.');
+            const persisted = entryDraftToPersist(draft);
+            const encrypted = persisted ? await cipher.sealLocalDraft({ scope, draft: persisted }) : null;
+            if (disposed) return;
+            if (encrypted === null) storage.removeItem(key); else storage.setItem(key, encrypted);
+            observed = encrypted;
+            if (retire) disposed = true;
+        }));
+        tail = task.catch(() => {});
+        return task;
+    };
     return {
         async read(): Promise<EntryLocalDraft | null> {
             observed = storage.getItem(key);
@@ -49,19 +63,8 @@ export function createEntryLocalDraft(scope: Scope, storage: Pick<Storage, 'getI
             }
             return entryDraftToPersist(draft);
         },
-        save(draft: EntryLocalDraft | null) {
-            const task = tail.then(() => exclusive(async () => {
-                if (disposed) return;
-                if (storage.getItem(key) !== observed) throw new Error('La bozza è cambiata in un’altra scheda. Il testo resta in questa schermata.');
-                const persisted = entryDraftToPersist(draft);
-                const encrypted = persisted ? await cipher.sealLocalDraft({ scope, draft: persisted }) : null;
-                if (disposed) return;
-                if (encrypted === null) storage.removeItem(key); else storage.setItem(key, encrypted);
-                observed = encrypted;
-            }));
-            tail = task.catch(() => {});
-            return task;
-        },
+        save,
+        discard: () => save(null, true),
         dispose() { disposed = true; },
     };
 }
