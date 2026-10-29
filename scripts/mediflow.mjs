@@ -12,7 +12,7 @@ import { verifySourceRuntime } from './source-runtime.mjs';
 import { initializeWindowsSystemCommand, windowsTaskkillCommand, windowsProcessCreationTimeTicks } from './windows-system-command.mjs';
 import { macDerivedDataDirectory } from './build-input-metadata.mjs';
 import { createChoiceServer } from './mediflow-launcher-page.mjs';
-import { prepareLauncherState } from './launcher-state.mjs';
+import { prepareLauncherState, localUiArchiveLock } from './launcher-state.mjs';
 import { verifyOwnedWeb } from './local-ui-web-identity.mjs';
 import { pairingDirectory, readPairingRequests, bridgeExistingLocalUi, frames, writeFrame } from './local-ui-pairing-transport.mjs';
 
@@ -413,8 +413,7 @@ export async function main(args = process.argv.slice(2)) {
   const ownership = claimLauncher(lockDirectory, identity, { reuseLive: true });
   let archiveOwnership = null;
   if (pluginChannel && ownership.claimed) {
-    const archiveLock = path.join(path.dirname(path.dirname(lockDirectory)),
-      `.mediflow-local-ui-${crypto.createHash('sha256').update(dataDir).digest('hex')}`);
+    const archiveLock = localUiArchiveLock(dataDir);
     try { archiveOwnership = claimLauncher(archiveLock, identity, { reuseLive: true }); }
     catch (error) { releaseLauncher(ownership); throw error; }
     if (!archiveOwnership.claimed) {

@@ -52,6 +52,7 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
       const server = net.createServer(); server.once('error', reject);
       server.listen(0, '127.0.0.1', () => { const port = server.address().port; server.close(error => error ? reject(error) : resolve(port)); });
     });
+    if (closed || signal.aborted) return unavailable();
     const child = spawn(process.execPath, [path.join(sourceRoot, 'scripts/mediflow.mjs'), '--riusa'], {
       cwd: sourceRoot, detached: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'], shell: false,
       env: { ...ordinaryLauncherEnvironment(dataDir), PORT: String(port) },
