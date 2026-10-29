@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "status": "proposed",
+  "corpusSha256": "3e744b64b67b891e4b0a3837dd3c3c7ce6a35a312ad9b6b11369a30b2f3a57ba",
+  "rows": [
+    {
+      "cell": "athena-local-direct",
+      "metric": "sourcePage",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed"
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "negation",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed"
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "uncertainty",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed"
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "subject",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed"
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "time",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed"
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "inventedSources",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed"
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "unconfirmedWrites",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed"
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "unexpectedEgress",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed"
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "equivalence",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed"
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "sourcePage",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed"
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "negation",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed"
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "uncertainty",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed"
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "subject",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed"
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "time",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed"
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "inventedSources",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed"
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "unconfirmedWrites",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed"
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "unexpectedEgress",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed"
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "equivalence",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed"
+    }
+  ]
+}
