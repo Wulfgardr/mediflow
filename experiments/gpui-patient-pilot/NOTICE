@@ -30,3 +30,8 @@ hyphenation 0.8.4, built from hyph-utf8 Italian patterns by Claudio Beccari
 (Copyright 2008-2011). The MIT permission notice and source provenance are
 preserved in app/assets/hyphenation/LICENSE-Italian.txt. The dictionary is embedded
 locally; no runtime download or system dictionary is required.
+
+The hyphenation 0.8.4 crate is available under Apache-2.0 or MIT. This pilot
+uses the MIT option; its copyright and permission notice are preserved in
+app/assets/hyphenation/LICENSE-hyphenation-MIT.txt. Italian pattern provenance,
+checksums and dictionary regeneration are documented in that directory's README.
