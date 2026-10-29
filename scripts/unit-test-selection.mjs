@@ -13,6 +13,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/local-ui-lifecycle.test.mjs',
   'scripts/local-ui-work-preservation.test.mjs',
   'scripts/runtime-leases.test.mjs',
+  'scripts/local-ui-browser-port.test.mjs',
   'scripts/local-ui-pairing-authority.test.mjs',
   'scripts/local-ui-pairing-transport.test.mjs',
   'scripts/package-local-ui-plugin.test.mjs',

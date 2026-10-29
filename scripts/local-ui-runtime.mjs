@@ -102,11 +102,11 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
   return navigate;
 }
 
-export async function archiveBrowserPort(dataDir) {
-  const file = path.join(path.dirname(localUiArchiveLock(dataDir)), 'browser-port.json');
-  const read = () => {
-    if (fs.lstatSync(file).isSymbolicLink()) return unavailable();
-    const fd = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+export async function archiveBrowserPort(dataDir, options) {
+  const file = path.join(path.dirname(localUiArchiveLock(dataDir, options)), 'browser-port.json');
+  const read = (target = file) => {
+    if (fs.lstatSync(target).isSymbolicLink()) return unavailable();
+    const fd = fs.openSync(target, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
     try {
       const stat = fs.fstatSync(fd);
       if (!stat.isFile() || stat.nlink !== 1 || stat.size > 64 || process.getuid && stat.uid !== process.getuid()) return unavailable();
@@ -115,12 +115,62 @@ export async function archiveBrowserPort(dataDir) {
       return value.port;
     } finally { fs.closeSync(fd); }
   };
-  try { return read(); } catch (error) { if (error.code !== 'ENOENT') throw error; }
-  const server = net.createServer();
-  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-  try {
-    const port = server.address().port;
-    try { fs.writeFileSync(file, JSON.stringify({ port }), { flag: 'wx', mode: 0o600 }); return port; }
-    catch (error) { if (error.code !== 'EEXIST') throw error; return read(); }
-  } finally { await new Promise(resolve => server.close(resolve)); }
+  let preferred;
+  try { preferred = read(); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  const archive = path.basename(path.dirname(file));
+  const registry = path.join(path.dirname(path.dirname(file)), 'browser-ports');
+  fs.mkdirSync(registry, { recursive: true, mode: 0o700 });
+  const stat = fs.lstatSync(registry);
+  if (!stat.isDirectory() || stat.isSymbolicLink() || process.getuid && stat.uid !== process.getuid()) return unavailable();
+  const owner = port => {
+    const fd = fs.openSync(path.join(registry, String(port)), fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+    try {
+      const stat = fs.fstatSync(fd);
+      if (!stat.isFile() || stat.size > 128 || process.getuid && stat.uid !== process.getuid()) return unavailable();
+      return fs.readFileSync(fd, 'utf8');
+    } finally { fs.closeSync(fd); }
+  };
+  const reserve = (port, binding = archive) => {
+    const temporary = path.join(registry, `.candidate-${crypto.randomUUID()}`);
+    fs.writeFileSync(temporary, binding, { flag: 'wx', mode: 0o600 });
+    try {
+      try { fs.linkSync(temporary, path.join(registry, String(port))); return true; }
+      catch (error) { if (error.code !== 'EEXIST') throw error; return owner(port) === binding; }
+    } finally { fs.unlinkSync(temporary); }
+  };
+  const available = async port => {
+    const server = net.createServer();
+    try {
+      await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
+      return true;
+    } catch (error) { if (!['EADDRINUSE', 'EACCES'].includes(error.code)) throw error; return false; }
+    finally { if (server.listening) await new Promise(resolve => server.close(resolve)); }
+  };
+  if (preferred && reserve(preferred) && await available(preferred)) return preferred;
+  for (const entry of fs.readdirSync(registry).sort()) {
+    if (!/^[0-9]+$/u.test(entry)) continue;
+    const port = Number(entry);
+    if (port >= 1024 && port <= 65535 && owner(port) === archive && await available(port)) return port;
+  }
+  for (const entry of fs.readdirSync(path.dirname(registry))) {
+    if (!/^local-ui-[a-f0-9]{64}$/u.test(entry)) continue;
+    const directory = path.join(path.dirname(registry), entry);
+    if (fs.lstatSync(directory).isSymbolicLink()) return unavailable();
+    try { reserve(read(path.join(directory, 'browser-port.json')), entry); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  for (let attempt = 0; attempt < 128; attempt++) {
+    const server = net.createServer();
+    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+    try {
+      const port = server.address().port;
+      if (!reserve(port)) continue;
+      if (!preferred) {
+        try { fs.writeFileSync(file, JSON.stringify({ port }), { flag: 'wx', mode: 0o600 }); }
+        catch (error) { if (error.code !== 'EEXIST') throw error; }
+      }
+      return port;
+    } finally { await new Promise(resolve => server.close(resolve)); }
+  }
+  return unavailable();
 }
