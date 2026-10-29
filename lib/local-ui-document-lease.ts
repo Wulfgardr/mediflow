@@ -19,7 +19,6 @@ export function startLocalUiDocumentLease(page: Pick<Window, 'addEventListener' 
     const hide = () => {
         if (phase === 'closed') return;
         phase = 'suspended';
-        void send(tab, 'release').catch(() => {});
     };
     const show = () => {
         if (phase !== 'suspended') return;
@@ -32,5 +31,6 @@ export function startLocalUiDocumentLease(page: Pick<Window, 'addEventListener' 
     return () => {
         clearInterval(timer); page.removeEventListener('pagehide', hide); page.removeEventListener('pageshow', show);
         hide(); phase = 'closed';
+        void send(tab, 'release').catch(() => {});
     };
 }

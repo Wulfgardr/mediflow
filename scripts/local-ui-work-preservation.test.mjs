@@ -87,6 +87,13 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
     await pause(17000);
     assert.equal(terminal(first), false, 'Last host exit killed a browser-held runtime');
     assert.equal((await page.request.get('/api/auth/check')).status(), 200);
+    for (const navigate of [() => page.reload(), () => page.goto(`/patients/${patient.id}/entries/new`)]) {
+        const renewed = page.waitForResponse(response => response.url().endsWith('/api/plugin-local-ui/lease')
+            && response.status() === 204 && response.request().postDataJSON().action === 'renew', { timeout: 10000 });
+        await navigate(); await renewed;
+        assert.equal(terminal(first), false, 'Document navigation killed the browser-owned runtime');
+        assert.equal((await page.request.get('/api/auth/check')).status(), 200);
+    }
     const closedAt = Date.now(); await page.close();
     await until(() => terminal(first), 18000);
     assert.ok(Date.now() - closedAt < 18000, 'UI lease did not expire');
