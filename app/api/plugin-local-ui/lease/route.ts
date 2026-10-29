@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
 import { requireSession } from '@/lib/security/server-auth';
-import { isPluginLocalUiRuntime } from '@/lib/security/plugin-local-ui-runtime';
+import { requiresLocalUiDocumentLease } from '@/lib/security/plugin-local-ui-runtime';
 import { localUiLeaseRequest } from '@/lib/security/local-ui-lease-request';
 
 export const runtime = 'nodejs';
 export async function POST(request: Request) {
     const deny = () => new Response(null, { status: 404 });
-    if (!isPluginLocalUiRuntime() || process.env.MEDIFLOW_RUNTIME_UI_LEASE !== '1' || Number(request.headers.get('content-length')) > 256) return deny();
+    if (!requiresLocalUiDocumentLease() || Number(request.headers.get('content-length')) > 256) return deny();
     const text = await request.text();
     if (text.length > 256) return deny();
     let value: unknown;

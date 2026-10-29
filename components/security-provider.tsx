@@ -71,6 +71,7 @@ export interface User {
 type AuthRecoveryState = 'ready' | 'required' | 'pending' | 'failed';
 
 interface SecurityContextType {
+    localUiLeaseRequired: boolean;
     isAuthenticated: boolean;
     isLocked: boolean;
     requiresSetup: boolean;
@@ -151,6 +152,7 @@ const SecurityContext = createContext<SecurityContextType | undefined>(undefined
 
 export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [localUiLeaseRequired, setLocalUiLeaseRequired] = useState(false);
     const [requiresSetup, setRequiresSetup] = useState<boolean | null>(null); // null = loading
     const [isLocked, setIsLocked] = useState(true);
     const [user, setUser] = useState<User | null>(null);
@@ -289,6 +291,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         try {
             const { response: res, payload: data, controlState } = await checkAuthHealthRequest();
             if (controlState === 'stale') return;
+            setLocalUiLeaseRequired(res.ok && controlState === 'accepted' && data?.status === 'ok' && data.localUiLeaseRequired === true);
             if (controlState === 'invalid') {
                 setAuthHealth({
                     status: 'error',
@@ -837,6 +840,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     if (isLocked || !isAuthenticated) {
         return (
             <SecurityContext.Provider value={{
+                localUiLeaseRequired,
                 isAuthenticated,
                 isLocked: true,
                 requiresSetup: false,
@@ -863,6 +867,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     // Normal flow with Lock Screen Overlay
     return (
         <SecurityContext.Provider value={{
+            localUiLeaseRequired,
             isAuthenticated,
             isLocked,
             requiresSetup: false,
