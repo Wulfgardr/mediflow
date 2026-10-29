@@ -479,7 +479,7 @@ impl ClinicalApp {
                             .type_role(theme, crate::theme::TextRole::Body)
                             .child(text!(label)),
                     )
-                    .child(editor.clone()),
+                    .child(crate::text_input::themed(editor.clone(), theme)),
             );
         }
         if let Some(state) = state.load.state(ReadObject::Profilo) {

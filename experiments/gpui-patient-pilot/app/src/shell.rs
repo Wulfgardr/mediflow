@@ -25,11 +25,17 @@ mod who_lookup;
 
 use crate::theme::{TypeRole, TypeStyle};
 
+use gpui::text;
 use gpui::{
     App, ClipboardItem, Context, Div, Entity, FocusHandle, KeyBinding, Role, ScrollAnchor,
     ScrollHandle, SharedString, Stateful, Subscription, Window, WindowAppearance, actions, div,
-    prelude::*, px, text,
+    prelude::*, px,
 };
+#[cfg(test)]
+macro_rules! text {
+    ($($args:tt)*) => { crate::shell::rendered_command::observe_ink(gpui::text!($($args)*)) };
+}
+
 use mediflow_patient_client::{PatientProfile, ReadFailure, UpdateOutcome, Workspace};
 use mediflow_runtime_client::{
     AgendaFilter, Ambulatory, Attachment, Checkup, CheckupDraft, DrugCatalogItem, Entry,
@@ -2874,7 +2880,7 @@ impl ClinicalApp {
             div()
                 .id(id.clone())
                 .min_w_0()
-                .child(field.editor.clone())
+                .child(crate::text_input::themed(field.editor.clone(), theme))
                 .into_any_element()
         };
         div()
@@ -2895,6 +2901,7 @@ impl ClinicalApp {
                     el.child(
                         div()
                             .debug_selector(|| "clinical-workspace-field-label".into())
+                            .text_color(theme.ink)
                             .type_role(theme, crate::theme::TextRole::Body)
                             .child(text!(field.label)),
                     )
@@ -3181,7 +3188,7 @@ impl ClinicalApp {
                                 .id("clinical-workspace-patient-search-anchor")
                                 .flex_1()
                                 .min_w_0()
-                                .child(self.search.clone()),
+                                .child(crate::text_input::themed(self.search.clone(), theme)),
                             false,
                         ),
                     ),
@@ -3492,7 +3499,7 @@ impl ClinicalApp {
             .min_w_0()
             .flex()
             .flex_col()
-            .bg(theme.paper)
+            .reading_surface(theme)
             .rounded(px(theme.paper_radius));
         let Some(patient) = self.patient.detail.ready() else {
             return pane.child(
@@ -4753,7 +4760,7 @@ impl ClinicalApp {
             .flex_1()
             .min_h_0()
             .min_w_0()
-            .bg(theme.paper)
+            .reading_surface(theme)
             .rounded(px(theme.paper_radius))
             .overflow_hidden()
             .on_action(cx.listener(|this, _: &NextFocus, window, cx| {
@@ -4910,7 +4917,7 @@ impl ClinicalApp {
             .flex()
             .flex_col()
             .gap(px(12.))
-            .bg(theme.paper);
+            .reading_surface(theme);
         if let Some(action) = self.discard {
             return threshold.bg(theme.draft)
                 .child(div().id("clinical-workspace-discard-question").accessibility_id("clinical-workspace-discard-question").role(Role::AlertDialog).aria_label("Scartare la bozza?")
@@ -5500,7 +5507,7 @@ impl ClinicalApp {
             .max_w_full()
             .overflow_y_scroll()
             .p(px(layout.margin))
-            .bg(theme.paper)
+            .reading_surface(theme)
             .rounded(px(theme.paper_radius));
         if self.show_other {
             return area.child(self.other_view(layout, cx));
@@ -5561,7 +5568,7 @@ impl ClinicalApp {
             .as_ref()
             .map(|session| session.base_url().to_owned())
             .unwrap_or_default();
-        div().w_full().min_w_0().max_w(px(760.)).flex().flex_col().gap(px(28.))
+        div().reading_surface(theme).w_full().min_w_0().max_w(px(760.)).flex().flex_col().gap(px(28.))
             .child(heading("clinical-workspace-settings-heading", "Impostazioni", theme))
             .child(button("clinical-workspace-manage-ambulatories", "Gestisci ambulatori…", theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| { this.ambulatory_management.active = true; this.area_scroll.set_offset(gpui::point(px(0.), px(0.))); this.load_ambulatories(cx); this.load_ambulatory_command_recovery(cx); })))
@@ -5611,7 +5618,7 @@ impl ClinicalApp {
         let theme = self.theme;
         let agenda = self.area == Area::Agenda;
         let selected = self.area;
-        div().w_full().min_w_0().max_w_full().flex().flex_col().gap(px(24.))
+        div().reading_surface(theme).w_full().min_w_0().max_w_full().flex().flex_col().gap(px(24.))
             .child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
                 .child(heading("clinical-workspace-global-heading", if agenda { "Agenda" } else { "Diario generale" }, theme))
                 .child(div().flex().flex_wrap().gap(px(8.))
@@ -5646,7 +5653,7 @@ impl ClinicalApp {
                     .type_role(theme, crate::theme::TextRole::Meta).child(text!(self.global_interval.description()))))
             .child(self.global_search_target.attach_enabled(
                 div().id("clinical-workspace-global-search-anchor").min_w_0().max_w_full()
-                    .child(self.global_search.clone()),
+                    .child(crate::text_input::themed(self.global_search.clone(), theme)),
                 false,
             ))
             .when_some(self.global_patients.state(ReadObject::NomiPazienti), |el, state| {
@@ -5676,6 +5683,7 @@ impl ClinicalApp {
         let state = self.agenda_state_after(now);
         let status = self.agenda_status(state.clone());
         let mut content = div()
+            .reading_surface(theme)
             .id("clinical-workspace-agenda-list")
             .accessibility_id("clinical-workspace-agenda-list")
             .role(Role::List)
@@ -5758,7 +5766,7 @@ impl ClinicalApp {
                     .gap(px(8.))
                     .child(section(
                         group.id(),
-                        format!("{} · {count}", group.title()),
+                        crate::title::TitleText::label(group.title()).with_count(count as u64),
                         theme,
                     ))
                     .when(group == AgendaGroup::Overdue, |el| {
@@ -5949,6 +5957,7 @@ impl ClinicalApp {
             })
             .collect();
         div()
+            .reading_surface(theme)
             .flex()
             .flex_col()
             .gap(px(20.))
@@ -7268,7 +7277,7 @@ impl ClinicalApp {
                 .iter()
                 .find(|row| row.system == system)
         });
-        let mut pane = div().min_w_0().flex().flex_col().gap(px(20.))
+        let mut pane = div().reading_surface(theme).min_w_0().flex().flex_col().gap(px(20.))
             .child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
                 .child(heading("clinical-workspace-references-heading", "Repertori", theme))
                 .child(button("clinical-workspace-references-refresh", "Rileggi", theme, false, true)
@@ -7299,7 +7308,7 @@ impl ClinicalApp {
                 .when(self.text_scale >= 2.5, |el| el.flex_col().items_stretch())
                 .child(self.reference_search_target.attach_enabled(
                     div().id("clinical-workspace-reference-search-anchor").flex_1().min_w(px(160.)).max_w_full()
-                        .child(self.reference_search.clone()), false))
+                        .child(crate::text_input::themed(self.reference_search.clone(), theme)), false))
                 .child(self.reference_run_target.attach_enabled(button("clinical-workspace-reference-run-search", "Cerca", theme, true, self.scope.is_some()), self.scope.is_some())
                     .when(self.scope.is_some(), |el| el.on_click(cx.listener(|this, _, _, cx| this.load_references(cx))))))
             .when_some(total, |el, total| el.child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
@@ -9194,13 +9203,15 @@ mod tests {
     }
 }
 
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(test)]
 mod review706b_callers {
     use super::*;
+    #[cfg(target_os = "macos")]
     struct Fixture {
         app: Entity<ClinicalApp>,
         mode: u8,
     }
+    #[cfg(target_os = "macos")]
     impl Render for Fixture {
         fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             self.app.update(cx, |app, cx| {
@@ -9226,7 +9237,7 @@ mod review706b_callers {
         let patient = serde_json::json!({"id":"review706b-patient","firstName":"","lastName":"Schwarzenegger","taxCode":"RSSMRA80A01H501U","version":1});
         app.install_patient(serde_json::from_value(patient.clone()).unwrap());
         app.global_patients = ReadLoad::Ready(vec![serde_json::from_value(patient).unwrap()]);
-        app.agenda=ReadLoad::Ready(vec![serde_json::from_value(serde_json::json!({"id":"review706b-control","patientId":"review706b-patient","version":1,"date":"2026-10-27","title":"Controllo sintetico","status":"pending"})).unwrap()]);
+        app.agenda=ReadLoad::Ready(vec![serde_json::from_value(serde_json::json!({"id":"review706b-control","patientId":"review706b-patient","version":1,"date":"2099-10-29","title":"Controllo sintetico","status":"pending"})).unwrap()]);
         app.agenda_flow.targets.insert(
             "review706b-control".into(),
             ScrollTarget::new(&app.area_scroll, cx),
@@ -9236,6 +9247,256 @@ mod review706b_callers {
         app.text_scale = 2.;
         app
     }
+    struct Hcg5Page {
+        app: Entity<ClinicalApp>,
+    }
+    impl Render for Hcg5Page {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            self.app.update(cx, |app, cx| {
+                let layout =
+                    Layout::for_window(f32::from(window.viewport_size().width), app.text_scale);
+                div()
+                    .size_full()
+                    .flex()
+                    .flex_col()
+                    .type_role(app.theme, crate::theme::TextRole::Body)
+                    .child(if app.area == Area::Patients {
+                        app.profile_view(layout, cx).into_any_element()
+                    } else if app.area == Area::References {
+                        app.references_view(cx).into_any_element()
+                    } else if app.area == Area::Analytics {
+                        app.analytics_view(cx).into_any_element()
+                    } else {
+                        app.area_view(layout, cx).into_any_element()
+                    })
+            })
+        }
+    }
+    #[gpui::test]
+    fn hcg5_page_inks_and_fields_contrast(cx: &mut gpui::TestAppContext) {
+        let (view, cx) = cx.add_window_view(|window, cx| Hcg5Page {
+            app: cx.new(|cx| make_app(window, cx)),
+        });
+        let mut failures = Vec::new();
+        for dark in [false, true] {
+            let theme = Theme::for_dark(dark);
+            for (area, confirm) in [
+                (Area::Agenda, false),
+                (Area::Diary, false),
+                (Area::Patients, false),
+                (Area::Settings, false),
+                (Area::References, false),
+                (Area::Analytics, false),
+                (Area::Patients, true),
+            ] {
+                view.update(cx, |v, cx| {
+                    v.app.update(cx, |app, cx| {
+                        app.area = area;
+                        app.theme = theme;
+                        app.text_scale = 1.;
+                        app.form = None;
+                        if confirm {
+                            let record=editing::Record::Checkup(serde_json::from_value(serde_json::json!({"id":"synthetic-checkup","patientId":"review706b-patient","version":1,"date":"2099-10-29","title":"Controllo sintetico","status":"pending"})).unwrap());
+                            app.stage_fields(FormKind::Checkup,record.fields(),Some(record),cx);
+                            app.form.as_mut().unwrap().state=FormState::Review;
+                        }
+
+                        cx.notify();
+                    })
+                });
+                cx.simulate_resize(gpui::size(px(1200.), px(14000.)));
+                let _probe = rendered_command::begin_inks();
+                rendered_command::take_fields();
+                let (quads, scale) = cx.update(|w, cx| {
+                    w.refresh();
+                    w.draw(cx).clear(cx);
+                    (w.painted_quads(), w.scale_factor())
+                });
+                let inks = rendered_command::painted_contrasts(
+                    rendered_command::take_inks(),
+                    &quads,
+                    scale,
+                );
+                let fields = rendered_command::take_fields();
+                assert!(!inks.is_empty());
+                if area == Area::Agenda {
+                    for label in [
+                        "Dal (AAAA-MM-GG)",
+                        "Al (AAAA-MM-GG)",
+                        "Intervallo applicato: tutte le date.",
+                        "Agenda letta",
+                        "Schwarzenegger",
+                        "Controllo sintetico",
+                        "Interfaccia corrente…",
+                        "Applica intervallo",
+                    ] {
+                        assert!(
+                            inks.iter().any(|(text, _)| text == label),
+                            "missing observed text {label}: {inks:?}"
+                        );
+                    }
+                    assert!(fields.len() >= 3, "date and search fields must render");
+                }
+                println!(
+                    "INKS dark={dark} confirmation={confirm}: {} texts, {} fields",
+                    inks.len(),
+                    fields.len()
+                );
+                for (label, ratio) in inks {
+                    if area == Area::Agenda {
+                        println!("AGENDA dark={dark} {label:?} text={ratio:.2}");
+                    }
+                    if ratio < 4.5 {
+                        failures.push(format!("dark={dark} {label:?}: text {ratio:.2}"));
+                    }
+                }
+                for (label, ink, paper, border) in fields {
+                    let ratio = rendered_command::contrast(ink.to_rgb(), paper.to_rgb());
+                    let stroke = rendered_command::contrast(border.to_rgb(), paper.to_rgb());
+                    println!("FIELD dark={dark} {label:?} text={ratio:.2} stroke={stroke:.2}");
+                    if ratio < 4.5 || stroke < 3. || paper != theme.paper {
+                        failures.push(format!("dark={dark} {label}: field text={ratio:.2} border={stroke:.2} theme={}",paper==theme.paper));
+                    }
+                }
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    #[gpui::test]
+    fn hcg5_contrast_rejects_invisible_text(cx: &mut gpui::TestAppContext) {
+        struct Fixture {
+            mode: u8,
+        }
+        impl Render for Fixture {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                let theme = Theme::for_dark(true);
+                div()
+                    .size_full()
+                    .reading_surface(theme)
+                    .relative()
+                    .child(
+                        div()
+                            .opacity(if self.mode == 1 {
+                                0.
+                            } else if self.mode == 3 {
+                                0.05
+                            } else {
+                                1.
+                            })
+                            .text_color(if self.mode == 0 {
+                                theme.paper
+                            } else {
+                                theme.ink
+                            })
+                            .child(rendered_command::observe_ink(gpui::text!(
+                                "Testo da verificare"
+                            ))),
+                    )
+                    .when(self.mode == 2, |el| {
+                        el.child(div().absolute().inset_0().bg(theme.paper))
+                    })
+            }
+        }
+        let (view, cx) = cx.add_window_view(|_, _| Fixture { mode: 0 });
+        for mode in 0..4 {
+            view.update(cx, |v, cx| {
+                v.mode = mode;
+                cx.notify();
+            });
+            let _probe = rendered_command::begin_inks();
+            let (quads, scale) = cx.update(|w, cx| {
+                w.refresh();
+                w.draw(cx).clear(cx);
+                (w.painted_quads(), w.scale_factor())
+            });
+            let samples =
+                rendered_command::painted_contrasts(rendered_command::take_inks(), &quads, scale);
+            assert_eq!(samples.len(), 1);
+            assert!(
+                samples[0].1 < 4.5,
+                "invisible mode {mode} escaped: {samples:?}"
+            );
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[gpui::test]
+    fn hcg5_real_page_margins(cx: &mut gpui::TestAppContext) {
+        let mut native = gpui::TestAppContext::build_with_text_system(
+            cx.dispatcher.clone(),
+            None,
+            std::sync::Arc::new(gpui_apple::AppleTextSystem::new()),
+        );
+        let (view, cx) = native.add_window_view(|window, cx| Hcg5Page {
+            app: cx.new(|cx| make_app(window, cx)),
+        });
+        for dark in [false, true] {
+            for scale in [1., 2., 4.] {
+                for width in [390., 420., 800.] {
+                    for (area, heading) in [
+                        (Area::Agenda, "Agenda"),
+                        (Area::Diary, "Diario generale"),
+                        (Area::Settings, "Impostazioni"),
+                        (Area::Patients, "Schwarzenegger"),
+                    ] {
+                        view.update(cx, |v, cx| {
+                            v.app.update(cx, |app, cx| {
+                                app.area = area;
+                                app.text_scale = scale;
+                                app.theme = Theme::for_dark(dark).sized(scale, false);
+                                cx.notify();
+                            })
+                        });
+                        cx.simulate_resize(gpui::size(px(width), px(14000.)));
+                        crate::title::take_title_nodes();
+                        crate::title::take_title_lines();
+                        cx.update(|w, cx| {
+                            w.refresh();
+                            w.draw(cx).clear(cx);
+                        });
+                        let nodes = crate::title::take_title_nodes();
+                        let (_, _, bounds, _) = nodes
+                            .iter()
+                            .find(|(_, n, _, _)| n.value() == Some(heading))
+                            .expect("page heading");
+                        let margin = if width / scale < 700. { 16. } else { 28. };
+                        assert_eq!(
+                            bounds.origin.x,
+                            px(margin),
+                            "{heading}/{width}/{scale}/{dark}"
+                        );
+                        if area == Area::Agenda {
+                            let status = cx
+                                .debug_bounds("clinical-workspace-agenda-update")
+                                .expect("agenda status");
+                            assert_eq!(status.origin.x, px(margin));
+                            println!(
+                                "HCG5_POSITION {width} {scale} {dark} {}",
+                                f32::from(status.origin.y)
+                            );
+                            let (_, _, bounds, _) = nodes
+                                .iter()
+                                .find(|(_, n, _, _)| n.value() == Some("OGGI E PROSSIMI · 1"))
+                                .expect("counted section");
+                            assert_eq!(bounds.origin.x, px(margin));
+                            let lines = crate::title::take_title_lines();
+                            let (_, lines) = lines
+                                .iter()
+                                .find(|(label, _)| label == "OGGI E PROSSIMI · 1")
+                                .unwrap();
+                            assert!(
+                                lines.iter().any(|l| l.contains("PROSSIMI · 1")),
+                                "{width}/{scale}/{dark}: {lines:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
     #[gpui::test]
     fn actual_preview_304(cx: &mut gpui::TestAppContext) {
         let mut native = gpui::TestAppContext::build_with_text_system(
@@ -9280,6 +9541,7 @@ mod review706b_callers {
                     + 1.)
         );
     }
+    #[cfg(target_os = "macos")]
     #[gpui::test]
     fn all_actual_callers_use_common_renderer(cx: &mut gpui::TestAppContext) {
         let mut native = gpui::TestAppContext::build_with_text_system(
@@ -9336,6 +9598,7 @@ mod review706b_callers {
             "real callers bypass common renderer: {missing:?}"
         );
     }
+    #[cfg(target_os = "macos")]
     #[gpui::test]
     fn actual_directory_name_string_boundary_stays_protected(cx: &mut gpui::TestAppContext) {
         let mut native = gpui::TestAppContext::build_with_text_system(

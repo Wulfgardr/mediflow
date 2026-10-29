@@ -38,6 +38,7 @@ pub enum SegmentRole {
     ItalianProse,
     Name,
     Code,
+    Count,
 }
 
 #[derive(Clone)]
@@ -46,6 +47,26 @@ pub struct TitleText {
     segments: Vec<(Range<usize>, SegmentRole)>,
 }
 impl TitleText {
+    pub fn label(text: impl Into<SharedString>) -> Self {
+        Self::new(text.into(), SegmentRole::ItalianProse)
+    }
+    pub fn with_count(self, count: u64) -> Self {
+        self.append(SegmentRole::ItalianProse, " · ")
+            .append(SegmentRole::Count, count.to_string())
+    }
+    pub fn section_label(self, theme: Theme) -> Self {
+        let mut text = String::new();
+        let mut segments = Vec::new();
+        for (range, role) in self.segments {
+            let start = text.len();
+            text.push_str(&theme.role(TypeRole::Section).label(&self.text[range]));
+            segments.push((start..text.len(), role));
+        }
+        Self {
+            text: text.into(),
+            segments,
+        }
+    }
     pub fn name(text: impl NameInput) -> Self {
         Self::new(text.name_string(), SegmentRole::Name)
     }
@@ -87,23 +108,41 @@ impl TitleText {
     }
     fn tokens(&self) -> Vec<(&str, SegmentRole)> {
         let mut offset = 0;
-        self.text
-            .split_whitespace()
-            .map(|word| {
-                let start = offset + self.text[offset..].find(word).expect("title token");
-                offset = start + word.len();
-                let role = self
-                    .segments
-                    .iter()
-                    .find(|(range, role)| {
-                        *role != SegmentRole::ItalianProse
-                            && range.start < offset
-                            && range.end > start
-                    })
-                    .map_or(SegmentRole::ItalianProse, |(_, role)| *role);
-                (word, role)
-            })
-            .collect()
+        let mut ranges: Vec<Range<usize>> = Vec::new();
+        for word in self
+            .text
+            .split(|c: char| c.is_whitespace() && c != '\u{a0}' && c != '\u{202f}')
+            .filter(|word| !word.is_empty())
+        {
+            let start = offset + self.text[offset..].find(word).expect("title token");
+            offset = start + word.len();
+            ranges.push(start..offset);
+        }
+        let mut tokens = Vec::new();
+        let mut index = 0;
+        while index < ranges.len() {
+            let start = ranges[index].start;
+            let mut end = ranges[index].end;
+            if index + 2 < ranges.len()
+                && &self.text[ranges[index + 1].clone()] == "·"
+                && self.text[ranges[index + 2].clone()]
+                    .chars()
+                    .all(|c| c.is_ascii_digit())
+            {
+                end = ranges[index + 2].end;
+                index += 2;
+            }
+            let role = self
+                .segments
+                .iter()
+                .find(|(range, role)| {
+                    *role != SegmentRole::ItalianProse && range.start < end && range.end > start
+                })
+                .map_or(SegmentRole::ItalianProse, |(_, role)| *role);
+            tokens.push((&self.text[start..end], role));
+            index += 1;
+        }
+        tokens
     }
 }
 impl From<SharedString> for TitleText {
@@ -300,7 +339,21 @@ fn layout_title(
         .unwrap_or(minimum);
     let mut rows = Vec::new();
     let mut row = String::new();
-    for (word, role) in text.tokens() {
+    let tokens = text.tokens().into_iter().flat_map(|(word, role)| {
+        if f32::from(shape(word, size).width()) > width
+            && let Some(index) = word.rfind(char::is_whitespace)
+            && word[..index].contains('·')
+            && word[index..].trim().chars().all(|c| c.is_ascii_digit())
+        {
+            vec![
+                (word[..index].trim_end(), role),
+                (word[index..].trim(), SegmentRole::Count),
+            ]
+        } else {
+            vec![(word, role)]
+        }
+    });
+    for (word, role) in tokens {
         let candidate = if row.is_empty() {
             word.to_owned()
         } else {
@@ -503,6 +556,8 @@ impl Element for Title {
         window: &mut Window,
         cx: &mut App,
     ) {
+        #[cfg(test)]
+        crate::shell::rendered_command::record_ink(self.text.text().to_owned(), bounds, window);
         let layout = layout.borrow();
         let mut origin = bounds.origin;
         for line in &layout.lines {
@@ -538,6 +593,105 @@ mod tests {
                     .debug_selector(|| "title-under-test".into())
                     .child(title(self.label, self.theme).test_role(self.role)),
             )
+        }
+    }
+
+    #[gpui::test]
+    fn hcg5_counts_keep_all_digits_at_400(cx: &mut TestAppContext) {
+        let mut native = TestAppContext::build_with_text_system(
+            cx.dispatcher.clone(),
+            None,
+            std::sync::Arc::new(gpui_apple::AppleTextSystem::new()),
+        );
+        let (_, cx) = native.add_window_view(|_, _| Fixture {
+            theme: Theme::for_dark(false),
+            label: "",
+            role: TypeRole::Section,
+        });
+        cx.update(|window, _| {
+            let theme = Theme::for_dark(false).sized(4., false);
+            let typography = theme.role(TypeRole::Section);
+            let mut style = window.text_style();
+            style.font_family = typography.family.into();
+            style.font_weight = typography.weight;
+            style.font_features = gpui::FontFeatures(std::sync::Arc::new(vec![("tnum".into(), 1)]));
+            for label in [
+                "SCADUTI",
+                "OGGI E PROSSIMI",
+                "CONCLUSI O ANNULLATI",
+                "DATA O STATO DA VERIFICARE",
+                "AUJOURD’HUI ET À VENIR",
+            ] {
+                for count in [1, 20, 200, 2000] {
+                    let text = TitleText::label(label).with_count(count);
+                    let count = count.to_string();
+                    let layout = layout_title(
+                        &text,
+                        &style,
+                        typography.size,
+                        theme,
+                        358.,
+                        window.text_system(),
+                    );
+                    let lines: Vec<_> = layout.lines.iter().map(|l| l.text.as_ref()).collect();
+                    assert!(
+                        lines.iter().any(|line| line.ends_with(count.as_str())),
+                        "{label}/{count}: {lines:?}"
+                    );
+                    assert_eq!(
+                        lines
+                            .iter()
+                            .flat_map(|l| l.chars())
+                            .filter(char::is_ascii_digit)
+                            .collect::<String>(),
+                        count
+                    );
+                }
+            }
+        });
+    }
+
+    #[gpui::test]
+    fn hcg5_counted_section_geometry(cx: &mut TestAppContext) {
+        let mut native = TestAppContext::build_with_text_system(
+            cx.dispatcher.clone(),
+            None,
+            std::sync::Arc::new(gpui_apple::AppleTextSystem::new()),
+        );
+        let (_, cx) = native.add_window_view(|_, _| Fixture {
+            theme: Theme::for_dark(false),
+            label: "OGGI E PROSSIMI\u{a0}·\u{a0}1",
+            role: TypeRole::Section,
+        });
+        for dark in [false, true] {
+            for scale in [1., 2., 4.] {
+                for width in [390., 420., 800.] {
+                    for label in ["OGGI E PROSSIMI · 1", "OGGI E PROSSIMI\u{a0}·\u{a0}1"] {
+                        cx.update(|window, cx| {
+                            let theme = Theme::for_dark(dark).sized(scale, false);
+                            let text = TitleText::from(label);
+                            let result = layout_title(
+                                &text,
+                                &window.text_style(),
+                                theme.role(TypeRole::Section).size,
+                                theme,
+                                width - 32.,
+                                window.text_system(),
+                            );
+                            let lines: Vec<_> =
+                                result.lines.iter().map(|l| l.text.as_ref()).collect();
+                            assert!(
+                                lines.iter().any(|line| line
+                                    .replace('\u{a0}', " ")
+                                    .contains("PROSSIMI · 1")),
+                                "{width}/{scale}/{dark}: {lines:?}"
+                            );
+                            assert!(f32::from(result.size.width) <= width - 32. + 1.);
+                            let _ = cx;
+                        });
+                    }
+                }
+            }
         }
     }
 
@@ -1134,5 +1288,21 @@ mod review706d {
             (f32::from(bounds.size.height) - expected).abs() < 1.,
             "Strong override ignored by heading"
         );
+    }
+}
+
+#[cfg(test)]
+mod count_contract_tests {
+    use super::*;
+    #[test]
+    fn hcg5_typed_count_survives_section_case() {
+        let text = TitleText::label("Straße")
+            .with_count(2000)
+            .section_label(Theme::for_dark(false));
+        assert_eq!(text.text(), "STRASSE · 2000");
+        let (range, role) = text.segments.last().unwrap();
+        assert_eq!(*role, SegmentRole::Count);
+        assert_eq!(&text.text[range.clone()], "2000");
+        assert_eq!(text.tokens().last().unwrap().1, SegmentRole::Count);
     }
 }
