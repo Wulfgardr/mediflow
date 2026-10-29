@@ -63,3 +63,13 @@ test('SIGKILL of the first client preserves the second lease; last death closes 
  owner.releaseInitial();clients[0].kill('SIGKILL');await until(()=>owner.active===1);assert.equal(idle,0);
  clients[1].kill('SIGKILL');await until(()=>idle===1);assert.equal(owner.active,0);
 });
+
+
+test('disconnect before the lease acknowledgement cannot leave a client registered',async t=>{
+ const directory=temporary(t);let idle=0;
+ const owner=await createRuntimeLeases({directory,identity:runtimeProcessIdentity,initialPlugin:true,onIdle:()=>idle++});t.after(()=>owner.close());
+ const channel=Object.assign(new EventEmitter(),{connected:false});
+ await assert.rejects(acquireRuntimeLease(owner.receipt,runtimeProcessIdentity,'plugin',channel),/disconnesso/u);
+ owner.releaseInitial();await until(()=>idle===1);assert.equal(owner.active,0);
+ await owner.close();await owner.close();
+});
