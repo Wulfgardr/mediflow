@@ -372,7 +372,7 @@ function xcodeFixture(t) {
   return root;
 }
 
-test('Xcode mobile UI selects all three Swift files with the single-attempt CI argv', t => {
+test('Xcode mobile UI selects all three Swift files with the reported-retry CI argv', t => {
   const selection = collectNativeToolSelections(xcodeFixture(t))['xcode:mobile-ui'];
   assert.deepEqual(selection.errors, []);
   assert.deepEqual(selection.files, mobileUiFiles);
@@ -390,19 +390,21 @@ test('Xcode mobile UI selects all three Swift files with the single-attempt CI a
 
 test('Xcode mobile UI rejects divergent argv instead of claiming source coverage', async t => {
   const expansion = '"${only_testing[@]}"';
-  for (const [name, replacement] of [
-    ['retry reintroduced', `${expansion} -retry-tests-on-failure -test-iterations 2`],
-    ['additional argument', `${expansion} -quiet`],
-    ['test omitted', `${expansion} -skip-testing:MediFlowMobileAppUITests/MobileVisitProductUITests`],
-    ['target narrowed', '-only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests'],
-    ['iPad filters disconnected', ''],
+  for (const [name, original, replacement] of [
+    ['retries removed', '-retry-tests-on-failure -test-iterations 2', ''],
+    ['more retries', '-test-iterations 2', '-test-iterations 3'],
+    ['result bundle disconnected', '.xcresult"', '.other.xcresult"'],
+    ['additional argument', expansion, `${expansion} -quiet`],
+    ['test omitted', expansion, `${expansion} -skip-testing:MediFlowMobileAppUITests/MobileVisitProductUITests`],
+    ['target narrowed', expansion, '-only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests'],
+    ['iPad filters disconnected', expansion, ''],
   ]) {
     await t.test(name, child => {
       const root = xcodeFixture(child);
       const file = path.join(root, appleWorkflow);
       const source = readFileSync(file, 'utf8');
-      assert.equal(source.split(expansion).length, 2);
-      writeFileSync(file, source.replace(expansion, replacement));
+      assert.ok(source.includes(original));
+      writeFileSync(file, source.replace(original, replacement));
       const selection = collectNativeToolSelections(root)['xcode:mobile-ui'];
       assert.deepEqual(selection.files, []);
       assert.deepEqual(selection.errors, ['Xcode UI argv changed']);
