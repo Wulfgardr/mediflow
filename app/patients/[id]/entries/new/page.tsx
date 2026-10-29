@@ -123,7 +123,7 @@ export default function NewEntryPage() {
         || visitSessionEvents.length > 0;
 
     /* WUL-676: keep the workspace guard active during pending saves. */
-    useRuntimeTwinPendingForm(hasUnsavedChanges);
+    useRuntimeTwinPendingForm(hasUnsavedChanges, localDraft.clear);
     const patientRead = useLiveQueryState(() => db.patients.get(id), [id], undefined, ['patients']);
     const patient = patientRead.data;
     /* WUL-420 */

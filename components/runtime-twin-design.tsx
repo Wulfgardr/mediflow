@@ -2,10 +2,10 @@
 
 /* ADR 0123: one official UI, two navigation arrangements. The isolated
    comparison can still show Original without remounting clinical forms. */
-import { createContext, useCallback, useContext, useEffect, useId, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 
 export type TwinComposition = 'workbench' | 'stream';
-const DesignContext = createContext({ enabled: false, proposal: false, setProposal: (_value: boolean) => {}, composition: 'stream' as TwinComposition, setComposition: (_value: TwinComposition) => {}, pendingForms: false, registerPending: (_id: string, _pending: boolean) => {} });
+const DesignContext = createContext({ enabled: false, proposal: false, setProposal: (_value: boolean) => {}, composition: 'stream' as TwinComposition, setComposition: (_value: TwinComposition) => {}, pendingForms: false, registerPending: (_id: string, _pending: boolean) => {}, registerDiscard: (_id: string, _discard: (() => Promise<void>) | null) => {}, discardPendingForms: async () => {} });
 // browser-local presentation preference only; no record identifiers.
 const COMPOSITION_KEY = 'mediflow.runtime-twin.composition';
 const COMPOSITION_EVENT = 'mediflow:twin-composition';
@@ -36,9 +36,16 @@ export const useRuntimeTwinDesign = () => useContext(DesignContext);
 export const useRuntimeTwinFolder = () => useContext(RuntimeTwinFolderContext);
 
 /* form owners report only a pending bit, never clinical contents. */
-export function useRuntimeTwinPendingForm(pending: boolean) {
-    const { enabled, registerPending } = useRuntimeTwinDesign();
+export function useRuntimeTwinPendingForm(pending: boolean, discard?: () => Promise<void>) {
+    const { enabled, registerPending, registerDiscard } = useRuntimeTwinDesign();
     const id = useId();
+    const discardRef = useRef(discard);
+    useEffect(() => { discardRef.current = discard; }, [discard]);
+    useEffect(() => {
+        if (!enabled || !pending) return;
+        registerDiscard(id, async () => { await discardRef.current?.(); });
+        return () => registerDiscard(id, null);
+    }, [enabled, id, pending, registerDiscard]);
     useEffect(() => {
         if (!enabled) return;
         registerPending(id, pending);
@@ -61,6 +68,13 @@ export function RuntimeTwinDesignProvider({ comparisonEnabled = false, children 
         } catch { transientComposition = value; }
         window.dispatchEvent(new Event(COMPOSITION_EVENT));
     }, []);
+    const discarders = useRef(new Map<string, () => Promise<void>>());
+    const registerDiscard = useCallback((id: string, discard: (() => Promise<void>) | null) => {
+        if (discard) discarders.current.set(id, discard); else discarders.current.delete(id);
+    }, []);
+    const discardPendingForms = useCallback(async () => {
+        for (const discard of discarders.current.values()) await discard();
+    }, []);
     const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
     const registerPending = useCallback((id: string, pending: boolean) => {
         setPendingIds(current => {
@@ -74,5 +88,5 @@ export function RuntimeTwinDesignProvider({ comparisonEnabled = false, children 
         document.documentElement.dataset.twinComposition = composition;
     }, [proposal, composition]);
     // enabled denotes the shared presentation/unsaved-form boundary, never a capability.
-    return <DesignContext.Provider value={{ enabled: true, proposal, setProposal, composition, setComposition, pendingForms: pendingIds.size > 0, registerPending }}>{children}</DesignContext.Provider>;
+    return <DesignContext.Provider value={{ enabled: true, proposal, setProposal, composition, setComposition, pendingForms: pendingIds.size > 0, registerPending, registerDiscard, discardPendingForms }}>{children}</DesignContext.Provider>;
 }
