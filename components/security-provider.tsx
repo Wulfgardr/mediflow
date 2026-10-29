@@ -287,11 +287,11 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
-    const checkAuthStatus = async () => {
+    const checkAuthStatus = async (updateLocalUiLeaseRequired: (required: boolean) => void) => {
         try {
             const { response: res, payload: data, controlState } = await checkAuthHealthRequest();
             if (controlState === 'stale') return;
-            setLocalUiLeaseRequired(res.ok && controlState === 'accepted' && data?.status === 'ok' && data.localUiLeaseRequired === true);
+            updateLocalUiLeaseRequired(res.ok && controlState === 'accepted' && data?.status === 'ok' && data.localUiLeaseRequired === true);
             if (controlState === 'invalid') {
                 setAuthHealth({
                     status: 'error',
@@ -423,7 +423,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     // Reconcile another tab's completed replacement before its displayed records can be reused.
     useEffect(() => {
-        const reconcile = () => { if (document.visibilityState === 'visible') void checkAuthStatus(); };
+        const reconcile = () => { if (document.visibilityState === 'visible') void checkAuthStatus(setLocalUiLeaseRequired); };
         window.addEventListener('focus', reconcile);
         document.addEventListener('visibilitychange', reconcile);
         const timer = window.setInterval(reconcile, 15000);
@@ -438,7 +438,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         const init = async () => {
             await restoreSession();
-            await checkAuthStatus();
+            await checkAuthStatus(setLocalUiLeaseRequired);
         };
         void init();
     }, []);
@@ -805,7 +805,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 )}
                 <AuthHealthScreen
                     health={authHealth}
-                    onRetry={() => checkAuthStatus()}
+                    onRetry={() => checkAuthStatus(setLocalUiLeaseRequired)}
                     onRepair={canOfferLegacyRepair(authHealth) ? repairFromLegacy : undefined}
                     isRepairing={isRepairing}
                 />
