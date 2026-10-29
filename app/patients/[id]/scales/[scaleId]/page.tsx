@@ -7,7 +7,7 @@ import { subscribeClientAccountAuthority } from '@/lib/security/client-auth-api'
 import type { CockpitSnapshot } from '@/components/kree8/cockpit-read-snapshot';
 import type { Patient } from '@/lib/db';
 import localStyles from './runner.module.css';
-import { db } from '@/lib/db';
+import { db, ScaleEntryWriteError, type PreparedScaleEntryCreate } from '@/lib/db';
 import { useParams, useRouter } from 'next/navigation';
 import ScaleEngine from '@/components/scale-engine';
 import { SCALES } from '@/lib/scale-definitions';
@@ -28,6 +28,9 @@ export default function ScaleRunnerPage() {
 function ScaleRunner({ patientId, scaleId }: { patientId: string; scaleId: string }) {
     const router = useRouter();
     const { showToast } = useToast();
+    const [answersLocked, setAnswersLocked] = useState(false);
+    const [draftEntryId] = useState(() => uuidv4());
+    const pendingWrite = useRef<Promise<PreparedScaleEntryCreate> | null>(null);
     const [setting, setSetting] = useState<'ambulatory' | 'home'>('ambulatory');
 
     const snapshotVisibility = useRef({ valid: true });
@@ -91,29 +94,29 @@ function ScaleRunner({ patientId, scaleId }: { patientId: string; scaleId: strin
     const handleComplete = async (result: { score: number; answers: Record<string, string | number>; interpretation: string }) => {
         try {
             if (!scaleDef || !canComplete.current(identity)) return;
-            // MF085-003: validation and canonical metadata precede db.entries.add.
-            await submitScale(scaleId, result.answers, submission => {
-                if (!canComplete.current(identity)) throw new Error('Scale patient read is no longer current.');
-                return db.entries.add({
-                    id: uuidv4(),
-                    patientId,
-                    date: new Date(),
-                    type: 'scale',
-                    title: submission.title,
-                    setting,
-                    content: submission.content,
-                    metadata: submission.metadata,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                    attachments: []
-                });
+            const receipt = await submitScale(scaleId, result.answers, async submission => {
+                if (!canComplete.current(identity)) throw new ScaleEntryWriteError('UNCONFIRMED');
+                setAnswersLocked(true);
+                if (!pendingWrite.current) {
+                    const now = new Date(Math.floor(Date.now() / 1000) * 1000);
+                    pendingWrite.current = db.entries.prepareScaleCreate({
+                        id: draftEntryId, patientId, date: now, type: 'scale', title: submission.title,
+                        setting, content: submission.content, metadata: submission.metadata,
+                        createdAt: now, updatedAt: now, attachments: [],
+                    }, () => canComplete.current(identity)).catch(error => {
+                        pendingWrite.current = null;
+                        throw error;
+                    });
+                }
+                return (await pendingWrite.current).submit();
             });
+            if (receipt.alreadyRegistered) showToast({ tone: 'success', title: 'Valutazione già registrata', description: 'È stato recuperato lo stesso esito, senza duplicarlo.' });
 
             // Land on the independent reread of the saved evaluation.
             router.push(`/patients/${patientId}/modules#scale`);
         } catch (error) {
             console.error("Failed to save scale", error);
-            showToast({ tone: 'error', title: 'Errore nel salvataggio della valutazione', description: 'Il punteggio non è stato registrato. Riprova.' });
+            showToast({ tone: 'error', title: 'Errore nel salvataggio della valutazione', description: error instanceof ScaleEntryWriteError ? error.message : 'Registrazione non confermata. La bozza è conservata: premi Completa per verificare lo stesso invio.' });
         }
     };
 
@@ -164,7 +167,7 @@ function ScaleRunner({ patientId, scaleId }: { patientId: string; scaleId: strin
                 <fieldset disabled={!enabled} inert={!enabled} className={localStyles.form}>
                 <label className={styles.context}>
                     Contesto
-                    <select value={setting} onChange={event => setSetting(event.target.value as 'ambulatory' | 'home')}>
+                    <select disabled={answersLocked} value={setting} onChange={event => setSetting(event.target.value as 'ambulatory' | 'home')}>
                         <option value="ambulatory">Ambulatorio</option>
                         <option value="home">Domicilio</option>
                     </select>
@@ -176,7 +179,7 @@ function ScaleRunner({ patientId, scaleId }: { patientId: string; scaleId: strin
                 </details>
                 {draft && (
                     <ScaleEngine key={`${patientId}:${scaleDef.id}`} scale={scaleDef} showHeading={false} patientLabel={patientLabel}
-                        onComplete={handleComplete} onCancel={handleCancel} />
+                        answersLocked={answersLocked} onComplete={handleComplete} onCancel={handleCancel} />
                 )}
                 </fieldset>
             </section>

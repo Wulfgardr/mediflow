@@ -192,9 +192,9 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
         }
     }
 
-    func testScaleDraftRejectsRemovedArchivedDeletedChangedAndWrongPatient() async throws {
+    func testScaleDraftRejectsRemovedArchivedDeletedAndWrongPatient() async throws {
         let a = detail(id: "p1")
-        for state in ["removed", "archived", "deleted", "version", "wrong-id"] {
+        for state in ["removed", "archived", "deleted", "wrong-id"] {
             let source = S7MockDataSource(details: ["p1": a])
             let model = await makeModel(source: source)
             await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: a)
@@ -210,6 +210,83 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
             XCTAssertEqual(calls, 0, state)
             XCTAssertNotNil(error, state)
         }
+    }
+
+    func testScaleRetryReplaysIdenticalSealedPayloadAfterLostResponse() async throws {
+        for definition in ClinicalScales.all {
+            let patient = detail(id: "p1")
+            let source = S7MockDataSource(details: ["p1": patient])
+            await source.configureScaleCommit(replyLost: true)
+            let model = await makeModel(source: source)
+            await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+            let captured = await model.makeScaleDraft(definition)
+            let draft = try XCTUnwrap(captured)
+            let answers = Dictionary(uniqueKeysWithValues: definition.questions.map { ($0.id, 0) })
+            let first = await model.submitScale(draft, answers: answers)
+            XCTAssertFalse(first)
+            let second = await model.submitScale(draft, answers: answers)
+            let payloads = await source.scalePayloads
+            let committed = await source.scaleCommitCount
+            let status = await model.statusMessage
+            XCTAssertTrue(second)
+            XCTAssertEqual(payloads.count, 2)
+            XCTAssertEqual(payloads.first?.id, payloads.last?.id)
+            XCTAssertEqual(payloads.first?.date, payloads.last?.date)
+            XCTAssertEqual(payloads.first?.title, payloads.last?.title)
+            XCTAssertEqual(payloads.first?.content, payloads.last?.content)
+            XCTAssertEqual(payloads.first?.metadata, payloads.last?.metadata)
+            XCTAssertEqual(committed, 1)
+            XCTAssertTrue(status?.contains("già registrata") == true)
+        }
+    }
+
+    func testScaleRetryCannotChangeAlreadyPreparedAnswers() async throws {
+        let patient = detail(id: "p1")
+        let source = S7MockDataSource(details: ["p1": patient])
+        await source.configureScaleCommit(replyLost: true)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        let captured = await model.makeScaleDraft(ClinicalScales.adl)
+        let draft = try XCTUnwrap(captured)
+        let first = await model.submitScale(draft, answers: Dictionary(uniqueKeysWithValues: ClinicalScales.adl.questions.map { ($0.id, 0) }))
+        XCTAssertFalse(first)
+        let changed = await model.submitScale(draft, answers: Dictionary(uniqueKeysWithValues: ClinicalScales.adl.questions.map { ($0.id, 1) }))
+        let calls = await source.createEntryCalls
+        let error = await model.errorMessage
+        XCTAssertFalse(changed)
+        XCTAssertEqual(calls, 1)
+        XCTAssertEqual(error, ClinicalScaleDraftError.answersChanged.localizedDescription)
+    }
+
+    func testScalePatientVersionChangeDoesNotBlockActivePatient() async throws {
+        let patient = detail(id: "p1")
+        let source = S7MockDataSource(details: ["p1": patient])
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        let captured = await model.makeScaleDraft(ClinicalScales.adl)
+        let draft = try XCTUnwrap(captured)
+        await source.replacePatient(id: "p1", with: detail(id: "p1", version: 7))
+        let saved = await model.submitScale(draft, answers: Dictionary(uniqueKeysWithValues: ClinicalScales.adl.questions.map { ($0.id, 0) }))
+        XCTAssertTrue(saved)
+        let calls = await source.createEntryCalls
+        XCTAssertEqual(calls, 1)
+    }
+
+    func testScaleConcurrentArchiveIsRejectedAtCommitAndPreservesDraft() async throws {
+        let patient = detail(id: "p1")
+        let source = S7MockDataSource(details: ["p1": patient])
+        await source.configureScaleCommit(inactiveAtCommit: true)
+        let model = await makeModel(source: source)
+        await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        let captured = await model.makeScaleDraft(ClinicalScales.adl)
+        let draft = try XCTUnwrap(captured)
+        let saved = await model.submitScale(draft, answers: Dictionary(uniqueKeysWithValues: ClinicalScales.adl.questions.map { ($0.id, 0) }))
+        let error = await model.errorMessage
+        let commits = await source.scaleCommitCount
+        XCTAssertFalse(saved)
+        XCTAssertEqual(commits, 0)
+        XCTAssertEqual(error, HomeBaseScaleWriteError.patientInactive.localizedDescription)
+        XCTAssertEqual(draft.patientID, "p1")
     }
 
     func testScaleDraftCannotMoveToAnotherSession() async throws {
@@ -735,6 +812,17 @@ actor S7MockDataSource: HomeBasePatientsDataSource {
     private let attachments: [HomeBaseAttachmentSummary]
     private let visitDraft: HomeBaseVisitDraftResponse?
     private let visitDraftDelayNanoseconds: UInt64
+    private var scaleCommitMode = false
+    private var scaleReplyLost = false
+    private var scaleInactiveAtCommit = false
+    private var committedScalePayload: HomeBaseEntryCreatePayload?
+    private(set) var scalePayloads: [HomeBaseEntryCreatePayload] = []
+    private(set) var scaleCommitCount = 0
+    func configureScaleCommit(replyLost: Bool = false, inactiveAtCommit: Bool = false) {
+        scaleCommitMode = true
+        scaleReplyLost = replyLost
+        scaleInactiveAtCommit = inactiveAtCommit
+    }
     private(set) var lastCreateEntryPatientID: String?
     func replacePatient(id: String, with patient: HomeBasePatientDetail?) { details[id] = patient }
     private(set) var lastCreateEntryPayload: HomeBaseEntryCreatePayload?
@@ -860,6 +948,23 @@ actor S7MockDataSource: HomeBasePatientsDataSource {
         createEntryCalls += 1
         lastCreateEntryPatientID = patientId
         lastCreateEntryPayload = payload
+        if scaleCommitMode {
+            scalePayloads.append(payload)
+            if scaleInactiveAtCommit { throw HomeBaseScaleWriteError.patientInactive }
+            if let existing = committedScalePayload {
+                guard existing.id == payload.id, existing.date == payload.date, existing.title == payload.title,
+                      existing.content == payload.content, existing.metadata == payload.metadata else {
+                    throw HomeBaseScaleWriteError.payloadConflict
+                }
+                return HomeBaseCreatedResource(id: payload.id, version: 1, idempotent: true)
+            }
+            committedScalePayload = payload
+            scaleCommitCount += 1
+            if scaleReplyLost {
+                scaleReplyLost = false
+                throw HomeBaseClientError.httpStatus(503, "Risposta persa dopo il commit sintetico")
+            }
+        }
         return HomeBaseCreatedResource(id: payload.id, version: 1)
     }
 

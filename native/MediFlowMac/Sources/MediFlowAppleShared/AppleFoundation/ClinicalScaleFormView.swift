@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ClinicalScaleDraft: Identifiable {
+final class ClinicalScaleDraft: Identifiable {
     let id = UUID()
     let definition: ClinicalScaleDefinition
     let patientID: String
@@ -17,10 +17,21 @@ struct ClinicalScaleDraft: Identifiable {
         self.connectionIdentity = connectionIdentity
     }
 
-    func validate(patientID: String, version: Int, isArchived: Bool?, deletedAt: Date?) throws {
+    func validate(patientID: String, isArchived: Bool?, deletedAt: Date?) throws {
         guard patientID == self.patientID else { throw ClinicalScaleDraftError.wrongPatient }
         guard isArchived != true, deletedAt == nil else { throw ClinicalScaleDraftError.unavailable }
-        guard version == patientVersion else { throw ClinicalScaleDraftError.changed }
+    }
+
+    private var preparedRequest: (answers: [String: Int], payload: HomeBaseEntryCreatePayload)?
+
+    func request(answers: [String: Int], prepare: () throws -> HomeBaseEntryCreatePayload) throws -> HomeBaseEntryCreatePayload {
+        if let preparedRequest {
+            guard preparedRequest.answers == answers else { throw ClinicalScaleDraftError.answersChanged }
+            return preparedRequest.payload
+        }
+        let payload = try prepare()
+        preparedRequest = (answers, payload)
+        return payload
     }
 
     var title: String {
@@ -30,8 +41,8 @@ struct ClinicalScaleDraft: Identifiable {
 
 enum ClinicalScaleDraftError: String, LocalizedError {
     case wrongPatient = "Il paziente della richiesta non coincide con quello della bozza. Punteggio non registrato."
-    case unavailable = "Il paziente della bozza non è più disponibile oppure è archiviato o nel cestino. Punteggio non registrato."
-    case changed = "Il paziente è stato modificato dopo l'apertura della bozza. Riapri la scala sul paziente aggiornato. Punteggio non registrato."
+    case unavailable = "Paziente archiviato o rimosso. Nessuna nuova registrazione. La bozza è conservata."
+    case answersChanged = "Le risposte non coincidono con quelle del primo invio. Riprendi la stessa bozza o verifica gli esiti prima di iniziarne una nuova."
     case connectionChanged = "Il collegamento o l'ambulatorio è cambiato. Punteggio non registrato."
     var errorDescription: String? { rawValue }
 }
@@ -43,6 +54,7 @@ struct ClinicalScaleFormView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var answers: [String: Int] = [:]
     @State private var isSubmitting = false
+    @State private var hasAttemptedSubmission = false
     @State private var submissionError: String?
     private var definition: ClinicalScaleDefinition { draft.definition }
 
@@ -109,7 +121,7 @@ struct ClinicalScaleFormView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .pickerStyle(.menu)
-                    .disabled(isSubmitting)
+                    .disabled(isSubmitting || hasAttemptedSubmission)
                     .padding(.vertical, 8)
                     .accessibilityIdentifier("scale-question-\(question.id)")
                 }
@@ -141,6 +153,7 @@ struct ClinicalScaleFormView: View {
         Button("Completa") {
             guard result != nil, !isSubmitting else { return }
             let submittedAnswers = answers
+            hasAttemptedSubmission = true
             isSubmitting = true
             Task { @MainActor in
                 submissionError = await onSubmit(submittedAnswers)

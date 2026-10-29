@@ -1496,8 +1496,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 guard let patient = patients.first(where: { $0.id == patientID }) else {
                     throw ClinicalScaleDraftError.unavailable
                 }
-                try draft.validate(patientID: patient.id, version: patient.version,
-                    isArchived: patient.isArchived, deletedAt: patient.deletedAt)
+                try draft.validate(patientID: patient.id, isArchived: patient.isArchived, deletedAt: patient.deletedAt)
                 let base = Date(timeIntervalSince1970: 1_750_000_000)
                 if selectedPatient?.id == patientID {
                     entries.insert(HomeBaseEntrySummary(
@@ -1530,19 +1529,22 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 throw ClinicalScaleDraftError.unavailable
             }
             guard isCurrent() else { throw ClinicalScaleDraftError.connectionChanged }
-            try draft.validate(patientID: patient.id, version: patient.version,
-                isArchived: patient.isArchived, deletedAt: patient.deletedAt)
-            _ = try await connection.dataSource.createEntry(
-                patientId: patientID,
-                payload: HomeBaseEntryCreatePayload(id: draft.id.uuidString, type: "scale",
-                    title: try self.sealField(definition.title), date: Date(),
+            try draft.validate(patientID: patient.id, isArchived: patient.isArchived, deletedAt: patient.deletedAt)
+            let payload = try draft.request(answers: answers) {
+                HomeBaseEntryCreatePayload(id: draft.id.uuidString, type: "scale",
+                    title: try self.sealField(definition.title), date: Date(timeIntervalSince1970: floor(Date().timeIntervalSince1970)),
                     content: try self.sealField(content) ?? "",
-                    metadata: try self.sealStructuredField(submission.metadataJSON)),
+                    metadata: try self.sealStructuredField(submission.metadataJSON))
+            }
+            let receipt = try await connection.dataSource.createEntry(patientId: patientID, payload: payload,
                 credentials: connection.credentials, sessionCookie: connection.sessionCookie,
                 ambulatoryId: connection.ambulatoryId)
+            guard receipt.id == payload.id else { throw HomeBaseClientError.contract }
             acknowledged = true
             guard isCurrent() else { return }
-            self.statusMessage = "Valutazione \(definition.title) registrata per \(draft.patientLabel): \(result.score)/\(definition.maxScore)."
+            self.statusMessage = receipt.idempotent == true
+                ? "Valutazione già registrata per \(draft.patientLabel): \(result.score)/\(definition.maxScore)."
+                : "Valutazione \(definition.title) registrata per \(draft.patientLabel): \(result.score)/\(definition.maxScore)."
             guard self.selectedPatient?.id == patientID else { return }
             let entries = try await self.fetchDecryptedEntries(patientId: patientID, credentials: connection.credentials,
                 sessionCookie: connection.sessionCookie, ambulatoryId: connection.ambulatoryId)

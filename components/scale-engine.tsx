@@ -16,12 +16,13 @@ export type { ScaleQuestion, ScaleDefinition } from '@/lib/scale-validation';
 interface ScaleEngineProps {
     scale: ScaleDefinition;
     showHeading?: boolean;
+    answersLocked?: boolean;
     patientLabel?: string;
     onComplete: (result: { score: number; answers: Record<string, string | number>; interpretation: string }) => void | Promise<void>;
     onCancel: () => void;
 }
 
-export default function ScaleEngine({ scale, onComplete, onCancel, showHeading = true, patientLabel }: ScaleEngineProps) {
+export default function ScaleEngine({ scale, onComplete, onCancel, showHeading = true, patientLabel, answersLocked = false }: ScaleEngineProps) {
     const confirm = useConfirm();
     const answerGroupId = useId();
     const [answers, setAnswers] = useState<Record<string, string | number>>({});
@@ -37,7 +38,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
     useEffect(() => { questionRef.current?.focus(); }, [currentStep]);
 
     const handleAnswer = (questionId: string, value: string | number) => {
-        if (submittingRef.current) return;
+        if (submittingRef.current || answersLocked) return;
         setValidationError(null);
         setAnswers(prev => ({ ...prev, [questionId]: value }));
     };
@@ -103,7 +104,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
             <div className={styles.formColumns}>
             <div>
             <p className={styles.progress} aria-live="polite">Domanda {currentStep + 1} di {scale.questions.length}</p>
-            <fieldset className={styles.questionGroup} disabled={isSubmitting}>
+            <fieldset className={styles.questionGroup} disabled={isSubmitting || answersLocked}>
                 <legend className={styles.legend}>
                     <h3 ref={questionRef} tabIndex={-1} className={styles.question}>{currentQuestion.text}</h3>
                 </legend>
