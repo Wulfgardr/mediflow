@@ -5,6 +5,26 @@ import CryptoKit
 // G1 (ADR 0071 parity): the patient-list row now derives an age from the summary
 // birthDate. Lock the boundary logic of the age helper.
 final class PatientSummaryPresentationTests: XCTestCase {
+    func testChartReadingPositionsAreExactAndScopedToPatient() {
+        var state = PatientChartReturnState()
+        state.record(CGPoint(x: 0, y: 482.5), patientID: "patient-a")
+        state.record(CGPoint(x: 0, y: 903), patientID: "patient-b")
+        XCTAssertEqual(state.position(patientID: "patient-a"), CGPoint(x: 0, y: 482.5))
+        XCTAssertEqual(state.position(patientID: "patient-b"), CGPoint(x: 0, y: 903))
+        XCTAssertNil(state.position(patientID: "patient-c"))
+    }
+
+    func testSummaryReturnFocusIsScopedToPatientAndConsumedOnce() {
+        var state = PatientChartReturnState()
+        state.leave(patientID: "patient-a", category: .scales)
+        state.leave(patientID: "patient-b", category: .measures)
+        XCTAssertNil(state.returnToChart(patientID: "patient-c"))
+        XCTAssertEqual(state.returnToChart(patientID: "patient-a"),
+                       PatientChartSummaryReturn(patientID: "patient-a", category: .scales))
+        XCTAssertNil(state.returnToChart(patientID: "patient-a"))
+        XCTAssertEqual(state.returnToChart(patientID: "patient-b")?.category, .measures)
+    }
+
     func testChartSummaryContainsEachExternalCategoryOnce() {
         let categories = PatientChartSummaryCategory.allCases
         XCTAssertEqual(categories.map(\.title), ["Terapie attive", "Misure", "Diario", "Scale"])

@@ -9,6 +9,12 @@ struct PairedPatientDetailSection: View {
     @Binding var icdQuery: String
     @Binding var confirmsFHIRExport: Bool
 
+    var onOpenSummary: ((PatientChartSummaryCategory) -> Void)? = nil
+    var summaryReturn: PatientChartSummaryReturn? = nil
+    #if os(iOS)
+    @AccessibilityFocusState(for: .voiceOver) private var focusedSummaryCategory: PatientChartSummaryCategory?
+    #endif
+
     private var showsIdentity: Bool { true }
     private var showsClinical: Bool { true }
     private var showsAdministration: Bool { true }
@@ -1174,7 +1180,8 @@ private extension PairedPatientDetailSection {
             ForEach(PatientChartSummaryCategory.allCases) { category in
                 let count = mobileChartCount(for: category)
                 Button {
-                    model.activePatientSection = category.destination
+                    if let onOpenSummary { onOpenSummary(category) }
+                    else { model.activePatientSection = category.destination }
                 } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
                         Text(category.title).font(.body)
@@ -1192,6 +1199,7 @@ private extension PairedPatientDetailSection {
                 .foregroundStyle(.primary)
                 .accessibilityLabel(category.accessibilityLabel(count: count))
                 .accessibilityIdentifier("patient-summary-\(category.id)")
+                .accessibilityFocused($focusedSummaryCategory, equals: category)
             }
             if let next = model.checkups.filter({ $0.deletedAt == nil && $0.status == "pending" && $0.date >= Date() })
                 .min(by: { $0.date < $1.date }) {
@@ -1201,6 +1209,14 @@ private extension PairedPatientDetailSection {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("patient-clinical-signals")
+        .task(id: summaryReturn) {
+            focusedSummaryCategory = nil
+            guard let summaryReturn, summaryReturn.patientID == detail.id,
+                  model.activePatientSection == .overview else { return }
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            focusedSummaryCategory = summaryReturn.category
+        }
     }
 }
 #endif

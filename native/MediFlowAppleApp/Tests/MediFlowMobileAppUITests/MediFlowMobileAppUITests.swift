@@ -86,11 +86,28 @@ final class MediFlowMobileAppUITests: XCTestCase {
             ("diary", "Apri Diario, 3", .diary),
             ("scales", "Apri Scale, 0", .scales),
         ]
+        func positionInReadingPane(_ row: XCUIElement) {
+            XCTAssertTrue(row.waitForExistence(timeout: 5))
+            for _ in 0..<12 {
+                let delta = row.frame.midY - 360
+                if abs(delta) < 50 { break }
+                let start = app.coordinate(withNormalizedOffset: CGVector(
+                    dx: UIDevice.current.userInterfaceIdiom == .pad ? 0.75 : 0.5, dy: 0.65))
+                let end = start.withOffset(CGVector(dx: 0, dy: -min(150, max(-150, delta))))
+                start.press(forDuration: 0.1, thenDragTo: end,
+                            withVelocity: XCUIGestureVelocity(rawValue: 100), thenHoldForDuration: 0.2)
+            }
+            XCTAssertTrue(row.isHittable)
+            XCTAssertLessThan(abs(row.frame.midY - 360), 50)
+        }
         for (id, label, destination) in destinations {
             XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "patient-summary-")).count, 4)
             let button = app.buttons["patient-summary-\(id)"]
-            XCTAssertTrue(scrollDown(to: button, requireHittable: true))
+            let selectedOverview = app.buttons["patient-section-overview"]
+            if selectedOverview.exists { selectedOverview.tap() }
+            positionInReadingPane(button)
             XCTAssertEqual(button.label, label)
+            let sourceY = button.frame.minY
             button.tap()
             let direct = app.buttons["patient-section-\(destination.identifier)"]
             if direct.exists {
@@ -100,6 +117,28 @@ final class MediFlowMobileAppUITests: XCTestCase {
             }
             XCTAssertFalse(app.staticTexts["patient-detail-name"].exists)
             openPatientSection(.overview)
+            XCTAssertTrue(button.isHittable)
+            XCTAssertEqual(button.frame.minY, sourceY, accuracy: 4)
+        }
+        for destination in [PatientSection.diary, .documents, .therapies] {
+            let anchor = app.buttons["patient-summary-scales"]
+            positionInReadingPane(anchor)
+            let sourceY = anchor.frame.minY
+            openPatientSection(destination)
+            openPatientSection(.overview)
+            XCTAssertTrue(anchor.isHittable)
+            XCTAssertEqual(anchor.frame.minY, sourceY, accuracy: 4)
+        }
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            let anchor = app.buttons["patient-summary-scales"]
+            positionInReadingPane(anchor)
+            let sourceY = anchor.frame.minY
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+            let row = app.buttons["patient-cell-demo-0"]
+            XCTAssertTrue(row.waitForExistence(timeout: 10))
+            row.tap()
+            XCTAssertTrue(anchor.waitForExistence(timeout: 10))
+            XCTAssertEqual(anchor.frame.minY, sourceY, accuracy: 4)
         }
         XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "Diagnosi")).count, 0)
         XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "Esenzioni")).count, 0)
