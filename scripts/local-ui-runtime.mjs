@@ -46,16 +46,18 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
   const identity = readProductIdentity(sourceRoot);
   if (identity.worktreeHash !== 'clean' || identity.revision !== revision.slice(0, 12)) return unavailable();
   const expected = { sourceFingerprint: identity.sourceFingerprint, dataDir };
-  let starting = null, launcher = null;
+  let starting = null, launcher = null, startingChild = null, closed = false;
   const start = async signal => {
     const port = await new Promise((resolve, reject) => {
       const server = net.createServer(); server.once('error', reject);
       server.listen(0, '127.0.0.1', () => { const port = server.address().port; server.close(error => error ? reject(error) : resolve(port)); });
     });
+    if (closed || signal.aborted) return unavailable();
     const child = spawn(process.execPath, [path.join(sourceRoot, 'scripts/mediflow.mjs'), '--riusa'], {
       cwd: sourceRoot, detached: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'], shell: false,
       env: { ...ordinaryLauncherEnvironment(dataDir), PORT: String(port) },
     });
+    startingChild = child;
     try {
       await new Promise((resolve, reject) => {
         const timer = setTimeout(() => finish(new Error('navigation_unavailable')), 8000);
@@ -79,9 +81,10 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
       launcher = child;
       const retire = () => { if (launcher === child) launcher = null; };
       child.once('exit', retire); child.once('disconnect', retire);
-    } finally { child.unref(); child.channel?.unref(); }
+    } finally { startingChild = null; child.unref(); child.channel?.unref(); }
   };
-  return async (intent, signal) => {
+  const navigate = async (intent, signal) => {
+    if (closed) return unavailable();
     const expiresAt = Date.now() + 8000;
     const deadline = AbortSignal.any([signal, AbortSignal.timeout(8000)]);
     deadline.throwIfAborted();
@@ -92,4 +95,11 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
       await new Promise(resolve => { const timer = setTimeout(resolve, 100); timer.unref(); });
     }
   };
+  navigate.close = () => {
+    closed = true;
+    if (startingChild?.connected) startingChild.disconnect();
+    if (launcher?.connected) launcher.disconnect();
+    launcher = null;
+  };
+  return navigate;
 }

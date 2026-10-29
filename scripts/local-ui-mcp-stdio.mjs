@@ -12,5 +12,7 @@ async function close() {
   if (closing) return;
   closing = true;
   runtime.close(); await handle.close();
+  if (process.connected) process.disconnect();
 }
 process.once('SIGINT', close); process.once('SIGTERM', close); process.stdin.once('end', close);
+process.once('disconnect', close);

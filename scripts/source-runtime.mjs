@@ -175,6 +175,17 @@ export async function startSourceRuntime(mode, root = ROOT) {
     MEDIFLOW_APP_FINGERPRINT: identity.sourceFingerprint });
   process.chdir(web);
   if (mode === 'web') {
+    if (process.env.MEDIFLOW_WEB_OWNER_GATE) {
+      if (!process.connected) throw new Error('Web owner required');
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => { process.off('message', receive); reject(new Error('Web owner timeout')); }, 30000);
+        const receive = frame => {
+          if (frame?.type !== 'mediflow-web-owner-start' || frame.nonce !== process.env.MEDIFLOW_WEB_OWNER_GATE) return;
+          clearTimeout(timer); process.off('message', receive); resolve();
+        };
+        process.on('message', receive);
+      });
+    }
     if (process.connected && process.env.MEDIFLOW_PLUGIN_LOCAL_UI === '1') {
       const { installLocalUiWebNavigation } = await import('./local-ui-web-navigation.mjs');
       const { openUrl } = await import('./launcher-helpers.mjs');

@@ -104,3 +104,10 @@ export function prepareLauncherState(root, { env = process.env, platform = proce
     lockDirectory: paths.join(directory, `.mediflow-launcher-${key}`),
   };
 }
+
+export function localUiArchiveLock(dataDir) {
+  const directory = path.join(launcherConfigDirectory(),
+    `local-ui-${crypto.createHash('sha256').update(dataDir).digest('hex')}`);
+  privateDirectory(directory);
+  return path.join(directory, 'launcher');
+}
