@@ -69,6 +69,10 @@ export function createLocalUiSupervisorProduction(
   if (!dataDir || !options.sourceRoot || !options.webBuildIdentity?.revision) throw new Error('data_directory_required');
   const navigate = createLocalUiRuntimeNavigator({ sourceRoot: options.sourceRoot, dataDir, revision: options.webBuildIdentity.revision });
   const children = createPortableSupervisorProductionChildProcessesV1({ ...options, dataDir, agentKind: 'plugin_local_ui' });
-  try { return createLocalUiSupervisorRuntime(children, navigate); }
+  try {
+    const runtime = createLocalUiSupervisorRuntime(children, navigate);
+    void runtime.closed.then(() => navigate.close());
+    return runtime;
+  }
   catch (error) { children.terminateAll(); throw error; }
 }

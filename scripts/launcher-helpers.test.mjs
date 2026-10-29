@@ -2685,16 +2685,14 @@ for (const scenario of ['remove-error', 'pending-launcher']) test(scenario === '
     assert.match(output, /cancelled 0/u);
 });
 
-test('disconnecting the plugin leaves its ordinary runtime alive and usable', { timeout: 12000 }, async t => {
+test('disconnecting the plugin closes its owned runtime', { timeout: 12000 }, async t => {
     const f = await ordinaryLauncherFixture(t, 'web');
     await f.until(() => f.output().includes('Pronto:'));
     assert.equal(await navigateOwnedLocalUiRuntime(f.child, 'history', new AbortController().signal, Date.now() + 5000, f.expected), true);
     f.child.disconnect();
-    const receipt = JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
-    const state = await (await fetch(new URL('state', receipt.choiceUrl), { signal: AbortSignal.timeout(3000) })).json();
-    assert.equal(state.ready, true);
-    assert.equal((await fetch(state.url, { signal: AbortSignal.timeout(3000) })).status, 200);
-    assert.equal(f.child.exitCode, null);
+    await f.waitForTerminal();
+    assert.equal(f.child.exitCode, 0);
+    assert.equal(existsSync(path.join(f.stateFiles.lockDirectory, 'active')), false);
     await assert.rejects(navigateOwnedLocalUiRuntime(f.child, 'search', new AbortController().signal), /navigation_unavailable/);
 });
 
@@ -2841,9 +2839,9 @@ for (const [name, count, controlFault] of [
     ['cancellation during an unverified Web startup sends no navigation frame', 1],
     ['ordinary and plugin startup recover a stale owner before choosing pairing', 4],
     ['IPC cancellation during the Web identity proof cannot dispatch a late intent', 1],
-    ['disconnecting the plugin leaves its ordinary runtime alive and usable', 1],
+    ['IPC rejects replay, expiry, revoked IDs and extra fields without new navigation', 1],
     ['ordinary and plugin startup recover a stale owner before choosing pairing', 4, 'reply-error'],
-    ['disconnecting the plugin leaves its ordinary runtime alive and usable', 1, 'terminal-before-reply'],
+    ['IPC rejects replay, expiry, revoked IDs and extra fields without new navigation', 1, 'terminal-before-reply'],
     ['cancellation during an unverified Web startup sends no navigation frame', 1, 'windows-terminal'],
 ]) test(`unverified stop fails visibly and drains all owned fixtures: ${name}${controlFault ? " (" + controlFault + ")" : ""}`, { timeout: 30000 }, async t => {
     const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-stop-audit-~')));

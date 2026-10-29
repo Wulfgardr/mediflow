@@ -411,6 +411,18 @@ export async function main(args = process.argv.slice(2)) {
   const { preferencesFile, lockDirectory } = prepareLauncherState(ROOT);
   const pluginChannel = options.reuseOnly && process.connected;
   const ownership = claimLauncher(lockDirectory, identity, { reuseLive: true });
+  let archiveOwnership = null;
+  if (pluginChannel && ownership.claimed) {
+    const archiveLock = path.join(path.dirname(path.dirname(lockDirectory)),
+      `.mediflow-local-ui-${crypto.createHash('sha256').update(dataDir).digest('hex')}`);
+    try { archiveOwnership = claimLauncher(archiveLock, identity, { reuseLive: true }); }
+    catch (error) { releaseLauncher(ownership); throw error; }
+    if (!archiveOwnership.claimed) {
+      releaseLauncher(ownership);
+      await bridgeExistingLocalUi(pairingDirectory(archiveLock), { dataDir, sourceFingerprint: identity.sourceFingerprint });
+      return;
+    }
+  }
   const existing = pluginChannel || ownership.claimed ? null : await findExistingInstance(ownership.receipt, identity);
   if (existing) {
     const url = options.choose ? `${existing.choiceUrl}?scegli=1` : existing.url;
@@ -419,6 +431,7 @@ export async function main(args = process.argv.slice(2)) {
     return;
   }
   const requestsDirectory = pairingDirectory(lockDirectory);
+  const archiveRequests = archiveOwnership ? pairingDirectory(archiveOwnership.directory) : null;
   if (pluginChannel && !ownership.claimed) {
     await bridgeExistingLocalUi(requestsDirectory, { dataDir, sourceFingerprint: identity.sourceFingerprint });
     return;
@@ -473,6 +486,7 @@ export async function main(args = process.argv.slice(2)) {
         await stopChild();
         await chooser?.close();
         releaseLauncher(ownership);
+        if (archiveOwnership) releaseLauncher(archiveOwnership);
         clearInterval(ownershipHold); ownershipHold = null;
         shutdownComplete = true;
         for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.off(signal, onSignal);
@@ -559,7 +573,7 @@ export async function main(args = process.argv.slice(2)) {
   const onParentMessage = message => handleNavigation(message, frame => process.send(frame, () => {}), () => process.connected);
   const onDisconnect = () => {
     for (const requestId of pendingNavigation) cancelNavigation(requestId);
-    if (!pluginChannel) onSignal();
+    onSignal();
   };
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(signal, onSignal);
   if (process.connected) {
@@ -698,6 +712,7 @@ export async function main(args = process.argv.slice(2)) {
     }
     if (closing) return;
     child.once('exit', () => {
+      if (pluginChannel && !closing) { void shutdown(); return; }
       if (!closing && attempt === generation) update({ ready: false, busy: false, url: null, step: 'errore', message: 'MediFlow si è arrestato. Controlla i log nel terminale prima di riaprire.' });
     });
     if (!options.reuseOnly && remember && choice !== 'sviluppo') atomicJson(preferencesFile, { schemaVersion: 1, choice });
@@ -735,7 +750,7 @@ export async function main(args = process.argv.slice(2)) {
     pairingPoll = setInterval(() => {
       if (!state.ready || !state.navigationReady || closing || !child?.connected) return;
       try {
-        for (const request of readPairingRequests(requestsDirectory)) {
+        for (const request of [requestsDirectory, archiveRequests].filter(Boolean).flatMap(readPairingRequests)) {
           if (request.dataDir !== dataDir || request.sourceFingerprint !== identity.sourceFingerprint || pairRequests.size >= 64) continue;
           const pair = { ...request, instance, socket: null }; pairRequests.set(pair.nonce, pair);
           child.send({ type: 'mediflow-local-ui-pair-offer', request: { nonce: pair.nonce, host: pair.host,
