@@ -9226,7 +9226,7 @@ mod review706b_callers {
         let patient = serde_json::json!({"id":"review706b-patient","firstName":"","lastName":"Schwarzenegger","taxCode":"RSSMRA80A01H501U","version":1});
         app.install_patient(serde_json::from_value(patient.clone()).unwrap());
         app.global_patients = ReadLoad::Ready(vec![serde_json::from_value(patient).unwrap()]);
-        app.agenda=ReadLoad::Ready(vec![serde_json::from_value(serde_json::json!({"id":"review706b-control","patientId":"review706b-patient","version":1,"date":"2026-10-27","title":"Controllo sintetico","status":"pending"})).unwrap()]);
+        app.agenda=ReadLoad::Ready(vec![serde_json::from_value(serde_json::json!({"id":"review706b-control","patientId":"review706b-patient","version":1,"date":"2099-10-29","title":"Controllo sintetico","status":"pending"})).unwrap()]);
         app.agenda_flow.targets.insert(
             "review706b-control".into(),
             ScrollTarget::new(&app.area_scroll, cx),
@@ -9236,6 +9236,102 @@ mod review706b_callers {
         app.text_scale = 2.;
         app
     }
+    struct Hcg5Page {
+        app: Entity<ClinicalApp>,
+    }
+    impl Render for Hcg5Page {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            self.app.update(cx, |app, cx| {
+                let layout =
+                    Layout::for_window(f32::from(window.viewport_size().width), app.text_scale);
+                div()
+                    .size_full()
+                    .flex()
+                    .flex_col()
+                    .type_role(app.theme, crate::theme::TextRole::Body)
+                    .child(if app.area == Area::Patients {
+                        app.profile_view(layout, cx).into_any_element()
+                    } else {
+                        app.area_view(layout, cx).into_any_element()
+                    })
+            })
+        }
+    }
+    #[gpui::test]
+    fn hcg5_real_page_margins(cx: &mut gpui::TestAppContext) {
+        let mut native = gpui::TestAppContext::build_with_text_system(
+            cx.dispatcher.clone(),
+            None,
+            std::sync::Arc::new(gpui_apple::AppleTextSystem::new()),
+        );
+        let (view, cx) = native.add_window_view(|window, cx| Hcg5Page {
+            app: cx.new(|cx| make_app(window, cx)),
+        });
+        for dark in [false, true] {
+            for scale in [1., 2., 4.] {
+                for width in [390., 420., 800.] {
+                    for (area, heading) in [
+                        (Area::Agenda, "Agenda"),
+                        (Area::Diary, "Diario generale"),
+                        (Area::Settings, "Impostazioni"),
+                        (Area::Patients, "Schwarzenegger"),
+                    ] {
+                        view.update(cx, |v, cx| {
+                            v.app.update(cx, |app, cx| {
+                                app.area = area;
+                                app.text_scale = scale;
+                                app.theme = Theme::for_dark(dark).sized(scale, false);
+                                cx.notify();
+                            })
+                        });
+                        cx.simulate_resize(gpui::size(px(width), px(14000.)));
+                        crate::title::take_title_nodes();
+                        crate::title::take_title_lines();
+                        cx.update(|w, cx| {
+                            w.refresh();
+                            w.draw(cx).clear(cx);
+                        });
+                        let nodes = crate::title::take_title_nodes();
+                        let (_, _, bounds, _) = nodes
+                            .iter()
+                            .find(|(_, n, _, _)| n.value() == Some(heading))
+                            .expect("page heading");
+                        let margin = if width / scale < 700. { 16. } else { 28. };
+                        assert_eq!(
+                            bounds.origin.x,
+                            px(margin),
+                            "{heading}/{width}/{scale}/{dark}"
+                        );
+                        if area == Area::Agenda {
+                            let status = cx
+                                .debug_bounds("clinical-workspace-agenda-update")
+                                .expect("agenda status");
+                            assert_eq!(status.origin.x, px(margin));
+                            println!(
+                                "HCG5_POSITION {width} {scale} {dark} {}",
+                                f32::from(status.origin.y)
+                            );
+                            let (_, _, bounds, _) = nodes
+                                .iter()
+                                .find(|(_, n, _, _)| n.value() == Some("OGGI E PROSSIMI · 1"))
+                                .expect("counted section");
+                            assert_eq!(bounds.origin.x, px(margin));
+                            let lines = crate::title::take_title_lines();
+                            let (_, lines) = lines
+                                .iter()
+                                .find(|(label, _)| label == "OGGI E PROSSIMI · 1")
+                                .unwrap();
+                            assert!(
+                                lines.iter().any(|l| l.contains("PROSSIMI · 1")),
+                                "{width}/{scale}/{dark}: {lines:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     #[gpui::test]
     fn actual_preview_304(cx: &mut gpui::TestAppContext) {
         let mut native = gpui::TestAppContext::build_with_text_system(
