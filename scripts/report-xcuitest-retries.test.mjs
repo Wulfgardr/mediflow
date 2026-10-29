@@ -15,9 +15,20 @@ const testCase = (children = [], result = 'Passed', name = 'Suite/testAgenda()')
 const tree = (...children) => ({ testNodes: [{ nodeType: 'Test Plan', name: 'Plan', children }] });
 
 test('first-attempt passes and intentional skips have no recovered failures', () => {
-  const report = retryReport(tree(testCase(), testCase([], 'Skipped', 'Suite/testIPad()')));
+  const report = retryReport(tree(testCase(), testCase([
+    failure('Test skipped - iPad-only layout contract'),
+  ], 'Skipped', 'Suite/testIPad()')));
   assert.equal(report.failed, false);
   assert.match(report.markdown, /Nessun test ripetuto/);
+});
+
+test('skip metadata cannot hide an earlier failure or an assertion', () => {
+  assert.equal(retryReport(tree(testCase([
+    attempt('Failed', [background]), attempt('Skipped', ['Test skipped - iPad-only layout contract']),
+  ], 'Skipped'))).failed, true);
+  assert.equal(retryReport(tree(testCase([
+    failure('XCTAssertEqual failed'),
+  ], 'Skipped'))).failed, true);
 });
 
 test('reports a recovered background assertion even when parent is Failed', () => {
