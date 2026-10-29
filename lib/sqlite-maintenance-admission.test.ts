@@ -29,9 +29,14 @@ function child(script: string, dir: string) {
     worker.stdout!.on('data', bytes => { output += bytes.toString(); });
     worker.stderr!.on('data', bytes => { output += bytes.toString(); });
     const terminal = new Promise<number | null>((resolve, reject) => {
-        const timer = setTimeout(() => { worker.kill(); reject(new Error('owned child deadline: ' + output)); }, 20_000);
-        worker.once('error', error => { clearTimeout(timer); reject(error); });
-        worker.once('exit', code => { clearTimeout(timer); resolve(code); });
+        let failure: Error | undefined;
+        const timer = setTimeout(() => { failure = new Error('owned child deadline: ' + output); worker.kill(); }, 20_000);
+        worker.once('error', error => { failure = error; });
+        worker.once('close', code => {
+            clearTimeout(timer);
+            if (failure) reject(failure);
+            else resolve(code);
+        });
     });
     return { worker, terminal, output: () => output };
 }
@@ -64,6 +69,33 @@ test('lease spans native open and close; successful maintenance admits the next 
         const next = openAdmittedSqlite(f.target);
         await next.close();
     } finally { f.cleanup(); }
+});
+
+test('default async close shares the synchronous admission budget under gate contention', async () => {
+    const f = fixture();
+    const participant = openAdmittedSqlite(f.target);
+    const gate = path.join(store(f.target), 'gate');
+    fs.mkdirSync(gate);
+    let release: ReturnType<typeof setTimeout> | undefined;
+    const nativeMkdir = fs.mkdirSync;
+    try {
+        await assert.rejects(participant.close({ timeoutMs: 20 }), /admission_busy/);
+        assert.equal(participant.database.open, false);
+        assert.equal(fs.readdirSync(path.join(store(f.target), 'leases')).length, 1);
+        fs.mkdirSync = ((file, options) => {
+            if (String(file) === gate && !release) release = setTimeout(() => fs.rmdirSync(gate), 1200);
+            return nativeMkdir(file, options);
+        }) as typeof fs.mkdirSync;
+        await participant.close();
+        assert.deepEqual(fs.readdirSync(path.join(store(f.target), 'leases')), []);
+        await runWithSqliteMaintenance(f.target, {}, () => {});
+    } finally {
+        fs.mkdirSync = nativeMkdir;
+        clearTimeout(release);
+        if (fs.existsSync(gate)) fs.rmdirSync(gate);
+        await participant.close();
+        f.cleanup();
+    }
 });
 
 test('intent first denies native open and cannot create a missing target', async () => {
