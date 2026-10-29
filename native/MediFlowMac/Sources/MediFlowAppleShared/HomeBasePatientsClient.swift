@@ -1632,6 +1632,11 @@ public actor HomeBasePatientsClient {
                         throw HomeBaseClientError.profileVersionConflict(profile)
                     }
                 }
+                if [404, 409].contains(httpResponse.statusCode),
+                   let code = (try? JSONDecoder().decode(APIErrorPayload.self, from: data))?.code,
+                   let failure = HomeBaseScaleWriteError(rawValue: code) {
+                    throw failure
+                }
                 // WUL-308: a 409 carries a structured VERSION_CONFLICT body; surface
                 // it as a typed error so the UI can show expected-vs-current version.
                 if httpResponse.statusCode == 409,
@@ -1869,9 +1874,26 @@ private struct AmbulatoryClearRequest: Encodable {
     let version: Int
 }
 
+public enum HomeBaseScaleWriteError: String, Error, LocalizedError {
+    case patientInactive = "SCALE_PATIENT_INACTIVE"
+    case payloadConflict = "SCALE_IDEMPOTENCY_CONFLICT"
+    public var errorDescription: String? {
+        switch self {
+        case .patientInactive: "Paziente archiviato o rimosso. Nessuna nuova registrazione. La bozza è conservata."
+        case .payloadConflict: "Questo invio è già associato a un contenuto diverso. Verifica gli esiti registrati prima di iniziare una nuova valutazione."
+        }
+    }
+}
+
 public struct HomeBaseCreatedResource: Decodable, Equatable, Sendable {
     public let id: String
     public let version: Int?
+    public let idempotent: Bool?
+    public init(id: String, version: Int?, idempotent: Bool? = nil) {
+        self.id = id
+        self.version = version
+        self.idempotent = idempotent
+    }
 }
 
 /* the paired source/ordinary operation cannot redirect its credentials or projection. */

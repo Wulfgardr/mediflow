@@ -330,6 +330,51 @@
       "change": "POST /api/v1/network/pairing-intents/{intentId}/confirm response 201.pairedClient.clientPlatform changed",
       "trackingIssue": "WUL-706",
       "reason": "ADR0145 / WUL-714: explicitly add windows and linux to the paired native client roster for the Rust/GPUI transition requested on 17 October 2026. Existing Apple request values remain accepted; unknown platforms still fail closed. Response enum extension is not universally compatible with older strict consumers: old hosts reject new platforms and older client roster decoding must be assessed before rollout. No capability or role is granted by platform alone. Spec 1.37.0, network protocol 1.12.0."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/entries/{entryId} response 409.code was removed",
+      "trackingIssue": "WUL-768",
+      "reason": "HC-A2 / ADR0053, OpenAPI 1.45.0: the original EntryVersionConflictResponse remains unchanged in the first oneOf branch. The added SCALE_PATIENT_INACTIVE branch implements the required atomic active-patient gate for scale results. The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary entry CAS responses retain every original field. Apple and Web clients handle the scale denial without discarding the draft."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/entries/{entryId} response 409.currentSnapshot was removed",
+      "trackingIssue": "WUL-768",
+      "reason": "HC-A2 / ADR0053, OpenAPI 1.45.0: the original EntryVersionConflictResponse remains unchanged in the first oneOf branch. The added SCALE_PATIENT_INACTIVE branch implements the required atomic active-patient gate for scale results. The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary entry CAS responses retain every original field. Apple and Web clients handle the scale denial without discarding the draft."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/entries/{entryId} response 409.currentState was removed",
+      "trackingIssue": "WUL-768",
+      "reason": "HC-A2 / ADR0053, OpenAPI 1.45.0: the original EntryVersionConflictResponse remains unchanged in the first oneOf branch. The added SCALE_PATIENT_INACTIVE branch implements the required atomic active-patient gate for scale results. The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary entry CAS responses retain every original field. Apple and Web clients handle the scale denial without discarding the draft."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/entries/{entryId} response 409.currentUpdatedAt was removed",
+      "trackingIssue": "WUL-768",
+      "reason": "HC-A2 / ADR0053, OpenAPI 1.45.0: the original EntryVersionConflictResponse remains unchanged in the first oneOf branch. The added SCALE_PATIENT_INACTIVE branch implements the required atomic active-patient gate for scale results. The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary entry CAS responses retain every original field. Apple and Web clients handle the scale denial without discarding the draft."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/entries/{entryId} response 409.currentVersion was removed",
+      "trackingIssue": "WUL-768",
+      "reason": "HC-A2 / ADR0053, OpenAPI 1.45.0: the original EntryVersionConflictResponse remains unchanged in the first oneOf branch. The added SCALE_PATIENT_INACTIVE branch implements the required atomic active-patient gate for scale results. The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary entry CAS responses retain every original field. Apple and Web clients handle the scale denial without discarding the draft."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/entries/{entryId} response 409.entity was removed",
+      "trackingIssue": "WUL-768",
+      "reason": "HC-A2 / ADR0053, OpenAPI 1.45.0: the original EntryVersionConflictResponse remains unchanged in the first oneOf branch. The added SCALE_PATIENT_INACTIVE branch implements the required atomic active-patient gate for scale results. The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary entry CAS responses retain every original field. Apple and Web clients handle the scale denial without discarding the draft."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/entries/{entryId} response 409.error was removed",
+      "trackingIssue": "WUL-768",
+      "reason": "HC-A2 / ADR0053, OpenAPI 1.45.0: the original EntryVersionConflictResponse remains unchanged in the first oneOf branch. The added SCALE_PATIENT_INACTIVE branch implements the required atomic active-patient gate for scale results. The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary entry CAS responses retain every original field. Apple and Web clients handle the scale denial without discarding the draft."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/entries/{entryId} response 409.expectedVersion was removed",
+      "trackingIssue": "WUL-768",
+      "reason": "HC-A2 / ADR0053, OpenAPI 1.45.0: the original EntryVersionConflictResponse remains unchanged in the first oneOf branch. The added SCALE_PATIENT_INACTIVE branch implements the required atomic active-patient gate for scale results. The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary entry CAS responses retain every original field. Apple and Web clients handle the scale denial without discarding the draft."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/entries/{entryId} response 409.recordId was removed",
+      "trackingIssue": "WUL-768",
+      "reason": "HC-A2 / ADR0053, OpenAPI 1.45.0: the original EntryVersionConflictResponse remains unchanged in the first oneOf branch. The added SCALE_PATIENT_INACTIVE branch implements the required atomic active-patient gate for scale results. The structural guard does not flatten oneOf and reports the old branch fields as removed; ordinary entry CAS responses retain every original field. Apple and Web clients handle the scale denial without discarding the draft."
     }
   ]
 }

@@ -1,59 +1,107 @@
 import SwiftUI
 
+final class ClinicalScaleDraft: Identifiable {
+    let id = UUID()
+    let definition: ClinicalScaleDefinition
+    let patientID: String
+    let patientVersion: Int
+    let patientLabel: String
+    let connectionIdentity: ClinicalWorkspaceConnection.Identity?
+
+    init(definition: ClinicalScaleDefinition, patient: HomeBasePatientDetail,
+         connectionIdentity: ClinicalWorkspaceConnection.Identity?) {
+        self.definition = definition
+        patientID = patient.id
+        patientVersion = patient.version
+        patientLabel = "\(patient.lastName) \(patient.firstName)"
+        self.connectionIdentity = connectionIdentity
+    }
+
+    func validate(patientID: String, isArchived: Bool?, deletedAt: Date?) throws {
+        guard patientID == self.patientID else { throw ClinicalScaleDraftError.wrongPatient }
+        guard isArchived != true, deletedAt == nil else { throw ClinicalScaleDraftError.unavailable }
+    }
+
+    private var preparedRequest: (answers: [String: Int], payload: HomeBaseEntryCreatePayload)?
+
+    func request(answers: [String: Int], prepare: () throws -> HomeBaseEntryCreatePayload) throws -> HomeBaseEntryCreatePayload {
+        if let preparedRequest {
+            guard preparedRequest.answers == answers else { throw ClinicalScaleDraftError.answersChanged }
+            return preparedRequest.payload
+        }
+        let payload = try prepare()
+        preparedRequest = (answers, payload)
+        return payload
+    }
+
+    var title: String {
+        "\(definition.id == "adl" ? "ADL" : definition.title) · \(patientLabel)"
+    }
+}
+
+enum ClinicalScaleDraftError: String, LocalizedError {
+    case wrongPatient = "Il paziente della richiesta non coincide con quello della bozza. Punteggio non registrato."
+    case unavailable = "Paziente archiviato o rimosso. Nessuna nuova registrazione. La bozza è conservata."
+    case answersChanged = "Le risposte non coincidono con quelle del primo invio. Riprendi la stessa bozza o verifica gli esiti prima di iniziarne una nuova."
+    case connectionChanged = "Il collegamento o l'ambulatorio è cambiato. Punteggio non registrato."
+    var errorDescription: String? { rawValue }
+}
+
 /// MF085-003: unanswered is nil, not the first option or a false toggle.
 struct ClinicalScaleFormView: View {
-    let definition: ClinicalScaleDefinition
-    let onSubmit: ([String: Int]) -> Void
-    let onCancel: () -> Void
+    let draft: ClinicalScaleDraft
+    let onSubmit: ([String: Int]) async -> String?
+    @Environment(\.dismiss) private var dismiss
     @State private var answers: [String: Int] = [:]
-
-    init(
-        definition: ClinicalScaleDefinition,
-        onSubmit: @escaping ([String: Int]) -> Void,
-        onCancel: @escaping () -> Void
-    ) {
-        self.definition = definition
-        self.onSubmit = onSubmit
-        self.onCancel = onCancel
-        _answers = State(initialValue: [:])
-    }
+    @State private var isSubmitting = false
+    @State private var hasAttemptedSubmission = false
+    @State private var submissionError: String?
+    private var definition: ClinicalScaleDefinition { draft.definition }
 
     private var result: ClinicalScaleResult? {
         try? definition.result(from: answers)
     }
 
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     var body: some View {
         NavigationStack {
-            GeometryReader { geometry in
-                let wide = geometry.size.width >= 760 && !dynamicTypeSize.isAccessibilitySize
-                Group {
-                if wide {
-                    HStack(alignment: .top, spacing: 0) {
-                        questions
-                        Divider()
-                        resultPanel.padding(24).frame(width: 280, alignment: .topLeading)
-                    }
-                } else {
-                    questions
-                }
-                }
-                .safeAreaInset(edge: .bottom, spacing: 0) { submissionBar(showsResult: !wide) }
-            }
+            questions
             .background(PlatformColors.chartCardSurface)
-            .navigationTitle(definition.title)
+            .navigationTitle(draft.title)
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(iOS)
+                ToolbarItem(placement: .principal) {
+                    Text(draft.title)
+                        .font(.headline)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("scale-context-title")
+                }
+                #endif
+                ToolbarItem(placement: .confirmationAction) { submitButton }
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Annulla", action: onCancel)
+                    Button("Annulla") { dismiss() }
+                        .disabled(isSubmitting)
                         .accessibilityIdentifier("cancel-scale-button")
                 }
             }
         }
+        .interactiveDismissDisabled(isSubmitting)
     }
 
     private var questions: some View {
         List {
+            Section {
+                resultPanel
+                if let submissionError {
+                    Text(submissionError)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("scale-submission-error")
+                }
+            }
             Section {
                 Text(definition.scaleDescription).chartMetadata()
                     .fixedSize(horizontal: false, vertical: true)
@@ -73,6 +121,7 @@ struct ClinicalScaleFormView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .pickerStyle(.menu)
+                    .disabled(isSubmitting || hasAttemptedSubmission)
                     .padding(.vertical, 8)
                     .accessibilityIdentifier("scale-question-\(question.id)")
                 }
@@ -86,7 +135,8 @@ struct ClinicalScaleFormView: View {
                 .font(.body.weight(.semibold)).foregroundStyle(PlatformColors.pencil)
             if let result {
                 Text("\(result.score)/\(definition.maxScore)")
-                    .inkRegister(weight: .semibold)
+                    .font(.largeTitle.weight(.semibold))
+                    .monospacedDigit()
                     .accessibilityIdentifier("scale-score")
                 Text(result.interpretation).inkRegister()
                     .fixedSize(horizontal: false, vertical: true)
@@ -99,39 +149,21 @@ struct ClinicalScaleFormView: View {
         }
     }
 
-    private func submissionBar(showsResult: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Divider()
-            if showsResult {
-                VStack(alignment: .leading, spacing: 12) {
-                    resultPanel
-                    submitButton
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
-            } else {
-                HStack(alignment: .center, spacing: 20) {
-                    Text("Risultato in bozza")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(PlatformColors.pencil)
-                    Spacer(minLength: 8)
-                    submitButton
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
+    private var submitButton: some View {
+        Button("Completa") {
+            guard result != nil, !isSubmitting else { return }
+            let submittedAnswers = answers
+            hasAttemptedSubmission = true
+            isSubmitting = true
+            Task { @MainActor in
+                submissionError = await onSubmit(submittedAnswers)
+                isSubmitting = false
+                if submissionError == nil { dismiss() }
             }
         }
-        .background(PlatformColors.chartCardSurface)
-    }
-
-    private var submitButton: some View {
-        Button("Invia") {
-            guard result != nil else { return }
-            onSubmit(answers)
-        }
         .buttonStyle(.borderedProminent)
-        .disabled(result == nil)
+        .tint(PlatformColors.freshInk)
+        .disabled(result == nil || isSubmitting)
         .accessibilityIdentifier("submit-scale-button")
     }
 }

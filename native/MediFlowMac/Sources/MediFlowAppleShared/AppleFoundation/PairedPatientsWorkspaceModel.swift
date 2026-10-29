@@ -1470,65 +1470,88 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }, canApplyFailure: { isCurrent() })
     }
 
-    /// A10: submit a completed clinical scale as a `type:"scale"` diary entry whose
-    /// encrypted metadata matches the web's shape, so the web reads it back.
-    func submitScale(_ definition: ClinicalScaleDefinition, answers: [String: Int]) async {
-        guard let patientId = selectedPatient?.id else { return }
-        // MF085-003: reject before any insertion, seal or clinical write.
+    func makeScaleDraft(_ definition: ClinicalScaleDefinition) -> ClinicalScaleDraft? {
+        guard let patient = selectedPatient, patient.isArchived != true, patient.deletedAt == nil else { return nil }
+        return ClinicalScaleDraft(definition: definition, patient: patient,
+            connectionIdentity: clinicalWorkspaceConnection?.identity)
+    }
+
+    @discardableResult
+    func submitScale(_ draft: ClinicalScaleDraft, answers: [String: Int]) async -> Bool {
+        let submission: ClinicalScaleSubmission
         do {
-            try await ClinicalScales.submit(definition: definition, answers: answers) { submission in
-                let definition = submission.definition
-                let result = submission.result
-                let metadataJSON = submission.metadataJSON
-                let content = ClinicalRichText.render(
-                    document: ClinicalRichText.parse(
-                        html: ClinicalScales.contentSummary(definition: definition, result: result)
-                    )
-                )
-
-                #if DEBUG
-                if Self.isUITestSeeded {
-                    let base = Date(timeIntervalSince1970: 1_750_000_000)
-                    entries.insert(HomeBaseEntrySummary(
-                        id: "scale-\(definition.id)-\(result.score)", patientId: patientId, type: "scale",
-                        title: definition.title, date: base, content: content, setting: nil,
-                        metadata: metadataJSON, attachments: nil, deletedAt: nil, deletionReason: nil,
-                        version: 1, createdAt: base, updatedAt: base
-                    ), at: 0)
-                    statusMessage = "Valutazione \(definition.title) inviata: \(result.score)/\(definition.maxScore)."
-                    return
-                }
-                #endif
-
-                guard let sessionCookie, let credentials = pairedCredentials else {
-                    errorMessage = "Apri prima un paziente con sessione paired online."
-                    return
-                }
-                await runTask {
-                    _ = try await self.makeClient().createEntry(
-                        patientId: patientId,
-                        payload: HomeBaseEntryCreatePayload(
-                            id: UUID().uuidString,
-                            type: "scale",
-                            title: try self.sealField(definition.title),
-                            date: Date(),
-                            content: try self.sealField(content) ?? "",
-                            metadata: try self.sealStructuredField(metadataJSON)
-                        ),
-                        credentials: credentials,
-                        sessionCookie: sessionCookie,
-                        ambulatoryId: self.ambulatoryId.trimmedOrNil
-                    )
-                    self.statusMessage = "Valutazione \(definition.title) inviata: \(result.score)/\(definition.maxScore)."
-                    self.entries = try await self.fetchDecryptedEntries(
-                        patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
-                        ambulatoryId: self.ambulatoryId.trimmedOrNil
-                    )
-                }
-            }
+            submission = try ClinicalScales.prepareSubmission(definition: draft.definition, answers: answers)
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
+        let definition = submission.definition
+        let result = submission.result
+        let content = ClinicalRichText.render(document: ClinicalRichText.parse(
+            html: ClinicalScales.contentSummary(definition: definition, result: result)))
+        let patientID = draft.patientID
+        #if DEBUG
+        if Self.isUITestSeeded {
+            do {
+                guard let patient = patients.first(where: { $0.id == patientID }) else {
+                    throw ClinicalScaleDraftError.unavailable
+                }
+                try draft.validate(patientID: patient.id, isArchived: patient.isArchived, deletedAt: patient.deletedAt)
+                let base = Date(timeIntervalSince1970: 1_750_000_000)
+                if selectedPatient?.id == patientID {
+                    entries.insert(HomeBaseEntrySummary(
+                        id: "scale-\(definition.id)-\(result.score)", patientId: patientID, type: "scale",
+                        title: definition.title, date: base, content: content, setting: nil,
+                        metadata: submission.metadataJSON, attachments: nil, deletedAt: nil, deletionReason: nil,
+                        version: 1, createdAt: base, updatedAt: base), at: 0)
+                }
+                statusMessage = "Valutazione \(definition.title) registrata per \(draft.patientLabel): \(result.score)/\(definition.maxScore)."
+                return true
+            } catch {
+                errorMessage = error.localizedDescription
+                return false
+            }
+        }
+        #endif
+        guard let connection = clinicalWorkspaceConnection, connection.identity == draft.connectionIdentity else {
+            errorMessage = ClinicalScaleDraftError.connectionChanged.localizedDescription
+            return false
+        }
+        let isCurrent = { self.clinicalWorkspaceConnection?.identity == connection.identity && !Task.isCancelled }
+        var acknowledged = false
+        await runTask({
+            guard isCurrent() else { throw ClinicalScaleDraftError.connectionChanged }
+            let patient: HomeBasePatientDetail
+            do {
+                patient = try await connection.dataSource.fetchPatient(id: patientID, credentials: connection.credentials,
+                    sessionCookie: connection.sessionCookie, ambulatoryId: connection.ambulatoryId)
+            } catch HomeBaseClientError.httpStatus(404, _) {
+                throw ClinicalScaleDraftError.unavailable
+            }
+            guard isCurrent() else { throw ClinicalScaleDraftError.connectionChanged }
+            try draft.validate(patientID: patient.id, isArchived: patient.isArchived, deletedAt: patient.deletedAt)
+            let payload = try draft.request(answers: answers) {
+                HomeBaseEntryCreatePayload(id: draft.id.uuidString, type: "scale",
+                    title: try self.sealField(definition.title), date: Date(timeIntervalSince1970: floor(Date().timeIntervalSince1970)),
+                    content: try self.sealField(content) ?? "",
+                    metadata: try self.sealStructuredField(submission.metadataJSON))
+            }
+            let receipt = try await connection.dataSource.createEntry(patientId: patientID, payload: payload,
+                credentials: connection.credentials, sessionCookie: connection.sessionCookie,
+                ambulatoryId: connection.ambulatoryId)
+            guard receipt.id == payload.id else { throw HomeBaseClientError.contract }
+            acknowledged = true
+            guard isCurrent() else { return }
+            self.statusMessage = receipt.idempotent == true
+                ? "Valutazione già registrata per \(draft.patientLabel): \(result.score)/\(definition.maxScore)."
+                : "Valutazione \(definition.title) registrata per \(draft.patientLabel): \(result.score)/\(definition.maxScore)."
+            guard self.selectedPatient?.id == patientID else { return }
+            let entries = try await self.fetchDecryptedEntries(patientId: patientID, credentials: connection.credentials,
+                sessionCookie: connection.sessionCookie, ambulatoryId: connection.ambulatoryId)
+            guard isCurrent(), self.selectedPatient?.id == patientID else { return }
+            self.entries = entries
+        }, canApplyFailure: isCurrent)
+        return acknowledged
     }
 
     func startEditingEntry(_ entry: HomeBaseEntrySummary) {

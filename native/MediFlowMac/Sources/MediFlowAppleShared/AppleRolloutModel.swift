@@ -84,13 +84,13 @@ public enum ClinicalWorkspaceSection: String, CaseIterable, Identifiable, Sendab
         case .patients: "Pazienti"
         case .agenda: "Agenda"
         case .diary: "Diario"
-        case .analytics: "Analytics"
+        case .analytics: "Analisi"
         case .scales: "Scale"
         case .settings: "Impostazioni"
         case .runtime: "Runtime"
         case .overview: "Panoramica"
         case .milestones: "Tappe"
-        case .host: "Host"
+        case .host: "Amministrazione"
         case .repertori: "Repertori"
         }
     }

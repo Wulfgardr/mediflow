@@ -40,7 +40,7 @@ struct PairedPatientsWorkspaceView: View {
     @State private var showsDeletedDiaryEntries = false
     @State private var confirmsReplacingEntryTemplate = false
     @State private var confirmsFHIRExport = false
-    @State private var presentingScale: ClinicalScaleDefinition?
+    @State private var presentingScale: ClinicalScaleDraft?
     @State private var icdQuery = ""
     // S6 (Wave 5): documents archive, upload, FSE single-record validation.
     @State private var attachmentDetailCandidate: HomeBaseAttachmentSummary?
@@ -173,22 +173,25 @@ struct PairedPatientsWorkspaceView: View {
         .task {
             await model.performAutomaticActionsIfNeeded()
             #if DEBUG
-            // Screenshot/UI-test affordance: auto-present a clinical scale sheet so
-            // the live-scored form can be captured. Debug-only, never in release.
-            if ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PRESENT_SCALE"] == "adl" {
-                presentingScale = ClinicalScales.adl
+            if let scaleID = ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PRESENT_SCALE"],
+               let scale = ClinicalScales.all.first(where: { $0.id == scaleID }) {
+                presentingScale = model.makeScaleDraft(scale)
             }
             #endif
         }
-        .sheet(item: $presentingScale) { scale in
-            ClinicalScaleFormView(
-                definition: scale,
-                onSubmit: { answers in
-                    Task { await model.submitScale(scale, answers: answers) }
-                    presentingScale = nil
-                },
-                onCancel: { presentingScale = nil }
-            )
+        .sheet(item: $presentingScale) { draft in
+            ClinicalScaleFormView(draft: draft) { answers in
+                await model.submitScale(draft, answers: answers) ? nil : (model.errorMessage ?? "Punteggio non registrato.")
+            }
+            .id(draft.id)
+            #if DEBUG
+            .task {
+                if ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_SCALE_SWITCH_PATIENT"] == "1",
+                   let other = model.patients.first(where: { $0.id != draft.patientID && $0.isArchived != true }) {
+                    await model.loadPatient(other)
+                }
+            }
+            #endif
         }
         .sheet(isPresented: $showsConnectionSetup) {
             PairedHomeBaseCredentialsSheet(

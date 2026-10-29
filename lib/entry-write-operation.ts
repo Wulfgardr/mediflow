@@ -45,9 +45,14 @@ function activeParentExists(tx: Tx, patientId: string): boolean {
         .where(and(eq(patients.id, patientId), activePatients())).get());
 }
 
-function sameNetworkCreate(existing: typeof entries.$inferSelect, values: typeof entries.$inferInsert): boolean {
+function activeScaleParentExists(tx: Tx, patientId: string): boolean {
+    return Boolean(tx.select({ id: patients.id }).from(patients)
+        .where(and(eq(patients.id, patientId), activePatients(), eq(patients.isArchived, false))).get());
+}
+
+function sameEntryCreate(existing: typeof entries.$inferSelect, values: typeof entries.$inferInsert): boolean {
     return existing.patientId === values.patientId && existing.type === values.type
-        && existing.title === values.title && existing.date.getTime() === values.date.getTime()
+        && existing.title === values.title && existing.date.getTime() === Math.floor(values.date.getTime() / 1000) * 1000
         && existing.content === values.content && existing.setting === values.setting
         && existing.metadata === values.metadata && existing.attachments === values.attachments
         && existing.deletedAt === null;
@@ -58,18 +63,27 @@ export function createEntryOperation(input: CreateInput): Result {
     return dbServer.transaction((tx): Result => {
         const denial = input.authorizeCommit?.(tx);
         if (denial) return denial;
-        const admitted = input.mode === 'network'
-            ? networkScopeContains(tx, input.patientId, input.scopeAmbulatoryId!)
-                && activeParentExists(tx, input.patientId)
-            : activeParentExists(tx, input.patientId);
-        if (!admitted) return { status: 404, value: { error: input.mode === 'network' ? 'Not found' : 'Patient not found' } };
+        if (input.values.type === 'scale' && (input.values.patientId !== input.patientId || input.values.id !== input.id)) {
+            return { status: 409, value: { code: 'SCALE_IDEMPOTENCY_CONFLICT', error: 'Identificativo o paziente incoerente con la richiesta.' } };
+        }
+        if (input.mode === 'network' && !networkScopeContains(tx, input.patientId, input.scopeAmbulatoryId!)) {
+            return { status: 404, value: { error: 'Not found',
+                ...(input.values.type === 'scale' ? { code: 'SCALE_PATIENT_INACTIVE' } : {}) } };
+        }
+        if (input.values.type === 'scale' && !activeScaleParentExists(tx, input.patientId)) {
+            return { status: 409, value: { code: 'SCALE_PATIENT_INACTIVE',
+                error: 'Paziente archiviato o rimosso. Punteggio non registrato.' } };
+        }
+        if (!activeParentExists(tx, input.patientId)) {
+            return { status: 404, value: { error: input.mode === 'network' ? 'Not found' : 'Patient not found' } };
+        }
 
         const existing = tx.select().from(entries).where(eq(entries.id, input.id)).get();
         if (existing) {
-            if (input.mode === 'network' && sameNetworkCreate(existing, input.values)) {
+            if ((input.mode === 'network' || input.values.type === 'scale') && sameEntryCreate(existing, input.values)) {
                 return { status: 200, value: { id: existing.id, version: existing.version, idempotent: true } };
             }
-            return { status: 409, value: { error: input.mode === 'network'
+            return { status: 409, value: { ...(input.values.type === 'scale' ? { code: 'SCALE_IDEMPOTENCY_CONFLICT' } : {}), error: input.mode === 'network'
                 ? 'Network diary create id already exists with different content' : 'Conflict' } };
         }
 
@@ -102,6 +116,11 @@ export function updateEntryOperation(input: UpdateInput): Result {
                     ? and(eq(entries.id, input.entryId), eq(entries.patientId, input.patientId!))
                     : eq(entries.id, input.entryId)).get();
         if (!existing) return { status: 404, value: { error: 'Not found' } };
+        if ((existing.type === 'scale' || input.values.type === 'scale')
+            && !activeScaleParentExists(tx, existing.patientId)) {
+            return { status: 409, value: { code: 'SCALE_PATIENT_INACTIVE',
+                error: 'Paziente archiviato o rimosso. Nessuna nuova registrazione.' } };
+        }
         if (!activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
         if (existing.version !== input.expectedVersion) {
             return { status: 409, value: buildEntryVersionConflictPayload(
