@@ -1221,7 +1221,16 @@ final class MediFlowMobileAppUITests: XCTestCase {
             predicate: NSPredicate(format: "exists == true AND hittable == true"), object: agenda)
         let agendaReady = XCTWaiter.wait(for: [ready], timeout: 30)
         if agendaReady != .completed {
-            print("Agenda non pronta per l'audit: \(app.debugDescription)")
+            let tree = app.debugDescription
+            let accessibilityTree = XCTAttachment(string: tree)
+            accessibilityTree.name = "Agenda non pronta - albero accessibilità"
+            accessibilityTree.lifetime = .keepAlways
+            add(accessibilityTree)
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.name = "Agenda non pronta - schermata"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+            print("Agenda non pronta per l'audit: \(tree)")
         }
         XCTAssertEqual(agendaReady, .completed,
                        "Il contenuto dell'Agenda deve essere visibile e interagibile prima dell'audit")
