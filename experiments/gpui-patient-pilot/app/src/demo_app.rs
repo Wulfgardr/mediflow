@@ -639,7 +639,12 @@ impl PatientApp {
                                             })
                                             .min_w_0()
                                             .flex_1()
-                                            .child(text!(patient.display_name())),
+                                            .child(crate::title::title(
+                                                crate::title::TitleText::name(
+                                                    patient.display_name(),
+                                                ),
+                                                theme,
+                                            )),
                                     )
                                     .when(
                                         !narrow
@@ -737,7 +742,7 @@ impl PatientApp {
             .child(div().flex_shrink_0().min_w_0().p(px(if compact { 16. } else { 28. })).border_b_1().border_color(theme.rule).flex().flex_wrap().items_center().justify_between().gap(px(16.)).when(compact, |el| el.flex_col().items_stretch())
                 .child(div().flex_1().min_w_0().max_w_full().flex().flex_col().gap(px(8.))
                     .child(div().id("clinical-workspace-patient-name").role(Role::Heading).aria_level(1).aria_label(SharedString::from(profile.display_name()))
-                        .type_role(theme, TypeRole::Person { compact }).child(crate::title::title(profile.display_name(), theme)))
+                        .type_role(theme, TypeRole::Person { compact }).child(crate::title::title(crate::title::TitleText::name(profile.display_name()), theme)))
                     .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary).child(text!(if profile.is_archived { "Scheda di prova in archivio" } else { "Scheda di prova in carico" }))))
                 .when(!compact, |el| el.child(self.profile_actions(phase, cx))))
             .child(div().id("clinical-workspace-profile-scroll").debug_selector(|| "clinical-workspace-profile-scroll".into()).flex_1().min_h_0().min_w_0().overflow_y_scroll().track_scroll(&self.profile_scroll)
@@ -860,7 +865,7 @@ impl PatientApp {
                     .child(self.button("clinical-workspace-keep-draft", "Mantieni la bozza", Command::KeepDraft, false, true, cx))
                     .child(self.button("clinical-workspace-discard-confirm", if self.discard == Some(DiscardAction::Hide) { "Scarta e nascondi" } else { "Scarta e rileggi" }, Command::Discard, true, true, cx)))))
             .when(review, |el| el.child(div().flex().flex_col().gap(px(12.))
-                .child(crate::components::confirmation_heading(format!("Registrare le note nella scheda di {}?", profile.display_name()), theme))
+                .child(crate::components::confirmation_heading(crate::title::TitleText::patient_question("Registrare le note nella scheda di ", profile.display_name(), "?"), theme))
                 .child(div().type_role(theme, TypeRole::Meta).child(text!("1 elemento: note della scheda. La modifica resta solo in memoria.")))
                 .child(div().flex().flex_wrap().gap(px(8.))
                     .child(self.button("clinical-workspace-cancel-review", "Torna alla bozza", Command::Cancel, false, true, cx))

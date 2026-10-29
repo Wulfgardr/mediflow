@@ -227,7 +227,7 @@ impl ClinicalApp {
             query: self.who.query.clone(),
         };
         let mut pane = div().min_w_0().max_w_full().flex().flex_col().gap(px(16.))
-            .child(heading("clinical-workspace-who-heading", "ICD-11 WHO", theme))
+            .child(heading("clinical-workspace-who-heading", crate::title::TitleText::code("ICD-11 WHO"), theme))
             .child(who_text("clinical-who-introduction", "Repertorio in inglese · release 2026-01. Questo percorso consulta il servizio WHO locale sul computer che ospita l’archivio.", theme))
             .child(self.who.read.attach_enabled(button("clinical-workspace-who-readiness", "Leggi stato del servizio", theme, false, can_read), can_read)
                 .when(can_read, |el| el.on_click(cx.listener(|this, _, _, cx| this.request_who(false, cx)))))
