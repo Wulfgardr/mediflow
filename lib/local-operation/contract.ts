@@ -43,13 +43,37 @@ export type LiveContext = Readonly<{
     patientId: string; practiceId: string; portalAccountId: string; role: 'physician';
     expiresAt: number; revocationEpoch: number; humanRevision: number;
 }>;
-export type Observation = Readonly<{ patientId: string; practiceId: string; portalAccountId: string;
-    uiVersion: string; humanRevision: number; planDigest: string | null; unclassifiedFields: readonly string[] }>;
+export const portalContextSchema = planSchema.pick({ patientId: true, practiceId: true, portalAccountId: true, operatorId: true, uiVersion: true });
+export const portalAttributes = { patientId: 'data-patient', practiceId: 'data-practice', portalAccountId: 'data-account',
+    operatorId: 'data-operator', uiVersion: 'data-ui' } satisfies Record<keyof z.infer<typeof portalContextSchema>, string>;
+export const observationSchema = portalContextSchema.extend({ humanRevision: z.number().int().nonnegative(), planDigest: digestSchema.nullable(),
+    census: z.enum(['complete', 'unverifiable']), unclassifiedFields: z.array(z.string().max(256)).max(1024) }).strict();
+export type Observation = Readonly<z.infer<typeof observationSchema>>;
+export type ProcedureSnapshot = Readonly<{
+    plan: Readonly<LocalOperationPlan>; context: LiveContext;
+    lease: Readonly<{ generation: number; territoryRevision: number; expiresAt: number; approvalExpiresAt: number | null;
+        operationId: string; attempt: number; revision: number; state: LocalOperationState; effectPossible: boolean }>;
+}>;
 export type AdapterContext = Readonly<{
     operationId: string; attempt: number; revision: number; signal: AbortSignal;
     assertCurrent(): void;
+    snapshot(observation: Observation): ProcedureSnapshot;
     authorizeRequest(destination: Destination): void;
 }>;
+
+export class ClosedObservation {
+    readonly #closed = true;
+    private constructor() { Object.freeze(this); }
+    static close(assertHealthy: () => void): ClosedObservation {
+        assertHealthy();
+        return new ClosedObservation();
+    }
+    static recover(record: LocalOperationRecord): ClosedObservation {
+        if (record.state !== 'confirmed_pending_recording' || !record.receipt) deny();
+        return new ClosedObservation();
+    }
+    assertClosed() { if (!this.#closed) deny(); }
+}
 
 /** Every request, redirect, frame, resource and background task must use authorizeRequest immediately before dispatch. */
 export interface LocalOperationAdapter {
@@ -60,6 +84,7 @@ export interface LocalOperationAdapter {
     act(context: AdapterContext, plan: Readonly<LocalOperationPlan>): Promise<unknown>;
     reconcile(context: AdapterContext, plan: Readonly<LocalOperationPlan>): Promise<unknown>;
     verifyReceipt(context: AdapterContext, receipt: LocalOperationReceipt): Promise<boolean>;
+    closeObservation(context: AdapterContext): Promise<ClosedObservation>;
     stop(): void;
 }
 export interface LocalOperationJournal {

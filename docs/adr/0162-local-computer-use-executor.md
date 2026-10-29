@@ -167,6 +167,103 @@ La sequenza completa è nell'analisi. CU-1 deve provare end-to-end sul simulator
 
 Tutte le prove usano dati inventati e portali sintetici. Nessun atto o chiamata applicativa istituzionale, nemmeno di prova, è autorizzato da questo ADR. Nessuna modifica di rete. La documentazione pubblica può essere consultata in sola lettura. Qualificazione del servizio e ammissione clinica richiedono le autorizzazioni e le prove specifiche di Moduli e del programma.
 
+## Profilo browser del simulatore CU-1 (29 ottobre 2026)
+
+Questo profilo riguarda esclusivamente Chromium avviato dall'adapter sintetico. Il processo
+non dispone di un trasporto diretto ammesso: un proxy HTTP locale rifiuta tutte le richieste,
+gli upgrade e CONNECT, senza eccezione loopback. La risoluzione DNS diretta e QUIC sono
+disabilitati; la policy WebRTC `disable_non_proxied_udp` forza il proxy, che non inoltra.
+Non si sostituiscono costruttori JavaScript. Worker, frame e popup condividono il confine
+del processo; i service worker sono bloccati nella configurazione del contesto.
+
+Solo l'intercettore di contesto può soddisfare una richiesta: ammette documenti del frame
+principale, senza redirect, query o fragment, e usa un trasporto host separato dopo la
+verifica della destinazione e dell'autorità correnti. Il trasporto non ritenta. Ogni altro
+canale resta senza inoltro anche se sfugge all'intercettore. Prima di aggiungere cookie o
+valori della pratica si controllano tramite CDP gli argomenti effettivi del browser e si
+esegue una prova STUN con destinatario UDP loopback. Configurazione non verificabile o
+pacchetti ricevuti impediscono l'avvio. La revoca chiude il processo browser, tutti i suoi
+contesti e i trasporti host in corso. La ripresa richiede autorità corrente e un processo nuovo.
+
+Il censimento usa `DOM.getDocument(depth=-1, pierce=true)` e confronta i documenti con
+l'albero dei frame CDP. Visita documenti di ogni pagina/popup, contenuti dei frame,
+shadow root aperti, chiusi e nativi e template. Un sottoalbero incompleto, un documento
+non risolto o un errore dell'automazione produce `unverifiable`; non equivale a un elenco
+vuoto. Il risultato ha un'unione chiusa e l'osservazione viene validata anche al confine
+del servizio. Solo `complete`, senza elementi inattesi, permette di continuare.
+
+La superficie sintetica ha un contratto positivo su tutti gli elementi e attributi,
+non un elenco dei tag interattivi conosciuti. Sono ammessi soltanto gli elementi statici
+previsti e i campi/pulsanti classificati con tipo e collocazione esatti. Ruoli,
+attributi o listener inattesi bloccano anche su elementi personalizzati. I sottoalberi
+nativi vengono attraversati e appartengono al controllo browser che li contiene; non
+sono campi indipendenti della pagina. Le proprietà dei controlli si leggono in un mondo
+isolato CDP. Prima di ogni POST, un token possiede le sessioni CDP e la sospensione degli
+script dal censimento fino alla risposta e alla lettura dell'esito. Nessun detach avviene
+fra censimento e click; su errore si chiude prima la pagina. Il token osserva l'epoca DOM,
+i frame e le navigazioni e viene consumato una sola volta dal guard del POST, nello
+stesso passo sincrono che avvia il trasporto host. Un cambiamento prima del dispatch
+rende il censimento non verificabile. La navigazione principale prodotta dal POST è
+attesa; dialog nativi, nuovi frame, worker, download e nuove pagine durante la fase
+falliscono chiuso anche dopo il dispatch, lasciando incerto un effetto già possibile.
+La sospensione non è una garanzia universale contro callback già in volo: epoca DOM,
+CSSOM e snapshot restano vincoli indipendenti. Una pagina non verificabile non viene
+compilata né inviata.
+
+Il token lega un unico `ProcedureSnapshot`, derivato dal piano della procedura e dal
+contesto locale: tutte le fonti e i campi del piano, identità risolta, pratica,
+account e operatore, versione UI, revisione umana, generazione e scadenze della lease,
+revisione territoriale, tentativo e revisione del journal. Il servizio valida con lo
+stesso confronto le osservazioni ordinarie e quella posseduta dal token. Dopo il focus sul comando previsto si rileggono insieme accessibilità, proprietà calcolate e
+valori, prima della navigazione nativa. Il consumo del token rilegge sincronicamente
+piano, contesto e lease dal servizio, confronta per uguaglianza lo snapshot legato e
+verifica il corpo effettivo del POST prima del trasporto. Cambiamenti o dati mancanti
+invalidano la prova; una nuova epoca non approva un nuovo contesto.
+
+L'inventario richiede l'albero di accessibilità completo di ogni documento. Ruolo,
+focusabilità ed editabilità calcolata dal browser devono corrispondere ai controlli
+previsti; il CSS può rendere modificabile anche un elemento statico. L'assenza
+dell'albero produce `unverifiable`. Il CSS della superficie sintetica appartiene al
+contratto positivo e viene confrontato come regole effettive in un mondo isolato,
+non soltanto come testo DOM: fogli aggiuntivi o adottati e regole diverse bloccano.
+Le modifiche CSSOM invalidano il token e le animazioni restano sospese durante la
+lease. Questo impedisce che stati transitori di focus, hover o pressione introducano
+controlli dopo la rilettura senza una mutazione DOM.
+
+Ogni lettura nominata usa lo stesso helper tipato `unique`: zero o più risultati
+rendono il censimento `unverifiable`. La verifica copre i contenitori singoli del
+contratto (documento, intestazione, metadati, stile, corpo, contesto, titolo visibile
+e form), i controlli nominati, la corrispondenza AX per nodo e il mondo di esecuzione.
+I metadati provengono da un solo contenitore e i controlli devono appartenere al suo
+unico form. Non si fondono attributi di nodi distinti. Anche il testo della risposta
+si legge atomicamente da un solo corpo del documento.
+
+Il livello di automazione mantiene un osservatore CDP degli eventi di input in un
+mondo isolato, dal primo censimento fino alla chiusura della pagina, anche fra due
+osservazioni e attraverso le navigazioni. Tastiera, puntatore, touch, rotella,
+composizione, clipboard, focus e selezione invalidano la prova indipendentemente
+dalle mutazioni DOM e dal valore finale. La revisione del portale e il confronto
+dello snapshot restano controlli aggiuntivi. Un binding assente, un mondo ambiguo,
+un errore del canale o la mancata risposta alla sonda rendono la pagina non
+verificabile. Il controllo viene ripetuto prima dei comandi e al consumo del token.
+
+Inserimento, focus e attivazione HTML dell'esecutore avvengono nel mondo isolato,
+con origine attribuita soltanto durante la chiamata sincrona che genera gli eventi.
+Non esiste una finestra asincrona in cui gli input esterni siano ignorati. Gli eventi
+accodati e consegnati dopo la chiamata invalidano comunque la prova. Il simulatore
+usa l'attivazione HTML del pulsante, senza simulare input hardware attribuibili
+anche al medico; non è una prova di gesture native o di un client ordinario.
+Un evento osservato dopo un possibile effetto impedisce la registrazione e lascia
+l'esito incerto: non annulla un invio già avvenuto.
+
+Riferimenti del confine: [proxy Chromium](https://chromium.googlesource.com/chromium/src/+/main/net/docs/proxy.md),
+[policy WebRTC](https://chromeenterprise.google/policies/#WebRtcIPHandling),
+[albero DOM CDP](https://chromedevtools.github.io/devtools-protocol/tot/DOM/#method-getDocument).
+Le prove misurano i destinatari loopback e falsificano separatamente trasporto e censimento.
+Non qualificano altri browser, versioni/configurazioni non verificate, isolamento OS,
+servizi istituzionali o un client con strumenti generici. Stati e transizioni CU restano
+quelli del modello esistente; i nuovi vincoli del browser sono verifiche runtime.
+
 ## Conseguenze e decisioni aperte
 
 Si riusano servizi, redazione, capacità territoriali e autorità native; si aggiungono esecutore, manifest, guard delle uscite e riconciliazione. Il costo maggiore è mantenere adapter affidabili e ambienti effettivamente isolati. Una UI cambiata può sospendere l'automazione; questo limite è preferibile a un atto di cui non si conoscono paziente, contenuto o esito.

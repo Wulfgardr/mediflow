@@ -4,7 +4,7 @@ import { readSqliteArchiveGeneration } from '../archive-generation.ts';
 import { readTerritorialPacks } from '../territorial-pack-store.ts';
 import { createAipOperationRpcHostV1 } from '../../packages/aip/src/operation-rpc.ts';
 import { LOCAL_OPERATION_DESCRIPTOR } from '../../packages/mcp/src/local-operation-contract.ts';
-import { deny, type LocalOperationPorts, type LiveContext } from './contract.ts';
+import { deny, type LocalOperationPorts, type LiveContext, type LocalOperationRecord } from './contract.ts';
 import { createLocalOperationJournalCipher } from './journal-cipher.ts';
 import { createSqliteLocalOperationJournal } from './sqlite-journal.ts';
 import { createLocalOperationService, type LocalCapability } from './service.ts';
@@ -25,6 +25,7 @@ export function createLocalOperationHost(ports: Omit<LocalOperationPorts, 'journ
     sourceSurface: 'native' | 'web';
     requestOpen(): Promise<void>;
     requestResume(capability: LocalCapability): Promise<void>;
+    recordConfirmed?(record: LocalOperationRecord): void;
 }) {
     let closed = false;
     function currentContext() {
@@ -37,6 +38,7 @@ export function createLocalOperationHost(ports: Omit<LocalOperationPorts, 'journ
     function journal() {
         const connection = ports.database();
         return createSqliteLocalOperationJournal(connection, { ...cipher,
+            recordConfirmed: ports.recordConfirmed,
             actor() {
                 const context = currentContext();
                 if (!context || context.archiveGeneration !== readSqliteArchiveGeneration(connection)) deny();

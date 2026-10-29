@@ -1,6 +1,6 @@
-import { deny, LocalOperationError, planDigest, planSchema, receiptSchema, territorialAllows,
+import { observationSchema, deny, LocalOperationError, planDigest, planSchema, receiptSchema, territorialAllows,
     type LocalOperationPlan, type LocalOperationRecord, type LocalOperationPorts, type LiveContext,
-    type LocalOperationReceipt, type AdapterContext, type Observation, type ArchiveAuthority } from './contract.ts';
+    ClosedObservation, type LocalOperationReceipt, type AdapterContext, type Observation, type ArchiveAuthority } from './contract.ts';
 
 export type LocalCapability = Readonly<{ kind: 'local_operation' }>;
 type Binding = { operationId: string; digest: string; context: string; territoryRevision: number;
@@ -94,10 +94,13 @@ export function createLocalOperationService(ports: LocalOperationPorts) {
             || territory.revision !== binding.territoryRevision) deny();
         return { binding, current, plan, context };
     }
-    function observation(value: Observation, plan: Readonly<LocalOperationPlan>, requireContent: boolean) {
-        const context = localContext(plan);
-        if (value.patientId !== plan.patientId || value.practiceId !== plan.practiceId || value.portalAccountId !== plan.portalAccountId
-            || value.uiVersion !== plan.uiVersion || value.humanRevision !== context.humanRevision
+    function observation(raw: Observation, plan: Readonly<LocalOperationPlan>, requireContent: boolean) {
+        const parsed = observationSchema.safeParse(raw);
+        if (!parsed.success || parsed.data.census !== 'complete') deny();
+        const value = parsed.data, context = localContext(plan);
+        const { census: _census, unclassifiedFields: _unknown, planDigest: _digest, humanRevision, ...identity } = value;
+        if (Object.entries(identity).some(([key, value]) => plan[key as keyof LocalOperationPlan] !== value)
+            || humanRevision !== context.humanRevision
             || value.unclassifiedFields.length || (requireContent && value.planDigest !== planDigest(plan))) deny();
     }
     async function run<T>(capability: LocalCapability, action: (observe: AdapterContext, phaseContext: PhaseContext) => Promise<T>): Promise<T> {
@@ -109,21 +112,32 @@ export function createLocalOperationService(ports: LocalOperationPorts) {
         function context(phase: 'observe' | 'prepare' | 'act' | 'reconcile', permit?: DispatchPermit): AdapterContext {
             const marker = permit?.marker ?? current;
             assertCurrent();
-            if (phase === 'act') {
+            function assertDispatch() {
                 const live = check(capability).current;
-                if (live.state !== 'attempt_started' || !live.effectPossible || live.attempt !== marker.attempt
-                    || live.revision !== marker.revision) deny();
+                if (!permit || permit.approvalExpiresAt <= ports.now() || live.state !== 'attempt_started' || !live.effectPossible
+                    || live.attempt !== marker.attempt || live.revision !== marker.revision) deny();
             }
+            if (phase === 'act') assertDispatch();
             return Object.freeze({ operationId: binding.operationId, attempt: marker.attempt, revision: marker.revision,
                 signal: controller.signal, assertCurrent,
+                snapshot(raw) {
+                    assertCurrent();
+                    const live = check(capability);
+                    observation(raw, live.plan, true);
+                    if (permit) assertDispatch();
+                    return freeze({ plan: live.plan, context: { ...live.context }, lease: {
+                        generation, territoryRevision: ports.currentTerritory().revision!, expiresAt: binding.expiresAt,
+                        approvalExpiresAt: permit?.approvalExpiresAt ?? null, operationId: live.current.operationId,
+                        attempt: live.current.attempt, revision: live.current.revision, state: live.current.state, effectPossible: live.current.effectPossible,
+                    } });
+                },
                 authorizeRequest(destination) {
                     assertCurrent();
                     if ((destination.purpose !== phase && destination.purpose !== 'observe')
                         || !plan.destinations.some(allowed => JSON.stringify(allowed) === JSON.stringify(destination))) deny();
                     if (destination.purpose === 'act') {
-                        const live = check(capability).current;
-                        if (!permit || permit.approvalExpiresAt <= ports.now() || actDispatched || live.state !== 'attempt_started' || !live.effectPossible
-                            || live.revision !== marker.revision || live.attempt !== marker.attempt) deny();
+                        assertDispatch();
+                        if (actDispatched) deny();
                         actDispatched = true;
                     }
                 },
@@ -155,7 +169,8 @@ export function createLocalOperationService(ports: LocalOperationPorts) {
             && new Set(receipt.parts.map(part => part.id)).size === receipt.parts.length
             && receipt.parts.length === plan.parts.length && plan.parts.every(id => receipt.parts.some(part => part.id === id));
     }
-    function registerOutcome(capability: LocalCapability, receipt: LocalOperationReceipt) {
+    function registerOutcome(capability: LocalCapability, receipt: LocalOperationReceipt, events: ClosedObservation) {
+        events.assertClosed();
         const { current, plan } = check(capability);
         if (!correlate(receipt, current, plan)) deny();
         if (receipt.parts.some(part => part.state !== 'confirmed')) {
@@ -175,7 +190,9 @@ export function createLocalOperationService(ports: LocalOperationPorts) {
         const { current, plan } = check(capability);
         if (!correlate(parsed.data, current, plan) || !await ports.adapter.verifyReceipt(ctx, parsed.data)) deny();
         ctx.assertCurrent();
-        return registerOutcome(capability, parsed.data);
+        const events = await ports.adapter.closeObservation(ctx);
+        ctx.assertCurrent();
+        return registerOutcome(capability, parsed.data, events);
     }
     return Object.freeze({
         create(operationId: string) {
@@ -235,7 +252,9 @@ export function createLocalOperationService(ports: LocalOperationPorts) {
         async reconcile(capability: LocalCapability) {
             const { current, plan } = check(capability);
             if (!current.effectPossible) throw new LocalOperationError('reconciliation_required');
-            if (current.state === 'confirmed_pending_recording' && current.receipt) return registerOutcome(capability, current.receipt);
+            if (current.state === 'confirmed_pending_recording' && current.receipt) {
+                return registerOutcome(capability, current.receipt, ClosedObservation.recover(current));
+            }
             return run(capability, async (ctx, phaseContext) => {
                 observation(await ports.adapter.observe(ctx), plan, true); ctx.assertCurrent();
                 return acceptReceipt(capability, ctx, await ports.adapter.reconcile(phaseContext('reconcile'), plan));
