@@ -409,7 +409,7 @@ struct PairedPatientsWorklistView: View {
     #if os(macOS)
     private var macOSWorklistHeader: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("Elenco")
+            Text("Visibili")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .accessibilityHeading(.h2)
@@ -430,6 +430,9 @@ struct PairedPatientsWorklistView: View {
             }
             Spacer(minLength: 4)
             csvImportAction
+                .labelStyle(.iconOnly)
+                .help("Importa CSV")
+                .fixedSize()
             patientSortMenu
                 .labelsHidden()
                 .controlSize(.small)

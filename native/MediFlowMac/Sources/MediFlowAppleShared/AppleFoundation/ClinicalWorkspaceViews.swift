@@ -1048,7 +1048,7 @@ struct PopulationAnalyticsWorkspaceView: View {
             }
         }
         #endif
-        .navigationTitle("Analytics")
+        .navigationTitle("Analisi")
         .toolbar {
             Button("Aggiorna", systemImage: "arrow.clockwise", action: refresh)
                 .disabled(!canRefresh)
@@ -1169,11 +1169,14 @@ struct ClinicalScalesWorkspaceView: View {
         }
     }
 
+    @ViewBuilder
     private func scaleForm(_ scale: ClinicalScaleDefinition) -> some View {
-        ClinicalScaleFormView(definition: scale, onSubmit: { answers in
-            Task { await workspaceModel.submitScale(scale, answers: answers) }
-            selectedScale = nil
+        if let patient = workspaceModel.selectedPatient {
+            ClinicalScaleFormView(definition: scale, patientLabel: "\(patient.lastName) \(patient.firstName)", onSubmit: { answers in
+                Task { await workspaceModel.submitScale(scale, answers: answers) }
+                selectedScale = nil
         }, onCancel: { selectedScale = nil })
+        }
     }
 
     private func open(_ patient: HomeBasePatientSummary) async {
