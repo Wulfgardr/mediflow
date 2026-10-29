@@ -1151,36 +1151,47 @@ private extension PairedPatientDetailSection {
         }
     }
 
-    var mobileChartCounts: some View {
+    func mobileChartCount(for category: PatientChartSummaryCategory) -> ClinicalSignalCount {
         let cap = PairedPatientsWorkspaceSupport.clinicalPreviewCap
-        let counts: [(String, ClinicalSignalCount?)] = [
-            ("Diagnosi", model.isPatientFieldLocked(.diagnoses) ? nil : PatientStructuredFields.diagnoses(detail.diagnoses).count.map { .exact($0) }),
-            ("Terapie attive", .fromLoadedList(count: model.therapies.filter { $0.deletedAt == nil && $0.status == "active" }.count,
-                loadedCount: model.therapies.count, limit: cap)),
-            ("Misure", .fromLoadedList(count: model.observations.filter { $0.deletedAt == nil }.count,
-                loadedCount: model.observations.count, limit: cap)),
-            ("Diario", .fromLoadedList(count: model.entries.filter { $0.deletedAt == nil }.count,
-                loadedCount: model.entries.count, limit: cap)),
-            ("Scale", .fromLoadedList(count: model.entries.filter { $0.deletedAt == nil && $0.type == "scale" }.count,
-                loadedCount: model.entries.count, limit: cap)),
-            ("Esenzioni", model.isPatientFieldLocked(.exemptions) ? nil : PatientStructuredFields.exemptions(detail.exemptions).count.map { .exact($0) }),
-        ]
-        return VStack(alignment: .leading, spacing: 12) {
-            ForEach(counts, id: \.0) { label, count in
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(label).font(.body)
-                    Spacer(minLength: 8)
-                    if let count {
+        switch category {
+        case .therapies:
+            return .fromLoadedList(count: model.therapies.filter { $0.deletedAt == nil && $0.status == "active" }.count,
+                loadedCount: model.therapies.count, limit: cap)
+        case .measures:
+            return .fromLoadedList(count: model.observations.filter { $0.deletedAt == nil }.count,
+                loadedCount: model.observations.count, limit: cap)
+        case .diary:
+            return .fromLoadedList(count: model.entries.filter { $0.deletedAt == nil }.count,
+                loadedCount: model.entries.count, limit: cap)
+        case .scales:
+            return .fromLoadedList(count: model.entries.filter { $0.deletedAt == nil && $0.type == "scale" }.count,
+                loadedCount: model.entries.count, limit: cap)
+        }
+    }
+
+    var mobileChartCounts: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(PatientChartSummaryCategory.allCases) { category in
+                let count = mobileChartCount(for: category)
+                Button {
+                    model.activePatientSection = category.destination
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(category.title).font(.body)
+                        Spacer(minLength: 8)
                         Text(count.displayText).font(.body.weight(.semibold)).monospacedDigit()
-                    } else {
-                        if (label == "Diagnosi" && !model.isPatientFieldLocked(.diagnoses)) ||
-                            (label == "Esenzioni" && !model.isPatientFieldLocked(.exemptions)) {
-                            unreadableField(label)
-                        } else {
-                            Label("Dato protetto", systemImage: "lock.fill").font(.footnote).foregroundStyle(.secondary)
-                        }
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
                     }
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .foregroundStyle(.primary)
+                .accessibilityLabel(category.accessibilityLabel(count: count))
+                .accessibilityIdentifier("patient-summary-\(category.id)")
             }
             if let next = model.checkups.filter({ $0.deletedAt == nil && $0.status == "pending" && $0.date >= Date() })
                 .min(by: { $0.date < $1.date }) {
@@ -1188,6 +1199,7 @@ private extension PairedPatientDetailSection {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("patient-clinical-signals")
     }
 }

@@ -5,6 +5,24 @@ import CryptoKit
 // G1 (ADR 0071 parity): the patient-list row now derives an age from the summary
 // birthDate. Lock the boundary logic of the age helper.
 final class PatientSummaryPresentationTests: XCTestCase {
+    func testChartSummaryContainsEachExternalCategoryOnce() {
+        let categories = PatientChartSummaryCategory.allCases
+        XCTAssertEqual(categories.map(\.title), ["Terapie attive", "Misure", "Diario", "Scale"])
+        XCTAssertEqual(Set(categories.map(\.id)).count, 4)
+        XCTAssertFalse(categories.contains { $0.destination == .overview })
+    }
+
+    func testChartSummaryRoutesToExistingPatientSections() {
+        XCTAssertEqual(PatientChartSummaryCategory.allCases.map(\.destination),
+                       [.therapies, .clinical, .diary, .scales])
+    }
+
+    func testChartSummaryAccessibleNamesPreserveCountBounds() {
+        XCTAssertEqual(PatientChartSummaryCategory.therapies.accessibilityLabel(count: .exact(1)), "Apri Terapie attive, 1")
+        XCTAssertEqual(PatientChartSummaryCategory.measures.accessibilityLabel(count: .init(count: 200, atCap: true)), "Apri Misure, 200+")
+        XCTAssertEqual(PatientChartSummaryCategory.scales.accessibilityLabel(count: .exact(0)), "Apri Scale, 0")
+    }
+
     func testRelativeDatesUseGregorianCalendar() throws {
         let date = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("2025-10-29T12:00:00Z"))
         let now = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("2026-10-29T12:00:00Z"))
