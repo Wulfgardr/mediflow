@@ -2756,7 +2756,7 @@ for (const saturated of [false,true]) test(`IPC consumes waiting IDs before read
         f.child.send({type:'mediflow-local-ui-cancel',requestId:revoked.requestId});
         if(saturated) for(let i=2;i<256;i++) assert.equal(await send(request()),'waiting');
         else for(const frame of [{...request(),patientId:'SYNTHETIC_SENTINEL'},{...request(),dataDir:'/synthetic/other'},
-            {...request(),sourceFingerprint:'other-source'},{...request(),expiresAt:Date.now()-1},{...request(),expiresAt:Date.now()+9000}]) assert.equal(await send(frame),'denied');
+            {...request(),sourceFingerprint:'other-source'},{...request(),expiresAt:0},{...request(),expiresAt:Number.MAX_SAFE_INTEGER}]) assert.equal(await send(frame),'denied',JSON.stringify(frame));
     } finally { f.releaseStartup(); }
     await f.until(()=>f.output().includes('Pronto:'));
     assert.equal(await send(first),'denied');
@@ -2788,7 +2788,7 @@ test('IPC rejects replay, expiry, revoked IDs and extra fields without new navig
     const request = { type: 'mediflow-local-ui-navigate', requestId: crypto.randomUUID(), intent: 'identity', expiresAt: Date.now() + 5000, ...f.expected };
     assert.equal(await send(request), 'accepted');
     assert.equal(await send(request), 'denied');
-    for (const frame of [{ ...request, requestId: crypto.randomUUID(), expiresAt: Date.now() - 1 },
+    for (const frame of [{ ...request, requestId: crypto.randomUUID(), expiresAt: 0 },
         { ...request, requestId: crypto.randomUUID(), patientId: 'SYNTHETIC_SENTINEL' }]) assert.equal(await send(frame), 'denied');
     const revoked = { ...request, requestId: crypto.randomUUID() };
     f.child.send({ type: 'mediflow-local-ui-cancel', requestId: revoked.requestId });
