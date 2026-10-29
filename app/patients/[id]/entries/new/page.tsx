@@ -1,5 +1,6 @@
 'use client';
 
+import { useEntryLocalDraft } from '@/hooks/use-entry-local-draft';
 import { formatCountLabel } from '@/lib/format-count';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -95,6 +96,11 @@ export default function NewEntryPage() {
     const [visitMedicationCandidates, setVisitMedicationCandidates] = useState<VisitMedicationCandidate[]>([]);
     const [isContextOpen, setIsContextOpen] = useState(false);
     const [isReadingQuadro, setIsReadingQuadro] = useState(false);
+    const draftValue = useMemo(() => ({ type, content, setting, entryDate, dictatedDraft }), [type, content, setting, entryDate, dictatedDraft]);
+    const localDraft = useEntryLocalDraft(id, draftValue, draft => {
+        setType(draft.type); setContent(draft.content); setSetting(draft.setting);
+        setEntryDate(draft.entryDate); setDictatedDraft(draft.dictatedDraft); setIsDictatedDraftReviewed(false);
+    });
     const writingRef = useRef<HTMLDivElement>(null);
     const quadroHeadingRef = useRef<HTMLHeadingElement>(null);
     const consultQuadro = () => {
@@ -270,6 +276,7 @@ export default function NewEntryPage() {
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
+        if (localDraft.state === 'loading') return;
         const normalizedContent = sanitizeClinicalRichTextHtml(content);
 
         if (isClinicalRichTextBlank(normalizedContent)) {
@@ -331,6 +338,7 @@ export default function NewEntryPage() {
 
             /* WUL-676: successful programmatic navigation is not
                intercepted by the workspace's link guard. */
+            await localDraft.clear().catch(() => showToast({ tone: 'warning', title: 'Voce registrata', description: 'La copia della bozza non è stata rimossa. Non registrarla di nuovo.' }));
             router.push(`/patients/${id}/modules`);
         } catch (error) {
             console.error(error);
@@ -754,6 +762,9 @@ export default function NewEntryPage() {
                 </div>
             )}
 
+            <p role="status" data-testid="local-draft-status">{localDraft.error || (localDraft.state === 'recovered'
+                ? 'Bozza recuperata. Rivedi il testo prima di registrarlo. Gli allegati vanno selezionati di nuovo.'
+                : !localDraft.saved ? 'Conservazione della bozza in corso…' : 'Testo e dati della bozza conservati cifrati in questo browser. Gli allegati vanno selezionati di nuovo.')}</p>
             <ClinicalRichTextEditor
                 className={proposal ? composerStyles.editor : undefined}
                 description={proposal ? "Usa la barra per formattare il testo. Tab passa al controllo successivo." : undefined}
@@ -933,6 +944,8 @@ export default function NewEntryPage() {
             </form>
         </div>
     );
+
+    if (localDraft.state === 'loading') return <p role="status">Recupero della bozza…</p>;
 
     if (proposal) {
         return (

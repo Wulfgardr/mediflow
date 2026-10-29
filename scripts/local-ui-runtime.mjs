@@ -4,6 +4,7 @@ import path from 'node:path';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { ordinaryLauncherEnvironment } from '../plugins/mediflow-local-ui/src/runtime-environment.mjs';
+import { localUiArchiveLock } from './launcher-state.mjs';
 import { readProductIdentity } from './launcher-helpers.mjs';
 
 const unavailable = () => { throw new Error('navigation_unavailable'); };
@@ -48,10 +49,7 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
   const expected = { sourceFingerprint: identity.sourceFingerprint, dataDir };
   let starting = null, launcher = null, startingChild = null, closed = false;
   const start = async signal => {
-    const port = await new Promise((resolve, reject) => {
-      const server = net.createServer(); server.once('error', reject);
-      server.listen(0, '127.0.0.1', () => { const port = server.address().port; server.close(error => error ? reject(error) : resolve(port)); });
-    });
+    const port = await archiveBrowserPort(dataDir);
     if (closed || signal.aborted) return unavailable();
     const child = spawn(process.execPath, [path.join(sourceRoot, 'scripts/mediflow.mjs'), '--riusa'], {
       cwd: sourceRoot, detached: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'], shell: false,
@@ -102,4 +100,27 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
     launcher = null;
   };
   return navigate;
+}
+
+export async function archiveBrowserPort(dataDir) {
+  const file = path.join(path.dirname(localUiArchiveLock(dataDir)), 'browser-port.json');
+  const read = () => {
+    if (fs.lstatSync(file).isSymbolicLink()) return unavailable();
+    const fd = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+    try {
+      const stat = fs.fstatSync(fd);
+      if (!stat.isFile() || stat.nlink !== 1 || stat.size > 64 || process.getuid && stat.uid !== process.getuid()) return unavailable();
+      const value = JSON.parse(fs.readFileSync(fd, 'utf8'));
+      if (Object.keys(value).join(',') !== 'port' || !Number.isInteger(value.port) || value.port < 1024 || value.port > 65535) return unavailable();
+      return value.port;
+    } finally { fs.closeSync(fd); }
+  };
+  try { return read(); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  const server = net.createServer();
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  try {
+    const port = server.address().port;
+    try { fs.writeFileSync(file, JSON.stringify({ port }), { flag: 'wx', mode: 0o600 }); return port; }
+    catch (error) { if (error.code !== 'EEXIST') throw error; return read(); }
+  } finally { await new Promise(resolve => server.close(resolve)); }
 }

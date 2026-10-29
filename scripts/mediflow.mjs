@@ -718,7 +718,7 @@ export async function main(args = process.argv.slice(2)) {
       instance = crypto.randomUUID();
       webSecret = choice === 'web' ? crypto.randomBytes(32).toString('hex') : null;
       const env = { ...process.env, ...(webSecret ? { MEDIFLOW_LOCAL_UI_WEB_SECRET: webSecret, MEDIFLOW_LOCAL_UI_INSTANCE: instance } : {}), HOSTNAME: '127.0.0.1', PORT: String(port),
-        ...(choice === 'web' ? { MEDIFLOW_PLUGIN_LOCAL_UI: '1' } : {}),
+        ...(choice === 'web' ? { MEDIFLOW_PLUGIN_LOCAL_UI: '1', MEDIFLOW_RUNTIME_UI_LEASE: pluginChannel ? '1' : '0' } : {}),
         ...(choice === 'web' ? { MEDIFLOW_WEB_OWNER_GATE: crypto.randomUUID() } : {}),
         MEDIFLOW_APP_REVISION: current.revision, MEDIFLOW_APP_BRANCH: current.branch,
         MEDIFLOW_APP_WORKTREE_HASH: current.worktreeHash, MEDIFLOW_APP_SOURCE_FINGERPRINT: current.sourceFingerprint,
@@ -739,6 +739,11 @@ export async function main(args = process.argv.slice(2)) {
       }
       if (choice === 'web') owned.send({ type: 'mediflow-web-owner-start', nonce: env.MEDIFLOW_WEB_OWNER_GATE });
       owned.on('message', frame => {
+        if (frame?.type === 'mediflow-ui-lease' && owned === child && leases) {
+          const accepted = leases.uiLease(frame.id, frame.expiresAt);
+          if (owned.connected) owned.send({ type: 'mediflow-ui-lease-result', requestId: frame.requestId, accepted }, () => {});
+          return;
+        }
         if (!['mediflow-local-ui-pair-approved', 'mediflow-local-ui-pair-revoked'].includes(frame?.type)) return;
         const pair = pairRequests.get(frame.nonce);
         if (!pair || owned !== child) return;
