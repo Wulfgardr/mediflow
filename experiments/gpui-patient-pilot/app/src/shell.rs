@@ -7277,7 +7277,7 @@ impl ClinicalApp {
                 .iter()
                 .find(|row| row.system == system)
         });
-        let mut pane = div().min_w_0().flex().flex_col().gap(px(20.))
+        let mut pane = div().reading_surface(theme).min_w_0().flex().flex_col().gap(px(20.))
             .child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
                 .child(heading("clinical-workspace-references-heading", "Repertori", theme))
                 .child(button("clinical-workspace-references-refresh", "Rileggi", theme, false, true)
@@ -7308,7 +7308,7 @@ impl ClinicalApp {
                 .when(self.text_scale >= 2.5, |el| el.flex_col().items_stretch())
                 .child(self.reference_search_target.attach_enabled(
                     div().id("clinical-workspace-reference-search-anchor").flex_1().min_w(px(160.)).max_w_full()
-                        .child(self.reference_search.clone()), false))
+                        .child(crate::text_input::themed(self.reference_search.clone(), theme)), false))
                 .child(self.reference_run_target.attach_enabled(button("clinical-workspace-reference-run-search", "Cerca", theme, true, self.scope.is_some()), self.scope.is_some())
                     .when(self.scope.is_some(), |el| el.on_click(cx.listener(|this, _, _, cx| this.load_references(cx))))))
             .when_some(total, |el, total| el.child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
@@ -9262,28 +9262,15 @@ mod review706b_callers {
                     .type_role(app.theme, crate::theme::TextRole::Body)
                     .child(if app.area == Area::Patients {
                         app.profile_view(layout, cx).into_any_element()
+                    } else if app.area == Area::References {
+                        app.references_view(cx).into_any_element()
+                    } else if app.area == Area::Analytics {
+                        app.analytics_view(cx).into_any_element()
                     } else {
                         app.area_view(layout, cx).into_any_element()
                     })
             })
         }
-    }
-    fn contrast(a: gpui::Hsla, b: gpui::Hsla) -> f64 {
-        fn lum(c: gpui::Hsla) -> f64 {
-            let c = c.to_rgb();
-            let linear = |x: f32| {
-                let x = f64::from(x);
-                if x <= 0.04045 {
-                    x / 12.92
-                } else {
-                    ((x + 0.055) / 1.055).powf(2.4)
-                }
-            };
-            0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b)
-        }
-        let a = lum(a);
-        let b = lum(b);
-        (a.max(b) + 0.05) / (a.min(b) + 0.05)
     }
     #[gpui::test]
     fn hcg5_page_inks_and_fields_contrast(cx: &mut gpui::TestAppContext) {
@@ -9298,6 +9285,8 @@ mod review706b_callers {
                 (Area::Diary, false),
                 (Area::Patients, false),
                 (Area::Settings, false),
+                (Area::References, false),
+                (Area::Analytics, false),
                 (Area::Patients, true),
             ] {
                 view.update(cx, |v, cx| {
@@ -9316,13 +9305,18 @@ mod review706b_callers {
                     })
                 });
                 cx.simulate_resize(gpui::size(px(1200.), px(14000.)));
-                rendered_command::take_inks();
+                let _probe = rendered_command::begin_inks();
                 rendered_command::take_fields();
-                cx.update(|w, cx| {
+                let (quads, scale) = cx.update(|w, cx| {
                     w.refresh();
                     w.draw(cx).clear(cx);
+                    (w.painted_quads(), w.scale_factor())
                 });
-                let inks = rendered_command::take_inks();
+                let inks = rendered_command::painted_contrasts(
+                    rendered_command::take_inks(),
+                    &quads,
+                    scale,
+                );
                 let fields = rendered_command::take_fields();
                 assert!(!inks.is_empty());
                 if area == Area::Agenda {
@@ -9348,17 +9342,7 @@ mod review706b_callers {
                     inks.len(),
                     fields.len()
                 );
-                for (label, ink) in inks {
-                    let paper = if ink == theme.paper {
-                        theme.fresh
-                    } else if ink == theme.shade {
-                        theme.appearance_selected
-                    } else if ink == theme.threshold_text {
-                        theme.ink
-                    } else {
-                        theme.paper
-                    };
-                    let ratio = contrast(ink, paper);
+                for (label, ratio) in inks {
                     if area == Area::Agenda {
                         println!("AGENDA dark={dark} {label:?} text={ratio:.2}");
                     }
@@ -9367,8 +9351,8 @@ mod review706b_callers {
                     }
                 }
                 for (label, ink, paper, border) in fields {
-                    let ratio = contrast(ink, paper);
-                    let stroke = contrast(border, paper);
+                    let ratio = rendered_command::contrast(ink.to_rgb(), paper.to_rgb());
+                    let stroke = rendered_command::contrast(border.to_rgb(), paper.to_rgb());
                     println!("FIELD dark={dark} {label:?} text={ratio:.2} stroke={stroke:.2}");
                     if ratio < 4.5 || stroke < 3. || paper != theme.paper {
                         failures.push(format!("dark={dark} {label}: field text={ratio:.2} border={stroke:.2} theme={}",paper==theme.paper));
@@ -9377,6 +9361,63 @@ mod review706b_callers {
             }
         }
         assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    #[gpui::test]
+    fn hcg5_contrast_rejects_invisible_text(cx: &mut gpui::TestAppContext) {
+        struct Fixture {
+            mode: u8,
+        }
+        impl Render for Fixture {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                let theme = Theme::for_dark(true);
+                div()
+                    .size_full()
+                    .reading_surface(theme)
+                    .relative()
+                    .child(
+                        div()
+                            .opacity(if self.mode == 1 {
+                                0.
+                            } else if self.mode == 3 {
+                                0.05
+                            } else {
+                                1.
+                            })
+                            .text_color(if self.mode == 0 {
+                                theme.paper
+                            } else {
+                                theme.ink
+                            })
+                            .child(rendered_command::observe_ink(gpui::text!(
+                                "Testo da verificare"
+                            ))),
+                    )
+                    .when(self.mode == 2, |el| {
+                        el.child(div().absolute().inset_0().bg(theme.paper))
+                    })
+            }
+        }
+        let (view, cx) = cx.add_window_view(|_, _| Fixture { mode: 0 });
+        for mode in 0..4 {
+            view.update(cx, |v, cx| {
+                v.mode = mode;
+                cx.notify();
+            });
+            let _probe = rendered_command::begin_inks();
+            let (quads, scale) = cx.update(|w, cx| {
+                w.refresh();
+                w.draw(cx).clear(cx);
+                (w.painted_quads(), w.scale_factor())
+            });
+            let samples =
+                rendered_command::painted_contrasts(rendered_command::take_inks(), &quads, scale);
+            assert_eq!(samples.len(), 1);
+            assert!(
+                samples[0].1 < 4.5,
+                "invisible mode {mode} escaped: {samples:?}"
+            );
+        }
     }
 
     #[cfg(target_os = "macos")]

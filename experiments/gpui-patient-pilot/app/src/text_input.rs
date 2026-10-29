@@ -773,6 +773,8 @@ impl Element for InputElement {
         let cursor = input.display_index(input.cursor());
         let caret = input.range.is_empty() && !input.read_only && focus.is_focused(w);
         let fresh = input.theme.fresh;
+        #[cfg(test)]
+        let probe_label = input.label.to_owned();
         w.handle_input(
             &focus,
             ElementInputHandler::new(bounds, self.input.clone()),
@@ -780,6 +782,8 @@ impl Element for InputElement {
         );
         self.text
             .paint(id, inspector, bounds, request, prepaint, w, cx);
+        #[cfg(test)]
+        crate::shell::rendered_command::record_ink(probe_label, bounds, w);
         let layout = self.text.layout().clone();
         if caret && let Some(position) = layout.position_for_index(cursor) {
             w.paint_quad(fill(

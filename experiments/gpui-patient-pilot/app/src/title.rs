@@ -318,7 +318,21 @@ fn layout_title(
         .unwrap_or(minimum);
     let mut rows = Vec::new();
     let mut row = String::new();
-    for (word, role) in text.tokens() {
+    let tokens = text.tokens().into_iter().flat_map(|(word, role)| {
+        if f32::from(shape(word, size).width()) > width
+            && let Some(index) = word.rfind(char::is_whitespace)
+            && word[..index].contains('·')
+            && word[index..].trim().chars().all(|c| c.is_ascii_digit())
+        {
+            vec![
+                (word[..index].trim_end(), role),
+                (word[index..].trim(), SegmentRole::Code),
+            ]
+        } else {
+            vec![(word, role)]
+        }
+    });
+    for (word, role) in tokens {
         let candidate = if row.is_empty() {
             word.to_owned()
         } else {
@@ -454,8 +468,6 @@ impl Element for Title {
             style.font_size = px(typography.size).into();
             style.font_weight = typography.weight;
         }
-        #[cfg(test)]
-        crate::shell::rendered_command::record_ink(self.text.text().to_owned(), style.color);
         let preferred = f32::from(style.font_size.to_pixels(window.rem_size()));
         let id =
             window.request_measured_layout(Style::default(), move |known, available, window, _| {
@@ -523,6 +535,8 @@ impl Element for Title {
         window: &mut Window,
         cx: &mut App,
     ) {
+        #[cfg(test)]
+        crate::shell::rendered_command::record_ink(self.text.text().to_owned(), bounds, window);
         let layout = layout.borrow();
         let mut origin = bounds.origin;
         for line in &layout.lines {
@@ -559,6 +573,60 @@ mod tests {
                     .child(title(self.label, self.theme).test_role(self.role)),
             )
         }
+    }
+
+    #[gpui::test]
+    fn hcg5_counts_keep_all_digits_at_400(cx: &mut TestAppContext) {
+        let mut native = TestAppContext::build_with_text_system(
+            cx.dispatcher.clone(),
+            None,
+            std::sync::Arc::new(gpui_apple::AppleTextSystem::new()),
+        );
+        let (_, cx) = native.add_window_view(|_, _| Fixture {
+            theme: Theme::for_dark(false),
+            label: "",
+            role: TypeRole::Section,
+        });
+        cx.update(|window, _| {
+            let theme = Theme::for_dark(false).sized(4., false);
+            let typography = theme.role(TypeRole::Section);
+            let mut style = window.text_style();
+            style.font_family = typography.family.into();
+            style.font_weight = typography.weight;
+            style.font_features = gpui::FontFeatures(std::sync::Arc::new(vec![("tnum".into(), 1)]));
+            for label in [
+                "SCADUTI",
+                "OGGI E PROSSIMI",
+                "CONCLUSI O ANNULLATI",
+                "DATA O STATO DA VERIFICARE",
+                "AUJOURD’HUI ET À VENIR",
+            ] {
+                for count in ["1", "20", "200", "2000"] {
+                    let text = TitleText::from(format!("{label} · {count}"));
+                    let layout = layout_title(
+                        &text,
+                        &style,
+                        typography.size,
+                        theme,
+                        358.,
+                        window.text_system(),
+                    );
+                    let lines: Vec<_> = layout.lines.iter().map(|l| l.text.as_ref()).collect();
+                    assert!(
+                        lines.iter().any(|line| line.ends_with(count)),
+                        "{label}/{count}: {lines:?}"
+                    );
+                    assert_eq!(
+                        lines
+                            .iter()
+                            .flat_map(|l| l.chars())
+                            .filter(char::is_ascii_digit)
+                            .collect::<String>(),
+                        count
+                    );
+                }
+            }
+        });
     }
 
     #[gpui::test]
