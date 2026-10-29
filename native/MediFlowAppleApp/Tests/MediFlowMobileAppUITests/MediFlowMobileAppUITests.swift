@@ -954,6 +954,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
            equivalente esiste gia in testEveryClinicalSurfaceOpensOnThisIdiom, che
            gira su entrambi gli idiomi. */
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "compact-only layout contract")
+        app.launchEnvironment["MEDIFLOW_APPLE_UITEST_LONG_WORKLIST"] = "1"
         launch(seedPatients: true, section: "modules", dynamicTypeSize: "accessibility5")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
         let tabBar = app.tabBars.firstMatch
@@ -968,7 +969,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
         // The final row must start out of reach, otherwise this gate proves
         // nothing about scrolling.
-        let lastRow = app.buttons["patient-cell-uitest-2"]
+        let lastRow = app.buttons["patient-cell-uitest-scroll-8"]
         XCTAssertTrue(lastRow.waitForExistence(timeout: 15))
         XCTAssertFalse(
             lastRow.isHittable && lastRow.frame.maxY <= tabBar.frame.minY,
@@ -1214,7 +1215,11 @@ final class MediFlowMobileAppUITests: XCTestCase {
         try app.performAccessibilityAudit()
 
         XCTAssertTrue(openSection("Agenda"), "Agenda non e raggiungibile per l'audit accessibilita")
-        XCTAssertTrue(sectionView("clinical-workspace-agenda-view").waitForExistence(timeout: 15))
+        let agenda = sectionView("clinical-workspace-agenda-view")
+        let ready = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == true AND hittable == true"), object: agenda)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 30), .completed,
+                       "Agenda deve essere visibile e interagibile prima dell'audit")
         try app.performAccessibilityAudit()
     }
 
