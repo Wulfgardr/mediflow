@@ -28,6 +28,34 @@ enum PatientStructuredFields {
     }
 }
 
+enum PatientChartSummaryCategory: String, CaseIterable, Identifiable {
+    case therapies, measures, diary, scales
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .therapies: "Terapie attive"
+        case .measures: "Misure"
+        case .diary: "Diario"
+        case .scales: "Scale"
+        }
+    }
+
+    var destination: PatientWorkspaceSection {
+        switch self {
+        case .therapies: .therapies
+        case .measures: .clinical
+        case .diary: .diary
+        case .scales: .scales
+        }
+    }
+
+    func accessibilityLabel(count: ClinicalSignalCount) -> String {
+        "Apri \(title), \(count.displayText)"
+    }
+}
+
 #if os(iOS)
 struct PatientChartGroup<Content: View>: View {
     let title: String

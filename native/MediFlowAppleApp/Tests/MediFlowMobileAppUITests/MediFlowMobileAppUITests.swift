@@ -66,11 +66,43 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let summary = sectionView("patient-clinical-signals")
         XCTAssertLessThan(diagnoses.frame.minY, exemptions.frame.minY)
         XCTAssertTrue(scrollDown(to: summary, requireHittable: true))
-        XCTAssertTrue(app.staticTexts["Misure"].exists)
+        XCTAssertTrue(app.buttons["patient-summary-measures"].exists)
         let identity = app.staticTexts["Dati anagrafici"]
         XCTAssertTrue(scrollDown(to: identity, requireHittable: true))
         XCTAssertTrue(app.staticTexts["patient-navigation-name"].exists)
         XCTAssertEqual(app.staticTexts["patient-navigation-name"].label, "Ferrari Giulia")
+    }
+
+    func testPatientChartSummaryNavigatesWithoutDuplicateCategories() {
+        app.launchEnvironment["MEDIFLOW_APPLE_DEMO"] = "1"
+        launch()
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "patient-cell-")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        row.tap()
+        XCTAssertTrue(app.staticTexts["patient-detail-name"].waitForExistence(timeout: 10))
+        let destinations: [(String, String, PatientSection)] = [
+            ("therapies", "Apri Terapie attive, 1", .therapies),
+            ("measures", "Apri Misure, 5", .clinical),
+            ("diary", "Apri Diario, 3", .diary),
+            ("scales", "Apri Scale, 0", .scales),
+        ]
+        for (id, label, destination) in destinations {
+            XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "patient-summary-")).count, 4)
+            let button = app.buttons["patient-summary-\(id)"]
+            XCTAssertTrue(scrollDown(to: button, requireHittable: true))
+            XCTAssertEqual(button.label, label)
+            button.tap()
+            let direct = app.buttons["patient-section-\(destination.identifier)"]
+            if direct.exists {
+                XCTAssertTrue(direct.isSelected)
+            } else {
+                XCTAssertEqual(app.buttons["patient-section-picker"].value as? String, destination.rawValue)
+            }
+            XCTAssertFalse(app.staticTexts["patient-detail-name"].exists)
+            openPatientSection(.overview)
+        }
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "Diagnosi")).count, 0)
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "Esenzioni")).count, 0)
     }
 
     private var app: XCUIApplication!
