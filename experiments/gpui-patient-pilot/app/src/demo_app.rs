@@ -489,7 +489,7 @@ impl PatientApp {
             .aria_label(title)
             .type_role(self.theme, TypeRole::Section)
             .text_color(self.theme.secondary)
-            .child(text!(title))
+            .child(crate::title::title(title, self.theme))
     }
 
     fn sidebar(&self, narrow: bool, cx: &mut Context<Self>) -> Stateful<Div> {

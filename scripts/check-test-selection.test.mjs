@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { checkTestSelection, discoverTestFiles, existingListedPaths, readCheckoutSource } from './check-test-selection.mjs';
 import { collectNativeToolSelections } from './native-tool-test-selection.mjs';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -239,5 +239,166 @@ test('GPUI test-support binding rejects missing, conditional, duplicate or disab
       assert.deepEqual(selection.files, [], name);
       assert.ok(selection.errors.length, name);
     });
+  }
+});
+
+function rustTokens(source) {
+  const tokens = [];
+  for (let i = 0; i < source.length;) {
+    if (/\s/u.test(source[i])) { i++; continue; }
+    if (source.startsWith('//', i)) { const end = source.indexOf('\n', i); i = end < 0 ? source.length : end; continue; }
+    if (source.startsWith('/*', i)) {
+      let depth = 1; i += 2;
+      while (i < source.length && depth) {
+        if (source.startsWith('/*', i)) { depth++; i += 2; }
+        else if (source.startsWith('*/', i)) { depth--; i += 2; }
+        else i++;
+      }
+      assert.equal(depth, 0, 'unterminated Rust comment'); continue;
+    }
+    const start = i;
+    const raw = /^(?:br|r)(#*)"/u.exec(source.slice(i));
+    const character = /^'(?:\\(?:u\{[0-9a-fA-F]+\}|.)|[^'\\\n])'/u.exec(source.slice(i));
+    if (raw) {
+      const end = source.indexOf(`"${raw[1]}`, i + raw[0].length);
+      assert.notEqual(end, -1, 'unterminated raw Rust string'); i = end + raw[1].length + 1;
+      tokens.push({ value: '<literal>', start, end: i }); continue;
+    }
+    if (source[i] === '"') {
+      i++;
+      while (i < source.length && source[i] !== '"') { if (source[i] === '\\') i++; i++; }
+      assert.ok(i < source.length, 'unterminated Rust string'); i++;
+      tokens.push({ value: '<literal>', start, end: i }); continue;
+    }
+    if (character) { i += character[0].length; tokens.push({ value: '<literal>', start, end: i }); continue; }
+    const word = /^(?:[A-Za-z_][A-Za-z_0-9]*|::)/u.exec(source.slice(i));
+    i += word ? word[0].length : 1;
+    tokens.push({ value: source.slice(start, i), start, end: i });
+  }
+  const pairs = new Map(), stack = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const value = tokens[i].value;
+    if ('([{'.includes(value)) stack.push(i);
+    else if (')]}'.includes(value)) {
+      const open = stack.pop(); assert.notEqual(open, undefined, 'unbalanced Rust expression');
+      assert.equal('([{'.indexOf(tokens[open].value), ')]}'.indexOf(value)); pairs.set(open, i); pairs.set(i, open);
+    }
+  }
+  assert.equal(stack.length, 0, 'unbalanced Rust source');
+  return { tokens, pairs };
+}
+
+function gpuiTitleCallerInventory(sources) {
+  const inventory = [], errors = [];
+  const roles = new Set(['PageTitle', 'Section', 'Person', 'PersonPreview', 'Threshold']);
+  const renderers = new Set(['title', 'heading', 'confirmation_heading', 'section', 'title_button']);
+  for (const [file, source] of sources) {
+    const { tokens: t, pairs } = rustTokens(source), v = i => t[i]?.value;
+    const functions = [];
+    for (let i = 0; i < t.length; i++) if (v(i) === 'fn' && v(i + 2) === '(') {
+      let body = pairs.get(i + 2) + 1;
+      while (body < t.length && !['{', ';'].includes(v(body))) body++;
+      if (v(body) === '{') functions.push({ name: v(i + 1), start: body, end: pairs.get(body) });
+    }
+    const fnAt = i => functions.filter(fn => fn.start < i && fn.end > i).at(-1);
+    const rendererCalls = (start, end) => {
+      const found = [];
+      for (let i = start; i < end; i++) {
+        if (!renderers.has(v(i)) || v(i + 1) !== '(') continue;
+        const trusted = v(i) === 'title'
+          ? (v(i - 1) === '::' && v(i - 2) === 'title') || (file === 'title.rs' && v(i - 1) !== '.')
+          : v(i - 1) !== '.' || (v(i) === 'section' && file === 'demo_app.rs');
+        if (trusted) found.push({ name: v(i), start: i, end: pairs.get(i + 1) });
+      }
+      return found;
+    };
+    for (let i = 0; i < t.length; i++) {
+      if (v(i) !== '.' || v(i + 1) !== 'type_role' || v(i + 2) !== '(') continue;
+      const close = pairs.get(i + 2), selected = [];
+      for (let j = i + 3; j < close; j++) {
+        if (v(j) !== 'TypeRole' || v(j + 1) !== '::' || !roles.has(v(j + 2))) continue;
+        // Threshold also styles the numeric value in number_line, which is not a title.
+        if (v(j + 2) === 'Threshold' && file === 'components.rs' && fnAt(i)?.name === 'number_line') continue;
+        selected.push(v(j + 2));
+      }
+      if (!selected.length) continue;
+      let start = i - 1;
+      while (v(start) === ')') {
+        const open = pairs.get(start), method = open - 1;
+        if (v(method - 1) === '.') start = method - 2;
+        else { start = method; while (v(start - 1) === '::') start -= 2; break; }
+      }
+      let end = close;
+      while (v(end + 1) === '.' && v(end + 3) === '(') end = pairs.get(end + 3);
+      const calls = rendererCalls(start, end + 1);
+      const raw = [];
+      for (let j = start; j <= end; j++) {
+        if (v(j) === 'text' && v(j + 1) === '!') raw.push(j);
+        if (v(j) === 'Text' && v(j + 1) === '::') raw.push(j);
+        if (v(j) === '.' && v(j + 1) === 'child' && v(j + 2) === '(') {
+          const childEnd = pairs.get(j + 2);
+          const content = rendererCalls(j + 3, childEnd);
+          const container = v(j + 3) === 'div' && v(j + 4) === '(';
+          if (!content.length && !container) raw.push(j);
+        }
+      }
+      const name = fnAt(i)?.name ?? '<unknown>';
+      for (const role of selected) {
+        const key = `${file}:${name}:${role}`;
+        inventory.push({ key, renderers: calls.map(call => call.name) });
+        if (!calls.length || raw.length) errors.push(`${key}: title/person/section rendered outside common renderer`);
+        if (['Person', 'PersonPreview'].includes(role) && !t.slice(start, end + 1).some((token, index, list) => token.value === 'TitleText' && list[index + 1]?.value === '::' && list[index + 2]?.value === 'name')) errors.push(`${key}: person role requires a protected name segment`);
+      }
+    }
+    // Global read models return names through local aliases, even when styled Strong.
+    for (let i = 0; i < t.length; i++) {
+      if (v(i) !== 'let' || v(i + 2) !== '=') continue;
+      let end = i + 3; while (end < t.length && v(end) !== ';') end++;
+      if (!t.slice(i + 3, end).some(token => token.value === 'global_patient_name')) continue;
+      const fn = fnAt(i), alias = v(i + 1);
+      assert.ok(fn, 'name alias outside a function');
+      const protectedName = t.slice(fn.start, fn.end).some((token, index, list) => token.value === 'TitleText' && list[index + 1]?.value === '::' && list[index + 2]?.value === 'name' && list[index + 3]?.value === '(' && list[index + 4]?.value === alias);
+      const key = `${file}:${fn.name}:NameAlias(${alias})`;
+      inventory.push({ key, renderers: protectedName ? ['title'] : [] });
+      if (!protectedName) errors.push(`${key}: unprotected person-name alias`);
+      for (let j = fn.start; j < fn.end; j++) if (v(j) === 'text' && v(j + 1) === '!' && v(j + 2) === '(') {
+        if (t.slice(j + 3, pairs.get(j + 2)).some(token => token.value === alias)) errors.push(`${key}: text! bypasses name renderer`);
+      }
+    }
+  }
+  return { inventory, errors };
+}
+
+test('GPUI title, section and person caller inventory requires the shared renderer', t => {
+  const directory = path.join(sourceRoot, pilot, 'app/src');
+  const sources = new Map(readdirSync(directory, { recursive: true }).filter(file => file.endsWith('.rs')).map(file => [file.split(path.sep).join('/'), readFileSync(path.join(directory, file), 'utf8')]));
+  const result = gpuiTitleCallerInventory(sources);
+  t.diagnostic(result.inventory.map(item => `${item.key} -> ${item.renderers.join(",")}`).join("\n"));
+  assert.deepEqual(result.errors, [], JSON.stringify(result.inventory, null, 2));
+  assert.deepEqual(result.inventory.map(item => item.key.replace(/:NameAlias\([^)]*\)$/u, ':NameAlias')).sort(), [
+    'components.rs:heading:PageTitle', 'components.rs:confirmation_heading:Threshold', 'components.rs:section:Section',
+    'demo_app.rs:section:Section', 'demo_app.rs:sidebar:PageTitle', 'demo_app.rs:profile:Person',
+    'demo_app.rs:render:PageTitle', 'demo_app.rs:render:PageTitle',
+    'shell.rs:sidebar:Section', 'shell.rs:login_view:Section', 'shell.rs:directory_view:Section',
+    'shell.rs:preview:PersonPreview', 'shell.rs:profile_view:Person', 'shell.rs:form_view:PageTitle',
+    'shell.rs:global_area_view:Section', 'shell.rs:references_view:Section',
+    'shell.rs:agenda_view_after:NameAlias', 'shell.rs:global_diary_view:NameAlias',
+    'shell/threshold_actions.rs:threshold_recovery:Section', 'shell/threshold_actions.rs:threshold_recovery:Section',
+  ].sort(), 'title callers must not silently disappear from the inventory');
+  for (const role of ['PageTitle', 'Section', 'Person', 'PersonPreview', 'Threshold', 'NameAlias(name)']) assert.ok(result.inventory.some(item => item.key.endsWith(`:${role}`)), `missing caller inventory: ${role}`);
+  const alias = 'fn view() { let person = self.global_patient_name("id"); div().type_role(theme, TypeRole::Strong).child(crate::title::title(TitleText::name(person), theme)) }';
+  assert.deepEqual(gpuiTitleCallerInventory(new Map([['fixture.rs', alias]])).errors, []);
+  assert.ok(gpuiTitleCallerInventory(new Map([['fixture.rs', alias.replace('crate::title::title(TitleText::name(person), theme)', 'text!(person)')]])).errors.length, 'aliased person name must not bypass renderer');
+  for (const role of ['PageTitle', 'Section', 'Person', 'PersonPreview', 'Threshold']) {
+    const expression = role === 'Person' ? 'Person { compact: false }' : role;
+    const content = ['Person', 'PersonPreview'].includes(role) ? 'TitleText::name(label)' : 'label';
+    const shared = `crate::title::title(${content}, theme)`;
+    const source = `fn fixture() { div().type_role(theme, TypeRole::${expression}).child(${shared}) }`;
+    assert.deepEqual(gpuiTitleCallerInventory(new Map([['fixture.rs', source]])).errors, []);
+    for (const bypass of ['text!(label)', 'label', '"literal"', 'form.kind.title()', 'div().child(text!(label))']) {
+      assert.ok(gpuiTitleCallerInventory(new Map([['fixture.rs', source.replace(shared, bypass)]])).errors.length, `undetected bypass: ${role}: ${bypass}`);
+    }
+    assert.ok(gpuiTitleCallerInventory(new Map([['fixture.rs', source.replace(')) }', ')).child(text!(other)) }')]])).errors.length, 'a valid sibling must not hide text!');
+    if (content !== 'label') assert.ok(gpuiTitleCallerInventory(new Map([['fixture.rs', source.replace(shared, 'crate::title::title(label, theme)')]])).errors.length, 'person role must retain its segment role');
   }
 });
