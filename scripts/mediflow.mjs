@@ -416,6 +416,9 @@ export async function main(args = process.argv.slice(2)) {
   const { preferencesFile, lockDirectory } = prepareLauncherState(ROOT);
   const pluginChannel = options.reuseOnly && process.connected;
   const ownership = claimLauncher(lockDirectory, identity, { reuseLive: true });
+  if (!ownership.claimed && ownership.receipt.dataDir && ownership.receipt.dataDir !== dataDir) {
+    throw new Error('Questa cartella usa già un archivio diverso. Apri l’istanza corretta.');
+  }
   let archiveOwnership = null;
   if (pluginChannel && ownership.claimed) {
     const archiveLock = localUiArchiveLock(dataDir);
@@ -773,7 +776,7 @@ export async function main(args = process.argv.slice(2)) {
       version: identity.version, folder: path.basename(ROOT) });
     leases = await createRuntimeLeases({ directory: archiveOwnership?.directory ?? lockDirectory,
       identity: runtimeProcessIdentity, initialPlugin: pluginChannel, onIdle: shutdown });
-    if (closing) { await chooser.close(); return; }
+    if (closing) { await leases.close(); await chooser.close(); return; }
     const receipt = { ...ownership.receipt, dataDir, choiceUrl: chooser.url, lease: leases.receipt };
     atomicJson(ownership.receiptFile, receipt);
     if (archiveOwnership) atomicJson(archiveOwnership.receiptFile, { ...archiveOwnership.receipt, dataDir, choiceUrl: chooser.url, lease: leases.receipt });

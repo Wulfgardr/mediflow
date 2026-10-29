@@ -55,7 +55,7 @@ export async function createRuntimeLeases({ directory, identity, initialPlugin, 
   const temporary = process.platform === 'win32' ? null : fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-lease-')));
   const address = process.platform === 'win32' ? `\\\\.\\pipe\\mediflow-lease-${key}` : path.join(temporary, 'ipc');
   const clients = new Set(), manual = new Set(initialPlugin ? [] : ['owner']);
-  let initial = initialPlugin, accepting = true, idleScheduled = false;
+  let initial = initialPlugin, accepting = true, idleScheduled = false, closingTask = null;
   const idle = () => {
     if (initial || clients.size || manual.size || !accepting || idleScheduled) return;
     idleScheduled = true;
@@ -93,7 +93,7 @@ export async function createRuntimeLeases({ directory, identity, initialPlugin, 
     close() {
       accepting = false;
       for (const socket of clients) socket.destroy();
-      return new Promise(resolve => server.close(() => { if (temporary) fs.rmSync(temporary, { recursive: true, force: true }); resolve(); }));
+      return closingTask ??= new Promise(resolve => server.close(() => { if (temporary) fs.rmSync(temporary, { recursive: true, force: true }); resolve(); }));
     },
   };
 }
@@ -121,6 +121,7 @@ export async function acquireRuntimeLease(receipt, identity, kind = 'plugin', ch
       clearTimeout(timer); socket.off('error', fail); socket.on('error', () => {});
       release = () => { channel.off('disconnect', release); socket.destroy(); };
       channel.once('disconnect', release);
+      if (channel.connected === false) { release(); reject(new Error('Client già disconnesso.')); return; }
       if (kind === 'manual') release();
       resolve();
     });

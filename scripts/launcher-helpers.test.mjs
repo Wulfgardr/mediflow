@@ -3028,3 +3028,15 @@ test('chooser reports a retained client lease instead of announcing a completed 
     const response=await fetch(endpoint,{method:'POST',headers:{Origin:endpoint.origin,'Content-Type':'application/json'},body:'{}'});
     assert.equal(response.status,409);assert.match(await response.text(),/altro client/u);
 });
+
+
+test('reusing a checkout with another archive never opens or leases its current Web',async t=>{
+    const f=await ordinaryLauncherFixture(t,'web');await f.until(()=>f.output().includes('Pronto:'));
+    const other=realpathSync(mkdtempSync(path.join(tmpdir(),'mf-other-archive-')));t.after(()=>rmSync(other,{recursive:true,force:true}));
+    const result=spawnSync(process.execPath,[path.join(f.source,'scripts/mediflow.mjs'),'--riusa','--senza-browser'],
+        {env:{...f.environment,MEDIFLOW_DATA_DIR:other},encoding:'utf8',timeout:5000});
+    assert.equal(result.status,1,result.stdout+result.stderr);assert.match(result.stderr,/archivio diverso/u);
+    const receipt=JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
+    const state=await (await fetch(new URL('state',receipt.choiceUrl))).json();
+    assert.equal((await fetch(state.url)).status,200);
+});
