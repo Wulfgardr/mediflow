@@ -144,6 +144,30 @@ private struct NativeFabricExperience: View {
     }
 }
 private struct NativeOrdinaryExperience: View {
+    #if os(iOS)
+    @Environment(\.patientChartScrollMemory) private var chartScrollMemory
+    #endif
+    private var sendDetailsExpansion: Binding<Bool>? {
+        #if os(iOS)
+        if let chartScrollMemory, let patientID = workspaceModel.selectedPatientID {
+            if function == .patientInsight { return chartScrollMemory.disclosure(.patientInsightDetails, patientID: patientID) }
+            if function == .smartImport { return chartScrollMemory.disclosure(.smartImportDetails, patientID: patientID) }
+        }
+        #endif
+        return nil
+    }
+    @ViewBuilder
+    private func sendDetails<Content: View>(@ViewBuilder content: @escaping () -> Content) -> some View {
+        #if os(iOS)
+        if let expansion = sendDetailsExpansion {
+            DisclosureGroup("Dettagli dell’invio", isExpanded: expansion, content: content)
+        } else {
+            DisclosureGroup("Dettagli dell’invio", content: content)
+        }
+        #else
+        DisclosureGroup("Dettagli dell’invio", content: content)
+        #endif
+    }
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
     let function: NativeOrdinaryFunction
     @ObservedObject var model: NativeOrdinaryModel
@@ -173,7 +197,7 @@ private struct NativeOrdinaryExperience: View {
                 if function == .treatmentReasoning {
                     Text("Destinazioni: auth.openai.com e chatgpt.com").chartMetadata()
                 }
-                DisclosureGroup("Dettagli dell’invio") {
+                sendDetails {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Dimensione: \(disclosure.payloadBytes) byte")
                         Text("Impronta dei contenuti: \(disclosure.sourceSha256)")

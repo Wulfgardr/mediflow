@@ -5,6 +5,147 @@ import CryptoKit
 // G1 (ADR 0071 parity): the patient-list row now derives an age from the summary
 // birthDate. Lock the boundary logic of the age helper.
 final class PatientSummaryPresentationTests: XCTestCase {
+    func testChartReadingAnchorsAreScopedToPatient() {
+        var state = PatientChartReturnState()
+        let first = PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 183.5)
+        let second = PatientChartReadingAnchor(id: "patient-summary-diary", distanceFromTop: 92)
+        state.leave(patientID: "patient-a", category: .scales, anchor: first)
+        state.leave(patientID: "patient-b", category: .diary, anchor: second)
+        XCTAssertEqual(state.position(patientID: "patient-a"), first)
+        XCTAssertEqual(state.position(patientID: "patient-b"), second)
+        XCTAssertNil(state.position(patientID: "patient-c"))
+    }
+
+    func testReadingAnchorKeepsRowDistanceAfterReloadChangesGeometry() {
+        let anchor = PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 233)
+        for newContentY in [CGFloat(933), 1133, 733] {
+            let offset = anchor.offset(anchorMinY: newContentY, insetTop: 100)
+            XCTAssertEqual(newContentY - offset - 100, 233, accuracy: 0.01)
+        }
+    }
+
+    func testDisclosureExpansionSurvivesReturnAndIsScopedToPatient() {
+        var state = PatientChartReturnState()
+        for disclosure in PatientChartDisclosure.allCases {
+            XCTAssertFalse(state.isExpanded(disclosure, patientID: "patient-a"))
+            state.setExpanded(true, disclosure: disclosure, patientID: "patient-a")
+            state.leave(patientID: "patient-a", category: .scales, anchor: PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 200))
+            _ = state.returnToChart(patientID: "patient-a")
+            XCTAssertTrue(state.isExpanded(disclosure, patientID: "patient-a"))
+            XCTAssertFalse(state.isExpanded(disclosure, patientID: "patient-b"))
+            state.setExpanded(false, disclosure: disclosure, patientID: "patient-a")
+            XCTAssertFalse(state.isExpanded(disclosure, patientID: "patient-a"))
+        }
+    }
+
+    func testSummaryReturnFocusIsScopedToPatientAndConsumedOnce() {
+        var state = PatientChartReturnState()
+        state.leave(patientID: "patient-a", category: .scales, anchor: PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 200))
+        state.leave(patientID: "patient-b", category: .measures, anchor: PatientChartReadingAnchor(id: "patient-summary-measures", distanceFromTop: 100))
+        XCTAssertNil(state.returnToChart(patientID: "patient-c"))
+        XCTAssertEqual(state.returnToChart(patientID: "patient-a"),
+                       PatientChartSummaryReturn(patientID: "patient-a", category: .scales))
+        XCTAssertNil(state.returnToChart(patientID: "patient-a"))
+        XCTAssertEqual(state.returnToChart(patientID: "patient-b")?.category, .measures)
+    }
+
+    func testSummaryReturnConsumesItsReadingAnchor() {
+        var state = PatientChartReturnState()
+        state.leave(patientID: "patient-a", category: .scales, anchor: PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 200))
+        XCTAssertNotNil(state.position(patientID: "patient-a"))
+        XCTAssertNotNil(state.returnToChart(patientID: "patient-a"))
+        XCTAssertNil(state.position(patientID: "patient-a"))
+        XCTAssertNil(state.returnToChart(patientID: "patient-a"))
+    }
+
+    func testDiscardedReturnKeepsPatientDisclosuresWithinSession() {
+        var state = PatientChartReturnState()
+        state.setExpanded(true, disclosure: .aiTools, patientID: "patient-a")
+        state.leave(patientID: "patient-a", category: .scales,
+                    anchor: PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 200))
+        state.discardReturns()
+        XCTAssertNil(state.position(patientID: "patient-a"))
+        XCTAssertNil(state.returnToChart(patientID: "patient-a"))
+        XCTAssertTrue(state.isExpanded(.aiTools, patientID: "patient-a"))
+        XCTAssertFalse(state.isExpanded(.aiTools, patientID: "patient-b"))
+    }
+
+    @MainActor func testSessionClosureDiscardsReturnSynchronously() throws {
+        let h = try LockReadHarness(test: self)
+        var state = PatientChartReturnState()
+        state.leave(patientID: "patient-a", category: .scales,
+                    anchor: PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 200))
+        state.setExpanded(true, disclosure: .aiTools, patientID: "patient-a")
+        let observation = h.model.clinicalSessionInvalidationEvents.sink { _ in state.discardReturns(endingSession: true) }
+        h.model.cancelMobileVisitAuthentication()
+        XCTAssertNil(state.position(patientID: "patient-a"))
+        XCTAssertNil(state.returnToChart(patientID: "patient-a"))
+        XCTAssertFalse(state.isExpanded(.aiTools, patientID: "patient-a"))
+        withExtendedLifetime(observation) {}
+    }
+
+    @MainActor func testSessionLockDiscardsReturnBeforeRemoteLogoutResponds() async throws {
+        let h = try LockReadHarness(test: self)
+        var state = PatientChartReturnState()
+        state.leave(patientID: "patient-a", category: .scales,
+                    anchor: PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 200))
+        let observation = h.model.clinicalSessionInvalidationEvents.sink { _ in state.discardReturns(endingSession: true) }
+        let started = h.transport.hold(LockReadFixture.logout)
+        let locking = Task { await h.model.lockSessionNow() }
+        await fulfillment(of: [started], timeout: 5)
+        XCTAssertNil(state.position(patientID: "patient-a"))
+        XCTAssertNil(state.returnToChart(patientID: "patient-a"))
+        try h.transport.release(LockReadFixture.logout, status: 204)
+        await locking.value
+        withExtendedLifetime(observation) {}
+    }
+
+    func testChartSummaryContainsEachExternalCategoryOnce() {
+        let categories = PatientChartSummaryCategory.allCases
+        XCTAssertEqual(categories.map(\.title), ["Terapie attive", "Misure", "Diario", "Scale"])
+        XCTAssertEqual(Set(categories.map(\.id)).count, 4)
+        XCTAssertFalse(categories.contains { $0.destination == .overview })
+    }
+
+    func testChartSummaryRoutesToExistingPatientSections() {
+        XCTAssertEqual(PatientChartSummaryCategory.allCases.map(\.destination),
+                       [.therapies, .clinical, .diary, .scales])
+    }
+
+    func testChartSummaryAccessibleNamesPreserveCountBounds() {
+        XCTAssertEqual(PatientChartSummaryCategory.therapies.accessibilityLabel(count: .exact(1)), "Apri Terapie attive, 1")
+        XCTAssertEqual(PatientChartSummaryCategory.measures.accessibilityLabel(count: .init(count: 200, atCap: true)), "Apri Misure, 200+")
+        XCTAssertEqual(PatientChartSummaryCategory.scales.accessibilityLabel(count: .exact(0)), "Apri Scale, 0")
+    }
+
+    func testRelativeDatesUseGregorianCalendar() throws {
+        let date = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("2025-10-29T12:00:00Z"))
+        let now = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("2026-10-29T12:00:00Z"))
+        for identifier in [Calendar.Identifier.gregorian, .buddhist, .japanese, .islamic] {
+            let formatter = ClinicalDatePresentation.makeRelativeFormatter(calendar: Calendar(identifier: identifier))
+            XCTAssertEqual(formatter.calendar.identifier, .gregorian)
+            XCTAssertEqual(formatter.localizedString(for: date, relativeTo: now), "1 anno fa")
+        }
+    }
+
+    func testPatientHeaderMetadataKeepsBirthAgeAndCompactCode() throws {
+        let birth = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("1951-07-20T00:00:00Z"))
+        let now = try XCTUnwrap(HomeBaseDateCoding.parseISO8601("2026-10-29T12:00:00Z"))
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.patientMetadata(birthDate: birth, taxCode: "DEMO00000R0000X", at: now),
+                       "75 anni · nascita 20 lug 1951 · …R0000X")
+        XCTAssertEqual(PairedPatientsWorkspaceSupport.patientMetadata(birthDate: nil, taxCode: ""), "")
+    }
+
+    func testHiddenPatientHeaderSurvivesDefaultSiblingPreferences() {
+        var hidden = PatientChartHeaderHiddenKey.defaultValue
+        PatientChartHeaderHiddenKey.reduce(value: &hidden) { true }
+        PatientChartHeaderHiddenKey.reduce(value: &hidden) { false }
+        XCTAssertTrue(hidden)
+        var visible = PatientChartHeaderHiddenKey.defaultValue
+        PatientChartHeaderHiddenKey.reduce(value: &visible) { false }
+        XCTAssertFalse(visible)
+    }
+
     func testEntryDateIsItalianRegardlessOfDeviceLanguage() {
         let formatter = PairedPatientsWorkspaceSupport.entryDateFormatter
         XCTAssertEqual(formatter.locale.identifier, "it_IT")

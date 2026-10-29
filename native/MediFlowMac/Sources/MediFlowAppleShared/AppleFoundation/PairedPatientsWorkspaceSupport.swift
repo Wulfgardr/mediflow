@@ -28,6 +28,14 @@ enum PairedPatientsWorkspaceSupport {
         return "…\(normalized.suffix(6))"
     }
 
+    static func patientMetadata(birthDate: Date?, taxCode: String, at now: Date = Date()) -> String {
+        var parts: [String] = []
+        if let age = age(from: birthDate, at: now) { parts.append("\(age) anni") }
+        if let birthDate { parts.append("nascita \(birthDateFormatter.string(from: birthDate))") }
+        if let code = cleanedPatientWorkspaceValue(taxCode) { parts.append(compactTaxCode(code)) }
+        return parts.joined(separator: " · ")
+    }
+
     private static let relativeUpdatedFormatter = ClinicalDatePresentation.relative
 
     static func relativeUpdated(_ date: Date) -> String {

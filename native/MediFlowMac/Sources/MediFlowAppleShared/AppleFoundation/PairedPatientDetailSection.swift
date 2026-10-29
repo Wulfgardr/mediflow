@@ -9,6 +9,13 @@ struct PairedPatientDetailSection: View {
     @Binding var icdQuery: String
     @Binding var confirmsFHIRExport: Bool
 
+    var onOpenSummary: ((PatientChartSummaryCategory) -> Void)? = nil
+    var summaryReturn: PatientChartSummaryReturn? = nil
+    #if os(iOS)
+    @Environment(\.patientChartScrollMemory) private var scrollMemory
+    @AccessibilityFocusState(for: .voiceOver) private var focusedSummaryCategory: PatientChartSummaryCategory?
+    #endif
+
     private var showsIdentity: Bool { true }
     private var showsClinical: Bool { true }
     private var showsAdministration: Bool { true }
@@ -428,7 +435,13 @@ struct PairedPatientDetailSection: View {
         Button {
             model.startEditingPatient()
         } label: {
+            Group {
+            #if os(iOS)
+            Text("Modifica")
+            #else
             Label("Modifica", systemImage: "pencil")
+            #endif
+            }
                 #if os(iOS)
                 .font(.body)
                 .fixedSize(horizontal: true, vertical: false)
@@ -440,6 +453,7 @@ struct PairedPatientDetailSection: View {
         .font(.caption)
         .labelStyle(.titleAndIcon)
         .disabled(model.isEditingPatient)
+        .accessibilityLabel("Modifica paziente")
         .accessibilityIdentifier("edit-patient-button")
     }
 
@@ -976,6 +990,68 @@ private extension PairedPatientDetailSection {
         let exemptions = exemptionRead.values ?? []
         return VStack(alignment: .leading, spacing: 0) {
             mobilePatientHeader.padding(.bottom, 16)
+            PatientChartGroup((model.isPatientFieldLocked(.diagnoses) || diagnosisRead.isUnreadable) ? "Diagnosi" : "Diagnosi · \(diagnoses.count)", anchorID: "patient-detail-diagnoses") {
+                if model.isPatientFieldLocked(.diagnoses) {
+                    Label("Diagnosi protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
+                        .font(.footnote).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("patient-diagnoses-locked")
+                } else if diagnosisRead.isUnreadable {
+                    unreadableField("Diagnosi")
+                } else if diagnoses.isEmpty {
+                    Text("Nessuna diagnosi registrata.").font(.footnote).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("patient-diagnoses-empty")
+                } else {
+                    ForEach(Array(diagnoses.enumerated()), id: \.offset) { _, diagnosis in
+                        PatientChartField(label: diagnosis.code.isEmpty ? "Diagnosi" : diagnosis.code,
+                            value: .recorded(diagnosis.description), labelIsCode: !diagnosis.code.isEmpty)
+                            .accessibilityLabel(diagnosis.displayText)
+                    }
+                }
+            }
+            .accessibilityIdentifier("patient-detail-diagnoses")
+            PatientChartGroup((model.isPatientFieldLocked(.exemptions) || exemptionRead.isUnreadable) ? "Esenzioni" : "Esenzioni · \(exemptions.count)", anchorID: "patient-detail-exemptions") {
+                if model.isPatientFieldLocked(.exemptions) {
+                    Label("Esenzioni protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
+                        .font(.footnote).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("patient-exemptions-locked")
+                } else if exemptionRead.isUnreadable {
+                    unreadableField("Esenzioni")
+                } else if exemptions.isEmpty {
+                    Text("Nessuna esenzione registrata.").font(.footnote).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("patient-exemptions-empty")
+                } else {
+                    Text(exemptions.joined(separator: ", "))
+                        .font(.system(.body, design: .monospaced))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .accessibilityIdentifier("patient-detail-exemptions")
+            PatientChartGroup("Riepilogo della cartella") {
+                mobileChartCounts
+            }
+            mobileReviewOverview
+            if let reason = cleanedPatientWorkspaceValue(detail.statusReason) {
+                PatientChartGroup("Motivo dello stato") { PatientChartProse(text: reason) }
+            }
+            if model.isPatientFieldLocked(.notes) {
+                PatientChartGroup("Note") {
+                    PatientChartField(label: "Note", value: .protected)
+                }
+            } else if let notes = cleanedPatientWorkspaceValue(detail.notes) {
+                PatientChartGroup("Note") { PatientChartProse(text: notes) }
+            }
+            if let summary = cleanedPatientWorkspaceValue(detail.aiSummary) {
+                PatientChartGroup("Sintesi con IA") { PatientChartProse(text: summary) }
+                    .accessibilityIdentifier("patient-detail-ai-summary")
+            }
+            if let insights = cleanedPatientWorkspaceValue(detail.documentInsights) {
+                PatientChartGroup("Informazioni dai documenti") {
+                    if DocumentInsightsCodec.decodeResult(detail.documentInsights).isUnreadable {
+                        unreadableField("Informazioni dai documenti")
+                    } else { PatientChartProse(text: insights) }
+                }
+                    .accessibilityIdentifier("patient-detail-document-insights")
+            }
             if detail.isArchived == true {
                 PatientChartGroup("Archiviazione") {
                     PatientChartField(label: "Motivo", value: .make(
@@ -1005,103 +1081,44 @@ private extension PairedPatientDetailSection {
                 PatientChartField(label: "Ambulatorio", value: .make(ambulatoryName))
                 PatientChartField(label: "Monitoraggio previsto", value: .make(detail.monitoringProfile))
             }
-            PatientChartGroup((model.isPatientFieldLocked(.diagnoses) || diagnosisRead.isUnreadable) ? "Diagnosi" : "Diagnosi · \(diagnoses.count)") {
-                if model.isPatientFieldLocked(.diagnoses) {
-                    Label("Diagnosi protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
-                        .font(.footnote).foregroundStyle(.secondary)
-                        .accessibilityIdentifier("patient-diagnoses-locked")
-                } else if diagnosisRead.isUnreadable {
-                    unreadableField("Diagnosi")
-                } else if diagnoses.isEmpty {
-                    Text("Nessuna diagnosi registrata.").font(.footnote).foregroundStyle(.secondary)
-                        .accessibilityIdentifier("patient-diagnoses-empty")
-                } else {
-                    ForEach(Array(diagnoses.enumerated()), id: \.offset) { _, diagnosis in
-                        PatientChartField(label: diagnosis.code.isEmpty ? "Diagnosi" : diagnosis.code,
-                            value: .recorded(diagnosis.description), labelIsCode: !diagnosis.code.isEmpty)
-                            .accessibilityLabel(diagnosis.displayText)
-                    }
-                }
-            }
-            .accessibilityIdentifier("patient-detail-diagnoses")
-            mobileReviewOverview
-            PatientChartGroup((model.isPatientFieldLocked(.exemptions) || exemptionRead.isUnreadable) ? "Esenzioni" : "Esenzioni · \(exemptions.count)") {
-                if model.isPatientFieldLocked(.exemptions) {
-                    Label("Esenzioni protette. Sblocca la sessione per consultarle.", systemImage: "lock.fill")
-                        .font(.footnote).foregroundStyle(.secondary)
-                        .accessibilityIdentifier("patient-exemptions-locked")
-                } else if exemptionRead.isUnreadable {
-                    unreadableField("Esenzioni")
-                } else if exemptions.isEmpty {
-                    Text("Nessuna esenzione registrata.").font(.footnote).foregroundStyle(.secondary)
-                        .accessibilityIdentifier("patient-exemptions-empty")
-                } else {
-                    Text(exemptions.joined(separator: ", "))
-                        .font(.system(.body, design: .monospaced))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .accessibilityIdentifier("patient-detail-exemptions")
-            if let reason = cleanedPatientWorkspaceValue(detail.statusReason) {
-                PatientChartGroup("Motivo dello stato") { PatientChartProse(text: reason) }
-            }
-            if model.isPatientFieldLocked(.notes) {
-                PatientChartGroup("Note") {
-                    PatientChartField(label: "Note", value: .protected)
-                }
-            } else if let notes = cleanedPatientWorkspaceValue(detail.notes) {
-                PatientChartGroup("Note") { PatientChartProse(text: notes) }
-            }
-            if let summary = cleanedPatientWorkspaceValue(detail.aiSummary) {
-                PatientChartGroup("Sintesi con IA") { PatientChartProse(text: summary) }
-                    .accessibilityIdentifier("patient-detail-ai-summary")
-            }
-            if let insights = cleanedPatientWorkspaceValue(detail.documentInsights) {
-                PatientChartGroup("Informazioni dai documenti") {
-                    if DocumentInsightsCodec.decodeResult(detail.documentInsights).isUnreadable {
-                        unreadableField("Informazioni dai documenti")
-                    } else { PatientChartProse(text: insights) }
-                }
-                    .accessibilityIdentifier("patient-detail-document-insights")
-            }
-            DisclosureGroup {
-                mobileChartCounts.padding(.top, 12)
-            } label: {
-                Text("Riepilogo della cartella").font(.headline)
-            }
-            .padding(.vertical, 16)
-            .overlay(alignment: .top) { Divider() }
-            .accessibilityIdentifier("patient-clinical-signals-disclosure")
             if model.isEditingPatient {
                 Divider()
                 patientEditForm.padding(.top, 16)
             }
         }
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                primaryEditAction
+                patientActionsOverflowMenu
+            }
+        }
     }
 
     var mobilePatientHeader: some View {
-        let layout = dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
-            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 10))
-        return VStack(alignment: .leading, spacing: 8) {
-            layout {
-                Text("\(detail.lastName) \(detail.firstName)")
-                    .inkVoice(28)
-                    .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-                    .lineLimit(2)
-                    .accessibilityLabel("\(detail.lastName) \(detail.firstName)")
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityIdentifier("patient-detail-name")
-                HStack(spacing: 12) {
-                    primaryEditAction
-                    patientActionsOverflowMenu
-                }
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            Text("\(detail.lastName) \(detail.firstName)")
+                .inkVoice(28)
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+                .lineLimit(2)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("patient-detail-name")
+            Text(PairedPatientsWorkspaceSupport.patientMetadata(birthDate: detail.birthDate, taxCode: detail.taxCode))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("patient-detail-metadata")
             if detail.isArchived == true {
                 Text("Archiviato").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
             }
         }
+        .background {
+            GeometryReader { geometry in
+                Color.clear.preference(key: PatientChartHeaderHiddenKey.self,
+                    value: geometry.frame(in: .named("patient-chart-scroll")).maxY <= 0)
+            }
+        }
     }
+
 
     var ambulatoryName: String? {
         guard let id = cleanedPatientWorkspaceValue(detail.ambulatoryId) else { return nil }
@@ -1141,34 +1158,53 @@ private extension PairedPatientDetailSection {
         }
     }
 
-    var mobileChartCounts: some View {
+    func mobileChartCount(for category: PatientChartSummaryCategory) -> ClinicalSignalCount {
         let cap = PairedPatientsWorkspaceSupport.clinicalPreviewCap
-        let counts: [(String, ClinicalSignalCount?)] = [
-            ("Diagnosi", model.isPatientFieldLocked(.diagnoses) ? nil : PatientStructuredFields.diagnoses(detail.diagnoses).count.map { .exact($0) }),
-            ("Terapie attive", .fromLoadedList(count: model.therapies.filter { $0.deletedAt == nil && $0.status == "active" }.count,
-                loadedCount: model.therapies.count, limit: cap)),
-            ("Osservazioni cliniche", .fromLoadedList(count: model.observations.filter { $0.deletedAt == nil }.count,
-                loadedCount: model.observations.count, limit: cap)),
-            ("Diario", .fromLoadedList(count: model.entries.filter { $0.deletedAt == nil }.count,
-                loadedCount: model.entries.count, limit: cap)),
-            ("Scale", .fromLoadedList(count: model.entries.filter { $0.deletedAt == nil && $0.type == "scale" }.count,
-                loadedCount: model.entries.count, limit: cap)),
-            ("Esenzioni", model.isPatientFieldLocked(.exemptions) ? nil : PatientStructuredFields.exemptions(detail.exemptions).count.map { .exact($0) }),
-        ]
-        return VStack(alignment: .leading, spacing: 12) {
-            ForEach(counts, id: \.0) { label, count in
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(label).font(.body)
-                    Spacer(minLength: 8)
-                    if let count {
+        switch category {
+        case .therapies:
+            return .fromLoadedList(count: model.therapies.filter { $0.deletedAt == nil && $0.status == "active" }.count,
+                loadedCount: model.therapies.count, limit: cap)
+        case .measures:
+            return .fromLoadedList(count: model.observations.filter { $0.deletedAt == nil }.count,
+                loadedCount: model.observations.count, limit: cap)
+        case .diary:
+            return .fromLoadedList(count: model.entries.filter { $0.deletedAt == nil }.count,
+                loadedCount: model.entries.count, limit: cap)
+        case .scales:
+            return .fromLoadedList(count: model.entries.filter { $0.deletedAt == nil && $0.type == "scale" }.count,
+                loadedCount: model.entries.count, limit: cap)
+        }
+    }
+
+    var mobileChartCounts: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(PatientChartSummaryCategory.allCases) { category in
+                let count = mobileChartCount(for: category)
+                Button {
+                    if let onOpenSummary { onOpenSummary(category) }
+                    else { model.activePatientSection = category.destination }
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(category.title).font(.body)
+                        Spacer(minLength: 8)
                         Text(count.displayText).font(.body.weight(.semibold)).monospacedDigit()
-                    } else {
-                        if (label == "Diagnosi" && !model.isPatientFieldLocked(.diagnoses)) ||
-                            (label == "Esenzioni" && !model.isPatientFieldLocked(.exemptions)) {
-                            unreadableField(label)
-                        } else {
-                            Label("Dato protetto", systemImage: "lock.fill").font(.footnote).foregroundStyle(.secondary)
-                        }
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.primary)
+                .accessibilityLabel(category.accessibilityLabel(count: count))
+                .accessibilityIdentifier("patient-summary-\(category.id)")
+                .accessibilityFocused($focusedSummaryCategory, equals: category)
+                .background {
+                    if let scrollMemory {
+                        PatientChartScrollAnchor(patientID: detail.id,
+                            id: "patient-summary-\(category.id)", memory: scrollMemory)
                     }
                 }
             }
@@ -1178,7 +1214,16 @@ private extension PairedPatientDetailSection {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("patient-clinical-signals")
+        .task(id: summaryReturn) {
+            focusedSummaryCategory = nil
+            guard let summaryReturn, summaryReturn.patientID == detail.id,
+                  model.activePatientSection == .overview else { return }
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            focusedSummaryCategory = summaryReturn.category
+        }
     }
 }
 #endif

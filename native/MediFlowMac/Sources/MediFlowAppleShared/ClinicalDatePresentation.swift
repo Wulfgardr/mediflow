@@ -33,10 +33,14 @@ enum ClinicalDatePresentation {
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }()
-    static let relative: RelativeDateTimeFormatter = {
+    static func makeRelativeFormatter(calendar: Calendar = .current) -> RelativeDateTimeFormatter {
         let formatter = RelativeDateTimeFormatter()
         formatter.locale = locale
         formatter.unitsStyle = .short
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = calendar.timeZone
+        formatter.calendar = gregorian
         return formatter
-    }()
+    }
+    static let relative = makeRelativeFormatter()
 }

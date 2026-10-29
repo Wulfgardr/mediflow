@@ -211,6 +211,7 @@ struct PairedPatientsWorklistView: View {
     @Binding var patientSortMode: PatientListSortMode
     // Compact navigation belongs to the workspace, not to a row.
     var onOpenPatient: ((HomeBasePatientSummary) -> Void)? = nil
+    var onOpenVisitComposer: (() -> Void)? = nil
 
     private var mobileVisitPresentation: Binding<Bool> {
         Binding(get: { showingMobileVisit }, set: { showingMobileVisit = $0
@@ -234,7 +235,7 @@ struct PairedPatientsWorklistView: View {
                     NavigationStack {
                         MobileVisitWorkspaceView(workspace: model, coordinator: coordinator) {
                             mobileVisitPresentation.wrappedValue = false
-                            if let patient = model.patients.first(where: { $0.id == model.selectedPatient?.id }) { onOpenPatient?(patient) }
+                            onOpenVisitComposer?()
                         }
                         .navigationTitle("Visita senza rete")
                         #if os(iOS)
