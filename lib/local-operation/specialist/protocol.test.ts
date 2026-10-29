@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { fork } from 'node:child_process';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
-import { createSyntheticSpecialistDemo as specialistFixture, SPECIALIST_SENTINELS } from './synthetic-demo.ts';
+import { createSyntheticSpecialistDemo as specialistFixture, SPECIALIST_SENTINELS } from './synthetic-demo.test-support.ts';
 import { LOCAL_OPERATION_RPC_MODE, LOCAL_OPERATION_TOOL_DESCRIPTOR, localOperationResultSchema } from '../../../packages/mcp/src/local-operation-contract.ts';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));

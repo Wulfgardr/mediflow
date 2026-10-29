@@ -7,7 +7,7 @@ portali istituzionali, uso clinico, modalità 2 o isolamento dell'intero compute
 
 ## Percorso e fonti
 
-`lib/local-operation/specialist/synthetic-demo.ts` compone un archivio SQLite
+`lib/local-operation/specialist/synthetic-demo.test-support.ts` compone un archivio SQLite
 isolato, il portale HTML inventato su loopback, Chromium e il servizio esistente.
 Identità e prescrizione già decisa sono rilette dalle tabelle `patients` e
 `service_prescriptions`, rispettando i campi cifrati `ENC:` della cartella; catalogo ed esenzione hanno versioni
@@ -21,7 +21,13 @@ pagina. Campi aggiunti, identità/pratica/account/UI diversi e input umano cambi
 impediscono il passo. Testo di pagina e istruzioni ostili rimangono dati locali.
 Le destinazioni sono esatte per metodo, percorso e fase; richieste di pagina,
 risorse, popup e download passano dal guard o sono bloccati. Service worker e
-cache HTTP del contesto instradato sono disabilitati. Nessuna clipboard o file
+cache HTTP del contesto instradato sono disabilitati. Il manifest ammette solo
+navigazioni: fetch/XHR, beacon, EventSource e risorse non sono canali autorizzati.
+WebSocket sono negati prima della creazione delle pagine; worker e trasporti
+paralleli sono disabilitati. La revoca chiude attivamente il documento e i suoi
+canali, inclusi i trasporti HTTP ancora in corso; una ripresa autorizzata crea una pagina nuova. Il censimento comprende
+input, textarea, select, pulsanti e contenteditable, con tipo e appartenenza al
+form previsti dal contratto. Nessuna clipboard o file
 di pagina viene acquisito. L'invio intercettato usa `maxRetries: 0` e
 `maxRedirects: 0`: Chromium può altrimenti ripetere un POST dopo un reset della
 connessione senza una seconda intercettazione. Il destinatario confronta
