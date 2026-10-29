@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import net from 'node:net';
 import { spawn, spawnSync } from 'node:child_process';
 import { chromium, expect } from '@playwright/test';
 import { archiveBrowserPort } from './local-ui-runtime.mjs';
@@ -89,7 +90,13 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
     const closedAt = Date.now(); await page.close();
     await until(() => terminal(first), 18000);
     assert.ok(Date.now() - closedAt < 18000, 'UI lease did not expire');
-    assert.equal(await archiveBrowserPort(data), port, 'Archive origin changed');
+    const blocker = net.createServer();
+    await new Promise((resolve, reject) => { blocker.once('error', reject); blocker.listen(port, '127.0.0.1', resolve); });
+    try {
+        assert.notEqual(await archiveBrowserPort(data), port, 'Foreign listener must receive a registered fallback');
+        assert.equal(blocker.listening, true);
+    } finally { await new Promise(resolve => blocker.close(resolve)); }
+    assert.equal(await archiveBrowserPort(data), port, 'Original draft origin must return after the conflict');
     const second = await launch(); page = await context.newPage(); await login(page);
     await page.goto(`/patients/${patient.id}/entries/new`);
     await expect(page.locator('[contenteditable="true"]').first()).toContainText('Resoconto sintetico non registrato 757');
