@@ -10,6 +10,34 @@ final class HomeBasePatientsClientTests: XCTestCase {
         super.tearDown()
     }
 
+    func testScaleCommitCodesRemainTypedAndClear() async throws {
+        for failure in [HomeBaseScaleWriteError.patientInactive, .payloadConflict] {
+            let client = makeClient { request in
+                (HTTPURLResponse(url: request.url!, statusCode: failure == .patientInactive ? 404 : 409, httpVersion: nil, headerFields: nil)!,
+                 try JSONSerialization.data(withJSONObject: ["code": failure.rawValue, "error": "Synthetic denial"]))
+            }
+            do {
+                _ = try await client.createEntry(patientId: "p1", payload: .init(id: "scale-1", type: "scale", date: Date(), content: "ENC:synthetic"),
+                    credentials: .init(clientId: "test", clientToken: "test"), sessionCookie: "sid=test", ambulatoryId: nil)
+                XCTFail("Expected scale denial")
+            } catch let actual as HomeBaseScaleWriteError {
+                XCTAssertEqual(actual, failure)
+                XCTAssertFalse(actual.localizedDescription.isEmpty)
+            }
+        }
+    }
+
+    func testScaleReplayDecodesAlreadyRegisteredReceipt() async throws {
+        let client = makeClient { request in
+            (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+             Data(#"{"id":"scale-1","version":1,"idempotent":true}"#.utf8))
+        }
+        let receipt = try await client.createEntry(patientId: "p1", payload: .init(id: "scale-1", type: "scale", date: Date(), content: "ENC:synthetic"),
+            credentials: .init(clientId: "test", clientToken: "test"), sessionCookie: "sid=test", ambulatoryId: nil)
+        XCTAssertEqual(receipt.id, "scale-1")
+        XCTAssertEqual(receipt.idempotent, true)
+    }
+
     func testNativeAuthorityRetirementUsesCurrentSessionAndReferenceOnly() async throws {
         let previous = String(repeating: "a", count: 64), current = String(repeating: "b", count: 64)
         let client = makeClient { request in
