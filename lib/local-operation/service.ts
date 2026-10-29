@@ -1,4 +1,4 @@
-import { deny, LocalOperationError, planDigest, planSchema, receiptSchema, territorialAllows,
+import { observationSchema, deny, LocalOperationError, planDigest, planSchema, receiptSchema, territorialAllows,
     type LocalOperationPlan, type LocalOperationRecord, type LocalOperationPorts, type LiveContext,
     type LocalOperationReceipt, type AdapterContext, type Observation, type ArchiveAuthority } from './contract.ts';
 
@@ -94,8 +94,10 @@ export function createLocalOperationService(ports: LocalOperationPorts) {
             || territory.revision !== binding.territoryRevision) deny();
         return { binding, current, plan, context };
     }
-    function observation(value: Observation, plan: Readonly<LocalOperationPlan>, requireContent: boolean) {
-        const context = localContext(plan);
+    function observation(raw: Observation, plan: Readonly<LocalOperationPlan>, requireContent: boolean) {
+        const parsed = observationSchema.safeParse(raw);
+        if (!parsed.success || parsed.data.census !== 'complete') deny();
+        const value = parsed.data, context = localContext(plan);
         if (value.patientId !== plan.patientId || value.practiceId !== plan.practiceId || value.portalAccountId !== plan.portalAccountId
             || value.uiVersion !== plan.uiVersion || value.humanRevision !== context.humanRevision
             || value.unclassifiedFields.length || (requireContent && value.planDigest !== planDigest(plan))) deny();

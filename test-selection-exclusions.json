@@ -180,6 +180,16 @@
     "owner": "@Wulfgardr"
   },
   {
+    "path": "lib/local-operation/specialist/browser-network.ts",
+    "reason": "Confine di rete del simulatore CU-1; avvia Chromium senza registrare test. Esercitato da vertical.test.ts e protocol.test.ts.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "lib/local-operation/specialist/browser-census.ts",
+    "reason": "Censimento CDP del simulatore CU-1; non registra test. Esercitato da vertical.test.ts.",
+    "owner": "@Wulfgardr"
+  },
+  {
     "path": "scripts/local-operation-specialist-demo.mjs",
     "reason": "Ingresso interattivo della demo CU-1 con conferma nativa; usa Chromium per il portale inventato, non registra test.",
     "owner": "@Wulfgardr"

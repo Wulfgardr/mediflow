@@ -43,8 +43,10 @@ export type LiveContext = Readonly<{
     patientId: string; practiceId: string; portalAccountId: string; role: 'physician';
     expiresAt: number; revocationEpoch: number; humanRevision: number;
 }>;
-export type Observation = Readonly<{ patientId: string; practiceId: string; portalAccountId: string;
-    uiVersion: string; humanRevision: number; planDigest: string | null; unclassifiedFields: readonly string[] }>;
+export const observationSchema = z.object({ patientId: id, practiceId: id, portalAccountId: id,
+    uiVersion: id, humanRevision: z.number().int().nonnegative(), planDigest: digestSchema.nullable(),
+    census: z.enum(['complete', 'unverifiable']), unclassifiedFields: z.array(z.string().max(256)).max(1024) }).strict();
+export type Observation = Readonly<z.infer<typeof observationSchema>>;
 export type AdapterContext = Readonly<{
     operationId: string; attempt: number; revision: number; signal: AbortSignal;
     assertCurrent(): void;
