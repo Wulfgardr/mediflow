@@ -10,6 +10,7 @@
     "maintenance:web": "node --experimental-strip-types --import ./scripts/register-strip-types-loader.mjs scripts/mediflow-headless-supervisor.mjs --maintenance-web",
     "verify:therapy-status": "node scripts/verify-therapy-status.mjs",
     "verify:local-operation": "node scripts/verify-local-operation.mjs",
+    "verify:specialist-operation": "node scripts/verify-specialist-operation.mjs",
     "test:clinical-http": "node scripts/run-clinical-http-suite.mjs",
     "preinstall": "node scripts/node-runtime-contract.mjs verify-node",
     "postinstall": "node scripts/node-runtime-contract.mjs verify",

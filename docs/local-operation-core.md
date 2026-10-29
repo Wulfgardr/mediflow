@@ -1,6 +1,6 @@
 # Nucleo locale delle operazioni CU
 
-CU-1a consegna il protocollo e il nucleo dell'esecutore previsti dall'[ADR 0162](./adr/0162-local-computer-use-executor.md), che resta **Proposed**. Le prove usano dati inventati e un adapter simulato su HTTP loopback. La verticale specialistica PRREG su portale sintetico appartiene a CU-1b: CU-1 rimane incompleta fino all'accettazione di entrambe. Nessun servizio istituzionale, client desktop o uso clinico è qualificato da questa consegna. La modalità 2 non è implementata.
+CU-1a consegna il protocollo e il nucleo dell'esecutore previsti dall'[ADR 0162](./adr/0162-local-computer-use-executor.md), che resta **Proposed**. Le prove usano dati inventati e un adapter simulato su HTTP loopback. La [verticale specialistica PRREG sintetica](./local-operation-specialist.md) riusa questo nucleo: CU-1 richiede ancora l'accettazione delle prove integrate. Nessun servizio istituzionale, client desktop o uso clinico è qualificato da questa consegna. La modalità 2 non è implementata.
 
 ## Confine remoto
 
@@ -22,7 +22,7 @@ Questi limiti riducono il polling e le superfici di uscita. Non rendono costanti
 
 Il factory verifica la generazione effettiva nel database e legge `readTerritorialPacks` dall'host; non usa capacità dichiarate o memorizzate dal client. `attachChild` registra solo il comando remoto sopra AIP. `publish` è una funzione dell'host, non un metodo MCP. Alla chiusura del figlio vengono distrutti riferimenti e autorità; nessuna approvazione o chiave entra nel canale.
 
-Il punto di composizione deve essere unico per superficie dell'adapter. La porta di invalidazione deve notificare cambio di sessione, paziente, pratica, account, dati, intervento umano e capacità. Il servizio rilegge comunque contesto e capacità prima di ogni richiesta e dopo gli `await`. Un adapter reale deve anche fermare il traffico di fondo e applicare il guard prima di ogni dispatch. Queste porte sono provate con un host simulato: CU-1b deve collegare superficie fidata, sorgenti del piano e portale sintetico, senza sostituire la conferma nativa con un booleano proveniente dalla chat.
+Il punto di composizione deve essere unico per superficie dell'adapter. La porta di invalidazione deve notificare cambio di sessione, paziente, pratica, account, dati, intervento umano e capacità. Il servizio rilegge comunque contesto e capacità prima di ogni richiesta e dopo gli `await`. Un adapter reale deve anche fermare il traffico di fondo e applicare il guard prima di ogni dispatch. La verticale specialistica collega queste porte a sorgenti dell’archivio, portale sintetico e superficie nativa separata; le prove automatiche sostituiscono la sola porta nativa. La chat non può fornire conferme.
 
 `scripts/local-operation-mcp-stdio.mjs` è l'entrypoint candidato, con IPC ereditato nel modo `local_operation_inherited_child_ipc_v1`. Senza parent autorizzato restituisce indisponibilità. Non è registrato nei plugin distribuiti o nel launcher ordinario e non amplia `mediflow-local-ui`.
 
@@ -50,7 +50,7 @@ CAS, salvataggio e audit `local_operation.changed` condividono una transazione S
 
 `attempt_started` ed `effectPossible` vengono scritti prima del comando esterno. Un timeout, una risposta persa o il recupero di un tentativo interrotto richiedono riconciliazione della stessa operazione. Il nucleo non offre un reinvio dopo un effetto possibile. Una ricevuta deve essere autenticata dall'adapter e correlata a operazione, paziente, pratica, contenuto, destinazione e tutte le parti attese. Un esito parziale resta incerto.
 
-Se la ricevuta è verificata ma il writer finale fallisce, resta `confirmed_pending_recording`: la ripresa registra soltanto l'esito locale. La conferma nel journal è l'esito operativo del servizio CU; la proiezione nella prescrizione specialistica sarà collegata ai servizi proprietari in CU-1b, senza scritture dirette dell'adapter.
+Se la ricevuta è verificata ma il writer finale fallisce, resta `confirmed_pending_recording`: la ripresa registra soltanto l'esito locale. La conferma nel journal è l'esito operativo del servizio CU; la verticale sintetica collega ora la proiezione nella prescrizione specialistica mediante il callback transazionale `recordConfirmed`, senza scritture dirette dell'adapter.
 
 A pacchetto disattivato i guard negano anche osservazione, riconciliazione e richieste di fondo; il servizio interrompe l'adapter e conserva `suspended_pack_disabled` oppure `uncertain` se un effetto è possibile. Le sole transizioni del journal di conservazione usano la fase del nucleo; non abilitano writer territoriali. La riattivazione non rinnova capability o approvazioni. Nessun completamento viene presunto.
 
