@@ -5766,7 +5766,7 @@ impl ClinicalApp {
                     .gap(px(8.))
                     .child(section(
                         group.id(),
-                        format!("{} · {count}", group.title()),
+                        crate::title::TitleText::label(group.title()).with_count(count as u64),
                         theme,
                     ))
                     .when(group == AgendaGroup::Overdue, |el| {
