@@ -1,6 +1,18 @@
 import XCTest
 
 final class MobileVisitProductUITests: XCTestCase {
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+    }
+
+    private func waitUntilHittable(_ element: XCUIElement, timeout: TimeInterval = 30,
+                                  file: StaticString = #filePath, line: UInt = #line) {
+        let ready = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == true AND hittable == true"), object: element)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: timeout), .completed,
+                       "Elemento non disponibile: \(element)", file: file, line: line)
+    }
+
     func testVisitEntryKeepsFirstPatientVisibleAtAX5() throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "compact-only layout contract")
         let app = XCUIApplication()
@@ -35,10 +47,13 @@ final class MobileVisitProductUITests: XCTestCase {
         app.launchEnvironment = ["MEDIFLOW_APPLE_UITEST_PATIENTS": "1", "MEDIFLOW_APPLE_UITEST_VISIT": run]
         app.launch()
         openVisit(app)
+        waitUntilHittable(app.buttons["mobile-visit-choose-patient"])
         app.buttons["mobile-visit-choose-patient"].tap()
+        waitUntilHittable(app.buttons["Sintetico Paziente"].firstMatch)
         app.buttons["Sintetico Paziente"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["mobile-visit-prepare"].waitForExistence(timeout: 10))
+        waitUntilHittable(app.buttons["mobile-visit-prepare"])
         app.buttons["mobile-visit-prepare"].tap()
+        waitUntilHittable(app.buttons["Acconsento e preparo il dossier"])
         app.buttons["Acconsento e preparo il dossier"].tap()
         let note = app.textViews["mobile-visit-note"]
         XCTAssertTrue(note.waitForExistence(timeout: 10))
