@@ -503,3 +503,10 @@ di ciascuna proposta e il limite di autorità dell’host.
 
 - [Comandi clear/delete ambulatori](ambulatory-destructive-commands.md): contratto host e conservazione G-2c/G-3d.
 - [ADR0169](adr/0169-gpui-ambulatory-destructive-commands.md): doppia autorità e snapshot per due comandi amministrativi nominati.
+
+## Punti di innesto territoriali, proposta del 29 ottobre 2026
+
+- [adr/0170-territorial-service-extension-points.md](./adr/0170-territorial-service-extension-points.md): ADR Proposed: nove punti di innesto e manifesto dei servizi, estensione di 0158.
+- [territorial/lombardia-services-and-prerequisites.md](./territorial/lombardia-services-and-prerequisites.md): Dodici servizi, priorità PRREG/GCM e prerequisiti Ente/Software House ancora aperti.
+- [territorial/italia-generico-paper-test.md](./territorial/italia-generico-paper-test.md): Prova sulla carta del solo profilo nazionale FSE/INI e SAC, senza servizi regionali.
+- [territorial/aria-letter-draft.md](./territorial/aria-letter-draft.md): Bozza non inviata delle domande ad ARIA, senza richiesta di accesso.
