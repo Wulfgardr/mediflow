@@ -103,7 +103,62 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
 }
 
 export async function archiveBrowserPort(dataDir, options) {
-  const file = path.join(path.dirname(localUiArchiveLock(dataDir, options)), 'browser-port.json');
+  const directory = path.dirname(localUiArchiveLock(dataDir, options));
+  const lock = path.join(directory, 'browser-port-allocation');
+  const candidate = `${lock}.candidate-${crypto.randomUUID()}`;
+  const token = `owner-${crypto.randomUUID()}.json`;
+  fs.mkdirSync(candidate, { mode: 0o700 });
+  let claimed = false;
+  const removeOwner = name => {
+    try { fs.unlinkSync(path.join(lock, name)); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    try { fs.rmdirSync(lock); }
+    catch (error) { if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) throw error; }
+  };
+  try {
+    fs.writeFileSync(path.join(candidate, token), JSON.stringify({ pid: process.pid }), { flag: 'wx', mode: 0o600 });
+    const deadline = Date.now() + 8000;
+    while (!claimed) {
+      try { fs.renameSync(candidate, lock); claimed = true; }
+      catch (error) {
+        if (!['EEXIST', 'ENOTEMPTY', 'EPERM', 'EACCES'].includes(error.code)) throw error;
+        try {
+          const stat = fs.lstatSync(lock);
+          if (!stat.isDirectory() || stat.isSymbolicLink() || process.getuid && stat.uid !== process.getuid()) return unavailable();
+          const entries = fs.readdirSync(lock);
+          if (entries.length === 1 && /^owner-[a-f0-9-]{36}\.json$/u.test(entries[0])) {
+            const file = path.join(lock, entries[0]);
+            const fd = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+            let owner;
+            try {
+              const stat = fs.fstatSync(fd);
+              if (stat.nlink === 0) continue;
+              if (!stat.isFile() || stat.nlink !== 1 || stat.size > 4096 || process.getuid && stat.uid !== process.getuid()) return unavailable();
+              owner = JSON.parse(fs.readFileSync(fd, 'utf8'));
+            } finally { fs.closeSync(fd); }
+            if (!Number.isSafeInteger(owner.pid) || owner.pid < 1) return unavailable();
+            let dead = false;
+            try { process.kill(owner.pid, 0); } catch (error) { if (error.code === 'ESRCH') dead = true; }
+            if (dead) removeOwner(entries[0]);
+          } else if (entries.length) return unavailable();
+          else {
+            try { fs.rmdirSync(lock); }
+            catch (error) { if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) throw error; }
+          }
+        } catch (error) { if (error.code !== 'ENOENT') throw error; }
+        if (Date.now() >= deadline) return unavailable();
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
+    }
+    return await allocateArchiveBrowserPort(directory);
+  } finally {
+    if (claimed) removeOwner(token);
+    fs.rmSync(candidate, { recursive: true, force: true });
+  }
+}
+
+async function allocateArchiveBrowserPort(directory) {
+  const file = path.join(directory, 'browser-port.json');
   const read = (target = file) => {
     if (fs.lstatSync(target).isSymbolicLink()) return unavailable();
     const fd = fs.openSync(target, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));

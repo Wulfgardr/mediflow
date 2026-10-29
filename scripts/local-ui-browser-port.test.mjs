@@ -70,9 +70,9 @@ test('foreign listener survives fallback; original draft origin returns after it
 });
 test('first concurrent calls for one archive converge on the published port without leaking reservations', async t => {
   const f = fixture(t), a = f.archive('same');
-  const ports = await Promise.all([archiveBrowserPort(a.data, f.options), archiveBrowserPort(a.data, f.options)]);
+  const ports = await Promise.all(Array.from({ length: 8 }, () => archiveBrowserPort(a.data, f.options)));
   const published = JSON.parse(fs.readFileSync(a.file, 'utf8')).port;
-  assert.deepEqual(ports, [published, published]);
+  assert.deepEqual(ports, Array(ports.length).fill(published));
   const registry = path.join(path.dirname(path.dirname(a.file)), 'browser-ports');
   assert.deepEqual(fs.readdirSync(registry), [String(published)]);
 });
@@ -81,8 +81,54 @@ test('first concurrent processes for the same archive use one published origin',
   const f = fixture(t);
   for (let run = 0; run < 10; run++) {
     const a = f.archive(`same-process-${run}`);
-    const ports = await Promise.all([fresh(a.data, f.options), fresh(a.data, f.options)]);
+    const ports = await Promise.all(Array.from({ length: 8 }, () => fresh(a.data, f.options)));
     const published = JSON.parse(fs.readFileSync(a.file, 'utf8')).port;
-    assert.deepEqual(ports, [published, published]);
+    assert.deepEqual(ports, Array(ports.length).fill(published));
   }
+});
+
+for (const separateProcesses of [false, true]) for (const occupied of [false, true]) {
+  test(`N concurrent allocations converge with a preferred port, occupied=${occupied}, processes=${separateProcesses}`, async t => {
+    const f = fixture(t), a = f.archive('same');
+    const probe = await listener(t), preferred = probe.address().port;
+    fs.writeFileSync(a.file, JSON.stringify({ port: preferred }));
+    if (!occupied) await new Promise(resolve => probe.close(resolve));
+    const ports = await Promise.all(Array.from({ length: 8 }, () => separateProcesses ? fresh(a.data, f.options) : archiveBrowserPort(a.data, f.options)));
+    assert.equal(new Set(ports).size, 1);
+    assert.equal(ports[0] === preferred, !occupied);
+    const next = await Promise.all(Array.from({ length: 8 }, () => fresh(a.data, f.options)));
+    assert.deepEqual(next, Array(8).fill(ports[0]));
+    const registry = path.join(path.dirname(path.dirname(a.file)), 'browser-ports');
+    assert.deepEqual(fs.readdirSync(registry).sort(), [...new Set([preferred, ports[0]])].map(String).sort());
+    if (occupied) {
+      assert.equal(probe.listening, true);
+      await new Promise(resolve => probe.close(resolve));
+      assert.deepEqual(await Promise.all(Array.from({ length: 8 }, () => fresh(a.data, f.options))), Array(8).fill(preferred));
+    }
+  });
+}
+
+test('allocation waits for a live owner and recovers its lock after process death', async t => {
+  const f = fixture(t), a = f.archive('recovery');
+  const child = spawn(process.execPath, ['--input-type=module', '-e',
+    `import net from 'node:net';
+     import {archiveBrowserPort} from ${JSON.stringify(new URL('./local-ui-runtime.mjs', import.meta.url).href)};
+     net.Server.prototype.listen = function () { process.send('locked'); return this; };
+     setInterval(() => {}, 1000);
+     await archiveBrowserPort(process.argv[1], JSON.parse(process.argv[2]));`, a.data, JSON.stringify(f.options)],
+    { stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
+  const exited = new Promise(resolve => child.once('exit', resolve));
+  t.after(async () => { if (child.exitCode === null && child.signalCode === null) child.kill(); await exited; });
+  await new Promise((resolve, reject) => {
+    child.once('message', resolve); child.once('error', reject);
+    child.once('exit', () => reject(new Error('Lock holder exited before acquisition')));
+  });
+  let settled = false;
+  const allocation = archiveBrowserPort(a.data, f.options).finally(() => { settled = true; });
+  await new Promise(resolve => setTimeout(resolve, 100));
+  assert.equal(settled, false, 'Live allocation owner must remain exclusive');
+  child.kill('SIGKILL'); await exited;
+  const port = await allocation;
+  assert.equal(port, JSON.parse(fs.readFileSync(a.file, 'utf8')).port);
+  assert.equal(await fresh(a.data, f.options), port);
 });
