@@ -1141,7 +1141,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     // MARK: - Il giro completo, sullo stesso codice per iPhone e iPad
 
-    func testCompactClinicalTabsExposeStableIdentifiers() throws {
+    func testCompactClinicalTabsExposeVisibleLabels() throws {
         launch(seedPatients: true)
 
         let tabBar = app.tabBars.firstMatch
@@ -1149,20 +1149,16 @@ final class MediFlowMobileAppUITests: XCTestCase {
             throw XCTSkip("Il layout regolare iPad usa la sidebar, non la tab bar compatta.")
         }
 
-        let compactTabIdentifiers = [
-            "clinical-workspace-section-patients-button",
-            "clinical-workspace-section-agenda-button",
-            "clinical-workspace-section-diary-button",
-            "clinical-workspace-section-other-button",
-        ]
-        let identifierQuery = tabBar.descendants(matching: .any).matching(
-            NSPredicate(format: "identifier IN %@", compactTabIdentifiers)
-        )
-        XCTAssertEqual(
-            identifierQuery.count,
-            compactTabIdentifiers.count,
-            "La snapshot AX deve esporre una sola tab per ciascun identifier clinico compatto."
-        )
+        let compactTabLabels = ["Pazienti", "Agenda", "Diario", "Altro"]
+        for label in compactTabLabels {
+            let buttons = tabBar.buttons.matching(NSPredicate(format: "label == %@", label))
+            XCTAssertEqual(
+                buttons.count,
+                1,
+                "La snapshot AX deve esporre una sola tab per ciascuna etichetta clinica compatta: \(label)."
+            )
+            XCTAssertTrue(buttons.firstMatch.isHittable)
+        }
     }
 
     /// Opens every clinical surface on whichever idiom is running and requires
@@ -1229,7 +1225,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
         app.terminate()
         launch(seedPatients: true, singlePatient: true)
-        let agendaTab = app.tabBars.buttons["clinical-workspace-section-agenda-button"]
+        let agendaTab = app.tabBars.buttons["Agenda"]
         let agendaTabReady = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == true AND hittable == true"), object: agendaTab)
         let tabReady = XCTWaiter.wait(for: [agendaTabReady], timeout: 30)
