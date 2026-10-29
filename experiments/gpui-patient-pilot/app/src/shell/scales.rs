@@ -3,7 +3,9 @@
 //! the retained encrypted attempt and the ordinary diary's complete readback.
 
 use super::*;
-use crate::theme::{TypeRole, TypeStyle};
+#[cfg(test)]
+use crate::theme::TypeRole;
+use crate::theme::TypeStyle;
 use mediflow_runtime_client::{
     PreparedScale, ScaleAnswers, ScaleCatalog, ScaleDescriptor, ScaleEntryAttempt,
     ScaleEntryReadback, ScaleId, ScalePreparationRequest,
@@ -47,6 +49,18 @@ pub(super) mod tests {
                     "definitionVersion":"synthetic-v1", "sourceId":"synthetic-source", "sourceBinding":"synthetic-binding",
                     "population":"synthetic", "scoring":"synthetic-host-only", "interpretation":"synthetic-host-only",
                     "interpretationVersion":"synthetic-interpretation-v1", "translation":"synthetic", "rights":"synthetic", "reviewGap":"synthetic"}})).collect::<Vec<_>>()})
+    }
+    pub(in crate::shell) fn stage_title_catalog_fixture(
+        app: &mut ClinicalApp,
+        cx: &Context<ClinicalApp>,
+    ) {
+        for id in ScaleId::ALL {
+            app.scales.targets.insert(
+                format!("scale-{}", id.as_str()),
+                ScrollTarget::new(&app.area_scroll, cx),
+            );
+        }
+        app.scales.catalog = Load::Ready(serde_json::from_value(catalog_wire()).unwrap());
     }
     pub(in crate::shell) fn stage_primary_label_fixture(
         app: &mut ClinicalApp,
@@ -1605,8 +1619,11 @@ impl ClinicalApp {
                             ))
                             .child(
                                 div()
-                                    .type_role(theme, TypeRole::Strong)
-                                    .child(text!(patient.display_name())),
+                                    .type_role(theme, crate::theme::TextRole::Strong)
+                                    .child(crate::title::title(
+                                        crate::title::TitleText::name(patient.display_name()),
+                                        theme,
+                                    )),
                             )
                             .child(text!(format!(
                                 "Nascita: {}",
@@ -1685,13 +1702,14 @@ impl ClinicalApp {
                         .map(|patient| {
                             let id = patient.id.clone();
                             let target = self.scales.targets.get(&format!("patient-{id}"));
-                            let row = button(
+                            let row = crate::components::title_button(
                                 format!("clinical-scale-patient-{id}"),
-                                format!(
-                                    "{} · {}",
-                                    patient.display_name(),
-                                    display_date(patient.birth_date.as_deref())
-                                ),
+                                crate::title::TitleText::name(patient.display_name())
+                                    .append(crate::title::SegmentRole::ItalianProse, " · ")
+                                    .append(
+                                        crate::title::SegmentRole::Code,
+                                        display_date(patient.birth_date.as_deref()),
+                                    ),
                                 theme,
                                 false,
                                 !matches!(self.patient.detail, ReadLoad::Loading { .. }),
@@ -1739,12 +1757,16 @@ impl ClinicalApp {
                         .flex()
                         .flex_col()
                         .gap(px(12.))
-                        .child(div().type_role(theme, TypeRole::Strong).child({
-                            let text = text!(scale.title.clone());
-                            #[cfg(test)]
-                            let text = rendered_command::observe_text(text);
-                            text
-                        }))
+                        .child(
+                            div()
+                                .type_role(theme, crate::theme::TextRole::Strong)
+                                .child({
+                                    let text = text!(scale.title.clone());
+                                    #[cfg(test)]
+                                    let text = rendered_command::observe_text(text);
+                                    text
+                                }),
+                        )
                         .child(div().text_color(theme.secondary).child({
                             let text = text!(scale.description.clone());
                             #[cfg(test)]
@@ -1797,20 +1819,23 @@ impl ClinicalApp {
             && !scale.is_working()
             && !scale.has_attempt()
             && self.discard.is_none();
-        let patient_context = format!(
-            "{} · {}",
+        let patient_context = crate::title::TitleText::name(
             self.patient
                 .detail
                 .ready()
                 .map(PatientDetail::display_name)
                 .unwrap_or_default(),
+        )
+        .append(crate::title::SegmentRole::ItalianProse, " · ")
+        .append(
+            crate::title::SegmentRole::Name,
             self.ambulatories
                 .ready()
                 .into_iter()
                 .flatten()
                 .find(|scope| Some(&scope.id) == self.scope.as_ref())
-                .map(|scope| scope.name.as_str())
-                .unwrap_or("Ambulatorio selezionato")
+                .map(|scope| scope.name.clone())
+                .unwrap_or_else(|| "Ambulatorio selezionato".into()),
         );
         let header = div()
             .min_w_0()
@@ -1834,15 +1859,15 @@ impl ClinicalApp {
             .child(
                 div()
                     .text_color(theme.secondary)
-                    .child(text!(patient_context)),
+                    .child(crate::title::title(patient_context, theme)),
             );
         let question = &scale.descriptor.questions[scale.question];
         let question_index = scale.question;
         let mut questions = div().min_w_0().flex_1().flex().flex_col().gap(px(16.));
         if scale.prepared.is_none() && !scale.has_attempt() {
-            questions = questions.child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
+            questions = questions.child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
                 .child(text!(format!("Domanda {} di {} · {} risposte inserite", scale.question + 1, scale.descriptor.questions.len(), scale.answers.len()))))
-                .child(scale.question_target.attach_enabled(heading("clinical-scale-question", question.text.clone(), theme).type_role(theme, TypeRole::Strong), false))
+                .child(scale.question_target.attach_enabled(crate::components::heading_with_role("clinical-scale-question", question.text.clone(), theme, crate::theme::TitleRole::Question), false))
                 .child(div().id("clinical-scale-options").role(Role::Group).aria_label(question.text.clone()).flex().flex_col().gap(px(8.))
                     .children(question.options.iter().enumerate().map(|(index, choice)| {
                         let selected = scale.answers.get(&question.id) == Some(&choice.value);
@@ -1895,12 +1920,16 @@ impl ClinicalApp {
                             let text = crate::shell::rendered_command::observe_text(text);
                             text
                         })
-                        .child(div().type_role(theme, TypeRole::Strong).child({
-                            let text = text!(label);
-                            #[cfg(test)]
-                            let text = crate::shell::rendered_command::observe_text(text);
-                            text
-                        }))
+                        .child(
+                            div()
+                                .type_role(theme, crate::theme::TextRole::Strong)
+                                .child({
+                                    let text = text!(label);
+                                    #[cfg(test)]
+                                    let text = crate::shell::rendered_command::observe_text(text);
+                                    text
+                                }),
+                        )
                 }));
         }
         questions = questions
@@ -1909,7 +1938,7 @@ impl ClinicalApp {
             }))
             .child(
                 div()
-                    .type_role(theme, TypeRole::Meta)
+                    .type_role(theme, crate::theme::TextRole::Meta)
                     .text_color(theme.secondary)
                     .child(text!(
                         "La voce viene registrata nel contesto ambulatoriale selezionato."
@@ -1947,7 +1976,7 @@ impl ClinicalApp {
                 )
                 .child(
                     div()
-                        .type_role(theme, TypeRole::Meta)
+                        .type_role(theme, crate::theme::TextRole::Meta)
                         .text_color(theme.secondary)
                         .child(text!(format!(
                             "Versione dell’interpretazione: {}",
@@ -1973,7 +2002,7 @@ impl ClinicalApp {
         }
         result = result.child(section("clinical-scale-source-heading", "FONTE E VERSIONE", theme))
             .child(div().child(text!(scale.descriptor.description.clone())))
-            .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary).flex().flex_col().gap(px(8.))
+            .child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary).flex().flex_col().gap(px(8.))
                 .child(text!(format!("Fonte indicata: {}", scale.descriptor.use_contract.source_id)))
                 .child(text!(format!("Definizione: {}", scale.descriptor.use_contract.definition_version)))
                 .child(text!(format!("Lingua: {} · Traduzione: {}", scale.descriptor.use_contract.language, scale.descriptor.use_contract.translation)))

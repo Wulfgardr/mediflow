@@ -14,7 +14,7 @@ pub fn fields(original: Option<&PatientDetail>) -> Vec<FieldSpec> {
         vec![
             row.first_name.clone(),
             row.last_name.clone(),
-            row.tax_code.clone(),
+            row.tax_code.raw_for_editor().to_owned(),
             row.birth_date.as_deref().map(day).unwrap_or_default(),
             row.address.clone().unwrap_or_default(),
             row.phone.clone().unwrap_or_default(),
@@ -118,7 +118,7 @@ pub fn create_draft(values: &[String]) -> Result<PatientCreateDraft, String> {
     Ok(PatientCreateDraft {
         first_name: values[0].clone(),
         last_name: values[1].clone(),
-        tax_code: values[2].clone(),
+        tax_code: values[2].clone().into(),
         birth_date: date(&values[3])?,
         address: nonblank(&values[4]),
         phone: nonblank(&values[5]),
@@ -167,7 +167,7 @@ pub fn profile_patch(
     Ok(PatientProfilePatch {
         first_name: (values[0] != original.first_name).then(|| values[0].clone()),
         last_name: (values[1] != original.last_name).then(|| values[1].clone()),
-        tax_code: (values[2] != original.tax_code).then(|| values[2].clone()),
+        tax_code: (values[2] != original.tax_code.raw_for_editor()).then(|| values[2].clone()),
         birth_date,
         address: nullable(4, "address", original.address.as_ref()),
         phone: nullable(5, "phone", original.phone.as_ref()),
@@ -263,7 +263,7 @@ pub fn update(
                 && patch
                     .tax_code
                     .as_ref()
-                    .is_none_or(|value| &row.tax_code == value)
+                    .is_none_or(|value| row.tax_code.raw_for_editor() == value)
                 && matches_nullable(&patch.birth_date, row.birth_date.as_deref(), true)
                 && matches_nullable(&patch.address, row.address.as_deref(), false)
                 && matches_nullable(&patch.phone, row.phone.as_deref(), false)

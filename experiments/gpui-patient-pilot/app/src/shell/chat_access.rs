@@ -8,7 +8,7 @@ use std::time::Duration;
 pub(super) struct ChatAccess {
     listener: Option<chat_access::Listener>,
     pending: Option<Pending>,
-    patient: String,
+    patient: mediflow_patient_client::PersonName,
     archive: String,
     pin: Entity<TextInput>,
     task: Option<gpui::Task<()>>,
@@ -20,7 +20,7 @@ impl ChatAccess {
         Self {
             listener: chat_access::Listener::configured(),
             pending: None,
-            patient: String::new(),
+            patient: mediflow_patient_client::PersonName::default(),
             archive: String::new(),
             pin: cx.new(|cx| {
                 TextInput::new(
@@ -43,7 +43,7 @@ impl ChatAccess {
         {
             pending.withdraw();
         }
-        self.patient.clear();
+        self.patient = mediflow_patient_client::PersonName::default();
         self.archive.clear();
         self.message = None;
         self.pin.update(cx, |input, cx| input.set_content("", cx));
@@ -191,7 +191,7 @@ impl ClinicalApp {
             .child(heading("native-chat-access-title", "Consenti l’accesso alla chat?", theme))
             .child(text!(format!("App richiedente: {app}")).with_id("native-chat-access-app"))
             .child(text!(format!("Archivio: {}", self.chat_access.archive)).with_id("native-chat-access-archive"))
-            .child(text!(format!("Paziente: {}", self.chat_access.patient)).with_id("native-chat-access-patient"))
+            .child(div().id("native-chat-access-patient").child(crate::title::title(crate::title::TitleText::patient_question("Paziente: ", self.chat_access.patient.clone(), ""), theme)))
             .child(notice("native-chat-access-operation", "Una verifica monouso dell’accesso. Nessun contenuto clinico viene restituito. La richiesta scade dopo 30 secondi.", theme, false))
             .when_some(self.chat_access.message.clone(), |el, message| el.child(notice("native-chat-access-error", message, theme, true)))
             .child(button("native-chat-access-touch-id", "Conferma con Touch ID", theme, true, enabled)

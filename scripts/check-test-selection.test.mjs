@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { checkTestSelection, discoverTestFiles, existingListedPaths, readCheckoutSource } from './check-test-selection.mjs';
 import { collectNativeToolSelections } from './native-tool-test-selection.mjs';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,7 +57,7 @@ test('a deleted file still listed by git is not read as a test', () => {
 const sourceRoot = fileURLToPath(new URL('..', import.meta.url));
 const pilot = 'experiments/gpui-patient-pilot';
 const pilotWorkflow = '.github/workflows/rust-gpui-pilot.yml';
-const pilotFiles = ['client/tests/flow.rs', 'client/tests/patient_names.rs', 'app/src/demo_app_tests.rs', 'app/src/chat_access/owner.rs', 'app/src/clinical_text.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/native_lock.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/platform_integration.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/shell/account_profile.rs', 'app/src/shell/agenda_flow.rs', 'app/src/shell/ambulatories.rs', 'app/src/shell/ai_preferences.rs', 'app/src/shell/ai_status.rs', 'app/src/shell/analytics.rs', 'app/src/shell/chat_access.rs', 'app/src/shell/document_details.rs', 'app/src/shell/local_preferences.rs', 'app/src/shell/local_settings.rs', 'app/src/shell/notes_recovery_tests.rs', 'app/src/shell/rendered_command.rs', 'app/src/shell/scales.rs', 'app/src/shell/therapy_picker.rs', 'app/src/shell/view_state.rs', 'app/src/shell/who_lookup.rs', 'app/src/text_input.rs', 'app/src/theme.rs',
+const pilotFiles = ['client/tests/flow.rs', 'client/tests/patient_names.rs', 'app/src/demo_app_tests.rs', 'app/src/chat_access/owner.rs', 'app/src/clinical_text.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/native_lock.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/patient_text.rs', 'app/src/platform_integration.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/shell/account_profile.rs', 'app/src/shell/agenda_flow.rs', 'app/src/shell/ambulatories.rs', 'app/src/shell/ai_preferences.rs', 'app/src/shell/ai_status.rs', 'app/src/shell/analytics.rs', 'app/src/shell/chat_access.rs', 'app/src/shell/document_details.rs', 'app/src/shell/local_preferences.rs', 'app/src/shell/local_settings.rs', 'app/src/shell/notes_recovery_tests.rs', 'app/src/shell/rendered_command.rs', 'app/src/shell/scales.rs', 'app/src/shell/therapy_picker.rs', 'app/src/shell/view_state.rs', 'app/src/shell/who_lookup.rs', 'app/src/text_input.rs', 'app/src/theme.rs', 'app/src/title.rs',
   'transport/src/dto.rs', 'transport/src/account_profile.rs', 'transport/src/ambulatories.rs', 'transport/src/ambulatory_command_recovery.rs', 'transport/src/ambulatory_command_transport.rs', 'transport/src/ambulatory_commands.rs', 'transport/src/ai_preferences.rs', 'transport/src/analytics.rs', 'transport/src/catalogs.rs', 'transport/src/context.rs', 'transport/src/crypto.rs', 'transport/src/http.rs', 'transport/src/ports.rs', 'transport/src/profile_query.rs', 'transport/src/scales.rs', 'transport/src/session.rs', 'transport/src/who.rs', 'transport/src/bin/mediflow-runtime-probe.rs'].map(file => `${pilot}/${file}`);
 const pilotTestCall = `cargo test --manifest-path ${pilot}/Cargo.toml --workspace --all-targets --locked`;
 function pilotFixture(t) {
@@ -71,7 +71,7 @@ function pilotFixture(t) {
     write(file, readFileSync(path.join(sourceRoot, file)));
   }
   for (const file of [...pilotFiles, `${pilot}/app/src/shell/threshold_actions.rs`, `${pilot}/app/src/shell/ambulatory_commands.rs`, `${pilot}/client/src/lib.rs`, `${pilot}/transport/src/bin/mediflow-runtime-probe.rs`, `${pilot}/Cargo.lock`, `${pilot}/state/src/lib.rs`]) write(file, 'must not execute');
-  write(`${pilot}/app/src/main.rs`, '// synthetic binding fixture\nmod appointments;\n#[cfg(unix)]\nmod chat_access;\nmod clinical_text;\nmod components;\nmod demo;\nmod demo_app;\nmod documents;\nmod editing;\nmod icons;\nmod native_lock;\nmod navigation;\nmod patient_forms;\nmod platform_integration;\nmod references;\nmod shell;\nmod text_input;\nmod theme;\nfn main() {}');
+  write(`${pilot}/app/src/main.rs`, '// synthetic binding fixture\nmod appointments;\n#[cfg(unix)]\nmod chat_access;\nmod clinical_text;\nmod components;\nmod demo;\nmod demo_app;\nmod documents;\nmod editing;\nmod icons;\nmod native_lock;\nmod navigation;\nmod patient_forms;\nmod patient_text;\nmod platform_integration;\nmod references;\nmod shell;\nmod text_input;\nmod theme;\nmod title;\nfn main() {}');
   write(`${pilot}/app/src/shell.rs`, '//! Synthetic shell binding fixture\nmod account_profile;\nmod agenda_flow;\nmod ai_preferences;\nmod ai_status;\nmod ambulatories;\nmod ambulatory_commands;\nmod analytics;\n#[cfg(unix)]\nmod chat_access;\nmod document_details;\npub(crate) mod local_preferences;\nmod local_settings;\n#[cfg(test)]\nmod notes_recovery_tests;\n#[cfg(test)]\npub(crate) mod rendered_command;\nmod scales;\nmod therapy_picker;\nmod threshold_actions;\nmod view_state;\nmod who_lookup;');
   write(`${pilot}/transport/src/lib.rs`, '//! Synthetic library binding fixture\n#![forbid(unsafe_code)]\nmod account_profile;\nmod ai_preferences;\nmod ambulatories;\nmod ambulatory_command_recovery;\nmod ambulatory_command_transport;\nmod ambulatory_commands;\nmod analytics;\nmod catalogs;\nmod context;\nmod crypto;\nmod dto;\nmod error;\nmod http;\nmod ports;\nmod profile_query;\nmod scales;\nmod session;\nmod tls;\nmod who;');
   for (const file of ['run.mjs', 'prepare-runtime.mjs', 'js-client.mjs', 'compare.mjs', 'verify-vectors.mjs']) {
@@ -205,8 +205,15 @@ test('GPUI test-support binding rejects missing, conditional, duplicate or disab
   const manifest = `${pilot}/app/Cargo.toml`;
   const main = `${pilot}/app/src/main.rs`;
   const support = 'gpui = { workspace = true, features = ["test-support"] }';
+  const appleSupport = 'gpui_apple = { git = "https://github.com/zed-industries/zed", rev = "56934ec0560bce8929025497411de7f5322fb6ca" }';
   for (const [name, file, before, after] of [
     ['missing dev table', manifest, '[dev-dependencies]', '# [dev-dependencies]'],
+    ['missing Apple text support', manifest, appleSupport, ''],
+    ['conditional Apple text table', manifest, `[dev-dependencies]\n${appleSupport}`, `[target.'cfg(target_os = "macos")'.dev-dependencies]\n${appleSupport}\n[dev-dependencies]`],
+    ['changed Apple text revision', manifest, appleSupport, appleSupport.replace('56934ec0560bce8929025497411de7f5322fb6ca', '0000000000000000000000000000000000000000')],
+    ['optional Apple text support', manifest, appleSupport, appleSupport.replace(' }', ', optional = true }')],
+    ['missing title module', main, 'mod title;', '// mod title;'],
+    ['conditional title module', main, 'mod title;', '#[cfg(target_os = "macos")]\nmod title;'],
     ['missing GPUI test support', manifest, support, 'gpui.workspace = true'],
     ['empty feature set', manifest, support, 'gpui = { workspace = true, features = [] }'],
     ['optional test support', manifest, support, 'gpui = { workspace = true, features = ["test-support"], optional = true }'],
@@ -233,4 +240,116 @@ test('GPUI test-support binding rejects missing, conditional, duplicate or disab
       assert.ok(selection.errors.length, name);
     });
   }
+});
+
+function rustTokens(source) {
+  const tokens = [];
+  for (let i = 0; i < source.length;) {
+    if (/\s/u.test(source[i])) { i++; continue; }
+    if (source.startsWith('//', i)) { const end = source.indexOf('\n', i); i = end < 0 ? source.length : end; continue; }
+    if (source.startsWith('/*', i)) {
+      let depth = 1; i += 2;
+      while (i < source.length && depth) {
+        if (source.startsWith('/*', i)) { depth++; i += 2; }
+        else if (source.startsWith('*/', i)) { depth--; i += 2; }
+        else i++;
+      }
+      assert.equal(depth, 0, 'unterminated Rust comment'); continue;
+    }
+    const start = i;
+    const raw = /^(?:br|r)(#*)"/u.exec(source.slice(i));
+    const character = /^'(?:\\(?:u\{[0-9a-fA-F]+\}|.)|[^'\\\n])'/u.exec(source.slice(i));
+    if (raw) {
+      const end = source.indexOf(`"${raw[1]}`, i + raw[0].length);
+      assert.notEqual(end, -1, 'unterminated raw Rust string'); i = end + raw[1].length + 1;
+      tokens.push({ value: '<literal>', start, end: i }); continue;
+    }
+    if (source[i] === '"') {
+      i++;
+      while (i < source.length && source[i] !== '"') { if (source[i] === '\\') i++; i++; }
+      assert.ok(i < source.length, 'unterminated Rust string'); i++;
+      tokens.push({ value: '<literal>', start, end: i }); continue;
+    }
+    if (character) { i += character[0].length; tokens.push({ value: '<literal>', start, end: i }); continue; }
+    const word = /^(?:[A-Za-z_][A-Za-z_0-9]*|::)/u.exec(source.slice(i));
+    i += word ? word[0].length : 1;
+    tokens.push({ value: source.slice(start, i), start, end: i });
+  }
+  const pairs = new Map(), stack = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const value = tokens[i].value;
+    if ('([{'.includes(value)) stack.push(i);
+    else if (')]}'.includes(value)) {
+      const open = stack.pop(); assert.notEqual(open, undefined, 'unbalanced Rust expression');
+      assert.equal('([{'.indexOf(tokens[open].value), ')]}'.indexOf(value)); pairs.set(open, i); pairs.set(i, open);
+    }
+  }
+  assert.equal(stack.length, 0, 'unbalanced Rust source');
+  return { tokens, pairs };
+}
+
+function gpuiTitleCallerInventory(sources) {
+  const errors = [], inventory = [];
+  const ordinary = new Set(['Prose', 'Brand', 'Body', 'Strong', 'Meta', 'Code']);
+  for (const [file, source] of sources) {
+    const { tokens: t, pairs } = rustTokens(source), v = i => t[i]?.value;
+    const rendering = /^(?:shell(?:\/|\.rs)|components\.rs|demo_app\.rs|title\.rs)$/u.test(file) || file.startsWith('shell/') || t.some(token => ['TitleText', 'title_element'].includes(token.value)) || t.some((token, i) => token.value === 'title' && v(i - 1) === '::' && v(i - 2) === 'crate');
+    for (let i = 0; i < t.length; i++) {
+      if (rendering && file !== 'title.rs' && v(i) === 'into_title_segment') errors.push(`${file}: protected segment conversion belongs in the title renderer`);
+      if (rendering && /^raw_for_/u.test(v(i) ?? '')) errors.push(`${file}: raw extraction in rendering module`);
+      const titleCall = (['title', 'title_element'].includes(v(i)) && v(i + 1) === '(' && v(i - 1) !== 'fn') || (v(i) === 'TitleText' && v(i + 1) === '::' && v(i + 3) === '(');
+      if (titleCall) {
+        const start = v(i) === 'TitleText' ? i + 3 : i + 1;
+        const end = pairs.get(start);
+        for (let j = start + 1; j < end; j++) if (v(j) === 'format' && v(j + 1) === '!') errors.push(`${file}: format! in title arguments`);
+      }
+      if (v(i) === '.' && v(i + 1) === 'type_role' && v(i + 2) === '(') {
+        const end = pairs.get(i + 2);
+        let comma = i + 3;
+        while (comma < end && v(comma) !== ',') comma++;
+        const arg = t.slice(comma + 1, end);
+        const roles = arg.filter((token, j) => token.value === 'TextRole' && arg[j + 1]?.value === '::').map(token => arg[arg.indexOf(token) + 2]?.value);
+        const expression = arg.map(token => token.value).join(' ').replace(/ ,$/u, '');
+        const direct = '(?:crate :: theme :: )?TextRole :: (?:Prose|Brand|Body|Strong|Meta|Code)';
+        const recognized = new RegExp(String.raw`^(?:${direct}|if (?:[A-Za-z_][A-Za-z_0-9]* \. )?[A-Za-z_][A-Za-z_0-9]* \{ ${direct} \} else \{ ${direct} \})$`, 'u').test(expression);
+        if (!recognized || !roles.length || roles.some(role => !ordinary.has(role)) || arg.some(token => token.value === 'TypeRole' || token.value === 'TitleRole')) errors.push(`${file}: unrecognized or protected type_role`);
+      }
+      if (v(i) === 'TitleText' && v(i + 1) === '::' && v(i + 2) === 'from' && v(i + 3) === '(') {
+        const arg = t.slice(i + 4, pairs.get(i + 3));
+        if (arg.some(token => ['display_name', 'global_patient_name'].includes(token.value))) errors.push(`${file}: person name passed as prose`);
+      }
+      if (v(i) === '.' && v(i + 1) === 'with_role' && v(i + 2) === '(') inventory.push(`${file}:${t[i].start}`);
+    }
+  }
+  return { errors, inventory };
+}
+
+test('GPUI title roles and patient names are protected by types and a fail-closed safety scan', t => {
+  const directory = path.join(sourceRoot, pilot, 'app/src');
+  const sources = new Map(readdirSync(directory, { recursive: true }).filter(file => file.endsWith('.rs')).map(file => [file.split(path.sep).join('/'), readFileSync(path.join(directory, file), 'utf8')]));
+  const result = gpuiTitleCallerInventory(sources);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.inventory.length, 19, 'title renderer role callers must not silently appear or disappear');
+  t.diagnostic(result.inventory.join('\n'));
+  for (const role of ['PageTitle', 'Section', 'Person', 'PersonPreview', 'Threshold']) {
+    for (const expression of [`TypeRole::${role}`, `TitleRole::${role}`, 'role', 'unknown_role()', 'TextRole::Missing', 'if selected { TextRole::Body } else { role }']) {
+      const source = `fn view() { let role = TypeRole::${role}; div().type_role(theme, ${expression}).child(text!("name")) }`;
+      assert.ok(gpuiTitleCallerInventory(new Map([['fixture.rs', source]])).errors.length, expression);
+    }
+  }
+  for (const getter of ['patient.display_name()', 'self.global_patient_name(id)']) assert.ok(gpuiTitleCallerInventory(new Map([['fixture.rs', `TitleText::from(${getter})`]])).errors.length);
+  assert.deepEqual(gpuiTitleCallerInventory(new Map([['fixture.rs', 'div().type_role(theme, TextRole::Body)']])).errors, []);
+});
+
+test('GPUI rendering rejects raw protected text and formatted title arguments', () => {
+  for (const file of ['shell.rs', 'shell/scales.rs', 'components.rs', 'demo_app.rs', 'title.rs', 'new_view.rs']) {
+    for (const method of ['raw_for_search', 'raw_for_clipboard', 'raw_for_editor']) {
+      const source = `use TitleText; fn view() { let raw = name.${method}(); TitleText::from(raw) }`;
+      assert.ok(gpuiTitleCallerInventory(new Map([[file, source]])).errors.length);
+    }
+    for (const expr of ['title(format!("{}", value), theme)', 'title({ let raw = format!("{}", value); raw }, theme)', 'TitleText::from(format!("{}", value))', 'TitleText::name(format!("{}", value))', 'title_element(role, format!("{}", value))']) assert.ok(gpuiTitleCallerInventory(new Map([[file, expr]])).errors.length, expr);
+  }
+  assert.ok(gpuiTitleCallerInventory(new Map([['shell.rs', 'name.into_title_segment()']])).errors.length);
+  assert.ok(gpuiTitleCallerInventory(new Map([['future.rs', 'use crate::title::title; let getter = PersonName::raw_for_editor;']])).errors.length);
+  assert.deepEqual(gpuiTitleCallerInventory(new Map([['patient_text.rs', 'name.raw_for_search()']])).errors, []);
 });

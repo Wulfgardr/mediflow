@@ -172,7 +172,7 @@ pub(crate) fn display_profile(
         id: patient_id.to_owned(),
         first_name: field.first_name,
         last_name: field.last_name,
-        tax_code: field.tax_code,
+        tax_code: field.tax_code.into(),
         birth_date: field.birth_date,
         address: field.address,
         phone: field.phone,

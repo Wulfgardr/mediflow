@@ -11,11 +11,13 @@ mod icons;
 mod native_lock;
 mod navigation;
 mod patient_forms;
+mod patient_text;
 mod platform_integration;
 mod references;
 mod shell;
 mod text_input;
 mod theme;
+mod title;
 
 use gpui::{App, AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions, px, size};
 use std::{borrow::Cow, path::PathBuf};

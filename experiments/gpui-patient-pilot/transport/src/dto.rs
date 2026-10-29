@@ -65,7 +65,7 @@ pub struct PatientSummary {
     pub first_name: String,
     pub last_name: String,
     pub birth_date: Option<String>,
-    pub tax_code: String,
+    pub tax_code: mediflow_patient_client::ClinicalCode,
     #[serde(default, deserialize_with = "nullable_bool")]
     pub is_adi: bool,
     #[serde(default, deserialize_with = "nullable_bool")]
@@ -76,13 +76,20 @@ pub struct PatientSummary {
 }
 
 impl PatientSummary {
-    pub fn display_name(&self) -> String {
-        mediflow_patient_client::format_patient_name(&self.first_name, &self.last_name)
+    pub fn display_name(&self) -> mediflow_patient_client::PersonName {
+        mediflow_patient_client::format_patient_name(&self.first_name, &self.last_name).into()
     }
     pub fn matches_query(&self, query: &str) -> bool {
         let query = query.trim().to_lowercase();
-        self.display_name().to_lowercase().contains(&query)
-            || self.tax_code.to_lowercase().contains(&query)
+        self.display_name()
+            .raw_for_search()
+            .to_lowercase()
+            .contains(&query)
+            || self
+                .tax_code
+                .raw_for_search()
+                .to_lowercase()
+                .contains(&query)
     }
 }
 
@@ -93,7 +100,7 @@ pub struct PatientDetail {
     pub first_name: String,
     pub last_name: String,
     pub birth_date: Option<String>,
-    pub tax_code: String,
+    pub tax_code: mediflow_patient_client::ClinicalCode,
     pub address: Option<String>,
     pub phone: Option<String>,
     pub caregiver: Option<String>,
@@ -174,8 +181,8 @@ pub enum AiFunctionSwitch {
 }
 
 impl PatientDetail {
-    pub fn display_name(&self) -> String {
-        mediflow_patient_client::format_patient_name(&self.first_name, &self.last_name)
+    pub fn display_name(&self) -> mediflow_patient_client::PersonName {
+        mediflow_patient_client::format_patient_name(&self.first_name, &self.last_name).into()
     }
     pub fn field_locked(&self, name: &str) -> bool {
         self.locked_fields.iter().any(|field| field == name)
@@ -189,7 +196,7 @@ impl PatientDetail {
 pub struct PatientCreateDraft {
     pub first_name: String,
     pub last_name: String,
-    pub tax_code: String,
+    pub tax_code: mediflow_patient_client::ClinicalCode,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub birth_date: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -293,7 +300,7 @@ pub struct Therapy {
     pub active_principle: Option<String>,
     pub dosage: String,
     pub motivation: Option<String>,
-    pub diagnosis_code: Option<String>,
+    pub diagnosis_code: Option<mediflow_patient_client::ClinicalCode>,
     pub diagnosis_name: Option<String>,
     pub status: String,
     pub start_date: String,
@@ -447,8 +454,8 @@ mod patient_name_tests {
         });
         let summary: PatientSummary = serde_json::from_value(value.clone()).unwrap();
         let detail: PatientDetail = serde_json::from_value(value).unwrap();
-        assert_eq!(summary.display_name(), "Conti Luca");
-        assert_eq!(detail.display_name(), "Conti Luca");
+        assert_eq!(summary.display_name().raw_for_search(), "Conti Luca");
+        assert_eq!(detail.display_name().raw_for_search(), "Conti Luca");
         assert!(summary.matches_query("conti luca"));
     }
 }

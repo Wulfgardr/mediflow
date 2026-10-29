@@ -113,9 +113,9 @@ pub fn appearance_segment(
         .type_role(
             theme,
             if selected {
-                TypeRole::Strong
+                crate::theme::TextRole::Strong
             } else {
-                TypeRole::Body
+                crate::theme::TextRole::Body
             },
         )
         .rounded(px(theme.control_radius))
@@ -171,7 +171,7 @@ pub fn button(
         .flex()
         .items_center()
         .justify_center()
-        .type_role(theme, TypeRole::Strong)
+        .type_role(theme, crate::theme::TextRole::Strong)
         .rounded(px(theme.control_radius))
         .border_1()
         .border_color(if primary && enabled {
@@ -206,6 +206,42 @@ pub fn button(
         .when(!label.is_empty(), |el| el.child(control_label(label)))
 }
 
+pub fn title_button(
+    id: impl Into<SharedString>,
+    label: crate::title::TitleText,
+    theme: Theme,
+    primary: bool,
+    enabled: bool,
+) -> Stateful<Div> {
+    title_button_with_role(id, label, theme, primary, enabled, None)
+}
+pub fn title_button_with_role(
+    id: impl Into<SharedString>,
+    label: crate::title::TitleText,
+    theme: Theme,
+    primary: bool,
+    enabled: bool,
+    role: Option<crate::theme::TitleRole>,
+) -> Stateful<Div> {
+    let accessible = label.text().to_owned();
+    let title = crate::title::title(label, theme);
+    let title = if let Some(role) = role {
+        title.with_role(role)
+    } else {
+        title
+    };
+    button(id, "", theme, primary, enabled)
+        .aria_label(accessible)
+        .child(
+            div()
+                .flex_auto()
+                .min_w_0()
+                .max_w_full()
+                .text_center()
+                .child(title),
+        )
+}
+
 pub fn tab(id: &'static str, label: &'static str, selected: bool, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
@@ -227,9 +263,9 @@ pub fn tab(id: &'static str, label: &'static str, selected: bool, theme: Theme) 
         .type_role(
             theme,
             if selected {
-                TypeRole::Strong
+                crate::theme::TextRole::Strong
             } else {
-                TypeRole::Body
+                crate::theme::TextRole::Body
             },
         )
         .rounded(px(theme.control_radius))
@@ -283,59 +319,42 @@ fn control_label(label: SharedString) -> Div {
         .child(text!(label))
 }
 
-pub fn heading(id: &'static str, label: impl Into<SharedString>, theme: Theme) -> Stateful<Div> {
+pub fn heading(
+    id: &'static str,
+    label: impl Into<crate::title::TitleText>,
+    theme: Theme,
+) -> Stateful<Div> {
+    heading_with_role(id, label, theme, crate::theme::TitleRole::PageTitle)
+}
+pub fn heading_with_role(
+    id: &'static str,
+    label: impl Into<crate::title::TitleText>,
+    theme: Theme,
+    role: crate::theme::TitleRole,
+) -> Stateful<Div> {
     let label = label.into();
     div()
         .id(id)
         .accessibility_id(id)
         .role(Role::Heading)
-        .aria_label(label.clone())
+        .aria_label(SharedString::from(label.text().to_owned()))
         .min_w_0()
         .max_w_full()
-        .whitespace_normal()
-        .type_role(theme, TypeRole::PageTitle)
         .text_color(theme.ink)
-        .child(text!(label))
+        .child(crate::title::title(label, theme).with_role(role))
 }
 
-pub fn confirmation_heading(question: String, theme: Theme) -> Stateful<Div> {
-    let words: Vec<_> = question.split_inclusive(' ').map(str::to_owned).collect();
-    let last = words.len().saturating_sub(1);
-    div()
-        .id("clinical-workspace-confirm-question")
-        .debug_selector(|| "threshold-question".into())
-        .role(Role::Heading)
-        .aria_label(question)
-        .type_role(theme, TypeRole::Threshold)
-        .flex()
-        .flex_wrap()
-        .children(words.into_iter().enumerate().map(|(index, word)| {
-            let mut unit = div().max_w_full().flex_shrink_0();
-            if index == last && word.ends_with('?') {
-                let before_mark = &word[..word.len() - 1];
-                let ending_start = before_mark.char_indices().next_back().map_or(0, |(i, _)| i);
-                unit = unit
-                    .debug_selector(|| "threshold-question-last-word".into())
-                    .flex()
-                    .flex_wrap()
-                    .child(div().max_w_full().flex_shrink_0().child(
-                        text!(&word[..ending_start]).with_id("threshold-question-last-prefix"),
-                    ))
-                    .child(
-                        div()
-                            .whitespace_nowrap()
-                            .flex_shrink_0()
-                            .debug_selector(|| "threshold-question-ending".into())
-                            .child(
-                                text!(&word[ending_start..])
-                                    .with_id("threshold-question-last-ending"),
-                            ),
-                    );
-            } else {
-                unit = unit.child(text!(word).with_id(("threshold-question-word", index)));
-            }
-            unit
-        }))
+pub fn confirmation_heading(
+    question: impl Into<crate::title::TitleText>,
+    theme: Theme,
+) -> Stateful<Div> {
+    heading_with_role(
+        "clinical-workspace-confirm-question",
+        question,
+        theme,
+        crate::theme::TitleRole::Threshold,
+    )
+    .debug_selector(|| "threshold-question".into())
 }
 
 pub fn section(
@@ -353,10 +372,9 @@ pub fn section(
         .min_w_0()
         .max_w_full()
         .whitespace_normal()
-        .type_role(theme, TypeRole::Section)
         .text_color(theme.secondary)
         .pb(px(8.))
-        .child(text!(label))
+        .child(crate::title::title(label, theme).with_role(crate::theme::TitleRole::Section))
 }
 
 pub fn notice(
@@ -390,7 +408,7 @@ pub fn notice(
         } else {
             theme.secondary
         })
-        .type_role(theme, TypeRole::Body)
+        .type_role(theme, crate::theme::TextRole::Body)
         .child(text!(message))
 }
 
@@ -566,7 +584,7 @@ pub fn writing_status(
         .flex()
         .items_center()
         .gap(px(8.))
-        .type_role(theme, TypeRole::Meta)
+        .type_role(theme, crate::theme::TextRole::Meta)
         .text_color(color)
         .child(writing_dot(ink, surface, theme))
         .child(writing_word(ink, surface, theme))
@@ -610,7 +628,7 @@ pub fn number_line(
         .flex_row()
         .items_baseline()
         .gap(px(4.))
-        .type_role(theme, TypeRole::Body)
+        .type_role(theme, crate::theme::TextRole::Body)
         .text_color(theme.ink)
         .when(!prefix.is_empty(), |element| {
             element.child(
@@ -623,8 +641,10 @@ pub fn number_line(
             div()
                 .debug_selector(move || format!("{id}-number"))
                 .flex_shrink_0()
-                .type_role(theme, TypeRole::Threshold)
-                .child(text!(number)),
+                .child(
+                    crate::title::title(number, theme)
+                        .with_role(crate::theme::TitleRole::Threshold),
+                ),
         )
         .when(!suffix.is_empty(), |element| {
             element.child(
