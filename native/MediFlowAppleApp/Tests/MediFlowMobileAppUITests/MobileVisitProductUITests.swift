@@ -42,7 +42,15 @@ final class MobileVisitProductUITests: XCTestCase {
         waitForUIReady(app.buttons["mobile-visit-choose-patient"], in: app)
         app.buttons["mobile-visit-choose-patient"].tap()
         waitForUIReady(app.buttons["Sintetico Paziente"].firstMatch, in: app)
-        app.buttons["Sintetico Paziente"].firstMatch.tap()
+        let patientOption = app.buttons["Sintetico Paziente"].firstMatch
+        var previousFrame: CGRect?
+        let stableFrame = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let frame = patientOption.frame
+            defer { previousFrame = frame }
+            return !frame.isEmpty && frame == previousFrame
+        }, object: patientOption)
+        XCTAssertEqual(XCTWaiter.wait(for: [stableFrame], timeout: 10), .completed)
+        patientOption.tap()
         let selectedPatient = app.staticTexts["Paziente scelto: Sintetico Paziente"]
         let patientSelected = selectedPatient.waitForExistence(timeout: 30)
         if !patientSelected {
