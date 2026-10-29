@@ -284,7 +284,7 @@ fn writes(
     let scope = &config.scope;
     let before =
         open_profile(session, scope, patient_id).map_err(|e| runtime_error("write-preread", e))?;
-    if before.tax_code.as_str() != "SYNTHETIC0000003" {
+    if before.tax_code.raw_for_editor() != "SYNTHETIC0000003" {
         return Err(fail("writes", "wrong-synthetic-identity"));
     }
     if before.version != 1
@@ -419,7 +419,7 @@ fn profile_projection(
     let phase = "profile-readback";
     unlocked(&row.locked_fields, phase)?;
     if row.id != id
-        || row.tax_code.as_str() != tax_code
+        || row.tax_code.raw_for_editor() != tax_code
         || row.ambulatory_id.is_some()
         || row.version != version
         || row.is_archived
@@ -492,7 +492,10 @@ fn patient_profile_writes(
         let existing = session
             .list_patients(scope, archived)
             .map_err(|e| runtime_error("profiles-preread", e))?;
-        if existing.iter().any(|row| row.tax_code.as_str() == tax_code) {
+        if existing
+            .iter()
+            .any(|row| row.tax_code.raw_for_editor() == tax_code)
+        {
             return Err(fail("profiles-preread", "synthetic-profile-already-used"));
         }
     }
@@ -642,7 +645,7 @@ fn resource_writes(
     let parent = open_profile(session, scope, patient_id)
         .map_err(|e| runtime_error("resources-parent", e))?;
     unlocked(&parent.locked_fields, "resources-parent")?;
-    if parent.tax_code.as_str() != "SYNTHETIC0000003"
+    if parent.tax_code.raw_for_editor() != "SYNTHETIC0000003"
         || parent.version != fixture.parent_version
         || parent.notes.as_deref() != Some(&fixture.parent_notes)
     {

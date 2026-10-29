@@ -225,6 +225,7 @@ impl From<TextRole> for TypeRole {
 }
 #[derive(Clone, Copy, Debug)]
 pub enum TitleRole {
+    Question,
     Person { compact: bool },
     PageTitle,
     PersonPreview,
@@ -234,6 +235,7 @@ pub enum TitleRole {
 impl From<TitleRole> for TypeRole {
     fn from(role: TitleRole) -> Self {
         match role {
+            TitleRole::Question => Self::Strong,
             TitleRole::Person { compact } => Self::Person { compact },
             TitleRole::PageTitle => Self::PageTitle,
             TitleRole::PersonPreview => Self::PersonPreview,

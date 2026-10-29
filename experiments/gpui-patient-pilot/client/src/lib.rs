@@ -14,11 +14,29 @@ pub const MAX_VERSION: u64 = 9_007_199_254_740_991;
 /// A bound for this synthetic client, not a change to the HTTP API contract.
 pub const MAX_NOTES_UTF16: usize = 262_144;
 
+pub struct NameSegment(String);
+impl NameSegment {
+    pub fn text(&self) -> &str {
+        &self.0
+    }
+}
+pub struct CodeSegment(String);
+impl CodeSegment {
+    pub fn text(&self) -> &str {
+        &self.0
+    }
+}
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PersonName(String);
 impl PersonName {
-    pub fn as_str(&self) -> &str {
+    pub fn raw_for_search(&self) -> &str {
         &self.0
+    }
+    pub fn raw_for_clipboard(&self) -> &str {
+        &self.0
+    }
+    pub fn into_title_segment(self) -> NameSegment {
+        NameSegment(self.0)
     }
 }
 impl From<String> for PersonName {
@@ -31,23 +49,23 @@ impl From<&str> for PersonName {
         Self(value.to_owned())
     }
 }
-impl std::fmt::Display for PersonName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct ClinicalCode(String);
-impl std::ops::Deref for ClinicalCode {
-    type Target = str;
-    fn deref(&self) -> &str {
+
+impl ClinicalCode {
+    pub fn raw_for_search(&self) -> &str {
         &self.0
     }
-}
-impl ClinicalCode {
-    pub fn as_str(&self) -> &str {
+    pub fn raw_for_clipboard(&self) -> &str {
         &self.0
+    }
+    pub fn raw_for_editor(&self) -> &str {
+        &self.0
+    }
+    pub fn into_title_segment(self) -> CodeSegment {
+        CodeSegment(self.0)
     }
 }
 impl From<String> for ClinicalCode {
@@ -58,11 +76,6 @@ impl From<String> for ClinicalCode {
 impl From<&str> for ClinicalCode {
     fn from(value: &str) -> Self {
         Self(value.to_owned())
-    }
-}
-impl std::fmt::Display for ClinicalCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
     }
 }
 
@@ -95,8 +108,16 @@ impl PatientProfile {
     pub fn matches_query(&self, query: &str) -> bool {
         let query = query.trim().to_lowercase();
         query.is_empty()
-            || self.display_name().as_str().to_lowercase().contains(&query)
-            || self.tax_code.to_lowercase().contains(&query)
+            || self
+                .display_name()
+                .raw_for_search()
+                .to_lowercase()
+                .contains(&query)
+            || self
+                .tax_code
+                .raw_for_search()
+                .to_lowercase()
+                .contains(&query)
     }
 
     fn valid(&self) -> bool {
@@ -104,7 +125,7 @@ impl PatientProfile {
             && (1..=MAX_VERSION).contains(&self.version)
             && valid_text(&self.first_name, 512)
             && valid_text(&self.last_name, 512)
-            && valid_text(&self.tax_code, 128)
+            && valid_text(self.tax_code.raw_for_editor(), 128)
             && self.birth_date.as_ref().is_none_or(|v| valid_text(v, 64))
             && self
                 .notes

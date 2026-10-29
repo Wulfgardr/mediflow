@@ -11,6 +11,7 @@ mod icons;
 mod native_lock;
 mod navigation;
 mod patient_forms;
+mod patient_text;
 mod platform_integration;
 mod references;
 mod shell;

@@ -156,11 +156,10 @@ impl ClinicalApp {
             .iter()
             .filter(|row| {
                 row.deleted_at.is_none()
-                    && (self
-                        .global_patient_name(&row.patient_id)
-                        .as_str()
-                        .to_lowercase()
-                        .contains(&query)
+                    && (crate::patient_text::search_name(
+                        &self.global_patient_name(&row.patient_id),
+                    )
+                    .contains(&query)
                         || row.title.to_lowercase().contains(&query)
                         || !row.locked_fields.iter().any(|field| field == "notes")
                             && row

@@ -1679,7 +1679,7 @@ impl RuntimeSession {
         for value in [
             draft.first_name.as_str(),
             draft.last_name.as_str(),
-            draft.tax_code.as_str(),
+            draft.tax_code.raw_for_editor(),
         ] {
             validate_patient_name(value)?;
         }

@@ -81,8 +81,15 @@ impl PatientSummary {
     }
     pub fn matches_query(&self, query: &str) -> bool {
         let query = query.trim().to_lowercase();
-        self.display_name().as_str().to_lowercase().contains(&query)
-            || self.tax_code.to_lowercase().contains(&query)
+        self.display_name()
+            .raw_for_search()
+            .to_lowercase()
+            .contains(&query)
+            || self
+                .tax_code
+                .raw_for_search()
+                .to_lowercase()
+                .contains(&query)
     }
 }
 
@@ -447,8 +454,8 @@ mod patient_name_tests {
         });
         let summary: PatientSummary = serde_json::from_value(value.clone()).unwrap();
         let detail: PatientDetail = serde_json::from_value(value).unwrap();
-        assert_eq!(summary.display_name().as_str(), "Conti Luca");
-        assert_eq!(detail.display_name().as_str(), "Conti Luca");
+        assert_eq!(summary.display_name().raw_for_search(), "Conti Luca");
+        assert_eq!(detail.display_name().raw_for_search(), "Conti Luca");
         assert!(summary.matches_query("conti luca"));
     }
 }

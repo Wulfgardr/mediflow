@@ -57,7 +57,7 @@ test('a deleted file still listed by git is not read as a test', () => {
 const sourceRoot = fileURLToPath(new URL('..', import.meta.url));
 const pilot = 'experiments/gpui-patient-pilot';
 const pilotWorkflow = '.github/workflows/rust-gpui-pilot.yml';
-const pilotFiles = ['client/tests/flow.rs', 'client/tests/patient_names.rs', 'app/src/demo_app_tests.rs', 'app/src/chat_access/owner.rs', 'app/src/clinical_text.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/native_lock.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/platform_integration.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/shell/account_profile.rs', 'app/src/shell/agenda_flow.rs', 'app/src/shell/ambulatories.rs', 'app/src/shell/ai_preferences.rs', 'app/src/shell/ai_status.rs', 'app/src/shell/analytics.rs', 'app/src/shell/chat_access.rs', 'app/src/shell/document_details.rs', 'app/src/shell/local_preferences.rs', 'app/src/shell/local_settings.rs', 'app/src/shell/notes_recovery_tests.rs', 'app/src/shell/rendered_command.rs', 'app/src/shell/scales.rs', 'app/src/shell/therapy_picker.rs', 'app/src/shell/view_state.rs', 'app/src/shell/who_lookup.rs', 'app/src/text_input.rs', 'app/src/theme.rs', 'app/src/title.rs',
+const pilotFiles = ['client/tests/flow.rs', 'client/tests/patient_names.rs', 'app/src/demo_app_tests.rs', 'app/src/chat_access/owner.rs', 'app/src/clinical_text.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/native_lock.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/patient_text.rs', 'app/src/platform_integration.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/shell/account_profile.rs', 'app/src/shell/agenda_flow.rs', 'app/src/shell/ambulatories.rs', 'app/src/shell/ai_preferences.rs', 'app/src/shell/ai_status.rs', 'app/src/shell/analytics.rs', 'app/src/shell/chat_access.rs', 'app/src/shell/document_details.rs', 'app/src/shell/local_preferences.rs', 'app/src/shell/local_settings.rs', 'app/src/shell/notes_recovery_tests.rs', 'app/src/shell/rendered_command.rs', 'app/src/shell/scales.rs', 'app/src/shell/therapy_picker.rs', 'app/src/shell/view_state.rs', 'app/src/shell/who_lookup.rs', 'app/src/text_input.rs', 'app/src/theme.rs', 'app/src/title.rs',
   'transport/src/dto.rs', 'transport/src/account_profile.rs', 'transport/src/ambulatories.rs', 'transport/src/ambulatory_command_recovery.rs', 'transport/src/ambulatory_command_transport.rs', 'transport/src/ambulatory_commands.rs', 'transport/src/ai_preferences.rs', 'transport/src/analytics.rs', 'transport/src/catalogs.rs', 'transport/src/context.rs', 'transport/src/crypto.rs', 'transport/src/http.rs', 'transport/src/ports.rs', 'transport/src/profile_query.rs', 'transport/src/scales.rs', 'transport/src/session.rs', 'transport/src/who.rs', 'transport/src/bin/mediflow-runtime-probe.rs'].map(file => `${pilot}/${file}`);
 const pilotTestCall = `cargo test --manifest-path ${pilot}/Cargo.toml --workspace --all-targets --locked`;
 function pilotFixture(t) {
@@ -71,7 +71,7 @@ function pilotFixture(t) {
     write(file, readFileSync(path.join(sourceRoot, file)));
   }
   for (const file of [...pilotFiles, `${pilot}/app/src/shell/threshold_actions.rs`, `${pilot}/app/src/shell/ambulatory_commands.rs`, `${pilot}/client/src/lib.rs`, `${pilot}/transport/src/bin/mediflow-runtime-probe.rs`, `${pilot}/Cargo.lock`, `${pilot}/state/src/lib.rs`]) write(file, 'must not execute');
-  write(`${pilot}/app/src/main.rs`, '// synthetic binding fixture\nmod appointments;\n#[cfg(unix)]\nmod chat_access;\nmod clinical_text;\nmod components;\nmod demo;\nmod demo_app;\nmod documents;\nmod editing;\nmod icons;\nmod native_lock;\nmod navigation;\nmod patient_forms;\nmod platform_integration;\nmod references;\nmod shell;\nmod text_input;\nmod theme;\nmod title;\nfn main() {}');
+  write(`${pilot}/app/src/main.rs`, '// synthetic binding fixture\nmod appointments;\n#[cfg(unix)]\nmod chat_access;\nmod clinical_text;\nmod components;\nmod demo;\nmod demo_app;\nmod documents;\nmod editing;\nmod icons;\nmod native_lock;\nmod navigation;\nmod patient_forms;\nmod patient_text;\nmod platform_integration;\nmod references;\nmod shell;\nmod text_input;\nmod theme;\nmod title;\nfn main() {}');
   write(`${pilot}/app/src/shell.rs`, '//! Synthetic shell binding fixture\nmod account_profile;\nmod agenda_flow;\nmod ai_preferences;\nmod ai_status;\nmod ambulatories;\nmod ambulatory_commands;\nmod analytics;\n#[cfg(unix)]\nmod chat_access;\nmod document_details;\npub(crate) mod local_preferences;\nmod local_settings;\n#[cfg(test)]\nmod notes_recovery_tests;\n#[cfg(test)]\npub(crate) mod rendered_command;\nmod scales;\nmod therapy_picker;\nmod threshold_actions;\nmod view_state;\nmod who_lookup;');
   write(`${pilot}/transport/src/lib.rs`, '//! Synthetic library binding fixture\n#![forbid(unsafe_code)]\nmod account_profile;\nmod ai_preferences;\nmod ambulatories;\nmod ambulatory_command_recovery;\nmod ambulatory_command_transport;\nmod ambulatory_commands;\nmod analytics;\nmod catalogs;\nmod context;\nmod crypto;\nmod dto;\nmod error;\nmod http;\nmod ports;\nmod profile_query;\nmod scales;\nmod session;\nmod tls;\nmod who;');
   for (const file of ['run.mjs', 'prepare-runtime.mjs', 'js-client.mjs', 'compare.mjs', 'verify-vectors.mjs']) {
@@ -293,7 +293,16 @@ function gpuiTitleCallerInventory(sources) {
   const ordinary = new Set(['Prose', 'Brand', 'Body', 'Strong', 'Meta', 'Code']);
   for (const [file, source] of sources) {
     const { tokens: t, pairs } = rustTokens(source), v = i => t[i]?.value;
+    const rendering = /^(?:shell(?:\/|\.rs)|components\.rs|demo_app\.rs|title\.rs)$/u.test(file) || file.startsWith('shell/') || t.some(token => ['TitleText', 'title_element'].includes(token.value)) || t.some((token, i) => token.value === 'title' && v(i - 1) === '::' && v(i - 2) === 'crate');
     for (let i = 0; i < t.length; i++) {
+      if (rendering && file !== 'title.rs' && v(i) === 'into_title_segment') errors.push(`${file}: protected segment conversion belongs in the title renderer`);
+      if (rendering && /^raw_for_/u.test(v(i) ?? '')) errors.push(`${file}: raw extraction in rendering module`);
+      const titleCall = (['title', 'title_element'].includes(v(i)) && v(i + 1) === '(' && v(i - 1) !== 'fn') || (v(i) === 'TitleText' && v(i + 1) === '::' && v(i + 3) === '(');
+      if (titleCall) {
+        const start = v(i) === 'TitleText' ? i + 3 : i + 1;
+        const end = pairs.get(start);
+        for (let j = start + 1; j < end; j++) if (v(j) === 'format' && v(j + 1) === '!') errors.push(`${file}: format! in title arguments`);
+      }
       if (v(i) === '.' && v(i + 1) === 'type_role' && v(i + 2) === '(') {
         const end = pairs.get(i + 2);
         let comma = i + 3;
@@ -330,4 +339,17 @@ test('GPUI title roles and patient names are protected by types and a fail-close
   }
   for (const getter of ['patient.display_name()', 'self.global_patient_name(id)']) assert.ok(gpuiTitleCallerInventory(new Map([['fixture.rs', `TitleText::from(${getter})`]])).errors.length);
   assert.deepEqual(gpuiTitleCallerInventory(new Map([['fixture.rs', 'div().type_role(theme, TextRole::Body)']])).errors, []);
+});
+
+test('GPUI rendering rejects raw protected text and formatted title arguments', () => {
+  for (const file of ['shell.rs', 'shell/scales.rs', 'components.rs', 'demo_app.rs', 'title.rs', 'new_view.rs']) {
+    for (const method of ['raw_for_search', 'raw_for_clipboard', 'raw_for_editor']) {
+      const source = `use TitleText; fn view() { let raw = name.${method}(); TitleText::from(raw) }`;
+      assert.ok(gpuiTitleCallerInventory(new Map([[file, source]])).errors.length);
+    }
+    for (const expr of ['title(format!("{}", value), theme)', 'title({ let raw = format!("{}", value); raw }, theme)', 'TitleText::from(format!("{}", value))', 'TitleText::name(format!("{}", value))', 'title_element(role, format!("{}", value))']) assert.ok(gpuiTitleCallerInventory(new Map([[file, expr]])).errors.length, expr);
+  }
+  assert.ok(gpuiTitleCallerInventory(new Map([['shell.rs', 'name.into_title_segment()']])).errors.length);
+  assert.ok(gpuiTitleCallerInventory(new Map([['future.rs', 'use crate::title::title; let getter = PersonName::raw_for_editor;']])).errors.length);
+  assert.deepEqual(gpuiTitleCallerInventory(new Map([['patient_text.rs', 'name.raw_for_search()']])).errors, []);
 });
