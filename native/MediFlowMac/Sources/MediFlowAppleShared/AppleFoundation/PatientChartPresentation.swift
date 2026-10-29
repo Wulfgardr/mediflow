@@ -56,6 +56,30 @@ enum PatientChartSummaryCategory: String, CaseIterable, Identifiable {
     }
 }
 
+struct PatientChartSummaryReturn: Hashable {
+    let patientID: String
+    let category: PatientChartSummaryCategory
+}
+
+struct PatientChartReturnState {
+    private var pending: [String: PatientChartSummaryCategory] = [:]
+    private var positions: [String: CGPoint] = [:]
+
+    mutating func record(_ position: CGPoint, patientID: String) {
+        positions[patientID] = position
+    }
+
+    func position(patientID: String) -> CGPoint? { positions[patientID] }
+
+    mutating func leave(patientID: String, category: PatientChartSummaryCategory) {
+        pending[patientID] = category
+    }
+
+    mutating func returnToChart(patientID: String) -> PatientChartSummaryReturn? {
+        pending.removeValue(forKey: patientID).map { PatientChartSummaryReturn(patientID: patientID, category: $0) }
+    }
+}
+
 #if os(iOS)
 struct PatientChartGroup<Content: View>: View {
     let title: String
