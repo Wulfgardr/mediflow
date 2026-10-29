@@ -373,7 +373,7 @@ function IncaricoArea({
                 ) : null}
               </div>
             ) : visible.length === 0 ? (
-              <p className={styles.emptyState}>
+              <p className={styles.emptyState} role="status">
                 {normalizedQuery
                   ? `Nessun risultato per “${query.trim()}”. Modifica la ricerca o cambia ambito.`
                   : 'Nessun paziente nell’ambito selezionato.'}
@@ -443,7 +443,7 @@ function IncaricoArea({
           </div>
         </section>
 
-        {patientStatus === 'ready' ? selected ? (
+        {patientStatus === 'ready' && selected ? (
           <aside
             className={patientStyles.caseLens}
             key={selected.id}
@@ -530,15 +530,6 @@ function IncaricoArea({
                 ) : null}
               </div>
             </div>
-          </aside>
-        ) : (
-          <aside className={patientStyles.caseLens} aria-label="Lente paziente" data-testid="lume-patient-lens">
-
-            <p className={patientStyles.caseLensEmpty} data-testid="lume-patient-lens-empty">
-              {normalizedQuery
-                ? 'Nessun paziente corrisponde alla ricerca corrente.'
-                : 'Nessun paziente selezionabile in questa vista.'}
-            </p>
           </aside>
         ) : null}
       </div>
