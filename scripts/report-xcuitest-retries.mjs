@@ -17,7 +17,9 @@ function descendants(node, type) {
 }
 
 function errors(node) {
-  return descendants(node, 'Failure Message').map(message => message.name);
+  const messages = descendants(node, 'Failure Message').map(message => message.name);
+  if (node.result === 'Skipped' && messages.every(message => message.startsWith('Test skipped - '))) return [];
+  return messages;
 }
 
 function infrastructure(message) {
