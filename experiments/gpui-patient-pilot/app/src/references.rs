@@ -1,7 +1,7 @@
 //! Read-only catalog views. Names, codes and provenance come from the linked
 //! archive; selecting or copying a result never prescribes or changes a record.
 
-use crate::theme::{TypeRole, TypeStyle};
+use crate::theme::TypeStyle;
 use gpui::{ClipboardItem, Div, SharedString, Stateful, div, prelude::*, px, text};
 use mediflow_runtime_client::{
     DrugCatalogItem, ExemptionCatalogItem, TerminologyItem, TerminologySystem,
@@ -117,12 +117,16 @@ impl ReferenceRows {
                 let copied = exemption_text(row);
                 result_row(format!("reference-exemption-{}", row.code), theme)
                     .child(code_line("Esenzione", &row.code, theme))
-                    .child(div().type_role(theme, TypeRole::Strong).child({
-                        let text = text!(row.description.clone());
-                        #[cfg(test)]
-                        let text = crate::shell::rendered_command::observe_text(text);
-                        text
-                    }))
+                    .child(
+                        div()
+                            .type_role(theme, crate::theme::TextRole::Strong)
+                            .child({
+                                let text = text!(row.description.clone());
+                                #[cfg(test)]
+                                let text = crate::shell::rendered_command::observe_text(text);
+                                text
+                            }),
+                    )
                     .children([
                         optional_line("Tipo", row.kind.as_deref(), theme),
                         optional_line("Fonte", row.source.as_deref(), theme),
@@ -175,12 +179,17 @@ impl ReferenceRows {
                     theme,
                 )
                 .child(code_line(row.system.as_str(), &row.code, theme))
-                .child(div().type_role(theme, TypeRole::Strong).child({
-                    let text = text!(row.display_it.as_ref().unwrap_or(&row.display).clone());
-                    #[cfg(test)]
-                    let text = crate::shell::rendered_command::observe_text(text);
-                    text
-                }))
+                .child(
+                    div()
+                        .type_role(theme, crate::theme::TextRole::Strong)
+                        .child({
+                            let text =
+                                text!(row.display_it.as_ref().unwrap_or(&row.display).clone());
+                            #[cfg(test)]
+                            let text = crate::shell::rendered_command::observe_text(text);
+                            text
+                        }),
+                )
                 .when(
                     row.display_it
                         .as_ref()
@@ -251,12 +260,16 @@ pub fn drug_identity(
         .flex_col()
         .gap(px(8.))
         .when_some(aic, |el, code| el.child(code_line("AIC", code, theme)))
-        .child(div().type_role(theme, TypeRole::Strong).child({
-            let text = text!(name.to_owned());
-            #[cfg(test)]
-            let text = crate::shell::rendered_command::observe_text(text);
-            text
-        }))
+        .child(
+            div()
+                .type_role(theme, crate::theme::TextRole::Strong)
+                .child({
+                    let text = text!(name.to_owned());
+                    #[cfg(test)]
+                    let text = crate::shell::rendered_command::observe_text(text);
+                    text
+                }),
+        )
         .child(optional_line("Principio attivo", active_principle, theme))
         .when_some(atc, |el, code| el.child(code_line("ATC", code, theme)))
 }
@@ -282,7 +295,7 @@ fn code_line(label: &str, code: &str, theme: Theme) -> Stateful<Div> {
         .flex_wrap()
         .when(theme.scale >= 2.5, |el| el.flex_col().items_stretch())
         .gap(px(8.))
-        .type_role(theme, TypeRole::Meta)
+        .type_role(theme, crate::theme::TextRole::Meta)
         .child(
             div()
                 .min_w_0()
@@ -301,7 +314,7 @@ fn code_line(label: &str, code: &str, theme: Theme) -> Stateful<Div> {
                 .min_w_0()
                 .max_w_full()
                 .whitespace_normal()
-                .type_role(theme, TypeRole::Code)
+                .type_role(theme, crate::theme::TextRole::Code)
                 .child({
                     let text = text!(code.to_owned());
                     #[cfg(test)]

@@ -7,7 +7,7 @@ fn patient_names_follow_surname_then_given_name_without_changing_identity() {
         "taxCode":"SYNTHETIC", "notes":null, "version":1, "isArchived":false
     }))
     .unwrap();
-    assert_eq!(patient.display_name(), "Conti Luca");
+    assert_eq!(patient.display_name().raw_for_search(), "Conti Luca");
     assert!(patient.matches_query("conti luca"));
     assert_eq!(patient.first_name, "Luca");
     assert_eq!(patient.last_name, "Conti");

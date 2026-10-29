@@ -24,3 +24,14 @@ This experiment does not relicense them or replace the web font.
 app/src/icons.rs embeds paths from Lucide 0.562.0, matching the web client's
 icon family. The complete Lucide ISC and original Feather MIT notices are
 included in that source file. These paths retain those licenses.
+
+app/assets/hyphenation/it.standard.bincode is the Italian dictionary from
+hyphenation 0.8.4, built from hyph-utf8 Italian patterns by Claudio Beccari
+(Copyright 2008-2011). The MIT permission notice and source provenance are
+preserved in app/assets/hyphenation/LICENSE-Italian.txt. The dictionary is embedded
+locally; no runtime download or system dictionary is required.
+
+The hyphenation 0.8.4 crate is available under Apache-2.0 or MIT. This pilot
+uses the MIT option; its copyright and permission notice are preserved in
+app/assets/hyphenation/LICENSE-hyphenation-MIT.txt. Italian pattern provenance,
+checksums and dictionary regeneration are documented in that directory's README.

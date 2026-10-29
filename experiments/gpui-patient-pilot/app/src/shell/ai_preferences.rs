@@ -2,7 +2,7 @@
 //! execute models; only an explicitly confirmed host preview can be submitted.
 
 use super::*;
-use crate::theme::{TypeRole, TypeStyle};
+use crate::theme::TypeStyle;
 use mediflow_runtime_client::{
     AiBindingState, AiDefaultSource, AiFunctionId, AiFunctionPreference, AiFunctionPreferences,
     AiModelState, AiPreferenceChange, AiPreferencePreset, AiPreferencesCommand,
@@ -348,7 +348,7 @@ impl ClinicalApp {
         let idle = state.working.is_none();
         let mut view = div().w_full().min_w_0().max_w(px(760.)).flex().flex_col().gap(px(20.))
             .child(heading("clinical-workspace-ai-preferences-heading", "Preferenze funzioni AI", theme))
-            .child(div().type_role(theme, TypeRole::Strong)
+            .child(div().type_role(theme, crate::theme::TextRole::Strong)
                 .child(text!("Le preferenze valgono per tutti gli operatori dell’host.")))
             .child(notice("clinical-workspace-ai-preferences-scope", "Questa pagina configura le quattro funzioni. La disponibilità indicata nel catalogo non verifica che il modello possa eseguire un’analisi.", theme, false))
             .child(div().flex().flex_wrap().gap(px(8.))
@@ -503,7 +503,7 @@ impl ClinicalApp {
             ));
         match draft {
             AiPreferenceChange::Preset { preset_id } => {
-                view = view.child(div().type_role(theme, TypeRole::Strong).child(text!(match preset_id {
+                view = view.child(div().type_role(theme, crate::theme::TextRole::Strong).child(text!(match preset_id {
                     AiPreferencePreset::HostDefaults => "Ripristina i modelli configurati sull’host, mantenendo gli interruttori attuali.",
                     AiPreferencePreset::AllOff => "Disattiva tutte le quattro funzioni AI dell’host.",
                 })));
@@ -516,7 +516,7 @@ impl ClinicalApp {
                 view = view
                     .child(
                         div()
-                            .type_role(theme, TypeRole::Strong)
+                            .type_role(theme, crate::theme::TextRole::Strong)
                             .child(text!(function_title(*function_id))),
                     )
                     .child(
@@ -559,7 +559,7 @@ impl ClinicalApp {
                         ))))
                         .child(
                             div()
-                                .type_role(theme, TypeRole::Strong)
+                                .type_role(theme, crate::theme::TextRole::Strong)
                                 .child(text!("Modello preferito")),
                         );
                     let options = std::iter::once((
@@ -713,7 +713,7 @@ fn function_summary(row: &AiFunctionPreference, kind: &str, theme: Theme) -> Sta
         .gap(px(8.))
         .child(
             div()
-                .type_role(theme, TypeRole::Strong)
+                .type_role(theme, crate::theme::TextRole::Strong)
                 .child(text!(function_title(row.id))),
         )
         .child(text!(format!(

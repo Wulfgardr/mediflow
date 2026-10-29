@@ -4,7 +4,7 @@
 
 use crate::components::{WritingInk, WritingStyle, WritingSurface};
 use crate::theme::Theme;
-use crate::theme::{TypeRole, TypeStyle};
+use crate::theme::TypeStyle;
 use gpui::{
     AnyElement, FontStyle, FontWeight, HighlightStyle, Role, SharedString, StrikethroughStyle,
     StyledText, UnderlineStyle, div, prelude::*, px, text,
@@ -588,7 +588,7 @@ pub fn render(source: &str, ink: WritingInk, theme: Theme) -> AnyElement {
     content_theme.ink = ink.color(WritingSurface::Plane, theme);
     div().min_w_0().flex().flex_col().gap(px(10. * theme.scale))
         .when(document.unsupported, |element| element.child(
-            div().text_color(theme.secondary).type_role(theme, TypeRole::Meta)
+            div().text_color(theme.secondary).type_role(theme, crate::theme::TextRole::Meta)
                 .child(text!("Formattazione non supportata: è mostrato il testo originale. Apri l'editor corrente per verificarla.")),
         ))
         .children(document.blocks.into_iter().enumerate().map(|(index, block)| {
@@ -623,9 +623,9 @@ fn block_text(
         .type_role(
             theme,
             if heading {
-                TypeRole::Strong
+                crate::theme::TextRole::Strong
             } else {
-                TypeRole::Prose
+                crate::theme::TextRole::Prose
             },
         )
         .writing_ink(ink, WritingSurface::Plane, theme)

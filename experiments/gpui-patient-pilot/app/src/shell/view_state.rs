@@ -1,5 +1,5 @@
 use super::*;
-use crate::theme::{TypeRole, TypeStyle};
+use crate::theme::TypeStyle;
 use gpui::Focusable;
 use std::time::Instant;
 
@@ -299,14 +299,14 @@ impl ViewState {
             .min_w_0()
             .max_w_full()
             .whitespace_normal()
-            .type_role(theme, TypeRole::Body)
+            .type_role(theme, crate::theme::TextRole::Body)
             .flex()
             .flex_col()
             .items_start()
             .gap(px(8.))
             .child(
                 div()
-                    .type_role(theme, TypeRole::Strong)
+                    .type_role(theme, crate::theme::TextRole::Strong)
                     .text_color(self.tone().color(theme))
                     .child(text!(first)),
             )

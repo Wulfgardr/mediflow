@@ -187,13 +187,18 @@ pub fn confirmation_command_label(patient: &str) -> String {
 
 pub const CONFIRMATION_COMMANDS: [&str; 2] = ["Torna alla bozza", "Conferma e registra"];
 
+#[cfg(test)]
 pub fn confirmation_question(count: usize, single_kind: &str, patient: &str) -> String {
+    format!("{}{patient}?", confirmation_prefix(count, single_kind))
+}
+
+pub fn confirmation_prefix(count: usize, single_kind: &str) -> String {
     let items = if count == 1 {
         format!("1 {single_kind}")
     } else {
         format!("{count} elementi")
     };
-    format!("Registrare {items} nella scheda di {patient}?")
+    format!("Registrare {items} nella scheda di ")
 }
 
 /// Move through the visible worklist without wrapping or using a hidden row.

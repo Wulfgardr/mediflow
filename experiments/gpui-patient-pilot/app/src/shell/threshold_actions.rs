@@ -193,16 +193,22 @@ impl ClinicalApp {
                                 .debug_selector(|| "threshold-recovery-status".into())
                                 .flex_shrink_0()
                                 .role(Role::Status)
-                                .type_role(theme, TypeRole::Section)
                                 .child(
                                     div()
                                         .debug_selector(|| "threshold-recovery-title".into())
-                                        .child(text!(title)),
+                                        .child(
+                                            crate::title::title(title, theme)
+                                                .with_role(crate::theme::TitleRole::Section),
+                                        ),
                                 )
                                 .child(
                                     div()
                                         .debug_selector(|| "threshold-recovery-state".into())
-                                        .child(text!(state)),
+                                        .child(
+                                            crate::title::title(state, theme)
+                                                .with_role(crate::theme::TitleRole::Section)
+                                                .with_role(crate::theme::TitleRole::Section),
+                                        ),
                                 ),
                         )
                         .child(
@@ -211,15 +217,15 @@ impl ClinicalApp {
                                 .relative()
                                 .min_w_0()
                                 .child({
-                                    let command = button(
+                                    let command = crate::components::title_button_with_role(
                                         "threshold-other-actions",
-                                        "Altre azioni",
+                                        crate::title::TitleText::from("Altre azioni"),
                                         theme,
                                         false,
                                         true,
+                                        Some(crate::theme::TitleRole::Section),
                                     )
                                     .debug_selector(|| "threshold-other-actions".into())
-                                    .type_role(theme, TypeRole::Section)
                                     .track_focus(&self.threshold_menu_focus)
                                     .aria_expanded(self.threshold_menu_open.get())
                                     .on_click(cx.listener(|this, _, window, cx| {

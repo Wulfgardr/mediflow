@@ -4,7 +4,7 @@
 
 use super::*;
 use crate::shell::view_state::ViewStateKind;
-use crate::theme::{TypeRole, TypeStyle};
+use crate::theme::TypeStyle;
 use mediflow_runtime_client::{
     AccountProfileRead, AccountProfileSnapshot, AccountProfileUpdate, AccountProfileUpdateOutcome,
 };
@@ -448,7 +448,7 @@ impl ClinicalApp {
             ))
             .child(
                 div()
-                    .type_role(theme, TypeRole::Body)
+                    .type_role(theme, crate::theme::TextRole::Body)
                     .text_color(theme.secondary)
                     .child(text!(
                         "Mostrati in intestazione, ricette e referti generati."
@@ -474,7 +474,11 @@ impl ClinicalApp {
                     .flex()
                     .flex_col()
                     .gap(px(8.))
-                    .child(div().type_role(theme, TypeRole::Body).child(text!(label)))
+                    .child(
+                        div()
+                            .type_role(theme, crate::theme::TextRole::Body)
+                            .child(text!(label)),
+                    )
                     .child(editor.clone()),
             );
         }
@@ -491,7 +495,7 @@ impl ClinicalApp {
             view = view.child(
                 div()
                     .id("clinical-workspace-profile-values")
-                    .type_role(theme, TypeRole::Meta)
+                    .type_role(theme, crate::theme::TextRole::Meta)
                     .text_color(theme.secondary)
                     .child(text!(format!(
                         "Valori salvati: {} · {}",

@@ -2,7 +2,7 @@
 //! belongs to one query generation, area, scope and connection; it never writes.
 
 use super::*;
-use crate::theme::{TypeRole, TypeStyle};
+use crate::theme::TypeStyle;
 use mediflow_runtime_client::{
     WHO_ATTRIBUTION, WhoReadiness, WhoReadinessStatus, WhoSearchResponse, WhoSource,
     normalize_who_query,
@@ -227,7 +227,7 @@ impl ClinicalApp {
             query: self.who.query.clone(),
         };
         let mut pane = div().min_w_0().max_w_full().flex().flex_col().gap(px(16.))
-            .child(heading("clinical-workspace-who-heading", "ICD-11 WHO", theme))
+            .child(heading("clinical-workspace-who-heading", crate::title::TitleText::code("ICD-11 WHO"), theme))
             .child(who_text("clinical-who-introduction", "Repertorio in inglese · release 2026-01. Questo percorso consulta il servizio WHO locale sul computer che ospita l’archivio.", theme))
             .child(self.who.read.attach_enabled(button("clinical-workspace-who-readiness", "Leggi stato del servizio", theme, false, can_read), can_read)
                 .when(can_read, |el| el.on_click(cx.listener(|this, _, _, cx| this.request_who(false, cx)))))
@@ -315,7 +315,7 @@ impl ClinicalApp {
                         div().id(SharedString::from(format!("clinical-workspace-who-result-{}", entry.code)))
                             .min_w_0().max_w_full().border_b_1().border_color(theme.rule).py(px(12.)).flex().flex_col().gap(px(8.))
                             .child(who_text("clinical-who-result-code", format!("ICD-11 · {}", entry.code), theme))
-                            .child(div().type_role(theme, TypeRole::Strong).child(text!(entry.description.clone())))
+                            .child(div().type_role(theme, crate::theme::TextRole::Strong).child(text!(entry.description.clone())))
                             .child(self.who.results[index].attach_enabled(button(format!("clinical-workspace-who-copy-{index}"), format!("Copia riferimento {}", entry.code), theme, false, true), true)
                                 .on_click(cx.listener(move |this, _, _, cx| this.copy_who_reference(token.clone(), index, cx))))
                     }));

@@ -129,15 +129,8 @@ fn hcg1_demo_geometry_keeps_list_filters_and_confirmation_reachable(cx: &mut gpu
             });
             draw(cx);
             let question = bounds(cx, "threshold-question");
-            let ending = bounds(cx, "threshold-question-ending");
-            let last_word = bounds(cx, "threshold-question-last-word");
-            assert_eq!(last_word.bottom(), question.bottom());
-            assert_eq!(ending.bottom(), last_word.bottom());
-            assert!(
-                last_word.size.width > ending.size.width,
-                "punctuation stays with the recipient"
-            );
             let bar = bounds(cx, "clinical-workspace-save-status");
+            contains(bar, question, "confirmation question");
             let content = bounds(cx, "clinical-workspace-profile-scroll");
             contains(viewport, bar, "confirmation");
             contains(
@@ -774,4 +767,64 @@ fn hcg3_demo_initial_preferences_error_is_visible_and_preserves_the_file(
         assert_eq!(app.dark_override, None);
     });
     assert_eq!(std::fs::read(path).unwrap(), b"{broken");
+}
+
+#[gpui::test]
+fn hcg4_review_real_demo_callers_keep_accessible_titles(cx: &mut gpui::TestAppContext) {
+    let (view, cx) = cx.add_window_view(PatientApp::new);
+    cx.simulate_resize(size(px(1200.), px(1400.)));
+    for phase in 0..5 {
+        view.update(cx, |app, cx| {
+            match phase {
+                0 => {
+                    app.show_list = true;
+                }
+                1 => {
+                    app.select_patient("prova-001", cx);
+                    app.workspace
+                        .edit_notes("Nota sintetica diversa".into())
+                        .unwrap();
+                    app.workspace.review().unwrap();
+                }
+                2 => {
+                    app.workspace = Workspace::default();
+                }
+                3 => {
+                    let request = app.workspace.select("prova-001").unwrap();
+                    app.workspace.receive_read(
+                        &request,
+                        Err(mediflow_patient_client::ReadFailure::Unavailable),
+                    );
+                }
+                _ => app.workspace.lock(),
+            }
+            cx.notify();
+        });
+        crate::title::take_title_nodes();
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        let nodes = crate::title::take_title_nodes();
+        let expected = match phase {
+            0 => "Pazienti",
+            1 => "Registrare le note nella scheda di Moretti Elena?",
+            2 => "Seleziona una scheda di prova",
+            3 => "La scheda non è disponibile",
+            _ => "Dati di prova nascosti",
+        };
+        assert!(
+            nodes
+                .iter()
+                .any(|(_, node, _, _)| node.value() == Some(expected)),
+            "demo caller {phase}: {expected}"
+        );
+        if phase == 1 {
+            assert!(
+                nodes
+                    .iter()
+                    .any(|(_, node, _, _)| node.value() == Some("Moretti Elena"))
+            );
+        }
+    }
 }

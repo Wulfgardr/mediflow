@@ -202,9 +202,51 @@ impl Typography {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum TextRole {
+    Prose,
+    Brand,
+    Body,
+    Strong,
+    Meta,
+    Code,
+}
+impl From<TextRole> for TypeRole {
+    fn from(role: TextRole) -> Self {
+        match role {
+            TextRole::Prose => Self::Prose,
+            TextRole::Brand => Self::Brand,
+            TextRole::Body => Self::Body,
+            TextRole::Strong => Self::Strong,
+            TextRole::Meta => Self::Meta,
+            TextRole::Code => Self::Code,
+        }
+    }
+}
+#[derive(Clone, Copy, Debug)]
+pub enum TitleRole {
+    Question,
+    Person { compact: bool },
+    PageTitle,
+    PersonPreview,
+    Section,
+    Threshold,
+}
+impl From<TitleRole> for TypeRole {
+    fn from(role: TitleRole) -> Self {
+        match role {
+            TitleRole::Question => Self::Strong,
+            TitleRole::Person { compact } => Self::Person { compact },
+            TitleRole::PageTitle => Self::PageTitle,
+            TitleRole::PersonPreview => Self::PersonPreview,
+            TitleRole::Section => Self::Section,
+            TitleRole::Threshold => Self::Threshold,
+        }
+    }
+}
 pub trait TypeStyle: Styled + Sized {
-    fn type_role(self, theme: Theme, role: TypeRole) -> Self {
-        let typography = theme.role(role);
+    fn type_role(self, theme: Theme, role: TextRole) -> Self {
+        let typography = theme.role(role.into());
         self.font_family(typography.family)
             .text_size(px(typography.size))
             .font_weight(typography.weight)
