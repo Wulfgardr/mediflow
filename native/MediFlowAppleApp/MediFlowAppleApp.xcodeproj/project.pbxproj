@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AB7040000000000000000001 /* UIReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB7040000000000000000002 /* UIReadiness.swift */; };
 		033BF77802FE8AAAEA132414 /* MediFlowAppleShared in Frameworks */ = {isa = PBXBuildFile; productRef = 72EEC18E3E55264AEE14AA58 /* MediFlowAppleShared */; };
 		106073ECD36704940DA42B6D /* MobileVisitProductUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 282D49CA4FB326E39DB5CC71 /* MobileVisitProductUITests.swift */; };
 		18CDE82377A243F4B41B0C9B /* MediFlowMacShellApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4691B9860CA77FA5871DC2A8 /* MediFlowMacShellApp.swift */; };
@@ -29,6 +30,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		AB7040000000000000000002 /* UIReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIReadiness.swift; sourceTree = "<group>"; };
 		121D53CD238781DE1F4D7312 /* MediFlowMobileShellApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediFlowMobileShellApp.swift; sourceTree = "<group>"; };
 		22294E85FD406F50AFBC48A9 /* MediFlowMobileAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediFlowMobileAppUITests.swift; sourceTree = "<group>"; };
 		282D49CA4FB326E39DB5CC71 /* MobileVisitProductUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileVisitProductUITests.swift; sourceTree = "<group>"; };
@@ -111,6 +113,7 @@
 			isa = PBXGroup;
 			children = (
 				22294E85FD406F50AFBC48A9 /* MediFlowMobileAppUITests.swift */,
+				AB7040000000000000000002 /* UIReadiness.swift */,
 				CC5F0A7BD278D6125B67FD3A /* MobilePairedStatusOverrideUITests.swift */,
 				282D49CA4FB326E39DB5CC71 /* MobileVisitProductUITests.swift */,
 			);
@@ -261,6 +264,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				45E4F741A3B8FBFFA75DD465 /* MediFlowMobileAppUITests.swift in Sources */,
+				AB7040000000000000000001 /* UIReadiness.swift in Sources */,
 				1D1D34F7A87FD455B29493B7 /* MobilePairedStatusOverrideUITests.swift in Sources */,
 				106073ECD36704940DA42B6D /* MobileVisitProductUITests.swift in Sources */,
 			);
