@@ -428,7 +428,13 @@ struct PairedPatientDetailSection: View {
         Button {
             model.startEditingPatient()
         } label: {
+            Group {
+            #if os(iOS)
+            Text("Modifica")
+            #else
             Label("Modifica", systemImage: "pencil")
+            #endif
+            }
                 #if os(iOS)
                 .font(.body)
                 .fixedSize(horizontal: true, vertical: false)
