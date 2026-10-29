@@ -118,7 +118,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
             XCTAssertFalse(app.staticTexts["patient-detail-name"].exists)
             openPatientSection(.overview)
             XCTAssertTrue(button.isHittable)
-            XCTAssertEqual(button.frame.minY, sourceY, accuracy: 4)
+            XCTAssertEqual(button.frame.minY, sourceY, accuracy: 1)
         }
         for destination in [PatientSection.diary, .documents, .therapies] {
             let anchor = app.buttons["patient-summary-scales"]
@@ -127,7 +127,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
             openPatientSection(destination)
             openPatientSection(.overview)
             XCTAssertTrue(anchor.isHittable)
-            XCTAssertEqual(anchor.frame.minY, sourceY, accuracy: 4)
+            XCTAssertEqual(anchor.frame.minY, sourceY, accuracy: 1)
         }
         if UIDevice.current.userInterfaceIdiom == .phone {
             let anchor = app.buttons["patient-summary-scales"]
@@ -138,10 +138,69 @@ final class MediFlowMobileAppUITests: XCTestCase {
             XCTAssertTrue(row.waitForExistence(timeout: 10))
             row.tap()
             XCTAssertTrue(anchor.waitForExistence(timeout: 10))
-            XCTAssertEqual(anchor.frame.minY, sourceY, accuracy: 4)
+            XCTAssertEqual(anchor.frame.minY, sourceY, accuracy: 1)
         }
         XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "Diagnosi")).count, 0)
         XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "Esenzioni")).count, 0)
+    }
+
+    func testPatientChartReturnKeepsDisclosuresAcrossReload() {
+        for expanded in [false, true] {
+            for reload in [false, true] {
+                app.launchEnvironment["MEDIFLOW_APPLE_DEMO"] = "1"
+                app.launchEnvironment["MEDIFLOW_APPLE_UITEST_CHART_RELOAD"] = "1"
+                launch()
+                let row = app.buttons["patient-cell-demo-0"]
+                XCTAssertTrue(row.waitForExistence(timeout: 15))
+                row.tap()
+                func position(_ element: XCUIElement) {
+                    XCTAssertTrue(element.waitForExistence(timeout: 5))
+                    var previousY: CGFloat?
+                    for _ in 0..<30 {
+                        if element.elementType == .staticText && element.isHittable { break }
+                        if element.elementType == .button && element.frame.minY > 190 && element.frame.minY < 400 { break }
+                        if let previousY, abs(previousY - element.frame.midY) < 1 && element.isHittable { break }
+                        previousY = element.frame.midY
+                        let delta = element.frame.midY - 333
+                        if abs(delta) < 40 { break }
+                        let start = app.coordinate(withNormalizedOffset: CGVector(
+                            dx: UIDevice.current.userInterfaceIdiom == .pad ? 0.75 : 0.5, dy: 0.65))
+                        let end = start.withOffset(CGVector(dx: 0, dy: -min(150, max(-150, delta))))
+                        start.press(forDuration: 0.1, thenDragTo: end,
+                                    withVelocity: XCUIGestureVelocity(rawValue: 100), thenHoldForDuration: 0.2)
+                    }
+                    XCTAssertTrue(element.isHittable)
+                }
+                if expanded {
+                    for label in ["Strumenti con IA", "Altre sezioni della cartella"] {
+                        let header = app.staticTexts[label].firstMatch
+                        position(header)
+                        header.tap()
+                    }
+                }
+                let anchor = app.buttons["patient-summary-scales"]
+                position(anchor)
+                let before = anchor.frame.minY
+                attachScreenshot(named: "anchor-before-expanded-\(expanded)-reload-\(reload)")
+                anchor.tap()
+                if reload {
+                    let refresh = app.buttons["layout-test-reload-chart"]
+                    XCTAssertTrue(refresh.waitForExistence(timeout: 5))
+                    refresh.tap()
+                }
+                openPatientSection(.overview)
+                XCTAssertTrue(anchor.isHittable)
+                XCTAssertEqual(anchor.frame.minY, before, accuracy: 1)
+                let venues = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Esegui la funzione"))
+                XCTAssertEqual(venues.count > 0, expanded)
+                XCTAssertEqual(app.buttons["patient-open-section-diary"].exists, expanded)
+                if reload {
+                    XCTAssertTrue(app.descendants(matching: .any).matching(
+                        NSPredicate(format: "label CONTAINS %@", "TEST-R1")).firstMatch.exists)
+                }
+                attachScreenshot(named: "anchor-return-expanded-\(expanded)-reload-\(reload)")
+            }
+        }
     }
 
     private var app: XCUIApplication!

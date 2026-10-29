@@ -1122,7 +1122,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             invalidateAttachmentPatientState()
         }
         #if DEBUG
-        if let detail = Self.uiTestSeededDetail(for: patient) {
+        var fixturePatient = patient
+        if AppleFoundationDemoMode.isDemoDataset, selectedPatientID == patient.id,
+           ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_CHART_RELOAD"] == "1" {
+            fixturePatient = HomeBasePatientSummary(
+                id: patient.id, firstName: patient.firstName, lastName: patient.lastName,
+                birthDate: patient.birthDate, taxCode: patient.taxCode, isAdi: patient.isAdi,
+                isArchived: patient.isArchived, version: patient.version + 1, updatedAt: patient.updatedAt,
+                diagnoses: #"[{"code":"TEST-R1","description":"Diagnosi inventata ricaricata: contenuto descrittivo più lungo, per verificare la posizione della riga dopo la nuova lettura della cartella."},{"code":"TEST-R2","description":"Seconda diagnosi inventata ricaricata con una descrizione che occupa più righe nel riepilogo clinico."},{"code":"TEST-R3","description":"Terza diagnosi inventata ricaricata: nessun dato clinico reale e nessuna scrittura sul database."}]"#)
+        }
+        if let detail = Self.uiTestSeededDetail(for: fixturePatient) {
             selectedPatientID = patient.id
             setSelectedPatient(detail)
             entries = Self.uiTestSeededEntries(patientId: patient.id)

@@ -5,13 +5,37 @@ import CryptoKit
 // G1 (ADR 0071 parity): the patient-list row now derives an age from the summary
 // birthDate. Lock the boundary logic of the age helper.
 final class PatientSummaryPresentationTests: XCTestCase {
-    func testChartReadingPositionsAreExactAndScopedToPatient() {
+    func testChartReadingAnchorsAreScopedToPatient() {
         var state = PatientChartReturnState()
-        state.record(CGPoint(x: 0, y: 482.5), patientID: "patient-a")
-        state.record(CGPoint(x: 0, y: 903), patientID: "patient-b")
-        XCTAssertEqual(state.position(patientID: "patient-a"), CGPoint(x: 0, y: 482.5))
-        XCTAssertEqual(state.position(patientID: "patient-b"), CGPoint(x: 0, y: 903))
+        let first = PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 183.5)
+        let second = PatientChartReadingAnchor(id: "patient-summary-diary", distanceFromTop: 92)
+        state.record(first, patientID: "patient-a")
+        state.record(second, patientID: "patient-b")
+        XCTAssertEqual(state.position(patientID: "patient-a"), first)
+        XCTAssertEqual(state.position(patientID: "patient-b"), second)
         XCTAssertNil(state.position(patientID: "patient-c"))
+    }
+
+    func testReadingAnchorKeepsRowDistanceAfterReloadChangesGeometry() {
+        let anchor = PatientChartReadingAnchor(id: "patient-summary-scales", distanceFromTop: 233)
+        for newContentY in [CGFloat(933), 1133, 733] {
+            let offset = anchor.offset(anchorMinY: newContentY, insetTop: 100)
+            XCTAssertEqual(newContentY - offset - 100, 233, accuracy: 0.01)
+        }
+    }
+
+    func testDisclosureExpansionSurvivesReturnAndIsScopedToPatient() {
+        var state = PatientChartReturnState()
+        for disclosure in PatientChartDisclosure.allCases {
+            XCTAssertFalse(state.isExpanded(disclosure, patientID: "patient-a"))
+            state.setExpanded(true, disclosure: disclosure, patientID: "patient-a")
+            state.leave(patientID: "patient-a", category: .scales)
+            _ = state.returnToChart(patientID: "patient-a")
+            XCTAssertTrue(state.isExpanded(disclosure, patientID: "patient-a"))
+            XCTAssertFalse(state.isExpanded(disclosure, patientID: "patient-b"))
+            state.setExpanded(false, disclosure: disclosure, patientID: "patient-a")
+            XCTAssertFalse(state.isExpanded(disclosure, patientID: "patient-a"))
+        }
     }
 
     func testSummaryReturnFocusIsScopedToPatientAndConsumedOnce() {
