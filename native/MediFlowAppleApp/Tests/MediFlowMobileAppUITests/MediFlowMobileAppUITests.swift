@@ -1215,11 +1215,11 @@ final class MediFlowMobileAppUITests: XCTestCase {
         try app.performAccessibilityAudit()
 
         XCTAssertTrue(openSection("Agenda"), "Agenda non e raggiungibile per l'audit accessibilita")
-        let agenda = sectionView("clinical-workspace-agenda-view")
+        let agenda = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
         let ready = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == true AND hittable == true"), object: agenda)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 30), .completed,
-                       "Agenda deve essere visibile e interagibile prima dell'audit")
+                       "Il contenuto dell'Agenda deve essere visibile e interagibile prima dell'audit")
         try app.performAccessibilityAudit()
     }
 
@@ -1774,6 +1774,13 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let draftBody = "Testo sintetico da conservare nel diario"
         let draftTranscript = "Trascrizione sintetica ancora da rivedere"
 
+        func waitForTypedValue(_ field: XCUIElement, expected: String) {
+            let completed = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "value == %@", expected), object: field)
+            XCTAssertEqual(XCTWaiter.wait(for: [completed], timeout: 15), .completed,
+                           "Il testo digitato deve essere completo prima di proseguire")
+        }
+
         // a device-orientation event alone does not prove that the
         // app window rotated. Record and await its geometry before reading the draft.
         func waitForDiaryOrientation(isLandscape: Bool) {
@@ -1849,6 +1856,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         title.tap()
         title.typeText(draftTitle)
+        waitForTypedValue(title, expected: draftTitle)
         XCTAssertTrue(revealDiaryControl(entryType))
         entryType.tap()
         let visit = app.buttons["Visita"]
@@ -1866,6 +1874,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(revealDiaryControl(paragraph))
         paragraph.tap()
         paragraph.typeText(draftBody)
+        waitForTypedValue(paragraph, expected: draftBody)
         XCTAssertEqual(paragraph.value as? String, draftBody)
         attachScreenshot(named: "mobile-harmonization-draft-keyboard-portrait")
         // cross the actual adaptive layout with a populated draft. A
@@ -1913,6 +1922,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertFalse(openVisitDraft.exists, "The opened visit composer has no destructive collapse action")
         transcript.tap()
         transcript.typeText(draftTranscript)
+        waitForTypedValue(transcript, expected: draftTranscript)
         XCTAssertEqual(transcript.value as? String, draftTranscript)
 
         openPatientSection(.documents)
