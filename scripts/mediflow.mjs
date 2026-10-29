@@ -420,12 +420,22 @@ export async function main(args = process.argv.slice(2)) {
     throw new Error('Questa cartella usa già un archivio diverso. Apri l’istanza corretta.');
   }
   let archiveOwnership = null;
-  if (pluginChannel && ownership.claimed) {
+  if (ownership.claimed) {
     const archiveLock = localUiArchiveLock(dataDir);
     try { archiveOwnership = claimLauncher(archiveLock, identity, { reuseLive: true }); }
     catch (error) { releaseLauncher(ownership); throw error; }
     if (!archiveOwnership.claimed) {
       releaseLauncher(ownership);
+      if (!pluginChannel) {
+        const existing = await findExistingInstance(archiveOwnership.receipt,
+          { ...identity, checkoutPath: archiveOwnership.receipt.checkoutPath });
+        if (!existing || existing.url === existing.choiceUrl) throw new Error('Un altro avvio di questo archivio è in corso. Attendi e riprova.');
+        await acquireRuntimeLease(archiveOwnership.receipt.lease, runtimeProcessIdentity, 'manual');
+        const url = options.choose ? `${existing.choiceUrl}?scegli=1` : existing.url;
+        log(`MediFlow è già attivo per questo archivio: ${url}`);
+        if (!options.noBrowser && !needsTextMenu()) openUrl(url);
+        return;
+      }
       await acquireRuntimeLease(archiveOwnership.receipt.lease, runtimeProcessIdentity);
       await bridgeExistingLocalUi(pairingDirectory(archiveLock), { dataDir, sourceFingerprint: identity.sourceFingerprint }, process, options.noBrowser ? () => {} : undefined);
       return;

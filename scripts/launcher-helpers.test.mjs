@@ -3040,3 +3040,21 @@ test('reusing a checkout with another archive never opens or leases its current 
     const state=await (await fetch(new URL('state',receipt.choiceUrl))).json();
     assert.equal((await fetch(state.url)).status,200);
 });
+
+test('ordinary reuse across checkouts shares the archive owner before opening Web', async t => {
+    const f = await ordinaryLauncherFixture(t, 'web', [], false);
+    await f.until(() => f.output().includes('Pronto:'));
+    const second = realpathSync(mkdtempSync(path.join(tmpdir(), 'mf-other-checkout-')));
+    t.after(() => rmSync(second, { recursive: true, force: true }));
+    const { cpSync } = await import('node:fs');
+    cpSync(f.source, second, { recursive: true });
+    appendFileSync(path.join(second, 'scripts/source-runtime.mjs'), "\nprocess.once('disconnect', () => process.exit(0));\n");
+    t.diagnostic(JSON.stringify({directory:second,role:'secondary-checkout'}));
+    const result = spawnSync(process.execPath, [path.join(second, 'scripts/mediflow.mjs'), '--scelta', 'web', '--senza-browser'],
+        { env: f.environment, encoding: 'utf8', timeout: 5000 });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout + result.stderr, /già attivo/u);
+    const receipt = JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
+    const state = await (await fetch(new URL('state', receipt.choiceUrl))).json();
+    assert.equal((await fetch(state.url)).status, 200);
+});

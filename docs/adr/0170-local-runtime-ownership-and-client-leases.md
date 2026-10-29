@@ -27,6 +27,11 @@ mentre un altro client usa il runtime. La conferma dei lease e la decisione di
 arresto sono serializzate nello stesso event loop: una volta deciso l'arresto,
 nuove acquisizioni sono negate e non possono essere confermate sul Web uscente.
 
+Il lock per archivio è acquisito anche dagli avvii ordinari, prima della scelta
+della modalità. Un altro checkout riusa soltanto un Web sano della stessa
+impronta sorgente; se è ancora in avvio o ha un’altra revisione, non ne apre un
+secondo e non ne assume la proprietà.
+
 Su Windows la named pipe è anche un vincolo di proprietà legato a un handle del
 processo. I file mantengono soltanto discovery e identità recuperabile, con il
 protocollo di generazioni esistente: un processo morto o un PID riciclato non
