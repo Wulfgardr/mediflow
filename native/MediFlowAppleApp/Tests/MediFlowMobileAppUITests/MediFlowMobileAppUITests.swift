@@ -43,10 +43,34 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(edit.waitForExistence(timeout: 10))
         let name = app.staticTexts["patient-detail-name"]
         XCTAssertTrue(name.exists)
-        XCTAssertGreaterThanOrEqual(edit.frame.minY, name.frame.maxY)
+        XCTAssertLessThan(edit.frame.maxY, name.frame.minY)
+        XCTAssertTrue(app.navigationBars.buttons["edit-patient-button"].exists)
         XCTAssertLessThan(edit.frame.height, 80)
         XCTAssertLessThan(name.frame.height, 150)
         XCTAssertTrue(edit.isHittable)
+    }
+
+    func testPatientChartClinicalOrderAndCollapsedTitle() {
+        app.launchEnvironment["MEDIFLOW_APPLE_DEMO"] = "1"
+        launch()
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "patient-cell-")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        row.tap()
+        XCTAssertTrue(app.staticTexts["patient-detail-name"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["patient-navigation-name"].exists)
+        XCTAssertTrue(app.navigationBars.buttons["edit-patient-button"].exists)
+        XCTAssertTrue(app.navigationBars.buttons["patient-actions-overflow"].exists)
+        XCTAssertTrue(app.staticTexts["patient-detail-metadata"].label.contains("nascita"))
+        let diagnoses = sectionView("patient-detail-diagnoses")
+        let exemptions = sectionView("patient-detail-exemptions")
+        let summary = sectionView("patient-clinical-signals")
+        XCTAssertLessThan(diagnoses.frame.minY, exemptions.frame.minY)
+        XCTAssertTrue(scrollDown(to: summary, requireHittable: true))
+        XCTAssertTrue(app.staticTexts["Misure"].exists)
+        let identity = app.staticTexts["Dati anagrafici"]
+        XCTAssertTrue(scrollDown(to: identity, requireHittable: true))
+        XCTAssertTrue(app.staticTexts["patient-navigation-name"].exists)
+        XCTAssertEqual(app.staticTexts["patient-navigation-name"].label, "Ferrari Giulia")
     }
 
     private var app: XCUIApplication!
