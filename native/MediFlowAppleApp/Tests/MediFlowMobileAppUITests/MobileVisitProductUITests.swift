@@ -5,14 +5,6 @@ final class MobileVisitProductUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    private func waitUntilHittable(_ element: XCUIElement, timeout: TimeInterval = 30,
-                                  file: StaticString = #filePath, line: UInt = #line) {
-        let ready = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == true AND hittable == true"), object: element)
-        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: timeout), .completed,
-                       "Elemento non disponibile: \(element)", file: file, line: line)
-    }
-
     func testVisitEntryKeepsFirstPatientVisibleAtAX5() throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "compact-only layout contract")
         let app = XCUIApplication()
@@ -47,26 +39,27 @@ final class MobileVisitProductUITests: XCTestCase {
         app.launchEnvironment = ["MEDIFLOW_APPLE_UITEST_PATIENTS": "1", "MEDIFLOW_APPLE_UITEST_VISIT": run]
         app.launch()
         openVisit(app)
-        waitUntilHittable(app.buttons["mobile-visit-choose-patient"])
+        waitForUIReady(app.buttons["mobile-visit-choose-patient"], in: app)
         app.buttons["mobile-visit-choose-patient"].tap()
-        waitUntilHittable(app.buttons["Sintetico Paziente"].firstMatch)
+        waitForUIReady(app.buttons["Sintetico Paziente"].firstMatch, in: app)
         app.buttons["Sintetico Paziente"].firstMatch.tap()
-        waitUntilHittable(app.buttons["mobile-visit-prepare"])
+        waitForUIReady(app.buttons["mobile-visit-prepare"], in: app)
         app.buttons["mobile-visit-prepare"].tap()
-        waitUntilHittable(app.buttons["Acconsento e preparo il dossier"])
+        waitForUIReady(app.buttons["Acconsento e preparo il dossier"], in: app)
         app.buttons["Acconsento e preparo il dossier"].tap()
         let note = app.textViews["mobile-visit-note"]
-        XCTAssertTrue(note.waitForExistence(timeout: 10))
+        waitForUIReady(note, in: app, timeout: 10)
         note.tap()
         note.typeText("Appunto solo sintetico conservato senza rete.")
         app.terminate()
         app.launchEnvironment["MEDIFLOW_APPLE_UITEST_VISIT_OFFLINE"] = "1"
         app.launch()
         openVisit(app)
+        waitForUIReady(app.buttons["mobile-visit-unlock"], in: app)
         app.buttons["mobile-visit-unlock"].tap()
-        XCTAssertTrue(app.buttons["mobile-visit-open-note"].firstMatch.waitForExistence(timeout: 10))
+        waitForUIReady(app.buttons["mobile-visit-open-note"].firstMatch, in: app, timeout: 10)
         app.buttons["mobile-visit-open-note"].firstMatch.tap()
-        XCTAssertTrue(note.waitForExistence(timeout: 5))
+        waitForUIReady(note, in: app, timeout: 5)
         XCTAssertEqual(note.value as? String, "Appunto solo sintetico conservato senza rete.")
         let offline = XCTAttachment(screenshot: app.screenshot())
         offline.name = "real-app-synthetic-offline-note"
@@ -76,16 +69,18 @@ final class MobileVisitProductUITests: XCTestCase {
         app.launchEnvironment["MEDIFLOW_APPLE_UITEST_VISIT_OFFLINE"] = nil
         app.launch()
         openVisit(app)
+        waitForUIReady(app.buttons["mobile-visit-unlock"], in: app)
         app.buttons["mobile-visit-unlock"].tap()
         let review = app.buttons["mobile-visit-review"].firstMatch
         scrollTo(review, in: app)
         review.tap()
+        waitForUIReady(app.secureTextFields["mobile-visit-password"], in: app)
         app.secureTextFields["mobile-visit-password"].tap()
         app.secureTextFields["mobile-visit-password"].typeText(String(Int.random(in: 1000...9999)))
         app.buttons["mobile-visit-authenticate"].tap()
         let consent = app.switches["Ho confrontato le fonti aggiornate e rivisto l’appunto"]
         scrollTo(consent, in: app)
-        XCTAssertTrue(consent.waitForExistence(timeout: 10))
+        waitForUIReady(consent, in: app, timeout: 10)
         consent.tap()
         app.buttons["mobile-visit-import"].tap()
         let diary = app.buttons["patient-section-diary"]
@@ -105,6 +100,7 @@ final class MobileVisitProductUITests: XCTestCase {
         app.terminate()
         app.launch()
         openVisit(app)
+        waitForUIReady(app.buttons["mobile-visit-unlock"], in: app)
         app.buttons["mobile-visit-unlock"].tap()
         let receipt = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "registrato in cartella e confermato")).firstMatch
         scrollTo(receipt, in: app)
@@ -132,8 +128,7 @@ final class MobileVisitProductUITests: XCTestCase {
                 menu.tap()
             }
         }
-        XCTAssertTrue(entry.waitForExistence(timeout: 5))
-        XCTAssertTrue(entry.isHittable)
+        waitForUIReady(entry, in: app, timeout: 5)
         entry.tap()
     }
 
