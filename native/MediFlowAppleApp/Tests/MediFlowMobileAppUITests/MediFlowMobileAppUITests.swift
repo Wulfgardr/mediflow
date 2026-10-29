@@ -43,10 +43,207 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(edit.waitForExistence(timeout: 10))
         let name = app.staticTexts["patient-detail-name"]
         XCTAssertTrue(name.exists)
-        XCTAssertGreaterThanOrEqual(edit.frame.minY, name.frame.maxY)
+        XCTAssertLessThan(edit.frame.maxY, name.frame.minY)
+        XCTAssertTrue(app.navigationBars.buttons["edit-patient-button"].exists)
         XCTAssertLessThan(edit.frame.height, 80)
         XCTAssertLessThan(name.frame.height, 150)
         XCTAssertTrue(edit.isHittable)
+    }
+
+    func testPatientChartClinicalOrderAndCollapsedTitle() {
+        app.launchEnvironment["MEDIFLOW_APPLE_DEMO"] = "1"
+        launch()
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "patient-cell-")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        row.tap()
+        XCTAssertTrue(app.staticTexts["patient-detail-name"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["patient-navigation-name"].exists)
+        XCTAssertTrue(app.navigationBars.buttons["edit-patient-button"].exists)
+        XCTAssertTrue(app.navigationBars.buttons["patient-actions-overflow"].exists)
+        XCTAssertTrue(app.staticTexts["patient-detail-metadata"].label.contains("nascita"))
+        let diagnoses = sectionView("patient-detail-diagnoses")
+        let exemptions = sectionView("patient-detail-exemptions")
+        let summary = sectionView("patient-clinical-signals")
+        XCTAssertLessThan(diagnoses.frame.minY, exemptions.frame.minY)
+        XCTAssertTrue(scrollDown(to: summary, requireHittable: true))
+        XCTAssertTrue(app.buttons["patient-summary-measures"].exists)
+        let identity = app.staticTexts["Dati anagrafici"]
+        XCTAssertTrue(scrollDown(to: identity, requireHittable: true))
+        XCTAssertTrue(app.staticTexts["patient-navigation-name"].exists)
+        XCTAssertEqual(app.staticTexts["patient-navigation-name"].label, "Ferrari Giulia")
+    }
+
+    func testPatientChartSummaryNavigatesWithoutDuplicateCategories() {
+        app.launchEnvironment["MEDIFLOW_APPLE_DEMO"] = "1"
+        launch()
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "patient-cell-")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        row.tap()
+        XCTAssertTrue(app.staticTexts["patient-detail-name"].waitForExistence(timeout: 10))
+        let destinations: [(String, String, PatientSection)] = [
+            ("therapies", "Apri Terapie attive, 1", .therapies),
+            ("measures", "Apri Misure, 5", .clinical),
+            ("diary", "Apri Diario, 3", .diary),
+            ("scales", "Apri Scale, 0", .scales),
+        ]
+        func positionInReadingPane(_ row: XCUIElement) {
+            XCTAssertTrue(row.waitForExistence(timeout: 5))
+            for _ in 0..<12 {
+                let delta = row.frame.midY - 360
+                if abs(delta) < 50 { break }
+                let start = app.coordinate(withNormalizedOffset: CGVector(
+                    dx: UIDevice.current.userInterfaceIdiom == .pad ? 0.75 : 0.5, dy: 0.65))
+                let end = start.withOffset(CGVector(dx: 0, dy: -min(150, max(-150, delta))))
+                start.press(forDuration: 0.1, thenDragTo: end,
+                            withVelocity: XCUIGestureVelocity(rawValue: 100), thenHoldForDuration: 0.2)
+            }
+            XCTAssertTrue(row.isHittable)
+            XCTAssertLessThan(abs(row.frame.midY - 360), 50)
+        }
+        for (id, label, destination) in destinations {
+            XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "patient-summary-")).count, 4)
+            let button = app.buttons["patient-summary-\(id)"]
+            let selectedOverview = app.buttons["patient-section-overview"]
+            if selectedOverview.exists { selectedOverview.tap() }
+            positionInReadingPane(button)
+            XCTAssertEqual(button.label, label)
+            let sourceY = button.frame.minY
+            button.tap()
+            let direct = app.buttons["patient-section-\(destination.identifier)"]
+            if direct.exists {
+                XCTAssertTrue(direct.isSelected)
+            } else {
+                XCTAssertEqual(app.buttons["patient-section-picker"].value as? String, destination.rawValue)
+            }
+            XCTAssertFalse(app.staticTexts["patient-detail-name"].exists)
+            openPatientSection(.overview)
+            XCTAssertTrue(button.isHittable)
+            XCTAssertEqual(button.frame.minY, sourceY, accuracy: 1)
+        }
+        for destination in [PatientSection.diary, .documents, .therapies] {
+            let anchor = app.buttons["patient-summary-scales"]
+            positionInReadingPane(anchor)
+            openPatientSection(destination)
+            openPatientSection(.overview)
+            XCTAssertTrue(app.staticTexts["patient-detail-name"].isHittable)
+            XCTAssertFalse(app.staticTexts["patient-navigation-name"].exists)
+        }
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            let anchor = app.buttons["patient-summary-scales"]
+            positionInReadingPane(anchor)
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+            let row = app.buttons["patient-cell-demo-0"]
+            XCTAssertTrue(row.waitForExistence(timeout: 10))
+            row.tap()
+            XCTAssertTrue(app.staticTexts["patient-detail-name"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.staticTexts["patient-detail-name"].isHittable)
+            XCTAssertFalse(app.staticTexts["patient-navigation-name"].exists)
+        }
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "Diagnosi")).count, 0)
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "Esenzioni")).count, 0)
+    }
+
+    func testPatientListAlwaysOpensChartAtTopAfterDepartures() {
+        for departure in ["list", "patient-change", "workspace-close", "abandon-summary"] {
+            app.launchEnvironment["MEDIFLOW_APPLE_DEMO"] = "1"
+            launch()
+            let first = app.buttons["patient-cell-demo-0"]
+            XCTAssertTrue(first.waitForExistence(timeout: 15))
+            first.tap()
+            let header = app.staticTexts["patient-detail-name"]
+            XCTAssertTrue(header.waitForExistence(timeout: 10))
+            let initialY = header.frame.minY
+            let start = app.coordinate(withNormalizedOffset: CGVector(
+                dx: UIDevice.current.userInterfaceIdiom == .pad ? 0.75 : 0.5, dy: 0.65))
+            start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -200)),
+                        withVelocity: XCUIGestureVelocity(rawValue: 100), thenHoldForDuration: 0.2)
+            XCTAssertLessThan(header.frame.minY, initialY - 100)
+            let anchor = app.buttons["patient-summary-scales"]
+            XCTAssertTrue(anchor.isHittable)
+            attachScreenshot(named: "chart-before-departure-\(departure)")
+            if departure != "list" { anchor.tap() }
+            if departure == "workspace-close" {
+                XCTAssertTrue(openSection("Agenda"))
+                XCTAssertTrue(openSection("Pazienti"))
+            }
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                app.navigationBars.buttons.element(boundBy: 0).tap()
+            }
+            if departure == "patient-change" {
+                let second = app.buttons["patient-cell-demo-1"]
+                XCTAssertTrue(second.waitForExistence(timeout: 10))
+                second.tap()
+                if UIDevice.current.userInterfaceIdiom == .phone {
+                    app.navigationBars.buttons.element(boundBy: 0).tap()
+                }
+            }
+            XCTAssertTrue(first.waitForExistence(timeout: 10))
+            first.tap()
+            XCTAssertTrue(header.waitForExistence(timeout: 10))
+            XCTAssertTrue(header.isHittable)
+            XCTAssertEqual(header.frame.minY, initialY, accuracy: 1)
+            XCTAssertFalse(app.staticTexts["patient-navigation-name"].exists)
+            attachScreenshot(named: "chart-reopened-from-list-\(departure)")
+        }
+    }
+
+    func testPatientChartReturnKeepsDisclosuresAcrossReload() {
+        for expanded in [false, true] {
+            for reload in [false, true] {
+                app.launchEnvironment["MEDIFLOW_APPLE_DEMO"] = "1"
+                app.launchEnvironment["MEDIFLOW_APPLE_UITEST_CHART_RELOAD"] = "1"
+                launch()
+                let row = app.buttons["patient-cell-demo-0"]
+                XCTAssertTrue(row.waitForExistence(timeout: 15))
+                row.tap()
+                func position(_ element: XCUIElement) {
+                    XCTAssertTrue(element.waitForExistence(timeout: 5))
+                    var previousY: CGFloat?
+                    for _ in 0..<30 {
+                        if element.elementType == .staticText && element.isHittable { break }
+                        if element.elementType == .button && element.frame.minY > 190 && element.frame.minY < 400 { break }
+                        if let previousY, abs(previousY - element.frame.midY) < 1 && element.isHittable { break }
+                        previousY = element.frame.midY
+                        let delta = element.frame.midY - 333
+                        if abs(delta) < 40 { break }
+                        let start = app.coordinate(withNormalizedOffset: CGVector(
+                            dx: UIDevice.current.userInterfaceIdiom == .pad ? 0.75 : 0.5, dy: 0.65))
+                        let end = start.withOffset(CGVector(dx: 0, dy: -min(150, max(-150, delta))))
+                        start.press(forDuration: 0.1, thenDragTo: end,
+                                    withVelocity: XCUIGestureVelocity(rawValue: 100), thenHoldForDuration: 0.2)
+                    }
+                    XCTAssertTrue(element.isHittable)
+                }
+                if expanded {
+                    for label in ["Strumenti con IA", "Altre sezioni della cartella"] {
+                        let header = app.staticTexts[label].firstMatch
+                        position(header)
+                        header.tap()
+                    }
+                }
+                let anchor = app.buttons["patient-summary-scales"]
+                position(anchor)
+                let before = anchor.frame.minY
+                attachScreenshot(named: "anchor-before-expanded-\(expanded)-reload-\(reload)")
+                anchor.tap()
+                if reload {
+                    let refresh = app.buttons["layout-test-reload-chart"]
+                    XCTAssertTrue(refresh.waitForExistence(timeout: 5))
+                    refresh.tap()
+                }
+                openPatientSection(.overview)
+                XCTAssertTrue(anchor.isHittable)
+                XCTAssertEqual(anchor.frame.minY, before, accuracy: 1)
+                let venues = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Esegui la funzione"))
+                XCTAssertEqual(venues.count > 0, expanded)
+                XCTAssertEqual(app.buttons["patient-open-section-diary"].exists, expanded)
+                if reload {
+                    XCTAssertTrue(app.descendants(matching: .any).matching(
+                        NSPredicate(format: "label CONTAINS %@", "TEST-R1")).firstMatch.exists)
+                }
+                attachScreenshot(named: "anchor-return-expanded-\(expanded)-reload-\(reload)")
+            }
+        }
     }
 
     private var app: XCUIApplication!

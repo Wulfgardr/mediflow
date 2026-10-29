@@ -8,6 +8,11 @@ struct PairedPatientsWorkspaceView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.clinicalPatientNavigation) private var linkedPatient
     @Environment(\.clinicalNavigationInteraction) private var navigationInteraction
+    @State private var patientChartHeaderHidden = false
+    @State private var summaryReturn: PatientChartSummaryReturn?
+    #if os(iOS)
+    @StateObject private var chartScrollMemory = PatientChartScrollMemory()
+    #endif
     @State private var navigationInteractionID = UUID()
     private let onShowProject: (() -> Void)?
     @ObservedObject private var model: PairedPatientsWorkspaceModel
@@ -225,7 +230,21 @@ struct PairedPatientsWorkspaceView: View {
         .onAppear {
             navigationInteraction?.register(navigationInteractionID, { navigationPresentationIsOpen })
         }
-        .onDisappear { navigationInteraction?.unregister(navigationInteractionID) }
+        .onDisappear {
+            navigationInteraction?.unregister(navigationInteractionID)
+            #if os(iOS)
+            resetChartReturn()
+            #endif
+        }
+        #if os(iOS)
+        .onReceive(model.clinicalSessionInvalidationEvents) { _ in
+            resetChartReturn(endingSession: true)
+        }
+        .onChange(of: preferredPatientColumn) { column in
+            if column == .sidebar { resetChartReturn() }
+        }
+        .onChange(of: patientDestinationID) { _ in resetChartReturn() }
+        #endif
         #if os(macOS)
         // The split already shows the selected patient. Consume this
         // one-shot intent so returning to the workspace cannot replay it.
@@ -246,6 +265,9 @@ struct PairedPatientsWorkspaceView: View {
             }
         }
         .onChange(of: model.selectedPatientID) { patientID in
+            #if os(iOS)
+            resetChartReturn()
+            #endif
             if patientID == nil {
                 #if os(iOS)
                 preferredPatientColumn = .sidebar
@@ -507,6 +529,8 @@ struct PairedPatientsWorkspaceView: View {
             patientSortMode: $patientSortMode,
             onOpenPatient: { patient in
                 guard model.canChangePatientSelection else { return }
+                resetChartReturn()
+                model.activePatientSection = .overview
                 patientDestinationID = patient.id
                 preferredPatientColumn = .detail
                 // Returning to the same chart must not discard its draft or refetch it.
@@ -521,6 +545,12 @@ struct PairedPatientsWorkspaceView: View {
                     #endif
                     Task { await model.loadPatient(patient) }
                 }
+            },
+            onOpenVisitComposer: {
+                guard let patientID = model.selectedPatient?.id, model.mobileVisitDraft != nil else { return }
+                resetChartReturn()
+                patientDestinationID = patientID
+                preferredPatientColumn = .detail
             }
         )
         .chartCard()
@@ -528,6 +558,20 @@ struct PairedPatientsWorkspaceView: View {
 
     private var presentedPatientID: String? {
         patientDestinationID ?? model.selectedPatientID
+    }
+
+    private func resetChartReturn(endingSession: Bool = false) {
+        chartScrollMemory.discardReturn(endingSession: endingSession)
+        summaryReturn = nil
+    }
+
+    private var mobilePatientSectionSelection: Binding<PatientWorkspaceSection> {
+        Binding(get: { model.activePatientSection }, set: { section in
+            guard section != model.activePatientSection else { return }
+            if model.activePatientSection == .overview { resetChartReturn() }
+            chartScrollMemory.isRestoring = section == .overview
+            model.activePatientSection = section
+        })
     }
 
     private func mobilePatientDestination(isWide: Bool) -> some View {
@@ -548,15 +592,67 @@ struct PairedPatientsWorkspaceView: View {
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .id("mobile-patient-chart-top")
+                .background {
+                    if let detail = model.selectedPatient, detail.id == presentedPatientID {
+                        let patientID = detail.id
+                        let generation = chartScrollMemory.resetGeneration
+                        PatientChartScrollRestoration(
+                            patientID: patientID, section: model.activePatientSection,
+                            memory: chartScrollMemory,
+                            isCurrent: { model.selectedPatientID == patientID && model.activePatientSection == .overview && chartScrollMemory.resetGeneration == generation },
+                            onRestore: {
+                                guard presentedPatientID == patientID, model.activePatientSection == .overview else { return }
+                                summaryReturn = chartScrollMemory.state.returnToChart(patientID: patientID)
+                            })
+                            .id(generation)
+                    }
+                }
+            }
+            .coordinateSpace(name: "patient-chart-scroll")
+            .onPreferenceChange(PatientChartHeaderHiddenKey.self) { patientChartHeaderHidden = $0 }
+            .onChange(of: chartScrollMemory.resetGeneration) { _ in
+                scroll.scrollTo("mobile-patient-chart-top", anchor: .top)
             }
             .safeAreaPadding(.bottom, 16)
             .clipped()
             .onChange(of: model.activePatientSection) { _ in
-                scroll.scrollTo("mobile-patient-chart-top", anchor: .top)
+                if model.activePatientSection == .overview {
+                    chartScrollMemory.isRestoring = true
+                } else {
+                    summaryReturn = nil
+                    scroll.scrollTo("mobile-patient-chart-top", anchor: .top)
+                }
             }
         }
+        .environment(\.patientChartScrollMemory, chartScrollMemory)
+        .environment(\.patientChartPatientID, presentedPatientID)
         .background(PlatformColors.chartCardSurface)
-        .navigationTitle(model.activePatientSection.title)
+        .navigationTitle(model.activePatientSection == .overview ? "" : model.activePatientSection.title)
+        .toolbar {
+            #if DEBUG
+            if AppleFoundationDemoMode.isDemoDataset,
+               ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_CHART_RELOAD"] == "1",
+               model.activePatientSection != .overview {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Ricarica dati inventati") {
+                        if let patient = model.patients.first(where: { $0.id == presentedPatientID }) {
+                            Task { await model.loadPatient(patient) }
+                        }
+                    }
+                    .accessibilityIdentifier("layout-test-reload-chart")
+                }
+            }
+            #endif
+            ToolbarItem(placement: .principal) {
+                if model.activePatientSection == .overview, patientChartHeaderHidden,
+                   let detail = model.selectedPatient, detail.id == presentedPatientID {
+                    Text("\(detail.lastName) \(detail.firstName)")
+                        .font(.headline).lineLimit(1).truncationMode(.tail)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityIdentifier("patient-navigation-name")
+                }
+            }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) {
             if let detail = model.selectedPatient, detail.id == presentedPatientID {
@@ -565,7 +661,7 @@ struct PairedPatientsWorkspaceView: View {
                     // the keyboard. Native compact toolbars cap controls at 36pt.
                     if isWide {
                         if model.activePatientSection != .overview { mobileWidePatientHeader(detail) }
-                        MobilePatientSectionNavigation(selection: $model.activePatientSection, showsAllSections: true)
+                        MobilePatientSectionNavigation(selection: mobilePatientSectionSelection, showsAllSections: true)
                             .padding(.horizontal, 12)
                     } else if verticalSizeClass == .compact && model.activePatientSection != .overview {
                         compactHeightPatientNavigation(detail)
@@ -589,7 +685,7 @@ struct PairedPatientsWorkspaceView: View {
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("patient-workspace-header")
             Menu {
-                Picker("Sezione clinica", selection: $model.activePatientSection) {
+                Picker("Sezione clinica", selection: mobilePatientSectionSelection) {
                     ForEach(PatientWorkspaceSection.allCases) { section in
                         Label(section.title, systemImage: section.symbolName).tag(section)
                     }
@@ -1284,7 +1380,7 @@ struct PairedPatientsWorkspaceView: View {
 
     private var patientSectionPicker: some View {
         #if os(iOS)
-        MobilePatientSectionNavigation(selection: $model.activePatientSection)
+        MobilePatientSectionNavigation(selection: mobilePatientSectionSelection)
             .padding(.horizontal, 12)
             .background(PlatformColors.chartCardSurface)
         #else
@@ -1375,6 +1471,14 @@ struct PairedPatientsWorkspaceView: View {
         .accessibilityIdentifier("patient-open-section-\(section.rawValue)")
     }
 
+    private func openPatientSummary(_ category: PatientChartSummaryCategory, patientID: String) {
+        guard model.selectedPatientID == patientID else { return }
+        #if os(iOS)
+        chartScrollMemory.captureSummary(patientID: patientID, category: category)
+        #endif
+        model.activePatientSection = category.destination
+    }
+
     private static var sectionSpacing: CGFloat { ClinicalChartMetrics.sectionSpacing }
 
     private var activePatientSectionSpacing: CGFloat {
@@ -1397,14 +1501,16 @@ struct PairedPatientsWorkspaceView: View {
                 detail: detail,
                 patientLifecycleSheet: $patientLifecycleSheet,
                 icdQuery: $icdQuery,
-                confirmsFHIRExport: $confirmsFHIRExport
+                confirmsFHIRExport: $confirmsFHIRExport,
+                onOpenSummary: { category in openPatientSummary(category, patientID: detail.id) },
+                summaryReturn: summaryReturn
             )
             .chartCard()
             #if os(macOS)
             NativePatientInsightView(workspaceModel: model).chartCard()
             NativeSmartImportView(workspaceModel: model).chartCard()
             #else
-            DisclosureGroup {
+            DisclosureGroup(isExpanded: chartScrollMemory.disclosure(.aiTools, patientID: detail.id)) {
                 VStack(alignment: .leading, spacing: 20) {
                     NativePatientInsightView(workspaceModel: model)
                     Divider()
@@ -1417,19 +1523,25 @@ struct PairedPatientsWorkspaceView: View {
             .padding(.vertical, 16)
             .overlay(alignment: .top) { Divider() }
             .accessibilityIdentifier("patient-ai-tools-disclosure")
+            .background {
+                PatientChartScrollAnchor(patientID: detail.id, id: "patient-ai-tools-disclosure", memory: chartScrollMemory)
+            }
             #endif
             #if !os(macOS)
             // Patient facts precede optional collection summaries.
             if !populatedPatientSections.isEmpty ||
                 (capabilities.hasCapability("network.replica.readonly-documents") &&
                  (model.attachmentsLoadState != .loaded || !model.attachments.isEmpty)) {
-                DisclosureGroup("Altre sezioni della cartella") {
+                DisclosureGroup("Altre sezioni della cartella", isExpanded: chartScrollMemory.disclosure(.contents, patientID: detail.id)) {
                     patientContents.padding(.top, 12)
                 }
                 .font(.headline)
                 .padding(.vertical, 16)
                 .overlay(alignment: .top) { Divider() }
                 .accessibilityIdentifier("patient-chart-contents-disclosure")
+                .background {
+                    PatientChartScrollAnchor(patientID: detail.id, id: "patient-chart-contents-disclosure", memory: chartScrollMemory)
+                }
             }
             #endif
             case .diary:
@@ -1643,4 +1755,9 @@ extension PairedPatientsWorkspaceView {
     static func parseObservationValue(_ raw: String) -> Double? {
         PairedPatientClinicalSections.parseObservationValue(raw)
     }
+}
+
+struct PatientChartHeaderHiddenKey: PreferenceKey {
+    static let defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
 }

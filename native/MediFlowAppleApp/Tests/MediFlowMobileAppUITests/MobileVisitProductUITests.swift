@@ -73,6 +73,9 @@ final class MobileVisitProductUITests: XCTestCase {
         XCTAssertTrue(consent.waitForExistence(timeout: 10))
         consent.tap()
         app.buttons["mobile-visit-import"].tap()
+        let diary = app.buttons["patient-section-diary"]
+        XCTAssertTrue(diary.waitForExistence(timeout: 10))
+        XCTAssertTrue(diary.isSelected, "Import must reveal the ordinary diary, preserving the prepared draft")
         let composer = app.buttons["homebase-open-new-entry-button"]
         scrollTo(composer, in: app)
         XCTAssertTrue(composer.waitForExistence(timeout: 10))

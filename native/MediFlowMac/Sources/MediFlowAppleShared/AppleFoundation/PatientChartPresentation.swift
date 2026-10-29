@@ -28,13 +28,88 @@ enum PatientStructuredFields {
     }
 }
 
+enum PatientChartSummaryCategory: String, CaseIterable, Identifiable {
+    case therapies, measures, diary, scales
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .therapies: "Terapie attive"
+        case .measures: "Misure"
+        case .diary: "Diario"
+        case .scales: "Scale"
+        }
+    }
+
+    var destination: PatientWorkspaceSection {
+        switch self {
+        case .therapies: .therapies
+        case .measures: .clinical
+        case .diary: .diary
+        case .scales: .scales
+        }
+    }
+
+    func accessibilityLabel(count: ClinicalSignalCount) -> String {
+        "Apri \(title), \(count.displayText)"
+    }
+}
+
+struct PatientChartSummaryReturn: Hashable {
+    let patientID: String
+    let category: PatientChartSummaryCategory
+}
+
+struct PatientChartReadingAnchor: Equatable {
+    let id: String
+    let distanceFromTop: CGFloat
+
+    func offset(anchorMinY: CGFloat, insetTop: CGFloat) -> CGFloat {
+        anchorMinY - distanceFromTop - insetTop
+    }
+}
+
+enum PatientChartDisclosure: String, CaseIterable {
+    case aiTools, contents, patientInsightDetails, smartImportDetails
+}
+
+struct PatientChartReturnState {
+    private var pending: [String: (category: PatientChartSummaryCategory, anchor: PatientChartReadingAnchor)] = [:]
+    private var disclosures: [String: Set<PatientChartDisclosure>] = [:]
+
+    func position(patientID: String) -> PatientChartReadingAnchor? { pending[patientID]?.anchor }
+
+    func isExpanded(_ disclosure: PatientChartDisclosure, patientID: String) -> Bool {
+        disclosures[patientID, default: []].contains(disclosure)
+    }
+    mutating func setExpanded(_ expanded: Bool, disclosure: PatientChartDisclosure, patientID: String) {
+        if expanded { disclosures[patientID, default: []].insert(disclosure) }
+        else { disclosures[patientID, default: []].remove(disclosure) }
+    }
+    mutating func leave(patientID: String, category: PatientChartSummaryCategory, anchor: PatientChartReadingAnchor) {
+        pending[patientID] = (category, anchor)
+    }
+    mutating func discardReturns(endingSession: Bool = false) {
+        pending.removeAll()
+        if endingSession { disclosures.removeAll() }
+    }
+    mutating func returnToChart(patientID: String) -> PatientChartSummaryReturn? {
+        pending.removeValue(forKey: patientID).map { PatientChartSummaryReturn(patientID: patientID, category: $0.category) }
+    }
+}
+
 #if os(iOS)
 struct PatientChartGroup<Content: View>: View {
+    @Environment(\.patientChartScrollMemory) private var scrollMemory
+    @Environment(\.patientChartPatientID) private var patientID
     let title: String
+    let anchorID: String
     private let content: Content
 
-    init(_ title: String, @ViewBuilder content: () -> Content) {
+    init(_ title: String, anchorID: String? = nil, @ViewBuilder content: () -> Content) {
         self.title = title
+        self.anchorID = anchorID ?? "patient-group-\(title)"
         self.content = content()
     }
 
@@ -49,6 +124,11 @@ struct PatientChartGroup<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 16)
         .overlay(alignment: .top) { Divider() }
+        .background {
+            if let scrollMemory, let patientID {
+                PatientChartScrollAnchor(patientID: patientID, id: anchorID, memory: scrollMemory)
+            }
+        }
     }
 }
 
