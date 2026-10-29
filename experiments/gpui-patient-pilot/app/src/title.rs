@@ -87,23 +87,41 @@ impl TitleText {
     }
     fn tokens(&self) -> Vec<(&str, SegmentRole)> {
         let mut offset = 0;
-        self.text
-            .split_whitespace()
-            .map(|word| {
-                let start = offset + self.text[offset..].find(word).expect("title token");
-                offset = start + word.len();
-                let role = self
-                    .segments
-                    .iter()
-                    .find(|(range, role)| {
-                        *role != SegmentRole::ItalianProse
-                            && range.start < offset
-                            && range.end > start
-                    })
-                    .map_or(SegmentRole::ItalianProse, |(_, role)| *role);
-                (word, role)
-            })
-            .collect()
+        let mut ranges: Vec<Range<usize>> = Vec::new();
+        for word in self
+            .text
+            .split(|c: char| c.is_whitespace() && c != '\u{a0}' && c != '\u{202f}')
+            .filter(|word| !word.is_empty())
+        {
+            let start = offset + self.text[offset..].find(word).expect("title token");
+            offset = start + word.len();
+            ranges.push(start..offset);
+        }
+        let mut tokens = Vec::new();
+        let mut index = 0;
+        while index < ranges.len() {
+            let start = ranges[index].start;
+            let mut end = ranges[index].end;
+            if index + 2 < ranges.len()
+                && &self.text[ranges[index + 1].clone()] == "·"
+                && self.text[ranges[index + 2].clone()]
+                    .chars()
+                    .all(|c| c.is_ascii_digit())
+            {
+                end = ranges[index + 2].end;
+                index += 2;
+            }
+            let role = self
+                .segments
+                .iter()
+                .find(|(range, role)| {
+                    *role != SegmentRole::ItalianProse && range.start < end && range.end > start
+                })
+                .map_or(SegmentRole::ItalianProse, |(_, role)| *role);
+            tokens.push((&self.text[start..end], role));
+            index += 1;
+        }
+        tokens
     }
 }
 impl From<SharedString> for TitleText {
@@ -538,6 +556,50 @@ mod tests {
                     .debug_selector(|| "title-under-test".into())
                     .child(title(self.label, self.theme).test_role(self.role)),
             )
+        }
+    }
+
+    #[gpui::test]
+    fn hcg5_counted_section_geometry(cx: &mut TestAppContext) {
+        let mut native = TestAppContext::build_with_text_system(
+            cx.dispatcher.clone(),
+            None,
+            std::sync::Arc::new(gpui_apple::AppleTextSystem::new()),
+        );
+        let (_, cx) = native.add_window_view(|_, _| Fixture {
+            theme: Theme::for_dark(false),
+            label: "OGGI E PROSSIMI\u{a0}·\u{a0}1",
+            role: TypeRole::Section,
+        });
+        for dark in [false, true] {
+            for scale in [1., 2., 4.] {
+                for width in [390., 420., 800.] {
+                    for label in ["OGGI E PROSSIMI · 1", "OGGI E PROSSIMI\u{a0}·\u{a0}1"] {
+                        cx.update(|window, cx| {
+                            let theme = Theme::for_dark(dark).sized(scale, false);
+                            let text = TitleText::from(label);
+                            let result = layout_title(
+                                &text,
+                                &window.text_style(),
+                                theme.role(TypeRole::Section).size,
+                                theme,
+                                width - 32.,
+                                window.text_system(),
+                            );
+                            let lines: Vec<_> =
+                                result.lines.iter().map(|l| l.text.as_ref()).collect();
+                            assert!(
+                                lines.iter().any(|line| line
+                                    .replace('\u{a0}', " ")
+                                    .contains("PROSSIMI · 1")),
+                                "{width}/{scale}/{dark}: {lines:?}"
+                            );
+                            assert!(f32::from(result.size.width) <= width - 32. + 1.);
+                            let _ = cx;
+                        });
+                    }
+                }
+            }
         }
     }
 
