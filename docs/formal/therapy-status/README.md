@@ -10,6 +10,28 @@ sono una prova TLA né un'estensione implicita degli invarianti legacy sottostan
 
 Il recovery cifrato supporta lo schema corrente 6 e i predecessori canonici 4 e 5; le 24 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
+## Raccordo WUL-757 del 29 ottobre 2026: copia locale della bozza
+
+Riesaminato il runtime `e9e170e4790159ae1f4d10922f7508c4c128981c`
+rispetto alla base `f52ac1e4bfc7c423a9a45da9860c337038615b21`.
+Il solo file coperto modificato è `lib/db.ts`: aggiunge `sealLocalDraft` e
+`openLocalDraft`, chiamati esclusivamente dalla copia locale dell'editor.
+Acquisiscono il segnale di lettura della sessione, usano la master key già
+sbloccata e ricontrollano il segnale dopo la cifratura o decifratura. Non
+inviano HTTP, non scrivono tabelle e non modificano la chiave o il segnale.
+Tutti i metodi preesistenti del client, inclusi letture, `setKey`, invii,
+await e controlli di concorrenza, restano identici alla base.
+
+Controller legacy e durevole, consumer TherapyManager, conferma, recupero,
+CAS, ledger e audit host conservano i byte già coperti. Nessuna transizione,
+guardia, atomicità, assunzione o posizione degli await del cambio stato
+terapia cambia. Modello, statechart, invarianti, testimoni, mutanti e limiti
+restano invariati. La copia cifrata della bozza e i lease del runtime sono
+fuori dal modello TLC; li verificano i rispettivi test e il collaudo browser.
+Dopo questo riesame sono aggiornati il solo digest di `lib/db.ts` e il
+riferimento del runtime; il comando completo `verify:therapy-status` deve
+verificare modello legacy e test causali senza ampliare la loro copertura.
+
 ## Raccordo HC-A2 del 29 ottobre 2026: esiti delle scale
 
 Riesaminato il diff rispetto a `d7e5e0f4228d5a4e112c5b526f5e212e106c122d`,
