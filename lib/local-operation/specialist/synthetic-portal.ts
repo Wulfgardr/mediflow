@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { unique } from './unique.ts';
 import { once } from 'node:events';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { deny, planDigest, receiptSchema, portalAttributes, type LocalOperationPlan, type LocalOperationReceipt } from '../contract.ts';
@@ -23,7 +24,7 @@ export async function createSyntheticSpecialistPortal() {
         ${extraResource ? '<link rel="stylesheet" href="/unclassified">' : ''}<style>${SYNTHETIC_PORTAL_STYLE}</style></head>
         <body><h1>Prescrizione specialistica</h1><p>Simulatore con soli dati inventati</p><p>${escape(hostileText)}</p>
         <main ${Object.entries(portalAttributes).map(([key, attribute]) => `${attribute}="${escape(visible[key as keyof typeof portalAttributes])}"`).join(' ')} data-human="${humanRevision}">
-        <form method="post" action="/draft">${plan.fields.map(field => `<label>${escape(specialistFieldLabel(field.name))}<input name="${escape(field.name)}" value="${escape(values?.fields.find(item => item.name === field.name)?.value ?? '')}"></label>`).join('')}
+        <form method="post" action="/draft">${plan.fields.map(field => `<label>${escape(specialistFieldLabel(field.name))}<input name="${escape(field.name)}" value="${escape(values ? unique(values.fields.filter(item => item.name === field.name)).value : '')}"></label>`).join('')}
         ${extraField ? `<label>Campo nuovo<input name="${escape(extraField)}" value="NEW_FIELD_SENTINEL_51"></label>` : ''}
         <button type="submit">Salva bozza</button><button type="submit" formaction="/submit">Emetti prescrizione</button>
         <button type="submit" formaction="/physician-submit">Invia e firma come medico</button></form>
@@ -31,14 +32,14 @@ export async function createSyntheticSpecialistPortal() {
     }
     function valuesMatch(body: string, expected: LocalOperationPlan) {
         const values = new URLSearchParams(body);
-        return [...values].length === expected.fields.length && expected.fields.every(field => values.getAll(field.name).length === 1 && values.get(field.name) === field.value);
+        return [...values].length === expected.fields.length && expected.fields.every(field => unique(values.getAll(field.name)) === field.value);
     }
     function submit(actor: 'executor' | 'physician', body: string) {
         if (state.kind !== 'draft' || !valuesMatch(body, state.plan) || planDigest(state.plan) !== planDigest(plan)
             || Object.keys(observed).length || (actor === 'executor' && plan.finalAct !== 'protected')) deny();
         const data: Omit<LocalOperationReceipt, 'evidence'> = { operationId: plan.operationId, patientId: plan.patientId,
             practiceId: plan.practiceId, planDigest: planDigest(plan), receiptId: `demo-receipt-${randomBytes(16).toString('hex')}`,
-            serviceState: 'synthetic-confirmed', destination: plan.destinations.find(item => item.purpose === 'act')!,
+            serviceState: 'synthetic-confirmed', destination: unique(plan.destinations.filter(item => item.purpose === 'act')),
             parts: plan.parts.map(id => ({ id, state: 'confirmed' })) };
         state = { kind: 'submitted', plan: structuredClone(plan), receipt: { ...data, evidence: sign(data) }, actor };
     }
@@ -78,7 +79,7 @@ export async function createSyntheticSpecialistPortal() {
         setObserved(value: typeof observed) { observed = value; },
         humanEdit(name: string, value: string) {
             if (state.kind !== 'draft') deny();
-            const field = state.plan.fields.find(field => field.name === name); if (!field) deny();
+            const field = unique(state.plan.fields.filter(field => field.name === name));
             field.value = value; humanRevision++;
         },
         loseResponse() { dropResponse = true; }, afterAct(callback: () => Promise<void>) { afterAct = callback; },

@@ -1,5 +1,7 @@
 import { request as http, type APIRequestContext, type Page, type BrowserContext } from '@playwright/test';
 import { launchConfinedBrowser } from './browser-network.ts';
+import { BrowserInput } from './browser-input.ts';
+import { unique } from './unique.ts';
 import { CensusToken, type CensusDispatch } from './browser-census.ts';
 import { deny, planDigest, portalAttributes, portalContextSchema, type LocalOperationAdapter, type LocalOperationPlan, type AdapterContext, type Destination } from '../contract.ts';
 
@@ -39,7 +41,7 @@ export async function createSyntheticSpecialistBrowser(input: {
                         const values = new URLSearchParams(request.postData() ?? '');
                         const expected = input.plan();
                         if ([...values].length !== expected.fields.length || expected.fields.some(field =>
-                            values.getAll(field.name).length !== 1 || values.get(field.name) !== field.value)) deny();
+                            unique(values.getAll(field.name)) !== field.value)) deny();
                         active.census.consume();
                         active.ctx.assertCurrent();
                         if (authority !== active || active.blocked) deny();
@@ -75,13 +77,15 @@ export async function createSyntheticSpecialistBrowser(input: {
                 const observation = await inspectPage(token);
                 if (observation.unclassifiedFields.length || observation.planDigest !== planDigest(input.plan())) deny();
                 token.bind(ctx.snapshot(observation), () => ctx.snapshot(inspectPage(token)));
-                await page.getByRole('button', { name: button, exact: true }).hover();
-                await page.getByRole('button', { name: button, exact: true }).focus();
+                const command = unique(token.census.status === 'complete' ? token.census.controls.filter(control => control.tag === 'BUTTON' && control.text === button) : []);
+                const selector = command.action ? `button[formaction=${JSON.stringify(command.action)}]` : 'button:not([formaction])';
+                const inputEvents = await BrowserInput.observe(context, page);
+                await inputEvents.command('focus', selector);
                 return await token.act(async census => {
                     if (!authority) deny();
                     authority.census = census;
-                    await Promise.all([page.waitForURL(url => url.pathname === (phase === 'prepare' ? '/draft' : '/submit')), page.getByRole('button', { name: button, exact: true }).click()]);
-                    if (phase === 'act') return JSON.parse(await page.locator('body').innerText()) as unknown;
+                    await Promise.all([page.waitForURL(url => url.pathname === (phase === 'prepare' ? '/draft' : '/submit')), inputEvents.command('click', selector)]);
+                    if (phase === 'act') return JSON.parse(await inputEvents.readBody()) as unknown;
                 });
             } catch (error) { await page.close().catch(() => {}); throw error; }
             finally { await token.close(); }
@@ -96,11 +100,13 @@ export async function createSyntheticSpecialistBrowser(input: {
         const buttons = controls.filter(control => control.tag === 'BUTTON');
         const unknown = [...census.unexpected, ...fields.filter(field => field.tag !== 'INPUT' || field.type !== 'text' || field.editable || !field.placed
             || !expected.fields.some(item => item.name === field.name)).map(field => field.name || 'unnamed-control')];
-        const expectedButtons = [['Salva bozza', null], ['Emetti prescrizione', '/submit'], ['Invia e firma come medico', '/physician-submit']];
+        const expectedButtons = [{ text: 'Salva bozza', action: null }, { text: 'Emetti prescrizione', action: '/submit' }, { text: 'Invia e firma come medico', action: '/physician-submit' }];
         const complete = fields.length === expected.fields.length && new Set(fields.map(field => field.name)).size === fields.length
-            && buttons.length === expectedButtons.length && buttons.every((button, index) => button.placed && !button.editable
-                && button.type === 'submit' && !button.name && button.text === expectedButtons[index]![0] && button.action === expectedButtons[index]![1]);
-        const readback = { ...expected, fields: expected.fields.map(field => ({ ...field, value: fields.find(item => item.name === field.name)?.value ?? '' })) };
+            && buttons.length === expectedButtons.length && expectedButtons.every(expected => {
+                const button = unique(buttons.filter(button => button.text === expected.text));
+                return button.placed && !button.editable && button.type === 'submit' && !button.name && expected.action === button.action;
+            });
+        const readback = { ...expected, fields: expected.fields.map(field => ({ ...field, value: unique(fields.filter(item => item.name === field.name)).value })) };
         return { ...portalContextSchema.parse(Object.fromEntries(Object.entries(portalAttributes).map(([key, attr]) => [key, census.metadata[attr]]))),
             humanRevision: Number(census.metadata['data-human']), census: census.status, unclassifiedFields: complete ? unknown : [...unknown, 'invalid-field-set'],
             planDigest: fields.every(field => field.value) && complete ? planDigest(readback) : null };
@@ -115,7 +121,7 @@ export async function createSyntheticSpecialistBrowser(input: {
             });
         },
         async prepare(ctx, plan) {
-            for (const field of plan.fields) { ctx.assertCurrent(); await page.locator(`input[name=${JSON.stringify(field.name)}]`).fill(field.value); }
+            for (const field of plan.fields) { ctx.assertCurrent(); await (await BrowserInput.observe(context, page)).command('fill', `input[name=${JSON.stringify(field.name)}]`, field.value); }
             await submit(ctx, 'prepare', 'Salva bozza');
         },
         act: ctx => submit(ctx, 'act', 'Emetti prescrizione'),

@@ -214,8 +214,7 @@ Il token lega un unico `ProcedureSnapshot`, derivato dal piano della procedura e
 contesto locale: tutte le fonti e i campi del piano, identità risolta, pratica,
 account e operatore, versione UI, revisione umana, generazione e scadenze della lease,
 revisione territoriale, tentativo e revisione del journal. Il servizio valida con lo
-stesso confronto le osservazioni ordinarie e quella posseduta dal token. Dopo hover e
-focus sul comando previsto si rileggono insieme accessibilità, proprietà calcolate e
+stesso confronto le osservazioni ordinarie e quella posseduta dal token. Dopo il focus sul comando previsto si rileggono insieme accessibilità, proprietà calcolate e
 valori, prima della navigazione nativa. Il consumo del token rilegge sincronicamente
 piano, contesto e lease dal servizio, confronta per uguaglianza lo snapshot legato e
 verifica il corpo effettivo del POST prima del trasporto. Cambiamenti o dati mancanti
@@ -230,6 +229,32 @@ non soltanto come testo DOM: fogli aggiuntivi o adottati e regole diverse blocca
 Le modifiche CSSOM invalidano il token e le animazioni restano sospese durante la
 lease. Questo impedisce che stati transitori di focus, hover o pressione introducano
 controlli dopo la rilettura senza una mutazione DOM.
+
+Ogni lettura nominata usa lo stesso helper tipato `unique`: zero o più risultati
+rendono il censimento `unverifiable`. La verifica copre i contenitori singoli del
+contratto (documento, intestazione, metadati, stile, corpo, contesto, titolo visibile
+e form), i controlli nominati, la corrispondenza AX per nodo e il mondo di esecuzione.
+I metadati provengono da un solo contenitore e i controlli devono appartenere al suo
+unico form. Non si fondono attributi di nodi distinti. Anche il testo della risposta
+si legge atomicamente da un solo corpo del documento.
+
+Il livello di automazione mantiene un osservatore CDP degli eventi di input in un
+mondo isolato, dal primo censimento fino alla chiusura della pagina, anche fra due
+osservazioni e attraverso le navigazioni. Tastiera, puntatore, touch, rotella,
+composizione, clipboard, focus e selezione invalidano la prova indipendentemente
+dalle mutazioni DOM e dal valore finale. La revisione del portale e il confronto
+dello snapshot restano controlli aggiuntivi. Un binding assente, un mondo ambiguo,
+un errore del canale o la mancata risposta alla sonda rendono la pagina non
+verificabile. Il controllo viene ripetuto prima dei comandi e al consumo del token.
+
+Inserimento, focus e attivazione HTML dell'esecutore avvengono nel mondo isolato,
+con origine attribuita soltanto durante la chiamata sincrona che genera gli eventi.
+Non esiste una finestra asincrona in cui gli input esterni siano ignorati. Gli eventi
+accodati e consegnati dopo la chiamata invalidano comunque la prova. Il simulatore
+usa l'attivazione HTML del pulsante, senza simulare input hardware attribuibili
+anche al medico; non è una prova di gesture native o di un client ordinario.
+Un evento osservato dopo un possibile effetto impedisce la registrazione e lascia
+l'esito incerto: non annulla un invio già avvenuto.
 
 Riferimenti del confine: [proxy Chromium](https://chromium.googlesource.com/chromium/src/+/main/net/docs/proxy.md),
 [policy WebRTC](https://chromeenterprise.google/policies/#WebRtcIPHandling),

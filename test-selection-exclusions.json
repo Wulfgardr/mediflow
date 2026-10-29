@@ -185,6 +185,11 @@
     "owner": "@Wulfgardr"
   },
   {
+    "path": "lib/local-operation/specialist/browser-input.ts",
+    "reason": "Osservatore CDP degli input del simulatore CU-1; non registra test. Esercitato da vertical.test.ts, incluse indisponibilita del canale e falsificazione.",
+    "owner": "@Wulfgardr"
+  },
+  {
     "path": "lib/local-operation/specialist/browser-census.ts",
     "reason": "Censimento CDP del simulatore CU-1; non registra test. Esercitato da vertical.test.ts.",
     "owner": "@Wulfgardr"

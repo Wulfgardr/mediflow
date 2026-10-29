@@ -4,6 +4,8 @@ import path from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { chromium } from '@playwright/test';
 import { createSyntheticSpecialistDemo as specialistFixture, SYNTHETIC_DECISION, SPECIALIST_SENTINELS } from './synthetic-demo.test-support.ts';
+import { BrowserInput } from './browser-input.ts';
+import { unique } from './unique.ts';
 import { physicianSubmit } from './browser-adapter.ts';
 import { portalAttributes, type ProcedureSnapshot } from '../contract.ts';
 import { recordSpecialistOutcome } from './outcome-service.ts';
@@ -16,6 +18,13 @@ async function authorized(f: Fixture) {
     const cap = await f.selectLocal();
     assert.equal((await f.service.prepare(cap)).state, 'saved');
     assert.equal((await f.service.approve(cap)).state, 'authorized'); return cap;
+}
+async function beforeExecutorClick(f: Fixture, before: () => Promise<void>) {
+    const input = await BrowserInput.observe(f.browser.context, f.browser.page), command = input.command.bind(input);
+    input.command = async (...args) => {
+        if (args[0] === 'click' && args[1] === 'button[formaction="/submit"]') await before();
+        return command(...args);
+    };
 }
 function rows(f: Fixture) { return f.db.prepare('SELECT * FROM service_prescriptions WHERE request_reference IS NOT NULL').all(); }
 function sends(f: Fixture) { return f.portal.traffic.filter(item => ['/submit', '/physician-submit'].includes(item.path)).length; }
@@ -473,19 +482,10 @@ test('CU-1 epoca: timer già accodato resta sospeso dal censimento alla conclusi
         document.body.append(d);
     }, 150); document.currentScript.remove();</script>`);
     let unexpectedBeforeClick = -1;
-    const getByRole = f.browser.page.getByRole.bind(f.browser.page);
-    f.browser.page.getByRole = (role, options) => {
-        const locator = getByRole(role, options);
-        if (options?.name === 'Emetti prescrizione') {
-            const click = locator.click.bind(locator);
-            locator.click = async (...args) => {
-                await new Promise(resolve => setTimeout(resolve, 250));
-                unexpectedBeforeClick = await f.browser.page.locator('dialog input').count();
-                return click(...args);
-            };
-        }
-        return locator;
-    };
+    await beforeExecutorClick(f, async () => {
+        await new Promise(resolve => setTimeout(resolve, 250));
+        unexpectedBeforeClick = await f.browser.page.locator('dialog input').count();
+    });
     const result = await f.service.execute(cap).then(value => value.state, () => 'rejected');
     assert.equal(result, 'confirmed', 'il percorso stabile deve completare l’atto con script sospesi');
     assert.equal(sends(f), 1);
@@ -495,21 +495,13 @@ test('CU-1 epoca: timer già accodato resta sospeso dal censimento alla conclusi
 test('CU-1 epoca: qualunque modifica dello stato osservato invalida l’atto prima del POST', async t => {
     for (const change of [
         () => { document.body.append(document.createElement('p')); },
-        () => { document.querySelector('main')!.setAttribute('data-human', '2'); },
-        () => { document.querySelector('h1')!.textContent = 'SYNTHETIC'; },
+        () => { Array.from(document.querySelectorAll('main')).forEach(element => element.setAttribute('data-human', '2')); },
+        () => { document.querySelectorAll('h1').forEach(element => { element.textContent = 'SYNTHETIC'; }); },
         () => { document.body.append(document.createElement('iframe')); },
         () => { location.hash = 'synthetic-state'; },
     ]) {
         const f = await fixture(t), cap = await authorized(f);
-        const getByRole = f.browser.page.getByRole.bind(f.browser.page);
-        f.browser.page.getByRole = (role, options) => {
-            const locator = getByRole(role, options);
-            if (options?.name === 'Emetti prescrizione') {
-                const click = locator.click.bind(locator);
-                locator.click = async (...args) => { await f.browser.page.evaluate(change); return click(...args); };
-            }
-            return locator;
-        };
+        await beforeExecutorClick(f, () => f.browser.page.evaluate(change));
         await assert.rejects(f.service.execute(cap), 'un’epoca diversa non autorizza l’atto');
         assert.equal(sends(f), 0); assert.equal(rows(f).length, 0);
         assert.equal(f.service.inspect(f.plan.operationId).state, 'uncertain');
@@ -528,25 +520,16 @@ for (const kind of ['alert', 'confirm', 'prompt', 'beforeunload', 'page'] as con
         let observed: string | undefined;
         f.browser.page.on('dialog', dialog => { observed = dialog.type(); });
         f.browser.context.on('page', () => { observed = 'page'; });
-        const getByRole = f.browser.page.getByRole.bind(f.browser.page);
-        f.browser.page.getByRole = (role, options) => {
-            const locator = getByRole(role, options);
-            if (options?.name === 'Emetti prescrizione') {
-                const click = locator.click.bind(locator);
-                locator.click = async (...args) => {
-                    if (kind === 'page') await f.browser.context.newPage();
-                    else if (kind === 'beforeunload') {
-                        assert.ok(censusSession);
-                        await censusSession.send('Emulation.setScriptExecutionDisabled', { value: false });
-                        await f.browser.page.evaluate(() => { window.onbeforeunload = () => 'SYNTHETIC'; });
-                        await f.browser.page.getByRole('heading').click();
-                        await Promise.all([f.browser.page.waitForEvent('dialog'), f.browser.page.close({ runBeforeUnload: true })]);
-                    } else await f.browser.page.evaluate(kind => { window[kind]('SYNTHETIC'); }, kind);
-                    return click(...args);
-                };
-            }
-            return locator;
-        };
+        await beforeExecutorClick(f, async () => {
+            if (kind === 'page') await f.browser.context.newPage();
+            else if (kind === 'beforeunload') {
+                assert.ok(censusSession);
+                await censusSession.send('Emulation.setScriptExecutionDisabled', { value: false });
+                await f.browser.page.evaluate(() => { window.onbeforeunload = () => 'SYNTHETIC'; });
+                await f.browser.page.getByRole('heading').click();
+                await Promise.all([f.browser.page.waitForEvent('dialog'), f.browser.page.close({ runBeforeUnload: true })]);
+            } else await f.browser.page.evaluate(kind => { window[kind]('SYNTHETIC'); }, kind);
+        });
         await assert.rejects(f.service.execute(cap));
         assert.equal(sends(f), 0); assert.equal(rows(f).length, 0);
         assert.equal(observed, kind, 'il contesto nativo deve essere stato effettivamente aperto');
@@ -603,10 +586,10 @@ test('CU-1 vincoli: qualunque vincolo semantico cambiato dopo approvazione imped
     const template = await fixture(t);
     const cases: { name: string; change(f: Fixture): Promise<void> | void }[] = [
         ...Object.entries(portalAttributes).map(([key, name]) => ({ name: key,
-            change: (f: Fixture) => f.browser.page.evaluate(name => document.querySelector('main')!.setAttribute(name, 'OTHER_SYNTHETIC'), name) })),
-        { name: 'revisione umana', change: f => f.browser.page.evaluate(() => document.querySelector('main')!.setAttribute('data-human', '2')) },
+            change: (f: Fixture) => f.browser.page.evaluate(name => Array.from(document.querySelectorAll('main')).forEach(element => element.setAttribute(name, 'OTHER_SYNTHETIC')), name) })),
+        { name: 'revisione umana', change: f => f.browser.page.evaluate(() => Array.from(document.querySelectorAll('main')).forEach(element => element.setAttribute('data-human', '2'))) },
         ...template.plan.fields.map(field => ({ name: field.name, change: (f: Fixture) =>
-            f.browser.page.evaluate(name => { document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!.value = 'OTHER_SYNTHETIC'; }, field.name) })),
+            f.browser.page.evaluate(name => { document.querySelectorAll<HTMLInputElement>(`input[name="${name}"]`).forEach(element => { element.setAttribute('value', 'OTHER_SYNTHETIC'); }); }, field.name) })),
         ...Object.entries(template.context).map(([name, value]) => ({ name: `contesto ${name}`, change: (f: Fixture) =>
             f.setContext({ [name]: typeof value === 'number' ? (name === 'expiresAt' ? f.now() : value + 1) : 'OTHER_SYNTHETIC' }, false) })),
         { name: 'approvazione scaduta', change: f => f.advance(120_000) },
@@ -632,15 +615,6 @@ test('CU-1 vincoli: qualunque controllo modificabile fuori contratto impedisce o
             const response = await route.fetch();
             await route.fulfill({ response, body: (await response.text()).replace('</style>', `${css}</style>`) });
         });
-        const get = f.browser.page.getByRole.bind(f.browser.page);
-        f.browser.page.getByRole = (role, options) => {
-            const locator = get(role, options);
-            if (options?.name === 'Emetti prescrizione') {
-                const click = locator.click.bind(locator);
-                locator.click = async (...args) => { await locator.focus(); return click(...args); };
-            }
-            return locator;
-        };
         const result = await f.service.execute(cap).then(value => value.state, () => 'rejected');
         assert.equal(sends(f), 0, css); assert.equal(rows(f).length, 0); assert.notEqual(result, 'confirmed');
     }
@@ -649,21 +623,29 @@ test('CU-1 vincoli: qualunque controllo modificabile fuori contratto impedisce o
 
 test('CU-1 vincoli: inventario riconosce ogni controllo modificabile fuori contratto', async t => {
     const { censusControls } = await import('./browser-census.ts');
-    const f = await fixture(t); await authorized(f);
     for (const deferred of [false, true]) {
+        const f = await fixture(t); await authorized(f);
         await f.browser.page.evaluate(deferred => {
-            const style = document.querySelector('style')!;
-            style.textContent += deferred
-                ? 'p:first-of-type{-webkit-user-modify:read-only} body:has(button:focus) p:first-of-type{-webkit-user-modify:read-write}'
-                : 'p:first-of-type{-webkit-user-modify:read-write}';
+            const styles = [...document.querySelectorAll('style')];
+            if (styles.length !== 1) throw new Error('invalid fixture');
+            for (const style of styles) {
+                style.textContent += deferred
+                    ? 'p:first-of-type{-webkit-user-modify:read-only} body:has(button:focus) p:first-of-type{-webkit-user-modify:read-write}'
+                    : 'p:first-of-type{-webkit-user-modify:read-write}';
+            }
         }, deferred);
-        await f.browser.page.getByRole('button', { name: 'Emetti prescrizione', exact: true }).focus();
+        await (await BrowserInput.observe(f.browser.context, f.browser.page)).command('focus', 'button[formaction="/submit"]');
         const census = await censusControls(f.browser.context, f.browser.page);
         assert.equal(census.status, 'complete');
         if (census.status === 'complete') assert.ok(census.unexpected.includes('unclassified-accessibility-control'));
-        await f.browser.page.locator('p').first().click();
-        await f.browser.page.keyboard.press('End'); await f.browser.page.keyboard.type(' SYNTHETIC_NEW');
-        assert.match(await f.browser.page.locator('p').first().innerText(), /SYNTHETIC_NEW$/);
+        const paragraph = unique(await f.browser.page.getByText('Simulatore con soli dati inventati', { exact: true }).all());
+        assert.equal(await paragraph.evaluate(element => getComputedStyle(element).getPropertyValue('-webkit-user-modify')), 'read-write');
+        await paragraph.click();
+        if (deferred) assert.equal(await paragraph.evaluate(element => getComputedStyle(element).getPropertyValue('-webkit-user-modify')), 'read-only');
+        else {
+            await f.browser.page.keyboard.press('End'); await f.browser.page.keyboard.type(' SYNTHETIC_NEW');
+            assert.match(await unique(await f.browser.page.getByText(/Simulatore con soli dati inventati/).all()).innerText(), /SYNTHETIC_NEW$/);
+        }
     }
 });
 
@@ -708,18 +690,12 @@ test('CU-1 vincoli: ogni componente dello snapshot è vincolato al token fino al
 });
 
 test('CU-1 vincoli: cambiamento dello stile durante il comando invalida il token', async t => {
-    const f = await fixture(t), cap = await authorized(f), get = f.browser.page.getByRole.bind(f.browser.page);
-    f.browser.page.getByRole = (role, options) => {
-        const locator = get(role, options);
-        if (options?.name === 'Emetti prescrizione') {
-            const click = locator.click.bind(locator);
-            locator.click = async (...args) => {
-                await f.browser.page.evaluate(() => document.styleSheets[0]!.insertRule('p{-webkit-user-modify:read-write}'));
-                return click(...args);
-            };
-        }
-        return locator;
-    };
+    const f = await fixture(t), cap = await authorized(f);
+    await beforeExecutorClick(f, () => f.browser.page.evaluate(() => {
+        const sheets = [...document.styleSheets];
+        if (sheets.length !== 1) throw new Error('invalid fixture');
+        for (const sheet of sheets) sheet.insertRule('p{-webkit-user-modify:read-write}');
+    }));
     await assert.rejects(f.service.execute(cap)); assert.equal(sends(f), 0); assert.equal(rows(f).length, 0);
 });
 
@@ -732,4 +708,112 @@ test('CU-1 vincoli: il contenuto inviato deve essere quello approvato anche dopo
         await route.fallback({ postData: values.toString() });
     });
     await assert.rejects(f.service.execute(cap)); assert.equal(sends(f), 0); assert.equal(rows(f).length, 0);
+});
+
+test('CU-1 unicità: ogni contenitore o landmark contrattuale deve esistere una sola volta', async t => {
+    const { censusControls } = await import('./browser-census.ts');
+    const f = await fixture(t); await authorized(f);
+    for (const tag of ['html', 'head', 'meta', 'title', 'style', 'body', 'main', 'h1', 'form']) {
+        for (const count of [0, 2]) {
+            await f.browser.page.evaluate(({ tag, count }) => {
+                const elements = [...document.querySelectorAll(tag)];
+                if (elements.length !== 1) throw new Error('invalid fixture');
+                for (const element of elements) {
+                    if (count === 0) element.remove();
+                    else document.body.appendChild(element.cloneNode(false));
+                }
+            }, { tag, count });
+            assert.equal((await censusControls(f.browser.context, f.browser.page)).status, 'unverifiable', `${tag}: ${count}`);
+            await f.browser.adapter.observe({ operationId: f.plan.operationId, attempt: 0, revision: 1, signal: new AbortController().signal,
+                assertCurrent() {}, snapshot() { throw new Error('unused'); }, authorizeRequest() {} });
+        }
+    }
+});
+
+test('CU-1 unicità: contesto aggiuntivo prima o dopo il proprietario non maschera un singolo attributo', async t => {
+    for (const human of [false, true]) for (const position of ['before', 'after']) {
+        const f = await fixture(t), cap = await authorized(f);
+        if (human) { f.portal.humanEdit('priority', 'B'); f.portal.humanEdit('priority', 'D'); }
+        await f.browser.context.route('**/portal', async route => {
+            const response = await route.fetch();
+            let body = await response.text();
+            const decoy = `<main ${human ? 'data-human="1"' : 'data-account="demo-account"'}><p>Contesto separato</p></main>`;
+            if (!human) body = body.replace('data-account="demo-account"', 'data-account="OTHER_SYNTHETIC_ACCOUNT"');
+            body = position === 'before' ? body.replace('<main ', `${decoy}<main `) : body.replace('</body>', `${decoy}</body>`);
+            await route.fulfill({ response, body });
+        });
+        await assert.rejects(f.service.execute(cap));
+        assert.equal(sends(f), 0); assert.equal(rows(f).length, 0); assert.equal(f.reviews.length, 1);
+    }
+});
+
+const humanInputs: { name: string; input(f: Fixture): Promise<unknown> }[] = [
+    { name: 'valore modificato e ripristinato', async input(f) {
+        const field = unique(await f.browser.page.locator('input[name="priority"]').all());
+        await field.fill('B'); await field.fill('D');
+    } },
+    { name: 'tasto senza modifica', input: f => f.browser.page.keyboard.press('Shift') },
+    { name: 'puntatore su testo statico', input: async f => unique(await f.browser.page.locator('h1').all()).click() },
+    { name: 'movimento del puntatore', input: f => f.browser.page.mouse.move(20, 20) },
+    { name: 'rotella', async input(f) {
+        await f.browser.page.mouse.wheel(0, 10);
+        await f.browser.page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    } },
+    { name: 'focus senza modifica', input: async f => unique(await f.browser.page.locator('input[name="priority"]').all()).focus() },
+];
+for (const input of humanInputs) for (const phase of ['fra censimenti', 'prima del comando']) {
+    test(`CU-1 input: qualunque input umano non strutturale invalida la prova, ${input.name}, ${phase}`, async t => {
+        const { censusControls } = await import('./browser-census.ts');
+        const f = await fixture(t), cap = await authorized(f);
+        const read = () => f.browser.page.evaluate(() => ({ html: document.documentElement.outerHTML,
+            values: [...document.querySelectorAll('input')].map(field => field.value) }));
+        const before = await read();
+        const intervene = async () => { await input.input(f); assert.deepEqual(await read(), before, 'nessuna modifica strutturale o del valore finale'); };
+        if (phase === 'fra censimenti') {
+            await intervene();
+            assert.equal((await censusControls(f.browser.context, f.browser.page)).status, 'unverifiable');
+        } else await beforeExecutorClick(f, intervene);
+        await assert.rejects(f.service.execute(cap));
+        assert.equal(sends(f), 0); assert.equal(rows(f).length, 0); assert.equal(f.reviews.length, 1);
+    });
+}
+
+test('CU-1 input: eventi non osservabili rendono il censimento unverifiable', async t => {
+    const { censusControls } = await import('./browser-census.ts');
+    const f = await fixture(t), attach = f.browser.context.newCDPSession.bind(f.browser.context);
+    f.browser.context.newCDPSession = async target => {
+        const session = await attach(target), send = session.send.bind(session);
+        session.send = ((method: string, params: never) => method === 'Runtime.addBinding'
+            ? Promise.reject(new Error('synthetic unavailable input events')) : send(method as never, params)) as typeof session.send;
+        return session;
+    };
+    assert.equal((await censusControls(f.browser.context, f.browser.page)).status, 'unverifiable');
+    await assert.rejects(f.service.prepare(await f.selectLocal()));
+    assert.equal(f.portal.traffic.filter(item => item.method === 'POST').length, 0);
+});
+
+test('CU-1 input: intervento dopo il dispatch lascia esito incerto e non registra la prescrizione', async t => {
+    const f = await fixture(t), cap = await authorized(f);
+    f.portal.afterAct(() => f.browser.page.keyboard.press('Shift'));
+    await assert.rejects(f.service.execute(cap));
+    assert.equal(sends(f), 1); assert.equal(rows(f).length, 0);
+    assert.equal(f.service.inspect(f.plan.operationId).state, 'uncertain');
+});
+
+test('CU-1 unicità: campi e comandi nominati assenti o duplicati non producono POST', async t => {
+    for (const selector of ['input[name="priority"]', 'button[formaction="/submit"]']) for (const count of [0, 2]) {
+        const f = await fixture(t), cap = await authorized(f);
+        const attach = f.browser.context.newCDPSession.bind(f.browser.context); let captures = 0;
+        f.browser.context.newCDPSession = async target => {
+            if (++captures === 2) await f.browser.page.evaluate(({ selector, count }) => {
+                const elements = [...document.querySelectorAll(selector)];
+                if (elements.length !== 1) throw new Error('invalid fixture');
+                for (const element of elements) {
+                    if (count === 0) element.remove(); else element.parentNode!.appendChild(element.cloneNode(true));
+                }
+            }, { selector, count });
+            return attach(target);
+        };
+        await assert.rejects(f.service.execute(cap)); assert.equal(sends(f), 0); assert.equal(rows(f).length, 0);
+    }
 });
