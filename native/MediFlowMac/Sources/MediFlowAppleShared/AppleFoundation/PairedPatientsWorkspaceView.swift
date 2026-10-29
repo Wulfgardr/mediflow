@@ -545,6 +545,12 @@ struct PairedPatientsWorkspaceView: View {
                     #endif
                     Task { await model.loadPatient(patient) }
                 }
+            },
+            onOpenVisitComposer: {
+                guard let patientID = model.selectedPatient?.id, model.mobileVisitDraft != nil else { return }
+                resetChartReturn()
+                patientDestinationID = patientID
+                preferredPatientColumn = .detail
             }
         )
         .chartCard()
