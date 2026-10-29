@@ -1,7 +1,7 @@
 //! Read-only host configuration. This surface never starts or configures AI.
 
 use super::*;
-use crate::theme::{TypeRole, TypeStyle};
+use crate::theme::TypeStyle;
 use mediflow_runtime_client::{AiCentralState, AiFunctionSwitch, AiLocalState, AiRuntimeStatus};
 
 pub(super) struct AiRuntimeObservation {
@@ -140,7 +140,7 @@ fn status_row(id: &str, title: &str, value: &str, theme: Theme) -> Stateful<Div>
         .gap(px(4.))
         .child(
             div()
-                .type_role(theme, TypeRole::Strong)
+                .type_role(theme, crate::theme::TextRole::Strong)
                 .child(text!(title.to_owned())),
         )
         .child(

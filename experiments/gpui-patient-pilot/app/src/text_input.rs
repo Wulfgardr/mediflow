@@ -905,9 +905,9 @@ impl Render for TextInput {
             .type_role(
                 theme,
                 if self.multiline {
-                    TypeRole::Prose
+                    crate::theme::TextRole::Prose
                 } else {
-                    TypeRole::Body
+                    crate::theme::TextRole::Body
                 },
             )
             .on_action(cx.listener(Self::backspace))

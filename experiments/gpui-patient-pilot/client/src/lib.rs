@@ -14,6 +14,58 @@ pub const MAX_VERSION: u64 = 9_007_199_254_740_991;
 /// A bound for this synthetic client, not a change to the HTTP API contract.
 pub const MAX_NOTES_UTF16: usize = 262_144;
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PersonName(String);
+impl PersonName {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+impl From<String> for PersonName {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+impl From<&str> for PersonName {
+    fn from(value: &str) -> Self {
+        Self(value.to_owned())
+    }
+}
+impl std::fmt::Display for PersonName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ClinicalCode(String);
+impl std::ops::Deref for ClinicalCode {
+    type Target = str;
+    fn deref(&self) -> &str {
+        &self.0
+    }
+}
+impl ClinicalCode {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+impl From<String> for ClinicalCode {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+impl From<&str> for ClinicalCode {
+    fn from(value: &str) -> Self {
+        Self(value.to_owned())
+    }
+}
+impl std::fmt::Display for ClinicalCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 pub fn format_patient_name(first_name: &str, last_name: &str) -> String {
     [last_name.trim(), first_name.trim()]
         .into_iter()
@@ -29,21 +81,21 @@ pub struct PatientProfile {
     pub first_name: String,
     pub last_name: String,
     pub birth_date: Option<String>,
-    pub tax_code: String,
+    pub tax_code: ClinicalCode,
     pub notes: Option<String>,
     pub version: u64,
     pub is_archived: bool,
 }
 
 impl PatientProfile {
-    pub fn display_name(&self) -> String {
-        format_patient_name(&self.first_name, &self.last_name)
+    pub fn display_name(&self) -> PersonName {
+        format_patient_name(&self.first_name, &self.last_name).into()
     }
 
     pub fn matches_query(&self, query: &str) -> bool {
         let query = query.trim().to_lowercase();
         query.is_empty()
-            || self.display_name().to_lowercase().contains(&query)
+            || self.display_name().as_str().to_lowercase().contains(&query)
             || self.tax_code.to_lowercase().contains(&query)
     }
 

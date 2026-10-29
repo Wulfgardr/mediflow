@@ -3,7 +3,9 @@
 //! the retained encrypted attempt and the ordinary diary's complete readback.
 
 use super::*;
-use crate::theme::{TypeRole, TypeStyle};
+#[cfg(test)]
+use crate::theme::TypeRole;
+use crate::theme::TypeStyle;
 use mediflow_runtime_client::{
     PreparedScale, ScaleAnswers, ScaleCatalog, ScaleDescriptor, ScaleEntryAttempt,
     ScaleEntryReadback, ScaleId, ScalePreparationRequest,
@@ -1615,12 +1617,14 @@ impl ClinicalApp {
                                 "PERSONA SELEZIONATA",
                                 theme,
                             ))
-                            .child(div().type_role(theme, TypeRole::Strong).child(
-                                crate::title::title(
-                                    crate::title::TitleText::name(patient.display_name()),
-                                    theme,
-                                ),
-                            ))
+                            .child(
+                                div()
+                                    .type_role(theme, crate::theme::TextRole::Strong)
+                                    .child(crate::title::title(
+                                        crate::title::TitleText::name(patient.display_name()),
+                                        theme,
+                                    )),
+                            )
                             .child(text!(format!(
                                 "Nascita: {}",
                                 display_date(patient.birth_date.as_deref())
@@ -1753,12 +1757,16 @@ impl ClinicalApp {
                         .flex()
                         .flex_col()
                         .gap(px(12.))
-                        .child(div().type_role(theme, TypeRole::Strong).child({
-                            let text = text!(scale.title.clone());
-                            #[cfg(test)]
-                            let text = rendered_command::observe_text(text);
-                            text
-                        }))
+                        .child(
+                            div()
+                                .type_role(theme, crate::theme::TextRole::Strong)
+                                .child({
+                                    let text = text!(scale.title.clone());
+                                    #[cfg(test)]
+                                    let text = rendered_command::observe_text(text);
+                                    text
+                                }),
+                        )
                         .child(div().text_color(theme.secondary).child({
                             let text = text!(scale.description.clone());
                             #[cfg(test)]
@@ -1857,9 +1865,9 @@ impl ClinicalApp {
         let question_index = scale.question;
         let mut questions = div().min_w_0().flex_1().flex().flex_col().gap(px(16.));
         if scale.prepared.is_none() && !scale.has_attempt() {
-            questions = questions.child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary)
+            questions = questions.child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
                 .child(text!(format!("Domanda {} di {} · {} risposte inserite", scale.question + 1, scale.descriptor.questions.len(), scale.answers.len()))))
-                .child(scale.question_target.attach_enabled(heading("clinical-scale-question", question.text.clone(), theme).type_role(theme, TypeRole::Strong), false))
+                .child(scale.question_target.attach_enabled(heading("clinical-scale-question", question.text.clone(), theme).type_role(theme, crate::theme::TextRole::Strong), false))
                 .child(div().id("clinical-scale-options").role(Role::Group).aria_label(question.text.clone()).flex().flex_col().gap(px(8.))
                     .children(question.options.iter().enumerate().map(|(index, choice)| {
                         let selected = scale.answers.get(&question.id) == Some(&choice.value);
@@ -1912,12 +1920,16 @@ impl ClinicalApp {
                             let text = crate::shell::rendered_command::observe_text(text);
                             text
                         })
-                        .child(div().type_role(theme, TypeRole::Strong).child({
-                            let text = text!(label);
-                            #[cfg(test)]
-                            let text = crate::shell::rendered_command::observe_text(text);
-                            text
-                        }))
+                        .child(
+                            div()
+                                .type_role(theme, crate::theme::TextRole::Strong)
+                                .child({
+                                    let text = text!(label);
+                                    #[cfg(test)]
+                                    let text = crate::shell::rendered_command::observe_text(text);
+                                    text
+                                }),
+                        )
                 }));
         }
         questions = questions
@@ -1926,7 +1938,7 @@ impl ClinicalApp {
             }))
             .child(
                 div()
-                    .type_role(theme, TypeRole::Meta)
+                    .type_role(theme, crate::theme::TextRole::Meta)
                     .text_color(theme.secondary)
                     .child(text!(
                         "La voce viene registrata nel contesto ambulatoriale selezionato."
@@ -1964,7 +1976,7 @@ impl ClinicalApp {
                 )
                 .child(
                     div()
-                        .type_role(theme, TypeRole::Meta)
+                        .type_role(theme, crate::theme::TextRole::Meta)
                         .text_color(theme.secondary)
                         .child(text!(format!(
                             "Versione dell’interpretazione: {}",
@@ -1990,7 +2002,7 @@ impl ClinicalApp {
         }
         result = result.child(section("clinical-scale-source-heading", "FONTE E VERSIONE", theme))
             .child(div().child(text!(scale.descriptor.description.clone())))
-            .child(div().type_role(theme, TypeRole::Meta).text_color(theme.secondary).flex().flex_col().gap(px(8.))
+            .child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary).flex().flex_col().gap(px(8.))
                 .child(text!(format!("Fonte indicata: {}", scale.descriptor.use_contract.source_id)))
                 .child(text!(format!("Definizione: {}", scale.descriptor.use_contract.definition_version)))
                 .child(text!(format!("Lingua: {} · Traduzione: {}", scale.descriptor.use_contract.language, scale.descriptor.use_contract.translation)))

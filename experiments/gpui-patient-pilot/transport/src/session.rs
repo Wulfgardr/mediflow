@@ -1676,7 +1676,11 @@ impl RuntimeSession {
         scope: &str,
         draft: &PatientCreateDraft,
     ) -> Result<CreatedResource> {
-        for value in [&draft.first_name, &draft.last_name, &draft.tax_code] {
+        for value in [
+            draft.first_name.as_str(),
+            draft.last_name.as_str(),
+            draft.tax_code.as_str(),
+        ] {
             validate_patient_name(value)?;
         }
         if let Some(date) = &draft.birth_date {
