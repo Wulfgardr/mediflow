@@ -333,10 +333,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
             if picker.value as? String != section.rawValue {
                 XCTAssertTrue(picker.isHittable, "The section picker must stay reachable", file: file, line: line)
                 picker.tap()
-                let options = app.buttons.matching(NSPredicate(format: "label == %@", section.rawValue))
-                XCTAssertTrue(options.element.waitForExistence(timeout: 5), "Missing section option: \(section.rawValue)", file: file, line: line)
-                XCTAssertEqual(options.count, 1, "The menu option must be unambiguous", file: file, line: line)
-                options.element.tap()
+                choose(menuItem: section.rawValue, in: app, timeout: 5, file: file, line: line) {
+                    picker.value as? String == section.rawValue
+                }
             }
             let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", section.rawValue), object: picker)
             XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed,
@@ -1073,19 +1072,28 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(row.isHittable)
         XCTAssertLessThanOrEqual(row.frame.maxY, tabBar.frame.minY)
 
-        func toolbarAction(_ identifier: String, overflowTitle: String? = nil) -> XCUIElement {
+        func tapToolbarAction(_ identifier: String, overflowTitle: String? = nil,
+                              opensSubmenu: Bool = false, expectedValue: String? = nil,
+                              effect: @escaping () -> Bool) {
             let direct = app.buttons[identifier]
-            if direct.isHittable { return direct }
-            app.buttons["OverflowBarButtonItem"].tap()
-            let button = direct.isHittable ? direct : app.buttons[overflowTitle ?? identifier]
-            XCTAssertTrue(button.waitForExistence(timeout: 5))
-            XCTAssertTrue(button.isHittable)
-            return button
+            if direct.isHittable {
+                if let expectedValue { XCTAssertEqual(direct.value as? String, expectedValue) }
+                direct.tap()
+            } else {
+                app.buttons["OverflowBarButtonItem"].tap()
+                if let expectedValue {
+                    let item = presentedMenu(in: app).buttons[overflowTitle ?? identifier]
+                    waitForUIReady(item, in: app, timeout: 5)
+                    XCTAssertEqual(item.value as? String, expectedValue)
+                }
+                choose(menuItem: overflowTitle ?? identifier, in: app,
+                       opensSubmenu: opensSubmenu, timeout: 5, effect: effect)
+            }
         }
 
-        let connection = toolbarAction("patient-worklist-connection-button")
-        XCTAssertEqual(connection.value as? String, "Home-base non configurato")
-        connection.tap()
+        tapToolbarAction("patient-worklist-connection-button", expectedValue: "Home-base non configurato") {
+            self.sectionView("homebase-configuration-sheet").exists
+        }
         XCTAssertTrue(sectionView("homebase-configuration-sheet").waitForExistence(timeout: 5))
         XCTAssertTrue(sectionView("homebase-connection-state").exists)
         XCTAssertTrue(sectionView("homebase-reconciliation-state").exists)
@@ -1093,11 +1101,17 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(row.isHittable)
         XCTAssertLessThanOrEqual(row.frame.maxY, tabBar.frame.minY)
 
-        toolbarAction("patient-worklist-tools-menu", overflowTitle: "Elenco").tap()
+        tapToolbarAction("patient-worklist-tools-menu", overflowTitle: "Elenco", opensSubmenu: true) {
+            self.presentedMenu(in: self.app).buttons["patient-view-mode"].isHittable
+        }
         XCTAssertTrue(sectionView("patient-view-mode").waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Importa CSV"].exists)
-        sectionView("patient-view-mode").tap()
-        app.buttons["Attivi"].tap()
+        choose(menuItem: "patient-view-mode", in: app, opensSubmenu: true, timeout: 5) {
+            self.presentedMenu(in: self.app).buttons["Attivi"].isHittable
+        }
+        choose(menuItem: "Attivi", in: app, timeout: 5) {
+            row.isHittable
+        }
         XCTAssertTrue(row.isHittable)
         XCTAssertLessThanOrEqual(row.frame.maxY, tabBar.frame.minY)
         row.tap()
@@ -1115,7 +1129,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
             tools.tap()
         } else {
             app.buttons["OverflowBarButtonItem"].tap()
-            app.buttons["Elenco"].tap()
+            choose(menuItem: "Elenco", in: app, opensSubmenu: true, timeout: 5) {
+                self.presentedMenu(in: self.app).buttons["patient-view-mode"].isHittable
+            }
         }
         let scope = sectionView("patient-view-mode")
         XCTAssertTrue(scope.waitForExistence(timeout: 15))
@@ -1589,9 +1605,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertLessThan(rossi.frame.minY, bianchi.frame.minY)
 
         sortMenu.tap()
-        let alphabetical = app.buttons["Alfabetico"]
-        XCTAssertTrue(alphabetical.waitForExistence(timeout: 5))
-        alphabetical.tap()
+        choose(menuItem: "Alfabetico", in: app, timeout: 5) {
+            sortMenu.value as? String == "Alfabetico" && bianchi.frame.minY < rossi.frame.minY
+        }
 
         XCTAssertLessThan(
             bianchi.frame.minY,
@@ -1619,7 +1635,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let filter = app.buttons["therapy-status-filter"]
         XCTAssertTrue(filter.waitForExistence(timeout: 5))
         filter.tap()
-        app.buttons["Sospese"].tap()
+        choose(menuItem: "Sospese", in: app, timeout: 5) {
+            !self.sectionView("therapy-row-therapy-active").exists
+        }
 
         XCTAssertTrue(sectionView("therapy-row-therapy-suspended").waitForExistence(timeout: 5))
         XCTAssertTrue(sectionView("therapy-row-therapy-active").waitForNonExistence(timeout: 3))
@@ -1646,7 +1664,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let filter = app.buttons["checkup-status-filter"]
         XCTAssertTrue(filter.waitForExistence(timeout: 5))
         filter.tap()
-        app.buttons["Completati"].tap()
+        choose(menuItem: "Completati", in: app, timeout: 5) {
+            !self.sectionView("checkup-row-checkup-pending").exists
+        }
 
         XCTAssertTrue(sectionView("checkup-row-checkup-completed").waitForExistence(timeout: 5))
         XCTAssertTrue(sectionView("checkup-row-checkup-pending").waitForNonExistence(timeout: 3))
@@ -1671,7 +1691,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let filter = app.buttons["entry-type-filter"]
         XCTAssertTrue(filter.waitForExistence(timeout: 5))
         filter.tap()
-        app.buttons["Visite"].tap()
+        choose(menuItem: "Visite", in: app, timeout: 5) {
+            !self.sectionView("entry-row-entry-note").exists
+        }
 
         XCTAssertTrue(sectionView("entry-row-entry-visit").waitForExistence(timeout: 5))
         XCTAssertTrue(sectionView("entry-row-entry-note").waitForNonExistence(timeout: 3))
@@ -1856,9 +1878,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
         waitForTypedValue(title, expected: draftTitle)
         XCTAssertTrue(revealDiaryControl(entryType))
         entryType.tap()
-        let visit = app.buttons["Visita"]
-        XCTAssertTrue(visit.waitForExistence(timeout: 5))
-        visit.tap()
+        choose(menuItem: "Visita", in: app, timeout: 5) {
+            entryType.label == "Tipo, Visita"
+        }
         XCTAssertEqual(entryType.label, "Tipo, Visita", "The native menu must announce the selected entry type")
 
         XCTAssertTrue(revealDiaryControl(addParagraph))
@@ -2148,8 +2170,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(picker.waitForExistence(timeout: 10),
                       "The scope picker should appear once ambulatories are loaded")
         picker.tap()
-        // Menu option label is the ambulatory name (distinct from the picker label).
-        app.buttons["Ambulatorio Nord"].tap()
+        choose(menuItem: "Ambulatorio Nord", in: app, timeout: 5) {
+            self.app.staticTexts["Scope attivo: AMB-2."].exists
+        }
 
         XCTAssertTrue(app.staticTexts["Scope attivo: AMB-2."].waitForExistence(timeout: 5),
                       "Selecting an ambulatory should switch the active scope")
@@ -2239,8 +2262,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
             XCTAssertTrue(scrollDown(to: picker, requireHittable: true))
             waitForUIReady(picker, in: app)
             picker.tap()
-            waitForUIReady(app.buttons["Dipendente"], in: app)
-            app.buttons["Dipendente"].tap()
+            choose(menuItem: "Dipendente", in: app) {
+                picker.value as? String == "Dipendente" || picker.label.hasSuffix(", Dipendente")
+            }
         }
         XCTAssertEqual(app.staticTexts["scale-context-title"].label, "ADL · Rossi Mario")
         waitForUIReady(app.buttons["submit-scale-button"], in: app)
@@ -2271,10 +2295,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(scrollDown(to: scaleButton, requireHittable: true), "The scale entry button should be available")
         waitForUIReady(scaleButton, in: app)
         scaleButton.tap()
-        let adlOption = app.buttons["new-scale-option-adl"]
-        XCTAssertTrue(adlOption.waitForExistence(timeout: 5), "The ADL scale option should be available")
-        waitForUIReady(adlOption, in: app)
-        adlOption.tap()
+        choose(menuItem: "new-scale-option-adl", in: app, timeout: 5) {
+            self.app.buttons["scale-question-bath"].exists
+        }
 
         // MF085-003: no first-option defaults; explicit zero is a real response.
         XCTAssertTrue(app.buttons["scale-question-bath"].waitForExistence(timeout: 5))
@@ -2286,8 +2309,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
             XCTAssertTrue(scrollDown(to: picker, requireHittable: true))
             waitForUIReady(picker, in: app)
             picker.tap()
-            waitForUIReady(app.buttons["Dipendente"], in: app)
-            app.buttons["Dipendente"].tap()
+            choose(menuItem: "Dipendente", in: app) {
+                picker.value as? String == "Dipendente" || picker.label.hasSuffix(", Dipendente")
+            }
             if index < 5 {
                 XCTAssertFalse(app.buttons["submit-scale-button"].isEnabled)
                 XCTAssertFalse(app.staticTexts["scale-score"].exists)
@@ -3246,11 +3270,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(revealInteropControl(query.element))
         XCTAssertTrue(query.element.isEnabled)
         query.element.tap()
-        let options = app.buttons.matching(NSPredicate(format: "label == %@", title))
-        XCTAssertTrue(options.element.waitForExistence(timeout: 5))
-        XCTAssertEqual(options.count, 1, "Select one explicit archive reason")
-        XCTAssertTrue(options.element.isHittable)
-        options.element.tap()
+        choose(menuItem: title, in: app, timeout: 5) {
+            query.element.value as? String == title || query.element.label == "Motivo, \(title)"
+        }
         assertInteropArchiveReason(title)
     }
 
@@ -3387,7 +3409,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
         // Lifecycle commands belong to the ordinary overflow menu.
         tapInteropButton("patient-actions-overflow")
-        tapInteropButton("archive-patient-button")
+        choose(menuItem: "archive-patient-button", in: app) {
+            self.app.buttons["patient-archive-confirm-button"].exists
+        }
         XCTAssertTrue(app.staticTexts["\(lastName) \(firstName)"].exists)
         XCTAssertFalse(app.buttons["patient-archive-confirm-button"].isEnabled)
         selectInteropArchiveReason("Altro")
@@ -3411,7 +3435,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(app.buttons["unarchive-patient-button"].isEnabled)
         try checkpoint("archived", version: 3, archived: true)
 
-        tapInteropButton("unarchive-patient-button")
+        choose(menuItem: "unarchive-patient-button", in: app) {
+            self.app.buttons["patient-unarchive-confirm-button"].exists
+        }
         tapInteropButton("patient-unarchive-confirm-button")
         XCTAssertTrue(app.buttons["patient-unarchive-confirm-button"].waitForNonExistence(timeout: 20))
         returnToInteropWorklist()
@@ -3421,7 +3447,9 @@ final class MediFlowMobileAppUITests: XCTestCase {
         try checkpoint("reactivated", version: 4)
 
         tapInteropButton("patient-actions-overflow")
-        tapInteropButton("soft-delete-patient-button")
+        choose(menuItem: "soft-delete-patient-button", in: app) {
+            self.app.buttons["patient-delete-confirm-button"].exists
+        }
         XCTAssertTrue(app.staticTexts["\(lastName) \(firstName)"].exists)
         fillInteropField("patient-delete-reason-field", value: "Eliminazione sintetica \(input.runID)")
         tapInteropButton("patient-delete-confirm-button")
@@ -3633,15 +3661,18 @@ final class MediFlowMobileAppUITests: XCTestCase {
         openPatientSection(.diary)
         let prior = interopRecordIDs(actionPrefix: "homebase-edit-entry-button-")
         tapInteropButton("new-scale-button")
-        tapInteropButton("new-scale-option-adl")
+        choose(menuItem: "new-scale-option-adl", in: app) {
+            self.app.staticTexts["scale-incomplete"].exists
+        }
         XCTAssertTrue(app.staticTexts["scale-incomplete"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["scale-score"].exists)
         XCTAssertFalse(app.buttons["submit-scale-button"].isEnabled)
         for (index, question) in ["bath", "dress", "toilet", "transfer", "cont", "feed"].enumerated() {
             tapInteropButton("scale-question-\(question)")
-            let answer = app.buttons.matching(NSPredicate(format: "label == %@", "Dipendente"))
-            XCTAssertEqual(answer.count, 1)
-            answer.element.tap()
+            let picker = app.buttons["scale-question-\(question)"]
+            choose(menuItem: "Dipendente", in: app) {
+                picker.value as? String == "Dipendente" || picker.label.hasSuffix(", Dipendente")
+            }
             if index < 5 { XCTAssertFalse(app.buttons["submit-scale-button"].isEnabled) }
         }
         XCTAssertEqual(app.staticTexts["scale-score"].label, "Punteggio: 0/6")
