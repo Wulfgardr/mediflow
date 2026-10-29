@@ -1214,13 +1214,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(ambulatoryScopePicker.isHittable)
         try app.performAccessibilityAudit()
 
-        app.terminate()
-        launch(seedPatients: true, singlePatient: true, section: "agenda")
-        let agenda = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
-        let ready = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == true AND hittable == true"), object: agenda)
-        let agendaReady = XCTWaiter.wait(for: [ready], timeout: 30)
-        if agendaReady != .completed {
+        func attachAgendaDiagnostics() {
             let tree = app.debugDescription
             let accessibilityTree = XCTAttachment(string: tree)
             accessibilityTree.name = "Agenda non pronta - albero accessibilità"
@@ -1232,6 +1226,22 @@ final class MediFlowMobileAppUITests: XCTestCase {
             add(screenshot)
             print("Agenda non pronta per l'audit: \(tree)")
         }
+
+        app.terminate()
+        launch(seedPatients: true, singlePatient: true)
+        let agendaTab = app.tabBars.buttons["clinical-workspace-section-agenda-button"]
+        let agendaTabReady = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == true AND hittable == true"), object: agendaTab)
+        let tabReady = XCTWaiter.wait(for: [agendaTabReady], timeout: 30)
+        if tabReady != .completed { attachAgendaDiagnostics() }
+        XCTAssertEqual(tabReady, .completed,
+                       "La scheda Agenda deve essere raggiungibile prima della navigazione")
+        agendaTab.tap()
+        let agenda = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
+        let ready = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == true AND hittable == true"), object: agenda)
+        let agendaReady = XCTWaiter.wait(for: [ready], timeout: 30)
+        if agendaReady != .completed { attachAgendaDiagnostics() }
         XCTAssertEqual(agendaReady, .completed,
                        "Il contenuto dell'Agenda deve essere visibile e interagibile prima dell'audit")
         try app.performAccessibilityAudit()
