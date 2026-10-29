@@ -75,12 +75,10 @@ enum PatientChartDisclosure: String, CaseIterable {
 }
 
 struct PatientChartReturnState {
-    private var pending: [String: PatientChartSummaryCategory] = [:]
-    private var positions: [String: PatientChartReadingAnchor] = [:]
+    private var pending: [String: (category: PatientChartSummaryCategory, anchor: PatientChartReadingAnchor)] = [:]
     private var disclosures: [String: Set<PatientChartDisclosure>] = [:]
 
-    mutating func record(_ anchor: PatientChartReadingAnchor, patientID: String) { positions[patientID] = anchor }
-    func position(patientID: String) -> PatientChartReadingAnchor? { positions[patientID] }
+    func position(patientID: String) -> PatientChartReadingAnchor? { pending[patientID]?.anchor }
 
     func isExpanded(_ disclosure: PatientChartDisclosure, patientID: String) -> Bool {
         disclosures[patientID, default: []].contains(disclosure)
@@ -89,9 +87,15 @@ struct PatientChartReturnState {
         if expanded { disclosures[patientID, default: []].insert(disclosure) }
         else { disclosures[patientID, default: []].remove(disclosure) }
     }
-    mutating func leave(patientID: String, category: PatientChartSummaryCategory) { pending[patientID] = category }
+    mutating func leave(patientID: String, category: PatientChartSummaryCategory, anchor: PatientChartReadingAnchor) {
+        pending[patientID] = (category, anchor)
+    }
+    mutating func discardReturns(endingSession: Bool = false) {
+        pending.removeAll()
+        if endingSession { disclosures.removeAll() }
+    }
     mutating func returnToChart(patientID: String) -> PatientChartSummaryReturn? {
-        pending.removeValue(forKey: patientID).map { PatientChartSummaryReturn(patientID: patientID, category: $0) }
+        pending.removeValue(forKey: patientID).map { PatientChartSummaryReturn(patientID: patientID, category: $0.category) }
     }
 }
 

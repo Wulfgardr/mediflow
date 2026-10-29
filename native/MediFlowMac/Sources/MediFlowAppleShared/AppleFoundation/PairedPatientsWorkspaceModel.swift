@@ -4139,6 +4139,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
     // subscribers discard clinical projections on every context transition,
     // including A -> B -> A in one actor turn. No patient payload travels here.
+    var clinicalSessionInvalidationEvents: AnyPublisher<Void, Never> {
+        clinicalSessionInvalidations.eraseToAnyPublisher()
+    }
+
     var clinicalWorkspaceInvalidations: AnyPublisher<Void, Never> {
         Publishers.Merge3(
             clinicalSessionInvalidations.eraseToAnyPublisher(),

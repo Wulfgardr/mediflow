@@ -230,7 +230,21 @@ struct PairedPatientsWorkspaceView: View {
         .onAppear {
             navigationInteraction?.register(navigationInteractionID, { navigationPresentationIsOpen })
         }
-        .onDisappear { navigationInteraction?.unregister(navigationInteractionID) }
+        .onDisappear {
+            navigationInteraction?.unregister(navigationInteractionID)
+            #if os(iOS)
+            resetChartReturn()
+            #endif
+        }
+        #if os(iOS)
+        .onReceive(model.clinicalSessionInvalidationEvents) { _ in
+            resetChartReturn(endingSession: true)
+        }
+        .onChange(of: preferredPatientColumn) { column in
+            if column == .sidebar { resetChartReturn() }
+        }
+        .onChange(of: patientDestinationID) { _ in resetChartReturn() }
+        #endif
         #if os(macOS)
         // The split already shows the selected patient. Consume this
         // one-shot intent so returning to the workspace cannot replay it.
@@ -251,6 +265,9 @@ struct PairedPatientsWorkspaceView: View {
             }
         }
         .onChange(of: model.selectedPatientID) { patientID in
+            #if os(iOS)
+            resetChartReturn()
+            #endif
             if patientID == nil {
                 #if os(iOS)
                 preferredPatientColumn = .sidebar
@@ -512,6 +529,8 @@ struct PairedPatientsWorkspaceView: View {
             patientSortMode: $patientSortMode,
             onOpenPatient: { patient in
                 guard model.canChangePatientSelection else { return }
+                resetChartReturn()
+                model.activePatientSection = .overview
                 patientDestinationID = patient.id
                 preferredPatientColumn = .detail
                 // Returning to the same chart must not discard its draft or refetch it.
@@ -535,12 +554,15 @@ struct PairedPatientsWorkspaceView: View {
         patientDestinationID ?? model.selectedPatientID
     }
 
+    private func resetChartReturn(endingSession: Bool = false) {
+        chartScrollMemory.discardReturn(endingSession: endingSession)
+        summaryReturn = nil
+    }
+
     private var mobilePatientSectionSelection: Binding<PatientWorkspaceSection> {
         Binding(get: { model.activePatientSection }, set: { section in
             guard section != model.activePatientSection else { return }
-            if model.activePatientSection == .overview, let patientID = presentedPatientID {
-                chartScrollMemory.capture(patientID: patientID)
-            }
+            if model.activePatientSection == .overview { resetChartReturn() }
             chartScrollMemory.isRestoring = section == .overview
             model.activePatientSection = section
         })
@@ -567,19 +589,24 @@ struct PairedPatientsWorkspaceView: View {
                 .background {
                     if let detail = model.selectedPatient, detail.id == presentedPatientID {
                         let patientID = detail.id
+                        let generation = chartScrollMemory.resetGeneration
                         PatientChartScrollRestoration(
                             patientID: patientID, section: model.activePatientSection,
                             memory: chartScrollMemory,
-                            isCurrent: { model.selectedPatientID == patientID && model.activePatientSection == .overview },
+                            isCurrent: { model.selectedPatientID == patientID && model.activePatientSection == .overview && chartScrollMemory.resetGeneration == generation },
                             onRestore: {
                                 guard presentedPatientID == patientID, model.activePatientSection == .overview else { return }
                                 summaryReturn = chartScrollMemory.state.returnToChart(patientID: patientID)
                             })
+                            .id(generation)
                     }
                 }
             }
             .coordinateSpace(name: "patient-chart-scroll")
             .onPreferenceChange(PatientChartHeaderHiddenKey.self) { patientChartHeaderHidden = $0 }
+            .onChange(of: chartScrollMemory.resetGeneration) { _ in
+                scroll.scrollTo("mobile-patient-chart-top", anchor: .top)
+            }
             .safeAreaPadding(.bottom, 16)
             .clipped()
             .onChange(of: model.activePatientSection) { _ in
@@ -1441,8 +1468,7 @@ struct PairedPatientsWorkspaceView: View {
     private func openPatientSummary(_ category: PatientChartSummaryCategory, patientID: String) {
         guard model.selectedPatientID == patientID else { return }
         #if os(iOS)
-        chartScrollMemory.capture(patientID: patientID, anchorID: "patient-summary-\(category.id)")
-        chartScrollMemory.state.leave(patientID: patientID, category: category)
+        chartScrollMemory.captureSummary(patientID: patientID, category: category)
         #endif
         model.activePatientSection = category.destination
     }
