@@ -414,7 +414,12 @@ pub fn notice(
             theme.secondary
         })
         .type_role(theme, crate::theme::TextRole::Body)
-        .child(text!(message))
+        .child({
+            let text = text!(message);
+            #[cfg(test)]
+            let text = crate::shell::rendered_command::observe_ink(text);
+            text
+        })
 }
 
 fn brand_render_image(dark: bool) -> &'static Arc<RenderImage> {

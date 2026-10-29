@@ -3,6 +3,10 @@
 //! and diagnostic counts are declared as absent instead of simulated.
 
 use super::*;
+#[cfg(test)]
+macro_rules! text {
+    ($($args:tt)*) => { crate::shell::rendered_command::observe_ink(gpui::text!($($args)*)) };
+}
 use mediflow_runtime_client::{
     DemographicsRequest, POPULATION_DEMOGRAPHICS_CAPABILITY, PopulationDemographics,
 };
@@ -230,7 +234,7 @@ impl ClinicalApp {
 
     pub(super) fn analytics_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
-        let mut pane = div()
+        let mut pane = div().reading_surface(theme)
             .min_w_0()
             .max_w_full()
             .max_w(px(760.))
@@ -265,7 +269,10 @@ impl ClinicalApp {
                             .flex_col()
                             .gap(px(6.))
                             .child(text!("Età minima"))
-                            .child(self.analytics.min_age.clone()),
+                            .child(crate::text_input::themed(
+                                self.analytics.min_age.clone(),
+                                theme,
+                            )),
                     )
                     .child(
                         div()
@@ -273,7 +280,10 @@ impl ClinicalApp {
                             .flex_col()
                             .gap(px(6.))
                             .child(text!("Età massima"))
-                            .child(self.analytics.max_age.clone()),
+                            .child(crate::text_input::themed(
+                                self.analytics.max_age.clone(),
+                                theme,
+                            )),
                     )
                     .child(
                         button(
