@@ -1175,7 +1175,7 @@ struct ClinicalScalesWorkspaceView: View {
             ClinicalScaleFormView(definition: scale, patientLabel: "\(patient.lastName) \(patient.firstName)", onSubmit: { answers in
                 Task { await workspaceModel.submitScale(scale, answers: answers) }
                 selectedScale = nil
-        }, onCancel: { selectedScale = nil })
+            }, onCancel: { selectedScale = nil })
         }
     }
 
