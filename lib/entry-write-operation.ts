@@ -45,6 +45,11 @@ function activeParentExists(tx: Tx, patientId: string): boolean {
         .where(and(eq(patients.id, patientId), activePatients())).get());
 }
 
+function activeScaleParentExists(tx: Tx, patientId: string): boolean {
+    return Boolean(tx.select({ id: patients.id }).from(patients)
+        .where(and(eq(patients.id, patientId), activePatients(), eq(patients.isArchived, false))).get());
+}
+
 function sameEntryCreate(existing: typeof entries.$inferSelect, values: typeof entries.$inferInsert): boolean {
     return existing.patientId === values.patientId && existing.type === values.type
         && existing.title === values.title && existing.date.getTime() === Math.floor(values.date.getTime() / 1000) * 1000
@@ -65,13 +70,11 @@ export function createEntryOperation(input: CreateInput): Result {
             return { status: 404, value: { error: 'Not found',
                 ...(input.values.type === 'scale' ? { code: 'SCALE_PATIENT_INACTIVE' } : {}) } };
         }
-        const parent = tx.select({ id: patients.id, isArchived: patients.isArchived, deletedAt: patients.deletedAt })
-            .from(patients).where(eq(patients.id, input.patientId)).get();
-        if (input.values.type === 'scale' && (!parent || parent.isArchived || parent.deletedAt)) {
+        if (input.values.type === 'scale' && !activeScaleParentExists(tx, input.patientId)) {
             return { status: 409, value: { code: 'SCALE_PATIENT_INACTIVE',
                 error: 'Paziente archiviato o rimosso. Punteggio non registrato.' } };
         }
-        if (!parent || parent.deletedAt) {
+        if (!activeParentExists(tx, input.patientId)) {
             return { status: 404, value: { error: input.mode === 'network' ? 'Not found' : 'Patient not found' } };
         }
 
@@ -113,13 +116,10 @@ export function updateEntryOperation(input: UpdateInput): Result {
                     ? and(eq(entries.id, input.entryId), eq(entries.patientId, input.patientId!))
                     : eq(entries.id, input.entryId)).get();
         if (!existing) return { status: 404, value: { error: 'Not found' } };
-        if (existing.type === 'scale' || input.values.type === 'scale') {
-            const parent = tx.select({ isArchived: patients.isArchived, deletedAt: patients.deletedAt }).from(patients)
-                .where(eq(patients.id, existing.patientId)).get();
-            if (!parent || parent.isArchived || parent.deletedAt) {
-                return { status: 409, value: { code: 'SCALE_PATIENT_INACTIVE',
-                    error: 'Paziente archiviato o rimosso. Nessuna nuova registrazione.' } };
-            }
+        if ((existing.type === 'scale' || input.values.type === 'scale')
+            && !activeScaleParentExists(tx, existing.patientId)) {
+            return { status: 409, value: { code: 'SCALE_PATIENT_INACTIVE',
+                error: 'Paziente archiviato o rimosso. Nessuna nuova registrazione.' } };
         }
         if (!activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
         if (existing.version !== input.expectedVersion) {
