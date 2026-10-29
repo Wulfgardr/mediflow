@@ -337,6 +337,7 @@ jobs:
               -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testProjectSidebarPreservesPatientWorkspaceWidthOnIPad
               -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testAccessibilityDynamicTypeUsesSinglePatientColumnOnIPad
               -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testIPadListColumnFollowsTheContainerAcrossRotation
+              -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testScaleDraftKeepsOriginalPatientWhenSelectionChanges
               -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testScaleRequiresSelectedPatientAndCanCancel
               -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testScaleFormSubmitsAndAppearsInDiary
               -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testIPadKeepsTheOpenChartAcrossRotation

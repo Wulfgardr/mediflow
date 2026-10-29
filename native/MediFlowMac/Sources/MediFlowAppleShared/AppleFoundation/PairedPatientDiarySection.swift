@@ -8,7 +8,7 @@ struct PairedPatientDiarySection: View {
     @Binding var showsDeletedDiaryEntries: Bool
     @Binding var confirmsReplacingEntryTemplate: Bool
     @Binding var entryDeletionCandidate: HomeBaseEntrySummary?
-    @Binding var presentingScale: ClinicalScaleDefinition?
+    @Binding var presentingScale: ClinicalScaleDraft?
     @Binding var attachmentDetailCandidate: HomeBaseAttachmentSummary?
 
     /* the final layout keeps labels visible at narrow and AX widths. */
@@ -107,7 +107,7 @@ struct PairedPatientDiarySection: View {
         Menu {
             ForEach(ClinicalScales.all) { scale in
                 Button {
-                    presentingScale = scale
+                    presentingScale = model.makeScaleDraft(scale)
                 } label: {
                     Text("\(scale.title) (\(scale.questions.count) domande)")
                 }
@@ -328,7 +328,7 @@ struct PairedPatientDiarySection: View {
 
 struct PairedPatientScalesSection: View {
     @ObservedObject var model: PairedPatientsWorkspaceModel
-    @Binding var presentingScale: ClinicalScaleDefinition?
+    @Binding var presentingScale: ClinicalScaleDraft?
 
     var body: some View {
         PairedScalesSection(
@@ -339,7 +339,7 @@ struct PairedPatientScalesSection: View {
                 Task { await model.loadSelectedPatientEntries() }
             },
             onStartScale: { scale in
-                presentingScale = scale
+                presentingScale = model.makeScaleDraft(scale)
             }
         )
     }

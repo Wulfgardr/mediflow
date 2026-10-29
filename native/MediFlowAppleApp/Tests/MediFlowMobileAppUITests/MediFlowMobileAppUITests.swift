@@ -2211,6 +2211,27 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertFalse(app.buttons["submit-scale-button"].exists)
     }
 
+    func testScaleDraftKeepsOriginalPatientWhenSelectionChanges() {
+        app.launchEnvironment["MEDIFLOW_APPLE_UITEST_PRESENT_SCALE"] = "adl"
+        app.launchEnvironment["MEDIFLOW_APPLE_UITEST_OPEN_PATIENT_INDEX"] = "0"
+        app.launchEnvironment["MEDIFLOW_APPLE_UITEST_SCALE_SWITCH_PATIENT"] = "1"
+        launch(seedPatients: true, section: "modules")
+        XCTAssertTrue(app.buttons["cancel-scale-button"].waitForExistence(timeout: 20))
+        XCTAssertEqual(app.staticTexts["scale-context-title"].label, "ADL · Rossi Mario")
+        for id in ["bath", "dress", "toilet", "transfer", "cont", "feed"] {
+            let picker = app.buttons["scale-question-\(id)"]
+            XCTAssertTrue(scrollDown(to: picker))
+            picker.tap()
+            app.buttons["Dipendente"].tap()
+        }
+        XCTAssertEqual(app.staticTexts["scale-context-title"].label, "ADL · Rossi Mario")
+        app.buttons["submit-scale-button"].tap()
+        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10))
+        XCTAssertEqual(sectionView("patient-detail-name").label, "Bianchi Anna")
+        openPatientSection(.diary)
+        XCTAssertFalse(app.staticTexts["ADL (Indice di Katz)"].exists)
+    }
+
     func testScaleFormSubmitsAndAppearsInDiary() {
         launch(seedPatients: true, section: "modules")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
