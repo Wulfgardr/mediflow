@@ -84,7 +84,7 @@ Sul runtime `d07f93fbbe5f69d4e74a68a8826c67db803cee10`:
   trasporto passate**; Clippy di tutti i target con `-Dwarnings` e fmt passati.
   Usata `gpui_apple/runtime_shaders`; resta l’avviso upstream `block 0.1.6`.
 - Typecheck, lint, claims, never-regress e censimento database passati;
-  **20 fixture negative** del confine database passate. Selezione COMPLETE:
+  **20 test**, comprese le fixture negative del confine database, passati. Selezione COMPLETE:
   **1319 file, 1276 selezionati, 43 esclusioni motivate**.
 - Raccordo formale delle terapie: **5.903.794 stati distinti**, coda vuota,
   invarianti invariati; tre mutanti e sei testimoni del modello rilevati,
@@ -135,11 +135,86 @@ sedi già integrati restano quelli esistenti.
 
 Limiti del client: portabile **8 MiB**, completo **512 MiB**. Un invio incerto
 senza ricevuta conserva il registro e blocca altri ripristini: manca una
-risoluzione nativa assistita del dubbio. Selettori fisici, VoiceOver, percorso
-Mac installato e accettazione clinica non sono attestati dai test sintetici.
+risoluzione nativa assistita del dubbio. VoiceOver, percorso Mac installato
+qualificato e accettazione clinica non sono attestati dai test sintetici.
 Nessun rinvio al Web è contato come completamento nativo.
 
 Implementazione assistita: GPT 6.1 Sol, effort xhigh. Nessun collaboratore
 aggiuntivo; consumi non attribuibili. PR in bozza, nessun merge o auto-merge;
 review indipendente del diff finale ancora necessaria. Gli esiti CI vanno
 letti sull’head della PR.
+
+
+## Integrazione con main e prova nella finestra Mac
+
+Integrato `origin/main` `37116136a` con il commit `3d9f8cf04`.
+L’unico conflitto era nella fixture Playwright: conservati annullamento e
+selezione del plugin, percorso dati isolato e rifiuto della porta 3000.
+Sul nuovo standalone `3d9f8cf04b94cb623c91127a8c483a3cee59cd03`, build e
+spec HTTP passano; typecheck e lint passano. Due esecuzioni complete della
+suite unit passano: ciascuna **9.001 test, 8.977 passati, zero falliti,
+24 saltati**. JavaScript e writer Web non cambiano nei commit successivi;
+i delta finali riguardano soltanto il client Rust, le sue prove e il dossier.
+
+Workspace Rust al commit `de22190a7`: **486 passati, otto ignorati**.
+Il successivo delta delle righe Impostazioni passa le **tre prove** dedicate;
+il delta finale del ritiro passa **otto prove** della gestione locale e
+archivi. Clippy workspace/tutti i target con `-Dwarnings`, fmt e **171 prove**
+della selezione passano sul sorgente finale. Questi gruppi si sovrappongono.
+
+La prova interattiva usa una copia temporanea ad-hoc del binario debug,
+`runtime_shaders`, archivio e stato interfaccia in cartelle temporanee private.
+Binario osservato: `6efa10cbc058e87d042192a12654bd89a82db7e6`;
+l’identità autorevole e il SHA-256 dell’eseguibile sono nel manifest esterno.
+Non è il bundle qualificato G-9: il packager ordinario richiede Metal
+precompilato e rifiuta `runtime_shaders`. Nessun archivio reale utilizzato.
+
+Esiti osservati nella finestra Mac con accessibilità attiva:
+
+- Abbinamento e accesso, Impostazioni e Archivi e backup, nuova autenticazione
+  della gestione locale; selettori nativi e backup completo cifrato di
+  **622.688 byte**, sincronizzato e riletto.
+- Anteprima del file portabile, pulsante distruttivo disabilitato senza parola,
+  annullamento: pazienti, utenti/chiavi, audit e generazione identici;
+  ricevuta e registro di invio assenti, verificati sul solo archivio temporaneo.
+- `RIPRISTINA`, invio dalla UI, sostituzione e ricevuta durevole. Record e
+  chiavi identici, ogni evento precedente conservato. Il vecchio abbinamento
+  viene rifiutato. Riavvio del solo servizio posseduto sullo stesso loopback,
+  nuovo abbinamento e nuovo accesso, GET della ricevuta dalla UI nativa;
+  «Concludi verifica» elimina il solo registro corrispondente. Ricevuta unica,
+  nessun reinvio. L’ultima gestione locale viene chiusa con ritiro confermato.
+- Il file completo prodotto da GPUI viene recuperato dal **writer offline
+  canonico**, dopo l’arresto del processo sorgente, in una seconda cartella
+  temporanea vuota. Record e involucri delle chiavi identici; gli otto eventi
+  originali identici più il solo evento canonico `territorial.packs.preserved`;
+  generazione nuova, zero sessioni restaurate. Questo non è un recupero
+  completo eseguito dalla UI GPUI.
+
+La prova reale ha trovato due collisioni di accessibilità nell’ingresso delle
+Impostazioni: pulsante Blocca ripetuto e descrizioni delle righe senza un
+contenitore identificato. I panic e due regressioni rosse precedono le
+correzioni: identità separate del pulsante e delle righe; le sei descrizioni
+sono distinte attraverso due ridisegni. La compilazione intermedia richiedeva
+anche il ritorno `Stateful<Div>`; il rosso è conservato.
+
+Dopo il ripristino, un ritiro remoto non confermato nascondeva il messaggio
+con le istruzioni per la ricevuta. La nuova regressione fallisce prima della
+correzione e passa dopo: il modulo locale aggiorna la vista senza riscrivere
+altri esiti. Il registro del ritiro e il suo avviso persistente rimangono
+invariati. Nella prova interattiva resta l’avviso conservativo relativo alla
+sessione precedente al ripristino: non viene cancellato dalla ricevuta o dal
+successivo ritiro riuscito di un’altra sessione. La sua risoluzione nativa
+assistita resta un limite.
+
+Altri rossi della prova: build ordinaria senza Metal Toolchain, risolta nella
+build di tutti i target con `runtime_shaders`; setup isolato con generazione
+mancante, rifiutato 409 e corretto in una nuova fixture. Il primo controllo
+dello storico offline pretendeva uguaglianza dell’intero elenco e rilevava
+il legittimo evento aggiunto. Una rilettura indipendente in sola lettura della
+stessa destinazione, senza ripetere il writer, verifica gli otto eventi
+identici e l’unico evento aggiuntivo con tutti i campi previsti.
+
+I due processi Web e le finestre native di questa prova sono stati chiusi;
+archivi sintetici e risultati restano preservati esternamente. Nessuna nuova
+galleria nel repository. **G-3 rimane parziale** per i residui dichiarati sopra;
+CI finale e review indipendente non vengono dedotte dalle prove locali.
