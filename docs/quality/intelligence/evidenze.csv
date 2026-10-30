@@ -9,3 +9,4 @@ build-sparse.log,eceba7e9fe3251bc9b2730d3a85168deed78e8918ac06787946aa52d752701c
 preflight-direct.log,2517d3b2f9991a6f08afd47aae0798f72f8281dcb69370a6afe8b759120e5246,PASS,solo presenza artefatto e runner; nessuna inferenza
 e2e-final.log,c770df50c860ac9cbc96ac937618ecc2b9e8d8c376d45f94c99572095f36406d,FAIL,ripristino da API privo di generazione archivio
 e2e-restore.log,20eed41f27887283a2b1bb72d28851d756cbd0fb48c7dcd974cd2ab6a3457e84,PASS,correzione ripristino tramite fetch pagina
+e2e-production.log,20ab4a8dc77306b8874aff4951791c3fe8423ba8580579d43e2b26a6c2493d1f,PASS,Web standalone f0de86dcf; spec corrente; runtime invariato
