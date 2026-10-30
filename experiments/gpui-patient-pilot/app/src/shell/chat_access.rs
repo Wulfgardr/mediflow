@@ -13,6 +13,7 @@ pub(super) struct ChatAccess {
     pin: Entity<TextInput>,
     task: Option<gpui::Task<()>>,
     message: Option<String>,
+    last_state: Option<State>,
 }
 
 impl ChatAccess {
@@ -35,6 +36,7 @@ impl ChatAccess {
             }),
             task: None,
             message: None,
+            last_state: None,
         }
     }
     pub(super) fn retire(&mut self, cx: &mut App) {
@@ -71,6 +73,15 @@ impl ClinicalApp {
     }
 
     fn poll_chat_access(&mut self, cx: &mut Context<Self>) {
+        let status = self
+            .chat_access
+            .pending
+            .as_ref()
+            .and_then(|p| p.lock().ok().map(|mut p| p.status()));
+        if status != self.chat_access.last_state {
+            self.chat_access.last_state = status;
+            cx.notify();
+        }
         let editable = self
             .chat_access
             .pending
@@ -138,6 +149,10 @@ impl ClinicalApp {
         else {
             return;
         };
+        let therapy_write = pending.lock().is_ok_and(|p| p.therapy().is_some());
+        if therapy_write && !with_pin {
+            return;
+        }
         if !with_pin && !pending.lock().is_ok_and(|mut p| p.prepare_biometric()) {
             if let Ok(mut p) = pending.lock() {
                 p.withdraw();
@@ -151,7 +166,10 @@ impl ClinicalApp {
         self.chat_access.message = None;
         let target = pending.clone();
         let background = cx.background_executor().spawn(async move {
-            let result = if with_pin {
+            let result = if therapy_write {
+                if crate::chat_access::owner::execute_therapy(&pending, attempt, &pin) { Ok(()) }
+                else { Err("Esito non confermato. Rileggi la ricevuta; non ripetere la scrittura.".to_owned()) }
+            } else if with_pin {
                 session.confirm_chat_access_pin(&context, &pin).map_err(|error| if error.status_code() == Some(423) {
                     "PIN bloccato dopo troppi tentativi. Attendi lo sblocco previsto dall’host.".to_owned()
                 } else { "PIN non confermato o sessione non più disponibile.".to_owned() })
@@ -159,7 +177,7 @@ impl ClinicalApp {
                 attempt.biometric().map_err(str::to_owned).and_then(|()|
                     session.revalidate_chat_access_context(&context).map_err(|error| ui_error(error).to_owned()))
             };
-            if let Ok(mut pending) = pending.lock() { pending.finish(attempt, result.is_ok()); }
+            if !therapy_write && let Ok(mut pending) = pending.lock() { pending.finish(attempt, result.is_ok()); }
             result.err()
         });
         cx.spawn(async move |this, cx| {
@@ -191,31 +209,61 @@ impl ClinicalApp {
                 (payload.to_owned(), digest.to_owned(), source.to_owned())
             })
         });
-        let enabled = state == State::Challenge && review.is_some();
+        let therapy = pending.lock().ok().and_then(|p| {
+            p.therapy().map(|t| {
+                (
+                    t.target.clone(),
+                    t.rows.clone(),
+                    t.selected.clone(),
+                    t.result.clone(),
+                )
+            })
+        });
+        let enabled = state == State::Challenge
+            && (review.is_some() || therapy.as_ref().is_some_and(|t| t.2.is_some()));
+        let therapy_mode = therapy.is_some();
         let theme = self.theme;
         Some(div().id("native-chat-access-confirmation").role(Role::Group)
             .aria_label("Conferma accesso della chat").flex_1().min_h_0().overflow_y_scroll()
             .p(px(20.)).border_1().border_color(theme.rule)
             .flex().flex_col().gap(px(12.))
-            .child(heading("native-chat-access-title", "Condividi la scheda di prova nella chat?", theme))
+            .child(heading("native-chat-access-title", if therapy_mode { "Conferma il cambio di stato della terapia" } else { "Condividi la scheda di prova nella chat?" }, theme))
             .child(text!(format!("App richiedente: {app}")).with_id("native-chat-access-app"))
             .child(text!(format!("Archivio: {}", self.chat_access.archive)).with_id("native-chat-access-archive"))
             .child(div().id("native-chat-access-patient").child(crate::title::title(crate::title::TitleText::patient_question("Paziente: ", self.chat_access.patient.clone(), ""), theme)))
-            .child(notice("native-chat-access-operation", "Scheda sintetica «basic», indipendente dalla cartella selezionata. Controlla i byte sotto: verranno mostrati soltanto nella vista della chat. Nomi e fonti restano qui. Hai 30 secondi per confermare una sola lettura; nessun rinnovo automatico.", theme, false))
+            .child(notice("native-chat-access-operation", if therapy_mode { "Scegli la terapia della cartella selezionata e controlla il nuovo stato. La scrittura usa il PIN nativo, una sola volta entro 30 secondi. I nomi restano qui. Touch ID per questa scrittura non è ancora abilitato." } else { "Scheda sintetica «basic», indipendente dalla cartella selezionata. Controlla i byte sotto: verranno mostrati soltanto nella vista della chat. Nomi e fonti restano qui. Hai 30 secondi per confermare una sola lettura; nessun rinnovo automatico." }, theme, false))
+            .when_some(therapy, |mut el, (target, rows, selected, result)| {
+                el = el.child(text!(format!("Nuovo stato: {target}")).with_id("native-chat-therapy-target"));
+                for (index, row) in rows.iter().enumerate() {
+                    if selected.as_ref().is_none_or(|s| s.0 == index) {
+                        let selectable = state == State::Challenge && selected.is_none() && row.status != target;
+                        let request = pending.clone();
+                        el = el.child(button(format!("native-chat-therapy-{index}"), format!("{} · {} · {} → {} · versione {}", row.drug_name, row.dosage, row.status, target, row.version), theme, false, selectable)
+                            .when(selectable, |button| button.on_click(cx.listener(move |_, _, _, cx| {
+                                let request = request.clone();
+                                std::thread::spawn(move || crate::chat_access::owner::choose_therapy(&request, index));
+                                cx.notify();
+                            }))));
+                    }
+                }
+                if let Some((_, id)) = selected { el = el.child(notice("native-chat-therapy-command", format!("Comando: {id}. Conserva questo riferimento per rileggere l’esito."), theme, false)); }
+                if let Some(result) = result { el = el.child(notice("native-chat-therapy-receipt", format!("Ricevuta e rilettura: {result}"), theme, false)); }
+                el
+            })
             .when_some(review, |el, (payload, digest, source)| el
                 .child(notice("native-chat-card-source", format!("Fonte locale sintetica: {source}"), theme, false))
                 .child(notice("native-chat-card-payload", payload, theme, false))
                 .child(text!(format!("SHA-256: {digest}")).with_id("native-chat-card-digest")))
             .when_some(self.chat_access.message.clone(), |el, message| el.child(notice("native-chat-access-error", message, theme, true)))
-            .child(button("native-chat-access-touch-id", "Conferma con Touch ID", theme, true, enabled)
-                .when(enabled, |el| el.on_click(cx.listener(|this, _, _, cx| this.approve_chat_access(false, cx)))))
+            .child(button("native-chat-access-touch-id", "Conferma con Touch ID", theme, true, enabled && !therapy_mode)
+                .when(enabled && !therapy_mode, |el| el.on_click(cx.listener(|this, _, _, cx| this.approve_chat_access(false, cx)))))
             .child(self.chat_access.pin.clone())
             .child(button("native-chat-access-pin-confirm", "Conferma con PIN", theme, false, enabled)
                 .when(enabled, |el| el.on_click(cx.listener(|this, _, _, cx| this.approve_chat_access(true, cx)))))
             .child(button("native-chat-access-deny", "Nega e ritira", theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| { this.chat_access.retire(cx); cx.notify(); })))
             .when(state != State::Challenge, |el| el.child(notice("native-chat-access-state",
-                if state == State::Consumed { "Scheda consegnata. Puoi revocare la vista; i byte già ricevuti dall’host non vengono cancellati." } else if state == State::Approved { "Scheda autorizzata per una sola lettura nella vista chat." } else { "Conferma in corso…" }, theme, false))))
+                if state == State::Consumed && therapy_mode { "Operazione terminata. Controlla ricevuta e rilettura; nessuna ripetizione automatica." } else if state == State::Consumed { "Scheda consegnata. Puoi revocare la vista; i byte già ricevuti dall’host non vengono cancellati." } else if state == State::Approved { "Scheda autorizzata per una sola lettura nella vista chat." } else { "Conferma in corso…" }, theme, false))))
     }
 }
 

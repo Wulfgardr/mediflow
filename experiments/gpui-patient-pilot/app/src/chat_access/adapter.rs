@@ -19,6 +19,10 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
     }
     let value = if command == "request" {
         json!({"command": command, "operation": OPERATION})
+    } else if let Some(id) = command.strip_prefix("receipt-") {
+        json!({"command":"receipt", "commandId":id})
+    } else if let Some(target) = command.strip_prefix("therapy-") {
+        json!({"command":"therapy", "target":target})
     } else {
         json!({"command": command})
     };
@@ -40,9 +44,19 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
     });
     let fields = value.as_object().map(|v| v.len());
     let has_payload = value.get("payload").is_some();
+    let has_receipt = value.get("receipt").is_some();
     if bytes.len() > 65_536
         || state.is_none()
-        || (!has_payload && fields != Some(1))
+        || (!has_payload && !has_receipt && fields != Some(1))
+        || (has_receipt
+            && (fields != Some(2)
+                || value["receipt"].as_object().map(|v| v.len()) != Some(2)
+                || !value["receipt"]["commandId"].as_str().is_some_and(|id| {
+                    id.len() == 36 && id.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-')
+                })
+                || !value["receipt"]["outcome"].as_str().is_some_and(|s| {
+                    ["pending", "unknown", "applied", "rejected", "closed"].contains(&s)
+                })))
         || (has_payload
             && (command != "consume"
                 || state != Some("consumed")
@@ -99,8 +113,8 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                     "annotations":{"readOnlyHint":true,"destructiveHint":false,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["model"]}}},
                 {"name": CONTROL, "description":"Scheda sintetica monouso dopo consenso nella GPUI; payload riservato alla vista.",
-                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","status","consume","revoke"]}},"required":["command"],"additionalProperties":false},
-                    "annotations":{"readOnlyHint":true,"destructiveHint":false,"openWorldHint":false},
+                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","receipt"]},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
+                    "annotations":{"readOnlyHint":false,"destructiveHint":true,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["app"]}}}]}),
             "resources/list" => {
                 json!({"resources":[{"uri":URI,"name":"MediFlow — accesso nativo","mimeType":"text/html;profile=mcp-app"}]})
@@ -130,10 +144,38 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                     };
                     json!({"content":[{"type":"text","text":"Stato della vista disponibile."}],"_meta":{"status":status}})
                 } else if attached
+                    && args["command"] == "receipt"
+                    && args.as_object().map(|v| v.len()) == Some(2)
+                    && args["commandId"].as_str().is_some_and(|id| {
+                        id.len() == 36 && id.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-')
+                    })
+                {
+                    match call(
+                        &mut socket,
+                        &format!("receipt-{}", args["commandId"].as_str().unwrap()),
+                    ) {
+                        Ok(status) => {
+                            json!({"content":[{"type":"text","text":"Ricevuta disponibile nella vista."}],"_meta":status})
+                        }
+                        Err(_) => {
+                            json!({"isError":true,"content":[{"type":"text","text":"Ricevuta non disponibile."}]})
+                        }
+                    }
+                } else if attached
                     && args.as_object().map(|v| v.len()) == Some(1)
-                    && args["command"]
-                        .as_str()
-                        .is_some_and(|s| ["request", "status", "consume", "revoke"].contains(&s))
+                    && args["command"].as_str().is_some_and(|s| {
+                        [
+                            "request",
+                            "status",
+                            "consume",
+                            "revoke",
+                            "therapy-active",
+                            "therapy-suspended",
+                            "therapy-completed",
+                            "receipt",
+                        ]
+                        .contains(&s)
+                    })
                 {
                     match call(&mut socket, args["command"].as_str().unwrap()) {
                         Ok(status) => {

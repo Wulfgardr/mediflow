@@ -50,6 +50,13 @@ impl Attempt {
         native::biometric(&self.0)
     }
 }
+pub(crate) struct TherapyWrite {
+    pub(crate) target: String,
+    view_id: Option<String>,
+    pub(crate) rows: Vec<mediflow_runtime_client::Therapy>,
+    pub(crate) selected: Option<(usize, String)>,
+    pub(crate) result: Option<serde_json::Value>,
+}
 pub(crate) struct Request {
     attempt: Attempt,
     state: State,
@@ -62,6 +69,7 @@ pub(crate) struct Request {
     binding: Option<Binding>,
     card: Option<super::card::Card>,
     cancelled: Arc<AtomicBool>,
+    therapy: Option<TherapyWrite>,
 }
 pub(crate) type Pending = Arc<Mutex<Request>>;
 
@@ -88,17 +96,61 @@ impl Request {
             binding: None,
             card: None,
             cancelled: Arc::new(AtomicBool::new(false)),
+            therapy: None,
         })))
+    }
+    pub(super) fn for_therapy(peer: Peer, stream: UnixStream, target: &str) -> Option<Pending> {
+        let request = Self::new(peer, stream)?;
+        request.lock().ok()?.therapy = Some(TherapyWrite {
+            target: target.into(),
+            view_id: None,
+            rows: Vec::new(),
+            selected: None,
+            result: None,
+        });
+        Some(request)
+    }
+    pub(super) fn for_receipt(peer: Peer, stream: UnixStream, id: &str) -> Option<Pending> {
+        let request = Self::for_therapy(peer, stream, "receipt")?;
+        request.lock().ok()?.therapy.as_mut()?.selected = Some((0, id.into()));
+        Some(request)
+    }
+    pub(crate) fn therapy(&self) -> Option<&TherapyWrite> {
+        self.therapy.as_ref()
+    }
+    pub(crate) fn safe_result(&self) -> Option<serde_json::Value> {
+        let therapy = self.therapy.as_ref()?;
+        let (_, id) = therapy.selected.as_ref()?;
+        let outcome = therapy
+            .result
+            .as_ref()
+            .and_then(|r| r["receipt"]["outcome"].as_str())
+            .unwrap_or(if self.state == State::Consumed {
+                "unknown"
+            } else {
+                "pending"
+            });
+        Some(serde_json::json!({"commandId":id,"outcome":outcome}))
     }
     pub(crate) fn app(&self) -> &'static str {
         self.peer.app()
     }
     pub(crate) fn withdraw(&mut self) {
+        if !matches!(self.state, State::Consumed | State::Withdrawn)
+            && let Some((_, id)) = self.therapy.as_ref().and_then(|t| t.selected.as_ref())
+            && let Some(binding) = self.binding.as_ref()
+        {
+            let _ = binding.session.chat_therapy_request(
+                &binding.context,
+                &serde_json::json!({"operation":"revoke", "commandId":id}),
+            );
+        }
         self.cancelled.store(true, Ordering::Release);
         native::cancel_biometric(&self.attempt.0);
         self.state = State::Withdrawn;
         self.binding = None;
         self.card = None;
+        self.therapy = None;
         self.attempt.0.fill(0);
     }
     fn current(&self, now: Instant) -> bool {
@@ -145,7 +197,9 @@ impl Request {
         self.state = State::Challenge;
     }
     pub(crate) fn begin(&mut self) -> Option<(RuntimeSession, ChatAccessContext, Attempt)> {
-        if self.status() != State::Challenge {
+        if self.status() != State::Challenge
+            || self.therapy.as_ref().is_some_and(|t| t.selected.is_none())
+        {
             return None;
         }
         self.state = State::Approving;
@@ -190,6 +244,84 @@ impl Request {
     }
 }
 
+pub(crate) fn choose_therapy(pending: &Pending, index: usize) {
+    let binding = pending.lock().ok().and_then(|mut p| {
+        if p.status() != State::Challenge {
+            return None;
+        }
+        let t = p.therapy.as_ref()?;
+        if t.selected.is_some() {
+            return None;
+        }
+        let row = t.rows.get(index)?.clone();
+        let target = t.target.clone();
+        let b = p.binding.as_ref()?;
+        let result = (
+            b.session.clone(),
+            b.context.clone(),
+            row,
+            target,
+            t.view_id.clone()?,
+        );
+        p.state = State::Preparing;
+        Some(result)
+    });
+    let Some((session, context, row, target, view_id)) = binding else {
+        return;
+    };
+    let result = session.preview_chat_therapy(&context, &row, &target, &view_id);
+    if let Ok(mut p) = pending.lock() {
+        if p.status() != State::Preparing {
+            return;
+        }
+        if let Ok(id) = result {
+            if let Some(t) = p.therapy.as_mut() {
+                t.selected = Some((index, id));
+            }
+            p.deadline = Some((p.clock)() + CHALLENGE);
+            p.state = State::Challenge;
+        } else {
+            p.withdraw();
+        }
+    }
+}
+
+pub(crate) fn execute_therapy(pending: &Pending, attempt: Attempt, pin: &str) -> bool {
+    let binding = pending.lock().ok().and_then(|mut p| {
+        if attempt != p.attempt || p.status() != State::Approving {
+            return None;
+        }
+        let (_, id) = p.therapy.as_ref()?.selected.as_ref()?;
+        let b = p.binding.as_ref()?;
+        let result = (b.session.clone(), b.context.clone(), id.clone());
+        p.state = State::Consuming;
+        Some(result)
+    });
+    let Some((session, context, id)) = binding else {
+        return false;
+    };
+    let result = session.chat_therapy_request(
+        &context,
+        &serde_json::json!({"operation":"execute","commandId":id,"pin":pin}),
+    );
+    let receipt = session
+        .chat_therapy_request(
+            &context,
+            &serde_json::json!({"operation":"receipt","commandId":id}),
+        )
+        .ok();
+    if let Ok(mut p) = pending.lock() {
+        if p.status() != State::Consuming {
+            return false;
+        }
+        if let Some(t) = p.therapy.as_mut() {
+            t.result = receipt;
+        }
+        p.finish_consume(true);
+    }
+    result.is_ok()
+}
+
 pub(crate) fn prepare_card(pending: &Pending) {
     if !pending.lock().is_ok_and(|mut p| p.needs_card()) {
         return;
@@ -197,6 +329,57 @@ pub(crate) fn prepare_card(pending: &Pending) {
     let Some(cancelled) = pending.lock().ok().map(|p| p.cancelled.clone()) else {
         return;
     };
+    let therapy_binding = pending.lock().ok().and_then(|p| {
+        p.therapy.as_ref()?;
+        let b = p.binding.as_ref()?;
+        Some((b.session.clone(), b.context.clone()))
+    });
+    if let Some((session, context)) = therapy_binding {
+        let recovery = pending.lock().ok().and_then(|p| {
+            let t = p.therapy.as_ref()?;
+            if t.target != "receipt" {
+                return None;
+            }
+            Some(t.selected.as_ref()?.1.clone())
+        });
+        if let Some(id) = recovery {
+            let result = session.chat_therapy_request(
+                &context,
+                &serde_json::json!({"operation":"receipt", "commandId":id}),
+            );
+            if let Ok(mut p) = pending.lock() {
+                if p.status() != State::Preparing {
+                    return;
+                }
+                if let Ok(result) = result {
+                    if let Some(t) = p.therapy.as_mut() {
+                        t.result = Some(result);
+                    }
+                    p.state = State::Consumed;
+                    p.deadline = None;
+                } else {
+                    p.withdraw();
+                }
+            }
+            return;
+        }
+        let rows = session.chat_therapy_rows(&context);
+        if let Ok(mut p) = pending.lock() {
+            if p.status() != State::Preparing {
+                return;
+            }
+            if let Ok((rows, view_id)) = rows {
+                if let Some(t) = p.therapy.as_mut() {
+                    t.rows = rows;
+                    t.view_id = Some(view_id);
+                }
+                p.state = State::Challenge;
+            } else {
+                p.withdraw();
+            }
+        }
+        return;
+    }
     let card = super::card::Card::prepare(cancelled);
     if let Ok(mut p) = pending.lock() {
         p.install_card(card);
@@ -356,6 +539,27 @@ mod tests {
                         json!({"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},
                         "operator":{"userId":"synthetic-user","authChannel":"native"}}),
                     )
+                } else if first.starts_with("GET /api/v1/network/patients/patient-a/therapies ") {
+                    (
+                        200,
+                        json!([{"id":"therapy-a", "patientId":"patient-a", "drugName":"Synthetic medicine", "dosage":"Synthetic dose", "status":"active", "startDate":"2026-10-30", "version":1}]),
+                    )
+                } else if first.starts_with("POST /api/auth/native/therapy-status ") {
+                    let end = bytes.windows(4).position(|w| w == b"\r\n\r\n").unwrap();
+                    let body: Value = serde_json::from_slice(&bytes[end + 4..]).unwrap();
+                    let result = match body["operation"].as_str().unwrap() {
+                        "open" => json!({"viewId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}),
+                        "preview" => {
+                            json!({"commandId":body["command"]["commandId"],"status":"preview"})
+                        }
+                        "execute" => json!({"outcome":"applied"}),
+                        "receipt" => {
+                            json!({"outcome":"terminal", "receipt":{"outcome":"applied"},"current":{"version":2,"status":"suspended"}})
+                        }
+                        "revoke" => json!({"status":"retired"}),
+                        _ => panic!("unexpected native test operation"),
+                    };
+                    (200, result)
                 } else if first.starts_with("GET /api/auth/native/chat-access-confirmation ") {
                     (200, json!({"status":"eligible"}))
                 } else if first.starts_with("GET /api/v1/network/patient-profile/selection-epoch ")
@@ -421,6 +625,31 @@ mod tests {
         assert_eq!(consume(&first), State::Consumed);
         assert_eq!(consume(&first), State::Withdrawn);
     }
+    #[test]
+    fn therapy_native_selection_preview_pin_receipt_and_replay_use_the_same_bound_request() {
+        let (session, _host) = native_session();
+        let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+        let (a, _remote) = UnixStream::pair().unwrap();
+        let pending = Request::for_therapy(Peer::test_peer(), a, "suspended").unwrap();
+        assert!(pending.lock().unwrap().bind(session, context));
+        prepare_card(&pending);
+        assert_eq!(pending.lock().unwrap().status(), State::Challenge);
+        assert!(pending.lock().unwrap().begin().is_none());
+        choose_therapy(&pending, 0);
+        assert_eq!(
+            pending.lock().unwrap().safe_result().unwrap()["outcome"],
+            "pending"
+        );
+        let (_, _, attempt) = pending.lock().unwrap().begin().unwrap();
+        assert!(execute_therapy(&pending, attempt, "2468"));
+        assert_eq!(pending.lock().unwrap().status(), State::Consumed);
+        let safe = pending.lock().unwrap().safe_result().unwrap();
+        assert_eq!(safe["outcome"], "applied");
+        assert_eq!(safe.as_object().unwrap().len(), 2);
+        assert!(!execute_therapy(&pending, attempt, "2468"));
+        assert!(pending.lock().unwrap().begin().is_none());
+    }
+
     fn assert_card_negative(scenario: &str) {
         let (session, _host) = native_session();
         let context = session.chat_access_context("scope-a", "patient-a").unwrap();

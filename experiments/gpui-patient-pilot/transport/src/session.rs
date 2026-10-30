@@ -442,6 +442,64 @@ impl RuntimeSession {
         }
     }
 
+    pub fn chat_therapy_rows(&self, context: &ChatAccessContext) -> Result<(Vec<Therapy>, String)> {
+        self.revalidate_chat_access_context(context)?;
+        let rows = self.list_therapies(&context.scope, &context.patient)?;
+        self.check_chat_access_context(context)?;
+        let view = self.chat_therapy_request(context, &json!({"operation":"open", "patientId":context.patient, "selectionEpoch":context.selection_epoch}))?;
+        let view_id = view["viewId"]
+            .as_str()
+            .ok_or(RuntimeError::InvalidResponse)?
+            .to_owned();
+        Ok((
+            rows.into_iter()
+                .filter(|r| r.locked_fields.is_empty() && r.deleted_at.is_none())
+                .collect(),
+            view_id,
+        ))
+    }
+
+    pub fn preview_chat_therapy(
+        &self,
+        context: &ChatAccessContext,
+        row: &Therapy,
+        target: &str,
+        view_id: &str,
+    ) -> Result<String> {
+        self.revalidate_chat_access_context(context)?;
+        if row.patient_id != context.patient
+            || !["active", "suspended", "completed"].contains(&target)
+        {
+            return Err(RuntimeError::Forbidden);
+        }
+        let command_id = crate::http::operation_uuid()?;
+        let body = json!({"operation":"preview", "selectionEpoch":context.selection_epoch, "viewId":view_id,
+            "command":{"protocol":"therapy.status.change.v1", "commandId":command_id,
+                "archiveGeneration":self.inner.user.archive_generation, "patientId":context.patient,
+                "therapyId":row.id, "expectedVersion":row.version, "target":target}});
+        let result = self.chat_therapy_request(context, &body)?;
+        if result != json!({"commandId":command_id, "status":"preview"}) {
+            return Err(RuntimeError::Forbidden);
+        }
+        Ok(command_id)
+    }
+
+    pub fn chat_therapy_request(&self, context: &ChatAccessContext, body: &Value) -> Result<Value> {
+        self.check_chat_access_context(context)?;
+        let result = self.request_with_profile_intent(
+            Method::POST,
+            &["api", "auth", "native", "therapy-status"],
+            &[],
+            Some(&context.scope),
+            Some(body),
+            true,
+            JSON_LIMIT,
+            Some(&context.intent),
+        )?;
+        self.check_chat_access_context(context)?;
+        Ok(result)
+    }
+
     pub fn confirm_chat_access_pin(&self, context: &ChatAccessContext, pin: &str) -> Result<()> {
         self.revalidate_chat_access_context(context)?;
         let body = json!({ "operation": "mediflow.chat.access-status.v1", "pin": pin });
