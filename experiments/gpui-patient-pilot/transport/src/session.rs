@@ -73,6 +73,107 @@ impl AmbulatoryCommandContext {
         self.context.cancel();
     }
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChatTherapyOutcome {
+    Retired,
+    Applied,
+    Rejected,
+    Closed,
+}
+impl ChatTherapyOutcome {
+    pub fn wire(self) -> &'static str {
+        match self {
+            Self::Retired => "retired",
+            Self::Applied => "applied",
+            Self::Rejected => "rejected",
+            Self::Closed => "closed",
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChatTherapyResolution {
+    Uncertain,
+    Confirmed(ChatTherapyOutcome),
+}
+impl ChatTherapyResolution {
+    pub fn wire(self) -> &'static str {
+        match self {
+            Self::Uncertain => "uncertain",
+            Self::Confirmed(outcome) => outcome.wire(),
+        }
+    }
+    pub fn message(self) -> &'static str {
+        match self {
+            Self::Uncertain => {
+                "Esito da verificare. Il ritiro non è confermato: rileggi l’esito senza ripetere la scrittura."
+            }
+            Self::Confirmed(ChatTherapyOutcome::Applied) => {
+                "Modifica registrata e auditata. Il ritiro non annulla il salvataggio."
+            }
+            Self::Confirmed(ChatTherapyOutcome::Retired) => {
+                "Ritiro confermato. Nessuna modifica alla terapia."
+            }
+            Self::Confirmed(ChatTherapyOutcome::Rejected) => {
+                "Scrittura respinta. Nessuna modifica."
+            }
+            Self::Confirmed(ChatTherapyOutcome::Closed) => "Comando chiuso senza modifica.",
+        }
+    }
+}
+#[derive(Clone)]
+pub struct ChatTherapyRecovery {
+    session: RuntimeSession,
+    scope: String,
+    command_id: String,
+}
+impl ChatTherapyRecovery {
+    /// Idempotently retires the command or reports its already committed outcome.
+    /// Receipt reading and retirement survive selection cancellation; neither can execute.
+    pub fn reconcile(&self) -> ChatTherapyResolution {
+        self.confirmed()
+            .map(ChatTherapyResolution::Confirmed)
+            .unwrap_or(ChatTherapyResolution::Uncertain)
+    }
+    fn confirmed(&self) -> Result<ChatTherapyOutcome> {
+        if let Ok(receipt) = self.session.request(
+            Method::POST,
+            &["api", "auth", "native", "therapy-status"],
+            &[],
+            Some(&self.scope),
+            Some(&json!({"operation":"receipt", "commandId":self.command_id})),
+            true,
+            crate::http::JSON_LIMIT,
+        ) {
+            match receipt["outcome"].as_str() {
+                Some("terminal") => return Self::outcome(&receipt["receipt"]),
+                Some("unknown") => {}
+                _ => return Err(RuntimeError::InvalidResponse),
+            }
+        }
+        let result = self.session.request(
+            Method::POST,
+            &["api", "auth", "native", "therapy-status"],
+            &[],
+            Some(&self.scope),
+            Some(&json!({"operation":"revoke", "commandId":self.command_id})),
+            true,
+            4096,
+        )?;
+        if result.as_object().is_none_or(|o| o.len() != 1) {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        Self::outcome(&result)
+    }
+    fn outcome(result: &Value) -> Result<ChatTherapyOutcome> {
+        match result["outcome"].as_str() {
+            Some("retired") => Ok(ChatTherapyOutcome::Retired),
+            Some("applied") => Ok(ChatTherapyOutcome::Applied),
+            Some("rejected") => Ok(ChatTherapyOutcome::Rejected),
+            Some("closed") => Ok(ChatTherapyOutcome::Closed),
+            _ => Err(RuntimeError::InvalidResponse),
+        }
+    }
+}
 struct SessionInner {
     account_context: RequestContext,
     client: RuntimeClient,
@@ -440,6 +541,111 @@ impl RuntimeSession {
         } else {
             Err(RuntimeError::Forbidden)
         }
+    }
+
+    pub fn chat_therapy_rows(&self, context: &ChatAccessContext) -> Result<(Vec<Therapy>, String)> {
+        self.revalidate_chat_access_context(context)?;
+        let rows = self.list_therapies(&context.scope, &context.patient)?;
+        self.check_chat_access_context(context)?;
+        let view = self.chat_therapy_request(context, &json!({"operation":"open", "patientId":context.patient, "selectionEpoch":context.selection_epoch}))?;
+        let view_id = view["viewId"]
+            .as_str()
+            .ok_or(RuntimeError::InvalidResponse)?
+            .to_owned();
+        Ok((
+            rows.into_iter()
+                .filter(|r| r.locked_fields.is_empty() && r.deleted_at.is_none())
+                .collect(),
+            view_id,
+        ))
+    }
+
+    pub fn preview_chat_therapy(
+        &self,
+        context: &ChatAccessContext,
+        row: &Therapy,
+        target: &str,
+        view_id: &str,
+    ) -> Result<String> {
+        self.revalidate_chat_access_context(context)?;
+        if row.patient_id != context.patient
+            || !["active", "suspended", "completed"].contains(&target)
+        {
+            return Err(RuntimeError::Forbidden);
+        }
+        let command_id = crate::http::operation_uuid()?;
+        let body = json!({"operation":"preview", "selectionEpoch":context.selection_epoch, "viewId":view_id,
+            "command":{"protocol":"therapy.status.change.v1", "commandId":command_id,
+                "archiveGeneration":self.inner.user.archive_generation, "patientId":context.patient,
+                "therapyId":row.id, "expectedVersion":row.version, "target":target}});
+        let result = self.chat_therapy_request(context, &body)?;
+        if result != json!({"commandId":command_id, "status":"preview"}) {
+            return Err(RuntimeError::Forbidden);
+        }
+        Ok(command_id)
+    }
+
+    pub fn chat_therapy_recovery(
+        &self,
+        context: &ChatAccessContext,
+        command_id: &str,
+    ) -> Result<ChatTherapyRecovery> {
+        self.check_chat_access_context(context)?;
+        self.recover_chat_therapy_command(&context.scope, command_id)
+    }
+
+    pub fn chat_therapy_reference_namespace(&self) -> String {
+        use sha2::{Digest, Sha256};
+        let bytes = serde_json::to_vec(&(
+            self.base_url(),
+            &self.user().archive_generation,
+            &self.user().id,
+        ))
+        .unwrap();
+        format!("{:x}", Sha256::digest(bytes))
+    }
+
+    pub fn recover_chat_therapy_command(
+        &self,
+        scope: &str,
+        command_id: &str,
+    ) -> Result<ChatTherapyRecovery> {
+        validate_scope_id(scope)?;
+        if command_id.len() != 36
+            || !command_id.bytes().enumerate().all(|(i, b)| {
+                if [8, 13, 18, 23].contains(&i) {
+                    b == b'-'
+                } else {
+                    b.is_ascii_hexdigit()
+                }
+            })
+        {
+            return Err(RuntimeError::InvalidInput);
+        }
+        Ok(ChatTherapyRecovery {
+            session: Self {
+                inner: self.inner.clone(),
+                context: self.inner.account_context.child(),
+            },
+            scope: scope.into(),
+            command_id: command_id.into(),
+        })
+    }
+
+    pub fn chat_therapy_request(&self, context: &ChatAccessContext, body: &Value) -> Result<Value> {
+        self.check_chat_access_context(context)?;
+        let result = self.request_with_profile_intent(
+            Method::POST,
+            &["api", "auth", "native", "therapy-status"],
+            &[],
+            Some(&context.scope),
+            Some(body),
+            true,
+            JSON_LIMIT,
+            Some(&context.intent),
+        )?;
+        self.check_chat_access_context(context)?;
+        Ok(result)
     }
 
     pub fn confirm_chat_access_pin(&self, context: &ChatAccessContext, pin: &str) -> Result<()> {
@@ -3182,6 +3388,28 @@ mod tests {
         }
     }
 
+    #[test]
+    fn chat_reference_namespace_survives_login_but_separates_host_archive_and_owner() {
+        let original = session();
+        let namespace = original.chat_therapy_reference_namespace();
+        assert_eq!(namespace, session().chat_therapy_reference_namespace());
+        assert_ne!(
+            namespace,
+            session_at("http://127.0.0.1:43182").chat_therapy_reference_namespace()
+        );
+        for field in ["owner", "archive"] {
+            let mut other = session();
+            let inner = Arc::get_mut(&mut other.inner).unwrap();
+            if field == "owner" {
+                inner.user.id = "other-owner".into();
+            } else {
+                inner.user.archive_generation = "other-archive".into();
+            }
+            assert_ne!(namespace, other.chat_therapy_reference_namespace());
+        }
+        assert_eq!(namespace.len(), 64);
+        assert!(namespace.bytes().all(|b| b.is_ascii_hexdigit()));
+    }
     fn session() -> RuntimeSession {
         session_at("http://127.0.0.1:43181")
     }
@@ -7500,5 +7728,22 @@ mod tests {
             );
             worker.join().unwrap();
         }
+    }
+}
+
+#[cfg(test)]
+mod chat_therapy_resolution_tests {
+    use super::*;
+    #[test]
+    fn unknown_receipt_cannot_construct_a_terminal_outcome() {
+        assert_eq!(
+            ChatTherapyRecovery::outcome(&json!({"outcome":"unknown"})),
+            Err(RuntimeError::InvalidResponse)
+        );
+        assert_eq!(
+            ChatTherapyRecovery::outcome(&json!({"outcome":"retired"})),
+            Ok(ChatTherapyOutcome::Retired)
+        );
+        assert_eq!(ChatTherapyResolution::Uncertain.wire(), "uncertain");
     }
 }

@@ -63,25 +63,7 @@ export function executeTherapyStatusCommand(session: ServerSession, command: The
     return dbServer.transaction(tx => {
         const actorRef = admitActor(tx, session);
         assertArchiveGeneration(tx, command.archiveGeneration);
-        const existing = existingReceipt(tx, command, actorRef, command.target);
-        if (existing) return receipt(existing);
-        admitResource(tx, command);
-        const row = base(command, actorRef), now = new Date(row.committedAt * 1000);
-        const therapy = tx.select().from(therapies).where(eq(therapies.id, command.therapyId)).get()!;
-        const endDate = command.target === 'completed' ? now : command.target === 'active' ? null : therapy.endDate;
-        const result = updateTherapyOperationInTransaction(tx, {
-            patientId: command.patientId, therapyId: command.therapyId, expectedVersion: command.expectedVersion,
-            values: { status: command.target, endDate, updatedAt: now }, changedFields: ['status', 'endDate'], mode: 'v1', occurredAt: now,
-            audit: { archiveGeneration: command.archiveGeneration, actorType: 'user', actorRef, sourceSurface: 'web', requestId: command.commandId, flags: ['auth:web'] },
-        });
-        if (result.status === 404) throw new TherapyStatusCommandDenied('denied');
-        if (result.status === 409) return insert(tx, { ...row, target: command.target, outcome: 'rejected', reason: 'version_conflict' });
-        if (!result.auditEventId) throw new Error('Therapy status command audit missing');
-        const audit = tx.select().from(auditEvents).where(eq(auditEvents.eventId, result.auditEventId)).get();
-        if (!audit) throw new Error('Therapy status command audit missing');
-        return insert(tx, { ...row, target: command.target, outcome: 'applied', resultVersion: command.expectedVersion + 1,
-            resultEndDate: endDate ? endDate.getTime() / 1000 : null, auditEventId: result.auditEventId,
-            auditSnapshot: JSON.stringify(snapshotBackupAudit(audit)) });
+        return executeTherapyStatusInTransaction(tx, command, actorRef);
     }, { behavior: 'immediate' });
 }
 export function closeTherapyStatusCommand(session: ServerSession, command: TherapyStatusCommand): TherapyStatusReceipt {
@@ -106,4 +88,26 @@ export function readTherapyStatusReceipt(session: ServerSession, command: Therap
         admitResource(tx, command);
         return { outcome: 'unknown' as const };
     }, { behavior: 'immediate' });
+}
+
+export function executeTherapyStatusInTransaction(tx: Tx, command: TherapyStatusExecute, actorRef: string, scopeAmbulatoryId?: string): TherapyStatusReceipt {
+    const existing = existingReceipt(tx, command, actorRef, command.target);
+    if (existing) return receipt(existing);
+    admitResource(tx, command);
+    const row = base(command, actorRef), now = new Date(row.committedAt * 1000);
+    const therapy = tx.select().from(therapies).where(eq(therapies.id, command.therapyId)).get()!;
+    const endDate = command.target === 'completed' ? now : command.target === 'active' ? null : therapy.endDate;
+    const result = updateTherapyOperationInTransaction(tx, {
+        patientId: command.patientId, therapyId: command.therapyId, expectedVersion: command.expectedVersion,
+        values: { status: command.target, endDate, updatedAt: now }, changedFields: ['status', 'endDate'], mode: scopeAmbulatoryId ? 'network' : 'v1', scopeAmbulatoryId, occurredAt: now,
+        audit: { archiveGeneration: command.archiveGeneration, actorType: 'user', actorRef, sourceSurface: scopeAmbulatoryId ? 'native' : 'web', requestId: command.commandId, flags: scopeAmbulatoryId ? ['auth:paired-client', 'chat:therapy-status'] : ['auth:web'] },
+    });
+    if (result.status === 404) throw new TherapyStatusCommandDenied('denied');
+    if (result.status === 409) return insert(tx, { ...row, target: command.target, outcome: 'rejected', reason: 'version_conflict' });
+    if (!result.auditEventId) throw new Error('Therapy status command audit missing');
+    const audit = tx.select().from(auditEvents).where(eq(auditEvents.eventId, result.auditEventId)).get();
+    if (!audit) throw new Error('Therapy status command audit missing');
+    return insert(tx, { ...row, target: command.target, outcome: 'applied', resultVersion: command.expectedVersion + 1,
+        resultEndDate: endDate ? endDate.getTime() / 1000 : null, auditEventId: result.auditEventId,
+        auditSnapshot: JSON.stringify(snapshotBackupAudit(audit)) });
 }

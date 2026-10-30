@@ -71,7 +71,7 @@ const gpuiPaths = [`${gpuiDirectory}/**`, 'app/fonts/**', 'native/MediFlowMac/So
   'docs/design/punto-inchiostro/tokens/punto-inchiostro.tokens.json', 'docs/design/lume/tokens/lume.tokens.json',
   'public/brand/mediflow/*.svg', 'native/contracts/crypto-golden-vectors.v3.json', 'native/contracts/recovery-backup-golden.v1.json', 'app/api/**', 'lib/**', 'drizzle/**',
   'packages/web-auth-lifecycle-owner/**', 'package.json', 'package-lock.json', 'scripts/prepare-e2e-db.mjs',
-  'scripts/web-auth-control-test-client.mjs', 'scripts/chat-card-*.mjs', 'scripts/fixtures/chat-card-owned-tree.mjs',
+  'scripts/web-auth-control-test-client.mjs', 'scripts/chat-card-*.mjs', 'scripts/*chat-therapy*', 'scripts/fixtures/chat-card-owned-tree.mjs',
   'scripts/native-tool-test-selection.mjs', 'scripts/check-test-selection.test.mjs', gpuiWorkflow];
 const gpuiTriggers = { pull_request: { paths: gpuiPaths }, push: { branches: ['main'], paths: gpuiPaths }, workflow_dispatch: null };
 // Closed, single-line TOML tables for this pilot's explicit Cargo targets. A new
@@ -144,7 +144,7 @@ export function cargoGpuiPilotTestCommand(root) {
   if (!/^mod account_profile;\s*mod agenda_flow;\s*mod ai_preferences;\s*mod ai_status;\s*mod ambulatories;\s*mod ambulatory_commands;\s*mod analytics;\s*#\[cfg\(unix\)\]\s*mod chat_access;\s*mod clinical_forms;\s*mod document_details;\s*mod document_library;\s*mod local_host;\s*pub\(crate\) mod local_preferences;\s*mod local_settings;\s*#\[cfg\(test\)\]\s*mod notes_recovery_tests;\s*#\[cfg\(test\)\]\s*pub\(crate\) mod rendered_command;\s*mod scales;\s*mod settings;\s*mod therapy_picker;\s*mod threshold_actions;\s*mod view_state;\s*mod who_lookup;/u.test(shell)) throw new Error('Pilot shell module binding changed');
   const library = read(root, `${gpuiDirectory}/transport/src/lib.rs`).replace(/^(?:\s|\/\/[^\n]*(?:\n|$))*/u, '');
   if (!/^#!\[forbid\(unsafe_code\)\]\s*mod account_profile;\s*mod ai_preferences;\s*mod ambulatories;\s*mod ambulatory_command_recovery;\s*mod ambulatory_command_transport;\s*mod ambulatory_commands;\s*mod analytics;\s*mod catalogs;\s*mod context;\s*mod crypto;\s*mod dto;\s*mod error;\s*mod http;\s*mod local_host;\s*mod ports;\s*mod profile_query;\s*mod retirement_notice;\s*mod scales;\s*mod session;\s*mod tls;\s*mod who;/u.test(library)) throw new Error('Pilot transport module binding changed');
-  const files = ['client/tests/flow.rs', 'client/tests/patient_names.rs', 'app/src/demo_app_tests.rs', 'app/src/chat_access/owner.rs', 'app/src/chat_access/card.rs', 'app/src/clinical_text.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/native_lock.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/patient_text.rs', 'app/src/platform_integration.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/shell/account_profile.rs', 'app/src/shell/agenda_flow.rs', 'app/src/shell/ambulatories.rs', 'app/src/shell/ai_preferences.rs', 'app/src/shell/ai_status.rs', 'app/src/shell/analytics.rs', 'app/src/shell/chat_access.rs', 'app/src/shell/document_details.rs', 'app/src/shell/document_library.rs', 'app/src/shell/settings.rs', 'app/src/shell/local_preferences.rs', 'app/src/shell/local_settings.rs', 'app/src/shell/local_host.rs', 'app/src/shell/local_host/archives.rs', 'app/src/shell/notes_recovery_tests.rs', 'app/src/shell/rendered_command.rs', 'app/src/shell/scales.rs', 'app/src/shell/therapy_picker.rs', 'app/src/shell/view_state.rs', 'app/src/shell/who_lookup.rs', 'app/src/text_input.rs', 'app/src/theme.rs', 'app/src/title.rs',
+  const files = ['client/tests/flow.rs', 'client/tests/patient_names.rs', 'app/src/demo_app_tests.rs', 'app/src/chat_access/owner.rs', 'app/src/chat_access/card.rs', 'app/src/chat_access/references.rs', 'app/src/clinical_text.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/native_lock.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/patient_text.rs', 'app/src/platform_integration.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/shell/account_profile.rs', 'app/src/shell/agenda_flow.rs', 'app/src/shell/ambulatories.rs', 'app/src/shell/ai_preferences.rs', 'app/src/shell/ai_status.rs', 'app/src/shell/analytics.rs', 'app/src/shell/chat_access.rs', 'app/src/shell/document_details.rs', 'app/src/shell/document_library.rs', 'app/src/shell/settings.rs', 'app/src/shell/local_preferences.rs', 'app/src/shell/local_settings.rs', 'app/src/shell/local_host.rs', 'app/src/shell/local_host/archives.rs', 'app/src/shell/notes_recovery_tests.rs', 'app/src/shell/rendered_command.rs', 'app/src/shell/scales.rs', 'app/src/shell/therapy_picker.rs', 'app/src/shell/view_state.rs', 'app/src/shell/who_lookup.rs', 'app/src/text_input.rs', 'app/src/theme.rs', 'app/src/title.rs',
     'transport/src/dto.rs', 'transport/src/account_profile.rs', 'transport/src/ambulatories.rs', 'transport/src/ambulatory_command_recovery.rs', 'transport/src/ambulatory_command_transport.rs', 'transport/src/ambulatory_commands.rs', 'transport/src/ai_preferences.rs', 'transport/src/analytics.rs', 'transport/src/catalogs.rs', 'transport/src/context.rs', 'transport/src/crypto.rs', 'transport/src/http.rs', 'transport/src/local_host.rs', 'transport/src/ports.rs', 'transport/src/profile_query.rs', 'transport/src/retirement_notice.rs', 'transport/src/scales.rs', 'transport/src/session.rs', 'transport/src/who.rs', 'transport/src/bin/mediflow-runtime-probe.rs'].map(file => `${gpuiDirectory}/${file}`);
   for (const file of [...files, `${gpuiDirectory}/app/src/shell/clinical_forms.rs`, `${gpuiDirectory}/app/src/shell/threshold_actions.rs`, `${gpuiDirectory}/app/src/shell/ambulatory_commands.rs`, `${gpuiDirectory}/client/src/lib.rs`, `${gpuiDirectory}/transport/src/bin/mediflow-runtime-probe.rs`, `${gpuiDirectory}/Cargo.lock`, `${gpuiDirectory}/state/src/lib.rs`, `${gpuiDirectory}/transport/src/local_host/archives.rs`]) read(root, file);
   return { files, executable: 'cargo', args: ['test', '--manifest-path', manifest, '--workspace', '--all-targets', '--locked'], toolchain };
@@ -164,6 +164,18 @@ export function collectGpuiPilotSelection(root) {
   return { files: command.files, errors: [], mode: 'conditional', conditional: true,
     binding: { ...binding, command: [command.executable, ...command.args], toolchain: command.toolchain,
       scope: 'Synthetic tests and native target compilation; no UI execution or product qualification' } };
+}
+
+function collectGpuiTherapyWithdrawal(root) {
+  const files = ['scripts/check-chat-therapy-withdraw.mjs', 'scripts/chat-therapy-withdraw-host.ts'];
+  for (const file of files) read(root, file);
+  const binding = collectLiteralCiBinding(root, {
+    workflow: gpuiWorkflow, job: 'native-tests', triggers: gpuiTriggers, ciCall: `node ${files[0]}`,
+  });
+  if (binding.jobIf !== null || binding.stepIf !== "runner.os == 'macOS'"
+    || !read(root, files[0]).includes("'real_route_withdraw_during_pin'")
+    || !read(root, files[0]).includes(files[1])) throw new Error('Native therapy withdrawal CI binding changed');
+  return { files, errors: [], mode: 'conditional', conditional: true, binding };
 }
 
 export function collectGpuiBundleSelection(root) {
@@ -273,6 +285,8 @@ export function collectNativeToolSelections(root) {
   if (fs.existsSync(path.join(root, `${gpuiDirectory}/Cargo.toml`))) {
     try { result['cargo:gpui-pilot'] = collectGpuiPilotSelection(root); }
     catch (error) { result['cargo:gpui-pilot'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
+    try { result['http:gpui-therapy-withdraw'] = collectGpuiTherapyWithdrawal(root); }
+    catch (error) { result['http:gpui-therapy-withdraw'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
     try { result['python:gpui-bundle'] = collectGpuiBundleSelection(root); }
     catch (error) { result['python:gpui-bundle'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
     try { result['http:gpui-comparison'] = collectGpuiComparisonSelection(root); }

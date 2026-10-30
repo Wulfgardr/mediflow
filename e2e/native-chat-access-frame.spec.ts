@@ -7,7 +7,7 @@ test.beforeEach(async ({ page, context }) => {
     await context.route(url => url.port === '3000', route => route.abort('blockedbyclient'));
     await page.setContent('<!doctype html><html><body></body></html>');
     await page.evaluate(source => {
-        const state = { status: 'challenge', attached: false, calls: [] as unknown[] };
+        const state = { status: 'challenge', attached: false, holdRevoke: false, releaseRevoke: undefined as undefined | (() => void), revokeStatus: 'withdrawn', calls: [] as unknown[], receipt: undefined as undefined | { commandId: string; outcome: string } };
         (window as unknown as { accessFixture: typeof state }).accessFixture = state;
         window.addEventListener('message', event => {
             const request = event.data;
@@ -19,12 +19,14 @@ test.beforeEach(async ({ page, context }) => {
                 const command = request.params.arguments.command;
                 let status = state.status;
                 let payload: string | undefined;
-                if (command === 'attach') { status = state.attached ? 'withdrawn' : 'ready'; state.attached = true; }
+                if (command === 'attach') { status = state.attached ? (state.status = state.revokeStatus) : 'ready'; state.attached = true; }
                 if (command === 'consume') { status = state.status = 'consumed'; payload = JSON.stringify({ profile: 'mediflow.synthetic-chat-card.v1', pseudonym: 'card_' + 'a'.repeat(32), history: [], therapies: [], measures: [] }); }
-                if (command === 'revoke') status = state.status = 'withdrawn';
-                result = { content: [{ type: 'text', text: 'Esito disponibile nella vista.' }], _meta: { status, ...(payload ? { payload } : {}) } };
+                if (command === 'revoke') status = state.status = state.revokeStatus;
+                result = { content: [{ type: 'text', text: 'Esito disponibile nella vista.' }], _meta: { status, ...(payload ? { payload } : {}), ...(state.receipt ? { receipt: state.receipt } : {}) } };
             }
-            (event.source as Window).postMessage({ jsonrpc: '2.0', id: request.id, result }, '*');
+            const reply = () => (event.source as Window).postMessage({ jsonrpc: '2.0', id: request.id, result }, '*');
+            if (request.params?.arguments?.command === 'revoke' && state.holdRevoke) state.releaseRevoke = reply;
+            else reply();
         });
         const frame = document.createElement('iframe'); frame.id = 'access'; frame.sandbox.add('allow-scripts');
         frame.style.width = '100%'; frame.style.height = '600px'; frame.srcdoc = source;
@@ -81,4 +83,84 @@ test('the initial tool-input notification does not revoke a view before the user
     await expect(page.frameLocator('#access').getByRole('button', { name: 'Richiedi accesso' })).toBeEnabled();
     await page.evaluate(() => (document.querySelector('#access') as HTMLIFrameElement).contentWindow!.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/tool-input', params: { arguments: {} } }, '*'));
     await expect(page.frameLocator('#access').getByRole('button', { name: 'Richiedi accesso' })).toBeEnabled();
+});
+
+
+test('therapy command exposes only target and opaque receipt, with no automatic write retry', async ({ page }) => {
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Sospendi terapia', exact: true }).click();
+    await expect(frame.getByRole('button', { name: 'Mostra scheda monouso' })).toBeDisabled();
+    await page.evaluate(() => {
+        const fixture = (window as unknown as { accessFixture: { status: string; receipt: unknown } }).accessFixture;
+        fixture.status = 'consumed'; fixture.receipt = { commandId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', outcome: 'applied' };
+    });
+    await expect(frame.locator('#therapy-receipt')).toContainText('Modifica registrata e auditata');
+    await expect(frame.getByRole('region', { name: 'Scheda sintetica' })).toBeHidden();
+    const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: {command: string} }[] } }).accessFixture.calls);
+    expect(calls.filter(c => c.arguments.command === 'therapy-suspended')).toHaveLength(1);
+    expect(calls.some(c => c.arguments.command === 'consume')).toBe(false);
+});
+
+test('receipt recovery is an explicit read using only the opaque command reference', async ({ page }) => {
+    const frame = page.frameLocator('#access');
+    const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    await frame.getByLabel('Riferimento del comando').fill(id);
+    await frame.getByRole('button', { name: 'Rileggi esito' }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { accessFixture: { calls: unknown[] } }).accessFixture.calls)).toContainEqual({ name: 'mediflow_native_access', arguments: { command: 'receipt', commandId: id } });
+});
+
+for (const outcome of ['uncertain', 'applied', 'retired'] as const) test(`therapy withdrawal waits for confirmation and shows ${outcome}`, async ({ page }) => {
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Sospendi terapia', exact: true }).click();
+    await expect(frame.getByRole('status')).toContainText('Conferma nella finestra');
+    await page.evaluate(outcome => {
+        const f = (window as unknown as { accessFixture: { holdRevoke: boolean; revokeStatus: string } }).accessFixture;
+        f.holdRevoke = true; f.revokeStatus = outcome;
+    }, outcome);
+    await frame.getByRole('button', { name: 'Revoca', exact: true }).click();
+    await expect(frame.getByRole('status')).toContainText('Esito da verificare');
+    await expect(frame.getByRole('button', { name: 'Rileggi esito e completa il ritiro' })).toBeEnabled();
+    await expect.poll(() => page.evaluate(() => !!(window as unknown as { accessFixture: { releaseRevoke?: () => void } }).accessFixture.releaseRevoke)).toBe(true);
+    await page.evaluate(() => (window as unknown as { accessFixture: { releaseRevoke: () => void } }).accessFixture.releaseRevoke());
+    await expect(frame.getByRole('status')).toContainText({ uncertain: 'Esito da verificare', applied: 'Modifica registrata e auditata', retired: 'Ritiro confermato' }[outcome]);
+    await expect(frame.getByRole('button', { name: 'Conferma con PIN' })).toHaveCount(0);
+    const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: { command: string } }[] } }).accessFixture.calls);
+    expect(calls.filter(c => c.arguments.command === 'therapy-suspended')).toHaveLength(1);
+    expect(calls.filter(c => c.arguments.command === 'revoke')).toHaveLength(1);
+    if (outcome === 'uncertain') {
+        await page.evaluate(() => {
+            const f = (window as unknown as { accessFixture: { holdRevoke: boolean; revokeStatus: string } }).accessFixture;
+            f.holdRevoke = false; f.revokeStatus = 'retired';
+        });
+        await frame.getByRole('button', { name: 'Rileggi esito e completa il ritiro' }).click();
+        await expect(frame.getByRole('status')).toContainText('Ritiro confermato');
+    }
+});
+
+for (const outcome of ['uncertain', 'applied', 'retired'] as const) test(`reload preserves actual adapter attach outcome ${outcome}`, async ({ page }) => {
+    const frame = page.frameLocator('#access');
+    await frame.locator('#therapy-suspended').click();
+    await expect(frame.getByRole('status')).toContainText('Conferma nella finestra MediFlow');
+    await page.evaluate(outcome => {
+        (window as unknown as { accessFixture: { revokeStatus: string } }).accessFixture.revokeStatus = outcome;
+    }, outcome);
+    await page.locator('#access').evaluate(element => {
+        const frame = element as HTMLIFrameElement; frame.srcdoc = frame.srcdoc;
+    });
+    const wanted = { uncertain: 'Esito da verificare', applied: 'Modifica registrata e auditata', retired: 'Ritiro confermato' }[outcome];
+    await expect(frame.getByRole('status')).toContainText(wanted, { timeout: 1500 });
+});
+
+for (const status of ['consumed', 'withdrawn', 'retired']) test(`unknown receipt never claims withdrawal on ${status}`, async ({ page }) => {
+    const frame = page.frameLocator('#access');
+    await page.evaluate(status => {
+        const f = (window as unknown as { accessFixture: { receipt: unknown; revokeStatus: string } }).accessFixture;
+        f.revokeStatus = status;
+        f.receipt = { commandId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', outcome: 'unknown' };
+    }, status);
+    await page.locator('#access').evaluate(element => { const frame = element as HTMLIFrameElement; frame.srcdoc = frame.srcdoc; });
+    await expect(frame.getByRole('status')).toContainText('Esito da verificare');
+    await expect(frame.getByRole('button', { name: 'Rileggi esito e completa il ritiro' })).toBeEnabled();
+    await expect(frame.locator('#command-id')).toHaveValue('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    await expect(frame.locator('#therapy-receipt')).not.toContainText('aaaaaaaa');
 });

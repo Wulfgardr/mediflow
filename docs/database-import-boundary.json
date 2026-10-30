@@ -31,7 +31,8 @@
     "first-ambulatory-bootstrap": "ADR0167: named first-ambulatory composition uses the outer IMMEDIATE transaction for current Web/paired authority, archive generation, zero-site gate and exact readback; mutation and audit delegate only to the existing createAmbulatory core within that transaction. No new writer, schema or general administrative authority.",
     "therapy-status-command": "ADR0168: named Web physician status command composes the common therapy Tx core, required audit and terminal receipt under one IMMEDIATE; read/close do not grant chat or generic clinical write authority.",
     "ambulatory-destructive-command": "ADR0169: named clear-test/delete host composition rechecks original paired device and fresh same-admin WebP3, generation and frozen plan under one IMMEDIATE with common Tx core, mandatory audit and terminal receipt; read/close do not require a surviving scope and never grant generic paired administration.",
-    "archive-restore-receipt": "Named admin archive preview and receipt reads use the existing admitted Node handle; receipt insertion takes that handle from the canonical restore transaction. No new driver, Rust SQL authority or alternative archive writer."
+    "archive-restore-receipt": "Named admin archive preview and receipt reads use the existing admitted Node handle; receipt insertion takes that handle from the canonical restore transaction. No new driver, Rust SQL authority or alternative archive writer.",
+    "chat-therapy-status": "Paired native therapy-status preview/authorization/receipt boundary. Uses the existing dbServer transaction and shared therapy-status command writer; no independent SQLite connection or clinical writer."
   },
   "semantics": {
     "edge": "Exact source path, resolved target, capability, import form, imported symbols and occurrence count. Value imports are conservatively treated as runtime dependencies; explicit type-only imports are not authority.",
@@ -1918,6 +1919,17 @@
       ],
       "count": 1,
       "classification": "archive-restore-receipt"
+    },
+    {
+      "file": "lib/chat-therapy-status.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "chat-therapy-status"
     }
   ],
   "opaqueLoaders": [
