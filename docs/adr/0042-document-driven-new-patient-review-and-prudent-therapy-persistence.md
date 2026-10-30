@@ -238,6 +238,9 @@ vettore condiviso descritti sopra. Tutti i campi sono inseriti dal medico con
 `correct`; nessun candidato è precompilato. L'anteprima locale conserva la
 bozza quando si torna alla revisione. Il PIN nativo autorizza il comando;
 la biometria è esplicitamente non disponibile per questa operazione.
+Il collegamento GPUI usa attualmente il deposito nativo Unix: il pannello è
+disponibile su macOS/Linux. La compilazione Windows del trasporto non attesta
+la disponibilità di questo pannello su Windows.
 
 Questa modifica cambia la risposta della sola route nativa. Dopo le verifiche
 correnti di operatore, dispositivo abbinato, generazione di archivio,
@@ -277,3 +280,6 @@ un confronto con byte locali non più presenti.
 Ritiro, errore, blocco e cambio di contesto svuotano PDF, testo estratto,
 campi e PIN dalla UI; nessun ritiro incerto elimina il riferimento. Restano
 riservate a Leonardo la prova Touch ID sul client reale e la qualificazione.
+Una risposta asincrona deve anche conservare il contesto locale non cancellato:
+annullare e riaprire nello stesso ambulatorio non riabilita il vecchio selettore
+o il risultato di una precedente acquisizione.

@@ -247,6 +247,7 @@ impl ClinicalApp {
     fn accepts_patient_document(&self, epoch: u64, session: &RuntimeSession, scope: &str) -> bool {
         self.epoch == epoch
             && !session.is_locked()
+            && session.request_context().check().is_ok()
             && !self.privacy_shield
             && self.scope.as_deref() == Some(scope)
             && self.session.as_ref().is_some_and(|s| {
@@ -842,6 +843,32 @@ mod tests {
                 assert!(app.patient_document_recovery_view(cx).is_some());
             });
         }
+    }
+
+    #[gpui::test]
+    fn cancelled_picker_and_stage_cannot_update_a_reopened_work_in_the_same_scope(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (session, _host) = crate::chat_access::owner::tests::native_session();
+        let (app, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        app.update(cx, |app, cx| {
+            let old = session.patient_document_session("scope-a").unwrap();
+            seed(app, &old, Phase::Reading, cx);
+            let epoch = app.epoch;
+            assert!(app.accepts_patient_document(epoch, &old, "scope-a"));
+            app.patient_document.detach(cx);
+            assert!(old.request_context().check().is_err());
+            let current = session.patient_document_session("scope-a").unwrap();
+            seed(app, &current, Phase::Review, cx);
+            assert_eq!(app.epoch, epoch);
+            assert!(app.accepts_patient_document(epoch, &current, "scope-a"));
+            assert!(!app.accepts_patient_document(epoch, &old, "scope-a"));
+            assert_eq!(
+                app.patient_document.fields[0].editor.read(cx).value(),
+                "Inventato"
+            );
+        });
     }
 
     #[gpui::test]
