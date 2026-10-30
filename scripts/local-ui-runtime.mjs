@@ -4,6 +4,7 @@ import path from 'node:path';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { ordinaryLauncherEnvironment } from '../plugins/mediflow-local-ui/src/runtime-environment.mjs';
+import { localUiArchiveLock } from './launcher-state.mjs';
 import { readProductIdentity } from './launcher-helpers.mjs';
 
 const unavailable = () => { throw new Error('navigation_unavailable'); };
@@ -48,10 +49,7 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
   const expected = { sourceFingerprint: identity.sourceFingerprint, dataDir };
   let starting = null, launcher = null, startingChild = null, closed = false;
   const start = async signal => {
-    const port = await new Promise((resolve, reject) => {
-      const server = net.createServer(); server.once('error', reject);
-      server.listen(0, '127.0.0.1', () => { const port = server.address().port; server.close(error => error ? reject(error) : resolve(port)); });
-    });
+    const port = await archiveBrowserPort(dataDir);
     if (closed || signal.aborted) return unavailable();
     const child = spawn(process.execPath, [path.join(sourceRoot, 'scripts/mediflow.mjs'), '--riusa'], {
       cwd: sourceRoot, detached: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'], shell: false,
@@ -102,4 +100,138 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
     launcher = null;
   };
   return navigate;
+}
+
+export async function archiveBrowserPort(dataDir, options) {
+  const directory = path.dirname(localUiArchiveLock(dataDir, options));
+  const lock = path.join(directory, 'browser-port-allocation');
+  const candidate = `${lock}.candidate-${crypto.randomUUID()}`;
+  const token = `owner-${crypto.randomUUID()}.json`;
+  fs.mkdirSync(candidate, { mode: 0o700 });
+  let claimed = false;
+  const removeOwner = name => {
+    try { fs.unlinkSync(path.join(lock, name)); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    try { fs.rmdirSync(lock); }
+    catch (error) { if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) throw error; }
+  };
+  try {
+    fs.writeFileSync(path.join(candidate, token), JSON.stringify({ pid: process.pid }), { flag: 'wx', mode: 0o600 });
+    const deadline = Date.now() + 8000;
+    while (!claimed) {
+      try { fs.renameSync(candidate, lock); claimed = true; }
+      catch (error) {
+        if (!['EEXIST', 'ENOTEMPTY', 'EPERM', 'EACCES'].includes(error.code)) throw error;
+        try {
+          const stat = fs.lstatSync(lock);
+          if (!stat.isDirectory() || stat.isSymbolicLink() || process.getuid && stat.uid !== process.getuid()) return unavailable();
+          const entries = fs.readdirSync(lock);
+          if (entries.length === 1 && /^owner-[a-f0-9-]{36}\.json$/u.test(entries[0])) {
+            const file = path.join(lock, entries[0]);
+            const fd = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+            let owner;
+            try {
+              const stat = fs.fstatSync(fd);
+              if (stat.nlink === 0) continue;
+              if (!stat.isFile() || stat.nlink !== 1 || stat.size > 4096 || process.getuid && stat.uid !== process.getuid()) return unavailable();
+              owner = JSON.parse(fs.readFileSync(fd, 'utf8'));
+            } finally { fs.closeSync(fd); }
+            if (!Number.isSafeInteger(owner.pid) || owner.pid < 1) return unavailable();
+            let dead = false;
+            try { process.kill(owner.pid, 0); } catch (error) { if (error.code === 'ESRCH') dead = true; }
+            if (dead) removeOwner(entries[0]);
+          } else if (entries.length) return unavailable();
+          else {
+            try { fs.rmdirSync(lock); }
+            catch (error) { if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) throw error; }
+          }
+        } catch (error) { if (error.code !== 'ENOENT') throw error; }
+        if (Date.now() >= deadline) return unavailable();
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
+    }
+    return await allocateArchiveBrowserPort(directory);
+  } finally {
+    if (claimed) removeOwner(token);
+    fs.rmSync(candidate, { recursive: true, force: true });
+  }
+}
+
+async function allocateArchiveBrowserPort(directory) {
+  const file = path.join(directory, 'browser-port.json');
+  const read = (target = file) => {
+    if (fs.lstatSync(target).isSymbolicLink()) return unavailable();
+    const fd = fs.openSync(target, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+    try {
+      const stat = fs.fstatSync(fd);
+      if (!stat.isFile() || stat.nlink !== 1 || stat.size > 64 || process.getuid && stat.uid !== process.getuid()) return unavailable();
+      const value = JSON.parse(fs.readFileSync(fd, 'utf8'));
+      if (Object.keys(value).join(',') !== 'port' || !Number.isInteger(value.port) || value.port < 1024 || value.port > 65535) return unavailable();
+      return value.port;
+    } finally { fs.closeSync(fd); }
+  };
+  let preferred;
+  try { preferred = read(); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  const archive = path.basename(path.dirname(file));
+  const registry = path.join(path.dirname(path.dirname(file)), 'browser-ports');
+  fs.mkdirSync(registry, { recursive: true, mode: 0o700 });
+  const stat = fs.lstatSync(registry);
+  if (!stat.isDirectory() || stat.isSymbolicLink() || process.getuid && stat.uid !== process.getuid()) return unavailable();
+  const owner = port => {
+    const fd = fs.openSync(path.join(registry, String(port)), fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+    try {
+      const stat = fs.fstatSync(fd);
+      if (!stat.isFile() || stat.size > 128 || process.getuid && stat.uid !== process.getuid()) return unavailable();
+      return fs.readFileSync(fd, 'utf8');
+    } finally { fs.closeSync(fd); }
+  };
+  const reserve = (port, binding = archive) => {
+    const temporary = path.join(registry, `.candidate-${crypto.randomUUID()}`);
+    fs.writeFileSync(temporary, binding, { flag: 'wx', mode: 0o600 });
+    try {
+      try { fs.linkSync(temporary, path.join(registry, String(port))); return true; }
+      catch (error) { if (error.code !== 'EEXIST') throw error; return owner(port) === binding; }
+    } finally { fs.unlinkSync(temporary); }
+  };
+  const available = async port => {
+    const server = net.createServer();
+    try {
+      await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
+      return true;
+    } catch (error) { if (!['EADDRINUSE', 'EACCES'].includes(error.code)) throw error; return false; }
+    finally { if (server.listening) await new Promise(resolve => server.close(resolve)); }
+  };
+  if (preferred && reserve(preferred) && await available(preferred)) return preferred;
+  for (const entry of preferred ? fs.readdirSync(registry).sort() : []) {
+    if (!/^[0-9]+$/u.test(entry)) continue;
+    const port = Number(entry);
+    if (port >= 1024 && port <= 65535 && owner(port) === archive && await available(port)) return port;
+  }
+  for (const entry of fs.readdirSync(path.dirname(registry))) {
+    if (!/^local-ui-[a-f0-9]{64}$/u.test(entry)) continue;
+    const directory = path.join(path.dirname(registry), entry);
+    if (fs.lstatSync(directory).isSymbolicLink()) return unavailable();
+    try { reserve(read(path.join(directory, 'browser-port.json')), entry); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  for (let attempt = 0; attempt < 128; attempt++) {
+    const server = net.createServer();
+    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+    let port;
+    try {
+      port = server.address().port;
+      if (!reserve(port)) continue;
+    } finally { await new Promise(resolve => server.close(resolve)); }
+    if (!preferred) {
+      try { fs.writeFileSync(file, JSON.stringify({ port }), { flag: 'wx', mode: 0o600 }); }
+      catch (error) {
+        if (error.code !== 'EEXIST') throw error;
+        const published = read();
+        if (published !== port && owner(port) === archive) fs.unlinkSync(path.join(registry, String(port)));
+        return published;
+      }
+    }
+    return port;
+  }
+  return unavailable();
 }

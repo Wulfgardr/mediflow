@@ -13,6 +13,7 @@ import { useSecurity } from '@/components/security-provider';
 import PrivacyBlur from '@/components/privacy-blur';
 import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
+import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import styles from './runtime-twin-workspace.module.css';
 import { PatientSheetMenu } from './patient-sheet-menu';
@@ -53,8 +54,9 @@ export function useRuntimeWorkspaceCommand(handler: CommandHandler) {
 }
 
 export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
-  const { enabled, proposal, composition, pendingForms } = useRuntimeTwinDesign();
+  const { enabled, proposal, composition, pendingForms, discardPendingForms } = useRuntimeTwinDesign();
   const confirm = useConfirm();
+  const { showToast } = useToast();
   const { lock } = useSecurity();
   const pathname = usePathname();
   const patientId = pathname.match(/^\/patients\/([^/]+)\//)?.[1] ?? null;
@@ -90,15 +92,21 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
       event.preventDefault(); event.stopImmediatePropagation();
       if (asking) return;
       asking = true;
-      void confirm({ title: 'Lasciare la compilazione?', message: 'È aperta una compilazione. Le modifiche non salvate andranno perse.', confirmLabel: 'Esci senza salvare', cancelLabel: 'Continua la compilazione', tone: 'danger' }).then(result => {
-        asking = false;
-        if (live && result.confirmed && anchor.isConnected) { approved = anchor; anchor.click(); approved = null; }
+      void confirm({ title: 'Lasciare la compilazione?', message: 'È aperta una compilazione. Le modifiche non salvate andranno perse.', confirmLabel: 'Esci senza salvare', cancelLabel: 'Continua la compilazione', tone: 'danger' }).then(async result => {
+        try {
+          if (live && result.confirmed && anchor.isConnected) {
+            await discardPendingForms();
+            if (live && anchor.isConnected) { approved = anchor; anchor.click(); approved = null; }
+          }
+        } catch {
+          showToast({ tone: 'error', title: 'Bozza non eliminata. La compilazione resta aperta.' });
+        } finally { asking = false; }
       });
     };
     document.addEventListener('click', navigate, true);
     window.addEventListener('beforeunload', leave);
     return () => { live = false; document.removeEventListener('click', navigate, true); window.removeEventListener('beforeunload', leave); };
-  }, [enabled, pendingForms, confirm]);
+  }, [enabled, pendingForms, confirm, discardPendingForms, showToast]);
   useEffect(() => {
     if (proposal && patientId) setOpened(current => current.includes(patientId) ? current : [...current, patientId]);
   }, [patientId, proposal]);

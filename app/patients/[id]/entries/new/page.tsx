@@ -1,5 +1,7 @@
 'use client';
 
+import { restoreEntryDraftDate, type EntryLocalDraft } from '@/lib/entry-local-draft';
+import { useEntryLocalDraft } from '@/hooks/use-entry-local-draft';
 import { formatCountLabel } from '@/lib/format-count';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -80,7 +82,8 @@ export default function NewEntryPage() {
     const [content, setContent] = useState('');
     const [setting, setSetting] = useState<'ambulatory' | 'home'>('ambulatory');
     const [entryDate, setEntryDate] = useState(defaultDate);
-    const [initialEntryDate] = useState(defaultDate);
+    const [editState, setEditState] = useState<EntryLocalDraft['editState']>('pristine');
+    const [dateSource, setDateSource] = useState<EntryLocalDraft['dateSource']>('default');
     const [files, setFiles] = useState<File[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [uploadProgress, setUploadProgress] = useState('');
@@ -95,6 +98,12 @@ export default function NewEntryPage() {
     const [visitMedicationCandidates, setVisitMedicationCandidates] = useState<VisitMedicationCandidate[]>([]);
     const [isContextOpen, setIsContextOpen] = useState(false);
     const [isReadingQuadro, setIsReadingQuadro] = useState(false);
+    const draftValue = useMemo(() => ({ editState, dateSource, type, content, setting, entryDate, dictatedDraft }), [editState, dateSource, type, content, setting, entryDate, dictatedDraft]);
+    const localDraft = useEntryLocalDraft(id, draftValue, draft => {
+        setType(draft.type); setContent(draft.content); setSetting(draft.setting);
+        setEditState('dirty'); setDateSource(draft.dateSource);
+        setEntryDate(restoreEntryDraftDate(draft, defaultDate)); setDictatedDraft(draft.dictatedDraft); setIsDictatedDraftReviewed(false);
+    });
     const writingRef = useRef<HTMLDivElement>(null);
     const quadroHeadingRef = useRef<HTMLHeadingElement>(null);
     const consultQuadro = () => {
@@ -108,13 +117,13 @@ export default function NewEntryPage() {
     const hasUnsavedChanges = !isClinicalRichTextBlank(content)
         || type !== 'visit'
         || setting !== 'ambulatory'
-        || entryDate !== initialEntryDate
+        || dateSource === 'user'
         || files.length > 0
         || dictatedDraft.trim().length > 0
         || visitSessionEvents.length > 0;
 
     /* WUL-676: keep the workspace guard active during pending saves. */
-    useRuntimeTwinPendingForm(hasUnsavedChanges);
+    useRuntimeTwinPendingForm(hasUnsavedChanges, localDraft.clear);
     const patientRead = useLiveQueryState(() => db.patients.get(id), [id], undefined, ['patients']);
     const patient = patientRead.data;
     /* WUL-420 */
@@ -171,6 +180,7 @@ export default function NewEntryPage() {
 
     /* WUL-420 */
     const handleDictatedDraftChange = (value: string) => {
+        setEditState('dirty');
         setDictatedDraft(value);
         setIsDictatedDraftReviewed(false);
         setVisitMedicationCandidates([]);
@@ -259,6 +269,7 @@ export default function NewEntryPage() {
     const insertReviewedDraft = () => {
         if (!dictatedDraft.trim() || !isDictatedDraftReviewed) return;
 
+        setEditState('dirty');
         const draftHtml = formatVisitDraftAsClinicalHtml(dictatedDraft);
         setContent((currentContent) => {
             const normalizedCurrentContent = sanitizeClinicalRichTextHtml(currentContent);
@@ -270,6 +281,7 @@ export default function NewEntryPage() {
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
+        if (localDraft.state === 'loading') return;
         const normalizedContent = sanitizeClinicalRichTextHtml(content);
 
         if (isClinicalRichTextBlank(normalizedContent)) {
@@ -331,6 +343,7 @@ export default function NewEntryPage() {
 
             /* WUL-676: successful programmatic navigation is not
                intercepted by the workspace's link guard. */
+            await localDraft.clear().catch(() => showToast({ tone: 'warning', title: 'Voce registrata', description: 'La copia della bozza non è stata rimossa. Non registrarla di nuovo.' }));
             router.push(`/patients/${id}/modules`);
         } catch (error) {
             console.error(error);
@@ -387,13 +400,13 @@ export default function NewEntryPage() {
         <div id="dati" className={composerStyles.metadata}>
             <label className={composerStyles.metadataField}>
                 <span>Tipo</span>
-                <select value={type} onChange={(event) => setType(event.target.value as typeof type)} aria-label="Tipo di voce">
+                <select value={type} onChange={(event) => { setEditState('dirty'); setType(event.target.value as typeof type); }} aria-label="Tipo di voce">
                     {types.map((entryType) => <option key={entryType.id} value={entryType.id}>{entryType.label}</option>)}
                 </select>
             </label>
             <label className={composerStyles.metadataField}>
                 <span>Luogo</span>
-                <select value={setting} onChange={(event) => setSetting(event.target.value as typeof setting)} aria-label="Luogo della voce clinica">
+                <select value={setting} onChange={(event) => { setEditState('dirty'); setSetting(event.target.value as typeof setting); }} aria-label="Luogo della voce clinica">
                     <option value="ambulatory">Ambulatorio</option>
                     <option value="home">Domicilio</option>
                 </select>
@@ -403,7 +416,7 @@ export default function NewEntryPage() {
                 <input
                     type="datetime-local"
                     value={entryDate}
-                    onChange={(event) => setEntryDate(event.target.value)}
+                    onChange={(event) => { setEditState('dirty'); setDateSource('user'); setEntryDate(event.target.value); }}
                     aria-label="Data e ora della voce clinica"
                     aria-describedby="entry-date-description"
                     required
@@ -424,7 +437,7 @@ export default function NewEntryPage() {
                         <input
                             type="datetime-local"
                             value={entryDate}
-                            onChange={(e) => setEntryDate(e.target.value)}
+                            onChange={(e) => { setEditState('dirty'); setDateSource('user'); setEntryDate(e.target.value); }}
                             className="w-full rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] py-3 pl-12 pr-4 text-sm font-medium text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)] focus:shadow-[var(--lume-focus-ring)] dark:[color-scheme:dark]"
                             aria-label="Data e ora della voce clinica"
                             aria-describedby="entry-date-description"
@@ -441,7 +454,7 @@ export default function NewEntryPage() {
                     <div className="grid grid-cols-2 gap-3" role="group" aria-labelledby="entry-setting-label">
                         <button
                             type="button"
-                            onClick={() => setSetting('ambulatory')}
+                            onClick={() => { setEditState('dirty'); setSetting('ambulatory'); }}
                             aria-pressed={setting === 'ambulatory'}
                             className={cn(
                                 'lume-press flex h-[56px] items-center justify-center gap-3 rounded-[var(--lume-radius-control)] border px-4 text-sm font-semibold transition-[border-color,background-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
@@ -455,7 +468,7 @@ export default function NewEntryPage() {
                         </button>
                         <button
                             type="button"
-                            onClick={() => setSetting('home')}
+                            onClick={() => { setEditState('dirty'); setSetting('home'); }}
                             aria-pressed={setting === 'home'}
                             className={cn(
                                 'lume-press flex h-[56px] items-center justify-center gap-3 rounded-[var(--lume-radius-control)] border px-4 text-sm font-semibold transition-[border-color,background-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
@@ -482,7 +495,7 @@ export default function NewEntryPage() {
                             <button
                                 key={currentType.id}
                                 type="button"
-                                onClick={() => setType(currentType.id as 'visit' | 'remote' | 'note')}
+                                onClick={() => { setEditState('dirty'); setType(currentType.id as 'visit' | 'remote' | 'note'); }}
                                 aria-pressed={isSelected}
                                 className={cn(
                                     'lume-press flex items-center gap-3 rounded-[var(--lume-radius-card)] border px-4 py-4 text-left transition-[border-color,background-color,color] duration-[var(--lume-dur-fuoco)] ease-[var(--lume-ease)]',
@@ -754,11 +767,14 @@ export default function NewEntryPage() {
                 </div>
             )}
 
+            <p role="status" data-testid="local-draft-status">{localDraft.error || (!localDraft.hasDraft ? 'Nessuna bozza da conservare.' : localDraft.state === 'recovered'
+                ? 'Bozza recuperata. Rivedi il testo prima di registrarlo. Gli allegati vanno selezionati di nuovo.'
+                : !localDraft.saved ? 'Conservazione della bozza in corso…' : 'Testo e dati della bozza conservati cifrati in questo browser. Gli allegati vanno selezionati di nuovo.')}</p>
             <ClinicalRichTextEditor
                 className={proposal ? composerStyles.editor : undefined}
                 description={proposal ? "Usa la barra per formattare il testo. Tab passa al controllo successivo." : undefined}
                 value={content}
-                onChange={setContent}
+                onChange={value => { setEditState('dirty'); setContent(value); }}
                 placeholder={'S: Sintomi e motivo della visita\nO: Parametri, esame obiettivo, dati oggettivi\nA: Valutazione clinica e ipotesi\nP: Piano, follow-up, indicazioni'}
             />
         </section>
@@ -933,6 +949,8 @@ export default function NewEntryPage() {
             </form>
         </div>
     );
+
+    if (localDraft.state === 'loading') return <p role="status">Recupero della bozza…</p>;
 
     if (proposal) {
         return (

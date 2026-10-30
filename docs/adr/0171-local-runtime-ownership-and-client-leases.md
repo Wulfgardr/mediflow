@@ -82,3 +82,51 @@ processo, URL del chooser, checkout e archivio. La richiesta di ispezione non
 acquisisce un lease e non rilascia sessioni. Solo dopo la conferma viene inviato
 il POST all'URL verificato. La ricevuta alterata viene rifiutata prima del POST;
 il possesso del solo PID o la forma di un UUID non autenticano un endpoint.
+
+## Documento Web e recupero della bozza, 29 ottobre 2026
+
+Nel runtime avviato da un plugin, ogni documento Web autenticato è un client.
+Pagina, plugin e sessione manuale usano un solo registro nel launcher, con tipi
+chiusi per il genere di lease e per le fasi accepting, idle-pending, stopping,
+closed. Un documento rinnova ogni tre secondi un lease di massimo quindici
+secondi, limitato anche dalla scadenza della sessione Web. Il launcher elimina
+le scadenze ogni 250 ms: connessione HTTP aperta, invio senza risposta e timer
+nel browser non costituiscono conferma. Il Web attende l'ack IPC del launcher.
+La chiusura della pagina prova a rilasciare il lease; il mancato saluto non ne
+impedisce la scadenza. Il ritorno dalla cache Indietro/Avanti rinnova con un
+nuovo identificativo: un rilascio tardivo del documento sospeso non può
+cancellare il lease ripreso. Lock, logout o revoca negano i rinnovi; un lease già
+confermato dura al massimo fino alla scadenza. La sospensione del browser o
+il throttling dei suoi timer possono produrre la stessa scadenza.
+
+L'endpoint ammette soltanto POST JSON dalla stessa origine loopback esatta,
+con sessione locale Web valida per l'archivio corrente. L'identità del lease
+combina il digest della sessione risolta dal server e un nonce di documento.
+Il browser non può scegliere la sessione o la deadline. L'IPC appartiene al
+Web posseduto della generazione corrente. Questo lease serve solo al lifecycle,
+non concede navigazione, selezione, capacità o autorità clinica. Dopo la
+transizione stopping non si può acquisire un lease. Gli avvii ordinari di
+MediFlow.command conservano il lease manuale e non attivano il lease Web.
+
+Il nuovo editor conservava il testo soltanto in RAM. La porta stabile da sola
+non lo recupera: ora conserva automaticamente testo, tipo, sede, data e testo
+dettato cifrati AES-GCM con la master key già sbloccata. La copia locale del
+browser è separata per generazione dell'archivio, utente e paziente; il medesimo
+contesto è verificato dentro l'involucro cifrato. Gli allegati File non sono
+conservati e l'editor chiede di selezionarli di nuovo. Una copia illeggibile o
+modificata in un'altra scheda non viene sovrascritta. Web Locks serializza il
+confronto e la scrittura; un errore di quota resta visibile. Il recupero lascia
+il testo da rivedere e la dettatura non confermata. Soltanto il normale gesto
+Registra nel diario invoca il writer clinico esistente; la copia viene rimossa
+dopo il successo. Nessuna nuova tabella, API dati o scrittura clinica.
+
+Per mantenere la stessa origine il navigator del plugin conserva una porta
+casuale assegnata all'archivio nella configurazione locale del launcher, con
+pubblicazione esclusiva e lettura di un file regolare verificato. Le ripartenze
+usano quella porta anche da un altro checkout. Se è occupata, l'avvio è negato:
+non si adotta il listener e non si sceglie un'altra origine che nasconderebbe
+le bozze. La configurazione non contiene dati clinici o chiavi. Gli avvii
+ordinari mantengono la propria scelta di porta. Cambiare manualmente porta,
+cancellare lo storage del browser o cambiare browser non trasferisce la bozza.
+Questa scelta limita il cambiamento al lifecycle e alla copia cifrata locale,
+senza introdurre un secondo archivio di bozze lato server.

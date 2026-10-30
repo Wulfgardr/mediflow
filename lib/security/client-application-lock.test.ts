@@ -463,7 +463,8 @@ test('restored PIN authority reconciles a concurrent recovery check without bypa
         compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 },
     }).outputText;
 
-    for (const outcome of ['restored', 'locked', 'missing', 'passphrase'] as const) {
+    for (const { outcome, leaseRequired } of (['restored', 'locked', 'missing', 'passphrase'] as const)
+        .flatMap(outcome => [false, true].map(leaseRequired => ({ outcome, leaseRequired })))) {
         const state = { authenticated: false, locked: true, user: null as { id: string } | null };
         const authorityAttemptGenerationRef = { current: 0 };
         const authRecoveryStateRef = { current: 'ready' };
@@ -481,15 +482,17 @@ test('restored PIN authority reconciles a concurrent recovery check without bypa
             setIsLocked: (value: boolean) => { state.locked = value; },
             updateAuthRecoveryState: (value: string) => { authRecoveryStateRef.current = value; },
             checkAuthHealthRequest: async () => ({ response: { ok: true }, controlState: 'accepted',
-                payload: { status: 'ok', isSetup: true, hasSession: true, unlock: { credential: 'pin' } } }),
+                payload: { status: 'ok', isSetup: true, hasSession: true, localUiLeaseRequired: leaseRequired, unlock: { credential: 'pin' } } }),
             readUnlockParameters: (value: unknown) => value,
             showUnlockCredential: () => undefined,
             setAuthHealth: () => undefined,
             setRequiresSetup: () => undefined,
             console: { error: (...args: unknown[]) => { assert.fail(String(args)); } },
-        }) as { restoreSession(): Promise<boolean>; checkAuthStatus(): Promise<void> };
+        }) as { restoreSession(): Promise<boolean>; checkAuthStatus(updateLocalUiLeaseRequired: (required: boolean) => void): Promise<void> };
         const restoring = callbacks.restoreSession();
-        await callbacks.checkAuthStatus();
+        const leaseUpdates: boolean[] = [];
+        await callbacks.checkAuthStatus(required => { leaseUpdates.push(required); });
+        assert.deepEqual(leaseUpdates, [leaseRequired]);
         assert.equal(authRecoveryStateRef.current, 'required');
         if (outcome === 'locked') {
             authorityAttemptGenerationRef.current += 1;

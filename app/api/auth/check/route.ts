@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requiresLocalUiDocumentLease } from '@/lib/security/plugin-local-ui-runtime';
 import fs from 'fs';
 import path from 'path';
 import os from 'node:os';
@@ -163,6 +164,7 @@ export async function GET(request: Request) {
         }).from(users).limit(2);
         const response = NextResponse.json({
             status: 'ok',
+            localUiLeaseRequired: requiresLocalUiDocumentLease(),
             archiveGeneration: currentArchiveGeneration(),
             archiveMaintenance: process.env.MEDIFLOW_ARCHIVE_MAINTENANCE_RESULT
                 ? JSON.parse(process.env.MEDIFLOW_ARCHIVE_MAINTENANCE_RESULT) : undefined,
