@@ -38,7 +38,7 @@ nell'archivio sintetico posseduto dal test.
 | Riga | Stato | Risultato e limite |
 | --- | --- | --- |
 | I-0 | parziale | Copertura delle 16 capacità e 13+3 celle congelata e verificata. Identità dei modelli, prove per capacità/superficie e budget restano aperti. |
-| I-1 | parziale | E2E Web: creazione/rilettura scheda e vista reale con quattro funzioni spente; nessuna richiesta generativa o esterna dal browser. Non prova egress del server, installazione, GPUI/headless né tutte le condizioni assente/guasto/quota. |
+| I-1 | parziale | E2E Web sviluppo e standalone production: creazione/rilettura scheda e vista reale con quattro funzioni spente; nessuna richiesta generativa o esterna dal browser. Non prova egress del server, installazione, GPUI/headless né tutte le condizioni assente/guasto/quota. |
 | I-2 | ferma | Nessuna nuova inferenza o retry: il margine del tentativo bounded storico non è ricostruibile con certezza. Servono autorizzazione residua esplicita, combinazione fissata, budget e prove offline sulle tre viste con misure e revoca fisica. I test di abort sintetico non provano la fine del runner. |
 | I-3 | parziale | Preflight senza override nega con `MLX_UNAVAILABLE`; configurando il runner diretto già installato passa la presenza di artefatto/eseguibile, senza inferenza, download o ripiego. Nessuna nuova proposta reale, misura o revoca fisica. |
 | I-3b | ferma | ADR 0166 resta Proposed. Nessuna equivalenza misurata o accettata; nessuna venue remota abilitata. |
@@ -77,3 +77,8 @@ Durante la verifica del ripristino, una prima versione del test ha fallito
 la POST eseguita dal contesto API privo della generazione archivio. La verifica corretta passa. Il test
 usa ora il normale fetch della pagina anche per il ripristino, come per
 le modifiche iniziali. Nessuna protezione del prodotto è stata modificata.
+
+La stessa prova E2E corretta passa anche sul bundle standalone di produzione
+`f0de86dcfc667bdce390c71469372eeb4c40e2c1`, porta 3298 e archivio sintetico
+nuovo. Le revisioni successive cambiano solo test, registro ed evidenze: il
+runtime del prodotto è identico. Il server di prova è stato arrestato.
