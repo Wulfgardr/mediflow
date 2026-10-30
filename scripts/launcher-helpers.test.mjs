@@ -2040,8 +2040,8 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         if (failures.length) throw new AggregateError(failures, failures.map(error => error.message).join('\n'));
     })();
     registerOrdinaryFixtureCleanup(t, cleanup);
-    const until = async predicate => {
-        const deadline = Date.now() + 10_000;
+    const until = async (predicate, timeoutMs = 10_000) => {
+        const deadline = Date.now() + timeoutMs;
         while (!predicate()) {
             assert.equal(child.exitCode, null, output);
             if (Date.now() > deadline) assert.fail(output);
@@ -3060,9 +3060,10 @@ test('IPC cancellation during the Web identity proof cannot dispatch a late inte
 });
 
 
-test('Windows launcher frees checkout and archive locks after autonomous Web exit', {skip:process.platform!=='win32',timeout:30000},async t=>{
+test('Windows launcher frees checkout and archive locks after autonomous Web exit', {skip:process.platform!=='win32',timeout:120000},async t=>{
+    const { WINDOWS_JOB_STARTUP_TIMEOUT_MS } = await import('./windows-runtime-job.mjs');
     const f=await ordinaryLauncherFixture(t,'web',[],true,true,{},null,{platform:'win32',job:true});
-    await f.until(()=>f.output().includes('Pronto:'));
+    await f.until(()=>f.output().includes('Pronto:'), WINDOWS_JOB_STARTUP_TIMEOUT_MS + 10000);
     const receipt=JSON.parse(readFileSync(f.runtimePid));
     assert.ok(receipt.pid>0);
     process.kill(receipt.pid,'SIGKILL');
@@ -3208,4 +3209,60 @@ test('navigation deadlines tolerate Windows clock skew without extending the loc
     for (const expiry of [now - 1, now, now + 8101, Number.MAX_SAFE_INTEGER, NaN, undefined]) {
         assert.equal(localUiNavigationDeadline(expiry, now), null);
     }
+});
+
+
+test('Windows Job startup follows bounded phases and rejects stalled or invalid helpers without retry', () => {
+    const moduleUrl = new URL('./windows-runtime-job.mjs', import.meta.url).href;
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+      import assert from 'node:assert/strict';
+      import { EventEmitter } from 'node:events';
+      import { registerHooks } from 'node:module';
+      const timers = new Map(); let now = 0, next = 0, helper, spawns = 0;
+      globalThis.setTimeout = (fn, delay) => { const id = ++next; timers.set(id, {fn, at:now + delay}); return id; };
+      globalThis.clearTimeout = id => timers.delete(id);
+      const advance = ms => { now += ms; for (const [id, timer] of [...timers]) if (timer.at <= now) { timers.delete(id); timer.fn(); } };
+      globalThis.fixture = {
+        spawn() { spawns++; return helper; },
+        fs:{lstatSync(){ return {isFile:()=>true,isSymbolicLink:()=>false}; }},
+        windowsTaskkillCommand:()=>process.execPath,
+        verifyChildOwner(){}, processOwner:()=>({pid:123}), runtimeProcessIdentity:()=> 'synthetic'
+      };
+      registerHooks({load(url,context,next){ const result=next(url,context); if(url === ${JSON.stringify(moduleUrl)}) {
+        result.source=String(result.source)
+          .replace("import fs from 'node:fs';", 'const {fs} = globalThis.fixture;')
+          .replace("import { spawn } from 'node:child_process';", 'const {spawn} = globalThis.fixture;')
+          .replace("import { windowsTaskkillCommand } from './windows-system-command.mjs';", 'const {windowsTaskkillCommand} = globalThis.fixture;')
+          .replace("import { processOwner, runtimeProcessIdentity, verifyChildOwner } from './runtime-leases.mjs';", 'const {processOwner,runtimeProcessIdentity,verifyChildOwner} = globalThis.fixture;');
+      } return result; }});
+      const {containWindowsWeb,WINDOWS_JOB_PHASE_TIMEOUT_MS:budget}=await import(${JSON.stringify(moduleUrl)});
+      const make = () => {
+        helper=new EventEmitter(); helper.pid=123;
+        helper.stdin=new EventEmitter();helper.stdin.destroy=()=>{helper.destroyed=true;};helper.stdin.end=()=>{};
+        helper.stdout=new EventEmitter();helper.stdout.setEncoding=()=>{};helper.stderr=new EventEmitter();
+        return containWindowsWeb({}, {token:{nonce:'synthetic'},file:'synthetic'});
+      };
+      const frame = (type,extra={}) => helper.stdout.emit('data',JSON.stringify({type,nonce:'synthetic',...extra})+'\\n');
+      let pending=make();
+      advance(budget-1);frame('compiling');advance(budget-1);frame('assigning');advance(budget-1);frame('ready');
+      const job=await pending;assert.equal(timers.size,0);assert.equal(spawns,1);
+      frame('drained',{active:0});helper.emit('close',0);await job.closed;
+      for (const phase of ['powershell','compiling','assigning']) {
+        pending=make();const rejected=assert.rejects(pending,new RegExp('phase='+phase));
+        if(phase!=='powershell') frame('compiling');if(phase==='assigning') frame('assigning');
+        advance(budget);await rejected;assert.equal(helper.destroyed,true);assert.equal(timers.size,0);
+        frame('ready');assert.equal(timers.size,0);
+      }
+      for (const scenario of ['duplicate','out-of-order','nonce','early-close']) {
+        pending=make();const rejected=assert.rejects(pending,/Invalid Windows Job transition|nonce mismatch|cleanup unconfirmed/);
+        if(scenario==='duplicate'){frame('compiling');frame('compiling');}
+        if(scenario==='out-of-order')frame('ready');
+        if(scenario==='nonce')frame('compiling',{nonce:'foreign'});
+        if(scenario==='early-close')helper.emit('close',0);
+        await rejected;assert.equal(timers.size,0);
+      }
+      assert.equal(spawns,8);
+      console.log(JSON.stringify({simulatedHelper:true,slowProgressAccepted:true,stalledPhases:3,invalidTransitions:4,retries:0}));
+    `], {encoding:'utf8',timeout:10000});
+    assert.equal(result.status, 0, result.stdout + result.stderr);
 });
