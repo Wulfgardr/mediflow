@@ -8,7 +8,7 @@ import { sanitizeAIInsightManualConfig } from './ai-insight-settings';
 
 function route() {
     const writes: unknown[] = [], audits: unknown[] = [];
-    const module = { exports: {} as { PUT: (request: Request, context: unknown) => Promise<Response>; GET: (request: Request, context: unknown) => Promise<Response> } };
+    const routeModule = { exports: {} as { PUT: (request: Request, context: unknown) => Promise<Response>; GET: (request: Request, context: unknown) => Promise<Response> } };
     const imports: Record<string, unknown> = {
         '@/lib/backup-restore-receipt-contract': { RESTORE_RECEIPT_PREFIX: 'restore.' },
         '@/lib/ai-providers/fabric/function-model-settings-write': { writeSettingWithFunctionModelGeneration: (...args: unknown[]) => writes.push(args) },
@@ -22,8 +22,8 @@ function route() {
         '@/lib/security/settings-write-policy': { evaluateSettingsWrite: () => ({ allowed: true }) },
     };
     const compiled = ts.transpileModule(readFileSync('app/api/settings/[key]/route.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
-    runInNewContext(compiled.outputText, { module, exports: module.exports, console, require: (key: string) => { assert.ok(Object.hasOwn(imports, key), key); return imports[key]; } });
-    return { ...module.exports, writes, audits };
+    runInNewContext(compiled.outputText, { module: routeModule, exports: routeModule.exports, console, require: (key: string) => { assert.ok(Object.hasOwn(imports, key), key); return imports[key]; } });
+    return { ...routeModule.exports, writes, audits };
 }
 const budget = { maxDocuments: 6, maxDocumentSummaryChars: 260, maxDocumentContextChars: 2200, outputMaxTokens: 512 };
 const invalid: [string, unknown][] = [
