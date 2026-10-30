@@ -1,0 +1,479 @@
+{
+  "sourceRevision": "2146011334d83a4aef2bafec2cb0a21faaf5afad",
+  "qualification": false,
+  "adr0166": "Proposed",
+  "ollamaVersion": "HEAD-36a6e99",
+  "ollamaBlocker": "provider_version_unsupported",
+  "ollamaDigest": "3460ffeede5453ead027dbd2f821b12ad0aa3de54630971993babdb2165221f7",
+  "athenaWeightsSha256": "e27c0b3dd5f05a738d1317197951caedebe39dcf890efad8e807bb3993e7bdea",
+  "corpusSha256": "3e744b64b67b891e4b0a3837dd3c3c7ce6a35a312ad9b6b11369a30b2f3a57ba",
+  "thresholdsSha256": "fe27753fc5011bdf76383a88569e68a9edfa21be4dcddfa278fe67804b296d75",
+  "thresholdResults": [
+    {
+      "cell": "athena-local-direct",
+      "metric": "sourcePage",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "negation",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "uncertainty",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "subject",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "time",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "inventedSources",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": true
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "unconfirmedWrites",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": true
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "unexpectedEgress",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": true
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "equivalence",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 1,
+      "passed": true
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "sourcePage",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "negation",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "uncertainty",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "subject",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "time",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "inventedSources",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": true
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "unconfirmedWrites",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": true
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "unexpectedEgress",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": true
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "equivalence",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 1,
+      "passed": true
+    }
+  ],
+  "rows": [
+    {
+      "id": "negazione",
+      "direct": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 6655.041500000001,
+        "responseSha256": "32bde2a910feca6b9d46626adb3c96880a2348b61a1eb0e6d26bdebae3957e7c",
+        "instructionSha256": "814542340388f6f7a4bed96cfbcdaa54f77ee71d08300971490fe0dfa71495b7"
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 6620.400582999999,
+        "responseSha256": "32bde2a910feca6b9d46626adb3c96880a2348b61a1eb0e6d26bdebae3957e7c",
+        "instructionSha256": "814542340388f6f7a4bed96cfbcdaa54f77ee71d08300971490fe0dfa71495b7"
+      },
+      "equivalent": true,
+      "expectedStatus": false
+    },
+    {
+      "id": "familiare",
+      "direct": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 8695.74225,
+        "responseSha256": "560eb5a7bfe9c9f813f1dbb28c7e067ce95794aa19b75877f471adb21179988d",
+        "instructionSha256": "0e430f9d810fa402a2ebf9983dbd8e16949237fbaec0ca9e8b73a2d0927932ff"
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 8675.298791000001,
+        "responseSha256": "560eb5a7bfe9c9f813f1dbb28c7e067ce95794aa19b75877f471adb21179988d",
+        "instructionSha256": "0e430f9d810fa402a2ebf9983dbd8e16949237fbaec0ca9e8b73a2d0927932ff"
+      },
+      "equivalent": true,
+      "expectedStatus": false
+    },
+    {
+      "id": "storico",
+      "direct": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 7171.036542000002,
+        "responseSha256": "3adaee25a30f01242c1efdc1fc8a8b36399e65fca892854e6aa1cfaa22e6b0cc",
+        "instructionSha256": "931f32f7770b0de7eb70b11db38b038fb620b11fb493006f929ce671ddb46e6b"
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 7178.081624999999,
+        "responseSha256": "3adaee25a30f01242c1efdc1fc8a8b36399e65fca892854e6aa1cfaa22e6b0cc",
+        "instructionSha256": "931f32f7770b0de7eb70b11db38b038fb620b11fb493006f929ce671ddb46e6b"
+      },
+      "equivalent": true,
+      "expectedStatus": false
+    },
+    {
+      "id": "assenza",
+      "direct": {
+        "status": "denied",
+        "code": "source_missing",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 0.0010410000031697564,
+        "responseSha256": null,
+        "instructionSha256": null
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "source_missing",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 0.0006670000002486631,
+        "responseSha256": null,
+        "instructionSha256": null
+      },
+      "equivalent": true,
+      "expectedStatus": true
+    },
+    {
+      "id": "contraddizione",
+      "direct": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 6657.283583000004,
+        "responseSha256": "64e7375153aa0644a6d2c3b293b639dfd76a2cb560145b8ad80a390a2f03e48a",
+        "instructionSha256": "39a52824ec81538994f64abad450a3ca4f5abacd2bbb3159ee85050c62c3e0b6"
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 6650.573958000001,
+        "responseSha256": "64e7375153aa0644a6d2c3b293b639dfd76a2cb560145b8ad80a390a2f03e48a",
+        "instructionSha256": "39a52824ec81538994f64abad450a3ca4f5abacd2bbb3159ee85050c62c3e0b6"
+      },
+      "equivalent": true,
+      "expectedStatus": false
+    },
+    {
+      "id": "ostile",
+      "direct": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 4103.907415999995,
+        "responseSha256": "cc2102ee0874ec1b5483e20d09cdd5ac61db8b6a693599ca4c4b71e6a52d0d49",
+        "instructionSha256": "a3112207b27bf82898675d481c356b49ac91446bf479fbc0f539da0f2fddc4c3"
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 4124.142374999996,
+        "responseSha256": "cc2102ee0874ec1b5483e20d09cdd5ac61db8b6a693599ca4c4b71e6a52d0d49",
+        "instructionSha256": "a3112207b27bf82898675d481c356b49ac91446bf479fbc0f539da0f2fddc4c3"
+      },
+      "equivalent": true,
+      "expectedStatus": false
+    },
+    {
+      "id": "malformato",
+      "direct": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 7167.844040999989,
+        "responseSha256": "437815e154b2d0b1691dcfdd228f3fcbfe1a30f64b95a96f20e6cf5b94cb2c0e",
+        "instructionSha256": "e9bfcf1b2839c35d7c4104856510f1cdb5827802fea25e3eb7211e165e6b25db"
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 7183.38337499999,
+        "responseSha256": "437815e154b2d0b1691dcfdd228f3fcbfe1a30f64b95a96f20e6cf5b94cb2c0e",
+        "instructionSha256": "e9bfcf1b2839c35d7c4104856510f1cdb5827802fea25e3eb7211e165e6b25db"
+      },
+      "equivalent": true,
+      "expectedStatus": true
+    },
+    {
+      "id": "revoca",
+      "direct": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 3610.014750000002,
+        "responseSha256": "dd6e4fff83d0b13a438f0a9f106cd27738b8a2034f47fb8ea418679199218ad1",
+        "instructionSha256": "77ba0bd4bb59e371811b858caa85366408f856629590f5be5252494561d04a89"
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 3614.6675419999956,
+        "responseSha256": "dd6e4fff83d0b13a438f0a9f106cd27738b8a2034f47fb8ea418679199218ad1",
+        "instructionSha256": "77ba0bd4bb59e371811b858caa85366408f856629590f5be5252494561d04a89"
+      },
+      "equivalent": true,
+      "expectedStatus": false
+    },
+    {
+      "id": "contesto",
+      "direct": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 4609.6448339999915,
+        "responseSha256": "7b001f5cb4f1fb8311bb99fd451f8864e86ed70971e98a1727c6b9240ba975c3",
+        "instructionSha256": "985f4d648d3b5077cf7e87b61f24e2e582e96c931abd722074c51c9b394b7d4e"
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 4101.5121669999935,
+        "responseSha256": "7b001f5cb4f1fb8311bb99fd451f8864e86ed70971e98a1727c6b9240ba975c3",
+        "instructionSha256": "985f4d648d3b5077cf7e87b61f24e2e582e96c931abd722074c51c9b394b7d4e"
+      },
+      "equivalent": true,
+      "expectedStatus": false
+    }
+  ],
+  "peakRssBytes": 4975099904,
+  "physicalNaturalStops": 16,
+  "physicalCancellationVerified": false,
+  "semanticReview": "pending",
+  "rawEvidenceSha256": {
+    "athena-03.receipt.json": "4e3807d911cd421ae6a63481748065d99042225642069c1839b3423fb40b5ddf",
+    "athena-06.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "athena-04.receipt.json": "99cb1ba080eff665ffb7c8104163330b124fc52e341a5beabf6136b2f2ddca34",
+    "athena-14.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "athena-11.receipt.json": "6e452f3d7c2dd332a6314c5ba93db0e0ee85102d17dcd4a015407286fb89ff24",
+    "athena-02.stdout": "c6cbfb50e88391da2d0192aad58ec63a4a7289ff4efa19416dd180a4ee7f5910",
+    "athena-10.stdout": "b292aba1df1886fd7b2abbf00c0455ccde029c85a1240657102a8a0510c67453",
+    "athena-02.result.json": "0d2939d700159ed7dd4fe5fd6fb7991f2c9babf1c328ef19e0cb1522494e5557",
+    "athena-10.receipt.json": "3e13d8afa4067d4c2b56f1b532c516e75f4dec9ad357b10e62f78d60c883c7e8",
+    "athena-05.receipt.json": "f4c2369108f8c495df4aea987e61d5d18e3fd2483ce0c1468dc369d0e4453040",
+    "athena-07.result.json": "aeba800a400aa06b3739af1cc712b8779147a50cdb3f96e758ce3cd5a8334cc8",
+    "athena-12.stdout": "64993aae8732c5680666c55a689dff471840d724c2a5ec80ecc383e0718cb25d",
+    "athena-02.receipt.json": "d1c810106d8297e218572809de3a736302dc7635aed08826a497d45e80f96d46",
+    "athena-00.stdout": "c0df272341d51f5dfce1384e18a2ce72c1bef7aee99b0361c2e17d9757d9c433",
+    "athena-08.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "athena-12.result.json": "57081534dd5274ad158eff9921c621d1d50a70e6ce8e37f62ab0379f8282cd2b",
+    "athena-04.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "athena-04.stdout": "9add4cc02c77214b840d1ab5d56471686794d6f31835592d911654ab5a94661a",
+    "athena-08.stdout": "d38415876540a73927cda97948516282d707835e5270f681e3ef14d730d8029a",
+    "athena-report.json": "dc7cab75ca1f18eab783b4c4b6591afdc09a38d1eb06079e91fdc96f0e3d8f90",
+    "athena-11.result.json": "5fdd3e337cc482e777be0740d1e597f794eb898ade63142353b950d8fd4dd4e7",
+    "athena-08.receipt.json": "26bffdc040bc9214d72deb28518f770247ee2fcfd39505e1c2857842dc1dca48",
+    "athena-04.result.json": "08e87418a9f2199d3f9b603e1e74834f8a1f3cd7673ebdc65504ca17a5e8d4c6",
+    "ollama-version.json": "6c2930a14e5d08cd739b97fe1a9742934f6b19e500509af34824fc3a7fd2e259",
+    "athena-00.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "athena-12.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "athena-01.result.json": "5e41d502b294011c34a0ed6015989a8a0e6d7c881b6d62c841eb5a8a39870547",
+    "athena-10.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "athena-02.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "athena-14.stdout": "e8e1d1f29dbf90ed976b83e1b7b60198ab93110832d5015c5c3fdc5e2078ce67",
+    "athena-08.result.json": "781f1d9c5eb9cc84c1398f94d6af3f8441ecf5bc5d28d42f07ee8c2111fc4b1e",
+    "athena-06.stdout": "c37b8b8e58d652a63249afbeb8c44cdd18a02f4ddc8db1bdbe9ae7ec248ffcd9",
+    "athena-09.receipt.json": "7d2f78e8c54db6effbbee33bb27cf2ca647a5a9019abcf2ccb92b992587e21eb",
+    "athena-14.result.json": "d0b79e5a6fed7c70d13ed7368075fdfc6d05d62a404c0e334f9bede07b27cf6e",
+    "athena-03.stdout": "c6cbfb50e88391da2d0192aad58ec63a4a7289ff4efa19416dd180a4ee7f5910",
+    "ollama-tags.json": "9ea576a3865502e1f80b0b39d8259a456e1496859a3723cc7b42f0349c7da216",
+    "athena-11.stdout": "b292aba1df1886fd7b2abbf00c0455ccde029c85a1240657102a8a0510c67453",
+    "athena-13.result.json": "a802e89fc86ae77958620e0f71efd36bf532dcf91a0884c61a8c9b66ab525d7d",
+    "athena-06.result.json": "c4cbf6eb33855e5b3ac1f6cc0d4de73be453b4527a481769bf3acd7967f9015c",
+    "athena-07.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "athena-15.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "athena-03.result.json": "a172de91a1284ff1372092eeb670934241b6dd0dc6b9fdc65e5d65715ab1bfbd",
+    "athena-09.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "athena-05.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "athena-machine-samples.jsonl": "fd9539392664bd2fd6d49a947f6a8a1afbf91cd5b1fac72d091735d4ad8d81eb",
+    "athena-13.stdout": "64993aae8732c5680666c55a689dff471840d724c2a5ec80ecc383e0718cb25d",
+    "athena-01.stdout": "c0df272341d51f5dfce1384e18a2ce72c1bef7aee99b0361c2e17d9757d9c433",
+    "athena-01.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "athena-13.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "athena-12.receipt.json": "e933b0ea6f3bfc01d51588d425e5f6ca95d2d6230ab6fe4c7b3312b745fcf69a",
+    "athena-15.receipt.json": "94234f0e57401c7719ccb48cceafcb0e2d20b759148d8dcdedf5157f7a45a938",
+    "athena-15.result.json": "3ba1f15b3cf4476628f51aa6e17b74301cd4bbbe2d56d3e9fac264ba8ebd4c62",
+    "athena-09.result.json": "96f51152651d241148d406964446fe973548dbf580ae4c466c387f5ed64263cc",
+    "athena-00.receipt.json": "caf988dd3cfe64f1d2d8096ee40e3e5ce999162d6278829c674628b2e6cb7374",
+    "athena-07.receipt.json": "6799e560c47f9c21bf9f38f673f330f1b72f3c987764d2c3f578fe1fc5b9f66e",
+    "athena-05.stdout": "9add4cc02c77214b840d1ab5d56471686794d6f31835592d911654ab5a94661a",
+    "athena-00.result.json": "c163a0275da1bd62f7d0d5800a6676a2d84923bae19dacde5f6ca74e0eda84a3",
+    "athena-09.stdout": "d38415876540a73927cda97948516282d707835e5270f681e3ef14d730d8029a",
+    "athena-06.receipt.json": "8aaab8d7df869b24e905f2ad7d7f7953a94f4a35fc2916bc88d0743f6756946c",
+    "athena-01.receipt.json": "a00a67f142b08173b25b6663123b98da10377143b3378585906ad6b4c9b7c6a8",
+    "athena-15.stdout": "e8e1d1f29dbf90ed976b83e1b7b60198ab93110832d5015c5c3fdc5e2078ce67",
+    "athena-05.result.json": "29d2eab18e0970dc7a1bc70efc1f04db48c4c5043801d039d295d7de23c29c7a",
+    "athena-14.receipt.json": "867ec64dfe11a56552899d7209aca42b445e9d5b7a339c7960dd9c9d1737d553",
+    "athena-07.stdout": "c37b8b8e58d652a63249afbeb8c44cdd18a02f4ddc8db1bdbe9ae7ec248ffcd9",
+    "athena-13.receipt.json": "8d09db95071401f92cf8372e2475ffc3a75088b6163cb1cb57b8ff3a99e1919a",
+    "athena-10.result.json": "739669e1fa45f9d82cc12e94af680d36e7902b985737ddfbeb16bb3618eb4b3f",
+    "athena-11.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "athena-03.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "environment-failure/athena-00.stdout": "c0df272341d51f5dfce1384e18a2ce72c1bef7aee99b0361c2e17d9757d9c433",
+    "environment-failure/athena-00.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "environment-failure/athena-00.receipt.json": "01cb3c132a04351cd9d07f63367092d7dcc05e6e4d1ba380a1c34f34c629ceb7"
+  }
+}
