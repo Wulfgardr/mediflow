@@ -7,6 +7,7 @@ import { Save } from 'lucide-react';
 import { Disclosure } from '@/components/disclosure';
 import styles from '@/components/settings/account-pages.module.css';
 import { useSecurity } from '@/components/security-provider';
+import { AccountProfileDraftMemory } from '@/lib/security/account-profile-draft';
 import { AccountProfileEditor, type ProfileEditorState } from '@/lib/security/account-profile-editor';
 import { captureClientAccountAuthority, observeArchiveGeneration, subscribeClientAccountAuthority } from '@/lib/security/client-auth-api';
 import { WorkProfileSettings } from '@/components/work-profile-onboarding';
@@ -18,6 +19,8 @@ import {
     SETTINGS_SECONDARY_BUTTON_CLASS,
 } from '@/components/settings/settings-ui';
 
+const pendingProfile = new AccountProfileDraftMemory();
+
 export default function SettingsProfilePage() {
     const { user, updateUser } = useSecurity();
     const editor = useRef<AccountProfileEditor | null>(null);
@@ -26,6 +29,7 @@ export default function SettingsProfilePage() {
     const [state, setState] = useState<ProfileEditorState>({
         draft: { doctorName: '', clinicName: '' }, current: null, busy: false, requiresRead: true, message: '',
     });
+    const discarded = useRef(false);
     const userId = user?.id;
     useEffect(() => {
         if (!userId) return;
@@ -36,14 +40,27 @@ export default function SettingsProfilePage() {
         editor.current = owner;
         setState(owner.state);
         const unsubscribe = subscribeClientAccountAuthority(() => owner.replaceAuthority(captureClientAccountAuthority()));
-        void owner.read();
-        return () => { unsubscribe(); owner.dispose(); editor.current = null; };
+        let live = true;
+        discarded.current = false;
+        void owner.read().then(() => {
+            if (!live || !owner.state.current) return;
+            const draft = pendingProfile.resume(owner.state.current);
+            if (draft) owner.resumeDraft(draft);
+        });
+        return () => {
+            live = false;
+            if (!discarded.current) pendingProfile.retain(owner.state.current, owner.state.draft);
+            unsubscribe(); owner.dispose(); editor.current = null;
+        };
     }, [userId]);
     const profile = state.draft;
     const [workProfileOpen, setWorkProfileOpen] = useState(false);
     useRuntimeTwinPendingForm(state.current !== null
         && (profile.doctorName !== (state.current.displayName ?? '')
-            || profile.clinicName !== (state.current.ambulatoryName ?? '')));
+            || profile.clinicName !== (state.current.ambulatoryName ?? '')), async () => {
+            discarded.current = true;
+            pendingProfile.discard();
+        });
 
     return (
         <section className={styles.page} data-testid="settings-profile-section">
