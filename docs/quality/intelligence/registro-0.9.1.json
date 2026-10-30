@@ -406,8 +406,8 @@
       },
       "proof": null,
       "blockedBy": [
-        "bounded_run_authority",
-        "I-0 budgets",
+        "disk_below_25_GiB",
+        "register_model_identity_unassigned",
         "I-2",
         "I-7"
       ]
@@ -493,8 +493,8 @@
       },
       "proof": null,
       "blockedBy": [
-        "bounded_run_authority",
-        "I-0 budgets",
+        "disk_below_25_GiB",
+        "register_model_identity_unassigned",
         "I-2",
         "I-7"
       ]
@@ -580,8 +580,8 @@
       },
       "proof": null,
       "blockedBy": [
-        "bounded_run_authority",
-        "I-0 budgets",
+        "disk_below_25_GiB",
+        "register_model_identity_unassigned",
         "I-2",
         "I-7"
       ]
@@ -667,7 +667,8 @@
       },
       "proof": null,
       "blockedBy": [
-        "I-0 budgets",
+        "disk_below_25_GiB",
+        "register_model_identity_unassigned",
         "I-3",
         "I-7"
       ]
@@ -779,5 +780,32 @@
     "memoryBudgetBytes": null,
     "latencyBudgetMs": null,
     "status": "baseline_and_decision_pending"
+  },
+  "localRunPrecheck": {
+    "date": "2026-10-30",
+    "sourceRevision": "e2ca1d9febfe8f22b7e00d77105e9d5280069066",
+    "evidence": "docs/quality/intelligence/2026-10-30-local-runs/precheck.json",
+    "status": "blocked_before_inference",
+    "inferenceAttempts": 0,
+    "limits": {
+      "maxProcessMemoryBytes": 25769803776,
+      "maxCaseTimeMs": 600000,
+      "minFreeDiskBytes": 26843545600,
+      "concurrentModelLoads": 1,
+      "maxRunsPerCell": 1,
+      "environmentRetryOnly": 1,
+      "downloadsAllowed": false,
+      "remoteInferenceAllowed": false
+    },
+    "approval": {
+      "reviewer": "Leonardo",
+      "status": "approved",
+      "decisionDate": "2026-10-30",
+      "source": "Autorizzazione esplicita nell’incarico del 30 ottobre 2026",
+      "corpusSha256": "3e744b64b67b891e4b0a3837dd3c3c7ce6a35a312ad9b6b11369a30b2f3a57ba",
+      "thresholdsSha256": "fe27753fc5011bdf76383a88569e68a9edfa21be4dcddfa278fe67804b296d75",
+      "thresholdsDocumentSha256": "546d1fbf6e0d23033c848efc47584065a714d3d13471f1a8215a11b51da10509",
+      "scope": "corpus e tutte le soglie; nessuna accettazione ADR 0166 o equivalenza"
+    }
   }
 }
