@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
+import { test, closureGallery } from './fixtures/patient-closure-gallery';
 import { bootstrapUnlockedSession, assertNoHorizontalOverflow, openPatientSection } from './utils';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
@@ -30,6 +31,7 @@ async function fixture(page: Page, count = 1) {
 }
 
 for (const count of [0, 1, 8]) test(`quattro tabelle e conteggi con ${count} record`, async ({ page }) => {
+    test.setTimeout(180_000);
     await fixture(page, count);
     for (const [index, name] of names.entries()) {
         const section = quadro(page).getByRole('region', { name, exact: true });
@@ -38,6 +40,7 @@ for (const count of [0, 1, 8]) test(`quattro tabelle e conteggi con ${count} rec
         if (count) await expect(section.locator('tbody tr')).toHaveCount(count);
         else await expect(section).toContainText(['Nessun problema registrato', 'Nessuna terapia attiva', 'Nessuna misura registrata', 'Nessun controllo aperto'][index]);
     }
+    await closureGallery(page, 'quadro', `record-${count}`, quadro(page));
     if (count) {
         for (const label of ['Codice', 'Descrizione', 'Da quando', 'Nome e dose', 'Posologia', 'ATC', 'Nome', 'Valore e unità', 'Data', 'Variazione', 'Scadenza']) await expect(quadro(page).getByRole('columnheader', { name: label, exact: true }).first()).toBeVisible();
         await expect(quadro(page).getByRole('cell', { name: '70 kg', exact: true })).toHaveCSS('text-align', 'right');
@@ -45,6 +48,7 @@ for (const count of [0, 1, 8]) test(`quattro tabelle e conteggi con ${count} rec
 });
 
 test('Misure recenti conta i parametri e conserva lo storico completo in Misure', async ({ page }) => {
+    test.setTimeout(180_000);
     const id = await fixture(page, 0);
     await page.evaluate(async patientId => {
         for (const unitCode of ['kg', 'g']) for (let n = 0; n < 12; n++) {
@@ -64,6 +68,7 @@ test('Misure recenti conta i parametri e conserva lo storico completo in Misure'
     await expect(measures.getByRole('cell', { name: /^12\/0?9\/2026$/, exact: true })).toHaveCount(2);
     await expect(measures.getByRole('cell', { name: /^\+1 kg dal 11\/0?9\/2026$/, exact: true })).toBeVisible();
     await expect(measures.getByRole('cell', { name: /^\+1000 g dal 11\/0?9\/2026$/, exact: true })).toBeVisible();
+    await closureGallery(page, 'quadro', 'aggregazione-unita-e-storico', quadro(page));
     await openPatientSection(page, 'parametri');
     const history = page.getByRole('complementary', { name: 'Andamento e storia delle misure' });
     await expect(history).toBeVisible();
@@ -74,6 +79,7 @@ test('Misure recenti conta i parametri e conserva lo storico completo in Misure'
 });
 
 for (const [route, sectionName] of [['therapies', 'Terapie attive'], ['observations', 'Misure recenti'], ['checkups', 'Controlli aperti']]) test(`errore ${route} distinto dal vuoto`, async ({ page }) => {
+    test.setTimeout(180_000);
     const id = await fixture(page, 0);
     await page.route(`**/api/${route}?**`, route => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Synthetic read failure' }) }));
     await page.goto(`/patients/${id}/modules`);
@@ -82,10 +88,12 @@ for (const [route, sectionName] of [['therapies', 'Terapie attive'], ['observati
     await expect(section).not.toContainText(/Nessun[ao]? /);
     await expect(section.locator('table')).toHaveCount(0);
     await expect(section.getByRole('heading')).not.toContainText('0');
+    await closureGallery(page, 'quadro', `errore-${route}`, section);
 });
 
 
 for (const [routeName, sectionName] of [['therapies', 'Terapie attive'], ['observations', 'Misure recenti'], ['checkups', 'Controlli aperti']]) test(`caricamento ${routeName} senza zeri o vuoti`, async ({ page }) => {
+    test.setTimeout(180_000);
     const id = await fixture(page, 0);
     let release!: () => void;
     const pending = new Promise<void>(resolve => { release = resolve; });
@@ -95,6 +103,7 @@ for (const [routeName, sectionName] of [['therapies', 'Terapie attive'], ['obser
         const section = quadro(page).getByRole('region', { name: sectionName, exact: true });
         await expect(section.getByRole('status')).toContainText('in corso');
         await expect(section.getByRole('heading')).not.toContainText('0');
+        await closureGallery(page, 'quadro', `caricamento-${routeName}`, section);
         await expect(section).not.toContainText(/Nessun[ao]? /);
         release();
         await expect(section.getByRole('status')).toHaveCount(0);
@@ -103,11 +112,13 @@ for (const [routeName, sectionName] of [['therapies', 'Terapie attive'], ['obser
 });
 
 test('lettura paziente fallita non annuncia problemi assenti', async ({ page }) => {
+    test.setTimeout(180_000);
     const id = await fixture(page, 0);
     await page.route(`**/api/patients/${id}`, route => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Synthetic read failure' }) }));
     await page.goto(`/patients/${id}/modules`);
     await expect(page.getByRole('alert').filter({ hasText: 'Impossibile leggere la scheda paziente' })).toBeVisible();
     await expect(quadro(page)).toHaveCount(0);
+    await closureGallery(page, 'quadro', 'paziente-non-disponibile', page.getByRole('alert').filter({ hasText: 'Impossibile leggere la scheda paziente' }));
 });
 
 for (const width of [1440, 768, 390]) test(`colonne leggibili a ${width} e Diario simultaneo in estesa`, async ({ page }) => {

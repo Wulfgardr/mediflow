@@ -13,7 +13,7 @@ test('rendezvous contains no secret and only the code transferred through the lo
   const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-ui-test-')));
   fs.chmodSync(directory, 0o700); t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const channel = new EventEmitter(), sent = [];
-  Object.assign(channel, { connected: true, send(frame, done) { sent.push(frame); done?.(); },
+  Object.assign(channel, { connected: true, send(frame, done) { sent.push(frame); this.emit('sent', frame); done?.(); },
     disconnect() { this.connected = false; this.emit('disconnect'); } });
   const expected = { dataDir: '/synthetic/archive', sourceFingerprint: 'synthetic-source' };
   let codeUrl;
@@ -41,19 +41,25 @@ test('rendezvous contains no secret and only the code transferred through the lo
   wrongHost.destroy(); assert.equal(rejected, true, 'the UI code must retain the requesting host binding');
   const peer = net.createConnection(request.returnPath); await once(peer, 'connect');
   const received = []; frames(peer, frame => received.push(frame));
+  const paired = once(channel, 'sent');
   writeFrame(peer, { type: 'paired', ...expected, nonce: request.nonce, host: request.host, token: code, status: 'accepted' });
-  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.deepEqual((await paired)[0], { type: 'mediflow-local-ui-paired', ...expected });
   channel.emit('message', first);channel.emit('message', revoked);
   await new Promise(resolve => setTimeout(resolve, 20));
   assert.deepEqual(received, [], 'A waiting request was replayed after pairing');
   assert.equal(sent.at(-1).status,'denied');
-  const next={...first,requestId:crypto.randomUUID(),expiresAt:Date.now()+7000};
-  channel.emit('message',next);await new Promise(resolve=>setTimeout(resolve,20));
-  assert.deepEqual(received,[next]);
+  const now = Date.now();
+  const next={...first,requestId:crypto.randomUUID(),expiresAt:now+8050};
+  const clock = t.mock.method(Date, 'now', () => now);
+  channel.emit('message',next);
+  clock.mock.restore();
+  await new Promise(resolve=>setTimeout(resolve,20));
+  const forwarded = { ...next, expiresAt: now + 8000 };
+  assert.deepEqual(received,[forwarded]);
   writeFrame(peer,{type:'mediflow-local-ui-result',requestId:next.requestId,status:'accepted'});
   await new Promise(resolve=>setTimeout(resolve,20));assert.equal(sent.at(-1).status,'accepted');
   channel.emit('message',next);await new Promise(resolve=>setTimeout(resolve,20));
-  assert.deepEqual(received,[next]);assert.equal(sent.at(-1).status,'denied');
+  assert.deepEqual(received,[forwarded]);assert.equal(sent.at(-1).status,'denied');
   assert.ok(!JSON.stringify(sent).includes(code));
   peer.destroy(); await once(channel, 'disconnect');
   assert.equal(channel.connected, false);
@@ -83,4 +89,24 @@ test('bridge admission validates frames and retains waiting IDs at capacity', as
   channel.emit('message',{type:'mediflow-local-ui-cancel',requestId:first.requestId});
   channel.emit('message',first);assert.equal(sent.at(-1).status,'denied');
   assert.ok(sent.every(frame=>Object.keys(frame).sort().join(',')==='dataDir,sourceFingerprint,type'||Object.keys(frame).sort().join(',')==='requestId,status,type'));
+});
+
+
+test('bridge admits bounded clock skew and rejects expired or oversized navigation deadlines', async t => {
+  const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-ui-clock-')));
+  fs.chmodSync(directory, 0o700);
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const channel = new EventEmitter(), sent = [];
+  Object.assign(channel, { connected: true, send(frame, done) { sent.push(frame); done?.(); },
+    disconnect() { this.connected = false; this.emit('disconnect'); } });
+  const expected = { dataDir: '/synthetic/archive', sourceFingerprint: 'synthetic-source' };
+  const close = await bridgeExistingLocalUi(directory, expected, channel, () => {});
+  t.after(close);
+  const now = Date.now();
+  t.mock.method(Date, 'now', () => now);
+  for (const [offset, status] of [[8050, 'waiting'], [8100, 'waiting'], [8101, 'denied'], [0, 'denied'], [-1, 'denied']]) {
+    const requestId = crypto.randomUUID();
+    channel.emit('message', { type: 'mediflow-local-ui-navigate', requestId, intent: 'search', expiresAt: now + offset, ...expected });
+    assert.deepEqual(sent.at(-1), { type: 'mediflow-local-ui-result', requestId, status }, `offset ${offset}`);
+  }
 });

@@ -10,7 +10,7 @@ use std::{
 const URI: &str = "ui://mediflow-native-chat-access/access";
 const OPEN: &str = "mediflow_native_access_open";
 const CONTROL: &str = "mediflow_native_access";
-const FIXED: &str = "Apri la vista MediFlow per richiedere accesso nella finestra nativa. Nessun contenuto clinico disponibile.";
+const FIXED: &str = "Apri la vista MediFlow per richiedere accesso nella finestra nativa. La scheda sintetica richiede consenso nativo sui byte finali.";
 const HTML: &str = include_str!("../../../../../lib/chat-card/native-access.html");
 
 fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
@@ -24,11 +24,12 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
     };
     writeln!(stream, "{value}")?;
     let mut bytes = Vec::new();
-    BufReader::new(Read::take(&mut *stream, 257)).read_until(b'\n', &mut bytes)?;
+    BufReader::new(Read::take(&mut *stream, 65_537)).read_until(b'\n', &mut bytes)?;
     let value: Value = serde_json::from_slice(&bytes)?;
     let state = value["status"].as_str().filter(|s| {
         [
             "requested",
+            "preparing",
             "challenge",
             "approving",
             "approved",
@@ -37,7 +38,17 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
         ]
         .contains(s)
     });
-    if bytes.len() > 256 || value.as_object().map(|v| v.len()) != Some(1) || state.is_none() {
+    let fields = value.as_object().map(|v| v.len());
+    let has_payload = value.get("payload").is_some();
+    if bytes.len() > 65_536
+        || state.is_none()
+        || (!has_payload && fields != Some(1))
+        || (has_payload
+            && (command != "consume"
+                || state != Some("consumed")
+                || fields != Some(2)
+                || !value["payload"].is_string()))
+    {
         return Err(io::ErrorKind::InvalidData.into());
     }
     Ok(value)
@@ -87,7 +98,7 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                 {"name": OPEN, "description": FIXED, "inputSchema":{"type":"object","properties":{},"additionalProperties":false},
                     "annotations":{"readOnlyHint":true,"destructiveHint":false,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["model"]}}},
-                {"name": CONTROL, "description":"Richiesta di accesso monouso nella GPUI; restituisce soltanto lo stato.",
+                {"name": CONTROL, "description":"Scheda sintetica monouso dopo consenso nella GPUI; payload riservato alla vista.",
                     "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","status","consume","revoke"]}},"required":["command"],"additionalProperties":false},
                     "annotations":{"readOnlyHint":true,"destructiveHint":false,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["app"]}}}]}),
