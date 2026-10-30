@@ -1,3 +1,4 @@
+import { isCiphertext, openPatientDocumentFile } from './security/attachment-file-envelope';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -16,6 +17,7 @@ import { ATTACHMENTS_ABSENT, frame, PAYLOAD_DIGEST_CODEC, SEAL_DIGEST_CODEC,
     SEAL_SCHEMA } from './headless/clinician-soap-entry-seal-codec-internal';
 import { decryptData, encryptData, generateMasterKey } from './security/security';
 
+const fileGolden = JSON.parse(fs.readFileSync('native/contracts/attachment-file-golden.v2.json', 'utf8'));
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LOADER = pathToFileURL(path.join(ROOT, 'scripts/register-strip-types-loader.mjs')).href;
 const MEMBERSHIP_TABLE = 'patients_to_ambulatories';
@@ -294,7 +296,8 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
     });
     insertRow(db, 'attachments', {
         id: 'w7-attachment', patient_id: 'w7-patient', type: 'application/pdf', size: 128,
-        ...(await sealed('attachments', ['name', 'path', 'data', 'summary_snapshot', 'parse_evidence_artifact_snapshot', 'ocr_replay_artifact_snapshot'])),
+        ...(await sealed('attachments', ['name', 'path', 'summary_snapshot', 'parse_evidence_artifact_snapshot', 'ocr_replay_artifact_snapshot'])),
+        data: fileGolden.data,
         ocr_queue_state: 'ocr_done', ocr_queue_reason: 'synthetic', ocr_queue_updated_at: now + 22, created_at: now + 22,
         document_source_ref: 'a'.repeat(64), document_revision: 7, document_freshness_epoch: 11,
     });
@@ -990,7 +993,7 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
 
                 for (let rowIndex = 0; rowIndex < sourceRows.length; rowIndex += 1) {
                     for (const [column, value] of Object.entries(sourceRows[rowIndex])) {
-                        if (typeof value !== 'string' || !value.startsWith('ENC:')) continue;
+                        if (typeof value !== 'string' || !isCiphertext(value)) continue;
                         encryptedFieldCount += 1;
                         assert.equal(
                             Buffer.from(String(targetRows[rowIndex][column])).compare(Buffer.from(value)),
@@ -1007,6 +1010,10 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             })) as { ok: boolean; artifactPath?: string; message?: string };
             assert.equal(reexport.ok, true, reexport.message); assert.ok(reexport.artifactPath);
             const restoredArtifact = await parseBackupArtifact(JSON.parse(fs.readFileSync(reexport.artifactPath, 'utf8')));
+            const fileKey = await crypto.subtle.importKey('raw', Buffer.from(fileGolden.masterKey, 'base64'), 'AES-GCM', false, ['decrypt']);
+            const restoredFile = restoredArtifact.payload.attachments.find(row => row.id === 'w7-attachment')!;
+            assert.equal(restoredFile.data, fileGolden.data);
+            assert.equal(await openPatientDocumentFile(restoredFile.data as string, fileKey), `data:application/pdf;base64,${fileGolden.original}`);
             assert.deepEqual(restoredArtifact.payload.headlessSoapEntryCommits, artifact.payload.headlessSoapEntryCommits);
             assert.deepEqual(restoredArtifact.payload.attachments.map(({ documentSourceRef, documentRevision, documentFreshnessEpoch }) => ({ documentSourceRef, documentRevision, documentFreshnessEpoch })),
                 artifact.payload.attachments.map(({ documentSourceRef, documentRevision, documentFreshnessEpoch }) => ({ documentSourceRef, documentRevision, documentFreshnessEpoch })));

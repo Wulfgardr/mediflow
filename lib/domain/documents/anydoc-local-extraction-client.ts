@@ -1,5 +1,7 @@
 'use client';
 
+import { isCiphertext } from '../../security/attachment-file-envelope';
+
 import {
     ATTACHMENT_EXTRACTION_ACTION_HEADER, ATTACHMENT_EXTRACTION_GRANT_HEADER,
     ATTACHMENT_EXTRACTION_PROJECTION_SCHEMA,
@@ -157,7 +159,7 @@ function parseGrant(raw: string | null): AttachmentExtractionProjectionGrant | n
         grantId: fields.grantId, expiresAt: fields.expiresAt as number, canonicalSource: current });
 }
 function decodeClientSource(data: unknown): Uint8Array<ArrayBuffer> | null {
-    if (typeof data !== 'string' || !data || data.startsWith('ENC:')
+    if (typeof data !== 'string' || !data || isCiphertext(data)
         || data.length > Math.ceil(MAX_SOURCE_BYTES / 3) * 4 + 1024) return null;
     const header = /^data:[^,]{0,512};base64,/iu.exec(data);
     const base64 = (header ? data.slice(header[0].length) : data).replace(/\s/gu, '');

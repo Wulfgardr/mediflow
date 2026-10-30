@@ -11,7 +11,7 @@ const Uint8ArrayConstructor = Uint8Array;
 const arrayPush = Function.call.bind(Array.prototype.push) as (target: Uint8Array[], value: Uint8Array) => number;
 const stringSlice = Function.call.bind(String.prototype.slice) as (value: string, start?: number, end?: number) => string;
 
-export type BoundedJsonReadControl = Readonly<{ signal: AbortSignal; deadline: number }>;
+export type BoundedJsonReadControl = Readonly<{ signal: AbortSignal; deadline: number; sensitive?: true }>;
 
 export type BoundedJsonBody = Readonly<{ ok: true; value: unknown; byteLength: number }>
     | Readonly<{ ok: false; status: 400 | 413 }>;
@@ -98,7 +98,8 @@ export function parseStrictJson(source: string): unknown {
     return jsonParse(source);
 }
 
-/** Accumulates at most the budget; rejects the crossing chunk before decoding/parsing. */
+/** Accumulates at most the budget; rejects the crossing chunk before decoding/parsing.
+ * Sensitive reads consume and erase received chunks and assembly bytes, not decoded JS strings. */
 export async function readBoundedJsonBody(
     request: Request,
     maximumBytes: number,
@@ -124,44 +125,52 @@ export async function readBoundedJsonBody(
     control?.signal.addEventListener('abort', abort, { once: true });
     const chunks: Uint8Array[] = [];
     let byteLength = 0;
+    let bytes: Uint8Array | undefined;
     try {
-        while (true) {
-            if (interrupted()) { cancel(reader); return objectFreeze({ ok: false, status: 400 }); }
-            const step = await reader.read();
-            if (interrupted()) { cancel(reader); return objectFreeze({ ok: false, status: 400 }); }
-            if (step.done) break;
-            if (!(step.value instanceof Uint8ArrayConstructor)) {
-                cancel(reader);
-                return objectFreeze({ ok: false, status: 400 });
+        try {
+            while (true) {
+                if (interrupted()) { cancel(reader); return objectFreeze({ ok: false, status: 400 }); }
+                const step = await reader.read();
+                if (!step.done && step.value instanceof Uint8ArrayConstructor && step.value.byteLength > 0) arrayPush(chunks, step.value);
+                if (interrupted()) { cancel(reader); return objectFreeze({ ok: false, status: 400 }); }
+                if (step.done) break;
+                if (!(step.value instanceof Uint8ArrayConstructor)) {
+                    cancel(reader);
+                    return objectFreeze({ ok: false, status: 400 });
+                }
+                byteLength += step.value.byteLength;
+                if (byteLength > maximumBytes) {
+                    cancel(reader);
+                    return objectFreeze({ ok: false, status: 413 });
+                }
             }
-            byteLength += step.value.byteLength;
-            if (byteLength > maximumBytes) {
-                cancel(reader);
-                return objectFreeze({ ok: false, status: 413 });
-            }
-            if (step.value.byteLength > 0) arrayPush(chunks, step.value);
+        } catch {
+            cancel(reader);
+            return objectFreeze({ ok: false, status: 400 });
+        } finally {
+            control?.signal.removeEventListener('abort', abort);
+            try { reader.releaseLock(); } catch { /* reader is already closed */ }
         }
-    } catch {
-        cancel(reader);
-        return objectFreeze({ ok: false, status: 400 });
-    } finally {
-        control?.signal.removeEventListener('abort', abort);
-        try { reader.releaseLock(); } catch { /* reader is already closed */ }
-    }
 
-    try {
-        const bytes = new Uint8ArrayConstructor(byteLength);
-        let offset = 0;
-        for (let index = 0; index < chunks.length; index += 1) {
-            const chunk = chunks[index]!;
-            bytes.set(chunk, offset); offset += chunk.byteLength;
+        try {
+            bytes = new Uint8ArrayConstructor(byteLength);
+            let offset = 0;
+            for (let index = 0; index < chunks.length; index += 1) {
+                const chunk = chunks[index]!;
+                bytes.set(chunk, offset); offset += chunk.byteLength;
+            }
+            const source = semantics === 'request-json' ? decodeRequestUtf8(bytes) : decodeUtf8(bytes);
+            const value = emptyBody === 'empty-object' && source.trim().length === 0
+                ? {} : semantics === 'strict' ? parseStrictJson(source) : jsonParse(source);
+            return objectFreeze({ ok: true, value, byteLength });
+        } catch {
+            return objectFreeze({ ok: false, status: 400 });
         }
-        const source = semantics === 'request-json' ? decodeRequestUtf8(bytes) : decodeUtf8(bytes);
-        const value = emptyBody === 'empty-object' && source.trim().length === 0
-            ? {} : semantics === 'strict' ? parseStrictJson(source) : jsonParse(source);
-        return objectFreeze({ ok: true, value, byteLength });
-    } catch {
-        return objectFreeze({ ok: false, status: 400 });
+    } finally {
+        if (control?.sensitive) {
+            for (const chunk of chunks) chunk.fill(0);
+            bytes?.fill(0);
+        }
     }
 }
 

@@ -10,6 +10,36 @@ sono una prova TLA né un'estensione implicita degli invarianti legacy sottostan
 
 Il recovery cifrato supporta lo schema corrente 6 e i predecessori canonici 4 e 5; le 24 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
+## Raccordo PR #739 del 30 ottobre 2026: lettura degli allegati ENC2
+
+Confrontati `lib/db.ts` e `lib/locked-field-guard.ts` di
+`826a4df3fc0ec069c0eabb5fb77c93fe3aa69757` con il runtime sincronizzato
+`91acfa2f5abfbdb1c0029a0b89dac708da0bcab8`: il diff coperto contiene soltanto
+il riconoscimento di `ENC2:` e il ramo di apertura del file. Nessun writer,
+controller, consumer TherapyManager, conferma, journal, CAS, ledger o audit
+è modificato. Il resto di `ApiTable`, inclusi trasporto, letture e fence di
+sessione, conserva il codice precedente.
+
+L'await aggiunto è raggiungibile soltanto per `attachments.data`. Nei campi
+delle altre tabelle un valore ENC2 viene conservato come ciphertext bloccato,
+senza tentare l'apertura; senza chiave, le terapie tornano come prima, ma
+entrambi i controller rifiutano anche il prefisso ENC2 nei tre campi letti
+per confermare uno stato. La guardia condivisa estende quindi il rifiuto dei
+valori illeggibili, non l'autorità di scrittura o una transizione. Le sei
+regressioni `ENC2 in therapy … cannot authorize a status command` verificano
+che nome farmaco, dose o stato così marcati non aprano una conferma né inviino
+un comando: il legacy resta senza intento e il durevole pubblica `unavailable`.
+
+Restano valide le assunzioni di contesto corrente, versione leggibile,
+marker conservativo e atomicità host: non cambiano gli await della terapia,
+l'ordine delle guardie, le gare o il recupero. Modello, statechart, invarianti,
+limiti, testimoni e mutanti restano invariati. Cifratura e cancellazione della
+memoria non sono proprietà di TLC: sono verificate separatamente dai test
+dei codec, dei buffer e degli allegati grandi. Dopo questa verifica di
+corrispondenza sono aggiornati solo i due digest e `syncCommit`; il comando
+completo `npm run verify:therapy-status` riesegue TLC e i test causali, senza
+ampliare esclusioni o attribuire al modello la prova della cifratura.
+
 ## Raccordo G-3 del 30 ottobre 2026: contratto dei campi cifrati
 
 Riesaminato `91acfa2f5abfbdb1c0029a0b89dac708da0bcab8` rispetto a
