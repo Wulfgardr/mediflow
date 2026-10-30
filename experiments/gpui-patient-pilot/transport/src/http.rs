@@ -378,6 +378,26 @@ impl RuntimeClient {
         body: Option<&Value>,
         mutation: bool,
     ) -> Result<RawResponse> {
+        self.dedicated_web_raw_observing_headers(
+            method,
+            path,
+            headers,
+            body,
+            mutation,
+            &mut |_, _| {},
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn dedicated_web_raw_observing_headers(
+        &self,
+        method: Method,
+        path: &[&str],
+        headers: HeaderMap,
+        body: Option<&Value>,
+        mutation: bool,
+        received: &mut impl FnMut(u16, &HeaderMap),
+    ) -> Result<RawResponse> {
         if !self.is_local_bootstrap_origin() {
             return Err(RuntimeError::Forbidden);
         }
@@ -402,7 +422,17 @@ impl RuntimeClient {
                     request = request.body(body.to_vec());
                 }
                 let response = request.send().await.map_err(|_| uncertain(mutation))?;
-                let raw = read_response_body(response, AUTH_LIMIT, mutation).await?;
+                received(response.status().as_u16(), response.headers());
+                let raw = read_response_body(
+                    response,
+                    if path.len() == 3 && path[..2] == ["api", "attachments"] {
+                        DOCUMENT_LIMIT
+                    } else {
+                        AUTH_LIMIT
+                    },
+                    mutation,
+                )
+                .await?;
                 if (300..400).contains(&raw.status) {
                     return Err(RuntimeError::Rejected(raw.status));
                 }
@@ -769,7 +799,8 @@ impl HostBootstrapSession {
             cookie: Zeroizing::new(String::new()),
             sent: std::sync::atomic::AtomicBool::new(false),
         };
-        let (cookie, login) = authenticate_web_p3(&host.client, user, host.headers()?, passphrase);
+        let (cookie, login, _) =
+            authenticate_web_p3(&host.client, user, host.headers()?, passphrase, false);
         if let Some(cookie) = cookie {
             host.cookie = cookie;
         }
@@ -865,8 +896,10 @@ pub(crate) fn authenticate_web_p3(
     user: &RuntimeUser,
     headers: HeaderMap,
     passphrase: &str,
-) -> (Option<Zeroizing<String>>, Result<()>) {
+    local_client: bool,
+) -> (Option<Zeroizing<String>>, Result<()>, bool) {
     let mut cookie = None;
+    let mut possibly_issued = false;
     let login = (|| {
         let checked = client.dedicated_web_raw(
             Method::GET,
@@ -908,18 +941,29 @@ pub(crate) fn authenticate_web_p3(
         headers.insert("if-match", sensitive_header(etag)?);
         headers.insert("idempotency-key", sensitive_header(&operation_uuid()?)?);
         let mut body = serde_json::json!({"username":user.username,"verifier":&*material.verifier});
-        let logged = client.dedicated_web_raw(
+        possibly_issued = true;
+        let logged = client.dedicated_web_raw_observing_headers(
             Method::POST,
-            &["api", "auth", "login"],
+            &if local_client {
+                vec!["api", "auth", "local-client", "login"]
+            } else {
+                vec!["api", "auth", "login"]
+            },
             headers,
             Some(&body),
             true,
+            &mut |status, headers| {
+                cookie = session_cookie(headers).ok();
+                possibly_issued = cookie.is_some() || (200..300).contains(&status);
+            },
         );
         if let Some(Value::String(verifier)) = body.get_mut("verifier") {
             verifier.zeroize();
         }
         let logged = logged?;
-        cookie = Some(session_cookie(&logged.headers)?);
+        if cookie.is_none() {
+            return Err(RuntimeError::InvalidResponse);
+        }
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         struct Login {
@@ -934,14 +978,14 @@ pub(crate) fn authenticate_web_p3(
         if !admitted.success
             || admitted.id != user.id
             || admitted.username != user.username
-            || admitted.role != "admin"
+            || admitted.role != user.role
             || admitted.archive_generation != user.archive_generation
         {
             return Err(RuntimeError::InvalidResponse);
         }
         Ok(())
     })();
-    (cookie, login)
+    (cookie, login, possibly_issued)
 }
 
 pub(crate) fn control_cookie(

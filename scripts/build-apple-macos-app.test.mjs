@@ -124,6 +124,8 @@ function buildFixture(t) {
   const input = fixture(t), root = path.join(input.directory, 'repo with spaces');
   for (const file of ['package.json', 'scripts/build-input-metadata.mjs', 'scripts/build-apple-macos-app.sh', 'scripts/macos-native-artifact.py', 'scripts/check-macos-web-runtime-native-payload.sh',
     'scripts/stage-chatgpt-execution-mac-assets.ts', 'scripts/run-strip-types.mjs',
+    'scripts/local-api-tls-proxy.mjs', 'lib/security/loopback-ingress.mjs',
+    'scripts/check-standalone-runtime-bundle.mjs', 'scripts/scheduled-backup-runtime-contract.mjs', 'scripts/anydoc-pdf-smoke-diagnostics.mjs',
     'scripts/native-first-install.mjs', 'scripts/native-first-install-contract.json', 'scripts/launcher-helpers.mjs', 'scripts/node-runtime-contract.mjs',
     'scripts/fixtures/mac-packaging-test-loader.mjs', 'scripts/fixtures/mac-packaging-test-support.mjs',
     ...['execution-mac-assets.ts', 'execution-mac-config.ts', 'execution-mac-native.ts', 'execution-mac-state.ts', 'execution-sandbox.ts', 'execution-contract.ts'].map(name => 'lib/chatgpt-execution/' + name)]) {
@@ -133,7 +135,6 @@ function buildFixture(t) {
   const web = path.join(root, '.next/standalone');
   write(path.join(web, 'server.js'), '// not an actual web build\n'); dependencies(web);
   write(path.join(root, '.next/static/synthetic.js'), '// synthetic static asset\n');
-  write(path.join(root, 'scripts/local-api-tls-proxy.mjs'), '// synthetic proxy, never run\n');
   const driverPath = write(path.join(root, 'tool-driver.mjs'), driver);
   write(path.join(root, 'scripts/generate-apple-xcodeproj.sh'), `#!/bin/bash\nexec "${process.execPath}" "${driverPath}" generate "$@"\n`, 0o755);
   for (const [file, command] of [['check-apple-structure.sh', 'structure-guard'], ['check-apple-network-entitlements.sh', 'entitlement-guard']]) {
@@ -474,7 +475,8 @@ for (const overlay of ['.next', '.next/static', 'public']) {
 test('a pre-existing proxy symlink is rejected before Xcode or any asset staging', t => {
   const input = buildFixture(t), outside = write(path.join(input.directory, 'unrelated-proxy.mjs'), '// must stay unchanged\n');
   appRoot(path.dirname(input.app));
-  fs.symlinkSync(outside, path.join(input.app, 'Contents/Resources/local-api-tls-proxy.mjs'));
+  fs.mkdirSync(path.join(input.app, 'Contents/Resources/scripts'));
+  fs.symlinkSync(outside, path.join(input.app, 'Contents/Resources/scripts/local-api-tls-proxy.mjs'));
   const before = fs.readFileSync(outside), result = input.run();
   deny(result); assert.match(result.stderr, /Nonphysical proxy destination/);
   assert.deepEqual(fs.readFileSync(outside), before);
