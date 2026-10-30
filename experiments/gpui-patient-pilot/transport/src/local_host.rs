@@ -11,7 +11,7 @@ use reqwest::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::sync::{
-    Arc, Weak,
+    Arc, Mutex, Weak,
     atomic::{AtomicBool, Ordering},
 };
 use zeroize::Zeroizing;
@@ -105,7 +105,7 @@ pub struct LocalHostAccess {
     owner: Arc<()>,
     closed: AtomicBool,
     retired: AtomicBool,
-    retirement_started: AtomicBool,
+    retirement_marker: Mutex<Option<String>>,
     notice: RetirementNotice,
 }
 impl LocalHostAccess {
@@ -132,8 +132,12 @@ impl LocalHostAccess {
             COOKIE,
             sensitive_header(&format!("mediflow_auth_control={}", *control))?,
         );
-        let (cookie, login) = authenticate_web_p3(&client, user, headers, passphrase, true);
+        let (cookie, login, possibly_issued) =
+            authenticate_web_p3(&client, user, headers, passphrase, true);
         let Some(cookie) = cookie else {
+            if possibly_issued {
+                notice.begin();
+            }
             return Err(login.err().unwrap_or(RuntimeError::InvalidResponse));
         };
         let access = Self {
@@ -145,7 +149,7 @@ impl LocalHostAccess {
             owner: Arc::new(()),
             closed: AtomicBool::new(false),
             retired: AtomicBool::new(false),
-            retirement_started: AtomicBool::new(false),
+            retirement_marker: Mutex::new(None),
             notice,
         };
         if let Err(error) = login {
@@ -322,8 +326,10 @@ impl LocalHostAccess {
         }
     }
     fn record_retirement(&self) {
-        if !self.retirement_started.swap(true, Ordering::AcqRel) {
-            self.notice.change(true);
+        if let Ok(mut marker) = self.retirement_marker.lock()
+            && marker.is_none()
+        {
+            *marker = Some(self.notice.begin());
         }
     }
     pub fn begin_retirement(self: &Arc<Self>) -> RetiringAccess {
@@ -375,7 +381,11 @@ impl LocalHostAccess {
             return Err(RuntimeError::InvalidResponse);
         }
         self.retired.store(true, Ordering::Release);
-        self.notice.change(false);
+        if let Ok(marker) = self.retirement_marker.lock()
+            && let Some(marker) = marker.as_ref()
+        {
+            self.notice.confirm(marker);
+        }
         Ok(())
     }
 }

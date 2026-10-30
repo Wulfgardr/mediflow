@@ -1,8 +1,8 @@
 use super::*;
+pub(super) use mediflow_runtime_client::RETIREMENT_WARNING;
 use mediflow_runtime_client::{
     HostSettingKey, LocalHostAccess, PreparedDocumentDeletion, PreparedHostSetting,
 };
-pub(super) use mediflow_runtime_client::RETIREMENT_WARNING;
 use mediflow_runtime_client::{RetirementNotice, RetiringAccess};
 use std::{path::PathBuf, sync::Arc};
 
