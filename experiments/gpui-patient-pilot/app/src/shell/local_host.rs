@@ -142,6 +142,19 @@ impl LocalAdministration {
     }
 }
 impl ClinicalApp {
+    pub(super) fn withdraw_local_host(&mut self, cx: &mut Context<Self>) {
+        if let Some(access) = self.local_host.withdraw(cx) {
+            let task = cx
+                .background_executor()
+                .spawn(async move { access.retire() });
+            cx.spawn(async move |this, cx| {
+                let _ = task.await;
+                let _ = this.update(cx, |_, cx| cx.notify());
+            })
+            .detach();
+        }
+    }
+
     fn run_local_host<T: Send + 'static>(
         &mut self,
         operation: impl FnOnce() -> Result<T, RuntimeError> + Send + 'static,
@@ -562,6 +575,48 @@ impl ClinicalApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[gpui::test]
+    fn failed_retirement_keeps_the_restore_outcome_and_its_own_warning(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        let notice = RetirementNotice::new(None);
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host("Synthetic scales fixture passphrase", notice.clone())
+                .unwrap(),
+        );
+        host.plan("POST /api/auth/local-client/logout")
+            .send((
+                503,
+                serde_json::json!({"error":"synthetic retirement fault"}),
+            ))
+            .unwrap();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let outcome = "Ripristino eseguito. Riapri l’archivio e rileggi la ricevuta.";
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.local_host.retirement = notice.clone();
+            app.local_host.authority = Authority::Open(access);
+            app.disconnect(cx);
+            app.message = Some((outcome.into(), true));
+        });
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert_eq!(app.message.as_ref().unwrap().0, outcome);
+            assert!(app.local_host.retirement.pending());
+        });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert!(
+            cx.debug_bounds("local-session-retirement-warning")
+                .is_some()
+        );
+    }
+
     #[gpui::test]
     fn unconfirmed_retirement_is_visible_on_the_locked_login_screen(cx: &mut gpui::TestAppContext) {
         let (view, cx) =

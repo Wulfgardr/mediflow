@@ -1100,21 +1100,7 @@ impl ClinicalApp {
         self.chat_access.retire(cx);
         self.analytics.reset(cx);
         self.scales.reset(cx);
-        if let Some(access) = self.local_host.withdraw(cx) {
-            let task = cx
-                .background_executor()
-                .spawn(async move { access.retire() });
-            cx.spawn(async move |this, cx| {
-                let result = task.await;
-                let _ = this.update(cx, |this, cx| {
-                    if result.is_err() {
-                        this.message = Some((local_host::RETIREMENT_WARNING.into(), true));
-                    }
-                    cx.notify();
-                });
-            })
-            .detach();
-        }
+        self.withdraw_local_host(cx);
         self.account_profile.reset(self.theme, cx);
         self.settings_page = SettingsPage::Overview;
         self.ambulatory_management.reset(self.theme, cx);
