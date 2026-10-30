@@ -1,3 +1,4 @@
+pub mod patient_document;
 use crate::{ChatWriteOutcome, ChatWriteResolution};
 use crate::{
     account_profile::{
