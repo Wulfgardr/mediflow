@@ -352,3 +352,33 @@ handoff ancora pendenti, senza arrestare il launcher o il Web autonomi.
 `--riusa` conserva inizializzazione e servizi facoltativi ordinari, incluso
 Ollama, e limita il riuso alla build già ammessa e alla conservazione delle
 preferenze. Il selettore ordinario e le scelte ricordate restano efficaci.
+
+
+### Prima chiamata durante avvio o abbinamento, 30 ottobre 2026
+
+Il limite di otto secondi comprende handshake del launcher, scelta ordinaria,
+avvio Web e abbinamento. Il launcher risponde `waiting` finché la scelta o
+l'abbinamento non sono pronti; il navigator ritenta entro la stessa deadline.
+Il tool può quindi chiedere l'apertura prima del login o del binding clinico,
+ma non promette di completare il selettore o il consenso entro quel limite.
+Se la UI diventa pronta in tempo, la richiesta prosegue; altrimenti termina
+senza restare in coda. Una seconda chiamata dopo la scelta o il consenso è
+una nuova richiesta esplicita, con nuovo ID e nuova scadenza.
+
+Questo comportamento è previsto. L'errore precedente, «MediFlow navigation
+unavailable.», non spiegava il passo successivo. La ricevuta di errore MCP
+è ora sempre la stringa fissa «MediFlow navigation unavailable. Complete startup
+or pairing in MediFlow, then retry. This request is no longer pending.».
+Non distingue avvio, abbinamento, rifiuto, revoca, input invalido o errore di
+trasporto e non rivela dati di paziente, codici, consenso, archivio o sessione.
+L'invito a riprovare non concede autorità e non conferma disponibilità.
+La ricevuta positiva resta `continue_in_mediflow`.
+
+Nessun aumento dei timeout o accodamento persistente: readiness tardiva,
+cambio contesto, lock e revoca non riattivano la richiesta terminata.
+L'harness automatico esercita MCP stdio e RPC reali con readiness Web
+controllata. Il medesimo raccordo attraversa anche il ciclo di attesa del
+navigator e l'IPC del launcher reale: cinque sessioni fredde nel selettore
+e una nell'abbinamento, con Web sintetico. Dopo la readiness o il consenso
+non deve comparire alcun intento vecchio; una nuova chiamata deve riuscire.
+Le prove non sostituiscono il collaudo dei client reali.

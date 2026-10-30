@@ -41,6 +41,14 @@ export async function navigateOwnedLocalUiRuntime(child, intent, signal, expires
   });
 }
 
+export async function waitForLocalUiNavigation(launcher, intent, deadline, expiresAt, expected) {
+  for (;;) {
+    deadline.throwIfAborted();
+    if (await navigateOwnedLocalUiRuntime(launcher, intent, deadline, expiresAt, expected)) return;
+    await new Promise(resolve => { const timer = setTimeout(resolve, 100); timer.unref(); });
+  }
+}
+
 export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision }) {
   if (!path.isAbsolute(sourceRoot) || fs.realpathSync(sourceRoot) !== sourceRoot
     || !path.isAbsolute(dataDir) || fs.realpathSync(dataDir) !== dataDir) return unavailable();
@@ -87,11 +95,7 @@ export function createLocalUiRuntimeNavigator({ sourceRoot, dataDir, revision })
     const deadline = AbortSignal.any([signal, AbortSignal.timeout(8000)]);
     deadline.throwIfAborted();
     if (!launcher) { starting ??= start(deadline).finally(() => { starting = null; }); await starting; }
-    for (;;) {
-      deadline.throwIfAborted();
-      if (await navigateOwnedLocalUiRuntime(launcher, intent, deadline, expiresAt, expected)) return;
-      await new Promise(resolve => { const timer = setTimeout(resolve, 100); timer.unref(); });
-    }
+    await waitForLocalUiNavigation(launcher, intent, deadline, expiresAt, expected);
   };
   navigate.close = () => {
     closed = true;
