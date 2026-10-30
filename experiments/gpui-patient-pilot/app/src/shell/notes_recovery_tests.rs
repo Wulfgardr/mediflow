@@ -93,6 +93,7 @@ impl Host {
                     "unlock":{"credential":"passphrase", "kdfVersion":3, "salt":"AwMDAwMDAwMDAwMDAwMDAw=="}}),
                 "POST /api/auth/local-client/login" => json!({"success":true,"id":"synthetic-user","username":"synthetic","role":"admin","archiveGeneration":"synthetic-generation"}),
                 "POST /api/auth/local-client/logout" => { status = 204; Value::Null },
+                "POST /api/system/backup-restore" => { status = 409; json!({"success":false,"code":"restore_blocked","reason":"snapshot"}) },
                 "POST /api/system/backup-restore/verify" => json!({"success":true,"format":"mediflow-backup","version":1,"counts":{"patients":1},"expectedSnapshot":"a".repeat(64),"sourceChecksum":"b".repeat(64)}),
                 "POST /api/auth/native/login" => json!({"success":true, "id":"synthetic-user", "username":"synthetic", "role":"admin",
                     "archiveGeneration":"synthetic-generation", "salt":"AwMDAwMDAwMDAwMDAwMDAw==",

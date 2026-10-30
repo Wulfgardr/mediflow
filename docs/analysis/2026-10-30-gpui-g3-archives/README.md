@@ -141,3 +141,32 @@ Il prefisso condiviso è ora riservato al servizio: POST, PUT, GET generici e
 il writer comune delle impostazioni lo rifiutano. La spec HTTP tenta sia la
 creazione di una falsa ricevuta sia la sovrascrittura di quella reale;
 controlla 403, assenza della falsa e identità della ricevuta autentica.
+
+
+La conferma nativa mostra nome e dimensione del file associati al comando
+preparato. I rifiuti HTTP certi 400/403/409/412 liberano soltanto il registro
+corrispondente dopo la risposta, senza reinvio; errori di trasporto, risposte
+5xx e altri esiti incerti lo conservano. Una prova GPUI invia una sola volta,
+riceve un conflitto e verifica chiusura dell’accesso, rimozione del proprio
+registro e assenza di retry. Le tre prove dell’area archivi passano.
+
+
+Tre nuove fixture SQLite ignorano rispettivamente cancellazione di una
+collezione, inserimento clinico e inserimento della ricevuta. Prima della
+correzione tutti e tre i test fallivano: il writer poteva completare una
+sostituzione non corrispondente al backup. Ora controlla l’assenza dei record
+dopo ogni cancellazione, il numero di righe inserite e la persistenza esatta
+della ricevuta, dentro la medesima transazione canonica. Gli ignore causano
+rollback di dati, generazione e ricevuta. Il gruppo di 87 prove su backup,
+recupero, chiavi, audit e ledger passa. Nessun interruttore di guasto è
+aggiunto al prodotto. Le tre mutazioni richieste sono state ripetute sulla
+sorgente finale in un’altra copia temporanea: falliscono per le stesse
+asserzioni previste.
+
+
+La fixture della rilettura aveva una scadenza avviata prima della conclusione
+del login e ha prodotto un rosso sotto carico. È stata sostituita con un
+riscontro causale: al ritorno del metodo la fixture deve aver ricevuto la
+GET. Nessun timeout del prodotto, soglia o controllo è allentato; la ricevuta
+inventata senza GET continua a far fallire il test, senza dipendere dal tempo
+di derivazione della passphrase.

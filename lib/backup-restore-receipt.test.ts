@@ -31,7 +31,7 @@ test('restore requires the exact keyword, operation id and snapshot together', (
     }
     assert.equal(parseRestoreIntent(new Request('http://localhost')), null);
 });
-for (const mode of ['cancel', 'conflict', 'crash', 'committed-crash', 'success'] as const) {
+for (const mode of ['cancel', 'conflict', 'crash', 'committed-crash', 'success', 'receipt-ignore', 'clinical-ignore', 'clear-ignore'] as const) {
     test(`synthetic restore ${mode}: keys, history, records and receipt follow the transaction`, async () => {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mf-g3-synthetic-'));
         try {
@@ -68,9 +68,12 @@ for (const mode of ['cancel', 'conflict', 'crash', 'committed-crash', 'success']
                     db.function('synthetic_crash', () => process.kill(process.pid, 'SIGKILL'));
                     db.exec("CREATE TRIGGER synthetic_crash_mid_restore AFTER DELETE ON patients BEGIN SELECT synthetic_crash(); END");
                 }
+                if ('${mode}' === 'receipt-ignore') db.exec("CREATE TRIGGER synthetic_receipt_ignore BEFORE INSERT ON settings WHEN NEW.key LIKE 'archive.restore.receipt.%' BEGIN SELECT RAISE(IGNORE); END");
+                if ('${mode}' === 'clear-ignore') db.exec("CREATE TRIGGER synthetic_patient_clear_ignore BEFORE DELETE ON patients BEGIN SELECT RAISE(IGNORE); END");
+                if ('${mode}' === 'clinical-ignore') db.exec("CREATE TRIGGER synthetic_attachment_ignore BEFORE INSERT ON attachments BEGIN SELECT RAISE(IGNORE); END");
                 if ('${mode}' !== 'cancel') {
                     try { restoreBackupArtifact(artifact, () => false, intent); }
-                    catch (error) { if ('${mode}' !== 'conflict' || error.reason !== 'snapshot') throw error; }
+                    catch (error) { if (!(('${mode}' === 'conflict' && error.reason === 'snapshot') || ('${mode}' === 'receipt-ignore' && error.message === 'RESTORE_RECEIPT_NOT_PERSISTED') || ('${mode}' === 'clinical-ignore' && error.message === 'RESTORE_ROWS_NOT_PERSISTED') || ('${mode}' === 'clear-ignore' && error.message === 'RESTORE_ROWS_NOT_CLEARED'))) throw error; }
                 }
                 if ('${mode}' === 'committed-crash') process.kill(process.pid, 'SIGKILL');
             `);
