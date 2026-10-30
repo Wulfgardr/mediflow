@@ -222,6 +222,17 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
             await fixture(page, { active: 3, suspended: 1, completed: 1 });
             await page.evaluate(theme => { document.documentElement.classList.toggle('dark', theme === 'grafite'); document.documentElement.classList.toggle('light', theme === 'giorno'); }, theme);
             if (zoom) await zoom.setZoom(size === 'zoom-400' ? 4 : 2);
+            const heading = section(page).getByRole('heading', { name: /Terapie farmacologiche/ });
+            const title = heading.getByText('Terapie farmacologiche', { exact: true });
+            const titleRect = await title.evaluate(element => {
+                const range = document.createRange(); range.selectNodeContents(element);
+                const rect = range.getBoundingClientRect();
+                return { x: rect.x, y: rect.y, right: rect.right, bottom: rect.bottom };
+            });
+            const countRect = await heading.locator('span').last().boundingBox();
+            expect(titleRect.right <= countRect!.x || titleRect.bottom <= countRect!.y ||
+                countRect!.y + countRect!.height <= titleRect.y, 'Titolo e conteggi devono restare separati').toBe(true);
+
             const dir = process.env.THERAPY_COMPOSITION_CAPTURES || test.info().outputPath('captures');
             await mkdir(dir, { recursive: true });
             const capture = async (state: string) => {
