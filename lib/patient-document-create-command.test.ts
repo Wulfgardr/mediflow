@@ -173,8 +173,9 @@ for (const table of ['patients', 'patients_to_ambulatories', 'attachments', 'aud
 });
 test('five minute view cannot enter preview even with a fresh PIN', async () => {
     const f = await fixture(), before = effects();
+    const duplicate = dbServer.select().from(patients).where(eq(patients.lastName, 'Rossi')).all().length ? 'create-separate' as const : 'none' as const;
     tick += 300_000;
-    assert.throws(() => f.api.preview(f.host, f.view.viewId, { ...f.review, duplicate: 'create-separate' }));
+    assert.throws(() => f.api.preview(f.host, f.view.viewId, { ...f.review, duplicate }));
     assert.deepEqual(effects(), before);
 });
 test('owner denial after the source/audit writes rolls back the complete command', async () => {
