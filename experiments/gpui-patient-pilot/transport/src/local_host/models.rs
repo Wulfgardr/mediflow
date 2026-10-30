@@ -95,7 +95,7 @@ fn valid_endpoint(value: &str) -> bool {
     })
 }
 impl LocalHostAccess {
-    fn model_value(&self, key: &str) -> Result<Option<String>> {
+    pub(super) fn model_value(&self, key: &str) -> Result<Option<String>> {
         let row = self.request(Method::GET, &["api", "settings", key], None, false)?;
         if row["key"] != key {
             return Err(RuntimeError::InvalidResponse);
@@ -290,5 +290,118 @@ mod review738_endpoint_probe {
             !valid_endpoint("http://[::1]:11434/v1/"),
             "the Web strictOllamaLoopbackBaseUrl rejects IPv6; native must not accept and persist it"
         );
+    }
+}
+
+#[derive(Clone, Deserialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalProviderStatus {
+    pub provider: String,
+    pub credential_class: String,
+    pub model: Option<String>,
+    pub state: String,
+    pub revision: String,
+    pub version: u64,
+    pub receipt: Option<String>,
+    pub can_activate: bool,
+    pub inference: String,
+    pub qualification: String,
+}
+impl LocalProviderStatus {
+    fn parse(value: Value) -> Result<Self> {
+        let status: Self =
+            serde_json::from_value(value).map_err(|_| RuntimeError::InvalidResponse)?;
+        if status.provider != "ollama"
+            || status.credential_class != "local_model"
+            || status.inference != "not_run"
+            || status.qualification != "not_assessed"
+            || status.revision.len() != 64
+            || !status.revision.bytes().all(|c| c.is_ascii_hexdigit())
+            || status.model.as_ref().is_some_and(|m| !valid_model(m))
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        Ok(status)
+    }
+    pub fn description(&self) -> &'static str {
+        match self.state.as_str() {
+            "missing" => "Collegamento locale da attivare.",
+            "available_unqualified" => {
+                "Collegamento locale attivo. Le funzioni mantengono le proprie abilitazioni e verifiche."
+            }
+            "degraded" => {
+                "Collegamento da recuperare: controlla Ollama, poi avvia una nuova verifica."
+            }
+            "revoked" => {
+                "Collegamento revocato. Questa pagina non può riattivarlo: rivolgiti all’operatore del computer."
+            }
+            "configuration_missing" => {
+                "Scegli un modello Ollama già installato e salva la configurazione."
+            }
+            "locality_denied" => "Collegamento non ammesso. Usa Ollama locale sulla porta 11434.",
+            _ => "Stato non disponibile. Rivolgiti all’operatore del computer.",
+        }
+    }
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LocalProviderOutcome {
+    Confirmed(LocalProviderStatus),
+    Denied(String),
+}
+impl LocalHostAccess {
+    pub fn read_local_provider(&self) -> Result<LocalProviderStatus> {
+        let value = self.request(
+            Method::GET,
+            &["api", "ai", "local-provider", "onboarding"],
+            None,
+            false,
+        )?;
+        self.headers()?;
+        LocalProviderStatus::parse(value)
+    }
+    pub fn activate_local_provider(
+        &self,
+        before: &LocalProviderStatus,
+    ) -> Result<LocalProviderOutcome> {
+        if !before.can_activate {
+            return Err(RuntimeError::Forbidden);
+        }
+        let response = self.client.dedicated_web_raw(
+            Method::POST,
+            &["api", "ai", "local-provider", "onboarding"],
+            self.headers()?,
+            Some(&json!({"intent":"verify_and_activate", "expectedRevision":before.revision})),
+            true,
+        )?;
+        self.headers()?;
+        let value: Value =
+            serde_json::from_slice(&response.body).map_err(|_| RuntimeError::Indeterminate)?;
+        if response.status != 200 {
+            return Ok(LocalProviderOutcome::Denied(provider_denial(&value)));
+        }
+        let written = LocalProviderStatus::parse(value)?;
+        let observed = self.read_local_provider()?;
+        if written != observed || observed.state != "available_unqualified" {
+            return Err(RuntimeError::Indeterminate);
+        }
+        Ok(LocalProviderOutcome::Confirmed(observed))
+    }
+}
+fn provider_denial(value: &Value) -> String {
+    match value["error"].as_str() {
+        Some("provider_version_unsupported") => {
+            let mismatch = &value["versionMismatch"];
+            match (mismatch["serverVersion"].as_str(), mismatch["supportedVersions"].as_str()) {
+                (Some(found), Some(supported)) if found.len() <= 128 && supported.len() <= 512 =>
+                    format!("Versione di Ollama trovata: {found}. Versioni ammesse: {supported}. Aggiorna MediFlow o installa una versione di Ollama ammessa."),
+                _ => "Versione di Ollama non ammessa. Aggiorna MediFlow o installa una versione ammessa.".into(),
+            }
+        }
+        Some("provider_unreachable") => "Ollama non è raggiungibile. Apri Ollama e rileggi lo stato.".into(),
+        Some("provider_unready") => "Ollama è raggiungibile ma il modello non è pronto. Controlla il modello installato e rileggi lo stato.".into(),
+        Some("configuration_changed") => "La configurazione o lo stato sono cambiati. Rileggi prima di una nuova verifica.".into(),
+        Some("verification_interrupted") => "Verifica interrotta. Rileggi lo stato prima di una nuova conferma.".into(),
+        Some("revoked") => "Collegamento revocato. Questa pagina non può riattivarlo.".into(),
+        _ => "Verifica non riuscita. Rileggi lo stato prima di una nuova conferma.".into(),
     }
 }

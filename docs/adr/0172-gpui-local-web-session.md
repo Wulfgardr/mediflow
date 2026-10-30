@@ -122,3 +122,31 @@ Il salvataggio non ammette un provider, non abilita una funzione e non genera
 testo. Il download e la rimozione non vengono riaperti: il Web corrente nega
 il pull HTTP e non offre un writer di rimozione. PIN legacy, recupero da kit
 all'accesso e gli altri residui G-2 restano nel rapporto della tranche.
+
+## Consumer G-2 per motore locale, parametri e account ChatGPT
+
+Il client riusa GET/POST `/api/ai/local-provider/onboarding` con l'intento
+fisso `verify_and_activate` e la revisione opaca letta. Il modello è risolto
+sul server dalla configurazione salvata. Il timeout di questa route è di 70
+secondi; ammissione, versioni supportate e budget host restano nell'ADR 0136.
+Solo per questa route il trasporto conserva i corpi di diniego 409/503 per
+presentare versione non ammessa e indisponibilità, senza convertirli in
+successo. Il controllo prioritario di sostituzione archivio resta attivo.
+
+I parametri usano i writer Web delle chiavi `aiInsightMode`,
+`aiInsightManualConfig` e `documentRouterControlFlow`, con preparazione,
+conferma, rilettura prima dell'invio e dopo ogni PUT. Non è introdotto un
+writer generico, un CAS composto o una transazione delle tre chiavi.
+
+Il controllo account dell'ADR 0126 usa le route nominate sotto
+`/api/settings/ai/chatgpt`: status, login start/cancel/complete, read, models,
+rate-limits e logout. I POST mantengono corpo vuoto, controllo Web e rilettura.
+L'URL ufficiale transitorio è ritirato con i dati della vista; blocco e chiusura
+mantengono il ritiro della sessione locale. Le risposte precedenti a un
+annullamento non possono ripubblicare lo stato account. Non si usano sessioni
+consumer preesistenti o credenziali API.
+
+Questi consumer non concedono consenso né disponibilità per l'inferenza.
+Prova DEMO e consensi sul contenuto delle proposte restano distinti e ancora
+privi del nuovo consumer nativo. Il [rapporto G-2](../analysis/2026-10-30-gpui-g2-settings/models.md)
+conserva limiti e alternative sui file dei modelli; il pull resta negato.

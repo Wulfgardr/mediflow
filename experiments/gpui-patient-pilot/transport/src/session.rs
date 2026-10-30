@@ -4821,7 +4821,29 @@ mod tests {
         });
         (url, seen_rx, release_tx, worker)
     }
+    #[test]
+    fn nonblocking_fixture_streams_use_the_existing_bounded_http_read() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        assert_ne!(listener.local_addr().unwrap().port(), 3000);
+        let mut client = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (mut server, _) = listener.accept().unwrap();
+        server.set_nonblocking(true).unwrap();
+        let worker = std::thread::spawn(move || read_request(&mut server));
+        std::thread::sleep(Duration::from_millis(50));
+        std::io::Write::write_all(
+            &mut client,
+            b"GET /synthetic HTTP/1.1\r\nContent-Length: 0\r\n\r\n",
+        )
+        .unwrap();
+        assert!(
+            worker
+                .join()
+                .unwrap()
+                .starts_with("GET /synthetic HTTP/1.1")
+        );
+    }
     pub(super) fn read_request(stream: &mut std::net::TcpStream) -> String {
+        stream.set_nonblocking(false).unwrap();
         stream
             .set_read_timeout(Some(Duration::from_secs(5)))
             .unwrap();
@@ -8196,6 +8218,294 @@ mod g2_settings_tests {
                 access.apply_local_models(&command),
                 Err(RuntimeError::ReadRequired)
             );
+            worker.join().unwrap();
+        }
+    }
+    fn g2_provider_status(state: &str, revision: &str) -> serde_json::Value {
+        json!({"provider":"ollama","credentialClass":"local_model","model":"synthetic","state":state,"revision":revision.repeat(64),"version":1,"receipt":"synthetic-receipt","canActivate":true,"inference":"not_run","qualification":"not_assessed"})
+    }
+    fn g2_web_request(
+        listener: &TcpListener,
+        method: &str,
+        path: &str,
+        status: u16,
+        value: serde_json::Value,
+    ) -> String {
+        let (mut stream, _) = listener.accept().unwrap();
+        let request = read_request(&mut stream);
+        assert!(
+            request.starts_with(&format!("{method} {path} ")),
+            "{request}"
+        );
+        assert!(request.contains("mediflow_session="));
+        assert!(
+            !request
+                .to_ascii_lowercase()
+                .contains("x-mediflow-paired-client")
+        );
+        assert!(request.contains("sec-fetch-site: same-origin"));
+        local_host_reply(&mut stream, status, value, "");
+        request
+    }
+    #[test]
+    fn g2_provider_activation_is_revision_bound_and_requires_readback() {
+        for changed in [false, true] {
+            let (listener, session) = fixture();
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                g2_web_request(
+                    &listener,
+                    "GET",
+                    "/api/ai/local-provider/onboarding",
+                    200,
+                    g2_provider_status("missing", "a"),
+                );
+                let request = g2_web_request(
+                    &listener,
+                    "POST",
+                    "/api/ai/local-provider/onboarding",
+                    200,
+                    g2_provider_status("available_unqualified", "b"),
+                );
+                let body: serde_json::Value =
+                    serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+                assert_eq!(
+                    body,
+                    json!({"intent":"verify_and_activate","expectedRevision":"a".repeat(64)})
+                );
+                g2_web_request(
+                    &listener,
+                    "GET",
+                    "/api/ai/local-provider/onboarding",
+                    200,
+                    g2_provider_status(
+                        if changed {
+                            "revoked"
+                        } else {
+                            "available_unqualified"
+                        },
+                        "b",
+                    ),
+                );
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let before = access.read_local_provider().unwrap();
+            assert_eq!(access.activate_local_provider(&before).is_ok(), !changed);
+            session.lock();
+            assert_eq!(access.read_local_provider(), Err(RuntimeError::Locked));
+            worker.join().unwrap();
+        }
+    }
+    #[test]
+    fn g2_provider_unsupported_version_and_unready_are_actionable_without_bypass() {
+        for (code, status, expected) in [
+            ("provider_version_unsupported", 409, "0.99.0"),
+            ("provider_unreachable", 503, "non è raggiungibile"),
+            ("provider_unready", 503, "non è pronto"),
+        ] {
+            let (listener, session) = fixture();
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                g2_web_request(
+                    &listener,
+                    "GET",
+                    "/api/ai/local-provider/onboarding",
+                    200,
+                    g2_provider_status("missing", "a"),
+                );
+                g2_web_request(
+                    &listener,
+                    "POST",
+                    "/api/ai/local-provider/onboarding",
+                    status,
+                    json!({"error":code,"versionMismatch":{"serverVersion":"0.99.0","supportedVersions":"0.40.6"}}),
+                );
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let before = access.read_local_provider().unwrap();
+            let crate::LocalProviderOutcome::Denied(message) =
+                access.activate_local_provider(&before).unwrap()
+            else {
+                panic!("denial expected")
+            };
+            assert!(message.contains(expected));
+            worker.join().unwrap();
+        }
+    }
+    fn g2_parameter_values(mode: &str) -> [(&'static str, String); 3] {
+        [("aiInsightMode", mode.into()), ("aiInsightManualConfig", r#"{"maxDocuments":6,"maxDocumentSummaryChars":260,"maxDocumentContextChars":2200,"outputMaxTokens":512}"#.into()), ("documentRouterControlFlow", "off".into())]
+    }
+    fn g2_serve_parameters(listener: &TcpListener, mode: &str) {
+        for (key, value) in g2_parameter_values(mode) {
+            g2_web_request(
+                listener,
+                "GET",
+                &format!("/api/settings/{key}"),
+                200,
+                json!({"key":key,"value":value}),
+            );
+        }
+    }
+    #[test]
+    fn g2_parameters_readback_conflict_partial_and_single_submission() {
+        for scenario in ["success", "conflict", "partial", "discordant"] {
+            let (listener, session) = fixture();
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                g2_serve_parameters(&listener, "full_auto");
+                g2_serve_parameters(&listener, "full_auto");
+                g2_serve_parameters(
+                    &listener,
+                    if scenario == "conflict" {
+                        "complete"
+                    } else {
+                        "full_auto"
+                    },
+                );
+                if scenario == "conflict" {
+                    return;
+                }
+                for (index, (key, value)) in g2_parameter_values("manual").into_iter().enumerate() {
+                    let failed = scenario == "partial" && index == 1;
+                    let request = g2_web_request(
+                        &listener,
+                        "PUT",
+                        &format!("/api/settings/{key}"),
+                        if failed { 503 } else { 200 },
+                        json!({"success":true,"key":key,"value":value}),
+                    );
+                    let body: serde_json::Value =
+                        serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+                    assert_eq!(body, json!({"value":value}));
+                    if failed {
+                        return;
+                    }
+                    g2_web_request(
+                        &listener,
+                        "GET",
+                        &format!("/api/settings/{key}"),
+                        200,
+                        json!({"key":key,"value":value}),
+                    );
+                }
+                g2_serve_parameters(
+                    &listener,
+                    if scenario == "discordant" {
+                        "complete"
+                    } else {
+                        "manual"
+                    },
+                );
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let before = access.read_insight_parameters().unwrap();
+            let command = access
+                .prepare_insight_parameters(
+                    &before,
+                    "manual",
+                    crate::InsightBudget::default(),
+                    "off",
+                )
+                .unwrap();
+            let result = access.apply_insight_parameters(&command);
+            match scenario {
+                "success" => assert_eq!(result, Ok(true)),
+                "discordant" => assert_eq!(result, Ok(false)),
+                "conflict" => assert_eq!(result, Err(RuntimeError::Conflict)),
+                _ => assert_eq!(result, Err(RuntimeError::Indeterminate)),
+            };
+            assert_eq!(
+                access.apply_insight_parameters(&command),
+                Err(RuntimeError::ReadRequired)
+            );
+            worker.join().unwrap();
+        }
+    }
+    fn g2_account_status(state: &str) -> serde_json::Value {
+        json!({"state":state,"notice":null,"plan":if state=="connected" {json!("plus")} else {json!(null)},"loginExpiresAt":null,"actions":["connect","read_rate_limits","logout"],"inferenceEnabled":false,"executionBlock":"data_boundary_unqualified"})
+    }
+    #[test]
+    fn g2_chatgpt_exact_empty_operations_quotes_and_official_login_without_remote_transport() {
+        for operation in [
+            crate::ChatGptAccountOperation::Connect,
+            crate::ChatGptAccountOperation::Limits,
+            crate::ChatGptAccountOperation::Logout,
+        ] {
+            let (listener, session) = fixture();
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                g2_web_request(
+                    &listener,
+                    "GET",
+                    "/api/settings/ai/chatgpt/status",
+                    200,
+                    g2_account_status("connected"),
+                );
+                let (path, value, state) = match operation {
+                    crate::ChatGptAccountOperation::Connect => (
+                        "login/start",
+                        json!({"status":g2_account_status("awaiting_login"),"authUrl":"https://auth.openai.com/oauth/authorize?state=synthetic"}),
+                        "awaiting_login",
+                    ),
+                    crate::ChatGptAccountOperation::Limits => (
+                        "rate-limits",
+                        json!({"status":g2_account_status("connected"),"primary":{"usedPercent":38.0,"windowDurationMins":300,"resetsAt":123},"secondary":null}),
+                        "connected",
+                    ),
+                    _ => ("logout", g2_account_status("disconnected"), "disconnected"),
+                };
+                let request = g2_web_request(
+                    &listener,
+                    "POST",
+                    &format!("/api/settings/ai/chatgpt/{path}"),
+                    200,
+                    value,
+                );
+                assert_eq!(request.split("\r\n\r\n").nth(1).unwrap(), "{}");
+                g2_web_request(
+                    &listener,
+                    "GET",
+                    "/api/settings/ai/chatgpt/status",
+                    200,
+                    g2_account_status(state),
+                );
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let result = access.operate_chatgpt_account(operation).unwrap();
+            match operation {
+                crate::ChatGptAccountOperation::Connect => assert!(result.auth_url.is_some()),
+                crate::ChatGptAccountOperation::Limits => {
+                    let windows = result.limits.unwrap();
+                    assert_eq!(windows[0].as_ref().unwrap().used_percent, 38.);
+                    assert!(windows[1].is_none());
+                }
+                _ => assert_eq!(result.status.state, crate::AccountState::Disconnected),
+            }
+            session.lock();
+            assert!(matches!(
+                access.read_chatgpt_account(),
+                Err(RuntimeError::Locked)
+            ));
             worker.join().unwrap();
         }
     }
