@@ -22,6 +22,10 @@ restano consultabili nell’[indice del tag v0.9.0](https://github.com/Wulfgardr
 Le voci storiche conservano date, conteggi, revisioni e limiti:
 la data di questo indice non rinnova le prove cui rimandano.
 
+Il [rapporto G-2 su accesso e modelli](analysis/2026-10-30-gpui-g2-settings/README.md)
+registra il delta nativo del 30 ottobre, le superfici di credenziali e i residui
+che richiedono una decisione esplicita.
+
 ## Preparazione indipendente delle future 0.9.x
 
 | File | Scopo | Quando consultarlo |
