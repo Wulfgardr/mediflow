@@ -1,5 +1,5 @@
 {
-  "syncCommit": "75393f7d8a3a86f9dc4aa85cd9489719a1c2a379",
+  "syncCommit": "91acfa2f5abfbdb1c0029a0b89dac708da0bcab8",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -33,7 +33,7 @@
   "files": {
     "lib/therapy-status-confirmation.ts": "33eebc3197e988f3f1c134f1ac8499da1de95171e21d0ac7e3396c2a202c6486",
     "components/therapy-manager.tsx": "b6f063e3434015ddf20f8c60797ab9d924ed05507d10acb2fd2bb1f9d3120e6e",
-    "lib/db.ts": "2f8695dfe31be34cf66e1d341dbaf9a3978e0cefdc6e870d93043c6a5dc7d6a5",
+    "lib/db.ts": "4f089d7dd89b6476aadc683688f965d0724de380944737d6f345410976034a89",
     "lib/security/client-auth-api.ts": "754aebaedb77bc9629a32d90f754ecc3ee7e89ead880c6add9088dd6449ee5ce",
     "lib/therapy-write-operation.ts": "f72e2fe81427c5b74a87db7fe79fc96f372553eff6e1ca0b6badf3fd0cd1f3ee",
     "app/api/therapies/[id]/route.ts": "3f4765cd55a13360965fae38bced33cec5cc69403dd0bbfd6d67417c5c40e4e2",
@@ -48,7 +48,8 @@
     "lib/therapy-status-command-schema.ts": "98c0aba0a361ef83655a632be41a257f8b9e99a950591113683a8094e26f4c87",
     "lib/therapy-status-command-recovery-schema.ts": "8231c04d505139c63f36f9657e2a2a0c964cd48b39d4ae4b2d2a0f2c552f5f4a",
     "lib/ambulatory-destructive-command-recovery-schema.ts": "2fc3ec7999981e606eefeedbe36ee1e9232b095d63c26054b1105f59d8c20910",
-    "lib/api-table-response.ts": "5f19aab147a2d4459c1d2ec96e6c6d67bb20ad8c23b0cd9f38239771ffbb602c"
+    "lib/api-table-response.ts": "5f19aab147a2d4459c1d2ec96e6c6d67bb20ad8c23b0cd9f38239771ffbb602c",
+    "lib/backup-encrypted-fields.json": "27d036cb546f048f96ac4f8f9a5eca6f8360a798ba8cf7d173deb19328ac77e3"
   },
   "verificationInputs": [
     "docs/formal/therapy-status/",

@@ -104,3 +104,13 @@ test('current key/writer pairs still resolve to allowed', () => {
         assert.equal(evaluateSettingsWrite(key, localTokenSession).allowed, true, `${key} allowed for local-token bootstrap`);
     }
 });
+
+test('archive restore receipts cannot be forged through any generic settings channel', () => {
+    for (const actor of [webSession, webAdminSession, nativeSession, localTokenSession]) {
+        for (const key of ['archive.restore.receipt.', 'archive.restore.receipt.12345678-1234-4123-8123-123456789012']) {
+            const decision = evaluateSettingsWrite(key, actor);
+            assert.equal(decision.allowed, false);
+            assert.equal(decision.allowed === false && decision.status, 403);
+        }
+    }
+});

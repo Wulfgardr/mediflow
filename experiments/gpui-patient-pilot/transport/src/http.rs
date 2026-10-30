@@ -406,7 +406,11 @@ impl RuntimeClient {
             .transpose()
             .map_err(|_| RuntimeError::InvalidInput)?
             .map(Zeroizing::new);
-        if encoded.as_ref().is_some_and(|v| v.len() > 4096) {
+        let archive = path.starts_with(&["api", "system", "backup-restore"]);
+        if encoded
+            .as_ref()
+            .is_some_and(|v| v.len() > if archive { JSON_LIMIT } else { 4096 })
+        {
             return Err(RuntimeError::TooLarge);
         }
         http_runtime().block_on(self.context.run(
@@ -425,7 +429,11 @@ impl RuntimeClient {
                 received(response.status().as_u16(), response.headers());
                 let raw = read_response_body(
                     response,
-                    if path.len() == 3 && path[..2] == ["api", "attachments"] {
+                    if path == ["api", "system", "recovery-backup"] {
+                        512 * 1024 * 1024
+                    } else if archive {
+                        JSON_LIMIT
+                    } else if path.len() == 3 && path[..2] == ["api", "attachments"] {
                         DOCUMENT_LIMIT
                     } else {
                         AUTH_LIMIT

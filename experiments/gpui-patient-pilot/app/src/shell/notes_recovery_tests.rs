@@ -91,6 +91,10 @@ impl Host {
                 let response = match route.as_str() {
                 "GET /api/auth/check" => json!({"status":"ok", "isSetup":true, "archiveGeneration":"synthetic-generation",
                     "unlock":{"credential":"passphrase", "kdfVersion":3, "salt":"AwMDAwMDAwMDAwMDAwMDAw=="}}),
+                "POST /api/auth/local-client/login" => json!({"success":true,"id":"synthetic-user","username":"synthetic","role":"admin","archiveGeneration":"synthetic-generation"}),
+                "POST /api/auth/local-client/logout" => { status = 204; Value::Null },
+                "POST /api/system/backup-restore" => { status = 409; json!({"success":false,"code":"restore_blocked","reason":"snapshot"}) },
+                "POST /api/system/backup-restore/verify" => json!({"success":true,"format":"mediflow-backup","version":1,"counts":{"patients":1},"expectedSnapshot":"a".repeat(64),"sourceChecksum":"b".repeat(64)}),
                 "POST /api/auth/native/login" => json!({"success":true, "id":"synthetic-user", "username":"synthetic", "role":"admin",
                     "archiveGeneration":"synthetic-generation", "salt":"AwMDAwMDAwMDAwMDAwMDAw==",
                     "encryptedMasterKey":"v3:BQUFBQUFBQUFBQUFAm40aZvQGpityOwyLKhsE40tJdbsjtrugIXzoJ/lk9gjlh5j7pIPeh7DLQ7ikGhA"}),
@@ -142,7 +146,8 @@ impl Host {
                 value => panic!("unexpected fixture route: {value}"),
             }.to_string();
                 drop(state);
-                let _ = write!(stream, "HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nSet-Cookie: mediflow_session={}; Path=/; HttpOnly\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}", "a".repeat(64), response.len());
+                let extra = if route == "GET /api/auth/check" { format!("ETag: \"{}\"\r\nSet-Cookie: mediflow_auth_control={}; Path=/; HttpOnly\r\n", "e".repeat(64), "c".repeat(43)) } else { String::new() };
+                let _ = write!(stream, "HTTP/1.1 {status} Synthetic\r\n{extra}Content-Type: application/json\r\nSet-Cookie: mediflow_session={}; Path=/; HttpOnly\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}", "a".repeat(64), response.len());
                 }));
             }
             for worker in workers {

@@ -1,3 +1,4 @@
+import { RESTORE_RECEIPT_PREFIX } from '../backup-restore-receipt-contract';
 import type { ServerSession } from '@/lib/security/server-session';
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 
@@ -114,6 +115,9 @@ export function evaluateSettingsWrite(
     key: string,
     session: ServerSession,
 ): SettingsWriteDecision {
+    if (typeof key === 'string' && key.startsWith(RESTORE_RECEIPT_PREFIX)) {
+        return { allowed: false, status: 403, reason: 'Le ricevute di ripristino appartengono al servizio di recupero.' };
+    }
     const channel = settingsWriteChannelForSession(session);
     const policy = SETTINGS_WRITE_REGISTRY[key];
 

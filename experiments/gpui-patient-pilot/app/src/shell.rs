@@ -438,7 +438,7 @@ pub struct ClinicalApp {
     ai_refresh_target: ScrollTarget,
     ai_preferences: AiPreferences,
     settings_page: SettingsPage,
-    settings_targets: [ScrollTarget; 7],
+    settings_targets: [ScrollTarget; 8],
     local_host: local_host::LocalAdministration,
     account_profile: AccountProfile,
     who: WhoLookup,
@@ -1106,21 +1106,7 @@ impl ClinicalApp {
         self.chat_access.detach(cx);
         self.analytics.reset(cx);
         self.scales.reset(cx);
-        if let Some(access) = self.local_host.withdraw(cx) {
-            let task = cx
-                .background_executor()
-                .spawn(async move { access.retire() });
-            cx.spawn(async move |this, cx| {
-                let result = task.await;
-                let _ = this.update(cx, |this, cx| {
-                    if result.is_err() {
-                        this.message = Some((local_host::RETIREMENT_WARNING.into(), true));
-                    }
-                    cx.notify();
-                });
-            })
-            .detach();
-        }
+        self.withdraw_local_host(cx);
         self.account_profile.reset(self.theme, cx);
         self.settings_page = SettingsPage::Overview;
         self.ambulatory_management.reset(self.theme, cx);

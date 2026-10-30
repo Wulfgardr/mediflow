@@ -325,3 +325,11 @@ test(`ambulatory command encrypted predecessor v5 recovery ${alteration}`, async
         assert.equal(digest(fs.readFileSync(oldFile)), before); assert.equal(digest(await decryptRecoveryBackup(artifact, f.key)), before);
     } finally { f.cleanup(); }
 });
+
+test('GPUI and Web share the authenticated recovery envelope golden', async () => {
+    const { readFileSync } = await import('node:fs');
+    const golden = JSON.parse(readFileSync(new URL('../native/contracts/recovery-backup-golden.v1.json', import.meta.url), 'utf8'));
+    const key = await crypto.subtle.importKey('raw', Buffer.from(golden.masterKey, 'base64'), 'AES-GCM', false, ['decrypt']);
+    const decrypted = await decryptRecoveryBackup(Buffer.from(golden.artifact, 'base64'), key);
+    assert.deepEqual(Buffer.from(decrypted), Buffer.from(golden.database, 'base64'));
+});
