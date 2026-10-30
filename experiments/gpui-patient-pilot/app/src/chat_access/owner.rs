@@ -226,7 +226,7 @@ pub(crate) fn consume_card(pending: &Pending) -> (State, Option<String>) {
     )
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 pub(crate) fn consume(pending: &Pending) -> State {
     let binding = pending.lock().ok().and_then(|mut p| p.begin_consume());
     let valid = binding
@@ -469,6 +469,92 @@ mod tests {
             }
             assert_eq!(consume_card(&pending), (State::Withdrawn, None));
         }
+    }
+
+    #[test]
+    #[ignore = "requires an explicit owned synthetic host, Node 24.18.0 and real GLiNER installation; OS peer is a test double"]
+    fn owned_synthetic_host_v3_real_redaction_native_pin_and_single_delivery() {
+        let file = std::env::var("MEDIFLOW_CHAT_PIN_TEST_CONFIG")
+            .expect("explicit synthetic config required");
+        let config: Value = serde_json::from_slice(&std::fs::read(file).unwrap()).unwrap();
+        assert_eq!(config["synthetic"], true);
+        let base = config["baseUrl"].as_str().unwrap();
+        let address = base
+            .strip_prefix("http://")
+            .unwrap()
+            .parse::<std::net::SocketAddr>()
+            .unwrap();
+        assert_eq!(address.ip(), std::net::Ipv4Addr::LOCALHOST);
+        assert_ne!(address.port(), 3000);
+        let session = RuntimeClient::new(RuntimeConfig {
+            base_url: base.into(),
+            tls_pin_sha256: None,
+        })
+        .unwrap()
+        .login(
+            PairingCredentials::new(
+                config["pairingId"].as_str().unwrap(),
+                config["pairingToken"].as_str().unwrap(),
+            )
+            .unwrap(),
+            config["username"].as_str().unwrap(),
+            config["passphrase"].as_str().unwrap(),
+        )
+        .unwrap();
+        session.list_ambulatories().unwrap();
+        let scope = config["scope"].as_str().unwrap();
+        let patient = config["patientId"].as_str().unwrap();
+        session.select_profile_patient(scope, patient).unwrap();
+        let context = session.chat_access_context(scope, patient).unwrap();
+        let (pending, _remote) = synthetic_request();
+        assert!(pending.lock().unwrap().bind(session.clone(), context));
+        prepare_card(&pending);
+        assert_eq!(pending.lock().unwrap().status(), State::Challenge);
+        let reviewed = pending.lock().unwrap().review().unwrap().0.to_owned();
+        let (bound, context, attempt) = pending.lock().unwrap().begin().unwrap();
+        bound
+            .confirm_chat_access_pin(
+                &context,
+                &std::env::var("MEDIFLOW_CHAT_PIN_TEST_PIN").unwrap(),
+            )
+            .unwrap();
+        pending.lock().unwrap().finish(attempt, true);
+        let (state, payload) = consume_card(&pending);
+        assert_eq!(state, State::Consumed);
+        assert_eq!(payload.as_deref(), Some(reviewed.as_str()));
+        assert_eq!(consume_card(&pending), (State::Withdrawn, None));
+        for scenario in ["absent", "expired", "idle", "revoked"] {
+            let context = session.chat_access_context(scope, patient).unwrap();
+            let (pending, _remote) = synthetic_request();
+            assert!(pending.lock().unwrap().bind(session.clone(), context));
+            prepare_card(&pending);
+            assert_eq!(pending.lock().unwrap().status(), State::Challenge);
+            if scenario != "absent" {
+                let (bound, context, attempt) = pending.lock().unwrap().begin().unwrap();
+                bound
+                    .confirm_chat_access_pin(
+                        &context,
+                        &std::env::var("MEDIFLOW_CHAT_PIN_TEST_PIN").unwrap(),
+                    )
+                    .unwrap();
+                pending.lock().unwrap().finish(attempt, true);
+            }
+            {
+                let mut p = pending.lock().unwrap();
+                match scenario {
+                    "expired" => p.deadline = Some(Instant::now() - Duration::from_millis(1)),
+                    "idle" => p.created = Instant::now() - VIEW_IDLE,
+                    "revoked" => p.withdraw(),
+                    _ => {}
+                }
+            }
+            assert_eq!(
+                consume_card(&pending),
+                (State::Withdrawn, None),
+                "{scenario}"
+            );
+        }
+        session.logout().unwrap();
     }
 
     fn connected() -> (Pending, UnixStream) {

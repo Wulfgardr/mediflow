@@ -390,3 +390,14 @@ test('closed schemas classify every emitted leaf and reject unknown caller field
     const implementation = readFileSync(new URL('./synthetic-card-broker.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(implementation, /db-server|chatgpt-|process\.env|readFile|fetch\(/u);
 });
+
+test('native recomposition rejects a foreign token and loses its map on revocation', async () => {
+    const first = await ready(), second = await ready();
+    const note = JSON.parse(first.review.payload).history[0].note;
+    const foreign = JSON.parse(second.review.payload).history[0].note;
+    assert.equal(first.b.owner.recompose(first.token, note), corpus[0].inputText);
+    assert.throws(() => first.b.owner.recompose(first.token, foreign));
+    assert.equal('recompose' in first.b.reader, false);
+    await first.b.owner.revoke();
+    assert.throws(() => first.b.owner.recompose(first.token, note));
+});

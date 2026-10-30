@@ -45,21 +45,33 @@ Questo differisce dal profilo ipotizzato 26B118. Node locale **24.18.0**.
   etichetta esplicita: otto casi validi, recall critica 1, nessun token vietato
   residuo. Nessun ricorso alle annotazioni per produrre gli span. Il limite
   resta questo corpus e il linguaggio sintetico chiuso del broker.
-- 300 test Node mirati: redazione, evidenze, broker, PIN/lockout autentico
+- Oltre 300 test Node mirati: redazione, evidenze, broker, PIN/lockout autentico
   sul verifier e route paired, owner privato e selezione della suite.
 - GPUI: build e Clippy workspace/all-targets; cinque test chat passati,
   sette integrazioni storiche ignorate perché richiedono un antenato desktop
-  firmato. Il doppio del risultato biometrico è solo test, senza flag runtime.
+  firmato; un’ulteriore integrazione richiede l’host sintetico e GLiNER locali. Il doppio del risultato biometrico è solo test, senza flag runtime.
+- Prova integrata esplicita sul vero host sintetico: login v3, preparazione
+  GLiNER nel processo Node privato avviato dalla GPUI, PIN verificato dal
+  verifier paired reale, consumo del payload uguale ai byte revisionati,
+  replay respinto e logout. Sullo stesso host, nuove preparazioni GLiNER e
+  PIN reali negano consenso assente, scadenza dei 30 s, inattività di 5 min
+  e revoca. Per le scadenze si spostano gli istanti della richiesta nel test;
+  non si attende artificialmente il timeout. PASS. Il peer OS è un doppio di test; non attesta
+  l'antenato firmato né un clic nella finestra desktop. Il primo tentativo
+  ha rivelato l'ordine errato degli import nel processo Node: corretto e
+  coperto dal test di avvio diretto, senza loader ereditato dal test runner.
 - Frame Playwright a 390 e 1440 px: consumo singolo, reload negato, revoca
   nativa, nuovo input tool, teardown, cinque minuti e notifica iniziale.
   Il contesto rifiuta esplicitamente qualsiasi richiesta alla porta 3000.
+- 64 test dei consumatori della preparazione comune: pass.
 - Lint, typecheck, claims e never-regress passati.
 
 Le prove native del consenso assente/scaduto, rifiuto, inattività, revoca,
 istanza diversa, replay, lock, cambio archivio e selezione/ABA negano la
 consegna. Il test PIN Node usa il verifier reale e il lockout persistente;
-il server dei test Rust di stato è un doppio HTTP. Le due prove non sono
-un singolo E2E nei desktop reali.
+il server dei test Rust di stato è un doppio HTTP. La prova integrata unisce ora verifier e broker reali, ma non è
+un E2E nei desktop reali. Il figlio Node riceve un ambiente minimo senza
+credenziali ereditate dal processo GPUI.
 
 Sul desktop reale Claude è stato osservato il rendering della risorsa.
 Il primo tentativo è stato ritirato dalla notifica iniziale: la correzione
@@ -67,6 +79,12 @@ ha un caso di regressione nel frame. Il primo sblocco v3 della GPUI è stato
 osservato su runtime sintetico isolato. La qualifica completa del candidato
 con PIN nella finestra e payload inline deve ancora essere attestata.
 Nessuna prova Touch ID reale è dichiarata.
+
+Gli hash di report e log sono in `evidenze.csv`; i file completi restano nel
+  dossier locale `~/Antigravity/mf-hillclimb-20261028/chat-c-<SHA-base>/curated/`.
+  Nessuna galleria è aggiunta a Git. Le configurazioni temporanee di Claude
+  sono state ripristinate byte per byte, la bozza iniziale è stata ripristinata
+  senza invio e i processi GPUI/HTTP posseduti dal run sono stati arrestati.
 
 ## Stato dei criteri e prova restante
 
@@ -112,5 +130,10 @@ non recuperano concessioni precedenti.
 concorrente sono soltanto gli ingressi esistenti di `shell/chat_access.rs`
 (`start_chat_access`, `retire`, `chat_access_view`) e la loro eventuale nuova
 collocazione; il broker e il trasporto restano in moduli separati.
+
+I primi controlli CI hanno inoltre rilevato la registrazione non aggiornata
+dei nuovi trigger e una funzione di test inutilizzata su Linux. Correzioni
+circoscritte a registrazione e compilazione condizionale, senza esclusioni
+di controlli o aumento di soglie.
 
 Sviluppo assistito: GPT-6.1 Sol, effort xhigh, nessun subagente.
