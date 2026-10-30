@@ -13,6 +13,7 @@ mod chat_access;
 mod clinical_forms;
 mod document_details;
 mod document_library;
+mod local_host;
 pub(crate) mod local_preferences;
 mod local_settings;
 #[cfg(test)]
@@ -437,7 +438,8 @@ pub struct ClinicalApp {
     ai_refresh_target: ScrollTarget,
     ai_preferences: AiPreferences,
     settings_page: SettingsPage,
-    settings_targets: [ScrollTarget; 6],
+    settings_targets: [ScrollTarget; 7],
+    local_host: local_host::LocalAdministration,
     account_profile: AccountProfile,
     who: WhoLookup,
     scales: ScaleArea,
@@ -691,6 +693,7 @@ impl ClinicalApp {
             ai_preferences: AiPreferences::new(&area_scroll, cx),
             settings_page: SettingsPage::Overview,
             settings_targets: ScrollTarget::group(&area_scroll, cx),
+            local_host: local_host::LocalAdministration::new(theme, &area_scroll, cx),
             account_profile: AccountProfile::new(Theme::for_dark(false), cx),
             who: WhoLookup::new(&area_scroll, cx),
             scales: ScaleArea::new(&area_scroll, theme, cx),
@@ -763,6 +766,7 @@ impl ClinicalApp {
         #[cfg(unix)]
         app.start_chat_access(cx);
         let quit = cx.on_app_quit(|this, cx| {
+            let local_access = this.local_host.withdraw(cx);
             #[cfg(unix)]
             this.chat_access.retire(cx);
             this.ambulatory_management.destructive.withdraw(cx);
@@ -774,6 +778,9 @@ impl ClinicalApp {
                 session.lock();
             }
             let task = cx.background_executor().spawn(async move {
+                if let Some(access) = local_access {
+                    let _ = access.retire();
+                }
                 if let Some(session) = session {
                     let _ = session.logout();
                 }
@@ -784,6 +791,13 @@ impl ClinicalApp {
         });
         app._subscriptions.push(quit);
         let release = cx.on_release(|this, cx| {
+            if let Some(access) = this.local_host.withdraw(cx) {
+                cx.background_executor()
+                    .spawn(async move {
+                        let _ = access.retire();
+                    })
+                    .detach();
+            }
             #[cfg(unix)]
             this.chat_access.retire(cx);
             this.ambulatory_management.destructive.withdraw(cx);
@@ -868,6 +882,7 @@ impl ClinicalApp {
         self.global_patients.interrupt();
         self.read_timer = None;
         self.read_state_commands.clear();
+        self.local_host.clear_view();
         self.ai_preferences.reset();
         if self.settings_page == SettingsPage::AiPreferences {
             self.settings_page = SettingsPage::Overview;
@@ -1080,6 +1095,13 @@ impl ClinicalApp {
         self.chat_access.retire(cx);
         self.analytics.reset(cx);
         self.scales.reset(cx);
+        if let Some(access) = self.local_host.withdraw(cx) {
+            cx.background_executor()
+                .spawn(async move {
+                    let _ = access.retire();
+                })
+                .detach();
+        }
         self.account_profile.reset(self.theme, cx);
         self.settings_page = SettingsPage::Overview;
         self.ambulatory_management.reset(self.theme, cx);
@@ -1166,6 +1188,14 @@ impl ClinicalApp {
     }
 
     fn change_scope(&mut self, id: &str, cx: &mut Context<Self>) {
+        if self.local_host.has_work() {
+            self.message = Some((
+                "Completa o annulla l’operazione locale prima di cambiare contesto.".into(),
+                false,
+            ));
+            cx.notify();
+            return;
+        }
         if self.form.is_some() || self.ambulatory_management.draft.is_some() {
             self.message = Some((
                 "Completa o scarta la bozza prima di cambiare ambulatorio.".into(),
@@ -1236,6 +1266,14 @@ impl ClinicalApp {
     }
 
     fn select_patient(&mut self, id: &str, open: bool, cx: &mut Context<Self>) {
+        if self.local_host.has_work() {
+            self.message = Some((
+                "Completa o annulla l’operazione locale prima di cambiare contesto.".into(),
+                false,
+            ));
+            cx.notify();
+            return;
+        }
         if self.form.is_some() {
             self.message = Some(("La bozza appartiene al paziente corrente. Completa o scarta prima di cambiare scheda.".into(), false));
             cx.notify();
@@ -1351,6 +1389,14 @@ impl ClinicalApp {
     }
 
     fn navigate(&mut self, area: Area, cx: &mut Context<Self>) {
+        if self.local_host.has_work() {
+            self.message = Some((
+                "Completa o annulla l’operazione locale prima di cambiare contesto.".into(),
+                false,
+            ));
+            cx.notify();
+            return;
+        }
         if area == Area::Agenda && self.agenda_flow.origin.is_some() {
             self.return_to_agenda(cx);
             return;
@@ -1630,6 +1676,7 @@ impl ClinicalApp {
             && self.form.is_none()
             && self.discard.is_none()
             && !self.edit_pending
+            && !self.local_host.has_work()
             && self.document_operation == DocumentOperation::Idle
             && !self.show_other
     }
@@ -1741,6 +1788,14 @@ impl ClinicalApp {
     }
 
     fn request_discard(&mut self, action: Discard, cx: &mut Context<Self>) {
+        if action == Discard::Reload && self.local_host.has_work() {
+            self.message = Some((
+                "Completa o annulla l’operazione locale prima di rileggere.".into(),
+                false,
+            ));
+            cx.notify();
+            return;
+        }
         if action == Discard::Lock {
             let ai_pending = self.ai_preferences.is_saving();
             let ambulatory_pending = self.ambulatory_management.is_saving();
@@ -2010,7 +2065,10 @@ impl ClinicalApp {
     }
 
     fn open_form(&mut self, kind: FormKind, _window: &mut Window, cx: &mut Context<Self>) {
-        if self.edit_pending || self.document_operation != DocumentOperation::Idle {
+        if self.local_host.has_work()
+            || self.edit_pending
+            || self.document_operation != DocumentOperation::Idle
+        {
             return;
         }
         if !self.can_write(kind) {
@@ -2531,6 +2589,14 @@ impl ClinicalApp {
 
 impl ClinicalApp {
     fn section_selected(&mut self, section: PatientSection, cx: &mut Context<Self>) {
+        if self.local_host.has_work() {
+            self.message = Some((
+                "Completa o annulla l’operazione locale prima di cambiare contesto.".into(),
+                false,
+            ));
+            cx.notify();
+            return;
+        }
         if self.form.is_some() {
             self.message = Some((
                 "Completa o scarta la bozza prima di cambiare modulo.".into(),
@@ -5233,6 +5299,7 @@ impl Render for ClinicalApp {
             }
         }
         let theme = self.theme;
+        self.local_host.prepare_render(theme, window, cx);
         if self.settings_page == SettingsPage::AiPreferences {
             self.ai_preferences.prepare_render(window, cx);
         }
@@ -5376,7 +5443,7 @@ impl Render for ClinicalApp {
                 this.reveal_focused(window, cx);
             }))
             .on_action(cx.listener(|this, _: &Search, _, cx| {
-                if this.session.is_some() && this.form.is_none() {
+                if this.session.is_some() && this.form.is_none() && !this.local_host.has_work() {
                     this.show_other = false;
                     this.show_sections = false;
                     match this.area {
@@ -5407,6 +5474,10 @@ impl Render for ClinicalApp {
             )
             .on_action(cx.listener(|this, _: &Review, window, cx| this.review_form(window, cx)))
             .on_action(cx.listener(|this, _: &Escape, window, cx| {
+                if this.local_host.command_visible() {
+                    this.cancel_local_command(window, cx);
+                    return;
+                }
                 if this.threshold_menu_open.get() {
                     this.threshold_menu_open.set(false);
                     window.focus(&this.threshold_menu_focus, cx);
@@ -5742,6 +5813,7 @@ impl ClinicalApp {
     fn can_edit_record(&self, kind: editing::Kind) -> bool {
         self.form.is_none()
             && !self.edit_pending
+            && !self.local_host.has_work()
             && self.document_operation == DocumentOperation::Idle
             && self.can_write(form_kind(kind))
             && self
