@@ -1,5 +1,6 @@
-import { isCiphertext } from '../../security/attachment-file-envelope';
 'use client';
+
+import { isCiphertext } from '../../security/attachment-file-envelope';
 
 import {
     ATTACHMENT_EXTRACTION_ACTION_HEADER, ATTACHMENT_EXTRACTION_GRANT_HEADER,
