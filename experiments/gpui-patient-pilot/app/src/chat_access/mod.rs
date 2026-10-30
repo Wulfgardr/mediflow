@@ -225,9 +225,11 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
                 if let Some(p) = &pending
                     && let Ok(mut p) = p.lock()
                 {
-                    p.withdraw();
+                    p.revoke();
+                    p.status()
+                } else {
+                    State::Uncertain
                 }
-                State::Withdrawn
             }
             _ => break,
         };

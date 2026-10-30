@@ -163,3 +163,26 @@ test('five minute view lifetime denies a fresh preview confirmation without rene
     await assert.rejects(f.service.execute(f.context, f.command.commandId, pin));
     assert.equal(effects(f.command.therapyId).audits, 0);
 });
+
+test('revocation is idempotent, selection independent and reports a committed write', async () => {
+    const f = await fixture();
+    await f.service.preview(f.context, f.command, f.epoch, f.viewId);
+    f.owner.issueSelection({ expectedEpoch: f.epoch, patientId: f.command.patientId, ambulatoryId: f.context.scopeAmbulatoryId });
+    assert.deepEqual(await f.service.revoke(f.context, f.command.commandId), { outcome: 'retired' });
+    assert.deepEqual(await f.service.revoke(f.context, f.command.commandId), { outcome: 'retired' });
+    await assert.rejects(f.service.execute(f.context, f.command.commandId, pin));
+    assert.deepEqual(effects(f.command.therapyId), { therapy: { version: 1, status: 'active' }, audits: 0 });
+    const committed = await fixture();
+    await committed.service.preview(committed.context, committed.command, committed.epoch, committed.viewId);
+    await committed.service.execute(committed.context, committed.command.commandId, pin);
+    committed.owner.issueSelection({ expectedEpoch: committed.epoch, patientId: committed.command.patientId, ambulatoryId: committed.context.scopeAmbulatoryId });
+    for (let i = 0; i < 2; i++) assert.deepEqual(await committed.service.revoke(committed.context, committed.command.commandId), { outcome: 'applied' });
+    assert.deepEqual(effects(committed.command.therapyId), { therapy: { version: 2, status: 'suspended' }, audits: 1 });
+});
+test('another session cannot revoke a pending command or read a foreign receipt', async () => {
+    const f = await fixture();
+    await f.service.preview(f.context, f.command, f.epoch, f.viewId);
+    await assert.rejects(f.service.revoke({ ...f.context, session: { ...f.context.session } }, f.command.commandId));
+    assert.equal((await f.service.execute(f.context, f.command.commandId, pin)).outcome, 'applied');
+    await assert.rejects(f.service.revoke({ ...f.context, scopeAmbulatoryId: randomUUID() }, f.command.commandId));
+});

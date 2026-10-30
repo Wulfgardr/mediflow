@@ -73,6 +73,54 @@ impl AmbulatoryCommandContext {
         self.context.cancel();
     }
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChatTherapyOutcome {
+    Retired,
+    Applied,
+    Rejected,
+    Closed,
+}
+impl ChatTherapyOutcome {
+    pub fn wire(self) -> &'static str {
+        match self {
+            Self::Retired => "retired",
+            Self::Applied => "applied",
+            Self::Rejected => "rejected",
+            Self::Closed => "closed",
+        }
+    }
+}
+#[derive(Clone)]
+pub struct ChatTherapyRecovery {
+    session: RuntimeSession,
+    scope: String,
+    command_id: String,
+}
+impl ChatTherapyRecovery {
+    /// Idempotently retires the command or reports its already committed outcome.
+    /// Only this fixed operation survives local patient-selection cancellation.
+    pub fn reconcile(&self) -> Result<ChatTherapyOutcome> {
+        let result = self.session.request(
+            Method::POST,
+            &["api", "auth", "native", "therapy-status"],
+            &[],
+            Some(&self.scope),
+            Some(&json!({"operation":"revoke", "commandId":self.command_id})),
+            true,
+            4096,
+        )?;
+        if result.as_object().is_none_or(|o| o.len() != 1) {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        match result["outcome"].as_str() {
+            Some("retired") => Ok(ChatTherapyOutcome::Retired),
+            Some("applied") => Ok(ChatTherapyOutcome::Applied),
+            Some("rejected") => Ok(ChatTherapyOutcome::Rejected),
+            Some("closed") => Ok(ChatTherapyOutcome::Closed),
+            _ => Err(RuntimeError::InvalidResponse),
+        }
+    }
+}
 struct SessionInner {
     account_context: RequestContext,
     client: RuntimeClient,
@@ -482,6 +530,33 @@ impl RuntimeSession {
             return Err(RuntimeError::Forbidden);
         }
         Ok(command_id)
+    }
+
+    pub fn chat_therapy_recovery(
+        &self,
+        context: &ChatAccessContext,
+        command_id: &str,
+    ) -> Result<ChatTherapyRecovery> {
+        self.check_chat_access_context(context)?;
+        if command_id.len() != 36
+            || !command_id.bytes().enumerate().all(|(i, b)| {
+                if [8, 13, 18, 23].contains(&i) {
+                    b == b'-'
+                } else {
+                    b.is_ascii_hexdigit()
+                }
+            })
+        {
+            return Err(RuntimeError::InvalidInput);
+        }
+        Ok(ChatTherapyRecovery {
+            session: Self {
+                inner: self.inner.clone(),
+                context: self.inner.account_context.child(),
+            },
+            scope: context.scope.clone(),
+            command_id: command_id.into(),
+        })
     }
 
     pub fn chat_therapy_request(&self, context: &ChatAccessContext, body: &Value) -> Result<Value> {

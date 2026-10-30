@@ -40,6 +40,11 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
             "consuming",
             "consumed",
             "withdrawn",
+            "uncertain",
+            "retired",
+            "applied",
+            "rejected",
+            "closed",
         ]
         .contains(s)
     });
@@ -56,7 +61,10 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
                     id.len() == 36 && id.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-')
                 })
                 || !value["receipt"]["outcome"].as_str().is_some_and(|s| {
-                    ["pending", "unknown", "applied", "rejected", "closed"].contains(&s)
+                    [
+                        "pending", "unknown", "applied", "rejected", "closed", "retired",
+                    ]
+                    .contains(&s)
                 })))
         || (has_payload
             && (command != "consume"
@@ -136,14 +144,14 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
             "tools/call" if params["name"] == CONTROL && issued => {
                 let args = &params["arguments"];
                 if args == &json!({"command":"attach"}) {
-                    let status = if attached {
-                        let _ = call(&mut socket, "revoke");
-                        "withdrawn"
+                    let meta = if attached {
+                        call(&mut socket, "revoke")
+                            .unwrap_or_else(|_| json!({"status":"uncertain"}))
                     } else {
                         attached = true;
-                        "ready"
+                        json!({"status":"ready"})
                     };
-                    json!({"content":[{"type":"text","text":"Stato della vista disponibile."}],"_meta":{"status":status}})
+                    json!({"content":[{"type":"text","text":"Stato della vista disponibile."}],"_meta":meta})
                 } else if attached
                     && args["command"] == "receipt"
                     && args.as_object().map(|v| v.len()) == Some(2)
@@ -183,7 +191,7 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                             json!({"content":[{"type":"text","text":"Stato di accesso disponibile nella vista."}],"_meta":status})
                         }
                         Err(_) => {
-                            json!({"isError":true,"content":[{"type":"text","text":"Accesso nativo non disponibile."}],"_meta":{"status":"withdrawn"}})
+                            json!({"isError":true,"content":[{"type":"text","text":"Accesso nativo non disponibile."}],"_meta":{"status":"uncertain"}})
                         }
                     }
                 } else {

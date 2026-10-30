@@ -43,8 +43,8 @@ pub use http::{PairingCredentials, RuntimeClient, RuntimeConfig};
 pub use profile_query::{ProfileCurrentness, ProfileProjection};
 pub use scales::*;
 pub use session::{
-    AiPreferencesContext, AmbulatoryCommandContext, ChatAccessContext, FirstAmbulatoryContext,
-    ProfileQueryIntent, RuntimeSession,
+    AiPreferencesContext, AmbulatoryCommandContext, ChatAccessContext, ChatTherapyOutcome,
+    ChatTherapyRecovery, FirstAmbulatoryContext, ProfileQueryIntent, RuntimeSession,
 };
 pub use who::{
     WHO_ATTRIBUTION, WhoEntry, WhoReadiness, WhoReadinessStatus, WhoReceipt, WhoSearchResponse,
