@@ -27,7 +27,16 @@ Il target resta Mac16,5 M4 Max/36 GB. Un carico singolo è il profilo del futuro
 banco, non una sostenibilità già dimostrata. Budget di memoria e tempi restano
 nulli fino a baseline e decisione; non si riciclano i limiti dei 16 GiB.
 
-## Nuovo incarico locale del 30 ottobre 2026
+## Misura successiva del 30 ottobre 2026
+
+La [misura reale](2026-10-30-local-runs/misura.md) aggiorna il controllo
+preliminare: identità assegnate e spazio disponibile. I-2 resta bloccata
+da `provider_version_unsupported` per Ollama `HEAD-36a6e99`. ATHENA Q4
+ha completato i 9 casi diretti e via Fabric, con 10 soglie fallite su 18.
+Nessuna proposta normalizzata sui casi positivi. I dinieghi uguali non
+provano equivalenza; ADR 0166 resta Proposed e la revisione umana è aperta.
+
+## Controllo preliminare del 30 ottobre 2026
 
 Il [dossier del controllo preliminare](2026-10-30-local-runs/README.md) registra
 l'approvazione esplicita di corpus e soglie ATHENA fornita da Leonardo nel nuovo
