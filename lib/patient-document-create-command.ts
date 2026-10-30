@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import type { dbServer } from './db-server';
 import { ambulatories, attachments, auditEvents, patients, patientsToAmbulatories, users } from './schema';
+import { activePatients } from './patient-lifecycle';
 import { assertArchiveGeneration } from './archive-generation';
 import { createHostAttachmentCurrentness } from './attachment-currentness-host';
 import { createNativeChatWriteApprovals } from './native-chat-write-approval';
@@ -86,7 +87,7 @@ function reviewed(source: PreparedPatientDocument, value: PatientDocumentCreateR
 function duplicateSet(tx: Tx, values: typeof patients.$inferInsert): string {
     const name = (value: string) => value.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('it-IT');
     const taxCode = values.taxCode.trim().toUpperCase();
-    return tx.select({ id: patients.id, firstName: patients.firstName, lastName: patients.lastName, taxCode: patients.taxCode }).from(patients).all()
+    return tx.select({ id: patients.id, firstName: patients.firstName, lastName: patients.lastName, taxCode: patients.taxCode }).from(patients).where(activePatients()).all()
         .filter(row => row.taxCode.trim().toUpperCase() === taxCode
             || (name(row.firstName) === name(values.firstName) && name(row.lastName) === name(values.lastName)))
         .map(row => row.id).sort().join(',');
