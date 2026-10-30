@@ -7087,16 +7087,19 @@ mod tests {
             let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
             let origin = session.base_url().to_owned();
             let valid = generation == "synthetic-generation" && checksum == "b".repeat(64);
+            let (finished, completion) = std::sync::mpsc::channel::<()>();
             let worker = thread::spawn(move || {
                 local_host_login(&listener);
                 listener.set_nonblocking(true).unwrap();
-                let started = std::time::Instant::now();
                 let mut stream = loop {
                     if let Ok((stream, _)) = listener.accept() {
                         break stream;
                     }
                     assert!(
-                        started.elapsed() < std::time::Duration::from_secs(3),
+                        matches!(
+                            completion.try_recv(),
+                            Err(std::sync::mpsc::TryRecvError::Empty)
+                        ),
                         "receipt GET absent"
                     );
                     thread::sleep(std::time::Duration::from_millis(5));
@@ -7122,7 +7125,9 @@ mod tests {
                 source_checksum: "b".repeat(64),
                 origin,
             };
-            assert_eq!(access.read_restore_receipt(&lookup).is_ok(), valid);
+            let observed = access.read_restore_receipt(&lookup);
+            let _ = finished.send(());
+            assert_eq!(observed.is_ok(), valid);
             worker.join().unwrap();
         }
     }

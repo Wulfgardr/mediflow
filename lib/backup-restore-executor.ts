@@ -1,7 +1,7 @@
 import { restoreSnapshot, writeRestoreReceipt, type RestoreIntent, type RestoreReceipt } from './backup-restore-receipt';
 import { planAmbulatoryCommandUnion, insertAmbulatoryCommandUnion } from './ambulatory-destructive-command-backup';
 import { planTherapyStatusCommandUnion, insertTherapyStatusCommandUnion } from './therapy-status-command-backup';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { assertExemptionImportReceiptRows } from './exemption-import-receipt';
 import { migrateProstheticsSources } from './reference-data/prosthetics-catalog-schema';
 import { assertProstheticsCatalogBackup } from './reference-data/prosthetics-catalog-backup';
@@ -214,6 +214,13 @@ function normalizeInsertRow<T extends Record<string, unknown>>(row: T): T {
     return normalized as T;
 }
 
+function clearRows(table: InsertableTable): void {
+    dbServer.delete(table).run();
+    if (dbServer.select({ present: sql<number>`1` }).from(table).limit(1).get()) {
+        throw new Error('RESTORE_ROWS_NOT_CLEARED');
+    }
+}
+
 function insertRows<T extends Record<string, unknown>>(
     runner: InsertRunner,
     table: InsertableTable,
@@ -226,7 +233,8 @@ function insertRows<T extends Record<string, unknown>>(
     }) : rows;
     for (const group of chunk(insertableRows, 250)) {
         /* Repertory dates are declared source text, not clinical timestamp columns. */
-        runner.insert(table).values((table === prostheticsCatalogEntries || table === prostheticsCatalogSources) ? group : group.map(normalizeInsertRow)).run();
+        const inserted = runner.insert(table).values((table === prostheticsCatalogEntries || table === prostheticsCatalogSources) ? group : group.map(normalizeInsertRow)).run();
+        if (inserted.changes !== group.length) throw new Error('RESTORE_ROWS_NOT_PERSISTED');
     }
 }
 
@@ -406,9 +414,9 @@ export function restoreBackupArtifact(
         rotateSqliteArchiveGeneration(openDbServer());
         clearAllSessions();
         for (const collection of CLEAR_ORDER) {
-            dbServer.delete(TABLE_LOOKUP[collection]).run();
+            clearRows(TABLE_LOOKUP[collection]);
         }
-        dbServer.delete(patientsToAmbulatories).run();
+        clearRows(patientsToAmbulatories);
 
         for (const collection of INSERT_ORDER) {
             insertRows(dbServer, TABLE_LOOKUP[collection], collection === 'headlessSoapActiveRoleAttestations'

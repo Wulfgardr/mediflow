@@ -38,7 +38,11 @@ export function restoreSnapshot(db: Database.Database): string {
 }
 export function writeRestoreReceipt(db: Database.Database, intent: RestoreIntent, sourceChecksum: string): RestoreReceipt {
     const receipt = { id: intent.id, sourceChecksum, archiveGeneration: readSqliteArchiveGeneration(db), completedAt: new Date().toISOString() };
-    db.prepare('INSERT INTO settings (key,value) VALUES (?,?)').run(PREFIX + intent.id, JSON.stringify(receipt));
+    const key = PREFIX + intent.id;
+    const value = JSON.stringify(receipt);
+    const inserted = db.prepare('INSERT INTO settings (key,value) VALUES (?,?)').run(key, value);
+    const stored = db.prepare('SELECT value FROM settings WHERE key=?').get(key) as { value: string } | undefined;
+    if (inserted.changes !== 1 || stored?.value !== value) throw new Error('RESTORE_RECEIPT_NOT_PERSISTED');
     return receipt;
 }
 export function readRestoreReceipt(db: Database.Database, id: string): RestoreReceipt | null {

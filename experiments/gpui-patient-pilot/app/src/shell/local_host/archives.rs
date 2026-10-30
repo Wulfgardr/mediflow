@@ -9,7 +9,7 @@ use std::{
 enum ArchiveOperation {
     Idle,
     Reading,
-    Review(Arc<PreparedArchiveRestore>),
+    Review(ArchiveReview),
     Applying,
 }
 #[derive(Clone, Copy)]
@@ -17,8 +17,13 @@ enum FilePurpose {
     Restore,
     VerifyRecovery,
 }
+struct ArchiveReview {
+    command: Arc<PreparedArchiveRestore>,
+    name: String,
+    bytes: usize,
+}
 enum FileResult {
-    Review(Arc<PreparedArchiveRestore>),
+    Review(ArchiveReview),
     Verified,
 }
 pub(super) struct ArchiveArea {
@@ -64,6 +69,21 @@ impl ArchiveArea {
             focus_review: false,
             _subscription: subscription,
         }
+    }
+    fn clear_journal(&mut self) -> std::io::Result<()> {
+        let (Some(path), Some(lookup)) = (&self.journal, &self.pending) else {
+            return Err(std::io::ErrorKind::InvalidInput.into());
+        };
+        if read_pending(path)?.as_ref() != Some(lookup) {
+            return Err(std::io::ErrorKind::InvalidData.into());
+        }
+        fs::remove_file(path)?;
+        #[cfg(unix)]
+        if let Some(parent) = path.parent() {
+            File::open(parent)?.sync_all()?;
+        }
+        self.pending = None;
+        Ok(())
     }
     pub(super) fn has_work(&self) -> bool {
         !matches!(self.operation, ArchiveOperation::Idle)
@@ -164,9 +184,10 @@ impl ClinicalApp {
         if area.journal_error || area.journal.is_none() {
             pane = pane.child(notice("archive-journal-error", "Registro del ripristino non disponibile. Conserva gli eventuali file di stato e verifica la cartella di recupero dell’interfaccia prima di iniziare un ripristino.", theme, true));
         }
-        if let ArchiveOperation::Review(command) = &area.operation {
+        if let ArchiveOperation::Review(review) = &area.operation {
             pane = pane.child(div().id("archive-review").flex().flex_col().gap(px(12.))
-                .child(text!(format!("Ripristino del file portabile: {} record. I dati esportabili verranno sostituiti. Account e chiavi restano invariati; lo storico protetto viene conservato. I dispositivi abbinati dovranno essere abbinati di nuovo.", command.records())))
+                .child(text!(format!("File: {} ({} byte).", review.name, review.bytes)))
+                .child(text!(format!("Ripristino del file portabile: {} record. I dati esportabili verranno sostituiti. Account e chiavi restano invariati; lo storico protetto viene conservato. L’operazione non è reversibile. I dispositivi abbinati dovranno essere abbinati di nuovo.", review.command.records())))
                 .child(crate::text_input::themed(area.confirmation.clone(), theme))
                 .child(button("archive-cancel", "Annulla", theme, true, true).on_click(cx.listener(|this, _, _, cx| this.cancel_archive_restore(cx))))
                 .child(button("archive-confirm", "Ripristina adesso", theme, false, RestoreConfirmation::new(area.confirmation.read(cx).value()).is_ok()).on_click(cx.listener(|this, _, _, cx| this.confirm_archive_restore(cx)))));
@@ -277,7 +298,11 @@ impl ClinicalApp {
                             let maximum = match purpose { FilePurpose::Restore => 8 * 1024 * 1024, FilePurpose::VerifyRecovery => 512 * 1024 * 1024 + 96 };
                             let bytes = read_selected(&path, maximum).map_err(|_| RuntimeError::InvalidInput)?;
                             match purpose {
-                                FilePurpose::Restore => access.prepare_archive_restore(&bytes).map(Arc::new).map(FileResult::Review),
+                                FilePurpose::Restore => {
+                                    let name = path.file_name().and_then(|name| name.to_str()).filter(|name| !name.chars().any(char::is_control)).ok_or(RuntimeError::InvalidInput)?.to_owned();
+                                    let command = Arc::new(access.prepare_archive_restore(&bytes)?);
+                                    Ok(FileResult::Review(ArchiveReview { command, name, bytes: bytes.len() }))
+                                },
                                 FilePurpose::VerifyRecovery => { access.verify_recovery_archive(&bytes)?; Ok(FileResult::Verified) }
                             }
                         }, |this, result, cx| {
@@ -310,13 +335,13 @@ impl ClinicalApp {
     }
     fn confirm_archive_restore(&mut self, cx: &mut Context<Self>) {
         let area = &self.local_host.archives;
-        let ArchiveOperation::Review(command) = &area.operation else {
+        let ArchiveOperation::Review(review) = &area.operation else {
             return;
         };
         let Ok(confirmation) = RestoreConfirmation::new(area.confirmation.read(cx).value()) else {
             return;
         };
-        let command = command.clone();
+        let command = review.command.clone();
         let Some(access) = self.local_host.access() else {
             return;
         };
@@ -336,25 +361,33 @@ impl ClinicalApp {
         }
         self.local_host.archives.pending = Some(lookup);
         self.local_host.archives.operation = ArchiveOperation::Applying;
-        self.run_local_host(move || access.restore_archive(&command, confirmation), |this, result, cx| {
-            this.disconnect(cx);
-            this.message = Some((match result { Ok(()) => "Ripristino eseguito. Riapri l’archivio e rileggi la ricevuta in Archivi e backup.".into(), Err(error) => format!("{} Riapri l’archivio e rileggi la ricevuta prima di procedere.", ui_error(error)) }, true)); cx.notify();
-        }, cx);
+        self.run_local_host(
+            move || access.restore_archive(&command, confirmation),
+            |this, result, cx| {
+                let rejected = matches!(result, Err(RuntimeError::Conflict | RuntimeError::Forbidden | RuntimeError::Rejected(400 | 412)));
+                let released = rejected && this.local_host.archives.clear_journal().is_ok();
+                this.local_host.archives.journal_error |= rejected && !released;
+                this.disconnect(cx);
+                let message = match result {
+                    Ok(()) => "Ripristino eseguito. Riapri l’archivio e rileggi la ricevuta in Archivi e backup.".into(),
+                    Err(error) if released => format!("{} Ripristino bloccato: i dati non sono stati modificati. Riapri l’archivio e prepara di nuovo il file; nessun reinvio automatico.", ui_error(error)),
+                    Err(error) => format!("{} Riapri l’archivio e rileggi la ricevuta prima di procedere.", ui_error(error)),
+                };
+                this.message = Some((message, true)); cx.notify();
+            }, cx,
+        );
     }
+
     fn finish_archive_receipt(&mut self, cx: &mut Context<Self>) {
         let area = &mut self.local_host.archives;
         if !area.receipt_verified || area.has_work() {
             return;
         }
-        if let (Some(path), Some(lookup)) = (&area.journal, &area.pending)
-            && (read_pending(path).ok().flatten().as_ref() != Some(lookup)
-                || fs::remove_file(path).is_err())
-        {
+        if area.clear_journal().is_err() {
             area.journal_error = true;
             cx.notify();
             return;
         }
-        area.pending = None;
         area.receipt_verified = false;
         cx.notify();
     }
@@ -395,6 +428,65 @@ impl ClinicalApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn synthetic_review(command: Arc<PreparedArchiveRestore>) -> ArchiveReview {
+        ArchiveReview {
+            command,
+            name: "backup-sintetico.mediflow".into(),
+            bytes: 14,
+        }
+    }
+    #[gpui::test]
+    fn archive_definite_conflict_releases_only_its_journal_and_never_retries(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host(
+                    "Synthetic scales fixture passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let command = Arc::new(
+            access
+                .prepare_archive_restore(br#"{"payload":{}}"#)
+                .unwrap(),
+        );
+        let fixture = local_preferences::tests::Fixture::new();
+        fs::create_dir_all(&fixture.0).unwrap();
+        let journal = fixture.0.join("pending.json");
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.area = Area::Settings;
+            app.settings_page = SettingsPage::Archives;
+            app.local_host.authority = Authority::Open(access);
+            app.local_host.archives.journal = Some(journal.clone());
+            app.local_host.archives.operation = ArchiveOperation::Review(synthetic_review(command));
+            app.local_host
+                .archives
+                .confirmation
+                .update(cx, |input, cx| input.set_content("RIPRISTINA", cx));
+            app.confirm_archive_restore(cx);
+            assert!(journal.exists());
+        });
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert!(app.session.is_none());
+            assert!(app.local_host.archives.pending.is_none());
+            assert!(!app.local_host.archives.journal_error);
+        });
+        assert!(!journal.exists());
+        assert_eq!(
+            host.routes()
+                .iter()
+                .filter(|route| route.as_str() == "POST /api/system/backup-restore")
+                .count(),
+            1
+        );
+    }
     #[gpui::test]
     fn archive_review_requires_keyword_cancellation_has_no_effect_and_lock_retires_review(
         cx: &mut gpui::TestAppContext,
@@ -425,7 +517,8 @@ mod tests {
             app.settings_page = SettingsPage::Archives;
             app.local_host.authority = Authority::Open(access);
             app.local_host.archives.journal = Some(journal.clone());
-            app.local_host.archives.operation = ArchiveOperation::Review(command.clone());
+            app.local_host.archives.operation =
+                ArchiveOperation::Review(synthetic_review(command.clone()));
             app.confirm_archive_restore(cx);
             assert!(matches!(
                 app.local_host.archives.operation,
@@ -439,7 +532,7 @@ mod tests {
             app.cancel_archive_restore(cx);
             assert!(!app.local_host.has_work());
             assert!(!journal.exists());
-            app.local_host.archives.operation = ArchiveOperation::Review(command);
+            app.local_host.archives.operation = ArchiveOperation::Review(synthetic_review(command));
             app.disconnect(cx);
             assert!(!app.local_host.has_work());
             assert!(
