@@ -2,6 +2,7 @@ mod adapter;
 mod card;
 mod native;
 pub(crate) mod owner;
+pub(crate) mod references;
 
 use owner::{Pending, Request, State};
 use serde_json::{Value, json};
@@ -228,7 +229,7 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
                     p.revoke();
                     p.status()
                 } else {
-                    State::Uncertain
+                    State::Therapy(mediflow_runtime_client::ChatTherapyResolution::Uncertain)
                 }
             }
             _ => break,

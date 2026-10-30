@@ -6,10 +6,11 @@ import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } 
 import { ambulatories, patients, therapies, patientsToAmbulatories, settings, users } from '../lib/schema.ts';
 import { bindSessionToArchive, currentArchiveGeneration } from '../lib/security/archive-session-generation.ts';
 import { NETWORK_PAIRING_STATE_KEY, serializeNetworkPairingState } from '../lib/network-pairing-model.ts';
-import { captureNativeLoginSessionFence, createNativeServerSession } from '../lib/security/server-session.ts';
+import { captureNativeLoginSessionFence, createNativeServerSession } from '../lib/security/server-session';
 
 assert.ok(process.env.MEDIFLOW_DATA_DIR, 'owned synthetic data directory required');
 const data = process.env.MEDIFLOW_DATA_DIR;
+assert.ok(fs.readdirSync(data).every(name => name.endsWith('.log')), 'host requires a new synthetic directory containing at most its own logs');
 const load = createRequire(import.meta.url);
 const bcrypt = load('bcryptjs') as typeof import('bcryptjs');
 const cookies = { cookies: new Map<string, string>() };
@@ -52,7 +53,7 @@ async function main(){
 
  const f=await fixture();
  const token='b'.repeat(64);
- f.context.pairedClient.tokenHash=load(process.cwd()+'/lib/network-pairing-model.ts').hashNetworkPairedClientToken(token);
+ f.context.pairedClient.tokenHash=load('../lib/network-pairing-model.ts').hashNetworkPairedClientToken(token);
  const session=createNativeServerSession({id:f.context.session.userId,username:f.context.session.username,role:'admin'},{clientId:f.context.pairedClient.clientId,clientPlatform:f.context.pairedClient.clientPlatform,tokenHash:f.context.pairedClient.tokenHash},captureNativeLoginSessionFence())!;
  bindSessionToArchive(session,currentArchiveGeneration());
  f.context.session=session;
@@ -67,14 +68,16 @@ async function main(){
  dbServer.update(therapies).set({drugName:'Synthetic medicine',dosage:'Synthetic dose'}).where(eq(therapies.id,f.command.therapyId)).run();
  const vector=JSON.parse(fs.readFileSync(process.cwd()+'/native/contracts/crypto-golden-vectors.v3.json','utf8'));
  const ports=JSON.parse(fs.readFileSync(process.cwd()+'/experiments/gpui-patient-pilot/transport/tests/fixtures/host-ports.json','utf8'));
- const therapyRoute=load(process.cwd()+'/app/api/auth/native/therapy-status/route.ts');
- const profileRoute=load(process.cwd()+'/app/api/v1/network/patients/[id]/profile-query/route.ts');
+ const therapyRoute=load('../app/api/auth/native/therapy-status/route.ts');
+ const profileRoute=load('../app/api/v1/network/patients/[id]/profile-query/route.ts');
+ const sessions = new Map([[session.id, session]]);
+ let loginCount = 0;
  const operations:string[]=[];
  let revokes=0;
  const compare=bcrypt.compare.bind(bcrypt);
  (bcrypt as any).compare=async (value:string,hash:string)=>{
   fs.writeFileSync(process.env.REVIEW_PIN_BARRIER!,'pending');
-  await new Promise<void>((resolve,reject)=>{const deadline=Date.now()+15000;const timer=setInterval(()=>{if(fs.existsSync(process.env.REVIEW_PIN_RELEASE!)){clearInterval(timer);resolve();}else if(Date.now()>deadline){clearInterval(timer);reject(new Error('PIN barrier timeout'));}},5);});
+  await new Promise<void>((resolve,reject)=>{const deadline=Date.now()+60000;const timer=setInterval(()=>{if(fs.existsSync(process.env.REVIEW_PIN_RELEASE!)){clearInterval(timer);resolve();}else if(Date.now()>deadline){clearInterval(timer);reject(new Error('PIN barrier timeout'));}},5);});
   return compare(value,hash);
  };
  const server=http.createServer(async(req,res)=>{
@@ -85,14 +88,21 @@ async function main(){
    const json=bytes?JSON.parse(bytes):{};
    console.log(req.method,path,json.operation ?? '');
    let response:Response;
-   const reply=(value:any,status=200)=>Response.json(value,{status,headers:{'Set-Cookie':'mediflow_session='+f.context.session.id}});
+   let responseSession = sessions.get((req.headers.cookie ?? '').match(/mediflow_session=([^;]+)/)?.[1] ?? '') ?? session;
+   if (path === '/api/auth/native/login' && ++loginCount > 1) {
+     responseSession = createNativeServerSession({ id:session.userId, username:session.username, role:'admin' }, { clientId:f.context.pairedClient.clientId, clientPlatform:f.context.pairedClient.clientPlatform, tokenHash:f.context.pairedClient.tokenHash }, captureNativeLoginSessionFence())!;
+     bindSessionToArchive(responseSession, currentArchiveGeneration());
+     sessions.set(responseSession.id, responseSession);
+   }
+   cookies.cookies.set('mediflow_session', responseSession.id);
+   const reply=(value:any,status=200)=>Response.json(value,{status,headers:{'Set-Cookie':'mediflow_session='+responseSession.id}});
    if(path==='/api/auth/check')response=reply({status:'ok',isSetup:true,archiveGeneration:currentArchiveGeneration(),unlock:{credential:'passphrase',kdfVersion:3,salt:vector.salt}});
    else if(path==='/api/auth/native/login')response=reply({success:true,id:f.context.session.userId,username:f.context.session.username,role:'admin',archiveGeneration:currentArchiveGeneration(),salt:vector.salt,encryptedMasterKey:vector.wrappedMasterKey});
    else if(path==='/api/v1/network/capabilities')response=reply({protocolVersion:'1.13.0',operatingMode:'network-home-base',capabilities:[],hostPorts:ports});
    else if(path==='/api/v1/network/ambulatories')response=reply([{id:f.context.scopeAmbulatoryId,name:'Synthetic',version:1}]);
    else if(path==='/api/v1/network/identity')response=reply({scope:{effectiveAmbulatoryId:f.context.scopeAmbulatoryId,requestBinding:'expected-ambulatory-id-v1'},operator:{userId:f.context.session.userId,authChannel:'native'}});
    else if(path==='/api/auth/native/chat-access-confirmation')response=reply({status:'eligible'});
-   else if(path==='/api/v1/network/patient-profile/selection-epoch')response=reply({contractVersion:1,selectionEpoch:f.owner.snapshotSelectionEpoch(f.context.session)});
+   else if(path==='/api/v1/network/patient-profile/selection-epoch')response=reply({contractVersion:1,selectionEpoch:nativeProfileSelectionOwner.registry.acquire(responseSession).snapshotSelectionEpoch(responseSession)});
    else {
     const headers=new Headers();for(const[k,v]of Object.entries(req.headers))if(v)headers.set(k,Array.isArray(v)?v.join(','):v);
     const request=new Request('http://127.0.0.1'+req.url,{method:req.method,headers,...(req.method==='GET'?{}:{body:bytes})});
@@ -100,9 +110,15 @@ async function main(){
     else if(path===('/api/v1/network/patients/'+f.command.patientId+'/therapies'))response=reply([{id:f.command.therapyId,patientId:f.command.patientId,drugName:'Synthetic medicine',dosage:'Synthetic dose',status:'active',startDate:'2026-10-30',version:1}]);
     else if(path==='/api/auth/native/therapy-status'){
       operations.push(json.operation);
+      const scenario = process.env.MEDIFLOW_CHAT_WITHDRAW_SCENARIO;
+      if (json.operation === 'revoke' && (scenario === 'crash-lost' || (scenario === 'crash-denied' && ++revokes === 1))) { req.socket.destroy(); return; }
+      if (json.operation === 'revoke' && scenario === 'crash-retired' && ++revokes === 1) {
+          await therapyRoute.POST(request);
+          req.socket.destroy(); return;
+      }
       response = json.operation==='revoke' && process.env.MEDIFLOW_CHAT_WITHDRAW_SCENARIO==='unavailable' && ++revokes===1
         ? reply({status:'unavailable'},503) : await therapyRoute.POST(request);
-      if(json.operation==='execute'||json.operation==='revoke') fs.writeFileSync(json.operation==='execute' ? process.env.REVIEW_RESULT! : process.env.REVIEW_REVOKE_RESULT!,JSON.stringify({effects:effects(f.command.therapyId),operations,serverStatus:response.status}));
+      if(['execute','revoke','receipt'].includes(json.operation)) fs.writeFileSync(json.operation==='execute' ? process.env.REVIEW_RESULT! : process.env.REVIEW_REVOKE_RESULT!,JSON.stringify({effects:effects(f.command.therapyId),operations,serverStatus:response.status}));
     } else response=reply({status:'denied'},404);
    }
    const body=await response.text();res.writeHead(response.status,Object.fromEntries(response.headers));res.end(body);

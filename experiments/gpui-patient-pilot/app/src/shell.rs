@@ -654,7 +654,11 @@ impl ClinicalApp {
         let threshold_region_scroll = ScrollHandle::new();
         let mut app = Self {
             #[cfg(unix)]
-            chat_access: chat_access::ChatAccess::new(theme, cx),
+            chat_access: chat_access::ChatAccess::new(
+                theme,
+                local_preferences.chat_therapy_directory(),
+                cx,
+            ),
             session: None,
             request_context: RequestContext::default(),
             pairing: None,
@@ -5331,6 +5335,10 @@ impl Render for ClinicalApp {
         let chat_access = self.chat_access_view(cx);
         #[cfg(not(unix))]
         let chat_access: Option<Stateful<Div>> = None;
+        #[cfg(unix)]
+        let chat_recovery = self.chat_recovery_view(cx);
+        #[cfg(not(unix))]
+        let chat_recovery: Option<Stateful<Div>> = None;
         let content = if let Some(access) = chat_access {
             access.into_any_element()
         } else if !connected {
@@ -5564,6 +5572,7 @@ impl Render for ClinicalApp {
                                         .flex_shrink_0(),
                                 )
                             })
+                            .children(chat_recovery)
                             .child(content),
                     ),
             )

@@ -1,12 +1,17 @@
 use super::*;
+use crate::chat_access::references::CommandReferences;
 use crate::chat_access::{
     self,
     owner::{Pending, State},
 };
+use mediflow_runtime_client::ChatTherapyResolution;
 use std::time::Duration;
 
 pub(super) struct ChatAccess {
     listener: Option<chat_access::Listener>,
+    references: CommandReferences,
+    recovery_messages: Vec<ChatTherapyResolution>,
+    recovery_epoch: u64,
     pending: Option<Pending>,
     patient: mediflow_patient_client::PersonName,
     archive: String,
@@ -17,9 +22,16 @@ pub(super) struct ChatAccess {
 }
 
 impl ChatAccess {
-    pub(super) fn new(theme: Theme, cx: &mut Context<ClinicalApp>) -> Self {
+    pub(super) fn new(
+        theme: Theme,
+        directory: Option<std::path::PathBuf>,
+        cx: &mut Context<ClinicalApp>,
+    ) -> Self {
         Self {
             listener: chat_access::Listener::configured(),
+            references: CommandReferences::new(directory),
+            recovery_messages: Vec::new(),
+            recovery_epoch: 0,
             pending: None,
             patient: mediflow_patient_client::PersonName::default(),
             archive: String::new(),
@@ -39,22 +51,40 @@ impl ChatAccess {
             last_state: None,
         }
     }
+    fn unattached_commands(&self, session: &RuntimeSession) -> std::io::Result<Vec<String>> {
+        let active = self.pending.as_ref().and_then(|p| {
+            p.lock().ok().and_then(|p| {
+                p.therapy()
+                    .and_then(|t| t.selected.as_ref().map(|s| s.1.clone()))
+            })
+        });
+        self.references.for_session(session).pending().map(|ids| {
+            ids.into_iter()
+                .filter(|id| Some(id) != active.as_ref())
+                .collect()
+        })
+    }
     pub(super) fn retire(&mut self, cx: &mut App) {
         if let Some(pending) = self.pending.as_ref()
             && let Ok(mut pending) = pending.lock()
         {
             pending.withdraw();
         }
-        if self
-            .pending
-            .as_ref()
-            .is_some_and(|p| p.lock().is_ok_and(|mut p| p.status() == State::Withdrawn))
-        {
+        if self.pending.as_ref().is_some_and(|p| {
+            p.lock().is_ok_and(|mut p| {
+                matches!(
+                    p.status(),
+                    State::Withdrawn | State::Therapy(ChatTherapyResolution::Confirmed(_))
+                )
+            })
+        }) {
             self.pending = None;
         }
         self.patient = mediflow_patient_client::PersonName::default();
         self.archive.clear();
         self.last_state = None;
+        self.recovery_messages.clear();
+        self.recovery_epoch = self.recovery_epoch.wrapping_add(1);
         self.message = None;
         self.pin.update(cx, |input, cx| input.set_content("", cx));
     }
@@ -108,12 +138,11 @@ impl ClinicalApp {
             .and_then(|l| l.incoming.try_recv().ok());
         if let Some(pending) = incoming {
             self.chat_access.retire(cx);
-            if self
-                .chat_access
-                .pending
-                .as_ref()
-                .is_some_and(|p| p.lock().is_ok_and(|mut p| p.status() == State::Uncertain))
-            {
+            if self.chat_access.pending.as_ref().is_some_and(|p| {
+                p.lock().is_ok_and(|mut p| {
+                    p.status() == State::Therapy(ChatTherapyResolution::Uncertain)
+                })
+            }) {
                 if let Ok(mut p) = pending.lock() {
                     p.withdraw();
                 }
@@ -138,6 +167,9 @@ impl ClinicalApp {
                 ))
             });
             if let Some((session, context, patient, archive)) = binding {
+                if let Ok(mut p) = pending.lock() {
+                    p.references = self.chat_access.references.clone();
+                }
                 if pending
                     .lock()
                     .is_ok_and(|mut pending| pending.bind(session, context))
@@ -221,6 +253,91 @@ impl ClinicalApp {
         cx.notify();
     }
 
+    pub(super) fn chat_recovery_view(&self, cx: &Context<Self>) -> Option<Stateful<Div>> {
+        let session = self.session.as_ref()?;
+        let recovery = self.chat_access.unattached_commands(session);
+        if self.session.is_some()
+            && (!recovery.as_ref().is_ok_and(|ids| ids.is_empty())
+                || !self.chat_access.recovery_messages.is_empty())
+        {
+            let messages = if self.chat_access.recovery_messages.is_empty() {
+                vec![ChatTherapyResolution::Uncertain]
+            } else {
+                self.chat_access.recovery_messages.clone()
+            };
+            return Some(
+                div()
+                    .id("native-chat-recovery")
+                    .flex()
+                    .flex_col()
+                    .gap(px(12.))
+                    .p(px(20.))
+                    .children(messages.into_iter().enumerate().map(|(index, message)| {
+                        notice(
+                            format!("native-chat-recovery-warning-{index}"),
+                            message.message(),
+                            self.theme,
+                            message == ChatTherapyResolution::Uncertain,
+                        )
+                    }))
+                    .child(
+                        button(
+                            "native-chat-recovery-reread",
+                            "Rileggi esito e completa il ritiro",
+                            self.theme,
+                            false,
+                            self.scope.is_some(),
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            let Some(session) = this.session.clone() else {
+                                return;
+                            };
+                            let Some(scope) = this.scope.clone() else {
+                                return;
+                            };
+                            let ids = this
+                                .chat_access
+                                .unattached_commands(&session)
+                                .unwrap_or_default();
+                            let references = this.chat_access.references.for_session(&session);
+                            let epoch = this.chat_access.recovery_epoch;
+                            let task = cx.background_executor().spawn(async move {
+                                let mut resolutions = Vec::new();
+                                for id in ids {
+                                    let resolution = session
+                                        .recover_chat_therapy_command(&scope, &id)
+                                        .map_or(ChatTherapyResolution::Uncertain, |r| {
+                                            r.reconcile()
+                                        });
+                                    if let ChatTherapyResolution::Confirmed(outcome) = resolution {
+                                        let _ = references.confirm(&id, outcome);
+                                    }
+                                    resolutions.push(resolution);
+                                }
+                                if resolutions.is_empty() {
+                                    resolutions.push(ChatTherapyResolution::Uncertain);
+                                }
+                                resolutions
+                            });
+                            cx.spawn(async move |this, cx| {
+                                let resolutions = task.await;
+                                let _ = this.update(cx, |this, cx| {
+                                    if this.session.is_some()
+                                        && this.chat_access.recovery_epoch == epoch
+                                    {
+                                        this.chat_access.recovery_messages = resolutions;
+                                        cx.notify();
+                                    }
+                                });
+                            })
+                            .detach();
+                        })),
+                    ),
+            );
+        }
+        None
+    }
+
     pub(super) fn chat_access_view(&self, cx: &Context<Self>) -> Option<Stateful<Div>> {
         let pending = self.chat_access.pending.as_ref()?;
         let (state, app) = pending.lock().ok().map(|mut p| (p.status(), p.app()))?;
@@ -283,7 +400,7 @@ impl ClinicalApp {
             .child(self.chat_access.pin.clone())
             .child(button("native-chat-access-pin-confirm", "Conferma con PIN", theme, false, enabled)
                 .when(enabled, |el| el.on_click(cx.listener(|this, _, _, cx| this.approve_chat_access(true, cx)))))
-            .when(state == State::Uncertain, |el| el
+            .when(state == State::Therapy(ChatTherapyResolution::Uncertain), |el| el
                 .child(notice("native-chat-therapy-uncertain", "Esito da verificare. Il ritiro non è confermato: la scrittura potrebbe essere avvenuta. Rileggi l’esito prima di proseguire.", theme, true))
                 .child(button("native-chat-therapy-reread", "Rileggi esito e completa il ritiro", theme, false, true)
                     .on_click(cx.listener(|this, _, _, cx| {
@@ -292,16 +409,11 @@ impl ClinicalApp {
                         }
                         cx.notify();
                     }))))
-            .when_some(if let State::Resolved(outcome) = state { Some(outcome) } else { None }, |el, outcome| el.child(notice("native-chat-therapy-outcome", match outcome {
-                mediflow_runtime_client::ChatTherapyOutcome::Applied => "Modifica registrata. Il comando non può più essere ritirato.",
-                mediflow_runtime_client::ChatTherapyOutcome::Retired => "Ritiro confermato. Questo comando non ha modificato la terapia.",
-                mediflow_runtime_client::ChatTherapyOutcome::Rejected => "Scrittura respinta. Questo comando non ha modificato la terapia.",
-                mediflow_runtime_client::ChatTherapyOutcome::Closed => "Comando chiuso senza modifiche.",
-            }, theme, false)))
+            .when_some(if let State::Therapy(resolution) = state { Some(resolution) } else { None }, |el, resolution| el.child(notice("native-chat-therapy-outcome", resolution.message(), theme, resolution == ChatTherapyResolution::Uncertain)))
             .child(button("native-chat-access-deny", "Nega e ritira", theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| { this.chat_access.retire(cx); cx.notify(); })))
             .when(state != State::Challenge, |el| el.child(notice("native-chat-access-state",
-                if matches!(state, State::Resolved(_) | State::Uncertain) { "" } else if state == State::Consumed && therapy_mode { "Operazione terminata. Controlla ricevuta e rilettura; nessuna ripetizione automatica." } else if state == State::Consumed { "Scheda consegnata. Puoi revocare la vista; i byte già ricevuti dall’host non vengono cancellati." } else if state == State::Approved { "Scheda autorizzata per una sola lettura nella vista chat." } else { "Conferma in corso…" }, theme, false))))
+                if matches!(state, State::Therapy(ChatTherapyResolution::Confirmed(_)) | State::Therapy(ChatTherapyResolution::Uncertain)) { "" } else if state == State::Consumed && therapy_mode { "Operazione terminata. Controlla ricevuta e rilettura; nessuna ripetizione automatica." } else if state == State::Consumed { "Scheda consegnata. Puoi revocare la vista; i byte già ricevuti dall’host non vengono cancellati." } else if state == State::Approved { "Scheda autorizzata per una sola lettura nella vista chat." } else { "Conferma in corso…" }, theme, false))))
     }
 }
 
@@ -309,6 +421,50 @@ impl ClinicalApp {
 mod tests {
     use super::*;
     use gpui::EntityInputHandler;
+
+    #[gpui::test]
+    fn reopened_authenticated_shell_shows_unresolved_command_without_a_live_request(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let directory = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join(format!("mf-chat-shell-{}", std::process::id()));
+        let (session, _host) = crate::chat_access::owner::tests::native_session();
+        let references = CommandReferences::new(Some(directory.clone())).for_session(&session);
+        references
+            .remember("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+            .unwrap();
+        let (app, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        app.update(cx, |app, cx| {
+            app.chat_access = ChatAccess::new(app.theme, Some(directory.clone()), cx);
+            assert!(app.chat_access.pending.is_none());
+            assert!(
+                app.chat_recovery_view(cx).is_none(),
+                "recovery must wait for authentication"
+            );
+            app.session = Some(session);
+            assert!(
+                app.chat_recovery_view(cx).is_some(),
+                "restart lost the persistent warning"
+            );
+            assert_eq!(
+                app.chat_access
+                    .references
+                    .for_session(app.session.as_ref().unwrap())
+                    .pending()
+                    .unwrap()
+                    .len(),
+                1
+            );
+            assert!(
+                app.chat_access.pending.is_none(),
+                "recovery must not recreate execute authority"
+            );
+        });
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 
     #[gpui::test]
     fn confirmation_pin_is_unavailable_to_native_surrounding_text_services(
