@@ -47,9 +47,8 @@ pub use profile_query::{ProfileCurrentness, ProfileProjection};
 pub use retirement_notice::{RETIREMENT_WARNING, RetirementNotice};
 pub use scales::*;
 pub use session::{
-    AiPreferencesContext, AmbulatoryCommandContext, ChatAccessContext, ChatTherapyOutcome,
-    ChatTherapyRecovery, ChatTherapyResolution, FirstAmbulatoryContext, ProfileQueryIntent,
-    RuntimeSession,
+    AiPreferencesContext, AmbulatoryCommandContext, ChatAccessContext, ChatWriteRecovery,
+    FirstAmbulatoryContext, ProfileQueryIntent, RuntimeSession,
 };
 pub use who::{
     WHO_ATTRIBUTION, WhoEntry, WhoReadiness, WhoReadinessStatus, WhoReceipt, WhoSearchResponse,

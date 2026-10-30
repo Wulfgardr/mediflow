@@ -229,7 +229,7 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
                     p.revoke();
                     p.status()
                 } else {
-                    State::Therapy(mediflow_runtime_client::ChatTherapyResolution::Uncertain)
+                    State::Write(mediflow_runtime_client::ChatWriteResolution::Uncertain)
                 }
             }
             _ => break,
