@@ -1,0 +1,58 @@
+{
+  "base": "dad877af34028b579894e301e1d69ff947263c1a",
+  "prodotto": "9e480838a6e417bb49b4ffb1a9b17df2cc298537",
+  "diff_applicativo": "CollapsibleSection: flex-auto al posto di flex-1 sul titolo attivo; nessuna modifica clinica",
+  "node": "24.18.0",
+  "abi": 137,
+  "superficie": "Chromium, produzione standalone",
+  "porte": [
+    3147,
+    3148
+  ],
+  "archivi": "sintetici isolati distinti, copia legacy disabilitata",
+  "prove": {
+    "prima": {
+      "startTime": "2026-10-30T06:06:52.266Z",
+      "duration": 260075.884,
+      "expected": 24,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "dopo": {
+      "startTime": "2026-10-30T06:12:49.050Z",
+      "duration": 299635.549,
+      "expected": 32,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "coppie_nuove": 588,
+  "coppie_riusate_terapie": 24,
+  "regressioni_solo_dopo": 32,
+  "scritture_cliniche_modificate": false,
+  "regressione_titolo_base": "FAIL atteso, geometria sovrapposta a 320 px",
+  "unit_conservazione_form": "PASS",
+  "righe": {
+    "W-7": "chiusa nelle prove Web sintetiche; CI della head distinta",
+    "W-9": "chiusa nelle prove Web sintetiche; CI della head distinta",
+    "W-10": "chiusa nelle prove Web sintetiche; CI della head distinta",
+    "W-21c": "chiusa nelle prove Web sintetiche; CI della head distinta"
+  },
+  "controlli_locali": {
+    "lint": "PASS",
+    "typecheck": "PASS",
+    "build_base": "PASS",
+    "build_candidata": "PASS",
+    "bundle_standalone": "PASS",
+    "test_selection": "PASS",
+    "never_regress": "PASS",
+    "claims": "PASS"
+  },
+  "limiti": [
+    "Nessuna ammissione clinica o chiusura della release",
+    "Servizi esterni non verificati",
+    "Suite di scrittura storiche riusate, non rieseguite"
+  ]
+}
