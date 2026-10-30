@@ -254,6 +254,49 @@ impl ClinicalApp {
 mod tests {
     use super::*;
     #[gpui::test]
+    fn leaving_functions_retires_oauth_observation_on_every_subpage(cx: &mut gpui::TestAppContext) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        cx.update(|window, cx| {
+            view.update(cx, |app, cx| {
+                app.area = Area::Settings;
+                for page in [
+                    SettingsPage::Overview,
+                    SettingsPage::Models,
+                    SettingsPage::AiPreferences,
+                    SettingsPage::Profile,
+                    SettingsPage::Access,
+                    SettingsPage::Appearance,
+                    SettingsPage::Ambulatories,
+                    SettingsPage::Archives,
+                ] {
+                    app.settings_page = SettingsPage::Functions;
+                    app.local_host.chatgpt.observation = Some(ChatGptAccountObservation {
+                        status: serde_json::from_value(serde_json::json!({"state":"awaiting_login","notice":null,"plan":null,"loginExpiresAt":123,"actions":["cancel_login"],"inferenceEnabled":false,"executionBlock":"data_boundary_unqualified"})).unwrap(),
+                        auth_url: Some(Zeroizing::new(
+                            "https://auth.openai.com/oauth/authorize?state=synthetic".into(),
+                        )),
+                        models: None,
+                        limits: None,
+                    });
+                    app.local_host.chatgpt.observed_at = Some(std::time::Instant::now());
+                    let generation = app.local_host.chatgpt.generation;
+                    app.select_settings_page(page, window, cx);
+                    assert_eq!(app.settings_page, page);
+                    assert!(
+                        app.local_host.chatgpt.observation.is_none(),
+                        "OAuth observation retained after leaving Functions"
+                    );
+                    assert!(app.local_host.chatgpt.observed_at.is_none());
+                    assert_eq!(app.local_host.chatgpt.generation, generation + 1);
+                    app.select_settings_page(SettingsPage::Functions, window, cx);
+                    assert!(app.local_host.chatgpt.observation.is_none());
+                }
+            })
+        });
+    }
+
+    #[gpui::test]
     fn chatgpt_navigation_and_lock_erase_transient_account_details(cx: &mut gpui::TestAppContext) {
         let (view, cx) =
             cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
