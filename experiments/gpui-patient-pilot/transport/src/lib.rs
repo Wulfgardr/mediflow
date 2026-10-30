@@ -19,6 +19,7 @@ mod http;
 mod local_host;
 mod ports;
 mod profile_query;
+mod retirement_notice;
 mod scales;
 mod session;
 mod tls;
@@ -43,6 +44,7 @@ pub use http::{FirstAmbulatoryDraft, HostBootstrapSession};
 pub use http::{PairingCredentials, RuntimeClient, RuntimeConfig};
 pub use local_host::*;
 pub use profile_query::{ProfileCurrentness, ProfileProjection};
+pub use retirement_notice::{RETIREMENT_WARNING, RetirementNotice};
 pub use scales::*;
 pub use session::{
     AiPreferencesContext, AmbulatoryCommandContext, ChatAccessContext, FirstAmbulatoryContext,

@@ -1,3 +1,4 @@
+use crate::RetirementNotice;
 use crate::http::{authenticate_web_p3, control_cookie, operation_uuid, sensitive_header};
 use crate::{
     Attachment, RequestContext, Result, RuntimeClient, RuntimeError, RuntimeSession, RuntimeUser,
@@ -104,6 +105,8 @@ pub struct LocalHostAccess {
     owner: Arc<()>,
     closed: AtomicBool,
     retired: AtomicBool,
+    retirement_started: AtomicBool,
+    notice: RetirementNotice,
 }
 impl LocalHostAccess {
     pub(crate) fn authenticate(
@@ -111,6 +114,7 @@ impl LocalHostAccess {
         native: RuntimeSession,
         user: &RuntimeUser,
         passphrase: &str,
+        notice: RetirementNotice,
     ) -> Result<Self> {
         if !client.is_local_bootstrap_origin() {
             return Err(RuntimeError::Forbidden);
@@ -141,6 +145,8 @@ impl LocalHostAccess {
             owner: Arc::new(()),
             closed: AtomicBool::new(false),
             retired: AtomicBool::new(false),
+            retirement_started: AtomicBool::new(false),
+            notice,
         };
         if let Err(error) = login {
             return Err(if access.retire().is_err() {
@@ -315,6 +321,17 @@ impl LocalHostAccess {
             _ => Ok(false),
         }
     }
+    fn record_retirement(&self) {
+        if !self.retirement_started.swap(true, Ordering::AcqRel) {
+            self.notice.change(true);
+        }
+    }
+    pub fn begin_retirement(self: &Arc<Self>) -> RetiringAccess {
+        self.record_retirement();
+        RetiringAccess {
+            access: self.clone(),
+        }
+    }
     pub fn retire(&self) -> Result<()> {
         if self.closed.swap(true, Ordering::AcqRel) {
             return if self.retired.load(Ordering::Acquire) {
@@ -323,6 +340,7 @@ impl LocalHostAccess {
                 Err(RuntimeError::Indeterminate)
             };
         }
+        self.record_retirement();
         let client = self.client.with_request_context(RequestContext::default());
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -357,7 +375,17 @@ impl LocalHostAccess {
             return Err(RuntimeError::InvalidResponse);
         }
         self.retired.store(true, Ordering::Release);
+        self.notice.change(false);
         Ok(())
+    }
+}
+
+pub struct RetiringAccess {
+    access: Arc<LocalHostAccess>,
+}
+impl RetiringAccess {
+    pub fn retire(self) -> Result<()> {
+        self.access.retire()
     }
 }
 

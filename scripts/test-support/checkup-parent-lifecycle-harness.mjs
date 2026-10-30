@@ -70,7 +70,7 @@ export function createHarness({ sharedWal = false, sourceOverrides = {} } = {}) 
         'lib/patient-lifecycle.ts', 'lib/checkup-concurrency.ts', 'lib/version-concurrency.ts',
         'lib/api-v1-clinical-lifecycle.ts', 'lib/api-v1-clinical-write-normalization.ts', 'lib/status-normalization.ts',
         'lib/api-error-response.ts', 'lib/archive-generation.ts', 'lib/security/archive-write-request.ts',
-        'lib/checkup-json-body.ts', 'lib/bounded-request-body.ts', 'lib/checkup-write-operation.ts',
+        'lib/security/loopback-ingress.mjs', 'lib/checkup-json-body.ts', 'lib/bounded-request-body.ts', 'lib/checkup-write-operation.ts',
     ]);
     const auditDouble = {
         listChangedFields: (body, excluded) => Object.keys(body).filter(k => !excluded.includes(k)),
@@ -90,6 +90,7 @@ export function createHarness({ sharedWal = false, sourceOverrides = {} } = {}) 
     };
     function load(relative) {
         assert.ok(allowed.has(relative), `unexpected production import: ${relative}`);
+        if (relative === 'lib/security/loopback-ingress.mjs') return nativeRequire(path.join(ROOT, relative));
         if (cache.has(relative)) return cache.get(relative).exports;
         const filename = path.join(ROOT, relative), loadedModule = { exports: {} }; cache.set(relative, loadedModule);
         // Explicit mutation-test input is evaluated only by this private loader;
@@ -101,7 +102,7 @@ export function createHarness({ sharedWal = false, sourceOverrides = {} } = {}) 
             if (Object.hasOwn(doubles, name)) return doubles[name];
             if (name.startsWith('node:') || name === 'drizzle-orm' || name === 'drizzle-orm/sqlite-core') return nativeRequire(name);
             const resolved = name.startsWith('@/') ? name.slice(2) : path.posix.normalize(path.posix.join(path.posix.dirname(relative), name));
-            const target = resolved.endsWith('.ts') ? resolved : `${resolved}.ts`;
+            const target = (resolved.endsWith('.ts') || resolved === 'lib/security/loopback-ingress.mjs') ? resolved : `${resolved}.ts`;
             // The mutation operation uses relative imports for these same fixture seams.
             if (target === 'lib/db-server.ts') return { dbServer };
             if (target === 'lib/security/audit.ts') return auditDouble;

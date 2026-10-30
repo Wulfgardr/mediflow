@@ -516,7 +516,11 @@ impl RuntimeSession {
     pub fn can_access_local_host(&self) -> bool {
         self.ensure_open().is_ok() && self.inner.client.is_local_bootstrap_origin()
     }
-    pub fn authenticate_local_host(&self, passphrase: &str) -> Result<crate::LocalHostAccess> {
+    pub fn authenticate_local_host(
+        &self,
+        passphrase: &str,
+        notice: crate::RetirementNotice,
+    ) -> Result<crate::LocalHostAccess> {
         self.ensure_open()?;
         crate::LocalHostAccess::authenticate(
             self.inner
@@ -525,6 +529,7 @@ impl RuntimeSession {
             self.account_session(),
             &self.inner.user,
             passphrase,
+            notice,
         )
     }
 
@@ -6821,6 +6826,14 @@ mod tests {
         write!(stream,"HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n{extra}\r\n{body}",body.len()).unwrap();
     }
     fn local_host_login(listener: &std::net::TcpListener) {
+        local_host_login_as(listener, "synthetic-user", "admin", "synthetic-generation");
+    }
+    fn local_host_login_as(
+        listener: &std::net::TcpListener,
+        id: &str,
+        role: &str,
+        generation: &str,
+    ) {
         for step in 0..3 {
             let (mut stream, _) = listener.accept().unwrap();
             let request = read_request(&mut stream);
@@ -6850,7 +6863,7 @@ mod tests {
                 local_host_reply(
                     &mut stream,
                     200,
-                    json!({"success":true,"id":"synthetic-user","username":"synthetic","role":"admin","archiveGeneration":"synthetic-generation"}),
+                    json!({"success":true,"id":id,"username":"synthetic","role":role,"archiveGeneration":generation}),
                     &format!(
                         "Set-Cookie: mediflow_session={}; Path=/; HttpOnly\r\n",
                         "b".repeat(64)
@@ -6863,11 +6876,75 @@ mod tests {
         json!({"id":"file-a","patientId":"patient-a","name":"Referto sintetico.txt","path":"referto.txt","type":"text/plain","size":5,"data":"data:text/plain;base64,cHJvdmE=","currentness":{"sourceRef":"a".repeat(64),"revision":7,"freshnessEpoch":9}})
     }
     #[test]
+    fn local_host_rejected_login_keeps_failed_retirement_after_restart() {
+        use std::{net::TcpListener, thread};
+        for (id, role, generation) in [
+            ("synthetic-user", "clinician", "synthetic-generation"),
+            ("other-user", "admin", "synthetic-generation"),
+            ("synthetic-user", "admin", "other-generation"),
+        ] {
+            for status in [204, 503] {
+                let directory = std::env::temp_dir().join(format!(
+                    "mediflow-host-{}",
+                    crate::http::operation_uuid().unwrap()
+                ));
+                std::fs::create_dir_all(&directory).unwrap();
+                let path = directory.join("retirement.json");
+                let notice = crate::RetirementNotice::new(Some(path.clone()));
+                let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+                let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+                let worker = thread::spawn(move || {
+                    local_host_login_as(&listener, id, role, generation);
+                    let (mut stream, _) = listener.accept().unwrap();
+                    assert!(read_request(&mut stream).starts_with("GET /api/auth/check "));
+                    local_host_reply(
+                        &mut stream,
+                        200,
+                        json!({"status":"ok","hasSession":true}),
+                        &format!("ETag: \"{}\"\r\n", "f".repeat(64)),
+                    );
+                    let (mut stream, _) = listener.accept().unwrap();
+                    let request = read_request(&mut stream);
+                    assert!(request.starts_with("POST /api/auth/local-client/logout "));
+                    assert!(request.contains(&format!("mediflow_session={}", "b".repeat(64))));
+                    assert!(request.contains(&format!("mediflow_auth_control={}", "c".repeat(43))));
+                    if status == 204 {
+                        use std::io::Write;
+                        write!(stream, "HTTP/1.1 204 Synthetic\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+                    } else {
+                        local_host_reply(
+                            &mut stream,
+                            status,
+                            json!({"error":"synthetic logout failure"}),
+                            "",
+                        );
+                    }
+                    listener.set_nonblocking(true).unwrap();
+                    assert!(listener.accept().is_err());
+                });
+                let result = session
+                    .authenticate_local_host("Local host synthetic passphrase", notice.clone());
+                assert!(matches!(result, Err(RuntimeError::Indeterminate)) == (status == 503));
+                assert!(result.is_err());
+                worker.join().unwrap();
+                assert_eq!(notice.pending(), status == 503);
+                assert_eq!(
+                    crate::RetirementNotice::new(Some(path)).pending(),
+                    status == 503
+                );
+                std::fs::remove_dir_all(directory).unwrap();
+            }
+        }
+    }
+    #[test]
     fn local_host_remote_origin_is_denied_before_any_web_authentication() {
         let remote = session_at("https://example.invalid");
         assert!(!remote.can_access_local_host());
         assert!(matches!(
-            remote.authenticate_local_host("Local host synthetic passphrase"),
+            remote.authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None)
+            ),
             Err(RuntimeError::Forbidden)
         ));
     }
@@ -6915,7 +6992,10 @@ mod tests {
                 assert!(listener.accept().is_err(), "one destructive dispatch only");
             });
             let access = session
-                .authenticate_local_host("Local host synthetic passphrase")
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
                 .unwrap();
             let command = access
                 .prepare_document_deletion("patient-a", "file-a")
@@ -6951,7 +7031,10 @@ mod tests {
                 assert!(listener.accept().is_err());
             });
             let access = session
-                .authenticate_local_host("Local host synthetic passphrase")
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
                 .unwrap();
             assert!(matches!(
                 access.prepare_document_deletion("other-patient", "file-a"),
@@ -6988,7 +7071,10 @@ mod tests {
             );
         });
         let access = session
-            .authenticate_local_host("Local host synthetic passphrase")
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
             .unwrap();
         let command = access
             .prepare_switch(crate::HostSettingKey::PatientInsight, true)
@@ -7016,7 +7102,10 @@ mod tests {
             assert!(listener.accept().is_err());
         });
         let access = session
-            .authenticate_local_host("Local host synthetic passphrase")
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
             .unwrap();
         let command = access
             .prepare_document_deletion("patient-a", "file-a")
@@ -7068,7 +7157,10 @@ mod tests {
                 }
             });
             let access = session
-                .authenticate_local_host("Local host synthetic passphrase")
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
                 .unwrap();
             assert_eq!(
                 access.retire(),
