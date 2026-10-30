@@ -134,6 +134,7 @@ collocazione; il broker e il trasporto restano in moduli separati.
 I primi controlli CI hanno inoltre rilevato la registrazione non aggiornata
 dei nuovi trigger e una funzione di test inutilizzata su Linux. Correzioni
 circoscritte a registrazione e compilazione condizionale, senza esclusioni
-di controlli o aumento di soglie.
+di controlli o aumento di soglie. Il manifesto CSV iniziale usava CRLF:
+`git diff --check` lo ha respinto; è stato normalizzato a LF.
 
 Sviluppo assistito: GPT-6.1 Sol, effort xhigh, nessun subagente.
