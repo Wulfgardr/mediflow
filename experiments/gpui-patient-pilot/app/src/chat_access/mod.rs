@@ -1,4 +1,5 @@
 mod adapter;
+mod card;
 mod native;
 pub(crate) mod owner;
 
@@ -114,8 +115,8 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
     let mut reader = BufReader::new(reader);
     let mut pending: Option<Pending> = None;
     let mut bytes = Vec::new();
-    let opened = std::time::Instant::now();
-    while opened.elapsed() < Duration::from_secs(300)
+    let mut last_activity = std::time::Instant::now();
+    while last_activity.elapsed() < Duration::from_secs(300)
         && active.load(Ordering::Acquire)
         && peer.current(&stream)
         && !native::screen_locked()
@@ -146,6 +147,7 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
             }
             Err(_) => break,
         }
+        let mut payload = None;
         let status = match serde_json::from_slice::<Value>(&bytes) {
             Ok(value)
                 if value == json!({"command": "request", "operation": owner::OPERATION})
@@ -169,7 +171,11 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
                 .unwrap_or(State::Withdrawn),
             Ok(value) if value == json!({"command": "consume"}) => pending
                 .as_ref()
-                .map(owner::consume)
+                .map(|p| {
+                    let result = owner::consume_card(p);
+                    payload = result.1;
+                    result.0
+                })
                 .unwrap_or(State::Withdrawn),
             Ok(value) if value == json!({"command": "revoke"}) => {
                 if let Some(p) = &pending
@@ -181,8 +187,18 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
             }
             _ => break,
         };
+        if !matches!(status, State::Withdrawn)
+            && serde_json::from_slice::<Value>(&bytes).is_ok_and(|v| v["command"] != "status")
+        {
+            last_activity = std::time::Instant::now();
+        }
         bytes.clear();
-        if writeln!(stream, "{}", json!({"status": status.wire()})).is_err() {
+        let response = if let Some(payload) = payload {
+            json!({"status":status.wire(), "payload":payload})
+        } else {
+            json!({"status": status.wire()})
+        };
+        if writeln!(stream, "{response}").is_err() {
             break;
         }
     }
