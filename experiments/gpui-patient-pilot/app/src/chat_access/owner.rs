@@ -1325,6 +1325,15 @@ pub(crate) mod tests {
             }
         }
 
+        if std::env::var_os("MF_CRASH_DAMAGED_MARKER").is_some() {
+            use std::os::unix::fs::PermissionsExt;
+            let id = std::fs::read_to_string(&command_file).unwrap();
+            let marker = directory
+                .join(session.chat_therapy_reference_namespace())
+                .join(&id);
+            std::fs::set_permissions(marker, std::fs::Permissions::from_mode(0o644)).unwrap();
+            assert_eq!(references.scan().unwrap().invalid.len(), 1);
+        }
         let ids = references.pending().unwrap();
         assert_eq!(
             ids.len(),
