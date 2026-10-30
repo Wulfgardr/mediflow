@@ -790,6 +790,61 @@ mod tests {
         }
     }
     #[gpui::test]
+    fn reopening_after_volatile_state_loss_at_every_phase_keeps_the_command_and_requires_recovery(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (session, _host) = crate::chat_access::owner::tests::native_session();
+        let (app, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        for phase in [
+            Phase::Selecting,
+            Phase::Reading,
+            Phase::Review,
+            Phase::Preview,
+            Phase::Sending,
+            Phase::Outcome,
+        ] {
+            app.update(cx, |app, cx| {
+                seed(app, &session, phase, cx);
+                let directory = std::env::temp_dir().canonicalize().unwrap().join(format!(
+                    "mf-document-reopen-{}-{}-{phase:?}",
+                    std::process::id(),
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_nanos()
+                ));
+                app.patient_document.references = CommandReferences::new(Some(directory.clone()));
+                app.patient_document
+                    .references
+                    .for_session(&session)
+                    .remember(ID)
+                    .unwrap();
+                app.patient_document = PatientDocument::new(app.theme, Some(directory), cx);
+                assert!(app.patient_document.work.is_none());
+                assert!(app.patient_document.recovery.is_empty());
+                assert!(
+                    app.patient_document.fields.iter().all(|field| field
+                        .editor
+                        .read(cx)
+                        .value()
+                        .is_empty())
+                );
+                assert!(app.patient_document.pin.editor.read(cx).value().is_empty());
+                assert_eq!(
+                    app.patient_document
+                        .references
+                        .for_session(&session)
+                        .pending()
+                        .unwrap(),
+                    [ID]
+                );
+                assert!(app.patient_document_recovery_view(cx).is_some());
+            });
+        }
+    }
+
+    #[gpui::test]
     fn local_preview_preserves_explicit_draft_and_never_autofills_or_sends(
         cx: &mut gpui::TestAppContext,
     ) {
