@@ -3,6 +3,11 @@
 Base: `6c99ff83c8d96b2cfce63fc79b87023e4345d62d`, main aggiornato il 30 ottobre 2026.
 Il confronto usa il censimento G-0, sezione Impostazioni, e le pagine Web della stessa revisione. Nessun rinvio equivale a completamento nativo.
 
+Il [rapporto su motore locale, parametri e account ChatGPT](models.md) aggiorna
+questo censimento per il relativo contributo. Le proposte di esclusione sotto
+sono storiche e non approvate: la decisione del 30 ottobre mantiene tutte le
+voci G-2 obbligatorie.
+
 ## Lacune iniziali, nell'ordine di intervento
 
 | Unità | Funzioni ancora mancanti alla base |
