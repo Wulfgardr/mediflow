@@ -1,0 +1,66 @@
+[
+  {
+    "endpoint": "http://localhost:11434",
+    "accepted": true
+  },
+  {
+    "endpoint": "http://127.0.0.1:11434/v1",
+    "accepted": true
+  },
+  {
+    "endpoint": "http://localhost:11434/v1/",
+    "accepted": true
+  },
+  {
+    "endpoint": "http://127.0.0.1:11434/v",
+    "accepted": true
+  },
+  {
+    "endpoint": "http://127.0.0.1:11434/api/tags",
+    "accepted": true
+  },
+  {
+    "endpoint": "http://localhost:11434/api/chat/",
+    "accepted": true
+  },
+  {
+    "endpoint": "http://localhost:11434/?synthetic=x#fragment",
+    "accepted": true
+  },
+  {
+    "endpoint": "http://[::1]:11434/v1/",
+    "accepted": false
+  },
+  {
+    "endpoint": "http://[::ffff:127.0.0.1]:11434",
+    "accepted": false
+  },
+  {
+    "endpoint": "http://192.168.0.1:11434",
+    "accepted": false
+  },
+  {
+    "endpoint": "http://host.docker.internal:11434",
+    "accepted": false
+  },
+  {
+    "endpoint": "https://127.0.0.1:11434",
+    "accepted": false
+  },
+  {
+    "endpoint": "http://user@localhost:11434",
+    "accepted": false
+  },
+  {
+    "endpoint": "http://localhost:11434/arbitrary",
+    "accepted": false
+  },
+  {
+    "endpoint": "http://localhost:11434/v1?x=y",
+    "accepted": false
+  },
+  {
+    "endpoint": "not-a-url",
+    "accepted": false
+  }
+]

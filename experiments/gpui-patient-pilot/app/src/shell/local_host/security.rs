@@ -110,6 +110,9 @@ impl ClinicalApp {
             .fields
             .each_ref()
             .map(|field| Zeroizing::new(field.read(cx).value().to_owned()));
+        for field in &self.local_host.security.fields {
+            field.update(cx, |input, cx| input.retire(cx));
+        }
         self.local_host.return_focus = window.focused(cx);
         self.local_host.security.message = None;
         self.local_host.security.operation = SecurityOperation::Preparing;
@@ -118,9 +121,6 @@ impl ClinicalApp {
             |this, result, cx| {
                 match result {
                     Ok(command) => {
-                        for field in &this.local_host.security.fields {
-                            field.update(cx, |input, cx| input.retire(cx));
-                        }
                         this.local_host.security.operation =
                             SecurityOperation::Review(Arc::new(command));
                         this.local_host.security.saved = false;
@@ -225,8 +225,8 @@ impl ClinicalApp {
                 if this.account_profile.generation != authority || this.local_host.generation != generation { return; }
                 this.disconnect(cx);
                 this.message = Some(match result {
-                    Ok(()) => ("Passphrase aggiornata. Rinnova l’accesso e sblocca con la nuova passphrase.".into(), false),
-                    Err(error) => (format!("Cambio della passphrase non confermato. {} Accedi di nuovo prima di preparare una nuova operazione.", ui_error(error)), true),
+                    Ok(()) => ("Nuove credenziali rilette. Rinnova l’accesso e verifica lo sblocco con la nuova passphrase.".into(), false),
+                    Err(error) => (format!("Cambio della passphrase: esito da verificare. {} Conserva il nuovo kit e la chiave scritta su carta, insieme ai precedenti. Accedi di nuovo e prova lo sblocco con la nuova passphrase; se non riesce, prova quella precedente. Verifica l’accesso prima di preparare un’altra operazione.", ui_error(error)), true),
                 });
                 cx.notify();
             });
@@ -348,9 +348,6 @@ mod tests {
             1,
             "the real Access page must expose exactly one recovery review"
         );
-        host.plan("POST /api/auth/passphrase/change")
-            .send((200, serde_json::json!({"success":true})))
-            .unwrap();
         view.update(cx, |app, cx| {
             app.local_host.security.saved = true;
             app.local_host.security.paper = true;
@@ -369,7 +366,7 @@ mod tests {
             );
             assert_eq!(
                 app.message.as_ref().unwrap().0,
-                "Passphrase aggiornata. Rinnova l’accesso e sblocca con la nuova passphrase."
+                "Nuove credenziali rilette. Rinnova l’accesso e verifica lo sblocco con la nuova passphrase."
             );
             assert!(!app.message.as_ref().unwrap().1);
             assert!(!app.local_host.retirement.pending());
@@ -399,6 +396,135 @@ mod tests {
         view.read_with(cx, |app, _| {
             assert!(!app.local_host.security.has_work());
             assert!(!app.local_host.security.paper);
+        });
+    }
+}
+
+#[cfg(test)]
+mod review738 {
+    use super::*;
+    #[gpui::test]
+    fn preparation_errors_retire_all_secret_fields(cx: &mut gpui::TestAppContext) {
+        let host = notes_recovery_tests::Host::new();
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host(
+                    "Synthetic scales fixture passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        for (new, confirm, server_error) in [
+            (
+                "New synthetic passphrase for rotation",
+                "Different confirmation for rotation",
+                false,
+            ),
+            ("short", "short", false),
+            (
+                "New synthetic passphrase for rotation",
+                "New synthetic passphrase for rotation",
+                true,
+            ),
+        ] {
+            if server_error {
+                host.plan("GET /api/auth/check")
+                    .send((500, serde_json::json!({"status":"error"})))
+                    .unwrap();
+            }
+            cx.update(|window, cx| {
+                view.update(cx, |app, cx| {
+                    app.session = Some(host.session.clone());
+                    app.local_host.authority = Authority::Open(access.clone());
+                    app.area = Area::Settings;
+                    app.settings_page = SettingsPage::Access;
+                    for (field, value) in app.local_host.security.fields.iter().zip([
+                        "Synthetic scales fixture passphrase",
+                        new,
+                        confirm,
+                    ]) {
+                        field.update(cx, |input, cx| input.set_content(value, cx));
+                    }
+                    app.prepare_security_change(window, cx);
+                    assert!(
+                        app.local_host
+                            .security
+                            .fields
+                            .iter()
+                            .all(|field| field.read(cx).value().is_empty()),
+                        "secret UI state must be retired before background preparation"
+                    );
+                })
+            });
+            cx.run_until_parked();
+            view.read_with(cx, |app, cx| {
+                assert!(matches!(
+                    app.local_host.security.operation,
+                    SecurityOperation::Idle
+                ));
+                assert!(app.local_host.security.message.is_some());
+                assert!(
+                    app.local_host
+                        .security
+                        .fields
+                        .iter()
+                        .all(|field| field.read(cx).value().is_empty())
+                );
+            });
+        }
+    }
+    #[gpui::test]
+    fn review738_success_requires_readback(cx: &mut gpui::TestAppContext) {
+        let host = notes_recovery_tests::Host::new();
+        let notice = RetirementNotice::new(None);
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host("Synthetic scales fixture passphrase", notice.clone())
+                .unwrap(),
+        );
+        let command = Arc::new(
+            access
+                .prepare_passphrase_change(
+                    "Synthetic scales fixture passphrase",
+                    "New synthetic passphrase for review 738",
+                    "New synthetic passphrase for review 738",
+                )
+                .unwrap(),
+        );
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        host.plan("POST /api/auth/passphrase/change")
+            .send((200, serde_json::json!({"success":true})))
+            .unwrap();
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.local_host.retirement = notice;
+            app.local_host.authority = Authority::Open(access);
+            app.local_host.security.operation = SecurityOperation::Review(command);
+            app.local_host.security.saved = true;
+            app.local_host.security.paper = true;
+            app.apply_security_change(cx);
+        });
+        cx.run_until_parked();
+        let routes = host.routes();
+        let post = routes
+            .iter()
+            .position(|route| route.starts_with("POST /api/auth/passphrase/change"))
+            .unwrap();
+        let reads_after = routes
+            .iter()
+            .skip(post + 1)
+            .filter(|route| route.starts_with("GET /api/auth/check"))
+            .count();
+        eprintln!("review738: auth check readbacks after credential POST = {reads_after}");
+        view.read_with(cx, |app,_| {
+            assert!(host.session.is_locked());
+            let success = app.message.as_ref().is_some_and(|(message,error)| !*error && message.starts_with("Passphrase aggiornata"));
+            assert!(app.message.as_ref().unwrap().0.contains("esito da verificare"));
+            assert!(reads_after > 0);
+            assert!(!success, "the synthetic writer returned 200 without changing credentials: the client must not announce verified success");
         });
     }
 }

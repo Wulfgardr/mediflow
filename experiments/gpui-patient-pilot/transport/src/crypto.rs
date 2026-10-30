@@ -95,7 +95,7 @@ fn random_salt() -> Result<String> {
     Ok(BASE64.encode(bytes))
 }
 
-fn wrap_key(master: &MasterKey, kek: &MasterKey, prefix: &str) -> Result<String> {
+pub(crate) fn wrap_key(master: &MasterKey, kek: &MasterKey, prefix: &str) -> Result<String> {
     let mut iv = [0u8; 12];
     getrandom::fill(&mut iv).map_err(|_| RuntimeError::Crypto)?;
     wrap_key_with_iv(master, kek, prefix, &iv)
@@ -145,19 +145,18 @@ fn recovery_material(entropy: &[u8], salt: &str) -> Result<(MasterKey, MasterKey
 }
 
 pub(crate) fn passphrase_bundle(
-    master: &MasterKey,
     passphrase: &str,
     username: &str,
+    wrap: impl FnOnce(&MasterKey, &MasterKey) -> Result<(String, String)>,
 ) -> Result<PassphraseBundle> {
     let salt = random_salt()?;
     let material = derive_v3(passphrase, &salt)?;
-    let encrypted = wrap_key(master, &material.kek, "v3:")?;
     let mut entropy = Zeroizing::new([0u8; 20]);
     getrandom::fill(entropy.as_mut()).map_err(|_| RuntimeError::Crypto)?;
     let recovery_key = format_recovery_key(&entropy);
     let recovery_salt = random_salt()?;
     let (kek, verifier) = recovery_material(entropy.as_ref(), &recovery_salt)?;
-    let recovery_wrapping = wrap_key(master, &kek, "r1:")?;
+    let (encrypted, recovery_wrapping) = wrap(&material.kek, &kek)?;
     let credentials = Zeroizing::new(serde_json::json!({
         "encryptedMasterKey": encrypted, "salt": salt, "verifier": &*material.verifier,
         "recovery": {"wrappedMasterKey": recovery_wrapping, "salt": recovery_salt, "verifier": BASE64.encode(verifier.as_ref())}
