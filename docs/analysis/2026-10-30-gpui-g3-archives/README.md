@@ -77,7 +77,20 @@ La suite `npm run test:unit` più recente conta 8841 passati, un fallito e
 `history, search` invece di `search`; la stessa prova passa nella rilettura
 isolata, senza modifiche. Le due invocazioni WHO successive non sono eseguite
 dal launcher quando il primo gruppo è rosso. Non si dichiara la suite completa
-verde. Gli esiti CI sull’head sono riportati nella PR. I log completi, compresi i rossi,
+verde. Le suite WHO residue sono poi state eseguite separatamente: 61/61 e
+66/66 verdi, in sequenza. Build standalone e spec HTTP con runtime/archivio
+propri passano sul runtime `91acfa2f5abfbdb1c0029a0b89dac708da0bcab8`.
+La spec ritira prima la sessione di setup con il logout locale esatto.
+
+La prima CI ha segnalato la deriva del digest di `lib/db.ts` nella copertura
+formale delle terapie. Dopo il confronto strutturale del JSON e l’identità
+byte per byte del resto del client, il raccordo documenta e fissa la nuova
+fonte condivisa. `verify:therapy-status` passa: 5.903.794 stati distinti,
+coda vuota, invarianti invariati; tre mutanti e sei testimoni del modello,
+122 test causali, due mutanti del controller e 29 test dopo ripristino.
+Questa correzione cambia soltanto copertura e documentazione: il prodotto
+mantiene le sorgenti del runtime verificato. Gli esiti CI sull’head sono
+riportati nella PR. I log completi, compresi i rossi,
 restano fuori dalla repository nella cartella `gpui-g3-<head>` sotto
 `~/Antigravity/mf-hillclimb-20261028/`. Il CSV locale identifica le sorgenti;
 non viene aggiunta una galleria in Git.
