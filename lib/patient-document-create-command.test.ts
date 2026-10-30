@@ -257,4 +257,11 @@ test('old operator receipt cannot be read in another scope or by another actor',
     const g = await fixture();
     assert.throws(() => service().receipt(g.host, f.view.commandId));
 });
+test('a deleted patient is not proposed as a duplicate', async () => {
+    const f = await fixture();
+    dbServer.insert(patients).values({ id: randomUUID(), firstName: 'Mario', lastName: 'Rossi', taxCode: f.review.taxCode.value }).run();
+    assert.throws(() => f.api.preview(f.host, f.view.viewId, { ...f.review, duplicate: 'none' }));
+    dbServer.update(patients).set({ deletedAt: new Date() }).run();
+    assert.equal(f.api.preview(f.host, f.view.viewId, { ...f.review, duplicate: 'none' }).status, 'preview');
+});
 test.after(() => { cleanup(); dbServer.$client.close(); });
