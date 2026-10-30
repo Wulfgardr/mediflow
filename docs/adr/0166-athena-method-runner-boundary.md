@@ -248,3 +248,24 @@ esecuzione. La serializzazione originale resta provata come prefisso storico,
 ma il prompt completo cambia. Il validatore V2 non cambia. Il confronto reale
 precedente non qualifica il nuovo prompt. Stato Proposed invariato; review
 della correzione, equivalenza e accettazione restano decisioni separate.
+
+## Rinvio del 30 ottobre 2026
+
+Stato **Proposed** invariato. Decisione di Leonardo: ATHENA e Treatment
+Reasoning rinviati oltre la 0.9.1; I-3, I-3b e I-7 non sono requisiti della
+release. Treatment Reasoning deve restare non disponibile agli utenti.
+
+Il replay del secondo passo deterministico nega 32/32 risposte storiche:
+14 `extraction_structure_missing`, 18 `extraction_unmapped_text`, zero
+estratti. Non converte la prosa libera senza ricostruirne contenuto o legami.
+Nessuna nuova invocazione ATHENA; il prompt libero non è stato misurato.
+Revisione umana dei grezzi ancora da svolgere: 0/32. I due giri precedenti
+hanno ciascuno 10 soglie fallite su 18. Dinieghi identici non provano qualità
+o equivalenza. Il progetto originale vieta l'uso per la cura diretta dei pazienti.
+
+La [PR #747](https://github.com/Wulfgardr/mediflow/pull/747) è chiusa, esclusa
+dalla release e recuperabile dal ramo `codex/athena-two-step`.
+Per riprendere serve scegliere fra lettura di ricerca, secondo modello che
+estrae e generazione vincolata; definire il perimetro e le prove prima di
+eseguire. Conservare corpus e 18 soglie approvati, provenienza e limiti;
+nessuna accettazione dell'ADR o ammissione clinica implicita.

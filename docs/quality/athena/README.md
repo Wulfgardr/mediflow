@@ -1,7 +1,7 @@
-# Banco sintetico ATHENA I-3b/I-7
+# Banco sintetico ATHENA, rinviato oltre la 0.9.1
 
 Corpus e soglie **approvati da Leonardo il 30/10/2026**. ADR 0166 resta Proposed.
-Nessuna misura clinica è stata eseguita su questo corpus. I casi sono inventati,
+Le misure sintetiche storiche non qualificano la funzione. I casi sono inventati,
 non derivano da cartelle reali e non sono un holdout cieco: sono visibili nel repo.
 
 ## Corpus approvato
@@ -123,3 +123,34 @@ invariato. I pesi, il corpus, il decoding e le soglie restano invariati.
 Il primo rapporto conserva valore storico e non viene sovrascritto. I nuovi
 esiti sono nel dossier del secondo giro collegato dal registro intelligence.
 ADR 0166 resta Proposed; nessun diniego identico accetta l'equivalenza.
+
+## Decisione del 30 ottobre 2026
+
+ATHENA e Treatment Reasoning escono dalla 0.9.1; I-3, I-3b e I-7 non sono
+requisiti di release. Il corpus e tutte le 18 soglie restano approvati e
+invariati. I due giri storici falliscono 10 soglie su 18 ciascuno; il replay
+deterministico successivo nega 32/32 risposte, zero estratti e zero nuove
+invocazioni. La revisione umana dei grezzi resta da svolgere (0/32).
+Il nuovo prompt libero non è stato misurato. Nessuna equivalenza dimostrata.
+
+La [PR #747](https://github.com/Wulfgardr/mediflow/pull/747) è chiusa e non
+entra; il ramo `codex/athena-two-step` resta recuperabile. ADR 0166 resta
+Proposed e descrive le tre opzioni per una ripresa. Il progetto ATHENA
+originale vieta l'uso per la cura diretta dei pazienti. Le istruzioni di
+esecuzione sopra sono conservate per una futura ripresa autorizzata.
+
+## Verifica del prodotto sul sorgente del 30 ottobre 2026
+
+Il rinvio documentale non spegne i percorsi esistenti. W-8 resta bloccata:
+il pannello Web invita ad aprire le funzioni cliniche; le preferenze Web e
+GPUI permettono l'attivazione. Il catalogo può dichiarare ATHENA disponibile
+quando lifecycle e pesi sono presenti. Il percorso ChatGPT comprende ancora
+Treatment Reasoning. Il prompt modificato da #741 è condiviso con
+l'esecuzione production, quindi non è limitato al banco sintetico.
+
+Il default è spento, ma non forza a spento una configurazione salvata.
+La presenza dei pesi da sola non supera kill switch, lifecycle e scelta del
+modello. Per garantire l'indisponibilità anche su configurazioni già attive
+serve cambiare il confine di esecuzione. La modifica si ferma prima di quel
+confine, come richiesto da Leonardo: nessuna correzione cosmetica dichiara
+la funzione spenta. Nessuna prova su archivio clinico o inferenza eseguita.
