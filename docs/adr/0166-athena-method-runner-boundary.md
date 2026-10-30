@@ -21,7 +21,12 @@ Fonti immutabili in fondo. Questa proposta non è un'ammissione clinica.
 | Come trattare 0.9.1 e prova successiva? | Tenere I-3/I-3b aperte, approvare separatamente il run locale limitato descritto sotto e decidere sui risultati. | Rinviare formalmente la funzione nel contratto di release. La sola indisponibilità non soddisfa I-3. |
 
 Accettare il disegno non autorizza il run, una distribuzione o una nuova sede
-remota. Decide Leonardo; questa PR resta in bozza e non va unita a main.
+remota.
+
+**Scelte di Leonardo del 30/10/2026.** Modulo di ricerca opzionale, con originale
+fissato e adattamento MediFlow distinto. Due passi: risposta libera, poi estrazione
+separata e rigorosa, prima deterministica. Autorizzato un solo run locale limitato sul
+disegno scelto. L'ADR resta Proposed: l'accettazione si decide sui risultati.
 
 ## Stato verificato e ipotesi
 
