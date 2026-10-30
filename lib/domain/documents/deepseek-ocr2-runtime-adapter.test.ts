@@ -156,7 +156,8 @@ test('observes a process promise returned after reentrant cancellation', async (
     await new Promise((resolve) => setImmediate(resolve));
 });
 
-test('cancels one-shot, zeroes raster retention, terminates then kills, and discards late completion', async () => {
+test('cancels one-shot, zeroes raster retention, terminates then kills, and discards late completion', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
     let release!: (value: unknown) => void; const pending = new Promise<unknown>((resolve) => { release = resolve; });
     let raster: Buffer = Buffer.alloc(0); const events: string[] = [];
     const adapter = DEEPSEEK_OCR2_OFFICIAL_ADAPTER_INTERNAL_TEST_SEAM.create(engine((value) => {
@@ -165,7 +166,8 @@ test('cancels one-shot, zeroes raster retention, terminates then kills, and disc
     const execution = adapter.execute(request()); assert.equal(adapter.cancel(), true);
     const result = await execution; assert.equal(result.reason, 'cancelled'); assert.equal(result.receipt, null);
     assert.ok(raster.byteLength > 0); assert.equal(raster.every((value: number) => value === 0), true);
-    release(output()); await new Promise((resolve) => setTimeout(resolve, 40));
+    release(output()); await new Promise((resolve) => setImmediate(resolve));
+    t.mock.timers.tick(10);
     assert.deepEqual(events, ['terminate', 'kill']); assert.equal((await adapter.execute(request())).reason, 'restart_forbidden');
     assert.equal(adapter.cancel(), false);
 });
