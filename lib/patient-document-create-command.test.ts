@@ -28,8 +28,7 @@ const { confirmNativeChatAccessPin } = load('./security/native-chat-access-confi
 const pin = ['2', '4', '6', '8'].join('');
 const service = () => createPatientDocumentCommandService(dbServer, () => tick);
 let tick = Date.now();
-async function fixture() {
-    const scope = randomUUID();
+async function fixture(scope: string = randomUUID()) {
     dbServer.insert(ambulatories).values({ id: scope, name: 'Ambulatorio sintetico', isDefault: true }).run();
     const context = syntheticNetworkPatientAuthority(dbServer, scope);
     cookies.cookies.set('ambulatory_id', scope);
@@ -236,6 +235,12 @@ test('duplicate review recognizes accented names and repeated whitespace without
     const review = { ...f.review, firstName: { action: 'correct' as const, value: 'Élena' }, lastName: { action: 'correct' as const, value: 'De Rossi' } };
     assert.throws(() => f.api.preview(f.host, f.view.viewId, review));
     f.api.preview(f.host, f.view.viewId, { ...review, duplicate: 'create-separate' });
+});
+test('existing non-UUID ambulatory identifiers retain the same reviewed destination', async () => {
+    const f = await fixture('synthetic-legacy-scope');
+    const duplicate = dbServer.select().from(patients).where(eq(patients.lastName, 'Rossi')).all().length ? 'create-separate' as const : 'none' as const;
+    f.api.preview(f.host, f.view.viewId, { ...f.review, duplicate });
+    assert.deepEqual(await f.api.execute(f.host, f.view.commandId, pin), { outcome: 'applied' });
 });
 test('old operator receipt cannot be read in another scope or by another actor', async () => {
     const f = await preview(); await f.api.execute(f.host, f.view.commandId, pin);

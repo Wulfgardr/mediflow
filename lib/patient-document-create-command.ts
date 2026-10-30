@@ -97,7 +97,8 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
     const binding = (host: PatientDocumentCreateHost, sourceId: string) => ({ session: host.session, scope: host.ambulatoryId, selection: host.epoch, resource: sourceId });
     function admit(tx: Tx, host: PatientDocumentCreateHost) {
         host.assertCurrent(tx);
-        if (!COMMAND_UUID.test(host.archiveGeneration) || !COMMAND_UUID.test(host.ambulatoryId)
+        if (!COMMAND_UUID.test(host.archiveGeneration) || typeof host.ambulatoryId !== 'string'
+            || host.ambulatoryId.length < 1 || host.ambulatoryId.length > 128 || /[\u0000-\u0020\u007f]/u.test(host.ambulatoryId)
             || !Number.isSafeInteger(host.epoch) || host.epoch < 0) return deny();
         assertArchiveGeneration(tx, host.archiveGeneration);
         if (tx.select().from(users).where(eq(users.id, host.actorRef)).get()?.role !== 'admin'
