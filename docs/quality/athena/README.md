@@ -1,12 +1,12 @@
 # Banco sintetico ATHENA I-3b/I-7
 
-Corpus e soglie **proposti**, non approvati. ADR 0166 resta Proposed.
+Corpus e soglie **approvati da Leonardo il 30/10/2026**. ADR 0166 resta Proposed.
 Nessuna misura clinica è stata eseguita su questo corpus. I casi sono inventati,
 non derivano da cartelle reali e non sono un holdout cieco: sono visibili nel repo.
 
-## Revisione richiesta a Leonardo
+## Corpus approvato
 
-Rivedere ogni caso in [`corpus.json`](../../../scripts/athena-quality/corpus.json):
+La revisione approvata comprende ogni caso in [`corpus.json`](../../../scripts/athena-quality/corpus.json):
 plausibilità, sufficienza delle fonti, negazione, incertezza, soggetto, tempo e
 risultato atteso. Le pagine sono inventate: `entry:synthetic.<caso>.p2` indica
 pagina 2 della nota inventata; il caso contraddittorio aggiunge pagina 3.
@@ -14,7 +14,7 @@ Nessuna pagina viene acquisita da documenti reali. Il metodo esistente non ha
 un campo pagina: il banco conserva la pagina nell'identificativo e nell'etichetta,
 senza cambiare il metodo o aggiungere un secondo prompt.
 
-| Caso | Esito atteso | Revisione proposta |
+| Caso | Esito atteso | Revisione approvata |
 | --- | --- | --- |
 | negazione | Proposta V2 | Sospensione ibuprofene, intolleranza solo possibile |
 | familiare | Proposta V2 | Warfarin della madre, nessun anticoagulante del paziente |
@@ -26,10 +26,10 @@ senza cambiare il metodo o aggiungere un secondo prompt.
 | revoca | Diniego al commit | Lease sintetica revocata durante la Promise del runner |
 | contesto | Diniego al commit | Revisione sintetica cambiata durante la Promise del runner |
 
-Approvare o correggere ogni riga di [soglie proposte](soglie-proposte.md).
+Tutte le righe delle [soglie approvate](soglie-proposte.md) sono approvate.
 La versione macchina è [`thresholds.json`](../../../scripts/athena-quality/thresholds.json).
 Ogni modifica richiede nuovi hash nel manifest e una nuova approvazione.
-Non modificare lo stato proposto nel repository per simulare una decisione.
+L’approvazione non attesta una misura superata o l’ammissione clinica.
 Dopo la decisione, conservare fuori Git una ricevuta con queste chiavi esatte:
 
 ```json
