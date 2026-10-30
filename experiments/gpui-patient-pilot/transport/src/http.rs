@@ -425,6 +425,9 @@ impl RuntimeClient {
                 if let Some(body) = encoded {
                     request = request.body(body.to_vec());
                 }
+                if path == ["api", "ai", "local-provider", "onboarding"] {
+                    request = request.timeout(Duration::from_secs(70));
+                }
                 let response = request.send().await.map_err(|_| uncertain(mutation))?;
                 received(response.status().as_u16(), response.headers());
                 let raw = read_response_body(
@@ -449,6 +452,11 @@ impl RuntimeClient {
                         && matches!(conflict_code(&raw.body), ConflictCode::ArchiveReplaced)
                     {
                         return Err(RuntimeError::ArchiveReplaced);
+                    }
+                    if path == ["api", "ai", "local-provider", "onboarding"]
+                        && matches!(raw.status, 409 | 503)
+                    {
+                        return Ok(raw);
                     }
                     return Err(match raw.status {
                         401 => RuntimeError::Rejected(401),

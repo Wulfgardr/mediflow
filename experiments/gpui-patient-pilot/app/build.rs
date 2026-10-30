@@ -5,6 +5,8 @@ fn main() {
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("macos") {
         return;
     }
+    println!("cargo:rerun-if-env-changed=MACOSX_DEPLOYMENT_TARGET");
+    let minimum = env::var("MACOSX_DEPLOYMENT_TARGET").unwrap_or_else(|_| "11.0".into());
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     let object = out.join("chat-access.o");
     assert!(
@@ -14,11 +16,14 @@ fn main() {
                 "-fblocks",
                 "-Wall",
                 "-Werror",
+                "-Wunguarded-availability",
+                "-Wunguarded-availability-new",
                 "-c",
                 "src/chat_access/native.m",
                 "-o"
             ])
             .arg(&object)
+            .arg(format!("-mmacosx-version-min={minimum}"))
             .status()
             .unwrap()
             .success()
