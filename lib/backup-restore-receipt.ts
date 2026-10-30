@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import Database from 'better-sqlite3';
-import { resolveDataPath } from './data-dir';
+import type Database from 'better-sqlite3';
+import { openDbServer } from './db-server';
 import { readSqliteArchiveGeneration } from './archive-generation';
 
 const PREFIX = 'archive.restore.receipt.';
@@ -19,8 +19,11 @@ export function parseRestoreIntent(request: Request): RestoreIntent | null {
 }
 function quote(value: string): string { return '"' + value.replaceAll('"', '""') + '"'; }
 export function readRestorePreviewSnapshot(): string {
-    const db = new Database(resolveDataPath('medical.db'), { readonly: true, fileMustExist: true });
-    try { return db.transaction(() => restoreSnapshot(db))(); } finally { db.close(); }
+    const db = openDbServer();
+    return db.transaction(() => restoreSnapshot(db))();
+}
+export function readCurrentRestoreReceipt(id: string): RestoreReceipt | null {
+    return readRestoreReceipt(openDbServer(), id);
 }
 export function restoreSnapshot(db: Database.Database): string {
     const hash = createHash('sha256');

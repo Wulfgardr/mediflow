@@ -14,7 +14,7 @@ o zona pericolo nativi. Non è una chiusura del contratto G-3.
 | Superficie | Autorità ed effetto |
 | --- | --- |
 | Gestione locale GPUI | Riusa cookie/control P3 e attestazione server loopback della #725. Nessuna nuova autenticazione, grant paired o attestazione alternativa. |
-| GET `/api/system/backup-restore` e POST `/api/system/backup-restore/verify` | Il primo esporta con la route esistente; il secondo mantiene il preflight senza writer. Aggiunge impronta della fonte e snapshot letto da una connessione SQLite **readonly**, in una transazione di lettura. |
+| GET `/api/system/backup-restore` e POST `/api/system/backup-restore/verify` | Il primo esporta con la route esistente; il secondo mantiene il preflight senza writer. Aggiunge impronta della fonte e snapshot letto tramite il collegamento SQLite già ammesso dal runtime, in una transazione di lettura. |
 | POST `/api/system/backup-restore` | Le sessioni local-client devono presentare identificatore, snapshot e parola `RIPRISTINA`. Lo stesso executor Web controlla lo snapshot sotto `BEGIN IMMEDIATE`, prima della cancellazione. |
 | Executor comune | Nella stessa transazione salva `archive.restore.receipt.<id>` nelle impostazioni, con impronta della fonte, generazione finale e data. Non aggiunge un secondo writer. Record, chiavi, allegati e storico seguono il contratto portabile esistente. |
 | GET `/api/system/backup-restore/receipts/[id]` | Solo amministratore Web autenticato. GPUI riapre l’autorità dopo il ripristino e confronta identificatore, fonte, origine e generazione corrente. La risposta al POST non sostituisce il GET. |
@@ -120,3 +120,12 @@ clinica. Queste prove non sono sostituite da build o test sintetici.
 
 Implementazione assistita: GPT 6.1 Sol, effort xhigh. Nessun collaboratore
 aggiuntivo; consumi non attribuibili. Nessun merge o auto-merge.
+
+
+La CI ha inoltre rifiutato il nuovo import diretto del driver per la lettura
+dello snapshot. Tale connessione è stata eliminata: anteprima e ricevuta
+usano il collegamento canonico già ammesso. Il censimento registra soltanto
+l’esatto import `openDbServer` del servizio nominato, senza nuova connessione,
+writer alternativo o accesso SQL Rust. I guard e le relative fixture negative
+sono stati rieseguiti. Le prove precedenti del writer e del codec restano
+valide; il percorso HTTP viene rieseguito per il nuovo adattatore di lettura.
