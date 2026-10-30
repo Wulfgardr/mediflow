@@ -1,5 +1,32 @@
 use super::*;
 
+thread_local! {
+    static BUTTON_IDS: std::cell::RefCell<Option<Vec<String>>> = const { std::cell::RefCell::new(None) };
+}
+
+pub(crate) fn record_button_id(id: &str) {
+    BUTTON_IDS.with(|ids| {
+        if let Some(ids) = ids.borrow_mut().as_mut() {
+            ids.push(id.to_owned());
+        }
+    });
+}
+
+pub(crate) fn button_ids(render: impl FnOnce()) -> Vec<String> {
+    struct Capture;
+    impl Drop for Capture {
+        fn drop(&mut self) {
+            BUTTON_IDS.with(|ids| *ids.borrow_mut() = None);
+        }
+    }
+    BUTTON_IDS.with(|ids| {
+        assert!(ids.borrow_mut().replace(Vec::new()).is_none());
+    });
+    let _capture = Capture;
+    render();
+    BUTTON_IDS.with(|ids| ids.borrow_mut().take().unwrap())
+}
+
 pub(super) fn observe(element: Stateful<Div>) -> gpui::AnyElement {
     Observed(element).into_any_element()
 }
