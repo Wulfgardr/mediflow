@@ -25,7 +25,9 @@ export type PreparedPatientDocument = Readonly<{
     candidates: Readonly<Partial<Record<'firstName' | 'lastName' | 'taxCode' | 'birthDate', string>>>;
 }>;
 /** Host capability, never decoded from request JSON. Rechecks the original source on every use. */
-export type PatientDocumentSourcePort = Readonly<{ readCurrent: (tx: Tx) => PreparedPatientDocument }>;
+export type PatientDocumentSourcePort = Readonly<{
+    session: object; ambulatoryId: string; readCurrent: (tx: Tx) => PreparedPatientDocument;
+}>;
 type Field = Readonly<{ action: 'approve' | 'correct'; value: string }>;
 export type PatientDocumentCreateReview = Readonly<{
     firstName: Field; lastName: Field; taxCode: Field; birthDate?: Field;
@@ -40,7 +42,8 @@ export class PatientDocumentDuplicateReviewRequired extends Error {
 }
 const deny = (): never => { throw new Error('Patient document create denied'); };
 const sealed = (value: unknown): value is string => typeof value === 'string' && /^ENC:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$/u.test(value);
-function snapshot(port: PatientDocumentSourcePort, tx: Tx): PreparedPatientDocument {
+function snapshot(port: PatientDocumentSourcePort, tx: Tx, host: PatientDocumentCreateHost): PreparedPatientDocument {
+    if (port.session !== host.session || port.ambulatoryId !== host.ambulatoryId) return deny();
     const source = port.readCurrent(tx);
     if (!source || !COMMAND_UUID.test(source.sourceId) || source.type !== 'application/pdf'
         || !sealed(source.data) || !sealed(source.name) || !sealed(source.path)
@@ -126,7 +129,7 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
     }
     return {
         open(host: PatientDocumentCreateHost, port: PatientDocumentSourcePort) {
-            const source = database.transaction(tx => { admit(tx, host); const result = snapshot(port, tx); admit(tx, host); return result; }, { behavior: 'immediate' });
+            const source = database.transaction(tx => { admit(tx, host); const result = snapshot(port, tx, host); admit(tx, host); return result; }, { behavior: 'immediate' });
             for (const view of views.values()) if (clock() - view.at >= 300_000) pending.get(view.commandId)?.release();
             if (views.size >= 128) return deny();
             const viewId = approvals.open(binding(host, source.sourceId)), commandId = randomUUID();
@@ -155,7 +158,7 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
             const patientId = randomUUID(), values = reviewed(view.source, review, patientId);
             const command = database.transaction(tx => {
                 admit(tx, host);
-                if (receipt(tx, host, view.commandId).outcome !== 'unknown' || JSON.stringify(snapshot(view.port, tx)) !== JSON.stringify(view.source)) return deny();
+                if (receipt(tx, host, view.commandId).outcome !== 'unknown' || JSON.stringify(snapshot(view.port, tx, host)) !== JSON.stringify(view.source)) return deny();
                 const duplicates = duplicateSet(tx, values);
                 if (Boolean(duplicates) !== (review.duplicate === 'create-separate')) throw new PatientDocumentDuplicateReviewRequired();
                 admit(tx, host);
@@ -178,7 +181,7 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
                     if (known.outcome !== 'unknown') return known;
                     approvals.check(preview);
                     const command = preview.command;
-                    if (preview.selection !== host.epoch || JSON.stringify(snapshot(command.port, tx)) !== JSON.stringify(command.source)
+                    if (preview.selection !== host.epoch || JSON.stringify(snapshot(command.port, tx, host)) !== JSON.stringify(command.source)
                         || duplicateSet(tx, command.values) !== command.duplicates) return deny();
                     const used = tx.select({ id: auditEvents.eventId }).from(auditEvents).where(sql`json_extract(${auditEvents.redactedMetadata}, '$.patientDocumentCreate.sourceId') = ${command.source.sourceId}`).get();
                     if (used) return deny();
