@@ -43,7 +43,7 @@ if (mode === 'receipt') {
 } else {
     const source = { sourceId: randomUUID(), name: 'ENC:bmFtZQ==:bmFtZQ==', path: 'ENC:cGF0aA==:cGF0aA==',
         data: 'ENC:c291cmNl:c291cmNl', type: 'application/pdf' as const, size: 512, identity: 'ambiguous' as const, quality: 'ready' as const, candidates: {} };
-    const view = api.open(host, { readCurrent: () => source });
+    const view = api.open(host, { session: host.session, ambulatoryId: host.ambulatoryId, readCurrent: () => source });
     api.preview(host, view.viewId, { firstName: { action: 'correct', value: 'Mario' }, lastName: { action: 'correct', value: 'Rossi' },
         taxCode: { action: 'correct', value: randomUUID() }, duplicate: 'none' });
     process.stdout.write(JSON.stringify({ commandId: view.commandId }) + '\n');

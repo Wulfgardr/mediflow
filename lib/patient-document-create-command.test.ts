@@ -48,7 +48,7 @@ async function fixture(scope: string = randomUUID()) {
     const source: PreparedPatientDocument = { sourceId: randomUUID(), name: 'ENC:bmFtZQ==:bmFtZQ==', path: 'ENC:cGF0aA==:cGF0aA==',
         data: 'ENC:c291cmNl:c291cmNl', type: 'application/pdf', size: 512, identity: 'ambiguous', quality: 'ready',
         candidates: { firstName: 'Rossi', lastName: 'Mario', taxCode: randomUUID() } };
-    const port = { readCurrent: () => { if (!current) throw new Error('Original source retired'); return source; } };
+    const port = { session: context.session, ambulatoryId: scope, readCurrent: () => { if (!current) throw new Error('Original source retired'); return source; } };
     const review: PatientDocumentCreateReview = { firstName: { action: 'correct', value: 'Mario' }, lastName: { action: 'correct', value: 'Rossi' },
         taxCode: { action: 'approve', value: source.candidates.taxCode! }, duplicate: 'none' };
     const api = service(), view = api.open(host, port);
@@ -157,7 +157,7 @@ test('unknown after restart stays unknown; foreign session cannot retire a live 
 });
 for (const quality of ['uncertain', 'ocr_error'] as const) test(`${quality}: no creation from an uncorrected extraction`, async () => {
     const f = await fixture(), api = service();
-    const source = { ...f.source, quality }, view = api.open(f.host, { readCurrent: () => source });
+    const source = { ...f.source, quality }, view = api.open(f.host, { ...f.port, readCurrent: () => source });
     const before = effects();
     assert.throws(() => api.preview(f.host, view.viewId, f.review));
     assert.deepEqual(effects(), before);
@@ -212,7 +212,7 @@ test('labelled approved fields are the only fields inserted; omitted birth date 
     const f = await fixture(), api = service();
     const source = { ...f.source, identity: 'labelled' as const,
         candidates: { firstName: 'Ada', lastName: randomUUID(), taxCode: randomUUID(), birthDate: '1950-01-02' } };
-    const view = api.open(f.host, { readCurrent: () => source });
+    const view = api.open(f.host, { ...f.port, readCurrent: () => source });
     api.preview(f.host, view.viewId, { firstName: { action: 'approve', value: source.candidates.firstName },
         lastName: { action: 'approve', value: source.candidates.lastName }, taxCode: { action: 'approve', value: source.candidates.taxCode }, duplicate: 'none' });
     assert.deepEqual(await api.execute(f.host, view.commandId, pin), { outcome: 'applied' });
@@ -241,6 +241,12 @@ test('existing non-UUID ambulatory identifiers retain the same reviewed destinat
     const duplicate = dbServer.select().from(patients).where(eq(patients.lastName, 'Rossi')).all().length ? 'create-separate' as const : 'none' as const;
     f.api.preview(f.host, f.view.viewId, { ...f.review, duplicate });
     assert.deepEqual(await f.api.execute(f.host, f.view.commandId, pin), { outcome: 'applied' });
+});
+test('a source owned by another session or creation scope cannot open a review', async () => {
+    const f = await fixture(), api = service(), before = effects();
+    assert.throws(() => api.open(f.host, { ...f.port, session: {} }));
+    assert.throws(() => api.open(f.host, { ...f.port, ambulatoryId: randomUUID() }));
+    assert.deepEqual(effects(), before);
 });
 test('old operator receipt cannot be read in another scope or by another actor', async () => {
     const f = await preview(); await f.api.execute(f.host, f.view.commandId, pin);
