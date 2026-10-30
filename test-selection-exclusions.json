@@ -45,6 +45,11 @@
     "owner": "@Wulfgardr"
   },
   {
+    "path": "e2e/fixtures/settings-closure-gallery.ts",
+    "reason": "WUL-787: galleria aggiuntiva richiamata dagli spec Impostazioni, senza test autonomi.",
+    "owner": "@Wulfgardr"
+  },
+  {
     "path": "e2e/fixtures/treatment-reasoning.ts",
     "reason": "Synthetic catalog, publication and patient factories consumed by treatment-proposal-composition.spec.ts and treatment-reasoning-fabric-review.spec.ts; no standalone test registration.",
     "owner": "@Wulfgardr"

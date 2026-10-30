@@ -1,3 +1,4 @@
+import { localUiNavigationDeadline } from './local-ui-navigation-deadline.mjs';
 import { installWebLease } from './local-ui-web-lease.mjs';
 import { installWebPairing } from './local-ui-web-pairing.mjs';
 
@@ -23,8 +24,7 @@ export function installLocalUiWebNavigation(channel, origin, open, target = glob
     }
     if (Object.keys(value).sort().join(',') !== 'expiresAt,intent,requestId,schemaVersion'
       || value.schemaVersion !== SCHEMA || !INTENTS.has(value.intent)
-      || !/^[a-f0-9-]{36}$/u.test(value.requestId) || !Number.isSafeInteger(value.expiresAt)
-      || value.expiresAt <= Date.now() || value.expiresAt > Date.now() + 8000) return;
+      || !/^[a-f0-9-]{36}$/u.test(value.requestId) || localUiNavigationDeadline(value.expiresAt) === null) return;
     currentRequestId = value.requestId;
     try {
       if (typeof publish === 'function' && publish(value.intent) === true) return true;

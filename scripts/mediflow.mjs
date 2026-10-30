@@ -18,6 +18,8 @@ import { prepareLauncherState, localUiArchiveLock } from './launcher-state.mjs';
 import { verifyOwnedWeb } from './local-ui-web-identity.mjs';
 import { pairingDirectory, readPairingRequests, bridgeExistingLocalUi, frames, writeFrame } from './local-ui-pairing-transport.mjs';
 
+import { localUiNavigationDeadline } from './local-ui-navigation-deadline.mjs';
+
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CHOICES = ['web', 'mac', 'agenti', 'sviluppo'];
 const log = message => process.stderr.write(`${message}\n`);
@@ -615,17 +617,18 @@ export async function main(args = process.argv.slice(2)) {
     }
     if (message.type !== 'mediflow-local-ui-navigate') return;
     let status = 'denied';
+    const expiresAt = localUiNavigationDeadline(message.expiresAt);
     if (Object.keys(message).sort().join(',') === 'dataDir,expiresAt,intent,requestId,sourceFingerprint,type'
       && message.dataDir === dataDir && message.sourceFingerprint === identity.sourceFingerprint
       && !pendingNavigation.has(requestId)
       && ['search', 'identity', 'history', 'prescribing'].includes(message.intent)
-      && Number.isSafeInteger(message.expiresAt) && message.expiresAt > Date.now() && message.expiresAt <= Date.now() + 8000
+      && expiresAt !== null
       && rememberNavigation(requestId)) {
       if (!state.ready && !closing && state.step !== 'errore') status = 'waiting';
       else {
         const controller = new AbortController(); navigationControllers.set(requestId, controller);
         try {
-          await navigate(message.intent, { requestId, expiresAt: message.expiresAt, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(message.expiresAt - Date.now())]) }, pair);
+          await navigate(message.intent, { requestId, expiresAt, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(Math.max(1, expiresAt - Date.now()))]) }, pair);
           status = isConnected() ? 'accepted' : 'denied';
         } catch { cancelNavigation(requestId); }
         finally { navigationControllers.delete(requestId); }

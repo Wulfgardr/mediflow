@@ -1,0 +1,59 @@
+{
+  "base": "dad877af34028b579894e301e1d69ff947263c1a",
+  "product": "561437529dad275e3abbd99a0203cfc382f43565",
+  "buildId": "rX4GjEBWp-ZUJDmE4E9QG",
+  "node": "24.18.0",
+  "abi": 137,
+  "port": 3000,
+  "pairedCaptures": 642,
+  "browser": {
+    "additional": {
+      "passed": 17,
+      "failed": 0,
+      "retries": 0,
+      "duration": "4.1m"
+    },
+    "profileRegression": {
+      "passed": 1,
+      "failed": 0,
+      "retries": 0,
+      "duration": "14.4s"
+    }
+  },
+  "unit": {
+    "passed": 20,
+    "failed": 0,
+    "skipped": 0
+  },
+  "staticChecks": [
+    "lint",
+    "typecheck",
+    "type-scale",
+    "test-selection",
+    "never-regress",
+    "claims"
+  ],
+  "backup": {
+    "flowChanged": false,
+    "restorePosts": 0,
+    "entireWarningViewport": [
+      1440,
+      2160
+    ],
+    "scrollingViewport": [
+      1440,
+      1000
+    ],
+    "zoom": 4
+  },
+  "states": {
+    "W-18a": "chiusa sul prodotto Web sintetico verificato",
+    "W-19b": "chiusa sul prodotto Web sintetico verificato",
+    "W-19e": "chiusa sul prodotto Web sintetico verificato",
+    "W-19f": "chiusa sul prodotto Web sintetico verificato",
+    "W-19k": "chiusa sul prodotto Web sintetico verificato",
+    "W-19l": "chiusa sul prodotto Web sintetico verificato",
+    "W-20c": "chiusa sul prodotto Web sintetico verificato"
+  },
+  "scope": "Interfaccia Web locale con trasporti simulati per cataloghi, provider e aggiornamenti. Nessuna qualifica di servizi reali o ammissione clinica."
+}
