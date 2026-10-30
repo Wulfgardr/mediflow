@@ -1296,7 +1296,7 @@ pub(crate) mod tests {
         if !retired {
             assert_eq!(
                 references.pending().unwrap(),
-                [id.clone()],
+                std::slice::from_ref(&id),
                 "uncertainty erased the reference"
             );
             assert_eq!(
