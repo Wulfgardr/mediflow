@@ -13,6 +13,7 @@ const WEB_ADMIN_ROUTES = [
     { file: 'app/api/system/audit/route.ts', handlers: ['GET'] },
     { file: 'app/api/system/backup-restore/route.ts', handlers: ['GET', 'POST'] },
     { file: 'app/api/system/backup-restore/verify/route.ts', handlers: ['POST'] },
+    { file: 'app/api/system/backup-restore/receipts/[id]/route.ts', handlers: ['GET'] },
     { file: 'app/api/system/backup-scheduler/route.ts', handlers: ['GET', 'POST'] },
     { file: 'app/api/system/cloud-provider-probe/route.ts', handlers: ['POST'] },
     { file: 'app/api/system/fix-orphans/route.ts', handlers: ['GET', 'POST'] },
@@ -63,6 +64,8 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
         const routeUrl = ${JSON.stringify(routeUrl)};
         const verifyUrl = ${JSON.stringify(verifyUrl)};
         const modules = new Map([
+            ['@/lib/backup-restore-receipt', ${JSON.stringify(toDataModule("export function parseRestoreIntent() { return null; } export function readRestorePreviewSnapshot() { return 'a'.repeat(64); }"))}],
+            ['@/lib/security/loopback-ingress.mjs', ${JSON.stringify(toDataModule("export function isLocalClientSession() { return false; }"))}],
             ['next/server', ${JSON.stringify(toDataModule("export const NextResponse = Response;"))}],
             ['@/lib/db-server', ${JSON.stringify(toDataModule("export const dbServer = { transaction() { globalThis.dbCalls = (globalThis.dbCalls ?? 0) + 1; throw new Error('database touched'); } };"))}],
             ['@/lib/schema', ${JSON.stringify(toDataModule(`export const ${[
@@ -81,7 +84,7 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
             ['@/lib/security/archive-write-request', ${JSON.stringify(toDataModule("export function archiveWriteRequestDenial() { return null; }"))}],
             ['@/lib/security/server-auth-policy', ${JSON.stringify(toDataModule("export function isWebAdminSession(session) { globalThis.adminCalls = (globalThis.adminCalls ?? 0) + 1; return session.role === 'admin'; }"))}],
             ['@/lib/reference-data/prosthetics-catalog-backup', ${JSON.stringify(toDataModule("export function serializeProstheticsDocument(row) { return row; }"))}],
-            ['@/lib/backup-artifact', ${JSON.stringify(toDataModule("export const BACKUP_COLLECTIONS = Object.freeze([]); export async function serializeBackupArtifact() { return '{}'; }"))}],
+            ['@/lib/backup-artifact', ${JSON.stringify(toDataModule("export const BACKUP_COLLECTIONS = Object.freeze([]); export function backupArtifactInputChecksum() { return 'b'.repeat(64); } export async function serializeBackupArtifact() { return '{}'; }"))}],
             ['@/lib/backup-patient-ambulatory-links', ${JSON.stringify(toDataModule("export function enrichBackupPatientsWithAmbulatoryLinks(rows) { return rows; }"))}],
             ['@/lib/backup-restore-preflight', ${JSON.stringify(toDataModule("export async function runBackupRestorePreflight() { globalThis.preflightCalls = (globalThis.preflightCalls ?? 0) + 1; return { artifact: { format: 'mediflow-backup', version: 1, manifest: { recordCounts: {} } }, result: { ok: true } }; }"))}],
             ['@/lib/backup-restore-executor', ${JSON.stringify(toDataModule("export class BackupRestoreBlockedError extends Error { constructor(reason, detail) { super(detail); this.reason = reason; } } export function restoreBackupArtifact(_artifact, fence) { globalThis.restoreCalls = (globalThis.restoreCalls ?? 0) + 1; if (globalThis.blockRestore) throw new BackupRestoreBlockedError('durable_review_commands', 'synthetic block'); fence(); }"))}],
