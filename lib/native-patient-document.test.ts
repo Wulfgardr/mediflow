@@ -5,6 +5,9 @@ import { createCipheriv, randomBytes, randomUUID } from 'node:crypto';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import http from 'node:http';
+import { once } from 'node:events';
+import { installLoopbackIngress, proxyLoopbackHeaders } from './security/loopback-ingress.mjs';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
@@ -48,9 +51,8 @@ async function scan(blank: boolean) {
     return { name: seal('scansione-inventata.pdf'), path: seal('scansione-inventata.pdf'), original: bytes.toString('base64'),
         data: seal(`data:application/pdf;base64,${bytes.toString('base64')}`) };
 }
-function fixture() {
-    const scope = randomUUID();
-    dbServer.insert(ambulatories).values({ id: scope, name: 'Ambulatorio inventato', isDefault: true }).run();
+function fixture(scope = randomUUID()) {
+    dbServer.insert(ambulatories).values({ id: scope, name: 'Ambulatorio inventato', isDefault: true }).onConflictDoNothing().run();
     const context = syntheticNetworkPatientAuthority(dbServer, scope);
     context.pairedClient.grantedCapabilities.push('network.replica.write-documents');
     const row = dbServer.select().from(settings).where(eq(settings.key, NETWORK_PAIRING_STATE_KEY)).get()!;
@@ -69,6 +71,33 @@ function effects() {
     return ['patients', 'patients_to_ambulatories', 'attachments'].map(table =>
         (dbServer.$client.prepare(`SELECT count(*) n FROM ${table}`).get() as { n: number }).n);
 }
+installLoopbackIngress();
+async function localPost(request: Request, extra: Record<string, string> = {}) {
+    const server = http.createServer(async (req, res) => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(Buffer.from(chunk));
+        const response = await POST(new Request('http://127.0.0.1/api/auth/native/patient-document', {
+            method: 'POST', headers: req.headers as Record<string, string>, body: Buffer.concat(chunks),
+        }));
+        res.writeHead(response.status); res.end(await response.text());
+    });
+    server.listen(0, '127.0.0.1'); await once(server, 'listening');
+    try {
+        const address = server.address() as { port: number };
+        const body = await request.text();
+        return await new Promise<Response>((resolve, reject) => {
+            const call = http.request({ hostname: '127.0.0.1', port: address.port,
+                path: new URL(request.url).pathname, method: 'POST', headers: {
+                    ...Object.fromEntries(request.headers), 'content-type': 'application/json', ...extra,
+                } }, res => {
+                let value = ''; res.on('data', chunk => { value += chunk; });
+                res.on('end', () => resolve(new Response(value, { status: res.statusCode })));
+            });
+            call.on('error', reject); call.end(body);
+        });
+    } finally { server.close(); }
+}
+
 test('real AnyDoc text PDF, native current host, PIN and readback use the single writer', async () => {
     const context = fixture(), api = createNativePatientDocumentService(dbServer), before = effects();
     const source = await document(), view = await api.stage(context, source);
@@ -106,7 +135,7 @@ test('real scanned PDF uses local Apple Vision, stays uncertain and needs manual
 });
 test('empty scan blocks native review with explicit OCR error and no patient', { skip: process.platform !== 'darwin' }, async () => {
     const context = fixture(), before = effects();
-    const response = await POST(new Request('http://127.0.0.1/api/auth/native/patient-document',
+    const response = await localPost(new Request('http://127.0.0.1/api/auth/native/patient-document',
         { method: 'POST', headers: context.request.headers, body: JSON.stringify({ operation: 'stage', source: await scan(true) }) }));
     assert.equal(response.status, 409);
     assert.deepEqual(await response.json(), { status: 'review-required', detail: 'empty_extraction' });
@@ -115,7 +144,7 @@ test('empty scan blocks native review with explicit OCR error and no patient', {
 test('native route rejects URLs, source IDs and caller candidates; returns only opaque receipt', async () => {
     const context = fixture();
     const send = async (body: unknown) => {
-        const response = await POST(new Request('http://127.0.0.1/api/auth/native/patient-document',
+        const response = await localPost(new Request('http://127.0.0.1/api/auth/native/patient-document',
             { method: 'POST', headers: context.request.headers, body: JSON.stringify(body) }));
         return { status: response.status, body: await response.json() };
     };
@@ -199,5 +228,102 @@ test('invalid and malformed PDF bytes cannot open a review or create partial rec
         await assert.rejects(api.stage(context, { ...source, original }));
         assert.deepEqual(effects(), before);
     }
+});
+test('native intake requires socket attestation and originless JSON before consuming the body', async () => {
+    const context = fixture(), before = effects();
+    const body = JSON.stringify({ operation: 'stage', source: await document() });
+    const request = (headers = {}) => new Request('http://127.0.0.1/api/auth/native/patient-document', {
+        method: 'POST', headers: { ...Object.fromEntries(context.request.headers), 'content-type': 'application/json', ...headers }, body,
+    });
+    for (const headers of [{}, { 'x-mediflow-server-loopback': 'a'.repeat(64),
+        'x-forwarded-for': '127.0.0.1', 'x-forwarded-host': 'localhost', 'x-forwarded-proto': 'https' }]) {
+        const input = request(headers);
+        assert.equal((await POST(input)).status, 403);
+        assert.equal(input.bodyUsed, false);
+    }
+    const foreign = new URL('http://127.0.0.1'); foreign.hostname = 'foreign.invalid';
+    for (const headers of [
+        { origin: foreign.origin, 'sec-fetch-site': 'cross-site' },
+        { origin: 'http://127.0.0.1' }, { 'sec-fetch-site': 'cross-site' },
+        { 'content-type': 'text/plain' },
+        { ...proxyLoopbackHeaders({ 'x-mediflow-server-loopback': 'a'.repeat(64),
+            'x-mediflow-proxy-loopback': 'a'.repeat(64), 'x-forwarded-for': '127.0.0.1',
+            host: 'localhost' }, '192.0.2.5'), 'x-mediflow-tls-proxy': 'local-api' },
+    ]) assert.equal((await localPost(request(), headers)).status, 403);
+    assert.deepEqual(effects(), before);
+    const response = await localPost(request(), {
+        ...proxyLoopbackHeaders({}, '127.0.0.1'), 'x-mediflow-tls-proxy': 'local-api',
+    });
+    assert.equal(response.status, 200);
+    const view = await response.json();
+    await localPost(new Request(request(), { body: JSON.stringify({ operation: 'revoke', commandId: view.commandId }) }));
+});
+for (const previewed of [false, true]) test(`scope A-B-A permanently retires source and approval (preview=${previewed})`, async () => {
+    const context = fixture(), api = createNativePatientDocumentService(dbServer), before = effects();
+    const view = await api.stage(context, await document());
+    if (previewed) await api.preview(context, view.commandId, view.viewId, review());
+    const scopeB = randomUUID();
+    dbServer.insert(ambulatories).values({ id: scopeB, name: 'Secondo ambulatorio sintetico' }).run();
+    cookies.cookies.set('ambulatory_id', scopeB);
+    const other = { ...context, scopeAmbulatoryId: scopeB };
+    if (previewed) await assert.rejects(api.execute(other, view.commandId, pin));
+    else await assert.rejects(api.preview(other, view.commandId, view.viewId, review()));
+    cookies.cookies.set('ambulatory_id', context.scopeAmbulatoryId);
+    if (previewed) await assert.rejects(api.execute(context, view.commandId, pin));
+    else await assert.rejects(api.preview(context, view.commandId, view.viewId, review()));
+    assert.deepEqual(effects(), before);
+    const fresh = await api.stage(context, await document());
+    await api.revoke(context, fresh.commandId);
+});
+for (const previewed of [false, true]) test(`production route retires A-B-A work (preview=${previewed})`, async () => {
+    const context = fixture(), before = effects();
+    const send = async (body: unknown) => localPost(new Request('http://127.0.0.1/api/auth/native/patient-document', {
+        method: 'POST', headers: context.request.headers, body: JSON.stringify(body),
+    }));
+    const staged = await send({ operation: 'stage', source: await document() });
+    assert.equal(staged.status, 200); const view = await staged.json();
+    const preview = { operation: 'preview', commandId: view.commandId, viewId: view.viewId, review: review() };
+    const execute = { operation: 'execute', commandId: view.commandId, pin };
+    if (previewed) assert.equal((await send(preview)).status, 200);
+    const scopeB = randomUUID();
+    dbServer.insert(ambulatories).values({ id: scopeB, name: 'Ambulatorio B sintetico' }).run();
+    cookies.cookies.set('ambulatory_id', scopeB);
+    assert.equal((await send(previewed ? execute : preview)).status, 403);
+    cookies.cookies.set('ambulatory_id', context.scopeAmbulatoryId);
+    assert.equal((await send(previewed ? execute : preview)).status, 403);
+    assert.deepEqual(effects(), before);
+});
+test('scope observed by the shared native resolver retires work even without a document request in B', async () => {
+    const context = fixture(), api = createNativePatientDocumentService(dbServer);
+    const view = await api.stage(context, await document());
+    await api.preview(context, view.commandId, view.viewId, review());
+    const scopeB = randomUUID();
+    dbServer.insert(ambulatories).values({ id: scopeB, name: 'Ambulatorio B sintetico' }).run();
+    cookies.cookies.set('ambulatory_id', scopeB);
+    const { resolveNetworkScope } = load('./network-write-context.ts') as typeof import('./network-write-context');
+    assert.equal(await resolveNetworkScope(context.session, new Request(context.request)), scopeB);
+    cookies.cookies.set('ambulatory_id', context.scopeAmbulatoryId);
+    await assert.rejects(api.execute(context, view.commandId, pin));
+});
+test('simultaneous stages reserve one source slot per session and release it on retirement/error', async () => {
+    const context = fixture(), api = createNativePatientDocumentService(dbServer), source = await document();
+    const results = await Promise.allSettled([api.stage(context, source), api.stage(context, source)]);
+    assert.equal(results.filter(x => x.status === 'fulfilled').length, 1);
+    for (const result of results) if (result.status === 'fulfilled') await api.revoke(context, result.value.commandId);
+    await assert.rejects(api.stage(context, { ...source, original: Buffer.from('%PDF-invalid').toString('base64') }));
+    const next = await api.stage(context, source); await api.revoke(context, next.commandId);
+});
+test('fifteen retained sources plus two concurrent preparations never exceed sixteen slots', async () => {
+    const api = createNativePatientDocumentService(dbServer), source = await document(), scope = randomUUID();
+    const retained = [];
+    for (let i = 0; i < 15; i++) {
+        const context = fixture(scope); retained.push({ context, view: await api.stage(context, source) });
+    }
+    const contexts = [fixture(scope), fixture(scope)];
+    const results = await Promise.allSettled(contexts.map(context => api.stage(context, source)));
+    assert.equal(results.filter(x => x.status === 'fulfilled').length, 1);
+    for (const [i, result] of results.entries()) if (result.status === 'fulfilled') retained.push({ context: contexts[i], view: result.value });
+    for (const { context, view } of retained) await api.revoke(context, view.commandId);
+    const next = await api.stage(contexts[0], source); await api.revoke(contexts[0], next.commandId);
 });
 test.after(() => { master.fill(0); cleanup(); dbServer.$client.close(); });

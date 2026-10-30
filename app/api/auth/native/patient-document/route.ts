@@ -4,12 +4,17 @@ import { nativePatientDocumentService } from '@/lib/native-patient-document-prod
 import { PatientDocumentDuplicateReviewRequired, type PatientDocumentCreateReview } from '@/lib/patient-document-create-command';
 import { COMMAND_UUID } from '@/lib/therapy-status-command-contract';
 import { NativePatientDocumentExtractionFailed } from '@/lib/native-patient-document';
+import { hasAttestedLoopbackIngress } from '@/lib/security/loopback-ingress.mjs';
 
 export const runtime = 'nodejs';
 const reply = (value: unknown, status = 200) => Response.json(value, { status,
     headers: { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
 let active = 0;
 export async function POST(request: Request): Promise<Response> {
+    // This native-only intake accepts originless clients, never browser-origin requests.
+    if (!hasAttestedLoopbackIngress(request) || request.headers.has('origin')
+        || ![null, 'none'].includes(request.headers.get('sec-fetch-site'))
+        || request.headers.get('content-type')?.toLowerCase() !== 'application/json') return reply({ status: 'denied' }, 403);
     if (active >= 2) return reply({ status: 'denied' }, 503);
     active += 1;
     try {
