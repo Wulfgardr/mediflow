@@ -89,14 +89,18 @@ La cifratura avviene nel client prima della persistenza. Il mapping comprende
 campi paziente (`address`, `phone`, `notes`, `aiSummary`, `documentInsights`),
 contenuti del diario clinico, note dei controlli, motivazioni terapeutiche,
 allegati e snapshot documentali (`summarySnapshot`,
-`parseEvidenceArtifactSnapshot`). Il formato a riposo è:
+`parseEvidenceArtifactSnapshot`). Il formato degli scrittori esistenti è:
 
 ```text
 ENC:<iv_b64>:<cipher_b64>
 ```
 
+Il solo `attachments.data` della creazione del paziente da documento può usare `ENC2:<wrap_iv_b64>:<wrapped_key_b64>:<iv_b64>:<cipher_b64>`, cifrato dal client con chiave casuale per file avvolta dalla master key. Gli scrittori esistenti mantengono `ENC:` e i dati esistenti non vengono migrati. Il contratto è nell’appendice di [ADR 0042](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md).
 
-Il server non possiede la chiave in chiaro; la master key resta nella sessione
+
+Nella sola creazione del paziente da documento, il client invia al server il PDF in chiaro per l’estrazione e la chiave del singolo file per la verifica al caricamento. Il server decifra il payload, confronta i byte prima dell’estrazione e azzera i buffer della chiave in ogni uscita. Non riceve mai la master key; terminata la verifica non può decifrare l’allegato persistito.
+
+Il server non riceve la master key; la master key resta nella sessione
 attiva del browser o del client. Identificativi e alcuni metadati rimangono
 fuori dal mapping, perciò il PIN non equivale a zero-knowledge dell’intero
 database.

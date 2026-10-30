@@ -305,6 +305,7 @@ e il PIN non abilita un perimetro zero-knowledge dell’intero database.
 Dato originale -> AES-256-GCM -> "ENC:<iv_b64>:<cipher_b64>" -> DB
 ```
 
+Il solo `attachments.data` della creazione del paziente da documento può usare `ENC2:<wrap_iv_b64>:<wrapped_key_b64>:<iv_b64>:<cipher_b64>`, cifrato dal client con chiave casuale per file avvolta dalla master key. Gli scrittori esistenti mantengono `ENC:` e i dati esistenti non vengono migrati. Il contratto è nell’appendice di [ADR 0042](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md).
 
 Il mapping è in `lib/db.ts` (ENCRYPTED_FIELDS); per i campi effettivamente
 presenti occorre verificare `lib/schema.ts`.

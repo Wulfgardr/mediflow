@@ -77,6 +77,8 @@ la KEK apre la master key, che il browser tiene in memoria e oggi anche nel
 `sessionStorage`; questa permette al client di cifrare i campi
 in `AES-256-GCM` prima di salvarli come `ENC:<iv_b64>:<cipher_b64>`.
 
+Il solo `attachments.data` della creazione del paziente da documento può usare `ENC2:<wrap_iv_b64>:<wrapped_key_b64>:<iv_b64>:<cipher_b64>`, cifrato dal client con chiave casuale per file avvolta dalla master key. Gli scrittori esistenti mantengono `ENC:` e i dati esistenti non vengono migrati. Il contratto è nell’appendice di [ADR 0042](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md).
+
 La stessa protezione riguarda gli snapshot documentali sensibili, compresi
 `summarySnapshot` e `parseEvidenceArtifactSnapshot`. Identificativi e metadati
 fuori dal mapping non vanno descritti come se fossero coperti automaticamente.

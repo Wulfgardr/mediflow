@@ -1,3 +1,4 @@
+import { isSealedAttachmentData } from './attachment-payload';
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
@@ -47,7 +48,7 @@ function snapshot(port: PatientDocumentSourcePort, tx: Tx, host: PatientDocument
     if (port.session !== host.session || port.ambulatoryId !== host.ambulatoryId) return deny();
     const source = port.readCurrent(tx);
     if (!source || !COMMAND_UUID.test(source.sourceId) || source.type !== 'application/pdf'
-        || !sealed(source.data) || !sealed(source.name) || !sealed(source.path)
+        || !isSealedAttachmentData(source.data) || !sealed(source.name) || !sealed(source.path)
         || !Number.isSafeInteger(source.size) || source.size < 1 || source.size > 20 * 1024 * 1024
         || source.data.length > 28 * 1024 * 1024
         || !['labelled', 'ambiguous'].includes(source.identity) || !['ready', 'uncertain', 'ocr_error'].includes(source.quality)) return deny();

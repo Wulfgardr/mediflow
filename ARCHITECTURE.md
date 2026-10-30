@@ -111,11 +111,13 @@ semplici metadati tecnici.
 
 Il PIN non viene persistito, ma il file SQLite non è cifrato integralmente:
 non se ne può dedurre una proprietà zero-knowledge dell’intero database.
-I valori protetti vengono salvati in questo formato:
+Gli scrittori esistenti salvano i valori protetti in questo formato:
 
 ```
 ENC:<iv_b64>:<cipher_b64>
 ```
+
+Il solo `attachments.data` della creazione del paziente da documento può usare `ENC2:<wrap_iv_b64>:<wrapped_key_b64>:<iv_b64>:<cipher_b64>`, cifrato dal client con chiave casuale per file avvolta dalla master key. Gli scrittori esistenti mantengono `ENC:` e i dati esistenti non vengono migrati. Il contratto è nell’appendice di [ADR 0042](./docs/adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md).
 
 Lo swap di manutenzione conserva una snapshot SQLite autonoma dell'originale
 in `medical.db.swap-recovery` prima di rinominare il database. La snapshot

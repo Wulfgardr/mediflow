@@ -10,6 +10,25 @@ import MediFlowCore
 /// Windows-MSVC and Linux Swift toolchains (swift-crypto) in CI.
 final class CryptoGoldenVectorsTests: XCTestCase {
 
+    func testAttachmentFileSharedVectorAndLockedState() throws {
+        let nativeDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let vector = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: nativeDir.appendingPathComponent("contracts/attachment-file-golden.v2.json"))) as? [String: Any])
+        let master = SymmetricKey(data: try XCTUnwrap(Data(base64Encoded: vector["masterKey"] as! String)))
+        let envelope = try XCTUnwrap(vector["data"] as? String)
+        let original = try XCTUnwrap(vector["original"] as? String)
+        XCTAssertEqual(PatientFieldCrypto.decryptStringField(envelope, masterKey: master), "data:application/pdf;base64," + original)
+        XCTAssertTrue(PatientFieldCrypto.isLocked(envelope, masterKey: nil))
+        XCTAssertNil(PatientFieldCrypto.decryptStringField(envelope, masterKey: nil))
+        XCTAssertTrue(PatientFieldCrypto.isLocked(envelope, masterKey: SymmetricKey(size: .bits256)))
+        for index in 1...4 {
+            var parts = envelope.components(separatedBy: ":")
+            var bytes = try XCTUnwrap(Data(base64Encoded: parts[index])); bytes[0] ^= 1
+            parts[index] = bytes.base64EncodedString()
+            XCTAssertNil(CryptoService.decryptField(parts.joined(separator: ":"), masterKey: master))
+        }
+    }
+
     private struct Fixture: Decodable {
         let version: Int
         let inputs: Inputs

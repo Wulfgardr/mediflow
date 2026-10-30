@@ -1,3 +1,4 @@
+import { isCiphertext, openPatientDocumentFile } from './security/attachment-file-envelope';
 import { decryptData } from './security/security';
 
 /** The restore replaces every clinical record: refuse it before the request when its ciphertext cannot be read. */
@@ -13,6 +14,9 @@ const camel = (table: string) => table.replace(/_([a-z])/g, (_, letter: string) 
 const COLLECTION_OF: Record<string, string> = { siss_handoff_events: 'sissHandoffs' };
 
 async function readable(value: string, masterKey: CryptoKey | null): Promise<boolean> {
+    if (value.startsWith('ENC2:')) {
+        try { return masterKey !== null && Boolean(await openPatientDocumentFile(value, masterKey)); } catch { return false; }
+    }
     const [, iv, ciphertext, ...rest] = value.split(':');
     return masterKey !== null && Boolean(iv) && Boolean(ciphertext) && rest.length === 0
         && await decryptData(ciphertext, iv, masterKey) !== null;
@@ -38,7 +42,7 @@ export async function assertBackupReadableWithKey(
             if (!row || typeof row !== 'object') continue;
             for (const field of fields) {
                 const value = (row as Record<string, unknown>)[field];
-                if (typeof value !== 'string' || !value.startsWith('ENC:') || await readable(value, masterKey)) continue;
+                if (typeof value !== 'string' || !isCiphertext(value) || await readable(value, masterKey)) continue;
                 throw new BackupRestoreKeyError(
                     'Ripristino non avviato: questo backup contiene dati cifrati con una chiave diversa da quella sbloccata. '
                     + 'I dati attuali non sono stati toccati. Sblocca con le credenziali con cui il backup è stato creato e riprova.',

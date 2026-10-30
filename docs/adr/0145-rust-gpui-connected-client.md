@@ -94,7 +94,7 @@ Il client riproduce il contratto v3 dell'ADR 0143, usando i vettori dorati
 già condivisi tra Web e Swift: NFKC, PBKDF2-HMAC-SHA256, HKDF-SHA256,
 verificatore e AES-GCM. Invia il verificatore, non la passphrase. La master
 key e la sessione restano in memoria; nessun file di preferenze contiene
-passphrase o chiave. Il formato dei campi cifrati resta `ENC:iv:data`.
+passphrase o chiave. Gli scrittori esistenti mantengono `ENC:iv:data`. Dal 30 ottobre 2026 i lettori riconoscono anche `ENC2:` per il solo contenuto degli allegati creati da documento (ADR 0042); il client GPUI di questa route resta da realizzare.
 Il client deve distinguere un dato non decifrabile da un campo vuoto.
 
 Il collegamento del dispositivo e l'accesso dell'operatore sono due passaggi
