@@ -1,16 +1,20 @@
 use super::*;
-use crate::chat_access::references::CommandReferences;
+use crate::chat_access::references::{CommandReferences, ReferenceScan};
 use crate::chat_access::{
     self,
     owner::{Pending, State},
 };
 use mediflow_runtime_client::ChatTherapyResolution;
-use std::time::Duration;
+use std::{collections::BTreeMap, time::Duration};
 
 pub(super) struct ChatAccess {
     listener: Option<chat_access::Listener>,
     references: CommandReferences,
-    recovery_messages: Vec<ChatTherapyResolution>,
+    recovery_messages: BTreeMap<String, ChatTherapyResolution>,
+    recovery_namespace: Option<String>,
+    recovery_error: bool,
+    recovery_busy: bool,
+    owner: Option<(String, RuntimeSession)>,
     recovery_epoch: u64,
     pending: Option<Pending>,
     patient: mediflow_patient_client::PersonName,
@@ -30,7 +34,11 @@ impl ChatAccess {
         Self {
             listener: chat_access::Listener::configured(),
             references: CommandReferences::new(directory),
-            recovery_messages: Vec::new(),
+            recovery_messages: BTreeMap::new(),
+            recovery_namespace: None,
+            recovery_error: false,
+            recovery_busy: false,
+            owner: None,
             recovery_epoch: 0,
             pending: None,
             patient: mediflow_patient_client::PersonName::default(),
@@ -51,18 +59,36 @@ impl ChatAccess {
             last_state: None,
         }
     }
-    fn unattached_commands(&self, session: &RuntimeSession) -> std::io::Result<Vec<String>> {
-        let active = self.pending.as_ref().and_then(|p| {
-            p.lock().ok().and_then(|p| {
-                p.therapy()
-                    .and_then(|t| t.selected.as_ref().map(|s| s.1.clone()))
-            })
-        });
-        self.references.for_session(session).pending().map(|ids| {
-            ids.into_iter()
-                .filter(|id| Some(id) != active.as_ref())
-                .collect()
+    fn owns_session(&self, session: &RuntimeSession) -> bool {
+        self.owner.as_ref().is_some_and(|(namespace, owner)| {
+            !owner.is_locked()
+                && !session.is_locked()
+                && *namespace == session.chat_therapy_reference_namespace()
         })
+    }
+    fn unattached_commands(&self, session: &RuntimeSession) -> std::io::Result<ReferenceScan> {
+        let active = self
+            .pending
+            .as_ref()
+            .filter(|_| self.owns_session(session))
+            .and_then(|p| {
+                p.lock().ok().and_then(|p| {
+                    p.therapy()
+                        .and_then(|t| t.selected.as_ref().map(|s| s.1.clone()))
+                })
+            });
+        let mut scan = self.references.for_session(session).scan()?;
+        scan.ids.retain(|id| Some(id) != active.as_ref());
+        Ok(scan)
+    }
+    pub(super) fn detach(&mut self, cx: &mut App) {
+        self.retire(cx);
+        if let Some(pending) = self.pending.take()
+            && let Ok(mut pending) = pending.lock()
+        {
+            pending.detach();
+        }
+        self.owner = None;
     }
     pub(super) fn retire(&mut self, cx: &mut App) {
         if let Some(pending) = self.pending.as_ref()
@@ -84,6 +110,9 @@ impl ChatAccess {
         self.archive.clear();
         self.last_state = None;
         self.recovery_messages.clear();
+        self.recovery_namespace = None;
+        self.recovery_error = false;
+        self.recovery_busy = false;
         self.recovery_epoch = self.recovery_epoch.wrapping_add(1);
         self.message = None;
         self.pin.update(cx, |input, cx| input.set_content("", cx));
@@ -111,6 +140,15 @@ impl ClinicalApp {
     }
 
     fn poll_chat_access(&mut self, cx: &mut Context<Self>) {
+        if self.chat_access.pending.is_some()
+            && self
+                .session
+                .as_ref()
+                .is_none_or(|s| !self.chat_access.owns_session(s))
+        {
+            self.chat_access.detach(cx);
+            cx.notify();
+        }
         let status = self.chat_access.pending.as_ref().and_then(|p| {
             p.lock().ok().map(|mut p| {
                 (
@@ -172,10 +210,12 @@ impl ClinicalApp {
                 }
                 if pending
                     .lock()
-                    .is_ok_and(|mut pending| pending.bind(session, context))
+                    .is_ok_and(|mut pending| pending.bind(session.clone(), context))
                 {
                     let preparing = pending.clone();
                     std::thread::spawn(move || crate::chat_access::owner::prepare_card(&preparing));
+                    self.chat_access.owner =
+                        Some((session.chat_therapy_reference_namespace(), session.clone()));
                     self.chat_access.patient = patient;
                     self.chat_access.archive = archive;
                     self.chat_access.pending = Some(pending);
@@ -253,92 +293,128 @@ impl ClinicalApp {
         cx.notify();
     }
 
-    pub(super) fn chat_recovery_view(&self, cx: &Context<Self>) -> Option<Stateful<Div>> {
-        let session = self.session.as_ref()?;
-        let recovery = self.chat_access.unattached_commands(session);
-        if self.session.is_some()
-            && (!recovery.as_ref().is_ok_and(|ids| ids.is_empty())
-                || !self.chat_access.recovery_messages.is_empty())
-        {
-            let messages = if self.chat_access.recovery_messages.is_empty() {
-                vec![ChatTherapyResolution::Uncertain]
-            } else {
-                self.chat_access.recovery_messages.clone()
-            };
-            return Some(
-                div()
-                    .id("native-chat-recovery")
-                    .flex()
-                    .flex_col()
-                    .gap(px(12.))
-                    .p(px(20.))
-                    .children(messages.into_iter().enumerate().map(|(index, message)| {
-                        notice(
-                            format!("native-chat-recovery-warning-{index}"),
-                            message.message(),
-                            self.theme,
-                            message == ChatTherapyResolution::Uncertain,
-                        )
-                    }))
-                    .child(
-                        button(
-                            "native-chat-recovery-reread",
-                            "Rileggi esito e completa il ritiro",
-                            self.theme,
-                            false,
-                            self.scope.is_some(),
-                        )
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            let Some(session) = this.session.clone() else {
-                                return;
-                            };
-                            let Some(scope) = this.scope.clone() else {
-                                return;
-                            };
-                            let ids = this
-                                .chat_access
-                                .unattached_commands(&session)
-                                .unwrap_or_default();
-                            let references = this.chat_access.references.for_session(&session);
-                            let epoch = this.chat_access.recovery_epoch;
-                            let task = cx.background_executor().spawn(async move {
-                                let mut resolutions = Vec::new();
-                                for id in ids {
-                                    let resolution = session
-                                        .recover_chat_therapy_command(&scope, &id)
-                                        .map_or(ChatTherapyResolution::Uncertain, |r| {
-                                            r.reconcile()
-                                        });
-                                    if let ChatTherapyResolution::Confirmed(outcome) = resolution {
-                                        let _ = references.confirm(&id, outcome);
-                                    }
-                                    resolutions.push(resolution);
-                                }
-                                if resolutions.is_empty() {
-                                    resolutions.push(ChatTherapyResolution::Uncertain);
-                                }
-                                resolutions
-                            });
-                            cx.spawn(async move |this, cx| {
-                                let resolutions = task.await;
-                                let _ = this.update(cx, |this, cx| {
-                                    if this.session.is_some()
-                                        && this.chat_access.recovery_epoch == epoch
-                                    {
-                                        this.chat_access.recovery_messages = resolutions;
-                                        cx.notify();
-                                    }
-                                });
-                            })
-                            .detach();
-                        })),
-                    ),
-            );
+    fn reread_chat_recovery(&mut self, cx: &mut Context<Self>) {
+        if self.chat_access.recovery_busy {
+            return;
         }
-        None
+        let Some(session) = self.session.clone().filter(|s| !s.is_locked()) else {
+            return;
+        };
+        let Some(scope) = self.scope.clone() else {
+            return;
+        };
+        let scan = match self.chat_access.unattached_commands(&session) {
+            Ok(scan) => scan,
+            Err(_) => {
+                self.chat_access.recovery_error = true;
+                cx.notify();
+                return;
+            }
+        };
+        self.chat_access.recovery_error = false;
+        if scan.ids.is_empty() {
+            cx.notify();
+            return;
+        }
+        self.chat_access.recovery_busy = true;
+        let namespace = session.chat_therapy_reference_namespace();
+        if self.chat_access.recovery_namespace.as_ref() != Some(&namespace) {
+            self.chat_access.recovery_messages.clear();
+        }
+        self.chat_access.recovery_namespace = Some(namespace.clone());
+        self.chat_access.recovery_error = false;
+        let references = self.chat_access.references.for_session(&session);
+        let epoch = self.chat_access.recovery_epoch;
+        let task = cx.background_executor().spawn(async move {
+            let mut resolutions = BTreeMap::new();
+            let mut storage_error = false;
+            for id in scan.ids {
+                let resolution = session
+                    .recover_chat_therapy_command(&scope, &id)
+                    .map_or(ChatTherapyResolution::Uncertain, |r| r.reconcile());
+                if let ChatTherapyResolution::Confirmed(outcome) = resolution {
+                    storage_error |= references.confirm(&id, outcome).is_err();
+                }
+                resolutions.insert(id, resolution);
+            }
+            (resolutions, storage_error, session)
+        });
+        cx.spawn(async move |this, cx| {
+            let (resolutions, storage_error, owner) = task.await;
+            let _ = this.update(cx, |this, cx| {
+                if !owner.is_locked()
+                    && this.session.as_ref().is_some_and(|s| {
+                        !s.is_locked() && s.chat_therapy_reference_namespace() == namespace
+                    })
+                    && this.chat_access.recovery_epoch == epoch
+                {
+                    this.chat_access.recovery_busy = false;
+                    this.chat_access.recovery_messages.extend(resolutions);
+                    this.chat_access.recovery_error = storage_error;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+        cx.notify();
+    }
+
+    pub(super) fn chat_recovery_view(&self, cx: &Context<Self>) -> Option<Stateful<Div>> {
+        let session = self.session.as_ref().filter(|s| !s.is_locked())?;
+        let recovery = self.chat_access.unattached_commands(session);
+        let mut messages = if self.chat_access.recovery_namespace.as_ref()
+            == Some(&session.chat_therapy_reference_namespace())
+        {
+            self.chat_access.recovery_messages.clone()
+        } else {
+            BTreeMap::new()
+        };
+        let mut storage_error = self.chat_access.recovery_error || recovery.is_err();
+        let mut invalid = false;
+        let mut pending = false;
+        if let Ok(scan) = recovery {
+            pending = !scan.ids.is_empty();
+            invalid = !scan.invalid.is_empty();
+            for id in scan.ids {
+                messages
+                    .entry(id)
+                    .or_insert(ChatTherapyResolution::Uncertain);
+            }
+        }
+        storage_error |= invalid;
+        if messages.is_empty() && !storage_error {
+            return None;
+        }
+        let confirmed = messages
+            .values()
+            .any(|r| matches!(r, ChatTherapyResolution::Confirmed(_)));
+        Some(div().id("native-chat-recovery").flex().flex_col().gap(px(12.)).p(px(20.))
+            .children(messages.into_iter().enumerate().map(|(index, (id, resolution))|
+                notice(format!("native-chat-recovery-warning-{index}"), format!("Comando {id}: {}", resolution.message()), self.theme, resolution == ChatTherapyResolution::Uncertain)))
+            .when(storage_error, |el| el.child(notice("native-chat-recovery-storage", "Problema di conservazione locale dei riferimenti. Gli esiti confermati restano confermati; i comandi validi possono essere riletti. Accantonare un elemento locale non conferma il ritiro sul server.", self.theme, true)))
+            .when(pending, |el| el.child(button("native-chat-recovery-reread", "Rileggi esito e completa il ritiro", self.theme, false, self.scope.is_some() && !self.chat_access.recovery_busy)
+                .on_click(cx.listener(|this, _, _, cx| this.reread_chat_recovery(cx)))))
+            .when(storage_error && !pending, |el| el.child(button("native-chat-recovery-retry-storage", "Riprova lettura riferimenti locali", self.theme, false, self.scope.is_some())
+                .on_click(cx.listener(|this, _, _, cx| this.reread_chat_recovery(cx)))))
+            .when(invalid, |el| el.child(button("native-chat-recovery-quarantine", "Accantona gli elementi locali non validi", self.theme, false, true)
+                .on_click(cx.listener(|this, _, _, cx| {
+                    if let Some(session) = this.session.as_ref().filter(|s| !s.is_locked()) {
+                        this.chat_access.recovery_error = this.chat_access.references.for_session(session).quarantine_invalid().is_err();
+                    }
+                    cx.notify();
+                }))))
+            .when(confirmed, |el| el.child(button("native-chat-recovery-dismiss", "Chiudi gli esiti confermati", self.theme, false, true)
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.chat_access.recovery_messages.retain(|_, r| !matches!(r, ChatTherapyResolution::Confirmed(_)));
+                    cx.notify();
+                })))))
     }
 
     pub(super) fn chat_access_view(&self, cx: &Context<Self>) -> Option<Stateful<Div>> {
+        let session = self.session.as_ref()?;
+        if !self.chat_access.owns_session(session) {
+            return None;
+        }
         let pending = self.chat_access.pending.as_ref()?;
         let (state, app) = pending.lock().ok().map(|mut p| (p.status(), p.app()))?;
         if state == State::Withdrawn {
@@ -422,6 +498,7 @@ mod tests {
     use super::*;
     use gpui::EntityInputHandler;
 
+    #[cfg(target_os = "macos")]
     #[gpui::test]
     fn reopened_authenticated_shell_shows_unresolved_command_without_a_live_request(
         cx: &mut gpui::TestAppContext,
@@ -485,5 +562,273 @@ mod tests {
             input.set_content("", cx);
             assert!(input.value().is_empty());
         });
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod recovery_regressions {
+    use super::*;
+    use mediflow_runtime_client::ChatTherapyOutcome;
+    const A: &str = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const B: &str = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    fn directory() -> std::path::PathBuf {
+        std::env::temp_dir().canonicalize().unwrap().join(format!(
+            "mf729-giro3-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ))
+    }
+    fn click(cx: &mut gpui::VisualTestContext, label: &'static str) {
+        super::super::notes_recovery_tests::draw(cx);
+        let target = cx.debug_bounds(label).expect("control rendered");
+        cx.simulate_click(target.center(), gpui::Modifiers::default());
+        cx.run_until_parked();
+    }
+    fn painted(cx: &mut gpui::VisualTestContext) -> Vec<String> {
+        let _probe = super::super::rendered_command::begin_inks();
+        super::super::notes_recovery_tests::draw(cx);
+        super::super::rendered_command::take_inks()
+            .into_iter()
+            .map(|ink| ink.label)
+            .collect()
+    }
+    #[gpui::test]
+    fn logout_detaches_uncertain_request_and_renders_login(cx: &mut gpui::TestAppContext) {
+        let directory = directory();
+        let (session, _host) = crate::chat_access::owner::tests::native_session();
+        let references = CommandReferences::new(Some(directory.clone()));
+        let (pending, _remote) = crate::chat_access::owner::tests::unresolved_request(
+            session.clone(),
+            references.clone(),
+        );
+        let (app, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        cx.simulate_resize(gpui::size(px(1440.), px(1200.)));
+        app.update(cx, |app, cx| {
+            app.chat_access = ChatAccess::new(app.theme, Some(directory.clone()), cx);
+            app.chat_access.owner =
+                Some((session.chat_therapy_reference_namespace(), session.clone()));
+            app.chat_access.pending = Some(pending.clone());
+            app.session = Some(session.clone());
+            assert!(app.chat_access_view(cx).is_some());
+            app.disconnect(cx);
+            assert!(app.session.is_none());
+            assert!(
+                app.chat_access.pending.is_none(),
+                "logout retained the old Request"
+            );
+            assert!(app.chat_access_view(cx).is_none());
+            assert_eq!(references.for_session(&session).pending().unwrap(), [A]);
+            assert!(
+                pending.lock().unwrap().begin().is_none(),
+                "logout retained execute authority"
+            );
+            pending.lock().unwrap().revoke();
+            assert_eq!(
+                pending.lock().unwrap().status(),
+                State::Therapy(ChatTherapyResolution::Uncertain),
+                "detached Request used a closed session to reconcile"
+            );
+        });
+        let labels = painted(cx);
+        assert!(!labels.iter().any(|s| s.contains(A)));
+        assert!(
+            cx.debug_bounds("control-label:Continua con l'accesso")
+                .is_some(),
+            "login is hidden"
+        );
+        let reopened = crate::chat_access::owner::tests::relogin(&session);
+        app.update(cx, |app, cx| {
+            app.session = Some(reopened);
+            app.scope = Some("scope-a".into());
+            assert!(app.chat_access.pending.is_none());
+            assert!(app.chat_recovery_view(cx).is_some());
+        });
+        click(cx, "control-label:Rileggi esito e completa il ritiro");
+        assert!(
+            references
+                .for_session(&session)
+                .pending()
+                .unwrap()
+                .is_empty(),
+            "new login did not recover the original partition"
+        );
+        assert!(
+            painted(cx)
+                .iter()
+                .any(|s| s.contains(A) && s.contains("Modifica registrata"))
+        );
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+    #[gpui::test]
+    fn owner_change_hides_and_detaches_previous_request(cx: &mut gpui::TestAppContext) {
+        let directory = directory();
+        let (first, _host1) = crate::chat_access::owner::tests::native_session_as("first-operator");
+        let (second, _host2) =
+            crate::chat_access::owner::tests::native_session_as("second-operator");
+        let references = CommandReferences::new(Some(directory.clone()));
+        let (pending, _remote) =
+            crate::chat_access::owner::tests::unresolved_request(first.clone(), references.clone());
+        let (app, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        app.update(cx, |app, cx| {
+            app.chat_access = ChatAccess::new(app.theme, Some(directory.clone()), cx);
+            app.chat_access.owner = Some((first.chat_therapy_reference_namespace(), first.clone()));
+            app.chat_access.pending = Some(pending);
+            app.session = Some(second.clone());
+            assert!(
+                app.chat_access_view(cx).is_none(),
+                "old reference escaped its owner partition"
+            );
+            app.poll_chat_access(cx);
+            assert!(app.chat_access.pending.is_none());
+            assert!(app.chat_recovery_view(cx).is_none());
+            assert!(
+                references
+                    .for_session(&second)
+                    .pending()
+                    .unwrap()
+                    .is_empty()
+            );
+            assert_eq!(references.for_session(&first).pending().unwrap(), [A]);
+            app.session = Some(first);
+            assert!(
+                app.chat_recovery_view(cx).is_some(),
+                "original partition lost durable recovery"
+            );
+        });
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+    #[gpui::test]
+    fn reread_confirmed_command_is_not_uncertain_and_new_command_stays_visible(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let directory = directory();
+        let (session, _host) = crate::chat_access::owner::tests::native_session();
+        let references = CommandReferences::new(Some(directory.clone())).for_session(&session);
+        references.remember(A).unwrap();
+        let (app, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        cx.simulate_resize(gpui::size(px(1440.), px(1200.)));
+        app.update(cx, |app, cx| {
+            app.chat_access = ChatAccess::new(app.theme, Some(directory.clone()), cx);
+            app.session = Some(session);
+            app.scope = Some("scope-a".into());
+        });
+        click(cx, "control-label:Rileggi esito e completa il ritiro");
+        app.read_with(cx, |app, _| {
+            assert!(references.pending().unwrap().is_empty());
+            assert_eq!(
+                app.chat_access.recovery_messages.get(A),
+                Some(&ChatTherapyResolution::Confirmed(
+                    ChatTherapyOutcome::Applied
+                ))
+            );
+        });
+        app.update(cx, |app, cx| app.reread_chat_recovery(cx));
+        cx.run_until_parked();
+        assert!(
+            !painted(cx)
+                .iter()
+                .any(|s| s.contains("Il ritiro non è confermato")),
+            "empty reread fabricated an uncertainty"
+        );
+        assert!(
+            cx.debug_bounds("control-label:Rileggi esito e completa il ritiro")
+                .is_none()
+        );
+        references.remember(B).unwrap();
+        let labels = painted(cx);
+        assert!(
+            labels
+                .iter()
+                .any(|s| s.contains(B) && s.contains("Esito da verificare")),
+            "new pending command hidden behind old receipt"
+        );
+        assert!(
+            labels
+                .iter()
+                .any(|s| s.contains(A) && s.contains("Modifica registrata"))
+        );
+        click(cx, "control-label:Chiudi gli esiti confermati");
+        let labels = painted(cx);
+        assert!(!labels.iter().any(|s| s.contains(A)));
+        assert!(
+            labels
+                .iter()
+                .any(|s| s.contains(B) && s.contains("Esito da verificare"))
+        );
+        click(cx, "control-label:Rileggi esito e completa il ritiro");
+        click(cx, "control-label:Chiudi gli esiti confermati");
+        app.update(cx, |app, cx| assert!(app.chat_recovery_view(cx).is_none()));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+    #[gpui::test]
+    fn incomplete_marker_does_not_block_shell_recovery_or_claim_withdrawal(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        let directory = directory();
+        let (session, _host) = crate::chat_access::owner::tests::native_session();
+        let references = CommandReferences::new(Some(directory.clone())).for_session(&session);
+        references.remember(A).unwrap();
+        let partition = directory.join(session.chat_therapy_reference_namespace());
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(partition.join(B))
+            .unwrap();
+        let (app, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        cx.simulate_resize(gpui::size(px(1440.), px(1200.)));
+        app.update(cx, |app, cx| {
+            app.chat_access = ChatAccess::new(app.theme, Some(directory.clone()), cx);
+            app.session = Some(session);
+            app.scope = Some("scope-a".into());
+        });
+        assert!(
+            painted(cx)
+                .iter()
+                .any(|s| s.contains("Problema di conservazione locale"))
+        );
+        click(cx, "control-label:Rileggi esito e completa il ritiro");
+        assert!(
+            references.pending().unwrap().is_empty(),
+            "incomplete marker blocked valid command recovery"
+        );
+        let labels = painted(cx);
+        assert!(
+            labels
+                .iter()
+                .any(|s| s.contains(A) && s.contains("Modifica registrata"))
+        );
+        assert!(
+            labels
+                .iter()
+                .any(|s| s.contains("Problema di conservazione locale"))
+        );
+        click(cx, "control-label:Accantona gli elementi locali non validi");
+        assert!(references.scan().unwrap().invalid.is_empty());
+        click(cx, "control-label:Chiudi gli esiti confermati");
+        app.update(cx, |app, cx| assert!(app.chat_recovery_view(cx).is_none()));
+        std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o755)).unwrap();
+        app.update(cx, |app, cx| app.reread_chat_recovery(cx));
+        let labels = painted(cx);
+        assert!(
+            labels
+                .iter()
+                .any(|s| s.contains("Problema di conservazione locale"))
+        );
+        assert!(
+            !labels
+                .iter()
+                .any(|s| s.contains("Il ritiro non è confermato"))
+        );
+        std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }

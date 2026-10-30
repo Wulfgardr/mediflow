@@ -1,5 +1,5 @@
 use super::native::{self, Peer};
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 use mediflow_runtime_client::ChatTherapyOutcome;
 use mediflow_runtime_client::{
     ChatAccessContext, ChatTherapyRecovery, ChatTherapyResolution, RuntimeSession,
@@ -164,6 +164,10 @@ impl Request {
             self.therapy = None;
         }
         self.binding = None;
+    }
+    pub(crate) fn detach(&mut self) {
+        self.withdraw();
+        self.recovery = None;
     }
     pub(crate) fn revoke(&mut self) {
         if self.state == State::Therapy(ChatTherapyResolution::Uncertain) {
@@ -499,6 +503,10 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn native_session() -> (RuntimeSession, Host) {
+        native_session_as("synthetic-user")
+    }
+    pub(crate) fn native_session_as(user: &str) -> (RuntimeSession, Host) {
+        let user = user.to_owned();
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         listener.set_nonblocking(true).unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
@@ -561,7 +569,7 @@ pub(crate) mod tests {
                 } else if first.starts_with("POST /api/auth/native/login ") {
                     (
                         200,
-                        json!({"success":true,"id":"synthetic-user","username":"synthetic","role":"admin",
+                        json!({"success":true,"id":user,"username":"synthetic","role":"admin",
                         "archiveGeneration":"synthetic-generation","salt":vector["salt"],"encryptedMasterKey":vector["wrappedMasterKey"]}),
                     )
                 } else if first.starts_with("GET /api/v1/network/capabilities ") {
@@ -578,7 +586,7 @@ pub(crate) mod tests {
                     (
                         200,
                         json!({"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},
-                        "operator":{"userId":"synthetic-user","authChannel":"native"}}),
+                        "operator":{"userId":user,"authChannel":"native"}}),
                     )
                 } else if first.starts_with("GET /api/v1/network/patients/patient-a/therapies ") {
                     (
@@ -647,6 +655,64 @@ pub(crate) mod tests {
                 worker: Some(worker),
             },
         )
+    }
+
+    pub(crate) fn relogin(previous: &RuntimeSession) -> RuntimeSession {
+        let vector: Value = serde_json::from_str(include_str!(
+            "../../../../../native/contracts/crypto-golden-vectors.v3.json"
+        ))
+        .unwrap();
+        let session = RuntimeClient::new(RuntimeConfig {
+            base_url: previous.base_url().into(),
+            tls_pin_sha256: None,
+        })
+        .unwrap()
+        .login(
+            PairingCredentials::new("synthetic-chat-client", "b".repeat(32)).unwrap(),
+            "synthetic",
+            vector["passphrase"].as_str().unwrap(),
+        )
+        .unwrap();
+        session.list_ambulatories().unwrap();
+        session
+    }
+
+    pub(crate) fn unresolved_request(
+        session: RuntimeSession,
+        references: super::super::references::CommandReferences,
+    ) -> (Pending, UnixStream) {
+        let (a, remote) = UnixStream::pair().unwrap();
+        let id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+        let pending = Request::for_receipt(Peer::test_peer(), a, id).unwrap();
+        {
+            let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+            let mut p = pending.lock().unwrap();
+            p.references = references;
+            assert!(p.bind(session.clone(), context.clone()));
+            p.references.remember(id).unwrap();
+            p.recovery = Some(session.chat_therapy_recovery(&context, id).unwrap());
+            p.state = State::Therapy(ChatTherapyResolution::Uncertain);
+        }
+        (pending, remote)
+    }
+
+    #[test]
+    fn detached_request_cannot_reuse_its_previous_session_for_recovery() {
+        let (session, _host) = native_session();
+        let (pending, _remote) = unresolved_request(
+            session,
+            super::super::references::CommandReferences::default(),
+        );
+        let mut pending = pending.lock().unwrap();
+        pending.detach();
+        pending.revoke();
+        assert_eq!(
+            pending.status(),
+            State::Therapy(ChatTherapyResolution::Uncertain),
+            "detached Request kept the previous recovery session"
+        );
+        assert!(pending.begin().is_none());
+        assert_eq!(pending.safe_result().unwrap()["outcome"], "unknown");
     }
 
     fn synthetic_request() -> (Pending, UnixStream) {
