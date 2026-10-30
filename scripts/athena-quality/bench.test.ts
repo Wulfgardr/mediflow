@@ -47,7 +47,13 @@ test('CLI self-test refuses the unavailable release and remote venues before exe
     assert.match(clean.stderr, /Non disponibile in questa versione/);
     const denied = spawnSync(process.execPath, [fileURLToPath(launcher), '--self-test', '--venue', 'chatgpt'], { encoding: 'utf8' });
     assert.equal(denied.status, 1);
-    assert.match(denied.stderr, /ADR_0166_NOT_ACCEPTED|REMOTE_VENUE_NOT_IMPLEMENTED/);
+    assert.match(denied.stderr, /Non disponibile in questa versione/);
+    for (const mode of ['--run', '--preflight']) {
+        const result = spawnSync(process.execPath, [fileURLToPath(launcher), mode, '--approval', '/missing-synthetic-approval'], { encoding: 'utf8' });
+        assert.equal(result.status, 1);
+        assert.match(result.stderr, /Non disponibile in questa versione/);
+        assert.doesNotMatch(result.stderr, /ENOENT|MLX_UNAVAILABLE|NETWORK_DENIAL_NOT_VERIFIED/);
+    }
 });
 
 test('release denial precedes even an unavailable runner without retry or fallback', async () => {

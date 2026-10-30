@@ -823,6 +823,6 @@
     "pullRequest": "https://github.com/Wulfgardr/mediflow/pull/747",
     "branch": "codex/athena-two-step",
     "corpusAnd18Thresholds": "approved_unchanged",
-    "runtimeBlocker": "activation_and_execution_paths_still_present"
+    "runtimeBlocker": "release_denial_implemented_surface_acceptance_pending"
   }
 }

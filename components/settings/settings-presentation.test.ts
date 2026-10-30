@@ -42,9 +42,10 @@ test('account card distinguishes informative account, demo, opt-in ordinary func
     assert.match(text(boundary), /scelta esplicita[\s\S]*consenso[\s\S]*contenuto esatto[\s\S]*OpenAI[\s\S]*revisione/i);
     assert.match(text(boundary), /non verifica[\s\S]*sessione/i);
     assert.match(text(boundary), /dati sanitari reali[\s\S]*non autorizza/i);
-    for (const id of ['patient_insight', 'smart_import', 'document_synthesis', 'treatment_reasoning'] as const) {
+    for (const id of ['patient_insight', 'smart_import', 'document_synthesis'] as const) {
         assert.ok(text(boundary).includes(FUNCTION_META[id].title));
     }
+    assert.match(text(boundary), /La revisione del trattamento non è disponibile in questa versione/);
     assert.doesNotMatch(visible, /ADR\s?0134|data_boundary_unqualified|Uso nelle funzioni sospeso/);
     assert.match(text(tree), /inferenceEnabled: false/);
     const demo = find(tree, node => node.type === 'a' && node.props.href === '/settings/ai/chatgpt');

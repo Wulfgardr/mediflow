@@ -248,6 +248,9 @@ impl LocalHostAccess {
         key: HostSettingKey,
         enabled: bool,
     ) -> Result<PreparedHostSetting> {
+        if key == HostSettingKey::TreatmentReasoning {
+            return Err(RuntimeError::Forbidden);
+        }
         Ok(PreparedHostSetting {
             owner: Arc::downgrade(&self.owner),
             key,

@@ -16,8 +16,8 @@ test('the release decision denies only Treatment Reasoning', () => {
     assert.throws(() => assertFunctionAvailableInRelease('treatment_reasoning'), denied);
     for (const id of ['patient_insight', 'smart_import', 'document_synthesis']) assert.doesNotThrow(() => assertFunctionAvailableInRelease(id));
 });
-for (const provider of ['athena_mlx', 'athena_transformers', 'chatgpt_subscription', 'other_provider']) {
-    test(`Web, GPUI and headless dispatch: saved enabled and ${provider} cannot reach a transport`, async () => {
+{
+    test('Web, GPUI and headless local dispatch: saved enabled and present ATHENA cannot reach a transport', async () => {
         let launches = 0;
         const handler = createFunctionModelDispatch({ authenticate: async () => 'synthetic-session', readSources: () => sources })('treatment_reasoning', async () => { launches++; return Response.json({}); });
         const response = await handler(new Request('http://localhost/api/ai/treatment-reasoning/preview', { method: 'POST' }));

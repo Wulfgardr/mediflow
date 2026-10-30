@@ -21,8 +21,8 @@ Treatment Reasoning rinviate oltre la 0.9.1, incluse le tre remote prima
 condizionate. I-3, I-3b e I-7 non sono requisiti della release. Il campo
 `deferredCells` conserva quelle celle; `conditionalCells` è vuoto. Corpus e
 18 soglie ATHENA restano approvati e invariati. Il campo `deferral` registra
-lo stop: l’indisponibilità nel runtime non è verificata, perché restano
-percorsi attivabili. Nessuna generazione Treatment Reasoning è ammessa dal
+lo stop: il blocco di esecuzione è implementato, ma
+l’accettazione dell’indisponibilità sulle superfici resta da completare. Nessuna generazione Treatment Reasoning è ammessa dal
 contratto di release. Le misure e le tabelle successive sono storiche e non
 riaprono quei requisiti. `null` per modello o prova significa dato non fissato, non scelta
 libera o permesso di esecuzione. Gli alias non valgono come identità immutabili.

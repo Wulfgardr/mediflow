@@ -13,7 +13,7 @@ import { ChoiceField } from '@/components/choice-field';
 import { Disclosure } from '@/components/disclosure';
 type FunctionRow = FunctionModelPreferences['functions'][number];
 function Description({ row }: { row: FunctionRow }) {
-    if (row.id === 'treatment_reasoning') return <p>{names[row.id]}: {TREATMENT_REASONING_UNAVAILABLE_LABEL}</p>;
+    if (row.id === 'treatment_reasoning') return <p>{names[row.id]}: {TREATMENT_REASONING_UNAVAILABLE_LABEL}. Interruttore salvato: {row.enabled ? 'attivo' : 'spento'}. {row.defaultSource === 'saved_preference' ? 'Preferenza salvata' : 'Configurazione del computer'} · {row.options.find(o => o.modelOptionId === row.defaultModelOptionId)?.label ?? 'Modello salvato non presente nel catalogo'}. Questa configurazione non viene usata in questa versione.</p>;
     const model = row.options.find(o => o.modelOptionId === row.defaultModelOptionId);
     return <p>{names[row.id]}: {row.enabled ? 'attivo' : 'spento'} · {model ? `${model.label} · ${providerName(model.provider)}` : 'modello locale non disponibile'}{row.defaultSource === 'host_configuration' ? ' · modello del computer' : ' · preferenza salvata'}</p>;
 }
@@ -29,7 +29,7 @@ function PreferenceCard({ row, disabled, account, activationSupported, preview }
     const configuredDefault = row.options.find(o => o.modelOptionId === row.defaultModelOptionId);
     const configurationState = !row.enabled ? 'off' : row.bindingState === 'current' && configuredDefault?.state === 'available_unqualified' ? 'configured' : 'unavailable';
     const warning = model === null && row.defaultSource !== 'host_configuration' ? 'Il modello del computer sarà indicato nell’anteprima.' : row.bindingState === 'stale' ? 'Scelta salvata scaduta: serve una nuova decisione.' : row.bindingState === 'unsupported' ? 'Predefinito non disponibile.' : selected?.state === 'available_unqualified' ? '' : 'Provider locale non disponibile';
-    if (row.id === 'treatment_reasoning') return <article className={styles.card}><h3>{names[row.id]}</h3><p>{TREATMENT_REASONING_UNAVAILABLE_LABEL}</p><p>{TREATMENT_REASONING_UNAVAILABLE_REASON}</p></article>;
+    if (row.id === 'treatment_reasoning') return <article className={styles.card}><h3>{names[row.id]}</h3><Description row={row} /><p>{TREATMENT_REASONING_UNAVAILABLE_REASON}</p></article>;
     return <article className={styles.card}>
         <div className={styles.row}><h3>{names[row.id]}</h3><span className={styles.preferenceStatus} data-state={configurationState}>{configurationState === 'off' ? 'Disattivata' : configurationState === 'configured' ? 'Configurazione locale presente' : 'Configurazione locale non disponibile'}</span></div>
         {activationSupported && <ChoiceField label="Canale per questa modifica" aria-label={`Canale per questa modifica · ${names[row.id]}`} value={channel} disabled={disabled} disabledReason="Attendi il completamento della modifica in corso."

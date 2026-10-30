@@ -59,7 +59,7 @@ export function ChatGptAccountCard({ active }: { active: boolean }) {
             <strong data-testid="chatgpt-execution-state">{presentation.executionLabel}</strong>
             <p>Qui gestisci l’accesso e consulti modelli e utilizzo dell’account. Questa scheda non invia dati del paziente e non avvia elaborazioni.</p>
             <p><strong>Prova dimostrativa.</strong> È un percorso separato, solo con dati demo. Una prova riuscita non autorizza l’uso clinico.</p>
-            <p><strong>Funzioni ordinarie.</strong> Quadro paziente, Importazione assistita, Sintesi dei documenti e Revisione del trattamento prevedono un percorso OpenAI separato, solo su scelta esplicita. Quando i controlli lo consentono, ogni invio richiede il controllo e l’oscuramento dei dati identificativi e il tuo consenso sul contenuto esatto da trasmettere a OpenAI; ogni risultato richiede revisione.</p>
+            <p><strong>Funzioni ordinarie.</strong> Quadro paziente, Importazione assistita e Sintesi dei documenti prevedono un percorso OpenAI separato, solo su scelta esplicita. Quando i controlli lo consentono, ogni invio richiede il controllo e l’oscuramento dei dati identificativi e il tuo consenso sul contenuto esatto da trasmettere a OpenAI; ogni risultato richiede revisione. La revisione del trattamento non è disponibile in questa versione.</p>
             <p>Il collegamento qui mostrato non verifica la disponibilità di quel percorso né della sessione che esegue la richiesta.</p>
             <p><strong>Dati sanitari reali.</strong> Collegare l’account, avere un piano a pagamento o superare la demo non autorizza a usarli. Restano necessarie le verifiche tecniche e le autorizzazioni previste per l’uso clinico; questa scheda non le concede.</p>
         </div>

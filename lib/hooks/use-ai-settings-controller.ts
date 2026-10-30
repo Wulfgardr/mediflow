@@ -36,7 +36,6 @@ import {
 import {
     AI_TREATMENT_REASONING_KILL_SWITCH_KEY,
     isAiTreatmentReasoningEnabledValue,
-    serializeAiTreatmentReasoningKillSwitchState,
 } from '@/lib/ai-treatment-reasoning-kill-switch';
 import {
     DEFAULT_DOCUMENT_ROUTER_CONTROL_FLOW_MODE,
@@ -219,10 +218,6 @@ export function useAiSettingsController() {
             await db.settings.put({
                 key: AI_SMART_IMPORT_KILL_SWITCH_KEY,
                 value: serializeAiSmartImportKillSwitchState(smartImportEnabled),
-            });
-            await db.settings.put({
-                key: AI_TREATMENT_REASONING_KILL_SWITCH_KEY,
-                value: serializeAiTreatmentReasoningKillSwitchState(treatmentReasoningEnabled),
             });
             await saveAIInsightStoredSettings(aiInsightSettings);
             setAiTestStatus('idle');
