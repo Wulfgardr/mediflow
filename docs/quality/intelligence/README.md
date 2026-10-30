@@ -27,6 +27,19 @@ Il target resta Mac16,5 M4 Max/36 GB. Un carico singolo è il profilo del futuro
 banco, non una sostenibilità già dimostrata. Budget di memoria e tempi restano
 nulli fino a baseline e decisione; non si riciclano i limiti dei 16 GiB.
 
+## Nuovo incarico locale del 30 ottobre 2026
+
+Il [dossier del controllo preliminare](2026-10-30-local-runs/README.md) registra
+l'approvazione esplicita di corpus e soglie ATHENA fornita da Leonardo nel nuovo
+incarico. Le inferenze restano bloccate: spazio libero interno sotto 25 GiB e
+identità non assegnate nel registro. Zero tentativi consumati, nessuna nuova
+misura di qualità, tempo, memoria o arresto fisico. Il registro conserva null
+per modelli e prove runtime; le ragioni di blocco locali sono aggiornate.
+I limiti autorizzati sono ricevuti nel campo separato `localRunPrecheck`, senza
+trasformarli in budget di prodotto qualificati. ADR 0166 resta Proposed.
+
+La verifica seguente è storica e precede questa nuova autorizzazione.
+
 ## Verifica del 30 ottobre 2026
 
 Base aggiornata: `498658cbf596b96811eecb843a3a60e3ea8ea458`.
