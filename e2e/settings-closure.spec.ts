@@ -5,7 +5,7 @@ import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { closureGallery } from './fixtures/settings-closure-gallery';
 
 function synthetic(baseURL?: string) {
-    if (!baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port !== '3000'
+    if (!baseURL || new URL(baseURL).hostname !== '127.0.0.1' || (process.env.SETTINGS_CLOSURE === '1' && new URL(baseURL).port !== '3000')
         || process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR
         || process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY !== '1') throw Error('Archivio sintetico isolato sulla porta 3000 richiesto');
 }
@@ -51,7 +51,7 @@ test('Profilo: ritorno browser e blocco conservano la bozza senza salvarla', asy
 test('Backup: avviso completo e annullamento raggiungibili al 400 percento', async ({ baseURL }) => {
     test.setTimeout(120_000); synthetic(baseURL);
     const zoom = await openBrowserZoomFixture(baseURL!), page = zoom.page;
-    const directory = process.env.BACKUP_COMPOSITION_SCREENSHOTS!;
+    const directory = (process.env.BACKUP_COMPOSITION_SCREENSHOTS || test.info().outputPath('screenshots'));
     const frames: unknown[] = []; let writes = 0;
     await page.route('**/api/system/backup-restore', route => {
         if (route.request().method() === 'POST') { writes++; return route.abort(); }

@@ -70,7 +70,7 @@ const cases: readonly [route: 'fabric' | 'governance', scenario: Scenario][] = [
 for (const [route, scenario] of cases) test(`${route} read state: ${scenario}`, async ({ baseURL }) => {
     test.setTimeout(90_000);
     test.skip(supplemental400 && !(route === 'fabric' && scenario === 'status-error' || route === 'governance' && scenario === 'error'));
-    if (!baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port !== '3000'
+    if (!baseURL || new URL(baseURL).hostname !== '127.0.0.1' || (process.env.SETTINGS_CLOSURE === '1' && new URL(baseURL).port !== '3000')
         || process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR) throw Error('Owned synthetic loopback required');
     const zoom = await openBrowserZoomFixture(baseURL), page = zoom.page;
     const guard = await installFunctionsEgressGuard(page, baseURL);
@@ -185,7 +185,10 @@ for (const [route, scenario] of cases) test(`${route} read state: ${scenario}`, 
         if (!captureOpenDiagnostic) await capture(page, target, `${route}-${scenario}-1440`, frames);
         const visualState = route === 'fabric' ? ['pending', 'status-error', 'unauthorized'].includes(scenario) : ['pending', 'error'].includes(scenario);
         const dayColors = new Map<number | string, string>();
-        if (visualState || settingsClosure) for (const theme of ['giorno', 'grafite']) for (const size of (settingsClosure ? [1440, 768, 390, 'zoom-200'] : [320, 'zoom-400'])) {
+        const additionalSizes = scenario === 'ready' && route === 'fabric'
+            ? [1440, 768, 390, 320, 'zoom-200', 'zoom-400'] : [1440, 768, 390, 'zoom-200'];
+        const sizes = settingsClosure ? additionalSizes : [320, 'zoom-400'];
+        if (visualState || settingsClosure) for (const theme of ['giorno', 'grafite']) for (const size of sizes) {
             await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(size === 'zoom-400' ? 4 : size === 'zoom-200' ? 2 : 1);
             if (typeof size === 'number') await page.setViewportSize({ width: size, height: 1000 });
             await page.evaluate(theme => { document.documentElement.classList.toggle('dark', theme === 'grafite'); document.documentElement.dataset.theme = theme; }, theme);
@@ -193,7 +196,10 @@ for (const [route, scenario] of cases) test(`${route} read state: ${scenario}`, 
             expect(evidence.theme).toBe(theme);
             if (theme === 'giorno') dayColors.set(size, evidence.palette.color);
             else expect(evidence.palette.color, `${route}-${scenario}-${size}: distinct computed theme color`).not.toBe(dayColors.get(size));
-            await assertNoHorizontalOverflow(page, [{ label: route, selector: `[data-testid="settings-ai-${route}-section"]` }]);
+            if (process.env.SETTINGS_CLOSURE_BEFORE === '1') {
+                const overflow = await surface.evaluate(element => element.scrollWidth - element.clientWidth);
+                expect.soft(overflow, `${route}-${scenario}-${theme}-${size}: sconfinamento`).toBeLessThanOrEqual(1);
+            } else await assertNoHorizontalOverflow(page, [{ label: route, selector: `[data-testid="settings-ai-${route}-section"]` }]);
         }
         if (captureOpenDiagnostic) {
             await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
