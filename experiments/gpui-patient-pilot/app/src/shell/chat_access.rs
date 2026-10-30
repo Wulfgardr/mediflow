@@ -108,6 +108,8 @@ impl ClinicalApp {
                     .lock()
                     .is_ok_and(|mut pending| pending.bind(session, context))
                 {
+                    let preparing = pending.clone();
+                    std::thread::spawn(move || crate::chat_access::owner::prepare_card(&preparing));
                     self.chat_access.patient = patient;
                     self.chat_access.archive = archive;
                     self.chat_access.pending = Some(pending);
@@ -117,10 +119,12 @@ impl ClinicalApp {
             }
             cx.notify();
         }
-        if self.chat_access.pending.as_ref().is_some_and(|p| {
-            p.lock()
-                .is_ok_and(|mut p| matches!(p.status(), State::Withdrawn | State::Consumed))
-        }) {
+        if self
+            .chat_access
+            .pending
+            .as_ref()
+            .is_some_and(|p| p.lock().is_ok_and(|mut p| p.status() == State::Withdrawn))
+        {
             self.chat_access.retire(cx);
             cx.notify();
         }
@@ -179,20 +183,29 @@ impl ClinicalApp {
     pub(super) fn chat_access_view(&self, cx: &Context<Self>) -> Option<Stateful<Div>> {
         let pending = self.chat_access.pending.as_ref()?;
         let (state, app) = pending.lock().ok().map(|mut p| (p.status(), p.app()))?;
-        if matches!(state, State::Consumed | State::Withdrawn) {
+        if state == State::Withdrawn {
             return None;
         }
-        let enabled = state == State::Challenge;
+        let review = pending.lock().ok().and_then(|p| {
+            p.review().map(|(payload, digest, source)| {
+                (payload.to_owned(), digest.to_owned(), source.to_owned())
+            })
+        });
+        let enabled = state == State::Challenge && review.is_some();
         let theme = self.theme;
         Some(div().id("native-chat-access-confirmation").role(Role::Group)
             .aria_label("Conferma accesso della chat").flex_1().min_h_0().overflow_y_scroll()
             .p(px(20.)).border_1().border_color(theme.rule)
             .flex().flex_col().gap(px(12.))
-            .child(heading("native-chat-access-title", "Consenti l’accesso alla chat?", theme))
+            .child(heading("native-chat-access-title", "Condividi la scheda di prova nella chat?", theme))
             .child(text!(format!("App richiedente: {app}")).with_id("native-chat-access-app"))
             .child(text!(format!("Archivio: {}", self.chat_access.archive)).with_id("native-chat-access-archive"))
             .child(div().id("native-chat-access-patient").child(crate::title::title(crate::title::TitleText::patient_question("Paziente: ", self.chat_access.patient.clone(), ""), theme)))
-            .child(notice("native-chat-access-operation", "Una verifica monouso dell’accesso. Nessun contenuto clinico viene restituito. La richiesta scade dopo 30 secondi.", theme, false))
+            .child(notice("native-chat-access-operation", "Scheda sintetica «basic», indipendente dalla cartella selezionata. Controlla i byte sotto: verranno mostrati soltanto nella vista della chat. Nomi e fonti restano qui. Hai 30 secondi per confermare una sola lettura; nessun rinnovo automatico.", theme, false))
+            .when_some(review, |el, (payload, digest, source)| el
+                .child(notice("native-chat-card-source", format!("Fonte locale sintetica: {source}"), theme, false))
+                .child(notice("native-chat-card-payload", payload, theme, false))
+                .child(text!(format!("SHA-256: {digest}")).with_id("native-chat-card-digest")))
             .when_some(self.chat_access.message.clone(), |el, message| el.child(notice("native-chat-access-error", message, theme, true)))
             .child(button("native-chat-access-touch-id", "Conferma con Touch ID", theme, true, enabled)
                 .when(enabled, |el| el.on_click(cx.listener(|this, _, _, cx| this.approve_chat_access(false, cx)))))
@@ -202,7 +215,7 @@ impl ClinicalApp {
             .child(button("native-chat-access-deny", "Nega e ritira", theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| { this.chat_access.retire(cx); cx.notify(); })))
             .when(state != State::Challenge, |el| el.child(notice("native-chat-access-state",
-                if state == State::Approved { "Accesso autorizzato per una sola verifica nella vista chat." } else { "Conferma in corso…" }, theme, false))))
+                if state == State::Consumed { "Scheda consegnata. Puoi revocare la vista; i byte già ricevuti dall’host non vengono cancellati." } else if state == State::Approved { "Scheda autorizzata per una sola lettura nella vista chat." } else { "Conferma in corso…" }, theme, false))))
     }
 }
 

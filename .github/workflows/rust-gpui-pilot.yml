@@ -18,6 +18,8 @@ on:
       - 'package-lock.json'
       - 'scripts/prepare-e2e-db.mjs'
       - 'scripts/web-auth-control-test-client.mjs'
+      - 'scripts/chat-card-*.mjs'
+      - 'scripts/fixtures/chat-card-owned-tree.mjs'
       - 'scripts/native-tool-test-selection.mjs'
       - 'scripts/check-test-selection.test.mjs'
       - '.github/workflows/rust-gpui-pilot.yml'
@@ -39,6 +41,8 @@ on:
       - 'package-lock.json'
       - 'scripts/prepare-e2e-db.mjs'
       - 'scripts/web-auth-control-test-client.mjs'
+      - 'scripts/chat-card-*.mjs'
+      - 'scripts/fixtures/chat-card-owned-tree.mjs'
       - 'scripts/native-tool-test-selection.mjs'
       - 'scripts/check-test-selection.test.mjs'
       - '.github/workflows/rust-gpui-pilot.yml'
@@ -70,6 +74,11 @@ jobs:
       CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Install Node for owned process regression tests
+        if: runner.os != 'Windows'
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444b # v5
+        with:
+          node-version: '24.18.0'
       - name: Install source-pinned Rust toolchain
         run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt --component clippy
       - name: Install Linux GPUI build dependencies
