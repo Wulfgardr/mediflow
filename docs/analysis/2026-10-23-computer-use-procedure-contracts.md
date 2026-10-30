@@ -1,6 +1,6 @@
-# CU — contratti delle procedure
+# CU: contratti delle procedure
 
-Data: 23 ottobre 2026. Autore: Astra. Stato: **proposti, non implementati**. [Analisi](./2026-10-23-computer-use-procedures.md), [fonti/versioni](./2026-10-23-computer-use-sources.md), [ADR 0162](../adr/0162-local-computer-use-executor.md). Tutti gli esempi futuri di sviluppo devono essere inventati e separati dall'archivio clinico. Nessuna specifica qui autorizza l'uso del servizio reale.
+Data: 23 ottobre 2026. Autore: Astra. Stato: **contratti proposti; verticale specialistica sintetica implementata, accettazione aperta**. [Analisi](./2026-10-23-computer-use-procedures.md), [fonti/versioni](./2026-10-23-computer-use-sources.md), [ADR 0162](../adr/0162-local-computer-use-executor.md). Tutti gli esempi futuri di sviluppo devono essere inventati e separati dall'archivio clinico. Nessuna specifica qui autorizza l'uso del servizio reale.
 
 ## Contratto comune
 
@@ -24,7 +24,7 @@ La capacità territoriale si verifica anche prima di ogni accesso di riconciliaz
 
 La riconciliazione remota riprende dopo riattivazione esplicita tramite l'operazione host ammessa da ADR 0158, nuova autorità e rilettura delle capacità. In alternativa il medico verifica o completa manualmente nel portale, fuori dall'esecutore CU, e acquisisce l'evidenza: ciò non sblocca rete o writer territoriali in MediFlow. La loro registrazione attende la riattivazione; se l'esito precedente è incerto, verifica prima di qualsiasi nuovo invio. L'intervento manuale non sana una ricevuta non verificabile.
 
-## 1. Specialistica PRREG — prima verticale
+## 1. Specialistica PRREG: prima verticale
 
 **Fonti/versione:** specifica PRREG rev. 1.4 e delta 1.5 descritti nel registro; catalogo specialistico pertinente da versionare. Stato documentato; prima prova su portale sintetico, non replica dichiarata della UI istituzionale corrente. Pacchetto Italia + Lombardia; ruolo prescritto dal contratto della modalità GUI, senza deduzione di diritti WS.
 
@@ -97,3 +97,7 @@ La riconciliazione remota riprende dopo riattivazione esplicita tramite l'operaz
 ## Manutenzione e prova dei contratti
 
 Ogni adapter dichiara quali stati/campi sono documentati, simulati e osservati sul client, separandoli dalle qualifiche sul servizio. Una nuova versione di UI o catalogo non abilita il modello a ricostruire selettori o regole: richiede un aggiornamento verificato del contratto. I contratti condividono nucleo, autorizzazione e ricevute; non condividono automaticamente ruoli, destinatari o obblighi clinici. Il corpus di accettazione contiene almeno un caso riuscito e un caso di sospensione/ripresa per ciascuna procedura, più i rischi specifici descritti sopra. Per ciascuna procedura coprire anche l’attesa dell’atto manuale, la riconciliazione con ricevuta assente/parziale e il divieto di rete e writer territoriali a pacchetto disattivato; per le esenzioni le prove riguardano l’atto contenitore.
+
+## Stato del 30 ottobre 2026
+
+Il [dossier di accettazione](./2026-10-30-cu-acceptance/README.md) attribuisce le prove alle revisioni, distingue il servizio comune dagli adapter e raccoglie i [casi sintetici per tutte le procedure](./2026-10-30-cu-acceptance/casi-contrattuali.md). Farmaceutica, Protesica e INPS non hanno adapter specifici verificati; l’applicazione mista delle esenzioni resta non rappresentabile nell’adapter specialistico attuale e viene rifiutata. I test comuni non dichiarano queste implementazioni completate. ADR 0162 resta Proposed e CU-1 attende Leonardo.
