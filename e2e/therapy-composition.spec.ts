@@ -4,6 +4,10 @@ import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
+test.beforeEach(({ baseURL }) => {
+    if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw new Error('Owned synthetic archive and non-3000 loopback required');
+});
+
 const section = (page: Page) => page.locator('#terapie');
 const register = (page: Page) => section(page).locator('[data-clinical-register="therapies"]');
 const creation = (page: Page) => section(page).getByRole('button', { name: 'Nuova terapia', exact: true });
@@ -208,15 +212,16 @@ test('eliminazione conserva motivo obbligatorio, ritorno prioritario e un solo i
     expect(writes).toHaveLength(1);
 });
 
-for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', 'zoom-200']) {
+for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', 'zoom-200', '320', 'zoom-400']) {
     test(`cattura terapie ${theme} ${size}`, async ({ page, baseURL }) => {
-        const zoom = size === 'zoom-200' ? await openBrowserZoomFixture(baseURL!) : undefined;
+        test.setTimeout(120_000);
+        const zoom = size.startsWith('zoom-') ? await openBrowserZoomFixture(baseURL!) : undefined;
         try {
             if (zoom) page = zoom.page;
             await page.setViewportSize({ width: zoom ? 1440 : Number(size), height: 1000 });
             await fixture(page, { active: 3, suspended: 1, completed: 1 });
             await page.evaluate(theme => { document.documentElement.classList.toggle('dark', theme === 'grafite'); document.documentElement.classList.toggle('light', theme === 'giorno'); }, theme);
-            if (zoom) await zoom.setZoom(2);
+            if (zoom) await zoom.setZoom(size === 'zoom-400' ? 4 : 2);
             const dir = process.env.THERAPY_COMPOSITION_CAPTURES || test.info().outputPath('captures');
             await mkdir(dir, { recursive: true });
             const capture = async (state: string) => {

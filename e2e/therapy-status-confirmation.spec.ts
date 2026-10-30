@@ -3,6 +3,10 @@ import { differenceInYears } from 'date-fns';
 import { mkdir } from 'node:fs/promises';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow } from './utils';
 
+test.beforeEach(({ baseURL }) => {
+  if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw new Error('Owned synthetic archive and non-3000 loopback required');
+});
+
 type Fixture = { patientId: string; therapyId: string; secondId: string };
 const birthDate = '1972-04-12T00:00:00.000Z';
 const patientLabel = (now: Date) => `Sintetica Ada, ${differenceInYears(now, new Date(birthDate))} anni`;

@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
+import { expect, type Locator, type Page, type Route } from '@playwright/test';
+import { test, closureGallery } from './fixtures/patient-closure-gallery';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
 
@@ -57,6 +58,7 @@ async function installWorklistFixture(page: Page, baseURL: string) {
 }
 
 test('Worklist: observed read states and one primary action', async ({page,baseURL},info) => {
+  test.setTimeout(240_000);
   if(process.env.MF085_SYNTHETIC_E2E!=='1'||!process.env.MEDIFLOW_DATA_DIR||!baseURL||new URL(baseURL).hostname!=='127.0.0.1'||new URL(baseURL).port==='3000')throw Error('Owned synthetic archive and loopback required');
   const baseline=process.env.WORKLIST_READ_BASELINE==='1',directory=process.env.WORKLIST_READ_SCREENSHOTS;
   const fixture=await installWorklistFixture(page,baseURL),frames:unknown[]=[],errors:string[]=[];
@@ -69,6 +71,7 @@ test('Worklist: observed read states and one primary action', async ({page,baseU
     if(baseline)expect.soft(await condition()).toBe(expected);else await expect.poll(condition).toBe(expected);
   };
   const gallery=async(state:string,target:Locator)=>{
+    if (await closureGallery(page, 'worklist', state, target)) return;
     const palettes=new Map<string,string>();
     for(const theme of ['giorno','grafite'])for(const width of [1440,768]){
       await page.setViewportSize({width,height:1000});

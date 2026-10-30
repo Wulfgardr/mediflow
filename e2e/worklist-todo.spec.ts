@@ -2,18 +2,20 @@ import { expect, test, type Request } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
+import { closureGallery, registerClosureZoom } from './fixtures/patient-closure-gallery';
 import { installWorklistTodoFixture } from './fixtures/worklist-todo';
 import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
 
 const directoryCommandSelector = '[data-patient-directory] > header :is(a, button):not(.mf-composite-field .mf-button-icon)';
 
 test('Da fare: controlli confermati, letture negative, filtri e ritorno alla riga', async ({ baseURL }, info) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL
     || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw Error('Owned synthetic archive required');
   const baseline = process.env.WORKLIST_TODO_BASELINE === '1';
   const directory = process.env.WORKLIST_TODO_SCREENSHOTS ? `${process.env.WORKLIST_TODO_SCREENSHOTS}/attempt-${info.retry}` : undefined;
   const zoom = await openBrowserZoomFixture(baseURL), page = zoom.page;
+  registerClosureZoom(page, zoom);
   const fixture = await installWorklistTodoFixture(page, baseURL);
   fixture.state.patients[2].lastName = 'Inventata C con cognome composto eccezionalmente lungo per verificare la riga';
   fixture.state.checkups = [
@@ -35,9 +37,9 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
     await bootstrapUnlockedSession(page, '1234');
     await page.goto('/?area=incarico');
     await expect(rows).toHaveCount(3);
-    for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', 'zoom-200']) {
+    for (const theme of ['giorno', 'grafite']) for (const size of (process.env.PATIENT_CLOSURE_EVIDENCE ? ['320', 'zoom-400'] : ['1440', '768', '390', 'zoom-200'])) {
       await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
-      if (size === 'zoom-200') await zoom.setZoom(2);
+      if (size.startsWith('zoom-')) await zoom.setZoom(size === 'zoom-400' ? 4 : 2);
       else await page.setViewportSize({ width: Number(size), height: 1000 });
       await page.evaluate(value => {
         localStorage.setItem('mediflow-theme', value);
@@ -102,6 +104,7 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
         await assertNoHorizontalOverflow(page, [{ label: 'document', selector: 'document' }, { label: 'worklist', selector: '[data-testid=lume-worklist]' }]);
       }
     }
+    await closureGallery(page, 'worklist-todo', 'ready', worklist);
     if (baseline) return;
     await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(1);
     expect(new Set((frames as { palette: string }[]).map(frame => frame.palette)).size).toBe(2);
@@ -118,10 +121,12 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
     await search.fill('Inventata B'); await expect(rows).toHaveCount(1); await expect(search).toBeFocused();
     await expect(search.locator('..').locator('.mf-button-icon')).toBeVisible();
     await expect(page.locator(directoryCommandSelector)).toHaveCount(3);
+    await closureGallery(page, 'worklist-todo', 'loading-filtered', worklist);
     fixture.state.checkupHold = null; release();
     await expect(worklist.getByRole('alert')).toContainText('Impossibile leggere i controlli');
     await expect(search).toBeFocused(); await expect(rows).toHaveCount(1);
     await expect(row('B')).toContainText('Controlli non disponibili');
+    await closureGallery(page, 'worklist-todo', 'error-filtered', worklist);
     const batchBefore = fixture.calls.filter(call => call.path === '/api/checkups').length;
     fixture.state.checkupStatus = 200;
     await worklist.getByRole('button', { name: 'Riprova controlli', exact: true }).click();
@@ -129,6 +134,7 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
     expect(fixture.calls.filter(call => call.path === '/api/checkups').length).toBe(batchBefore + 1);
     expect(fixture.calls.filter(call => call.path === '/api/checkups').every(call => !/patientId|limit|offset/.test(call.search))).toBe(true);
     await page.getByRole('button', { name: 'Archivio', exact: true }).click(); await expect(rows).toHaveCount(0);
+    await closureGallery(page, 'worklist-todo', 'empty-filtered', worklist);
     await search.fill('Inventata'); await expect(rows).toHaveCount(1); await expect(row('Z')).toContainText('Nessun controllo aperto');
     await page.getByRole('button', { name: 'Attivi', exact: true }).click();
     await search.fill('Inventata C'); await expect(rows).toHaveCount(1);

@@ -3,6 +3,10 @@ import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflo
 
 // Real authenticated routes and synthetic SQLite records. Only the named
 // transport failures are injected; writes forwarded by route.fetch still commit.
+test.beforeEach(({ baseURL }) => {
+  if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw new Error('Owned synthetic archive and non-3000 loopback required');
+});
+
 type Fixture = { patientId: string; therapyId: string; secondId: string };
 const dosage = (page: Page) => page.locator('#terapie input[name="dosage"]');
 const note = (page: Page) => page.locator('#terapie textarea[name="motivation"]');

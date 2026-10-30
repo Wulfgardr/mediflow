@@ -13,7 +13,7 @@ export async function openBrowserZoomFixture(baseURL: string) {
         background: { service_worker: 'worker.js' } }));
     await writeFile(join(extension, 'worker.js'), 'chrome.runtime.onInstalled.addListener(() => {});');
     const context = await chromium.launchPersistentContext(join(root, 'profile'), {
-        channel: 'chromium', headless: true, viewport: { width: 1440, height: 1000 },
+        baseURL, channel: 'chromium', headless: true, viewport: { width: 1440, height: 1000 },
         extraHTTPHeaders: trustedWebRequestHeaders(baseURL),
         args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
     });

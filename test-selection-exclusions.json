@@ -203,5 +203,10 @@
     "path": "scripts/athena-quality/run.ts",
     "reason": "CLI diagnostica con autoverifica, esercitata da scripts/athena-quality/bench.test.ts; non è una suite node:test.",
     "owner": "WUL-790"
+  },
+  {
+    "path": "e2e/fixtures/patient-closure-gallery.ts",
+    "reason": "Fixture Playwright e galleria opzionale della vista paziente; esercitata dagli spec Quadro, Follow-up e worklist, non contiene una suite autonoma.",
+    "owner": "WUL-787"
   }
 ]
