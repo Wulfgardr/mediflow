@@ -1,4 +1,6 @@
 mod archives;
+mod models;
+mod security;
 use crate::RetirementNotice;
 use crate::http::{authenticate_web_p3, control_cookie, operation_uuid, sensitive_header};
 use crate::{
@@ -6,10 +8,12 @@ use crate::{
     validate_id,
 };
 pub use archives::*;
+pub use models::*;
 use reqwest::{
     Method,
     header::{COOKIE, HeaderMap},
 };
+pub use security::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::sync::{
@@ -330,6 +334,7 @@ impl LocalHostAccess {
     fn record_retirement(&self) {
         if let Ok(mut marker) = self.retirement_marker.lock()
             && marker.is_none()
+            && !self.retired.load(Ordering::Acquire)
         {
             *marker = Some(self.notice.begin());
         }

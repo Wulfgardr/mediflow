@@ -1,0 +1,34 @@
+{
+  "kind": "synthetic native rendering, not host integration or installed qualification",
+  "sourceBase": "6c99ff83c8d96b2cfce63fc79b87023e4345d62d",
+  "captures": [
+    {
+      "theme": "giorno",
+      "width": 1200,
+      "case": "models",
+      "file": "giorno-1200-models.png",
+      "sha256": "2a20b590272d603dd13c2fe8595eb41c55d3fa8df840e9a42ef98bc44c160924"
+    },
+    {
+      "theme": "grafite",
+      "width": 390,
+      "case": "access",
+      "file": "grafite-390-access.png",
+      "sha256": "41576316fc6d756a9ea792935173a6e87dae1da58ea34c978212fb87b0c483b8"
+    },
+    {
+      "theme": "grafite",
+      "width": 390,
+      "case": "models",
+      "file": "grafite-390-models.png",
+      "sha256": "789f21ea870923d1dac3b7b258d3d92ad46d812f216f7c3740fbf4aa6b4ff27e"
+    },
+    {
+      "theme": "grafite",
+      "width": 390,
+      "case": "review",
+      "file": "grafite-390-review.png",
+      "sha256": "b63e10aaddba58c855e662f04cb3e5562102a9261d85ca335809ec9f8f85671d"
+    }
+  ]
+}

@@ -1,4 +1,6 @@
 mod archives;
+mod models;
+mod security;
 use super::*;
 use archives::ArchiveArea;
 pub(super) use mediflow_runtime_client::RETIREMENT_WARNING;
@@ -30,6 +32,8 @@ enum Operation {
 pub(super) struct LocalAdministration {
     pub(super) retirement: RetirementNotice,
     archives: ArchiveArea,
+    security: security::SecurityArea,
+    models: models::ModelsArea,
     authority: Authority,
     operation: Operation,
     secret: Entity<TextInput>,
@@ -67,6 +71,8 @@ impl LocalAdministration {
                     .map(|p| p.with_file_name("archive-restore-pending.json")),
                 cx,
             ),
+            security: security::SecurityArea::new(theme, cx),
+            models: models::ModelsArea::new(theme, cx),
             retirement: RetirementNotice::new(retirement_path),
             authority: Authority::Closed,
             operation: Operation::Idle,
@@ -80,10 +86,15 @@ impl LocalAdministration {
         }
     }
     pub(super) fn command_visible(&self) -> bool {
-        self.archives.has_work() || !matches!(self.operation, Operation::Idle)
+        self.models.has_work()
+            || self.security.has_work()
+            || self.archives.has_work()
+            || !matches!(self.operation, Operation::Idle)
     }
     pub(super) fn has_work(&self) -> bool {
-        self.archives.has_work()
+        self.models.has_work()
+            || self.security.has_work()
+            || self.archives.has_work()
             || matches!(self.authority, Authority::Authenticating)
             || matches!(
                 self.operation,
@@ -105,6 +116,8 @@ impl LocalAdministration {
             .checked_add(1)
             .expect("local authority generation exhausted");
         self.archives.withdraw(cx);
+        self.security.withdraw(cx);
+        self.models.withdraw(cx);
         self.secret.update(cx, |input, cx| input.retire(cx));
         let access = match std::mem::replace(&mut self.authority, Authority::Closed) {
             Authority::Open(access) => Some(access.begin_retirement()),
@@ -128,6 +141,8 @@ impl LocalAdministration {
         cx: &mut Context<ClinicalApp>,
     ) {
         self.archives.configure(theme, window, cx);
+        self.security.configure(theme, cx);
+        self.models.configure(theme, cx);
         self.secret.update(cx, |input, cx| {
             input.configure(
                 theme,
@@ -222,7 +237,12 @@ impl ClinicalApp {
                         Ok(access) => Authority::Open(access),
                         Err(error) => Authority::Failed(ui_error(error)),
                     };
-                    this.read_local_switches(cx);
+                    if this.settings_page == SettingsPage::Functions {
+                        this.read_local_switches(cx);
+                    }
+                    if this.settings_page == SettingsPage::Models {
+                        this.read_model_configuration(cx);
+                    }
                     cx.notify();
                     true
                 })
@@ -333,6 +353,9 @@ impl ClinicalApp {
     }
     pub(super) fn cancel_local_command(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.cancel_archive_restore(cx);
+        if self.cancel_security_change(window, cx) || self.cancel_models_review(window, cx) {
+            return;
+        }
         if matches!(
             self.local_host.operation,
             Operation::Review(_) | Operation::Failed(_) | Operation::Unconfirmed { .. }
@@ -385,8 +408,25 @@ impl ClinicalApp {
         }
         match &self.local_host.authority {
             Authority::Open(_) => {
-                pane=pane.child(notice("local-host-authority","Accesso locale confermato per questo account. Abilitare una funzione non avvia un’analisi.",theme,false))
-                    .child(button("local-host-read","Rileggi funzioni",theme,false,!self.local_host.has_work()).on_click(cx.listener(|this,_,_,cx|this.read_local_switches(cx))));
+                pane = pane
+                    .child(notice(
+                        "local-host-authority",
+                        "Accesso locale confermato per questo account.",
+                        theme,
+                        false,
+                    ))
+                    .when(self.settings_page == SettingsPage::Functions, |el| {
+                        el.child(
+                            button(
+                                "local-host-read",
+                                "Rileggi funzioni",
+                                theme,
+                                false,
+                                !self.local_host.has_work(),
+                            )
+                            .on_click(cx.listener(|this, _, _, cx| this.read_local_switches(cx))),
+                        )
+                    });
                 pane = pane.child(
                     button(
                         "local-host-close",
@@ -397,12 +437,12 @@ impl ClinicalApp {
                     )
                     .on_click(cx.listener(|this, _, _, cx| this.close_local_host(cx))),
                 );
-                if let Some(rows) = self
-                    .local_host
-                    .switches
-                    .ready()
-                    .filter(|_| self.settings_page != SettingsPage::Archives)
-                {
+                if let Some(rows) = self.local_host.switches.ready().filter(|_| {
+                    !matches!(
+                        self.settings_page,
+                        SettingsPage::Archives | SettingsPage::Access | SettingsPage::Models
+                    )
+                }) {
                     pane = pane.children(rows.iter().map(|&(key, enabled)| {
                         div()
                             .min_w_0()
@@ -434,7 +474,12 @@ impl ClinicalApp {
                             )
                     }));
                 }
-                if let Some(state) = self.local_host.switches.state(ReadObject::Profilo) {
+                if let Some(state) = self
+                    .local_host
+                    .switches
+                    .state(ReadObject::Profilo)
+                    .filter(|_| self.settings_page == SettingsPage::Functions)
+                {
                     pane = pane.child(state.render(
                         "local-host-state",
                         theme,
@@ -444,7 +489,7 @@ impl ClinicalApp {
                 }
             }
             state => {
-                pane=pane.child(text!("Conferma la passphrase per gestire le funzioni e i documenti su questo computer. La passphrase non viene salvata."))
+                pane=pane.child(text!("Conferma la passphrase per gestire le impostazioni e i documenti su questo computer. La passphrase non viene salvata."))
                     .child(crate::text_input::themed(self.local_host.secret.clone(),theme))
                     .child(button("local-host-authenticate","Apri gestione locale",theme,true,!matches!(state,Authority::Authenticating))
                         .on_click(cx.listener(|this,_,_,cx|this.authenticate_local_host(cx))));
@@ -466,7 +511,10 @@ impl ClinicalApp {
                 }
             }
         }
-        if !matches!(self.local_host.operation, Operation::Idle) {
+        if self.local_host.security.has_work()
+            || self.local_host.models.has_work()
+            || !matches!(self.local_host.operation, Operation::Idle)
+        {
             pane = pane.child(self.threshold(
                 Layout::for_window(760., self.text_scale),
                 ThresholdMode::Complete,
@@ -481,6 +529,12 @@ impl ClinicalApp {
         cx: &Context<Self>,
     ) -> Option<Stateful<Div>> {
         let theme = self.theme;
+        if self.local_host.models.has_work() {
+            return self.models_threshold(threshold, cx);
+        }
+        if self.local_host.security.has_work() {
+            return self.security_threshold(threshold, cx);
+        }
         match &self.local_host.operation {
             Operation::Idle => None,
             Operation::Reading => Some(threshold.child(notice(

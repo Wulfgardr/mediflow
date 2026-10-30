@@ -83,6 +83,98 @@ pub(crate) fn unwrap_v3(wrapped: &str, kek: &MasterKey) -> Result<MasterKey> {
     Ok(key)
 }
 
+pub(crate) struct PassphraseBundle {
+    pub credentials: Zeroizing<String>,
+    pub kit: Zeroizing<String>,
+    pub recovery_key: Zeroizing<String>,
+}
+
+fn random_salt() -> Result<String> {
+    let mut bytes = [0u8; 16];
+    getrandom::fill(&mut bytes).map_err(|_| RuntimeError::Crypto)?;
+    Ok(BASE64.encode(bytes))
+}
+
+pub(crate) fn wrap_key(master: &MasterKey, kek: &MasterKey, prefix: &str) -> Result<String> {
+    let mut iv = [0u8; 12];
+    getrandom::fill(&mut iv).map_err(|_| RuntimeError::Crypto)?;
+    wrap_key_with_iv(master, kek, prefix, &iv)
+}
+fn wrap_key_with_iv(
+    master: &MasterKey,
+    kek: &MasterKey,
+    prefix: &str,
+    iv: &[u8; 12],
+) -> Result<String> {
+    let cipher = Aes256Gcm::new_from_slice(kek.as_ref()).map_err(|_| RuntimeError::Crypto)?;
+    let sealed = cipher
+        .encrypt(Nonce::from_slice(iv), master.as_ref())
+        .map_err(|_| RuntimeError::Crypto)?;
+    let mut bytes = iv.to_vec();
+    bytes.extend(sealed);
+    Ok(format!("{prefix}{}", BASE64.encode(bytes)))
+}
+
+fn format_recovery_key(entropy: &[u8; 20]) -> Zeroizing<String> {
+    let alphabet = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+    let mut recovery_key = Zeroizing::new(String::new());
+    for index in 0..32 {
+        if index > 0 && index % 4 == 0 {
+            recovery_key.push('-');
+        }
+        let bit = index * 5;
+        let mut value = 0usize;
+        for offset in 0..5 {
+            value = (value << 1)
+                | usize::from((entropy[(bit + offset) / 8] >> (7 - (bit + offset) % 8)) & 1);
+        }
+        recovery_key.push(alphabet[value] as char);
+    }
+    recovery_key
+}
+fn recovery_material(entropy: &[u8], salt: &str) -> Result<(MasterKey, MasterKey)> {
+    let decoded_salt = BASE64.decode(salt).map_err(|_| RuntimeError::Crypto)?;
+    let hkdf = Hkdf::<Sha256>::new(Some(&decoded_salt), entropy);
+    let mut kek = Zeroizing::new([0u8; 32]);
+    let mut verifier = Zeroizing::new([0u8; 32]);
+    hkdf.expand(b"mediflow.recovery.kek.v1", kek.as_mut())
+        .map_err(|_| RuntimeError::Crypto)?;
+    hkdf.expand(b"mediflow.recovery.verifier.v1", verifier.as_mut())
+        .map_err(|_| RuntimeError::Crypto)?;
+    Ok((kek, verifier))
+}
+
+pub(crate) fn passphrase_bundle(
+    passphrase: &str,
+    username: &str,
+    wrap: impl FnOnce(&MasterKey, &MasterKey) -> Result<(String, String)>,
+) -> Result<PassphraseBundle> {
+    let salt = random_salt()?;
+    let material = derive_v3(passphrase, &salt)?;
+    let mut entropy = Zeroizing::new([0u8; 20]);
+    getrandom::fill(entropy.as_mut()).map_err(|_| RuntimeError::Crypto)?;
+    let recovery_key = format_recovery_key(&entropy);
+    let recovery_salt = random_salt()?;
+    let (kek, verifier) = recovery_material(entropy.as_ref(), &recovery_salt)?;
+    let (encrypted, recovery_wrapping) = wrap(&material.kek, &kek)?;
+    let credentials = Zeroizing::new(serde_json::json!({
+        "encryptedMasterKey": encrypted, "salt": salt, "verifier": &*material.verifier,
+        "recovery": {"wrappedMasterKey": recovery_wrapping, "salt": recovery_salt, "verifier": BASE64.encode(verifier.as_ref())}
+    }).to_string());
+    let kit = Zeroizing::new(
+        serde_json::json!({
+            "schemaVersion": "mediflow.recovery-kit.v1", "username": username,
+            "wrappedMasterKey": recovery_wrapping, "salt": recovery_salt
+        })
+        .to_string(),
+    );
+    Ok(PassphraseBundle {
+        credentials,
+        kit,
+        recovery_key,
+    })
+}
+
 pub(crate) fn seal(value: &Value, master: &MasterKey) -> Result<String> {
     let mut iv = [0u8; 12];
     getrandom::fill(&mut iv).map_err(|_| RuntimeError::Crypto)?;
@@ -346,5 +438,29 @@ mod recovery_tests {
         }
         assert!(verify_recovery(&artifact[..artifact.len() - 1], &master).is_err());
         assert!(verify_recovery(&artifact, &Zeroizing::new([1u8; 32])).is_err());
+    }
+}
+
+#[cfg(test)]
+mod credential_rotation_tests {
+    use super::*;
+    #[test]
+    fn recovery_material_key_and_wrapping_match_independent_node_vector() {
+        let value: Value = serde_json::from_str(include_str!(
+            "../../comparison/recovery-wrapping-vector.json"
+        ))
+        .unwrap();
+        let decode = |key: &str| BASE64.decode(value[key].as_str().unwrap()).unwrap();
+        let entropy: [u8; 20] = decode("entropy").try_into().unwrap();
+        assert_eq!(*format_recovery_key(&entropy), value["recoveryKey"]);
+        let (kek, verifier) = recovery_material(&entropy, value["salt"].as_str().unwrap()).unwrap();
+        assert_eq!(BASE64.encode(kek.as_ref()), value["kek"]);
+        assert_eq!(BASE64.encode(verifier.as_ref()), value["verifier"]);
+        let master = Zeroizing::new(decode("masterKey").try_into().unwrap());
+        let iv = decode("iv").try_into().unwrap();
+        assert_eq!(
+            wrap_key_with_iv(&master, &kek, "r1:", &iv).unwrap(),
+            value["wrapping"]
+        );
     }
 }
