@@ -162,9 +162,10 @@ impl ClinicalApp {
         label: &'static str,
         description: &'static str,
         cx: &Context<Self>,
-    ) -> Div {
+    ) -> Stateful<Div> {
         let theme = self.theme;
         div()
+            .id(format!("clinical-workspace-settings-item-{}", page.index()))
             .min_w_0()
             .border_b_1()
             .border_color(theme.rule)
@@ -185,13 +186,56 @@ impl ClinicalApp {
                         this.select_settings_page(page, window, cx)
                     })),
             )
-            .child(div().text_color(theme.secondary).child(text!(description)))
+            .child(div().text_color(theme.secondary).child({
+                let text = text!(description);
+                #[cfg(test)]
+                let text = rendered_command::observe_text(text);
+                text
+            }))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct SettingsWithSidebar(Entity<ClinicalApp>);
+    impl Render for SettingsWithSidebar {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            self.0.update(cx, |app, cx| {
+                let layout = Layout::for_window(1200., 1.);
+                div()
+                    .size_full()
+                    .flex()
+                    .child(app.sidebar(layout, cx))
+                    .child(app.settings_view(layout, cx))
+            })
+        }
+    }
+
+    #[gpui::test]
+    fn settings_rows_keep_distinct_accessible_descriptions(cx: &mut gpui::TestAppContext) {
+        let (_, cx) = cx.add_window_view(|window, cx| {
+            let app = cx.new(|cx| ClinicalApp::new(String::new(), window, cx));
+            SettingsWithSidebar(app)
+        });
+        for _ in 0..2 {
+            rendered_command::take_text_nodes();
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+            let nodes = rendered_command::take_text_nodes();
+            assert_eq!(nodes.len(), 6);
+            let mut unique = HashSet::new();
+            for (id, node) in nodes {
+                assert!(
+                    unique.insert(id.clone()),
+                    "Duplicate settings description: {id:?}, {node:?}"
+                );
+            }
+        }
+    }
 
     #[gpui::test]
     fn settings_and_navigation_keep_distinct_accessible_commands(cx: &mut gpui::TestAppContext) {
