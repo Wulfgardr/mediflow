@@ -4,9 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { windowsTaskkillCommand } from './windows-system-command.mjs';
 import { processOwner, runtimeProcessIdentity, verifyChildOwner } from './runtime-leases.mjs';
+import { WINDOWS_JOB_PHASE_TIMEOUT_MS } from './windows-runtime-job-deadlines.mjs';
 
-export const WINDOWS_JOB_PHASE_TIMEOUT_MS = 30000;
-export const WINDOWS_JOB_STARTUP_TIMEOUT_MS = 3 * WINDOWS_JOB_PHASE_TIMEOUT_MS;
+export { WINDOWS_JOB_PHASE_TIMEOUT_MS, WINDOWS_JOB_STARTUP_TIMEOUT_MS } from './windows-runtime-job-deadlines.mjs';
 
 export async function containWindowsWeb(child, owner) {
   verifyChildOwner(owner);

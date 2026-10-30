@@ -1786,7 +1786,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 return result;
             }});`);
     }
-    for (const name of ['local-ui-navigation-deadline.mjs', 'mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job.ps1', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs']) {
+    for (const name of ['local-ui-navigation-deadline.mjs', 'mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job-deadlines.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job.ps1', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs']) {
         const rawBytes = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
         const bytes = name === 'mediflow.mjs' && !lifecycle?.job
             ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", 'false') : lifecycle?.job === 'simulated' && name === 'mediflow.mjs'
@@ -3215,6 +3215,7 @@ test('navigation deadlines tolerate Windows clock skew without extending the loc
 
 test('Windows Job startup follows bounded phases and rejects stalled or invalid helpers without retry', () => {
     const moduleUrl = new URL('./windows-runtime-job.mjs', import.meta.url).href;
+    const sourceRuntimeUrl = new URL('./source-runtime.mjs', import.meta.url).href;
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
       import assert from 'node:assert/strict';
       import { EventEmitter } from 'node:events';
@@ -3227,7 +3228,9 @@ test('Windows Job startup follows bounded phases and rejects stalled or invalid 
         spawn() { spawns++; return helper; },
         fs:{lstatSync(){ return {isFile:()=>true,isSymbolicLink:()=>false}; }},
         windowsTaskkillCommand:()=>process.execPath,
-        verifyChildOwner(){}, processOwner:()=>({pid:123}), runtimeProcessIdentity:()=> 'synthetic'
+        verifyChildOwner(){}, processOwner:()=>({pid:123}), runtimeProcessIdentity:()=> 'synthetic',
+        verifySourceRuntime:()=>({web:'/synthetic',identity:{revision:'synthetic',branch:'synthetic',worktreeHash:'clean',sourceFingerprint:'synthetic'}}),
+        createRequire:()=>()=>{globalThis.serverStarted=true;}
       };
       registerHooks({load(url,context,next){ const result=next(url,context); if(url === ${JSON.stringify(moduleUrl)}) {
         result.source=String(result.source)
@@ -3235,8 +3238,16 @@ test('Windows Job startup follows bounded phases and rejects stalled or invalid 
           .replace("import { spawn } from 'node:child_process';", 'const {spawn} = globalThis.fixture;')
           .replace("import { windowsTaskkillCommand } from './windows-system-command.mjs';", 'const {windowsTaskkillCommand} = globalThis.fixture;')
           .replace("import { processOwner, runtimeProcessIdentity, verifyChildOwner } from './runtime-leases.mjs';", 'const {processOwner,runtimeProcessIdentity,verifyChildOwner} = globalThis.fixture;');
+      } else if(url === ${JSON.stringify(sourceRuntimeUrl)}) {
+        result.source=String(result.source)
+          .replace("import { createRequire } from 'node:module';", 'const {createRequire} = globalThis.fixture;')
+          .replace('const { web, identity } = verifySourceRuntime(root);', 'const { web, identity } = globalThis.fixture.verifySourceRuntime(root);');
       } return result; }});
       const {containWindowsWeb,WINDOWS_JOB_PHASE_TIMEOUT_MS:budget}=await import(${JSON.stringify(moduleUrl)});
+      const {startSourceRuntime}=await import(${JSON.stringify(sourceRuntimeUrl)});
+      Object.defineProperty(process,'platform',{value:'win32'});
+      Object.defineProperty(process,'connected',{value:true});
+      process.chdir=()=>{};process.env.MEDIFLOW_WEB_OWNER_GATE='synthetic';
       const make = () => {
         helper=new EventEmitter(); helper.pid=123;
         helper.stdin=new EventEmitter();helper.stdin.destroy=()=>{helper.destroyed=true;};helper.stdin.end=()=>{};
@@ -3244,10 +3255,18 @@ test('Windows Job startup follows bounded phases and rejects stalled or invalid 
         return containWindowsWeb({}, {token:{nonce:'synthetic'},file:'synthetic'});
       };
       const frame = (type,extra={}) => helper.stdout.emit('data',JSON.stringify({type,nonce:'synthetic',...extra})+'\\n');
+      const runtime=startSourceRuntime('web');runtime.catch(()=>{});
       let pending=make();
       advance(budget-1);frame('compiling');advance(budget-1);frame('assigning');advance(budget-1);frame('ready');
-      const job=await pending;assert.equal(timers.size,0);assert.equal(spawns,1);
+      const job=await pending;assert.equal(spawns,1);
+      assert.equal(globalThis.serverStarted,undefined);
+      process.emit('message',{type:'mediflow-web-owner-start',nonce:'foreign'});
+      assert.equal(globalThis.serverStarted,undefined);
+      process.emit('message',{type:'mediflow-web-owner-start',nonce:'synthetic'});
+      await runtime;assert.equal(globalThis.serverStarted,true);assert.equal(timers.size,0);
       frame('drained',{active:0});helper.emit('close',0);await job.closed;
+      const missingOwner=assert.rejects(startSourceRuntime('web'),/Web owner timeout/);
+      advance(3*budget);await missingOwner;assert.equal(process.listenerCount('message'),0);
       for (const phase of ['powershell','compiling','assigning']) {
         pending=make();const rejected=assert.rejects(pending,new RegExp('phase='+phase));
         if(phase!=='powershell') frame('compiling');if(phase==='assigning') frame('assigning');
