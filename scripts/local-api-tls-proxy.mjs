@@ -1,5 +1,6 @@
 // Codex: created 2026-02-01
 import fs from 'fs';
+import { proxyLoopbackHeaders } from '../lib/security/loopback-ingress.mjs';
 import http from 'http';
 import https from 'https';
 import { URL } from 'url';
@@ -35,7 +36,7 @@ const options = {
 
 const server = https.createServer(options, (req, res) => {
     const forwardedHeaders = {
-        ...req.headers,
+        ...proxyLoopbackHeaders(req.headers, req.socket.remoteAddress),
         'x-forwarded-proto': 'https',
         'x-forwarded-host': req.headers.host || `${bindHost}:${port}`,
         'x-forwarded-port': String(port),

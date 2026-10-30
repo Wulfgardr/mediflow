@@ -1,4 +1,4 @@
-import { isIP } from 'node:net';
+import { hasAttestedLoopbackIngress } from './loopback-ingress.mjs';
 import { isTrustedWebMutationRequest } from './request-transport';
 import { webAuthControlIdFromRequest, webAuthSessionIdFromRequest } from './web-auth-control-transport';
 import { completeExactWebP3Logout } from './web-auth-logout-server';
@@ -6,10 +6,8 @@ import { completeExactWebP3Logout } from './web-auth-logout-server';
 function localRequest(request: Request): boolean {
     try {
         const url = new URL(request.url);
-        if (request.method !== 'POST' || url.search || request.headers.has('x-mediflow-tls-proxy') || !isTrustedWebMutationRequest(request)) return false;
-        const host = request.headers.get('host') ?? url.host;
-        const hostname = new URL(`${url.protocol}//${host}`).hostname.replace(/^\[|\]$/gu, '');
-        return hostname === 'localhost' || hostname === '::1' || isIP(hostname) === 4 && hostname.startsWith('127.');
+        return request.method === 'POST' && !url.search
+            && hasAttestedLoopbackIngress(request) && isTrustedWebMutationRequest(request);
     } catch { return false; }
 }
 

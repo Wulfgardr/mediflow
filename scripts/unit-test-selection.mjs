@@ -10,6 +10,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/fhir-scale-export-falsification.test.mjs',
   'scripts/owned-synthetic-http-suite.test.mjs',
   'scripts/launcher-helpers.test.mjs',
+  'scripts/loopback-ingress.test.mjs',
   'scripts/local-ui-lifecycle.test.mjs',
   'scripts/local-ui-work-preservation.test.mjs',
   'scripts/runtime-leases.test.mjs',

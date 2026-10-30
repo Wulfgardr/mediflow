@@ -2,7 +2,75 @@ use super::*;
 use mediflow_runtime_client::{
     HostSettingKey, LocalHostAccess, PreparedDocumentDeletion, PreparedHostSetting,
 };
-use std::sync::Arc;
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
+
+pub(super) const RETIREMENT_WARNING: &str = "Ritiro di una sessione locale non confermato. Verifica le sessioni dell’host prima di lasciare la postazione.";
+
+#[derive(Clone)]
+pub(super) struct RetirementNotice(Arc<Mutex<(usize, Option<PathBuf>)>>);
+impl RetirementNotice {
+    fn new(path: Option<PathBuf>) -> Self {
+        let pending = path
+            .as_ref()
+            .map(|path| match std::fs::read(path) {
+                Ok(bytes) => serde_json::from_slice::<usize>(&bytes).unwrap_or(1),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => 0,
+                Err(_) => 1,
+            })
+            .unwrap_or(0);
+        Self(Arc::new(Mutex::new((pending, path))))
+    }
+    pub(super) fn pending(&self) -> bool {
+        self.0.lock().map(|state| state.0 > 0).unwrap_or(true)
+    }
+    fn change(&self, begin: bool) {
+        if let Ok(mut state) = self.0.lock() {
+            state.0 = if begin {
+                state.0.saturating_add(1)
+            } else {
+                state.0.saturating_sub(1)
+            };
+            if let Some(path) = &state.1 {
+                let saved = (|| -> std::io::Result<()> {
+                    let parent = path.parent().ok_or(std::io::ErrorKind::InvalidInput)?;
+                    #[cfg(windows)]
+                    mediflow_local_state::create_directory(parent)?;
+                    #[cfg(not(windows))]
+                    std::fs::create_dir_all(parent)?;
+                    std::fs::write(path, serde_json::to_vec(&state.0)?)
+                })();
+                if saved.is_err() {
+                    eprintln!("{RETIREMENT_WARNING}");
+                }
+            }
+        }
+    }
+    fn begin(&self, access: Arc<LocalHostAccess>) -> RetiringAccess {
+        self.change(true);
+        RetiringAccess {
+            access,
+            notice: self.clone(),
+        }
+    }
+}
+pub(super) struct RetiringAccess {
+    access: Arc<LocalHostAccess>,
+    notice: RetirementNotice,
+}
+impl RetiringAccess {
+    pub(super) fn retire(self) -> Result<(), RuntimeError> {
+        let result = self.access.retire();
+        if result.is_ok() {
+            self.notice.change(false);
+        } else {
+            eprintln!("{RETIREMENT_WARNING}");
+        }
+        result
+    }
+}
 
 enum Authority {
     Closed,
@@ -24,6 +92,7 @@ enum Operation {
     Unconfirmed { command: Command, message: String },
 }
 pub(super) struct LocalAdministration {
+    pub(super) retirement: RetirementNotice,
     authority: Authority,
     operation: Operation,
     secret: Entity<TextInput>,
@@ -35,7 +104,12 @@ pub(super) struct LocalAdministration {
     _subscription: Subscription,
 }
 impl LocalAdministration {
-    pub(super) fn new(theme: Theme, scroll: &ScrollHandle, cx: &mut Context<ClinicalApp>) -> Self {
+    pub(super) fn new(
+        theme: Theme,
+        scroll: &ScrollHandle,
+        retirement_path: Option<PathBuf>,
+        cx: &mut Context<ClinicalApp>,
+    ) -> Self {
         let secret = cx.new(|cx| {
             TextInput::new(
                 "local-host-passphrase",
@@ -49,6 +123,7 @@ impl LocalAdministration {
         });
         let subscription = cx.subscribe(&secret, |_, _, _: &InputChanged, cx| cx.notify());
         Self {
+            retirement: RetirementNotice::new(retirement_path),
             authority: Authority::Closed,
             operation: Operation::Idle,
             secret,
@@ -79,14 +154,14 @@ impl LocalAdministration {
             _ => None,
         }
     }
-    pub(super) fn withdraw(&mut self, cx: &mut App) -> Option<Arc<LocalHostAccess>> {
+    pub(super) fn withdraw(&mut self, cx: &mut App) -> Option<RetiringAccess> {
         self.generation = self
             .generation
             .checked_add(1)
             .expect("local authority generation exhausted");
         self.secret.update(cx, |input, cx| input.retire(cx));
         let access = match std::mem::replace(&mut self.authority, Authority::Closed) {
-            Authority::Open(access) => Some(access),
+            Authority::Open(access) => Some(self.retirement.begin(access)),
             _ => None,
         };
         self.operation = Operation::Idle;
@@ -162,6 +237,7 @@ impl ClinicalApp {
         let task = cx
             .background_executor()
             .spawn(async move { session.authenticate_local_host(&passphrase).map(Arc::new) });
+        let retirement = self.local_host.retirement.clone();
         cx.spawn(async move |this, cx| {
             let result = task.await;
             let cleanup = result.as_ref().ok().cloned();
@@ -190,6 +266,7 @@ impl ClinicalApp {
                 })
                 .unwrap_or(false);
             if !accepted && let Some(access) = cleanup {
+                let access = retirement.begin(access);
                 cx.background_executor()
                     .spawn(async move {
                         let _ = access.retire();
@@ -530,6 +607,41 @@ impl ClinicalApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn unconfirmed_retirement_survives_restart_and_a_later_success_cannot_hide_it() {
+        let fixture = local_preferences::tests::Fixture::new();
+        std::fs::create_dir_all(&fixture.0).unwrap();
+        let path = fixture.0.join("retirement.json");
+        let notice = RetirementNotice::new(Some(path.clone()));
+        assert!(!notice.pending());
+        notice.change(true);
+        assert!(notice.pending());
+        let reopened = RetirementNotice::new(Some(path.clone()));
+        assert!(reopened.pending());
+        reopened.change(true);
+        reopened.change(false);
+        assert!(reopened.pending());
+        reopened.change(false);
+        assert!(!RetirementNotice::new(Some(path)).pending());
+    }
+    #[gpui::test]
+    fn unconfirmed_retirement_is_visible_on_the_locked_login_screen(cx: &mut gpui::TestAppContext) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            app.local_host.retirement.change(true);
+            app.disconnect(cx);
+        });
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert!(
+            cx.debug_bounds("local-session-retirement-warning")
+                .is_some()
+        );
+    }
     #[gpui::test]
     fn local_host_lock_retires_secret_and_pending_confirmation_and_generation(
         cx: &mut gpui::TestAppContext,

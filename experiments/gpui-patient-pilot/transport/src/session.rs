@@ -6842,7 +6842,7 @@ mod tests {
                     ),
                 );
             } else {
-                assert!(request.starts_with("POST /api/auth/login "));
+                assert!(request.starts_with("POST /api/auth/local-client/login "));
                 assert!(lower.contains(&format!("mediflow_auth_control={}", "c".repeat(43))));
                 assert!(lower.contains("if-match:"));
                 assert!(lower.contains("idempotency-key:"));
