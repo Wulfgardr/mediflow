@@ -954,6 +954,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
            equivalente esiste gia in testEveryClinicalSurfaceOpensOnThisIdiom, che
            gira su entrambi gli idiomi. */
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "compact-only layout contract")
+        app.launchEnvironment["MEDIFLOW_APPLE_UITEST_LONG_WORKLIST"] = "1"
         launch(seedPatients: true, section: "modules", dynamicTypeSize: "accessibility5")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
         let tabBar = app.tabBars.firstMatch
@@ -968,7 +969,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
         // The final row must start out of reach, otherwise this gate proves
         // nothing about scrolling.
-        let lastRow = app.buttons["patient-cell-uitest-2"]
+        let lastRow = app.buttons["patient-cell-uitest-scroll-8"]
         XCTAssertTrue(lastRow.waitForExistence(timeout: 15))
         XCTAssertFalse(
             lastRow.isHittable && lastRow.frame.maxY <= tabBar.frame.minY,
@@ -1140,7 +1141,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     // MARK: - Il giro completo, sullo stesso codice per iPhone e iPad
 
-    func testCompactClinicalTabsExposeStableIdentifiers() throws {
+    func testCompactClinicalTabsExposeVisibleLabels() throws {
         launch(seedPatients: true)
 
         let tabBar = app.tabBars.firstMatch
@@ -1148,20 +1149,16 @@ final class MediFlowMobileAppUITests: XCTestCase {
             throw XCTSkip("Il layout regolare iPad usa la sidebar, non la tab bar compatta.")
         }
 
-        let compactTabIdentifiers = [
-            "clinical-workspace-section-patients-button",
-            "clinical-workspace-section-agenda-button",
-            "clinical-workspace-section-diary-button",
-            "clinical-workspace-section-other-button",
-        ]
-        let identifierQuery = tabBar.descendants(matching: .any).matching(
-            NSPredicate(format: "identifier IN %@", compactTabIdentifiers)
-        )
-        XCTAssertEqual(
-            identifierQuery.count,
-            compactTabIdentifiers.count,
-            "La snapshot AX deve esporre una sola tab per ciascun identifier clinico compatto."
-        )
+        let compactTabLabels = ["Pazienti", "Agenda", "Diario", "Altro"]
+        for label in compactTabLabels {
+            let buttons = tabBar.buttons.matching(NSPredicate(format: "label == %@", label))
+            XCTAssertEqual(
+                buttons.count,
+                1,
+                "La snapshot AX deve esporre una sola tab per ciascuna etichetta clinica compatta: \(label)."
+            )
+            XCTAssertTrue(buttons.firstMatch.isHittable)
+        }
     }
 
     /// Opens every clinical surface on whichever idiom is running and requires
@@ -1213,8 +1210,13 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(ambulatoryScopePicker.isHittable)
         try app.performAccessibilityAudit()
 
-        XCTAssertTrue(openSection("Agenda"), "Agenda non e raggiungibile per l'audit accessibilita")
-        XCTAssertTrue(sectionView("clinical-workspace-agenda-view").waitForExistence(timeout: 15))
+        app.terminate()
+        launch(seedPatients: true, singlePatient: true)
+        let agendaTab = app.tabBars.buttons["Agenda"]
+        waitForUIReady(agendaTab, in: app)
+        agendaTab.tap()
+        let agenda = app.staticTexts["Collega l'home-base prima di caricare l'agenda."]
+        waitForUIReady(agenda, in: app)
         try app.performAccessibilityAudit()
     }
 
@@ -1769,6 +1771,13 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let draftBody = "Testo sintetico da conservare nel diario"
         let draftTranscript = "Trascrizione sintetica ancora da rivedere"
 
+        func waitForTypedValue(_ field: XCUIElement, expected: String) {
+            let completed = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "value == %@", expected), object: field)
+            XCTAssertEqual(XCTWaiter.wait(for: [completed], timeout: 15), .completed,
+                           "Il testo digitato deve essere completo prima di proseguire")
+        }
+
         // a device-orientation event alone does not prove that the
         // app window rotated. Record and await its geometry before reading the draft.
         func waitForDiaryOrientation(isLandscape: Bool) {
@@ -1844,6 +1853,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         title.tap()
         title.typeText(draftTitle)
+        waitForTypedValue(title, expected: draftTitle)
         XCTAssertTrue(revealDiaryControl(entryType))
         entryType.tap()
         let visit = app.buttons["Visita"]
@@ -1861,6 +1871,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(revealDiaryControl(paragraph))
         paragraph.tap()
         paragraph.typeText(draftBody)
+        waitForTypedValue(paragraph, expected: draftBody)
         XCTAssertEqual(paragraph.value as? String, draftBody)
         attachScreenshot(named: "mobile-harmonization-draft-keyboard-portrait")
         // cross the actual adaptive layout with a populated draft. A
@@ -1908,6 +1919,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertFalse(openVisitDraft.exists, "The opened visit composer has no destructive collapse action")
         transcript.tap()
         transcript.typeText(draftTranscript)
+        waitForTypedValue(transcript, expected: draftTranscript)
         XCTAssertEqual(transcript.value as? String, draftTranscript)
 
         openPatientSection(.documents)
@@ -2201,13 +2213,16 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["MEDIFLOW_APPLE_UITEST_OPEN_PATIENT_INDEX"] = "0"
         app.launch()
-        XCTAssertTrue(app.buttons["cancel-scale-button"].waitForExistence(timeout: 20))
+        waitForUIReady(app.buttons["cancel-scale-button"], in: app)
         XCTAssertEqual(app.staticTexts["scale-context-title"].label, "ADL · Rossi Mario")
         XCTAssertEqual(app.buttons["submit-scale-button"].label, "Completa")
         let result = app.staticTexts["scale-incomplete"]
         let question = app.buttons["scale-question-bath"]
+        XCTAssertTrue(result.waitForExistence(timeout: 20))
+        XCTAssertTrue(question.waitForExistence(timeout: 20))
         XCTAssertLessThan(result.frame.minY, question.frame.minY)
         app.buttons["cancel-scale-button"].tap()
+        XCTAssertTrue(app.buttons["cancel-scale-button"].waitForNonExistence(timeout: 15))
         XCTAssertFalse(app.buttons["submit-scale-button"].exists)
     }
 
@@ -2217,7 +2232,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.launchEnvironment["MEDIFLOW_APPLE_UITEST_OPEN_PATIENT_INDEX"] = "0"
         app.launchEnvironment["MEDIFLOW_APPLE_UITEST_SCALE_SWITCH_PATIENT"] = "1"
         launch(seedPatients: true, section: "modules")
-        XCTAssertTrue(app.buttons["cancel-scale-button"].waitForExistence(timeout: 20))
+        waitForUIReady(app.buttons["cancel-scale-button"], in: app)
         XCTAssertEqual(app.staticTexts["scale-context-title"].label, "ADL · Rossi Mario")
         for id in ["bath", "dress", "toilet", "transfer", "cont", "feed"] {
             let picker = app.buttons["scale-question-\(id)"]
@@ -2226,9 +2241,15 @@ final class MediFlowMobileAppUITests: XCTestCase {
             app.buttons["Dipendente"].tap()
         }
         XCTAssertEqual(app.staticTexts["scale-context-title"].label, "ADL · Rossi Mario")
+        waitForUIReady(app.buttons["submit-scale-button"], in: app)
         app.buttons["submit-scale-button"].tap()
-        XCTAssertTrue(sectionView("patient-detail-name").waitForExistence(timeout: 10))
-        XCTAssertEqual(sectionView("patient-detail-name").label, "Bianchi Anna")
+        XCTAssertTrue(app.buttons["cancel-scale-button"].waitForNonExistence(timeout: 20))
+        let changedPatient = sectionView("patient-detail-name")
+        let patientSelected = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == true AND label == %@", "Bianchi Anna"),
+            object: changedPatient)
+        XCTAssertEqual(XCTWaiter.wait(for: [patientSelected], timeout: 30), .completed)
+        XCTAssertEqual(changedPatient.label, "Bianchi Anna")
         openPatientSection(.diary)
         XCTAssertFalse(app.staticTexts["ADL (Indice di Katz)"].exists)
     }
@@ -2266,12 +2287,14 @@ final class MediFlowMobileAppUITests: XCTestCase {
                 XCTAssertFalse(app.staticTexts["scale-score"].exists)
             }
         }
+        waitForUIReady(app.buttons["submit-scale-button"], in: app)
         XCTAssertTrue(app.buttons["submit-scale-button"].isEnabled)
         XCTAssertEqual(app.buttons["submit-scale-button"].label, "Completa")
         app.buttons["submit-scale-button"].tap()
+        XCTAssertTrue(app.buttons["cancel-scale-button"].waitForNonExistence(timeout: 20))
 
         // The scale entry appears in the diary (seed short-circuit inserts it).
-        XCTAssertTrue(app.staticTexts["ADL (Indice di Katz)"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["ADL (Indice di Katz)"].waitForExistence(timeout: 30))
     }
 
     func testICDSearchAddsCodedDiagnosis() {

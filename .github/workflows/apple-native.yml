@@ -148,7 +148,7 @@ jobs:
               scripts/macos-native-artifact.py | scripts/macos-native-artifact_test.py | scripts/build-apple-macos-app.sh) apple=true; continue ;;
               # @Codex: la gamba UI gira solo fuori dalle PR. Il merge che introduce o
               # corregge quella gamba deve quindi attivarla sul push a main.
-              .github/workflows/apple-native.yml | scripts/assert-ipad-ui-contracts.sh)
+              .github/workflows/apple-native.yml | scripts/assert-ipad-ui-contracts.sh | scripts/report-xcuitest-retries.mjs | scripts/report-xcuitest-retries.test.mjs)
                 apple=true
                 continue
                 ;;
@@ -298,6 +298,9 @@ jobs:
         idiom: [iPhone, iPad]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
       - name: Select latest stable Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
       - name: Install xcodegen
@@ -343,17 +346,39 @@ jobs:
               -only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests/testIPadKeepsTheOpenChartAcrossRotation
             )
           fi
-          # -retry-tests-on-failure absorbs transient runner flakes (e.g. the
-          # "Timed out while acquiring background assertion" launch flake) without
-          # masking real failures: a test must pass within the retries.
           xcodebuild test \
             -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
             -scheme MediFlowMobileApp \
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.id }}" \
             "${only_testing[@]}" \
+            -resultBundlePath "${RUNNER_TEMP}/xcuitest-${{ matrix.idiom }}.xcresult" \
             -retry-tests-on-failure -test-iterations 2 \
             CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee "${RUNNER_TEMP}/xcuitest-${{ matrix.idiom }}.log"
+      - name: Report repeated tests and reject recovered product failures
+        if: ${{ !cancelled() }}
+        env:
+          IDIOM: ${{ matrix.idiom }}
+        run: node scripts/report-xcuitest-retries.mjs "${RUNNER_TEMP}/xcuitest-${{ matrix.idiom }}.xcresult"
+      - name: Export attachments for inspection without local Xcode
+        if: ${{ !cancelled() }}
+        run: |
+          xcrun xcresulttool export attachments \
+            --path "${RUNNER_TEMP}/xcuitest-${{ matrix.idiom }}.xcresult" \
+            --output-path "${RUNNER_TEMP}/xcuitest-${{ matrix.idiom }}-attachments"
+      - name: Retain XCUITest results and diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: xcuitest-${{ matrix.idiom }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/xcuitest-${{ matrix.idiom }}.xcresult
+            ${{ runner.temp }}/xcuitest-${{ matrix.idiom }}.xcresult.tests.json
+            ${{ runner.temp }}/xcuitest-${{ matrix.idiom }}.xcresult.retries.md
+            ${{ runner.temp }}/xcuitest-${{ matrix.idiom }}-attachments/
+            ${{ runner.temp }}/xcuitest-${{ matrix.idiom }}.log
+          if-no-files-found: error
+          retention-days: 7
       - name: Verify the four iPad contracts ran without skips
         if: ${{ !cancelled() && matrix.idiom == 'iPad' }}
         run: scripts/assert-ipad-ui-contracts.sh "${RUNNER_TEMP}/xcuitest-iPad.log"

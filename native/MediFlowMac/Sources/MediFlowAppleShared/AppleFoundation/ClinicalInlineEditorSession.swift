@@ -127,6 +127,7 @@ final class ClinicalInlineEditorSession {
     private var snapshot: [ClinicalRichTextTextRun]?
     private var kind: ClinicalRichTextEditorBlock.EditableKind = .paragraph
     private var applying = false
+    private var publishing = false
 
     init(document: Binding<ClinicalRichTextEditorDocument>, blockID: UUID, controller: ClinicalInlineEditorController) {
         self.document = document
@@ -140,6 +141,7 @@ final class ClinicalInlineEditorSession {
     }
 
     func synchronize(document: Binding<ClinicalRichTextEditorDocument>, enabled: Bool) {
+        guard !publishing else { return }
         self.document = document
         guard let surface else { return }
         guard let block = document.wrappedValue.blocks.first(where: { $0.id == blockID }),
@@ -243,6 +245,8 @@ final class ClinicalInlineEditorSession {
         var current = document.wrappedValue
         guard current.updateRuns(id: blockID, runs: runs, expecting: snapshot) else { return false }
         self.snapshot = ClinicalInlineEditing.coalesced(runs)
+        publishing = true
+        defer { publishing = false }
         document.wrappedValue = current
         return true
     }
