@@ -1,4 +1,5 @@
 import 'server-only';
+import { assertFunctionAvailableInRelease } from '../../ai-function-availability';
 
 import { types } from 'node:util';
 import { createHash } from 'node:crypto';
@@ -195,6 +196,7 @@ export function createTreatmentReasoningProductionService(sources: Sources) {
             return sources.projectionBroker.acquireIngest();
         },
         async acquirePreview(): Promise<Readonly<{ preview(input: unknown): Promise<TreatmentReasoningProductionResult> }>> {
+            assertFunctionAvailableInRelease('treatment_reasoning');
             const operation = await sources.projectionBroker.acquirePreview();
             return Object.freeze({
                 async preview(value: unknown): Promise<TreatmentReasoningProductionResult> {
@@ -294,6 +296,7 @@ export function createTreatmentReasoningPortableProductionService(sources: Porta
     return Object.freeze({
         acquireIngest: sources.projectionBroker.acquireIngest,
         async acquirePreview() {
+            assertFunctionAvailableInRelease('treatment_reasoning');
             const operation = await sources.projectionBroker.acquirePreview();
             return Object.freeze({ async preview(value: unknown): Promise<PortableTreatmentProductionResult> {
                 const request = previewRequest(value); if (!request) return deny('input_invalid') as Extract<TreatmentReasoningProductionResult, { status: 'denied' }>;

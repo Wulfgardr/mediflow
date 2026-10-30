@@ -1,6 +1,7 @@
+import 'server-only';
+import { AiFunctionUnavailableError, assertFunctionAvailableInRelease } from '../ai-function-availability';
 /* named host orchestration. Original function handlers own acquisition
  * and publication. This registry never turns a prompt/source/DTO into authority. */
-import 'server-only';
 import { nativeOrdinaryHostSourceSignal, nativeOrdinarySourceMatchesGrant, nativeOrdinarySourceAcquisition, nativeOrdinaryHostSourcesAreCurrent, readNativeOrdinaryHostSource, closeNativeOrdinaryHostSources,
     type NativeOrdinaryHostSourceCapture } from '../security/server-session-clinical-context-native-sources';
 import type { PairedNativeSession } from '../security/paired-native-session';
@@ -82,6 +83,7 @@ function snapshot(entry: Entry): OrdinaryFlowState {
 }
 function reply(value: unknown, status = 200) { return Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } }); }
 export function ordinaryFailure(error: unknown): Response {
+    if (error instanceof AiFunctionUnavailableError) return Response.json({ error: error.code, code: error.code }, { status: 403 });
     const code = error instanceof ProductError || error instanceof ExecutionError ? error.code : 'upstream_error';
     return reply({ error: 'OpenAI non disponibile per questa operazione. Nessun provider alternativo e stato usato.', code, receipt: { denial: error instanceof ProductError || error instanceof ExecutionError ? error.denial : null } },
         code === 'session_expired' ? 401 : ['invalid_request'].includes(code) ? 400 : ['busy', 'catalog_stale', 'model_unavailable', 'revoked'].includes(code) ? 409 : 503);
@@ -117,6 +119,7 @@ export function isOrdinaryFunctionSelected(functionId: OrdinaryFunction): boolea
  * The verifier removes authority; it cannot create an entry or select a profile. */
 export async function executeOwnedOrdinaryProfile(functionId: OrdinaryFunction, profile: OrdinaryTaskProfile,
     current: () => boolean, knownIdentifiers?: RedactionSessionInput['knownIdentifiers']): Promise<OrdinaryExecutionResult> {
+    assertFunctionAvailableInRelease(functionId);
     const entry = scope.getStore();
     if (!entry || entry.functionId !== functionId || entry.claimed || !entry.applicationCurrent || readOrdinaryTaskProfile(profile).functionId !== functionId) throw new ProductError('invalid_request');
     if (entry.session.authChannel === 'native' && !entry.nativeSources) throw new ProductError('revoked');
@@ -165,6 +168,7 @@ export function ordinaryResultMetadata(result: OrdinaryExecutionResult): Readonl
 /** The route passes the authenticated projection; identity is minted BEFORE lookup. */
 export async function beginOrdinaryFunction(request: Request, functionId: OrdinaryFunction, session: owner.OrdinarySession,
     originalHandler: (request: Request) => Promise<Response>): Promise<Response> {
+    assertFunctionAvailableInRelease(functionId);
     if (request.signal.aborted) throw new ProductError('revoked');
     const identity = acquireOrdinarySessionResourceIdentity(session);
     if (!identity) throw new ProductError('session_expired');

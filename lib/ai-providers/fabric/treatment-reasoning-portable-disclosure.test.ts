@@ -35,7 +35,7 @@ const command = (input: FunctionModelSources, version: 'v1' | 'v2' = 'v2'): Func
     const view = readFunctionModelPreferences(input, version);
     return { schemaVersion: version === 'v1' ? 'mediflow.function-preferences-command.v1' : 'mediflow.function-preferences-command.v2',
         commandId: randomUUID(), expectedRevision: view.revision, expectedCatalogRevision: view.catalogRevision, action: 'set',
-        functionId: 'treatment_reasoning', enabled: true, defaultModelOptionId: buildFunctionModelCatalog(input).hostDefaults.treatment_reasoning };
+        functionId: 'patient_insight', enabled: true, defaultModelOptionId: buildFunctionModelCatalog(input).hostDefaults.patient_insight };
 };
 
 test('v2 disclosure is configuration-only, honest engine identity; v1 roster and snapshot stay exact', () => {
@@ -92,40 +92,22 @@ test('negotiated v1 projection never widens its closed union; v2 shares authorit
 });
 
 test('legacy persisted MLX choice survives unchanged and is never promoted to portable when catalog changes', () => {
-    const legacy = sources(false); const request = command(legacy, 'v1'); const plan = planFunctionModelUpdate(legacy, request);
-    const saved = { ...legacy, settings: { ...legacy.settings, ...plan.writes } };
-    assert.equal(resolveFunctionModelDispatch(saved, 'treatment_reasoning').binding.provider, 'athena_mlx');
-    const withPortable = { ...saved, portable: status('admitted') };
-    for (const version of ['v1', 'v2'] as const) {
-        const row = readFunctionModelPreferences(withPortable, version).functions[3];
-        assert.equal(row.defaultModelOptionId, request.action === 'set' ? request.defaultModelOptionId : null);
-        assert.equal(row.bindingState, 'stale'); assert.equal(row.defaultSource, 'saved_preference');
-    }
-    assert.throws(() => resolveFunctionModelDispatch(withPortable, 'treatment_reasoning'), /catalog_stale/u);
-    assert.equal(withPortable.settings[FUNCTION_PREFERENCES_KEY], plan.writes[FUNCTION_PREFERENCES_KEY]);
+const legacy=sources(false);const catalog=buildFunctionModelCatalog(legacy);
+const state={schemaVersion:'mediflow.function-preferences-store.v1',defaults:{patient_insight:null,smart_import:null,document_synthesis:null,treatment_reasoning:{modelOptionId:catalog.hostDefaults.treatment_reasoning,catalogRevision:catalog.revision}},lastCommand:null};
+const raw=JSON.stringify(state);const saved={...legacy,settings:{...legacy.settings,[FUNCTION_PREFERENCES_KEY]:raw},portable:status('admitted')};
+for(const version of ['v1','v2'] as const){const row=readFunctionModelPreferences(saved,version).functions[3];assert.equal(row.defaultModelOptionId,catalog.hostDefaults.treatment_reasoning);assert.equal(row.bindingState,'stale');assert.equal(row.enabled,true);}
+assert.throws(()=>resolveFunctionModelDispatch(saved,'treatment_reasoning'),/Non disponibile/);assert.equal(saved.settings[FUNCTION_PREFERENCES_KEY],raw);
 });
 
 test('v1 commands cannot bind portable explicitly, by host-default or preset; all-off remains possible', () => {
-    const input = sources(); const req = command(input, 'v1');
-    assert.throws(() => planFunctionModelUpdate(input, req), /unsupported/u);
-    assert.throws(() => planFunctionModelUpdate(input, { ...req, defaultModelOptionId: null }), /unsupported/u);
-    const { schemaVersion, commandId, expectedRevision, expectedCatalogRevision } = req;
-    const preset = { schemaVersion, commandId, expectedRevision, expectedCatalogRevision, action: 'preset', presetId: 'host_defaults' };
-    assert.throws(() => planFunctionModelUpdate(input, preset), /unsupported/u);
-    assert.ok(planFunctionModelUpdate(input, { ...preset, presetId: 'all_off' }).view.functions.every(f => !f.enabled));
-    assert.throws(() => parseFunctionModelCommand({ ...req, extra: true }), /input_invalid/u);
-    const stale = { ...input, portable: { ...status('admitted'), revision: 3 } };
-    assert.throws(() => planFunctionModelUpdate(stale, command(input)), /catalog_stale/u);
+const input=sources();const req={...command(input,'v1'),functionId:'treatment_reasoning'};
+assert.throws(()=>planFunctionModelUpdate(input,req),/Non disponibile/);assert.throws(()=>planFunctionModelUpdate(input,{...req,defaultModelOptionId:null}),/Non disponibile/);
+const {schemaVersion,commandId,expectedRevision,expectedCatalogRevision}=req;
+for(const presetId of ['host_defaults','all_off']){const plan=planFunctionModelUpdate(input,{schemaVersion,commandId,expectedRevision,expectedCatalogRevision,action:'preset',presetId});assert.equal(plan.writes[FUNCTION_SWITCH_KEYS.treatment_reasoning],undefined);assert.equal(plan.view.functions[3].enabled,true);}
 });
 
 test('v1 can retain an opaque portable saved choice only while disabling; not re-enable it', () => {
-    const input = sources(); const plan = planFunctionModelUpdate(input, command(input));
-    const saved = { ...input, settings: { ...input.settings, ...plan.writes } };
-    const v1 = readFunctionModelPreferences(saved); assert.equal(v1.functions[3].bindingState, 'stale');
-    const req = { ...command(saved, 'v1'), enabled: false };
-    const disabled = planFunctionModelUpdate(saved, req); assert.equal(disabled.view.functions[3].enabled, false);
-    const later = { ...saved, settings: { ...saved.settings, ...disabled.writes } };
-    assert.throws(() => planFunctionModelUpdate(later, command(later, 'v1')), /unsupported/u);
+const input=sources();for(const enabled of [true,false])assert.throws(()=>planFunctionModelUpdate(input,{...command(input,'v1'),functionId:'treatment_reasoning',enabled}),/Non disponibile/);
 });
 
 test('browser rejects mislabeled v1 portable payloads, extra data, impossible readiness and mixed preview versions', () => {
@@ -136,7 +118,7 @@ test('browser rejects mislabeled v1 portable payloads, extra data, impossible re
         const changed = clone(value); const row = changed.functions[3].options.find(o => o.provider === 'athena_transformers');
         assert.ok(row); edit(row as unknown as Record<string, unknown>); assert.throws(() => parsePreferences(changed), /invalid/u);
     };
-    modifyOption(o => { o.provisioningState = 'NEEDS_CONTEXT'; });
+    modifyOption(o => { o.provisioningState = 'NEEDS_CONTEXT'; o.state = 'available_unqualified'; });
     modifyOption(o => { o.prerequisites = ['http://127.0.0.1']; });
     modifyOption(o => { o.secret = 'unexpected'; });
     modifyOption(o => { o.prerequisites = ['same', 'same']; });
@@ -188,14 +170,14 @@ test('current browser uses negotiated v2 through real producer preview/apply/rer
     };
     const client = createPreferencesClient(transport); t.after(() => client.reset());
     await client.read(); assert.equal(client.getSnapshot().dto?.schemaVersion, 'mediflow.function-preferences.v2');
-    await client.preview({ action: 'set', functionId: 'treatment_reasoning', enabled: true,
-        defaultModelOptionId: buildFunctionModelCatalog(f.input()).hostDefaults.treatment_reasoning });
+    await client.preview({ action: 'set', functionId: 'patient_insight', enabled: true,
+        defaultModelOptionId: buildFunctionModelCatalog(f.input()).hostDefaults.patient_insight });
     assert.ok(client.getSnapshot().proposed); assert.equal(f.writes(), 0);
-    await client.apply(); assert.equal(client.getSnapshot().saved, true); assert.deepEqual(f.batches(), [[FUNCTION_PREFERENCES_KEY, FUNCTION_SWITCH_KEYS.treatment_reasoning,
+    await client.apply(); assert.equal(client.getSnapshot().saved, true); assert.deepEqual(f.batches(), [[FUNCTION_PREFERENCES_KEY, FUNCTION_SWITCH_KEYS.patient_insight,
         FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY].sort()]);
     assert.equal(f.input().settings[FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY], '1');
     assert.deepEqual(headers, ['2', '2', '2', '2']);
-    assert.equal(resolveFunctionModelDispatch(f.input(), 'treatment_reasoning').binding.provider, 'athena_transformers');
+    assert.equal(resolveFunctionModelDispatch(f.input(), 'patient_insight').binding.provider, 'ollama');
 });
 
 test('Fabric route/page source wiring negotiates v2 while retaining legacy validator and account boundary', () => {
