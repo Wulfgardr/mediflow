@@ -104,6 +104,5 @@ test('receipt recovery is an explicit read using only the opaque command referen
     const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
     await frame.getByLabel('Riferimento del comando').fill(id);
     await frame.getByRole('button', { name: 'Rileggi esito' }).click();
-    const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: unknown[] } }).accessFixture.calls);
-    expect(calls).toContainEqual({ name: 'mediflow_native_access', arguments: { command: 'receipt', commandId: id } });
+    await expect.poll(() => page.evaluate(() => (window as unknown as { accessFixture: { calls: unknown[] } }).accessFixture.calls)).toContainEqual({ name: 'mediflow_native_access', arguments: { command: 'receipt', commandId: id } });
 });

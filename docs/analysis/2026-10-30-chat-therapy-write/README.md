@@ -59,3 +59,12 @@ state respinte: ora usano il binding esatto e le tre gare passano.
 
 Sviluppo assistito: GPT-6.1 Sol, effort xhigh, nessun subagente.
 Consumi non attribuiti; nessun merge o installazione nell'archivio reale.
+
+La build Web pulita di `5e2cad1239361e344e85b5b60ab37fc7c77510e0`
+è passata con Node 24.18.0, inclusi postbuild e verifica del bundle standalone.
+La suite mirata finale conta 52 test Node e 18 frame Playwright passati;
+il raccordo terapia Rust passa con un host HTTP doppio. La prima CI ha
+respinto il nuovo import `dbServer` non censito e ha esposto una lettura
+prematura dei messaggi nel test di recupero. L'inventario registra ora solo
+il nuovo import nominato, senza nuova connessione o writer. Il test attende
+l'arrivo del comando, senza retry dell'operazione.
