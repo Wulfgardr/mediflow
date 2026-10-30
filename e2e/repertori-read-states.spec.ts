@@ -62,7 +62,7 @@ async function installCatalogFixture(page: Page, baseURL: string) {
 
 for (const failure of ['counts', 'prosthetics'] as const) test(`Repertori: ${failure} read truth and recovery`, async ({ page: ownedPage, baseURL }, info) => {
   if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL
-    || new URL(baseURL).hostname !== '127.0.0.1' || (process.env.SETTINGS_CLOSURE === '1' && new URL(baseURL).port !== '3000')) throw Error('Owned synthetic archive and loopback required');
+    || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw Error('Owned synthetic archive and loopback required');
   test.setTimeout(settingsClosure ? 180_000 : 45_000);
   const baseline = process.env.REPERTORI_READ_BASELINE === '1';
   const directory = process.env.REPERTORI_READ_SCREENSHOTS;
@@ -200,7 +200,7 @@ for (const failure of ['counts', 'prosthetics'] as const) test(`Repertori: ${fai
 
 test('Repertori: failed WHO catalog read stays unreadable with an available optional service', async ({ page, baseURL }, info) => {
   if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL
-    || new URL(baseURL).hostname !== '127.0.0.1' || (process.env.SETTINGS_CLOSURE === '1' && new URL(baseURL).port !== '3000')) throw Error('Owned synthetic archive and loopback required');
+    || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw Error('Owned synthetic archive and loopback required');
   const fixture = await installCatalogFixture(page, baseURL), errors: string[] = [], observations: unknown[] = [];
   fixture.state.whoStatus = 503; fixture.state.whoAvailable = true;
   page.on('pageerror', error => errors.push(error.message));

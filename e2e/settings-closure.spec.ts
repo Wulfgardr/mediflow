@@ -5,9 +5,9 @@ import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { closureGallery } from './fixtures/settings-closure-gallery';
 
 function synthetic(baseURL?: string) {
-    if (!baseURL || new URL(baseURL).hostname !== '127.0.0.1' || (process.env.SETTINGS_CLOSURE === '1' && new URL(baseURL).port !== '3000')
+    if (!baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000'
         || process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR
-        || process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY !== '1') throw Error('Archivio sintetico isolato sulla porta 3000 richiesto');
+        || process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY !== '1') throw Error('Archivio sintetico isolato richiesto, mai sulla porta 3000');
 }
 
 test('Profilo: ritorno browser e blocco conservano la bozza senza salvarla', async ({ baseURL }) => {
