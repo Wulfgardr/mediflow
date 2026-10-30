@@ -1,4 +1,5 @@
 import 'server-only';
+import { observeNativeDocumentContext } from './security/native-document-context';
 import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import type { dbServer } from './db-server';
@@ -35,26 +36,44 @@ export function createNativePatientDocumentService(database: typeof dbServer, cl
     const commands = createPatientDocumentCommandService(database, clock);
     const sources = new Map<string, Source>();
     let preparing = 0;
+    const reservations = new Map<object, () => void>();
     async function host(context: NetworkWriteContext): Promise<PatientDocumentCreateHost> {
         if (context.session.authChannel !== 'native' || context.session.role !== 'admin') return deny();
+        const lifecycle = observeNativeDocumentContext(context.session, context.scopeAmbulatoryId);
         const guard = await prepareNetworkPatientCommitGuard(context, CAPABILITIES);
         const result: PatientDocumentCreateHost = {
             session: context.session, actorRef: context.session.userId, ambulatoryId: context.scopeAmbulatoryId,
-            archiveGeneration: archiveGenerationForSession(context.session) ?? deny(), epoch: 0, surface: 'native',
-            assertCurrent: tx => { if (guard(tx)) deny(); },
+            archiveGeneration: archiveGenerationForSession(context.session) ?? deny(), epoch: lifecycle.epoch, surface: 'native',
+            assertCurrent: tx => {
+                if (!lifecycle.current() || guard(tx)) {
+                    lifecycle.retire();
+                    deny();
+                }
+            },
             confirm: async pin => await confirmNativeChatAccessPin(context.session as PairedNativeSession, pin) === 'confirmed',
             retain(dispose) {
                 const port = serverSessions.mintNativeSessionResourcePort(context.session);
                 if (!port) return deny();
-                const registration = serverSessions.registerNativeSessionPrivateResource(port, dispose);
+                let release = () => {};
+                const retire = () => { try { dispose(); } finally { queueMicrotask(() => release()); } };
+                const registration = serverSessions.registerNativeSessionPrivateResource(port, retire);
                 if (!registration) { serverSessions.releaseNativeSessionResourcePort(port); return deny(); }
+                let releaseContext: () => void;
+                try { releaseContext = lifecycle.retain(retire); }
+                catch (error) {
+                    serverSessions.unregisterNativeSessionPrivateResource(port, registration);
+                    serverSessions.releaseNativeSessionResourcePort(port);
+                    throw error;
+                }
                 let released = false;
-                return () => {
+                release = () => {
                     if (released) return;
                     released = true;
+                    releaseContext();
                     serverSessions.unregisterNativeSessionPrivateResource(port, registration);
                     serverSessions.releaseNativeSessionResourcePort(port);
                 };
+                return release;
             },
         };
         database.transaction(tx => result.assertCurrent(tx), { behavior: 'immediate' });
@@ -62,7 +81,8 @@ export function createNativePatientDocumentService(database: typeof dbServer, cl
     }
     function owned(owner: PatientDocumentCreateHost, commandId: string) {
         const entry = sources.get(commandId);
-        if (entry && (entry.host.session !== owner.session || entry.host.ambulatoryId !== owner.ambulatoryId)) return deny();
+        if (entry && entry.host.session !== owner.session) return deny();
+        if (entry && (entry.host.ambulatoryId !== owner.ambulatoryId || entry.host.epoch !== owner.epoch)) { entry.release(); return deny(); }
         return entry;
     }
     function reread(owner: PatientDocumentCreateHost, commandId: string) {
@@ -88,7 +108,7 @@ export function createNativePatientDocumentService(database: typeof dbServer, cl
     return {
         async stage(context: NetworkWriteContext, value: unknown) {
             const owner = await host(context);
-            if (preparing >= 2 || sources.size >= 16 || [...sources.values()].some(entry => entry.host.session === owner.session)) return deny();
+            if (preparing >= 2 || reservations.size >= 16 || reservations.has(owner.session)) return deny();
             if (!value || typeof value !== 'object' || Array.isArray(value)
                 || Object.keys(value).sort().join(',') !== 'data,name,original,path') return deny();
             const input = value as Record<string, unknown>;
@@ -106,11 +126,13 @@ export function createNativePatientDocumentService(database: typeof dbServer, cl
             let source: PreparedPatientDocument | null = null;
             const dispose = () => {
                 current = false; bytes.fill(0); source = null;
+                if (reservations.get(owner.session) === release) reservations.delete(owner.session);
                 clearTimeout(timer);
                 if (commandId) sources.delete(commandId);
                 queueMicrotask(() => releaseOwner());
             };
             const release = () => { dispose(); releaseOwner(); };
+            reservations.set(owner.session, release);
             preparing += 1;
             try {
                 releaseOwner = owner.retain(dispose);
