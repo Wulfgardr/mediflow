@@ -44,7 +44,7 @@ test('history exposes content and source locally, confirmation is consumed and c
   await confirmation(page).click();
   await expect(page).toHaveURL(/#timeline$/u);
   const row = page.locator('#timeline article').filter({ hasText: 'Controllo inventato' });
-  await expect(row).toContainText('Contenuto sintetico della storia.');
+  await expect(row).not.toContainText('Contenuto sintetico della storia.');
   await expect(row).toContainText('Fonte: Fonte sintetica verificabile');
   await expect(row.locator('time')).toHaveAttribute('datetime', '2026-10-29T10:00:00.000Z');
   await expect(confirmation(page)).toHaveCount(0);

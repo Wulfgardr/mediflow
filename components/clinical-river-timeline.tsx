@@ -143,7 +143,7 @@ export function ClinicalRiverTimeline({
                                             <a href={presentation.href} aria-label={`Apri ${item.title} · ${presentation.label}`}>{item.title}</a>
                                         </h3>
                                         {item.source ? <p className={styles.origin}>Fonte: {item.source}</p> : null}
-                                        {item.summary ? <p className={styles.summary}>{item.summary}</p> : null}
+                                        {item.kind !== 'entry' && item.summary ? <p className={styles.summary}>{item.summary}</p> : null}
                                     </div>
                                 </article>
                             );

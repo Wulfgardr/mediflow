@@ -2,9 +2,9 @@
 
 Refs WUL-757. Contratto 0.9.1, P-2 e P-3; ADR 0159 e 0171.
 
-La timeline mostra il contenuto sintetizzato della voce e la fonte registrata,
-con la stessa lettura del diario. Il titolo apre il diario per leggere il testo
-completo. Una fonte non leggibile resta non disponibile. La ricevuta MCP rimane
+La timeline mostra data, titolo e fonte registrata della voce, senza ripetere
+la prosa del Diario (W-15b). Il titolo apre il Diario, dove si legge il testo.
+Una fonte non leggibile resta non disponibile. La ricevuta MCP rimane
 `continue_in_mediflow`: contenuto e fonte restano nella UI locale.
 
 ## Prove automatiche
@@ -25,7 +25,7 @@ Web Core esegue i due harness reali dopo la build; E2E esegue gli spec isolati.
 
 | Criterio | Prova ripetibile | Confine |
 | --- | --- | --- |
-| P-2 storia con fonte | Intento IPC, consenso UI, data, titolo, contenuto, fonte e accesso al diario | Web standalone reale, abbinamento locale; nessuna qualifica dei manifest CLI |
+| P-2 storia con fonte | Intento IPC, consenso UI, data, titolo, fonte nella timeline; contenuto nel Diario raggiunto dal titolo | Web standalone reale, abbinamento locale; nessuna qualifica dei manifest CLI |
 | P-3 cambio paziente | Cambio cartella e selezione cambiata da altro consumatore sulla stessa sessione | Conferma vecchia rimossa o negata prima della navigazione |
 | P-3 lock e revoca | Richiesta pendente ritirata, successive richieste negate | Sessione Web e autorità di abbinamento reali |
 | P-3 scadenza e timeout | IPC già scaduto, conferma oltre 15 secondi, risposta epoch ritardata | Nessuna navigazione tardiva; una richiesta nuova funziona |
