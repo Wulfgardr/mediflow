@@ -563,3 +563,16 @@ la tranche successiva alla base `c8b27824b`. G-2 e G-4 restano parziali.
 | G-4a | Picker multiplo fino a 20 file, un candidato letto alla volta; revisione, conferma e rilettura separate; esiti per file, senza avanzamento dopo esito incerto. Originale testuale UTF-8 nella vista, paginazione senza perdita di caratteri, fonte assente/illeggibile/estranea e ritiro dei callback precedenti. | Renderer PDF/immagini e qualifica completa del percorso nativo installato. Deduplicazione preventiva, non atomica fra client. |
 | G-4b/c/d | I limiti sono visibili nel client. Nuova scheda da documento indica non disponibile e non duplica C-6/PR #736. | Curation, revisione dei dati estratti, mapping e importazione strutturata CSV, raccordo al comando C-6 dopo integrazione. |
 | G-2 | Nessuna modifica. | Sicurezza account, gestione completa dei modelli e restanti pagine amministrative del censimento. |
+
+### Tranche G-2: accesso e modelli locali
+
+La tranche `codex/gpui-g2-settings`, dalla base `6c99ff83c`, aggiunge la pagina
+Accesso con cambio passphrase v3, kit r1 e blocco; Modelli e hardware legge
+l'inventario Ollama e modifica la configurazione tramite le route Web e la
+sessione locale già attestate. Nessuna seconda autorità o nuovo writer server.
+Il [rapporto](2026-10-30-gpui-g2-settings/README.md) elenca prima le lacune della
+base, poi superfici, prove e singoli residui con proposte di esclusione non
+approvate. G-2 resta aperta, incluse le parti G-2d/e/f/g non implementate.
+Download/rimozione sono riconciliati con il Web corrente, che non li offre
+come operazioni HTTP ammesse; il rinvio agli strumenti Ollama non è contato
+come completamento nativo.
