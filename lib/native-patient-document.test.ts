@@ -463,6 +463,42 @@ test('durable native receipt permits only the same operator device archive and s
     }
 });
 
+for (const previewed of [false, true]) test(`same owner new login can retire live ${previewed ? 'preview' : 'stage'} without resuming it`, async () => {
+    const context = fixture(), api = createNativePatientDocumentService(dbServer);
+    const view = await api.stage(context, await document());
+    if (previewed) await api.preview(context, view.commandId, view.viewId, review());
+    const session = createNativeServerSession({ id: context.session.userId, username: context.session.username, role: 'admin' }, {
+        clientId: context.pairedClient.clientId, clientPlatform: context.pairedClient.clientPlatform, tokenHash: context.pairedClient.tokenHash,
+    }, captureNativeLoginSessionFence());
+    bindSessionToArchive(session, currentArchiveGeneration());
+    const fresh = { ...context, session };
+    assert.deepEqual(await api.receipt(fresh, view.commandId), { outcome: 'unknown' });
+    await assert.rejects(api.preview(fresh, view.commandId, view.viewId, review()));
+    await assert.rejects(api.execute(fresh, view.commandId, pin));
+    const pairingRow = dbServer.select().from(settings).where(eq(settings.key, NETWORK_PAIRING_STATE_KEY)).get()!;
+    const previousClients = JSON.parse(pairingRow.value!).clients;
+    const otherDevice = fixture(context.scopeAmbulatoryId, { clientId: 'other-live-document-device' });
+    const pairingState = JSON.parse(dbServer.select().from(settings).where(eq(settings.key, NETWORK_PAIRING_STATE_KEY)).get()!.value!);
+    pairingState.clients.push(...previousClients);
+    dbServer.update(settings).set({ value: JSON.stringify(pairingState) }).where(eq(settings.key, NETWORK_PAIRING_STATE_KEY)).run();
+    assert.deepEqual(await api.receipt(otherDevice, randomUUID()), { outcome: 'unknown' });
+    await assert.rejects(api.revoke(otherDevice, view.commandId));
+    const user = { id: randomUUID(), username: randomUUID(), role: 'admin' };
+    dbServer.insert(users).values({ ...user, passwordHash: 'synthetic-unusable', encryptedMasterKey: 'synthetic-unusable', salt: 'synthetic-unusable' }).run();
+    const foreignSession = createNativeServerSession(user, {
+        clientId: context.pairedClient.clientId, clientPlatform: context.pairedClient.clientPlatform, tokenHash: context.pairedClient.tokenHash,
+    }, captureNativeLoginSessionFence());
+    bindSessionToArchive(foreignSession, currentArchiveGeneration());
+    const otherOperator = { ...context, session: foreignSession };
+    assert.deepEqual(await api.receipt(otherOperator, randomUUID()), { outcome: 'unknown' });
+    await assert.rejects(api.revoke(otherOperator, view.commandId));
+    assert.deepEqual(await api.receipt(fresh, view.commandId), { outcome: 'unknown' });
+    assert.deepEqual(await api.revoke(fresh, view.commandId), { outcome: 'retired' });
+    assert.deepEqual(await api.revoke(fresh, view.commandId), { outcome: 'retired' });
+    await assert.rejects(api.preview(context, view.commandId, view.viewId, review()));
+    await assert.rejects(api.execute(context, view.commandId, pin));
+});
+
 test('common command receipt remains opaque for chat and MCP consumers', async () => {
     const context = fixture(), api = createNativePatientDocumentService(dbServer), view = await api.stage(context, await document());
     await api.preview(context, view.commandId, view.viewId, review());

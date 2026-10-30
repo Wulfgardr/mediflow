@@ -259,6 +259,10 @@ soltanto rileggere la ricevuta o richiedere la revoca idempotente. Deve
 corrispondere per operatore, dispositivo, archivio e ambulatorio. Non può
 riprendere `preview` o `execute`; tali operazioni richiedono la lavorazione
 in RAM della sessione originale. Un comando sconosciuto resta `unknown`.
+Se la lavorazione originale è ancora in RAM, la revoca confronta lo stesso
+proprietario usato dalla ricevuta e ritira l’approvazione della sessione
+originale. Non trasferisce l’approvazione alla nuova sessione. Senza stato RAM
+né esito durevole, il ritiro conserva `unknown`.
 
 GPUI riusa `CommandReferences` e `ChatWriteResolution`, conservando soltanto
 il codice opaco prima della conferma. Alla riapertura avvisa e offre la
