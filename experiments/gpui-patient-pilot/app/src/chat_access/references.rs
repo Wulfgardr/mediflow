@@ -103,44 +103,28 @@ impl CommandReferences {
         let mut scan = ReferenceScan::default();
         for entry in fs::read_dir(path)? {
             let name = entry?.file_name();
-            if name == ".quarantine" {
-                continue;
-            }
             match name.to_str() {
-                Some(id) if self.verify(id).is_ok() => scan.ids.push(id.to_owned()),
+                Some(id) if Self::valid(id) => {
+                    if self.verify(id).is_err() {
+                        scan.invalid.push(name.clone());
+                    }
+                    scan.ids.push(id.to_owned());
+                }
+                Some(name_str) if Self::is_temporary(name_str) => {
+                    if fs::remove_file(path.join(&name)).is_err() {
+                        scan.invalid.push(name);
+                    }
+                }
                 _ => scan.invalid.push(name),
             }
         }
         scan.ids.sort();
         Ok(scan)
     }
-    pub(crate) fn quarantine_invalid(&self) -> io::Result<()> {
-        let scan = self.scan()?;
-        let directory = self.directory()?;
-        let quarantine = directory.join(".quarantine");
-        fs::DirBuilder::new()
-            .mode(0o700)
-            .recursive(true)
-            .create(&quarantine)?;
-        let meta = fs::symlink_metadata(&quarantine)?;
-        if !meta.is_dir()
-            || quarantine.canonicalize()? != quarantine
-            || meta.uid() != super::native::uid()
-            || meta.permissions().mode() & 0o777 != 0o700
-        {
-            return Err(io::ErrorKind::PermissionDenied.into());
-        }
-        let batch = quarantine.join(Self::temporary_name()?);
-        fs::DirBuilder::new().mode(0o700).create(&batch)?;
-        for name in scan.invalid {
-            if name.to_str().is_some_and(|id| self.verify(id).is_ok()) {
-                continue;
-            }
-            fs::rename(directory.join(&name), batch.join(name))?;
-        }
-        fs::File::open(&batch)?.sync_all()?;
-        fs::File::open(&quarantine)?.sync_all()?;
-        fs::File::open(directory)?.sync_all()
+    fn is_temporary(name: &str) -> bool {
+        name.strip_prefix(".pending-").is_some_and(|suffix| {
+            suffix.len() == 32 && suffix.bytes().all(|b| b.is_ascii_hexdigit())
+        })
     }
     fn temporary_name() -> io::Result<String> {
         let mut random = [0; 16];
@@ -189,7 +173,9 @@ impl CommandReferences {
         fs::File::open(directory)?.sync_all()
     }
     pub(crate) fn confirm(&self, id: &str, _outcome: ChatTherapyOutcome) -> io::Result<()> {
-        self.verify(id)?;
+        if !Self::valid(id) {
+            return Err(io::ErrorKind::InvalidInput.into());
+        }
         fs::remove_file(self.directory()?.join(id))?;
         fs::File::open(self.directory()?)?.sync_all()
     }
@@ -239,37 +225,33 @@ mod tests {
         fs::remove_dir(path).unwrap();
     }
     #[test]
-    fn incomplete_marker_does_not_hide_a_valid_command_and_can_be_quarantined() {
+    fn damaged_final_markers_remain_pending_alongside_valid_commands() {
         let store = CommandReferences::default();
         let valid = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-        let invalid = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+        let damaged = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
         store.remember(valid).unwrap();
         let directory = store.directory().unwrap().to_owned();
-        fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(directory.join(invalid))
-            .unwrap();
-        assert_eq!(
-            store.pending().unwrap(),
-            [valid],
-            "invalid marker hid a valid command"
-        );
-        assert_eq!(store.scan().unwrap().invalid, [OsString::from(invalid)]);
-        store.quarantine_invalid().unwrap();
+        for content in ["", "wrong", "cccccccc-cccc-4ccc-8ccc-cccccccccccc"] {
+            fs::write(directory.join(damaged), content).unwrap();
+            fs::set_permissions(directory.join(damaged), fs::Permissions::from_mode(0o600))
+                .unwrap();
+            assert_eq!(store.pending().unwrap(), [valid, damaged]);
+            assert_eq!(store.scan().unwrap().invalid, [OsString::from(damaged)]);
+            store.confirm(damaged, ChatTherapyOutcome::Applied).unwrap();
+        }
+        store.remember(damaged).unwrap();
+        fs::set_permissions(directory.join(damaged), fs::Permissions::from_mode(0o644)).unwrap();
+        assert_eq!(store.pending().unwrap(), [valid, damaged]);
+        assert_eq!(store.scan().unwrap().invalid, [OsString::from(damaged)]);
+        assert!(store.remember(damaged).is_err());
+        store.confirm(damaged, ChatTherapyOutcome::Applied).unwrap();
         assert_eq!(store.pending().unwrap(), [valid]);
-        assert!(store.scan().unwrap().invalid.is_empty());
-        let saved: Vec<_> = fs::read_dir(directory.join(".quarantine"))
-            .unwrap()
-            .collect();
-        assert_eq!(saved.len(), 1);
-        assert_eq!(
-            fs::metadata(saved[0].as_ref().unwrap().path().join(invalid))
-                .unwrap()
-                .len(),
-            0
-        );
+        fs::write(directory.join("not-a-command"), damaged).unwrap();
+        fs::write(directory.join(".pending-not-staging"), damaged).unwrap();
+        assert_eq!(store.pending().unwrap(), [valid]);
+        assert_eq!(store.scan().unwrap().invalid.len(), 2);
+        assert!(directory.join("not-a-command").exists());
+        assert!(directory.join(".pending-not-staging").exists());
         assert_eq!(fs::read_to_string(directory.join(valid)).unwrap(), valid);
         fs::remove_dir_all(directory).unwrap();
     }
@@ -287,9 +269,10 @@ mod tests {
         );
         assert_eq!(fs::read_to_string(&temporary).unwrap(), staged);
         assert_eq!(store.pending().unwrap(), [valid]);
+        assert!(!temporary.exists());
+        assert!(store.scan().unwrap().invalid.is_empty());
         store.remember(staged).unwrap();
         assert_eq!(store.pending().unwrap(), [valid, staged]);
-        store.quarantine_invalid().unwrap();
         assert_eq!(store.pending().unwrap(), [valid, staged]);
         fs::remove_dir_all(store.directory().unwrap()).unwrap();
     }

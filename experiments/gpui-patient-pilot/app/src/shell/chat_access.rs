@@ -391,18 +391,11 @@ impl ClinicalApp {
         Some(div().id("native-chat-recovery").flex().flex_col().gap(px(12.)).p(px(20.))
             .children(messages.into_iter().enumerate().map(|(index, (id, resolution))|
                 notice(format!("native-chat-recovery-warning-{index}"), format!("Comando {id}: {}", resolution.message()), self.theme, resolution == ChatTherapyResolution::Uncertain)))
-            .when(storage_error, |el| el.child(notice("native-chat-recovery-storage", "Problema di conservazione locale dei riferimenti. Gli esiti confermati restano confermati; i comandi validi possono essere riletti. Accantonare un elemento locale non conferma il ritiro sul server.", self.theme, true)))
+            .when(storage_error, |el| el.child(notice("native-chat-recovery-storage", "Problema di conservazione locale dei riferimenti. Gli esiti confermati restano confermati. I comandi riconoscibili dal nome possono essere riletti anche se il file è difettoso. Gli altri elementi non sono comandi e vengono ignorati.", self.theme, true)))
             .when(pending, |el| el.child(button("native-chat-recovery-reread", "Rileggi esito e completa il ritiro", self.theme, false, self.scope.is_some() && !self.chat_access.recovery_busy)
                 .on_click(cx.listener(|this, _, _, cx| this.reread_chat_recovery(cx)))))
             .when(storage_error && !pending, |el| el.child(button("native-chat-recovery-retry-storage", "Riprova lettura riferimenti locali", self.theme, false, self.scope.is_some())
                 .on_click(cx.listener(|this, _, _, cx| this.reread_chat_recovery(cx)))))
-            .when(invalid, |el| el.child(button("native-chat-recovery-quarantine", "Accantona gli elementi locali non validi", self.theme, false, true)
-                .on_click(cx.listener(|this, _, _, cx| {
-                    if let Some(session) = this.session.as_ref().filter(|s| !s.is_locked()) {
-                        this.chat_access.recovery_error = this.chat_access.references.for_session(session).quarantine_invalid().is_err();
-                    }
-                    cx.notify();
-                }))))
             .when(confirmed, |el| el.child(button("native-chat-recovery-dismiss", "Chiudi gli esiti confermati", self.theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.chat_access.recovery_messages.retain(|_, r| !matches!(r, ChatTherapyResolution::Confirmed(_)));
@@ -640,6 +633,14 @@ mod recovery_regressions {
                 .is_some(),
             "login is hidden"
         );
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(
+            directory
+                .join(session.chat_therapy_reference_namespace())
+                .join(A),
+            std::fs::Permissions::from_mode(0o644),
+        )
+        .unwrap();
         let reopened = crate::chat_access::owner::tests::relogin(&session);
         app.update(cx, |app, cx| {
             app.session = Some(reopened);
@@ -647,6 +648,17 @@ mod recovery_regressions {
             assert!(app.chat_access.pending.is_none());
             assert!(app.chat_recovery_view(cx).is_some());
         });
+        let labels = painted(cx);
+        assert!(
+            labels
+                .iter()
+                .any(|s| s.contains(A) && s.contains("Esito da verificare"))
+        );
+        assert!(
+            labels
+                .iter()
+                .any(|s| s.contains("Problema di conservazione locale"))
+        );
         click(cx, "control-label:Rileggi esito e completa il ritiro");
         assert!(
             references
@@ -795,10 +807,22 @@ mod recovery_regressions {
                 .iter()
                 .any(|s| s.contains("Problema di conservazione locale"))
         );
+        let labels = painted(cx);
+        for id in [A, B] {
+            assert!(
+                labels
+                    .iter()
+                    .any(|s| s.contains(id) && s.contains("Esito da verificare"))
+            );
+        }
+        assert!(
+            cx.debug_bounds("control-label:Accantona gli elementi locali non validi")
+                .is_none()
+        );
         click(cx, "control-label:Rileggi esito e completa il ritiro");
         assert!(
             references.pending().unwrap().is_empty(),
-            "incomplete marker blocked valid command recovery"
+            "damaged marker blocked command recovery"
         );
         let labels = painted(cx);
         assert!(
@@ -809,12 +833,21 @@ mod recovery_regressions {
         assert!(
             labels
                 .iter()
-                .any(|s| s.contains("Problema di conservazione locale"))
+                .any(|s| s.contains(B) && s.contains("Modifica registrata"))
         );
-        click(cx, "control-label:Accantona gli elementi locali non validi");
         assert!(references.scan().unwrap().invalid.is_empty());
         click(cx, "control-label:Chiudi gli esiti confermati");
         app.update(cx, |app, cx| assert!(app.chat_recovery_view(cx).is_none()));
+        std::fs::write(partition.join("not-a-command"), A).unwrap();
+        let labels = painted(cx);
+        assert!(
+            labels
+                .iter()
+                .any(|s| s.contains("Problema di conservazione locale"))
+        );
+        assert!(!labels.iter().any(|s| s.contains("Esito da verificare")));
+        assert!(references.pending().unwrap().is_empty());
+        std::fs::remove_file(partition.join("not-a-command")).unwrap();
         std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o755)).unwrap();
         app.update(cx, |app, cx| app.reread_chat_recovery(cx));
         let labels = painted(cx);
