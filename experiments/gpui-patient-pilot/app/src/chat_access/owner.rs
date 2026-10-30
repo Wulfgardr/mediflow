@@ -1,8 +1,8 @@
 use super::native::{self, Peer};
 #[cfg(all(test, target_os = "macos"))]
-use mediflow_runtime_client::ChatTherapyOutcome;
+use mediflow_runtime_client::ChatWriteOutcome;
 use mediflow_runtime_client::{
-    ChatAccessContext, ChatTherapyRecovery, ChatTherapyResolution, RuntimeSession,
+    ChatAccessContext, ChatWriteRecovery, ChatWriteResolution, RuntimeSession,
 };
 use std::{
     os::unix::net::UnixStream,
@@ -27,7 +27,7 @@ pub(crate) enum State {
     Consuming,
     Consumed,
     Withdrawn,
-    Therapy(ChatTherapyResolution),
+    Write(ChatWriteResolution),
 }
 impl State {
     pub(crate) fn wire(self) -> &'static str {
@@ -40,7 +40,7 @@ impl State {
             Self::Consuming => "consuming",
             Self::Consumed => "consumed",
             Self::Withdrawn => "withdrawn",
-            Self::Therapy(resolution) => resolution.wire(),
+            Self::Write(resolution) => resolution.wire(),
         }
     }
 }
@@ -76,7 +76,7 @@ pub(crate) struct Request {
     card: Option<super::card::Card>,
     cancelled: Arc<AtomicBool>,
     therapy: Option<TherapyWrite>,
-    recovery: Option<ChatTherapyRecovery>,
+    recovery: Option<ChatWriteRecovery>,
     pub(crate) references: super::references::CommandReferences,
 }
 pub(crate) type Pending = Arc<Mutex<Request>>;
@@ -132,8 +132,8 @@ impl Request {
         let therapy = self.therapy.as_ref()?;
         let (_, id) = therapy.selected.as_ref()?;
         let outcome = match self.state {
-            State::Therapy(ChatTherapyResolution::Uncertain) => "unknown",
-            State::Therapy(ChatTherapyResolution::Confirmed(outcome)) => outcome.wire(),
+            State::Write(ChatWriteResolution::Uncertain) => "unknown",
+            State::Write(ChatWriteResolution::Confirmed(outcome)) => outcome.wire(),
             State::Consumed => "unknown",
             _ => "pending",
         };
@@ -150,8 +150,8 @@ impl Request {
         if self.therapy.as_ref().is_some_and(|t| t.selected.is_some()) {
             if !matches!(
                 self.state,
-                State::Therapy(ChatTherapyResolution::Confirmed(_))
-                    | State::Therapy(ChatTherapyResolution::Uncertain)
+                State::Write(ChatWriteResolution::Confirmed(_))
+                    | State::Write(ChatWriteResolution::Uncertain)
             ) {
                 self.reconcile_therapy();
             }
@@ -170,19 +170,20 @@ impl Request {
         self.recovery = None;
     }
     pub(crate) fn revoke(&mut self) {
-        if self.state == State::Therapy(ChatTherapyResolution::Uncertain) {
+        if self.state == State::Write(ChatWriteResolution::Uncertain) {
             self.reconcile_therapy();
         } else {
             self.withdraw();
         }
     }
     pub(crate) fn reconcile_therapy(&mut self) {
-        self.state = State::Therapy(self.recovery.as_ref().map_or(
-            ChatTherapyResolution::Uncertain,
-            ChatTherapyRecovery::reconcile,
-        ));
+        self.state = State::Write(
+            self.recovery
+                .as_ref()
+                .map_or(ChatWriteResolution::Uncertain, ChatWriteRecovery::reconcile),
+        );
         self.deadline = None;
-        if let State::Therapy(ChatTherapyResolution::Confirmed(outcome)) = self.state
+        if let State::Write(ChatWriteResolution::Confirmed(outcome)) = self.state
             && let Some((_, id)) = self.therapy.as_ref().and_then(|t| t.selected.as_ref())
         {
             let _ = self.references.confirm(id, outcome);
@@ -204,8 +205,8 @@ impl Request {
         if !matches!(
             self.state,
             State::Withdrawn
-                | State::Therapy(ChatTherapyResolution::Uncertain)
-                | State::Therapy(ChatTherapyResolution::Confirmed(_))
+                | State::Write(ChatWriteResolution::Uncertain)
+                | State::Write(ChatWriteResolution::Confirmed(_))
         ) && !self.current((self.clock)())
         {
             self.withdraw();
@@ -325,7 +326,7 @@ pub(crate) fn choose_therapy(pending: &Pending, index: usize) {
         }
         if let Ok((id, recovery)) = result {
             if p.references.remember(&id).is_err() {
-                p.state = State::Therapy(recovery.reconcile());
+                p.state = State::Write(recovery.reconcile());
                 return;
             }
             p.recovery = Some(recovery);
@@ -691,7 +692,7 @@ pub(crate) mod tests {
             assert!(p.bind(session.clone(), context.clone()));
             p.references.remember(id).unwrap();
             p.recovery = Some(session.chat_therapy_recovery(&context, id).unwrap());
-            p.state = State::Therapy(ChatTherapyResolution::Uncertain);
+            p.state = State::Write(ChatWriteResolution::Uncertain);
         }
         (pending, remote)
     }
@@ -708,7 +709,7 @@ pub(crate) mod tests {
         pending.revoke();
         assert_eq!(
             pending.status(),
-            State::Therapy(ChatTherapyResolution::Uncertain),
+            State::Write(ChatWriteResolution::Uncertain),
             "detached Request kept the previous recovery session"
         );
         assert!(pending.begin().is_none());
@@ -756,9 +757,7 @@ pub(crate) mod tests {
         assert!(execute_therapy(&pending, attempt, "2468"));
         assert_eq!(
             pending.lock().unwrap().status(),
-            State::Therapy(ChatTherapyResolution::Confirmed(
-                ChatTherapyOutcome::Applied
-            ))
+            State::Write(ChatWriteResolution::Confirmed(ChatWriteOutcome::Applied))
         );
         let safe = pending.lock().unwrap().safe_result().unwrap();
         assert_eq!(safe["outcome"], "applied");
@@ -1313,7 +1312,7 @@ pub(crate) mod tests {
             pending.lock().unwrap().withdraw();
             assert_eq!(
                 pending.lock().unwrap().status(),
-                State::Therapy(ChatTherapyResolution::Uncertain)
+                State::Write(ChatWriteResolution::Uncertain)
             );
             std::fs::write(
                 std::env::var("REVIEW_KILL_READY").unwrap(),
@@ -1329,7 +1328,7 @@ pub(crate) mod tests {
             use std::os::unix::fs::PermissionsExt;
             let id = std::fs::read_to_string(&command_file).unwrap();
             let marker = directory
-                .join(session.chat_therapy_reference_namespace())
+                .join(session.chat_write_reference_namespace())
                 .join(&id);
             std::fs::set_permissions(marker, std::fs::Permissions::from_mode(0o644)).unwrap();
             assert_eq!(references.scan().unwrap().invalid.len(), 1);
@@ -1361,10 +1360,10 @@ pub(crate) mod tests {
         let retired = std::env::var("MEDIFLOW_CHAT_WITHDRAW_SCENARIO").unwrap() == "crash-retired";
         assert_eq!(
             state,
-            State::Therapy(if retired {
-                ChatTherapyResolution::Confirmed(ChatTherapyOutcome::Retired)
+            State::Write(if retired {
+                ChatWriteResolution::Confirmed(ChatWriteOutcome::Retired)
             } else {
-                ChatTherapyResolution::Uncertain
+                ChatWriteResolution::Uncertain
             }),
             "unknown receipt must not claim confirmed withdrawal"
         );
@@ -1421,7 +1420,7 @@ pub(crate) mod tests {
         request.revoke();
         assert_eq!(
             request.status(),
-            State::Therapy(ChatTherapyResolution::Uncertain)
+            State::Write(ChatWriteResolution::Uncertain)
         );
         assert_eq!(request.safe_result().unwrap()["outcome"], "unknown");
     }

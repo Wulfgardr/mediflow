@@ -4,13 +4,13 @@ use crate::chat_access::{
     self,
     owner::{Pending, State},
 };
-use mediflow_runtime_client::ChatTherapyResolution;
+use mediflow_runtime_client::ChatWriteResolution;
 use std::{collections::BTreeMap, time::Duration};
 
 pub(super) struct ChatAccess {
     listener: Option<chat_access::Listener>,
     references: CommandReferences,
-    recovery_messages: BTreeMap<String, ChatTherapyResolution>,
+    recovery_messages: BTreeMap<String, ChatWriteResolution>,
     recovery_namespace: Option<String>,
     recovery_error: bool,
     recovery_busy: bool,
@@ -63,7 +63,7 @@ impl ChatAccess {
         self.owner.as_ref().is_some_and(|(namespace, owner)| {
             !owner.is_locked()
                 && !session.is_locked()
-                && *namespace == session.chat_therapy_reference_namespace()
+                && *namespace == session.chat_write_reference_namespace()
         })
     }
     fn unattached_commands(&self, session: &RuntimeSession) -> std::io::Result<ReferenceScan> {
@@ -100,7 +100,7 @@ impl ChatAccess {
             p.lock().is_ok_and(|mut p| {
                 matches!(
                     p.status(),
-                    State::Withdrawn | State::Therapy(ChatTherapyResolution::Confirmed(_))
+                    State::Withdrawn | State::Write(ChatWriteResolution::Confirmed(_))
                 )
             })
         }) {
@@ -177,9 +177,8 @@ impl ClinicalApp {
         if let Some(pending) = incoming {
             self.chat_access.retire(cx);
             if self.chat_access.pending.as_ref().is_some_and(|p| {
-                p.lock().is_ok_and(|mut p| {
-                    p.status() == State::Therapy(ChatTherapyResolution::Uncertain)
-                })
+                p.lock()
+                    .is_ok_and(|mut p| p.status() == State::Write(ChatWriteResolution::Uncertain))
             }) {
                 if let Ok(mut p) = pending.lock() {
                     p.withdraw();
@@ -215,7 +214,7 @@ impl ClinicalApp {
                     let preparing = pending.clone();
                     std::thread::spawn(move || crate::chat_access::owner::prepare_card(&preparing));
                     self.chat_access.owner =
-                        Some((session.chat_therapy_reference_namespace(), session.clone()));
+                        Some((session.chat_write_reference_namespace(), session.clone()));
                     self.chat_access.patient = patient;
                     self.chat_access.archive = archive;
                     self.chat_access.pending = Some(pending);
@@ -317,7 +316,7 @@ impl ClinicalApp {
             return;
         }
         self.chat_access.recovery_busy = true;
-        let namespace = session.chat_therapy_reference_namespace();
+        let namespace = session.chat_write_reference_namespace();
         if self.chat_access.recovery_namespace.as_ref() != Some(&namespace) {
             self.chat_access.recovery_messages.clear();
         }
@@ -331,8 +330,8 @@ impl ClinicalApp {
             for id in scan.ids {
                 let resolution = session
                     .recover_chat_therapy_command(&scope, &id)
-                    .map_or(ChatTherapyResolution::Uncertain, |r| r.reconcile());
-                if let ChatTherapyResolution::Confirmed(outcome) = resolution {
+                    .map_or(ChatWriteResolution::Uncertain, |r| r.reconcile());
+                if let ChatWriteResolution::Confirmed(outcome) = resolution {
                     storage_error |= references.confirm(&id, outcome).is_err();
                 }
                 resolutions.insert(id, resolution);
@@ -344,7 +343,7 @@ impl ClinicalApp {
             let _ = this.update(cx, |this, cx| {
                 if !owner.is_locked()
                     && this.session.as_ref().is_some_and(|s| {
-                        !s.is_locked() && s.chat_therapy_reference_namespace() == namespace
+                        !s.is_locked() && s.chat_write_reference_namespace() == namespace
                     })
                     && this.chat_access.recovery_epoch == epoch
                 {
@@ -363,7 +362,7 @@ impl ClinicalApp {
         let session = self.session.as_ref().filter(|s| !s.is_locked())?;
         let recovery = self.chat_access.unattached_commands(session);
         let mut messages = if self.chat_access.recovery_namespace.as_ref()
-            == Some(&session.chat_therapy_reference_namespace())
+            == Some(&session.chat_write_reference_namespace())
         {
             self.chat_access.recovery_messages.clone()
         } else {
@@ -376,9 +375,7 @@ impl ClinicalApp {
             pending = !scan.ids.is_empty();
             invalid = !scan.invalid.is_empty();
             for id in scan.ids {
-                messages
-                    .entry(id)
-                    .or_insert(ChatTherapyResolution::Uncertain);
+                messages.entry(id).or_insert(ChatWriteResolution::Uncertain);
             }
         }
         storage_error |= invalid;
@@ -387,10 +384,10 @@ impl ClinicalApp {
         }
         let confirmed = messages
             .values()
-            .any(|r| matches!(r, ChatTherapyResolution::Confirmed(_)));
+            .any(|r| matches!(r, ChatWriteResolution::Confirmed(_)));
         Some(div().id("native-chat-recovery").flex().flex_col().gap(px(12.)).p(px(20.))
             .children(messages.into_iter().enumerate().map(|(index, (id, resolution))|
-                notice(format!("native-chat-recovery-warning-{index}"), format!("Comando {id}: {}", resolution.message()), self.theme, resolution == ChatTherapyResolution::Uncertain)))
+                notice(format!("native-chat-recovery-warning-{index}"), format!("Comando {id}: {}", resolution.message()), self.theme, resolution == ChatWriteResolution::Uncertain)))
             .when(storage_error, |el| el.child(notice("native-chat-recovery-storage", "Problema di conservazione locale dei riferimenti. Gli esiti confermati restano confermati. I comandi riconoscibili dal nome possono essere riletti anche se il file è difettoso. Gli altri elementi non sono comandi e vengono ignorati.", self.theme, true)))
             .when(pending, |el| el.child(button("native-chat-recovery-reread", "Rileggi esito e completa il ritiro", self.theme, false, self.scope.is_some() && !self.chat_access.recovery_busy)
                 .on_click(cx.listener(|this, _, _, cx| this.reread_chat_recovery(cx)))))
@@ -398,7 +395,7 @@ impl ClinicalApp {
                 .on_click(cx.listener(|this, _, _, cx| this.reread_chat_recovery(cx)))))
             .when(confirmed, |el| el.child(button("native-chat-recovery-dismiss", "Chiudi gli esiti confermati", self.theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| {
-                    this.chat_access.recovery_messages.retain(|_, r| !matches!(r, ChatTherapyResolution::Confirmed(_)));
+                    this.chat_access.recovery_messages.retain(|_, r| !matches!(r, ChatWriteResolution::Confirmed(_)));
                     cx.notify();
                 })))))
     }
@@ -469,7 +466,7 @@ impl ClinicalApp {
             .child(self.chat_access.pin.clone())
             .child(button("native-chat-access-pin-confirm", "Conferma con PIN", theme, false, enabled)
                 .when(enabled, |el| el.on_click(cx.listener(|this, _, _, cx| this.approve_chat_access(true, cx)))))
-            .when(state == State::Therapy(ChatTherapyResolution::Uncertain), |el| el
+            .when(state == State::Write(ChatWriteResolution::Uncertain), |el| el
                 .child(notice("native-chat-therapy-uncertain", "Esito da verificare. Il ritiro non è confermato: la scrittura potrebbe essere avvenuta. Rileggi l’esito prima di proseguire.", theme, true))
                 .child(button("native-chat-therapy-reread", "Rileggi esito e completa il ritiro", theme, false, true)
                     .on_click(cx.listener(|this, _, _, cx| {
@@ -478,11 +475,11 @@ impl ClinicalApp {
                         }
                         cx.notify();
                     }))))
-            .when_some(if let State::Therapy(resolution) = state { Some(resolution) } else { None }, |el, resolution| el.child(notice("native-chat-therapy-outcome", resolution.message(), theme, resolution == ChatTherapyResolution::Uncertain)))
+            .when_some(if let State::Write(resolution) = state { Some(resolution) } else { None }, |el, resolution| el.child(notice("native-chat-therapy-outcome", resolution.message(), theme, resolution == ChatWriteResolution::Uncertain)))
             .child(button("native-chat-access-deny", "Nega e ritira", theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| { this.chat_access.retire(cx); cx.notify(); })))
             .when(state != State::Challenge, |el| el.child(notice("native-chat-access-state",
-                if matches!(state, State::Therapy(ChatTherapyResolution::Confirmed(_)) | State::Therapy(ChatTherapyResolution::Uncertain)) { "" } else if state == State::Consumed && therapy_mode { "Operazione terminata. Controlla ricevuta e rilettura; nessuna ripetizione automatica." } else if state == State::Consumed { "Scheda consegnata. Puoi revocare la vista; i byte già ricevuti dall’host non vengono cancellati." } else if state == State::Approved { "Scheda autorizzata per una sola lettura nella vista chat." } else { "Conferma in corso…" }, theme, false))))
+                if matches!(state, State::Write(ChatWriteResolution::Confirmed(_)) | State::Write(ChatWriteResolution::Uncertain)) { "" } else if state == State::Consumed && therapy_mode { "Operazione terminata. Controlla ricevuta e rilettura; nessuna ripetizione automatica." } else if state == State::Consumed { "Scheda consegnata. Puoi revocare la vista; i byte già ricevuti dall’host non vengono cancellati." } else if state == State::Approved { "Scheda autorizzata per una sola lettura nella vista chat." } else { "Conferma in corso…" }, theme, false))))
     }
 }
 
@@ -561,7 +558,7 @@ mod tests {
 #[cfg(all(test, target_os = "macos"))]
 mod recovery_regressions {
     use super::*;
-    use mediflow_runtime_client::ChatTherapyOutcome;
+    use mediflow_runtime_client::ChatWriteOutcome;
     const A: &str = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     const B: &str = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
     fn directory() -> std::path::PathBuf {
@@ -603,7 +600,7 @@ mod recovery_regressions {
         app.update(cx, |app, cx| {
             app.chat_access = ChatAccess::new(app.theme, Some(directory.clone()), cx);
             app.chat_access.owner =
-                Some((session.chat_therapy_reference_namespace(), session.clone()));
+                Some((session.chat_write_reference_namespace(), session.clone()));
             app.chat_access.pending = Some(pending.clone());
             app.session = Some(session.clone());
             assert!(app.chat_access_view(cx).is_some());
@@ -622,7 +619,7 @@ mod recovery_regressions {
             pending.lock().unwrap().revoke();
             assert_eq!(
                 pending.lock().unwrap().status(),
-                State::Therapy(ChatTherapyResolution::Uncertain),
+                State::Write(ChatWriteResolution::Uncertain),
                 "detached Request used a closed session to reconcile"
             );
         });
@@ -636,7 +633,7 @@ mod recovery_regressions {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(
             directory
-                .join(session.chat_therapy_reference_namespace())
+                .join(session.chat_write_reference_namespace())
                 .join(A),
             std::fs::Permissions::from_mode(0o644),
         )
@@ -688,7 +685,7 @@ mod recovery_regressions {
             cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
         app.update(cx, |app, cx| {
             app.chat_access = ChatAccess::new(app.theme, Some(directory.clone()), cx);
-            app.chat_access.owner = Some((first.chat_therapy_reference_namespace(), first.clone()));
+            app.chat_access.owner = Some((first.chat_write_reference_namespace(), first.clone()));
             app.chat_access.pending = Some(pending);
             app.session = Some(second.clone());
             assert!(
@@ -735,9 +732,7 @@ mod recovery_regressions {
             assert!(references.pending().unwrap().is_empty());
             assert_eq!(
                 app.chat_access.recovery_messages.get(A),
-                Some(&ChatTherapyResolution::Confirmed(
-                    ChatTherapyOutcome::Applied
-                ))
+                Some(&ChatWriteResolution::Confirmed(ChatWriteOutcome::Applied))
             );
         });
         app.update(cx, |app, cx| app.reread_chat_recovery(cx));
@@ -787,7 +782,7 @@ mod recovery_regressions {
         let (session, _host) = crate::chat_access::owner::tests::native_session();
         let references = CommandReferences::new(Some(directory.clone())).for_session(&session);
         references.remember(A).unwrap();
-        let partition = directory.join(session.chat_therapy_reference_namespace());
+        let partition = directory.join(session.chat_write_reference_namespace());
         std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)

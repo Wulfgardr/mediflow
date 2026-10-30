@@ -17,14 +17,15 @@ function copy(file, destination, replacements = {}, transform = s => s) {
 }
 for (const name of ['baseline', 'cas', 'threshold', 'view-lifetime', 'single-use', 'restored']) {
   const directory = join(output, name); mkdirSync(directory);
-  const native = join(directory, 'native.ts'), common = join(directory, 'common.ts'), writer = join(directory, 'writer.ts'), test = join(directory, 'test.ts');
-  const replacements = { [resolve('lib/chat-therapy-status.ts')]: native, [resolve('lib/therapy-status-command-service')]: common, [resolve('lib/therapy-status-command-service.ts')]: common,
+  const native = join(directory, 'native.ts'), common = join(directory, 'common.ts'), writer = join(directory, 'writer.ts'), test = join(directory, 'test.ts'), approvals = join(directory, 'approvals.ts');
+  const replacements = { [resolve('lib/native-chat-write-approval')]: approvals, [resolve('lib/native-chat-write-approval.ts')]: approvals, [resolve('lib/chat-therapy-status.ts')]: native, [resolve('lib/therapy-status-command-service')]: common, [resolve('lib/therapy-status-command-service.ts')]: common,
     [resolve('lib/therapy-write-operation')]: writer };
   copy('lib/therapy-write-operation.ts', writer, {}, source => name === 'cas' ? source.replace('if (existing.version !== input.expectedVersion)', 'if (false)').replace('eq(therapies.version, input.expectedVersion)', 'eq(therapies.version, existing.version)') : source);
   copy('lib/therapy-status-command-service.ts', common, replacements);
-  copy('lib/chat-therapy-status.ts', native, replacements, source => name === 'threshold' ? source.replaceAll('now() - preview.at >= 30_000', 'false')
+  copy('lib/native-chat-write-approval.ts', approvals, replacements, source => name === 'threshold' ? source.replaceAll('now() - preview.at >= 30_000', 'false')
     : name === 'view-lifetime' ? source.replaceAll('now() - preview.viewAt >= 300_000', 'false')
-    : name === 'single-use' ? source.replace("|| preview.phase !== 'preview'", '').replace("preview.phase = 'retired'; previews.delete(commandId);", '') : source);
+    : name === 'single-use' ? source.replace("|| preview.phase !== 'preview'", '').replace('finish: retire', 'finish: () => undefined') : source);
+  copy('lib/chat-therapy-status.ts', native, replacements);
   copy('lib/chat-therapy-status.test.ts', test, replacements);
   const run = spawnSync(process.execPath, ['scripts/run-strip-types.mjs', '--test', '--test-reporter=tap', test], { cwd: root,
     env: { ...process.env, MEDIFLOW_DATA_DIR: directory }, encoding: 'utf8' });
