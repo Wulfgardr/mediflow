@@ -790,13 +790,22 @@ export async function main(args = process.argv.slice(2)) {
       });
       owned.stderr.on('data', chunk => process.stderr.write(chunk));
       target = await headlessUrl;
-      const ready = await waitForRunningInstance(target, current.sourceFingerprint, { timeoutMs: 120000,
-        probe: async (url, expected) => {
-          if (closing || !owned.pid || owned.exitCode !== null || owned.signalCode !== null) throw new Error('Il processo MediFlow si è arrestato prima di essere pronto.');
-          return probeRunningInstance(url, expected);
-        } });
-      if (choice === 'web' && !await verifyOwnedWeb(target, webSecret)) throw new Error('L’identità Web non è verificata.');
-      if (!ready.ok) throw new Error('MediFlow non risponde con l’identità attesa. Controlla il terminale.');
+      const startup = new AbortController();
+      const abortStartup = () => startup.abort();
+      const startupTimer = setTimeout(abortStartup, 120000);
+      owned.once('exit', abortStartup);
+      try {
+        const ready = await waitForRunningInstance(target, current.sourceFingerprint, { timeoutMs: 120000,
+          probe: async (url, expected) => {
+            if (closing || !owned.pid || owned.exitCode !== null || owned.signalCode !== null) throw new Error('Il processo MediFlow si è arrestato prima di essere pronto.');
+            return probeRunningInstance(url, expected);
+          } });
+        if (!ready.ok) throw new Error('MediFlow non risponde con l’identità attesa. Controlla il terminale.');
+        if (choice === 'web' && !await verifyOwnedWeb(target, webSecret, startup.signal)) throw new Error('L’identità Web non è verificata.');
+      } finally {
+        clearTimeout(startupTimer);
+        owned.off('exit', abortStartup);
+      }
       if (owned.exitCode !== null || owned.signalCode !== null) throw new Error('Il processo MediFlow si è arrestato durante l’avvio.');
       ipcStopChildren.add(owned);
     }
