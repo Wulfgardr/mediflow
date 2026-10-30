@@ -1,3 +1,4 @@
+import { settingsClosure } from './fixtures/settings-closure-gallery';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { buildPortableFabricStatusSnapshot } from '../lib/ai-providers/fabric/status';
@@ -69,7 +70,7 @@ const cases: readonly [route: 'fabric' | 'governance', scenario: Scenario][] = [
 for (const [route, scenario] of cases) test(`${route} read state: ${scenario}`, async ({ baseURL }) => {
     test.setTimeout(90_000);
     test.skip(supplemental400 && !(route === 'fabric' && scenario === 'status-error' || route === 'governance' && scenario === 'error'));
-    if (!baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000'
+    if (!baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port !== '3000'
         || process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR) throw Error('Owned synthetic loopback required');
     const zoom = await openBrowserZoomFixture(baseURL), page = zoom.page;
     const guard = await installFunctionsEgressGuard(page, baseURL);
@@ -103,7 +104,8 @@ for (const [route, scenario] of cases) test(`${route} read state: ${scenario}`, 
     });
     try {
         await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-        await page.goto(`/settings/ai/${route}`);
+        await page.goto(settingsClosure && route === 'fabric' ? '/settings/ai' : `/settings/ai/${route}`);
+        await expect(page).toHaveURL(new URL(`/settings/ai/${route}`, baseURL).href);
         const surface = page.getByTestId(`settings-ai-${route}-section`);
         await expect(surface).toBeVisible();
         let target: Locator;
@@ -183,9 +185,9 @@ for (const [route, scenario] of cases) test(`${route} read state: ${scenario}`, 
         if (!captureOpenDiagnostic) await capture(page, target, `${route}-${scenario}-1440`, frames);
         const visualState = route === 'fabric' ? ['pending', 'status-error', 'unauthorized'].includes(scenario) : ['pending', 'error'].includes(scenario);
         const dayColors = new Map<number | string, string>();
-        if (visualState) for (const theme of ['giorno', 'grafite']) for (const size of [320, 'zoom-400'] as const) {
-            await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(size === 'zoom-400' ? 4 : 1);
-            if (size === 320) await page.setViewportSize({ width: 320, height: 1000 });
+        if (visualState || settingsClosure) for (const theme of ['giorno', 'grafite']) for (const size of (settingsClosure ? [1440, 768, 390, 'zoom-200'] : [320, 'zoom-400'])) {
+            await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(size === 'zoom-400' ? 4 : size === 'zoom-200' ? 2 : 1);
+            if (typeof size === 'number') await page.setViewportSize({ width: size, height: 1000 });
             await page.evaluate(theme => { document.documentElement.classList.toggle('dark', theme === 'grafite'); document.documentElement.dataset.theme = theme; }, theme);
             const evidence = await capture(page, target, `${route}-${scenario}-${theme}-${size}`, frames);
             expect(evidence.theme).toBe(theme);
