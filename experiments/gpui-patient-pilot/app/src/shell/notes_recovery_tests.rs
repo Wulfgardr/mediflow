@@ -17,6 +17,7 @@ const CONCURRENT: &str = "C: controllo anticipato a venerdì";
 const PUT: &str = "PUT /api/v1/network/patients/patient-a";
 
 struct HostState {
+    unlock_salt: String,
     notes: Value,
     version: u64,
     epoch: u64,
@@ -44,6 +45,7 @@ impl Host {
         let requests = Arc::new(Mutex::new(Vec::new()));
         let captured = requests.clone();
         let state = Arc::new(Mutex::new(HostState {
+            unlock_salt: "AwMDAwMDAwMDAwMDAwMDAw==".into(),
             notes: json!("A: note iniziali"),
             version: 1,
             epoch: 1,
@@ -90,7 +92,11 @@ impl Host {
                 let mut status = 200;
                 let response = match route.as_str() {
                 "GET /api/auth/check" => json!({"status":"ok", "isSetup":true, "archiveGeneration":"synthetic-generation",
-                    "unlock":{"credential":"passphrase", "kdfVersion":3, "salt":"AwMDAwMDAwMDAwMDAwMDAw=="}}),
+                    "unlock":{"credential":"passphrase", "kdfVersion":3, "salt":state.unlock_salt}}),
+                "POST /api/auth/passphrase/change" => {
+                    state.unlock_salt = body["salt"].as_str().unwrap().to_owned();
+                    json!({"success":true})
+                },
                 "POST /api/auth/local-client/login" => json!({"success":true,"id":"synthetic-user","username":"synthetic","role":"admin","archiveGeneration":"synthetic-generation"}),
                 "POST /api/auth/local-client/logout" => { status = 204; Value::Null },
                 "POST /api/system/backup-restore" => { status = 409; json!({"success":false,"code":"restore_blocked","reason":"snapshot"}) },

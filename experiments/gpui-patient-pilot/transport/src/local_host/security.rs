@@ -6,6 +6,7 @@ pub struct PreparedPassphraseChange {
     owner: Weak<()>,
     bundle: crypto::PassphraseBundle,
     current_verifier: Zeroizing<String>,
+    previous_salt: String,
     submitted: AtomicBool,
 }
 impl PreparedPassphraseChange {
@@ -48,6 +49,10 @@ impl LocalHostAccess {
             owner: Arc::downgrade(&self.owner),
             bundle,
             current_verifier: material.verifier,
+            previous_salt: checked["unlock"]["salt"]
+                .as_str()
+                .ok_or(RuntimeError::InvalidResponse)?
+                .to_owned(),
             submitted: AtomicBool::new(false),
         })
     }
@@ -81,6 +86,20 @@ impl LocalHostAccess {
                 secret.zeroize();
             }
         }
+        let verified = if matches!(&result, Ok(value) if value["success"] == true) {
+            self.request(Method::GET, &["api", "auth", "check"], None, false)
+                .is_ok_and(|checked| {
+                    checked["status"] == "ok"
+                        && checked["isSetup"] == true
+                        && checked["archiveGeneration"] == self.generation
+                        && checked["unlock"]["credential"] == "passphrase"
+                        && checked["unlock"]["kdfVersion"] == 3
+                        && checked["unlock"]["salt"] == body["salt"]
+                        && checked["unlock"]["salt"] != command.previous_salt
+                })
+        } else {
+            false
+        };
         self.native.lock();
         match result {
             Ok(value) if value["success"] == true => {
@@ -91,7 +110,11 @@ impl LocalHostAccess {
                 {
                     self.notice.confirm(marker);
                 }
-                Ok(())
+                if verified {
+                    Ok(())
+                } else {
+                    Err(RuntimeError::Indeterminate)
+                }
             }
             Ok(_) => Err(RuntimeError::Indeterminate),
             Err(error) => Err(error),

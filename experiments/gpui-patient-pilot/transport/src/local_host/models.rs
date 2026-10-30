@@ -78,14 +78,20 @@ fn valid_model(value: &str) -> bool {
         && !value.chars().any(|c| c.is_whitespace() || c.is_control())
 }
 fn valid_endpoint(value: &str) -> bool {
-    reqwest::Url::parse(value).is_ok_and(|url| {
+    let normalized = ["/v1/", "/v1", "/v/", "/v"]
+        .iter()
+        .find_map(|suffix| value.strip_suffix(suffix))
+        .unwrap_or(value);
+    let normalized = normalized.strip_suffix('/').unwrap_or(normalized);
+    reqwest::Url::parse(normalized).is_ok_and(|url| {
         url.scheme() == "http"
-            && matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"))
+            && matches!(url.host_str(), Some("localhost" | "127.0.0.1"))
             && url.username().is_empty()
             && url.password().is_none()
-            && url.query().is_none()
-            && url.fragment().is_none()
-            && matches!(url.path(), "" | "/" | "/v1" | "/v1/")
+            && matches!(
+                url.path().strip_suffix('/').unwrap_or(url.path()),
+                "" | "/api/chat" | "/api/generate" | "/api/tags" | "/api/show" | "/api/pull"
+            )
     })
 }
 impl LocalHostAccess {
@@ -256,25 +262,33 @@ mod tests {
     use super::*;
     #[test]
     fn model_names_and_endpoints_follow_web_locality() {
-        for endpoint in [
-            "http://localhost:11434",
-            "http://127.0.0.1:11434/v1",
-            "http://[::1]:11434/v1/",
-        ] {
-            assert!(valid_endpoint(endpoint));
-        }
-        for endpoint in [
-            "https://example.org",
-            "http://192.168.0.1:11434",
-            "http://127.0.0.1/path",
-            "http://user@localhost",
-            "http://localhost/?secret=x",
-        ] {
-            assert!(!valid_endpoint(endpoint));
+        let cases: Value = serde_json::from_str(include_str!(
+            "../../../comparison/ollama-endpoint-cases.json"
+        ))
+        .unwrap();
+        for case in cases.as_array().unwrap() {
+            let endpoint = case["endpoint"].as_str().unwrap();
+            assert_eq!(
+                valid_endpoint(endpoint),
+                case["accepted"].as_bool().unwrap(),
+                "{endpoint}"
+            );
         }
         assert_eq!(canonical_model("a:latest"), "a");
         assert_eq!(canonical_model("hf.co/a/b:latest"), "hf.co/a/b");
         assert_ne!(canonical_model("a:7b"), "a");
         assert!(!valid_model("a\nb"));
+    }
+}
+
+#[cfg(test)]
+mod review738_endpoint_probe {
+    use super::*;
+    #[test]
+    fn review738_reject_endpoint_disallowed_by_web() {
+        assert!(
+            !valid_endpoint("http://[::1]:11434/v1/"),
+            "the Web strictOllamaLoopbackBaseUrl rejects IPv6; native must not accept and persist it"
+        );
     }
 }
