@@ -52,3 +52,13 @@ test('refresh or another owner cannot reuse approval or payload references', asy
   await assert.rejects(second.command({ command: 'consume', payloadSha256: a.payloadSha256 }), /synthetic_card_denied/);
   assert.equal((await consume(first)).payload, a.payload);
 });
+
+test('direct Node startup registers its own loader before resolving the broker and fails closed without installation', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const result = spawnSync(process.execPath, [new URL('./chat-card-native-owner.mjs', import.meta.url).pathname, '/missing-synthetic-installation.json'], {
+    env: { PATH: process.env.PATH }, encoding: 'utf8', timeout: 10000,
+  });
+  assert.equal(result.status, 1);
+  assert.deepEqual(JSON.parse(result.stdout), { status: 'denied' });
+  assert.doesNotMatch(result.stderr, /ERR_MODULE_NOT_FOUND/);
+});

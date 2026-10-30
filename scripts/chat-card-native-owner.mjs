@@ -2,7 +2,7 @@ import './register-strip-types-loader.mjs';
 import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
-import { createSyntheticCardBroker } from '../lib/chat-card/synthetic-card-broker.ts';
+const { createSyntheticCardBroker } = await import('../lib/chat-card/synthetic-card-broker.ts');
 
 const denied = () => { throw new Error('synthetic_card_denied'); };
 

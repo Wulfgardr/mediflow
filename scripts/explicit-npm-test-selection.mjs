@@ -260,7 +260,7 @@ export function collectSyntheticPluginSelections(root) {
     ...collectPluginSelections(root, directory, workflow, 'synthetic-plugin',
       [`${directory}/**`, 'packages/mcp/src/contracts.ts', workflow], scripts),
     ...collectPluginSelections(root, 'plugins/mediflow-chat-demo', '.github/workflows/chat-demo.yml', 'chat-demo',
-      ['plugins/mediflow-chat-demo/**', 'lib/chat-card/**', 'lib/ai-preparation/**',
+      ['plugins/mediflow-chat-demo/**', 'lib/chat-card/**', 'scripts/chat-card-native-owner*', 'e2e/native-chat-access-frame*', 'lib/ai-preparation/**',
         'scripts/fixtures/chat-card-corpus.json', 'scripts/register-strip-types-loader.mjs', 'package.json', 'package-lock.json',
         'app/fonts/Newsreader*', 'docs/design/lume/tokens/lume.tokens.json', '.github/workflows/chat-demo.yml'],
       [...scripts, { script: 'test:falsification', ciCall: 'npm run test:falsification', command: 'node scripts/falsify.mjs' },
