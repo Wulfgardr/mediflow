@@ -1,8 +1,6 @@
-import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
-import { windowsTaskkillCommand } from './windows-system-command.mjs';
 import { processOwner, runtimeProcessIdentity, verifyChildOwner } from './runtime-leases.mjs';
 import { WINDOWS_JOB_PHASE_TIMEOUT_MS } from './windows-runtime-job-deadlines.mjs';
 
@@ -10,19 +8,25 @@ export { WINDOWS_JOB_PHASE_TIMEOUT_MS, WINDOWS_JOB_STARTUP_TIMEOUT_MS } from './
 
 export async function containWindowsWeb(child, owner) {
   verifyChildOwner(owner);
-  const script = fileURLToPath(new URL('./windows-runtime-job.ps1', import.meta.url));
-  const executable = path.join(path.dirname(windowsTaskkillCommand()), 'WindowsPowerShell', 'v1.0', 'powershell.exe');
-  if (!fs.lstatSync(executable).isFile() || fs.lstatSync(executable).isSymbolicLink()) throw new Error('Windows Job helper unavailable.');
-  const helper = spawn(executable, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, '-OwnerFile', owner.file],
-    { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  const script = fileURLToPath(new URL('./windows-runtime-job-helper.mjs', import.meta.url));
+  if (!fs.lstatSync(script).isFile() || fs.lstatSync(script).isSymbolicLink()) throw new Error('Windows Job helper unavailable.');
+  const env = { ...process.env };
+  for (const name of ['NODE_OPTIONS', 'NODE_PATH', 'LD_PRELOAD', 'LD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH']) delete env[name];
+  const helper = spawn(process.execPath, [script, owner.file],
+    { env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
   let readyResolve, drainedResolve, failReady, failDrained, buffer = '', stderr = '', drained = false;
   const ready = new Promise((resolve, reject) => { readyResolve = resolve; failReady = reject; });
   const closed = new Promise((resolve, reject) => { drainedResolve = resolve; failDrained = reject; });
   closed.catch(() => {});
   let failed = false;
-  const fail = error => { failed = true; clearTimeout(timer); helper.stdin.destroy(); failReady(error); failDrained(error); };
+  const fail = error => {
+    if (failed) return;
+    failed = true; clearTimeout(timer); helper.stdin.destroy();
+    if (helper.exitCode === null && helper.signalCode === null) helper.kill();
+    failReady(error); failDrained(error);
+  };
   const started = performance.now();
-  let phase = 'powershell', timer;
+  let phase = 'node', timer;
   const armDeadline = () => {
     clearTimeout(timer);
     timer = setTimeout(() => {
@@ -45,8 +49,8 @@ export async function containWindowsWeb(child, owner) {
       try {
         const frame = JSON.parse(line);
         if (frame.nonce !== owner.token.nonce) throw new Error('Windows Job nonce mismatch.');
-        if (frame.type === 'compiling' && phase === 'powershell') { phase = 'compiling'; armDeadline(); }
-        else if (frame.type === 'assigning' && phase === 'compiling') { phase = 'assigning'; armDeadline(); }
+        if (frame.type === 'bootstrap' && phase === 'node') { phase = 'bootstrap'; armDeadline(); }
+        else if (frame.type === 'assigning' && phase === 'bootstrap') { phase = 'assigning'; armDeadline(); }
         else if (frame.type === 'ready' && phase === 'assigning') { phase = 'ready'; clearTimeout(timer); readyResolve(); }
         else if (frame.type === 'drained' && frame.active === 0 && phase === 'ready') { phase = 'drained'; drained = true; }
         else throw new Error(`Invalid Windows Job transition: ${phase} -> ${frame.type}.`);
