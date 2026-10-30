@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 3,
+  "exports": [
+    "createJobForProcess",
+    "getProcessCreationTimeTicks",
+    "getSystemDirectory"
+  ],
+  "platform": "win32",
+  "arch": "arm64",
+  "napiVersion": 1,
+  "binary": "system-directory.node",
+  "bytes": 8192,
+  "sha256": "5c62e9f046e9c8ef2c0104f4cae138d6765ab743d1fb49eef02a48c240aae706",
+  "dependencies": [
+    "kernel32.dll",
+    "node.exe"
+  ],
+  "sourceSha256": "d225cabaca09fca34c103e93608963aca8bb01dfca4ff7df21b285147cb16e7c",
+  "recipeSha256": "576c867a61525717b5bb5d613b92f195432357306ced21cdec07adae78c9c1f1",
+  "builderSha256": "dac5c0648b21e5e1f4c085ceea902eb80c52a7eba5329abd909ec57f28a72089",
+  "sdk": {
+    "node": "24.22.0",
+    "headersSha256": "00e9f08b9057f9f5428387a5ffd496e53f274565b40b144b7ba876700755352a",
+    "librarySha256": "2c0c3215d59c09d7c136da4949696dae121a299e9bdfc64cd9130a58610af63d"
+  },
+  "build": {
+    "node": "v24.22.1",
+    "arch": "arm64",
+    "machine": "arm64",
+    "uv": "1.52.1",
+    "compiler": "19.51.36260.0",
+    "architecture": "arm64"
+  }
+}
