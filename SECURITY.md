@@ -67,15 +67,17 @@ client**: è questa la protezione che il progetto può dichiarare, non
 l’illeggibilità dell’intero database senza PIN. Una dichiarazione più ampia
 richiede un ADR e una verifica dedicata.
 
-I valori cifrati usano il formato:
+Gli scrittori esistenti usano il formato:
 
 ```
 ENC:<iv_b64>:<cipher_b64>
 ```
 
+Il solo `attachments.data` della creazione del paziente da documento può usare `ENC2:<wrap_iv_b64>:<wrapped_key_b64>:<iv_b64>:<cipher_b64>`, cifrato dal client con chiave casuale per file avvolta dalla master key. Gli scrittori esistenti mantengono `ENC:` e i dati esistenti non vengono migrati. Il contratto è nell’appendice di [ADR 0042](./docs/adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md).
+
 ### Decifratura fallita e conservazione del ciphertext
 
-Se un campo `ENC:` non può essere decifrato, perché la chiave manca o il dato è
+Se un campo `ENC:` o `ENC2:` non può essere decifrato, perché la chiave manca o il dato è
 corrotto, la UI mostra `[LOCKED DATA]`. Il segnaposto serve soltanto a rendere
 visibile il problema e non deve mai essere persistito.
 

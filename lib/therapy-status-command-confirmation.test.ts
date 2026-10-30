@@ -86,3 +86,11 @@ test('second tab prompt is retired by the shared pending marker before another c
     await b.recover([therapy], 'B'); assert.equal(f.state()?.phase, 'uncertain');
     assert.equal(f.state()?.target, undefined); await b.confirm(); assert.equal(f.calls(), 1);
 });
+
+for (const field of ['drugName', 'dosage', 'status'] as const) test(`ENC2 in therapy ${field} cannot authorize a status command`, async () => {
+    const h = fixture();
+    const owner = h.make();
+    owner.begin({ ...therapy, [field]: 'ENC2:invalid-file-field' }, 'completed', 'Sintetico');
+    await owner.confirm();
+    assert.equal(h.state()?.phase, 'unavailable'); assert.equal(h.calls(), 0);
+});

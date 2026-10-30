@@ -479,3 +479,11 @@ test('formal trace: a GET sampled before late host commit stays uncertain across
     assert.equal(first.writes.length, 1);
     assert.equal(writes, 0);
 });
+
+for (const field of ['drugName', 'dosage', 'status'] as const) test(`ENC2 in therapy ${field} cannot authorize a status command`, async () => {
+    const h = harness();
+    const owner = h.controller;
+    owner.begin({ ...original, [field]: 'ENC2:invalid-file-field' }, 'completed', 'Sintetico');
+    await owner.confirm();
+    assert.equal(h.controller.snapshot, null); assert.equal(h.writes.length, 0);
+});

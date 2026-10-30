@@ -198,6 +198,9 @@ pub(crate) fn open(value: &str, master: &MasterKey) -> Result<Value> {
     if value.len() > 24 * 1024 * 1024 {
         return Err(RuntimeError::TooLarge);
     }
+    if value.starts_with("ENC2:") {
+        return open_file(value, master);
+    }
     let mut parts = value.split(':');
     if parts.next() != Some("ENC") {
         return Err(RuntimeError::Crypto);
@@ -220,12 +223,65 @@ pub(crate) fn open(value: &str, master: &MasterKey) -> Result<Value> {
     serde_json::from_slice(&plaintext).map_err(|_| RuntimeError::Crypto)
 }
 
+pub(crate) fn is_ciphertext(value: &str) -> bool {
+    value.starts_with("ENC:") || value.starts_with("ENC2:")
+}
+
+fn open_file(value: &str, master: &MasterKey) -> Result<Value> {
+    let parts: Vec<&str> = value.split(':').collect();
+    if parts.len() != 5 || parts[0] != "ENC2" {
+        return Err(RuntimeError::Crypto);
+    }
+    let decode = |value: &str| -> Result<Vec<u8>> {
+        let bytes = BASE64.decode(value).map_err(|_| RuntimeError::Crypto)?;
+        if BASE64.encode(&bytes) != value {
+            return Err(RuntimeError::Crypto);
+        }
+        Ok(bytes)
+    };
+    let wrap_iv = decode(parts[1])?;
+    let wrapped = decode(parts[2])?;
+    let iv = decode(parts[3])?;
+    let data = decode(parts[4])?;
+    if wrap_iv.len() != 12 || wrapped.len() != 48 || iv.len() != 12 || data.len() < 17 {
+        return Err(RuntimeError::Crypto);
+    }
+    let wrapping = Aes256Gcm::new_from_slice(master.as_ref()).map_err(|_| RuntimeError::Crypto)?;
+    let key = Zeroizing::new(
+        wrapping
+            .decrypt(
+                Nonce::from_slice(&wrap_iv),
+                Payload {
+                    msg: &wrapped,
+                    aad: b"mediflow.attachment.file-key.v2",
+                },
+            )
+            .map_err(|_| RuntimeError::Crypto)?,
+    );
+    let cipher = Aes256Gcm::new_from_slice(&key).map_err(|_| RuntimeError::Crypto)?;
+    let plaintext = Zeroizing::new(
+        cipher
+            .decrypt(
+                Nonce::from_slice(&iv),
+                Payload {
+                    msg: &data,
+                    aad: b"mediflow.attachment.data.v2",
+                },
+            )
+            .map_err(|_| RuntimeError::Crypto)?,
+    );
+    Ok(Value::String(format!(
+        "data:application/pdf;base64,{}",
+        BASE64.encode(&plaintext)
+    )))
+}
+
 /// Legacy plaintext is displayable; ENC data must authenticate and JSON-decode.
 /// Structured fields are rendered as JSON, never silently treated as empty.
 pub(crate) fn display_field(value: &Value, master: &MasterKey, structured: bool) -> Result<Value> {
     let decoded = match value {
         Value::Null => return Ok(Value::Null),
-        Value::String(text) if text.starts_with("ENC:") => open(text, master)?,
+        Value::String(text) if is_ciphertext(text) => open(text, master)?,
         Value::String(_) => return Ok(value.clone()),
         _ => return Err(RuntimeError::Crypto),
     };
@@ -241,6 +297,38 @@ pub(crate) fn display_field(value: &Value, master: &MasterKey, structured: bool)
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn attachment_file_shared_vector_and_false_wrapping() {
+        let vector: Value = serde_json::from_str(include_str!(
+            "../../../../native/contracts/attachment-file-golden.v2.json"
+        ))
+        .unwrap();
+        let master = Zeroizing::new(
+            BASE64
+                .decode(vector["masterKey"].as_str().unwrap())
+                .unwrap()
+                .try_into()
+                .unwrap(),
+        );
+        let data = vector["data"].as_str().unwrap();
+        let expected = Value::String(format!(
+            "data:application/pdf;base64,{}",
+            vector["original"].as_str().unwrap()
+        ));
+        assert_eq!(open(data, &master).unwrap(), expected);
+        assert_eq!(
+            display_field(&Value::String(data.into()), &master, false).unwrap(),
+            expected
+        );
+        assert!(open(data, &Zeroizing::new([0; 32])).is_err());
+        for index in 1..=4 {
+            let mut parts: Vec<String> = data.split(':').map(str::to_string).collect();
+            let mut bytes = BASE64.decode(&parts[index]).unwrap();
+            bytes[0] ^= 1;
+            parts[index] = BASE64.encode(bytes);
+            assert!(open(&parts.join(":"), &master).is_err());
+        }
+    }
     #[test]
     fn web_and_swift_field_golden_matches_bytes() {
         let key = Zeroizing::new(std::array::from_fn(|i| i as u8));

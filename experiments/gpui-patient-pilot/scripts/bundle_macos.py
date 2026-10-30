@@ -80,15 +80,15 @@ def build_number(sha):
 
 def contract_minimum_macos():
     contract = (ROOT / "docs/releases/0.9.1-contract.md").read_text()
-    match = re.search(r"^\| Versione minima \| macOS ([0-9.]+) su questo target;", contract, re.MULTILINE)
+    match = re.search(r"^\| Versione minima del pacchetto GPUI \| macOS ([0-9.]+) su Apple Silicon;", contract, re.MULTILINE)
     if not match:
-        raise ValueError("Missing U0 minimum macOS contract")
+        raise ValueError("Missing GPUI minimum macOS contract")
     return match[1]
 
 
 def bundle_info(config, version, sha):
     if config["minimum_macos"] != contract_minimum_macos():
-        raise ValueError("Configured minimum macOS diverges from U0 contract")
+        raise ValueError("Configured minimum macOS diverges from GPUI contract")
     return {
         "CFBundleName": config["name"], "CFBundleDisplayName": config["name"],
         "CFBundleIdentifier": config["identifier"], "CFBundleExecutable": config["executable"],
@@ -97,6 +97,12 @@ def bundle_info(config, version, sha):
         "LSMinimumSystemVersion": config["minimum_macos"], "NSHighResolutionCapable": True,
         "MediFlowSourceRevision": sha,
     }
+
+
+def verify_macho_minimum(load_commands, minimum):
+    minima = re.findall(r"^\s*minos\s+(\S+)", load_commands, re.MULTILINE)
+    if minima != [minimum]:
+        raise ValueError(f"Mach-O minimum macOS differs from configuration: {minima}")
 
 
 def validate_destination(path):
@@ -272,9 +278,7 @@ def main():
     macos.mkdir()
     executable = macos / config["executable"]
     load_commands = run("xcrun", "vtool", "-show-build", str(binary)).stdout
-    minima = re.findall(r"^\s*minos\s+(\S+)", load_commands, re.MULTILINE)
-    if minima != [config["minimum_macos"]]:
-        raise ValueError(f"Mach-O minimum macOS differs from configuration: {minima}")
+    verify_macho_minimum(load_commands, config["minimum_macos"])
     shutil.copyfile(binary, executable)
     executable.chmod(0o755)
     (bundle / "Contents/Info.plist").write_bytes(plistlib.dumps(info, sort_keys=True))

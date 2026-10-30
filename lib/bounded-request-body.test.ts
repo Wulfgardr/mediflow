@@ -165,3 +165,41 @@ test('canonical synchronous strict parser validates keys at each object level', 
     assert.throws(() => parseStrictJson('{"nested":{"a":1,"\\u0061":2}}'), SyntaxError);
     assert.throws(() => parseStrictJson('{"a":}'), SyntaxError);
 });
+
+for (const fault of ['success', 'malformed', 'overflow', 'abort-after-chunk', 'abort-at-read', 'stream-error'] as const) {
+    test(`sensitive JSON wipes owned HTTP buffers on ${fault}`, async () => {
+        const chunks = [encoder.encode('{"source":{"fileKey":[17,29,31]'), encoder.encode('}}')];
+        if (fault === 'malformed') chunks[1] = encoder.encode('malformed');
+        const controller = new AbortController(), assembly: Uint8Array[] = [];
+        let index = 0;
+        const stream = new ReadableStream<Uint8Array>({
+            pull(c) {
+                if (fault === 'stream-error' && index === 1) { c.error(new Error('synthetic')); return; }
+                if (fault === 'abort-after-chunk' && index === 1) { controller.abort(); return; }
+                if (index === chunks.length) { c.close(); return; }
+                c.enqueue(chunks[index++]!);
+                if (fault === 'abort-at-read') controller.abort();
+            },
+        }, { highWaterMark: 0 });
+        const originalSet = Uint8Array.prototype.set;
+        Uint8Array.prototype.set = function (value, offset) { assembly.push(this); return originalSet.call(this, value, offset); };
+        let result;
+        try {
+            result = await readBoundedJsonBody({ headers: new Headers(), body: stream } as Request,
+                fault === 'overflow' ? chunks[0]!.length + 1 : 1024, 'request-json',
+                { signal: controller.signal, deadline: performance.now() + 5000, sensitive: true });
+        } finally { Uint8Array.prototype.set = originalSet; }
+        assert.equal(result.ok, fault === 'success');
+        if (fault === 'overflow') assert.deepEqual(result, { ok: false, status: 413 });
+        assert.ok(index > 0);
+        for (const chunk of chunks.slice(0, index)) assert.ok(chunk.every(byte => byte === 0), 'received chunk still contains wire key');
+        if (fault === 'success' || fault === 'malformed') assert.ok(assembly.length > 0);
+        for (const bytes of assembly) assert.ok(bytes.every(byte => byte === 0), 'assembly still contains wire key');
+        assert.equal(stream.locked, false);
+    });
+}
+test('ordinary JSON reader keeps existing ownership of HTTP buffers', async () => {
+    const bytes = encoder.encode('{"value":17}'), original = bytes.slice();
+    assert.equal((await readBoundedJsonBody(fixture([bytes]).request, 1024)).ok, true);
+    assert.deepEqual(bytes, original);
+});

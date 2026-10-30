@@ -1,5 +1,7 @@
 'use client';
 
+import { INSIGHT_LIMITS } from '@/lib/insight-parameters-contract';
+
 import { FunctionPreferencesPanel } from '@/components/function-models/function-preferences-panel';
 import { useCallback, useState } from 'react';
 import type { FunctionModelPreferences } from '@/lib/function-models/browser';
@@ -191,8 +193,8 @@ export default function SettingsAiFunctionsPage() {
                                 Documenti massimi
                                 <input
                                     type="number"
-                                    min={2}
-                                    max={12}
+                                    min={INSIGHT_LIMITS.maxDocuments[0]}
+                                    max={INSIGHT_LIMITS.maxDocuments[1]}
                                     value={aiInsightSettings.manualConfig.maxDocuments}
                                     onChange={(e) => updateManualInsightConfig('maxDocuments', Number.parseInt(e.target.value, 10))}
                                     className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
@@ -202,8 +204,8 @@ export default function SettingsAiFunctionsPage() {
                                 Caratteri per documento
                                 <input
                                     type="number"
-                                    min={120}
-                                    max={480}
+                                    min={INSIGHT_LIMITS.maxDocumentSummaryChars[0]}
+                                    max={INSIGHT_LIMITS.maxDocumentSummaryChars[1]}
                                     value={aiInsightSettings.manualConfig.maxDocumentSummaryChars}
                                     onChange={(e) => updateManualInsightConfig('maxDocumentSummaryChars', Number.parseInt(e.target.value, 10))}
                                     className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
@@ -213,8 +215,8 @@ export default function SettingsAiFunctionsPage() {
                                 Budget contesto documenti
                                 <input
                                     type="number"
-                                    min={800}
-                                    max={5000}
+                                    min={INSIGHT_LIMITS.maxDocumentContextChars[0]}
+                                    max={INSIGHT_LIMITS.maxDocumentContextChars[1]}
                                     value={aiInsightSettings.manualConfig.maxDocumentContextChars}
                                     onChange={(e) => updateManualInsightConfig('maxDocumentContextChars', Number.parseInt(e.target.value, 10))}
                                     className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
@@ -224,8 +226,8 @@ export default function SettingsAiFunctionsPage() {
                                 Output max token
                                 <input
                                     type="number"
-                                    min={256}
-                                    max={1200}
+                                    min={INSIGHT_LIMITS.outputMaxTokens[0]}
+                                    max={INSIGHT_LIMITS.outputMaxTokens[1]}
                                     value={aiInsightSettings.manualConfig.outputMaxTokens}
                                     onChange={(e) => updateManualInsightConfig('outputMaxTokens', Number.parseInt(e.target.value, 10))}
                                     className={`mt-1 ${SETTINGS_INPUT_CLASS}`}
