@@ -1,5 +1,11 @@
 # Prove locali del 30 ottobre 2026
 
+Il controllo preliminare sotto è storico. La [misura successiva](misura.md)
+registra le identità assegnate, il limite aggiornato a 30 GiB e i risultati:
+I-2 bloccata dalla versione Ollama non supportata; ATHENA eseguita sui 9 casi,
+10 soglie fallite su 18. Nessuna equivalenza o ammissione dichiarata.
+I [numeri del banco](misura.json) conservano esiti e soglie senza ritocchi.
+
 Le inferenze sono ferme prima del primo tentativo. Il controllo preliminare
 [registrato in JSON](precheck.json) misura lo spazio libero sotto i 25 GiB
 richiesti e trova `modelIdentity: null` in tutte le quattro celle locali.

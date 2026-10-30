@@ -807,5 +807,15 @@
       "thresholdsDocumentSha256": "546d1fbf6e0d23033c848efc47584065a714d3d13471f1a8215a11b51da10509",
       "scope": "corpus e tutte le soglie; nessuna accettazione ADR 0166 o equivalenza"
     }
+  },
+  "localRunMeasurement": {
+    "sourceRevision": "2146011334d83a4aef2bafec2cb0a21faaf5afad",
+    "evidence": "docs/quality/intelligence/2026-10-30-local-runs/misura.json",
+    "report": "docs/quality/intelligence/2026-10-30-local-runs/misura.md",
+    "status": "ollama_blocked_athena_quality_failed",
+    "maxProcessMemoryBytes": 32212254720,
+    "qualification": false,
+    "semanticReview": "pending",
+    "note": "Il precheck precedente resta storico; identita assegnate e numeri nella misura, nessuna ammissione runtime."
   }
 }
