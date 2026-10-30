@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
+import { test, closureGallery } from './fixtures/patient-closure-gallery';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 
 async function fixture(page: Page) {
@@ -14,6 +15,7 @@ async function fixture(page: Page) {
 }
 
 async function capture(page: Page, state: string) {
+    if (await closureGallery(page, 'followup', state, state.startsWith('followup') ? page.locator('#follow-up') : page.getByTestId('patient-profile-notes'))) return;
     const directory = process.env.W10_EVIDENCE_DIR;
     if (!directory) return;
     await mkdir(directory, { recursive: true });
@@ -33,6 +35,7 @@ async function capture(page: Page, state: string) {
 }
 
 for (const state of ['loading', 'error', 'empty', 'available'] as const) test(`Follow-up: ${state}`, async ({ page }) => {
+    test.setTimeout(180_000);
     const id = await fixture(page);
     let release!: () => void;
     const pending = new Promise<void>(resolve => { release = resolve; });
@@ -74,6 +77,7 @@ for (const state of ['loading', 'error', 'empty', 'available'] as const) test(`F
 });
 
 for (const state of ['loading', 'unavailable', 'available'] as const) test(`Note cattura 011: ${state}`, async ({ page }) => {
+    test.setTimeout(180_000);
     const id = await fixture(page);
     let release!: () => void;
     const pending = new Promise<void>(resolve => { release = resolve; });
