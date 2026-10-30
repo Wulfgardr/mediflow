@@ -108,6 +108,18 @@ test('Backup: avviso completo e annullamento raggiungibili al 400 percento', asy
                 await page.screenshot({ path: `${directory}/avviso-${theme}-400-${offset}.png`, animations: 'disabled' });
             }
             expect(covered.size, `Tutte le righe dell’avviso leggibili in ${theme}`).toBe(lineCount);
+            await page.setViewportSize({ width: 1440, height: 2160 });
+            await warning.evaluate(element => element.scrollIntoView({ block: 'center' }));
+            expect(await warning.evaluate(element => {
+                const r = element.getBoundingClientRect();
+                return [r.y + 1, r.bottom - 1].every(y => {
+                    const hit = document.elementFromPoint(r.x + r.width / 2, y);
+                    return hit === element || !!hit && element.contains(hit);
+                });
+            }), 'Avviso intero nel viewport alto dichiarato, senza composizione di immagini').toBe(true);
+            await page.screenshot({ path: `${directory}/avviso-${theme}-400-intero-1440x2160.png`, animations: 'disabled' });
+            frames.push({ theme, entireWarning: true, viewport: { width: 1440, height: 2160 }, zoom: 4, rect: await warning.boundingBox(), text });
+            await page.setViewportSize({ width: 1440, height: 1000 });
             const keyword = page.getByTestId('restore-confirmation-input'), submit = page.getByTestId('restore-confirmation-submit');
             await keyword.fill('RIPRI'); await expect(submit).toBeDisabled();
             await keyword.fill('RIPRISTINA'); await expect(submit).toBeEnabled();

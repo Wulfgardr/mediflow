@@ -221,11 +221,6 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
         await updates.getByRole('button', { name: 'Piu tardi', exact: true }).click();
         await expect(updates).toContainText('Avviso rimandato per questa versione.');
         await closureGallery(page, zoom, directory, 'update-rimandato', updates.getByText('Avviso rimandato per questa versione.', { exact: true }));
-        if (settingsClosure) {
-            fixture.state.update = 'error'; await page.reload();
-            await expect(updates.getByRole('alert')).toHaveText('Errore: HTTP 503');
-            await closureGallery(page, zoom, directory, 'update-prima-lettura-negata', updates.getByRole('alert'));
-        }
         expect(errors).toEqual([]); expect(fixture.blocked).toEqual([]);
     } finally {
         releaseRead?.(); releaseWho?.();
@@ -234,4 +229,21 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
             if (directory) { await mkdir(directory, { recursive: true }); await writeFile(`${directory}/surfaces.json`, JSON.stringify({ frames, sectionTitles, errors, calls: fixture.calls, allBlocked: fixture.blocked }, null, 2)); }
         } finally { await page.unrouteAll({ behavior: 'ignoreErrors' }); await zoom.close(); }
     }
+});
+
+
+test('Settings evidence: aggiornamenti non leggibili alla prima apertura', async ({ baseURL }) => {
+    test.setTimeout(90_000);
+    if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR) throw Error('Archivio sintetico richiesto');
+    const zoom = await openBrowserZoomFixture(baseURL!), page = zoom.page;
+    const fixture = await installSettingsEvidenceMocks(page, baseURL!);
+    try {
+        await bootstrapUnlockedSession(page, '1234'); fixture.state.update = 'error';
+        await page.goto('/settings/diagnostica');
+        const updates = page.getByTestId('settings-update-awareness-panel');
+        await expect(updates.getByRole('alert')).toContainText('Errore: HTTP 503');
+        await expect(updates).not.toContainText('0.9.1-synthetic-next');
+        await closureGallery(page, zoom, process.env.SETTINGS_EVIDENCE_SCREENSHOTS, 'update-prima-lettura-negata', updates.getByRole('alert'));
+        expect(fixture.blocked).toEqual([]);
+    } finally { await fixture.close(); await zoom.close(); }
 });
