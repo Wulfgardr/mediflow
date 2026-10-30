@@ -156,9 +156,10 @@ for (const name of ['_CodeSignature', 'CodeResources']) {
   throw new Error('Refusing to mutate a sealed app. Build in fresh, unsigned DerivedData.');
 }
 for (const name of ['Resources', 'Resources/WebRuntime', 'Resources/WebRuntime/.next',
-  'Resources/WebRuntime/.next/static', 'Resources/WebRuntime/public', 'Resources/WebRuntime/HeadlessRuntime', 'Frameworks', 'Helpers']) physical(path.join(app, 'Contents', name), true);
+  'Resources/WebRuntime/.next/static', 'Resources/WebRuntime/public', 'Resources/WebRuntime/HeadlessRuntime', 'Resources/scripts', 'Resources/lib', 'Resources/lib/security', 'Frameworks', 'Helpers']) physical(path.join(app, 'Contents', name), true);
 for (const [relative, message] of [
-  ['Resources/local-api-tls-proxy.mjs', 'Nonphysical proxy destination'],
+  ['Resources/scripts/local-api-tls-proxy.mjs', 'Nonphysical proxy destination'],
+  ['Resources/lib/security/loopback-ingress.mjs', 'Nonphysical ingress module destination'],
   ['Resources/mediflow-headless-supervisor.mjs', 'Nonphysical Headless launcher destination'],
   ['Resources/WebRuntime/native-first-install.mjs', 'Nonphysical native first-install destination'],
   ['Resources/WebRuntime/native-first-install-contract.json', 'Nonphysical native first-install contract destination'],
@@ -337,7 +338,10 @@ if [[ -d "$ROOT_DIR/public" ]]; then
   mkdir -p "$WEB/public"
   cp -R "$ROOT_DIR/public/." "$WEB/public/"
 fi
-cp "$ROOT_DIR/scripts/local-api-tls-proxy.mjs" "$RES/local-api-tls-proxy.mjs"
+mkdir -p "$RES/scripts" "$RES/lib/security"
+cp "$ROOT_DIR/scripts/local-api-tls-proxy.mjs" "$RES/scripts/local-api-tls-proxy.mjs"
+cp "$ROOT_DIR/lib/security/loopback-ingress.mjs" "$RES/lib/security/loopback-ingress.mjs"
+node "$ROOT_DIR/scripts/check-standalone-runtime-bundle.mjs" --tls-proxy-resources "$RES"
 # split the copied standalone payload before the strict Resources guard.
 # The original standalone stays usable. No symlink and no native bytes change.
 node "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \

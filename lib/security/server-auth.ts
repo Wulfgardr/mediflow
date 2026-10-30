@@ -1,7 +1,8 @@
 import 'server-only';
 
 import { types } from 'node:util';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { isLocalClientSession, localClientSessionIngressAllowed } from './loopback-ingress.mjs';
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
@@ -204,13 +205,18 @@ async function validateProjectionAgainstDatabase(projection: WebSessionProjectio
     return null;
 }
 
+async function sessionIngressAllowed(sessionId: string): Promise<boolean> {
+    return !isLocalClientSession(sessionId)
+        || localClientSessionIngressAllowed({ headers: await headers() }, sessionId);
+}
+
 async function resolveValidatedActiveWebSession(): Promise<WebSessionProjection | null> {
     try {
         const cookieStore = await cookies();
         const sessionId = exactCookieValue(cookieStore.get(SESSION_COOKIE_NAME), SESSION_COOKIE_NAME, SESSION_ID);
         const controlId = exactCookieValue(cookieStore.get(CONTROL_COOKIE_NAME), CONTROL_COOKIE_NAME, CONTROL_ID);
         const projection = activeWebProjection(sessionId, controlId);
-        return projection ? await validateProjectionAgainstDatabase(projection) : null;
+        return projection && await sessionIngressAllowed(projection.id) ? await validateProjectionAgainstDatabase(projection) : null;
     } catch {
         return null;
     }
@@ -261,6 +267,7 @@ export async function acquireAuthenticatedWebSessionProjectionOwnerContext(): Pr
 
         const projection = activeWebProjection(sessionId, controlId);
         if (!ambientThenSafe() || !projection) return null;
+        if (!await sessionIngressAllowed(projection.id) || !ambientThenSafe()) return null;
         const userIdPredicate = eq(users.id, projection.userId);
         if (!ambientThenSafe()) return null;
         const selected = dbServer.select({ id: users.id, username: users.username, role: users.role });

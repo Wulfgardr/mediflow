@@ -9,6 +9,7 @@ pub(super) enum SettingsPage {
     Models,
     Ambulatories,
     AiPreferences,
+    Functions,
 }
 
 impl SettingsPage {
@@ -19,7 +20,8 @@ impl SettingsPage {
             Self::Appearance => 2,
             Self::Models => 3,
             Self::Ambulatories => 4,
-            Self::AiPreferences => 5,
+            Self::AiPreferences => 6,
+            Self::Functions => 5,
         }
     }
 }
@@ -31,7 +33,10 @@ impl ClinicalApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.ambulatory_management.is_saving() || self.ai_preferences_blocks_navigation(cx) {
+        if self.local_host.has_work()
+            || self.ambulatory_management.is_saving()
+            || self.ai_preferences_blocks_navigation(cx)
+        {
             return;
         }
         let previous = self.settings_page;
@@ -116,10 +121,13 @@ impl ClinicalApp {
                         window.focus(&this.focus, cx);
                     }))))
 ,
+            SettingsPage::Functions => view.child(heading("clinical-workspace-settings-heading","Funzioni AI",theme))
+                .child(self.local_host_panel(cx))
+                .child(button("local-host-function-preferences","Preferenze e scelta del modello per funzione…",theme,false,!self.local_host.has_work()).on_click(cx.listener(|this,_,window,cx|this.select_settings_page(SettingsPage::AiPreferences,window,cx)))),
             SettingsPage::Models => view
                 .child(heading("clinical-workspace-settings-heading", "Modelli", theme))
                 .child(self.ai_status_view(cx))
-                .child(notice("clinical-workspace-models-native-limits", "Installazione dei modelli, profilo hardware e interruttori delle funzioni non ancora disponibili in questa app.", theme, false)),
+                .child(notice("clinical-workspace-models-native-limits", "Installazione dei modelli e profilo hardware non ancora disponibili in questa app.", theme, false)),
             SettingsPage::Overview => {
                 let origin = self.session.as_ref().map(|session| session.base_url().to_owned()).unwrap_or_default();
                 view.child(heading("clinical-workspace-settings-heading", "Impostazioni", theme))
@@ -132,7 +140,7 @@ impl ClinicalApp {
                     .child(section("clinical-workspace-settings-intelligenza", "Intelligenza", theme))
                     .children([
                         (SettingsPage::Models, "Modelli", "Stato della configurazione sull’host"),
-                        (SettingsPage::AiPreferences, "Funzioni AI", "Preferenze e scelta del modello per funzione"),
+                        (SettingsPage::Functions, "Funzioni AI", "Preferenze e scelta del modello per funzione"),
                     ].into_iter().map(|(page, label, description)| self.settings_item(page, label, description, cx)))
                     .child(section("clinical-workspace-connection-heading", "Archivio collegato", theme))
                     .child(text!(origin))

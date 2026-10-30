@@ -222,3 +222,29 @@ test('route reads both cookies once and denies a rejected cookie Promise', () =>
     const child = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '--eval', program], { encoding: 'utf8' });
     assert.equal(child.status, 0, child.stderr || child.stdout);
 });
+
+test('local GPUI logout denies fabricated Requests without a server socket attestation', async () => {
+    const { createLocalClientLogout } = await import('./local-client-logout');
+    const calls: string[] = [];
+    const handler = createLocalClientLogout((bearer, control, request) => completeExactWebP3Logout(bearer, control, request, sources({
+        resolve: (session, binding) => { assert.equal(session, SESSION_ID); assert.equal(binding, CONTROL_ID); return active(); },
+        retire: () => { calls.push('exact-session'); return receipt('completed'); },
+    })));
+    const local = (headers: Record<string, string> = {}, url = 'http://127.0.0.1:4321/api/auth/local-client/logout') => new Request(url, { method: 'POST', headers: {
+        host: '127.0.0.1:4321', origin: 'http://127.0.0.1:4321', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json',
+        cookie: `mediflow_session=${SESSION_ID}; mediflow_auth_control=${CONTROL_ID}`, ...headers,
+    } });
+    const deniedTransports: Record<string, string>[] = [{ host: '192.0.2.1:4321' }, { origin: 'http://localhost:4321' }, { 'sec-fetch-site': 'cross-site' },
+        { 'x-mediflow-tls-proxy': 'local-api' }, { 'content-type': 'text/plain' }];
+    for (const headers of deniedTransports) {
+        assert.equal((await handler(local(headers))).status, 403);
+    }
+    assert.equal((await handler(local({}, 'http://127.0.0.1:4321/api/auth/local-client/logout?other=1'))).status, 403);
+    assert.equal((await handler(local({ cookie: '' }))).status, 403);
+    assert.deepEqual(calls, []);
+    assert.equal((await handler(local())).status, 403);
+    assert.deepEqual(calls, []);
+    const denied = createLocalClientLogout((bearer, control, request) => completeExactWebP3Logout(bearer, control, request, sources({ resolve: () => sealed({ status: 'absent' as const }) })));
+    assert.equal((await denied(local())).status, 403);
+    assert.deepEqual(calls, []);
+});
