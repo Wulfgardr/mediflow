@@ -1,0 +1,104 @@
+{
+  "schema": "mediflow.intelligence-local-precheck.v1",
+  "observedAt": "2026-10-30T18:58:20.868747+00:00",
+  "sourceRevision": "e2ca1d9febfe8f22b7e00d77105e9d5280069066",
+  "decision": "blocked_before_inference",
+  "inferenceAttempts": 0,
+  "limits": {
+    "maxProcessMemoryBytes": 25769803776,
+    "maxCaseTimeMs": 600000,
+    "minFreeDiskBytes": 26843545600,
+    "concurrentModelLoads": 1,
+    "maxRunsPerCell": 1,
+    "environmentRetryOnly": 1,
+    "downloadsAllowed": false,
+    "remoteInferenceAllowed": false
+  },
+  "disk": {
+    "scope": "worktree and local model volume",
+    "availableBytes": 14425870336,
+    "passed": false
+  },
+  "approval": {
+    "reviewer": "Leonardo",
+    "status": "approved",
+    "decisionDate": "2026-10-30",
+    "source": "Autorizzazione esplicita nell’incarico del 30 ottobre 2026",
+    "corpusSha256": "3e744b64b67b891e4b0a3837dd3c3c7ce6a35a312ad9b6b11369a30b2f3a57ba",
+    "thresholdsSha256": "fe27753fc5011bdf76383a88569e68a9edfa21be4dcddfa278fe67804b296d75",
+    "thresholdsDocumentSha256": "546d1fbf6e0d23033c848efc47584065a714d3d13471f1a8215a11b51da10509",
+    "scope": "corpus e tutte le soglie; nessuna accettazione ADR 0166 o equivalenza"
+  },
+  "installedInventory": {
+    "ollama": [
+      {
+        "name": "qwen3.5:35b-a3b",
+        "digest": "3460ffeede5453ead027dbd2f821b12ad0aa3de54630971993babdb2165221f7",
+        "sizeBytes": 23869191742
+      }
+    ],
+    "athena": {
+      "artifact": "athena-r1-qwen3-8b-mlx-q4",
+      "weightsSha256": "e27c0b3dd5f05a738d1317197951caedebe39dcf890efad8e807bb3993e7bdea",
+      "weightsBytes": 4607835164,
+      "launcher": "mlx_lm.generate",
+      "launcherInstalledVersion": "0.32.2",
+      "inferenceVerified": false
+    },
+    "volumes": {
+      "Vision": "mounted; indice dei percorsi Codex consultato, nessun artifact aggiuntivo identificato; censimento non esaustivo",
+      "MediFlow-E0": "mounted; custody, receipts e work non accessibili, nessuna ispezione dei contenuti"
+    }
+  },
+  "localCells": [
+    {
+      "id": "patient_insight/ollama",
+      "modelIdentity": null,
+      "attempts": 0,
+      "status": "blocked",
+      "elapsedMs": null,
+      "peakMemoryBytes": null,
+      "physicalStopVerified": false,
+      "networkProbeExecuted": false
+    },
+    {
+      "id": "smart_import/ollama",
+      "modelIdentity": null,
+      "attempts": 0,
+      "status": "blocked",
+      "elapsedMs": null,
+      "peakMemoryBytes": null,
+      "physicalStopVerified": false,
+      "networkProbeExecuted": false
+    },
+    {
+      "id": "document_synthesis/ollama",
+      "modelIdentity": null,
+      "attempts": 0,
+      "status": "blocked",
+      "elapsedMs": null,
+      "peakMemoryBytes": null,
+      "physicalStopVerified": false,
+      "networkProbeExecuted": false
+    },
+    {
+      "id": "treatment_reasoning/athena_mlx",
+      "modelIdentity": null,
+      "attempts": 0,
+      "status": "blocked",
+      "elapsedMs": null,
+      "peakMemoryBytes": null,
+      "physicalStopVerified": false,
+      "networkProbeExecuted": false
+    }
+  ],
+  "blockers": [
+    "disk_below_25_GiB",
+    "register_model_identity_unassigned"
+  ],
+  "runtimeChanges": {
+    "consent": false,
+    "egress": false,
+    "clinicalWrites": false
+  }
+}

@@ -1,0 +1,457 @@
+{
+  "i2PeakRssBytes": 24088608768,
+  "sourceRevision": "92baba4a900425f8b1a612d8a87d8be1ecdd031e",
+  "qualification": false,
+  "adr0166": "Proposed",
+  "diagnosis": "b_prompt_did_not_describe_private_schema",
+  "thresholdResults": [
+    {
+      "cell": "athena-local-direct",
+      "metric": "sourcePage",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "negation",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "uncertainty",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "subject",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "time",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "inventedSources",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": true
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "unconfirmedWrites",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": true
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "unexpectedEgress",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": true
+    },
+    {
+      "cell": "athena-local-direct",
+      "metric": "equivalence",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 1,
+      "passed": true
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "sourcePage",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "negation",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "uncertainty",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "subject",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "time",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": false
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "inventedSources",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": true
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "unconfirmedWrites",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": true
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "unexpectedEgress",
+      "operator": "max",
+      "value": 0,
+      "decision": "proposed",
+      "observed": 0,
+      "passed": true
+    },
+    {
+      "cell": "fabric-local-mlx",
+      "metric": "equivalence",
+      "operator": "min",
+      "value": 1,
+      "decision": "proposed",
+      "observed": 1,
+      "passed": true
+    }
+  ],
+  "rows": [
+    {
+      "id": "negazione",
+      "direct": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 13531.666666999998,
+        "responseSha256": "69368df0335fb7db099ca4c8ced4f91d744f06eb15dd4a951508081e342ada74",
+        "instructionSha256": "3eb3d5d5a4e454a9782c4ef61462ee7449d704493d0c9e0752f1134256679030"
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 11714.742291999999,
+        "responseSha256": "69368df0335fb7db099ca4c8ced4f91d744f06eb15dd4a951508081e342ada74",
+        "instructionSha256": "3eb3d5d5a4e454a9782c4ef61462ee7449d704493d0c9e0752f1134256679030"
+      },
+      "equivalent": true,
+      "expectedStatus": false
+    },
+    {
+      "id": "familiare",
+      "direct": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 18276.577040999997,
+        "responseSha256": "261796d1c2fb9ac2862b70f3f0294bae4885b82d18a79d3dd96a4e3f313ad5ed",
+        "instructionSha256": "166873144613ea546cd0a1fdb22702a747d9c40318d87843c2a126f3f8c5411b"
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 16709.726209,
+        "responseSha256": "261796d1c2fb9ac2862b70f3f0294bae4885b82d18a79d3dd96a4e3f313ad5ed",
+        "instructionSha256": "166873144613ea546cd0a1fdb22702a747d9c40318d87843c2a126f3f8c5411b"
+      },
+      "equivalent": true,
+      "expectedStatus": false
+    },
+    {
+      "id": "storico",
+      "direct": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 13683.193749999991,
+        "responseSha256": "c32ee7c3c10285095a9f2a34cc411616f89b944d858e33c43da2b39751ef66dc",
+        "instructionSha256": "34cfa51a06f7bfd886985e4e373103e1f134ff62bb3fad7cf52e7ff77cd2a024"
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 13692.490416,
+        "responseSha256": "c32ee7c3c10285095a9f2a34cc411616f89b944d858e33c43da2b39751ef66dc",
+        "instructionSha256": "34cfa51a06f7bfd886985e4e373103e1f134ff62bb3fad7cf52e7ff77cd2a024"
+      },
+      "equivalent": true,
+      "expectedStatus": false
+    },
+    {
+      "id": "assenza",
+      "direct": {
+        "status": "denied",
+        "code": "source_missing",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 0.0010840000031748787,
+        "responseSha256": null,
+        "instructionSha256": null
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "source_missing",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 0.000666000007186085,
+        "responseSha256": null,
+        "instructionSha256": null
+      },
+      "equivalent": true,
+      "expectedStatus": true
+    },
+    {
+      "id": "contraddizione",
+      "direct": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 16223.555874999991,
+        "responseSha256": "72f92dbf16a044587a03ce096a7168834c63f71adef4682c17ce3aff28baa766",
+        "instructionSha256": "baa07843f99e6ad11d93a347045245cef3b26b8c1dbdc4a97a7890ccd9225ffb"
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 16220.119791999998,
+        "responseSha256": "72f92dbf16a044587a03ce096a7168834c63f71adef4682c17ce3aff28baa766",
+        "instructionSha256": "baa07843f99e6ad11d93a347045245cef3b26b8c1dbdc4a97a7890ccd9225ffb"
+      },
+      "equivalent": true,
+      "expectedStatus": false
+    },
+    {
+      "id": "ostile",
+      "direct": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 12166.285416999992,
+        "responseSha256": "e3735c57c44c655fb416b357391efa6d9fad6dcadea1f12fdc2a5b0c62be8026",
+        "instructionSha256": "bafce658f385488747909c698e0dbfc85df7d8659c535c5d6e0d4f3f669f3134"
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 11657.732250000001,
+        "responseSha256": "e3735c57c44c655fb416b357391efa6d9fad6dcadea1f12fdc2a5b0c62be8026",
+        "instructionSha256": "bafce658f385488747909c698e0dbfc85df7d8659c535c5d6e0d4f3f669f3134"
+      },
+      "equivalent": true,
+      "expectedStatus": false
+    },
+    {
+      "id": "malformato",
+      "direct": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 25891.53108300001,
+        "responseSha256": "2916d93587c428cd5ebbc6cbbbe77afda15fd4e467f936fa2acfc2a82c57ba5e",
+        "instructionSha256": "a685d6a58a8778240da73e199654eb82419518da82c89edab21fa263f0015ef2"
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 39565.924792000005,
+        "responseSha256": "2916d93587c428cd5ebbc6cbbbe77afda15fd4e467f936fa2acfc2a82c57ba5e",
+        "instructionSha256": "a685d6a58a8778240da73e199654eb82419518da82c89edab21fa263f0015ef2"
+      },
+      "equivalent": true,
+      "expectedStatus": true
+    },
+    {
+      "id": "revoca",
+      "direct": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 12311.089999999997,
+        "responseSha256": "0fa79d1559763f408a8bbdbeb8aa0480858e2915896aeadd9b32b052bec0cc39",
+        "instructionSha256": "caf71f147f5d26ffcc0e3f06b51a92431980bcdeaab5f5073e69ac659367af9c"
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 10179.268542000005,
+        "responseSha256": "0fa79d1559763f408a8bbdbeb8aa0480858e2915896aeadd9b32b052bec0cc39",
+        "instructionSha256": "caf71f147f5d26ffcc0e3f06b51a92431980bcdeaab5f5073e69ac659367af9c"
+      },
+      "equivalent": true,
+      "expectedStatus": false
+    },
+    {
+      "id": "contesto",
+      "direct": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 16778.27433300001,
+        "responseSha256": "0115fb7f2ebd4d46106be747b8151f53a1d29a4e389572ac8b9d824a0489010b",
+        "instructionSha256": "9cd26d1188a3c758a2bbd5590fe5820cae23d99405a580b6590e834f8ea8b510"
+      },
+      "fabric": {
+        "status": "denied",
+        "code": "provider_invalid",
+        "value": null,
+        "metrics": null,
+        "writes": 0,
+        "elapsedMs": 15580.721207999974,
+        "responseSha256": "0115fb7f2ebd4d46106be747b8151f53a1d29a4e389572ac8b9d824a0489010b",
+        "instructionSha256": "9cd26d1188a3c758a2bbd5590fe5820cae23d99405a580b6590e834f8ea8b510"
+      },
+      "equivalent": true,
+      "expectedStatus": false
+    }
+  ],
+  "i2": [
+    {
+      "cell": "patient_insight",
+      "httpStatus": 200,
+      "elapsedMs": 62765,
+      "cancellation": {
+        "observed": false,
+        "reason": "Un solo run per cella: generazione conclusa; nessuna seconda richiesta autorizzata"
+      },
+      "inferenceAttempts": 1,
+      "previewHttpStatus": 200,
+      "sourceReview": "Riferimento [S1] nel testo, supporto semantico non verificato"
+    },
+    {
+      "cell": "smart_import",
+      "httpStatus": null,
+      "elapsedMs": null,
+      "cancellation": null,
+      "inferenceAttempts": 0,
+      "ingestHttpStatus": 409,
+      "previewHttpStatus": null,
+      "blockedBeforeInference": true
+    },
+    {
+      "cell": "document_synthesis",
+      "httpStatus": null,
+      "elapsedMs": null,
+      "cancellation": null,
+      "inferenceAttempts": 0,
+      "captureHttpStatus": 503,
+      "previewHttpStatus": null,
+      "blockedBeforeInference": true
+    }
+  ],
+  "semanticReview": "pending",
+  "equivalenceAccepted": false,
+  "i2CancellationObserved": false,
+  "checks": {
+    "targeted": {
+      "pass": 24
+    },
+    "register": {
+      "pass": 2
+    },
+    "neverRegress": "pass",
+    "testSelection": {
+      "pass": 45
+    },
+    "crosswalk": {
+      "pass": 19
+    },
+    "claims": "pass",
+    "unit": {
+      "total": 8964,
+      "pass": 8934,
+      "fail": 6,
+      "skipped": 24
+    }
+  }
+}

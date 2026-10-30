@@ -26,7 +26,7 @@ const service = (invoke: (value: Readonly<{ instruction: string; signal: Readonl
 type Result = Awaited<ReturnType<ReturnType<typeof service>['execute']>>;
 const denied = (result: Result, code: string) => { const observed = result as unknown as Record<string, unknown>; assert.equal(result.status, 'denied'); assert.equal(result.code, code); assert.equal(observed.value, null); assert.equal(result.sourceBindings, null); assert.equal(observed.attestation, null); assert.equal('envelope' in observed, false); assert.equal('host' in observed, false); assert.equal('fallback' in observed, false); assert.equal(result.writesPerformed, 0); assert.equal(result.applyPolicy, 'none'); };
 
-test('retains the pre-extraction instruction bytes and legacy parser results across the complete existing synthetic corpus', async () => {
+test('retains the pre-extraction instruction prefix and legacy parser results across the complete existing synthetic corpus', async () => {
     const corpus = JSON.parse(readFileSync(new URL('../../../scripts/fixtures/treatment-reasoning-corpus.json', import.meta.url), 'utf8')) as (TreatmentReasoningPromptInput & { id: string; expectedResponse: unknown })[];
     const baseline = JSON.parse(readFileSync(new URL('../../../scripts/fixtures/athena-method-baseline.json', import.meta.url), 'utf8')) as { cases: { id: string; legacyPromptSha256: string; fabricInstructionSha256: string; legacyExpectedParseSha256: string }[] };
     const hash = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -41,7 +41,8 @@ test('retains the pre-extraction instruction bytes and legacy parser results acr
             sources: Object.freeze(item.sources.map(source => Object.freeze({ id: source.id, sourceKind: source.sourceKind, label: source.label, excerpt: source.excerpt ?? null, date: source.date ?? null }))),
         });
         const instruction = buildAthenaTreatmentReasoningInstruction(projection);
-        assert.equal(hash(instruction), expected.fabricInstructionSha256, item.id);
+        const original = instruction.slice(0, instruction.indexOf('Restituisci soltanto')) + 'automatic_clinical_writes=forbidden';
+        assert.equal(hash(original), expected.fabricInstructionSha256, item.id);
         assert.equal(hash(buildTreatmentReasoningPrompt(item)), expected.legacyPromptSha256, item.id);
         assert.equal(hash(JSON.stringify(parseTreatmentReasoningResponse(JSON.stringify(item.expectedResponse), { allowedEvidenceIds: [...evidenceRefs] }))), expected.legacyExpectedParseSha256, item.id);
         let calls = 0;
@@ -116,4 +117,16 @@ test('ordinary ATHENA composition selects only the existing direct-V2 method and
     assert.match(root, /return generateWithAthenaMlx\(\{ prompt: input.instruction/u);
     assert.doesNotMatch(root, /generateWithAthenaMlxClaims|athena-claims-profile/u);
     assert.doesNotMatch(execution, /athenaClaimsProfile|athena-claims-profile/u);
+});
+
+test('instructs the model with the closed V2 shape and exact claim bindings', () => {
+    const instruction = buildAthenaTreatmentReasoningInstruction(projection());
+    const line = instruction.split('\n').find(line => line.startsWith('response_shape_json='));
+    assert.ok(line, 'The model must receive the actual shape, not only its private schema name');
+    const shape = JSON.parse(line.slice('response_shape_json='.length));
+    assert.deepEqual(Object.keys(shape).sort(), Object.keys(output()).sort());
+    assert.deepEqual(Object.keys(shape.data).sort(), Object.keys(output().data).sort());
+    assert.match(instruction, /claimPath.*summary.*data.recommendation/u);
+    assert.match(instruction, /JSON.*markdown/u);
+    assert.match(instruction, /480.*900.*400/u);
 });
