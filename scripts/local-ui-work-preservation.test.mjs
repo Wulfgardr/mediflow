@@ -51,8 +51,13 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
         const input = page.getByLabel('PIN operatore').first();
         await input.waitFor({ timeout: 15000 });
         const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
-        if (await renew.isVisible()) await renew.click();
-        await expect(input).toBeEnabled(); await input.fill('1234');
+        // Il pulsante compare anche durante il controllo di avvio e sparisce da solo: si usa solo se il PIN resta bloccato.
+        await expect.poll(async () => {
+            if (await input.isEnabled()) return true;
+            if (await renew.isEnabled({ timeout: 250 }).catch(() => false)) await renew.click({ timeout: 1000 }).catch(() => {});
+            return false;
+        }, { timeout: 30000 }).toBe(true);
+        await input.fill('1234');
         await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
         await expect(input).toBeHidden({ timeout: 10000 });
     };
