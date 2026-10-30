@@ -10,6 +10,6 @@ export type LocalUiIntent = typeof LOCAL_UI_INTENTS[number];
 export const LOCAL_UI_OPERATION = Object.freeze({ operationId: LOCAL_UI_TOOL_ID,
   capabilityId: LOCAL_UI_TOOL_ID, serviceRef: 'mediflow.local-ui.navigation', maximumStage: 'read_only' as const });
 export const LOCAL_UI_RESULT = Object.freeze({ status: 'continue_in_mediflow' as const });
-export const LOCAL_UI_ERROR = 'MediFlow navigation unavailable.';
+export const LOCAL_UI_ERROR = 'MediFlow navigation unavailable. Complete startup or pairing in MediFlow, then retry. This request is no longer pending.';
 export const LOCAL_UI_CONTENT = 'continue_in_mediflow';
 export const LOCAL_UI_BUS = 'mediflow.local-ui.navigation.v1';

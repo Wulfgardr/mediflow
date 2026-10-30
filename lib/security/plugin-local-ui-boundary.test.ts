@@ -1,63 +1,15 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { EventEmitter } from 'node:events';
 import test from 'node:test';
-import { pathToFileURL } from 'node:url';
 import { LOCAL_UI_WEB_READY, createLocalUiSupervisorRuntime } from './portable-supervisor-local-ui.ts';
 import type { PortableSupervisorProductionChildProcessesV1 } from './portable-supervisor-child-processes.ts';
-import { LOCAL_UI_TOOL_ID, LOCAL_UI_RPC_MODE, LOCAL_UI_RESULT, LOCAL_UI_INTENTS } from '../../packages/mcp/src/local-ui-contract.ts';
+import { LOCAL_UI_TOOL_ID, LOCAL_UI_RESULT, LOCAL_UI_INTENTS } from '../../packages/mcp/src/local-ui-contract.ts';
 import { installLocalUiWebNavigation } from '../../scripts/local-ui-web-navigation.mjs';
 
-const SENTINEL = 'SYNTHETIC_CF_STORY_SECRET_757';
-const META = { 'io.modelcontextprotocol/protocolVersion': '2026-07-28',
-  'io.modelcontextprotocol/clientCapabilities': {},
-  'io.modelcontextprotocol/clientInfo': { name: 'synthetic-local-ui-test', version: '1' } };
+import { fixture } from './local-ui-mcp-test-fixture.ts';
 
-function fixture(ready = true) {
-  const child = spawn(process.execPath, ['--import', pathToFileURL(`${process.cwd()}/scripts/register-strip-types-loader.mjs`).href,
-    'scripts/local-ui-mcp-stdio.mjs'], { env: { MEDIFLOW_DATA_DIR: process.env.MEDIFLOW_DATA_DIR, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', NODE_ENV: 'test', MEDIFLOW_AIP_OPERATION_RPC: LOCAL_UI_RPC_MODE, NODE_NO_WARNINGS: '1' },
-    stdio: ['pipe', 'pipe', 'pipe', 'ipc'] });
-  const pending = new Map<number, (value: any) => void>();
-  const wire: string[] = [], web: string[] = [], stderr: string[] = [];
-  const childFrames: Record<string, unknown>[] = [], parentFrames: Record<string, unknown>[] = [];
-  child.on('message', frame => { if (typeof frame === 'string') childFrames.push(JSON.parse(frame)); });
-  let buffer = '', counter = 0, terminal: (() => void) | undefined, stopped = false;
-  child.stdout!.setEncoding('utf8'); child.stderr!.setEncoding('utf8');
-  child.stderr!.on('data', text => stderr.push(text));
-  child.stdout!.on('data', text => {
-    buffer += text;
-    while (buffer.includes('\n')) {
-      const index = buffer.indexOf('\n'), line = buffer.slice(0, index); buffer = buffer.slice(index + 1);
-      wire.push(line); const value = JSON.parse(line); pending.get(value.id)?.(value); pending.delete(value.id);
-    }
-  });
-  const port = { connection: {}, subscribe(listener: (frame: unknown) => void) {
-    child.on('message', listener); return () => { child.off('message', listener); };
-  }, publish(frame: string) { parentFrames.push(JSON.parse(frame)); child.send(frame); }, onClose() { return () => {}; }, terminate() { child.kill(); } };
-  let webListener: ((frame: unknown) => void) | undefined;
-  const children = { mcpPort: port, subscribeWeb(listener: (frame: unknown) => void) { webListener = listener; return () => {}; },
-    sendWeb(frame: string, done: (error: Error | null) => void) { web.push(frame); done(null); },
-    onTerminal(listener: () => void) { terminal = listener; return () => { terminal = undefined; }; },
-    terminateAll() { stopped = true; child.kill(); }, terminateMcp() { child.kill(); }, terminateWeb() {} };
-  const runtime = createLocalUiSupervisorRuntime(children as unknown as PortableSupervisorProductionChildProcessesV1);
-  if (ready) webListener?.(LOCAL_UI_WEB_READY);
-  const request = (method: string, params: object, timeout = 5_000) => {
-    const id = ++counter;
-    return new Promise<any>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('synthetic_timeout')), timeout);
-      pending.set(id, value => { clearTimeout(timer); resolve(value); });
-      child.stdin!.write(JSON.stringify({ jsonrpc: '2.0', id, method, params: { ...params, _meta: META } }) + '\n');
-    });
-  };
-  const detachedRequest = (method: string, params: object) => {
-    const id = ++counter;
-    child.stdin!.write(JSON.stringify({ jsonrpc: '2.0', id, method, params: { ...params, _meta: META } }) + '\n');
-    return id;
-  };
-  const notify = (method: string, params: object) => child.stdin!.write(JSON.stringify({ jsonrpc: '2.0', method, params }) + '\n');
-  return { request, detachedRequest, notify, childFrames, parentFrames, web, wire, stderr, runtime, ready: () => webListener?.(LOCAL_UI_WEB_READY), terminal: () => terminal?.(), stopped: () => stopped, child };
-}
+const SENTINEL = 'SYNTHETIC_CF_STORY_SECRET_757';
 
 test('real MCP and parent admit only enum navigation before any clinical binding', async () => {
   const f = fixture();
@@ -74,7 +26,7 @@ test('real MCP and parent admit only enum navigation before any clinical binding
       { intent: 'search', _meta: { secret: SENTINEL } }, {}, { [SENTINEL]: 'history' }]) {
       const result = await f.request('tools/call', { name: LOCAL_UI_TOOL_ID, arguments: input });
       assert.equal(result.result.isError, true);
-      assert.equal(result.result.content[0].text, 'MediFlow navigation unavailable.');
+      assert.equal(result.result.content[0].text, 'MediFlow navigation unavailable. Complete startup or pairing in MediFlow, then retry. This request is no longer pending.');
     }
     for (const name of ['mediflow.patient.open_loops.read.v1', 'patient-profile.read.v1',
       'mediflow.terminology.search.v1', 'mediflow.semantic_query_plan.execute.v1',
@@ -220,7 +172,7 @@ test('the real RPC budget boundary rejects new calls without sacrificing cancell
     assert.deepEqual(f.web, []);
     assert.equal(f.childFrames.length, 255);
     const denied = JSON.parse(f.wire.find(frame => JSON.parse(frame).id === id)!);
-    assert.deepEqual(denied.result, { isError: true, content: [{ type: 'text', text: 'MediFlow navigation unavailable.' }] });
+    assert.deepEqual(denied.result, { isError: true, content: [{ type: 'text', text: 'MediFlow navigation unavailable. Complete startup or pairing in MediFlow, then retry. This request is no longer pending.' }] });
     assert.equal(f.stopped(), false);
     assert.equal((await f.request('tools/list', {})).result.tools.length, 1);
     assert.deepEqual(f.stderr, []);
@@ -268,4 +220,28 @@ test('Web dispatch rejects expired requests and cancellation only withdraws the 
   send(first); send(second); cancel(first); assert.deepEqual(seen, ['history', 'history']);
   cancel(second); assert.deepEqual(seen, ['history', 'history', 'reset']);
   close();
+});
+
+
+test('five cold first searches expire with retry guidance and never replay after readiness', async t => {
+  for (let session = 0; session < 5; session++) {
+    await t.test(`cold session ${session + 1}`, async () => {
+      const f = fixture(false);
+      const exited = new Promise(resolve => f.child.once('exit', resolve));
+      try {
+        await f.request('tools/list', {});
+        const first = await f.request('tools/call', { name: LOCAL_UI_TOOL_ID, arguments: { intent: 'search' } }, 11_000);
+        assert.deepEqual(first.result, { isError: true, content: [{ type: 'text', text:
+          'MediFlow navigation unavailable. Complete startup or pairing in MediFlow, then retry. This request is no longer pending.' }] });
+        assert.equal(f.web.length, 0);
+        f.ready();
+        await new Promise(resolve => setImmediate(resolve));
+        assert.equal(f.web.length, 0);
+        const second = await f.request('tools/call', { name: LOCAL_UI_TOOL_ID, arguments: { intent: 'search' } });
+        assert.deepEqual(second.result.structuredContent, LOCAL_UI_RESULT);
+        assert.equal(f.web.length, 1);
+        assert.doesNotMatch([...f.wire, ...f.stderr, ...f.web].join(''), new RegExp(SENTINEL));
+      } finally { f.runtime.terminate(); await exited; }
+    });
+  }
 });

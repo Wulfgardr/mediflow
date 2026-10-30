@@ -1899,7 +1899,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     const socket = createHttpServer();
     await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
     const port = socket.address().port; await new Promise(resolve => socket.close(resolve));
-    const child = spawn(process.execPath, [...fixtureImportArguments(ownerLoader), ...(lifecycle && !lifecycle.job ? fixtureImportArguments(stopLoader) : []), path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), '--senza-browser', ...args], {
+    const child = spawn(process.execPath, [...fixtureImportArguments(ownerLoader), ...(lifecycle && !lifecycle.job ? fixtureImportArguments(stopLoader) : []), path.join(source, 'scripts/mediflow.mjs'), ...(reuse ? ['--riusa'] : []), ...(args.includes('--scegli') ? [] : ['--senza-browser']), ...args], {
         env: { ...process.env, ...overrides, ...options.env, HOME: home, USERPROFILE: home, PORT: String(port) }, stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
     const closed = Promise.all([once(child, 'exit'), once(child.stderr, 'close')]).then(([exit]) => exit);
     let resolveTerminal, terminalFailureObserved = false, cleanupTask = null, ownerRecorded = false, launcherClosed = false, drainTask = null;
@@ -2989,16 +2989,34 @@ test('an existing ordinary launcher pairs only after code confirmation in its We
         await new Promise(resolve => setTimeout(resolve, 10));
     }
     assert.ok(pending);
-    assert.equal(await navigateOwnedLocalUiRuntime(bridge, 'history', AbortSignal.timeout(1500), Date.now()+1400, f.expected), false);
-    const decision = await fetch(state.url + '/fixture-decision', { method: 'POST', body: JSON.stringify({nonce:pending.nonce, allow:true, code}) });
-    assert.equal((await decision.json()).ok, true);
-    await new Promise(resolve => setTimeout(resolve, 100));
-    assert.equal(await navigateOwnedLocalUiRuntime(bridge, 'history', AbortSignal.timeout(1500), Date.now()+1400, f.expected), true);
-    await fetch(state.url + '/fixture-lock');
-    await f.until(() => !bridge.connected);
-    await assert.rejects(navigateOwnedLocalUiRuntime(bridge, 'identity', AbortSignal.timeout(1000), Date.now()+900, f.expected));
-    assert.equal((await (await fetch(state.url + '/fixture-pairing')).json()).active.length, 0);
-    assert.equal(f.child.exitCode, null);
+    await import('./register-strip-types-loader.mjs');
+    const { fixture } = await import('../lib/security/local-ui-mcp-test-fixture.ts');
+    const { waitForLocalUiNavigation } = await import('./local-ui-runtime.mjs');
+    const mcp = fixture(false, (intent, signal) => waitForLocalUiNavigation(bridge, intent,
+        AbortSignal.any([signal, AbortSignal.timeout(8000)]), Date.now() + 8000, f.expected));
+    const mcpExited = once(mcp.child, 'exit');
+    try {
+        await mcp.request('tools/list', {});
+        const first = await mcp.request('tools/call', {name:'mediflow.local_ui.navigate.v1',arguments:{intent:'search'}},11000);
+        assert.deepEqual(first.result,{isError:true,content:[{type:'text',text:'MediFlow navigation unavailable. Complete startup or pairing in MediFlow, then retry. This request is no longer pending.'}]});
+        assert.doesNotMatch(f.output(),/mediflow-local-ui-pair-use/u);
+        assert.equal(await navigateOwnedLocalUiRuntime(bridge, 'history', AbortSignal.timeout(1500), Date.now()+1400, f.expected), false);
+        const decision = await fetch(state.url + '/fixture-decision', { method: 'POST', body: JSON.stringify({nonce:pending.nonce, allow:true, code}) });
+        assert.equal((await decision.json()).ok, true);
+        await new Promise(resolve => setTimeout(resolve, 100));
+        assert.doesNotMatch(f.output(),/mediflow-local-ui-pair-use/u);
+        const second = await mcp.request('tools/call', {name:'mediflow.local_ui.navigate.v1',arguments:{intent:'search'}});
+        assert.equal(second.result.structuredContent.status,'continue_in_mediflow');
+        assert.equal(await navigateOwnedLocalUiRuntime(bridge, 'history', AbortSignal.timeout(1500), Date.now()+1400, f.expected), true);
+        await fetch(state.url + '/fixture-lock');
+        await f.until(() => !bridge.connected);
+        await assert.rejects(navigateOwnedLocalUiRuntime(bridge, 'identity', AbortSignal.timeout(1000), Date.now()+900, f.expected));
+        assert.equal((await (await fetch(state.url + '/fixture-pairing')).json()).active.length, 0);
+        assert.equal(f.child.exitCode, null);
+    } finally {
+        mcp.runtime.terminate(); await mcpExited;
+        if (bridge.connected) { const exited = once(bridge, 'exit'); bridge.disconnect(); await exited; }
+    }
 });
 
 test('ordinary Web children preserve supported configuration through the plugin environment', async t => {
@@ -3138,4 +3156,36 @@ test('Windows Job closure during chooser switch keeps the launcher alive and sta
     const state = await (await fetch(new URL('state',receipt.choiceUrl))).json();
     assert.equal(state.ready,true); assert.ok(state.url);
     assert.equal((await fetch(state.url)).status,200);
+});
+
+
+test('real MCP first search expires in the ordinary chooser and a new search succeeds', async t => {
+    await import('./register-strip-types-loader.mjs');
+    const { fixture } = await import('../lib/security/local-ui-mcp-test-fixture.ts');
+    const { waitForLocalUiNavigation } = await import('./local-ui-runtime.mjs');
+    for (let session = 0; session < 5; session++) await t.test(`chooser session ${session + 1}`, async t => {
+        const f = await ordinaryLauncherFixture(t, 'web', ['--scegli'], true, true, { DISPLAY: ':synthetic' });
+        await f.until(() => f.output().includes('Avvio:'));
+        const receipt = { choiceUrl: f.output().match(/Avvio: (http[^\s]+)/u)[1] };
+        const stateUrl = new URL('state', receipt.choiceUrl);
+        assert.equal((await (await fetch(stateUrl)).json()).ready, false);
+        const mcp = fixture(false, (intent, signal) => waitForLocalUiNavigation(f.child, intent,
+            AbortSignal.any([signal, AbortSignal.timeout(8000)]), Date.now() + 8000, f.expected));
+        const exited = once(mcp.child, 'exit');
+        try {
+            await mcp.request('tools/list', {});
+            const first = await mcp.request('tools/call', {name:'mediflow.local_ui.navigate.v1',arguments:{intent:'search'}},11000);
+            assert.deepEqual(first.result,{isError:true,content:[{type:'text',text:'MediFlow navigation unavailable. Complete startup or pairing in MediFlow, then retry. This request is no longer pending.'}]});
+            assert.doesNotMatch(f.output(),/FIXTURE_NAVIGATION/u);
+            const endpoint = new URL('choose',receipt.choiceUrl);
+            const response = await fetch(endpoint,{method:'POST',headers:{Origin:endpoint.origin,'Content-Type':'application/json'},body:JSON.stringify({choice:'web'})});
+            assert.equal(response.status,202); await response.text();
+            await f.until(() => f.output().includes('Pronto:'));
+            assert.doesNotMatch(f.output(),/FIXTURE_NAVIGATION/u);
+            const second = await mcp.request('tools/call', {name:'mediflow.local_ui.navigate.v1',arguments:{intent:'search'}});
+            assert.equal(second.result.structuredContent.status,'continue_in_mediflow');
+            await f.until(() => f.output().includes('FIXTURE_NAVIGATION'));
+            assert.equal((f.output().match(/FIXTURE_NAVIGATION/gu) ?? []).length,1);
+        } finally { mcp.runtime.terminate(); await exited; }
+    });
 });
