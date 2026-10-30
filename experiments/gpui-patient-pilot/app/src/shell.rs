@@ -693,7 +693,12 @@ impl ClinicalApp {
             ai_preferences: AiPreferences::new(&area_scroll, cx),
             settings_page: SettingsPage::Overview,
             settings_targets: ScrollTarget::group(&area_scroll, cx),
-            local_host: local_host::LocalAdministration::new(theme, &area_scroll, cx),
+            local_host: local_host::LocalAdministration::new(
+                theme,
+                &area_scroll,
+                local_preferences.local_retirement_path(),
+                cx,
+            ),
             account_profile: AccountProfile::new(Theme::for_dark(false), cx),
             who: WhoLookup::new(&area_scroll, cx),
             scales: ScaleArea::new(&area_scroll, theme, cx),
@@ -1096,11 +1101,19 @@ impl ClinicalApp {
         self.analytics.reset(cx);
         self.scales.reset(cx);
         if let Some(access) = self.local_host.withdraw(cx) {
-            cx.background_executor()
-                .spawn(async move {
-                    let _ = access.retire();
-                })
-                .detach();
+            let task = cx
+                .background_executor()
+                .spawn(async move { access.retire() });
+            cx.spawn(async move |this, cx| {
+                let result = task.await;
+                let _ = this.update(cx, |this, cx| {
+                    if result.is_err() {
+                        this.message = Some((local_host::RETIREMENT_WARNING.into(), true));
+                    }
+                    cx.notify();
+                });
+            })
+            .detach();
         }
         self.account_profile.reset(self.theme, cx);
         self.settings_page = SettingsPage::Overview;
@@ -5633,6 +5646,18 @@ impl Render for ClinicalApp {
                                 el.child(
                                     notice("clinical-workspace-copy-state", message, theme, error)
                                         .flex_shrink_0(),
+                                )
+                            })
+                            .when(self.local_host.retirement.pending(), |el| {
+                                el.child(
+                                    notice(
+                                        "local-session-retirement-warning",
+                                        local_host::RETIREMENT_WARNING,
+                                        theme,
+                                        true,
+                                    )
+                                    .debug_selector(|| "local-session-retirement-warning".into())
+                                    .flex_shrink_0(),
                                 )
                             })
                             .child(content),

@@ -76,3 +76,37 @@ G-4 conserva import multiplo, originale inline, curation, CSV e nuova scheda
 da documento; il controllo dei duplicati resta preventivo. La matrice G-7
 completa e l'installazione/qualifica del candidato non sono attestate da queste
 prove. G-3 non è modificato. Nessun merge, auto-merge o dato reale utilizzato.
+
+
+## Correzione del confine server dopo la review
+
+L'accesso GPUI usa `/api/auth/local-client/login`; il server lega la sessione
+all'ingresso loopback attestato. La stessa fonte (`loopback-ingress.mjs`) è
+usata dall'accesso, dalla risoluzione della sessione, dal controllo delle
+scritture e dal logout. Il proxy deriva la prova dal socket TLS, eliminando
+le attestazioni ricevute dal chiamante. Il logout locale via TLS è ammesso;
+quello LAN resta negato. Il dettaglio è in ADR 0172.
+
+`e2e/gpui-local-ingress.spec.ts`, su archivio sintetico e porta diversa da
+3000, esercita Next e il proxy TLS canonico con peer LAN reale, cookie P3
+valido, header forgiati, IPv6 e alias Host. Prova il diniego dei quattro
+interruttori e della DELETE, la conservazione dell'allegato dopo il diniego,
+la cancellazione locale e il logout locale seguito da GET 401. Le mutazioni
+sintetiche del controllo di sessione e del vecchio diniego del marker TLS
+fanno fallire rispettivamente le attese 401 (osservato 200) e 204 (osservato
+403); entrambe sono state rimosse prima della verifica finale.
+
+I test Rust verificano anche che un ritiro non confermato sopravviva al
+riavvio, che un ritiro successivo non lo nasconda e che l'avviso sia visibile
+sulla schermata di accesso bloccata. Le chiusure automatiche conservano tale
+stato prima del tentativo di rete.
+
+Il rosso Windows citato dalla review è intermittente sul medesimo head
+`9b0c932b5c0f1076e875f55abc53925e92f1405a`: il run
+[41015552823, tentativo 1](https://github.com/Wulfgardr/mediflow/actions/runs/41015552823/attempts/1)
+fallisce a `launcher-helpers.test.mjs:3009`; il
+[tentativo 2](https://github.com/Wulfgardr/mediflow/actions/runs/41015552823/attempts/2)
+passa. Il launcher non è stato modificato per questa correzione.
+
+Implementazione assistita: GPT 6.1 Sol, effort xhigh; nessun collaboratore
+aggiuntivo. I consumi non sono attribuibili da questa esecuzione.

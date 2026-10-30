@@ -128,7 +128,7 @@ impl LocalHostAccess {
             COOKIE,
             sensitive_header(&format!("mediflow_auth_control={}", *control))?,
         );
-        let (cookie, login) = authenticate_web_p3(&client, user, headers, passphrase);
+        let (cookie, login) = authenticate_web_p3(&client, user, headers, passphrase, true);
         let Some(cookie) = cookie else {
             return Err(login.err().unwrap_or(RuntimeError::InvalidResponse));
         };
@@ -143,8 +143,11 @@ impl LocalHostAccess {
             retired: AtomicBool::new(false),
         };
         if let Err(error) = login {
-            let _ = access.retire();
-            return Err(error);
+            return Err(if access.retire().is_err() {
+                RuntimeError::Indeterminate
+            } else {
+                error
+            });
         }
         Ok(access)
     }

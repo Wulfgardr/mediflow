@@ -223,7 +223,7 @@ test('route reads both cookies once and denies a rejected cookie Promise', () =>
     assert.equal(child.status, 0, child.stderr || child.stdout);
 });
 
-test('local GPUI logout accepts only exact loopback transport and retires its Web session without a Supervisor transition', async () => {
+test('local GPUI logout denies fabricated Requests without a server socket attestation', async () => {
     const { createLocalClientLogout } = await import('./local-client-logout');
     const calls: string[] = [];
     const handler = createLocalClientLogout((bearer, control, request) => completeExactWebP3Logout(bearer, control, request, sources({
@@ -240,11 +240,11 @@ test('local GPUI logout accepts only exact loopback transport and retires its We
         assert.equal((await handler(local(headers))).status, 403);
     }
     assert.equal((await handler(local({}, 'http://127.0.0.1:4321/api/auth/local-client/logout?other=1'))).status, 403);
-    assert.equal((await handler(local({ cookie: '' }))).status, 401);
+    assert.equal((await handler(local({ cookie: '' }))).status, 403);
     assert.deepEqual(calls, []);
-    assert.equal((await handler(local())).status, 204);
-    assert.deepEqual(calls, ['exact-session']);
+    assert.equal((await handler(local())).status, 403);
+    assert.deepEqual(calls, []);
     const denied = createLocalClientLogout((bearer, control, request) => completeExactWebP3Logout(bearer, control, request, sources({ resolve: () => sealed({ status: 'absent' as const }) })));
-    assert.equal((await denied(local())).status, 401);
-    assert.deepEqual(calls, ['exact-session']);
+    assert.equal((await denied(local())).status, 403);
+    assert.deepEqual(calls, []);
 });

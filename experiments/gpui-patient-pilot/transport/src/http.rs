@@ -778,7 +778,8 @@ impl HostBootstrapSession {
             cookie: Zeroizing::new(String::new()),
             sent: std::sync::atomic::AtomicBool::new(false),
         };
-        let (cookie, login) = authenticate_web_p3(&host.client, user, host.headers()?, passphrase);
+        let (cookie, login) =
+            authenticate_web_p3(&host.client, user, host.headers()?, passphrase, false);
         if let Some(cookie) = cookie {
             host.cookie = cookie;
         }
@@ -874,6 +875,7 @@ pub(crate) fn authenticate_web_p3(
     user: &RuntimeUser,
     headers: HeaderMap,
     passphrase: &str,
+    local_client: bool,
 ) -> (Option<Zeroizing<String>>, Result<()>) {
     let mut cookie = None;
     let login = (|| {
@@ -919,7 +921,11 @@ pub(crate) fn authenticate_web_p3(
         let mut body = serde_json::json!({"username":user.username,"verifier":&*material.verifier});
         let logged = client.dedicated_web_raw(
             Method::POST,
-            &["api", "auth", "login"],
+            &if local_client {
+                vec!["api", "auth", "local-client", "login"]
+            } else {
+                vec!["api", "auth", "login"]
+            },
             headers,
             Some(&body),
             true,

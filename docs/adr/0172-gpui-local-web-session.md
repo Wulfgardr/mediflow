@@ -14,7 +14,7 @@ le transazioni, le precondizioni e l'audit del Web.
 
 Il client offre la gestione locale soltanto quando l'origine home-base è
 loopback. L'operatore inserisce nuovamente la passphrase; il trasporto usa
-`/api/auth/check` e `/api/auth/login`, con derivazione v3, ETag e chiave della
+`/api/auth/check` e `/api/auth/local-client/login`, con derivazione v3, ETag e chiave della
 richiesta, senza trasmettere o conservare la passphrase. Cookie e control Web
 sono distinti dalle credenziali native, restano in memoria e sono ritirati
 al blocco, al rilascio della finestra e alla chiusura dell'app. Utente, ruolo e
@@ -43,15 +43,47 @@ precondizione. Anche il suo audit resta quello del Web, distinto dall'audit
 atomico della cancellazione documentale. La tranche non promette atomicità di
 più impostazioni né avvia generazioni.
 
+## Attestazione dell’ingresso sul server
+
+`loopback-ingress.mjs` è la fonte unica dell'attestazione. L'instrumentation
+Node osserva `http.server.request.start`, prima della consegna a Next, elimina
+le attestazioni presentate dal chiamante e controlla il peer del socket.
+Il proxy TLS canonico elimina gli stessi header e attesta solo i peer loopback
+con un segreto casuale di 256 bit condiviso entro la directory dati locale.
+Il file è creato esclusivamente, verificato come file regolare senza seguire
+collegamenti simbolici; sui sistemi Unix sono verificati anche proprietario
+e permessi privati. Su Windows eredita la protezione della directory dati. Il valore non è restituito al client.
+Una richiesta inoltrata senza prova valida resta non locale anche se dichiara
+Host, Origin o indirizzo inoltrato loopback. Il confine Node sostituisce la
+prova del proxy con un marcatore casuale privato del processo; senza
+instrumentation l'accesso locale viene negato.
+
+Il login dedicato vincola sul server l'identificatore della sessione alla
+restrizione loopback per l'intera durata emessa dal proprietario P3.
+La risoluzione ordinaria e quella del projection owner rivalidano il vincolo;
+il controllo condiviso delle scritture sull'archivio lo rivalida anche prima
+dei writer riusati. I login Web ordinari mantengono il loro contratto.
+Né il tipo Rust né un header scelto dal client concedono questa autorità.
+La prova dipende dall'indirizzo del peer, non dall'alias Host: IPv4 loopback,
+IPv6 loopback e IPv4 mappato sono coerenti. Il proxy deve usare la stessa
+directory dati del Web. Un proxy diverso senza attestazione non concede
+accesso GPUI locale.
+
 ## Ritiro nominato
 
 Il logout Web generale ritira anche il contesto del Supervisor. Il nuovo
 `POST /api/auth/local-client/logout` usa soltanto il servizio canonico
 `completeExactWebP3Logout` della coppia cookie/control presentata. È limitato
-a trasporto loopback, Origin esatto e richiesta JSON same-origin; rifiuta il
-marker del proxy LAN. Non chiama il controller del Supervisor e non cancella
+a ingresso loopback attestato, Origin esatto e richiesta JSON same-origin.
+Non chiama il controller del Supervisor e non cancella
 altre sessioni. Il 204 attesta il ritiro remoto; un errore mantiene distinta
-la chiusura locale dal ritiro non confermato. Non è aggiunto un writer.
+la chiusura locale dal ritiro non confermato. Le chiusure automatiche registrano
+prima del tentativo un contatore locale senza credenziali o dati clinici.
+Solo il ritiro confermato decrementa quel tentativo. Un insuccesso resta
+visibile nella finestra bloccata e al successivo avvio; la chiusura di una
+sessione successiva non nasconde un ritiro precedente non confermato.
+Il contatore usa la cartella di stato GPUI già prevista per le preferenze.
+Non è aggiunto un writer clinico.
 
 ## Limiti
 
