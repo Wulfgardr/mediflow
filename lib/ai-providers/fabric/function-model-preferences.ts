@@ -157,7 +157,8 @@ export function readFunctionModelPreferences(sources: FunctionModelSources, vers
         const stale = saved !== null && (saved.catalogRevision !== catalog.revision || !selectedBinding);
         const hidden = version === 'v1' && selectedBinding?.provider === 'athena_transformers';
         const options: FunctionModelOption[] = catalog.bindings.filter(item => item.functions.includes(id)).map(item => {
-            const common = { modelOptionId: item.modelOptionId, label: item.model,
+            const common = { modelOptionId: item.modelOptionId, label: item.provider === 'ollama' ? item.model
+                : `${item.model} · pesi ATHENA, adattamento MediFlow · ricerca, vietato per la cura diretta dei pazienti`,
                 state: item.available ? 'available_unqualified' as const : 'unavailable' as const };
             if (item.provider === 'athena_transformers') return Object.freeze({ ...common, provider: item.provider,
                 provisioningState: item.provisioningState ?? 'unavailable', prerequisites: item.prerequisites ?? ['unavailable'] });
