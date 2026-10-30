@@ -27,8 +27,12 @@ le poll verificano la selezione locale. Un cambio remoto dopo la consegna
 non ha una notifica server dedicata: non si promette ritiro immediato.
 
 Il mapping è confinato alla RAM del processo privato. Fine richiesta e revoca
-lo terminano; una preparazione ancora in attesa osserva la cancellazione
-entro 50 ms tra attese IPC, con limite totale di 90 s. Consumo e verifica
+chiudono il canale verso un supervisore Node, che riusa `stopOwnedChild` del
+launcher per arrestare e verificare la scomparsa del gruppo posseduto, incluso
+il worker Python. La GPUI attende l'esito del supervisore: un arresto non
+verificato produce un errore fisso, senza contenuti della scheda. Una
+preparazione ancora in attesa osserva la cancellazione entro 50 ms tra attese
+IPC, con limite totale di 90 s; l'arresto del gruppo ha un limite di 3 s. Consumo e verifica
 finale hanno un limite IPC di 2 s; sessione e selezione sono ricontrollate
 anche dopo l'attesa. Il renderer può avere già ricevuto i byte dopo il
 controllo finale: revoca e chiusura non ne attestano la cancellazione nell'host.
@@ -114,7 +118,8 @@ Impostare nella GPUI:
 - `MEDIFLOW_CHAT_CARD_NODE`: eseguibile assoluto Node 24.18.0;
 - `MEDIFLOW_CHAT_CARD_OWNER`: percorso assoluto a
   `scripts/chat-card-native-owner.mjs`, con byte uguali alla copia incorporata
-  nella build GPUI;
+  nella build GPUI; il file adiacente `scripts/chat-card-process-owner.mjs`
+  deve corrispondere anch'esso ai byte incorporati;
 - `MEDIFLOW_CHAT_CARD_INSTALLATION`: JSON locale privato con `runner` ed
   `evidence` secondo `SyntheticCardInstallation`; evidenze reali sul corpus
   `scripts/fixtures/chat-card-corpus.json`, mai report simulati in installazione.
@@ -138,3 +143,37 @@ di controlli o aumento di soglie. Il manifesto CSV iniziale usava CRLF:
 `git diff --check` lo ha respinto; è stato normalizzato a LF.
 
 Sviluppo assistito: GPT-6.1 Sol, effort xhigh, nessun subagente.
+
+## Correzioni della review sui processi e sulle scadenze
+
+Il test Rust `revoke_timeout_and_drop_stop_every_owned_descendant_only`
+avvia una scheda con due generazioni di discendenti, osserva tre processi e
+ne richiede zero dopo revoca durante la preparazione, timeout IPC e `Drop`.
+Una seconda scheda resta attiva in tutti e tre i casi e viene arrestata solo
+dal proprio proprietario. Revoca e timeout verificano l'arresto prima del
+`Drop`. Il supervisore usa un gruppo separato per ogni figlio; non ricerca
+processi per nome e non adotta processi esistenti.
+
+Verifica aggiuntiva locale con Node 24.18.0 e GLiNER reale: tre chiusure del
+canale mentre la preparazione non aveva ancora risposto, con Python osservato
+nell'albero posseduto. Per ogni run: tre processi osservati, zero superstiti,
+uscita del supervisore con arresto verificato. Questa prova esercita il
+supervisore reale; la regressione Rust esercita i tre ingressi del chiamante.
+
+I sei negativi del consenso ora installano una `Card` sintetica valida e
+ognuno verifica prima la consegna positiva degli stessi byte. Cambiano poi
+soltanto consenso assente, scadenza, rifiuto, revoca, inattività o rimozione
+della scheda. L'orologio della richiesta è iniettabile: i test avanzano a
+30 secondi e a 5 minuti senza attese reali. Nel caso dei 5 minuti la scheda
+viene preparata a 4 minuti e 59 secondi, quindi il consenso è ancora valido.
+
+Mutazioni eseguite separatamente su `Request::current()`, poi ripristinate:
+
+- rimosso il controllo della scadenza di 30 secondi: fallisce
+  `consent_expired_at_30_seconds_with_valid_card_never_delivers`;
+- rimosso il controllo dei 5 minuti: fallisce
+  `view_idle_at_5_minutes_with_fresh_card_never_delivers`.
+
+In entrambi i casi la mutazione consegna indebitamente il payload sintetico
+e il test fallisce sull'asserzione di ritiro senza payload. Nessuna mutazione
+è inclusa nel codice consegnato.

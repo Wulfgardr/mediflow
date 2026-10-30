@@ -57,6 +57,7 @@ pub(crate) struct Request {
     stream: UnixStream,
     lock_epoch: u64,
     created: Instant,
+    clock: Arc<dyn Fn() -> Instant + Send + Sync>,
     deadline: Option<Instant>,
     binding: Option<Binding>,
     card: Option<super::card::Card>,
@@ -66,6 +67,13 @@ pub(crate) type Pending = Arc<Mutex<Request>>;
 
 impl Request {
     pub(super) fn new(peer: Peer, stream: UnixStream) -> Option<Pending> {
+        Self::with_clock(peer, stream, Arc::new(Instant::now))
+    }
+    fn with_clock(
+        peer: Peer,
+        stream: UnixStream,
+        clock: Arc<dyn Fn() -> Instant + Send + Sync>,
+    ) -> Option<Pending> {
         let mut nonce = [0; 32];
         getrandom::fill(&mut nonce).ok()?;
         Some(Arc::new(Mutex::new(Self {
@@ -74,7 +82,8 @@ impl Request {
             peer,
             stream,
             lock_epoch: native::lock_epoch(),
-            created: Instant::now(),
+            created: clock(),
+            clock,
             deadline: None,
             binding: None,
             card: None,
@@ -104,7 +113,7 @@ impl Request {
                 .is_none_or(|b| b.session.check_chat_access_context(&b.context).is_ok())
     }
     pub(crate) fn status(&mut self) -> State {
-        if self.state != State::Withdrawn && !self.current(Instant::now()) {
+        if self.state != State::Withdrawn && !self.current((self.clock)()) {
             self.withdraw();
         }
         self.state
@@ -132,7 +141,7 @@ impl Request {
             return;
         }
         self.card = card;
-        self.deadline = Some(Instant::now() + CHALLENGE);
+        self.deadline = Some((self.clock)() + CHALLENGE);
         self.state = State::Challenge;
     }
     pub(crate) fn begin(&mut self) -> Option<(RuntimeSession, ChatAccessContext, Attempt)> {
@@ -174,7 +183,7 @@ impl Request {
             return self.state;
         }
         self.state = State::Consumed;
-        self.created = Instant::now();
+        self.created = (self.clock)();
         self.deadline = None;
         self.attempt.0.fill(0);
         self.state
@@ -412,40 +421,77 @@ mod tests {
         assert_eq!(consume(&first), State::Consumed);
         assert_eq!(consume(&first), State::Withdrawn);
     }
-    #[test]
-    fn consent_absent_expired_denied_revoked_idle_and_missing_card_never_deliver() {
-        for scenario in [
-            "absent",
-            "expired",
-            "denied",
-            "revoked",
-            "idle",
-            "missing-card",
-        ] {
-            let (session, _host) = native_session();
-            let context = session.chat_access_context("scope-a", "patient-a").unwrap();
-            let (pending, _remote) = synthetic_request();
+    fn assert_card_negative(scenario: &str) {
+        let (session, _host) = native_session();
+        let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+        for negative in [false, true] {
+            let time = Arc::new(Mutex::new(Instant::now()));
+            let clock = time.clone();
+            let (a, _remote) = UnixStream::pair().unwrap();
+            let pending = Request::with_clock(
+                Peer::test_peer(),
+                a,
+                Arc::new(move || *clock.lock().unwrap()),
+            )
+            .unwrap();
             let mut request = pending.lock().unwrap();
-            assert!(request.bind(session, context));
-            request.state = State::Challenge;
-            request.deadline = Some(Instant::now() + CHALLENGE);
-            if scenario != "absent" {
-                let (_, _, attempt) = request.begin().unwrap();
-                request.finish(attempt, scenario != "denied");
+            assert!(request.bind(session.clone(), context.clone()));
+            if scenario == "idle" {
+                *time.lock().unwrap() += VIEW_IDLE - Duration::from_secs(1);
             }
-            match scenario {
-                "expired" => request.deadline = Some(Instant::now() - Duration::from_millis(1)),
-                "idle" => request.created = Instant::now() - VIEW_IDLE,
-                "revoked" => request.withdraw(),
-                _ => {}
+            request.install_card(Some(super::super::card::Card::synthetic()));
+            assert_eq!(request.status(), State::Challenge);
+            if !negative || scenario != "absent" {
+                let (_, _, attempt) = request.begin().unwrap();
+                request.finish(attempt, !negative || scenario != "denied");
+            }
+            if negative {
+                match scenario {
+                    "expired" => *time.lock().unwrap() += CHALLENGE,
+                    "idle" => {
+                        *time.lock().unwrap() += Duration::from_secs(1);
+                    }
+                    "revoked" => request.withdraw(),
+                    "missing-card" => request.card = None,
+                    _ => {}
+                }
             }
             drop(request);
+            let expected = if negative {
+                (State::Withdrawn, None)
+            } else {
+                (State::Consumed, Some("synthetic-redacted-payload".into()))
+            };
             assert_eq!(
                 consume_card(&pending),
-                (State::Withdrawn, None),
-                "{scenario}"
+                expected,
+                "{scenario}, negative={negative}"
             );
         }
+    }
+    #[test]
+    fn consent_absent_with_valid_card_never_delivers() {
+        assert_card_negative("absent");
+    }
+    #[test]
+    fn consent_expired_at_30_seconds_with_valid_card_never_delivers() {
+        assert_card_negative("expired");
+    }
+    #[test]
+    fn consent_denied_with_valid_card_never_delivers() {
+        assert_card_negative("denied");
+    }
+    #[test]
+    fn consent_revoked_with_valid_card_never_delivers() {
+        assert_card_negative("revoked");
+    }
+    #[test]
+    fn view_idle_at_5_minutes_with_fresh_card_never_delivers() {
+        assert_card_negative("idle");
+    }
+    #[test]
+    fn missing_card_after_approval_never_delivers() {
+        assert_card_negative("missing-card");
     }
     #[test]
     fn session_archive_selection_aba_and_eof_retire_native_approval() {

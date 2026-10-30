@@ -46,6 +46,7 @@ async function main() {
   try {
     if (process.versions.node !== '24.18.0' || process.argv.length !== 3) return denied();
     owner = createNativeCardOwner(JSON.parse(readFileSync(process.argv[2], 'utf8')));
+    process.once('SIGTERM', () => { owner.close().then(() => process.exit(0), () => process.exit(1)); });
     const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
     for await (const line of lines) {
       if (Buffer.byteLength(line) > 128) return denied();
