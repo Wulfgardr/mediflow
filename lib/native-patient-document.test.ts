@@ -37,8 +37,11 @@ async function document(text = 'Nome: Mario\nCognome: Rossi\nDocumento inventato
         data: seal(`data:application/pdf;base64,${bytes.toString('base64')}`) };
 }
 async function scan(blank: boolean) {
-    const svg = `<svg width="1400" height="800" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="white"/>${blank ? '' : '<text x="80" y="180" font-size="48" fill="black">Nome: Mario</text><text x="80" y="280" font-size="48" fill="black">Cognome: Rossi</text><text x="80" y="380" font-size="48" fill="black">Documento inventato per la prova</text>'}</svg>`;
-    const png = await sharp(Buffer.from(svg)).png().toBuffer(), pdf = await PDFDocument.create();
+    const raster = sharp({ create: { width: 1400, height: 800, channels: 3, background: '#ffffff' } });
+    if (!blank) raster.composite([{ input: await sharp({ text: {
+        text: 'Nome: Mario\nCognome: Rossi\nDocumento inventato per la prova', font: 'sans 48', rgba: true,
+    } }).png().toBuffer(), top: 80, left: 80 }]);
+    const png = await raster.png().toBuffer(), pdf = await PDFDocument.create();
     const image = await pdf.embedPng(png);
     pdf.addPage([700, 400]).drawImage(image, { x: 0, y: 0, width: 700, height: 400 });
     const bytes = Buffer.from(await pdf.save());
@@ -116,7 +119,7 @@ test('native route rejects URLs, source IDs and caller candidates; returns only 
             { method: 'POST', headers: context.request.headers, body: JSON.stringify(body) }));
         return { status: response.status, body: await response.json() };
     };
-    assert.equal((await send({ operation: 'stage', source: { url: 'https://invalid.example/file.pdf' } })).status, 403);
+    assert.equal((await send({ operation: 'stage', source: { url: 'http://127.0.0.1:43182/file.pdf' } })).status, 403);
     assert.equal((await send({ operation: 'stage', source: { ...await document(), candidates: { firstName: 'Mario' } } })).status, 403);
     const staged = await send({ operation: 'stage', source: await document() });
     assert.equal(staged.status, 200); assert.match(staged.body.text, /Mario/u);
