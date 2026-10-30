@@ -24,24 +24,39 @@ test('I-1 Web: crea e rilegge una scheda con tutte le funzioni AI spente', async
     await route.continue();
   });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  for (const key of ['aiPatientInsightKillSwitch', 'aiSmartImportKillSwitch', 'aiDocumentSynthesisKillSwitch', 'aiTreatmentReasoningKillSwitch'] as const) {
-    await setAiLaneKillSwitch(page, key, 'disabled');
-  }
-  const id = await page.evaluate(async () => {
-    const response = await fetch('/api/patients', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firstName: 'Locale', lastName: 'Sintetico', taxCode: `LOCAL${Date.now()}`, address: 'Via Sintetica 1', phone: '0000000000' }),
+  const originalSettings: { key: string; value: string | null }[] = [];
+  try {
+    for (const key of ['aiPatientInsightKillSwitch', 'aiSmartImportKillSwitch', 'aiDocumentSynthesisKillSwitch', 'aiTreatmentReasoningKillSwitch'] as const) {
+      const before = await page.request.get(`/api/settings/${key}`);
+      expect(before.ok()).toBe(true);
+      originalSettings.push({ key, value: (await before.json()).value });
+      await setAiLaneKillSwitch(page, key, 'disabled');
+    }
+    const id = await page.evaluate(async () => {
+      const response = await fetch('/api/patients', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firstName: 'Locale', lastName: 'Sintetico', taxCode: `LOCAL${Date.now()}`, address: 'Via Sintetica 1', phone: '0000000000' }),
+      });
+      if (!response.ok) throw new Error(`Creazione: ${response.status}`);
+      return (await response.json()).id as string;
     });
-    if (!response.ok) throw new Error(`Creazione: ${response.status}`);
-    return (await response.json()).id as string;
-  });
-  await page.goto(`/patients/${id}/modules`);
-  await openPatientSection(page, 'attenzione');
-  const disclosure = page.locator('#patient-insight').locator(':scope > div > [data-disclosure-control]');
-  if (await disclosure.getAttribute('aria-expanded') !== 'true') await disclosure.click();
-  await expect(page.getByTestId('patient-insight-disabled-card')).toBeVisible();
-  const response = await page.request.get(`/api/patients/${id}`);
-  expect(response.ok()).toBe(true);
-  expect(await response.text()).toContain(id);
-  expect(unexpectedRequests).toEqual([]);
+    await page.goto(`/patients/${id}/modules`);
+    await openPatientSection(page, 'attenzione');
+    const disclosure = page.locator('#patient-insight').locator(':scope > div > [data-disclosure-control]');
+    if (await disclosure.getAttribute('aria-expanded') !== 'true') await disclosure.click();
+    await expect(page.getByTestId('patient-insight-disabled-card')).toBeVisible();
+    const response = await page.request.get(`/api/patients/${id}`);
+    expect(response.ok()).toBe(true);
+    expect(await response.text()).toContain(id);
+    expect(unexpectedRequests).toEqual([]);
+  } finally {
+    for (const setting of originalSettings) {
+      await page.evaluate(async original => {
+        const response = await fetch('/api/settings', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(original),
+        });
+        if (!response.ok) throw new Error(`Ripristino impostazioni: ${response.status}`);
+      }, setting);
+    }
+  }
 });

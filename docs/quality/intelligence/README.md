@@ -40,7 +40,7 @@ nell'archivio sintetico posseduto dal test.
 | I-0 | parziale | Copertura delle 16 capacità e 13+3 celle congelata e verificata. Identità dei modelli, prove per capacità/superficie e budget restano aperti. |
 | I-1 | parziale | E2E Web: creazione/rilettura scheda e vista reale con quattro funzioni spente; nessuna richiesta generativa o esterna dal browser. Non prova egress del server, installazione, GPUI/headless né tutte le condizioni assente/guasto/quota. |
 | I-2 | ferma | Nessuna nuova inferenza o retry: il margine del tentativo bounded storico non è ricostruibile con certezza. Servono autorizzazione residua esplicita, combinazione fissata, budget e prove offline sulle tre viste con misure e revoca fisica. I test di abort sintetico non provano la fine del runner. |
-| I-3 | parziale | Preflight del banco termina `MLX_UNAVAILABLE` nella configurazione corrente, senza download o ripiego. Nessuna nuova proposta reale, misura o revoca fisica. |
+| I-3 | parziale | Preflight senza override nega con `MLX_UNAVAILABLE`; configurando il runner diretto già installato passa la presenza di artefatto/eseguibile, senza inferenza, download o ripiego. Nessuna nuova proposta reale, misura o revoca fisica. |
 | I-3b | ferma | ADR 0166 resta Proposed. Nessuna equivalenza misurata o accettata; nessuna venue remota abilitata. |
 | I-4 | ferma | ChatGPT fuori dal perimetro locale di questo incarico; nessuna nuova generazione né quota utilizzata. |
 | I-5 | ferma | Decisione esplicita di Leonardo del 26 ottobre: nessuna prova API. |
@@ -56,7 +56,7 @@ le prove mancanti delle 13 celle e di ciascuna superficie.
 
 I log completi e il JSON del self-test restano nel dossier esterno
 `~/Antigravity/mf-hillclimb-20261028/intelligence-<sha-base>/`.
-`evidenze.csv` conserva i digest dei risultati sintetici. Nessuna galleria
+`evidenze.csv` conserva i digest dei risultati sintetici, anche falliti. Nessuna galleria
 è aggiunta alla repository. Il self-test dichiara `qualification: false`;
 le soglie in `../athena/soglie-proposte.md` non sono state approvate.
 
@@ -67,3 +67,13 @@ never-regress, claims e selezione test completa superati. Il primo tentativo
 (`unadmitted alias`, durante il banco E2E). Nessuna protezione è stata
 allentata; la build di produzione richiede la sorgente sparse prescritta in
 `docs/native-launch.md`, che esclude soltanto la fixture SQLite tracciata.
+
+La build nella sorgente sparse separata della prima revisione del contributo
+`f0de86dcfc667bdce390c71469372eeb4c40e2c1` è passata, compresa la preparazione
+del runtime standalone. Il test Web ripristina sempre le impostazioni sintetiche
+lette prima della prova, anche in caso di errore. Nessuna verifica GPUI è dedotta.
+
+Durante la verifica del ripristino, una prima versione del test ha fallito
+la POST eseguita dal contesto API privo della generazione archivio. La verifica corretta passa. Il test
+usa ora il normale fetch della pagina anche per il ripristino, come per
+le modifiche iniziali. Nessuna protezione del prodotto è stata modificata.
