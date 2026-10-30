@@ -1,0 +1,11 @@
+canale,Claude_4.29.0,Codex_26.1023.51421,limite
+Tool ordinario,testo fisso nel sorgente,testo fisso nel sorgente,ricezione finale da qualificare
+Tool app-only,payload in _meta,payload in _meta,il fornitore host trasporta i byte
+Contesto modello,nessun aggiornamento esplicito,nessun aggiornamento esplicito,non prova assenza di accesso interno del provider
+Errori e notifiche,codici fissi e stato finito,codici fissi e stato finito,osservazione integrata da completare
+Nomi e mapping,solo processo nativo privato,solo processo nativo privato,solo dati sintetici ammessi qui
+Temporanea,pulsante Incognito osservato,non verificata,nessun claim sulla retention effettiva
+Cronologia e memoria,UI incognito dichiara esclusioni,non verificata,D2 necessaria prima di dati reali
+Screenshot,pseudonimi nel frame;paziente e fonti nella GPUI,stesso disegno,host e sistema operativo possono acquisire le superfici
+Log accessibili,log MCP riporta metodi ed esiti,non verificati,non prova i canali interni non accessibili
+Chiusura e revoca,ritiro locale e cessazione del processo,stesso disegno,non cancella byte già ricevuti dal fornitore

@@ -4,6 +4,8 @@ on:
     paths:
       - 'plugins/mediflow-chat-demo/**'
       - 'lib/chat-card/**'
+      - 'scripts/chat-card-native-owner*'
+      - 'e2e/native-chat-access-frame*'
       - 'lib/ai-preparation/**'
       - 'scripts/fixtures/chat-card-corpus.json'
       - 'scripts/register-strip-types-loader.mjs'
@@ -17,6 +19,8 @@ on:
     paths:
       - 'plugins/mediflow-chat-demo/**'
       - 'lib/chat-card/**'
+      - 'scripts/chat-card-native-owner*'
+      - 'e2e/native-chat-access-frame*'
       - 'lib/ai-preparation/**'
       - 'scripts/fixtures/chat-card-corpus.json'
       - 'scripts/register-strip-types-loader.mjs'
@@ -49,6 +53,8 @@ jobs:
       - run: npm test
       - run: npm run test:falsification
       - run: npx --no-install playwright install --with-deps chromium
+      - run: npx --no-install playwright test --config e2e/native-chat-access-frame.config.ts
+        working-directory: .
       - run: npm run test:browser
       - run: npm run prepare:reference
       - run: npm run test:reference
