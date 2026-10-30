@@ -954,3 +954,35 @@ senza delega. Brief iniziale del coordinatore Opus; coordinamento corrente
 Astra. La revisione del coordinamento resta distinta dalla stesura: lo stato
 rimane Proposed. Il secondo round integra gli esiti riferiti dal pilota e da Leonardo, senza
 attribuirsi la loro esecuzione. Nessuna modifica di codice o ammissione clinica.
+
+## Incremento C-5 del 30 ottobre 2026: stato terapia con PIN nativo
+
+La vista può richiedere uno dei tre stati ammessi; terapia e anteprima sono
+scelte nella finestra GPUI sulla cartella selezionata. Nomi, ID delle risorse,
+versioni e dati della terapia rimangono nel canale paired e nella finestra
+nativa. Alla chat arrivano soltanto il riferimento casuale del comando e
+un esito chiuso, in `_meta`. Non si usa la fixture `basic` come cartella da
+modificare e non si espongono credenziali o comandi di commit al modello.
+
+`POST /api/auth/native/therapy-status` richiede sessione native admin paired,
+archivio, ambulatorio e capability lettura pazienti/terapie e scrittura terapie.
+Il servizio riusa la selezione autenticata e rivalida le autorizzazioni nella
+transazione. L'apertura della vista fissa il limite server di cinque minuti;
+l'anteprima lo può soltanto restringere a trenta secondi. L'autorizzazione
+si consuma prima della verifica PIN, non può cambiare payload e può essere
+revocata anche durante la verifica. Nessun rinnovo o invio automatico.
+
+Il comando già esistente resta l'unica sede di ledger, CAS, effetto e audit,
+nella stessa transazione `IMMEDIATE`. Un riavvio perde anteprime e consensi,
+ma non ricevute terminali. La rilettura esplicita restituisce ricevuta e stato
+corrente alla finestra nativa; un comando senza ricevuta resta ignoto e non
+viene rieseguito. I riferimenti casuali permettono il recupero senza salvare
+il mapping di ricomposizione.
+
+Questo incremento abilita la scrittura con il PIN già verificato dall'host.
+Touch ID resta disabilitato per questa operazione: il risultato locale della
+biometria non è ancora un'attestazione verificabile dal writer. L'accesso
+biometrico alla scheda sintetica rimane distinto. Non si accetta un booleano
+biometrico sul server. La qualifica dei due desktop, il raccordo biometrico
+per la scrittura e la review indipendente restano necessari prima di chiudere
+C-5. C-6 non è abilitata da questo incremento.

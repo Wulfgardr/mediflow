@@ -793,6 +793,15 @@
         "scripts/verify-specialist-operation.mjs"
       ],
       "prerequisites": "Node 24, npm ci e Chromium Playwright installato; soltanto portale loopback e archivio inventati."
+    },
+    {
+      "id": "chat-therapy-falsification",
+      "mode": "local",
+      "kind": "node-script",
+      "files": [
+        "scripts/falsify-chat-therapy.mjs"
+      ],
+      "prerequisites": "Node 24 e dipendenze locali; copie temporanee del servizio e test sintetici, nessuna mutazione del worktree."
     }
   ]
 }

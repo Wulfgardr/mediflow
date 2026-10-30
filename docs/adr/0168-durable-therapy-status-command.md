@@ -80,3 +80,27 @@ Altre versioni, tabelle o viste estranee, colonne/indici/trigger alterati e un v
 rifiutati. Il confronto riguarda ogni tabella del predecessore, non solo quelle già note.
 Questa ammissione canonica del predecessore v4 è distinta dal backup fisico corrente v5,
 che continua a conservare intenzionalmente anche le estensioni non registrate. Il backup originale resta immutato e la destinazione resta vuota/bootstrap.
+
+## Revoca della preview nativa dalla chat
+
+La revoca paired di `therapy.status.change.v1` è limitata a `commandId`,
+sessione e ambulatorio originari. Non richiede che la selezione paziente
+locale sia ancora valida e non abilita letture cliniche, preview o execute.
+Il trasporto di recupero conserva il vincolo di sessione, archivio e scope,
+ha il timeout HTTP ordinario e non ritenta automaticamente.
+
+La revoca e la lettura dell'esito già durevole condividono una transazione
+IMMEDIATE. Se esiste una ricevuta, restituiscono soltanto l'esito finito,
+verificando operatore, archivio e appartenenza all'ambulatorio; altrimenti
+ritirano la preview della sessione originaria. Nessun identificativo clinico
+attraversa questo percorso. Il controllo della fase della preview rimane
+all'interno della transazione di execute, dopo le attese per autorità e PIN:
+una revoca prima del commit impedisce effetto e audit. Dopo il commit prevale
+la ricevuta della scrittura già avvenuta. La revoca ripetuta è idempotente.
+
+La GPUI conserva il riferimento e rappresenta un esito server confermato
+oppure «esito da verificare». Un errore, compreso 503, non produce «ritirato».
+La rilettura esplicita ripete soltanto la revoca idempotente e recupera
+l'esito durevole; non riesegue la scrittura. Il frame chat attende la risposta
+e tratta la perdita del collegamento durante una scrittura come incerta.
+Questo emendamento non riguarda biometria o C-6 e non cambia `/api/v1`.
