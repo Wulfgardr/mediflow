@@ -1,6 +1,7 @@
 # ADR 0162 — Esecutore locale per procedure clinico-amministrative
 
 - Stato: **Proposed** — resta tale finché le prove di CU-1 non sono accettate.
+- Decisione del 30/10/2026: Leonardo è favorevole; accettazione solo dopo prova e verbale. Lo stato resta Proposed.
 - Data: 2026-10-23
 - Autore: Astra
 - Ambito: filone CU, issue madre [WUL-791](https://linear.app/wulfgardr/issue/WUL-791); CU-1 e contratti sintetici nella 0.9.1, qualifica istituzionale nella 0.9.6/0.9.7 con Moduli. Solo progetto documentale in questa PR.

@@ -895,7 +895,9 @@ La parità completa e la qualifica di entrambi i desktop restano obiettivi:
 la consegna di un sottoinsieme non chiude WUL-788. Accettazione dell'ADR,
 review del codice futuro, pubblicazione e ammissione clinica restano separate.
 
-## Decisioni ancora aperte per Leonardo
+<a id="decisioni-ancora-aperte-per-leonardo"></a>
+
+## Registro delle decisioni di Leonardo
 
 Le scelte Touch ID/PIN **nativi**, prima scrittura **stato terapia**, mapping
 **solo di sessione** e D3 **nomi solo nella finestra nativa** sono acquisite.
@@ -903,11 +905,15 @@ Anche le durate D4 per la prima qualifica sintetica sono approvate, senza
 attestare implementazione o budget. La numerazione resta quella del
 [registro 0.9.1](../releases/0.9.1-contract.md#decisioni-e-dipendenze-esterne):
 
-1. Fissare versioni minime OS/app/host e hardware compatibile, nel profilo Mac
-   con Touch ID previsto; lo sblocco rapido a freddo resta escluso dal primo incremento.
-2. Scegliere fasce d'età e criteri per età/date precise, con limiti di utilità
-   e riconoscibilità; nominare account/workspace e trattamenti ammessi prima
-   di dati reali, compresi screenshot, strumenti host, memoria e retention.
+1. **D1 decisa il 30/10/2026:** profilo del contratto 0.9.1, con build dei
+   client rilevate alla qualifica, senza dedurle dalle CLI. Apple Silicon da
+   M1 incluso è l'obiettivo di compatibilità, senza supporto Intel. La qualifica
+   formale resta sul profilo del contratto; le altre configurazioni richiedono
+   verifiche prima di dichiararle provate. Lo sblocco rapido a freddo resta escluso.
+2. **D2 decisa il 30/10/2026:** fasce d'età di 5 anni, account personali e
+   sola qualifica sintetica. Nessuna ammissione di dati reali. Conservazione
+   sanitaria nazionale e regionale da rispettare, con finestre configurabili
+   entro i vincoli applicabili; la retention del provider resta distinta.
 3. **D3 decisa il 25 ottobre:** nomi solo nella finestra nativa MediFlow,
    pseudonimi nella chat e corrispondenze solo in RAM per la sessione. Restano
    da accettare implementazione e prove; un futuro bridge di nomi richiede
@@ -916,9 +922,10 @@ attestare implementazione o budget. La numerazione resta quella del
    una sola operazione per autorizzazione, 30 secondi per confermarla, blocco
    dopo 5 minuti d'inattività, nessun rinnovo automatico. Restano aperti i
    budget proposti dopo baseline e l'accettazione dell'implementazione.
-5. Scegliere, dopo la verifica di idoneità, i canali pubblici e il perimetro
-   dichiarabile; il responsabile del deployment decide l'ammissione clinica
-   e contrattuale. Il desiderio di pubblicare non prova l'approvazione store.
+5. **D5 decisa il 30/10/2026:** solo installazione locale prima del GO.
+   Significa preparare e provare i pacchetti sui target locali identificati;
+   non pubblicarli nelle directory. Pubblicazione e ammissione clinica
+   richiedono le rispettive decisioni e verifiche.
 
 ## Fonti e limiti della ricognizione
 
