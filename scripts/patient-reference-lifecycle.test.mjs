@@ -56,7 +56,7 @@ function fixture(t) {
         './treatment-reasoning-production-operation': { createTreatmentReasoningProductionService: () => ({ acquireIngest: unavailable, acquirePreview: unavailable }) },
     };
     const allowed = new Set([STORE, PORTABLE, TREATMENT, 'lib/schema.ts', 'lib/patient-lifecycle.ts', 'lib/version-concurrency.ts',
-        'lib/ai-treatment-reasoning-kill-switch.ts', 'lib/ai-lane-kill-switch.ts']);
+        'lib/ai-treatment-reasoning-kill-switch.ts', 'lib/ai-lane-kill-switch.ts', 'lib/ai-function-availability.ts']);
     const cache = new Map();
     function load(relative) {
         assert.ok(allowed.has(relative), `unexpected production import: ${relative}`);
