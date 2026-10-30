@@ -59,6 +59,12 @@ jobs:
       # @Codex: component tests in test:unit launch Chromium as well as Node.
       - name: Install Chromium for component tests
         run: npx playwright install --with-deps chromium
+      - name: Plugin leases and encrypted draft on production runtime
+        timeout-minutes: 8
+        env:
+          MEDIFLOW_LIFECYCLE_REAL: '1'
+          MEDIFLOW_PRESERVATION_REAL: '1'
+        run: node --test --test-concurrency=1 --test-name-pattern='simultaneous plugin leases|real browser and plugin launcher' scripts/local-ui-lifecycle.test.mjs scripts/local-ui-work-preservation.test.mjs
       - name: Allocate synthetic test data directory
         run: |
           DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/mediflow-web-core.XXXXXX")"

@@ -7,7 +7,7 @@ import { FileText, Stethoscope, Activity, Trash2, AlertCircle, Undo, Phone, Home
 import { Button } from '@/components/ui/button';
 import { PatientSheetMenu } from '@/components/patient-sheet-menu';
 import { InkState } from '@/components/ui/ink-state';
-import { readPatientDiaryMetadata } from '@/lib/patient-diary-metadata';
+import { patientDiarySource, readPatientDiaryMetadata } from '@/lib/patient-diary-metadata';
 import { ClinicalRichTextContent } from '@/components/clinical-rich-text-content';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useLiveQuery } from '@/lib/live-query';
@@ -60,18 +60,11 @@ function presentEntry(entry: TimelineEntryData): EntryPresentation {
     const workflowState = firstMetadataText(entry.metadata, ['workflowStatus', 'status'])?.toLocaleLowerCase('it-IT');
     const draft = workflowState === 'draft' || workflowState === 'bozza';
     const signed = workflowState === 'signed' || workflowState === 'firmata';
-    const settingSource = entry.setting === 'home'
-        ? 'Assistenza domiciliare'
-        : entry.setting === 'hospital'
-            ? 'Ospedale'
-            : entry.setting === 'ambulatory'
-                ? 'Ambulatorio'
-                : undefined;
 
     return {
         author: firstMetadataText(entry.metadata, ['authorName', 'author', 'signedBy']),
         draft,
-        source: firstMetadataText(entry.metadata, ['sourceLabel', 'source']) ?? settingSource ?? 'Diario locale',
+        source: patientDiarySource(entry.metadata, entry.setting),
         stateLabel: entry.deletedAt ? 'Eliminata' : draft ? 'Bozza' : signed ? 'Firmata' : 'Registrata',
     };
 }
