@@ -1,6 +1,6 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { dbServer } from './db-server';
 import { ambulatories, attachments, auditEvents, patients, patientsToAmbulatories, users } from './schema';
 import { activePatients } from './patient-lifecycle';
@@ -93,7 +93,7 @@ function duplicateSet(tx: Tx, values: typeof patients.$inferInsert): string {
         .map(row => row.id).sort().join(',');
 }
 
-/** No HTTP caller yet. A production host must supply its current session/scope and source owners. */
+/** The host supplies its current session/scope and source owners, never capabilities decoded from JSON. */
 export function createPatientDocumentCommandService(database: typeof dbServer, clock: () => number = Date.now) {
     const approvals = createNativeChatWriteApprovals<Command>(clock);
     const views = new Map<string, { commandId: string; source: PreparedPatientDocument; port: PatientDocumentSourcePort; at: number }>();
@@ -196,6 +196,18 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
                     writeAuditEventInTransaction(tx, { archiveGeneration: host.archiveGeneration, actorType: 'user', actorRef: host.actorRef,
                         sourceSurface: host.surface, requestId: commandId, eventType: 'attachment.created', outcome: 'success', subjectType: 'attachment', subjectRef: command.source.sourceId });
                     audit(tx, host, commandId, command);
+                    const savedPatient = tx.select().from(patients).where(and(activePatients(), eq(patients.id, command.patientId))).get();
+                    const expectedPatient = { ...command.values, ambulatoryId: host.ambulatoryId };
+                    if (!savedPatient || Object.entries(expectedPatient).some(([key, expected]) => {
+                        const actual = savedPatient[key as keyof typeof savedPatient];
+                        return expected instanceof Date ? !(actual instanceof Date) || Math.floor(expected.getTime() / 1000) !== actual.getTime() / 1000 : expected !== actual;
+                    })) return deny();
+                    const savedSource = tx.select().from(attachments).where(and(eq(attachments.id, command.source.sourceId), eq(attachments.patientId, command.patientId))).get();
+                    if (!savedSource || ['name', 'path', 'data', 'type', 'size'].some(key => savedSource[key as keyof typeof savedSource] !== command.source[key as keyof PreparedPatientDocument])
+                        || savedSource.documentSourceRef !== currentness.sourceRef || savedSource.documentRevision !== currentness.revision
+                        || savedSource.documentFreshnessEpoch !== currentness.freshnessEpoch
+                        || !tx.select().from(patientsToAmbulatories).where(and(eq(patientsToAmbulatories.patientId, command.patientId), eq(patientsToAmbulatories.ambulatoryId, host.ambulatoryId))).get()
+                        || receipt(tx, host, commandId).outcome !== 'applied') return deny();
                     admit(tx, host);
                     approvals.check(preview);
                     return { outcome: 'applied' as const };

@@ -114,10 +114,52 @@ Diventa piu difficile:
 
 ## Incremento C-6 del 30 ottobre 2026: comando di dominio, senza nuovi ingressi
 
-`lib/patient-document-create-command.ts` implementa il primo incremento del
-comando di creazione da documento. Non ha ancora caller HTTP, Web, MCP o GPUI:
-non abilita l'importazione e non completa C-6. `PdfImporter` conserva il blocco
-prima della persistenza e gli endpoint legacy restano `410`.
+Il primo incremento di `lib/patient-document-create-command.ts`, nella PR #736,
+non aveva chiamanti HTTP, Web, MCP o GPUI. L'ingresso successivo descritto sotto
+non completa C-6. `PdfImporter` conserva il blocco prima della persistenza
+e gli endpoint legacy restano `410`.
+
+### Ingresso nativo del 30 ottobre 2026
+
+`POST /api/auth/native/patient-document` aggiunge un ingresso nominato al
+comando comune. Richiede sessione nativa autentica di amministratore,
+ambulatorio corrente e grant paired di creazione pazienti e scrittura
+documenti, ricontrollati nella transazione. Una sessione Web non lo usa.
+Non modifica `/api/v1`, gli endpoint legacy o il comportamento Web.
+
+`stage` riceve un solo PDF selezionato nel client nativo, fino a 10 MiB,
+con originale base64 e nome, percorso e contenuto cifrati dal medesimo
+client fidato. Il client deve cifrare esattamente lo stesso originale con
+la chiave che già possiede: il server non riceve la chiave e non attesta
+l'uguaglianza tra cifrato e testo in chiaro. Questo vincolo va provato sul
+futuro chiamante GPUI. Non sono ammessi URL, percorsi da aprire, identificativi
+di allegati della chat, candidati, opzioni di parser o provider.
+
+L'host copia i byte, controlla firma PDF, codifica e dimensione, esegue AnyDoc
+e prosegue con l'OCR locale soltanto per `image_or_scan`. Custodisce in RAM
+lo snapshot cifrato immutabile, legato alla sessione e al solo ambulatorio
+di creazione. Logout, scadenza entro cinque minuti o annullamento impediscono
+la pubblicazione o l'uso successivo; i buffer dei byte vengono azzerati.
+Non viene creato un paziente provvisorio per poter estrarre il testo.
+
+Il testo estratto è destinato esclusivamente al client nativo autenticato.
+Non c'è ancora Smart Import per il nuovo scope: i candidati sono vuoti e
+ogni estrazione riuscita resta `ambiguous` e `uncertain`. Tutti i campi
+inseriti richiedono quindi `correct`, anche in presenza di etichette
+apparentemente univoche. Un'estrazione fallita non apre la revisione e
+restituisce soltanto il dettaglio d'errore del contratto AnyDoc.
+
+`preview`, `execute`, `receipt` e `revoke` delegano al comando comune:
+nessun writer, deposito o modello degli esiti aggiuntivo. L'esecuzione usa
+il PIN nativo, poi rilegge ricevuta, paziente attivo, appartenenza
+all'ambulatorio e fonte prima di rispondere `applied`. Il recupero senza
+stato RAM conserva `unknown`; il ritiro non lo converte in `retired`.
+La ricevuta espone soltanto l'esito. Touch ID non è collegato a questo ingresso.
+
+Le prove chiamano l'handler autenticato e SQLite sintetico reale; non provano
+un percorso desktop installato. Mancano chiamante e revisione GPUI, avvio
+dalla chat e avviso del compositore, collegamento al deposito opaco Rust,
+Smart Import e uso Web dello stesso writer. C-6 resta aperta.
 
 Il comando riceve due porte interne dell'host, mai ricostruite da JSON: l'owner
 della sessione e dello scope «nuovo paziente», e la fonte preparata corrente.
