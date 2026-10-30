@@ -74,7 +74,7 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
         if (cache.has(relative)) return cache.get(relative);
         assert.ok([`app/api/${route}/route.ts`, 'lib/native-network-json-body.ts', 'lib/bounded-request-body.ts', 'lib/attachment-payload.ts', 'lib/patient-json-object.ts', 'lib/prescription-json-body.ts',
             'lib/entry-write-input.ts', 'lib/therapy-write-input.ts', 'lib/api-v1-clinical-write-normalization.ts', 'lib/status-normalization.ts',
-            'lib/network-write-context.ts', 'lib/network-request-scope.ts'].includes(relative), `unexpected production import ${relative}`);
+            'lib/network-write-context.ts', 'lib/network-request-scope.ts', 'lib/security/native-document-context.ts'].includes(relative), `unexpected production import ${relative}`);
         const source = fs.readFileSync(path.join(root, relative), 'utf8');
         const exports = {};
         cache.set(relative, exports);

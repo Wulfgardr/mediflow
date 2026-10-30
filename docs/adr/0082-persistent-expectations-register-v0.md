@@ -20,6 +20,8 @@ Serve un registro persistente distinto. Il registro deve mantenere provenienza, 
 - La prima slice resta sul web locale dell'host.
 - SQLite sul Mac resta lo storage autorevole.
 - Il server non possiede la chiave per decifrare i campi clinici.
+
+  Aggiornamento del 30 ottobre 2026: questa premessa resta riferita al registro attese. Nella sola creazione del paziente da documento, il client invia al server il PDF in chiaro per l’estrazione e la chiave del singolo file per la verifica al caricamento. Il server decifra il payload e confronta i byte prima dell’estrazione. Nei percorsi gestiti azzera i buffer HTTP posseduti, l’array della chiave e i buffer del verificatore. Il client conforme invia solo la chiave del file, non la master key; la chiave del file non viene conservata intenzionalmente. Non è garantita la cancellazione delle stringhe JS prodotte da JSON, delle copie interne di V8 o OpenSSL, né l’esecuzione dei blocchi di pulizia in caso di arresto del processo.
 - La fonte prescrittiva v0 è un `service_prescription_item`.
 - Il matching può proporre una chiusura. Non può applicarla.
 - Il registro non è ancora presente su `main`.

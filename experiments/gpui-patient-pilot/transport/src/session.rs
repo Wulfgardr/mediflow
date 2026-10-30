@@ -770,7 +770,9 @@ impl RuntimeSession {
             if let Some(rows) = artifact["payload"][&collection].as_array() {
                 for row in rows {
                     for field in &fields {
-                        if let Some(value) = row[field].as_str().filter(|v| v.starts_with("ENC:")) {
+                        if let Some(value) =
+                            row[field].as_str().filter(|v| crypto::is_ciphertext(v))
+                        {
                             crypto::open(value, master)?;
                         }
                     }
@@ -7175,6 +7177,113 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn enc2_archive_export_restore_keeps_bytes_and_checks_wrapping_before_http() {
+        use base64::Engine as _;
+        use std::{net::TcpListener, thread};
+        let vector: Value = serde_json::from_str(include_str!(
+            "../../../../native/contracts/attachment-file-golden.v2.json"
+        ))
+        .unwrap();
+        let artifact = json!({"payload":{"attachments":[{"data":vector["data"]}]}});
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let master = base64::engine::general_purpose::STANDARD
+            .decode(vector["masterKey"].as_str().unwrap())
+            .unwrap();
+        session.inner.secrets.lock().unwrap().master =
+            Some(Zeroizing::new(master.try_into().unwrap()));
+        let expected = artifact.clone();
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            let (mut stream, _) = listener.accept().unwrap();
+            assert!(read_request(&mut stream).starts_with("GET /api/system/backup-restore "));
+            local_host_reply(&mut stream, 200, expected.clone(), "");
+            for phase in 0..3 {
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                let body: Value =
+                    serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
+                assert_eq!(body, expected);
+                if phase < 2 {
+                    assert!(request.starts_with("POST /api/system/backup-restore/verify "));
+                    local_host_reply(
+                        &mut stream,
+                        200,
+                        json!({"success":true,"format":"mediflow-backup","version":1,"counts":{"attachments":1},"expectedSnapshot":"a".repeat(64),"sourceChecksum":"b".repeat(64)}),
+                        "",
+                    );
+                } else {
+                    assert!(request.starts_with("POST /api/system/backup-restore "));
+                    let id = request
+                        .lines()
+                        .find_map(|line| {
+                            line.to_ascii_lowercase()
+                                .starts_with("x-mediflow-restore-id: ")
+                                .then(|| line.split_once(": ").unwrap().1)
+                        })
+                        .unwrap()
+                        .trim();
+                    local_host_reply(
+                        &mut stream,
+                        200,
+                        json!({"success":true,"sourceChecksum":"b".repeat(64),"receipt":{"id":id}}),
+                        "",
+                    );
+                }
+            }
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let exported = access.export_archive().unwrap();
+        assert_eq!(
+            serde_json::from_slice::<Value>(&exported).unwrap(),
+            artifact
+        );
+        let prepared = access.prepare_archive_restore(&exported).unwrap();
+        access
+            .restore_archive(
+                &prepared,
+                crate::RestoreConfirmation::new("RIPRISTINA").unwrap(),
+            )
+            .unwrap();
+        let expected = Value::String(format!(
+            "data:application/pdf;base64,{}",
+            vector["original"].as_str().unwrap()
+        ));
+        let secrets = session.inner.secrets.lock().unwrap();
+        assert_eq!(
+            crypto::open(
+                artifact["payload"]["attachments"][0]["data"]
+                    .as_str()
+                    .unwrap(),
+                secrets.master.as_ref().unwrap()
+            )
+            .unwrap(),
+            expected
+        );
+        drop(secrets);
+        let mut corrupt = artifact.clone();
+        corrupt["payload"]["attachments"][0]["data"] = Value::String("ENC2:invalid".into());
+        assert!(matches!(
+            access.prepare_archive_restore(&serde_json::to_vec(&corrupt).unwrap()),
+            Err(RuntimeError::Crypto)
+        ));
+        session.inner.secrets.lock().unwrap().master = Some(Zeroizing::new([0; 32]));
+        assert!(matches!(
+            access.prepare_archive_restore(&exported),
+            Err(RuntimeError::Crypto)
+        ));
+        let listener = worker.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(listener.accept().is_err());
+    }
+
     #[test]
     fn local_host_archive_confirmation_cancellation_cas_and_single_submission() {
         use std::{net::TcpListener, thread};
