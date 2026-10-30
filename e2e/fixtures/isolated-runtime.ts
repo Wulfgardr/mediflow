@@ -19,6 +19,7 @@ async function availableLoopbackPort(): Promise<number> {
   const address = reservation.address();
   if (!address || typeof address === 'string') throw new Error('Loopback port unavailable.');
   await new Promise<void>((resolve, reject) => reservation.close(error => error ? reject(error) : resolve()));
+  if (address.port === 3000) throw new Error('Isolated tests refuse port 3000.');
   return address.port;
 }
 
@@ -35,7 +36,8 @@ export function isolatedRuntimeArguments(bundle: string): string[] {
 
 type IsolatedRuntime = Readonly<{ url: string;
   offerPairing(options?: { nonce?: string; expiresIn?: number; instance?: string }): { nonce: string; host: string };
-  usePairing(nonce: string, host: string): Promise<string>;
+  usePairing(nonce: string, host: string, options?: { intent?: string; expiresAt?: number }): Promise<string>;
+  cancelNavigation(): void;
 }>;
 
 export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRuntimeServices: boolean; pluginLocalUiRuntime: boolean }>({
@@ -127,7 +129,11 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
       expect(initial.status).toBe(200);
       expect(await initial.json()).toMatchObject({ status: 'ok', isSetup: false, hasSession: false, db: { state: 'ready' } });
       initialEmptyAccount = true;
+      let lastNavigation: string | undefined;
       await provide({ url,
+        cancelNavigation() {
+          child.send(JSON.stringify({ schemaVersion: 'mediflow.local-ui.cancel.v1', requestId: lastNavigation }));
+        },
         offerPairing(options = {}) {
           const request = { nonce: options.nonce ?? randomUUID(), host: randomUUID(), expiresAt: Date.now() + (options.expiresIn ?? 60000),
             instance: options.instance ?? environment.MEDIFLOW_LOCAL_UI_INSTANCE,
@@ -135,8 +141,9 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
           child.send({ type: 'mediflow-local-ui-pair-offer', request });
           return { nonce: request.nonce, host: request.host };
         },
-        usePairing(nonce, host) {
+        usePairing(nonce, host, options = {}) {
           const requestId = randomUUID();
+          lastNavigation = requestId;
           return new Promise((resolve, reject) => {
             const timer = setTimeout(() => { child.off('message', receive); reject(new Error('pairing IPC timeout')); }, 3000);
             const receive = (frame: any) => { if (frame?.type === 'mediflow-local-ui-pair-result' && frame.requestId === requestId) {
@@ -144,7 +151,7 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
             } };
             child.on('message', receive);
             child.send({ type: 'mediflow-local-ui-pair-use', nonce, host, requestId,
-              navigation: JSON.stringify({ schemaVersion: 'mediflow.local-ui.navigation.v1', intent: 'search', requestId, expiresAt: Date.now() + 5000 }) });
+              navigation: JSON.stringify({ schemaVersion: 'mediflow.local-ui.navigation.v1', intent: options.intent ?? 'search', requestId, expiresAt: options.expiresAt ?? Date.now() + 5000 }) });
           });
         },
       });

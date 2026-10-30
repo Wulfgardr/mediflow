@@ -2,6 +2,7 @@
 
 import { compactClinicalRichText } from '@/lib/clinical-rich-text';
 import type { Checkup, ClinicalEntry, DocumentInsight } from '@/lib/db';
+import { patientDiarySource } from '@/lib/patient-diary-metadata';
 import { InkState } from '@/components/ui/ink-state';
 import styles from './clinical-river-timeline.module.css';
 
@@ -16,6 +17,7 @@ type RiverItem = {
     title: string;
     summary: string;
     typeLabel?: string;
+    source?: string;
     date: Date;
     kind: 'entry' | 'checkup' | 'document';
 };
@@ -57,6 +59,7 @@ function buildRiverItems(
             id: `entry-${entry.id}`,
             title: entry.title || 'Voce clinica',
             summary: getEntrySummary(entry),
+            source: patientDiarySource(entry.metadata, entry.setting),
             typeLabel: ENTRY_TYPE_LABELS[entry.type] ?? 'Clinico',
             date: new Date(entry.date),
             kind: 'entry' as const,
@@ -139,6 +142,7 @@ export function ClinicalRiverTimeline({
                                         <h3 className={styles.title}>
                                             <a href={presentation.href} aria-label={`Apri ${item.title} · ${presentation.label}`}>{item.title}</a>
                                         </h3>
+                                        {item.source ? <p className={styles.origin}>Fonte: {item.source}</p> : null}
                                         {item.kind !== 'entry' && item.summary ? <p className={styles.summary}>{item.summary}</p> : null}
                                     </div>
                                 </article>

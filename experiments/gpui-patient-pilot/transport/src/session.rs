@@ -719,6 +719,26 @@ impl RuntimeSession {
         self.context = self.context.next_selection();
     }
 
+    pub fn can_access_local_host(&self) -> bool {
+        self.ensure_open().is_ok() && self.inner.client.is_local_bootstrap_origin()
+    }
+    pub fn authenticate_local_host(
+        &self,
+        passphrase: &str,
+        notice: crate::RetirementNotice,
+    ) -> Result<crate::LocalHostAccess> {
+        self.ensure_open()?;
+        crate::LocalHostAccess::authenticate(
+            self.inner
+                .client
+                .with_request_context(self.inner.account_context.child()),
+            self.account_session(),
+            &self.inner.user,
+            passphrase,
+            notice,
+        )
+    }
+
     pub fn user(&self) -> &RuntimeUser {
         &self.inner.user
     }
@@ -2647,7 +2667,7 @@ impl RuntimeSession {
         self.check_read_epoch(response.epoch)?;
         Ok(row)
     }
-    fn attachment(
+    pub(crate) fn attachment(
         &self,
         mut value: Value,
         patient_id: &str,
@@ -7022,6 +7042,450 @@ mod tests {
                 .starts_with("GET /api/auth/native/chat-access-confirmation ")
         );
         worker.join().unwrap();
+    }
+    fn local_host_reply(
+        stream: &mut std::net::TcpStream,
+        status: u16,
+        body: serde_json::Value,
+        extra: &str,
+    ) {
+        use std::io::Write;
+        let body = body.to_string();
+        write!(stream,"HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n{extra}\r\n{body}",body.len()).unwrap();
+    }
+    fn local_host_login(listener: &std::net::TcpListener) {
+        local_host_login_as(listener, "synthetic-user", "admin", "synthetic-generation");
+    }
+    fn local_host_login_as(
+        listener: &std::net::TcpListener,
+        id: &str,
+        role: &str,
+        generation: &str,
+    ) {
+        local_host_login_response(listener, id, role, generation, "complete");
+    }
+    fn local_host_login_response(
+        listener: &std::net::TcpListener,
+        id: &str,
+        role: &str,
+        generation: &str,
+        response: &str,
+    ) {
+        for step in 0..3 {
+            let (mut stream, _) = listener.accept().unwrap();
+            let request = read_request(&mut stream);
+            let lower = request.to_ascii_lowercase();
+            assert!(!lower.contains("x-mediflow-paired-client"));
+            assert!(!lower.contains(&format!("mediflow_session={}", "a".repeat(64))));
+            assert!(lower.contains("sec-fetch-site: same-origin"));
+            assert!(lower.contains("origin: http://127.0.0.1:"));
+            if step < 2 {
+                assert!(request.starts_with("GET /api/auth/check "));
+                local_host_reply(
+                    &mut stream,
+                    200,
+                    json!({"status":"ok","isSetup":true,"archiveGeneration":"synthetic-generation","unlock":{"credential":"passphrase","kdfVersion":3,"salt":"AwMDAwMDAwMDAwMDAwMDAw=="}}),
+                    &format!(
+                        "ETag: \"{}\"\r\nSet-Cookie: mediflow_auth_control={}; Path=/; HttpOnly\r\n",
+                        "e".repeat(64),
+                        "c".repeat(43)
+                    ),
+                );
+            } else {
+                assert!(request.starts_with("POST /api/auth/local-client/login "));
+                assert!(lower.contains(&format!("mediflow_auth_control={}", "c".repeat(43))));
+                assert!(lower.contains("if-match:"));
+                assert!(lower.contains("idempotency-key:"));
+                assert!(!request.contains("Local host synthetic passphrase"));
+                if response == "lost" {
+                    return;
+                }
+                if response == "truncated" {
+                    use std::io::Write;
+                    write!(stream, "HTTP/1.1 200 Synthetic\r\nContent-Length: 999\r\nConnection: close\r\nSet-Cookie: mediflow_session={}; Path=/; HttpOnly\r\n\r\n{{", "b".repeat(64)).unwrap();
+                    return;
+                }
+                local_host_reply(
+                    &mut stream,
+                    200,
+                    json!({"success":true,"id":id,"username":"synthetic","role":role,"archiveGeneration":generation}),
+                    &format!(
+                        "Set-Cookie: mediflow_session={}; Path=/; HttpOnly\r\n",
+                        "b".repeat(64)
+                    ),
+                );
+            }
+        }
+    }
+    fn local_host_document() -> serde_json::Value {
+        json!({"id":"file-a","patientId":"patient-a","name":"Referto sintetico.txt","path":"referto.txt","type":"text/plain","size":5,"data":"data:text/plain;base64,cHJvdmE=","currentness":{"sourceRef":"a".repeat(64),"revision":7,"freshnessEpoch":9}})
+    }
+    #[test]
+    fn local_host_rejected_login_keeps_failed_retirement_after_restart() {
+        use std::{net::TcpListener, thread};
+        for (id, role, generation) in [
+            ("synthetic-user", "clinician", "synthetic-generation"),
+            ("other-user", "admin", "synthetic-generation"),
+            ("synthetic-user", "admin", "other-generation"),
+        ] {
+            for status in [204, 503] {
+                let directory = std::env::temp_dir().join(format!(
+                    "mediflow-host-{}",
+                    crate::http::operation_uuid().unwrap()
+                ));
+                std::fs::create_dir_all(&directory).unwrap();
+                let path = directory.join("retirement.json");
+                let notice = crate::RetirementNotice::new(Some(path.clone()));
+                let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+                let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+                let worker = thread::spawn(move || {
+                    local_host_login_as(&listener, id, role, generation);
+                    let (mut stream, _) = listener.accept().unwrap();
+                    assert!(read_request(&mut stream).starts_with("GET /api/auth/check "));
+                    local_host_reply(
+                        &mut stream,
+                        200,
+                        json!({"status":"ok","hasSession":true}),
+                        &format!("ETag: \"{}\"\r\n", "f".repeat(64)),
+                    );
+                    let (mut stream, _) = listener.accept().unwrap();
+                    let request = read_request(&mut stream);
+                    assert!(request.starts_with("POST /api/auth/local-client/logout "));
+                    assert!(request.contains(&format!("mediflow_session={}", "b".repeat(64))));
+                    assert!(request.contains(&format!("mediflow_auth_control={}", "c".repeat(43))));
+                    if status == 204 {
+                        use std::io::Write;
+                        write!(stream, "HTTP/1.1 204 Synthetic\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+                    } else {
+                        local_host_reply(
+                            &mut stream,
+                            status,
+                            json!({"error":"synthetic logout failure"}),
+                            "",
+                        );
+                    }
+                    listener.set_nonblocking(true).unwrap();
+                    assert!(listener.accept().is_err());
+                });
+                let result = session
+                    .authenticate_local_host("Local host synthetic passphrase", notice.clone());
+                assert!(matches!(result, Err(RuntimeError::Indeterminate)) == (status == 503));
+                assert!(result.is_err());
+                worker.join().unwrap();
+                assert_eq!(notice.pending(), status == 503);
+                assert_eq!(
+                    crate::RetirementNotice::new(Some(path)).pending(),
+                    status == 503
+                );
+                std::fs::remove_dir_all(directory).unwrap();
+            }
+        }
+    }
+    #[test]
+    fn local_host_lost_login_response_preserves_retirement_uncertainty() {
+        use std::{net::TcpListener, thread};
+        for (response, status) in [("truncated", 204), ("truncated", 503), ("lost", 0)] {
+            let directory = std::env::temp_dir().join(format!(
+                "mediflow-host-{}",
+                crate::http::operation_uuid().unwrap()
+            ));
+            std::fs::create_dir_all(&directory).unwrap();
+            let path = directory.join("retirement.json");
+            let notice = crate::RetirementNotice::new(Some(path.clone()));
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let worker = thread::spawn(move || {
+                local_host_login_response(
+                    &listener,
+                    "synthetic-user",
+                    "admin",
+                    "synthetic-generation",
+                    response,
+                );
+                if response == "lost" {
+                    return;
+                }
+                let (mut stream, _) = listener.accept().unwrap();
+                assert!(read_request(&mut stream).starts_with("GET /api/auth/check "));
+                local_host_reply(
+                    &mut stream,
+                    200,
+                    json!({"status":"ok","hasSession":true}),
+                    &format!("ETag: \"{}\"\r\n", "f".repeat(64)),
+                );
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with("POST /api/auth/local-client/logout "));
+                assert!(request.contains(&format!("mediflow_session={}", "b".repeat(64))));
+                if status == 204 {
+                    use std::io::Write;
+                    write!(
+                        stream,
+                        "HTTP/1.1 204 Synthetic\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    )
+                    .unwrap();
+                } else {
+                    local_host_reply(&mut stream, status, json!({"error":"synthetic"}), "");
+                }
+            });
+            assert!(
+                session
+                    .authenticate_local_host("Local host synthetic passphrase", notice.clone())
+                    .is_err()
+            );
+            worker.join().unwrap();
+            assert_eq!(notice.pending(), status != 204);
+            assert_eq!(
+                crate::RetirementNotice::new(Some(path)).pending(),
+                status != 204
+            );
+            std::fs::remove_dir_all(directory).unwrap();
+        }
+    }
+    #[test]
+    fn local_host_remote_origin_is_denied_before_any_web_authentication() {
+        let remote = session_at("https://example.invalid");
+        assert!(!remote.can_access_local_host());
+        assert!(matches!(
+            remote.authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None)
+            ),
+            Err(RuntimeError::Forbidden)
+        ));
+    }
+    #[test]
+    fn local_host_document_delete_uses_web_cookies_exact_preconditions_and_verified_absence_without_retry()
+     {
+        use std::net::TcpListener;
+        use std::thread;
+        for (mutation, readback) in [(409, 200), (403, 200), (200, 200), (200, 503), (200, 404)] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with("GET /api/attachments/file-a "));
+                assert!(request.contains(&format!("mediflow_session={}", "b".repeat(64))));
+                assert!(!request.contains("x-mediflow-paired"));
+                local_host_reply(&mut stream, 200, local_host_document(), "");
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with("DELETE /api/attachments/file-a "));
+                let body: Value =
+                    serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+                assert_eq!(
+                    body,
+                    json!({"patientId":"patient-a","expected":{"sourceRef":"a".repeat(64),"revision":7,"freshnessEpoch":9}})
+                );
+                local_host_reply(&mut stream, mutation, json!({"success":mutation==200}), "");
+                if mutation == 200 {
+                    let (mut stream, _) = listener.accept().unwrap();
+                    assert!(read_request(&mut stream).starts_with("GET /api/attachments/file-a "));
+                    local_host_reply(
+                        &mut stream,
+                        readback,
+                        if readback == 200 {
+                            local_host_document()
+                        } else {
+                            json!({"error":"Synthetic failure"})
+                        },
+                        "",
+                    );
+                }
+                listener.set_nonblocking(true).unwrap();
+                assert!(listener.accept().is_err(), "one destructive dispatch only");
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let command = access
+                .prepare_document_deletion("patient-a", "file-a")
+                .unwrap();
+            assert_eq!(
+                access.delete_document(&command),
+                match mutation {
+                    409 => Err(RuntimeError::Conflict),
+                    403 => Err(RuntimeError::Forbidden),
+                    _ => Ok(readback == 404),
+                }
+            );
+            assert_eq!(
+                access.delete_document(&command),
+                Err(RuntimeError::ReadRequired)
+            );
+            worker.join().unwrap();
+        }
+    }
+    #[test]
+    fn local_host_unauthorized_and_foreign_patient_reads_never_prepare_a_deletion() {
+        use std::net::TcpListener;
+        use std::thread;
+        for status in [401, 200] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                let (mut stream, _) = listener.accept().unwrap();
+                assert!(read_request(&mut stream).starts_with("GET /api/attachments/file-a "));
+                local_host_reply(&mut stream, status, local_host_document(), "");
+                listener.set_nonblocking(true).unwrap();
+                assert!(listener.accept().is_err());
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            assert!(matches!(
+                access.prepare_document_deletion("other-patient", "file-a"),
+                Err(RuntimeError::Rejected(401) | RuntimeError::InvalidResponse)
+            ));
+            worker.join().unwrap();
+        }
+    }
+    #[test]
+    fn local_host_switch_changed_since_review_stops_before_put() {
+        use std::net::TcpListener;
+        use std::thread;
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            for value in ["disabled", "enabled"] {
+                let (mut stream, _) = listener.accept().unwrap();
+                assert!(
+                    read_request(&mut stream)
+                        .starts_with("GET /api/settings/aiPatientInsightKillSwitch ")
+                );
+                local_host_reply(
+                    &mut stream,
+                    200,
+                    json!({"key":"aiPatientInsightKillSwitch","value":value}),
+                    "",
+                );
+            }
+            listener.set_nonblocking(true).unwrap();
+            assert!(
+                listener.accept().is_err(),
+                "changed read precondition cannot PUT"
+            );
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let command = access
+            .prepare_switch(crate::HostSettingKey::PatientInsight, true)
+            .unwrap();
+        assert_eq!(access.apply_switch(&command), Err(RuntimeError::Conflict));
+        assert_eq!(
+            access.apply_switch(&command),
+            Err(RuntimeError::ReadRequired)
+        );
+        worker.join().unwrap();
+    }
+    #[test]
+    fn local_host_native_lock_blocks_a_prepared_delete_without_a_request() {
+        use std::net::TcpListener;
+        use std::thread;
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            let (mut stream, _) = listener.accept().unwrap();
+            let request = read_request(&mut stream);
+            assert!(request.starts_with("GET /api/attachments/file-a "));
+            local_host_reply(&mut stream, 200, local_host_document(), "");
+            listener.set_nonblocking(true).unwrap();
+            assert!(listener.accept().is_err());
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let command = access
+            .prepare_document_deletion("patient-a", "file-a")
+            .unwrap();
+        session.lock();
+        assert_eq!(access.delete_document(&command), Err(RuntimeError::Locked));
+        worker.join().unwrap();
+    }
+    #[test]
+    fn local_host_retirement_uses_its_exact_local_client_route_and_does_not_claim_failed_retirement()
+     {
+        use std::net::TcpListener;
+        use std::thread;
+        for status in [204, 409] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with("GET /api/auth/check "));
+                assert!(request.contains(&format!("mediflow_session={}", "b".repeat(64))));
+                local_host_reply(
+                    &mut stream,
+                    200,
+                    json!({"status":"ok","hasSession":true}),
+                    &format!("ETag: \"{}\"\r\n", "f".repeat(64)),
+                );
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with("POST /api/auth/local-client/logout "));
+                assert!(!request.starts_with("POST /api/auth/logout "));
+                assert!(request.contains(&format!("mediflow_auth_control={}", "c".repeat(43))));
+                assert!(!request.contains("x-mediflow-paired"));
+                if status == 204 {
+                    use std::io::Write;
+                    write!(
+                        stream,
+                        "HTTP/1.1 204 Synthetic\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    )
+                    .unwrap();
+                } else {
+                    local_host_reply(
+                        &mut stream,
+                        status,
+                        json!({"error":"retirement denied"}),
+                        "",
+                    );
+                }
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            assert_eq!(
+                access.retire(),
+                if status == 204 {
+                    Ok(())
+                } else {
+                    Err(RuntimeError::Conflict)
+                }
+            );
+            assert_eq!(
+                access.retire(),
+                if status == 204 {
+                    Ok(())
+                } else {
+                    Err(RuntimeError::Indeterminate)
+                }
+            );
+            worker.join().unwrap();
+        }
     }
 }
 

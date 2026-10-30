@@ -189,3 +189,21 @@ test('real standalone: forged recovery receipts cannot stop a manual Web; valid 
  client.disconnect();await until(()=>exited(client));
  await until(()=>exited(f.owner)&&runtimeProcessIdentity(f.web)===null);
 });
+
+test('real standalone: simultaneous plugin leases survive both disconnect orders', { skip: !real, timeout: 120000 }, async t => {
+  for (const ownerFirst of [true, false]) {
+    const f = await fixture(t);
+    const second = f.launch(true), third = f.launch(true);
+    await until(() => second.handshake && third.handshake);
+    const order = ownerFirst ? [f.owner, second, third] : [third, second, f.owner];
+    for (const client of order.slice(0, 2)) {
+      client.disconnect();
+      if (client !== f.owner) await until(() => exited(client));
+      assert.equal((await fetch(f.url)).status, 200);
+      assert.notEqual(runtimeProcessIdentity(f.web), null);
+    }
+    order[2].disconnect();
+    await until(() => exited(f.owner) && runtimeProcessIdentity(f.web) === null);
+    t.diagnostic(JSON.stringify({ ownerFirst, simultaneousPluginLeases: 3, finalWeb: 0 }));
+  }
+});

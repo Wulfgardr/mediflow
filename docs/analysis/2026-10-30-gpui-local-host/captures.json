@@ -1,0 +1,338 @@
+{
+  "base": "fb172d61811cccdcd20cb847baea34a1bac7f773",
+  "surface": "GPUI macOS 27.2; synthetic presentation fixture, no authentication or host effects",
+  "productSources": {
+    "experiments/gpui-patient-pilot/app/src/shell.rs": "509cd8d5997a4073c5a0c69e7d245f9b03bec19b253135269f2ced40efc05d74",
+    "experiments/gpui-patient-pilot/app/src/shell/local_host.rs": "20a303ccb9fe9f67757721f67ba3ac727e56c96b8d7f4fc6038767416ac016a9",
+    "experiments/gpui-patient-pilot/app/src/shell/settings.rs": "efda0237915ebd47bfdfb01f10c83e9a0c0b5cc0049ce5883f7ef7679150af78",
+    "experiments/gpui-patient-pilot/app/src/shell/clinical_forms.rs": "76b39628fe3bff21f40ae8feb04bffad17f6ec0bb9d48f896610e809d546f4cf",
+    "experiments/gpui-patient-pilot/app/src/shell/document_library.rs": "fbe9b3d02c4c5ca6bb8de783358761bff4c38504c6494b42189988c1c18cebd5",
+    "experiments/gpui-patient-pilot/transport/src/local_host.rs": "ebfb9805a3c4cf0e9971e83f91193ddcad08d219bd0e969ff97bfca7f5fce1aa",
+    "experiments/gpui-patient-pilot/transport/src/session.rs": "c66dbcff0ba7443e3be53f8be0673c9a9627732d861501fc32a672092b9b120b",
+    "experiments/gpui-patient-pilot/transport/src/http.rs": "31a1bcaf018c170cd67ea3ec5fc47aa9016fcc83d62d91f77924d365d4c7b704",
+    "app/api/auth/local-client/logout/route.ts": "9cae96dea94bbb60e526b1db83170a690341b0c5c6848e1b96ad4d81fde8c7d6",
+    "lib/security/local-client-logout.ts": "06efa29f99dc6b69e4389d2685013a94837ec8b887a54a7853cd67e8e0b39efa"
+  },
+  "captures": [
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "functions",
+      "path": "before-giorno-1200-functions.png",
+      "sha256": "855a8429dd222be1b84294707554a33a738d55821b9134a7b3ee95cc15716e16"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 390,
+      "case": "functions",
+      "path": "before-giorno-390-functions.png",
+      "sha256": "b40c199a798953aaeb7cba360b6984dc4fa11eddc789a6f57f829ef5d1eefabf"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "local-login",
+      "path": "before-giorno-1200-local-login.png",
+      "sha256": "855a8429dd222be1b84294707554a33a738d55821b9134a7b3ee95cc15716e16"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 390,
+      "case": "local-login",
+      "path": "before-giorno-390-local-login.png",
+      "sha256": "b40c199a798953aaeb7cba360b6984dc4fa11eddc789a6f57f829ef5d1eefabf"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "documents",
+      "path": "before-giorno-1200-documents.png",
+      "sha256": "7ecc55f3c93ae8423ffa92080fd9deb0714bc7e7967aa783d2445b8328d32f8b"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 390,
+      "case": "documents",
+      "path": "before-giorno-390-documents.png",
+      "sha256": "c374b6da1491297d94eb458970aa2cc6b131a4429f6e18c73361e8bc653480a3"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "delete-review",
+      "path": "before-giorno-1200-delete-review.png",
+      "sha256": "76fa1b11669e04223459d6e25a27b93121cf37cf8264838eb56a57660aa2d61d"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 390,
+      "case": "delete-review",
+      "path": "before-giorno-390-delete-review.png",
+      "sha256": "79368b02aaf358ad6e4f343ccbd0f0d585d4e7640934ab4e6e8d03d7e5ff3aa0"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "switch-review",
+      "path": "before-giorno-1200-switch-review.png",
+      "sha256": "76fa1b11669e04223459d6e25a27b93121cf37cf8264838eb56a57660aa2d61d"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 390,
+      "case": "switch-review",
+      "path": "before-giorno-390-switch-review.png",
+      "sha256": "79368b02aaf358ad6e4f343ccbd0f0d585d4e7640934ab4e6e8d03d7e5ff3aa0"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "functions",
+      "path": "before-grafite-1200-functions.png",
+      "sha256": "1aa76f7ee53b5d629b7c7067f4d12bbd07e3dd5e5fea71b33e07452ebaaec118"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 390,
+      "case": "functions",
+      "path": "before-grafite-390-functions.png",
+      "sha256": "5a107f3fbf2f35319ce7afe3281a956463f6670a733908088c7a9f39bb466560"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "local-login",
+      "path": "before-grafite-1200-local-login.png",
+      "sha256": "1aa76f7ee53b5d629b7c7067f4d12bbd07e3dd5e5fea71b33e07452ebaaec118"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 390,
+      "case": "local-login",
+      "path": "before-grafite-390-local-login.png",
+      "sha256": "5a107f3fbf2f35319ce7afe3281a956463f6670a733908088c7a9f39bb466560"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "documents",
+      "path": "before-grafite-1200-documents.png",
+      "sha256": "cf7406431396de32e47d35d3982e81e2dd03614dc77d781373855a4f98224689"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 390,
+      "case": "documents",
+      "path": "before-grafite-390-documents.png",
+      "sha256": "babd15ace9bea7baf966746ee4db061203d68751e1fac0cc92c75238ff2e6dd7"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "delete-review",
+      "path": "before-grafite-1200-delete-review.png",
+      "sha256": "7affe6d3ad3203ef4cadda4259378f9621bf78699dc6faa69fd1ec746f1dead4"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 390,
+      "case": "delete-review",
+      "path": "before-grafite-390-delete-review.png",
+      "sha256": "33995803259556a1275664a5b5025020be6a8d91e2c3b26f9b79fb352abbb1a6"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "switch-review",
+      "path": "before-grafite-1200-switch-review.png",
+      "sha256": "7affe6d3ad3203ef4cadda4259378f9621bf78699dc6faa69fd1ec746f1dead4"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 390,
+      "case": "switch-review",
+      "path": "before-grafite-390-switch-review.png",
+      "sha256": "33995803259556a1275664a5b5025020be6a8d91e2c3b26f9b79fb352abbb1a6"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "functions",
+      "path": "after-giorno-1200-functions.png",
+      "sha256": "7d3a738cd55fe561a34b4984df5bf5cd3c74813cfd068c7045e5cf4bf81ee9f6"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 390,
+      "case": "functions",
+      "path": "after-giorno-390-functions.png",
+      "sha256": "9b34c3a6bb092ed7c7fa71da8e1d3ad4690527fe04e9f81d81b150456b901330"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "local-login",
+      "path": "after-giorno-1200-local-login.png",
+      "sha256": "b6c3eb15b392a7fce63590c6da0a3cc8dca1042779d1b2c6cf52fd2281b4d705"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 390,
+      "case": "local-login",
+      "path": "after-giorno-390-local-login.png",
+      "sha256": "e320b729dc394545ce80331ef81aa3d348dbb46105b8cf557c89b926ba05c31f"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "documents",
+      "path": "after-giorno-1200-documents.png",
+      "sha256": "3a2ed99af8174264cc2f73c8a984a710ac7d95efcd20d26ad58f8fe355adbab6"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 390,
+      "case": "documents",
+      "path": "after-giorno-390-documents.png",
+      "sha256": "e27a17e2ef9c41b76651d89252a708a515a0b02529f2d3cbae48bc4175cdac6b"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "delete-review",
+      "path": "after-giorno-1200-delete-review.png",
+      "sha256": "8389f3b3633e21438b1640fc40bf1935f29f4812cbca684de41361ab90e99cfc"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 390,
+      "case": "delete-review",
+      "path": "after-giorno-390-delete-review.png",
+      "sha256": "78ea08189cde264ba03b5bca78caa4b85bf0c3286d229095f3c1567430dad375"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "switch-review",
+      "path": "after-giorno-1200-switch-review.png",
+      "sha256": "6be29a6d0ece9c4fec5ed96d19f616ab8403834e940fc2696a034f2a3a41ff7b"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 390,
+      "case": "switch-review",
+      "path": "after-giorno-390-switch-review.png",
+      "sha256": "87aa28e987351db0e1e8bad75cf1f0b3aa0d0e4bdf326d3beb982cd882e0b916"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "functions",
+      "path": "after-grafite-1200-functions.png",
+      "sha256": "3ba06f429dfa753bd77e12e26030dce9c5b04c8ce3e345130739c6ddb7f3cfff"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 390,
+      "case": "functions",
+      "path": "after-grafite-390-functions.png",
+      "sha256": "260931880f93cec59ebf334f52ccc5a69911c40f389d02bf308eb2ddf1c19138"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "local-login",
+      "path": "after-grafite-1200-local-login.png",
+      "sha256": "2d87e6c71a80bcab8dbb91997ad8ce2e90ca71453b027f5229e4bd77659776db"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 390,
+      "case": "local-login",
+      "path": "after-grafite-390-local-login.png",
+      "sha256": "5fd911fb233191c2ce74b09fbdc8b6131d054114f5687283cb58abd130b05316"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "documents",
+      "path": "after-grafite-1200-documents.png",
+      "sha256": "afe034bfee46d3992572eda7862862b7e178e20f76f526ab098f66b5e0d31911"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 390,
+      "case": "documents",
+      "path": "after-grafite-390-documents.png",
+      "sha256": "8c5f5b7b4346bbacd1ab05096d2c0a1e9fa9f3d1a4bfc717162c9a1efd912637"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "delete-review",
+      "path": "after-grafite-1200-delete-review.png",
+      "sha256": "696c94cd8cdf0ee4ab6061363287e29bb439689e712d9649d76f8745c197c55f"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 390,
+      "case": "delete-review",
+      "path": "after-grafite-390-delete-review.png",
+      "sha256": "b7ab1ea385d8e6eaa05c63eb858ac7ec17654c35a4737cc0e2bc0206d9a2e772"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "switch-review",
+      "path": "after-grafite-1200-switch-review.png",
+      "sha256": "7a083b1247207a1c58324cc611369be06ff12c53b6084d0cee5f86e75f2b1d8e"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 390,
+      "case": "switch-review",
+      "path": "after-grafite-390-switch-review.png",
+      "sha256": "f2dd273cdd715d01a024a1c2c70cc00f4905b2e92affc20f4155990f54b6bee9"
+    }
+  ]
+}

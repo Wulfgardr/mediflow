@@ -539,3 +539,16 @@ Le catture comparative usano il renderer e finestre GPUI macOS reali con
 stati sintetici predisposti da un harness temporaneo esterno al prodotto.
 Non sono una prova di picker, trasporto, autorizzazioni, audit o cancellazione
 contro l'host reale. Il writer e i contratti host restano invariati.
+
+### Seconda tranche — sessione Web locale
+
+Il seguito sopra `fb172d618` riusa le route Web già autenticate dal cookie,
+con nuova autenticazione esplicita e solo per home-base loopback. P51 dispone
+ora dei quattro interruttori nella pagina Funzioni AI. G-4a/b aggiunge la
+cancellazione del documento riletto con currentness esplicita, conferma,
+writer/audit Web e GET finale 404; diniego, conflitto ed esito non verificato
+non diventano successo. L'unico endpoint nuovo è il ritiro locale della propria
+sessione, senza coinvolgere il Supervisor. [ADR 0172](../adr/0172-gpui-local-web-session.md)
+e [prove e superfici di autorizzazione](2026-10-30-gpui-local-host/README.md)
+registrano la composizione proposta. Restano aperti gli altri residui sopra;
+nessuna chiusura complessiva G-2/G-4 o esclusione approvata è introdotta.

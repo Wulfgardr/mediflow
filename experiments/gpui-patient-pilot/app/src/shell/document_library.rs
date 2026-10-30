@@ -27,7 +27,8 @@ impl DocumentOperation {
 impl ClinicalApp {
     pub(super) fn documents_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
-        let writable = self.form.is_none()
+        let writable = !self.local_host.has_work()
+            && self.form.is_none()
             && self.document_operation == DocumentOperation::Idle
             && self.patient.attachments.ready().is_some()
             && self.can_write(FormKind::Document)
@@ -52,6 +53,8 @@ impl ClinicalApp {
                 let details_open = self.patient.document_details_id.as_deref() == Some(row.id.as_str());
                 let details_id = row.id.clone();
                 let id = row.id.clone();
+                let delete_id = row.id.clone();
+                let can_delete = can_open && !self.local_host.has_work() && self.local_host.access().is_some();
                 div().id(SharedString::from(format!("clinical-workspace-document-{id}")))
                     .min_w_0().max_w_full()
                     .border_b_1().border_color(theme.rule).py(px(16.)).flex().flex_col().gap(px(8.))
@@ -64,10 +67,12 @@ impl ClinicalApp {
                             .when(can_open, |el| el.on_click(cx.listener(move |this, _, _, cx| this.toggle_document_details(&details_id, cx)))))
                         .child(button(format!("clinical-workspace-download-document-{id}"), "Salva una copia…", theme, false, available)
                             .when(available, |el| el.on_click(cx.listener(move |this, _, _, cx| this.download_document(&id, cx))))))
+                    .child(button(format!("clinical-workspace-delete-document-{delete_id}"), "Elimina documento…", theme, false, can_delete)
+                        .when(can_delete,|el|el.on_click(cx.listener(move |this,_,window,cx|this.prepare_document_deletion(&delete_id,window,cx)))))
                     .when(details_open, |el| el.child(self.document_details_view(row, cx)))
             }))
             .child(div().text_color(theme.secondary).child(text!("Ogni caricamento richiede revisione e conferma. Il limite per file è 10 MiB. Le copie vengono salvate soltanto nella destinazione che scegli.")))
-            .child(notice("clinical-workspace-documents-native-limits", "Anteprima dell’originale, modifica e cancellazione non ancora disponibili in questa app.", theme, false))
+            .child(notice("clinical-workspace-documents-native-limits", "Anteprima dell’originale e modifica non ancora disponibili. Per eliminare un documento apri prima Gestione locale in Impostazioni → Funzioni AI.", theme, false))
     }
 
     pub(super) fn pick_document(&mut self, cx: &mut Context<Self>) {
