@@ -148,7 +148,7 @@ impl ClinicalApp {
                     ].into_iter().map(|(page, label, description)| self.settings_item(page, label, description, cx)))
                     .child(section("clinical-workspace-connection-heading", "Archivio collegato", theme))
                     .child(text!(origin))
-                    .child(button("clinical-workspace-lock", "Blocca e nascondi i dati", theme, false, true)
+                    .child(button("clinical-workspace-settings-lock", "Blocca e nascondi i dati", theme, false, true)
                         .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Lock, cx))))
                     .child(notice("clinical-workspace-settings-native-limits", "Cambio PIN e dispositivi, account ChatGPT, Fabric, governance, repertori amministrativi e diagnostica non ancora disponibili in questa app.", theme, false))
             }
@@ -192,6 +192,42 @@ impl ClinicalApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[gpui::test]
+    fn settings_and_navigation_keep_distinct_accessible_commands(cx: &mut gpui::TestAppContext) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        cx.update(|_, cx| {
+            view.update(cx, |app, cx| {
+                app.area = Area::Settings;
+                for page in [
+                    SettingsPage::Overview,
+                    SettingsPage::Profile,
+                    SettingsPage::Appearance,
+                    SettingsPage::Models,
+                    SettingsPage::Ambulatories,
+                    SettingsPage::AiPreferences,
+                    SettingsPage::Functions,
+                    SettingsPage::Archives,
+                ] {
+                    app.settings_page = page;
+                    let layout = Layout::for_window(1200., 1.);
+                    let ids = rendered_command::button_ids(|| {
+                        let _ = app.sidebar(layout, cx);
+                        let _ = app.settings_view(layout, cx);
+                    });
+                    assert!(!ids.is_empty());
+                    let mut unique = HashSet::new();
+                    for id in ids {
+                        assert!(
+                            unique.insert(id.clone()),
+                            "Duplicate command on {page:?}: {id}"
+                        );
+                    }
+                }
+            });
+        });
+    }
 
     #[gpui::test]
     fn settings_pages_preserve_profile_draft_and_return_to_the_opening_control(
