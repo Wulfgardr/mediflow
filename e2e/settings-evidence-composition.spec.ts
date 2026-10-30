@@ -7,7 +7,7 @@ import { bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
 const providerSettings = Object.freeze({ aiProvider: 'ollama', aiUrl: 'http://127.0.0.1:11434', ollamaUrl: 'http://127.0.0.1:11434' });
 async function installSettingsEvidenceMocks(page: Page, baseURL: string) {
     const origin = new URL(baseURL).origin;
-    if (new URL(baseURL).hostname !== '127.0.0.1' || (process.env.SETTINGS_CLOSURE === '1' && new URL(baseURL).port !== '3000')) throw Error('Explicit synthetic loopback runtime required');
+    if (new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw Error('Explicit synthetic loopback runtime required');
     const state: { models: 'ready' | 'error'; who: 'disabled' | 'available' | 'configured' | 'configuration_required' | 'credentials_absent' | 'offline' | 'unavailable'; update: 'available' | 'absent' | 'error' } = { models: 'ready', who: 'disabled', update: 'available' };
     const calls: Array<{ method: string; pathname: string; state: typeof state }> = [];
     const blocked: Array<{ method: string; url?: string; pathname?: string; search?: boolean }> = [];

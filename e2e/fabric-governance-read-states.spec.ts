@@ -70,7 +70,7 @@ const cases: readonly [route: 'fabric' | 'governance', scenario: Scenario][] = [
 for (const [route, scenario] of cases) test(`${route} read state: ${scenario}`, async ({ baseURL }) => {
     test.setTimeout(90_000);
     test.skip(supplemental400 && !(route === 'fabric' && scenario === 'status-error' || route === 'governance' && scenario === 'error'));
-    if (!baseURL || new URL(baseURL).hostname !== '127.0.0.1' || (process.env.SETTINGS_CLOSURE === '1' && new URL(baseURL).port !== '3000')
+    if (!baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000'
         || process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR) throw Error('Owned synthetic loopback required');
     const zoom = await openBrowserZoomFixture(baseURL), page = zoom.page;
     const guard = await installFunctionsEgressGuard(page, baseURL);
