@@ -1,6 +1,6 @@
 # ADR 0170: Punti di innesto dei servizi territoriali
 
-Data: 2026-10-29. Stato: **Proposed**, accettazione riservata a Leonardo.
+Data: 2026-10-29. Stato: **Accepted**, accettato da Leonardo il 30/10/2026.
 Riferimenti: [WUL-764](https://linear.app/wulfgardr/issue/WUL-764),
 [WUL-760](https://linear.app/wulfgardr/issue/WUL-760),
 [WUL-587](https://linear.app/wulfgardr/issue/WUL-587).
@@ -9,7 +9,7 @@ Riferimenti: [WUL-764](https://linear.app/wulfgardr/issue/WUL-764),
 
 Addendum a [0158](0158-territorial-packs.md), che resta Accepted: non ridefinisce
 strati, attivazione per installazione, conservazione, restore o autorità host.
-Propone il contratto descrittivo dei servizi che vi si aggiungono. Nessun adapter
+Accetta il contratto descrittivo dei servizi che vi si aggiungono. Nessun adapter
 è implementato da questo documento.
 
 Il [commento di Leonardo del 29 ottobre](https://linear.app/wulfgardr/issue/WUL-764)
@@ -18,7 +18,7 @@ repository finché il modulo è uno e scelta Ente/Software House ancora aperta.
 Per ora solo handover al portale e scheletro sintetico, senza integrazione
 diretta, richieste di accesso o prove istituzionali.
 
-## Contratto comune proposto
+## Contratto comune accettato
 
 Un punto di innesto è un confine applicativo, non un endpoint regionale.
 Il nucleo conosce identificativi, versioni e contenitori; profilo nazionale e
