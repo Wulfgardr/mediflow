@@ -563,3 +563,15 @@ Le fonti di metodo sono [pstack, commit fissato](https://github.com/cursor/plugi
 la [vista di TLA+](https://lamport.azurewebsites.net/tla/high-level-view.html) e
 la [descrizione degli strumenti](https://lamport.azurewebsites.net/tla/tools.html).
 Il modello è un'astrazione manuale sopra il codice, coerente con questo uso di TLC.
+
+## Raccordo C-5 del 30 ottobre 2026
+
+Il corpo transazionale di `executeTherapyStatusCommand` è condiviso con
+l'adapter paired nativo. Per il Web rimangono identici ammissione, CAS,
+identità del comando, terminalità, audit e transazione. Il ramo nativo
+aggiunge lo scope ambulatoriale del writer esistente e una provenienza audit
+`native`; l'autorizzazione precede la stessa transazione. Il digest del
+servizio è aggiornato dopo il confronto del corpo estratto e le prove Web,
+PIN nativo, gare e crash. Il modello legacy non viene esteso ai grant nativi:
+scadenze, consumo e revoca sono provati separatamente con orologio iniettabile
+e mutazioni in `scripts/falsify-chat-therapy.mjs`.

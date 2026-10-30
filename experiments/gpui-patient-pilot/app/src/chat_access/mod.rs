@@ -165,6 +165,50 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
                 pending = Some(request);
                 State::Requested
             }
+            Ok(value)
+                if pending.is_none()
+                    && value.as_object().is_some_and(|v| v.len() == 2)
+                    && value["command"] == "therapy"
+                    && value["target"]
+                        .as_str()
+                        .is_some_and(|s| ["active", "suspended", "completed"].contains(&s)) =>
+            {
+                let Ok(copy) = stream.try_clone() else {
+                    break;
+                };
+                let Some(request) =
+                    Request::for_therapy(peer, copy, value["target"].as_str().unwrap())
+                else {
+                    break;
+                };
+                if incoming.try_send(request.clone()).is_err() {
+                    break;
+                }
+                pending = Some(request);
+                State::Requested
+            }
+            Ok(value)
+                if pending.is_none()
+                    && value.as_object().is_some_and(|v| v.len() == 2)
+                    && value["command"] == "receipt"
+                    && value["commandId"].as_str().is_some_and(|id| {
+                        id.len() == 36 && id.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-')
+                    }) =>
+            {
+                let Ok(copy) = stream.try_clone() else {
+                    break;
+                };
+                let Some(request) =
+                    Request::for_receipt(peer, copy, value["commandId"].as_str().unwrap())
+                else {
+                    break;
+                };
+                if incoming.try_send(request.clone()).is_err() {
+                    break;
+                }
+                pending = Some(request);
+                State::Requested
+            }
             Ok(value) if value == json!({"command": "status"}) => pending
                 .as_ref()
                 .and_then(|p| p.lock().ok().map(|mut p| p.status()))
@@ -193,7 +237,12 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
             last_activity = std::time::Instant::now();
         }
         bytes.clear();
-        let response = if let Some(payload) = payload {
+        let response = if let Some(receipt) = pending
+            .as_ref()
+            .and_then(|p| p.lock().ok().and_then(|p| p.safe_result()))
+        {
+            json!({"status":status.wire(), "receipt":receipt})
+        } else if let Some(payload) = payload {
             json!({"status":status.wire(), "payload":payload})
         } else {
             json!({"status": status.wire()})
