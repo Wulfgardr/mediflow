@@ -144,3 +144,11 @@ locale. La misura reale richiede prima la revisione del corpus e l'approvazione
 delle soglie da parte di Leonardo; l'autoverifica deterministica non è prova
 di equivalenza MLX o qualità clinica. Il banco nega nel codice ogni venue
 remota e non cambia lo stato Proposed di questo ADR.
+
+## Evidenza successiva del 30 ottobre 2026
+
+La PR #741, secondo giro, corregge la descrizione del formato nel prompt di
+esecuzione. La serializzazione originale resta provata come prefisso storico,
+ma il prompt completo cambia. Il validatore V2 non cambia. Il confronto reale
+precedente non qualifica il nuovo prompt. Stato Proposed invariato; review
+della correzione, equivalenza e accettazione restano decisioni separate.
