@@ -402,7 +402,16 @@ impl RuntimeClient {
                     request = request.body(body.to_vec());
                 }
                 let response = request.send().await.map_err(|_| uncertain(mutation))?;
-                let raw = read_response_body(response, AUTH_LIMIT, mutation).await?;
+                let raw = read_response_body(
+                    response,
+                    if path.len() == 3 && path[..2] == ["api", "attachments"] {
+                        DOCUMENT_LIMIT
+                    } else {
+                        AUTH_LIMIT
+                    },
+                    mutation,
+                )
+                .await?;
                 if (300..400).contains(&raw.status) {
                     return Err(RuntimeError::Rejected(raw.status));
                 }
@@ -934,7 +943,7 @@ pub(crate) fn authenticate_web_p3(
         if !admitted.success
             || admitted.id != user.id
             || admitted.username != user.username
-            || admitted.role != "admin"
+            || admitted.role != user.role
             || admitted.archive_generation != user.archive_generation
         {
             return Err(RuntimeError::InvalidResponse);

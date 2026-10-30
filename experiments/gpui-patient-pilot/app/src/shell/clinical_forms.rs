@@ -400,6 +400,11 @@ impl ClinicalApp {
             .flex_col()
             .gap(px(12.))
             .reading_surface(theme);
+        if self.local_host.command_visible() {
+            return self
+                .local_command_threshold(threshold, cx)
+                .expect("visible local command");
+        }
         if let Some(action) = self.discard {
             return threshold.bg(theme.draft)
                 .child(div().id("clinical-workspace-discard-question").accessibility_id("clinical-workspace-discard-question").role(Role::AlertDialog).aria_label("Scartare la bozza?")

@@ -16,6 +16,7 @@ mod crypto;
 mod dto;
 mod error;
 mod http;
+mod local_host;
 mod ports;
 mod profile_query;
 mod scales;
@@ -40,6 +41,7 @@ pub use dto::*;
 pub use error::{Result, RuntimeError};
 pub use http::{FirstAmbulatoryDraft, HostBootstrapSession};
 pub use http::{PairingCredentials, RuntimeClient, RuntimeConfig};
+pub use local_host::*;
 pub use profile_query::{ProfileCurrentness, ProfileProjection};
 pub use scales::*;
 pub use session::{
