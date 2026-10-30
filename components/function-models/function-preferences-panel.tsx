@@ -96,6 +96,7 @@ export function FunctionPreferencesContent({ active, onRead, onProposalChange, s
             <h3 ref={headingRef} tabIndex={-1}>Preferenze per esperienza</h3><p>Scegli i modelli e conferma le modifiche nell’anteprima.</p>
             <p className={styles.hint}>La configurazione non prova la disponibilità del modello: viene verificata alla richiesta.</p>
             <p className={styles.hint}>Ripristina predefiniti usa i modelli del computer senza cambiare gli interruttori. Spegni tutte conserva i modelli. I preset hardware restano separati.</p>
+            <p className={styles.hint}>Queste azioni valgono per le tre funzioni disponibili: il Ragionamento terapeutico resta come è salvato.</p>
             <div className={styles.actions}>
                 {view.dto?.presets.map(preset => <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={view.busy || !!view.proposed || !active} key={preset} onClick={() => void client.preview({ action: 'preset', presetId: preset })}>{preset === 'host_defaults' ? 'Ripristina predefiniti' : 'Spegni tutte'}</button>)}
                 <button type="button" className="mf-button-text" disabled={!active || view.busy} onClick={() => void client.read()}>Rileggi impostazioni</button>

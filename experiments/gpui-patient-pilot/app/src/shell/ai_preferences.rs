@@ -411,7 +411,7 @@ impl ClinicalApp {
             let enabled = state.current && idle;
             view = view.child(div().flex().flex_col().gap(px(8.))
                 .child(section("clinical-workspace-ai-presets-heading", "IMPOSTAZIONI CONDIVISE", theme))
-                .child(text!("Valori host ripristina i modelli mantenendo gli interruttori attuali. Tutte disattivate spegne le quattro funzioni."))
+                .child(text!("Valori host ripristina i modelli mantenendo gli interruttori attuali. Tutte disattivate spegne le tre funzioni disponibili. Il Ragionamento terapeutico resta come è salvato."))
                 .child(div().flex().flex_wrap().gap(px(8.))
                     .children([(6, AiPreferencePreset::HostDefaults, "Valori host"), (7, AiPreferencePreset::AllOff, "Tutte disattivate")].map(|(index, preset_id, label)|
                         state.targets[index].attach_enabled(button(format!("clinical-workspace-ai-preset-{index}"), label, theme, false, enabled), enabled)
@@ -778,6 +778,41 @@ mod tests {
             enabled: false,
             default_model_option_id: Some(format!("model_option_{}", "c".repeat(32))),
         }
+    }
+
+    #[gpui::test]
+    fn retired_function_has_no_control_in_preferences(cx: &mut gpui::TestAppContext) {
+        let host = crate::shell::notes_recovery_tests::Host::new();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.area = Area::Settings;
+            app.settings_page = SettingsPage::AiPreferences;
+            app.receive_ai_preferences(Ok(snapshot()), cx);
+        });
+        cx.run_until_parked();
+        let commands = rendered_command::button_ids(|| {
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            })
+        });
+        assert!(
+            commands
+                .iter()
+                .any(|id| id == "clinical-workspace-ai-edit-patient_insight")
+        );
+        assert!(
+            !commands
+                .iter()
+                .any(|id| id == "clinical-workspace-ai-edit-treatment_reasoning")
+        );
+        assert!(
+            commands
+                .iter()
+                .any(|id| id == "clinical-workspace-ai-preset-7")
+        );
     }
 
     #[gpui::test]
