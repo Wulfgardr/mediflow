@@ -459,3 +459,49 @@ mod patient_name_tests {
         assert!(summary.matches_query("conti luca"));
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChatWriteOutcome {
+    Retired,
+    Applied,
+    Rejected,
+    Closed,
+}
+impl ChatWriteOutcome {
+    pub fn wire(self) -> &'static str {
+        match self {
+            Self::Retired => "retired",
+            Self::Applied => "applied",
+            Self::Rejected => "rejected",
+            Self::Closed => "closed",
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChatWriteResolution {
+    Uncertain,
+    Confirmed(ChatWriteOutcome),
+}
+impl ChatWriteResolution {
+    pub fn wire(self) -> &'static str {
+        match self {
+            Self::Uncertain => "uncertain",
+            Self::Confirmed(outcome) => outcome.wire(),
+        }
+    }
+    pub fn message(self) -> &'static str {
+        match self {
+            Self::Uncertain => {
+                "Esito da verificare. Il ritiro non è confermato: rileggi l’esito senza ripetere la scrittura."
+            }
+            Self::Confirmed(ChatWriteOutcome::Applied) => {
+                "Modifica registrata e auditata. Il ritiro non annulla il salvataggio."
+            }
+            Self::Confirmed(ChatWriteOutcome::Retired) => {
+                "Ritiro confermato. Nessuna scrittura eseguita."
+            }
+            Self::Confirmed(ChatWriteOutcome::Rejected) => "Scrittura respinta. Nessuna modifica.",
+            Self::Confirmed(ChatWriteOutcome::Closed) => "Comando chiuso senza modifica.",
+        }
+    }
+}

@@ -1,4 +1,4 @@
-use mediflow_runtime_client::ChatTherapyOutcome;
+use mediflow_runtime_client::ChatWriteOutcome;
 use std::{
     ffi::OsString,
     fs,
@@ -48,7 +48,7 @@ impl CommandReferences {
             path: self
                 .root
                 .as_ref()
-                .map(|p| p.join(session.chat_therapy_reference_namespace())),
+                .map(|p| p.join(session.chat_write_reference_namespace())),
         }
     }
     fn directory(&self) -> io::Result<&std::path::Path> {
@@ -172,7 +172,7 @@ impl CommandReferences {
         fs::rename(temporary, directory.join(id))?;
         fs::File::open(directory)?.sync_all()
     }
-    pub(crate) fn confirm(&self, id: &str, _outcome: ChatTherapyOutcome) -> io::Result<()> {
+    pub(crate) fn confirm(&self, id: &str, _outcome: ChatWriteOutcome) -> io::Result<()> {
         if !Self::valid(id) {
             return Err(io::ErrorKind::InvalidInput.into());
         }
@@ -220,7 +220,7 @@ mod tests {
             fs::metadata(path.join(id)).unwrap().permissions().mode() & 0o777,
             0o600
         );
-        reopened.confirm(id, ChatTherapyOutcome::Retired).unwrap();
+        reopened.confirm(id, ChatWriteOutcome::Retired).unwrap();
         assert!(reopened.pending().unwrap().is_empty());
         fs::remove_dir(path).unwrap();
     }
@@ -237,14 +237,14 @@ mod tests {
                 .unwrap();
             assert_eq!(store.pending().unwrap(), [valid, damaged]);
             assert_eq!(store.scan().unwrap().invalid, [OsString::from(damaged)]);
-            store.confirm(damaged, ChatTherapyOutcome::Applied).unwrap();
+            store.confirm(damaged, ChatWriteOutcome::Applied).unwrap();
         }
         store.remember(damaged).unwrap();
         fs::set_permissions(directory.join(damaged), fs::Permissions::from_mode(0o644)).unwrap();
         assert_eq!(store.pending().unwrap(), [valid, damaged]);
         assert_eq!(store.scan().unwrap().invalid, [OsString::from(damaged)]);
         assert!(store.remember(damaged).is_err());
-        store.confirm(damaged, ChatTherapyOutcome::Applied).unwrap();
+        store.confirm(damaged, ChatWriteOutcome::Applied).unwrap();
         assert_eq!(store.pending().unwrap(), [valid]);
         fs::write(directory.join("not-a-command"), damaged).unwrap();
         fs::write(directory.join(".pending-not-staging"), damaged).unwrap();
