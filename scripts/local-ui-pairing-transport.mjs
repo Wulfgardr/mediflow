@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import http from 'node:http';
+import { localUiNavigationDeadline } from './local-ui-navigation-deadline.mjs';
 import { openUrl } from './launcher-helpers.mjs';
 
 function privateDirectory(directory, create = false) {
@@ -96,6 +97,7 @@ export async function bridgeExistingLocalUi(directory, expected, channel = proce
           || frame.dataDir !== expected.dataDir || frame.sourceFingerprint !== expected.sourceFingerprint) { socket.destroy(); return; }
         if (frame.status !== 'accepted') { close(); return; }
         peer = socket; connected = true; socket.setTimeout(0); clearTimeout(timer); codePage.close(); codePage.closeAllConnections();
+        if (channel.connected) channel.send({ type: 'mediflow-local-ui-paired', ...expected }, () => {});
 
       } else if (frame?.type === 'mediflow-local-ui-result' && channel.connected) {
         channel.send({ type: frame.type, requestId: frame.requestId,
@@ -114,12 +116,13 @@ export async function bridgeExistingLocalUi(directory, expected, channel = proce
       if (connected) writeFrame(peer, frame);
       return;
     }
+    const expiresAt = localUiNavigationDeadline(frame.expiresAt);
     if (Object.keys(frame).sort().join(',') === 'dataDir,expiresAt,intent,requestId,sourceFingerprint,type'
       && frame.dataDir === expected.dataDir && frame.sourceFingerprint === expected.sourceFingerprint
       && ['search', 'identity', 'history', 'prescribing'].includes(frame.intent)
-      && Number.isSafeInteger(frame.expiresAt) && frame.expiresAt > Date.now() && frame.expiresAt <= Date.now() + 8000
+      && expiresAt !== null
       && !pendingNavigation.has(requestId) && rememberNavigation(requestId)) {
-      if (connected) { writeFrame(peer, frame); return; }
+      if (connected) { writeFrame(peer, { ...frame, expiresAt }); return; }
       if (channel.connected) channel.send({ type: 'mediflow-local-ui-result', requestId, status: 'waiting' }, () => {});
     } else if (channel.connected) channel.send({ type: 'mediflow-local-ui-result', requestId, status: 'denied' }, () => {});
   };
