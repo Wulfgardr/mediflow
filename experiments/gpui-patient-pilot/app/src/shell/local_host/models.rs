@@ -212,7 +212,7 @@ impl ClinicalApp {
                     })),
                 );
             }
-            pane = pane.child(text!("La configurazione consigliata aggiorna la bozza, senza scaricarla o salvarla. La memoria è un’indicazione orientativa: compatibilità e qualità vanno verificate. OCR e revisione terapeutica ATHENA hanno una configurazione separata."))
+            pane = pane.child(text!("La configurazione consigliata aggiorna la bozza, senza scaricarla o salvarla. La memoria è un’indicazione orientativa: compatibilità e qualità vanno verificate. OCR ha una configurazione separata. La revisione terapeutica non è disponibile in questa versione; la configurazione salvata non viene usata."))
                 .child(button("models-prepare", "Rivedi configurazione", theme, true, enabled && area.current).on_click(cx.listener(|this, _, window, cx| this.prepare_models(window, cx))))
                 .child(text!("Per scaricare un modello, usa gli strumenti di Ollama sul computer che lo ospita. Poi aggiorna l’elenco. Il servizio di MediFlow non offre scaricamento o rimozione."));
         }

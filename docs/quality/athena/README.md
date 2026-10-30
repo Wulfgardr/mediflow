@@ -141,16 +141,13 @@ esecuzione sopra sono conservate per una futura ripresa autorizzata.
 
 ## Verifica del prodotto sul sorgente del 30 ottobre 2026
 
-Il rinvio documentale non spegne i percorsi esistenti. W-8 resta bloccata:
-il pannello Web invita ad aprire le funzioni cliniche; le preferenze Web e
-GPUI permettono l'attivazione. Il catalogo può dichiarare ATHENA disponibile
-quando lifecycle e pesi sono presenti. Il percorso ChatGPT comprende ancora
-Treatment Reasoning. Il prompt modificato da #741 è condiviso con
-l'esecuzione production, quindi non è limitato al banco sintetico.
+Il blocco di release è implementato nei confini di esecuzione locali,
+portabili e ChatGPT, anche con interruttore salvato attivo e modello presente.
+Il catalogo terapeutico segnala indisponibilità; Web e GPUI conservano in sola
+lettura la configurazione salvata senza offrire attivazione o disattivazione.
+Il salvataggio AI comune non riscrive l'interruttore terapeutico.
 
-Il default è spento, ma non forza a spento una configurazione salvata.
-La presenza dei pesi da sola non supera kill switch, lifecycle e scelta del
-modello. Per garantire l'indisponibilità anche su configurazioni già attive
-serve cambiare il confine di esecuzione. La modifica si ferma prima di quel
-confine, come richiesto da Leonardo: nessuna correzione cosmetica dichiara
-la funzione spenta. Nessuna prova su archivio clinico o inferenza eseguita.
+W-8 resta in attesa dell'accettazione sulle superfici. Il campo
+`runtimeUnavailabilityVerified` resta false: il blocco implementato e i test
+sintetici non sostituiscono l'accettazione Web e GPUI. Nessuna prova su
+archivio clinico o inferenza eseguita.

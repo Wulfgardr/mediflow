@@ -97,10 +97,22 @@ test('a terminal remote result exposes explicit fresh preparation, without autom
     (button.props.onClick as () => void)(); assert.equal(resets, 1);
 });
 
-test('explicit OpenAI configuration previews only the shared switch with unavailable ATHENA', () => {
-const component=loadComponent('./function-preferences-panel.tsx','PreferenceCard');
-const tree=component({row:{id:'treatment_reasoning',enabled:true,options:[]},disabled:false,activationSupported:true,account:null,preview(){throw new Error('must not propose');}});
-assert.match(text(tree),/Non disponibile in questa versione/); assert.equal(nodes(tree).filter(n=>n.type==='button'||n.type==='select').length,0);
+for (const enabled of [true, false]) test(`retired Treatment Reasoning retains saved configuration read-only with switch ${enabled}`, () => {
+    const component = loadComponent('./function-preferences-panel.tsx', 'PreferenceCard');
+    const summary = loadComponent('./function-preferences-panel.tsx', 'Description');
+    const modelOptionId = 'model_option_' + 'a'.repeat(32);
+    const row = { id: 'treatment_reasoning', enabled, defaultSource: 'saved_preference', defaultModelOptionId: modelOptionId,
+        options: [{ modelOptionId, label: 'Synthetic saved ATHENA', provider: 'athena_mlx', state: 'unavailable' }] };
+    const tree = component({ row, disabled: false, activationSupported: true, account: null, preview() { throw new Error('must not propose'); } });
+    for (const projection of [tree, summary({ row })]) {
+        assert.match(text(projection), /Non disponibile in questa versione/);
+        assert.match(text(projection), /Synthetic saved ATHENA/);
+        assert.match(text(projection), /Preferenza salvata/);
+        assert.ok(text(projection).includes(`Interruttore salvato: ${enabled ? 'attivo' : 'spento'}`));
+        assert.match(text(projection), /non viene usata in questa versione/);
+        assert.doesNotMatch(text(projection), /Pronta|Configurazione locale presente/);
+        assert.equal(nodes(projection).filter(n => n.type === 'button' || n.type === 'select').length, 0);
+    }
 });
 
 test('a changed local default is saved even while its function is off', () => {

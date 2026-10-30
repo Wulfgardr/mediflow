@@ -2,6 +2,7 @@
 // Run with: node scripts/run-strip-types.mjs --test lib/security/settings-write-policy.test.ts
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -85,7 +86,10 @@ test('web session can write all web-session registry keys (current UI writers ke
 });
 
 // Prove every key a current writer uses keeps working for its documented channel.
-test('current key/writer pairs still resolve to allowed', () => {
+test('active UI writers remain allowed; the shared AI save excludes the retired switch', () => {
+    const sharedSave = readFileSync(new URL('../hooks/use-ai-settings-controller.ts', import.meta.url), 'utf8').split('const saveAiConfig = async () => {')[1].split('const testAiConnection')[0];
+    assert.doesNotMatch(sharedSave, /AI_TREATMENT_REASONING_KILL_SWITCH_KEY|aiTreatmentReasoningKillSwitch/);
+    assert.equal(evaluateSettingsWrite('aiTreatmentReasoningKillSwitch', webSession).allowed, false);
     const webWritten = [
         'aiProvider', 'aiUrl', 'ollamaUrl', 'aiModel', 'aiModel_clinical',
         'aiModel_reasoning', 'aiModelDefaultVersion', 'hardwareProfile',

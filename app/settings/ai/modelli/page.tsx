@@ -115,7 +115,7 @@ export default function SettingsAiModelsPage() {
                         <dd className={styles.hint}>Modello per elaborare e confrontare informazioni testuali. Puoi sceglierne uno diverso nel passo 2.</dd>
                     </div>
                 </dl>
-                <p className={styles.hint}>La configurazione consigliata sceglie lo stesso modello per i due ruoli, senza scaricarlo o salvarlo. La memoria è un’indicazione orientativa: compatibilità e qualità vanno verificate. OCR e revisione terapeutica ATHENA hanno una configurazione separata.</p>
+                <p className={styles.hint}>La configurazione consigliata sceglie lo stesso modello per i due ruoli, senza scaricarlo o salvarlo. La memoria è un’indicazione orientativa: compatibilità e qualità vanno verificate. OCR ha una configurazione separata. La revisione terapeutica non è disponibile in questa versione; la configurazione salvata non viene usata.</p>
                 </Disclosure>
             </Disclosure>
 

@@ -34,7 +34,7 @@ type SafetySeverity = TreatmentReasoningPublication['value']['data']['safetyFlag
 type SuggestedAction = TreatmentReasoningPublication['value']['data']['suggestedActions'][number];
 type ScopedValue<T> = Readonly<{ contextRevision: string; value: T }>;
 
-const LOCAL_DISABLED_ERROR = 'Treatment Reasoning è disabilitato nel controllo locale. Riattivalo in Impostazioni AI per chiedere una nuova anteprima.';
+const LOCAL_DISABLED_ERROR = 'Il ragionamento terapeutico non è disponibile in questa versione.';
 const PREVIEW_UNAVAILABLE_ERROR = 'Anteprima non disponibile. Controlla la sessione, la selezione e il motore scelto; non viene scelto automaticamente un altro motore.';
 const CONTEXT_UNAVAILABLE_ERROR = 'Impossibile leggere paziente e ambulatori. Controlla la sessione e riprova.';
 const AMBULATORY_MISSING_ERROR = 'Aggiungi un ambulatorio nelle impostazioni, poi riprova.';

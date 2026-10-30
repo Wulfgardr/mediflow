@@ -702,7 +702,13 @@ fn model_label(row: &AiFunctionPreference) -> String {
 }
 fn function_summary(row: &AiFunctionPreference, kind: &str, theme: Theme) -> Stateful<Div> {
     if row.id == AiFunctionId::TreatmentReasoning {
-        return div().id("treatment-reasoning-unavailable").child(text!("Ragionamento terapeutico")).child(text!("Non disponibile in questa versione. Le nuove proposte terapeutiche sono rinviate a una versione successiva. Le proposte salvate restano consultabili."));
+        return div().id("treatment-reasoning-unavailable")
+            .child(text!("Ragionamento terapeutico · Non disponibile in questa versione"))
+            .child(text!(format!("Interruttore salvato: {}. {} · {}. Questa configurazione non viene usata in questa versione.",
+                if row.enabled { "attivo" } else { "spento" },
+                if row.default_source == AiDefaultSource::SavedPreference { "Preferenza salvata" } else { "Configurazione del computer" },
+                row.options.iter().find(|option| Some(&option.model_option_id) == row.default_model_option_id.as_ref()).map(|option| option.label.as_str()).unwrap_or("Modello salvato non presente nel catalogo")
+            )));
     }
     let id = SharedString::from(format!("clinical-workspace-ai-{kind}-{}", row.id.as_str()));
     div()

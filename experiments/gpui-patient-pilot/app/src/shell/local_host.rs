@@ -461,6 +461,12 @@ impl ClinicalApp {
                     )
                 }) {
                     pane = pane.children(rows.iter().map(|&(key, enabled)| {
+                        if key == HostSettingKey::TreatmentReasoning {
+                            return div().child(text!(format!(
+                                "Ragionamento terapeutico · Non disponibile in questa versione. Interruttore salvato: {}. Non viene usato in questa versione.",
+                                if enabled { "attivo" } else { "spento" }
+                            )));
+                        }
                         div()
                             .min_w_0()
                             .flex()
