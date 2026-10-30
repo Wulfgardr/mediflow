@@ -25,6 +25,7 @@ impl ClinicalApp {
                     FormKind::PatientNew => "La scheda verrà creata nell'ambulatorio selezionato. I campi non compilati resteranno senza un valore riportato.",
                     FormKind::PatientProfile => "La conferma aggiorna soltanto i campi anagrafici che hai modificato. Le note e gli altri dati clinici restano fuori da questa modifica.",
                 })))))
+            .when(form.kind == FormKind::Document, |el| el.child(self.document_imports_view(cx)))
             .when_some(form.upload.as_ref(), |el, upload| el.child(div().flex().flex_col().gap(px(12.))
                 .child(div().type_role(theme, crate::theme::TextRole::Strong).child(text!(upload.name.clone())))
                 .child(div().type_role(theme, crate::theme::TextRole::Meta).child(text!(upload.mime_type.clone())))

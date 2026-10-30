@@ -4,6 +4,165 @@ use serde_json::Value;
 const SOURCE_SCHEMA: &str = "mediflow.document_parse_evidence_artifact.v1";
 const DISPLAY_CHARS: usize = 12_000;
 
+pub(super) struct DocumentOriginal {
+    pub(super) id: String,
+    state: ReadLoad<Result<Zeroizing<String>, String>>,
+    page: usize,
+    context: RequestContext,
+}
+
+impl Drop for DocumentOriginal {
+    fn drop(&mut self) {
+        self.context.cancel();
+    }
+}
+
+impl ClinicalApp {
+    pub(super) fn toggle_document_original(&mut self, id: &str, cx: &mut Context<Self>) {
+        if self.form.is_some()
+            || self.document_operation != DocumentOperation::Idle
+            || self.local_host.has_work()
+        {
+            return;
+        }
+        if self
+            .patient
+            .document_original
+            .as_ref()
+            .is_some_and(|view| view.id == id)
+        {
+            self.patient.document_original = None;
+            cx.notify();
+            return;
+        }
+        if !self.patient.attachments.ready().is_some_and(|rows| {
+            rows.iter().any(|row| {
+                row.id == id && Some(row.patient_id.as_str()) == self.selected_id.as_deref()
+            })
+        }) {
+            return;
+        }
+        let (Some(session), Some(scope), Some(patient)) = (
+            self.session.clone(),
+            self.scope.clone(),
+            self.selected_id.clone(),
+        ) else {
+            return;
+        };
+        let id = id.to_owned();
+        let context = RequestContext::default();
+        self.patient.document_original = Some(DocumentOriginal {
+            id: id.clone(),
+            state: ReadLoad::loading(),
+            page: 0,
+            context: context.clone(),
+        });
+        let requested = id.clone();
+        self.run(
+            move || {
+                let row = session.read_attachment(&scope, &patient, &requested)?;
+                Ok(documents::original_text(&row))
+            },
+            move |this, result, _| {
+                if context.check().is_ok()
+                    && let Some(view) = &mut this.patient.document_original
+                    && view.id == id
+                {
+                    view.state = ReadLoad::from_result(result);
+                }
+            },
+            cx,
+        );
+        cx.notify();
+    }
+
+    pub(super) fn document_original_view(&self, cx: &Context<Self>) -> Div {
+        let theme = self.theme;
+        let mut view = div()
+            .min_w_0()
+            .max_w_full()
+            .flex()
+            .flex_col()
+            .gap(px(12.))
+            .child(section("document-original-heading", "Originale", theme));
+        let Some(original) = &self.patient.document_original else {
+            return view;
+        };
+        match &original.state {
+            ReadLoad::Ready(Ok(text)) => {
+                let (text, count) =
+                    documents::text_window(text, original.page).expect("valid original page");
+                view = view
+                    .child(text_line(
+                        "document-original-text".into(),
+                        text.into(),
+                        theme,
+                    ))
+                    .child(text!(format!("Pagina {} di {count}", original.page + 1)))
+                    .child(
+                        div().flex().flex_wrap().gap(px(8.)).children(
+                            [
+                                (
+                                    "document-original-previous",
+                                    "Pagina precedente",
+                                    original.page.checked_sub(1),
+                                ),
+                                (
+                                    "document-original-next",
+                                    "Pagina successiva",
+                                    (original.page + 1 < count).then_some(original.page + 1),
+                                ),
+                            ]
+                            .into_iter()
+                            .map(|(id, label, page)| {
+                                button(id, label, theme, false, page.is_some()).when_some(
+                                    page,
+                                    |el, page| {
+                                        el.on_click(cx.listener(move |this, _, _, cx| {
+                                            if let Some(original) =
+                                                &mut this.patient.document_original
+                                                && let ReadLoad::Ready(Ok(text)) = &original.state
+                                                && documents::text_window(text, page).is_some()
+                                            {
+                                                original.page = page;
+                                            }
+                                            cx.notify();
+                                        }))
+                                    },
+                                )
+                            }),
+                        ),
+                    );
+            }
+            ReadLoad::Ready(Err(message)) => {
+                view = view.child(notice(
+                    "document-original-unavailable",
+                    message.clone(),
+                    theme,
+                    true,
+                ))
+            }
+            ReadLoad::Failed(error) => {
+                view = view.child(notice(
+                    "document-original-error",
+                    ui_error(*error),
+                    theme,
+                    true,
+                ))
+            }
+            _ => {
+                view = view.child(notice(
+                    "document-original-loading",
+                    "Caricamento anteprima…",
+                    theme,
+                    false,
+                ))
+            }
+        }
+        view
+    }
+}
+
 #[derive(Debug, PartialEq)]
 enum SavedText<'a> {
     Present(&'a str),
@@ -721,6 +880,117 @@ mod tests {
                 ..
             }
         )));
+    }
+
+    #[gpui::test]
+    fn original_reads_explicitly_and_late_reads_cannot_reopen_the_view(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        let route = "GET /api/v1/network/patients/patient-a/attachments/synthetic-document";
+        let mut row = attachment();
+        row.patient_id = "patient-a".into();
+        let wire = json!({"id":"synthetic-document","patientId":"patient-a","name":"Originale.txt","path":"originale.txt","type":"text/plain","size":5,"data":"data:text/plain;base64,cHJvdmE="});
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, _| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            app.selected_id = Some("patient-a".into());
+            app.patient.attachments = ReadLoad::Ready(vec![row]);
+        });
+        assert!(
+            !host
+                .routes()
+                .iter()
+                .any(|request| request.starts_with(route))
+        );
+        host.plan(route).send((200, wire.clone())).unwrap();
+        cx.update_window_entity(&view, |app, window, cx| {
+            let focus = cx.focus_handle();
+            window.focus(&focus, cx);
+            app.toggle_document_original("synthetic-document", cx);
+            assert!(focus.is_focused(window));
+            let previous = app
+                .patient
+                .document_original
+                .as_ref()
+                .unwrap()
+                .context
+                .clone();
+            assert!(matches!(
+                app.patient.document_original.as_ref().unwrap().state,
+                ReadLoad::Loading { .. }
+            ));
+            app.toggle_document_original("synthetic-document", cx);
+            assert!(previous.check().is_err());
+            assert!(focus.is_focused(window));
+        });
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert!(app.patient.document_original.is_none())
+        });
+        host.plan(route).send((200, wire)).unwrap();
+        view.update(cx, |app, cx| {
+            app.toggle_document_original("synthetic-document", cx)
+        });
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            let original = app.patient.document_original.as_ref().unwrap();
+            assert!(
+                matches!(&original.state, ReadLoad::Ready(Ok(text)) if text.as_str() == "prova")
+            );
+            let context = original.context.clone();
+            app.section_selected(PatientSection::Diary, cx);
+            assert!(app.patient.document_original.is_none());
+            assert!(context.check().is_err());
+            app.toggle_document_original("missing", cx);
+            assert!(app.patient.document_original.is_none());
+            app.disconnect(cx);
+        });
+        assert!(host.routes().iter().all(|request| {
+            !request.starts_with("POST /api/v1/network/patients/patient-a/attachments")
+        }));
+    }
+
+    #[gpui::test]
+    fn original_missing_or_foreign_source_never_becomes_a_readable_document(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        for (status, wire) in [
+            (404, json!({"error":"Not found"})),
+            (
+                200,
+                json!({"id":"synthetic-document","patientId":"foreign-patient","name":"Originale.txt","path":"originale.txt","type":"text/plain","size":5,"data":"data:text/plain;base64,cHJvdmE="}),
+            ),
+        ] {
+            let host = notes_recovery_tests::Host::new();
+            let mut row = attachment();
+            row.patient_id = "patient-a".into();
+            let (view, cx) =
+                cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+            host.plan("GET /api/v1/network/patients/patient-a/attachments/synthetic-document")
+                .send((status, wire))
+                .unwrap();
+            view.update(cx, |app, cx| {
+                app.session = Some(host.session.clone());
+                app.scope = Some("scope-a".into());
+                app.selected_id = Some("patient-a".into());
+                app.patient.attachments = ReadLoad::Ready(vec![row]);
+                app.toggle_document_original("synthetic-document", cx);
+            });
+            cx.run_until_parked();
+            view.update(cx, |app, cx| {
+                assert!(
+                    !app.patient
+                        .document_original
+                        .as_ref()
+                        .is_some_and(|original| matches!(original.state, ReadLoad::Ready(Ok(_))))
+                );
+                app.disconnect(cx);
+                assert!(app.patient.document_original.is_none());
+            });
+        }
     }
 
     #[gpui::test]
