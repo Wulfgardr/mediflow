@@ -86,7 +86,7 @@ test('negotiated v1 projection never widens its closed union; v2 shares authorit
     assert.equal(v1.catalogRevision, v2.catalogRevision); assert.equal(v1.revision, v2.revision);
     assert.ok(v1.functions.every(f => f.options.every(o => o.provider === 'ollama' || o.provider === 'athena_mlx')));
     assert.equal(v1.functions[3].defaultModelOptionId, null); assert.equal(v1.functions[3].bindingState, 'unsupported');
-    assert.equal(v2.functions[3].options.find(o => o.provider === 'athena_transformers')?.label, ATHENA_R1_QWEN3_8B_MODEL_ID);
+    assert.equal(v2.functions[3].options.find(o => o.provider === 'athena_transformers')?.label, `${ATHENA_R1_QWEN3_8B_MODEL_ID} · pesi ATHENA, adattamento MediFlow · ricerca, vietato per la cura diretta dei pazienti`);
     assert.deepEqual(parsePreferences(clone(v1)), v1); assert.deepEqual(parsePreferences(clone(v2)), v2);
     for (let i = 0; i < 3; i++) assert.deepEqual(v1.functions[i], v2.functions[i]);
 });

@@ -4,6 +4,11 @@ Corpus e soglie **approvati da Leonardo il 30/10/2026**. ADR 0166 resta Proposed
 Nessuna misura clinica è stata eseguita su questo corpus. I casi sono inventati,
 non derivano da cartelle reali e non sono un holdout cieco: sono visibili nel repo.
 
+Il [candidato a due passi e il replay](due-passi.md) sono separati dal banco
+storico sotto descritto. Il replay ha negato 32/32 risposte conservate: il
+nuovo run locale non è stato consumato. Modulo di ricerca opzionale, vietato
+per la cura diretta dei pazienti; nessuna equivalenza o ammissione clinica.
+
 ## Corpus approvato
 
 La revisione approvata comprende ogni caso in [`corpus.json`](../../../scripts/athena-quality/corpus.json):

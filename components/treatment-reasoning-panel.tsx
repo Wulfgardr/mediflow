@@ -1,6 +1,7 @@
 'use client';
 
 import { Disclosure } from '@/components/disclosure';
+import { ATHENA_RESEARCH_NOTICE } from '@/lib/ai-providers/athena-research/method';
 import { formatCountLabel } from '@/lib/format-count';
 import design from './treatment-reasoning.module.css';
 import { ChoiceField } from '@/components/choice-field';
@@ -230,6 +231,7 @@ export default function TreatmentReasoningPanel({
     return (
         <Disclosure title="Proposte" headingLevel={3}>
         <section className={design.panel} data-testid="treatment-reasoning-panel" aria-label="Ragionamento terapeutico">
+            <p className={design.meta}>{ATHENA_RESEARCH_NOTICE}</p>
             {!treatmentReasoningEnabled ? <div className={design.notice}>
                 <p className={design.strong}>Ragionamento terapeutico spento</p>
                 <Link href="/settings/ai/funzioni">Apri le funzioni cliniche</Link>
@@ -366,7 +368,7 @@ export default function TreatmentReasoningPanel({
                 <Disclosure className={design.details} title="Origine e dettagli della generazione">
                     <p className={design.meta}>Receipt, provenienza e currentness</p>
                     <dl className={design.origin}>
-                        <div><dt>Servizio utilizzato</dt><dd>{publication.attestation.provider === 'chatgpt_subscription' ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : publication.attestation.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : 'ATHENA Transformers · CPU locale'}</dd></div>
+                        <div><dt>Servizio utilizzato</dt><dd>{publication.attestation.provider === 'chatgpt_subscription' ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : publication.attestation.provider === 'athena_mlx' ? 'Pesi ATHENA MLX · adattamento MediFlow · ricerca' : 'Pesi ATHENA Transformers · adattamento MediFlow · ricerca'}</dd></div>
                         <div><dt>Stato verificato</dt><dd>{publication.attestation.provider === 'chatgpt_subscription' ? 'Consenso sui byte redatti · nessuna ammissione clinica implicita' : publication.attestation.readiness} · {publication.review} · {formatCountLabel(publication.writesPerformed, 'scrittura', 'scritture')}</dd></div>
                         {publication.schemaVersion === 'mediflow.ai.treatment-reasoning-publication.v2' && <div><dt>Motore e artefatto attestati</dt><dd>{publication.attestation.model} · {publication.attestation.platform} · ammissione {publication.attestation.admissionRevision}<br />SHA-256 {publication.attestation.artifactDigest}</dd></div>}
                         <div><dt>Contesto acquisito</dt><dd>{formatDateTime(publication.capturedAt)}</dd></div>
