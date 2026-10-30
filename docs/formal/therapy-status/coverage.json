@@ -39,7 +39,7 @@
     "app/api/therapies/[id]/route.ts": "3f4765cd55a13360965fae38bced33cec5cc69403dd0bbfd6d67417c5c40e4e2",
     "app/api/therapies/route.ts": "e13c48abb76cb0461eb1a9c1f23cf8724ec9cf34d32a7bd54909e58d4e251dac",
     "lib/locked-field-guard.ts": "8b5d037d1967e1c9ccb08d617fba9cdffa15eee0b9773ed048319b93bcd155a5",
-    "lib/therapy-status-command-service.ts": "44eee72121c2165eb2a62d7fd5e94dd5ef4db864482ae14c4f6ed40831874b6b",
+    "lib/therapy-status-command-service.ts": "626519d8fd06127ab0a21c8c4ced034ccee21cd60ed8fb24b0b491c6ee863764",
     "lib/therapy-status-command-confirmation.ts": "f2445977f0d0cac518ff0ad7939f75a616053504083c9e3d3a2d13c37526a0a9",
     "lib/therapy-status-command-contract.ts": "3432124d9b5f8b3113265d9779fa12e1411e508b0964cfd2e1bc532f49f4a7fe",
     "lib/therapy-status-command-client.ts": "c2b1b43b0caaee0c12ca5b784b19bf1caaf6f3685c31739e29b1ce22428331a9",
@@ -73,7 +73,11 @@
     "e2e/therapy-composition.spec.ts",
     "lib/ambulatory-destructive-command-recovery.test.ts",
     "lib/api-table-response.test.ts",
-    "lib/api-session-read.test.ts"
+    "lib/api-session-read.test.ts",
+    "lib/chat-therapy-status.ts",
+    "lib/chat-therapy-status.test.ts",
+    "scripts/falsify-chat-therapy.mjs",
+    "app/api/auth/native/therapy-status/route.ts"
   ],
   "durableProtocolCoverage": {
     "adr": "0168",

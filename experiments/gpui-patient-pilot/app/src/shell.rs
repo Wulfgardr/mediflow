@@ -656,7 +656,11 @@ impl ClinicalApp {
         let threshold_region_scroll = ScrollHandle::new();
         let mut app = Self {
             #[cfg(unix)]
-            chat_access: chat_access::ChatAccess::new(theme, cx),
+            chat_access: chat_access::ChatAccess::new(
+                theme,
+                local_preferences.chat_therapy_directory(),
+                cx,
+            ),
             session: None,
             request_context: RequestContext::default(),
             pairing: None,
@@ -773,7 +777,7 @@ impl ClinicalApp {
         let quit = cx.on_app_quit(|this, cx| {
             let local_access = this.local_host.withdraw(cx);
             #[cfg(unix)]
-            this.chat_access.retire(cx);
+            this.chat_access.detach(cx);
             this.ambulatory_management.destructive.withdraw(cx);
             this.request_context.cancel();
             this.retire_form(cx);
@@ -804,7 +808,7 @@ impl ClinicalApp {
                     .detach();
             }
             #[cfg(unix)]
-            this.chat_access.retire(cx);
+            this.chat_access.detach(cx);
             this.ambulatory_management.destructive.withdraw(cx);
             this.request_context.cancel();
             this.retire_form(cx);
@@ -1073,6 +1077,8 @@ impl ClinicalApp {
                 this.connecting = false;
                 match result.take().expect("one login result") {
                     Ok(session) => {
+                        #[cfg(unix)]
+                        this.chat_access.detach(cx);
                         this.session = Some(session);
                         this.focus_after_render = true;
                         this.message = None;
@@ -1097,7 +1103,7 @@ impl ClinicalApp {
 
     fn disconnect(&mut self, cx: &mut Context<Self>) {
         #[cfg(unix)]
-        self.chat_access.retire(cx);
+        self.chat_access.detach(cx);
         self.analytics.reset(cx);
         self.scales.reset(cx);
         self.withdraw_local_host(cx);
@@ -5397,6 +5403,10 @@ impl Render for ClinicalApp {
         let chat_access = self.chat_access_view(cx);
         #[cfg(not(unix))]
         let chat_access: Option<Stateful<Div>> = None;
+        #[cfg(unix)]
+        let chat_recovery = self.chat_recovery_view(cx);
+        #[cfg(not(unix))]
+        let chat_recovery: Option<Stateful<Div>> = None;
         let content = if let Some(access) = chat_access {
             access.into_any_element()
         } else if !connected {
@@ -5634,6 +5644,7 @@ impl Render for ClinicalApp {
                                         .flex_shrink_0(),
                                 )
                             })
+                            .children(chat_recovery)
                             .when(self.local_host.retirement.pending(), |el| {
                                 el.child(
                                     notice(
