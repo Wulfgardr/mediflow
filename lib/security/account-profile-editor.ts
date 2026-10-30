@@ -36,6 +36,11 @@ export class AccountProfileEditor {
     }
     dispose() { this.active = false; this.request++; }
     edit(draft: ProfileDraft) { this.publish({ draft }); }
+    resumeDraft(draft: ProfileDraft) {
+        if (!this.active || !this.state.current || !this.authorityCurrent()) return;
+        this.publish({ draft, requiresRead: true,
+            message: 'Bozza recuperata. Rileggi il profilo e confronta i valori salvati prima di salvare.' });
+    }
     private publish(patch: Partial<ProfileEditorState>) {
         this.state = { ...this.state, ...patch };
         this.changed(this.state);

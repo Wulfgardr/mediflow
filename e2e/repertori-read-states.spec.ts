@@ -1,3 +1,4 @@
+import { closureGallery, settingsClosure } from './fixtures/settings-closure-gallery';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
@@ -61,7 +62,8 @@ async function installCatalogFixture(page: Page, baseURL: string) {
 
 for (const failure of ['counts', 'prosthetics'] as const) test(`Repertori: ${failure} read truth and recovery`, async ({ page: ownedPage, baseURL }, info) => {
   if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL
-    || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw Error('Owned synthetic archive and loopback required');
+    || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port !== '3000') throw Error('Owned synthetic archive and loopback required');
+  test.setTimeout(settingsClosure ? 180_000 : 45_000);
   const baseline = process.env.REPERTORI_READ_BASELINE === '1';
   const directory = process.env.REPERTORI_READ_SCREENSHOTS;
   const zoom = baseline ? null : await openBrowserZoomFixture(baseURL);
@@ -109,6 +111,15 @@ for (const failure of ['counts', 'prosthetics'] as const) test(`Repertori: ${fai
     }
     fixture.state.hold = null; release(); await readReady();
     await shot('ready');
+    if (settingsClosure && failure === 'counts') {
+      for (const button of await area.getByRole('button', { name: /^Mostra dettaglio repertorio/ }).all()) {
+        await button.focus(); await page.keyboard.press('Enter');
+        await expect(button).toBeFocused(); await expect(button).toHaveAttribute('aria-pressed', 'true');
+        const label = (await button.getAttribute('aria-label'))!.replace(/[^a-zA-Z0-9]/g, '-');
+        await closureGallery(page, zoom!, directory, label, button);
+      }
+    }
+    await closureGallery(page, zoom!, directory, `${failure}-panoramica`, area.locator('header').first());
     if (failure === 'counts') fixture.state.countStatus = 503;
     else fixture.state.prostheticsStatus = 503;
     const failed = page.waitForResponse(response => new URL(response.url()).pathname === (failure === 'counts' ? '/api/exemptions' : '/api/prosthetics/catalog/status') && response.status() === 503);
@@ -139,10 +150,10 @@ for (const failure of ['counts', 'prosthetics'] as const) test(`Repertori: ${fai
         await expect(area.locator('header').first()).not.toContainText('voci indicizzate');
       }
       const colors = new Map<string, string>();
-      for (const theme of ['giorno', 'grafite']) for (const size of ['320', 'zoom-400']) {
+      for (const theme of ['giorno', 'grafite']) for (const size of (settingsClosure ? ['1440', '768', '390', 'zoom-200'] : ['320', 'zoom-400'])) {
         await page.setViewportSize({ width: 1440, height: 1000 }); await zoom!.setZoom(1);
-        await page.setViewportSize({ width: size === '320' ? 320 : 1440, height: 1000 });
-        if (size === 'zoom-400') await zoom!.setZoom(4);
+        await page.setViewportSize({ width: size.startsWith('zoom') ? 1440 : Number(size), height: 1000 });
+        if (size.startsWith('zoom')) await zoom!.setZoom(size === 'zoom-400' ? 4 : 2);
         await page.evaluate(value => {
           localStorage.setItem('mediflow-theme', value);
           document.documentElement.classList.remove('light', 'dark'); document.documentElement.classList.add(value);
@@ -173,6 +184,7 @@ for (const failure of ['counts', 'prosthetics'] as const) test(`Repertori: ${fai
     await expect(area.getByRole('button', { name: /^Mostra dettaglio repertorio/ })).toHaveCount(4);
     await expect(area.getByRole('link', { name: 'Gestisci repertori', exact: true })).toHaveAttribute('href', '/settings/repertori');
     await shot('observed-zero');
+    await closureGallery(page, zoom!, directory, `${failure}-zero`, area.locator('header').first());
   } finally {
     fixture.state.hold = null; release();
     try {
@@ -188,7 +200,7 @@ for (const failure of ['counts', 'prosthetics'] as const) test(`Repertori: ${fai
 
 test('Repertori: failed WHO catalog read stays unreadable with an available optional service', async ({ page, baseURL }, info) => {
   if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL
-    || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw Error('Owned synthetic archive and loopback required');
+    || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port !== '3000') throw Error('Owned synthetic archive and loopback required');
   const fixture = await installCatalogFixture(page, baseURL), errors: string[] = [], observations: unknown[] = [];
   fixture.state.whoStatus = 503; fixture.state.whoAvailable = true;
   page.on('pageerror', error => errors.push(error.message));

@@ -1,3 +1,4 @@
+import { closureGallery, settingsClosure } from './fixtures/settings-closure-gallery';
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
@@ -6,8 +7,8 @@ import { bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
 const providerSettings = Object.freeze({ aiProvider: 'ollama', aiUrl: 'http://127.0.0.1:11434', ollamaUrl: 'http://127.0.0.1:11434' });
 async function installSettingsEvidenceMocks(page: Page, baseURL: string) {
     const origin = new URL(baseURL).origin;
-    if (new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw Error('Explicit synthetic loopback runtime required');
-    const state: { models: 'ready' | 'error'; who: 'disabled' | 'available' | 'configured' | 'credentials_absent' | 'offline' | 'unavailable'; update: 'available' | 'absent' | 'error' } = { models: 'ready', who: 'disabled', update: 'available' };
+    if (new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port !== '3000') throw Error('Explicit synthetic loopback runtime required');
+    const state: { models: 'ready' | 'error'; who: 'disabled' | 'available' | 'configured' | 'configuration_required' | 'credentials_absent' | 'offline' | 'unavailable'; update: 'available' | 'absent' | 'error' } = { models: 'ready', who: 'disabled', update: 'available' };
     const calls: Array<{ method: string; pathname: string; state: typeof state }> = [];
     const blocked: Array<{ method: string; url?: string; pathname?: string; search?: boolean }> = [];
     const update = Object.freeze({ currentVersion: '0.9.1-synthetic', availableVersion: '0.9.1-synthetic-next', updateAvailable: true,
@@ -42,7 +43,7 @@ async function installSettingsEvidenceMocks(page: Page, baseURL: string) {
 }
 
 test('Settings evidence: composition, disclosed checks and failed update reread', async ({ baseURL }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(settingsClosure ? 480_000 : 120_000);
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR) throw Error('Explicit synthetic runtime required');
     const zoom = await openBrowserZoomFixture(baseURL!), page = zoom.page;
     const fixture = await installSettingsEvidenceMocks(page, baseURL!);
@@ -112,6 +113,7 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
             await expect(control).toHaveAttribute('aria-expanded', 'false');
             await control.focus(); await control.press('Enter'); await expect(control).toBeFocused();
             await expect(control).toHaveAttribute('aria-expanded', 'true');
+            await closureGallery(page, zoom, directory, `${await record.getAttribute('data-testid')}-dettagli`, control);
             await control.press('Enter'); await expect(control).toHaveAttribute('aria-expanded', 'false');
             await expect(status).toBeVisible(); await expect(limitation).toBeVisible();
         }
@@ -130,12 +132,15 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
         await sectionTitle(diagnostics.getByRole('heading', { name: 'Diagnostica di Sistema', exact: true }));
         await sectionTitle(checks);
         await expect(diagnostics.locator('[data-settings-primary="true"]:visible')).toHaveCount(1);
+        if (settingsClosure) for (const id of ['db', 'ai', 'api'])
+            await closureGallery(page, zoom, directory, `${id}-non-verificato`, diagnostics.locator(`[data-diagnostic-check="${id}"]`).getByRole('status'));
         const who = diagnostics.locator('[data-diagnostic-check="icd"]');
         await expect(who.getByRole('status')).toHaveText('Non ancora verificato');
         await who.getByRole('button', { name: 'Esegui singolo test: ICD-11 WHO', exact: true }).click();
         await expect(who.getByRole('alert')).toHaveText('Servizio WHO ICD-11 disattivato.');
         await capture('who-error', who.getByRole('alert'));
         expect(await who.getByRole('alert').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+        await closureGallery(page, zoom, directory, 'who-disattivato', who.getByRole('alert'));
         await checks.click(); await checks.click();
         await expect(who.getByRole('alert')).toHaveText('Servizio WHO ICD-11 disattivato.');
         fixture.state.who = 'available';
@@ -146,10 +151,49 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
         await whoAction.click();
         await expect(who.getByRole('status')).toHaveText('Verifica in corso');
         await expect(whoAction).toBeDisabled();
+        await closureGallery(page, zoom, directory, 'who-in-corso', who.getByRole('status'));
         releaseWho!();
         await expect(who.getByRole('status')).toContainText(/Risposta ricevuta in \d+ ms/);
         await expect(whoAction).toBeEnabled();
         await page.unroute('**/api/icd/proxy', holdWho);
+        await closureGallery(page, zoom, directory, 'who-disponibile', who.getByRole('status'));
+        if (settingsClosure) {
+            for (const status of ['configured', 'configuration_required', 'credentials_absent', 'offline', 'unavailable'] as const) {
+                fixture.state.who = status;
+                await whoAction.click(); await expect(who.getByRole('alert')).toBeVisible();
+                await closureGallery(page, zoom, directory, `who-${status}`, who.getByRole('alert'));
+            }
+            for (const id of ['db', 'ai', 'api']) {
+                const row = diagnostics.locator(`[data-diagnostic-check="${id}"]`);
+                const endpoint = id === 'db' ? '**/api/auth/check' : id === 'ai' ? '**/api/ai/models' : '**/api/settings/aiProvider';
+                let finish!: () => void;
+                const pending = new Promise<void>(resolve => { finish = resolve; });
+                const hold = async (route: import('@playwright/test').Route) => { await pending; await route.fallback(); };
+                await page.route(endpoint, hold);
+                try {
+                    await row.getByRole('button').click(); await expect(row.getByRole('status')).toHaveText('Verifica in corso');
+                    await closureGallery(page, zoom, directory, `${id}-in-corso`, row.getByRole('status'));
+                } finally { finish(); }
+                await expect(row.getByRole('status')).toContainText('Risposta ricevuta');
+                await page.unroute(endpoint, hold);
+                await closureGallery(page, zoom, directory, `${id}-risposta`, row.getByRole('status'));
+            }
+            for (const [id, endpoint] of [['db', '**/api/auth/check'], ['api', '**/api/settings/aiProvider']]) {
+                const fail = async (route: import('@playwright/test').Route) => {
+                    const response = await route.fetch();
+                    await route.fulfill({ response, status: 503, json: { error: 'Indisponibile' } });
+                };
+                await page.route(endpoint, fail);
+                const row = diagnostics.locator(`[data-diagnostic-check="${id}"]`);
+                await row.getByRole('button').click(); await expect(row.getByRole('alert')).toBeVisible();
+                await closureGallery(page, zoom, directory, `${id}-errore`, row.getByRole('alert'));
+                await page.unroute(endpoint, fail);
+            }
+            fixture.state.models = 'error';
+            const ai = diagnostics.locator('[data-diagnostic-check="ai"]');
+            await ai.getByRole('button').click(); await expect(ai.getByRole('alert')).toBeVisible();
+            await closureGallery(page, zoom, directory, 'ai-errore', ai.getByRole('alert'));
+        }
 
         fixture.state.update = 'error';
         const denied = page.waitForResponse(response => new URL(response.url()).pathname === '/api/system/update-awareness' && response.status() === 503);
@@ -158,6 +202,7 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
         await expect(updates.getByRole('alert')).toContainText('Errore: HTTP 503');
         await expect(updates).toContainText('0.9.1-synthetic-next');
         await capture('update-reread-503', updates);
+        await closureGallery(page, zoom, directory, 'update-rilettura-negata', updates.getByRole('alert'));
         await expect(updates.getByRole('link', { name: 'Apri aggiornamento', exact: true })).not.toHaveClass(/ui-btn-primary/);
         fixture.state.update = 'absent';
         const pending = new Promise<void>(resolve => { releaseRead = resolve; });
@@ -166,6 +211,7 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
         await updates.getByRole('button', { name: 'Aggiorna stato', exact: true }).click();
         await expect(updates).toHaveAttribute('aria-busy', 'true');
         await expect(updates.getByRole('status')).toHaveText('Lettura stato aggiornamenti...');
+        await closureGallery(page, zoom, directory, 'update-in-corso', updates.getByRole('status'));
         releaseRead!(); await expect(updates).toHaveAttribute('aria-busy', 'false');
         await page.unroute('**/api/system/update-awareness', hold);
         await expect(updates.getByRole('alert')).toHaveCount(0);
@@ -174,6 +220,12 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
         await updates.getByRole('button', { name: 'Aggiorna stato', exact: true }).click();
         await updates.getByRole('button', { name: 'Piu tardi', exact: true }).click();
         await expect(updates).toContainText('Avviso rimandato per questa versione.');
+        await closureGallery(page, zoom, directory, 'update-rimandato', updates.getByText('Avviso rimandato per questa versione.', { exact: true }));
+        if (settingsClosure) {
+            fixture.state.update = 'error'; await page.reload();
+            await expect(updates.getByRole('alert')).toHaveText('Errore: HTTP 503');
+            await closureGallery(page, zoom, directory, 'update-prima-lettura-negata', updates.getByRole('alert'));
+        }
         expect(errors).toEqual([]); expect(fixture.blocked).toEqual([]);
     } finally {
         releaseRead?.(); releaseWho?.();
