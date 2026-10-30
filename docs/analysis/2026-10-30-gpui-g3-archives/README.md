@@ -72,12 +72,15 @@ Verifica locale: Rust workspace 484 test passati, otto ignorati già previsti;
 `-Dwarnings`, typecheck, lint, never-regress e claims passati. Inventario
 COMPLETE: 1319 file, 1276 selezionati, 43 esclusioni motivate. Le prove mirate
 del trasporto sono state ripetute dopo l’ultima validazione del formato.
-La suite `npm run test:unit` più recente conta 8841 passati, un fallito e
+Un run di `npm run test:unit` conta 8841 passati, un fallito e
 23 saltati: il fallimento è la cancellazione MCP esterna al diff, con
 `history, search` invece di `search`; la stessa prova passa nella rilettura
 isolata, senza modifiche. Le due invocazioni WHO successive non sono eseguite
-dal launcher quando il primo gruppo è rosso. Non si dichiara la suite completa
-verde. Le suite WHO residue sono poi state eseguite separatamente: 61/61 e
+dal launcher quando il primo gruppo è rosso. Il run successivo sul runtime `f6b1a155aa4a4a01807079ced0b095ab4d2756a0`
+passa tutte le tre invocazioni: 8842 + 61 + 66 test passati, 23 saltati,
+zero falliti. Il precedente rosso è conservato. La successiva riserva del
+prefisso delle ricevute è verificata anche da 28 test pertinenti, incluse
+le due nuove regressioni della policy e del writer condiviso. Le suite WHO residue sono poi state eseguite separatamente: 61/61 e
 66/66 verdi, in sequenza. Build standalone e spec HTTP con runtime/archivio
 propri passano sul runtime `91acfa2f5abfbdb1c0029a0b89dac708da0bcab8`.
 La spec ritira prima la sessione di setup con il logout locale esatto.
@@ -129,3 +132,12 @@ l’esatto import `openDbServer` del servizio nominato, senza nuova connessione,
 writer alternativo o accesso SQL Rust. I guard e le relative fixture negative
 sono stati rieseguiti. Le prove precedenti del writer e del codec restano
 valide; il percorso HTTP viene rieseguito per il nuovo adattatore di lettura.
+
+
+Il riesame dei consumer ha riprodotto un diniego mancante: la policy delle
+impostazioni accettava il prefisso delle ricevute come chiave sconosciuta
+scrivibile dal Web. La nuova regressione falliva con `true !== false`.
+Il prefisso condiviso è ora riservato al servizio: POST, PUT, GET generici e
+il writer comune delle impostazioni lo rifiutano. La spec HTTP tenta sia la
+creazione di una falsa ricevuta sia la sovrascrittura di quella reale;
+controlla 403, assenza della falsa e identità della ricevuta autentica.

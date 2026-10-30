@@ -1,3 +1,4 @@
+import { RESTORE_RECEIPT_PREFIX } from '../../backup-restore-receipt-contract';
 import 'server-only';
 import { eq } from 'drizzle-orm';
 import { dbServer, runDbServerImmediateTransaction } from '../../db-server';
@@ -7,6 +8,7 @@ import { FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY, nextFunctionModelConfigura
 
 /** Called after the settings HTTP owner's authorization, in the same commit as revocation. */
 export function writeSettingWithFunctionModelGeneration(key: string, value: string): void {
+    if (key.startsWith(RESTORE_RECEIPT_PREFIX)) throw new Error('Host-managed restore receipt');
     if (key === FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY) throw new Error('Host-managed generation');
     runDbServerImmediateTransaction(() => {
         const before = dbServer.select({ value: settings.value }).from(settings).where(eq(settings.key, key)).get()?.value;

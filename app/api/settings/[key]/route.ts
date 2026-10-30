@@ -1,3 +1,4 @@
+import { RESTORE_RECEIPT_PREFIX } from '@/lib/backup-restore-receipt-contract';
 import { writeSettingWithFunctionModelGeneration } from '@/lib/ai-providers/fabric/function-model-settings-write';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
@@ -18,6 +19,7 @@ export async function GET(
 
     try {
         const { key } = await params;
+        if (key.startsWith(RESTORE_RECEIPT_PREFIX)) return NextResponse.json({ error: 'Dedicated restore receipt service required' }, { status: 403 });
         const result = await dbServer.select().from(settings).where(eq(settings.key, key)).get();
 
         if (!result) {

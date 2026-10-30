@@ -41,6 +41,17 @@ test('GPUI local authority restores with confirmation, atomic snapshot and durab
         return request.post('/api/system/backup-restore', { headers, data: backup });
     };
     let headers = await login();
+    const forge = async (key: string, value: string, auth: Record<string, string>) => {
+        syntheticDatabase().close();
+        expect((await request.put('/api/settings/' + key, { headers: auth, data: { value } })).status()).toBe(403);
+        syntheticDatabase().close();
+        expect((await request.post('/api/settings', { headers: auth, data: { key, value } })).status()).toBe(403);
+        expect((await request.get('/api/settings/' + key, { headers: auth })).status()).toBe(403);
+    };
+    const nonexistent = randomUUID();
+    await forge('archive.restore.receipt.' + nonexistent, '{}', headers);
+    expect((await request.get('/api/system/backup-restore/receipts/' + nonexistent, { headers })).status()).toBe(404);
+
     const created = await request.post('/api/patients', { headers, data: { firstName: 'Persona', lastName: 'Sintetica recupero GPUI', taxCode: 'SYN-' + randomUUID() } });
     expect(created.status(), await created.text()).toBe(201);
     const patient = (await created.json()).id;
@@ -84,6 +95,9 @@ test('GPUI local authority restores with confirmation, atomic snapshot and durab
         const receipt = await request.get(`/api/system/backup-restore/receipts/${id}`, { headers });
         expect(receipt.status()).toBe(200);
         expect(await receipt.json()).toMatchObject({ id, sourceChecksum: backup.manifest.checksum, archiveGeneration: headers['x-mediflow-archive-generation'] });
+        const persisted = await receipt.json();
+        await forge('archive.restore.receipt.' + id, '{}', headers);
+        expect(await (await request.get(`/api/system/backup-restore/receipts/${id}`, { headers })).json()).toEqual(persisted);
         expect(db.prepare('SELECT * FROM patients ORDER BY id').all()).toEqual(before);
         expect(db.prepare('SELECT * FROM users ORDER BY id').all()).toEqual(keys);
         const finalHistory = db.prepare('SELECT * FROM audit_events ORDER BY event_id').all();

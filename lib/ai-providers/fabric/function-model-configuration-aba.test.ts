@@ -128,3 +128,15 @@ test('configuration and generation commit atomically: a failed generation write 
         assert.equal((disk.prepare('SELECT value FROM settings WHERE key=?').get('aiModel_clinical') as { value: string }).value, 'synthetic-A:1');
     } finally { disk.exec('DROP TRIGGER synthetic_generation_failure'); }
 });
+
+test('generic settings owners and their shared writer cannot create or replace archive restore receipts', async () => {
+    const key = 'archive.restore.receipt.12345678-1234-4123-8123-123456789012';
+    const { writeSettingWithFunctionModelGeneration } = await import('./function-model-settings-write.ts');
+    for (const method of ['POST', 'PUT'] as const) {
+        const request = new Request(`http://localhost/api/settings${method === 'PUT' ? '/' + key : ''}`, { method, headers: { 'content-type': 'application/json',
+            'x-mediflow-archive-generation': generation.currentArchiveGeneration() }, body: JSON.stringify({ key, value: '{}' }) });
+        assert.equal((await (method === 'POST' ? POST(request) : PUT(request, { params: Promise.resolve({ key }) }))).status, 403);
+    }
+    assert.throws(() => writeSettingWithFunctionModelGeneration(key, '{}'), /Host-managed restore receipt/);
+    assert.equal(openDbServer().prepare('SELECT value FROM settings WHERE key=?').get(key), undefined);
+});

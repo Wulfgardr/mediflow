@@ -3,7 +3,7 @@ import type Database from 'better-sqlite3';
 import { openDbServer } from './db-server';
 import { readSqliteArchiveGeneration } from './archive-generation';
 
-const PREFIX = 'archive.restore.receipt.';
+import { RESTORE_RECEIPT_PREFIX as PREFIX } from './backup-restore-receipt-contract';
 export type RestoreIntent = { id: string; expectedSnapshot: string };
 export type RestoreReceipt = { id: string; sourceChecksum: string; archiveGeneration: string; completedAt: string };
 export function parseRestoreIntent(request: Request): RestoreIntent | null {
