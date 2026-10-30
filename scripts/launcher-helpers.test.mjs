@@ -3001,9 +3001,16 @@ test('an existing ordinary launcher pairs only after code confirmation in its We
         assert.deepEqual(first.result,{isError:true,content:[{type:'text',text:'MediFlow navigation unavailable. Complete startup or pairing in MediFlow, then retry. This request is no longer pending.'}]});
         assert.doesNotMatch(f.output(),/mediflow-local-ui-pair-use/u);
         assert.equal(await navigateOwnedLocalUiRuntime(bridge, 'history', AbortSignal.timeout(1500), Date.now()+1400, f.expected), false);
+        let paired;
+        const receive = frame => {
+            if (frame?.type === 'mediflow-local-ui-paired') paired = frame;
+        };
+        bridge.on('message', receive);
+        t.after(() => bridge.off('message', receive));
         const decision = await fetch(state.url + '/fixture-decision', { method: 'POST', body: JSON.stringify({nonce:pending.nonce, allow:true, code}) });
         assert.equal((await decision.json()).ok, true);
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await f.until(() => paired);
+        assert.deepEqual(paired, { type: 'mediflow-local-ui-paired', ...f.expected });
         assert.doesNotMatch(f.output(),/mediflow-local-ui-pair-use/u);
         const second = await mcp.request('tools/call', {name:'mediflow.local_ui.navigate.v1',arguments:{intent:'search'}});
         assert.equal(second.result?.structuredContent?.status,'continue_in_mediflow', JSON.stringify(second));
