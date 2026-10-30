@@ -78,7 +78,7 @@ export function CollapsibleSection({
 
     const heading = (
         <h3 className={`${sectionRecipe.heading} ${headerAction ? '' : sectionRecipe.header}`}>
-            {folderActive ? <div className="flex flex-wrap items-center gap-3"><span className={`${sectionRecipe.heading} flex min-w-0 flex-1 items-center gap-2 text-ink`}>{Icon ? <Icon className="h-5 w-5 text-muted" aria-hidden="true" /> : null}{title}</span>{' '}{count !== undefined && count !== '' ? <span className={sectionRecipe.count}>{count}</span> : null}</div>
+            {folderActive ? <div className="flex flex-wrap items-center gap-3"><span className={`${sectionRecipe.heading} flex min-w-0 flex-auto items-center gap-2 text-ink`}>{Icon ? <Icon className="h-5 w-5 text-muted" aria-hidden="true" /> : null}{title}</span>{' '}{count !== undefined && count !== '' ? <span className={sectionRecipe.count}>{count}</span> : null}</div>
                 : <DisclosureControl expanded={expanded} controls={regionId} onToggle={() => setOpen(value => !value)}>
                     {kicker && !folderSection ? <span className="section-kicker">{kicker}</span> : null}
                     <span className={`${sectionRecipe.heading} flex items-center gap-2`}>{Icon ? <Icon size={20} aria-hidden="true" /> : null}{title}

@@ -17,7 +17,6 @@ enum Working {
 }
 
 pub(super) struct AiPreferences {
-    pub(super) active: bool,
     context: Option<AiPreferencesContext>,
     snapshot: Option<AiFunctionPreferences>,
     received_at: Option<chrono::DateTime<chrono::Local>>,
@@ -34,7 +33,6 @@ pub(super) struct AiPreferences {
 impl AiPreferences {
     pub(super) fn new(scroll: &ScrollHandle, cx: &App) -> Self {
         Self {
-            active: false,
             context: None,
             snapshot: None,
             received_at: None,
@@ -53,7 +51,6 @@ impl AiPreferences {
         if let Some(context) = self.context.take() {
             context.cancel();
         }
-        self.active = false;
         self.snapshot = None;
         self.received_at = None;
         self.current = false;
@@ -158,8 +155,8 @@ impl ClinicalApp {
             context.cancel();
         }
         let context = session.ai_preferences_context();
+        self.settings_page = SettingsPage::AiPreferences;
         let state = &mut self.ai_preferences;
-        state.active = true;
         state.context = Some(context.clone());
         state.preview = None;
         state.current = false;
@@ -321,7 +318,7 @@ impl ClinicalApp {
         cx.notify();
     }
     pub(super) fn ai_preferences_blocks_navigation(&mut self, cx: &mut Context<Self>) -> bool {
-        if !self.ai_preferences.active || !self.ai_preferences.has_work() {
+        if (self.settings_page != SettingsPage::AiPreferences) || !self.ai_preferences.has_work() {
             return false;
         }
         self.show_other = false;
@@ -331,14 +328,15 @@ impl ClinicalApp {
         cx.notify();
         true
     }
-    fn close_ai_preferences(&mut self, cx: &mut Context<Self>) {
+    fn close_ai_preferences(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.ai_preferences_blocks_navigation(cx) {
             return;
         }
+        self.settings_page = SettingsPage::Overview;
         self.area_scroll.set_offset(gpui::point(px(0.), px(0.)));
         self.load_ai_status(cx);
+        window.focus(&self.settings_targets[5].focus, cx);
         self.ensure_account_profile_loaded(cx);
-        self.focus_after_render = true;
         cx.notify();
     }
 
@@ -353,7 +351,7 @@ impl ClinicalApp {
             .child(notice("clinical-workspace-ai-preferences-scope", "Questa pagina configura le quattro funzioni. La disponibilità indicata nel catalogo non verifica che il modello possa eseguire un’analisi.", theme, false))
             .child(div().flex().flex_wrap().gap(px(8.))
                 .child(state.targets[0].attach_enabled(button("clinical-workspace-ai-preferences-back", "Torna alle impostazioni", theme, false, idle), idle)
-                    .on_click(cx.listener(|this, _, _, cx| this.close_ai_preferences(cx))))
+                    .on_click(cx.listener(|this, _, window, cx| this.close_ai_preferences(window, cx))))
                 .child(state.targets[1].attach_enabled(button("clinical-workspace-ai-preferences-reload", "Rileggi preferenze dall’host", theme, false, idle), idle)
                     .on_click(cx.listener(|this, _, _, cx| this.load_ai_preferences(cx)))))
             .child(notice("clinical-workspace-ai-preferences-message", state.message.clone(), theme, state.failed));
@@ -780,7 +778,7 @@ mod tests {
                 RuntimeError::Indeterminate,
                 RuntimeError::Transport,
             ] {
-                app.ai_preferences.active = true;
+                app.settings_page = SettingsPage::AiPreferences;
                 app.receive_ai_preferences(Ok(snapshot()), cx);
                 app.start_ai_draft(change(), cx);
                 assert_eq!(app.ai_preferences.draft, Some(change()));
@@ -815,7 +813,7 @@ mod tests {
         let (view, cx) =
             cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
         view.update(cx, |app, cx| {
-            app.ai_preferences.active = true;
+            app.settings_page = SettingsPage::AiPreferences;
             app.receive_ai_preferences(Ok(snapshot()), cx);
             app.start_ai_draft(change(), cx);
             app.ai_preferences.working = Some(Working::Save);
@@ -861,7 +859,7 @@ mod tests {
         for error in [RuntimeError::Authentication, RuntimeError::Locked] {
             view.update(cx, |app, cx| {
                 app.area = Area::Settings;
-                app.ai_preferences.active = true;
+                app.settings_page = SettingsPage::AiPreferences;
                 app.receive_ai_preferences(Ok(snapshot()), cx);
                 app.start_ai_draft(change(), cx);
                 app.ai_preferences.working = Some(Working::Save);
@@ -874,7 +872,10 @@ mod tests {
             cx.run_until_parked();
             view.read_with(cx, |app, _| {
                 assert!(app.session.is_none());
-                assert!(!app.ai_preferences.active && !app.ai_preferences.current);
+                assert!(
+                    (app.settings_page != SettingsPage::AiPreferences)
+                        && !app.ai_preferences.current
+                );
                 assert!(app.ai_preferences.snapshot.is_none());
                 assert!(app.ai_preferences.draft.is_none() && app.ai_preferences.preview.is_none());
                 assert!(
@@ -896,7 +897,7 @@ mod tests {
             cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
         view.update(cx, |app, cx| {
             app.area = Area::Settings;
-            app.ai_preferences.active = true;
+            app.settings_page = SettingsPage::AiPreferences;
             app.receive_ai_preferences(Ok(snapshot()), cx);
             app.start_ai_draft(change(), cx);
             assert_eq!(
@@ -912,9 +913,12 @@ mod tests {
         });
         cx.run_until_parked();
         view.update(cx, |app, cx| {
-            assert!(app.ai_preferences.snapshot.is_none() && !app.ai_preferences.active);
+            assert!(
+                app.ai_preferences.snapshot.is_none()
+                    && (app.settings_page != SettingsPage::AiPreferences)
+            );
             app.area = Area::Settings;
-            app.ai_preferences.active = true;
+            app.settings_page = SettingsPage::AiPreferences;
             app.receive_ai_preferences(Ok(snapshot()), cx);
             app.start_ai_draft(change(), cx);
             app.run(|| Ok(snapshot()), ClinicalApp::receive_ai_preferences, cx);
@@ -923,7 +927,10 @@ mod tests {
         cx.run_until_parked();
         view.read_with(cx, |app, _| {
             assert!(app.ai_preferences.snapshot.is_none() && app.ai_preferences.draft.is_none());
-            assert!(app.ai_preferences.preview.is_none() && !app.ai_preferences.active);
+            assert!(
+                app.ai_preferences.preview.is_none()
+                    && (app.settings_page != SettingsPage::AiPreferences)
+            );
         });
     }
 }
