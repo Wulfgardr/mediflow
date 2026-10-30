@@ -21,6 +21,11 @@ export type PatientDocumentCreateHost = Readonly<{
     confirm: (pin: string) => Promise<boolean>;
     retain: (dispose: () => void) => (() => void);
 }>;
+type PatientDocumentOwner = Pick<PatientDocumentCreateHost, 'actorRef' | 'archiveGeneration' | 'ambulatoryId' | 'pairedClientId'>;
+function sameOwner(left: PatientDocumentOwner, right: PatientDocumentOwner) {
+    return left.actorRef === right.actorRef && left.archiveGeneration === right.archiveGeneration
+        && left.ambulatoryId === right.ambulatoryId && left.pairedClientId === right.pairedClientId;
+}
 export type PreparedPatientDocument = Readonly<{
     sourceId: string; name: string; path: string; data: string; type: 'application/pdf'; size: number;
     identity: 'labelled' | 'ambiguous'; quality: 'ready' | 'uncertain' | 'ocr_error';
@@ -98,7 +103,7 @@ function duplicateSet(tx: Tx, values: typeof patients.$inferInsert): string {
 export function createPatientDocumentCommandService(database: typeof dbServer, clock: () => number = Date.now) {
     const approvals = createNativeChatWriteApprovals<Command>(clock);
     const views = new Map<string, { commandId: string; source: PreparedPatientDocument; port: PatientDocumentSourcePort; at: number }>();
-    const pending = new Map<string, { session: object; scope: string; release: () => void }>();
+    const pending = new Map<string, { owner: PatientDocumentCreateHost; release: () => void }>();
     const binding = (host: PatientDocumentCreateHost, sourceId: string) => ({ session: host.session, scope: host.ambulatoryId, selection: host.epoch, resource: sourceId });
     function admit(tx: Tx, host: PatientDocumentCreateHost) {
         host.assertCurrent(tx);
@@ -114,8 +119,7 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
         const row = tx.select().from(auditEvents).where(eq(auditEvents.eventId, commandId)).get();
         if (!row) return { outcome: 'unknown' as const };
         const journal = parsePatientDocumentCreateJournal(JSON.parse(row.redactedMetadata ?? '{}').patientDocumentCreate);
-        if (!journal || journal.commandId !== commandId || journal.archiveGeneration !== host.archiveGeneration
-            || journal.ambulatoryId !== host.ambulatoryId || journal.pairedClientId !== host.pairedClientId || row.actorRef !== host.actorRef || row.outcome !== 'success'
+        if (!journal || journal.commandId !== commandId || !sameOwner(host, { ...journal, actorRef: row.actorRef ?? '' }) || row.outcome !== 'success'
             || (journal.patientId === null ? row.eventType !== 'patient.create.retired' : row.eventType !== 'patient.created' || row.subjectRef !== journal.patientId)) return deny();
         return journal.patientId === null ? { outcome: 'retired' as const } : { outcome: 'applied' as const };
     }
@@ -150,7 +154,7 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
             catch (error) { dispose(); throw error; }
             if (disposed) { releaseOwner(); return deny(); }
             timer.unref();
-            pending.set(commandId, { session: host.session, scope: host.ambulatoryId,
+            pending.set(commandId, { owner: host,
                 release: () => { clearTimeout(timer); dispose(); releaseOwner(); } });
             views.set(viewId, { commandId, source, port, at: clock() });
             return { viewId, commandId, identity: source.identity, quality: source.quality, candidates: source.candidates };
@@ -223,8 +227,9 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
                 if (known.outcome !== 'unknown') return known;
                 const active = pending.get(commandId);
                 if (!active) return { outcome: 'unknown' as const };
-                if (active.session !== host.session || active.scope !== host.ambulatoryId) return deny();
-                approvals.revoke(commandId, { session: host.session, scope: host.ambulatoryId });
+                if (!sameOwner(active.owner, host) || (active.owner.session !== host.session
+                    && (host.surface !== 'native' || active.owner.surface !== 'native' || !host.pairedClientId))) return deny();
+                approvals.revoke(commandId, { session: active.owner.session, scope: active.owner.ambulatoryId });
                 audit(tx, host, commandId);
                 admit(tx, host);
                 active.release();

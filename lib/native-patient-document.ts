@@ -189,7 +189,7 @@ export function createNativePatientDocumentService(database: typeof dbServer, cl
         async receipt(context: NetworkWriteContext, commandId: string) { return reread(await host(context), commandId); },
         async revoke(context: NetworkWriteContext, commandId: string) {
             const owner = await host(context);
-            const entry = owned(owner, commandId);
+            const entry = sources.get(commandId);
             const result = commands.revoke(owner, commandId);
             const read = reread(owner, commandId);
             if (read.outcome !== result.outcome) return deny();
