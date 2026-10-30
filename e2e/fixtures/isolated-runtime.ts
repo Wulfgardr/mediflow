@@ -33,7 +33,7 @@ export function isolatedRuntimeArguments(bundle: string): string[] {
   return [launcher, 'web'];
 }
 
-type IsolatedRuntime = Readonly<{ url: string;
+type IsolatedRuntime = Readonly<{ url: string; dataDirectory: string;
   offerPairing(options?: { nonce?: string; expiresIn?: number; instance?: string }): { nonce: string; host: string };
   usePairing(nonce: string, host: string): Promise<string>;
 }>;
@@ -127,7 +127,7 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
       expect(initial.status).toBe(200);
       expect(await initial.json()).toMatchObject({ status: 'ok', isSetup: false, hasSession: false, db: { state: 'ready' } });
       initialEmptyAccount = true;
-      await provide({ url,
+      await provide({ url, dataDirectory,
         offerPairing(options = {}) {
           const request = { nonce: options.nonce ?? randomUUID(), host: randomUUID(), expiresAt: Date.now() + (options.expiresIn ?? 60000),
             instance: options.instance ?? environment.MEDIFLOW_LOCAL_UI_INSTANCE,

@@ -1,9 +1,11 @@
+mod archives;
 use crate::RetirementNotice;
 use crate::http::{authenticate_web_p3, control_cookie, operation_uuid, sensitive_header};
 use crate::{
     Attachment, RequestContext, Result, RuntimeClient, RuntimeError, RuntimeSession, RuntimeUser,
     validate_id,
 };
+pub use archives::*;
 use reqwest::{
     Method,
     header::{COOKIE, HeaderMap},

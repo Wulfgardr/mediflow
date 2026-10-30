@@ -10,6 +10,7 @@ pub(super) enum SettingsPage {
     Ambulatories,
     AiPreferences,
     Functions,
+    Archives,
 }
 
 impl SettingsPage {
@@ -22,6 +23,7 @@ impl SettingsPage {
             Self::Ambulatories => 4,
             Self::AiPreferences => 6,
             Self::Functions => 5,
+            Self::Archives => 7,
         }
     }
 }
@@ -95,6 +97,7 @@ impl ClinicalApp {
             );
         }
         match self.settings_page {
+            SettingsPage::Archives => view.child(self.archives_view(cx)),
             SettingsPage::Profile => view.child(self.account_profile_view(cx)),
             SettingsPage::Appearance => view.child(heading("clinical-workspace-settings-heading", "Aspetto", theme))
             .child(div().flex().flex_col().gap(px(12.))
@@ -136,6 +139,7 @@ impl ClinicalApp {
                         (SettingsPage::Profile, "Profilo", "Nome medico e ambulatorio"),
                         (SettingsPage::Appearance, "Aspetto", "Tema, dimensione del testo e privacy"),
                         (SettingsPage::Ambulatories, "Ambulatori", "Sedi e contesti clinici"),
+                        (SettingsPage::Archives, "Archivi e backup", "Esportazione, verifica e ripristino"),
                     ].into_iter().map(|(page, label, description)| self.settings_item(page, label, description, cx)))
                     .child(section("clinical-workspace-settings-intelligenza", "Intelligenza", theme))
                     .children([

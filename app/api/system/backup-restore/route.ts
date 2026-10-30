@@ -1,3 +1,5 @@
+import { parseRestoreIntent } from '@/lib/backup-restore-receipt';
+import { isLocalClientSession } from '@/lib/security/loopback-ingress.mjs';
 import { serializeProstheticsDocument } from '@/lib/reference-data/prosthetics-catalog-backup';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { assertArchiveGeneration } from '@/lib/archive-generation';
@@ -208,6 +210,9 @@ export async function POST(request: Request) {
     if (archiveDenial) return archiveDenial;
 
     try {
+        let intent;
+        try { intent = parseRestoreIntent(request); } catch { return apiFailure('invalid_restore_intent', 'Confirmation and snapshot required.', 400); }
+        if (isLocalClientSession(session.id) && !intent) return apiFailure('restore_intent_required', 'Confirmation and snapshot required.', 400);
         const body = await request.json();
         const { artifact, result: preflight } = await runBackupRestorePreflight(body);
         if (!preflight.ok || !artifact) {
@@ -220,7 +225,7 @@ export async function POST(request: Request) {
         const restored = restoreBackupArtifact(artifact, () => {
             assertArchiveGeneration(dbServer, archiveGeneration);
             return disposeCheckupStatusTransitionForHostV1();
-        });
+        }, intent ?? undefined);
 
         return NextResponse.json({
             success: true,

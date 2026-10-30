@@ -516,6 +516,59 @@ impl RuntimeSession {
     pub fn can_access_local_host(&self) -> bool {
         self.ensure_open().is_ok() && self.inner.client.is_local_bootstrap_origin()
     }
+    pub(crate) fn seal_recovery_backup(&self, bytes: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
+        let secrets = self
+            .inner
+            .secrets
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?;
+        crypto::seal_recovery(bytes, secrets.master.as_ref().ok_or(RuntimeError::Locked)?)
+    }
+    pub(crate) fn verify_recovery_backup(&self, bytes: &[u8]) -> Result<()> {
+        let secrets = self
+            .inner
+            .secrets
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?;
+        crypto::verify_recovery(bytes, secrets.master.as_ref().ok_or(RuntimeError::Locked)?)
+    }
+    pub(crate) fn assert_backup_key(&self, artifact: &Value) -> Result<()> {
+        let fields: std::collections::BTreeMap<String, Vec<String>> =
+            serde_json::from_str(include_str!("../../../../lib/backup-encrypted-fields.json"))
+                .map_err(|_| RuntimeError::InvalidResponse)?;
+        let secrets = self
+            .inner
+            .secrets
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?;
+        let master = secrets.master.as_ref().ok_or(RuntimeError::Locked)?;
+        for (table, fields) in fields {
+            let mut collection = String::new();
+            let mut upper = false;
+            for c in table.chars() {
+                if c == '_' {
+                    upper = true;
+                } else {
+                    collection.push(if upper { c.to_ascii_uppercase() } else { c });
+                    upper = false;
+                }
+            }
+            if collection == "sissHandoffEvents" {
+                collection = "sissHandoffs".into();
+            }
+            if let Some(rows) = artifact["payload"][&collection].as_array() {
+                for row in rows {
+                    for field in &fields {
+                        if let Some(value) = row[field].as_str().filter(|v| v.starts_with("ENC:")) {
+                            crypto::open(value, master)?;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn authenticate_local_host(
         &self,
         passphrase: &str,
@@ -6887,6 +6940,190 @@ mod tests {
                     ),
                 );
             }
+        }
+    }
+    #[test]
+    fn local_host_archive_confirmation_cancellation_cas_and_single_submission() {
+        use std::{net::TcpListener, thread};
+        assert!(crate::RestoreConfirmation::new("").is_err());
+        for status in [0, 200, 409, 500] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                let (mut stream, _) = listener.accept().unwrap();
+                assert!(
+                    read_request(&mut stream)
+                        .starts_with("POST /api/system/backup-restore/verify ")
+                );
+                local_host_reply(
+                    &mut stream,
+                    200,
+                    json!({"success":true,"format":"mediflow-backup","version":1,"counts":{"patients":1},"expectedSnapshot":"a".repeat(64),"sourceChecksum":"b".repeat(64)}),
+                    "",
+                );
+                if status != 0 {
+                    let (mut stream, _) = listener.accept().unwrap();
+                    let request = read_request(&mut stream);
+                    assert!(request.starts_with("POST /api/system/backup-restore "));
+                    let lower = request.to_ascii_lowercase();
+                    assert!(lower.contains("x-mediflow-restore-snapshot: "));
+                    assert!(lower.contains("x-mediflow-restore-confirmation: ripristina"));
+                    assert!(lower.contains("x-mediflow-archive-generation: synthetic-generation"));
+                    assert!(!lower.contains("x-mediflow-paired-client"));
+                    let id = request
+                        .lines()
+                        .find_map(|line| {
+                            line.to_ascii_lowercase()
+                                .starts_with("x-mediflow-restore-id: ")
+                                .then(|| line.split_once(": ").unwrap().1)
+                        })
+                        .unwrap()
+                        .trim();
+                    local_host_reply(
+                        &mut stream,
+                        status,
+                        json!({"success":true,"sourceChecksum":"b".repeat(64),"receipt":{"id":id}}),
+                        "",
+                    );
+                }
+                listener
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let prepared = access
+                .prepare_archive_restore(br#"{"payload":{}}"#)
+                .unwrap();
+            assert_eq!(prepared.records(), 1);
+            if status != 0 {
+                let result = access.restore_archive(
+                    &prepared,
+                    crate::RestoreConfirmation::new("RIPRISTINA").unwrap(),
+                );
+                assert_eq!(
+                    result,
+                    match status {
+                        200 => Ok(()),
+                        409 => Err(RuntimeError::Conflict),
+                        _ => Err(RuntimeError::Rejected(500)),
+                    }
+                );
+                assert_eq!(
+                    access.restore_archive(
+                        &prepared,
+                        crate::RestoreConfirmation::new("RIPRISTINA").unwrap()
+                    ),
+                    Err(RuntimeError::ReadRequired)
+                );
+            }
+            drop(prepared);
+            let listener = worker.join().unwrap();
+            listener.set_nonblocking(true).unwrap();
+            assert!(
+                listener.accept().is_err(),
+                "cancel and consumed restore cannot send a request"
+            );
+        }
+    }
+    #[test]
+    fn local_host_archive_rejects_foreign_key_before_verify_and_lock_before_restore() {
+        use std::{net::TcpListener, thread};
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            let (mut stream, _) = listener.accept().unwrap();
+            assert!(
+                read_request(&mut stream).starts_with("POST /api/system/backup-restore/verify ")
+            );
+            local_host_reply(
+                &mut stream,
+                200,
+                json!({"success":true,"format":"mediflow-backup","version":1,"counts":{},"expectedSnapshot":"a".repeat(64),"sourceChecksum":"b".repeat(64)}),
+                "",
+            );
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        assert!(matches!(
+            access.prepare_archive_restore(
+                br#"{"payload":{"patients":[{"notes":"ENC:wrong:key"}]}}"#
+            ),
+            Err(RuntimeError::Crypto)
+        ));
+        let prepared = access
+            .prepare_archive_restore(br#"{"payload":{}}"#)
+            .unwrap();
+        session.lock();
+        assert_eq!(
+            access.restore_archive(
+                &prepared,
+                crate::RestoreConfirmation::new("RIPRISTINA").unwrap()
+            ),
+            Err(RuntimeError::Locked)
+        );
+        let listener = worker.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(listener.accept().is_err());
+    }
+    #[test]
+    fn local_host_archive_receipt_must_be_reread_from_the_same_origin_and_current_generation() {
+        use std::{net::TcpListener, thread};
+        for (generation, checksum) in [
+            ("synthetic-generation", "b".repeat(64)),
+            ("old-generation", "b".repeat(64)),
+            ("synthetic-generation", "c".repeat(64)),
+        ] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let origin = session.base_url().to_owned();
+            let valid = generation == "synthetic-generation" && checksum == "b".repeat(64);
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                listener.set_nonblocking(true).unwrap();
+                let started = std::time::Instant::now();
+                let mut stream = loop {
+                    if let Ok((stream, _)) = listener.accept() {
+                        break stream;
+                    }
+                    assert!(
+                        started.elapsed() < std::time::Duration::from_secs(3),
+                        "receipt GET absent"
+                    );
+                    thread::sleep(std::time::Duration::from_millis(5));
+                };
+                assert!(read_request(&mut stream).starts_with(
+                    "GET /api/system/backup-restore/receipts/12345678-1234-4123-8123-123456789012 "
+                ));
+                local_host_reply(
+                    &mut stream,
+                    200,
+                    json!({"id":"12345678-1234-4123-8123-123456789012","sourceChecksum":checksum,"archiveGeneration":generation,"completedAt":"2026-10-30T12:00:00.000Z"}),
+                    "",
+                );
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let lookup = crate::RestoreLookup {
+                id: "12345678-1234-4123-8123-123456789012".into(),
+                source_checksum: "b".repeat(64),
+                origin,
+            };
+            assert_eq!(access.read_restore_receipt(&lookup).is_ok(), valid);
+            worker.join().unwrap();
         }
     }
     fn local_host_document() -> serde_json::Value {

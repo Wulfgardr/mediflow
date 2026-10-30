@@ -1,5 +1,8 @@
 //! Wire compatibility with lib/security/security.ts and unlock-credential.ts.
-use aes_gcm::{Aes256Gcm, KeyInit, Nonce, aead::Aead};
+use aes_gcm::{
+    Aes256Gcm, KeyInit, Nonce,
+    aead::{Aead, Payload},
+};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use hkdf::Hkdf;
 use pbkdf2::pbkdf2_hmac;
@@ -231,5 +234,117 @@ mod tests {
                 );
             }
         }
+    }
+}
+
+const RECOVERY_LIMIT: usize = 512 * 1024 * 1024;
+fn valid_database(bytes: &[u8]) -> bool {
+    (100..=RECOVERY_LIMIT).contains(&bytes.len()) && bytes.starts_with(b"SQLite format 3\0")
+}
+pub(crate) fn seal_recovery(database: &[u8], master: &MasterKey) -> Result<Zeroizing<Vec<u8>>> {
+    let mut header = [0u8; 80];
+    header[..8].copy_from_slice(b"MDFREC01");
+    getrandom::fill(&mut header[8..20]).map_err(|_| RuntimeError::Crypto)?;
+    getrandom::fill(&mut header[68..80]).map_err(|_| RuntimeError::Crypto)?;
+    let mut key = Zeroizing::new([0u8; 32]);
+    getrandom::fill(key.as_mut()).map_err(|_| RuntimeError::Crypto)?;
+    seal_recovery_with(database, master, header, &key)
+}
+fn seal_recovery_with(
+    database: &[u8],
+    master: &MasterKey,
+    mut header: [u8; 80],
+    key: &MasterKey,
+) -> Result<Zeroizing<Vec<u8>>> {
+    if !valid_database(database) {
+        return Err(RuntimeError::InvalidResponse);
+    }
+    let wrapping = Aes256Gcm::new_from_slice(master.as_ref()).map_err(|_| RuntimeError::Crypto)?;
+    let wrapped = wrapping
+        .encrypt(
+            Nonce::from_slice(&header[8..20]),
+            Payload {
+                msg: key.as_ref(),
+                aad: b"mediflow.recovery-backup.key.v1",
+            },
+        )
+        .map_err(|_| RuntimeError::Crypto)?;
+    header[20..68].copy_from_slice(&wrapped);
+    let cipher = Aes256Gcm::new_from_slice(key.as_ref()).map_err(|_| RuntimeError::Crypto)?;
+    let ciphertext = cipher
+        .encrypt(
+            Nonce::from_slice(&header[68..80]),
+            Payload {
+                msg: database,
+                aad: &header,
+            },
+        )
+        .map_err(|_| RuntimeError::Crypto)?;
+    let mut bytes = Zeroizing::new(header.to_vec());
+    bytes.extend(ciphertext);
+    Ok(bytes)
+}
+pub(crate) fn verify_recovery(artifact: &[u8], master: &MasterKey) -> Result<()> {
+    if !(196..=RECOVERY_LIMIT + 96).contains(&artifact.len()) || !artifact.starts_with(b"MDFREC01")
+    {
+        return Err(RuntimeError::InvalidInput);
+    }
+    let wrapping = Aes256Gcm::new_from_slice(master.as_ref()).map_err(|_| RuntimeError::Crypto)?;
+    let key = Zeroizing::new(
+        wrapping
+            .decrypt(
+                Nonce::from_slice(&artifact[8..20]),
+                Payload {
+                    msg: &artifact[20..68],
+                    aad: b"mediflow.recovery-backup.key.v1",
+                },
+            )
+            .map_err(|_| RuntimeError::Crypto)?,
+    );
+    let cipher = Aes256Gcm::new_from_slice(&key).map_err(|_| RuntimeError::Crypto)?;
+    let plaintext = Zeroizing::new(
+        cipher
+            .decrypt(
+                Nonce::from_slice(&artifact[68..80]),
+                Payload {
+                    msg: &artifact[80..],
+                    aad: &artifact[..80],
+                },
+            )
+            .map_err(|_| RuntimeError::Crypto)?,
+    );
+    if !valid_database(&plaintext) {
+        return Err(RuntimeError::Crypto);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+    #[test]
+    fn recovery_envelope_matches_web_golden_and_authenticates_both_tags() {
+        let golden: Value = serde_json::from_str(include_str!(
+            "../../../../native/contracts/recovery-backup-golden.v1.json"
+        ))
+        .unwrap();
+        let decode = |key: &str| BASE64.decode(golden[key].as_str().unwrap()).unwrap();
+        let master = Zeroizing::new(decode("masterKey").try_into().unwrap());
+        let key = Zeroizing::new(decode("dataKey").try_into().unwrap());
+        let database = decode("database");
+        let artifact = decode("artifact");
+        let header = artifact[..80].try_into().unwrap();
+        assert_eq!(
+            &*seal_recovery_with(&database, &master, header, &key).unwrap(),
+            &artifact
+        );
+        verify_recovery(&artifact, &master).unwrap();
+        for index in [0, 8, 20, 67, 68, 79, 80, artifact.len() - 1] {
+            let mut invalid = artifact.clone();
+            invalid[index] ^= 1;
+            assert!(verify_recovery(&invalid, &master).is_err());
+        }
+        assert!(verify_recovery(&artifact[..artifact.len() - 1], &master).is_err());
+        assert!(verify_recovery(&artifact, &Zeroizing::new([1u8; 32])).is_err());
     }
 }
