@@ -230,6 +230,13 @@ test('revocation before preview cannot be renewed and a reused source cannot cre
     await assert.rejects(api.execute(g.host, view.commandId, pin));
     assert.deepEqual(effects(), before);
 });
+test('duplicate review recognizes accented names and repeated whitespace without choosing an identity', async () => {
+    const f = await fixture();
+    dbServer.insert(patients).values({ id: randomUUID(), firstName: 'ÉLENA', lastName: 'DE  ROSSI', taxCode: randomUUID() }).run();
+    const review = { ...f.review, firstName: { action: 'correct' as const, value: 'Élena' }, lastName: { action: 'correct' as const, value: 'De Rossi' } };
+    assert.throws(() => f.api.preview(f.host, f.view.viewId, review));
+    f.api.preview(f.host, f.view.viewId, { ...review, duplicate: 'create-separate' });
+});
 test('old operator receipt cannot be read in another scope or by another actor', async () => {
     const f = await preview(); await f.api.execute(f.host, f.view.commandId, pin);
     assert.throws(() => service().receipt({ ...f.host, actorRef: randomUUID() }, f.view.commandId));

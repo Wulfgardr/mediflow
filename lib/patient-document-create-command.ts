@@ -1,6 +1,6 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import { and, eq, or, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { dbServer } from './db-server';
 import { ambulatories, attachments, auditEvents, patients, patientsToAmbulatories, users } from './schema';
 import { assertArchiveGeneration } from './archive-generation';
@@ -81,11 +81,12 @@ function reviewed(source: PreparedPatientDocument, value: PatientDocumentCreateR
     return Object.freeze(normalized.values);
 }
 function duplicateSet(tx: Tx, values: typeof patients.$inferInsert): string {
-    return tx.select({ id: patients.id }).from(patients).where(or(
-        sql`upper(trim(${patients.taxCode})) = ${values.taxCode.trim().toUpperCase()}`,
-        and(sql`lower(trim(${patients.firstName})) = ${values.firstName.trim().toLowerCase()}`,
-            sql`lower(trim(${patients.lastName})) = ${values.lastName.trim().toLowerCase()}`),
-    )).all().map(row => row.id).sort().join(',');
+    const name = (value: string) => value.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('it-IT');
+    const taxCode = values.taxCode.trim().toUpperCase();
+    return tx.select({ id: patients.id, firstName: patients.firstName, lastName: patients.lastName, taxCode: patients.taxCode }).from(patients).all()
+        .filter(row => row.taxCode.trim().toUpperCase() === taxCode
+            || (name(row.firstName) === name(values.firstName) && name(row.lastName) === name(values.lastName)))
+        .map(row => row.id).sort().join(',');
 }
 
 /** No HTTP caller yet. A production host must supply its current session/scope and source owners. */
