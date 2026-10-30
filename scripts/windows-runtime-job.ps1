@@ -1,5 +1,7 @@
 param([Parameter(Mandatory=$true)][string]$OwnerFile)
 $ErrorActionPreference = 'Stop'
+$owner = Get-Content -LiteralPath $OwnerFile -Raw | ConvertFrom-Json
+[Console]::Out.WriteLine((@{type='compiling';nonce=$owner.nonce} | ConvertTo-Json -Compress))
 Add-Type -TypeDefinition @'
 using System;
 using System.ComponentModel;
@@ -20,7 +22,7 @@ public static class MediFlowJob {
  public static uint Active(IntPtr job) { Accounting a; Check(QueryInformationJobObject(job,1,out a,(uint)Marshal.SizeOf(typeof(Accounting)),IntPtr.Zero)); return a.Active; }
 }
 '@
-$owner = Get-Content -LiteralPath $OwnerFile -Raw | ConvertFrom-Json
+[Console]::Out.WriteLine((@{type='assigning';nonce=$owner.nonce} | ConvertTo-Json -Compress))
 $target = [Diagnostics.Process]::GetProcessById([int]$owner.pid)
 if ($target.StartTime.ToUniversalTime().Ticks.ToString() -ne $owner.start) { throw 'Owner identity mismatch' }
 $job = [MediFlowJob]::CreateJobObject([IntPtr]::Zero,$null)
