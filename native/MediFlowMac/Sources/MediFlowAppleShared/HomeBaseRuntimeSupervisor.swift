@@ -238,7 +238,7 @@ public final class HomeBaseRuntimeSupervisor: ObservableObject {
     }
 
     private func proxyScriptURL() throws -> URL {
-        if let resourceURL = Bundle.main.url(forResource: "local-api-tls-proxy", withExtension: "mjs") {
+        if let resourceURL = Bundle.main.url(forResource: "local-api-tls-proxy", withExtension: "mjs", subdirectory: "scripts") {
             return resourceURL
         }
         throw HomeBaseRuntimeSupervisorError.missingProxyScript

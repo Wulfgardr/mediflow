@@ -24,3 +24,13 @@ export function readPatientDiaryMetadata(input: unknown): DiaryMetadata {
     }
     return { state: 'readable', value: record };
 }
+
+export function patientDiarySource(metadata: unknown, setting?: string): string {
+    const read = readPatientDiaryMetadata(metadata);
+    if (read.state === 'unreadable') return 'Fonte non disponibile';
+    for (const key of ['sourceLabel', 'source']) {
+        const value = read.value?.[key];
+        if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return ({ home: 'Assistenza domiciliare', hospital: 'Ospedale', ambulatory: 'Ambulatorio' } as Record<string, string>)[setting ?? ''] ?? 'Diario locale';
+}

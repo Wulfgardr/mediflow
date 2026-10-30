@@ -149,6 +149,12 @@ impl LocalPreferencesStore {
             .map(|p| p.join("chat-therapy-pending"))
     }
 
+    pub(crate) fn local_retirement_path(&self) -> Option<PathBuf> {
+        self.path
+            .as_ref()
+            .map(|path| path.with_file_name("local-session-retirement.json"))
+    }
+
     pub(crate) fn ambulatory_command_directory(&self) -> io::Result<Option<PathBuf>> {
         if let Some(error) = &self.initial_error {
             return Err(io::Error::other(error.clone()));

@@ -248,8 +248,8 @@ impl HostAmbulatoryCommand {
         if self.auth_attempted.swap(true, Ordering::AcqRel) {
             return Err(RuntimeError::ReadRequired);
         }
-        let (cookie, result) =
-            authenticate_web_p3(&self.client, &self.user, self.headers()?, passphrase);
+        let (cookie, result, _) =
+            authenticate_web_p3(&self.client, &self.user, self.headers()?, passphrase, false);
         if let Some(cookie) = cookie {
             *self.cookie.lock().map_err(|_| RuntimeError::Locked)? = cookie;
         }

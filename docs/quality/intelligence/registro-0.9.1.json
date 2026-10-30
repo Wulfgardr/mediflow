@@ -1,0 +1,783 @@
+{
+  "schema": "mediflow.intelligence-release-register.v1",
+  "release": "0.9.1",
+  "sourceRevision": "498658cbf596b96811eecb843a3a60e3ea8ea458",
+  "contract": "docs/releases/0.9.1-contract.md",
+  "contractSha256": "210e33499ab588e3a11b9fcaba9513e05a61558b2924497908bcad8adf542849",
+  "purpose": "coverage_only_no_runtime_admission",
+  "capabilities": [
+    {
+      "descriptor": {
+        "id": "patient_insight",
+        "class": "generative",
+        "operation": "synthesis",
+        "authorityPlane": "clinical_application",
+        "dataClass": "clinical",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfileId": "local_only",
+        "review": "review_first",
+        "availabilityDisposition": "proposal_only",
+        "killSwitch": "aiPatientInsightKillSwitch",
+        "contractSchema": "mediflow.ai.extract.v1",
+        "entryPoint": "app/api/ai/patient-insight/preview/route.ts"
+      },
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ],
+      "runtimeProof": null
+    },
+    {
+      "descriptor": {
+        "id": "smart_import",
+        "class": "generative",
+        "operation": "extraction",
+        "authorityPlane": "clinical_application",
+        "dataClass": "clinical",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfileId": "local_only",
+        "review": "review_first",
+        "availabilityDisposition": "proposal_only",
+        "killSwitch": "aiSmartImportKillSwitch",
+        "contractSchema": "mediflow.ai.extract.v1",
+        "entryPoint": "app/api/ai/smart-import/preview/route.ts"
+      },
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ],
+      "runtimeProof": null
+    },
+    {
+      "descriptor": {
+        "id": "document_synthesis",
+        "class": "generative",
+        "operation": "synthesis",
+        "authorityPlane": "clinical_application",
+        "dataClass": "clinical",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfileId": "local_only",
+        "review": "review_first",
+        "availabilityDisposition": "proposal_only",
+        "killSwitch": "aiDocumentSynthesisKillSwitch",
+        "contractSchema": "mediflow.ai.extract.v1",
+        "entryPoint": "app/api/ai/document-synthesis/preview/route.ts"
+      },
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ],
+      "runtimeProof": null
+    },
+    {
+      "descriptor": {
+        "id": "ocr",
+        "class": "generative",
+        "operation": "ocr",
+        "authorityPlane": "clinical_application",
+        "dataClass": "clinical",
+        "venues": [],
+        "egressProfileId": "local_only",
+        "review": "review_first",
+        "availabilityDisposition": "unavailable",
+        "killSwitch": null,
+        "contractSchema": null,
+        "entryPoint": null
+      },
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ],
+      "runtimeProof": null
+    },
+    {
+      "descriptor": {
+        "id": "treatment_reasoning",
+        "class": "generative",
+        "operation": "reasoning",
+        "authorityPlane": "clinical_application",
+        "dataClass": "clinical",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfileId": "local_only",
+        "review": "review_first",
+        "availabilityDisposition": "proposal_only",
+        "killSwitch": "aiTreatmentReasoningKillSwitch",
+        "contractSchema": "mediflow.treatment_reasoning.v1",
+        "entryPoint": "app/api/ai/treatment-reasoning/preview/route.ts"
+      },
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ],
+      "runtimeProof": null
+    },
+    {
+      "descriptor": {
+        "id": "icd_lookup",
+        "class": "deterministic",
+        "operation": "lookup",
+        "authorityPlane": "clinical_application",
+        "dataClass": "clinical",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfileId": "local_only",
+        "review": "review_first",
+        "availabilityDisposition": "available",
+        "killSwitch": null,
+        "contractSchema": null,
+        "entryPoint": "lib/icd-service.ts"
+      },
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ],
+      "runtimeProof": null
+    },
+    {
+      "descriptor": {
+        "id": "aifa_drug_search",
+        "class": "deterministic",
+        "operation": "lookup",
+        "authorityPlane": "clinical_application",
+        "dataClass": "clinical",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfileId": "local_only",
+        "review": "review_first",
+        "availabilityDisposition": "available",
+        "killSwitch": null,
+        "contractSchema": "mediflow.aifa-catalog-manifest.v1",
+        "entryPoint": "lib/aifa-catalog.ts"
+      },
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ],
+      "runtimeProof": null
+    },
+    {
+      "descriptor": {
+        "id": "service_prescription_matching",
+        "class": "deterministic",
+        "operation": "matching",
+        "authorityPlane": "clinical_application",
+        "dataClass": "clinical",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfileId": "local_only",
+        "review": "review_first",
+        "availabilityDisposition": "available",
+        "killSwitch": null,
+        "contractSchema": null,
+        "entryPoint": "lib/service-prescription-write.ts"
+      },
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ],
+      "runtimeProof": null
+    },
+    {
+      "descriptor": {
+        "id": "evidence_absorption",
+        "class": "deterministic",
+        "operation": "extraction",
+        "authorityPlane": "clinical_application",
+        "dataClass": "clinical",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfileId": "local_only",
+        "review": "review_first",
+        "availabilityDisposition": "available",
+        "killSwitch": null,
+        "contractSchema": "mediflow.evidence_queue.v1",
+        "entryPoint": "lib/domain/documents/evidence-queue-contract.ts"
+      },
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ],
+      "runtimeProof": null
+    },
+    {
+      "descriptor": {
+        "id": "patient_open_loops",
+        "class": "deterministic",
+        "operation": "projection",
+        "authorityPlane": "clinical_application",
+        "dataClass": "clinical",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfileId": "local_only",
+        "review": "informational",
+        "availabilityDisposition": "available",
+        "killSwitch": null,
+        "contractSchema": null,
+        "entryPoint": "lib/patient-open-loops.ts"
+      },
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ],
+      "runtimeProof": null
+    },
+    {
+      "descriptor": {
+        "id": "fhir_export",
+        "class": "deterministic",
+        "operation": "export",
+        "authorityPlane": "clinical_application",
+        "dataClass": "clinical",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfileId": "local_only",
+        "review": "informational",
+        "availabilityDisposition": "available",
+        "killSwitch": null,
+        "contractSchema": null,
+        "entryPoint": "lib/fhir/bundle-generator.ts"
+      },
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ],
+      "runtimeProof": null
+    },
+    {
+      "descriptor": {
+        "id": "document_classification",
+        "class": "deterministic",
+        "operation": "classification",
+        "authorityPlane": "clinical_application",
+        "dataClass": "clinical",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfileId": "local_only",
+        "review": "review_first",
+        "availabilityDisposition": "available",
+        "killSwitch": null,
+        "contractSchema": null,
+        "entryPoint": "lib/domain/documents/document-class-router.ts"
+      },
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ],
+      "runtimeProof": null
+    },
+    {
+      "descriptor": {
+        "id": "document_identity_resolution",
+        "class": "deterministic",
+        "operation": "extraction",
+        "authorityPlane": "clinical_application",
+        "dataClass": "clinical",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfileId": "local_only",
+        "review": "review_first",
+        "availabilityDisposition": "available",
+        "killSwitch": null,
+        "contractSchema": null,
+        "entryPoint": "lib/domain/documents/document-identity-resolution.ts"
+      },
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ],
+      "runtimeProof": null
+    },
+    {
+      "descriptor": {
+        "id": "pii_redaction_layer1",
+        "class": "deterministic",
+        "operation": "redaction",
+        "authorityPlane": "clinical_application",
+        "dataClass": "clinical",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfileId": "local_only",
+        "review": "informational",
+        "availabilityDisposition": "available",
+        "killSwitch": null,
+        "contractSchema": null,
+        "entryPoint": "lib/ai-egress-gate.ts"
+      },
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ],
+      "runtimeProof": null
+    },
+    {
+      "descriptor": {
+        "id": "fse_document_validation",
+        "class": "deterministic",
+        "operation": "validation",
+        "authorityPlane": "clinical_application",
+        "dataClass": "clinical",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfileId": "local_only",
+        "review": "informational",
+        "availabilityDisposition": "available",
+        "killSwitch": null,
+        "contractSchema": null,
+        "entryPoint": "lib/fse-validate-document.ts"
+      },
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ],
+      "runtimeProof": null
+    },
+    {
+      "descriptor": {
+        "id": "observation_range_classification",
+        "class": "deterministic",
+        "operation": "classification",
+        "authorityPlane": "clinical_application",
+        "dataClass": "clinical",
+        "venues": [
+          "local_process",
+          "home_base"
+        ],
+        "egressProfileId": "local_only",
+        "review": "informational",
+        "availabilityDisposition": "available",
+        "killSwitch": null,
+        "contractSchema": null,
+        "entryPoint": "lib/observation-range.ts"
+      },
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ],
+      "runtimeProof": null
+    }
+  ],
+  "cells": [
+    {
+      "id": "patient_insight/ollama",
+      "functionId": "patient_insight",
+      "provider": "ollama",
+      "venue": "local_process",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "bounded_run_authority",
+        "I-0 budgets",
+        "I-2",
+        "I-7"
+      ]
+    },
+    {
+      "id": "patient_insight/openai.responses.v1",
+      "functionId": "patient_insight",
+      "provider": "openai.responses.v1",
+      "venue": "remote_api",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "Leonardo API pause 2026-10-26",
+        "I-7"
+      ]
+    },
+    {
+      "id": "patient_insight/anthropic.messages.v1",
+      "functionId": "patient_insight",
+      "provider": "anthropic.messages.v1",
+      "venue": "remote_api",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "Leonardo API pause 2026-10-26",
+        "I-7"
+      ]
+    },
+    {
+      "id": "patient_insight/chatgpt",
+      "functionId": "patient_insight",
+      "provider": "chatgpt",
+      "venue": "host_subscription",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "local_only_task",
+        "I-4",
+        "I-7"
+      ]
+    },
+    {
+      "id": "smart_import/ollama",
+      "functionId": "smart_import",
+      "provider": "ollama",
+      "venue": "local_process",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "bounded_run_authority",
+        "I-0 budgets",
+        "I-2",
+        "I-7"
+      ]
+    },
+    {
+      "id": "smart_import/openai.responses.v1",
+      "functionId": "smart_import",
+      "provider": "openai.responses.v1",
+      "venue": "remote_api",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "Leonardo API pause 2026-10-26",
+        "I-7"
+      ]
+    },
+    {
+      "id": "smart_import/anthropic.messages.v1",
+      "functionId": "smart_import",
+      "provider": "anthropic.messages.v1",
+      "venue": "remote_api",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "Leonardo API pause 2026-10-26",
+        "I-7"
+      ]
+    },
+    {
+      "id": "smart_import/chatgpt",
+      "functionId": "smart_import",
+      "provider": "chatgpt",
+      "venue": "host_subscription",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "local_only_task",
+        "I-4",
+        "I-7"
+      ]
+    },
+    {
+      "id": "document_synthesis/ollama",
+      "functionId": "document_synthesis",
+      "provider": "ollama",
+      "venue": "local_process",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "bounded_run_authority",
+        "I-0 budgets",
+        "I-2",
+        "I-7"
+      ]
+    },
+    {
+      "id": "document_synthesis/openai.responses.v1",
+      "functionId": "document_synthesis",
+      "provider": "openai.responses.v1",
+      "venue": "remote_api",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "Leonardo API pause 2026-10-26",
+        "I-7"
+      ]
+    },
+    {
+      "id": "document_synthesis/anthropic.messages.v1",
+      "functionId": "document_synthesis",
+      "provider": "anthropic.messages.v1",
+      "venue": "remote_api",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "Leonardo API pause 2026-10-26",
+        "I-7"
+      ]
+    },
+    {
+      "id": "document_synthesis/chatgpt",
+      "functionId": "document_synthesis",
+      "provider": "chatgpt",
+      "venue": "host_subscription",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "local_only_task",
+        "I-4",
+        "I-7"
+      ]
+    },
+    {
+      "id": "treatment_reasoning/athena_mlx",
+      "functionId": "treatment_reasoning",
+      "provider": "athena_mlx",
+      "venue": "local_process",
+      "conditional": false,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "I-0 budgets",
+        "I-3",
+        "I-7"
+      ]
+    }
+  ],
+  "conditionalCells": [
+    {
+      "id": "treatment_reasoning/openai.responses.v1",
+      "functionId": "treatment_reasoning",
+      "provider": "openai.responses.v1",
+      "venue": "remote_api",
+      "conditional": true,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "I-3b",
+        "I-7",
+        "ADR0166"
+      ]
+    },
+    {
+      "id": "treatment_reasoning/anthropic.messages.v1",
+      "functionId": "treatment_reasoning",
+      "provider": "anthropic.messages.v1",
+      "venue": "remote_api",
+      "conditional": true,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "I-3b",
+        "I-7",
+        "ADR0166"
+      ]
+    },
+    {
+      "id": "treatment_reasoning/chatgpt",
+      "functionId": "treatment_reasoning",
+      "provider": "chatgpt",
+      "venue": "host_subscription",
+      "conditional": true,
+      "modelIdentity": null,
+      "dataClass": "synthetic_only",
+      "qualification": "not_qualified",
+      "surfaces": {
+        "web": "not_verified",
+        "gpui": "not_verified",
+        "chat": "not_verified",
+        "headless": "not_verified"
+      },
+      "proof": null,
+      "blockedBy": [
+        "I-3b",
+        "I-7",
+        "ADR0166"
+      ]
+    }
+  ],
+  "extraction": [
+    {
+      "id": "anydoc",
+      "source": "lib/domain/documents/anydoc-local-extraction-runner.ts",
+      "status": "not_qualified"
+    },
+    {
+      "id": "apple_vision",
+      "source": "lib/domain/documents/ocr-service.ts",
+      "status": "not_qualified"
+    }
+  ],
+  "additionalContractRequirements": [
+    {
+      "id": "search",
+      "source": "lib/headless/application-operation-registry.ts",
+      "status": "not_qualified",
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ]
+    },
+    {
+      "id": "navigation",
+      "source": "lib/headless/canonical-capability-catalog.ts",
+      "status": "not_qualified",
+      "chatCriteria": [
+        "C-7",
+        "C-8"
+      ]
+    }
+  ],
+  "localProfile": {
+    "target": "Mac16,5 M4 Max 36 GB",
+    "concurrentModelLoads": 1,
+    "memoryBudgetBytes": null,
+    "latencyBudgetMs": null,
+    "status": "baseline_and_decision_pending"
+  }
+}
