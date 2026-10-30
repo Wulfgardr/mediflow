@@ -25,6 +25,7 @@ export function registerClosureZoom(page: Page, zoom: Awaited<ReturnType<typeof 
 export async function closureGallery(page: Page, area: string, state: string, target: Locator) {
   const root = process.env.PATIENT_CLOSURE_EVIDENCE;
   if (!root) return false;
+  const previousFocus = await page.evaluateHandle(() => document.activeElement);
   const zoom = zooms.get(page)!;
   const directory = `${root}/${area}`;
   await mkdir(directory, { recursive: true });
@@ -64,5 +65,7 @@ export async function closureGallery(page: Page, area: string, state: string, ta
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await zoom.setZoom(1);
+  await previousFocus.asElement()?.focus();
+  await previousFocus.dispose();
   return true;
 }
