@@ -40,10 +40,17 @@ impl ChatAccess {
         }
     }
     pub(super) fn retire(&mut self, cx: &mut App) {
-        if let Some(pending) = self.pending.take()
+        if let Some(pending) = self.pending.as_ref()
             && let Ok(mut pending) = pending.lock()
         {
             pending.withdraw();
+        }
+        if self
+            .pending
+            .as_ref()
+            .is_some_and(|p| p.lock().is_ok_and(|mut p| p.status() == State::Withdrawn))
+        {
+            self.pending = None;
         }
         self.patient = mediflow_patient_client::PersonName::default();
         self.archive.clear();
@@ -101,6 +108,18 @@ impl ClinicalApp {
             .and_then(|l| l.incoming.try_recv().ok());
         if let Some(pending) = incoming {
             self.chat_access.retire(cx);
+            if self
+                .chat_access
+                .pending
+                .as_ref()
+                .is_some_and(|p| p.lock().is_ok_and(|mut p| p.status() == State::Uncertain))
+            {
+                if let Ok(mut p) = pending.lock() {
+                    p.withdraw();
+                }
+                return;
+            }
+            self.chat_access.pending = None;
             let binding = self.session.as_ref().and_then(|session| {
                 let scope = self.scope.as_deref()?;
                 let patient = self.patient.detail.ready()?;
@@ -264,10 +283,25 @@ impl ClinicalApp {
             .child(self.chat_access.pin.clone())
             .child(button("native-chat-access-pin-confirm", "Conferma con PIN", theme, false, enabled)
                 .when(enabled, |el| el.on_click(cx.listener(|this, _, _, cx| this.approve_chat_access(true, cx)))))
+            .when(state == State::Uncertain, |el| el
+                .child(notice("native-chat-therapy-uncertain", "Esito da verificare. Il ritiro non è confermato: la scrittura potrebbe essere avvenuta. Rileggi l’esito prima di proseguire.", theme, true))
+                .child(button("native-chat-therapy-reread", "Rileggi esito e completa il ritiro", theme, false, true)
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        if let Some(p) = this.chat_access.pending.clone() {
+                            std::thread::spawn(move || { if let Ok(mut p) = p.lock() { p.revoke(); } });
+                        }
+                        cx.notify();
+                    }))))
+            .when_some(if let State::Resolved(outcome) = state { Some(outcome) } else { None }, |el, outcome| el.child(notice("native-chat-therapy-outcome", match outcome {
+                mediflow_runtime_client::ChatTherapyOutcome::Applied => "Modifica registrata. Il comando non può più essere ritirato.",
+                mediflow_runtime_client::ChatTherapyOutcome::Retired => "Ritiro confermato. Questo comando non ha modificato la terapia.",
+                mediflow_runtime_client::ChatTherapyOutcome::Rejected => "Scrittura respinta. Questo comando non ha modificato la terapia.",
+                mediflow_runtime_client::ChatTherapyOutcome::Closed => "Comando chiuso senza modifiche.",
+            }, theme, false)))
             .child(button("native-chat-access-deny", "Nega e ritira", theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| { this.chat_access.retire(cx); cx.notify(); })))
             .when(state != State::Challenge, |el| el.child(notice("native-chat-access-state",
-                if state == State::Consumed && therapy_mode { "Operazione terminata. Controlla ricevuta e rilettura; nessuna ripetizione automatica." } else if state == State::Consumed { "Scheda consegnata. Puoi revocare la vista; i byte già ricevuti dall’host non vengono cancellati." } else if state == State::Approved { "Scheda autorizzata per una sola lettura nella vista chat." } else { "Conferma in corso…" }, theme, false))))
+                if matches!(state, State::Resolved(_) | State::Uncertain) { "" } else if state == State::Consumed && therapy_mode { "Operazione terminata. Controlla ricevuta e rilettura; nessuna ripetizione automatica." } else if state == State::Consumed { "Scheda consegnata. Puoi revocare la vista; i byte già ricevuti dall’host non vengono cancellati." } else if state == State::Approved { "Scheda autorizzata per una sola lettura nella vista chat." } else { "Conferma in corso…" }, theme, false))))
     }
 }
 

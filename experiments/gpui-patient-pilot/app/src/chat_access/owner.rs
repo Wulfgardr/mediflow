@@ -1,5 +1,7 @@
 use super::native::{self, Peer};
-use mediflow_runtime_client::{ChatAccessContext, RuntimeSession};
+use mediflow_runtime_client::{
+    ChatAccessContext, ChatTherapyOutcome, ChatTherapyRecovery, RuntimeSession,
+};
 use std::{
     os::unix::net::UnixStream,
     sync::{
@@ -23,6 +25,8 @@ pub(crate) enum State {
     Consuming,
     Consumed,
     Withdrawn,
+    Uncertain,
+    Resolved(ChatTherapyOutcome),
 }
 impl State {
     pub(crate) fn wire(self) -> &'static str {
@@ -35,6 +39,8 @@ impl State {
             Self::Consuming => "consuming",
             Self::Consumed => "consumed",
             Self::Withdrawn => "withdrawn",
+            Self::Uncertain => "uncertain",
+            Self::Resolved(outcome) => outcome.wire(),
         }
     }
 }
@@ -70,6 +76,7 @@ pub(crate) struct Request {
     card: Option<super::card::Card>,
     cancelled: Arc<AtomicBool>,
     therapy: Option<TherapyWrite>,
+    recovery: Option<ChatTherapyRecovery>,
 }
 pub(crate) type Pending = Arc<Mutex<Request>>;
 
@@ -97,6 +104,7 @@ impl Request {
             card: None,
             cancelled: Arc::new(AtomicBool::new(false)),
             therapy: None,
+            recovery: None,
         })))
     }
     pub(super) fn for_therapy(peer: Peer, stream: UnixStream, target: &str) -> Option<Pending> {
@@ -121,37 +129,58 @@ impl Request {
     pub(crate) fn safe_result(&self) -> Option<serde_json::Value> {
         let therapy = self.therapy.as_ref()?;
         let (_, id) = therapy.selected.as_ref()?;
-        let outcome = therapy
-            .result
-            .as_ref()
-            .and_then(|r| r["receipt"]["outcome"].as_str())
-            .unwrap_or(if self.state == State::Consumed {
-                "unknown"
-            } else {
-                "pending"
-            });
+        let outcome = match self.state {
+            State::Uncertain => "unknown",
+            State::Resolved(outcome) => outcome.wire(),
+            _ => therapy
+                .result
+                .as_ref()
+                .and_then(|r| r["receipt"]["outcome"].as_str())
+                .unwrap_or(if self.state == State::Consumed {
+                    "unknown"
+                } else {
+                    "pending"
+                }),
+        };
         Some(serde_json::json!({"commandId":id,"outcome":outcome}))
     }
     pub(crate) fn app(&self) -> &'static str {
         self.peer.app()
     }
     pub(crate) fn withdraw(&mut self) {
-        if !matches!(self.state, State::Consumed | State::Withdrawn)
-            && let Some((_, id)) = self.therapy.as_ref().and_then(|t| t.selected.as_ref())
-            && let Some(binding) = self.binding.as_ref()
-        {
-            let _ = binding.session.chat_therapy_request(
-                &binding.context,
-                &serde_json::json!({"operation":"revoke", "commandId":id}),
-            );
-        }
         self.cancelled.store(true, Ordering::Release);
         native::cancel_biometric(&self.attempt.0);
-        self.state = State::Withdrawn;
-        self.binding = None;
         self.card = None;
-        self.therapy = None;
         self.attempt.0.fill(0);
+        if self.recovery.is_some() {
+            if !matches!(self.state, State::Resolved(_) | State::Uncertain) {
+                self.reconcile_therapy();
+            }
+            if let Some(t) = self.therapy.as_mut() {
+                t.rows.clear();
+                t.result = None;
+            }
+        } else {
+            self.state = State::Withdrawn;
+            self.therapy = None;
+        }
+        self.binding = None;
+    }
+    pub(crate) fn revoke(&mut self) {
+        if self.state == State::Uncertain {
+            self.reconcile_therapy();
+        } else {
+            self.withdraw();
+        }
+    }
+    pub(crate) fn reconcile_therapy(&mut self) {
+        if let Some(recovery) = &self.recovery {
+            self.state = match recovery.reconcile() {
+                Ok(outcome) => State::Resolved(outcome),
+                Err(_) => State::Uncertain,
+            };
+            self.deadline = None;
+        }
     }
     fn current(&self, now: Instant) -> bool {
         now.duration_since(self.created) < VIEW_IDLE
@@ -165,7 +194,11 @@ impl Request {
                 .is_none_or(|b| b.session.check_chat_access_context(&b.context).is_ok())
     }
     pub(crate) fn status(&mut self) -> State {
-        if self.state != State::Withdrawn && !self.current((self.clock)()) {
+        if !matches!(
+            self.state,
+            State::Withdrawn | State::Uncertain | State::Resolved(_)
+        ) && !self.current((self.clock)())
+        {
             self.withdraw();
         }
         self.state
@@ -269,12 +302,19 @@ pub(crate) fn choose_therapy(pending: &Pending, index: usize) {
     let Some((session, context, row, target, view_id)) = binding else {
         return;
     };
-    let result = session.preview_chat_therapy(&context, &row, &target, &view_id);
+    let result = session
+        .preview_chat_therapy(&context, &row, &target, &view_id)
+        .and_then(|id| {
+            session
+                .chat_therapy_recovery(&context, &id)
+                .map(|recovery| (id, recovery))
+        });
     if let Ok(mut p) = pending.lock() {
         if p.status() != State::Preparing {
             return;
         }
-        if let Ok(id) = result {
+        if let Ok((id, recovery)) = result {
+            p.recovery = Some(recovery);
             if let Some(t) = p.therapy.as_mut() {
                 t.selected = Some((index, id));
             }
@@ -310,14 +350,13 @@ pub(crate) fn execute_therapy(pending: &Pending, attempt: Attempt, pin: &str) ->
             &serde_json::json!({"operation":"receipt","commandId":id}),
         )
         .ok();
-    if let Ok(mut p) = pending.lock() {
-        if p.status() != State::Consuming {
-            return false;
-        }
+    if let Ok(mut p) = pending.lock()
+        && p.status() == State::Consuming
+    {
+        p.reconcile_therapy();
         if let Some(t) = p.therapy.as_mut() {
             t.result = receipt;
         }
-        p.finish_consume(true);
     }
     result.is_ok()
 }
@@ -552,11 +591,16 @@ mod tests {
                         "preview" => {
                             json!({"commandId":body["command"]["commandId"],"status":"preview"})
                         }
-                        "execute" => json!({"outcome":"applied"}),
+                        "execute" => {
+                            current.store(4, Ordering::Release);
+                            json!({"outcome":"applied"})
+                        }
                         "receipt" => {
                             json!({"outcome":"terminal", "receipt":{"outcome":"applied"},"current":{"version":2,"status":"suspended"}})
                         }
-                        "revoke" => json!({"status":"retired"}),
+                        "revoke" => {
+                            json!({"outcome":if current.load(Ordering::Acquire) == 4 {"applied"} else {"retired"}})
+                        }
                         _ => panic!("unexpected native test operation"),
                     };
                     (200, result)
@@ -642,7 +686,10 @@ mod tests {
         );
         let (_, _, attempt) = pending.lock().unwrap().begin().unwrap();
         assert!(execute_therapy(&pending, attempt, "2468"));
-        assert_eq!(pending.lock().unwrap().status(), State::Consumed);
+        assert_eq!(
+            pending.lock().unwrap().status(),
+            State::Resolved(ChatTherapyOutcome::Applied)
+        );
         let safe = pending.lock().unwrap().safe_result().unwrap();
         assert_eq!(safe["outcome"], "applied");
         assert_eq!(safe.as_object().unwrap().len(), 2);
@@ -985,5 +1032,139 @@ mod tests {
         assert_eq!(request.lock().unwrap().status(), State::Withdrawn);
         assert_eq!(consume(&request), State::Withdrawn);
         assert!(request.lock().unwrap().binding.is_none());
+    }
+    #[test]
+    #[ignore = "requires scripts/check-chat-therapy-withdraw.mjs owned synthetic real route host"]
+    fn real_route_withdraw_during_pin() {
+        let config: Value = serde_json::from_slice(
+            &std::fs::read(std::env::var("REVIEW_CONFIG").unwrap()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(config["synthetic"], true);
+        let address = config["baseURL"]
+            .as_str()
+            .unwrap()
+            .strip_prefix("http://")
+            .unwrap()
+            .parse::<std::net::SocketAddr>()
+            .unwrap();
+        assert_eq!(address.ip(), std::net::Ipv4Addr::LOCALHOST);
+        assert_ne!(address.port(), 3000);
+        let session = RuntimeClient::new(RuntimeConfig {
+            base_url: config["baseURL"].as_str().unwrap().into(),
+            tls_pin_sha256: None,
+        })
+        .unwrap()
+        .login(
+            PairingCredentials::new(
+                config["pairingId"].as_str().unwrap(),
+                config["pairingToken"].as_str().unwrap(),
+            )
+            .unwrap(),
+            config["username"].as_str().unwrap(),
+            config["passphrase"].as_str().unwrap(),
+        )
+        .unwrap();
+        let scope = config["scope"].as_str().unwrap();
+        let patient = config["patientId"].as_str().unwrap();
+        session.list_ambulatories().unwrap();
+        session.select_profile_patient(scope, patient).unwrap();
+        let intent = session.profile_query_intent();
+        session
+            .open_patient_profile(scope, patient, &intent)
+            .unwrap();
+        let context = session.chat_access_context(scope, patient).unwrap();
+        let (a, _remote) = UnixStream::pair().unwrap();
+        let pending = Request::for_therapy(Peer::test_peer(), a, "suspended").unwrap();
+        assert!(pending.lock().unwrap().bind(session.clone(), context));
+        prepare_card(&pending);
+        assert_eq!(pending.lock().unwrap().status(), State::Challenge);
+        choose_therapy(&pending, 0);
+        let (_, _, attempt) = pending.lock().unwrap().begin().unwrap();
+        let executing = pending.clone();
+        let worker = std::thread::spawn(move || execute_therapy(&executing, attempt, "2468"));
+        let barrier = std::env::var("REVIEW_PIN_BARRIER").unwrap();
+        let deadline = Instant::now() + Duration::from_secs(8);
+        while !std::path::Path::new(&barrier).exists() {
+            assert!(Instant::now() < deadline, "PIN barrier absent");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let scenario = std::env::var("MEDIFLOW_CHAT_WITHDRAW_SCENARIO").unwrap();
+        if scenario == "after-commit" {
+            std::fs::write(std::env::var("REVIEW_PIN_RELEASE").unwrap(), "release").unwrap();
+            wait_file("REVIEW_RESULT");
+        }
+        session.clear_profile_selection();
+        let withdrawn = pending.lock().unwrap().status().wire();
+        std::fs::write(std::env::var("REVIEW_PIN_RELEASE").unwrap(), "release").unwrap();
+        worker.join().unwrap();
+        let result = std::env::var("REVIEW_RESULT").unwrap();
+        let deadline = Instant::now() + Duration::from_secs(8);
+        while !std::path::Path::new(&result).exists() {
+            assert!(Instant::now() < deadline, "durable state absent");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let result: Value = serde_json::from_slice(&std::fs::read(result).unwrap()).unwrap();
+        let expected_audits = if scenario == "before-commit" { 0 } else { 1 };
+        assert_eq!(
+            result["effects"]["audits"], expected_audits,
+            "withdrawal effects: {result}"
+        );
+        assert_eq!(result["effects"]["therapy"]["version"], 1 + expected_audits);
+        assert_eq!(
+            result["effects"]["therapy"]["status"],
+            if expected_audits == 0 {
+                "active"
+            } else {
+                "suspended"
+            }
+        );
+        let revoked: Value = serde_json::from_slice(
+            &std::fs::read(std::env::var("REVIEW_REVOKE_RESULT").unwrap()).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            revoked["operations"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|op| op == "revoke"),
+            "server never received revocation"
+        );
+        assert_eq!(
+            withdrawn,
+            match scenario.as_str() {
+                "before-commit" => "retired",
+                "unavailable" => "uncertain",
+                _ => "applied",
+            }
+        );
+        if scenario == "unavailable" {
+            assert_eq!(pending.lock().unwrap().status().wire(), "uncertain");
+            pending.lock().unwrap().revoke();
+            assert_eq!(pending.lock().unwrap().status().wire(), "applied");
+        }
+        let before = pending.lock().unwrap().status().wire();
+        pending.lock().unwrap().reconcile_therapy();
+        pending.lock().unwrap().reconcile_therapy();
+        assert_eq!(pending.lock().unwrap().status().wire(), before);
+        let after: Value = serde_json::from_slice(
+            &std::fs::read(std::env::var("REVIEW_REVOKE_RESULT").unwrap()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            after["effects"], result["effects"],
+            "double revocation changed durable effects"
+        );
+        assert!(pending.lock().unwrap().begin().is_none());
+    }
+
+    fn wait_file(key: &str) {
+        let path = std::env::var(key).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(12);
+        while !std::path::Path::new(&path).exists() {
+            assert!(Instant::now() < deadline, "missing {key}");
+            std::thread::sleep(Duration::from_millis(5));
+        }
     }
 }

@@ -2,7 +2,7 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { dbServer } from './db-server';
-import { therapies, therapyStatusCommands } from './schema';
+import { therapies, therapyStatusCommands, patientsToAmbulatories } from './schema';
 import type { NetworkWriteContext } from './network-write-context';
 import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
 import { nativeProfileSelectionOwner } from './security/native-profile-selection-owner';
@@ -79,9 +79,21 @@ export function createChatTherapyStatusService(clock: () => number = Date.now) {
             } finally { preview.phase = 'retired'; previews.delete(commandId); }
         },
         async revoke(context: NetworkWriteContext, commandId: string) {
-            const preview = previews.get(commandId);
-            if (preview?.session === context.session) { preview.phase = 'retired'; previews.delete(commandId); }
-            return { status: 'retired' as const };
+            if (!COMMAND_UUID.test(commandId)) return deny();
+            const guard = await authority(context);
+            return dbServer.transaction(tx => {
+                guard(tx);
+                const row = tx.select().from(therapyStatusCommands).where(eq(therapyStatusCommands.commandId, commandId)).get();
+                if (row) {
+                    if (row.actorRef !== context.session.userId || row.archiveGeneration !== archiveGenerationForSession(context.session)
+                        || !tx.select().from(patientsToAmbulatories).where(and(eq(patientsToAmbulatories.patientId, row.patientId), eq(patientsToAmbulatories.ambulatoryId, context.scopeAmbulatoryId))).get()) return deny();
+                    return { outcome: row.outcome };
+                }
+                const preview = previews.get(commandId);
+                if (preview && (preview.session !== context.session || preview.scope !== context.scopeAmbulatoryId)) return deny();
+                if (preview) { preview.phase = 'retired'; previews.delete(commandId); }
+                return { outcome: 'retired' as const };
+            }, { behavior: 'immediate' });
         },
         async receipt(context: NetworkWriteContext, commandId: string) {
             if (!COMMAND_UUID.test(commandId)) return deny();

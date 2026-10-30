@@ -420,3 +420,11 @@ test('Xcode mobile UI rejects divergent argv instead of claiming source coverage
     });
   }
 });
+
+
+test('native therapy withdrawal harness is selected on the real macOS CI step', () => {
+  const selection = collectNativeToolSelections(sourceRoot)['http:gpui-therapy-withdraw'];
+  assert.deepEqual(selection.errors, []);
+  assert.deepEqual(selection.files, ['scripts/check-chat-therapy-withdraw.mjs', 'scripts/chat-therapy-withdraw-host.ts']);
+  assert.equal(selection.binding.stepIf, "runner.os == 'macOS'");
+});

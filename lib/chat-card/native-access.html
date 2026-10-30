@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Gap4wQZVqOHgtlmKPy50iZW3xdQU9/NMcyf3A66Zs84='; style-src 'sha256-nDLYNGJAq2NN356ZfJgk8AcRaxZu6zn5pUDbxnDnGBM='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow — accesso nativo</title>
+<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-4xxIWCfSyzaEoAdD0MRZ4fcURggrc1MpHRcL2oCTgYY='; style-src 'sha256-nDLYNGJAq2NN356ZfJgk8AcRaxZu6zn5pUDbxnDnGBM='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow — accesso nativo</title>
 <style>html{color-scheme:light dark;font:17px system-ui}body{margin:24px;max-width:40rem}h1{font-size:1.4rem;font-weight:500}button{font:inherit;margin:8px 8px 8px 0;padding:10px 16px}p{line-height:1.5}section{overflow-wrap:anywhere;border-top:1px solid GrayText;margin-top:20px}h2{font-size:1.15rem}li{margin-block:12px;line-height:1.5}</style></head>
 <body><h1>MediFlow</h1><p>Conferma l’accesso nella finestra MediFlow già sbloccata. La scheda sintetica viene redatta localmente e condivisa dopo la tua revisione nella finestra nativa. I nomi restano in MediFlow.</p>
 <p id="status" role="status" aria-live="polite">Collegamento alla chat…</p>
@@ -10,7 +10,7 @@
 (() => {
     let sequence = 0, ready = false, started = false, terminal = false, generation = 0, timer, expiry, therapyMode = false;
     const pending = new Map(), element = id => document.getElementById(id);
-    const labels = { preparing: 'Redazione locale della scheda sintetica…', requested: 'Richiesta inviata alla finestra MediFlow.', challenge: 'Conferma nella finestra MediFlow entro 30 secondi.', approving: 'Conferma nativa in corso…', consuming: 'Verifica dell’accesso in corso…', approved: 'Accesso monouso autorizzato.', consumed: 'Scheda condivisa. Autorizzazione consumata.', withdrawn: 'Accesso ritirato. Apri una nuova vista per richiederlo di nuovo.' };
+    const labels = { preparing: 'Redazione locale della scheda sintetica…', requested: 'Richiesta inviata alla finestra MediFlow.', challenge: 'Conferma nella finestra MediFlow entro 30 secondi.', approving: 'Conferma nativa in corso…', consuming: 'Verifica dell’accesso in corso…', approved: 'Accesso monouso autorizzato.', consumed: 'Scheda condivisa. Autorizzazione consumata.', uncertain: 'Esito da verificare. Rileggi nella finestra MediFlow; non ripetere la scrittura.', retired: 'Ritiro confermato. Nessuna modifica alla terapia.', applied: 'Modifica registrata e auditata. Il ritiro non annulla il salvataggio.', rejected: 'Scrittura respinta. Nessuna modifica.', closed: 'Comando chiuso senza modifica.', withdrawn: 'Accesso ritirato. Apri una nuova vista per richiederlo di nuovo.' };
     function rpc(method, params) { return new Promise((resolve, reject) => { const id = ++sequence; const timeout = setTimeout(() => { pending.delete(id); reject(new Error('timeout')); }, 10000); pending.set(id, { resolve, reject, timeout }); window.parent.postMessage({ jsonrpc: '2.0', id, method, params }, '*'); }); }
     function stop() { terminal = true; generation++; clearTimeout(timer); for (const id of ['request', 'consume', 'revoke', 'therapy-active', 'therapy-suspended', 'therapy-completed', 'receipt'])
         element(id).disabled = true; }
@@ -20,7 +20,8 @@
         element('request').disabled = true;
         element('consume').disabled = state !== 'approved' || therapyMode;
         element('revoke').disabled = state === 'withdrawn';
-        if (state === 'withdrawn') stop();
+        element('revoke').textContent = state === 'uncertain' ? 'Rileggi esito e completa il ritiro' : 'Revoca';
+        if (['withdrawn','retired','applied','rejected','closed'].includes(state)) stop();
     }
     function render(card) {
         const target = element('card'); target.replaceChildren();
@@ -40,24 +41,24 @@
             return;
         const state = value?._meta?.status;
         if (!Object.hasOwn(labels, state)) {
-            show('withdrawn');
+            show(therapyMode ? 'uncertain' : 'withdrawn');
             return;
         }
         if (therapyMode && value?._meta?.receipt) {
             const receipt = value._meta.receipt;
-            if (!/^[0-9a-f-]{36}$/.test(receipt.commandId) || !['pending','unknown','applied','rejected','closed'].includes(receipt.outcome)) { show('withdrawn'); return; }
+            if (!/^[0-9a-f-]{36}$/.test(receipt.commandId) || !['pending','unknown','applied','rejected','closed','retired'].includes(receipt.outcome)) { show(therapyMode ? 'uncertain' : 'withdrawn'); return; }
             element('command-id').value = receipt.commandId;
-            const outcomes = { pending: 'Anteprima pronta. Conferma soltanto nella finestra MediFlow.', unknown: 'Esito ignoto: rileggi la ricevuta, senza ripetere la scrittura.', applied: 'Modifica registrata e auditata.', rejected: 'Conflitto di versione: nessuna modifica.', closed: 'Comando chiuso senza modifica.' };
+            const outcomes = { retired: 'Ritiro confermato: nessuna modifica.', pending: 'Anteprima pronta. Conferma soltanto nella finestra MediFlow.', unknown: 'Esito ignoto: rileggi la ricevuta, senza ripetere la scrittura.', applied: 'Modifica registrata e auditata.', rejected: 'Conflitto di versione: nessuna modifica.', closed: 'Comando chiuso senza modifica.' };
             element('therapy-receipt').textContent = receipt.commandId + ' · ' + outcomes[receipt.outcome];
         }
         if (state === 'consumed' && !therapyMode) {
             if (command === 'consume') {
-            if (typeof value?._meta?.payload !== 'string' || value._meta.payload.length > 60000) { show('withdrawn'); return; }
+            if (typeof value?._meta?.payload !== 'string' || value._meta.payload.length > 60000) { show(therapyMode ? 'uncertain' : 'withdrawn'); return; }
             const card = JSON.parse(value._meta.payload);
-            if (card.profile !== 'mediflow.synthetic-chat-card.v1' || !/^card_[a-f0-9]{32}$/.test(card.pseudonym)) { show('withdrawn'); return; }
+            if (card.profile !== 'mediflow.synthetic-chat-card.v1' || !/^card_[a-f0-9]{32}$/.test(card.pseudonym)) { show(therapyMode ? 'uncertain' : 'withdrawn'); return; }
             render(card);
             expiry = setTimeout(() => { rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'revoke' } }).catch(() => {}); show('withdrawn'); }, 300000);
-            } else if (command !== 'status' || element('card').hidden) { show('withdrawn'); return; }
+            } else if (command !== 'status' || element('card').hidden) { show(therapyMode ? 'uncertain' : 'withdrawn'); return; }
         }
         show(state);
         if (therapyMode && state === 'consumed') element('status').textContent = 'Controlla la ricevuta e la rilettura nella finestra MediFlow.';
@@ -66,7 +67,7 @@
         }
     }
     catch {
-        show('withdrawn');
+        show(therapyMode ? 'uncertain' : 'withdrawn');
     } }
     const commandStatus = () => { if (!terminal)
         command('status'); };
@@ -76,9 +77,9 @@
         pending.delete(message.id);
         clearTimeout(p.timeout);
         message.error ? p.reject(new Error('denied')) : p.resolve(message.result);
-    } if (message.method === 'ui/notifications/tool-input' || message.method === 'ui/notifications/tool-cancelled') { if (started) { rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'revoke' } }).catch(() => {}); show('withdrawn'); } } if (message.method === 'ui/resource-teardown') {
+    } if (message.method === 'ui/notifications/tool-input' || message.method === 'ui/notifications/tool-cancelled') { if (started) { show(therapyMode ? 'uncertain' : 'withdrawn'); command('revoke'); } } if (message.method === 'ui/resource-teardown') {
         rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'revoke' } }).catch(() => { });
-        show('withdrawn');
+        show(therapyMode ? 'uncertain' : 'withdrawn');
         window.parent.postMessage({ jsonrpc: '2.0', id: message.id, result: {} }, '*');
     } });
     element('request').onclick = () => { if (ready && !terminal) {
@@ -100,10 +101,10 @@
         command('receipt', id);
     };
     element('consume').onclick = () => { clearTimeout(timer); element('consume').disabled = true; command('consume'); };
-    element('revoke').onclick = () => { command('revoke'); show('withdrawn'); };
+    element('revoke').onclick = () => { clearTimeout(timer); show(therapyMode ? 'uncertain' : 'withdrawn'); command('revoke'); };
     window.addEventListener('pagehide', () => { if (ready)
-        rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'revoke' } }).catch(() => { }); show('withdrawn'); });
+        rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'revoke' } }).catch(() => { }); show(therapyMode ? 'uncertain' : 'withdrawn'); });
     rpc('ui/initialize', { protocolVersion: '2026-01-26', appInfo: { name: 'mediflow-native-access', version: '0.1.0' }, appCapabilities: {} }).then(async () => { window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/initialized' }, '*'); const attach = await rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'attach' } }); if (attach?._meta?.status !== 'ready')
-        throw new Error('denied'); ready = true; element('status').textContent = 'MediFlow richiede una conferma nella finestra nativa.'; for (const id of ['request','therapy-active','therapy-suspended','therapy-completed','receipt']) element(id).disabled = false; requestAnimationFrame(() => window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/size-changed', params: { height: Math.ceil(document.documentElement.scrollHeight) } }, '*')); }).catch(() => show('withdrawn'));
+        throw new Error('denied'); ready = true; element('status').textContent = 'MediFlow richiede una conferma nella finestra nativa.'; for (const id of ['request','therapy-active','therapy-suspended','therapy-completed','receipt']) element(id).disabled = false; requestAnimationFrame(() => window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/size-changed', params: { height: Math.ceil(document.documentElement.scrollHeight) } }, '*')); }).catch(() => show(therapyMode ? 'uncertain' : 'withdrawn'));
 })();
 </script></body></html>

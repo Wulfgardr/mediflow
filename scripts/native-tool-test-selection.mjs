@@ -71,7 +71,7 @@ const gpuiPaths = [`${gpuiDirectory}/**`, 'app/fonts/**', 'native/MediFlowMac/So
   'docs/design/punto-inchiostro/tokens/punto-inchiostro.tokens.json', 'docs/design/lume/tokens/lume.tokens.json',
   'public/brand/mediflow/*.svg', 'native/contracts/crypto-golden-vectors.v3.json', 'app/api/**', 'lib/**', 'drizzle/**',
   'packages/web-auth-lifecycle-owner/**', 'package.json', 'package-lock.json', 'scripts/prepare-e2e-db.mjs',
-  'scripts/web-auth-control-test-client.mjs', 'scripts/chat-card-*.mjs', 'scripts/fixtures/chat-card-owned-tree.mjs',
+  'scripts/web-auth-control-test-client.mjs', 'scripts/chat-card-*.mjs', 'scripts/*chat-therapy*', 'scripts/fixtures/chat-card-owned-tree.mjs',
   'scripts/native-tool-test-selection.mjs', 'scripts/check-test-selection.test.mjs', gpuiWorkflow];
 const gpuiTriggers = { pull_request: { paths: gpuiPaths }, push: { branches: ['main'], paths: gpuiPaths }, workflow_dispatch: null };
 // Closed, single-line TOML tables for this pilot's explicit Cargo targets. A new
@@ -164,6 +164,18 @@ export function collectGpuiPilotSelection(root) {
   return { files: command.files, errors: [], mode: 'conditional', conditional: true,
     binding: { ...binding, command: [command.executable, ...command.args], toolchain: command.toolchain,
       scope: 'Synthetic tests and native target compilation; no UI execution or product qualification' } };
+}
+
+function collectGpuiTherapyWithdrawal(root) {
+  const files = ['scripts/check-chat-therapy-withdraw.mjs', 'scripts/chat-therapy-withdraw-host.ts'];
+  for (const file of files) read(root, file);
+  const binding = collectLiteralCiBinding(root, {
+    workflow: gpuiWorkflow, job: 'native-tests', triggers: gpuiTriggers, ciCall: `node ${files[0]}`,
+  });
+  if (binding.jobIf !== null || binding.stepIf !== "runner.os == 'macOS'"
+    || !read(root, files[0]).includes("'real_route_withdraw_during_pin'")
+    || !read(root, files[0]).includes(files[1])) throw new Error('Native therapy withdrawal CI binding changed');
+  return { files, errors: [], mode: 'conditional', conditional: true, binding };
 }
 
 export function collectGpuiBundleSelection(root) {
@@ -273,6 +285,8 @@ export function collectNativeToolSelections(root) {
   if (fs.existsSync(path.join(root, `${gpuiDirectory}/Cargo.toml`))) {
     try { result['cargo:gpui-pilot'] = collectGpuiPilotSelection(root); }
     catch (error) { result['cargo:gpui-pilot'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
+    try { result['http:gpui-therapy-withdraw'] = collectGpuiTherapyWithdrawal(root); }
+    catch (error) { result['http:gpui-therapy-withdraw'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
     try { result['python:gpui-bundle'] = collectGpuiBundleSelection(root); }
     catch (error) { result['python:gpui-bundle'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
     try { result['http:gpui-comparison'] = collectGpuiComparisonSelection(root); }

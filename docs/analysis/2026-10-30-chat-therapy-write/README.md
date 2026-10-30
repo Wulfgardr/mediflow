@@ -68,3 +68,47 @@ respinto il nuovo import `dbServer` non censito e ha esposto una lettura
 prematura dei messaggi nel test di recupero. L'inventario registra ora solo
 il nuovo import nominato, senza nuova connessione o writer. Il test attende
 l'arrivo del comando, senza retry dell'operazione.
+
+### Correzione del ritiro durante il PIN (#729)
+
+La review di `92dbf5b72` ha riprodotto un ritiro locale senza POST di revoca:
+il trasporto esigeva ancora la selezione appena invalidata. Il recupero usa
+ora un contesto di sessione separato, limitato alla revoca del comando e
+all'esito finito. Errori di rete conservano «esito da verificare» e riferimento;
+GPUI e frame non dichiarano il ritiro prima della conferma server. Una
+ricevuta già applicata resta «scrittura avvenuta». Gli esiti confermati sono
+un enum distinto dallo stato incerto; da entrambi non è possibile confermare
+nuovamente il comando.
+
+`node scripts/check-chat-therapy-withdraw.mjs` prepara host e database nuovi,
+usa il trasporto Rust e la route Node reale con bcrypt sospeso su barriera,
+e arresta il proprio host. Rifiuta la porta 3000. I tre casi verificano:
+ritiro prima del commit (versione 1, terapia attiva, zero audit), primo
+POST di revoca a 503 (stato incerto, poi rilettura con scrittura applicata),
+revoca dopo commit (versione 2, un audit, scrittura applicata). Tutti
+verificano doppia revoca e impossibilità di una nuova conferma. Il confronto
+PIN, la route, la selezione server, il writer e SQLite sono reali;
+login/discovery e identità del peer desktop sono fixture sintetiche.
+La regressione è collegata al job macOS GPUI.
+
+Le prove del frame sospendono la risposta alla revoca e verificano gli stati
+incerto, applicato e ritirato. Nessun test qui qualifica una finestra desktop
+reale, Touch ID, l'uso clinico o il rilascio. Il diff correttivo richiede la
+review indipendente del coordinatore; nessun subagente è stato impiegato.
+
+Le due mutazioni richieste, rimozione del ricontrollo di fase server e
+rimozione dell'invio Rust della revoca, falliscono entrambe sull'asserzione
+indipendente degli effetti durevoli: un audit osservato invece di zero.
+Nessuna è conteggiata per un errore di compilazione. Baseline e codice
+ripristinato passano i tre scenari. Passano inoltre 18 test Node del servizio,
+12 test Rust chat/accesso (9 casi separati richiedono prerequisiti espliciti),
+12 test frame senza retry, 45 test della selezione, Clippy con avvisi negati,
+formattazione, lint, tipi, guardie writer/AI/claims e modello finito legacy.
+
+I primi tentativi correttivi sono conservati nelle evidenze locali:
+`cargo` fuori dal workspace non selezionava la toolchain, un doppio import
+bcrypt non raggiungeva la barriera, la prima fixture tentava di selezionare
+un paziente non creato, e una prima fotografia del risultato precedeva la
+revoca dopo commit. Sono stati corretti gli harness, senza attenuare le
+asserzioni sugli effetti. Clippy ha richiesto di unire due condizioni e
+il censimento dei test ha richiesto il raccordo esplicito al job macOS.
