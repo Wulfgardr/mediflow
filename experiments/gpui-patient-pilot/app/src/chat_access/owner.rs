@@ -2,17 +2,21 @@ use super::native::{self, Peer};
 use mediflow_runtime_client::{ChatAccessContext, RuntimeSession};
 use std::{
     os::unix::net::UnixStream,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant},
 };
 
-pub(crate) const OPERATION: &str = "mediflow.chat.access-status.v1";
+pub(crate) const OPERATION: &str = "mediflow.chat.synthetic-card.v1";
 const CHALLENGE: Duration = Duration::from_secs(30);
 const VIEW_IDLE: Duration = Duration::from_secs(300);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum State {
     Requested,
+    Preparing,
     Challenge,
     Approving,
     Approved,
@@ -24,6 +28,7 @@ impl State {
     pub(crate) fn wire(self) -> &'static str {
         match self {
             Self::Requested => "requested",
+            Self::Preparing => "preparing",
             Self::Challenge => "challenge",
             Self::Approving => "approving",
             Self::Approved => "approved",
@@ -54,6 +59,8 @@ pub(crate) struct Request {
     created: Instant,
     deadline: Option<Instant>,
     binding: Option<Binding>,
+    card: Option<super::card::Card>,
+    cancelled: Arc<AtomicBool>,
 }
 pub(crate) type Pending = Arc<Mutex<Request>>;
 
@@ -70,15 +77,19 @@ impl Request {
             created: Instant::now(),
             deadline: None,
             binding: None,
+            card: None,
+            cancelled: Arc::new(AtomicBool::new(false)),
         })))
     }
     pub(crate) fn app(&self) -> &'static str {
         self.peer.app()
     }
     pub(crate) fn withdraw(&mut self) {
+        self.cancelled.store(true, Ordering::Release);
         native::cancel_biometric(&self.attempt.0);
         self.state = State::Withdrawn;
         self.binding = None;
+        self.card = None;
         self.attempt.0.fill(0);
     }
     fn current(&self, now: Instant) -> bool {
@@ -93,9 +104,7 @@ impl Request {
                 .is_none_or(|b| b.session.check_chat_access_context(&b.context).is_ok())
     }
     pub(crate) fn status(&mut self) -> State {
-        if !matches!(self.state, State::Consumed | State::Withdrawn)
-            && !self.current(Instant::now())
-        {
+        if self.state != State::Withdrawn && !self.current(Instant::now()) {
             self.withdraw();
         }
         self.state
@@ -107,9 +116,24 @@ impl Request {
             return false;
         }
         self.binding = Some(Binding { session, context });
+        self.state = State::Preparing;
+        true
+    }
+    pub(crate) fn review(&self) -> Option<(&str, &str, &str)> {
+        let card = self.card.as_ref()?;
+        Some((&card.payload, &card.digest, &card.native_source))
+    }
+    pub(crate) fn needs_card(&mut self) -> bool {
+        self.status() == State::Preparing
+    }
+    fn install_card(&mut self, card: Option<super::card::Card>) {
+        if self.status() != State::Preparing || card.is_none() {
+            self.withdraw();
+            return;
+        }
+        self.card = card;
         self.deadline = Some(Instant::now() + CHALLENGE);
         self.state = State::Challenge;
-        true
     }
     pub(crate) fn begin(&mut self) -> Option<(RuntimeSession, ChatAccessContext, Attempt)> {
         if self.status() != State::Challenge {
@@ -150,12 +174,59 @@ impl Request {
             return self.state;
         }
         self.state = State::Consumed;
+        self.created = Instant::now();
+        self.deadline = None;
         self.attempt.0.fill(0);
-        self.binding = None;
         self.state
     }
 }
 
+pub(crate) fn prepare_card(pending: &Pending) {
+    if !pending.lock().is_ok_and(|mut p| p.needs_card()) {
+        return;
+    }
+    let Some(cancelled) = pending.lock().ok().map(|p| p.cancelled.clone()) else {
+        return;
+    };
+    let card = super::card::Card::prepare(cancelled);
+    if let Ok(mut p) = pending.lock() {
+        p.install_card(card);
+    }
+}
+
+pub(crate) fn consume_card(pending: &Pending) -> (State, Option<String>) {
+    let binding = pending.lock().ok().and_then(|mut p| p.begin_consume());
+    let valid = binding
+        .as_ref()
+        .is_some_and(|(s, c)| s.revalidate_chat_access_context(c).is_ok());
+    let mut payload = None;
+    if valid
+        && let Ok(mut p) = pending.lock()
+        && p.status() == State::Consuming
+    {
+        payload = p.card.as_mut().and_then(|c| c.consume());
+    }
+    let valid = payload.is_some()
+        && binding.is_some_and(|(s, c)| s.revalidate_chat_access_context(&c).is_ok());
+    let state = pending
+        .lock()
+        .map(|mut p| {
+            let state = p.finish_consume(valid);
+            p.card = None;
+            state
+        })
+        .unwrap_or(State::Withdrawn);
+    (
+        state,
+        if state == State::Consumed {
+            payload
+        } else {
+            None
+        },
+    )
+}
+
+#[cfg(test)]
 pub(crate) fn consume(pending: &Pending) -> State {
     let binding = pending.lock().ok().and_then(|mut p| p.begin_consume());
     let valid = binding
@@ -319,6 +390,87 @@ mod tests {
         )
     }
 
+    fn synthetic_request() -> (Pending, UnixStream) {
+        let (a, b) = UnixStream::pair().unwrap();
+        (Request::new(Peer::test_peer(), a).unwrap(), b)
+    }
+    #[test]
+    fn biometric_result_double_is_bound_to_one_native_attempt_and_one_consumption() {
+        let (session, _host) = native_session();
+        let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+        let (first, _remote) = synthetic_request();
+        let (other, _remote2) = synthetic_request();
+        assert!(first.lock().unwrap().bind(session.clone(), context.clone()));
+        assert!(other.lock().unwrap().bind(session, context));
+        first.lock().unwrap().state = State::Challenge;
+        other.lock().unwrap().state = State::Challenge;
+        let (_, _, attempt) = first.lock().unwrap().begin().unwrap();
+        other.lock().unwrap().begin().unwrap();
+        other.lock().unwrap().finish(attempt, true);
+        assert_eq!(other.lock().unwrap().status(), State::Withdrawn);
+        first.lock().unwrap().finish(attempt, true);
+        assert_eq!(consume(&first), State::Consumed);
+        assert_eq!(consume(&first), State::Withdrawn);
+    }
+    #[test]
+    fn consent_absent_expired_denied_revoked_idle_and_missing_card_never_deliver() {
+        for scenario in [
+            "absent",
+            "expired",
+            "denied",
+            "revoked",
+            "idle",
+            "missing-card",
+        ] {
+            let (session, _host) = native_session();
+            let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+            let (pending, _remote) = synthetic_request();
+            let mut request = pending.lock().unwrap();
+            assert!(request.bind(session, context));
+            request.state = State::Challenge;
+            request.deadline = Some(Instant::now() + CHALLENGE);
+            if scenario != "absent" {
+                let (_, _, attempt) = request.begin().unwrap();
+                request.finish(attempt, scenario != "denied");
+            }
+            match scenario {
+                "expired" => request.deadline = Some(Instant::now() - Duration::from_millis(1)),
+                "idle" => request.created = Instant::now() - VIEW_IDLE,
+                "revoked" => request.withdraw(),
+                _ => {}
+            }
+            drop(request);
+            assert_eq!(
+                consume_card(&pending),
+                (State::Withdrawn, None),
+                "{scenario}"
+            );
+        }
+    }
+    #[test]
+    fn session_archive_selection_aba_and_eof_retire_native_approval() {
+        for change in [0, 1, 3, 4] {
+            let (session, host) = native_session();
+            let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+            let (pending, remote) = synthetic_request();
+            let mut request = pending.lock().unwrap();
+            assert!(request.bind(session.clone(), context));
+            request.state = State::Challenge;
+            let (_, _, attempt) = request.begin().unwrap();
+            request.finish(attempt, true);
+            drop(request);
+            if change == 0 {
+                session.lock();
+            } else if change != 4 {
+                host.state.store(change, Ordering::Release);
+            }
+            if change == 4 {
+                drop(remote);
+            }
+            assert_eq!(consume_card(&pending), (State::Withdrawn, None));
+        }
+    }
+
     fn connected() -> (Pending, UnixStream) {
         let (a, b) = UnixStream::pair().unwrap();
         let peer = native::capture(&a, true)
@@ -412,6 +564,8 @@ mod tests {
         let (second, _remote2) = connected();
         assert!(first.lock().unwrap().bind(session.clone(), context.clone()));
         assert!(second.lock().unwrap().bind(session, context));
+        first.lock().unwrap().state = State::Challenge;
+        second.lock().unwrap().state = State::Challenge;
         let (_, _, attempt) = first.lock().unwrap().begin().unwrap();
         second.lock().unwrap().begin().unwrap();
         second.lock().unwrap().finish(attempt, true);
@@ -430,6 +584,7 @@ mod tests {
             let context = session.chat_access_context("scope-a", "patient-a").unwrap();
             let (request, _remote) = connected();
             assert!(request.lock().unwrap().bind(session.clone(), context));
+            request.lock().unwrap().state = State::Challenge;
             let (_, _, attempt) = request.lock().unwrap().begin().unwrap();
             request.lock().unwrap().finish(attempt, true);
             if change != 0 {
@@ -461,6 +616,7 @@ mod tests {
         let context = session.chat_access_context("scope-a", "patient-a").unwrap();
         let (request, remote) = connected();
         assert!(request.lock().unwrap().bind(session, context));
+        request.lock().unwrap().state = State::Challenge;
         let (_, _, attempt) = request.lock().unwrap().begin().unwrap();
         request.lock().unwrap().finish(attempt, true);
         assert_eq!(request.lock().unwrap().status(), State::Approved);
