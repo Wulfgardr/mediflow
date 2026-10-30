@@ -24,7 +24,7 @@ export async function POST(request: Request): Promise<Response> {
         if (!resolved.ok) return reply({ status: 'denied' }, resolved.response.status);
         if (resolved.context.session.authChannel !== 'native' || new URL(request.url).search) return reply({ status: 'denied' }, 403);
         const body = parsed = await readNativeNetworkJson(request, 35 * 1024 * 1024,
-            { signal: AbortSignal.any([request.signal, AbortSignal.timeout(10_000)]), deadline: performance.now() + 10_000 });
+            { signal: AbortSignal.any([request.signal, AbortSignal.timeout(10_000)]), deadline: performance.now() + 10_000, sensitive: true });
         if (!body || typeof body !== 'object' || Array.isArray(body)) return reply({ status: 'denied' }, 400);
         const input = body as Record<string, unknown>, keys = Object.keys(input).sort().join(',');
         const context = resolved.context;

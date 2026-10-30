@@ -1,3 +1,6 @@
+import { getAttachmentPayloadByteSize, isSealedAttachmentData, isSealedAttachmentValue } from './attachment-payload';
+import { parseAttachmentContentCurrentnessPut } from './api-schemas/attachments';
+import { createSyntheticPdf } from './security/attachment-large-pdf-test-fixture';
 import { sealPatientDocumentFile, openPatientDocumentFile } from './security/attachment-file-envelope';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -22,11 +25,11 @@ import type { PatientDocumentCreateReview } from './patient-document-create-comm
 
 const data = mkdtempSync(join(tmpdir(), 'mediflow-native-patient-document-'));
 process.env.MEDIFLOW_DATA_DIR = data;
-const load = createRequire(import.meta.url), cookies = { cookies: new Map<string, string>() };
+const nodeRequire = createRequire(import.meta.url), cookies = { cookies: new Map<string, string>() };
 const cleanup = installNetworkPatientCookieFixture(data, cookies);
-const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server'); openDbServer();
-const { createNativePatientDocumentService } = load('./native-patient-document.ts') as typeof import('./native-patient-document');
-const { POST } = load('../app/api/auth/native/patient-document/route.ts') as typeof import('../app/api/auth/native/patient-document/route');
+const { dbServer, openDbServer } = nodeRequire('./db-server.ts') as typeof import('./db-server'); openDbServer();
+const { createNativePatientDocumentService } = nodeRequire('./native-patient-document.ts') as typeof import('./native-patient-document');
+const { POST } = nodeRequire('../app/api/auth/native/patient-document/route.ts') as typeof import('../app/api/auth/native/patient-document/route');
 const master = randomBytes(32), pin = ['2', '4', '6', '8'].join('');
 function seal(value: string) {
     const iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', master, iv);
@@ -77,13 +80,19 @@ function effects() {
         (dbServer.$client.prepare(`SELECT count(*) n FROM ${table}`).get() as { n: number }).n);
 }
 installLoopbackIngress();
-async function localPost(request: Request, extra: Record<string, string> = {}) {
+async function localPost(request: Request, extra: Record<string, string> = {}, observe?: (buffers: Uint8Array[]) => void) {
     const server = http.createServer(async (req, res) => {
         const chunks: Buffer[] = [];
         for await (const chunk of req) chunks.push(Buffer.from(chunk));
-        const response = await POST(new Request('http://127.0.0.1/api/auth/native/patient-document', {
+        const routeRequest = new Request('http://127.0.0.1/api/auth/native/patient-document', {
             method: 'POST', headers: req.headers as Record<string, string>, body: Buffer.concat(chunks),
-        }));
+        });
+        const owned: Uint8Array[] = [], set = Uint8Array.prototype.set;
+        if (observe) Uint8Array.prototype.set = function(value, offset) { owned.push(this); return set.call(this, value, offset); };
+        let response: Response;
+        try { response = await POST(routeRequest); }
+        finally { Uint8Array.prototype.set = set; }
+        observe?.(owned);
         res.writeHead(response.status); res.end(await response.text());
     });
     server.listen(0, '127.0.0.1'); await once(server, 'listening');
@@ -221,7 +230,7 @@ test('a second admitted administrator in the same scope cannot read another oper
     const session = createNativeServerSession(user, { clientId, clientPlatform, tokenHash }, captureNativeLoginSessionFence()); assert(session);
     bindSessionToArchive(session, currentArchiveGeneration());
     const other = { ...context, session };
-    const { prepareNetworkPatientCommitGuard } = load('./network-patient-commit-authority.ts') as typeof import('./network-patient-commit-authority');
+    const { prepareNetworkPatientCommitGuard } = nodeRequire('./network-patient-commit-authority.ts') as typeof import('./network-patient-commit-authority');
     const guard = await prepareNetworkPatientCommitGuard(other, 'network.replica.write-patient-lifecycle');
     assert.equal(dbServer.transaction(tx => guard(tx)), null);
     await assert.rejects(api.receipt(other, view.commandId));
@@ -305,7 +314,7 @@ test('scope observed by the shared native resolver retires work even without a d
     const scopeB = randomUUID();
     dbServer.insert(ambulatories).values({ id: scopeB, name: 'Ambulatorio B sintetico' }).run();
     cookies.cookies.set('ambulatory_id', scopeB);
-    const { resolveNetworkScope } = load('./network-write-context.ts') as typeof import('./network-write-context');
+    const { resolveNetworkScope } = nodeRequire('./network-write-context.ts') as typeof import('./network-write-context');
     assert.equal(await resolveNetworkScope(context.session, new Request(context.request)), scopeB);
     cookies.cookies.set('ambulatory_id', context.scopeAmbulatoryId);
     await assert.rejects(api.execute(context, view.commandId, pin));
@@ -375,4 +384,41 @@ test('good file reads identical saved bytes; false wrapping is unreadable with h
         const persisted = JSON.stringify(dbServer.$client.prepare('SELECT redacted_metadata FROM audit_events').all());
         assert(!persisted.includes('fileKey'));
     }
+});
+
+for (const size of [5 * 1024 * 1024, 10 * 1024 * 1024]) test(`valid ${size}-byte PDF survives stage, command snapshots and data validators`, async () => {
+    const context = fixture(), api = createNativePatientDocumentService(dbServer), before = effects();
+    const bytes = createSyntheticPdf(size);
+    assert.equal(bytes.length, size);
+    assert.equal((await PDFDocument.load(bytes)).getPageCount(), 1);
+    const sealedFile = await file(bytes);
+    assert.equal(isSealedAttachmentData(sealedFile.data), true);
+    assert.equal(isSealedAttachmentValue(sealedFile.data), false);
+    assert.deepEqual(getAttachmentPayloadByteSize(sealedFile.data), { ok: true, size: sealedFile.data.length });
+    const put = { expected: { sourceRef: 'a'.repeat(64), revision: 1, freshnessEpoch: 1 }, replacement: sealedFile.data };
+    assert.deepEqual(parseAttachmentContentCurrentnessPut(put), put);
+    const masterKey = await crypto.subtle.importKey('raw', master, 'AES-GCM', false, ['decrypt']);
+    assert.equal(await openPatientDocumentFile(sealedFile.data, masterKey), `data:application/pdf;base64,${bytes.toString('base64')}`);
+    const source = { name: seal('grande-sintetico.pdf'), path: seal('grande-sintetico.pdf'), original: bytes.toString('base64'), ...sealedFile };
+    const view = await api.stage(context, source);
+    assert.match(view.text, /Mario/u);
+    assert.ok(source.fileKey.every(byte => byte === 0));
+    await api.preview(context, view.commandId, view.viewId, review());
+    assert.deepEqual(await api.execute(context, view.commandId, pin), { outcome: 'applied', attachmentReadback: 'client-verification-required' });
+    assert.deepEqual(effects(), before.map(n => n + 1));
+    const stored = dbServer.$client.prepare('SELECT data FROM attachments ORDER BY rowid DESC LIMIT 1').get() as { data: string };
+    assert.equal(stored.data, sealedFile.data);
+});
+
+test('native route opts into HTTP buffer erasure even when stage denies the source', async () => {
+    const context = fixture(), source = await document();
+    source.data = 'ENC2:invalid';
+    const body = JSON.stringify({ operation: 'stage', source });
+    let captured: Uint8Array[] = [];
+    const response = await localPost(new Request('http://127.0.0.1/api/auth/native/patient-document',
+        { method: 'POST', headers: context.request.headers, body }), {}, buffers => { captured = buffers; });
+    assert.equal(response.status, 403);
+    const assembly = captured.filter(bytes => bytes.length === Buffer.byteLength(body));
+    assert.ok(assembly.length > 0);
+    assert.ok(assembly.every(bytes => bytes.every(byte => byte === 0)), 'route did not erase HTTP assembly');
 });
