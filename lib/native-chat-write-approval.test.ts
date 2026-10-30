@@ -22,6 +22,13 @@ const kind = 'synthetic-write';
         assert.throws(() => approvals.check(preview), NativeChatWriteDenied);
         assert.throws(() => approvals.consume('synthetic-command', binding), NativeChatWriteDenied);
     });
+    test(`${kind}: an expired preview does not release its command id`, () => {
+        const { approvals, binding, at } = setup();
+        const first = approvals.open(binding), second = approvals.open(binding);
+        approvals.preview(first, binding, 'synthetic-command', { kind }, () => undefined);
+        at(30_000);
+        assert.throws(() => approvals.preview(second, binding, 'synthetic-command', { kind }, () => undefined), NativeChatWriteDenied);
+    });
     test(`${kind}: revocation during asynchronous verification prevents commit`, async () => {
         const { approvals, binding } = setup();
         const view = approvals.open(binding);

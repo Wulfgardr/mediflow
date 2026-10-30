@@ -40,8 +40,9 @@ export function createNativeChatWriteApprovals<T>(clock: () => number = Date.now
             if (!view || !same(view, binding) || at - view.at >= 300_000) return denyNativeChatWrite();
             views.delete(id);
             admit();
+            if (previews.has(commandId)) return denyNativeChatWrite();
             for (const [id, preview] of previews) if (at - preview.at >= 30_000) retire(id);
-            if (previews.size >= 256 || previews.has(commandId)) return denyNativeChatWrite();
+            if (previews.size >= 256) return denyNativeChatWrite();
             const preview: NativeChatWritePreview<T> = { ...binding, command, at, viewAt: view.at, phase: 'preview' };
             previews.set(commandId, preview);
             return preview;
