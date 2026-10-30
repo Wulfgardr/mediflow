@@ -116,4 +116,6 @@ for (const [name, before, after, testName, diagnostic] of [
 }
 run('code-restored', process.execPath, ['scripts/run-strip-types.mjs', '--test', '--test-reporter=tap', 'lib/therapy-status-confirmation.test.ts'],
   (status, log) => status === 0 && /# fail 0/.test(log), testEnv);
+run('chat-therapy-mutants', process.execPath, ['scripts/falsify-chat-therapy.mjs'],
+  (status, log) => status === 0 && log.includes('single-use: intended assertion failure') && log.includes('restored: PASS'), testEnv);
 console.log(`Verified finite model, witnesses, negative controls and real controller/HTTP tests. Logs: ${output}`);

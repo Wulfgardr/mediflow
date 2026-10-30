@@ -141,6 +141,14 @@ impl LocalPreferencesStore {
         }
     }
 
+    #[cfg(unix)]
+    pub(crate) fn chat_therapy_directory(&self) -> Option<PathBuf> {
+        self.path
+            .as_ref()?
+            .parent()
+            .map(|p| p.join("chat-therapy-pending"))
+    }
+
     pub(crate) fn local_retirement_path(&self) -> Option<PathBuf> {
         self.path
             .as_ref()
