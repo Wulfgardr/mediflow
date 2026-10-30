@@ -133,6 +133,8 @@ impl ClinicalApp {
             SettingsPage::Functions => view.child(heading("clinical-workspace-settings-heading","Funzioni AI",theme))
                 .child(self.local_host_panel(cx))
                 .child(self.ai_status_view(cx))
+                .child(self.parameters_view(cx))
+                .child(self.chatgpt_account_view(cx))
                 .child(button("local-host-function-preferences","Preferenze e scelta del modello per funzione…",theme,false,!self.local_host.has_work()).on_click(cx.listener(|this,_,window,cx|this.select_settings_page(SettingsPage::AiPreferences,window,cx)))),
             SettingsPage::Models => view
                 .child(heading("clinical-workspace-settings-heading", "Modelli e hardware", theme))
