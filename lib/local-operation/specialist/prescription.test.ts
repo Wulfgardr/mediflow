@@ -21,3 +21,20 @@ test('CU-1 specialistica: nessuna inferenza, troncamento o normalizzazione clini
         assert.throws(() => validateSpecialistDecision({ ...decision, ...changes }, catalog, 1_000_000));
     }
 });
+
+test('CU contratto esenzioni: scadenza al limite e titolo futuro bloccano', () => {
+    for (const changes of [{ validUntil: 1_000_000 }, { validFrom: 1_000_001 }]) {
+        assert.throws(() => validateSpecialistDecision({ ...decision,
+            exemption: { ...decision.exemption, ...changes } }, catalog, 1_000_000));
+    }
+});
+
+test('CU contratto esenzioni: applicazione mista non rappresentabile sospende l’intero piano', () => {
+    const second = { ...decision.items[0]!, id: 'demo-second', code: 'DEMO.02' };
+    const mixedCatalog = { ...catalog, entries: [...catalog.entries,
+        { code: second.code, description: second.description, unit: second.unit }] };
+    assert.throws(() => validateSpecialistDecision({ ...decision, items: [...decision.items, second] }, mixedCatalog, 1_000_000));
+    const both = { ...decision, items: [...decision.items, second],
+        exemption: { ...decision.exemption, applicableCodes: ['DEMO.01', 'DEMO.02'] } };
+    assert.deepEqual(validateSpecialistDecision(both, mixedCatalog, 1_000_000), both);
+});
