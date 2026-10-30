@@ -104,3 +104,11 @@ La stessa prova E2E corretta passa anche sul bundle standalone di produzione
 `f0de86dcfc667bdce390c71469372eeb4c40e2c1`, porta 3298 e archivio sintetico
 nuovo. Le revisioni successive cambiano solo test, registro ed evidenze: il
 runtime del prodotto è identico. Il server di prova è stato arrestato.
+
+## Secondo giro del 30 ottobre 2026
+
+Il [secondo rapporto](2026-10-30-local-runs/giro2.md) e i
+[risultati](2026-10-30-local-runs/giro2.json) conservano separatamente la prova
+con Ollama.app 0.40.6 e il nuovo confronto ATHENA dopo la correzione del prompt.
+La prima misura resta storica. ADR 0166 resta Proposed e la revisione semantica
+resta aperta. I fallimenti della misura e della suite unitaria restano visibili.

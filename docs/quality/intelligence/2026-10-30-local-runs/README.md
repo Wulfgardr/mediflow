@@ -102,3 +102,11 @@ installazione. Il test usa una directory sintetica temporanea esplicita.
 Non sono state eseguite build o prove E2E: il diff è soltanto documentale,
 e nessuna di queste verifiche sostituirebbe i run bloccati. CI della PR
 riporta separatamente i controlli sulla revisione pubblicata.
+
+## Secondo giro
+
+Vedi [rapporto](giro2.md) e [numeri](giro2.json). Il binario Ollama.app
+0.40.6 consente un server separato, senza modificare quello condiviso.
+Il prompt ATHENA descrive ora il formato V2, con validatore invariato.
+Le prove sopra restano riferite alle revisioni originali; il secondo giro
+non accetta ADR 0166 né equivalenza.
