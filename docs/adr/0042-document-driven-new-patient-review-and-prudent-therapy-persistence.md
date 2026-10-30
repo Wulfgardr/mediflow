@@ -111,3 +111,70 @@ Diventa piu difficile:
 - import automatico di terapie manual-only senza match o posologia minima
 - promozione del materiale documentale non confermato a dato strutturato senza
   review operatore
+
+## Incremento C-6 del 30 ottobre 2026: comando di dominio, senza nuovi ingressi
+
+`lib/patient-document-create-command.ts` implementa il primo incremento del
+comando di creazione da documento. Non ha ancora caller HTTP, Web, MCP o GPUI:
+non abilita l'importazione e non completa C-6. `PdfImporter` conserva il blocco
+prima della persistenza e gli endpoint legacy restano `410`.
+
+Il comando riceve due porte interne dell'host, mai ricostruite da JSON: l'owner
+della sessione e dello scope «nuovo paziente», e la fonte preparata corrente.
+Il futuro punto di composizione deve collegare gli owner reali, controllare
+upload e tipo sui byte originali e produrre evidenze AnyDoc/OCR prima di
+emettere la fonte. Il comando non esegue estrazione né accetta URL o file ID
+della chat. Le prove del comando usano una porta fonte sintetica; non
+qualificano estrattori o custodia degli originali.
+
+La revisione ammette solo nome, cognome, codice fiscale e data di nascita,
+ciascuno approvato o corretto esplicitamente. Il chiamante host deve marcare
+come ambigui nomi senza etichette separate e identità multiple, anche quando
+un parser restituisce due stringhe apparentemente complete. Per esempio
+«Paziente: Rossi Mario» non autorizza l'approvazione della separazione
+Rossi/Mario: il comando richiede la correzione esplicita di entrambi i campi.
+Un errore OCR impedisce la creazione; una fonte incerta richiede la correzione
+manuale di ogni campo inserito. Questo incremento non inserisce diagnosi,
+terapie, prescrizioni o testo documentale in note cliniche.
+
+Il controllo duplicati confronta codice fiscale oppure nome e cognome,
+anche con schede archiviate/eliminate e fuori dallo scope di destinazione.
+Non restituisce identificativi delle corrispondenze. Richiede la scelta
+distinta `create-separate`; non aggiorna né unisce la scheda esistente.
+Una variazione delle corrispondenze dopo la revisione blocca il commit.
+
+Il ciclo comune `createNativeChatWriteApprovals` mantiene le soglie di cinque
+minuti dalla vista e trenta secondi dalla revisione, con consumo prima della
+conferma. Il servizio richiede all'host conferma e verifica corrente dentro
+la transazione, anche dopo le scritture. Non implementa biometria o ripieghi:
+questa porta va collegata alla conferma autorizzata, senza simulare Touch ID.
+Il ritiro della sessione elimina gli stati privati tramite l'owner; la
+scadenza elimina i riferimenti RAM senza dichiarare un ritiro durevole.
+
+Paziente, membership, fonte cifrata con currentness emessa dall'host e i due
+audit obbligatori committano nella stessa transazione SQLite `IMMEDIATE`.
+L'audit `patient.created` ha `eventId = commandId` e metadato validato
+`patientDocumentCreate`: soli riferimenti opachi di comando, generazione,
+ambulatorio, paziente e fonte. Il ritiro usa `patient.create.retired`, con
+paziente/fonte nulli. La chiave primaria dell'audit e la rilettura sotto lo
+stesso lock rendono durevoli idempotenza e ritiro. Anche il riuso di una fonte
+già consumata viene rifiutato. Non nasce un secondo deposito o enum degli
+esiti: il servizio restituisce `applied`, `retired` o `unknown`, compatibili
+con il `ChatWriteResolution` comune. La ricevuta non contiene campi paziente,
+filename, percorso, testo o identificativo della fonte.
+
+Un processo riavviato legge l'audit prima di cercare la conferma RAM. Senza
+ricevuta, `unknown` resta incerto e non rinnova il comando. Il ritiro di un
+comando sconosciuto resta `unknown`; il servizio non attribuisce un esito a
+uno stato perso. Le ricevute seguono l'audit esistente nei backup: la
+conservazione non concede autorità nella generazione successiva al restore.
+Il deposito opaco e il recupero nativo esistenti restano da collegare a questo
+comando; nessun comando paziente viene ancora aperto dalla chat.
+
+Le prove `patient-document-create-command.test.ts` esercitano SQLite,
+autorità paired e verifica PIN reali su dati sintetici. Le prove di processo
+uccidono il processo durante l'inserimento della fonte o dopo il commit e
+rileggono dal nuovo processo. La conferma di queste sole fixture di crash è
+simulata: non è una prova aggiuntiva di autenticazione. Il rapporto di consegna conserva separatamente lo script delle mutazioni
+e i log: lo script modifica temporaneamente le sorgenti e non viene eseguito
+insieme alle suite ordinarie.

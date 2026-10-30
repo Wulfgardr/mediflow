@@ -11,6 +11,8 @@ import { archiveGenerationForSession } from './archive-session-generation';
 import { assertArchiveGeneration } from '../archive-generation';
 import { parseProfileNotesCommitJournal, type ProfileNotesCommitJournal } from '../../packages/patient-profile-contracts/src/notes-commit';
 
+import { parsePatientDocumentCreateJournal, type PatientDocumentCreateJournal } from '../patient-document-create-journal';
+
 export const AUDIT_SCHEMA_VERSION = 1 as const;
 
 export const AUDIT_EVENT_TYPES = [
@@ -22,6 +24,7 @@ export const AUDIT_EVENT_TYPES = [
     'auth.checkup_active_role.enrolled',
     'auth.checkup_active_role.revoked',
     'patient.created',
+    'patient.create.retired',
     'patient.updated',
     'patient.deleted',
     'patient.restored',
@@ -105,6 +108,7 @@ export type AifaAuditChange = {
 
 export type AuditRedactedMetadata = {
     profileNotesCommit?: ProfileNotesCommitJournal;
+    patientDocumentCreate?: PatientDocumentCreateJournal;
     aifaCatalog?: AifaAuditChange;
     changedFields?: string[];
     resourceVersion?: number;
@@ -317,6 +321,11 @@ export function sanitizeAuditMetadata(value: AuditRedactedMetadata | null | unde
         if (!journal) throw new Error('Invalid profile notes commit audit metadata');
         sanitized.profileNotesCommit = journal;
     }
+    if (value.patientDocumentCreate !== undefined) {
+        const command = parsePatientDocumentCreateJournal(value.patientDocumentCreate);
+        if (!command) throw new Error('Invalid patient document create audit metadata');
+        sanitized.patientDocumentCreate = command;
+    }
     const change = value.aifaCatalog;
     if (change && (change.mode === 'remote' || change.mode === 'manual') && typeof change.forcedReduction === 'boolean') {
         const canonical = (manifest: AifaCatalogManifest | null): AifaCatalogManifest | null => {
@@ -359,7 +368,15 @@ function buildAuditEventRow(input: AuditWriteInput): typeof auditEvents.$inferIn
         || input.actorType !== 'user' || input.sourceSurface !== 'web' || occurredAt.getTime() !== journal.receipt.committedAt)) {
         throw new Error('Invalid profile notes commit audit event');
     }
-    const eventId = journal?.receipt.reference ?? uuidv4();
+    const create = redactedMetadata?.patientDocumentCreate;
+    if (create && (journal || input.actorType !== 'user' || input.requestId !== create.commandId
+        || input.archiveGeneration !== create.archiveGeneration || !['native', 'web'].includes(input.sourceSurface)
+        || input.outcome !== 'success' || (create.patientId === null
+            ? input.eventType !== 'patient.create.retired' || input.subjectType !== 'agent_operation' || input.subjectRef != null
+            : input.eventType !== 'patient.created' || input.subjectType !== 'patient' || input.subjectRef !== create.patientId))) {
+        throw new Error('Invalid patient document create audit event');
+    }
+    const eventId = create?.commandId ?? journal?.receipt.reference ?? uuidv4();
     return {
         eventId,
         schemaVersion: AUDIT_SCHEMA_VERSION,
