@@ -112,6 +112,7 @@ test('Diario paziente: prosa, provenienza e storico senza cambiare Scale o Timel
         if (baseline) await expect(page.locator('#timeline')).toContainText('Racconto clinico sintetico W15a');
         else {
             await expect(page.locator('#timeline')).not.toContainText(PROSE);
+            await expect(page.locator('#timeline')).toContainText('Fonte: Fonte documentale inventata');
             await page.locator('#timeline').getByRole('link', { name: 'Apri Controllo sintetico W15a · Diario', exact: true }).click();
             await expect(pane).toBeVisible(); await expect(row).toContainText(PROSE);
         }

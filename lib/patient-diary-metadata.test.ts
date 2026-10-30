@@ -24,3 +24,14 @@ test('unreadable fields never become an invented author, source or workflow stat
     }
     assert.deepEqual(readPatientDiaryMetadata({ workflowStatus: 'future-unrecognized-state' }), { state: 'readable', value: { workflowStatus: 'future-unrecognized-state' } });
 });
+
+test('history and diary share recorded source, setting fallback and unreadable provenance', async () => {
+    const { patientDiarySource } = await import('./patient-diary-metadata');
+    for (const metadata of [{ sourceLabel: ' Fonte inventata ', source: 'Altra fonte' }, JSON.stringify({ sourceLabel: 'Fonte inventata' })]) {
+        assert.equal(patientDiarySource(metadata, 'home'), 'Fonte inventata');
+    }
+    assert.equal(patientDiarySource({ source: 'Originale' }), 'Originale');
+    assert.equal(patientDiarySource(null, 'ambulatory'), 'Ambulatorio');
+    assert.equal(patientDiarySource(null), 'Diario locale');
+    assert.equal(patientDiarySource('ENC:synthetic', 'ambulatory'), 'Fonte non disponibile');
+});
