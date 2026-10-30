@@ -1,4 +1,82 @@
 use super::*;
+use std::path::PathBuf;
+
+const MAX_IMPORT_FILES: usize = 20;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum ImportOutcome {
+    Pending,
+    Reviewing,
+    Registered,
+    Duplicate,
+    Failed,
+}
+
+impl ImportOutcome {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Pending => "Da rivedere",
+            Self::Reviewing => "In revisione, non confermato",
+            Self::Registered => "Registrato e verificato",
+            Self::Duplicate => "Già presente, non importato di nuovo",
+            Self::Failed => "Non importato",
+        }
+    }
+}
+
+pub(super) struct ImportItem {
+    path: PathBuf,
+    outcome: ImportOutcome,
+}
+
+#[derive(Default)]
+pub(super) struct DocumentImports {
+    items: Vec<ImportItem>,
+    active: Option<usize>,
+}
+
+impl DocumentImports {
+    fn selected(paths: Vec<PathBuf>) -> Option<Self> {
+        if paths.is_empty() || paths.len() > MAX_IMPORT_FILES {
+            return None;
+        }
+        Some(Self {
+            items: paths
+                .into_iter()
+                .map(|path| ImportItem {
+                    path,
+                    outcome: ImportOutcome::Pending,
+                })
+                .collect(),
+            active: None,
+        })
+    }
+
+    fn pending(&self) -> bool {
+        self.items
+            .iter()
+            .any(|item| item.outcome == ImportOutcome::Pending)
+    }
+
+    fn next(&mut self) -> Option<PathBuf> {
+        if self.active.is_some() {
+            return None;
+        }
+        let index = self
+            .items
+            .iter()
+            .position(|item| item.outcome == ImportOutcome::Pending)?;
+        self.items[index].outcome = ImportOutcome::Reviewing;
+        self.active = Some(index);
+        Some(self.items[index].path.clone())
+    }
+
+    pub(super) fn finish(&mut self, outcome: ImportOutcome) {
+        if let Some(index) = self.active.take() {
+            self.items[index].outcome = outcome;
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) enum DocumentOperation {
@@ -27,21 +105,14 @@ impl DocumentOperation {
 impl ClinicalApp {
     pub(super) fn documents_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
-        let writable = !self.local_host.has_work()
-            && self.form.is_none()
-            && self.document_operation == DocumentOperation::Idle
-            && self.patient.attachments.ready().is_some()
-            && self.can_write(FormKind::Document)
-            && self
-                .patient
-                .detail
-                .ready()
-                .is_some_and(|patient| !patient.is_archived && patient.deleted_at.is_none());
+        let writable =
+            self.document_import_available() && self.patient.attachments.ready().is_some();
         div().min_w_0().max_w_full().flex().flex_col().gap(px(16.))
             .child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
                 .child(heading("clinical-workspace-documents-heading", "Documenti", theme))
-                .child(button("clinical-workspace-new-document", "Aggiungi documento…", theme, true, writable)
+                .child(button("clinical-workspace-new-document", "Aggiungi documenti…", theme, true, writable && !self.document_imports.pending())
                     .when(writable, |el| el.on_click(cx.listener(|this, _, _, cx| this.pick_document(cx))))))
+            .child(self.document_imports_view(cx))
             .child(div().text_color(theme.secondary).child(text!("Prima del salvataggio puoi annullare la copia cambiando scheda o bloccando la sessione. Una copia già avviata può completarsi anche dopo il blocco.")))
             .when(self.document_operation != DocumentOperation::Idle, |el| el.child(notice("clinical-workspace-document-operation", self.document_operation.message(), theme, false)))
             .when_some(self.patient.attachments.state(ReadObject::Documenti), |el, state| el.child(self.render_read_state("clinical-workspace-attachments-state", state, cx)))
@@ -54,6 +125,8 @@ impl ClinicalApp {
                 let details_id = row.id.clone();
                 let id = row.id.clone();
                 let delete_id = row.id.clone();
+                let original_id = row.id.clone();
+                let original_open = self.patient.document_original.as_ref().is_some_and(|view| view.id == row.id);
                 let can_delete = can_open && !self.local_host.has_work() && self.local_host.access().is_some();
                 div().id(SharedString::from(format!("clinical-workspace-document-{id}")))
                     .min_w_0().max_w_full()
@@ -67,24 +140,109 @@ impl ClinicalApp {
                             .when(can_open, |el| el.on_click(cx.listener(move |this, _, _, cx| this.toggle_document_details(&details_id, cx)))))
                         .child(button(format!("clinical-workspace-download-document-{id}"), "Salva una copia…", theme, false, available)
                             .when(available, |el| el.on_click(cx.listener(move |this, _, _, cx| this.download_document(&id, cx))))))
+                    .child(button(format!("clinical-workspace-original-{original_id}"), if original_open { "Chiudi originale" } else { "Originale" }, theme, false, can_open)
+                        .aria_expanded(original_open)
+                        .when(can_open, |el| el.on_click(cx.listener(move |this, _, _, cx| this.toggle_document_original(&original_id, cx)))))
+                    .when(original_open, |el| el.child(self.document_original_view(cx)))
                     .child(button(format!("clinical-workspace-delete-document-{delete_id}"), "Elimina documento…", theme, false, can_delete)
                         .when(can_delete,|el|el.on_click(cx.listener(move |this,_,window,cx|this.prepare_document_deletion(&delete_id,window,cx)))))
                     .when(details_open, |el| el.child(self.document_details_view(row, cx)))
             }))
             .child(div().text_color(theme.secondary).child(text!("Ogni caricamento richiede revisione e conferma. Il limite per file è 10 MiB. Le copie vengono salvate soltanto nella destinazione che scegli.")))
-            .child(notice("clinical-workspace-documents-native-limits", "Anteprima dell’originale e modifica non ancora disponibili. Per eliminare un documento apri prima Gestione locale in Impostazioni → Funzioni AI.", theme, false))
+            .child(notice("clinical-workspace-documents-native-limits", "Anteprima PDF e immagini, revisione dei dati estratti e importazione strutturata da CSV non disponibili. Nuova scheda da documento: non disponibile. Per eliminare un documento apri prima Gestione locale in Impostazioni → Funzioni AI.", theme, false))
     }
 
-    pub(super) fn pick_document(&mut self, cx: &mut Context<Self>) {
-        if self.document_operation != DocumentOperation::Idle
-            || self.form.is_some()
-            || !self.can_write(FormKind::Document)
-            || !self
+    pub(super) fn document_imports_view(&self, cx: &Context<Self>) -> Div {
+        let theme = self.theme;
+        if self.form.is_some() {
+            return div().when_some(self.document_imports.active, |el, index| {
+                el.child(text!(format!(
+                    "Documento {} di {}. Ogni documento richiede una conferma separata.",
+                    index + 1,
+                    self.document_imports.items.len()
+                )))
+            });
+        }
+        let can_continue = self.document_import_available();
+        div().min_w_0().flex().flex_col().gap(px(8.))
+            .when(!self.document_imports.items.is_empty(), |el| el
+                .child(text!("Ogni documento richiede una conferma separata. Annullare la bozza o cambiare contesto interrompe la selezione rimanente."))
+                .children(self.document_imports.items.iter().enumerate().map(|(index, item)| {
+                    let name = item.path.file_name().and_then(|name| name.to_str()).unwrap_or("Documento");
+                    notice(SharedString::from(format!("document-import-item-{index}")), format!("{name}: {}", item.outcome.label()), theme, item.outcome == ImportOutcome::Failed)
+                }))
+                .when(self.document_imports.pending(), |el| el.child(
+                    button("document-import-next", "Rivedi il prossimo documento", theme, true, can_continue)
+                        .when(can_continue, |el| el.on_click(cx.listener(|this, _, _, cx| this.next_document_import(cx)))))))
+    }
+
+    fn document_import_available(&self) -> bool {
+        self.form.is_none()
+            && !self.local_host.has_work()
+            && self.document_operation == DocumentOperation::Idle
+            && self.can_write(FormKind::Document)
+            && self
                 .patient
                 .detail
                 .ready()
                 .is_some_and(|patient| !patient.is_archived && patient.deleted_at.is_none())
-        {
+    }
+
+    fn next_document_import(&mut self, cx: &mut Context<Self>) {
+        if !self.document_import_available() {
+            return;
+        }
+        let Some(path) = self.document_imports.next() else {
+            return;
+        };
+        self.document_operation = DocumentOperation::CheckingImport;
+        self.message = None;
+        self.verified = None;
+        self.run(
+            move || Ok(documents::read_selected_file(&path)),
+            Self::receive_document_file,
+            cx,
+        );
+        cx.notify();
+    }
+
+    pub(super) fn advance_document_import_epoch(&mut self) {
+        let selection = std::mem::take(&mut self.document_imports);
+        self.next_epoch();
+        self.document_imports = selection;
+    }
+
+    pub(super) fn confirm_document_import(
+        &mut self,
+        session: RuntimeSession,
+        scope: String,
+        id: String,
+        upload: Upload,
+        cx: &mut Context<Self>,
+    ) {
+        self.run(move || {
+                let rows = session.list_attachments(&scope, &id)?;
+                let upload = match documents::admit_import(upload, &rows, |attachment| session.read_attachment(&scope, &id, attachment))? {
+                    documents::ImportAdmission::New(upload) => upload,
+                    documents::ImportAdmission::Duplicate { .. } => return Err(RuntimeError::Conflict),
+                };
+                let created = session.create_attachment(&scope, &id, &upload.name, &upload.mime_type, &upload.bytes)?;
+                after_create_read(session.read_attachment(&scope, &id, &created.id), |row| row.id == created.id && row.patient_id == id && upload.matches(&row))
+            }, |this, result, cx| {
+                match result {
+                    Ok(true) => {
+                        this.document_imports.finish(ImportOutcome::Registered);
+                        this.saved("Documento registrato: nome, formato, dimensione e contenuto riletti e verificati.", cx);
+                    },
+                    Ok(false) => this.save_unconfirmed(false, "La rilettura non conferma il documento inviato. Verifica la scheda prima di aggiungerlo di nuovo.".into(), cx),
+                    Err(error) => this.save_error(error, cx),
+                }
+                this.load_sections(cx);
+            }, cx);
+    }
+
+    pub(super) fn pick_document(&mut self, cx: &mut Context<Self>) {
+        if !self.document_import_available() || self.document_imports.pending() {
             return;
         }
         self.document_operation = DocumentOperation::Selecting;
@@ -95,17 +253,22 @@ impl ClinicalApp {
         let chosen = cx.prompt_for_paths(gpui::PathPromptOptions {
             files: true,
             directories: false,
-            multiple: false,
-            prompt: Some("Scegli documento".into()),
+            multiple: true,
+            prompt: Some("Scegli documenti".into()),
         });
         cx.spawn(async move |this, cx| {
             let result = chosen.await;
             let _ = this.update(cx, |this, cx| {
                 if !this.accept_document_picker(epoch, authority, cx) { return; }
                 match result {
-                    Ok(Ok(Some(paths))) if paths.len() == 1 => {
-                        let path = paths.into_iter().next().expect("one selected path");
-                        this.run(move || Ok(documents::read_selected_file(&path)), Self::receive_document_file, cx);
+                    Ok(Ok(Some(paths))) => {
+                        this.document_operation = DocumentOperation::Idle;
+                        if let Some(selection) = DocumentImports::selected(paths) {
+                            this.document_imports = selection;
+                            this.next_document_import(cx);
+                        } else {
+                            this.message = Some((format!("Scegli da 1 a {MAX_IMPORT_FILES} documenti. Nessun file è stato inviato."), true));
+                        }
                     }
                     Ok(Ok(None)) => this.document_operation = DocumentOperation::Idle,
                     _ => {
@@ -119,7 +282,7 @@ impl ClinicalApp {
         cx.notify();
     }
 
-    fn receive_document_file(
+    pub(super) fn receive_document_file(
         &mut self,
         result: Result<Result<documents::Upload, documents::DocumentError>, RuntimeError>,
         cx: &mut Context<Self>,
@@ -127,6 +290,7 @@ impl ClinicalApp {
         let upload = match result {
             Ok(Ok(upload)) => upload,
             other => {
+                self.document_imports.finish(ImportOutcome::Failed);
                 self.receive_document_upload(other, cx);
                 return;
             }
@@ -151,12 +315,14 @@ impl ClinicalApp {
                     this.receive_document_upload(Ok(Ok(upload)), cx);
                 }
                 Ok((documents::ImportAdmission::Duplicate { existing_id }, rows)) => {
+                    this.document_imports.finish(ImportOutcome::Duplicate);
                         this.patient.attachments = ReadLoad::Ready(rows);
                     this.document_operation = DocumentOperation::Idle;
                     this.patient.document_details_id = Some(existing_id);
                     this.message = Some(("Questo documento è già presente nella scheda. Non è stato importato di nuovo.".into(), false));
                 }
                 Err(error) => {
+                    this.document_imports.finish(ImportOutcome::Failed);
                     this.document_operation = DocumentOperation::Idle;
                     this.message = Some((format!("{} Il controllo dei duplicati non è riuscito. Il file non è stato inviato.", ui_error(error)), true));
                 }
@@ -172,6 +338,7 @@ impl ClinicalApp {
         self.document_operation = DocumentOperation::Idle;
         match result {
             Ok(Ok(upload)) if self.form.is_none() && self.can_write(FormKind::Document) => {
+                self.patient.document_original = None;
                 self.form = Some(Form {
                     kind: FormKind::Document,
                     fields: vec![],
@@ -358,6 +525,111 @@ mod tests {
         app.document_operation = DocumentOperation::Selecting;
     }
 
+    #[test]
+    fn selection_is_bounded_and_never_advances_an_active_file() {
+        assert!(DocumentImports::selected(vec![]).is_none());
+        assert!(DocumentImports::selected(vec![PathBuf::from("synthetic.txt"); 21]).is_none());
+        let mut selection =
+            DocumentImports::selected(vec!["a.txt".into(), "b.txt".into()]).unwrap();
+        assert_eq!(selection.next().unwrap(), PathBuf::from("a.txt"));
+        assert!(selection.next().is_none());
+        selection.finish(ImportOutcome::Registered);
+        assert_eq!(selection.next().unwrap(), PathBuf::from("b.txt"));
+        selection.finish(ImportOutcome::Failed);
+        assert!(!selection.pending());
+        assert_eq!(selection.items[0].outcome, ImportOutcome::Registered);
+        assert_eq!(selection.items[1].outcome, ImportOutcome::Failed);
+    }
+
+    #[gpui::test]
+    fn multiple_imports_need_individual_confirmation_and_keep_mixed_outcomes(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let root = std::env::temp_dir().join(format!(
+            "mediflow-multiple-import-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&root).unwrap();
+        std::fs::write(root.join("referto.txt"), b"prova").unwrap();
+        std::fs::write(root.join("duplicato.txt"), b"prova").unwrap();
+        let host = notes_recovery_tests::Host::new();
+        host.plan(LIST).send((200, json!([]))).unwrap();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            prepare(app, &host);
+            app.document_operation = DocumentOperation::Idle;
+            app.document_imports = DocumentImports::selected(vec![
+                root.join("referto.txt"),
+                root.join("assente.txt"),
+                root.join("duplicato.txt"),
+            ])
+            .unwrap();
+            app.next_document_import(cx);
+        });
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert!(app.form.as_ref().unwrap().state == FormState::Draft);
+            app.next_document_import(cx);
+            assert_eq!(app.document_imports.active, Some(0));
+        });
+        assert!(!host.routes().iter().any(|route| route.starts_with(CREATE)));
+        host.plan(LIST).send((200, json!([]))).unwrap();
+        host.plan(CREATE)
+            .send((201, json!({"id":"file-a"})))
+            .unwrap();
+        let mut detail = summary();
+        detail["data"] = json!("data:text/plain;base64,cHJvdmE=");
+        host.plan(DETAIL).send((200, detail.clone())).unwrap();
+        host.plan(LIST).send((200, json!([summary()]))).unwrap();
+        cx.update_window_entity(&view, |app, window, cx| app.review_form(window, cx));
+        view.update(cx, |app, cx| app.confirm_form(cx));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert!(app.form.is_none());
+            assert_eq!(
+                app.document_imports.items[0].outcome,
+                ImportOutcome::Registered
+            );
+            assert_eq!(
+                app.document_imports.items[1].outcome,
+                ImportOutcome::Pending
+            );
+            app.next_document_import(cx);
+        });
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert_eq!(app.document_imports.items[1].outcome, ImportOutcome::Failed)
+        });
+        host.plan(LIST).send((200, json!([summary()]))).unwrap();
+        host.plan(DETAIL).send((200, detail)).unwrap();
+        view.update(cx, |app, cx| app.next_document_import(cx));
+        cx.run_until_parked();
+        view.update(cx, |app, cx| {
+            assert!(app.form.is_none());
+            assert!(!app.document_imports.pending());
+            assert_eq!(
+                app.document_imports.items[2].outcome,
+                ImportOutcome::Duplicate
+            );
+            assert!(app.verified.is_none());
+            app.disconnect(cx);
+            assert!(app.document_imports.items.is_empty());
+        });
+        assert_eq!(
+            host.routes()
+                .iter()
+                .filter(|route| route.starts_with(CREATE))
+                .count(),
+            1
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     #[gpui::test]
     fn duplicate_native_import_rereads_the_existing_source_without_a_post(
         cx: &mut gpui::TestAppContext,
@@ -425,6 +697,10 @@ mod tests {
             cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
         view.update(cx, |app, cx| {
             prepare(app, &host);
+            app.document_imports =
+                DocumentImports::selected(vec!["referto.txt".into(), "successivo.txt".into()])
+                    .unwrap();
+            app.document_imports.next();
             app.receive_document_file(Ok(Ok(upload())), cx);
         });
         cx.run_until_parked();
@@ -439,6 +715,16 @@ mod tests {
         view.update(cx, |app, cx| app.confirm_form(cx));
         cx.run_until_parked();
         view.update(cx, |app, cx| {
+            app.next_document_import(cx);
+            assert_eq!(app.document_imports.active, Some(0));
+            assert_eq!(
+                app.document_imports.items[0].outcome,
+                ImportOutcome::Reviewing
+            );
+            assert_eq!(
+                app.document_imports.items[1].outcome,
+                ImportOutcome::Pending
+            );
             let form = app.form.as_ref().unwrap();
             assert!(form.state == FormState::Uncertain);
             assert_eq!(form.upload.as_ref().unwrap().bytes.as_slice(), b"prova");

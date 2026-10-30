@@ -12,6 +12,57 @@ use std::{
 use zeroize::Zeroizing;
 
 pub const MAX_DOCUMENT_BYTES: usize = 10 * 1024 * 1024;
+pub const TEXT_WINDOW_CHARS: usize = 65_536;
+
+pub fn original_text(attachment: &Attachment) -> Result<Zeroizing<String>, String> {
+    let bytes = decode_attachment(attachment).map_err(|error| error.to_string())?;
+    if attachment.mime_type != "text/plain" {
+        return Err(
+            "Formato non supportato dall’anteprima locale. L’allegato non è stato modificato."
+                .into(),
+        );
+    }
+    if bytes.starts_with(b"%PDF-")
+        || bytes.starts_with(b"\x89PNG")
+        || bytes.starts_with(b"\xff\xd8\xff")
+        || bytes.starts_with(b"GIF8")
+        || bytes.starts_with(b"RIFF")
+        || bytes.starts_with(b"BM")
+    {
+        return Err(
+            "Il tipo dichiarato non corrisponde al contenuto del documento. Anteprima interrotta."
+                .into(),
+        );
+    }
+    let text = std::str::from_utf8(&bytes).map_err(
+        |_| "Il testo non è un documento UTF-8 valido. L’allegato non è stato modificato.",
+    )?;
+    if text
+        .chars()
+        .any(|ch| matches!(ch, '\0'..='\u{8}' | '\u{b}' | '\u{e}'..='\u{1f}' | '\u{7f}'))
+    {
+        return Err(
+            "Il testo non è un documento UTF-8 valido. L’allegato non è stato modificato.".into(),
+        );
+    }
+    Ok(Zeroizing::new(text.to_owned()))
+}
+
+pub fn text_window(text: &str, page: usize) -> Option<(&str, usize)> {
+    let count = text.chars().count().div_ceil(TEXT_WINDOW_CHARS).max(1);
+    if page >= count {
+        return None;
+    }
+    let start = text
+        .char_indices()
+        .nth(page * TEXT_WINDOW_CHARS)
+        .map_or(text.len(), |(at, _)| at);
+    let end = text[start..]
+        .char_indices()
+        .nth(TEXT_WINDOW_CHARS)
+        .map_or(text.len(), |(at, _)| start + at);
+    Some((&text[start..end], count))
+}
 
 #[derive(Clone)]
 pub struct Upload {
@@ -653,5 +704,52 @@ mod import_tests {
         ));
         std::fs::remove_file(empty).unwrap();
         std::fs::remove_dir(root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod original_tests {
+    use super::*;
+    fn attachment(mime: &str, bytes: &[u8]) -> Attachment {
+        serde_json::from_value(serde_json::json!({"id":"file-a","patientId":"patient-a","name":"sintetico.txt","path":"sintetico.txt","type":mime,"size":bytes.len(),"data":format!("data:{mime};base64,{}", STANDARD.encode(bytes))})).unwrap()
+    }
+    #[test]
+    fn original_is_literal_utf8_and_rejects_binary_locked_and_unsupported_sources() {
+        let row = attachment(
+            "text/plain",
+            "# Titolo <script> 🩺\nTesto originale".as_bytes(),
+        );
+        assert_eq!(
+            original_text(&row).unwrap().as_str(),
+            "# Titolo <script> 🩺\nTesto originale"
+        );
+        for bytes in [b"%PDF-1.7".as_slice(), b"\xff", b"testo\0nullo"] {
+            assert!(original_text(&attachment("text/plain", bytes)).is_err());
+        }
+        assert!(
+            original_text(&attachment("application/pdf", b"%PDF-1.7"))
+                .unwrap_err()
+                .contains("Formato non supportato")
+        );
+        let mut locked = row.clone();
+        locked.locked_fields.push("data".into());
+        assert!(original_text(&locked).is_err());
+        locked = row.clone();
+        locked.data = None;
+        assert!(original_text(&locked).is_err());
+        locked = row;
+        locked.size += 1;
+        assert!(original_text(&locked).is_err());
+    }
+    #[test]
+    fn original_pages_keep_every_character_at_unicode_boundaries() {
+        let text = format!("{}🩺è\nUltima pagina", "a".repeat(TEXT_WINDOW_CHARS - 1));
+        let (first, count) = text_window(&text, 0).unwrap();
+        let (second, _) = text_window(&text, 1).unwrap();
+        assert_eq!(count, 2);
+        assert!(first.ends_with('🩺'));
+        assert_eq!(format!("{first}{second}"), text);
+        assert!(text_window(&text, 2).is_none());
+        assert_eq!(text_window("", 0), Some(("", 1)));
     }
 }

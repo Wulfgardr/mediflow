@@ -552,3 +552,14 @@ sessione, senza coinvolgere il Supervisor. [ADR 0172](../adr/0172-gpui-local-web
 e [prove e superfici di autorizzazione](2026-10-30-gpui-local-host/README.md)
 registrano la composizione proposta. Restano aperti gli altri residui sopra;
 nessuna chiusura complessiva G-2/G-4 o esclusione approvata è introdotta.
+
+## Delta del 30 ottobre 2026: importazione multipla e originale testuale
+
+Il [dossier del contributo](2026-10-30-gpui-g2-g4-rest/README.md) registra
+la tranche successiva alla base `c8b27824b`. G-2 e G-4 restano parziali.
+
+| Righe | Incremento | Residuo |
+| --- | --- | --- |
+| G-4a | Picker multiplo fino a 20 file, un candidato letto alla volta; revisione, conferma e rilettura separate; esiti per file, senza avanzamento dopo esito incerto. Originale testuale UTF-8 nella vista, paginazione senza perdita di caratteri, fonte assente/illeggibile/estranea e ritiro dei callback precedenti. | Renderer PDF/immagini e qualifica completa del percorso nativo installato. Deduplicazione preventiva, non atomica fra client. |
+| G-4b/c/d | I limiti sono visibili nel client. Nuova scheda da documento indica non disponibile e non duplica C-6/PR #736. | Curation, revisione dei dati estratti, mapping e importazione strutturata CSV, raccordo al comando C-6 dopo integrazione. |
+| G-2 | Nessuna modifica. | Sicurezza account, gestione completa dei modelli e restanti pagine amministrative del censimento. |
