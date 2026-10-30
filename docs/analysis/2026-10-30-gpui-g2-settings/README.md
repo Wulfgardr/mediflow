@@ -115,3 +115,34 @@ componente condiviso. Corretti senza togliere le asserzioni di comportamento.
 Il primo giro unitario manca dei tre asset pubblici macOS obbligatori: trovate
 copie locali con hash identici ai pin e configurate nelle prove successive.
 Nessun guard, soglia o test è stato disabilitato.
+
+### Controlli prima della pubblicazione
+
+Workspace Rust e tutti i target: **518 passate, zero fallite, dieci ignorate**
+già previste dalla base. Le prove finali mirate coprono anche il percorso
+positivo dei modelli, la rilettura discordante, la modifica parziale e il
+ritiro dell'avviso dopo rotazione confermata. I dieci casi ignorati richiedono
+un ancestor firmato o i loro harness di integrazione nominati; non sono stati
+aggiunti skip. La review indipendente non è sostituita da queste prove.
+
+- `cargo fmt --check` su tutti i membri e Clippy workspace/all-targets/locked
+  con `-Dwarnings`: passati. Su questo Mac è usata
+  `gpui_platform/runtime_shaders`; resta l'avviso upstream di compatibilità
+  futura di `block 0.1.6`, senza nuove soppressioni.
+- `npm run test:unit`, Node 24.18.0, sul selettore finale: **9.028 passate,
+  zero fallite, 24 saltate** nei tre gruppi, inclusi i due gruppi seriali WHO.
+- `node --test scripts/check-test-selection.test.mjs`: **45 passate**.
+  Inventario completo: 1.333 file di test, 1.289 selezionati, 44 esclusioni
+  motivate già previste. I nuovi moduli con prove sono selezionati; i moduli
+  senza prove sono verificati come sorgenti necessarie, senza inventare test.
+- `node scripts/check-never-regress.mjs`, claims guard e `npm run lint`:
+  passati. Nessuna nuova lineetta lunga nei testi aggiunti.
+- `npm run build`: passato in un clone fisico isolato della revisione
+  `8da465d7b`, con la stessa esclusione puntuale della fixture SQLite adottata
+  dalla CI. Metadata admission, manifest Node 24.18.0/ABI 137 e controllo
+  standalone passati. Il primo tentativo nel checkout completo è stato
+  correttamente negato dal guard; la fixture originale è conservata.
+
+I log integrali, i sorgenti temporanei e la serie completa delle catture sono
+in `~/Antigravity/mf-hillclimb-20261028/gpui-g2-6c99ff83c/`, fuori da Git.
+Nessun merge, installazione del candidato o qualifica clinica è attestato.
