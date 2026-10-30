@@ -36,6 +36,7 @@ pub enum DocumentError {
     NotFile,
     Name,
     TooLarge,
+    Empty,
     Locked,
     MissingData,
     InvalidData,
@@ -48,6 +49,7 @@ impl std::fmt::Display for DocumentError {
             Self::NotReadable => "Il file scelto non può essere letto. Controlla che sia disponibile e accessibile.",
             Self::NotFile => "Scegli un documento, non una cartella o un dispositivo.",
             Self::Name => "Il nome del documento non è utilizzabile. Rinomina il file prima di sceglierlo.",
+            Self::Empty => "Il file scelto è vuoto. Scegli un documento con contenuto.",
             Self::TooLarge => "Il documento supera il limite di 10 MiB per questa finestra.",
             Self::Locked => "Il contenuto cifrato del documento non è leggibile con questo accesso.",
             Self::MissingData => "La lettura non include il contenuto del documento. Non è stata creata una copia.",
@@ -113,6 +115,9 @@ pub fn read_selected_file(path: &Path) -> Result<Upload, DocumentError> {
         .map_err(|_| DocumentError::NotReadable)?;
     if bytes.len() > MAX_DOCUMENT_BYTES {
         return Err(DocumentError::TooLarge);
+    }
+    if bytes.is_empty() {
+        return Err(DocumentError::Empty);
     }
     let extension = path
         .extension()
@@ -527,5 +532,126 @@ mod tests {
         );
         std::fs::remove_file(path).unwrap();
         std::fs::remove_dir(directory).unwrap();
+    }
+}
+
+pub enum ImportAdmission {
+    New(Upload),
+    Duplicate { existing_id: String },
+}
+
+pub fn admit_import(
+    upload: Upload,
+    rows: &[Attachment],
+    mut read: impl FnMut(&str) -> Result<Attachment, mediflow_runtime_client::RuntimeError>,
+) -> Result<ImportAdmission, mediflow_runtime_client::RuntimeError> {
+    for row in rows {
+        if row.size != upload.bytes.len() as u64 || row.mime_type != upload.mime_type {
+            continue;
+        }
+        let detail = read(&row.id)?;
+        if detail.id != row.id || detail.patient_id != row.patient_id {
+            return Err(mediflow_runtime_client::RuntimeError::InvalidResponse);
+        }
+        let bytes = decode_attachment(&detail)
+            .map_err(|_| mediflow_runtime_client::RuntimeError::InvalidResponse)?;
+        if bytes.as_slice() == upload.bytes.as_slice() {
+            return Ok(ImportAdmission::Duplicate {
+                existing_id: row.id.clone(),
+            });
+        }
+    }
+    Ok(ImportAdmission::New(upload))
+}
+
+#[cfg(test)]
+mod import_tests {
+    use super::*;
+    use mediflow_runtime_client::RuntimeError;
+
+    fn upload() -> Upload {
+        Upload {
+            name: "referto.txt".into(),
+            mime_type: "text/plain".into(),
+            bytes: Arc::new(Zeroizing::new(b"prova".to_vec())),
+        }
+    }
+    fn row() -> Attachment {
+        serde_json::from_value(serde_json::json!({"id":"file-a", "patientId":"patient-a", "name":"altro-nome.txt", "path":"altro-nome.txt", "type":"text/plain", "size":5, "data":"data:text/plain;base64,cHJvdmE="})).unwrap()
+    }
+    #[test]
+    fn same_content_under_another_name_is_a_duplicate_not_a_new_import() {
+        let row = row();
+        let mut reads = vec![];
+        let admitted = admit_import(upload(), std::slice::from_ref(&row), |id| {
+            reads.push(id.to_owned());
+            Ok(row.clone())
+        })
+        .unwrap();
+        assert_eq!(reads, ["file-a"]);
+        assert!(
+            matches!(admitted, ImportAdmission::Duplicate { existing_id } if existing_id == "file-a")
+        );
+    }
+    #[test]
+    fn missing_unreadable_and_foreign_candidates_cannot_admit_a_new_import() {
+        for error in [
+            RuntimeError::Missing,
+            RuntimeError::Forbidden,
+            RuntimeError::Transport,
+        ] {
+            assert!(
+                matches!(admit_import(upload(), &[row()], |_| Err(error)), Err(e) if e == error)
+            );
+        }
+        for mode in 0..4 {
+            let mut detail = row();
+            match mode {
+                0 => detail.data = None,
+                1 => detail.locked_fields = vec!["data".into()],
+                2 => detail.patient_id = "other-patient".into(),
+                _ => detail.id = "other-file".into(),
+            }
+            assert!(matches!(
+                admit_import(upload(), &[row()], |_| Ok(detail.clone())),
+                Err(RuntimeError::InvalidResponse)
+            ));
+        }
+    }
+    #[test]
+    fn equal_size_different_content_is_admitted_and_irrelevant_rows_are_not_read() {
+        let mut detail = row();
+        detail.data = Some("data:text/plain;base64,YWx0cm8=".into());
+        assert!(matches!(
+            admit_import(upload(), &[row()], |_| Ok(detail.clone())).unwrap(),
+            ImportAdmission::New(_)
+        ));
+        detail.size = 6;
+        assert!(matches!(
+            admit_import(upload(), &[detail], |_| panic!("unrelated size")).unwrap(),
+            ImportAdmission::New(_)
+        ));
+    }
+    #[test]
+    fn absent_empty_and_directory_selections_do_not_become_documents() {
+        let root =
+            std::env::temp_dir().join(format!("mediflow-import-negative-{}", std::process::id()));
+        std::fs::create_dir(&root).unwrap();
+        let empty = root.join("empty.txt");
+        std::fs::write(&empty, []).unwrap();
+        assert!(matches!(
+            read_selected_file(&root.join("missing.txt")),
+            Err(DocumentError::NotReadable)
+        ));
+        assert!(matches!(
+            read_selected_file(&root),
+            Err(DocumentError::NotFile)
+        ));
+        assert!(matches!(
+            read_selected_file(&empty),
+            Err(DocumentError::Empty)
+        ));
+        std::fs::remove_file(empty).unwrap();
+        std::fs::remove_dir(root).unwrap();
     }
 }

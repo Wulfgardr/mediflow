@@ -10,7 +10,9 @@ mod ambulatory_commands;
 mod analytics;
 #[cfg(unix)]
 mod chat_access;
+mod clinical_forms;
 mod document_details;
+mod document_library;
 pub(crate) mod local_preferences;
 mod local_settings;
 #[cfg(test)]
@@ -18,6 +20,7 @@ mod notes_recovery_tests;
 #[cfg(test)]
 pub(crate) mod rendered_command;
 mod scales;
+mod settings;
 mod therapy_picker;
 mod threshold_actions;
 mod view_state;
@@ -70,9 +73,11 @@ use account_profile::AccountProfile;
 use ai_preferences::AiPreferences;
 use ai_status::AiRuntimeObservation;
 use analytics::AnalyticsArea;
+use document_library::DocumentOperation;
 use local_preferences::{LocalPreferences, LocalPreferencesStore};
 use local_settings::{PreferenceChange, PreferenceIssue};
 use scales::{ScaleArea, ScaleAssessment};
+use settings::SettingsPage;
 use therapy_picker::TherapySelection;
 use view_state::{ReadLoad, ReadObject, ViewState, ViewStateKind};
 use who_lookup::WhoLookup;
@@ -394,7 +399,7 @@ pub struct ClinicalApp {
     show_tls_pin: bool,
     login_scroll: gpui::ScrollHandle,
     connecting: bool,
-    document_busy: bool,
+    document_operation: DocumentOperation,
     copy_state: Option<documents::CopyState>,
     edit_pending: bool,
     focus_first_field: bool,
@@ -431,6 +436,8 @@ pub struct ClinicalApp {
     ai_status: Load<AiRuntimeObservation>,
     ai_refresh_target: ScrollTarget,
     ai_preferences: AiPreferences,
+    settings_page: SettingsPage,
+    settings_targets: [ScrollTarget; 6],
     account_profile: AccountProfile,
     who: WhoLookup,
     scales: ScaleArea,
@@ -657,7 +664,7 @@ impl ClinicalApp {
             settings_appearance: ScrollTarget::group(&area_scroll, cx),
             login_scroll,
             connecting: false,
-            document_busy: false,
+            document_operation: DocumentOperation::Idle,
             copy_state: None,
             edit_pending: false,
             focus_first_field: false,
@@ -682,6 +689,8 @@ impl ClinicalApp {
             reference_run_target: ScrollTarget::new(&area_scroll, cx),
             ai_refresh_target: ScrollTarget::new(&area_scroll, cx),
             ai_preferences: AiPreferences::new(&area_scroll, cx),
+            settings_page: SettingsPage::Overview,
+            settings_targets: ScrollTarget::group(&area_scroll, cx),
             account_profile: AccountProfile::new(Theme::for_dark(false), cx),
             who: WhoLookup::new(&area_scroll, cx),
             scales: ScaleArea::new(&area_scroll, theme, cx),
@@ -860,12 +869,15 @@ impl ClinicalApp {
         self.read_timer = None;
         self.read_state_commands.clear();
         self.ai_preferences.reset();
+        if self.settings_page == SettingsPage::AiPreferences {
+            self.settings_page = SettingsPage::Overview;
+        }
         self.who.reset();
         self.patient.document_details_id = None;
         if let Some(intent) = self.profile_query_intent.take() {
             intent.cancel();
         }
-        self.document_busy = false;
+        self.document_operation = DocumentOperation::Idle;
         self.edit_pending = false;
         self.ai_status = Load::Idle;
         self.epoch = self
@@ -1069,6 +1081,7 @@ impl ClinicalApp {
         self.analytics.reset(cx);
         self.scales.reset(cx);
         self.account_profile.reset(self.theme, cx);
+        self.settings_page = SettingsPage::Overview;
         self.ambulatory_management.reset(self.theme, cx);
         self.focus_after_render = true;
         self.focus_search_after_render = false;
@@ -1557,13 +1570,20 @@ impl ClinicalApp {
             }
         } else if self.area == Area::Settings {
             if self
+                .settings_targets
+                .iter()
+                .any(|target| target.reveal_if_focused(window, cx))
+            {
+                return;
+            }
+            if self
                 .settings_appearance
                 .iter()
                 .any(|target| target.reveal_if_focused(window, cx))
             {
                 return;
             }
-            if self.ai_preferences.active {
+            if self.settings_page == SettingsPage::AiPreferences {
                 self.ai_preferences.reveal_if_focused(window, cx);
             } else {
                 self.ai_refresh_target.reveal_if_focused(window, cx);
@@ -1610,7 +1630,7 @@ impl ClinicalApp {
             && self.form.is_none()
             && self.discard.is_none()
             && !self.edit_pending
-            && !self.document_busy
+            && self.document_operation == DocumentOperation::Idle
             && !self.show_other
     }
 
@@ -1740,7 +1760,7 @@ impl ClinicalApp {
         }
         if action == Discard::Reload
             && self.area == Area::Settings
-            && self.ambulatory_management.active
+            && (self.settings_page == SettingsPage::Ambulatories)
         {
             if !self.ambulatory_management.is_saving()
                 && !matches!(self.ambulatories, Load::Loading)
@@ -1750,7 +1770,7 @@ impl ClinicalApp {
             }
             return;
         }
-        if action == Discard::Reload && self.ai_preferences.active {
+        if action == Discard::Reload && (self.settings_page == SettingsPage::AiPreferences) {
             self.load_ai_preferences(cx);
             return;
         }
@@ -1990,7 +2010,7 @@ impl ClinicalApp {
     }
 
     fn open_form(&mut self, kind: FormKind, _window: &mut Window, cx: &mut Context<Self>) {
-        if self.edit_pending || self.document_busy {
+        if self.edit_pending || self.document_operation != DocumentOperation::Idle {
             return;
         }
         if !self.can_write(kind) {
@@ -2433,6 +2453,11 @@ impl ClinicalApp {
                 return;
             };
             self.run(move || {
+                let rows = session.list_attachments(&scope, &id)?;
+                let upload = match documents::admit_import(upload, &rows, |attachment| session.read_attachment(&scope, &id, attachment))? {
+                    documents::ImportAdmission::New(upload) => upload,
+                    documents::ImportAdmission::Duplicate { .. } => return Err(RuntimeError::Conflict),
+                };
                 let created = session.create_attachment(&scope, &id, &upload.name, &upload.mime_type, &upload.bytes)?;
                 after_create_read(session.read_attachment(&scope, &id, &created.id), |row| row.id == created.id && row.patient_id == id && upload.matches(&row))
             }, |this, result, cx| {
@@ -4450,50 +4475,6 @@ impl ClinicalApp {
             ))
     }
 
-    fn documents_view(&self, cx: &Context<Self>) -> Div {
-        let theme = self.theme;
-        let writable = self.form.is_none()
-            && !self.document_busy
-            && self.can_write(FormKind::Document)
-            && self
-                .patient
-                .detail
-                .ready()
-                .is_some_and(|patient| !patient.is_archived && patient.deleted_at.is_none());
-        div().min_w_0().max_w_full().flex().flex_col().gap(px(16.))
-            .child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
-                .child(heading("clinical-workspace-documents-heading", "Documenti", theme))
-                .child(button("clinical-workspace-new-document", "Aggiungi documento…", theme, true, writable)
-                    .when(writable, |el| el.on_click(cx.listener(|this, _, _, cx| this.pick_document(cx))))))
-            .child(div().text_color(theme.secondary).child(text!("Prima del salvataggio puoi annullare la copia cambiando scheda o bloccando la sessione. Una copia già avviata può completarsi anche dopo il blocco.")))
-            .when(self.document_busy, |el| el.child(notice("clinical-workspace-document-operation", "Operazione sul documento in corso…", theme, false)))
-            .when_some(self.patient.attachments.state(ReadObject::Documenti), |el, state| el.child(self.render_read_state("clinical-workspace-attachments-state", state, cx)))
-            .when(self.patient.attachments.ready().is_some_and(Vec::is_empty), |el| el.child(text!("Nessun documento presente nella scheda.")))
-            .children(self.patient.attachments.ready().into_iter().flatten().map(|row| {
-                let name = if row.locked_fields.iter().any(|field| field == "name") { "Nome del documento non leggibile".into() } else { row.name.clone() };
-                let can_open = !self.document_busy && self.form.is_none();
-                let available = can_open && !self.copy_state.is_some_and(documents::CopyState::is_writing) && documents::original_readable(row);
-                let details_open = self.patient.document_details_id.as_deref() == Some(row.id.as_str());
-                let details_id = row.id.clone();
-                let id = row.id.clone();
-                div().id(SharedString::from(format!("clinical-workspace-document-{id}")))
-                    .min_w_0().max_w_full()
-                    .border_b_1().border_color(theme.rule).py(px(16.)).flex().flex_col().gap(px(8.))
-                    .child(div().min_w_0().max_w_full().type_role(theme, crate::theme::TextRole::Strong).child(crate::title::title(crate::title::TitleText::name(name), theme)))
-                    .child(div().min_w_0().max_w_full().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
-                        .child(text!(format!("{} · {} · {}", row.mime_type, format_size(row.size), display_date(row.created_at.as_deref())))))
-                    .child(div().min_w_0().max_w_full().flex().flex_wrap().gap(px(8.))
-                        .child(button(format!("clinical-workspace-document-details-{id}"), if details_open { "Chiudi sintesi e fonte" } else { "Sintesi e fonte" }, theme, false, can_open)
-                            .aria_expanded(details_open)
-                            .when(can_open, |el| el.on_click(cx.listener(move |this, _, _, cx| this.toggle_document_details(&details_id, cx)))))
-                        .child(button(format!("clinical-workspace-download-document-{id}"), "Salva una copia…", theme, false, available)
-                            .when(available, |el| el.on_click(cx.listener(move |this, _, _, cx| this.download_document(&id, cx))))))
-                    .when(details_open, |el| el.child(self.document_details_view(row, cx)))
-            }))
-            .child(div().text_color(theme.secondary).child(text!("Ogni caricamento richiede revisione e conferma. Il limite per file è 10 MiB. Le copie vengono salvate soltanto nella destinazione che scegli.")))
-            .child(self.current_module_button("clinical-workspace-manage-documents", "Anteprima dell'originale e gestione…", PatientSection::Documents, cx))
-    }
-
     fn current_module_button(
         &self,
         id: &'static str,
@@ -4526,931 +4507,6 @@ impl ClinicalApp {
                 FormKind::PatientProfile => "network.replica.write-patient-profile",
             })
         })
-    }
-
-    fn form_view(&self, cx: &Context<Self>) -> Div {
-        let theme = self.theme;
-        let Some(form) = &self.form else {
-            return div();
-        };
-        let review = form.state != FormState::Draft;
-        let comparison = form.kind == FormKind::Notes && self.core.has_notes_comparison();
-        div().min_w_0().max_w_full().flex().flex_col().gap(px(20.))
-            .when(comparison, |el| el.child(self.notes_comparison_view()))
-            .when(!comparison, |el| el.child(div().flex().flex_col().gap(px(8.))
-                .child(section("clinical-workspace-draft-heading", if review { "RIVEDI PRIMA DI REGISTRARE" } else { "BOZZA NON REGISTRATA" }, theme))
-                .child(div().text_color(theme.fresh).child(crate::title::title(form.edit.as_ref().map_or(form.kind.title(), editing::Record::title), theme).with_role(crate::theme::TitleRole::PageTitle)))
-                .child(div().text_color(theme.secondary).child(text!(match form.kind {
-                    FormKind::Notes => "La conferma sostituisce soltanto le note della scheda del paziente indicato.",
-                    FormKind::Entry => "Questa voce è una nota di diario. Per una visita strutturata, un contatto remoto o allegati usa l'editor corrente.",
-                    FormKind::Scale => "La valutazione utilizza il questionario letto dall'host.",
-                    FormKind::Therapy => "Scegli il farmaco dal repertorio oppure riporta una terapia a testo libero. Verifica dose, motivo e date: la scelta della confezione non li modifica.",
-                    FormKind::Observation => "Riporta il valore e le codifiche presenti nel referto. Non vengono dedotte unità, intervalli o interpretazioni cliniche.",
-                    FormKind::Document => "Il documento scelto verrà aggiunto alla scheda del paziente indicato. Verifica nome, formato e dimensione prima di registrarlo.",
-                    FormKind::Checkup if form.edit.is_none() => "Indica la data e l'ora del controllo nel fuso del computer. L'orario è richiesto e non viene scelto automaticamente.",
-                    FormKind::Checkup => "Data e ora sono nel fuso del computer. Se non le modifichi, l'orario registrato resta invariato.",
-                    FormKind::PatientNew => "La scheda verrà creata nell'ambulatorio selezionato. I campi non compilati resteranno senza un valore riportato.",
-                    FormKind::PatientProfile => "La conferma aggiorna soltanto i campi anagrafici che hai modificato. Le note e gli altri dati clinici restano fuori da questa modifica.",
-                })))))
-            .when_some(form.upload.as_ref(), |el, upload| el.child(div().flex().flex_col().gap(px(12.))
-                .child(div().type_role(theme, crate::theme::TextRole::Strong).child(text!(upload.name.clone())))
-                .child(div().type_role(theme, crate::theme::TextRole::Meta).child(text!(upload.mime_type.clone())))
-                .child(text!(format!("{} · copia scelta in memoria", format_size(upload.bytes.len() as u64))))
-                .child(div().text_color(theme.secondary).child(text!("Il formato è associato all'estensione del file. La conferma non interpreta il contenuto e non apre il documento.")))))
-            .when(form.kind == FormKind::Therapy, |el| el.child(self.therapy_picker_view(cx)))
-            .children(form.fields.iter().enumerate()
-                .filter(|(index, field)| !(form.kind == FormKind::Therapy && *index == 0 && field.read_only))
-                .map(|(index, field)| self.field_view(field, format!("clinical-workspace-form-field-{index}"), cx)))
-            .when(form.kind == FormKind::Entry && !review, |el| el.child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
-                .child(text!("Il testo della nuova nota è semplice. Le voci già presenti conservano il loro formato originale nell'archivio."))))
-    }
-
-    fn notes_comparison_view(&self) -> Div {
-        let theme = self.theme;
-        let patient = self.patient.detail.ready();
-        div()
-            .min_w_0()
-            .max_w_full()
-            .flex()
-            .flex_col()
-            .gap(px(16.))
-            .child(
-                div()
-                    .id("clinical-notes-recorded")
-                    .debug_selector(|| "clinical-notes-recorded".into())
-                    .accessibility_id("clinical-notes-recorded")
-                    .role(Role::Group)
-                    .aria_label("Registrato ora")
-                    .min_w_0()
-                    .max_w_full()
-                    .flex()
-                    .flex_col()
-                    .gap(px(8.))
-                    .child(
-                        div()
-                            .type_role(theme, crate::theme::TextRole::Strong)
-                            .child(text!("Registrato ora")),
-                    )
-                    .when_some(
-                        patient.and_then(|row| row.updated_at.as_deref()),
-                        |el, time| {
-                            el.child(
-                                div()
-                                    .type_role(theme, crate::theme::TextRole::Meta)
-                                    .text_color(theme.secondary)
-                                    .child(text!(display_appointment(time))),
-                            )
-                        },
-                    )
-                    .child(div().min_w_0().max_w_full().child(clinical_text::render(
-                        patient.and_then(|row| row.notes.as_deref()).unwrap_or(""),
-                        WritingInk::Dry,
-                        theme,
-                    ))),
-            )
-            .child(
-                div()
-                    .id("clinical-notes-your-draft")
-                    .debug_selector(|| "clinical-notes-your-draft".into())
-                    .accessibility_id("clinical-notes-your-draft")
-                    .type_role(theme, crate::theme::TextRole::Strong)
-                    .text_color(theme.fresh)
-                    .child(text!("La tua bozza")),
-            )
-    }
-
-    fn form_subject(
-        &self,
-        form: &Form,
-        patient_name: &mediflow_patient_client::PersonName,
-    ) -> String {
-        let mut subject = format!(
-            "{} · {}",
-            crate::title::TitleText::name(patient_name.clone()).text(),
-            form.edit
-                .as_ref()
-                .map_or(form.kind.title(), editing::Record::title)
-        );
-        if form.kind == FormKind::Notes && self.core.has_notes_comparison() && self.core.is_dirty()
-        {
-            subject.push_str(". La tua bozza sostituirà il testo registrato ora.");
-        }
-        subject
-    }
-
-    fn threshold_detail_text(&self, mode: ThresholdMode) -> String {
-        let patient = self
-            .patient
-            .detail
-            .ready()
-            .map(PatientDetail::display_name)
-            .unwrap_or_default();
-        if self.discard.is_some() {
-            if self
-                .form
-                .as_ref()
-                .and_then(|form| form.scale.as_ref())
-                .is_some_and(ScaleAssessment::has_attempt)
-            {
-                "Un invio potrebbe essere già registrato. La chiusura non annulla una voce nel Diario; copia la bozza e verifica il suo identificativo prima di un nuovo inserimento.".into()
-            } else {
-                "Il testo non registrato verrà eliminato da questa finestra.".into()
-            }
-        } else if let Some(form) = &self.form {
-            if form
-                .scale
-                .as_ref()
-                .is_some_and(ScaleAssessment::is_preparing)
-            {
-                "Le risposte restano una bozza. Nessuna registrazione è in corso.".into()
-            } else {
-                match form.state {
-                FormState::Draft => self.form_subject(form,&patient),
-                FormState::Review if mode == ThresholdMode::FullPlane => {
-                    let detail = "Per rivedere il contenuto torna alla bozza. La registrazione sarà confermata soltanto dopo la rilettura.";
-                    if form.kind == FormKind::Notes && self.core.has_notes_comparison() {
-                        format!("La tua bozza sostituirà il testo registrato ora. {detail}")
-                    } else { detail.into() }
-                }
-                FormState::Review if form.kind == FormKind::Notes && self.core.has_notes_comparison() => self.form_subject(form,&patient),
-                FormState::Review => "Controlla il contenuto qui sopra. La registrazione sarà confermata soltanto dopo la rilettura.".into(),
-                FormState::Saving => "La bozza resta visibile fino alla verifica. Non inviare di nuovo.".into(),
-                FormState::Conflict | FormState::Uncertain if form.kind == FormKind::Notes => {
-                    let state=ViewState::new(ReadObject::Scheda,if form.state==FormState::Conflict {ViewStateKind::Conflitto}else{ViewStateKind::EsitoDaVerificare});
-                    let (first,second)=state.lines();
-                    format!("{first} {}",second.unwrap_or_default())
-                }
-                _ if form.kind == FormKind::Scale => "La rilettura non invia la valutazione. Le risposte restano in questa finestra fino alla verifica o alla chiusura esplicita.".into(),
-                _ => "La bozza è conservata. Copia il testo se vuoi conservarlo, poi rileggi la scheda prima di una nuova modifica.".into(),
-            }
-            }
-        } else {
-            self.verified.clone().unwrap_or_else(|| {
-                if self
-                    .patient
-                    .detail
-                    .ready()
-                    .is_some_and(|patient| patient.is_archived)
-                {
-                    "Scheda archiviata · sola lettura".into()
-                } else {
-                    "Scheda letta dall'archivio · nessuna bozza aperta".into()
-                }
-            })
-        }
-    }
-
-    fn threshold_detail(&self, mode: ThresholdMode, _cx: &Context<Self>) -> gpui::AnyElement {
-        let detail = self.threshold_detail_text(mode);
-        div()
-            .id("clinical-workspace-threshold-detail")
-            .debug_selector(|| "threshold-detail".into())
-            .min_w_0()
-            .type_role(self.theme, crate::theme::TextRole::Meta)
-            .child(text!(detail))
-            .into_any_element()
-    }
-
-    fn confirmation_plane(
-        &self,
-        id: &'static str,
-        content: impl IntoElement,
-        layout: Layout,
-        cx: &Context<Self>,
-    ) -> Stateful<Div> {
-        use gpui::{AvailableSpace, canvas, size};
-        let mut measure = self
-            .threshold(layout, ThresholdMode::Complete, cx)
-            .into_any_element();
-        let mut measure_essential = self
-            .threshold(layout, ThresholdMode::Compact, cx)
-            .into_any_element();
-        let complete = self
-            .threshold(layout, ThresholdMode::Complete, cx)
-            .into_any_element();
-        let compact = self
-            .threshold(layout, ThresholdMode::Compact, cx)
-            .into_any_element();
-        let full_plane = self
-            .threshold(layout, ThresholdMode::FullPlane, cx)
-            .into_any_element();
-        let confirming = self
-            .form
-            .as_ref()
-            .is_some_and(|form| form.state == FormState::Review)
-            && self.discard.is_none();
-        let editing_text = self.discard.is_none()
-            && self.form.as_ref().is_some_and(|form| {
-                form.state == FormState::Draft
-                    && !form.fields.is_empty()
-                    && form.kind != FormKind::Scale
-            });
-        let detail = self.threshold_detail(ThresholdMode::Compact, cx);
-        let limited = self.threshold_recovery(layout, cx);
-        let has_recovery_region = limited.is_some();
-        let content = content.into_any_element();
-        let scroll = self.profile_scroll.clone();
-        let mode = self.threshold_mode.clone();
-        let scrolls_with_content = self.threshold_scrolls_with_content.clone();
-        let menu_open = self.threshold_menu_open.clone();
-        let question_focus = self.threshold_question.focus.clone();
-        let theme = self.theme;
-        div()
-            .id(id)
-            .flex_1()
-            .min_h_0()
-            .min_w_0()
-            .reading_surface(theme)
-            .rounded(px(theme.paper_radius))
-            .overflow_hidden()
-            .on_action(cx.listener(|this, _: &NextFocus, window, cx| {
-                if this.threshold_mode.get() == ThresholdMode::FullPlane {
-                    window.focus_next(cx);
-                    this.reveal_focused(window, cx);
-                    cx.stop_propagation();
-                } else {
-                    cx.propagate();
-                }
-            }))
-            .on_action(cx.listener(|this, _: &PreviousFocus, window, cx| {
-                if this.threshold_mode.get() == ThresholdMode::FullPlane {
-                    window.focus_prev(cx);
-                    this.reveal_focused(window, cx);
-                    cx.stop_propagation();
-                } else {
-                    cx.propagate();
-                }
-            }))
-            .on_action(cx.listener(|this, _: &Escape, window, cx| {
-                if this.threshold_mode.get() == ThresholdMode::FullPlane {
-                    this.cancel_review(window, cx);
-                    cx.stop_propagation();
-                } else {
-                    cx.propagate();
-                }
-            }))
-            .child(
-                canvas(
-                    move |bounds, window, cx| {
-                        let available = size(
-                            AvailableSpace::Definite(bounds.size.width),
-                            AvailableSpace::MaxContent,
-                        );
-                        let measured = measure.layout_as_root(available, window, cx);
-                        let essential = measure_essential.layout_as_root(available, window, cx);
-                        let mut decision = ThresholdLayout::measured(
-                            f32::from(bounds.size.height),
-                            f32::from(measured.height),
-                            f32::from(essential.height),
-                            confirming,
-                            layout,
-                        );
-                        decision.scrolls_with_content =
-                            editing_text && essential.height > bounds.size.height / 3.;
-                        scrolls_with_content.set(decision.scrolls_with_content);
-                        let minimum_content = px(theme.role(TypeRole::Body).line_height.ceil())
-                            .min(bounds.size.height);
-                        let recovery_height = bounds.size.height - minimum_content;
-                        let overflow = decision.mode == ThresholdMode::Compact
-                            && !confirming
-                            && !decision.scrolls_with_content
-                            && essential.height > recovery_height;
-                        if !overflow {
-                            menu_open.set(false);
-                        }
-                        if mode.replace(decision.mode) != decision.mode
-                            && decision.mode == ThresholdMode::FullPlane
-                        {
-                            scroll.set_offset(gpui::point(px(0.), px(0.)));
-                            window.focus(&question_focus, cx);
-                        }
-                        let mut plane = if decision.mode == ThresholdMode::FullPlane {
-                            div()
-                                .id("clinical-workspace-plane-scroll")
-                                .debug_selector(|| "threshold-full-plane".into())
-                                .size_full()
-                                .min_w_0()
-                                .track_scroll(&scroll)
-                                .overflow_y_scroll()
-                                .child(full_plane)
-                                .into_any_element()
-                        } else {
-                            let threshold = if decision.scrolls_with_content {
-                                complete
-                            } else if decision.mode == ThresholdMode::Compact {
-                                if overflow {
-                                    limited
-                                        .map(|bar| bar.max_h(recovery_height).into_any_element())
-                                        .unwrap_or_else(|| {
-                                            div()
-                                                .id("threshold-recovery-overflow")
-                                                .flex_shrink_0()
-                                                .min_h_0()
-                                                .max_h(recovery_height)
-                                                .overflow_y_scroll()
-                                                .child(compact)
-                                                .into_any_element()
-                                        })
-                                } else {
-                                    compact
-                                }
-                            } else {
-                                complete
-                            };
-                            let mut scrolling = div()
-                                .id("clinical-workspace-plane-scroll")
-                                .debug_selector(|| "threshold-scroll".into())
-                                .track_scroll(&scroll)
-                                .flex_1()
-                                .min_h(if confirming { px(0.) } else { minimum_content })
-                                .min_w_0()
-                                .overflow_y_scroll()
-                                .child(content)
-                                .when(
-                                    decision.mode == ThresholdMode::Compact
-                                        && !decision.scrolls_with_content
-                                        && (!overflow || !has_recovery_region),
-                                    |el| el.child(div().p(px(layout.margin)).child(detail)),
-                                );
-                            let mut plane = div().size_full().flex().flex_col().min_w_0();
-                            if decision.scrolls_with_content {
-                                scrolling = scrolling.child(threshold);
-                                plane = plane.child(scrolling);
-                            } else {
-                                plane = plane.child(scrolling).child(threshold);
-                            }
-                            plane.into_any_element()
-                        };
-                        plane.layout_as_root(
-                            size(
-                                AvailableSpace::Definite(bounds.size.width),
-                                AvailableSpace::Definite(bounds.size.height),
-                            ),
-                            window,
-                            cx,
-                        );
-                        plane.prepaint_at(bounds.origin, window, cx);
-                        plane
-                    },
-                    |_, mut plane, window, cx| plane.paint(window, cx),
-                )
-                .size_full(),
-            )
-    }
-
-    fn threshold(&self, layout: Layout, mode: ThresholdMode, cx: &Context<Self>) -> Stateful<Div> {
-        let theme = self.theme;
-        let compact = mode != ThresholdMode::Complete;
-        let mut threshold = div()
-            .id("clinical-workspace-save-threshold")
-            .debug_selector(|| "threshold-bar".into())
-            .accessibility_id("clinical-workspace-save-threshold")
-            .role(Role::Region)
-            .aria_label("Stato della scrittura")
-            .min_w_0()
-            .max_w_full()
-            .flex_shrink_0()
-            .border_t_1()
-            .border_color(theme.rule)
-            .px(px(layout.margin))
-            .py(px(12.))
-            .flex()
-            .flex_col()
-            .gap(px(12.))
-            .reading_surface(theme);
-        if let Some(action) = self.discard {
-            return threshold.bg(theme.draft)
-                .child(div().id("clinical-workspace-discard-question").accessibility_id("clinical-workspace-discard-question").role(Role::AlertDialog).aria_label("Scartare la bozza?")
-                    .child(text!(if compact { "Scartare la bozza?" } else if self.form.as_ref().and_then(|form| form.scale.as_ref()).is_some_and(ScaleAssessment::has_attempt) {
-                        "Chiudere la bozza? Un invio potrebbe essere già registrato. La chiusura non annulla una voce nel Diario; copia la bozza e verifica il suo identificativo prima di un nuovo inserimento."
-                    } else { "Scartare la bozza? Il testo non registrato verrà eliminato da questa finestra." })))
-                .child(div().flex().flex_wrap().gap(px(8.)).when(layout.compact, |el| el.w_full().flex_col().items_stretch())
-                    .child(self.form_actions[4].attach(button("clinical-workspace-keep-draft", "Conserva la bozza", theme, true, true))
-                        .on_click(cx.listener(|this, _, _, cx| { this.discard = None; cx.notify(); })))
-                    .child(self.form_actions[5].attach(button("clinical-workspace-discard-draft", "Scarta e rileggi", theme, false, true))
-                        .on_click(cx.listener(move |this, _, _, cx| this.finish_discard(action, cx)))));
-        }
-        let Some(form) = &self.form else {
-            threshold = threshold.child(
-                div()
-                    .flex()
-                    .flex_wrap()
-                    .items_center()
-                    .justify_between()
-                    .gap(px(8.))
-                    .when(layout.magnified, |el| el.flex_col().items_stretch())
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .type_role(theme, crate::theme::TextRole::Meta)
-                            .text_color(theme.secondary)
-                            .child(text!(if compact {
-                                if self.verified.is_some() {
-                                    "Registrata".into()
-                                } else {
-                                    "Scheda letta".into()
-                                }
-                            } else {
-                                self.verified.clone().unwrap_or_else(|| {
-                                    if self
-                                        .patient
-                                        .detail
-                                        .ready()
-                                        .is_some_and(|patient| patient.is_archived)
-                                    {
-                                        "Scheda archiviata · sola lettura".into()
-                                    } else {
-                                        "Scheda letta dall'archivio · nessuna bozza aperta".into()
-                                    }
-                                })
-                            })),
-                    )
-                    .when(layout.compact, |el| {
-                        el.child(
-                            button("clinical-workspace-refresh", "Rileggi", theme, false, true)
-                                .on_click(cx.listener(|this, _, _, cx| {
-                                    this.request_discard(Discard::Reload, cx)
-                                })),
-                        )
-                    }),
-            );
-            return threshold;
-        };
-        if form
-            .scale
-            .as_ref()
-            .is_some_and(ScaleAssessment::is_preparing)
-        {
-            return threshold
-                .bg(theme.draft)
-                .child(
-                    div()
-                        .id("clinical-scale-preparing")
-                        .accessibility_id("clinical-scale-preparing")
-                        .role(Role::Status)
-                        .child(text!("Preparazione della valutazione nell’archivio…")),
-                )
-                .when(!compact, |el| el.child(self.threshold_detail(mode, cx)));
-        }
-        if form.kind == FormKind::Notes && form.state == FormState::Draft && !self.core.is_dirty() {
-            return threshold.bg(theme.paper).child(
-                div()
-                    .flex()
-                    .flex_wrap()
-                    .items_center()
-                    .justify_between()
-                    .gap(px(12.))
-                    .child(
-                        div()
-                            .id("clinical-workspace-clean-notes-status")
-                            .role(Role::Status)
-                            .aria_label("Nessuna modifica da registrare.")
-                            .min_h(px(theme.role(TypeRole::Body).line_height))
-                            .type_role(theme, crate::theme::TextRole::Body)
-                            .text_color(theme.secondary)
-                            .child(text!("Nessuna modifica da registrare.")),
-                    )
-                    .child(
-                        self.form_actions[0]
-                            .attach(button(
-                                "clinical-workspace-cancel-form",
-                                "Torna alla scheda",
-                                theme,
-                                false,
-                                true,
-                            ))
-                            .on_click(cx.listener(|this, _, _, cx| this.close_clean_notes(cx))),
-                    ),
-            );
-        }
-        let review_enabled = form.scale.as_ref().is_none_or(ScaleAssessment::can_prepare);
-        let repeated_scale = form
-            .scale
-            .as_ref()
-            .is_some_and(ScaleAssessment::has_attempt);
-        let patient_name = if form.kind == FormKind::PatientNew {
-            mediflow_patient_client::format_patient_name(
-                &form
-                    .fields
-                    .first()
-                    .map(|field| field.value(cx))
-                    .unwrap_or_default(),
-                &form
-                    .fields
-                    .get(1)
-                    .map(|field| field.value(cx))
-                    .unwrap_or_default(),
-            )
-            .into()
-        } else {
-            self.patient
-                .detail
-                .ready()
-                .map(PatientDetail::display_name)
-                .unwrap_or_default()
-        };
-        let subject = self.form_subject(form, &patient_name);
-        match form.state {
-            FormState::Draft => threshold
-                .bg(theme.draft)
-                .border_color(theme.draft_rule)
-                .child(
-                    div()
-                        .flex()
-                        .flex_wrap()
-                        .items_center()
-                        .justify_between()
-                        .gap(px(12.))
-                        .when(layout.compact && form.kind == FormKind::Notes, |el| {
-                            el.flex_col().items_stretch()
-                        })
-                        .when(compact, |el| el.flex_col().items_stretch())
-                        .child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .flex()
-                                .flex_col()
-                                .gap(px(4.))
-                                .child(writing_status(
-                                    "clinical-workspace-writing-status",
-                                    WritingInk::Fresh,
-                                    WritingSurface::Plane,
-                                    theme,
-                                ))
-                                .when(!compact, |el| {
-                                    el.child(
-                                        div()
-                                            .min_w_0()
-                                            .max_w_full()
-                                            .whitespace_normal()
-                                            .type_role(theme, crate::theme::TextRole::Meta)
-                                            .child(text!(subject)),
-                                    )
-                                }),
-                        )
-                        .child(
-                            div()
-                                .flex()
-                                .flex_wrap()
-                                .gap(px(8.))
-                                .when(layout.compact, |el| el.w_full().flex_col().items_stretch())
-                                .child(
-                                    self.form_actions[0]
-                                        .attach(button(
-                                            "clinical-workspace-cancel-form",
-                                            if form.kind == FormKind::Notes {
-                                                "Scarta la bozza"
-                                            } else {
-                                                "Scarta…"
-                                            },
-                                            theme,
-                                            false,
-                                            true,
-                                        ))
-                                        .on_click(cx.listener(|this, _, _, cx| {
-                                            this.request_discard(Discard::Form, cx)
-                                        })),
-                                )
-                                .child(
-                                    self.form_actions[1]
-                                        .attach_enabled(
-                                            button(
-                                                "clinical-workspace-review-save",
-                                                threshold_actions::Command::Review
-                                                    .primary_label(form.kind),
-                                                theme,
-                                                true,
-                                                review_enabled,
-                                            )
-                                            .debug_selector(|| {
-                                                "clinical-workspace-review-save".into()
-                                            }),
-                                            review_enabled,
-                                        )
-                                        .when(review_enabled, |el| {
-                                            el.on_click(cx.listener(|this, _, window, cx| {
-                                                this.review_form(window, cx)
-                                            }))
-                                        }),
-                                ),
-                        ),
-                ),
-            FormState::Review => threshold
-                .bg(theme.paper)
-                .text_color(theme.ink)
-                .child(self.threshold_question.attach_enabled(
-                    confirmation_heading(
-                        if repeated_scale {
-                            crate::title::TitleText::patient_question(
-                                "Ripetere l’invio della stessa valutazione per ",
-                                patient_name.clone(),
-                                "?",
-                            )
-                        } else if form.kind == FormKind::PatientNew {
-                            crate::title::TitleText::patient_question(
-                                "Creare la scheda di ",
-                                patient_name.clone(),
-                                " nell'ambulatorio selezionato?",
-                            )
-                        } else {
-                            crate::title::TitleText::patient_question(
-                                confirmation_prefix(
-                                    1,
-                                    if form.edit.is_some() {
-                                        "modifica"
-                                    } else {
-                                        form.kind.noun()
-                                    },
-                                ),
-                                patient_name.clone(),
-                                "?",
-                            )
-                        },
-                        theme,
-                    ),
-                    mode == ThresholdMode::FullPlane,
-                ))
-                .when(!compact, |el| el.child(self.threshold_detail(mode, cx)))
-                .child(
-                    div()
-                        .flex()
-                        .flex_wrap()
-                        .gap(px(8.))
-                        .when(layout.compact, |el| el.w_full().flex_col().items_stretch())
-                        .child({
-                            let command = self.form_actions[2]
-                                .attach(button(
-                                    "clinical-workspace-cancel-review",
-                                    if repeated_scale {
-                                        "Continua la verifica"
-                                    } else {
-                                        CONFIRMATION_COMMANDS[0]
-                                    },
-                                    theme,
-                                    false,
-                                    true,
-                                ))
-                                .debug_selector(|| "threshold-back".into())
-                                .on_click(cx.listener(|this, _, window, cx| {
-                                    this.cancel_review(window, cx)
-                                }));
-                            #[cfg(test)]
-                            let command = rendered_command::observe(command);
-                            command
-                        })
-                        .child({
-                            let command = self.form_actions[3]
-                                .attach(
-                                    button(
-                                        "clinical-workspace-confirm-save",
-                                        CONFIRMATION_COMMANDS[1],
-                                        theme,
-                                        true,
-                                        true,
-                                    )
-                                    .debug_selector(|| "clinical-workspace-confirm-save".into())
-                                    .aria_label(
-                                        confirmation_command_label(
-                                            crate::title::TitleText::name(patient_name.clone())
-                                                .text(),
-                                        ),
-                                    ),
-                                )
-                                .on_click(cx.listener(|this, _, _, cx| this.confirm_form(cx)));
-                            #[cfg(test)]
-                            let command = rendered_command::observe(command);
-                            command
-                        }),
-                )
-                .when(mode == ThresholdMode::FullPlane, |el| {
-                    el.child(self.threshold_detail(mode, cx))
-                }),
-            FormState::Saving => threshold
-                .bg(theme.draft)
-                .child(
-                    div()
-                        .id("clinical-workspace-saving-status")
-                        .accessibility_id("clinical-workspace-saving-status")
-                        .role(Role::Status)
-                        .aria_label("Registrazione e rilettura in corso")
-                        .child(text!(if form.kind == FormKind::Notes
-                            && self.core.phase() == mediflow_patient_client::Phase::Recovering
-                        {
-                            "Rilettura della scheda… La bozza resta intatta."
-                        } else if form.scale.as_ref().is_some_and(ScaleAssessment::is_reading) {
-                            "Rilettura della voce e verifica del contesto in corso…"
-                        } else {
-                            "Registrazione e rilettura in corso…"
-                        })),
-                )
-                .when(!compact, |el| el.child(self.threshold_detail(mode, cx))),
-            FormState::Conflict | FormState::Uncertain | FormState::Rejected => {
-                if form.kind == FormKind::Notes
-                    && form.state == FormState::Rejected
-                    && self.core.phase() == mediflow_patient_client::Phase::Locked
-                    && self
-                        .patient
-                        .detail
-                        .ready()
-                        .is_some_and(|patient| patient.is_archived || patient.deleted_at.is_some())
-                {
-                    let copy_label = "Copia la bozza";
-                    let discard_label = "Scarta la bozza";
-                    return threshold.bg(theme.draft)
-                        .child(notice("clinical-notes-readonly", if compact { "Scheda non modificabile" } else { "La scheda non è più modificabile. La bozza resta disponibile per la copia o lo scarto." }, theme, true))
-                        .child(div().flex().flex_wrap().gap(px(8.)).when(layout.compact, |el| el.w_full().flex_col().items_stretch())
-                            .child(self.form_actions[6].attach(button("clinical-workspace-copy-draft", copy_label, theme, false, true).debug_selector(|| copy_label.into()))
-                                .on_click(cx.listener(|this, _, _, cx| this.copy_draft(cx))))
-                            .child(self.form_actions[0].attach(button("clinical-notes-discard", discard_label, theme, false, true).debug_selector(|| discard_label.into()))
-                                .on_click(cx.listener(|this, _, _, cx| this.finish_discard(Discard::Form, cx)))));
-                }
-                if form.kind == FormKind::Notes && form.state != FormState::Rejected {
-                    let kind = if form.state == FormState::Conflict {
-                        ViewStateKind::Conflitto
-                    } else {
-                        ViewStateKind::EsitoDaVerificare
-                    };
-                    return threshold
-                        .when(compact, |el| {
-                            el.child(
-                                div()
-                                    .id("clinical-notes-recovery-status")
-                                    .role(Role::Status)
-                                    .type_role(theme, crate::theme::TextRole::Strong)
-                                    .child(text!(if form.state == FormState::Conflict {
-                                        "Scheda cambiata"
-                                    } else {
-                                        "Esito da verificare"
-                                    })),
-                            )
-                            .child(
-                                self.form_actions[7]
-                                    .attach(
-                                        button(
-                                            "clinical-notes-recovery-command",
-                                            if form.state == FormState::Conflict {
-                                                "Rileggi la scheda"
-                                            } else {
-                                                "Rileggi e verifica"
-                                            },
-                                            theme,
-                                            false,
-                                            true,
-                                        )
-                                        .debug_selector(
-                                            || "clinical-notes-recovery-command".into(),
-                                        ),
-                                    )
-                                    .on_click(cx.listener(|this, _, _, cx| this.reread_notes(cx))),
-                            )
-                        })
-                        .when(!compact, |el| {
-                            el.child(ViewState::new(ReadObject::Scheda, kind).render(
-                                "clinical-notes-recovery",
-                                theme,
-                                &self.form_actions[7].focus,
-                                cx.listener(|this, _, _, cx| this.reread_notes(cx)),
-                            ))
-                        })
-                        .child(
-                            div()
-                                .flex()
-                                .flex_wrap()
-                                .gap(px(8.))
-                                .when(layout.compact, |el| el.w_full().flex_col().items_stretch())
-                                .child(
-                                    self.form_actions[6]
-                                        .attach(button(
-                                            "clinical-workspace-copy-draft",
-                                            "Copia bozza",
-                                            theme,
-                                            false,
-                                            true,
-                                        ))
-                                        .on_click(
-                                            cx.listener(|this, _, _, cx| this.copy_draft(cx)),
-                                        ),
-                                )
-                                .child(
-                                    self.form_actions[0]
-                                        .attach(button(
-                                            "clinical-notes-discard",
-                                            "Scarta la bozza",
-                                            theme,
-                                            false,
-                                            true,
-                                        ))
-                                        .on_click(cx.listener(|this, _, _, cx| {
-                                            this.request_discard(Discard::Form, cx)
-                                        })),
-                                ),
-                        );
-                }
-                let label = if compact {
-                    match form.state {
-                        FormState::Conflict => "Scheda cambiata",
-                        FormState::Rejected => "Non registrata",
-                        _ => "Esito da verificare",
-                    }
-                } else if form.kind == FormKind::Scale && !repeated_scale {
-                    "Valutazione da rivedere. Le risposte sono conservate."
-                } else {
-                    match form.state {
-                        FormState::Conflict => "La scheda è cambiata. La bozza è conservata.",
-                        FormState::Rejected => {
-                            "La registrazione è stata rifiutata. La bozza è conservata."
-                        }
-                        _ => "Esito da verificare. La bozza è conservata.",
-                    }
-                };
-                threshold
-                    .bg(theme.draft)
-                    .child(
-                        div()
-                            .id("clinical-workspace-save-uncertain")
-                            .accessibility_id("clinical-workspace-save-uncertain")
-                            .role(Role::Alert)
-                            .aria_label(label)
-                            .child(text!(label)),
-                    )
-                    .when(!compact, |el| el.child(self.threshold_detail(mode, cx)))
-                    .child(
-                        div()
-                            .flex()
-                            .flex_wrap()
-                            .gap(px(8.))
-                            .when(layout.compact, |el| el.w_full().flex_col().items_stretch())
-                            .child(
-                                self.form_actions[6]
-                                    .attach(button(
-                                        "clinical-workspace-copy-draft",
-                                        "Copia bozza",
-                                        theme,
-                                        false,
-                                        true,
-                                    ))
-                                    .on_click(cx.listener(|this, _, _, cx| this.copy_draft(cx))),
-                            )
-                            .child(
-                                self.form_actions[7]
-                                    .attach(
-                                        button(
-                                            "clinical-workspace-reconcile",
-                                            if form.kind == FormKind::Scale {
-                                                "Rileggi e verifica"
-                                            } else {
-                                                "Rileggi scheda…"
-                                            },
-                                            theme,
-                                            true,
-                                            true,
-                                        )
-                                        .debug_selector(|| "clinical-workspace-reconcile".into()),
-                                    )
-                                    .on_click(cx.listener(|this, _, _, cx| {
-                                        this.request_discard(Discard::Reload, cx)
-                                    })),
-                            )
-                            .when(form.kind == FormKind::Scale, |el| {
-                                el.child(
-                                    self.form_actions[0]
-                                        .attach(button(
-                                            "clinical-scale-close-draft",
-                                            "Chiudi bozza…",
-                                            theme,
-                                            false,
-                                            true,
-                                        ))
-                                        .on_click(cx.listener(|this, _, _, cx| {
-                                            this.request_discard(Discard::Form, cx)
-                                        })),
-                                )
-                            })
-                            .when(
-                                form.scale
-                                    .as_ref()
-                                    .is_some_and(ScaleAssessment::retry_ready),
-                                |el| {
-                                    el.child(
-                                        self.form_actions[1]
-                                            .attach(button(
-                                                "clinical-scale-review-retry",
-                                                "Rivedi lo stesso invio",
-                                                theme,
-                                                false,
-                                                true,
-                                            ))
-                                            .on_click(cx.listener(|this, _, _, cx| {
-                                                this.review_scale_retry(cx)
-                                            })),
-                                    )
-                                },
-                            ),
-                    )
-            }
-        }
     }
 
     fn other_view(&self, layout: Layout, cx: &Context<Self>) -> Div {
@@ -5553,63 +4609,6 @@ impl ClinicalApp {
             .child(button("clinical-workspace-open-current-area", button_label, theme, true, true)
                 .on_click(cx.listener(move |this, _, _, cx| this.open_current(selected.current_path(), cx)))));
         area
-    }
-
-    fn settings_view(&self, layout: Layout, cx: &Context<Self>) -> Div {
-        if self.ambulatory_management.active {
-            return self.ambulatory_management_view(cx);
-        }
-        if self.ai_preferences.active {
-            return self.ai_preferences_view(cx);
-        }
-        let theme = self.theme;
-        let origin = self
-            .session
-            .as_ref()
-            .map(|session| session.base_url().to_owned())
-            .unwrap_or_default();
-        div().reading_surface(theme).w_full().min_w_0().max_w(px(760.)).flex().flex_col().gap(px(28.))
-            .child(heading("clinical-workspace-settings-heading", "Impostazioni", theme))
-            .child(button("clinical-workspace-manage-ambulatories", "Gestisci ambulatori…", theme, false, true)
-                .on_click(cx.listener(|this, _, _, cx| { this.ambulatory_management.active = true; this.area_scroll.set_offset(gpui::point(px(0.), px(0.))); this.load_ambulatories(cx); this.load_ambulatory_command_recovery(cx); })))
-            .child(self.account_profile_view(cx))
-            .child(div().flex().flex_col().gap(px(12.))
-                .child(section("clinical-workspace-appearance-heading", "ASPETTO", theme))
-                .child(self.appearance((layout.width-if layout.compact {0.} else {layout.navigation}-if layout.magnified {0.} else {16.}-2.*layout.margin).min(760.),false,cx)))
-            .child(div().flex().flex_col().gap(px(12.))
-                .child(section("clinical-workspace-text-scale-heading", "DIMENSIONE DEL TESTO", theme))
-                .child(div().text_color(theme.secondary).child(text!("La pagina passa a una sola colonna quando serve più spazio per leggere.")))
-                .child(div().flex().flex_wrap().gap(px(8.))
-                    .children([(1., "100%"), (1.25, "125%"), (1.5, "150%"), (2., "200%"), (3., "300%"), (4., "400%")].into_iter().map(|(scale, label)| {
-                        button(format!("clinical-workspace-text-scale-{}", (scale * 100.) as u32), label, theme, false, true)
-                            .aria_selected(self.text_scale == scale).when(self.text_scale == scale, |el| el.bg(theme.selected).border_color(theme.fresh))
-                            .on_click(cx.listener(move |this, _, _, cx| this.change_local_preference(PreferenceChange::TextScale(scale), cx)))
-                    }))))
-            .child(button("clinical-workspace-increased-contrast", if self.increased_contrast { "Contrasto dei filetti: aumentato" } else { "Aumenta il contrasto dei filetti" }, theme, false, true)
-                .on_click(cx.listener(|this, _, _, cx| this.change_local_preference(PreferenceChange::Contrast(!this.increased_contrast), cx))))
-            .child(self.local_preferences_status(cx))
-            .child(div().border_t_1().border_color(theme.rule).pt(px(24.)).flex().flex_col().gap(px(12.))
-                .child(section("clinical-workspace-privacy-heading", "Privacy", theme))
-                .child(div().text_color(theme.secondary).child(text!("Copre questa finestra e conserva la bozza. L’accesso resta aperto finché non scegli Blocca. Puoi oscurare e mostrare i contenuti anche con Ctrl/Cmd + Maiusc + P.")))
-                .child(button("clinical-workspace-privacy-cover", "Oscura contenuti", theme, false, true)
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.change_local_preference(PreferenceChange::Privacy(true), cx);
-                        window.focus(&this.focus, cx);
-                    }))))
-            .child(button("clinical-workspace-ai-preferences-open", "Preferenze funzioni AI…", theme, false, true)
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.area_scroll.set_offset(gpui::point(px(0.), px(0.)));
-                    this.load_ai_preferences(cx);
-                })))
-            .child(self.ai_status_view(cx))
-            .child(div().border_t_1().border_color(theme.rule).pt(px(24.)).flex().flex_col().gap(px(12.))
-                .child(section("clinical-workspace-connection-heading", "ARCHIVIO COLLEGATO", theme))
-                .child(text!(origin))
-                .child(div().text_color(theme.secondary).child(text!("Le cartelle vengono lette dall'archivio. Il blocco nasconde subito i dati e chiude l'accesso di questa finestra.")))
-                .child(button("clinical-workspace-lock", "Blocca e nascondi i dati", theme, false, true)
-                    .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Lock, cx)))))
-            .child(button("clinical-workspace-current-settings", "Account, dispositivi e archivio…", theme, false, true)
-                .on_click(cx.listener(|this, _, _, cx| this.open_current(Area::Settings.current_path(), cx))))
     }
 }
 
@@ -6234,7 +5233,7 @@ impl Render for ClinicalApp {
             }
         }
         let theme = self.theme;
-        if self.ai_preferences.active {
+        if self.settings_page == SettingsPage::AiPreferences {
             self.ai_preferences.prepare_render(window, cx);
         }
         self.prepare_ambulatory_management(theme, window, cx);
@@ -6619,7 +5618,7 @@ impl ClinicalApp {
     fn new_patient(&mut self, cx: &mut Context<Self>) {
         if self.form.is_some()
             || self.edit_pending
-            || self.document_busy
+            || self.document_operation != DocumentOperation::Idle
             || self.scope.is_none()
             || !self.can_write(FormKind::PatientNew)
         {
@@ -6644,7 +5643,7 @@ impl ClinicalApp {
     fn edit_patient_profile(&mut self, cx: &mut Context<Self>) {
         if self.form.is_some()
             || self.edit_pending
-            || self.document_busy
+            || self.document_operation != DocumentOperation::Idle
             || !self.can_write(FormKind::PatientProfile)
             || !self
                 .patient
@@ -6743,7 +5742,7 @@ impl ClinicalApp {
     fn can_edit_record(&self, kind: editing::Kind) -> bool {
         self.form.is_none()
             && !self.edit_pending
-            && !self.document_busy
+            && self.document_operation == DocumentOperation::Idle
             && self.can_write(form_kind(kind))
             && self
                 .patient
@@ -6988,210 +5987,7 @@ impl ClinicalApp {
     }
 }
 
-impl ClinicalApp {
-    fn pick_document(&mut self, cx: &mut Context<Self>) {
-        if self.document_busy
-            || self.form.is_some()
-            || !self.can_write(FormKind::Document)
-            || !self
-                .patient
-                .detail
-                .ready()
-                .is_some_and(|patient| !patient.is_archived && patient.deleted_at.is_none())
-        {
-            return;
-        }
-        self.document_busy = true;
-        self.message = None;
-        let epoch = self.epoch;
-        let authority = self.account_profile.generation;
-        let chosen = cx.prompt_for_paths(gpui::PathPromptOptions {
-            files: true,
-            directories: false,
-            multiple: false,
-            prompt: Some("Scegli documento".into()),
-        });
-        cx.spawn(async move |this, cx| {
-            let result = chosen.await;
-            let _ = this.update(cx, |this, cx| {
-                if !this.accept_document_picker(epoch, authority, cx) { return; }
-                match result {
-                    Ok(Ok(Some(paths))) if paths.len() == 1 => {
-                        let path = paths.into_iter().next().expect("one selected path");
-                        this.run(move || Ok(documents::read_selected_file(&path)), Self::receive_document_upload, cx);
-                    }
-                    Ok(Ok(None)) => this.document_busy = false,
-                    _ => {
-                        this.document_busy = false;
-                        this.message = Some(("Il selettore di file non è disponibile. Puoi riprovare o usare Documenti nell'interfaccia corrente.".into(), true));
-                    }
-                }
-                cx.notify();
-            });
-        }).detach();
-        cx.notify();
-    }
-
-    fn receive_document_upload(
-        &mut self,
-        result: Result<Result<documents::Upload, documents::DocumentError>, RuntimeError>,
-        _cx: &mut Context<Self>,
-    ) {
-        self.document_busy = false;
-        match result {
-            Ok(Ok(upload)) if self.form.is_none() && self.can_write(FormKind::Document) => {
-                self.form = Some(Form {
-                    kind: FormKind::Document,
-                    fields: vec![],
-                    upload: Some(upload),
-                    edit: None,
-                    patient_original: None,
-                    created_id: None,
-                    therapy: None,
-                    scale: None,
-                    state: FormState::Draft,
-                    _subscriptions: vec![],
-                });
-                self.show_sections = false;
-                self.patient_section = PatientSection::Documents;
-                self.directory = false;
-                self.verified = None;
-                self.focus_after_render = true;
-                self.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
-            }
-            Ok(Ok(_)) => {
-                self.message = Some((
-                    "È già aperta una bozza o l'accesso è cambiato. Il file non è stato aggiunto."
-                        .into(),
-                    false,
-                ))
-            }
-            Ok(Err(error)) => self.message = Some((error.to_string(), true)),
-            Err(error) => self.message = Some((ui_error(error), true)),
-        }
-    }
-
-    fn accept_document_picker(
-        &mut self,
-        epoch: u64,
-        authority: u64,
-        cx: &mut Context<Self>,
-    ) -> bool {
-        if self.account_profile.generation != authority {
-            return false;
-        }
-        if let Some(error) = self
-            .session
-            .as_ref()
-            .and_then(RuntimeSession::retirement_error)
-        {
-            self.save_error(error, cx);
-            return false;
-        }
-        self.epoch == epoch && self.session.is_some()
-    }
-
-    fn run_document_copy(
-        &mut self,
-        operation: impl FnOnce() -> Result<(), documents::DocumentError> + Send + 'static,
-        cx: &mut Context<Self>,
-    ) {
-        let epoch = self.epoch;
-        let authority = self.account_profile.generation;
-        self.copy_state = Some(documents::CopyState::Writing);
-        let task = cx.background_executor().spawn(async move { operation() });
-        cx.spawn(async move |this, cx| {
-            let result = task.await;
-            let _ = this.update(cx, |this, cx| {
-                this.copy_state = Some(documents::CopyState::Finished(result));
-                if this.epoch == epoch && this.account_profile.generation == authority {
-                    this.document_busy = false;
-                }
-                cx.notify();
-            });
-        })
-        .detach();
-        cx.notify();
-    }
-
-    fn download_document(&mut self, document_id: &str, cx: &mut Context<Self>) {
-        if self.document_busy
-            || self.form.is_some()
-            || self
-                .copy_state
-                .is_some_and(documents::CopyState::is_writing)
-        {
-            return;
-        }
-        let Some(row) = self
-            .patient
-            .attachments
-            .ready()
-            .into_iter()
-            .flatten()
-            .find(|row| row.id == document_id && documents::original_readable(row))
-        else {
-            return;
-        };
-        let id = document_id.to_owned();
-        let suggested = documents::suggested_name(&row.name);
-        let directory = documents::initial_save_directory();
-        // The native picker runs before any content read. Its detached future
-        // retains only the identifier, never an already-decrypted document.
-        let chosen = cx.prompt_for_new_path(&directory, Some(&suggested));
-        let epoch = self.epoch;
-        let authority = self.account_profile.generation;
-        self.document_busy = true;
-        self.message = Some(("Scegli dove salvare la copia del documento.".into(), false));
-        cx.spawn(async move |this, cx| {
-            let result = chosen.await;
-            let _ = this.update(cx, |this, cx| {
-                if !this.accept_document_picker(epoch, authority, cx) { return; }
-                match result {
-                    Ok(Ok(Some(path))) => {
-                        let (Some(session), Some(scope), Some(patient_id)) = (this.session.clone(), this.scope.clone(), this.selected_id.clone()) else { return; };
-                        let context = session.request_context();
-                        this.copy_state = Some(documents::CopyState::Reading);
-                        this.message = None;
-                        this.run(move || {
-                            context.check()?;
-                            let attachment = session.read_attachment(&scope, &patient_id, &id)?;
-                            Ok(documents::decode_attachment(&attachment).map(|bytes| (context, path, bytes)))
-                        }, |this, result, cx| {
-                            match result {
-                                Ok(Ok((context, path, bytes))) => match documents::admit_download(&context, path, bytes) {
-                                    Ok(download) => this.run_document_copy(move || download.write(), cx),
-                                    Err(error) => {
-                                        this.copy_state = Some(documents::CopyState::Withdrawn);
-                                        this.document_busy = false;
-                                        if error.retires_session() { this.save_error(error, cx); }
-                                    }
-                                },
-                                Ok(Err(error)) => {
-                                    this.copy_state = None;
-                                    this.document_busy = false;
-                                    this.message = Some((error.to_string(), true));
-                                }
-                                Err(error) => {
-                                    this.copy_state = Some(documents::CopyState::Withdrawn);
-                                    this.document_busy = false;
-                                    this.message = Some((ui_error(error), true));
-                                }
-                            }
-                        }, cx);
-                    }
-                    Ok(Ok(None)) => { this.document_busy = false; this.message = None; }
-                    _ => {
-                        this.document_busy = false;
-                        this.message = Some(("La scelta della destinazione non è disponibile. Nessuna copia è stata creata.".into(), true));
-                    }
-                }
-                cx.notify();
-            });
-        }).detach();
-        cx.notify();
-    }
-}
+impl ClinicalApp {}
 
 impl ClinicalApp {
     fn load_references(&mut self, cx: &mut Context<Self>) {
@@ -8068,7 +6864,7 @@ mod tests {
             cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
         view.update(cx, |app, cx| {
             synthetic_notes_form(app, FormState::Draft, cx);
-            app.document_busy = true;
+            app.document_operation = DocumentOperation::Selecting;
             app.run_document_copy(|| Ok(()), cx);
             app.disconnect(cx);
         });
@@ -8081,7 +6877,7 @@ mod tests {
             assert!(app.selected_id.is_none());
             assert!(app.scope.is_none());
             assert!(app.patient.detail.ready().is_none());
-            assert!(!app.document_busy);
+            assert!(app.document_operation == DocumentOperation::Idle);
         });
     }
 

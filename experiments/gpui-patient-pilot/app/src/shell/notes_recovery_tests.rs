@@ -1310,7 +1310,7 @@ fn g1a2_restore_retires_document_upload_and_late_upload_callback(cx: &mut gpui::
             "late upload reattached retired clinical bytes"
         );
         assert!(app.patient.attachments.ready().is_none());
-        assert!(!app.document_busy);
+        assert!(app.document_operation == DocumentOperation::Idle);
     });
 }
 
