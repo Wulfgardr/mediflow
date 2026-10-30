@@ -151,7 +151,8 @@ test('cancelled generation that ignores abort cannot publish into the fresh prep
 });
 
 test('the new recovery cannot activate Treatment Reasoning remote or an inactive client', async t => {
-    const h = harness('treatment_reasoning'); t.after(() => h.client.reset(false)); await h.select(); await h.complete();
+    const h = harness('treatment_reasoning'); t.after(() => h.client.reset(false)); await h.select();
+    await assert.rejects(h.client.begin(), /Non disponibile in questa versione/);
     const before = h.calls.length; await h.client.reprepareRemote(); assert.equal(h.calls.length, before);
     h.client.reset(false); await h.client.reprepareRemote(); assert.equal(h.calls.length, before);
 });
