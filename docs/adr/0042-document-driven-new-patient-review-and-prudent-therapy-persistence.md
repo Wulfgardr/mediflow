@@ -209,8 +209,9 @@ paziente/fonte nulli. La chiave primaria dell'audit e la rilettura sotto lo
 stesso lock rendono durevoli idempotenza e ritiro. Anche il riuso di una fonte
 già consumata viene rifiutato. Non nasce un secondo deposito o enum degli
 esiti: il servizio restituisce `applied`, `retired` o `unknown`, compatibili
-con il `ChatWriteResolution` comune. La ricevuta non contiene campi paziente,
-filename, percorso, testo o identificativo della fonte.
+con il `ChatWriteResolution` comune. La ricevuta comune non contiene campi paziente,
+filename, percorso, testo o identificativo della fonte. La sola risposta
+nativa può aggiungere i riferimenti verificati secondo l’appendice GPUI.
 
 Un processo riavviato legge l'audit prima di cercare la conferma RAM. Senza
 ricevuta, `unknown` resta incerto e non rinnova il comando. Il ritiro di un
@@ -227,3 +228,48 @@ rileggono dal nuovo processo. La conferma di queste sole fixture di crash è
 simulata: non è una prova aggiuntiva di autenticazione. Il rapporto di consegna conserva separatamente lo script delle mutazioni
 e i log: lo script modifica temporaneamente le sorgenti e non viene eseguito
 insieme alle suite ordinarie.
+
+## Appendice: client GPUI e riferimenti nativi, 30 ottobre 2026
+
+La finestra GPUI acquisisce un solo PDF, tramite selettore o trascinamento,
+fino a 10 MiB. Il client produce ENC2 con una chiave casuale per file custodita
+in `Zeroizing`; l'involucro sotto la master e il payload usano gli AAD e il
+vettore condiviso descritti sopra. Tutti i campi sono inseriti dal medico con
+`correct`; nessun candidato è precompilato. L'anteprima locale conserva la
+bozza quando si torna alla revisione. Il PIN nativo autorizza il comando;
+la biometria è esplicitamente non disponibile per questa operazione.
+
+Questa modifica cambia la risposta della sola route nativa. Dopo le verifiche
+correnti di operatore, dispositivo abbinato, generazione di archivio,
+ambulatorio, paziente attivo e allegato, `execute`, `receipt` e `revoke`
+restituiscono, solo per `applied`, `patientId` e `attachmentId` insieme a
+`attachmentReadback: client-verification-required`. Non aggiungono nome file,
+percorso, testo, anteprima o campi del paziente. `unknown` e `retired` restano
+privi di riferimenti. Il comando comune conserva la ricevuta opaca: chat e
+MCP non ricevono questi identificativi.
+
+Il journal di audit esistente può includere `pairedClientId`, un identificativo
+opaco del dispositivo già autenticato. Nessuna nuova tabella o deposito è
+introdotto. La verifica di proprietà riusa operatore, generazione e ambulatorio
+del comando comune e aggiunge il confronto del dispositivo. Un journal senza
+quel vincolo non autorizza la divulgazione dei riferimenti nativi.
+
+Una nuova sessione autenticata e sbloccata dello stesso proprietario può
+soltanto rileggere la ricevuta o richiedere la revoca idempotente. Deve
+corrispondere per operatore, dispositivo, archivio e ambulatorio. Non può
+riprendere `preview` o `execute`; tali operazioni richiedono la lavorazione
+in RAM della sessione originale. Un comando sconosciuto resta `unknown`.
+
+GPUI riusa `CommandReferences` e `ChatWriteResolution`, conservando soltanto
+il codice opaco prima della conferma. Alla riapertura avvisa e offre la
+rilettura. `applied` non completa il controllo: il client rilegge l'allegato
+indicato dalla ricevuta e apre ENC2 con la master. Verifica tipo, dimensione,
+firma PDF e, quando ancora disponibile, uguaglianza con lo snapshot originale.
+Se l'apertura fallisce, mostra scrittura applicata ma verifica incompleta e
+conserva il comando. Dopo un crash lo snapshot non è persistito: l'apertura
+verifica GCM sul documento individuato dalla ricevuta durevole, senza inventare
+un confronto con byte locali non più presenti.
+
+Ritiro, errore, blocco e cambio di contesto svuotano PDF, testo estratto,
+campi e PIN dalla UI; nessun ritiro incerto elimina il riferimento. Restano
+riservate a Leonardo la prova Touch ID sul client reale e la qualificazione.

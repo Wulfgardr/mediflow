@@ -18,6 +18,8 @@ pub(crate) mod local_preferences;
 mod local_settings;
 #[cfg(test)]
 mod notes_recovery_tests;
+#[cfg(unix)]
+mod patient_document;
 #[cfg(test)]
 pub(crate) mod rendered_command;
 mod scales;
@@ -396,6 +398,8 @@ struct StoredPairing {
 pub struct ClinicalApp {
     #[cfg(unix)]
     chat_access: chat_access::ChatAccess,
+    #[cfg(unix)]
+    patient_document: patient_document::PatientDocument,
     session: Option<RuntimeSession>,
     request_context: RequestContext,
     pairing: Option<StoredPairing>,
@@ -659,6 +663,14 @@ impl ClinicalApp {
         let threshold_region_scroll = ScrollHandle::new();
         let mut app = Self {
             #[cfg(unix)]
+            patient_document: patient_document::PatientDocument::new(
+                theme,
+                local_preferences
+                    .chat_therapy_directory()
+                    .and_then(|p| p.parent().map(|p| p.join("patient-document-pending"))),
+                cx,
+            ),
+            #[cfg(unix)]
             chat_access: chat_access::ChatAccess::new(
                 theme,
                 local_preferences.chat_therapy_directory(),
@@ -782,6 +794,8 @@ impl ClinicalApp {
             let local_access = this.local_host.withdraw(cx);
             #[cfg(unix)]
             this.chat_access.detach(cx);
+            #[cfg(unix)]
+            this.patient_document.detach(cx);
             this.ambulatory_management.destructive.withdraw(cx);
             this.request_context.cancel();
             this.retire_form(cx);
@@ -813,6 +827,8 @@ impl ClinicalApp {
             }
             #[cfg(unix)]
             this.chat_access.detach(cx);
+            #[cfg(unix)]
+            this.patient_document.detach(cx);
             this.ambulatory_management.destructive.withdraw(cx);
             this.request_context.cancel();
             this.retire_form(cx);
@@ -1085,6 +1101,8 @@ impl ClinicalApp {
                     Ok(session) => {
                         #[cfg(unix)]
                         this.chat_access.detach(cx);
+                        #[cfg(unix)]
+                        this.patient_document.detach(cx);
                         this.session = Some(session);
                         this.focus_after_render = true;
                         this.message = None;
@@ -1110,6 +1128,8 @@ impl ClinicalApp {
     fn disconnect(&mut self, cx: &mut Context<Self>) {
         #[cfg(unix)]
         self.chat_access.detach(cx);
+        #[cfg(unix)]
+        self.patient_document.detach(cx);
         self.analytics.reset(cx);
         self.scales.reset(cx);
         self.withdraw_local_host(cx);
@@ -1222,6 +1242,8 @@ impl ClinicalApp {
         {
             return;
         }
+        #[cfg(unix)]
+        self.withdraw_patient_document(cx);
         self.withdraw_ambulatory_command_view(cx);
         self.ambulatory_management.initial_scope = false;
         self.next_epoch();
@@ -1530,6 +1552,10 @@ impl ClinicalApp {
     }
 
     fn reveal_focused(&self, window: &mut Window, cx: &mut App) {
+        #[cfg(unix)]
+        if self.patient_document.reveal(window, cx) {
+            return;
+        }
         if self.threshold_menu_open.get() {
             if let Some(index) = self
                 .threshold_menu_targets
@@ -3201,6 +3227,22 @@ impl ClinicalApp {
                         ),
                     ),
             )
+            .when(cfg!(unix), |el| {
+                #[cfg(unix)]
+                let el = el.child(
+                    button(
+                        "document-create-open",
+                        "Nuova scheda da PDF",
+                        theme,
+                        false,
+                        self.scope.is_some()
+                            && self.form.is_none()
+                            && self.can_write(FormKind::PatientNew),
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.open_patient_document(cx))),
+                );
+                el
+            })
             .child(
                 div()
                     .flex()
@@ -5271,6 +5313,8 @@ fn record_header(theme: Theme, leading: Div, trailing: Div) -> Div {
 
 impl Render for ClinicalApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        #[cfg(unix)]
+        self.prepare_patient_document(window, cx);
         self.prepare_local_appearance(window);
         if self.privacy_shield {
             return self.privacy_view(cx);
@@ -5404,7 +5448,17 @@ impl Render for ClinicalApp {
         let chat_recovery = self.chat_recovery_view(cx);
         #[cfg(not(unix))]
         let chat_recovery: Option<Stateful<Div>> = None;
-        let content = if let Some(access) = chat_access {
+        #[cfg(unix)]
+        let document_create = self.patient_document_view(cx);
+        #[cfg(not(unix))]
+        let document_create: Option<Stateful<Div>> = None;
+        #[cfg(unix)]
+        let document_recovery = self.patient_document_recovery_view(cx);
+        #[cfg(not(unix))]
+        let document_recovery: Option<Stateful<Div>> = None;
+        let content = if let Some(document) = document_create {
+            document.into_any_element()
+        } else if let Some(access) = chat_access {
             access.into_any_element()
         } else if !connected {
             self.login_view(layout, cx).into_any_element()
@@ -5642,6 +5696,7 @@ impl Render for ClinicalApp {
                                 )
                             })
                             .children(chat_recovery)
+                            .children(document_recovery)
                             .when(self.local_host.retirement.pending(), |el| {
                                 el.child(
                                     notice(

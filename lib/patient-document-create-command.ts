@@ -16,7 +16,7 @@ import { parsePatientDocumentCreateJournal } from './patient-document-create-jou
 type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 export type PatientDocumentCreateHost = Readonly<{
     session: object; actorRef: string; archiveGeneration: string; ambulatoryId: string; epoch: number;
-    surface: 'native' | 'web';
+    surface: 'native' | 'web'; pairedClientId?: string;
     assertCurrent: (tx: Tx) => void;
     confirm: (pin: string) => Promise<boolean>;
     retain: (dispose: () => void) => (() => void);
@@ -115,7 +115,7 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
         if (!row) return { outcome: 'unknown' as const };
         const journal = parsePatientDocumentCreateJournal(JSON.parse(row.redactedMetadata ?? '{}').patientDocumentCreate);
         if (!journal || journal.commandId !== commandId || journal.archiveGeneration !== host.archiveGeneration
-            || journal.ambulatoryId !== host.ambulatoryId || row.actorRef !== host.actorRef || row.outcome !== 'success'
+            || journal.ambulatoryId !== host.ambulatoryId || journal.pairedClientId !== host.pairedClientId || row.actorRef !== host.actorRef || row.outcome !== 'success'
             || (journal.patientId === null ? row.eventType !== 'patient.create.retired' : row.eventType !== 'patient.created' || row.subjectRef !== journal.patientId)) return deny();
         return journal.patientId === null ? { outcome: 'retired' as const } : { outcome: 'applied' as const };
     }
@@ -125,7 +125,8 @@ export function createPatientDocumentCommandService(database: typeof dbServer, c
             outcome: 'success', actorType: 'user', actorRef: host.actorRef, sourceSurface: host.surface,
             subjectType: command ? 'patient' : 'agent_operation', subjectRef: command?.patientId ?? null, requestId: commandId,
             redactedMetadata: { patientDocumentCreate: { commandId, archiveGeneration: host.archiveGeneration,
-                ambulatoryId: host.ambulatoryId, patientId: command?.patientId ?? null, sourceId: command?.source.sourceId ?? null },
+                ambulatoryId: host.ambulatoryId, patientId: command?.patientId ?? null, sourceId: command?.source.sourceId ?? null,
+                ...(host.pairedClientId ? { pairedClientId: host.pairedClientId } : {}) },
             changedFields: command ? ['firstName', 'lastName', 'taxCode', ...(command.values.birthDate ? ['birthDate'] : [])] : undefined },
         });
     }
