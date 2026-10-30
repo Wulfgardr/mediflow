@@ -817,5 +817,14 @@
     "qualification": false,
     "semanticReview": "pending",
     "note": "Il precheck precedente resta storico; identita assegnate e numeri nella misura, nessuna ammissione runtime."
+  },
+  "localRunMeasurementRound2": {
+    "sourceRevision": "92baba4a900425f8b1a612d8a87d8be1ecdd031e",
+    "evidence": "docs/quality/intelligence/2026-10-30-local-runs/giro2.json",
+    "report": "docs/quality/intelligence/2026-10-30-local-runs/giro2.md",
+    "status": "i2_partial_athena_quality_failed_unit_failed",
+    "qualification": false,
+    "semanticReview": "pending",
+    "maxProcessMemoryBytes": 32212254720
   }
 }

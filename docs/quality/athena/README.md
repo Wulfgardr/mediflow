@@ -110,3 +110,16 @@ lease; non provano l'integrazione del broker autenticato né l'arresto fisico
 del processo MLX. Restano aperti confronto Web/GPUI/chat, tempi end-to-end di
 prodotto e soglie di prestazione, ricetta/provenienza del modello e ammissione
 clinica. Nessun esito di questo banco accetta automaticamente ADR 0166 o I-7.
+
+## Correzione del prompt del secondo giro
+
+Il secondo giro della PR #741 descrive nel prompt il formato V2 effettivamente
+richiesto, compresi campi, enumerazioni, limiti e associazioni delle affermazioni
+alle fonti. Il prompt precedente nominava soltanto lo schema privato MediFlow.
+Il progetto ATHENA originale restituisce una risposta finale libera: non è
+stato verificato un formato nativo `review` da convertire automaticamente.
+La correzione modifica l'esecuzione e richiede review; il validatore resta
+invariato. I pesi, il corpus, il decoding e le soglie restano invariati.
+Il primo rapporto conserva valore storico e non viene sovrascritto. I nuovi
+esiti sono nel dossier del secondo giro collegato dal registro intelligence.
+ADR 0166 resta Proposed; nessun diniego identico accetta l'equivalenza.
