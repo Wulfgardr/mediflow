@@ -1,3 +1,5 @@
+import { isDocumentRouterMode, type DocumentRouterControlFlowMode } from '../../insight-parameters-contract';
+export type { DocumentRouterControlFlowMode } from '../../insight-parameters-contract';
 import { buildDocumentFallbackSummary } from '../../ai-task-contracts';
 import { assertAiDocumentSynthesisEnabledValue } from '../../ai-document-synthesis-kill-switch';
 import type { DocumentStructuredAnalysis } from './document-synthesis-parser';
@@ -8,12 +10,12 @@ import {
 
 export const DOCUMENT_ROUTER_CONTROL_FLOW_SETTING_KEY = 'documentRouterControlFlow';
 
-export type DocumentRouterControlFlowMode = 'off' | 'shadow' | 'active';
+
 
 export const DEFAULT_DOCUMENT_ROUTER_CONTROL_FLOW_MODE: DocumentRouterControlFlowMode = 'shadow';
 
 export function parseDocumentRouterControlFlowMode(value: unknown): DocumentRouterControlFlowMode {
-    return value === 'off' || value === 'shadow' || value === 'active'
+    return isDocumentRouterMode(value)
         ? value
         : DEFAULT_DOCUMENT_ROUTER_CONTROL_FLOW_MODE;
 }
