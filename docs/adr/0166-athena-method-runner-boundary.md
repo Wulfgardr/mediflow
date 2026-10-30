@@ -240,3 +240,11 @@ un holdout cieco. Nessuna loro media compensa un criterio fallito.
 [misura1]: https://github.com/Wulfgardr/mediflow/blob/c9a236ea238d67880c17d25ebe153d3a50c752fb/docs/quality/intelligence/2026-10-30-local-runs/misura.md
 [misura2]: https://github.com/Wulfgardr/mediflow/blob/c9a236ea238d67880c17d25ebe153d3a50c752fb/docs/quality/intelligence/2026-10-30-local-runs/giro2.md
 [previous]: https://github.com/Wulfgardr/mediflow/blob/973b19dbe6f91acd3141e96deda74ead9dfcf309/docs/adr/0166-athena-method-runner-boundary.md
+
+## Evidenza successiva del 30 ottobre 2026
+
+La PR #741, secondo giro, corregge la descrizione del formato nel prompt di
+esecuzione. La serializzazione originale resta provata come prefisso storico,
+ma il prompt completo cambia. Il validatore V2 non cambia. Il confronto reale
+precedente non qualifica il nuovo prompt. Stato Proposed invariato; review
+della correzione, equivalenza e accettazione restano decisioni separate.

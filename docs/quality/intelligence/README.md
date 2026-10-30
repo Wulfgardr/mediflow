@@ -27,6 +27,28 @@ Il target resta Mac16,5 M4 Max/36 GB. Un carico singolo è il profilo del futuro
 banco, non una sostenibilità già dimostrata. Budget di memoria e tempi restano
 nulli fino a baseline e decisione; non si riciclano i limiti dei 16 GiB.
 
+## Misura successiva del 30 ottobre 2026
+
+La [misura reale](2026-10-30-local-runs/misura.md) aggiorna il controllo
+preliminare: identità assegnate e spazio disponibile. I-2 resta bloccata
+da `provider_version_unsupported` per Ollama `HEAD-36a6e99`. ATHENA Q4
+ha completato i 9 casi diretti e via Fabric, con 10 soglie fallite su 18.
+Nessuna proposta normalizzata sui casi positivi. I dinieghi uguali non
+provano equivalenza; ADR 0166 resta Proposed e la revisione umana è aperta.
+
+## Controllo preliminare del 30 ottobre 2026
+
+Il [dossier del controllo preliminare](2026-10-30-local-runs/README.md) registra
+l'approvazione esplicita di corpus e soglie ATHENA fornita da Leonardo nel nuovo
+incarico. Le inferenze restano bloccate: spazio libero interno sotto 25 GiB e
+identità non assegnate nel registro. Zero tentativi consumati, nessuna nuova
+misura di qualità, tempo, memoria o arresto fisico. Il registro conserva null
+per modelli e prove runtime; le ragioni di blocco locali sono aggiornate.
+I limiti autorizzati sono ricevuti nel campo separato `localRunPrecheck`, senza
+trasformarli in budget di prodotto qualificati. ADR 0166 resta Proposed.
+
+La verifica seguente è storica e precede questa nuova autorizzazione.
+
 ## Verifica del 30 ottobre 2026
 
 Base aggiornata: `498658cbf596b96811eecb843a3a60e3ea8ea458`.
@@ -82,3 +104,11 @@ La stessa prova E2E corretta passa anche sul bundle standalone di produzione
 `f0de86dcfc667bdce390c71469372eeb4c40e2c1`, porta 3298 e archivio sintetico
 nuovo. Le revisioni successive cambiano solo test, registro ed evidenze: il
 runtime del prodotto è identico. Il server di prova è stato arrestato.
+
+## Secondo giro del 30 ottobre 2026
+
+Il [secondo rapporto](2026-10-30-local-runs/giro2.md) e i
+[risultati](2026-10-30-local-runs/giro2.json) conservano separatamente la prova
+con Ollama.app 0.40.6 e il nuovo confronto ATHENA dopo la correzione del prompt.
+La prima misura resta storica. ADR 0166 resta Proposed e la revisione semantica
+resta aperta. I fallimenti della misura e della suite unitaria restano visibili.
