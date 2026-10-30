@@ -44,6 +44,9 @@ impl ClinicalApp {
             return;
         }
         let previous = self.settings_page;
+        if previous == SettingsPage::Functions && page != SettingsPage::Functions {
+            self.local_host.clear_view();
+        }
         self.settings_page = page;
         self.area_scroll.set_offset(gpui::point(px(0.), px(0.)));
         if page == SettingsPage::Profile {
@@ -159,7 +162,7 @@ impl ClinicalApp {
                     .child(text!(origin))
                     .child(button("clinical-workspace-settings-lock", "Blocca e nascondi i dati", theme, false, true)
                         .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Lock, cx))))
-                    .child(notice("clinical-workspace-settings-native-limits", "Account ChatGPT, Fabric, governance, repertori amministrativi e diagnostica non ancora disponibili in questa app.", theme, false))
+                    .child(notice("clinical-workspace-settings-native-limits", "Il controllo account ChatGPT è disponibile. DEMO, consenso alle proposte e generazione nativa non sono ancora disponibili.", theme, false))
             }
             SettingsPage::Ambulatories | SettingsPage::AiPreferences => unreachable!(),
         }

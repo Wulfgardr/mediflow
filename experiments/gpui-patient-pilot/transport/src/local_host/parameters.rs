@@ -4,13 +4,18 @@ const KEYS: [&str; 3] = [
     "aiInsightManualConfig",
     "documentRouterControlFlow",
 ];
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+/// ```compile_fail
+/// use mediflow_runtime_client::InsightBudget;
+/// let mut budget = InsightBudget::default();
+/// budget.max_documents = 99;
+/// ```
 pub struct InsightBudget {
-    pub max_documents: u32,
-    pub max_document_summary_chars: u32,
-    pub max_document_context_chars: u32,
-    pub output_max_tokens: u32,
+    max_documents: u32,
+    max_document_summary_chars: u32,
+    max_document_context_chars: u32,
+    output_max_tokens: u32,
 }
 impl Default for InsightBudget {
     fn default() -> Self {
@@ -23,6 +28,37 @@ impl Default for InsightBudget {
     }
 }
 impl InsightBudget {
+    pub fn new(
+        max_documents: u32,
+        max_document_summary_chars: u32,
+        max_document_context_chars: u32,
+        output_max_tokens: u32,
+    ) -> Result<Self> {
+        let budget = Self {
+            max_documents,
+            max_document_summary_chars,
+            max_document_context_chars,
+            output_max_tokens,
+        };
+        if budget.valid() {
+            Ok(budget)
+        } else {
+            Err(RuntimeError::InvalidInput)
+        }
+    }
+    pub fn max_documents(&self) -> u32 {
+        self.max_documents
+    }
+    pub fn max_document_summary_chars(&self) -> u32 {
+        self.max_document_summary_chars
+    }
+    pub fn max_document_context_chars(&self) -> u32 {
+        self.max_document_context_chars
+    }
+    pub fn output_max_tokens(&self) -> u32 {
+        self.output_max_tokens
+    }
+
     fn from_stored(value: Option<&str>) -> Self {
         let value: Value = value
             .and_then(|v| serde_json::from_str(v).ok())
@@ -53,29 +89,105 @@ impl InsightBudget {
             output_max_tokens: bounded(&value["outputMaxTokens"], 512, 256, 1200),
         }
     }
-    pub fn valid(&self) -> bool {
+    fn valid(&self) -> bool {
         (2..=12).contains(&self.max_documents)
             && (120..=480).contains(&self.max_document_summary_chars)
             && (800..=5000).contains(&self.max_document_context_chars)
             && (256..=1200).contains(&self.output_max_tokens)
     }
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InsightMode {
+    FullAuto,
+    Balanced,
+    Complete,
+    Manual,
+}
+impl InsightMode {
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "full_auto" => Some(Self::FullAuto),
+            "balanced" => Some(Self::Balanced),
+            "complete" => Some(Self::Complete),
+            "manual" => Some(Self::Manual),
+            _ => None,
+        }
+    }
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::FullAuto => "full_auto",
+            Self::Balanced => "balanced",
+            Self::Complete => "complete",
+            Self::Manual => "manual",
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InsightRouter {
+    Off,
+    Shadow,
+    Active,
+}
+impl InsightRouter {
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "off" => Some(Self::Off),
+            "shadow" => Some(Self::Shadow),
+            "active" => Some(Self::Active),
+            _ => None,
+        }
+    }
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Off => "off",
+            Self::Shadow => "shadow",
+            Self::Active => "active",
+        }
+    }
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InsightParameters {
-    pub mode: String,
-    pub budget: InsightBudget,
-    pub router: String,
+    mode: InsightMode,
+    budget: InsightBudget,
+    router: InsightRouter,
     values: Vec<Option<String>>,
 }
+impl InsightParameters {
+    pub fn mode(&self) -> InsightMode {
+        self.mode
+    }
+    pub fn router(&self) -> InsightRouter {
+        self.router
+    }
+    pub fn budget(&self) -> &InsightBudget {
+        &self.budget
+    }
+}
+/// ```compile_fail
+/// use mediflow_runtime_client::{PreparedInsightParameters, InsightMode};
+/// fn change(command: &mut PreparedInsightParameters) {
+///     command.mode = InsightMode::Manual;
+/// }
+/// ```
 pub struct PreparedInsightParameters {
     owner: Weak<()>,
     before: InsightParameters,
-    pub mode: String,
-    pub budget: InsightBudget,
-    pub router: String,
+    mode: InsightMode,
+    budget: InsightBudget,
+    router: InsightRouter,
     submitted: AtomicBool,
 }
 impl PreparedInsightParameters {
+    pub fn mode(&self) -> InsightMode {
+        self.mode
+    }
+    pub fn router(&self) -> InsightRouter {
+        self.router
+    }
+    pub fn budget(&self) -> &InsightBudget {
+        &self.budget
+    }
+
     pub fn description(&self) -> String {
         let mode = match self.mode.as_str() {
             "balanced" => "Rapida",
@@ -105,11 +217,13 @@ impl LocalHostAccess {
             .collect::<Result<Vec<_>>>()?;
         let mode = values[0]
             .as_deref()
-            .filter(|v| valid_mode(v))
-            .unwrap_or("full_auto")
-            .into();
+            .and_then(InsightMode::parse)
+            .unwrap_or(InsightMode::FullAuto);
         let budget = InsightBudget::from_stored(values[1].as_deref());
-        let router = router_mode(values[2].as_deref()).into();
+        let router = values[2]
+            .as_deref()
+            .and_then(InsightRouter::parse)
+            .unwrap_or(InsightRouter::Shadow);
         Ok(InsightParameters {
             mode,
             budget,
@@ -124,18 +238,17 @@ impl LocalHostAccess {
         budget: InsightBudget,
         router: &str,
     ) -> Result<PreparedInsightParameters> {
-        if !valid_mode(mode) || !budget.valid() || !valid_router(router) {
-            return Err(RuntimeError::InvalidInput);
-        }
+        let mode = InsightMode::parse(mode).ok_or(RuntimeError::InvalidInput)?;
+        let router = InsightRouter::parse(router).ok_or(RuntimeError::InvalidInput)?;
         if self.read_insight_parameters()? != *before {
             return Err(RuntimeError::Conflict);
         }
         Ok(PreparedInsightParameters {
             owner: Arc::downgrade(&self.owner),
             before: before.clone(),
-            mode: mode.into(),
+            mode,
             budget,
-            router: router.into(),
+            router,
             submitted: AtomicBool::new(false),
         })
     }
@@ -152,9 +265,9 @@ impl LocalHostAccess {
         }
         let budget =
             serde_json::to_string(&command.budget).map_err(|_| RuntimeError::InvalidInput)?;
-        for (key, value) in KEYS
-            .iter()
-            .zip([command.mode.as_str(), &budget, &command.router])
+        for (key, value) in
+            KEYS.iter()
+                .zip([command.mode.as_str(), &budget, command.router.as_str()])
         {
             let row = self.request(
                 Method::PUT,
@@ -175,17 +288,6 @@ impl LocalHostAccess {
             && observed.router == command.router)
     }
 }
-fn valid_mode(value: &str) -> bool {
-    matches!(value, "full_auto" | "balanced" | "complete" | "manual")
-}
-fn router_mode(value: Option<&str>) -> &str {
-    value
-        .filter(|value| valid_router(value))
-        .unwrap_or("shadow")
-}
-fn valid_router(value: &str) -> bool {
-    matches!(value, "off" | "shadow" | "active")
-}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -203,15 +305,22 @@ mod tests {
                 output_max_tokens: 512
             }
         );
-        let mut budget = InsightBudget::default();
         for (docs, expected) in [(1, false), (2, true), (12, true), (13, false)] {
-            budget.max_documents = docs;
-            assert_eq!(budget.valid(), expected);
+            assert_eq!(InsightBudget::new(docs, 260, 2200, 512).is_ok(), expected);
         }
-        assert!(!valid_mode("provider"));
-        assert!(!valid_router("automatic"));
-        assert_eq!(router_mode(None), "shadow");
-        assert_eq!(router_mode(Some("invalid")), "shadow");
-        assert_eq!(router_mode(Some("active")), "active");
+        for (summary, context, tokens) in [
+            (119, 2200, 512),
+            (481, 2200, 512),
+            (260, 799, 512),
+            (260, 5001, 512),
+            (260, 2200, 255),
+            (260, 2200, 1201),
+        ] {
+            assert!(InsightBudget::new(6, summary, context, tokens).is_err());
+        }
+        assert!(InsightBudget::new(2, 120, 800, 256).is_ok());
+        assert!(InsightBudget::new(12, 480, 5000, 1200).is_ok());
+        assert!(InsightMode::parse("provider").is_none());
+        assert!(InsightRouter::parse("automatic").is_none());
     }
 }

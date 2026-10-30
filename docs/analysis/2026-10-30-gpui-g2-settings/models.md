@@ -133,3 +133,22 @@ Gli esiti intermedi, i comandi e i log integrali restano in
 Non sono state aggiunte gallerie o catture al repository. Il disco è stato
 controllato durante la lavorazione, sempre sopra la soglia di 25 GiB.
 La CI e la review del contributo restano verifiche distinte dalle prove locali.
+
+## Correzioni dei residui della review
+
+Le PUT Web delle chiavi `aiInsightMode`, `aiInsightManualConfig` e
+`documentRouterControlFlow` rifiutano ora con HTTP 400 modalità sconosciute,
+JSON incompleto o con campi estranei e budget non interi o fuori intervallo.
+Il rifiuto precede il writer e l'audit. Il contratto delle modalità e dei
+limiti è condiviso con il Web in `lib/insight-parameters-contract.ts`.
+Gli archivi esistenti restano leggibili con gli stessi default e clamp:
+nessuna migrazione e nessun rifiuto aggiunto alla lettura.
+
+Il comando Rust espone soltanto accessor; modalità e router sono enum chiusi.
+Il budget ha campi privati e costruzione validata. Lasciare Funzioni ritira
+l'osservazione transitoria ChatGPT e invalida i callback precedenti, conservando
+la bozza dei parametri. Il controllo account è disponibile; DEMO, consenso
+alle proposte e generazione nativa restano da consegnare. La qualifica della
+finestra installata resta da eseguire e documentare nel dossier.
+
+Correzioni GPT 6.1 Sol, effort high, senza collaboratori.

@@ -168,13 +168,13 @@ impl ClinicalApp {
                 match result {
                     Ok(snapshot) => {
                         if area.snapshot.is_none() {
-                            area.mode = snapshot.mode.clone();
-                            area.router = snapshot.router.clone();
+                            area.mode = snapshot.mode().as_str().into();
+                            area.router = snapshot.router().as_str().into();
                             for (field, value) in area.fields.iter().zip([
-                                snapshot.budget.max_documents,
-                                snapshot.budget.max_document_summary_chars,
-                                snapshot.budget.max_document_context_chars,
-                                snapshot.budget.output_max_tokens,
+                                snapshot.budget().max_documents(),
+                                snapshot.budget().max_document_summary_chars(),
+                                snapshot.budget().max_document_context_chars(),
+                                snapshot.budget().output_max_tokens(),
                             ]) {
                                 field.update(cx, |input, cx| {
                                     input.set_content(value.to_string(), cx)
@@ -222,18 +222,18 @@ impl ClinicalApp {
             cx.notify();
             return;
         };
-        let budget = InsightBudget {
+        let budget = InsightBudget::new(
             max_documents,
             max_document_summary_chars,
             max_document_context_chars,
             output_max_tokens,
-        };
+        );
         let mode = area.mode.clone();
         let router = area.router.clone();
         self.local_host.return_focus = window.focused(cx);
         self.local_host.operation = Operation::Reading;
         self.run_local_host(
-            move || access.prepare_insight_parameters(&before, &mode, budget, &router),
+            move || access.prepare_insight_parameters(&before, &mode, budget?, &router),
             |this, result, cx| {
                 this.local_host.operation = match result {
                     Ok(command) => Operation::Review(Command::Parameters(Arc::new(command))),
