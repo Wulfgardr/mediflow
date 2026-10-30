@@ -641,6 +641,7 @@ impl ClinicalApp {
                 self.load_account_profile(cx);
             }
             ReadObject::Documenti => {
+                self.patient.document_original = None;
                 self.patient.attachments = ReadLoad::loading();
                 self.run(
                     move || session.list_attachments(&scope, &id),
