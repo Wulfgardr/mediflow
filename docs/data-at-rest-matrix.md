@@ -45,7 +45,7 @@ Il server non decifra i campi clinici, salvo la verifica al caricamento descritt
 permette di derivare la chiave di avvolgimento; nel profilo PIN transitorio il
 server riceve invece il PIN e possiede involucro e salt.
 
-Nella sola creazione del paziente da documento, il client invia al server il PDF in chiaro per l’estrazione e la chiave del singolo file per la verifica al caricamento. Il server decifra il payload, confronta i byte prima dell’estrazione e azzera i buffer della chiave in ogni uscita. Non riceve mai la master key; terminata la verifica non può decifrare l’allegato persistito.
+Nella sola creazione del paziente da documento, il client invia al server il PDF in chiaro per l’estrazione e la chiave del singolo file per la verifica al caricamento. Il server decifra il payload e confronta i byte prima dell’estrazione. Nei percorsi gestiti azzera i buffer HTTP posseduti, l’array della chiave e i buffer del verificatore. Il client conforme invia solo la chiave del file, non la master key; la chiave del file non viene conservata intenzionalmente. Non è garantita la cancellazione delle stringhe JS prodotte da JSON, delle copie interne di V8 o OpenSSL, né l’esecuzione dei blocchi di pulizia in caso di arresto del processo.
 
 Il solo `attachments.data` di questa route può essere `ENC2:`: chiave casuale per file avvolta con la master key, nonce e payload AES-256-GCM. Nome e percorso restano `ENC:`; nessuna migrazione o modifica degli scrittori esistenti.
 

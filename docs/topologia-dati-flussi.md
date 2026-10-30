@@ -668,6 +668,6 @@ production o autorità agentica generale.
 
 ### Verifica del PDF nella creazione da documento (30 ottobre 2026)
 
-Nella sola creazione del paziente da documento, il client invia al server il PDF in chiaro per l’estrazione e la chiave del singolo file per la verifica al caricamento. Il server decifra il payload, confronta i byte prima dell’estrazione e azzera i buffer della chiave in ogni uscita. Non riceve mai la master key; terminata la verifica non può decifrare l’allegato persistito.
+Nella sola creazione del paziente da documento, il client invia al server il PDF in chiaro per l’estrazione e la chiave del singolo file per la verifica al caricamento. Il server decifra il payload e confronta i byte prima dell’estrazione. Nei percorsi gestiti azzera i buffer HTTP posseduti, l’array della chiave e i buffer del verificatore. Il client conforme invia solo la chiave del file, non la master key; la chiave del file non viene conservata intenzionalmente. Non è garantita la cancellazione delle stringhe JS prodotte da JSON, delle copie interne di V8 o OpenSSL, né l’esecuzione dei blocchi di pulizia in caso di arresto del processo.
 
 La cifratura rimane nel client. `ENC2:` riguarda soltanto il `data` di questa route; i metadati e gli scrittori esistenti restano `ENC:`. Il server non verifica l’involucro della chiave: l’apertura deve essere provata dal client, e la ricevuta dichiara `attachmentReadback: client-verification-required`.

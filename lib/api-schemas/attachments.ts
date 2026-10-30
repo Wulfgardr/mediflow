@@ -1,4 +1,4 @@
-import { ENCRYPTED_ATTACHMENT_FILE_PATTERN } from '../attachment-payload';
+import { isSealedAttachmentFileData } from '../attachment-payload';
 import { z } from 'zod';
 import { types } from 'node:util';
 import {
@@ -87,7 +87,7 @@ export function parseAttachmentContentCurrentnessPut(value: unknown): Attachment
     if (!root) return null;
     const expected = parseAttachmentExpectedCurrentness(root.expected!.value);
     const replacement = root.replacement!.value;
-    if (!expected || typeof replacement !== 'string' || replacement.length === 0 || (!regexpTest(SEALED_ATTACHMENT, replacement) && !regexpTest(ENCRYPTED_ATTACHMENT_FILE_PATTERN, replacement))) return null;
+    if (!expected || typeof replacement !== 'string' || replacement.length === 0 || (!regexpTest(SEALED_ATTACHMENT, replacement) && !isSealedAttachmentFileData(replacement))) return null;
     return objectFreeze({ expected, replacement });
 }
 
