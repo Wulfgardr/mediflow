@@ -79,8 +79,12 @@ TeamIdentifier. Il rifiuto `spctl` è atteso e viene registrato: questo
 candidato non è Developer ID, notarizzato o ammesso alla distribuzione
 pubblica. `minimum_macos` è l'unico valore di configurazione per
 `LSMinimumSystemVersion` e `MACOSX_DEPLOYMENT_TARGET`: deve coincidere con
-il minimo U0 del contratto 0.9.1. La build verifica anche il `minos` Mach-O.
-Il target 0.9.1 resta il Mac U0; altri Mac non sono qualificati.
+il minimo del pacchetto GPUI nel contratto 0.9.1. La build verifica anche il `minos` Mach-O.
+Il minimo del pacchetto è macOS 11.0 su Apple Silicon. Compatibilità da M1
+incluso come obiettivo, Intel escluso. Il target di qualifica 0.9.1 resta
+il Mac U0; altri Mac e sistemi non sono qualificati. ATHENA può non essere
+disponibile su macchine con risorse limitate. Il runtime host separato
+richiede i propri prerequisiti. Vedi [il censimento delle API](macos-compatibility.md).
 
 ## Ripetibilità e prova di avvio
 

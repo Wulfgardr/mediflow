@@ -49,13 +49,20 @@ class BundleTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, name):
                     bundle.embedded_brand_inventory(executable)
 
-    def test_minimum_macos_matches_u0_and_generated_plist(self):
+    def test_minimum_macos_matches_contract_and_generated_plist(self):
         config = json.loads((bundle.PACKAGING / "macos.json").read_text())
         info = plistlib.loads(plistlib.dumps(bundle.bundle_info(config, "0.1.0", "abcdef")))
         self.assertEqual(info["LSMinimumSystemVersion"], bundle.contract_minimum_macos())
-        config["minimum_macos"] = "11.0"
-        with self.assertRaisesRegex(ValueError, "U0"):
+        self.assertEqual(info["LSMinimumSystemVersion"], "11.0")
+        config["minimum_macos"] = "27.2"
+        with self.assertRaisesRegex(ValueError, "GPUI"):
             bundle.bundle_info(config, "0.1.0", "abcdef")
+
+    def test_macho_minimum_rejects_stale_missing_or_multiple_targets(self):
+        bundle.verify_macho_minimum("    platform MACOS\n    minos 11.0\n    sdk 27.2\n", "11.0")
+        for commands in ("minos 27.2", "sdk 11.0", "minos 11.0\nminos 11.0", "minos 10.15"):
+            with self.subTest(commands=commands), self.assertRaisesRegex(ValueError, "Mach-O"):
+                bundle.verify_macho_minimum(commands, "11.0")
 
     def test_link_only_license_is_rejected_in_source_and_supplement(self):
         with tempfile.TemporaryDirectory() as directory:
