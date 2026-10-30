@@ -263,7 +263,7 @@ fn text_line(id: String, content: String, theme: Theme) -> Stateful<Div> {
 
 impl ClinicalApp {
     pub(super) fn toggle_document_details(&mut self, id: &str, cx: &mut Context<Self>) {
-        if self.document_busy
+        if self.document_operation != DocumentOperation::Idle
             || self.form.is_some()
             || !self.patient.attachments.ready().is_some_and(|rows| {
                 rows.iter().any(|row| {
@@ -619,7 +619,7 @@ mod tests {
                         assert!(!labels.iter().any(|label| label == "Origine non indicata"));
                     }
                     assert!(app.form.is_none());
-                    assert!(!app.document_busy);
+                    assert!(app.document_operation == DocumentOperation::Idle);
                 });
                 cx.draw(
                     gpui::Point::default(),

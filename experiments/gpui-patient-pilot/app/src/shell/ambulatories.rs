@@ -5,7 +5,6 @@ use mediflow_runtime_client::{
 };
 
 pub(super) struct Management {
-    pub(super) active: bool,
     pub(super) draft: Option<Editor>,
     pub(super) initial_scope: bool,
     pub(super) destructive: super::ambulatory_commands::Commands,
@@ -19,7 +18,6 @@ pub(super) struct Management {
 impl Default for Management {
     fn default() -> Self {
         Self {
-            active: false,
             draft: None,
             initial_scope: true,
             destructive: Default::default(),
@@ -670,7 +668,7 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.ambulatory_management.active || self.area != Area::Settings {
+        if (self.settings_page != SettingsPage::Ambulatories) || self.area != Area::Settings {
             return;
         }
         self.prepare_ambulatory_command_view(theme, window, cx);
@@ -789,7 +787,7 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
             .child(heading("clinical-workspace-ambulatories-heading", "Ambulatori", theme))
             .child(div().flex().flex_wrap().gap(px(12.))
                 .child(self.ambulatory_button("clinical-workspace-ambulatories-back", "Torna alle Impostazioni", theme, false, !busy)
-                    .on_click(cx.listener(|this, _, _, cx| { if this.ambulatory_management.is_saving() { return; } this.withdraw_ambulatory_command_view(cx); this.ambulatory_management.active=false; cx.notify(); })))
+                    .on_click(cx.listener(|this, _, window, cx| { if this.ambulatory_management.is_saving() { return; } this.withdraw_ambulatory_command_view(cx); this.select_settings_page(SettingsPage::Overview, window, cx); })))
                 .child(self.ambulatory_button("clinical-workspace-ambulatories-reread", "Rileggi le sedi", theme, false, !busy && !matches!(self.ambulatories, Load::Loading))
                     .on_click(cx.listener(|this, _, _, cx| {
                             if this.ambulatory_management.is_saving() || matches!(this.ambulatories,Load::Loading) { return; }
@@ -1160,7 +1158,7 @@ mod tests {
             cx,
         );
         let retained = field.editor.clone();
-        app.ambulatory_management.active = true;
+        app.settings_page = SettingsPage::Ambulatories;
         app.ambulatory_management.draft = Some(Editor {
             target,
             fields: vec![field],
@@ -1203,7 +1201,7 @@ mod tests {
         })
         .collect();
         let retained = fields.iter().map(|field| field.editor.clone()).collect();
-        app.ambulatory_management.active = true;
+        app.settings_page = SettingsPage::Ambulatories;
         app.ambulatory_management.bootstrap = Some(BootstrapEditor {
             fields,
             payload: Some(

@@ -1,0 +1,582 @@
+{
+  "base": "dad877af34028b579894e301e1d69ff947263c1a",
+  "surface": "macOS 27.2 GPUI, synthetic presentation fixture; no host effects",
+  "captures": [
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "settings",
+      "path": "before-giorno-1200-settings.png",
+      "sha256": "9cb9ca362ba4e96a3467ff482cb239336fb3a939d5e28584664f6ecf099af4f0"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 390,
+      "case": "settings",
+      "path": "before-giorno-390-settings.png",
+      "sha256": "99544bdfaeefdad8b861761eddb39a3806c0761674d909402ff589714e1209ce"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "profile",
+      "path": "before-giorno-1200-profile.png",
+      "sha256": "72970f3622f3346e850305a95cb39beeae7f315963b11fe1e39efcd0ab823413"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 390,
+      "case": "profile",
+      "path": "before-giorno-390-profile.png",
+      "sha256": "f6df56056d72e6a6855d69f52834428d679ed72c319e352570a6b2ccd1d427bc"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "appearance",
+      "path": "before-giorno-1200-appearance.png",
+      "sha256": "cdcbdfb2f969d22f471686bcae2dfd90f393fe8be9573a6fa2376aa880cd2e5b"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 390,
+      "case": "appearance",
+      "path": "before-giorno-390-appearance.png",
+      "sha256": "f3d4981b0dc3a7e6d9daf8c9966ef4c1ffad4524ddadc530d6336f478808513f"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "models",
+      "path": "before-giorno-1200-models.png",
+      "sha256": "fa7df961f2d6e0f9acaa716dd81ebc5c5e42bb136f21282188cba01d01241ab4"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 390,
+      "case": "models",
+      "path": "before-giorno-390-models.png",
+      "sha256": "d934500332dfbe32ec17192309a4be60b55c76f39557b294844f92ef699b3944"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "documents",
+      "path": "before-giorno-1200-documents.png",
+      "sha256": "1890883e7782720fd27d8592d39582bb572006c6500c24b81698648d4ff0e9e4"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 390,
+      "case": "documents",
+      "path": "before-giorno-390-documents.png",
+      "sha256": "7e7ac5ac149727967b35ae3d594f1629b816bcd17f8f518c623186b1600ceb8f"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "empty",
+      "path": "before-giorno-1200-empty.png",
+      "sha256": "e5532f6b9c8ae87b47d879f59379a22f86067694e6327b7fd2f8b900c4572400"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 390,
+      "case": "empty",
+      "path": "before-giorno-390-empty.png",
+      "sha256": "fbb23117d2d8ac46f7c1d2daf10cca99e30326f40738ab64b5f3d51aa9a6f6a3"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "loading",
+      "path": "before-giorno-1200-loading.png",
+      "sha256": "f0672fed03aaa5e88b7dd37ee807110e45414b4f66cdb297b5787ac24486e48d"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 390,
+      "case": "loading",
+      "path": "before-giorno-390-loading.png",
+      "sha256": "84ab2757d3dff933e533cbfd6126b8cec323d04f1acbc57896196775f54a7534"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "error",
+      "path": "before-giorno-1200-error.png",
+      "sha256": "6f67e4b1cd9b2d34c39c599f8dd3f2df43baac410d4ff5ad7980e92417f62f2d"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 390,
+      "case": "error",
+      "path": "before-giorno-390-error.png",
+      "sha256": "126bf041eaa517b3aaf1e8f2ad165b87f246f8a21acd1d1f8b0f46113ee6e9f6"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "review",
+      "path": "before-giorno-1200-review.png",
+      "sha256": "c12c178277a677cd69a35d0f78e023cd8c4fbbd3705b27a13406769d4e339e8e"
+    },
+    {
+      "stage": "before",
+      "theme": "giorno",
+      "width": 390,
+      "case": "review",
+      "path": "before-giorno-390-review.png",
+      "sha256": "6c47c05dd2266fc1db1d3bf33110d0b59676d28ba2a800a2d9eecfe80d4a6e6f"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "settings",
+      "path": "before-grafite-1200-settings.png",
+      "sha256": "ba1fa7a8cd77da65332b207a110a9964d6993b281f898ee4c60d648b332f9003"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 390,
+      "case": "settings",
+      "path": "before-grafite-390-settings.png",
+      "sha256": "6dd6374c60b5a14706f8db415d5b1215ce459e46a42fa46e87f7f47a7417b4d4"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "profile",
+      "path": "before-grafite-1200-profile.png",
+      "sha256": "78468839d2d218f6af5fe92f99135c3af4c40ec89f99e598e24727882b6267ef"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 390,
+      "case": "profile",
+      "path": "before-grafite-390-profile.png",
+      "sha256": "44cec63462b08c2ceabdb0d56caaa1ae10292a0bf8bef6efcc05b52bdda7cd11"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "appearance",
+      "path": "before-grafite-1200-appearance.png",
+      "sha256": "785f081741184cd4751b5b3352372e8dd26592f3e5b61fa94efce18e11e9b686"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 390,
+      "case": "appearance",
+      "path": "before-grafite-390-appearance.png",
+      "sha256": "3644d0d70347b7b2bdc93fc10fb7deb608d0c2cf3a6399365f9af08c36cb2cfa"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "models",
+      "path": "before-grafite-1200-models.png",
+      "sha256": "2bb70fba4b1d94afeeef8fde5bc2894819684a2c7d3b9d5043a0d6f7c852a02b"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 390,
+      "case": "models",
+      "path": "before-grafite-390-models.png",
+      "sha256": "77e829f55807557f33bc5d547ca523a41c3b1a3a5d7588aa9162847749bf2612"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "documents",
+      "path": "before-grafite-1200-documents.png",
+      "sha256": "da0e1559b15e04ee0b21bd89ac934649b0c46b0cf78cba7a59e6298576802166"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 390,
+      "case": "documents",
+      "path": "before-grafite-390-documents.png",
+      "sha256": "68b3bec2e4f2782a7784a51c6e22f8642c262fd63898344f7655eae2e527802a"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "empty",
+      "path": "before-grafite-1200-empty.png",
+      "sha256": "798f90ce7bdfef384cbe32900d122ddabc8a5ae6c2d31b4bc21d13b85189e114"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 390,
+      "case": "empty",
+      "path": "before-grafite-390-empty.png",
+      "sha256": "e9306be57fb84c9d9bbabcc88748c710f9aab667900baf2414aae0629373c28f"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "loading",
+      "path": "before-grafite-1200-loading.png",
+      "sha256": "b2ac10754f4f243257e7d8ad6aeefc0b0e7c6af5b6538b706a44992d8d1256e3"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 390,
+      "case": "loading",
+      "path": "before-grafite-390-loading.png",
+      "sha256": "443146a8c7b6ca6db49d7be32eed8d03f102981ca6eae53548597868a3ccb614"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "error",
+      "path": "before-grafite-1200-error.png",
+      "sha256": "0254858bf7c3aae8bf46a7bf56999fe9b4df4b877a2d922e9c9f6790397eebf7"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 390,
+      "case": "error",
+      "path": "before-grafite-390-error.png",
+      "sha256": "994850c447be6b8b77d6189e09a1e4bc1c47537981f2ede71099035ebc9eb433"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "review",
+      "path": "before-grafite-1200-review.png",
+      "sha256": "e1ad90dc336c16525d211b82504afea37b8c54d028b313de3ea189e6743f7b27"
+    },
+    {
+      "stage": "before",
+      "theme": "grafite",
+      "width": 390,
+      "case": "review",
+      "path": "before-grafite-390-review.png",
+      "sha256": "02c019d47481203e5e747208ae89606bb46655084af9666302f7b32813cababb"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "settings",
+      "path": "after-giorno-1200-settings.png",
+      "sha256": "66b3a56c8bc709226fe5c0f716bb8d003b7c3aa15a0f9b50273337e6de519e6d"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 390,
+      "case": "settings",
+      "path": "after-giorno-390-settings.png",
+      "sha256": "239242eae7bc1ddd011d0c870296837feef5d3af186c24d71d68ba4a68416351"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "profile",
+      "path": "after-giorno-1200-profile.png",
+      "sha256": "7fec421742871a81cb6cd0247f654e12d55e33bc33ad8ca1aaa0c671ef72cde7"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 390,
+      "case": "profile",
+      "path": "after-giorno-390-profile.png",
+      "sha256": "f993e3f0bbd6f080af4758d4330cc7d11ef4ecb21ae8e4d2459c124c7814696b"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "appearance",
+      "path": "after-giorno-1200-appearance.png",
+      "sha256": "f3d256366d7ac1358553546bf3badfd59a6aa03896538d900b98fb1035d0c2ef"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 390,
+      "case": "appearance",
+      "path": "after-giorno-390-appearance.png",
+      "sha256": "86edbc8a76ee615fc9faa33bd365338271a4bfe8ea89ee120b0befe8c1326613"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "models",
+      "path": "after-giorno-1200-models.png",
+      "sha256": "ad72bcd1826416d971908397de75acd6c85d83d0aaf9ab0835c0db3a78cb2d43"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 390,
+      "case": "models",
+      "path": "after-giorno-390-models.png",
+      "sha256": "790d60e806307faa7cc476c6917e9d3cc2784ec03ad63940115c756c97d6b409"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "documents",
+      "path": "after-giorno-1200-documents.png",
+      "sha256": "7ecc55f3c93ae8423ffa92080fd9deb0714bc7e7967aa783d2445b8328d32f8b"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 390,
+      "case": "documents",
+      "path": "after-giorno-390-documents.png",
+      "sha256": "c374b6da1491297d94eb458970aa2cc6b131a4429f6e18c73361e8bc653480a3"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "empty",
+      "path": "after-giorno-1200-empty.png",
+      "sha256": "417d53b6adbe6a1dc73c6a672c955f3d6c5f8afd3f768348d1b08aa0576538f8"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 390,
+      "case": "empty",
+      "path": "after-giorno-390-empty.png",
+      "sha256": "21a560ca0f25f4ad1819b9d8a3af087875eaa5058c017356e362c0e9fb02606a"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "loading",
+      "path": "after-giorno-1200-loading.png",
+      "sha256": "7ec43a60c26b3514cc50bd5da8e10aeb929592b150003da9f0f52a03399da7f8"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 390,
+      "case": "loading",
+      "path": "after-giorno-390-loading.png",
+      "sha256": "35c5d4b4827f89c070466ea744a013f43709744705eaf273619b39d3ab7a658f"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "error",
+      "path": "after-giorno-1200-error.png",
+      "sha256": "360e5e5228eff30ac41b73188e2494e4aeec31c3070bfc981bd7678ab184507b"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 390,
+      "case": "error",
+      "path": "after-giorno-390-error.png",
+      "sha256": "9e2f2c119b928f258e52bbfb1fcb234800c2c1255278c98b61fc424b167f83d1"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 1200,
+      "case": "review",
+      "path": "after-giorno-1200-review.png",
+      "sha256": "c12c178277a677cd69a35d0f78e023cd8c4fbbd3705b27a13406769d4e339e8e"
+    },
+    {
+      "stage": "after",
+      "theme": "giorno",
+      "width": 390,
+      "case": "review",
+      "path": "after-giorno-390-review.png",
+      "sha256": "6c47c05dd2266fc1db1d3bf33110d0b59676d28ba2a800a2d9eecfe80d4a6e6f"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "settings",
+      "path": "after-grafite-1200-settings.png",
+      "sha256": "454098881f7b7caedc83c7ebb85d52e00cc76dda23ba8d9b252162468e38d261"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 390,
+      "case": "settings",
+      "path": "after-grafite-390-settings.png",
+      "sha256": "214b7a31de26d12ed6d80b8b9c9e07532f47de6188ee324c03000e4672253e8e"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "profile",
+      "path": "after-grafite-1200-profile.png",
+      "sha256": "30e514457fdd5856d0a7db2aafd68d35b3a86fa877c334598a33d33ae8e6a367"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 390,
+      "case": "profile",
+      "path": "after-grafite-390-profile.png",
+      "sha256": "bbfb5b9ddf9f907a6fccf428276c1e3d2b127fe27df6cf6493d319043a9424b7"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "appearance",
+      "path": "after-grafite-1200-appearance.png",
+      "sha256": "f39f38923363853613c4c7407aadbea6dc4affb6f7a54305d721894c3979f39e"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 390,
+      "case": "appearance",
+      "path": "after-grafite-390-appearance.png",
+      "sha256": "bfe918537be4494abadd5861086e7b507182a3898ba947f64b0580032f8add2f"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "models",
+      "path": "after-grafite-1200-models.png",
+      "sha256": "270d2cd1daaaa73a208665736d6e0dd7a7ca3ac924fb3739a6983edb2eb1ac70"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 390,
+      "case": "models",
+      "path": "after-grafite-390-models.png",
+      "sha256": "61309b3da85fb2515b09b9cd8d83b6991b7612db0a1f2c80aa71c449cc59e4e5"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "documents",
+      "path": "after-grafite-1200-documents.png",
+      "sha256": "cf7406431396de32e47d35d3982e81e2dd03614dc77d781373855a4f98224689"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 390,
+      "case": "documents",
+      "path": "after-grafite-390-documents.png",
+      "sha256": "babd15ace9bea7baf966746ee4db061203d68751e1fac0cc92c75238ff2e6dd7"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "empty",
+      "path": "after-grafite-1200-empty.png",
+      "sha256": "c537ed53d93a08bc336bc650a9e09672d31c15567a3b1ad82bef01fe41a25c58"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 390,
+      "case": "empty",
+      "path": "after-grafite-390-empty.png",
+      "sha256": "91e162b61f47aaccffe98a7d6341b65b23d7fe2bbc76b0cfecad697f18b3ab27"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "loading",
+      "path": "after-grafite-1200-loading.png",
+      "sha256": "45bb75850dda48a529d09735e8855b4b66b74d45bf9c26dd9f6379d01484f9a2"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 390,
+      "case": "loading",
+      "path": "after-grafite-390-loading.png",
+      "sha256": "89ccf773877b98651723f2ae1f799ef1d7996cba8668dc8109d6d54a4cbfe93a"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "error",
+      "path": "after-grafite-1200-error.png",
+      "sha256": "4fbb7ec7a9bc218bfef7b137b0acaddab7a27bdf76171c0817db967f05aaa4dd"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 390,
+      "case": "error",
+      "path": "after-grafite-390-error.png",
+      "sha256": "7740e88eace2011888289a10c2d25b45281e277dc5aa3df39a779380bbc153db"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 1200,
+      "case": "review",
+      "path": "after-grafite-1200-review.png",
+      "sha256": "e1ad90dc336c16525d211b82504afea37b8c54d028b313de3ea189e6743f7b27"
+    },
+    {
+      "stage": "after",
+      "theme": "grafite",
+      "width": 390,
+      "case": "review",
+      "path": "after-grafite-390-review.png",
+      "sha256": "02c019d47481203e5e747208ae89606bb46655084af9666302f7b32813cababb"
+    }
+  ]
+}
