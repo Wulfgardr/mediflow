@@ -20,7 +20,7 @@ for (const scenario of (process.env.MEDIFLOW_CHAT_WITHDRAW_ONLY ? [process.env.M
         while (!existsSync(env.REVIEW_CONFIG)) { assert.equal(host.exitCode, null, 'host failed'); assert.ok(Date.now() < deadline, 'host timeout'); await delay(25); }
         const log = openSync(join(dir, 'rust.log'), 'wx');
         try {
-            const rust = spawn(process.env.CARGO ?? `${process.env.HOME}/.cargo/bin/cargo`, ['test', '--manifest-path', 'experiments/gpui-patient-pilot/Cargo.toml', '-p', 'mediflow-gpui-patient-pilot', '--features', 'gpui_platform/runtime_shaders', '--locked', 'real_route_withdraw_during_pin', '--', '--ignored', '--nocapture'], { env, stdio: ['ignore', log, log] });
+            const rust = spawn(process.env.CARGO ?? 'cargo', ['test', '--manifest-path', 'experiments/gpui-patient-pilot/Cargo.toml', '-p', 'mediflow-gpui-patient-pilot', '--features', 'gpui_platform/runtime_shaders', '--locked', 'real_route_withdraw_during_pin', '--', '--ignored', '--nocapture'], { env, stdio: ['ignore', log, log] });
             const [code] = await once(rust, 'exit');
             assert.equal(code, 0, `${scenario}: see ${dir}/rust.log`);
         } finally { closeSync(log); }

@@ -213,5 +213,10 @@
     "path": "e2e/fixtures/patient-closure-gallery.ts",
     "reason": "Fixture Playwright e galleria opzionale della vista paziente; esercitata dagli spec Quadro, Follow-up e worklist, non contiene una suite autonoma.",
     "owner": "WUL-787"
+  },
+  {
+    "path": "lib/local-operation/specialist/acceptance.test-support.ts",
+    "reason": "WUL-791: Harness interattivo per Leonardo con helper nativo e Touch ID reale; richiede selezione, diniego e gesto personale. Non registra test automatici. Procedura in docs/analysis/2026-10-30-cu-acceptance/accettazione-leonardo.md.",
+    "owner": "@Wulfgardr"
   }
 ]
