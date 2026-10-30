@@ -3,12 +3,75 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { bundledTreatmentPortableFailure, treatmentPortablePrivateArtifact, runTreatmentPortableSelfTest } from './treatment-reasoning-portable-setup.mjs';
 import { createHash } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node-runtime-contract.mjs';
 import { assertScheduledBackupRuntime } from './scheduled-backup-runtime-contract.mjs';
 import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
+
+import http from 'node:http';
+import https from 'node:https';
+import { once } from 'node:events';
+
+async function checkPackagedTlsProxy(resources) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-packaged-tls-'));
+  const cert = path.join(directory, 'cert.pem'), key = path.join(directory, 'key.pem');
+  const marker = 'synthetic-packaged-tls-response';
+  const backend = http.createServer((req, res) => res.end(marker));
+  let proxy;
+  try {
+    const generated = spawnSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
+      '-subj', '/CN=localhost', '-keyout', key, '-out', cert], { encoding: 'utf8', timeout: 10_000, windowsHide: true });
+    if (generated.error || generated.status !== 0) throw new Error('Packaged TLS proxy: synthetic certificate generation failed.');
+    backend.listen(0, '127.0.0.1');
+    await once(backend, 'listening');
+    proxy = spawn(process.execPath, [path.join(resources, 'scripts', 'local-api-tls-proxy.mjs')], {
+      cwd: resources,
+      env: { ...process.env, NODE_OPTIONS: '', MEDIFLOW_DATA_DIR: path.join(directory, 'state'), MEDIFLOW_TLS_CERT_PATH: cert, MEDIFLOW_TLS_KEY_PATH: key,
+        MEDIFLOW_TLS_BIND_HOST: '127.0.0.1', MEDIFLOW_TLS_PORT: '0', MEDIFLOW_TLS_NETWORK_MODE: 'local-only',
+        MEDIFLOW_HTTP_TARGET: `http://127.0.0.1:${backend.address().port}` },
+      stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+    });
+    await new Promise((resolve, reject) => {
+      let output = '', errors = '', probing = false;
+      const timer = setTimeout(() => reject(new Error('Packaged TLS proxy: startup/request timed out.')), 10_000);
+      const finish = (error) => { clearTimeout(timer); if (error) reject(error); else resolve(); };
+      proxy.once('error', finish);
+      proxy.once('exit', (code) => finish(new Error(`Packaged TLS proxy exited (${code}): ${errors.slice(0, 2000)}`)));
+      proxy.stderr.on('data', chunk => { errors = (errors + chunk).slice(-2000); });
+      proxy.stdout.on('data', chunk => {
+        output = (output + chunk).slice(-2000);
+        const match = /TLS proxy listening on https:\/\/127\.0\.0\.1:(\d+)/u.exec(output);
+        if (!match || probing) return;
+        probing = true;
+        https.get({ hostname: '127.0.0.1', port: Number(match[1]), path: '/synthetic-bundle-smoke', rejectUnauthorized: false }, response => {
+          let body = '';
+          response.on('data', chunk => { body += chunk; });
+          response.once('error', finish);
+          response.once('end', () => finish(response.statusCode === 200 && body === marker
+            ? undefined : new Error('Packaged TLS proxy did not forward the synthetic response.')));
+        }).once('error', finish);
+      });
+    });
+  } finally {
+    if (proxy?.pid && proxy.exitCode === null && proxy.signalCode === null) {
+      const exited = once(proxy, 'exit');
+      proxy.kill();
+      await exited;
+    }
+    backend.closeAllConnections();
+    await new Promise(resolve => backend.close(resolve));
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+  console.log('Packaged TLS proxy started and forwarded HTTPS to the synthetic backend.');
+}
+
+if (process.argv[2] === '--tls-proxy-resources') {
+  if (process.argv.length !== 4 || !path.isAbsolute(process.argv[3])) throw new Error('Expected an absolute packaged Resources path.');
+  await checkPackagedTlsProxy(process.argv[3]);
+  process.exit(0);
+}
+const { bundledTreatmentPortableFailure, treatmentPortablePrivateArtifact, runTreatmentPortableSelfTest } = await import('./treatment-reasoning-portable-setup.mjs');
 
 // only safe, failure-only smoke diagnostics omit the CLI exception stack.
 class PdfPageWorkerSmokeError extends Error {}

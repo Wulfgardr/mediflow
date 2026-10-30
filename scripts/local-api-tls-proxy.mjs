@@ -70,7 +70,7 @@ const server = https.createServer(options, (req, res) => {
 });
 
 server.listen(port, bindHost, () => {
-    console.log(`TLS proxy listening on https://${bindHost}:${port}`);
+    console.log(`TLS proxy listening on https://${bindHost}:${server.address().port}`);
     console.log(`Forwarding to ${target.toString()}`);
     console.log(`Transport mode: ${networkMode}`);
 });

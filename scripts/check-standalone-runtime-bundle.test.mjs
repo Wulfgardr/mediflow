@@ -325,3 +325,31 @@ test('Treatment portable bundle requires exact worker/CLI/TS closure and rejects
   assert.match(source, /bundledTreatmentPortableFailure\(standaloneDir, root\)/u);
   assert.match(config, /\*\*\/\*\.safetensors/u);
 });
+
+test('packaged TLS proxy starts outside the checkout and fails if its shared import is absent', async t => {
+  for (const included of [true, false]) {
+    await t.test(included ? 'complete packaged layout forwards HTTPS' : 'missing shared module rejects the bundle', () => {
+      const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-tls-bundle-'));
+      try {
+        const resources = path.join(directory, 'MediFlow.app', 'Contents', 'Resources');
+        const scripts = path.join(resources, 'scripts');
+        fs.mkdirSync(scripts, { recursive: true });
+        fs.copyFileSync(path.join(root, 'scripts/local-api-tls-proxy.mjs'), path.join(scripts, 'local-api-tls-proxy.mjs'));
+        if (included) {
+          const security = path.join(resources, 'lib', 'security');
+          fs.mkdirSync(security, { recursive: true });
+          fs.copyFileSync(path.join(root, 'lib/security/loopback-ingress.mjs'), path.join(security, 'loopback-ingress.mjs'));
+        }
+        const result = spawnSync(node, [checker, '--tls-proxy-resources', resources], {
+          cwd: directory, env: { ...process.env, NODE_OPTIONS: '' }, encoding: 'utf8', timeout: 25_000,
+        });
+        assert.equal(result.error, undefined);
+        assert.equal(result.status, included ? 0 : 1, result.stderr);
+        if (included) assert.match(result.stdout, /started and forwarded HTTPS/u);
+        else assert.match(result.stderr, /ERR_MODULE_NOT_FOUND/u);
+      } finally {
+        fs.rmSync(directory, { recursive: true, force: true });
+      }
+    });
+  }
+});

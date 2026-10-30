@@ -110,3 +110,67 @@ passa. Il launcher non è stato modificato per questa correzione.
 
 Implementazione assistita: GPT 6.1 Sol, effort xhigh; nessun collaboratore
 aggiuntivo. I consumi non sono attribuibili da questa esecuzione.
+
+## Correzioni della seconda review
+
+Il bundle macOS conserva il proxy in
+`Contents/Resources/scripts/local-api-tls-proxy.mjs` e la fonte condivisa in
+`Contents/Resources/lib/security/loopback-ingress.mjs`. Il supervisore cerca
+il proxy nella stessa sottocartella. Il controllo standalone, invocato dal
+packager prima della firma con `--tls-proxy-resources`, avvia quella copia,
+esegue una richiesta HTTPS verso un backend HTTP sintetico e chiude entrambi
+i processi. Una regressione rimuove il modulo dal layout isolato e richiede
+`ERR_MODULE_NOT_FOUND`. I test del packager usano ora il proxy reale.
+
+Il loader dei test del ciclo di vita dei checkup ammette e carica come ESM
+soltanto il nuovo percorso condiviso esplicito. Non aggiunge una regola
+aperta per i file `.mjs`.
+
+`RetirementNotice` appartiene ora al trasporto. Ogni accesso locale conserva
+lo stesso registro della finestra; il ritiro lo aggiorna una sola volta prima
+della rete e lo decrementa soltanto dopo il 204. Anche il login respinto dopo
+l'emissione del cookie passa da questo punto. Le fixture verificano identità,
+ruolo e generazione discordanti, con logout 204 e 503, riaprendo il file di
+stato dopo la risposta.
+
+Su Windows il difetto era il requisito di ACL private imposto a una cartella
+già esistente con permessi ereditati: la verifica interrompeva il salvataggio
+del contatore. Il contatore, che non contiene credenziali né dati clinici,
+usa la creazione ordinaria della cartella; le protezioni degli archivi di
+credenziali restano nei rispettivi componenti. La prova originale di
+persistenza è stata spostata nel modulo che possiede il registro, conservando
+le asserzioni e la cartella creata con `create_dir_all`.
+
+Su una copia completa della repository nella VM Windows ARM64, ripristinare
+il requisito ACL riproduce `assertion failed: reopened.pending()`; con il
+codice corretto passano le dieci prove selezionate sul ritiro, compresa la
+fixture con ruolo discordante e logout 503. Questa prova non sostituisce la
+CI Windows x64. Sul Mac la rimozione della registrazione dal ritiro automatico
+fa fallire la nuova regressione. Entrambe le mutazioni sono state rimosse.
+
+Workspace Rust: 466 prove passate, sette ignorate già previste; Clippy con
+`-Dwarnings` e formattazione passano. Sul Mac è stata usata la feature
+`gpui_apple/runtime_shaders`. Resta l'avviso upstream di incompatibilità futura
+di `block 0.1.6`. Nessun merge o nuova review indipendente è dichiarato da
+questa implementazione.
+
+La suite completa `npm run test:unit`, con Node 24.18.0, dipendenze fisiche
+installate dal lockfile e sorgenti pubbliche macOS congelate configurate,
+è stata eseguita prima del push: 8.824 passate, 23 saltate, una fallita.
+L'unico rosso finale è
+`headless-checkup-active-role-session-grant.test.ts`, «poisons an outer
+operation when currentness checks trigger reentry», con `session_unavailable`:
+file e componente sono fuori dal diff. Il test era passato nei due giri
+precedenti; la riprova isolata dell'intero file passa 8/8. La fixture fissa
+`NOW = Date.now() + 1_000` al caricamento, mentre emette nuove sessioni durante
+le prove; sotto carico una sessione può risultare creata dopo tale istante.
+Questo rilievo non è stato corretto né escluso dal selettore.
+
+Gli altri rossi intermedi sono stati ricondotti al loader ESM e all'inventario
+GPUI da aggiornare, alle dipendenze collegate fuori dal worktree e ai percorsi
+macOS non configurati. Le correzioni e i prerequisiti indicati sopra li
+risolvono nel giro finale. Una prova concorrente degli ambulatori, estranea
+al diff, era rossa nel primo giro: la riprova selezionata passa 2/2 e i due
+giri completi successivi passano quel controllo. La suite completa finale
+resta quindi rossa per la sola prova del grant descritta sopra. La VM Windows
+è stata arrestata al termine delle verifiche.
