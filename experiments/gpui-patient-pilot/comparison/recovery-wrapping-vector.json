@@ -1,0 +1,11 @@
+{
+  "source": "Node 24 crypto, same HKDF contexts and AES-GCM format as unlock-credential.ts",
+  "entropy": "AAECAwQFBgcICQoLDA0ODxAREhM=",
+  "salt": "KCkqKywtLi8wMTIzNDU2Nw==",
+  "iv": "UFFSU1RVVldYWVpb",
+  "masterKey": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+  "recoveryKey": "000G-40R4-0M30-E209-185G-R38E-1W81-24GK",
+  "kek": "nbxWiXu5rkxI2+PzdlATnBou/U04Oa9MbrWGp+YNpfI=",
+  "verifier": "DrntBDJm+xfwvtz/j9AvnU6nXTQLRywpPs/7c9K5J60=",
+  "wrapping": "r1:UFFSU1RVVldYWVpbKAeNZ+5hCK30yz5CWGOyfW1RRoAam8k5UcjQaqHIJnAUQUK9aLjpQA8xuIW1taWT"
+}

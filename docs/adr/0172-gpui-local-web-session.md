@@ -94,3 +94,31 @@ amministrativi, import multiplo/CSV e nuova scheda da documento restano distinti
 G-3 non è modificato. Nessuna installazione, rete o dato clinico reale è provato
 dai test sintetici. La review dovrà valutare le superfici di autorizzazione
 elencate nella PR e il lifecycle della sessione Web locale.
+
+## Estensione G-2: accesso e modelli locali
+
+Il consumer GPUI aggiunge due percorsi nominati sulla stessa autorità loopback:
+
+- POST `/api/auth/passphrase/change`, con verificatore corrente, nuovo involucro
+  v3 e nuovo involucro di recupero r1 compatibili con il Web. Kit e chiave sono
+  preparati sul client, conservati separatamente e confermati prima dell'invio.
+  Il writer Web resta responsabile di CAS e ritiro delle sessioni. Il client
+  blocca tutte le copie della propria sessione anche se la risposta si perde;
+  la richiesta preparata è consumabile una sola volta. Una risposta positiva
+  attesta il ritiro eseguito dal writer, senza un secondo logout artificiale.
+- GET `/api/ai/models` e GET/PUT delle sette chiavi di configurazione nominate
+  in `local_host/models.rs`: profilo hardware, provider Ollama, modelli dei due
+  ruoli, compatibilità del modello clinico e i due indirizzi già usati dal Web.
+  L'inventario è distinto dalla configurazione. Ogni conferma è legata alla
+  lettura iniziale e alla specifica autorità; una rilettura prima delle PUT
+  respinge cambiamenti osservati. Le PUT sono separate, come nel Web: nessun
+  CAS composto è promesso. Esito parziale o rilettura discordante conservano la
+  bozza e impongono una lettura esplicita prima di una nuova preparazione.
+
+L'elenco delle chiavi non è un'API generica e nessun parametro consente di
+scegliere route o metodi HTTP. Non sono aggiunte porte, autorizzazioni server,
+metodi di derivazione, writer di credenziali o possibilità di invio remoto.
+Il salvataggio non ammette un provider, non abilita una funzione e non genera
+testo. Il download e la rimozione non vengono riaperti: il Web corrente nega
+il pull HTTP e non offre un writer di rimozione. PIN legacy, recupero da kit
+all'accesso e gli altri residui G-2 restano nel rapporto della tranche.
