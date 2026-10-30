@@ -958,6 +958,25 @@ class MedicalApiClient {
         if (input.therapies.length > 0) notifyDbChange('therapies');
     }
 
+    async sealLocalDraft(value: unknown): Promise<string> {
+        const signal = this.getSessionReadSignal(); signal.throwIfAborted();
+        const key = this.masterKey;
+        if (!key) throw new Error('Sessione bloccata.');
+        const encrypted = await encryptData(value, key);
+        signal.throwIfAborted();
+        return `ENC:${encrypted.iv}:${encrypted.data}`;
+    }
+
+    async openLocalDraft(value: string): Promise<unknown> {
+        const signal = this.getSessionReadSignal(); signal.throwIfAborted();
+        const key = this.masterKey;
+        const parts = /^ENC:([A-Za-z0-9+/]+=*):([A-Za-z0-9+/]+=*)$/u.exec(value);
+        if (!key || !parts) throw new Error('Bozza non decifrabile.');
+        const result = await decryptData(parts[2], parts[1], key);
+        signal.throwIfAborted();
+        return result;
+    }
+
     async assertBackupReadable(artifactJson: string): Promise<void> {
         const key = this.masterKey;
         await assertBackupReadableWithKey(artifactJson, key, ENCRYPTED_FIELDS);

@@ -214,6 +214,9 @@ test('editor Lume compone un solo lavoro focale in giorno e grafite, wide e narr
       fullPage: true,
       animations: 'disabled',
     });
+    await page.getByRole('link', { name: 'Torna alla scheda paziente', exact: true }).click();
+    await page.getByRole('button', { name: 'Esci senza salvare', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`));
   }
 });
 

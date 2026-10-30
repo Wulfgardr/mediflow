@@ -28,3 +28,29 @@ for (const flag of ['0', '1']) {
     });
   }
 }
+
+for (const plugin of ['0', '1']) {
+  for (const ipc of [false, true]) {
+    for (const required of ['0', '1']) {
+      for (const installed of [false, true]) {
+        test(`document lease requires host plugin=${plugin}, IPC=${ipc}, lease=${required}, handler=${installed}`, async () => {
+          const child = spawn(process.execPath, ['--import', './scripts/register-strip-types-loader.mjs', '--input-type=module', '--eval', `
+            const { requiresLocalUiDocumentLease } = await import(${JSON.stringify(new URL('./plugin-local-ui-runtime.ts', import.meta.url).href)});
+            if (${installed}) globalThis[Symbol.for('mediflow.local-ui.lease.v1')] = () => {};
+            process.stdout.write(JSON.stringify(requiresLocalUiDocumentLease()));
+            process.disconnect?.();
+          `], {
+            env: { ...process.env, MEDIFLOW_PLUGIN_LOCAL_UI: plugin, MEDIFLOW_RUNTIME_UI_LEASE: required },
+            stdio: ipc ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
+          });
+          let stdout = '', stderr = '';
+          child.stdout!.on('data', chunk => { stdout += chunk; });
+          child.stderr!.on('data', chunk => { stderr += chunk; });
+          const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('exit', resolve); });
+          assert.equal(code, 0, stderr);
+          assert.equal(JSON.parse(stdout), plugin === '1' && ipc && required === '1' && installed);
+        });
+      }
+    }
+  }
+}

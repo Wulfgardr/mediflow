@@ -199,7 +199,7 @@ la scadenza al ricevimento IPC e ritira soltanto l'intento della richiesta
 revocata, lasciando intatta un'eventuale richiesta successiva. Non viene
 conservata una coda da riprendere. La risposta al modello resta fissa. Non cambiano sessione clinica, single-writer,
 conferma locale, epoch, scadenza o revoca. Nessuna porta clinica viene composta dal
-raccordo. Il recupero cifrato delle bozze dopo riavvio resta una proposta separata.
+raccordo. Il lifecycle e il recupero della bozza locale seguono ADR 0171, emendamento del 29 ottobre 2026.
 
 ## Decisione
 

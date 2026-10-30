@@ -109,3 +109,36 @@ test('recovery authenticates the owner and endpoint without acquiring or droppin
  await assert.rejects(verifyRuntimeReceipt({...receipt,lease:other.receipt},runtimeProcessIdentity));
  assert.equal(owner.active,1);assert.equal(idle,0);
 });
+
+test('authenticated UI lease shares idle with plugin/manual leases and expires without a browser goodbye', async t => {
+ const owner=await createRuntimeLeases({directory:temporary(t),identity:runtimeProcessIdentity,initialPlugin:true,onIdle:()=>idle++});
+ let idle=0;t.after(()=>owner.close());
+ const id='a'.repeat(64)+':'+crypto.randomUUID();
+ assert.equal(owner.uiLease(id,Date.now()+600),true);
+ owner.releaseInitial();await pause(300);assert.equal(idle,0);assert.equal(owner.active,1);
+ assert.equal(owner.uiLease(id,Date.now()+600),true);
+ await pause(350);assert.equal(idle,0);
+ await until(()=>idle===1);assert.equal(owner.active,0);
+ assert.equal(owner.uiLease(id,Date.now()+600),false,'No resurrection after stopping');
+});
+test('UI cannot extend its deadline beyond the server budget and stop waits for it',async t=>{
+ let idle=0;const owner=await createRuntimeLeases({directory:temporary(t),identity:runtimeProcessIdentity,initialPlugin:false,onIdle:()=>idle++});t.after(()=>owner.close());
+ const id='b'.repeat(64)+':'+crypto.randomUUID();
+ for(const value of [Date.now()+16000,Date.now()-1,Infinity,'forever']) assert.equal(owner.uiLease(id,value),false);
+ assert.equal(owner.uiLease('forged',Date.now()+1000),false);
+ assert.equal(owner.uiLease(id,Date.now()+1000),true);assert.equal(owner.requestStop(),false);
+ assert.equal(owner.uiLease(id,null),true);await until(()=>idle===1);
+});
+
+test('plugin browser port belongs to the archive, survives fresh launchers, and never follows an alias',async t=>{
+ const {archiveBrowserPort}=await import('./local-ui-runtime.mjs');
+ const data=temporary(t);const first=await archiveBrowserPort(data);
+ assert.equal(await archiveBrowserPort(data),first);
+ const result=spawn(process.execPath,['--input-type=module','-e',`import {archiveBrowserPort} from ${JSON.stringify(new URL('./local-ui-runtime.mjs',import.meta.url).href)};console.log(await archiveBrowserPort(process.argv[1]));`,data],{stdio:['ignore','pipe','inherit']});
+ let output='';for await(const chunk of result.stdout)output+=chunk;assert.equal(Number(output.trim()),first);
+ const {localUiArchiveLock}=await import('./launcher-state.mjs');
+ const file=path.join(path.dirname(localUiArchiveLock(data)),'browser-port.json');
+ t.after(()=>fs.rmSync(path.dirname(file),{recursive:true,force:true}));
+ fs.writeFileSync(file,JSON.stringify({port:'forged'}));await assert.rejects(archiveBrowserPort(data));
+ fs.unlinkSync(file);fs.symlinkSync(path.join(data,'missing'),file);await assert.rejects(archiveBrowserPort(data));
+});
