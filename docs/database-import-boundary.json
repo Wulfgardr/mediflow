@@ -32,7 +32,8 @@
     "therapy-status-command": "ADR0168: named Web physician status command composes the common therapy Tx core, required audit and terminal receipt under one IMMEDIATE; read/close do not grant chat or generic clinical write authority.",
     "ambulatory-destructive-command": "ADR0169: named clear-test/delete host composition rechecks original paired device and fresh same-admin WebP3, generation and frozen plan under one IMMEDIATE with common Tx core, mandatory audit and terminal receipt; read/close do not require a surviving scope and never grant generic paired administration.",
     "archive-restore-receipt": "Named admin archive preview and receipt reads use the existing admitted Node handle; receipt insertion takes that handle from the canonical restore transaction. No new driver, Rust SQL authority or alternative archive writer.",
-    "chat-therapy-status": "Paired native therapy-status preview/authorization/receipt boundary. Uses the existing dbServer transaction and shared therapy-status command writer; no independent SQLite connection or clinical writer."
+    "chat-therapy-status": "Paired native therapy-status preview/authorization/receipt boundary. Uses the existing dbServer transaction and shared therapy-status command writer; no independent SQLite connection or clinical writer.",
+    "native-patient-document": "ADR0042: named native document intake composition injects the existing Node handle into the common patient creation command and its readback. No driver, new connection, generic writer or agent source locator."
   },
   "semantics": {
     "edge": "Exact source path, resolved target, capability, import form, imported symbols and occurrence count. Value imports are conservatively treated as runtime dependencies; explicit type-only imports are not authority.",
@@ -1930,6 +1931,17 @@
       ],
       "count": 1,
       "classification": "chat-therapy-status"
+    },
+    {
+      "file": "lib/native-patient-document-production.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "native-patient-document"
     }
   ],
   "opaqueLoaders": [

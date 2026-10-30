@@ -25,6 +25,7 @@ const editorPath = path.join(sourceRoot, 'lib/patient-edit-session.ts');
 const securityPath = path.join(sourceRoot, 'lib/security/security.ts');
 const { PatientEditSession } = await import(pathToFileURL(editorPath));
 const { encryptData, decryptData } = await import(pathToFileURL(securityPath));
+const { openPatientDocumentFile, isCiphertext } = await import(pathToFileURL(path.join(sourceRoot, 'lib/security/attachment-file-envelope.ts')));
 const phaseFlags = ['exerciseWrites', 'exerciseResourceWrites', 'exercisePatientProfileWrites'];
 for (const flag of phaseFlags) assert.ok(config[flag] === undefined || typeof config[flag] === 'boolean');
 assert.ok(phaseFlags.filter((flag) => config[flag] === true).length <= 1, 'Mutation phases are mutually exclusive');
@@ -129,7 +130,11 @@ async function login() {
 async function decode(record, session) {
     const decoded = { ...record };
     for (const [field, value] of Object.entries(decoded)) {
-        if (typeof value !== 'string' || !value.startsWith('ENC:')) continue;
+        if (typeof value !== 'string' || !isCiphertext(value)) continue;
+        if (value.startsWith('ENC2:')) {
+            decoded[field] = await openPatientDocumentFile(value, session.key);
+            continue;
+        }
         const parts = value.split(':');
         assert.equal(parts.length, 3, 'A sealed field must have exactly one IV and one payload');
         decoded[field] = await decryptData(parts[2], parts[1], session.key);

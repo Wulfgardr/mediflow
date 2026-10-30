@@ -93,6 +93,14 @@
     "url": "https://raw.githubusercontent.com/madsmtm/objc2/8852b424193ca41602281b3d7540d7c8ed51e49a/LICENSE.md"
   },
   {
+    "file": "objc2-terms-MIT.txt",
+    "note": "Published crate omits its license file. Standard MIT permission terms from the existing local supplement; the bundle includes original Cargo author/license metadata. No copyright owner or year invented.",
+    "package": "hyphenation_commons@0.8.4",
+    "sha256": "f9c4c77baa3828004ee54b8a4f2db2e88ed44a6237a493965bf551fac0fcb62d",
+    "source_file": "LICENSE-MIT.md",
+    "source_package": "raw-window-handle@0.6.2"
+  },
+  {
     "file": "lyon-1.0.19-NOTICES.txt",
     "package": "lyon@1.0.19",
     "sha256": "b4328df90caba43589a54b5a4baf49e7e21f4d69a9a4fb0f46fc46370fdc64cb",

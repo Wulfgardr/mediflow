@@ -127,7 +127,7 @@ di una connessione non amplia questo perimetro.
 ```mermaid
 flowchart LR
   Plain["Dato clinico in chiaro"] --> Encrypt["Cifratura client-side AES-256-GCM"]
-  Encrypt --> EncFmt["Formato ENC:iv_b64:cipher_b64"]
+  Encrypt --> EncFmt["ENC:iv_b64:cipher_b64; ENC2 per data della creazione da documento"]
   EncFmt --> DB[("SQLite medical.db")]
   PIN["PIN utente"] --> KDF["PBKDF2-SHA256"]
   Salt["users.salt"] --> KDF
@@ -665,3 +665,9 @@ rappresentati è il contenuto sorgente 0.8.5, con la distinzione documentale
 precisata sopra. La topologia non è una prova di firma, pubblicazione,
 certificazione, deployment cloud, AI paired, qualifica dell'entrypoint MCP
 production o autorità agentica generale.
+
+### Verifica del PDF nella creazione da documento (30 ottobre 2026)
+
+Nella sola creazione del paziente da documento, il client invia al server il PDF in chiaro per l’estrazione e la chiave del singolo file per la verifica al caricamento. Il server decifra il payload e confronta i byte prima dell’estrazione. Nei percorsi gestiti azzera i buffer HTTP posseduti, l’array della chiave e i buffer del verificatore. Il client conforme invia solo la chiave del file, non la master key; la chiave del file non viene conservata intenzionalmente. Non è garantita la cancellazione delle stringhe JS prodotte da JSON, delle copie interne di V8 o OpenSSL, né l’esecuzione dei blocchi di pulizia in caso di arresto del processo.
+
+La cifratura rimane nel client. `ENC2:` riguarda soltanto il `data` di questa route; i metadati e gli scrittori esistenti restano `ENC:`. Il server non verifica l’involucro della chiave: l’apertura deve essere provata dal client, e la ricevuta dichiara `attachmentReadback: client-verification-required`.

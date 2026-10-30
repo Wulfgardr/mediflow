@@ -1,9 +1,11 @@
+mod provider;
 use super::*;
 use mediflow_runtime_client::{
     HardwareProfile, InstalledLocalModel, LocalModelConfiguration, PreparedLocalModels,
 };
 
 pub(super) struct ModelsArea {
+    provider: provider::ProviderArea,
     fields: [Entity<TextInput>; 3],
     snapshot: Load<LocalModelConfiguration>,
     inventory: Load<Vec<InstalledLocalModel>>,
@@ -34,6 +36,7 @@ impl ModelsArea {
             .map(|field| cx.subscribe(field, |_, _, _: &InputChanged, cx| cx.notify()))
             .collect();
         Self {
+            provider: provider::ProviderArea::default(),
             fields,
             snapshot: Load::Idle,
             inventory: Load::Idle,
@@ -45,13 +48,17 @@ impl ModelsArea {
             _subscriptions: subscriptions,
         }
     }
-    pub(super) fn has_work(&self) -> bool {
+    pub(super) fn command_visible(&self) -> bool {
         !matches!(self.operation, ModelOperation::Idle)
+    }
+    pub(super) fn has_work(&self) -> bool {
+        self.provider.busy || self.command_visible()
     }
     pub(super) fn withdraw(&mut self, cx: &mut App) {
         for field in &self.fields {
             field.update(cx, |input, cx| input.retire(cx));
         }
+        self.provider = provider::ProviderArea::default();
         self.snapshot = Load::Idle;
         self.current = false;
         self.inventory = Load::Idle;
@@ -215,7 +222,7 @@ impl ClinicalApp {
         if let Some(message) = &area.message {
             pane = pane.child(notice("models-message", message.clone(), theme, false));
         }
-        pane
+        pane.child(self.local_provider_view(cx))
     }
     fn set_model_field(&mut self, index: usize, value: &str, cx: &mut Context<Self>) {
         if self.local_host.has_work() {
@@ -345,6 +352,7 @@ impl ClinicalApp {
                 Ok(true) => {
                     this.local_host.models.operation = ModelOperation::Idle;
                     this.local_host.models.current = false;
+                    this.read_local_provider(cx);
                     this.local_host.models.message = Some("Configurazione salvata e riletta. Le funzioni mantengono abilitazioni e consensi separati.".into());
                 }
                 _ => {

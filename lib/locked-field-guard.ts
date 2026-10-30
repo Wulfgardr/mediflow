@@ -35,7 +35,7 @@ export function isLockedDataPlaceholder(value: unknown): value is typeof LOCKED_
 }
 
 export function isEncryptedFieldValue(value: unknown): value is string {
-    return typeof value === 'string' && value.startsWith('ENC:');
+    return typeof value === 'string' && (value.startsWith('ENC:') || value.startsWith('ENC2:'));
 }
 
 // Fields of an item whose decrypt failed and whose ciphertext is preserved.

@@ -7,7 +7,7 @@ import { settings } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
 import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
-import { normalizeSettingValue } from '@/lib/settings-value';
+import { isValidInsightSetting, normalizeSettingValue } from '@/lib/settings-value';
 import { evaluateSettingsWrite } from '@/lib/security/settings-write-policy';
 
 export async function GET(
@@ -59,6 +59,9 @@ export async function PUT(
             console.warn(`[MediFlow] settings write TODO: registra la chiave sconosciuta "${key}" in lib/security/settings-write-policy.ts`);
         }
 
+        if (!isValidInsightSetting(key, value)) {
+            return NextResponse.json({ error: 'Invalid Insight parameter value' }, { status: 400 });
+        }
         const persistedValue = normalizeSettingValue(value);
 
         writeSettingWithFunctionModelGeneration(key, persistedValue);

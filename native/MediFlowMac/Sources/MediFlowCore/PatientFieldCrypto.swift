@@ -35,7 +35,7 @@ public enum PatientFieldCrypto {
     /// can tell an empty field apart from an unreadable one. It never returns the
     /// ciphertext itself.
     public static func isLocked(_ value: String?, masterKey: SymmetricKey?) -> Bool {
-        guard let value, value.hasPrefix(CryptoService.encPrefix) else { return false }
+        guard let value, CryptoService.isCiphertext(value) else { return false }
         guard let masterKey else { return true }
         return CryptoService.decryptField(value, masterKey: masterKey) == nil
     }
@@ -44,7 +44,7 @@ public enum PatientFieldCrypto {
     /// undecryptable ENC (no/wrong key) -> nil so ciphertext is never shown.
     public static func decryptStringField(_ value: String?, masterKey: SymmetricKey?) -> String? {
         guard let value else { return nil }
-        guard value.hasPrefix(CryptoService.encPrefix) else { return value }
+        guard CryptoService.isCiphertext(value) else { return value }
         guard let masterKey, let decrypted = CryptoService.decryptField(value, masterKey: masterKey) else {
             return nil
         }
@@ -55,7 +55,7 @@ public enum PatientFieldCrypto {
     /// JSON the codecs expect; plaintext -> as-is; undecryptable -> nil.
     public static func decryptStructuredField(_ value: String?, masterKey: SymmetricKey?) -> String? {
         guard let value else { return nil }
-        guard value.hasPrefix(CryptoService.encPrefix) else { return value }
+        guard CryptoService.isCiphertext(value) else { return value }
         guard let masterKey else { return nil }
         return CryptoService.decryptField(value, masterKey: masterKey)
     }
@@ -128,7 +128,7 @@ public enum PatientFieldCrypto {
         _ value: String?, masterKey: SymmetricKey?, transform: (String) -> String
     ) -> EditableField {
         guard let value else { return .absent }
-        guard value.hasPrefix(CryptoService.encPrefix) else { return .plaintext(value) }
+        guard CryptoService.isCiphertext(value) else { return .plaintext(value) }
         guard let masterKey, let decrypted = CryptoService.decryptField(value, masterKey: masterKey) else {
             return .locked(ciphertext: value)
         }

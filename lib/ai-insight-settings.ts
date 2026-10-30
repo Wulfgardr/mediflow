@@ -1,4 +1,5 @@
-export type AIInsightMode = 'full_auto' | 'balanced' | 'complete' | 'manual';
+import { INSIGHT_LIMITS, isInsightMode, type AIInsightMode } from './insight-parameters-contract';
+export type { AIInsightMode } from './insight-parameters-contract';
 
 export interface AIInsightManualConfig {
     maxDocuments: number;
@@ -94,7 +95,7 @@ function cloneConfig(config: AIInsightManualConfig): AIInsightManualConfig {
 }
 
 function parseMode(value: unknown): AIInsightMode {
-    if (value === 'balanced' || value === 'complete' || value === 'manual' || value === 'full_auto') {
+    if (isInsightMode(value)) {
         return value;
     }
 
@@ -140,10 +141,10 @@ export function sanitizeAIInsightManualConfig(value: unknown): AIInsightManualCo
     const record = value && typeof value === 'object' ? value as Record<string, unknown> : {};
 
     return {
-        maxDocuments: coerceNumber(record.maxDocuments, DEFAULT_AI_INSIGHT_MANUAL_CONFIG.maxDocuments, 2, 12),
-        maxDocumentSummaryChars: coerceNumber(record.maxDocumentSummaryChars, DEFAULT_AI_INSIGHT_MANUAL_CONFIG.maxDocumentSummaryChars, 120, 480),
-        maxDocumentContextChars: coerceNumber(record.maxDocumentContextChars, DEFAULT_AI_INSIGHT_MANUAL_CONFIG.maxDocumentContextChars, 800, 5000),
-        outputMaxTokens: coerceNumber(record.outputMaxTokens, DEFAULT_AI_INSIGHT_MANUAL_CONFIG.outputMaxTokens, 256, 1200),
+        maxDocuments: coerceNumber(record.maxDocuments, DEFAULT_AI_INSIGHT_MANUAL_CONFIG.maxDocuments, ...INSIGHT_LIMITS.maxDocuments),
+        maxDocumentSummaryChars: coerceNumber(record.maxDocumentSummaryChars, DEFAULT_AI_INSIGHT_MANUAL_CONFIG.maxDocumentSummaryChars, ...INSIGHT_LIMITS.maxDocumentSummaryChars),
+        maxDocumentContextChars: coerceNumber(record.maxDocumentContextChars, DEFAULT_AI_INSIGHT_MANUAL_CONFIG.maxDocumentContextChars, ...INSIGHT_LIMITS.maxDocumentContextChars),
+        outputMaxTokens: coerceNumber(record.outputMaxTokens, DEFAULT_AI_INSIGHT_MANUAL_CONFIG.outputMaxTokens, ...INSIGHT_LIMITS.outputMaxTokens),
     };
 }
 
