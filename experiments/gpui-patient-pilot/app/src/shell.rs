@@ -777,7 +777,7 @@ impl ClinicalApp {
         let quit = cx.on_app_quit(|this, cx| {
             let local_access = this.local_host.withdraw(cx);
             #[cfg(unix)]
-            this.chat_access.retire(cx);
+            this.chat_access.detach(cx);
             this.ambulatory_management.destructive.withdraw(cx);
             this.request_context.cancel();
             this.retire_form(cx);
@@ -808,7 +808,7 @@ impl ClinicalApp {
                     .detach();
             }
             #[cfg(unix)]
-            this.chat_access.retire(cx);
+            this.chat_access.detach(cx);
             this.ambulatory_management.destructive.withdraw(cx);
             this.request_context.cancel();
             this.retire_form(cx);
@@ -1077,6 +1077,8 @@ impl ClinicalApp {
                 this.connecting = false;
                 match result.take().expect("one login result") {
                     Ok(session) => {
+                        #[cfg(unix)]
+                        this.chat_access.detach(cx);
                         this.session = Some(session);
                         this.focus_after_render = true;
                         this.message = None;
@@ -1101,7 +1103,7 @@ impl ClinicalApp {
 
     fn disconnect(&mut self, cx: &mut Context<Self>) {
         #[cfg(unix)]
-        self.chat_access.retire(cx);
+        self.chat_access.detach(cx);
         self.analytics.reset(cx);
         self.scales.reset(cx);
         if let Some(access) = self.local_host.withdraw(cx) {
