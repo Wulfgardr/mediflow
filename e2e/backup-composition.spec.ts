@@ -7,7 +7,7 @@ const baseline = process.env.BACKUP_COMPOSITION_BASELINE === '1';
 
 test('Backup: composizione, tastiera, bozza di conferma e verifica senza ripristino', async ({ baseURL }) => {
     test.setTimeout(180_000);
-    if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port !== '3000') throw new Error('Runtime e archivio sintetici isolati richiesti');
+    if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).hostname !== '127.0.0.1' || (process.env.SETTINGS_CLOSURE === '1' && new URL(baseURL).port !== '3000')) throw new Error('Runtime e archivio sintetici isolati richiesti');
     const directory = process.env.BACKUP_COMPOSITION_SCREENSHOTS, causal = process.env.BACKUP_COMPOSITION_CAUSAL === '1';
     const zoom = await openBrowserZoomFixture(baseURL), page = zoom.page;
     await page.route('**/api/siss/session-status', route => route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } }));
