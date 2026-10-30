@@ -74,7 +74,7 @@ use account_profile::AccountProfile;
 use ai_preferences::AiPreferences;
 use ai_status::AiRuntimeObservation;
 use analytics::AnalyticsArea;
-use document_library::DocumentOperation;
+use document_library::{DocumentImports, DocumentOperation};
 use local_preferences::{LocalPreferences, LocalPreferencesStore};
 use local_settings::{PreferenceChange, PreferenceIssue};
 use scales::{ScaleArea, ScaleAssessment};
@@ -361,6 +361,7 @@ struct PatientData {
     checkups: ReadLoad<Vec<Checkup>>,
     attachments: ReadLoad<Vec<Attachment>>,
     document_details_id: Option<String>,
+    document_original: Option<document_details::DocumentOriginal>,
 }
 impl Default for PatientData {
     fn default() -> Self {
@@ -372,6 +373,7 @@ impl Default for PatientData {
             checkups: ReadLoad::Idle,
             attachments: ReadLoad::Idle,
             document_details_id: None,
+            document_original: None,
         }
     }
 }
@@ -401,6 +403,7 @@ pub struct ClinicalApp {
     login_scroll: gpui::ScrollHandle,
     connecting: bool,
     document_operation: DocumentOperation,
+    document_imports: DocumentImports,
     copy_state: Option<documents::CopyState>,
     edit_pending: bool,
     focus_first_field: bool,
@@ -671,6 +674,7 @@ impl ClinicalApp {
             login_scroll,
             connecting: false,
             document_operation: DocumentOperation::Idle,
+            document_imports: DocumentImports::default(),
             copy_state: None,
             edit_pending: false,
             focus_first_field: false,
@@ -898,6 +902,8 @@ impl ClinicalApp {
         }
         self.who.reset();
         self.patient.document_details_id = None;
+        self.patient.document_original = None;
+        self.document_imports = DocumentImports::default();
         if let Some(intent) = self.profile_query_intent.take() {
             intent.cancel();
         }
@@ -1353,6 +1359,7 @@ impl ClinicalApp {
         self.patient.checkups = ReadLoad::loading();
         self.patient.attachments = ReadLoad::loading();
         self.patient.document_details_id = None;
+        self.patient.document_original = None;
         self.watch_patient_reads(cx);
         let s = session.clone();
         let a = scope.clone();
@@ -2401,7 +2408,11 @@ impl ClinicalApp {
         self.message = None;
         // Supersede pending reads before writing: an older list cannot replace
         // the authoritative reread after an acknowledged mutation.
-        self.next_epoch();
+        if kind == FormKind::Document {
+            self.advance_document_import_epoch();
+        } else {
+            self.next_epoch();
+        }
         let session = self.session.as_ref().expect("active session").clone();
         let intent = self.profile_intent(&session);
         if kind == FormKind::PatientNew {
@@ -2515,22 +2526,7 @@ impl ClinicalApp {
                 self.save_error(RuntimeError::InvalidInput, cx);
                 return;
             };
-            self.run(move || {
-                let rows = session.list_attachments(&scope, &id)?;
-                let upload = match documents::admit_import(upload, &rows, |attachment| session.read_attachment(&scope, &id, attachment))? {
-                    documents::ImportAdmission::New(upload) => upload,
-                    documents::ImportAdmission::Duplicate { .. } => return Err(RuntimeError::Conflict),
-                };
-                let created = session.create_attachment(&scope, &id, &upload.name, &upload.mime_type, &upload.bytes)?;
-                after_create_read(session.read_attachment(&scope, &id, &created.id), |row| row.id == created.id && row.patient_id == id && upload.matches(&row))
-            }, |this, result, cx| {
-                match result {
-                    Ok(true) => this.saved("Documento registrato: nome, formato, dimensione e contenuto riletti e verificati.", cx),
-                    Ok(false) => this.save_unconfirmed(false, "La rilettura non conferma il documento inviato. Verifica la scheda prima di aggiungerlo di nuovo.".into(), cx),
-                    Err(error) => this.save_error(error, cx),
-                }
-                this.load_sections(cx);
-            }, cx);
+            self.confirm_document_import(session, scope, id, upload, cx);
         } else {
             self.run(move || save_new_record(&session, &scope, &id, kind, &values, selected_drug.as_ref()), |this, result, cx| {
                 match result {
@@ -2610,6 +2606,7 @@ impl ClinicalApp {
         } else {
             self.focus_after_render = true;
             self.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
+            self.patient.document_original = None;
             self.patient_section = section;
             self.show_sections = false;
         }
