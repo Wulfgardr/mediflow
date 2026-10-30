@@ -1,0 +1,7 @@
+file,sha256,esito,limite
+self-test.json,815f595aaa27be2dcccbf8f7a794c2c90bd33420a4070e4df724819e3dab593a,PASS,deterministic_fake_only; qualification=false
+preflight.log,155c6f4d0801cac99055252a10a6fd3cfc6b718fb8668683e64415d5ba235009,FAIL,MLX_UNAVAILABLE; nessuna inferenza
+e2e.log,2e613e30294e76deceadde796200b372174465cda2025c2ac1f9e26489e22e66,PASS,Web sviluppo; solo AI spenta
+tests.log,94453bd415d9792ad5cf8550499c886c06374d27802597b26b7a7ba697d04142,PASS,16 test sintetici
+boundaries.log,e2a177e0f3173119df46e264e72f3d456373bfac59fbb844d3742082cb7cac96,PASS,33 test sintetici
+build.log,79e756b69d40021fc95013f91634198ce58a5b4c0b946c4f710579a2e117f8b6,FAIL,preflight metadata nella checkout non sparse
