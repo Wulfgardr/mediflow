@@ -519,3 +519,23 @@ Eseguita nella worktree G-0, con Node **24.22.0**:
 - Il guard standard non comprende ogni file di `docs/analysis/`: le **stesse regole** sono state eseguite anche sul solo nuovo censimento, tramite copia temporanea fuori repository con root esplicita; **1 file, nessun rilievo**. Nessuna modifica al guard di prodotto.
 - Riconciliazione documentale indipendente: **66 ID parità univoci**, **36 route pagina**, **17 route Impostazioni**, **205 righe della specifica** confrontate con testo e numero di riga originali, **40 unità PR univoche**, nessun riferimento a unità sconosciuta e collegamenti locali del censimento esistenti. Il CSV comprende 18 righe README, 112 della specifica, 29 dell'addendum, 35 di piattaforme/schermate e 11 dell'ascolto.
 - Diff limitato a documentazione e crosswalk CSV. Nessun test runtime rieseguito e nessun PASS clinico/nativo attribuito a G-0. Gli esiti CI e la review del contributo restano nella PR; non sono anticipati da questo verbale.
+
+## Delta del 30 ottobre 2026 — Impostazioni e documenti Mac
+
+La tranche `codex/gpui-g2-g4`, da `dad877af34028b579894e301e1d69ff947263c1a`,
+non chiude G-2 o G-4 e non introduce esclusioni approvate. Le righe originarie
+restano il censimento della base del 23 ottobre; questa tabella ne registra il delta.
+
+| Righe | Delta nativo | Residuo aperto |
+| --- | --- | --- |
+| P40/P41/P42/P54, G-2a/b | Indice con Profilo, Aspetto, Ambulatori, Modelli e Funzioni AI; modalità di navigazione esclusiva. Profilo e scelte locali mantengono gli editor esistenti. Ritorno all'indice con fuoco sul comando di apertura. | Il profilo non comprende la sicurezza account. Preferenze del sistema operativo e qualificazione completa G-8 restano distinte. |
+| P38/P44/P50/P51/P64–66, G-2a/d/e | Stato dei modelli e preferenze già disponibili raggiungibili da pagine native distinte. Nessun rinvio al Web è contato come implementazione. | Cambio PIN/dispositivi, installazione/pull, hardware, interruttori, account ChatGPT, Fabric e governance non implementati. Le porte amministrative non esposte non sono un'esclusione dalla release. |
+| G-2f/g | L'indice dichiara l'assenza delle pagine amministrative native. | Repertori amministrativi, compliance, diagnostica e sviluppo restano aperti; distruttive e archivi appartengono a G-3. |
+| P15/P16/P18, G-4a/b | File vuoto respinto. Prima della revisione e della conferma, lettura dell'elenco corrente e confronto dei byte dei candidati di pari formato/dimensione. Duplicato anche con nome diverso: nessun nuovo invio. Fonte candidata assente/illeggibile/estranea: controllo fallito, nessun invio. Fasi di scelta/verifica/copia distinte nel tipo. | Controllo preventivo, non deduplicazione atomica fra client concorrenti. Import multiplo, originale inline, curation e cancellazione con precondizioni host restano aperti. Il rinvio Web precedente è sostituito dall'indicazione esplicita delle funzioni non disponibili. |
+| G-4c/d | Nessun cambiamento. | Import CSV e nuova scheda da documento restano aperti, insieme ai servizi G-5/G-6 necessari. |
+| G-7 pertinente | Le pagine riusano gli stati account/AI/documenti esistenti; bozza profilo conservata tra sottopagine, ritiro al blocco e ritorno del fuoco verificati. | Non è qualificata l'intera matrice degli stati G-0, né un'installazione o una sessione clinica sul candidato. |
+
+Le catture comparative usano il renderer e finestre GPUI macOS reali con
+stati sintetici predisposti da un harness temporaneo esterno al prodotto.
+Non sono una prova di picker, trasporto, autorizzazioni, audit o cancellazione
+contro l'host reale. Il writer e i contratti host restano invariati.
