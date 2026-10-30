@@ -95,3 +95,19 @@ il frame con un host di test a 390 e 1440 px, senza attestare R su un host deskt
 Rilevazione del 26 ottobre: macOS `27.2 (26B118)`, Codex `26.1021.31345`
 build `21828` e Claude `3.6556.2`. La rilevazione identifica installazioni e
 requisiti di firma, non qualifica il percorso interattivo dei due host.
+
+## Collegamento sintetico al broker, 30 ottobre 2026
+
+L'operazione del socket diventa `mediflow.chat.synthetic-card.v1`. La GPUI
+avvia un processo Node privato con configurazione locale esplicita; esso
+compone il broker sintetico esistente e GLiNER, senza accesso all'archivio.
+La revisione dei byte finali e la ricomposizione rimangono nella GPUI.
+Dopo il gesto nativo, una sola lettura restituisce alla vista il payload
+pseudonimizzato in `_meta`. L'adapter MCP non riceve il mapping o la fonte
+ricomposta. Il verifier PIN paired mantiene il proprio purpose di conferma
+nativa; non emette proof trasferibili né nuove sessioni.
+
+Il [rapporto del contributo](../analysis/2026-10-30-chat-native-broker/README.md)
+distingue prove automatiche, GLiNER reale e prove desktop ancora aperte.
+Questa composizione resta esplicitamente sintetica, non modifica writer,
+ammissione clinica o stato Proposed dell'ADR.

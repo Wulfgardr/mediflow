@@ -8,6 +8,8 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import corpus from '../../../scripts/fixtures/chat-card-corpus.json' with { type: 'json' };
 import { createCardServer, CARD_TOOL, CARD_URI, CARD_DENIED } from '../src/card-server.mjs';
 const SENTINEL = 'IDENTIFYING_SENTINEL_Serena_Falsa_17_04_1972';
+// Nonce, HMAC, UUID e pseudonimi sono casuali: un token breve come 1972 puo' comparirvi per caso senza essere un dato.
+const withoutOpaqueValues = text => text.replace(/(?<![0-9a-f])(?:[0-9a-f]{32,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?![0-9a-f])/gu, '<opaco>');
 async function protocol(flags, run) {
   const transport = new StdioClientTransport({ command: process.execPath,
     args: ['--import', new URL('../../../scripts/register-strip-types-loader.mjs', import.meta.url).pathname, new URL('card-stdio-fixture.mjs', import.meta.url).pathname, ...flags], stderr: 'pipe',
@@ -25,7 +27,7 @@ async function protocol(flags, run) {
     await client.connect(transport);
     await run(client, frames, transport);
   } finally { await client.close(); }
-  const wire = JSON.stringify(frames);
+  const wire = withoutOpaqueValues(JSON.stringify(frames));
   assert.ok(frames.some(frame => frame.result?.protocolVersion), 'intercept actual inbound frames');
   for (const forbidden of [SENTINEL, ...corpus.flatMap(entry => entry.gold.forbiddenTokens), 'Serena Falsa', 'VLLMRT72D57F205Z', '/synthetic/', 'pythonSha256', 'payloadSha256', 'localSource']) {
     assert.equal(wire.includes(forbidden), false, forbidden);
@@ -49,6 +51,11 @@ async function call(client, operation, view) {
   if (operation === 'prepare') nonces.set(view, result._meta?.consentNonce);
   return result;
 }
+test('the wire check ignores only whole opaque values, never a token in clear text', () => {
+  const hex = `${'a'.repeat(30)}1972${'b'.repeat(30)}`;
+  for (const opaque of [hex, `card_${'0'.repeat(14)}1972${'0'.repeat(14)}`, '1972aaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee']) assert.equal(withoutOpaqueValues(opaque).includes('1972'), false, opaque);
+  for (const clear of ['nata nel 1972', '17/04/1972', '"year":1972', 'abc1972', `${'a'.repeat(31)}-1972`]) assert.equal(withoutOpaqueValues(clear).includes('1972'), true, clear);
+});
 test('real stdio: model-visible opener and app-only sharing; data-free resource; only approved broker bytes; following turn', async () => {
   let pseudonym;
   await protocol([], async client => {

@@ -1,0 +1,11 @@
+funzione,servizio,vista_azione,permesso,prova,limite
+Scheda sintetica,createSyntheticCardBroker,Storia e misure,sessione paired e consenso nativo monouso,broker Node e frame 390/1440,fixture basic; desktop finali da qualificare
+Terapie sintetiche,createSyntheticCardBroker,Terapie in lettura,stesso consenso,broker Node e frame,non legge terapie archivio
+Farmaci,repertori comuni,non collegata,nessun nuovo permesso,non eseguita,richiede catalogo I-0
+Protesica,servizi applicativi comuni,non collegata,nessun nuovo permesso,non eseguita,omissione esplicita
+Riassunto,Fabric,non collegata,consenso Fabric esistente,non eseguita,fuori unità 1
+Stato terapia,writer comune,non collegata,conferma e step-up del writer,non eseguita,C-5a/b separati
+Comandi clinici,servizi applicativi comuni,non collegati,nessuna autorità chat aggiunta,non eseguita,C-8 richiede writer pertinente
+Paziente da documento,Smart Import,non collegata,revisione e conferma native,non eseguita,C-6 separato
+Voce,cattura locale,non collegata,permessi nativi,non eseguita,C-9a separato
+Ambulatorio,servizi agenda e ambulatori,non collegata,scope comune,non eseguita,C-9b separato

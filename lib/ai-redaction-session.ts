@@ -201,6 +201,13 @@ export function createRedactionSession(): Readonly<{
                     spans.push({ start: match.index, end: match.index + match[1].length, type: layerOneType(token) });
                 }
             }
+            for (const match of input.text.matchAll(/[^\s"'<>()[\]{};,:]+?\.(?:pdf|docx?|xlsx?|csv|jpe?g|png|tiff?|dcm|xml|json)\b/giu)) {
+                spans.push({ start: match.index, end: match.index + match[0].length, type: 'identifier' });
+            }
+            for (const match of input.text.matchAll(/\b(?:luogo|indirizzo|residenza|domicilio)\s*:\s*([^\r\n;]+?)(?=\.(?:\s|$)|;|\r?\n|$)/giu)) {
+                const start = match.index + match[0].lastIndexOf(match[1]);
+                spans.push({ start, end: start + match[1].length, type: 'address' });
+            }
             const merged = mergeSpans(input.text, spans);
             const newValues = new Set(merged.map(span => input.text.slice(span.start, span.end))
                 .filter(value => !tokensByValue.has(value)));

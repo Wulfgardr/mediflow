@@ -49,6 +49,13 @@ pub(super) fn capture(stream: &UnixStream, require_host: bool) -> Option<Peer> {
 }
 
 impl Peer {
+    #[cfg(all(test, target_os = "macos"))]
+    pub(super) fn test_peer() -> Self {
+        Self {
+            kind: -1,
+            ..Self::default()
+        }
+    }
     pub(super) fn app(self) -> &'static str {
         match self.kind {
             1 => "Codex",
@@ -57,6 +64,10 @@ impl Peer {
         }
     }
     pub(super) fn current(self, stream: &UnixStream) -> bool {
+        #[cfg(all(test, target_os = "macos"))]
+        if self.kind == -1 {
+            return connection_open(stream);
+        }
         connection_open(stream) && capture(stream, true) == Some(self)
     }
 }

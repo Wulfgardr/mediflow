@@ -1,19 +1,38 @@
 <!doctype html>
-<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-YZifmS3mzWGQA38ElKqZGxF63pNl99mDkLVpS52sYzY='; style-src 'sha256-PrAHMu6Ei0L74WVOVjD6Qc/y9l40VpegIOso3wx/8g0='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow — accesso nativo</title>
-<style>html{color-scheme:light dark;font:17px system-ui}body{margin:24px;max-width:40rem}h1{font-size:1.4rem;font-weight:500}button{font:inherit;margin:8px 8px 8px 0;padding:10px 16px}p{line-height:1.5}</style></head>
-<body><h1>MediFlow</h1><p>Conferma l’accesso nella finestra MediFlow già sbloccata. Questa vista riceve soltanto l’esito, senza dati clinici.</p>
+<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-2H7u1D9xAvjb2JabCil9WdM8CbPxeLRpLkRUms8JQyU='; style-src 'sha256-nDLYNGJAq2NN356ZfJgk8AcRaxZu6zn5pUDbxnDnGBM='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow — accesso nativo</title>
+<style>html{color-scheme:light dark;font:17px system-ui}body{margin:24px;max-width:40rem}h1{font-size:1.4rem;font-weight:500}button{font:inherit;margin:8px 8px 8px 0;padding:10px 16px}p{line-height:1.5}section{overflow-wrap:anywhere;border-top:1px solid GrayText;margin-top:20px}h2{font-size:1.15rem}li{margin-block:12px;line-height:1.5}</style></head>
+<body><h1>MediFlow</h1><p>Conferma l’accesso nella finestra MediFlow già sbloccata. La scheda sintetica viene redatta localmente e condivisa dopo la tua revisione nella finestra nativa. I nomi restano in MediFlow.</p>
 <p id="status" role="status" aria-live="polite">Collegamento alla chat…</p>
-<button id="request" disabled>Richiedi accesso</button><button id="consume" disabled>Verifica accesso monouso</button><button id="revoke" disabled>Revoca</button>
+<section id="card" hidden aria-label="Scheda sintetica"></section>
+<button id="request" disabled>Richiedi accesso</button><button id="consume" disabled>Mostra scheda monouso</button><button id="revoke" disabled>Revoca</button>
 <script>
 (() => {
-    let sequence = 0, ready = false, terminal = false, generation = 0, timer;
+    let sequence = 0, ready = false, started = false, terminal = false, generation = 0, timer, expiry;
     const pending = new Map(), element = id => document.getElementById(id);
-    const labels = { requested: 'Richiesta inviata alla finestra MediFlow.', challenge: 'Conferma nella finestra MediFlow entro 30 secondi.', approving: 'Conferma nativa in corso…', consuming: 'Verifica dell’accesso in corso…', approved: 'Accesso monouso autorizzato.', consumed: 'Accesso monouso verificato e consumato.', withdrawn: 'Accesso ritirato. Apri una nuova vista per richiederlo di nuovo.' };
+    const labels = { preparing: 'Redazione locale della scheda sintetica…', requested: 'Richiesta inviata alla finestra MediFlow.', challenge: 'Conferma nella finestra MediFlow entro 30 secondi.', approving: 'Conferma nativa in corso…', consuming: 'Verifica dell’accesso in corso…', approved: 'Accesso monouso autorizzato.', consumed: 'Scheda condivisa. Autorizzazione consumata.', withdrawn: 'Accesso ritirato. Apri una nuova vista per richiederlo di nuovo.' };
     function rpc(method, params) { return new Promise((resolve, reject) => { const id = ++sequence; const timeout = setTimeout(() => { pending.delete(id); reject(new Error('timeout')); }, 10000); pending.set(id, { resolve, reject, timeout }); window.parent.postMessage({ jsonrpc: '2.0', id, method, params }, '*'); }); }
     function stop() { terminal = true; generation++; clearTimeout(timer); for (const id of ['request', 'consume', 'revoke'])
         element(id).disabled = true; }
-    function show(state) { element('status').textContent = labels[state] || labels.withdrawn; element('request').disabled = true; element('consume').disabled = state !== 'approved'; element('revoke').disabled = ['consumed', 'withdrawn'].includes(state); if (['consumed', 'withdrawn'].includes(state))
-        stop(); }
+    function show(state) {
+        if (state === 'withdrawn') { element('card').replaceChildren(); element('card').hidden = true; clearTimeout(expiry); }
+        element('status').textContent = labels[state] || labels.withdrawn;
+        element('request').disabled = true;
+        element('consume').disabled = state !== 'approved';
+        element('revoke').disabled = state === 'withdrawn';
+        if (state === 'withdrawn') stop();
+    }
+    function render(card) {
+        const target = element('card'); target.replaceChildren();
+        const add = (tag, text) => { const node = document.createElement(tag); node.textContent = text; target.append(node); };
+        add('h2', 'Scheda di prova · ' + card.pseudonym);
+        for (const [title, rows] of [
+            ['Storia', card.history.map(row => row.condition + ' · ' + row.relativeTime + '\n' + row.note)],
+            ['Terapie', card.therapies.map(row => row.medicine + ' · ' + row.dose + ' · ' + row.frequency)],
+            ['Misure', card.measures.map(row => row.kind + ': ' + row.value + ' ' + row.unit + ' · ' + row.relativeTime)]
+        ]) { add('h2', title); for (const row of rows) add('p', row); if (!rows.length) add('p', 'Nessuna voce nella selezione.'); }
+        add('p', 'Fonte sintetica; nomi e riferimenti originali disponibili soltanto nella finestra MediFlow.');
+        target.hidden = false;
+    }
     async function command(command) { const current = generation; try {
         const value = await rpc('tools/call', { name: 'mediflow_native_access', arguments: { command } });
         if (current !== generation)
@@ -22,6 +41,15 @@
         if (!Object.hasOwn(labels, state)) {
             show('withdrawn');
             return;
+        }
+        if (state === 'consumed') {
+            if (command === 'consume') {
+            if (typeof value?._meta?.payload !== 'string' || value._meta.payload.length > 60000) { show('withdrawn'); return; }
+            const card = JSON.parse(value._meta.payload);
+            if (card.profile !== 'mediflow.synthetic-chat-card.v1' || !/^card_[a-f0-9]{32}$/.test(card.pseudonym)) { show('withdrawn'); return; }
+            render(card);
+            expiry = setTimeout(() => { rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'revoke' } }).catch(() => {}); show('withdrawn'); }, 300000);
+            } else if (command !== 'status' || element('card').hidden) { show('withdrawn'); return; }
         }
         show(state);
         if (!terminal) {
@@ -39,19 +67,20 @@
         pending.delete(message.id);
         clearTimeout(p.timeout);
         message.error ? p.reject(new Error('denied')) : p.resolve(message.result);
-    } if (message.method === 'ui/resource-teardown') {
+    } if (message.method === 'ui/notifications/tool-input' || message.method === 'ui/notifications/tool-cancelled') { if (started) { rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'revoke' } }).catch(() => {}); show('withdrawn'); } } if (message.method === 'ui/resource-teardown') {
         rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'revoke' } }).catch(() => { });
-        stop();
+        show('withdrawn');
         window.parent.postMessage({ jsonrpc: '2.0', id: message.id, result: {} }, '*');
     } });
     element('request').onclick = () => { if (ready && !terminal) {
+        started = true;
         element('request').disabled = true;
         command('request');
     } };
     element('consume').onclick = () => { clearTimeout(timer); element('consume').disabled = true; command('consume'); };
-    element('revoke').onclick = () => { command('revoke'); stop(); element('status').textContent = labels.withdrawn; };
+    element('revoke').onclick = () => { command('revoke'); show('withdrawn'); };
     window.addEventListener('pagehide', () => { if (ready)
-        rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'revoke' } }).catch(() => { }); stop(); });
+        rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'revoke' } }).catch(() => { }); show('withdrawn'); });
     rpc('ui/initialize', { protocolVersion: '2026-01-26', appInfo: { name: 'mediflow-native-access', version: '0.1.0' }, appCapabilities: {} }).then(async () => { window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/initialized' }, '*'); const attach = await rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'attach' } }); if (attach?._meta?.status !== 'ready')
         throw new Error('denied'); ready = true; element('status').textContent = 'MediFlow richiede una conferma nella finestra nativa.'; element('request').disabled = false; requestAnimationFrame(() => window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/size-changed', params: { height: Math.ceil(document.documentElement.scrollHeight) } }, '*')); }).catch(() => show('withdrawn'));
 })();

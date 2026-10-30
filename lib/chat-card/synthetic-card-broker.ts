@@ -148,6 +148,14 @@ export function createSyntheticCardBroker(input: SyntheticCardInstallation) {
                 return consent;
             } catch { return fail(); }
         },
+        recompose(token: PreparedSyntheticCard, text: string): string {
+            const attempt = prepared.get(handle(token)) ?? fail();
+            const { read, evidenceExpiresAt } = boundary(attempt);
+            if (typeof text !== 'string' || text.length > 4096) return fail();
+            const restored = read.restoreText(text);
+            current(attempt, evidenceExpiresAt);
+            return restored;
+        },
         resolveSource(token: PreparedSyntheticCard, reference: string) {
             const attempt = prepared.get(handle(token)) ?? fail();
             current(attempt);

@@ -252,3 +252,18 @@ test('rejects accessors and proxies at every input layer without invoking hooks 
     assert.match(session.prepare(good()).redactedText, /_1\}\}$/);
     session.close();
 });
+
+test('redacts file references and explicitly labelled locations without reading corpus annotations', () => {
+    const values = ['Allegato_test.pdf', 'Eli\u0301sa_D’Amico_1972.PDF', '/tmp/cartella/referto.xml', 'scan_001.dcm'];
+    for (const file of values) {
+        const text = `metformina 500 mg. File: ${file}. Luogo: Comune di Fantasia. Pressione 128/76 mmHg.`;
+        const session = createRedactionSession();
+        const read = session.prepare({ text, entities: [] });
+        assert.ok(!read.redactedText.includes(file));
+        assert.ok(!read.redactedText.includes('Comune di Fantasia'));
+        assert.ok(read.redactedText.includes('metformina 500 mg'));
+        assert.ok(read.redactedText.includes('Pressione 128/76 mmHg'));
+        assert.equal(read.rehydrate(read.redactedText), text);
+        session.close();
+    }
+});
