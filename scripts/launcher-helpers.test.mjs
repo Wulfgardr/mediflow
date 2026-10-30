@@ -3266,3 +3266,28 @@ test('Windows Job startup follows bounded phases and rejects stalled or invalid 
     `], {encoding:'utf8',timeout:10000});
     assert.equal(result.status, 0, result.stdout + result.stderr);
 });
+
+
+test('Windows native binding verification releases the binary before returning to the launcher', {skip:process.platform!=='win32'}, async t => {
+    const { cpSync } = await import('node:fs');
+    const directory = mkdtempSync(path.join(tmpdir(), 'mf-binding-release-'));
+    t.after(() => rmSync(directory, {recursive:true,force:true}));
+    mkdirSync(path.join(directory,'node_modules'));
+    writeFileSync(path.join(directory,'package.json'),'{}');
+    for (const dependency of ['better-sqlite3','bindings','file-uri-to-path']) {
+        cpSync(path.join(repoRoot,'node_modules',dependency),path.join(directory,'node_modules',dependency),{recursive:true});
+    }
+    const binary = path.join(directory,'node_modules/better-sqlite3/build/Release/better_sqlite3.node');
+    const { chmodSync } = await import('node:fs');
+    chmodSync(binary,0o600);
+    const result = spawnSync(process.execPath,['--input-type=module','-e',`
+      import fs from 'node:fs';
+      import {verifyNativeBindingInChild} from ${JSON.stringify(new URL('./node-runtime-contract.mjs',import.meta.url).href)};
+      verifyNativeBindingInChild(${JSON.stringify(directory)});
+      if (process.report.getReport().sharedObjects.some(file => file.toLowerCase().endsWith(${JSON.stringify(binary.toLowerCase())}))) throw new Error('Native binding remains mapped in the launcher.');
+      fs.unlinkSync(${JSON.stringify(binary)});
+      console.log(JSON.stringify({binaryReleased:true,node:process.version}));
+    `],{encoding:'utf8',timeout:30000});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+    assert.match(result.stdout,/"binaryReleased":true/u);
+});
