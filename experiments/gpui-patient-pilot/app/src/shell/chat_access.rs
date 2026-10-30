@@ -13,7 +13,7 @@ pub(super) struct ChatAccess {
     pin: Entity<TextInput>,
     task: Option<gpui::Task<()>>,
     message: Option<String>,
-    last_state: Option<State>,
+    last_state: Option<(State, bool)>,
 }
 
 impl ChatAccess {
@@ -47,6 +47,7 @@ impl ChatAccess {
         }
         self.patient = mediflow_patient_client::PersonName::default();
         self.archive.clear();
+        self.last_state = None;
         self.message = None;
         self.pin.update(cx, |input, cx| input.set_content("", cx));
     }
@@ -73,11 +74,14 @@ impl ClinicalApp {
     }
 
     fn poll_chat_access(&mut self, cx: &mut Context<Self>) {
-        let status = self
-            .chat_access
-            .pending
-            .as_ref()
-            .and_then(|p| p.lock().ok().map(|mut p| p.status()));
+        let status = self.chat_access.pending.as_ref().and_then(|p| {
+            p.lock().ok().map(|mut p| {
+                (
+                    p.status(),
+                    p.therapy().is_some_and(|t| t.selected.is_some()),
+                )
+            })
+        });
         if status != self.chat_access.last_state {
             self.chat_access.last_state = status;
             cx.notify();
