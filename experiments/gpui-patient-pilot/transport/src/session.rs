@@ -6834,6 +6834,15 @@ mod tests {
         role: &str,
         generation: &str,
     ) {
+        local_host_login_response(listener, id, role, generation, "complete");
+    }
+    fn local_host_login_response(
+        listener: &std::net::TcpListener,
+        id: &str,
+        role: &str,
+        generation: &str,
+        response: &str,
+    ) {
         for step in 0..3 {
             let (mut stream, _) = listener.accept().unwrap();
             let request = read_request(&mut stream);
@@ -6860,6 +6869,14 @@ mod tests {
                 assert!(lower.contains("if-match:"));
                 assert!(lower.contains("idempotency-key:"));
                 assert!(!request.contains("Local host synthetic passphrase"));
+                if response == "lost" {
+                    return;
+                }
+                if response == "truncated" {
+                    use std::io::Write;
+                    write!(stream, "HTTP/1.1 200 Synthetic\r\nContent-Length: 999\r\nConnection: close\r\nSet-Cookie: mediflow_session={}; Path=/; HttpOnly\r\n\r\n{{", "b".repeat(64)).unwrap();
+                    return;
+                }
                 local_host_reply(
                     &mut stream,
                     200,
@@ -6934,6 +6951,67 @@ mod tests {
                 );
                 std::fs::remove_dir_all(directory).unwrap();
             }
+        }
+    }
+    #[test]
+    fn local_host_lost_login_response_preserves_retirement_uncertainty() {
+        use std::{net::TcpListener, thread};
+        for (response, status) in [("truncated", 204), ("truncated", 503), ("lost", 0)] {
+            let directory = std::env::temp_dir().join(format!(
+                "mediflow-host-{}",
+                crate::http::operation_uuid().unwrap()
+            ));
+            std::fs::create_dir_all(&directory).unwrap();
+            let path = directory.join("retirement.json");
+            let notice = crate::RetirementNotice::new(Some(path.clone()));
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let worker = thread::spawn(move || {
+                local_host_login_response(
+                    &listener,
+                    "synthetic-user",
+                    "admin",
+                    "synthetic-generation",
+                    response,
+                );
+                if response == "lost" {
+                    return;
+                }
+                let (mut stream, _) = listener.accept().unwrap();
+                assert!(read_request(&mut stream).starts_with("GET /api/auth/check "));
+                local_host_reply(
+                    &mut stream,
+                    200,
+                    json!({"status":"ok","hasSession":true}),
+                    &format!("ETag: \"{}\"\r\n", "f".repeat(64)),
+                );
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with("POST /api/auth/local-client/logout "));
+                assert!(request.contains(&format!("mediflow_session={}", "b".repeat(64))));
+                if status == 204 {
+                    use std::io::Write;
+                    write!(
+                        stream,
+                        "HTTP/1.1 204 Synthetic\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    )
+                    .unwrap();
+                } else {
+                    local_host_reply(&mut stream, status, json!({"error":"synthetic"}), "");
+                }
+            });
+            assert!(
+                session
+                    .authenticate_local_host("Local host synthetic passphrase", notice.clone())
+                    .is_err()
+            );
+            worker.join().unwrap();
+            assert_eq!(notice.pending(), status != 204);
+            assert_eq!(
+                crate::RetirementNotice::new(Some(path)).pending(),
+                status != 204
+            );
+            std::fs::remove_dir_all(directory).unwrap();
         }
     }
     #[test]
