@@ -1786,7 +1786,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 return result;
             }});`);
     }
-    for (const name of ['mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job.ps1', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs']) {
+    for (const name of ['local-ui-navigation-deadline.mjs', 'mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job.ps1', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs']) {
         const rawBytes = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
         const bytes = name === 'mediflow.mjs' && !lifecycle?.job
             ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", 'false') : lifecycle?.job === 'simulated' && name === 'mediflow.mjs'
@@ -3006,7 +3006,7 @@ test('an existing ordinary launcher pairs only after code confirmation in its We
         await new Promise(resolve => setTimeout(resolve, 100));
         assert.doesNotMatch(f.output(),/mediflow-local-ui-pair-use/u);
         const second = await mcp.request('tools/call', {name:'mediflow.local_ui.navigate.v1',arguments:{intent:'search'}});
-        assert.equal(second.result.structuredContent.status,'continue_in_mediflow');
+        assert.equal(second.result?.structuredContent?.status,'continue_in_mediflow', JSON.stringify(second));
         assert.equal(await navigateOwnedLocalUiRuntime(bridge, 'history', AbortSignal.timeout(1500), Date.now()+1400, f.expected), true);
         await fetch(state.url + '/fixture-lock');
         await f.until(() => !bridge.connected);
@@ -3183,9 +3183,22 @@ test('real MCP first search expires in the ordinary chooser and a new search suc
             await f.until(() => f.output().includes('Pronto:'));
             assert.doesNotMatch(f.output(),/FIXTURE_NAVIGATION/u);
             const second = await mcp.request('tools/call', {name:'mediflow.local_ui.navigate.v1',arguments:{intent:'search'}});
-            assert.equal(second.result.structuredContent.status,'continue_in_mediflow');
+            assert.equal(second.result?.structuredContent?.status,'continue_in_mediflow', JSON.stringify(second));
             await f.until(() => f.output().includes('FIXTURE_NAVIGATION'));
             assert.equal((f.output().match(/FIXTURE_NAVIGATION/gu) ?? []).length,1);
         } finally { mcp.runtime.terminate(); await exited; }
     });
+});
+
+
+test('navigation deadlines tolerate Windows clock skew without extending the local budget or accepting expiry', async () => {
+    const { localUiNavigationDeadline } = await import('./local-ui-navigation-deadline.mjs');
+    const now = 100_000;
+    for (const skew of [0, 3, 8, 16, 100]) {
+        assert.equal(localUiNavigationDeadline(now + 8000 + skew, now), now + 8000);
+    }
+    assert.equal(localUiNavigationDeadline(now + 7990, now), now + 7990);
+    for (const expiry of [now - 1, now, now + 8101, Number.MAX_SAFE_INTEGER, NaN, undefined]) {
+        assert.equal(localUiNavigationDeadline(expiry, now), null);
+    }
 });
