@@ -129,6 +129,8 @@ impl ChatWriteRecovery {
     }
 }
 struct SessionInner {
+    #[cfg(test)]
+    preparation_probe: Mutex<Option<g2_settings_tests::PreparationProbe>>,
     account_context: RequestContext,
     client: RuntimeClient,
     user: RuntimeUser,
@@ -634,6 +636,8 @@ impl RuntimeSession {
         let account_context = context.session_scope();
         Self {
             inner: Arc::new(SessionInner {
+                #[cfg(test)]
+                preparation_probe: Mutex::new(None),
                 account_context,
                 client,
                 user,
@@ -675,6 +679,53 @@ impl RuntimeSession {
 
     pub fn can_access_local_host(&self) -> bool {
         self.ensure_open().is_ok() && self.inner.client.is_local_bootstrap_origin()
+    }
+    pub(crate) fn prepare_passphrase_bundle(
+        &self,
+        passphrase: &str,
+    ) -> Result<crypto::PassphraseBundle> {
+        self.ensure_open()?;
+        #[cfg(test)]
+        self.passphrase_preparation_checkpoint(None);
+        self.ensure_open()?;
+        let bundle =
+            crypto::passphrase_bundle(passphrase, &self.user().username, |kek, recovery_kek| {
+                #[cfg(test)]
+                self.passphrase_preparation_checkpoint(None);
+                let secrets = self
+                    .inner
+                    .secrets
+                    .lock()
+                    .map_err(|_| RuntimeError::Locked)?;
+                self.ensure_open()?;
+                let master = secrets.master.as_ref().ok_or(RuntimeError::Locked)?;
+                Ok((
+                    crypto::wrap_key(master, kek, "v3:")?,
+                    crypto::wrap_key(master, recovery_kek, "r1:")?,
+                ))
+            })?;
+        self.ensure_open()?;
+        Ok(bundle)
+    }
+    #[cfg(test)]
+    fn passphrase_preparation_checkpoint(&self, worker_master: Option<&MasterKey>) {
+        let mut guard = self.inner.preparation_probe.lock().unwrap();
+        if let Some(probe) = guard.as_mut()
+            && probe.skip > 0
+        {
+            probe.skip -= 1;
+            return;
+        }
+        let probe = guard.take();
+        drop(guard);
+        if let Some(probe) = probe {
+            probe.paused.send(()).unwrap();
+            probe.release.recv().unwrap();
+            probe
+                .observed
+                .send(worker_master.is_some_and(|key| key.as_ref() == [7; 32]))
+                .unwrap();
+        }
     }
     pub(crate) fn seal_recovery_backup(&self, bytes: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
         let secrets = self
@@ -3367,7 +3418,7 @@ mod tests {
     fn session() -> RuntimeSession {
         session_at("http://127.0.0.1:43181")
     }
-    fn session_at(base_url: &str) -> RuntimeSession {
+    pub(super) fn session_at(base_url: &str) -> RuntimeSession {
         RuntimeSession::new(
             RuntimeClient::new(RuntimeConfig {
                 base_url: base_url.into(),
@@ -4768,7 +4819,7 @@ mod tests {
         });
         (url, seen_rx, release_tx, worker)
     }
-    fn read_request(stream: &mut std::net::TcpStream) -> String {
+    pub(super) fn read_request(stream: &mut std::net::TcpStream) -> String {
         stream
             .set_read_timeout(Some(Duration::from_secs(5)))
             .unwrap();
@@ -7050,7 +7101,7 @@ mod tests {
         );
         worker.join().unwrap();
     }
-    fn local_host_reply(
+    pub(super) fn local_host_reply(
         stream: &mut std::net::TcpStream,
         status: u16,
         body: serde_json::Value,
@@ -7060,7 +7111,7 @@ mod tests {
         let body = body.to_string();
         write!(stream,"HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n{extra}\r\n{body}",body.len()).unwrap();
     }
-    fn local_host_login(listener: &std::net::TcpListener) {
+    pub(super) fn local_host_login(listener: &std::net::TcpListener) {
         local_host_login_as(listener, "synthetic-user", "admin", "synthetic-generation");
     }
     fn local_host_login_as(
@@ -7699,5 +7750,344 @@ mod chat_therapy_resolution_tests {
             Ok(ChatWriteOutcome::Retired)
         );
         assert_eq!(ChatWriteResolution::Uncertain.wire(), "uncertain");
+    }
+}
+
+#[cfg(test)]
+mod g2_settings_tests {
+    use super::tests::{local_host_login, local_host_reply, read_request, session_at};
+    use super::*;
+    use std::{net::TcpListener, thread};
+
+    pub(super) struct PreparationProbe {
+        pub(super) skip: usize,
+        pub(super) paused: std::sync::mpsc::Sender<()>,
+        pub(super) release: std::sync::mpsc::Receiver<()>,
+        pub(super) observed: std::sync::mpsc::Sender<bool>,
+    }
+    #[test]
+    fn lock_retires_every_master_copy_from_passphrase_preparation() {
+        use std::{sync::mpsc, time::Duration};
+        for skip in [0, 1] {
+            let session = session_at("http://127.0.0.1:43181");
+            let (paused_tx, paused_rx) = mpsc::channel();
+            let (release_tx, release_rx) = mpsc::channel();
+            let (observed_tx, observed_rx) = mpsc::channel();
+            *session.inner.preparation_probe.lock().unwrap() = Some(PreparationProbe {
+                skip,
+                paused: paused_tx,
+                release: release_rx,
+                observed: observed_tx,
+            });
+            let worker_session = session.clone();
+            let worker = thread::spawn(move || {
+                worker_session
+                    .prepare_passphrase_bundle("New synthetic passphrase for rotation")
+                    .err()
+            });
+            paused_rx.recv_timeout(Duration::from_secs(120)).unwrap();
+            session.lock();
+            assert!(session.is_locked());
+            assert!(session.inner.secrets.lock().unwrap().master.is_none());
+            release_tx.send(()).unwrap();
+            assert!(
+                !observed_rx.recv_timeout(Duration::from_secs(120)).unwrap(),
+                "a worker master copy survived lock"
+            );
+            assert_eq!(worker.join().unwrap(), Some(RuntimeError::Locked));
+        }
+    }
+    fn fixture() -> (TcpListener, RuntimeSession) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        assert_ne!(listener.local_addr().unwrap().port(), 3000);
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        (listener, session)
+    }
+    fn check(listener: &TcpListener) {
+        let (mut stream, _) = listener.accept().unwrap();
+        assert!(read_request(&mut stream).starts_with("GET /api/auth/check "));
+        local_host_reply(
+            &mut stream,
+            200,
+            json!({"status":"ok","isSetup":true,"archiveGeneration":"synthetic-generation","unlock":{"credential":"passphrase","kdfVersion":3,"salt":"AwMDAwMDAwMDAwMDAwMDAw=="}}),
+            "",
+        );
+    }
+    #[test]
+    fn g2_passphrase_rotation_uses_web_writer_retires_all_local_clones_and_never_replays() {
+        for (status, readback) in [
+            (200, "changed"),
+            (200, "unchanged"),
+            (200, "missing"),
+            (200, "foreign"),
+            (200, "unavailable"),
+            (403, ""),
+            (409, ""),
+            (500, ""),
+            (0, ""),
+        ] {
+            let (listener, session) = fixture();
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                check(&listener);
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with("POST /api/auth/passphrase/change "));
+                assert!(!request.contains("Local host synthetic passphrase"));
+                assert!(!request.contains("New synthetic passphrase for rotation"));
+                assert!(!request.to_lowercase().contains("x-mediflow-paired-client"));
+                assert!(request.contains(&format!("mediflow_session={}", "b".repeat(64))));
+                let body: Value =
+                    serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+                if status != 0 {
+                    local_host_reply(&mut stream, status, json!({"success": status == 200}), "");
+                }
+                drop(stream);
+                if status == 200 {
+                    let (mut stream, _) = listener.accept().unwrap();
+                    assert!(read_request(&mut stream).starts_with("GET /api/auth/check "));
+                    let mut checked = json!({"status":"ok","isSetup":true,"archiveGeneration":"synthetic-generation","unlock":{"credential":"passphrase","kdfVersion":3,"salt":body["salt"]}});
+                    match readback {
+                        "unchanged" => {
+                            checked["unlock"]["salt"] = json!("AwMDAwMDAwMDAwMDAwMDAw==")
+                        }
+                        "missing" => {
+                            checked["unlock"].as_object_mut().unwrap().remove("salt");
+                        }
+                        "foreign" => checked["archiveGeneration"] = json!("foreign-generation"),
+                        _ => {}
+                    }
+                    local_host_reply(
+                        &mut stream,
+                        if readback == "unavailable" { 503 } else { 200 },
+                        checked,
+                        "",
+                    );
+                }
+                let expected = crypto::derive_v3(
+                    "Local host synthetic passphrase",
+                    "AwMDAwMDAwMDAwMDAwMDAw==",
+                )
+                .unwrap();
+                assert_eq!(body["currentVerifier"], *expected.verifier);
+                let material = crypto::derive_v3(
+                    "New synthetic passphrase for rotation",
+                    body["salt"].as_str().unwrap(),
+                )
+                .unwrap();
+                assert_eq!(body["verifier"], *material.verifier);
+                assert_eq!(
+                    crypto::unwrap_v3(body["encryptedMasterKey"].as_str().unwrap(), &material.kek)
+                        .unwrap()
+                        .as_ref(),
+                    &[7; 32]
+                );
+                assert_ne!(body["salt"], body["recovery"]["salt"]);
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let command = access
+                .prepare_passphrase_change(
+                    "Local host synthetic passphrase",
+                    "New synthetic passphrase for rotation",
+                    "New synthetic passphrase for rotation",
+                )
+                .unwrap();
+            let kit: Value = serde_json::from_slice(command.recovery_kit()).unwrap();
+            assert_eq!(kit["schemaVersion"], "mediflow.recovery-kit.v1");
+            assert_eq!(kit["username"], "synthetic");
+            assert!(kit.get("verifier").is_none());
+            assert!(
+                !std::str::from_utf8(command.recovery_kit())
+                    .unwrap()
+                    .contains(command.recovery_key())
+            );
+            let kit_before = command.recovery_kit().to_vec();
+            let key_before = Zeroizing::new(command.recovery_key().to_owned());
+            let outcome = access.change_passphrase(&command);
+            assert_eq!(
+                outcome.is_ok(),
+                status == 200 && readback == "changed",
+                "status {status}, readback {readback}: {outcome:?}"
+            );
+            if status == 200 && readback != "changed" {
+                assert_eq!(outcome, Err(RuntimeError::Indeterminate));
+            }
+            assert_eq!(command.recovery_kit(), kit_before);
+            assert_eq!(command.recovery_key(), key_before.as_str());
+            assert!(session.is_locked());
+            assert!(access.change_passphrase(&command).is_err());
+            worker.join().unwrap();
+        }
+    }
+    fn serve_config(listener: &TcpListener, changed: bool) {
+        for (key, value) in [
+            ("hardwareProfile", "custom"),
+            ("aiProvider", "ollama"),
+            (
+                "aiModel_clinical",
+                if changed {
+                    "concurrent"
+                } else {
+                    "synthetic:latest"
+                },
+            ),
+            ("aiModel_reasoning", "synthetic"),
+            ("aiModel", "synthetic"),
+            ("aiUrl", "http://127.0.0.1:11434/v1"),
+            ("ollamaUrl", "http://127.0.0.1:11434/v1"),
+            ("aiModelDefaultVersion", "qwen35-default-v1"),
+        ] {
+            let (mut stream, _) = listener.accept().unwrap();
+            assert!(read_request(&mut stream).starts_with(&format!("GET /api/settings/{key} ")));
+            local_host_reply(&mut stream, 200, json!({"key":key,"value":value}), "");
+        }
+    }
+    #[test]
+    fn g2_models_read_inventory_prevent_concurrent_overwrite_and_never_pull() {
+        let (listener, session) = fixture();
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            serve_config(&listener, false);
+            let (mut stream, _) = listener.accept().unwrap();
+            let request = read_request(&mut stream);
+            assert!(request.starts_with("GET /api/ai/models "));
+            assert!(request.contains("x-target-url: http://127.0.0.1:11434/v1"));
+            local_host_reply(
+                &mut stream,
+                200,
+                json!({"models":[{"name":"synthetic","size":1024},{"name":"synthetic:latest","size":1024}]}),
+                "",
+            );
+            serve_config(&listener, false);
+            serve_config(&listener, true);
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let before = access.read_local_model_configuration().unwrap();
+        let installed = access.installed_local_models(&before.endpoint).unwrap();
+        assert_eq!(installed.len(), 1);
+        assert_eq!(installed[0].size, Some(1024));
+        let command = access
+            .prepare_local_models(
+                &before,
+                &before.endpoint,
+                "new-synthetic",
+                "new-synthetic",
+                crate::HardwareProfile::Low,
+            )
+            .unwrap();
+        assert_eq!(
+            access.apply_local_models(&command),
+            Err(RuntimeError::Conflict)
+        );
+        assert_eq!(
+            access.apply_local_models(&command),
+            Err(RuntimeError::ReadRequired)
+        );
+        worker.join().unwrap();
+    }
+    #[test]
+    fn g2_models_partial_writes_and_final_reread_never_turn_an_error_into_success() {
+        for failure_at in [None, Some(2), Some(8)] {
+            let (listener, session) = fixture();
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                for _ in 0..3 {
+                    serve_config(&listener, false);
+                }
+                for (index, (key, value)) in [
+                    ("hardwareProfile", "low"),
+                    ("aiProvider", "ollama"),
+                    ("aiModel_clinical", "new-synthetic"),
+                    ("aiModel_reasoning", "new-synthetic"),
+                    ("aiModel", "new-synthetic"),
+                    ("aiUrl", "http://127.0.0.1:11434/v1"),
+                    ("ollamaUrl", "http://127.0.0.1:11434/v1"),
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    let (mut stream, _) = listener.accept().unwrap();
+                    let request = read_request(&mut stream);
+                    assert!(request.starts_with(&format!("PUT /api/settings/{key} ")));
+                    let body: Value =
+                        serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+                    assert_eq!(body["value"], value);
+                    let status = if failure_at == Some(index) { 500 } else { 200 };
+                    local_host_reply(
+                        &mut stream,
+                        status,
+                        json!({"success":status == 200,"key":key,"value":value}),
+                        "",
+                    );
+                    if status != 200 {
+                        return;
+                    }
+                }
+                if failure_at == Some(8) {
+                    serve_config(&listener, false);
+                } else {
+                    for (key, value) in [
+                        ("hardwareProfile", "low"),
+                        ("aiProvider", "ollama"),
+                        ("aiModel_clinical", "new-synthetic"),
+                        ("aiModel_reasoning", "new-synthetic"),
+                        ("aiModel", "new-synthetic"),
+                        ("aiUrl", "http://127.0.0.1:11434/v1"),
+                        ("ollamaUrl", "http://127.0.0.1:11434/v1"),
+                        ("aiModelDefaultVersion", "qwen35-default-v1"),
+                    ] {
+                        let (mut stream, _) = listener.accept().unwrap();
+                        assert!(
+                            read_request(&mut stream)
+                                .starts_with(&format!("GET /api/settings/{key} "))
+                        );
+                        local_host_reply(&mut stream, 200, json!({"key":key,"value":value}), "");
+                    }
+                }
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let before = access.read_local_model_configuration().unwrap();
+            let command = access
+                .prepare_local_models(
+                    &before,
+                    &before.endpoint,
+                    "new-synthetic",
+                    "new-synthetic",
+                    crate::HardwareProfile::Low,
+                )
+                .unwrap();
+            if failure_at == Some(2) {
+                assert_eq!(
+                    access.apply_local_models(&command),
+                    Err(RuntimeError::Indeterminate)
+                );
+            } else {
+                assert_eq!(
+                    access.apply_local_models(&command),
+                    Ok(failure_at.is_none()),
+                    "old configuration at final readback cannot confirm the write"
+                );
+            }
+            assert_eq!(
+                access.apply_local_models(&command),
+                Err(RuntimeError::ReadRequired)
+            );
+            worker.join().unwrap();
+        }
     }
 }

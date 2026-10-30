@@ -139,7 +139,7 @@ fn read_pending(path: &Path) -> std::io::Result<Option<RestoreLookup>> {
         Err(error) => Err(error),
     }
 }
-fn write_new(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+pub(super) fn write_new(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
