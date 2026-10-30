@@ -462,7 +462,7 @@ impl ClinicalApp {
                 }) {
                     pane = pane.children(rows.iter().map(|&(key, enabled)| {
                         if key == HostSettingKey::TreatmentReasoning {
-                            return div().child(text!(format!(
+                            return div().debug_selector(|| "local-host-treatment-unavailable".into()).child(text!(format!(
                                 "Ragionamento terapeutico · Non disponibile in questa versione. Interruttore salvato: {}. Non viene usato in questa versione.",
                                 if enabled { "attivo" } else { "spento" }
                             )));
@@ -655,6 +655,53 @@ impl ClinicalApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[gpui::test]
+    fn retired_function_has_no_switch_in_the_local_panel(cx: &mut gpui::TestAppContext) {
+        let host = notes_recovery_tests::Host::new();
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host(
+                    "Synthetic scales fixture passphrase",
+                    RetirementNotice::new(None),
+                )
+                .unwrap(),
+        );
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        for saved in [true, false] {
+            view.update(cx, |app, _| {
+                app.session = Some(host.session.clone());
+                app.area = Area::Settings;
+                app.settings_page = SettingsPage::Functions;
+                app.local_host.authority = Authority::Open(access.clone());
+                app.local_host.switches = ReadLoad::Ready(vec![
+                    (HostSettingKey::PatientInsight, saved),
+                    (HostSettingKey::TreatmentReasoning, saved),
+                ]);
+            });
+            let commands = rendered_command::button_ids(|| {
+                cx.update(|window, cx| {
+                    window.refresh();
+                    window.draw(cx).clear(cx);
+                })
+            });
+            assert!(
+                cx.debug_bounds("local-host-treatment-unavailable")
+                    .is_some()
+            );
+            assert!(
+                commands
+                    .iter()
+                    .any(|id| id == "local-host-aiPatientInsightKillSwitch")
+            );
+            assert!(
+                !commands
+                    .iter()
+                    .any(|id| id == "local-host-aiTreatmentReasoningKillSwitch")
+            );
+        }
+    }
+
     #[gpui::test]
     fn failed_retirement_keeps_the_restore_outcome_and_its_own_warning(
         cx: &mut gpui::TestAppContext,
