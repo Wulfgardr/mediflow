@@ -1855,7 +1855,8 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     const proof = ${JSON.stringify(webIdentity)} === 'invalid-delayed' ? '0'.repeat(64) : webIdentityProof(process.env.MEDIFLOW_LOCAL_UI_WEB_SECRET, challenge);
                     process.stderr.write('FIXTURE_IDENTITY_PROOF\\n');
                     res.setHeader('Content-Length', '64');
-                    if (${JSON.stringify(webIdentity)}.toString().endsWith('delayed')) setTimeout(() => res.end(proof), 100); else res.end(proof); return;
+                    if (${JSON.stringify(webIdentity)} === 'cold-identity') setTimeout(() => res.end(proof), 1250);
+                    else if (${JSON.stringify(webIdentity)}.toString().endsWith('delayed')) setTimeout(() => res.end(proof), 100); else res.end(proof); return;
                 }
                 res.setHeader('Content-Type', 'application/json');
                 res.end(JSON.stringify({ ...${JSON.stringify(identity)}, fingerprint: 'synthetic' })); });
@@ -3290,4 +3291,55 @@ test('Windows native binding verification releases the binary before returning t
     `],{encoding:'utf8',timeout:30000});
     assert.equal(result.status,0,result.stdout+result.stderr);
     assert.match(result.stdout,/"binaryReleased":true/u);
+});
+
+
+test('ordinary Web startup waits for one cold identity proof within its startup deadline', async t => {
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, 'cold-identity');
+    await f.until(() => f.output().includes('Pronto:'));
+    assert.equal((f.output().match(/FIXTURE_IDENTITY_PROOF/gu) ?? []).length, 1, f.output());
+});
+
+
+test('synthetic crash writer retains its open transaction across garbage collection', async t => {
+    const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mf-writer-gc-')));
+    const loader = path.join(directory, 'force-gc.mjs');
+    writeFileSync(loader, `import http from 'node:http';
+      const listen=http.Server.prototype.listen;
+      http.Server.prototype.listen=function(...args) {
+        const callback=args.at(-1);
+        if(typeof callback==='function') args[args.length-1]=function(...values) {
+          global.gc(); setImmediate(()=>{global.gc();setImmediate(()=>callback.apply(this,values));});
+        };
+        return listen.apply(this,args);
+      };`);
+    const generation = crypto.randomUUID();
+    const child = spawn(process.execPath, ['--expose-gc', ...fixtureImportArguments(loader),
+        path.join(repoRoot,'scripts/windows-stop-integrity-smoke.mjs'),'--transaction-writer',directory,generation], {
+        env:{...process.env,MEDIFLOW_DATA_DIR:directory,MEDIFLOW_E2E_DISABLE_LEGACY_COPY:'1'},
+        stdio:['ignore','ignore','pipe','ipc'],windowsHide:true,
+    });
+    let stderr = '';
+    child.stderr.on('data', bytes => { stderr += bytes; });
+    const closed = new Promise(resolve => child.once('close', resolve));
+    t.after(async () => {
+        if(child.pid && child.exitCode===null && child.signalCode===null) child.kill('SIGKILL');
+        await closed;
+        rmSync(directory,{recursive:true,force:true});
+    });
+    const ready = new Promise((resolve,reject) => {
+        child.once('message',resolve);child.once('error',reject);
+        closed.then(()=>reject(new Error('Synthetic writer closed before transaction readiness: '+stderr)));
+    });
+    const frame = await waitForFixtureClose(ready,10000);
+    assert.equal(frame.type,'transaction-open');assert.equal(frame.generation,generation);
+    assert.equal(frame.writer,child.pid);assert.equal(frame.openRows,128);assert.ok(frame.walBytes>0);
+    assert.equal(await (await fetch('http://127.0.0.1:'+frame.port,{signal:AbortSignal.timeout(3000)})).text(),generation);
+    child.kill('SIGKILL');await closed;
+    const {openAdmittedSqlite} = await import('../lib/sqlite-maintenance-admission.mjs');
+    const lease = openAdmittedSqlite(path.join(directory,'synthetic.db'),{role:'synthetic-gc-check',sqliteOptions:{fileMustExist:true}});
+    try {
+        assert.equal(lease.database.pragma('integrity_check',{simple:true}),'ok');
+        assert.deepEqual(lease.database.prepare('SELECT id,value FROM synthetic_stop_rows ORDER BY id').all(),[{id:'committed',value:generation}]);
+    } finally {lease.closeSync();}
 });
