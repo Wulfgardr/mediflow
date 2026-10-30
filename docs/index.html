@@ -150,7 +150,7 @@
 ## 1. Vision & Filosofia
 
 > [!IMPORTANT]
-> **Cifratura dei campi sensibili, non dell'intero database**: il browser cifra i campi clinici sensibili prima di salvarli e il server non li decifra. Nomi, identificativi e terapie restano in chiaro; il server riceve il PIN a ogni accesso. La [matrice dei dati a riposo](./data-at-rest-matrix.md) dice che cosa si legge senza la chiave.
+> **Cifratura dei campi sensibili, non dell'intero database**: il browser cifra i campi clinici sensibili prima di salvarli e il server non li decifra, salvo la verifica al caricamento della creazione del paziente da documento. Nella sola creazione del paziente da documento, il client invia al server il PDF in chiaro per l’estrazione e la chiave del singolo file per la verifica al caricamento. Il server decifra il payload, confronta i byte prima dell’estrazione e azzera i buffer della chiave in ogni uscita. Non riceve mai la master key; terminata la verifica non può decifrare l’allegato persistito. Nomi, identificativi e terapie restano in chiaro; il server riceve il PIN a ogni accesso. La [matrice dei dati a riposo](./data-at-rest-matrix.md) dice che cosa si legge senza la chiave.
 
 MediFlow nasce con tre principi fondamentali:
 
@@ -318,7 +318,7 @@ erDiagram
 ```
 
 > [!WARNING]
-> I campi marcati con 🔐 sono **cifrati lato client** prima della trasmissione. Il database contiene solo stringhe `ENC:iv:ciphertext`.
+> I campi marcati con 🔐 sono **cifrati lato client** prima della trasmissione. I valori cifrati usano `ENC:iv:ciphertext`; il solo `attachments.data` della creazione del paziente da documento può usare `ENC2:wrap_iv:wrapped_key:iv:ciphertext`.
 
 ### 4.2 Mappa dei Campi Cifrati
 
@@ -419,7 +419,7 @@ sequenceDiagram
 | **Key Derivation** | PBKDF2-SHA256, 100.000 iterazioni |
 | **IV** | 12 byte casuali per ogni operazione |
 | **Key Storage** | JWK esportato in `sessionStorage` (volatile) |
-| **At-Rest** | Solo ciphertext (`ENC:base64iv:base64data`) |
+| **At-Rest** | Ciphertext (`ENC:base64iv:base64data`; `ENC2:` per il solo `data` della creazione da documento) |
 
 ### 6.2 Configurazione ICD-11 WHO
 

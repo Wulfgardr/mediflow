@@ -1,3 +1,4 @@
+import { isCiphertext } from '../../security/attachment-file-envelope';
 import 'server-only';
 
 import { Buffer } from 'node:buffer';
@@ -99,7 +100,7 @@ function read(id: string, patientId: string, metadataOnly = false): Row | null {
         revision: row.revision as number, freshnessEpoch: row.freshnessEpoch as number }) });
 }
 function decode(data: string): Uint8Array | null {
-    if (!data || data.startsWith('ENC:') || data.length > Math.ceil(ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES / 3) * 4 + 1024) return null;
+    if (!data || isCiphertext(data) || data.length > Math.ceil(ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES / 3) * 4 + 1024) return null;
     const offset = DATA_URL.test(data) ? data.indexOf(',') + 1 : 0; const compact = data.slice(offset).replace(/\s/gu, '');
     if (!compact || compact.length % 4 !== 0 || !BASE64.test(compact)) return null;
     try {
@@ -176,10 +177,10 @@ function createSourceAuthority(sessionValue: ServerSession, native: boolean) {
         const issue = (value: unknown, encryptedOnly: boolean): { locator: object; canonicalSource: AttachmentExtractionCurrent } | null => {
             const id = selector(value); if (!id) return null; let bound: Bound | null = null;
             if (lease((patientId) => {
-                const row = read(id, patientId); if (!row || (encryptedOnly && !row.data.startsWith('ENC:'))) return 0;
+                const row = read(id, patientId); if (!row || (encryptedOnly && !isCiphertext(row.data))) return 0;
                 const locatorGeneration = captureAttachmentExtractionLocatorGeneration();
                 bound = Object.freeze({ id: row.id, patientId: row.patientId, current: row.current,
-                    storedDataSha256: storedDigest(row.data), encrypted: row.data.startsWith('ENC:'), ...epochs(), locatorGeneration });
+                    storedDataSha256: storedDigest(row.data), encrypted: isCiphertext(row.data), ...epochs(), locatorGeneration });
                 return isCurrentAttachmentExtractionLocatorGeneration(locatorGeneration) ? 1 : 0;
             }) !== 1) return null;
             const published = bound as Bound | null;
@@ -195,7 +196,7 @@ function createSourceAuthority(sessionValue: ServerSession, native: boolean) {
                 if (projection === undefined) bytes = decode(row.data);
                 else {
                     // The authenticated client supplies content, never ciphertext equality or currentness authority.
-                    if (!row.data.startsWith('ENC:') || isProxy(projection) || !types.isUint8Array(projection)
+                    if (!isCiphertext(row.data) || isProxy(projection) || !types.isUint8Array(projection)
                         || getPrototype(projection) !== Uint8Array.prototype) return 0;
                     const length = apply(bytesLength, projection, []) as number;
                     if (length < 1 || length > ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES) return 0;

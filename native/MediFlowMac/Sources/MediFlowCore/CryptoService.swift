@@ -1,6 +1,6 @@
 // Zero-knowledge field crypto for the paired Apple client, byte-compatible with
 // the web (lib/security.ts). The home-base stores ENC:base64(iv):base64(ct‖tag)
-// ciphertext; the server never holds the key. The operator PIN derives a KEK
+// ciphertext; the server never receives the master key. The operator PIN derives a KEK
 // (PBKDF2-HMAC-SHA256; v1=100k legacy, v2=600k for PIN wraps) that unwraps the
 // AES-256-GCM master key, which then decrypts/encrypts clinical fields. Verified
 // against web-produced test vectors. v3 uses a NFKC passphrase, PBKDF2 at 2m
@@ -21,6 +21,34 @@ import CommonCrypto
 
 public enum CryptoService {
     public static let encPrefix = "ENC:"
+    public static func isCiphertext(_ value: String) -> Bool {
+        value.hasPrefix(encPrefix) || value.hasPrefix("ENC2:")
+    }
+
+    private static func openFile(_ value: String, masterKey: SymmetricKey) -> String? {
+        guard value.utf8.count <= 20 * 1024 * 1024 else { return nil }
+        let parts = value.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 5 else { return nil }
+        let decoded = parts.dropFirst().compactMap { text -> Data? in
+            guard let data = Data(base64Encoded: String(text)), data.base64EncodedString() == text else { return nil }
+            return data
+        }
+        guard decoded.count == 4, decoded[0].count == 12, decoded[1].count == 48,
+              decoded[2].count == 12, decoded[3].count >= 17 else { return nil }
+        func open(_ iv: Data, _ data: Data, _ key: SymmetricKey, _ domain: String) throws -> Data {
+            let box = try AES.GCM.SealedBox(nonce: AES.GCM.Nonce(data: iv),
+                                          ciphertext: data.dropLast(16), tag: data.suffix(16))
+            return try AES.GCM.open(box, using: key, authenticating: Data(domain.utf8))
+        }
+        do {
+            var raw = try open(decoded[0], decoded[1], masterKey, "mediflow.attachment.file-key.v2")
+            defer { raw.resetBytes(in: 0..<raw.count) }
+            guard raw.count == 32 else { return nil }
+            var bytes = try open(decoded[2], decoded[3], SymmetricKey(data: raw), "mediflow.attachment.data.v2")
+            defer { bytes.resetBytes(in: 0..<bytes.count) }
+            return jsonEncode("data:application/pdf;base64," + bytes.base64EncodedString())
+        } catch { return nil }
+    }
 
     // Versioned PBKDF2 work factor for the wrapped-master-key blob, in lockstep
     // with the web (lib/security.ts KDF_ITERATIONS). v1 = legacy 100k (unwrap
@@ -63,6 +91,7 @@ public enum CryptoService {
     /// unchanged when it is not an ENC value (API-direct plaintext), and nil only
     /// when an ENC value fails to decrypt (wrong key / tampered).
     public static func decryptField(_ value: String, masterKey: SymmetricKey) -> String? {
+        if value.hasPrefix("ENC2:") { return openFile(value, masterKey: masterKey) }
         guard value.hasPrefix(encPrefix) else { return value }
         let parts = value.split(separator: ":", omittingEmptySubsequences: false)
         guard parts.count == 3,

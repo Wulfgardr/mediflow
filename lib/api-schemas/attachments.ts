@@ -1,3 +1,4 @@
+import { ENCRYPTED_ATTACHMENT_FILE_PATTERN } from '../attachment-payload';
 import { z } from 'zod';
 import { types } from 'node:util';
 import {
@@ -49,8 +50,8 @@ const arrayIsArray = Array.isArray;
 const numberIsSafeInteger = Number.isSafeInteger;
 const regexpTest = Function.call.bind(RegExp.prototype.test) as (expression: RegExp, value: string) => boolean;
 const isProxy = types.isProxy;
-const SOURCE_REF = /^[0-9a-f]{64}$/u;
 const SEALED_ATTACHMENT = /^ENC:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$/u;
+const SOURCE_REF = /^[0-9a-f]{64}$/u;
 const ROOT_KEYS = ['expected', 'replacement'] as const;
 const EXPECTED_KEYS = ['sourceRef', 'revision', 'freshnessEpoch'] as const;
 
@@ -86,7 +87,7 @@ export function parseAttachmentContentCurrentnessPut(value: unknown): Attachment
     if (!root) return null;
     const expected = parseAttachmentExpectedCurrentness(root.expected!.value);
     const replacement = root.replacement!.value;
-    if (!expected || typeof replacement !== 'string' || replacement.length === 0 || !regexpTest(SEALED_ATTACHMENT, replacement)) return null;
+    if (!expected || typeof replacement !== 'string' || replacement.length === 0 || (!regexpTest(SEALED_ATTACHMENT, replacement) && !regexpTest(ENCRYPTED_ATTACHMENT_FILE_PATTERN, replacement))) return null;
     return objectFreeze({ expected, replacement });
 }
 

@@ -1,7 +1,7 @@
 import { archiveGenerationForSession } from './security/archive-session-generation';
 import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
-import { getAttachmentPayloadByteSize, isSealedAttachmentValue, resolveMaxAttachmentBytes } from './attachment-payload';
+import { getAttachmentPayloadByteSize, isSealedAttachmentData, isSealedAttachmentValue, resolveMaxAttachmentBytes } from './attachment-payload';
 import {
     listChangedFields,
     requestIdFromRequest,
@@ -61,7 +61,7 @@ function validateNetworkAttachmentCreateBody(
     }
 
     for (const field of NETWORK_SEALED_ATTACHMENT_CREATE_FIELDS) {
-        if (!isSealedAttachmentValue(body[field])) {
+        if (!(field === 'data' ? isSealedAttachmentData(body[field]) : isSealedAttachmentValue(body[field]))) {
             return {
                 ok: false,
                 status: 400,

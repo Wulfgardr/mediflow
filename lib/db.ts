@@ -1,3 +1,4 @@
+import { openPatientDocumentFile } from './security/attachment-file-envelope';
 import backupEncryptedFields from './backup-encrypted-fields.json';
 import type { ProstheticsCatalogSelection, ProstheticsSnapshot } from './reference-data/prosthetics-catalog-contract';
 // API Client Facade for SQLite Backend
@@ -821,14 +822,26 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private async decryptItem(item: any): Promise<any> {
         const key = this.getMasterKey();
-        if (!key || !item) return item;
+        if (!item) return item;
+        if (!key) {
+            if (this.tableName === 'attachments' && typeof item.data === 'string' && item.data.startsWith('ENC2:')) {
+                rememberLockedCiphertext(item, 'data', item.data);
+                item.data = LOCKED_DATA_PLACEHOLDER;
+            }
+            return item;
+        }
 
         const fields = ENCRYPTED_FIELDS[this.tableName];
         if (!fields) return item;
 
         for (const field of fields) {
-            if (item[field] && typeof item[field] === 'string' && item[field].startsWith('ENC:')) {
+            if (item[field] && typeof item[field] === 'string' && isEncryptedFieldValue(item[field])) {
                 try {
+                    if (item[field].startsWith('ENC2:')) {
+                        if (this.tableName !== 'attachments' || field !== 'data') throw new Error('Invalid file field');
+                        item[field] = await openPatientDocumentFile(item[field], key);
+                        continue;
+                    }
                     const parts = item[field].split(':');
                     if (parts.length === 3) {
                         const iv = parts[1];

@@ -1,3 +1,4 @@
+import { erasePatientDocumentFileKey } from '@/lib/patient-document-file-verification';
 import { requireNetworkCapabilityContext } from '@/lib/network-write-context';
 import { readNativeNetworkJson } from '@/lib/native-network-json-body';
 import { nativePatientDocumentService } from '@/lib/native-patient-document-production';
@@ -17,11 +18,12 @@ export async function POST(request: Request): Promise<Response> {
         || request.headers.get('content-type')?.toLowerCase() !== 'application/json') return reply({ status: 'denied' }, 403);
     if (active >= 2) return reply({ status: 'denied' }, 503);
     active += 1;
+    let parsed: unknown;
     try {
         const resolved = await requireNetworkCapabilityContext(request, 'network.replica.write-patient-lifecycle');
         if (!resolved.ok) return reply({ status: 'denied' }, resolved.response.status);
         if (resolved.context.session.authChannel !== 'native' || new URL(request.url).search) return reply({ status: 'denied' }, 403);
-        const body = await readNativeNetworkJson(request, 35 * 1024 * 1024,
+        const body = parsed = await readNativeNetworkJson(request, 35 * 1024 * 1024,
             { signal: AbortSignal.any([request.signal, AbortSignal.timeout(10_000)]), deadline: performance.now() + 10_000 });
         if (!body || typeof body !== 'object' || Array.isArray(body)) return reply({ status: 'denied' }, 400);
         const input = body as Record<string, unknown>, keys = Object.keys(input).sort().join(',');
@@ -42,5 +44,8 @@ export async function POST(request: Request): Promise<Response> {
         if (error instanceof NativePatientDocumentExtractionFailed) return reply({ status: 'review-required', detail: error.detail }, 409);
         return error instanceof PatientDocumentDuplicateReviewRequired
             ? reply({ status: 'duplicate-review-required' }, 409) : reply({ status: 'denied' }, 403);
-    } finally { active -= 1; }
+    } finally {
+        if (parsed && typeof parsed === 'object' && 'source' in parsed) erasePatientDocumentFileKey(parsed.source);
+        active -= 1;
+    }
 }

@@ -128,12 +128,19 @@ documenti, ricontrollati nella transazione. Una sessione Web non lo usa.
 Non modifica `/api/v1`, gli endpoint legacy o il comportamento Web.
 
 `stage` riceve un solo PDF selezionato nel client nativo, fino a 10 MiB,
-con originale base64 e nome, percorso e contenuto cifrati dal medesimo
-client fidato. Il client deve cifrare esattamente lo stesso originale con
-la chiave che già possiede: il server non riceve la chiave e non attesta
-l'uguaglianza tra cifrato e testo in chiaro. Questo vincolo va provato sul
-futuro chiamante GPUI. Non sono ammessi URL, percorsi da aprire, identificativi
-di allegati della chat, candidati, opzioni di parser o provider.
+con originale base64 e nome/percorso `ENC:`. Il client genera una chiave AES-256 casuale per il file e cifra i byte PDF con nonce casuale di 12 byte. Avvolge la chiave con la master key e un secondo nonce casuale di 12 byte. `data` usa il formato versionato:
+
+```text
+ENC2:<wrap_iv_b64>:<wrapped_key_b64>:<iv_b64>:<cipher_b64>
+```
+
+Base64 RFC 4648 canonico; i due ciphertext comprendono il tag GCM di 16 byte. L’involucro della chiave ha 48 byte e AAD UTF-8 `mediflow.attachment.file-key.v2`; il payload cifra direttamente i byte PDF, con AAD `mediflow.attachment.data.v2`. Nome e percorso mantengono `ENC:`; nessun altro campo accetta ENC2. Non cambiano schema, dati o scrittori preesistenti.
+
+Aggiornamento del 30 ottobre 2026: **il client cifra, il server verifica**. `stage.source` ha esattamente `name`, `path`, `original`, `data`, `fileKey`. `fileKey` è un array JSON mutabile di 32 interi 0–255, mai la master key. Il server verifica GCM e uguaglianza byte per byte col PDF ricevuto, prima di AnyDoc, OCR o creazione della fonte. Rifiuta payload illeggibili, chiavi errate e originali diversi. Azzera array e buffer posseduti prima dell’estrazione, anche in errore, e non li conserva né li riporta in log, errori o ricevute. L’azzeramento riguarda i buffer posseduti dal codice: non attesta cancellazione forense delle copie interne a JSON, runtime o libreria crittografica.
+
+Il server non apre l’involucro sotto la master key. Un involucro falso può rendere il file illeggibile, ma non sostituirlo con un PDF differente da quello verificato. `execute` e `receipt`, anche dopo riavvio, restituiscono `outcome: applied` insieme a `attachmentReadback: client-verification-required`: attestano la scrittura, non l’apertura. Il futuro client GPUI deve rileggere `attachments.data`, aprire l’involucro con la master key e confrontare i byte con lo snapshot originale prima di presentare un esito completo; se fallisce deve mostrare l’allegato come non leggibile. Non esiste ancora una UI GPUI di questo comando. Il produttore `sealPatientDocumentFile` è esercitato da un client sintetico attraverso stage, revisione, execute e rilettura effettiva; il vettore condiviso è `native/contracts/attachment-file-golden.v2.json`.
+
+Non sono ammessi URL, percorsi da aprire, identificativi di allegati della chat, candidati, opzioni di parser o provider.
 
 L'host copia i byte, controlla firma PDF, codifica e dimensione, esegue AnyDoc
 e prosegue con l'OCR locale soltanto per `image_or_scan`. Custodisce in RAM
@@ -150,7 +157,7 @@ apparentemente univoche. Un'estrazione fallita non apre la revisione e
 restituisce soltanto il dettaglio d'errore del contratto AnyDoc.
 
 `preview`, `execute`, `receipt` e `revoke` delegano al comando comune:
-nessun writer, deposito o modello degli esiti aggiuntivo. L'esecuzione usa
+nessun writer o deposito aggiuntivo; la ricevuta nativa distingue la verifica di apertura ancora richiesta. L'esecuzione usa
 il PIN nativo, poi rilegge ricevuta, paziente attivo, appartenenza
 all'ambulatorio e fonte prima di rispondere `applied`. Il recupero senza
 stato RAM conserva `unknown`; il ritiro non lo converte in `retired`.

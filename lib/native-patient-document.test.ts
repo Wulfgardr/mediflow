@@ -1,3 +1,4 @@
+import { sealPatientDocumentFile, openPatientDocumentFile } from './security/attachment-file-envelope';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequire } from 'node:module';
@@ -32,12 +33,16 @@ function seal(value: string) {
     const data = Buffer.concat([cipher.update(JSON.stringify(value)), cipher.final(), cipher.getAuthTag()]);
     return `ENC:${iv.toString('base64')}:${data.toString('base64')}`;
 }
+async function file(bytes: Buffer) {
+    const key = await crypto.subtle.importKey('raw', master, 'AES-GCM', false, ['encrypt', 'decrypt']);
+    return sealPatientDocumentFile(new Uint8Array(bytes), key);
+}
 async function document(text = 'Nome: Mario\nCognome: Rossi\nDocumento inventato per la prova') {
     const pdf = await PDFDocument.create(), font = await pdf.embedFont(StandardFonts.Helvetica);
     pdf.addPage().drawText(text, { font, size: 12, x: 40, y: 700 });
     const bytes = Buffer.from(await pdf.save());
     return { name: seal('sintetico.pdf'), path: seal('sintetico.pdf'), original: bytes.toString('base64'),
-        data: seal(`data:application/pdf;base64,${bytes.toString('base64')}`) };
+        ...await file(bytes) };
 }
 async function scan(blank: boolean) {
     const raster = sharp({ create: { width: 1400, height: 800, channels: 3, background: '#ffffff' } });
@@ -49,7 +54,7 @@ async function scan(blank: boolean) {
     pdf.addPage([700, 400]).drawImage(image, { x: 0, y: 0, width: 700, height: 400 });
     const bytes = Buffer.from(await pdf.save());
     return { name: seal('scansione-inventata.pdf'), path: seal('scansione-inventata.pdf'), original: bytes.toString('base64'),
-        data: seal(`data:application/pdf;base64,${bytes.toString('base64')}`) };
+        ...await file(bytes) };
 }
 function fixture(scope = randomUUID()) {
     dbServer.insert(ambulatories).values({ id: scope, name: 'Ambulatorio inventato', isDefault: true }).onConflictDoNothing().run();
@@ -100,18 +105,18 @@ async function localPost(request: Request, extra: Record<string, string> = {}) {
 
 test('real AnyDoc text PDF, native current host, PIN and readback use the single writer', async () => {
     const context = fixture(), api = createNativePatientDocumentService(dbServer), before = effects();
-    const source = await document(), view = await api.stage(context, source);
+    const source = await document(), view = await api.stage(context, structuredClone(source));
     assert.match(view.text, /Mario/u); assert.equal(view.identity, 'ambiguous'); assert.equal(view.quality, 'uncertain');
     assert.deepEqual(view.candidates, {}); assert.deepEqual(effects(), before);
     await api.preview(context, view.commandId, view.viewId, review());
-    assert.deepEqual(await api.execute(context, view.commandId, pin), { outcome: 'applied' });
+    assert.deepEqual(await api.execute(context, view.commandId, pin), { outcome: 'applied', attachmentReadback: 'client-verification-required' });
     assert.deepEqual(effects(), before.map(n => n + 1));
     const restarted = createNativePatientDocumentService(dbServer);
-    assert.deepEqual(await restarted.receipt(context, view.commandId), { outcome: 'applied' });
-    assert.deepEqual(await restarted.execute(context, view.commandId, 'invalid'), { outcome: 'applied' });
+    assert.deepEqual(await restarted.receipt(context, view.commandId), { outcome: 'applied', attachmentReadback: 'client-verification-required' });
+    assert.deepEqual(await restarted.execute(context, view.commandId, 'invalid'), { outcome: 'applied', attachmentReadback: 'client-verification-required' });
     assert.deepEqual(effects(), before.map(n => n + 1));
     const receipt = JSON.stringify(await restarted.receipt(context, view.commandId));
-    assert.equal(receipt, '{"outcome":"applied"}');
+    assert.equal(receipt, '{"outcome":"applied","attachmentReadback":"client-verification-required"}');
 });
 test('multiple identities and hostile instructions remain text requiring explicit corrections', async () => {
     const context = fixture(), api = createNativePatientDocumentService(dbServer), before = effects();
@@ -131,7 +136,7 @@ test('real scanned PDF uses local Apple Vision, stays uncertain and needs manual
     assert.match(view.text, /Mario/u); assert.equal(view.quality, 'uncertain');
     assert.deepEqual(effects(), before);
     await api.preview(context, view.commandId, view.viewId, review());
-    assert.deepEqual(await api.execute(context, view.commandId, pin), { outcome: 'applied' });
+    assert.deepEqual(await api.execute(context, view.commandId, pin), { outcome: 'applied', attachmentReadback: 'client-verification-required' });
 });
 test('empty scan blocks native review with explicit OCR error and no patient', { skip: process.platform !== 'darwin' }, async () => {
     const context = fixture(), before = effects();
@@ -154,8 +159,8 @@ test('native route rejects URLs, source IDs and caller candidates; returns only 
     assert.equal(staged.status, 200); assert.match(staged.body.text, /Mario/u);
     assert.deepEqual(await send({ operation: 'preview', commandId: staged.body.commandId, viewId: staged.body.viewId, review: review() }),
         { status: 200, body: { commandId: staged.body.commandId, status: 'preview' } });
-    assert.deepEqual(await send({ operation: 'execute', commandId: staged.body.commandId, pin }), { status: 200, body: { outcome: 'applied' } });
-    assert.deepEqual(await send({ operation: 'receipt', commandId: staged.body.commandId }), { status: 200, body: { outcome: 'applied' } });
+    assert.deepEqual(await send({ operation: 'execute', commandId: staged.body.commandId, pin }), { status: 200, body: { outcome: 'applied', attachmentReadback: 'client-verification-required' } });
+    assert.deepEqual(await send({ operation: 'receipt', commandId: staged.body.commandId }), { status: 200, body: { outcome: 'applied', attachmentReadback: 'client-verification-required' } });
 });
 test('unknown after service restart stays unknown, including retirement', async () => {
     const context = fixture(), api = createNativePatientDocumentService(dbServer);
@@ -174,7 +179,7 @@ test('duplicate requires a separate explicit choice and never changes the existi
     const view = await api.stage(context, await document());
     await assert.rejects(api.preview(context, view.commandId, view.viewId, values), /Possible duplicate/u);
     await api.preview(context, view.commandId, view.viewId, { ...values, duplicate: 'create-separate' });
-    assert.deepEqual(await api.execute(context, view.commandId, pin), { outcome: 'applied' });
+    assert.deepEqual(await api.execute(context, view.commandId, pin), { outcome: 'applied', attachmentReadback: 'client-verification-required' });
     assert.deepEqual(dbServer.select().from(patients).where(eq(patients.id, existingId)).get(), before);
 });
 for (const fault of ['source-missing', 'patient-changed'] as const) test(`readback detects ${fault} and rolls back before declaring success`, async () => {
@@ -225,7 +230,7 @@ test('invalid and malformed PDF bytes cannot open a review or create partial rec
     const context = fixture(), api = createNativePatientDocumentService(dbServer), before = effects();
     const source = await document();
     for (const original of [Buffer.from('not a PDF').toString('base64'), Buffer.from('%PDF-1.4\ninvalid').toString('base64')]) {
-        await assert.rejects(api.stage(context, { ...source, original }));
+        await assert.rejects(api.stage(context, { ...structuredClone(source), original }));
         assert.deepEqual(effects(), before);
     }
 });
@@ -307,23 +312,67 @@ test('scope observed by the shared native resolver retires work even without a d
 });
 test('simultaneous stages reserve one source slot per session and release it on retirement/error', async () => {
     const context = fixture(), api = createNativePatientDocumentService(dbServer), source = await document();
-    const results = await Promise.allSettled([api.stage(context, source), api.stage(context, source)]);
+    const results = await Promise.allSettled([api.stage(context, structuredClone(source)), api.stage(context, structuredClone(source))]);
     assert.equal(results.filter(x => x.status === 'fulfilled').length, 1);
     for (const result of results) if (result.status === 'fulfilled') await api.revoke(context, result.value.commandId);
-    await assert.rejects(api.stage(context, { ...source, original: Buffer.from('%PDF-invalid').toString('base64') }));
-    const next = await api.stage(context, source); await api.revoke(context, next.commandId);
+    await assert.rejects(api.stage(context, { ...structuredClone(source), original: Buffer.from('%PDF-invalid').toString('base64') }));
+    const next = await api.stage(context, structuredClone(source)); await api.revoke(context, next.commandId);
 });
 test('fifteen retained sources plus two concurrent preparations never exceed sixteen slots', async () => {
     const api = createNativePatientDocumentService(dbServer), source = await document(), scope = randomUUID();
     const retained = [];
     for (let i = 0; i < 15; i++) {
-        const context = fixture(scope); retained.push({ context, view: await api.stage(context, source) });
+        const context = fixture(scope); retained.push({ context, view: await api.stage(context, structuredClone(source)) });
     }
     const contexts = [fixture(scope), fixture(scope)];
-    const results = await Promise.allSettled(contexts.map(context => api.stage(context, source)));
+    const results = await Promise.allSettled(contexts.map(context => api.stage(context, structuredClone(source))));
     assert.equal(results.filter(x => x.status === 'fulfilled').length, 1);
     for (const [i, result] of results.entries()) if (result.status === 'fulfilled') retained.push({ context: contexts[i], view: result.value });
     for (const { context, view } of retained) await api.revoke(context, view.commandId);
-    const next = await api.stage(contexts[0], source); await api.revoke(contexts[0], next.commandId);
+    const next = await api.stage(contexts[0], structuredClone(source)); await api.revoke(contexts[0], next.commandId);
 });
 test.after(() => { master.fill(0); cleanup(); dbServer.$client.close(); });
+
+for (const fault of ['different-pdf', 'corrupt', 'wrong-key', 'missing-key', 'extra-field', 'bad-original', 'auth'] as const) test(`file verification rejects ${fault}, erases key, creates no source`, async t => {
+    const context = fixture(), api = createNativePatientDocumentService(dbServer), source = await document();
+    const logs: unknown[] = [];
+    for (const method of ['log', 'warn', 'error', 'info'] as const) t.mock.method(console, method, (...args: unknown[]) => { logs.push(args); });
+    const key = source.fileKey;
+    const secret = JSON.stringify(key);
+    const before = effects();
+    if (fault === 'different-pdf') { const b = await document('Documento B'); source.data = b.data; source.fileKey.splice(0, 32, ...b.fileKey); }
+    if (fault === 'corrupt') source.data = source.data.slice(0, -4) + 'AAAA';
+    if (fault === 'wrong-key') key[0] ^= 1;
+    if (fault === 'missing-key') delete (source as Partial<typeof source>).fileKey;
+    if (fault === 'extra-field') Object.assign(source, { secret });
+    if (fault === 'bad-original') source.original = 'invalid';
+    if (fault === 'auth') retireServerSessionForLogout(context.session.id);
+    await assert.rejects(api.stage(context, source), error => {
+        assert(!String(error).includes(secret)); return true;
+    });
+    if (fault !== 'missing-key') assert(key.every(byte => byte === 0));
+    assert.deepEqual(effects(), before);
+    assert(!JSON.stringify(logs).includes(secret));
+});
+test('good file reads identical saved bytes; false wrapping is unreadable with honest receipt', async () => {
+    for (const forged of [false, true]) {
+        const context = fixture(), api = createNativePatientDocumentService(dbServer), source = await document();
+        const key = source.fileKey;
+        if (forged) { const parts = source.data.split(':'); parts[2] = Buffer.alloc(48).toString('base64'); source.data = parts.join(':'); }
+        const view = await api.stage(context, source);
+        assert(key.every(byte => byte === 0));
+        await api.preview(context, view.commandId, view.viewId, review());
+        const receipt = await api.execute(context, view.commandId, pin);
+        assert.deepEqual(receipt, { outcome: 'applied', attachmentReadback: 'client-verification-required' });
+        const saved = dbServer.$client.prepare('SELECT data FROM attachments WHERE id = ?').get(view.commandId);
+        // Source id is deliberately distinct from the command id.
+        assert.equal(saved, undefined);
+        const row = dbServer.$client.prepare('SELECT data FROM attachments WHERE data = ?').get(source.data) as { data: string };
+        assert.equal(row.data, source.data);
+        const masterKey = await crypto.subtle.importKey('raw', master, 'AES-GCM', false, ['decrypt']);
+        if (forged) await assert.rejects(openPatientDocumentFile(row.data, masterKey));
+        else assert.equal((await openPatientDocumentFile(row.data, masterKey)).split(',')[1], source.original);
+        const persisted = JSON.stringify(dbServer.$client.prepare('SELECT redacted_metadata FROM audit_events').all());
+        assert(!persisted.includes('fileKey'));
+    }
+});

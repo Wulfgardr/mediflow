@@ -41,9 +41,13 @@ il file; dove una proprietà non è ancora provata da un test, è scritto.
   la chiave in chiaro nel `sessionStorage` come JWK
   (`components/security-provider.tsx`, `lib/security/client-security-session.ts`).
 
-Il server non decifra i campi clinici. Per v3 il verificatore di accesso non
+Il server non decifra i campi clinici, salvo la verifica al caricamento descritta sotto. Per v3 il verificatore di accesso non
 permette di derivare la chiave di avvolgimento; nel profilo PIN transitorio il
 server riceve invece il PIN e possiede involucro e salt.
+
+Nella sola creazione del paziente da documento, il client invia al server il PDF in chiaro per l’estrazione e la chiave del singolo file per la verifica al caricamento. Il server decifra il payload, confronta i byte prima dell’estrazione e azzera i buffer della chiave in ogni uscita. Non riceve mai la master key; terminata la verifica non può decifrare l’allegato persistito.
+
+Il solo `attachments.data` di questa route può essere `ENC2:`: chiave casuale per file avvolta con la master key, nonce e payload AES-256-GCM. Nome e percorso restano `ENC:`; nessuna migrazione o modifica degli scrittori esistenti.
 
 ## Minacce considerate
 
@@ -307,7 +311,7 @@ dati nel restore. Conservare i backup come gli altri dati sensibili.
 | Copia di riparazione `medical.db.bak-<data>-<ora>` | Directory dati. | Copia integrale del database com'era prima della riparazione, compresi `users` e l'involucro della chiave. | Campi cifrati; file `0600`. Le copie lasciate da versioni precedenti restano con i permessi con cui sono nate (misurato `0644` con umask `022`): verso gli altri account le protegge solo la directory dati. Resta finché non viene rimossa; il passaggio alla passphrase elimina quelle in cui l'account ha ancora l'involucro del PIN. | `app/api/system/repair-db/route.ts`, `lib/sqlite-repair.ts`, `lib/security/pin-era-residues.ts` |
 | Istantanee della riparazione `medical.db.swap-recovery/` | Accanto al database. | Durante una riparazione: copia integrale del database di prima, copia di quello che lo sostituisce e registro dello scambio. La directory viene rimossa a riparazione conclusa; dopo un'interruzione resta finché l'avvio successivo non conclude il recupero. | Campi cifrati; directory `0700`, istantanee e registro `0600`. | `lib/sqlite-repair.ts` |
 | Copie di manutenzione `medical.db.old-*`, `.repair-tmp*` | Directory dati. | Copie integrali del database. | Come il database; restano finché non vengono rimosse. | `lib/sqlite-repair.ts` |
-| Backup pianificato `.mediflow` | `<directory dati>/backups` o la destinazione configurata. | Le collezioni cliniche in JSON: i valori `ENC:` restano tali, il resto è in chiaro. Non contiene `users` né `settings`, quindi nemmeno l'involucro della chiave. | Campi cifrati; file `0600`, compresi quelli lasciati da versioni precedenti; una destinazione nuova nasce `0700`, una già esistente resta com'è. | `scripts/run-scheduled-backup.mjs` |
+| Backup pianificato `.mediflow` | `<directory dati>/backups` o la destinazione configurata. | Le collezioni cliniche in JSON: i valori `ENC:` e `ENC2:` restano tali, il resto è in chiaro. Non contiene `users` né `settings`, quindi nemmeno l'involucro della chiave. | Campi cifrati; file `0600`, compresi quelli lasciati da versioni precedenti; una destinazione nuova nasce `0700`, una già esistente resta com'è. | `scripts/run-scheduled-backup.mjs` |
 | Export portabile scaricato dall'interfaccia | Dove lo salva il browser. | Come il backup pianificato. | Campi cifrati. | `app/api/system/backup-restore/route.ts` |
 | Recupero completo `.mediflow-recovery` | Dove lo salva il browser. | Snapshot coerente di tutto SQLite, inclusi account, impostazioni e storico durevole. | Intero payload AES-256-GCM, chiave casuale per backup avvolta con la master key; kit corrispondente e chiave di recupero separati. | `lib/recovery-backup.ts`, `lib/recovery-backup-server.ts` |
 | Snapshot del recupero | `.recovery-backup-*` e `.recovery-restore-*` nella radice dati. | Stessa protezione per campo dell’archivio; metadati e identificativi in chiaro. | File `0600`, radice posseduta rimossa a fine operazione; un arresto improvviso può lasciare residui sul volume cifrato. | `lib/recovery-backup-server.ts`, `scripts/restore-recovery-backup.ts` |

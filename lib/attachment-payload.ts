@@ -1,5 +1,6 @@
 const BASE64_PAYLOAD_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/;
 export const ENCRYPTED_ATTACHMENT_PATTERN = /^ENC:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$/;
+export const ENCRYPTED_ATTACHMENT_FILE_PATTERN = /^ENC2:[A-Za-z0-9+/]{16}:[A-Za-z0-9+/]{64}:[A-Za-z0-9+/]{16}:(?:[A-Za-z0-9+/]{4}){5,}(?:[A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)$/u;
 const DATA_URL_BASE64_PREFIX = /^data:[^,]*;base64,/i;
 const DEFAULT_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
@@ -13,8 +14,8 @@ export function getAttachmentPayloadByteSize(value: unknown): { ok: true; size: 
 
     if (!value) return { ok: true, size: 0 };
 
-    if (value.startsWith('ENC:')) {
-        if (!ENCRYPTED_ATTACHMENT_PATTERN.test(value)) {
+    if (value.startsWith('ENC:') || value.startsWith('ENC2:')) {
+        if (!isSealedAttachmentData(value)) {
             return { ok: false, error: 'Attachment data must be valid base64 or encrypted attachment data' };
         }
         return { ok: true, size: Buffer.byteLength(value, 'utf8') };
@@ -40,4 +41,8 @@ export function isSealedAttachmentValue(value: unknown): value is string {
 export function resolveMaxAttachmentBytes(): number {
     const configured = Number.parseInt(process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES ?? '', 10);
     return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MAX_ATTACHMENT_BYTES;
+}
+
+export function isSealedAttachmentData(value: unknown): value is string {
+    return isSealedAttachmentValue(value) || typeof value === 'string' && ENCRYPTED_ATTACHMENT_FILE_PATTERN.test(value);
 }
