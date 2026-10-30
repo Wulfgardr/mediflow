@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import { ollamaLocalityErrorResponse } from './ollama-locality-response';
 import {
     assertLocalOllamaModelReference,
@@ -182,4 +183,12 @@ for (const serverVersion of ['0.40.5', '0.40.6']) for (const stage of ['tags', '
     await assert.rejects(attestLocalOllamaModel('http://127.0.0.1:11434', 'qwen-local'),
         error => error instanceof OllamaLocalityError && error.code === 'model_not_local');
     assert.equal(calls.length, stage === 'tags' ? 2 : stage === 'show' ? 3 : stage === 'preload' ? 4 : 5);
+});
+
+test('native model endpoints match the real Web locality gate', () => {
+    const cases = JSON.parse(readFileSync(new URL('../../experiments/gpui-patient-pilot/comparison/ollama-endpoint-cases.json', import.meta.url), 'utf8')) as { endpoint: string; accepted: boolean }[];
+    for (const { endpoint, accepted } of cases) {
+        if (accepted) assert.doesNotThrow(() => strictOllamaLoopbackBaseUrl(endpoint), endpoint);
+        else assert.throws(() => strictOllamaLoopbackBaseUrl(endpoint), (error) => error instanceof OllamaLocalityError && error.code === 'endpoint_not_loopback', endpoint);
+    }
 });

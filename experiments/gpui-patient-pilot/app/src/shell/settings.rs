@@ -5,6 +5,7 @@ pub(super) enum SettingsPage {
     #[default]
     Overview,
     Profile,
+    Access,
     Appearance,
     Models,
     Ambulatories,
@@ -24,6 +25,7 @@ impl SettingsPage {
             Self::AiPreferences => 6,
             Self::Functions => 5,
             Self::Archives => 7,
+            Self::Access => 8,
         }
     }
 }
@@ -48,6 +50,9 @@ impl ClinicalApp {
             self.ensure_account_profile_loaded(cx);
         }
         if page == SettingsPage::Models {
+            self.read_model_configuration(cx);
+        }
+        if page == SettingsPage::Functions {
             self.load_ai_status(cx);
         }
         if page == SettingsPage::AiPreferences {
@@ -97,6 +102,7 @@ impl ClinicalApp {
             );
         }
         match self.settings_page {
+            SettingsPage::Access => view.child(self.access_view(cx)),
             SettingsPage::Archives => view.child(self.archives_view(cx)),
             SettingsPage::Profile => view.child(self.account_profile_view(cx)),
             SettingsPage::Appearance => view.child(heading("clinical-workspace-settings-heading", "Aspetto", theme))
@@ -126,17 +132,18 @@ impl ClinicalApp {
 ,
             SettingsPage::Functions => view.child(heading("clinical-workspace-settings-heading","Funzioni AI",theme))
                 .child(self.local_host_panel(cx))
+                .child(self.ai_status_view(cx))
                 .child(button("local-host-function-preferences","Preferenze e scelta del modello per funzione…",theme,false,!self.local_host.has_work()).on_click(cx.listener(|this,_,window,cx|this.select_settings_page(SettingsPage::AiPreferences,window,cx)))),
             SettingsPage::Models => view
-                .child(heading("clinical-workspace-settings-heading", "Modelli", theme))
-                .child(self.ai_status_view(cx))
-                .child(notice("clinical-workspace-models-native-limits", "Installazione dei modelli e profilo hardware non ancora disponibili in questa app.", theme, false)),
+                .child(heading("clinical-workspace-settings-heading", "Modelli e hardware", theme))
+                .child(self.models_view(cx)),
             SettingsPage::Overview => {
                 let origin = self.session.as_ref().map(|session| session.base_url().to_owned()).unwrap_or_default();
                 view.child(heading("clinical-workspace-settings-heading", "Impostazioni", theme))
                     .child(section("clinical-workspace-settings-postazione", "Postazione", theme))
                     .children([
                         (SettingsPage::Profile, "Profilo", "Nome medico e ambulatorio"),
+                        (SettingsPage::Access, "Accesso", "Passphrase, PIN e blocco della sessione"),
                         (SettingsPage::Appearance, "Aspetto", "Tema, dimensione del testo e privacy"),
                         (SettingsPage::Ambulatories, "Ambulatori", "Sedi e contesti clinici"),
                         (SettingsPage::Archives, "Archivi e backup", "Esportazione, verifica e ripristino"),
@@ -150,7 +157,7 @@ impl ClinicalApp {
                     .child(text!(origin))
                     .child(button("clinical-workspace-settings-lock", "Blocca e nascondi i dati", theme, false, true)
                         .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Lock, cx))))
-                    .child(notice("clinical-workspace-settings-native-limits", "Cambio PIN e dispositivi, account ChatGPT, Fabric, governance, repertori amministrativi e diagnostica non ancora disponibili in questa app.", theme, false))
+                    .child(notice("clinical-workspace-settings-native-limits", "Account ChatGPT, Fabric, governance, repertori amministrativi e diagnostica non ancora disponibili in questa app.", theme, false))
             }
             SettingsPage::Ambulatories | SettingsPage::AiPreferences => unreachable!(),
         }
@@ -226,7 +233,7 @@ mod tests {
                 window.draw(cx).clear(cx);
             });
             let nodes = rendered_command::take_text_nodes();
-            assert_eq!(nodes.len(), 6);
+            assert_eq!(nodes.len(), 7);
             let mut unique = HashSet::new();
             for (id, node) in nodes {
                 assert!(
@@ -247,6 +254,7 @@ mod tests {
                 for page in [
                     SettingsPage::Overview,
                     SettingsPage::Profile,
+                    SettingsPage::Access,
                     SettingsPage::Appearance,
                     SettingsPage::Models,
                     SettingsPage::Ambulatories,
@@ -285,6 +293,7 @@ mod tests {
                 let editor = app.account_profile.synthetic_draft(cx);
                 for page in [
                     SettingsPage::Profile,
+                    SettingsPage::Access,
                     SettingsPage::Appearance,
                     SettingsPage::Models,
                 ] {
