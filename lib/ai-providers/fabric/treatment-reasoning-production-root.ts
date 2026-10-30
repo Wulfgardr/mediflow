@@ -1,4 +1,5 @@
 import 'server-only';
+import { assertFunctionAvailableInRelease } from '../../ai-function-availability';
 import { isOrdinaryFunctionSelected } from '../../chatgpt-product/ordinary-flow';
 import { createTreatmentReasoningChatGptService } from './treatment-reasoning-chatgpt-production';
 import { captureFunctionModelTransportGuard, captureTreatmentReasoningDispatch } from './function-model-dispatch';
@@ -128,6 +129,8 @@ const portableRuntime = createTreatmentReasoningPortableRuntime({ provisioning: 
     applicationRoot: process.cwd(),
 }) });
 export async function acquireTreatmentReasoningPreview() {
+    assertFunctionAvailableInRelease('treatment_reasoning');
+
     if (isOrdinaryFunctionSelected('treatment_reasoning')) return createTreatmentReasoningChatGptService({ projectionBroker, killSwitch }).acquirePreview();
     const selected = captureTreatmentReasoningDispatch();
     await selected.verify();

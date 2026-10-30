@@ -1,4 +1,5 @@
 'use client';
+import { TREATMENT_REASONING_UNAVAILABLE_LABEL, TREATMENT_REASONING_UNAVAILABLE_REASON } from '@/lib/ai-function-availability';
 /* presets are proposals; only a second explicit gesture persists settings. */
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { notifyDbChange } from '@/lib/live-query';
@@ -10,9 +11,9 @@ import { SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '
 import styles from './model-picker.module.css';
 import { ChoiceField } from '@/components/choice-field';
 import { Disclosure } from '@/components/disclosure';
-import { TreatmentReasoningPortableSetup } from '../treatment-reasoning-portable-setup';
 type FunctionRow = FunctionModelPreferences['functions'][number];
 function Description({ row }: { row: FunctionRow }) {
+    if (row.id === 'treatment_reasoning') return <p>{names[row.id]}: {TREATMENT_REASONING_UNAVAILABLE_LABEL}</p>;
     const model = row.options.find(o => o.modelOptionId === row.defaultModelOptionId);
     return <p>{names[row.id]}: {row.enabled ? 'attivo' : 'spento'} · {model ? `${model.label} · ${providerName(model.provider)}` : 'modello locale non disponibile'}{row.defaultSource === 'host_configuration' ? ' · modello del computer' : ' · preferenza salvata'}</p>;
 }
@@ -28,6 +29,7 @@ function PreferenceCard({ row, disabled, account, activationSupported, preview }
     const configuredDefault = row.options.find(o => o.modelOptionId === row.defaultModelOptionId);
     const configurationState = !row.enabled ? 'off' : row.bindingState === 'current' && configuredDefault?.state === 'available_unqualified' ? 'configured' : 'unavailable';
     const warning = model === null && row.defaultSource !== 'host_configuration' ? 'Il modello del computer sarà indicato nell’anteprima.' : row.bindingState === 'stale' ? 'Scelta salvata scaduta: serve una nuova decisione.' : row.bindingState === 'unsupported' ? 'Predefinito non disponibile.' : selected?.state === 'available_unqualified' ? '' : 'Provider locale non disponibile';
+    if (row.id === 'treatment_reasoning') return <article className={styles.card}><h3>{names[row.id]}</h3><p>{TREATMENT_REASONING_UNAVAILABLE_LABEL}</p><p>{TREATMENT_REASONING_UNAVAILABLE_REASON}</p></article>;
     return <article className={styles.card}>
         <div className={styles.row}><h3>{names[row.id]}</h3><span className={styles.preferenceStatus} data-state={configurationState}>{configurationState === 'off' ? 'Disattivata' : configurationState === 'configured' ? 'Configurazione locale presente' : 'Configurazione locale non disponibile'}</span></div>
         {activationSupported && <ChoiceField label="Canale per questa modifica" aria-label={`Canale per questa modifica · ${names[row.id]}`} value={channel} disabled={disabled} disabledReason="Attendi il completamento della modifica in corso."
@@ -42,7 +44,6 @@ function PreferenceCard({ row, disabled, account, activationSupported, preview }
                 {row.defaultSource === 'saved_preference' && !row.options.some(o => o.modelOptionId === model) && model && <option value={model} disabled>Preferenza non più disponibile</option>}
                 {row.options.map(o => <option key={o.modelOptionId} value={o.modelOptionId} disabled={enabled && o.state === 'unavailable'}>{o.label} · {providerName(o.provider)}{o.state === 'unavailable' ? ' · non disponibile' : ''}</option>)}
         </ChoiceField>}
-        {!remote && row.id === 'treatment_reasoning' && <TreatmentReasoningPortableSetup option={row.options.find(o => o.provider === 'athena_transformers')} />}
         {!remote && !selected && model !== null && <p>Nessun modello selezionabile</p>}
         <div className={styles.actions}><button type="button" role="switch" aria-checked={enabled} aria-label={`${names[row.id]} nella proposta`} className={`${SETTINGS_SECONDARY_BUTTON_CLASS} ${styles.switch}`} disabled={disabled} onClick={() => setEnabled(!enabled)}>{enabled ? 'Spegni' : 'Attiva'}</button>
             <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={disabled} onClick={() => preview(activationSupported && (remote || (!enabled && !localModelChanged))

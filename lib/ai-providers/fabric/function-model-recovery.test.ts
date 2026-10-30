@@ -119,11 +119,11 @@ test('all_off preview/apply/reread preserves stale choices, while host_defaults 
     const preview = service.preview(off); assert.equal(writes, 0); assert.deepEqual(service.read(), baseline);
     assert.equal(preview.proposed.functions[0].bindingState, 'stale');
     const applied = service.apply(off); assert.deepEqual(service.read(), applied); assert.deepEqual(service.apply(off), applied);
-    assert.equal(writes, 6); assert.ok(applied.functions.every(row => !row.enabled));
+    assert.equal(writes, 5); assert.ok(applied.functions.every(row => row.id === 'treatment_reasoning' ? row.enabled : !row.enabled));
     assert.deepEqual(savedDefault(sources), savedDefault(saved));
     const host = preset('host_defaults'); const hostPreview = service.preview(host);
     const reset = service.apply(host); assert.deepEqual(reset, hostPreview.proposed);
-    assert.ok(reset.functions.every(row => !row.enabled && row.defaultSource === 'host_configuration'));
+    assert.ok(reset.functions.every(row => (row.id === 'treatment_reasoning' ? row.enabled : !row.enabled) && row.defaultSource === 'host_configuration'));
     assert.equal(reset.functions[0].defaultModelOptionId, buildFunctionModelCatalog(sources).hostDefaults.patient_insight);
 });
 

@@ -1,4 +1,5 @@
 import 'server-only';
+import { AiFunctionUnavailableError } from '../../ai-function-availability';
 import type { createTreatmentReasoningChatGptService } from './treatment-reasoning-chatgpt-production';
 type RemoteResult = Awaited<ReturnType<Awaited<ReturnType<ReturnType<typeof createTreatmentReasoningChatGptService>['acquirePreview']>>['preview']>>;
 
@@ -56,6 +57,7 @@ async function body(request: Request): Promise<unknown | null> {
 }
 
 function typedError(error: unknown): NextResponse {
+    if (error instanceof AiFunctionUnavailableError) return failure(error.code, 403);
     if (!(error instanceof TreatmentReasoningAuthenticatedProjectionError)) return failure('operation_unavailable', 503);
     if (error.code === 'session_unavailable') return failure(error.code, 401);
     if (error.code === 'input_invalid') return failure(error.code, 400);

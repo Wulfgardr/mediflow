@@ -1,4 +1,5 @@
 'use client';
+import { TREATMENT_REASONING_UNAVAILABLE_LABEL, TREATMENT_REASONING_UNAVAILABLE_REASON } from '@/lib/ai-function-availability';
 
 import { ChatGptAccountPanel } from '@/components/settings/chatgpt-account-panel';
 
@@ -14,7 +15,7 @@ import { FabricVenueSection } from '@/components/settings/fabric-venue-section';
 import styles from '@/components/settings/settings-lume.module.css';
 import { SETTINGS_CARD_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS, SettingsSectionIntro } from '@/components/settings/settings-ui';
 import type { FabricObservabilitySnapshot } from '@/lib/ai-providers/fabric/routing-observability';
-import { FABRIC_STATUS_VERSION_HEADER, parsePortableFabricStatusEnvelope, portablePrerequisiteText, type TreatmentReasoningPortableDisclosure } from '@/lib/ai-providers/fabric/treatment-reasoning-portable-disclosure';
+import { FABRIC_STATUS_VERSION_HEADER, parsePortableFabricStatusEnvelope, type TreatmentReasoningPortableDisclosure } from '@/lib/ai-providers/fabric/treatment-reasoning-portable-disclosure';
 import type { FabricStatusSnapshot } from '@/lib/ai-providers/fabric/status';
 import {
     describeProviderDisclosure,
@@ -113,31 +114,11 @@ function FabricProviderSection({ snapshot }: { snapshot: FabricStatusSnapshot })
     );
 }
 
-function PortableTreatmentSection({ disclosure }: { disclosure: TreatmentReasoningPortableDisclosure }) {
-    const hardware = disclosure.hardware;
-    const gib = (bytes: number) => (bytes / 1024 ** 3).toLocaleString('it-IT', { maximumFractionDigits: 1 });
+function PortableTreatmentSection() {
     return <section className={SETTINGS_CARD_CLASS} aria-labelledby="fabric-treatment-portable-title" data-testid="fabric-treatment-portable">
-        <header className={styles.fabricBlockHeader}>
-            <h3 id="fabric-treatment-portable-title">Ragionamento terapeutico · motore Windows/Linux</h3>
-            <p>{disclosure.label}</p>
-        </header>
-        <p><code>{disclosure.model}</code></p>
-        <p role="status">{disclosure.state === 'admitted' ? 'Configurazione ammessa, esecuzione non osservata.'
-            : disclosure.state === 'platform_unsupported' ? 'Percorso non ammesso su questa piattaforma. Sui Mac supportati rimane MLX.'
-                : 'Motore non attivabile finché i prerequisiti non sono soddisfatti.'}</p>
-        <p>Selezione host: {disclosure.selected ? 'presente' : 'assente'}. Stato: <code>{disclosure.state}</code>.</p>
-        <p>Locale su questa postazione, senza host Mac remoto e senza fallback. Ogni risultato richiede revisione; nessuna scrittura clinica.</p>
-        {disclosure.prerequisites.length > 0 && <p>Prerequisiti: {disclosure.prerequisites.map(portablePrerequisiteText).join(' · ')}.</p>}
-        <details><summary>Hardware e preparazione offline</summary>
-            {hardware ? <>
-                <p>Architettura macchina: {hardware.machineArchitecture}; processo Node: {hardware.nodeArchitecture}.</p>
-                <p>RAM osservata: {gib(hardware.totalMemoryBytes)} GiB. Politica prudenziale: almeno {gib(hardware.minimumHostMemoryBytes)} GiB sull’host,
-                    con {gib(hardware.processMemoryLimitBytes)} GiB di limite del processo e {hardware.threads} thread.</p>
-                <p>Questi valori sono criteri di ammissione, non prestazioni misurate né qualificazione del runtime.</p>
-            </> : <p>Hardware non verificabile.</p>}
-            <p>L’operatore prepara e inventaria un runtime offline completo e i pesi originali, verifica le licenze, importa il manifest e conferma separatamente l’ammissione.
-                Questa pagina non installa, non scarica e non attiva la funzione.</p>
-        </details>
+        <h3 id="fabric-treatment-portable-title">Ragionamento terapeutico</h3>
+        <p>{TREATMENT_REASONING_UNAVAILABLE_LABEL}</p>
+        <p>{TREATMENT_REASONING_UNAVAILABLE_REASON}</p>
     </section>;
 }
 
@@ -185,7 +166,7 @@ export default function SettingsAiFabricPage() {
             <section className={SETTINGS_CARD_CLASS} aria-labelledby="fabric-local-title" data-testid="fabric-local-setup">
                 <header className={styles.fabricBlockHeader}>
                     <h3 id="fabric-local-title">Modelli locali e funzioni</h3>
-                    <p>Ollama e ATHENA seguono la configurazione e l’ammissione locali. Le preferenze mostrano soltanto le opzioni del catalogo host; salvarle non prova che una funzione sia pronta.</p>
+                    <p>Ollama segue la configurazione e l’ammissione locali. Le preferenze mostrano soltanto le opzioni del catalogo host; salvarle non prova che una funzione sia pronta.</p>
                 </header>
                 <nav aria-label="Configura Intelligence Fabric" className={serviceStyles.fabricActions}>
                     <Link href="/settings/ai/modelli" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Modelli e hardware</Link>
@@ -197,7 +178,7 @@ export default function SettingsAiFabricPage() {
             {/* external account metadata never feeds local preferences or readiness. */}
             <ChatGptAccountPanel />
             <FunctionStatusPanel />
-            {state.kind === 'ready' && state.portable && <PortableTreatmentSection disclosure={state.portable} />}
+            {state.kind === 'ready' && state.portable && <PortableTreatmentSection />}
 
             {state.kind === 'loading' ? <FabricLoadingState /> : null}
             {state.kind === 'unauthorized' ? <FabricErrorState unauthorized /> : null}

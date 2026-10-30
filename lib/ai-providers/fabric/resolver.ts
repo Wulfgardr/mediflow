@@ -1,3 +1,4 @@
+import { assertFunctionAvailableInRelease } from '../../ai-function-availability';
 import { isEgressGateOpen } from '../../ai-egress-gate';
 import {
     localProviderRegistry,
@@ -156,6 +157,8 @@ export function resolveFabricCapability(
     request: { descriptor: FabricCapabilityDescriptor; venue: FabricVenue; generative?: LocalProviderBindingInput },
 ): FabricResolution {
     const descriptor = request.descriptor;
+    assertFunctionAvailableInRelease(descriptor.id);
+
     // Snapshot unico e normale dell'array del chiamante: validazione e
     // membership successiva usano SOLO questa copia reale, mai i metodi
     // dell'oggetto originale (un includes ridefinito o un iteratore stateful
@@ -271,6 +274,8 @@ export function resolveFabricCapabilityWithHostResolution(
     request: HostResolvedFabricRequest,
 ): FabricResolution {
     const descriptor = request.descriptor;
+    assertFunctionAvailableInRelease(descriptor.id);
+
     const allowedVenues = Array.isArray(policy.allowedVenues)
         ? Array.from(policy.allowedVenues)
         : null;

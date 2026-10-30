@@ -6,14 +6,10 @@ import design from './treatment-reasoning.module.css';
 import { ChoiceField } from '@/components/choice-field';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
+import { TREATMENT_REASONING_UNAVAILABLE_LABEL, TREATMENT_REASONING_UNAVAILABLE_REASON } from '@/lib/ai-function-availability';
 import { Pencil, RefreshCw } from 'lucide-react';
 import { indexTreatmentReasoningSources } from './treatment-reasoning-sources';
 import PrivacyBlur from '@/components/privacy-blur';
-import {
-    AI_TREATMENT_REASONING_KILL_SWITCH_KEY,
-    isAiTreatmentReasoningEnabledValue,
-} from '@/lib/ai-treatment-reasoning-kill-switch';
 import {
     createTreatmentReasoningBrowserController,
     type TreatmentReasoningPublication,
@@ -24,7 +20,6 @@ import {
     type SmartImportContextProposal,
 } from '@/lib/security/smart-import-patient-context-browser-adapter';
 import { db, type Attachment, type ClinicalEntry, type Observation, type Patient, type Therapy } from '@/lib/db';
-import { useLiveQuery } from '@/lib/live-query';
 import { countTreatmentReasoningSources } from '@/lib/treatment-reasoning-context';
 
 interface TreatmentReasoningPanelProps {
@@ -99,13 +94,7 @@ export default function TreatmentReasoningPanel({
     const [ambulatory, setAmbulatory] = useState<SmartImportAmbulatoryChoice | null>(null);
     const [confirmed, setConfirmed] = useState(false);
     const [loadingProposal, setLoadingProposal] = useState(false);
-    const treatmentReasoningKillSwitch = useLiveQuery(
-        () => db.settings.get(AI_TREATMENT_REASONING_KILL_SWITCH_KEY),
-        [],
-        undefined,
-        ['settings'],
-    );
-    const treatmentReasoningEnabled = isAiTreatmentReasoningEnabledValue(treatmentReasoningKillSwitch?.value);
+    const treatmentReasoningEnabled = false;
     const sourceSummary = useMemo(
         () => countTreatmentReasoningSources({ patient, entries, therapies, observations, attachments }),
         [patient, entries, therapies, observations, attachments],
@@ -231,8 +220,8 @@ export default function TreatmentReasoningPanel({
         <Disclosure title="Proposte" headingLevel={3}>
         <section className={design.panel} data-testid="treatment-reasoning-panel" aria-label="Ragionamento terapeutico">
             {!treatmentReasoningEnabled ? <div className={design.notice}>
-                <p className={design.strong}>Ragionamento terapeutico spento</p>
-                <Link href="/settings/ai/funzioni">Apri le funzioni cliniche</Link>
+                <p className={design.strong}>{TREATMENT_REASONING_UNAVAILABLE_LABEL}</p>
+                <p>{TREATMENT_REASONING_UNAVAILABLE_REASON}</p>
             </div> : <>
             <header className={design.header}>
                 <h4>Ragionamento terapeutico</h4>

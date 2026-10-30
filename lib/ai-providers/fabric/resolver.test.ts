@@ -158,21 +158,8 @@ test('risolve una deterministica in-house senza modello', () => {
 });
 
 test('treatment reasoning e autogestito: provider athena_mlx senza registry', () => {
-    const descriptor = GENERATIVE_CAPABILITY_DESCRIPTORS.treatment_reasoning;
-    const result = resolveFabricCapability(policyFor(descriptor), {
-        descriptor,
-        venue: 'local_process',
-    });
-    assert.equal(result.generative, null);
-    assert.equal(result.receipt.provider, 'athena_mlx');
-    assert.equal(result.receipt.model, null);
-    assert.equal(result.receipt.providerReceipt, null);
-    // Un binding registry per la lane autogestita e' un errore di classe.
-    expectCode('class_mismatch', () => resolveFabricCapability(policyFor(descriptor), {
-        descriptor,
-        venue: 'local_process',
-        generative: binding,
-    }));
+const descriptor=GENERATIVE_CAPABILITY_DESCRIPTORS.treatment_reasoning;
+for (const venue of ['local_process','cloud','remote_host']) assert.throws(()=>resolveFabricCapability(policyFor(descriptor),{descriptor,venue:venue as never}),/Non disponibile/);
 });
 
 test('rifiuta ogni classe di errore Fabric raggiungibile', () => {

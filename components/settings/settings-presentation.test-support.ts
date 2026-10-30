@@ -1,3 +1,4 @@
+import * as availability from '../../lib/ai-function-availability.ts';
 /* @Codex WUL-684: isolated JSX contract harness. Not React DOM, a browser, or a
    lifecycle/focus simulation. Callbacks execute their real component code against
    explicit test doubles; effects never run unless the test invokes one. */
@@ -39,6 +40,7 @@ export function find(tree: unknown, predicate: (node: TestNode) => boolean): Tes
 }
 export const css = new Proxy({}, { get: (_target, name) => `fixture-${String(name)}` });
 export const frameworkDoubles = {
+    '@/lib/ai-function-availability': availability,
     'next/link': { default: (props: Record<string, unknown>) => element('a', props) },
     'next/image': { default: (props: Record<string, unknown>) => element('img', props) },
     '@/lib/utils': { cn: (...values: unknown[]) => values.filter(Boolean).join(' ') },

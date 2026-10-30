@@ -91,7 +91,7 @@ test('current key/writer pairs still resolve to allowed', () => {
         'aiModel_reasoning', 'aiModelDefaultVersion', 'hardwareProfile',
         'aiInsightMode', 'aiInsightManualConfig', 'aiPatientInsightKillSwitch',
         'documentRouterControlFlow',
-        'aiDocumentSynthesisKillSwitch', 'aiSmartImportKillSwitch', 'aiTreatmentReasoningKillSwitch',
+        'aiDocumentSynthesisKillSwitch', 'aiSmartImportKillSwitch',
         'uiReduceMotion',
         'uiReduceTransparency', 'uiStyleMode', 'terminologyRegistry', 'clinicName', 'network.mode',
     ];

@@ -1,4 +1,5 @@
 import 'server-only';
+import { AiFunctionUnavailableError } from '../../ai-function-availability';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { FunctionModelError, parseFunctionModelChoice, resolveFunctionModelDispatch,
     type FunctionModelId, type FunctionModelSources } from './function-model-preferences';
@@ -9,6 +10,7 @@ type Selection = ReturnType<typeof resolveFunctionModelDispatch>;
 type Scope = Readonly<{ selection: Selection; signal: AbortSignal; verify(): Promise<void> }>;
 const scopes = new AsyncLocalStorage<Scope>();
 export function functionModelErrorResponse(error: unknown): Response {
+    if (error instanceof AiFunctionUnavailableError) return Response.json({ error: error.message, code: error.code }, { status: 403 });
     const code = error instanceof FunctionModelError ? error.code : 'unavailable';
     const status = code === 'session_stale' ? 401 : ['input_invalid', 'unsupported', 'model_not_cataloged'].includes(code) ? 400
         : ['catalog_stale', 'revision_conflict', 'command_conflict', 'binding_stale'].includes(code) ? 409

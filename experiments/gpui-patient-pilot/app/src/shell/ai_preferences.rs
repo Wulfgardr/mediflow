@@ -348,7 +348,7 @@ impl ClinicalApp {
             .child(heading("clinical-workspace-ai-preferences-heading", "Preferenze funzioni AI", theme))
             .child(div().type_role(theme, crate::theme::TextRole::Strong)
                 .child(text!("Le preferenze valgono per tutti gli operatori dell’host.")))
-            .child(notice("clinical-workspace-ai-preferences-scope", "Questa pagina configura le quattro funzioni. La disponibilità indicata nel catalogo non verifica che il modello possa eseguire un’analisi.", theme, false))
+            .child(notice("clinical-workspace-ai-preferences-scope", "Scegli i modelli per le funzioni disponibili. La disponibilità indicata nel catalogo non verifica che il modello possa eseguire un’analisi.", theme, false))
             .child(div().flex().flex_wrap().gap(px(8.))
                 .child(state.targets[0].attach_enabled(button("clinical-workspace-ai-preferences-back", "Torna alle impostazioni", theme, false, idle), idle)
                     .on_click(cx.listener(|this, _, window, cx| this.close_ai_preferences(window, cx))))
@@ -373,6 +373,10 @@ impl ClinicalApp {
                 let Some(row) = snapshot.function(id) else {
                     continue;
                 };
+                if id == AiFunctionId::TreatmentReasoning {
+                    view = view.child(function_summary(row, "observed", theme));
+                    continue;
+                }
                 let change = AiPreferenceChange::Set {
                     function_id: id,
                     enabled: row.enabled,
@@ -503,7 +507,7 @@ impl ClinicalApp {
             AiPreferenceChange::Preset { preset_id } => {
                 view = view.child(div().type_role(theme, crate::theme::TextRole::Strong).child(text!(match preset_id {
                     AiPreferencePreset::HostDefaults => "Ripristina i modelli configurati sull’host, mantenendo gli interruttori attuali.",
-                    AiPreferencePreset::AllOff => "Disattiva tutte le quattro funzioni AI dell’host.",
+                    AiPreferencePreset::AllOff => "Disattiva le funzioni disponibili, mantenendo i modelli salvati.",
                 })));
             }
             AiPreferenceChange::Set {
@@ -511,6 +515,9 @@ impl ClinicalApp {
                 enabled: switched_on,
                 default_model_option_id,
             } => {
+                if *function_id == AiFunctionId::TreatmentReasoning {
+                    return view.child(text!("Non disponibile in questa versione. Le nuove proposte terapeutiche sono rinviate a una versione successiva. Le proposte salvate restano consultabili."));
+                }
                 view = view
                     .child(
                         div()
@@ -694,6 +701,9 @@ fn model_label(row: &AiFunctionPreference) -> String {
         })
 }
 fn function_summary(row: &AiFunctionPreference, kind: &str, theme: Theme) -> Stateful<Div> {
+    if row.id == AiFunctionId::TreatmentReasoning {
+        return div().id("treatment-reasoning-unavailable").child(text!("Ragionamento terapeutico")).child(text!("Non disponibile in questa versione. Le nuove proposte terapeutiche sono rinviate a una versione successiva. Le proposte salvate restano consultabili."));
+    }
     let id = SharedString::from(format!("clinical-workspace-ai-{kind}-{}", row.id.as_str()));
     div()
         .id(id.clone())

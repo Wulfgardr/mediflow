@@ -107,10 +107,10 @@ impl ClinicalApp {
             ("document-synthesis", "Sintesi dei documenti", status.kill_switches.document_synthesis),
             ("smart-import", "Importazione assistita", status.kill_switches.smart_import),
             ("treatment-reasoning", "Ragionamento sul trattamento", status.kill_switches.treatment_reasoning),
-        ].map(|(id, title, state)| status_row(id, title, match state {
+        ].map(|(id, title, state)| status_row(id, title, if id == "treatment-reasoning" { "Non disponibile in questa versione. Le nuove proposte terapeutiche sono rinviate a una versione successiva. Le proposte salvate restano consultabili." } else { match state {
             AiFunctionSwitch::Enabled => "Abilitata nella configurazione",
             AiFunctionSwitch::Disabled => "Disabilitata nella configurazione",
-        }, theme)))
+        } }, theme)))
         .child(status_row("local-runtime", "Runtime locale dell'archivio", match status.local_runtime.state {
             AiLocalState::Configured => "Ollama · Configurazione presente",
             AiLocalState::Misconfigured => "Ollama · Configurazione da correggere",
