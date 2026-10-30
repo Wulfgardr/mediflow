@@ -90,6 +90,36 @@ impl ChatTherapyOutcome {
         }
     }
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChatTherapyResolution {
+    Uncertain,
+    Confirmed(ChatTherapyOutcome),
+}
+impl ChatTherapyResolution {
+    pub fn wire(self) -> &'static str {
+        match self {
+            Self::Uncertain => "uncertain",
+            Self::Confirmed(outcome) => outcome.wire(),
+        }
+    }
+    pub fn message(self) -> &'static str {
+        match self {
+            Self::Uncertain => {
+                "Esito da verificare. Il ritiro non è confermato: rileggi l’esito senza ripetere la scrittura."
+            }
+            Self::Confirmed(ChatTherapyOutcome::Applied) => {
+                "Modifica registrata e auditata. Il ritiro non annulla il salvataggio."
+            }
+            Self::Confirmed(ChatTherapyOutcome::Retired) => {
+                "Ritiro confermato. Nessuna modifica alla terapia."
+            }
+            Self::Confirmed(ChatTherapyOutcome::Rejected) => {
+                "Scrittura respinta. Nessuna modifica."
+            }
+            Self::Confirmed(ChatTherapyOutcome::Closed) => "Comando chiuso senza modifica.",
+        }
+    }
+}
 #[derive(Clone)]
 pub struct ChatTherapyRecovery {
     session: RuntimeSession,
@@ -98,8 +128,28 @@ pub struct ChatTherapyRecovery {
 }
 impl ChatTherapyRecovery {
     /// Idempotently retires the command or reports its already committed outcome.
-    /// Only this fixed operation survives local patient-selection cancellation.
-    pub fn reconcile(&self) -> Result<ChatTherapyOutcome> {
+    /// Receipt reading and retirement survive selection cancellation; neither can execute.
+    pub fn reconcile(&self) -> ChatTherapyResolution {
+        self.confirmed()
+            .map(ChatTherapyResolution::Confirmed)
+            .unwrap_or(ChatTherapyResolution::Uncertain)
+    }
+    fn confirmed(&self) -> Result<ChatTherapyOutcome> {
+        if let Ok(receipt) = self.session.request(
+            Method::POST,
+            &["api", "auth", "native", "therapy-status"],
+            &[],
+            Some(&self.scope),
+            Some(&json!({"operation":"receipt", "commandId":self.command_id})),
+            true,
+            crate::http::JSON_LIMIT,
+        ) {
+            match receipt["outcome"].as_str() {
+                Some("terminal") => return Self::outcome(&receipt["receipt"]),
+                Some("unknown") => {}
+                _ => return Err(RuntimeError::InvalidResponse),
+            }
+        }
         let result = self.session.request(
             Method::POST,
             &["api", "auth", "native", "therapy-status"],
@@ -112,6 +162,9 @@ impl ChatTherapyRecovery {
         if result.as_object().is_none_or(|o| o.len() != 1) {
             return Err(RuntimeError::InvalidResponse);
         }
+        Self::outcome(&result)
+    }
+    fn outcome(result: &Value) -> Result<ChatTherapyOutcome> {
         match result["outcome"].as_str() {
             Some("retired") => Ok(ChatTherapyOutcome::Retired),
             Some("applied") => Ok(ChatTherapyOutcome::Applied),
@@ -538,6 +591,26 @@ impl RuntimeSession {
         command_id: &str,
     ) -> Result<ChatTherapyRecovery> {
         self.check_chat_access_context(context)?;
+        self.recover_chat_therapy_command(&context.scope, command_id)
+    }
+
+    pub fn chat_therapy_reference_namespace(&self) -> String {
+        use sha2::{Digest, Sha256};
+        let bytes = serde_json::to_vec(&(
+            self.base_url(),
+            &self.user().archive_generation,
+            &self.user().id,
+        ))
+        .unwrap();
+        format!("{:x}", Sha256::digest(bytes))
+    }
+
+    pub fn recover_chat_therapy_command(
+        &self,
+        scope: &str,
+        command_id: &str,
+    ) -> Result<ChatTherapyRecovery> {
+        validate_scope_id(scope)?;
         if command_id.len() != 36
             || !command_id.bytes().enumerate().all(|(i, b)| {
                 if [8, 13, 18, 23].contains(&i) {
@@ -554,7 +627,7 @@ impl RuntimeSession {
                 inner: self.inner.clone(),
                 context: self.inner.account_context.child(),
             },
-            scope: context.scope.clone(),
+            scope: scope.into(),
             command_id: command_id.into(),
         })
     }
@@ -3242,6 +3315,28 @@ mod tests {
         }
     }
 
+    #[test]
+    fn chat_reference_namespace_survives_login_but_separates_host_archive_and_owner() {
+        let original = session();
+        let namespace = original.chat_therapy_reference_namespace();
+        assert_eq!(namespace, session().chat_therapy_reference_namespace());
+        assert_ne!(
+            namespace,
+            session_at("http://127.0.0.1:43182").chat_therapy_reference_namespace()
+        );
+        for field in ["owner", "archive"] {
+            let mut other = session();
+            let inner = Arc::get_mut(&mut other.inner).unwrap();
+            if field == "owner" {
+                inner.user.id = "other-owner".into();
+            } else {
+                inner.user.archive_generation = "other-archive".into();
+            }
+            assert_ne!(namespace, other.chat_therapy_reference_namespace());
+        }
+        assert_eq!(namespace.len(), 64);
+        assert!(namespace.bytes().all(|b| b.is_ascii_hexdigit()));
+    }
     fn session() -> RuntimeSession {
         session_at("http://127.0.0.1:43181")
     }
@@ -6927,5 +7022,22 @@ mod tests {
                 .starts_with("GET /api/auth/native/chat-access-confirmation ")
         );
         worker.join().unwrap();
+    }
+}
+
+#[cfg(test)]
+mod chat_therapy_resolution_tests {
+    use super::*;
+    #[test]
+    fn unknown_receipt_cannot_construct_a_terminal_outcome() {
+        assert_eq!(
+            ChatTherapyRecovery::outcome(&json!({"outcome":"unknown"})),
+            Err(RuntimeError::InvalidResponse)
+        );
+        assert_eq!(
+            ChatTherapyRecovery::outcome(&json!({"outcome":"retired"})),
+            Ok(ChatTherapyOutcome::Retired)
+        );
+        assert_eq!(ChatTherapyResolution::Uncertain.wire(), "uncertain");
     }
 }

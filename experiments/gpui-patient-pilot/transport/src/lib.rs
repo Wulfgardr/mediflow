@@ -44,7 +44,8 @@ pub use profile_query::{ProfileCurrentness, ProfileProjection};
 pub use scales::*;
 pub use session::{
     AiPreferencesContext, AmbulatoryCommandContext, ChatAccessContext, ChatTherapyOutcome,
-    ChatTherapyRecovery, FirstAmbulatoryContext, ProfileQueryIntent, RuntimeSession,
+    ChatTherapyRecovery, ChatTherapyResolution, FirstAmbulatoryContext, ProfileQueryIntent,
+    RuntimeSession,
 };
 pub use who::{
     WHO_ATTRIBUTION, WhoEntry, WhoReadiness, WhoReadinessStatus, WhoReceipt, WhoSearchResponse,

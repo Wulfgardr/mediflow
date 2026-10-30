@@ -1,6 +1,8 @@
 use super::native::{self, Peer};
+#[cfg(test)]
+use mediflow_runtime_client::ChatTherapyOutcome;
 use mediflow_runtime_client::{
-    ChatAccessContext, ChatTherapyOutcome, ChatTherapyRecovery, RuntimeSession,
+    ChatAccessContext, ChatTherapyRecovery, ChatTherapyResolution, RuntimeSession,
 };
 use std::{
     os::unix::net::UnixStream,
@@ -25,8 +27,7 @@ pub(crate) enum State {
     Consuming,
     Consumed,
     Withdrawn,
-    Uncertain,
-    Resolved(ChatTherapyOutcome),
+    Therapy(ChatTherapyResolution),
 }
 impl State {
     pub(crate) fn wire(self) -> &'static str {
@@ -39,8 +40,7 @@ impl State {
             Self::Consuming => "consuming",
             Self::Consumed => "consumed",
             Self::Withdrawn => "withdrawn",
-            Self::Uncertain => "uncertain",
-            Self::Resolved(outcome) => outcome.wire(),
+            Self::Therapy(resolution) => resolution.wire(),
         }
     }
 }
@@ -77,6 +77,7 @@ pub(crate) struct Request {
     cancelled: Arc<AtomicBool>,
     therapy: Option<TherapyWrite>,
     recovery: Option<ChatTherapyRecovery>,
+    pub(crate) references: super::references::CommandReferences,
 }
 pub(crate) type Pending = Arc<Mutex<Request>>;
 
@@ -105,6 +106,7 @@ impl Request {
             cancelled: Arc::new(AtomicBool::new(false)),
             therapy: None,
             recovery: None,
+            references: super::references::CommandReferences::default(),
         })))
     }
     pub(super) fn for_therapy(peer: Peer, stream: UnixStream, target: &str) -> Option<Pending> {
@@ -130,17 +132,10 @@ impl Request {
         let therapy = self.therapy.as_ref()?;
         let (_, id) = therapy.selected.as_ref()?;
         let outcome = match self.state {
-            State::Uncertain => "unknown",
-            State::Resolved(outcome) => outcome.wire(),
-            _ => therapy
-                .result
-                .as_ref()
-                .and_then(|r| r["receipt"]["outcome"].as_str())
-                .unwrap_or(if self.state == State::Consumed {
-                    "unknown"
-                } else {
-                    "pending"
-                }),
+            State::Therapy(ChatTherapyResolution::Uncertain) => "unknown",
+            State::Therapy(ChatTherapyResolution::Confirmed(outcome)) => outcome.wire(),
+            State::Consumed => "unknown",
+            _ => "pending",
         };
         Some(serde_json::json!({"commandId":id,"outcome":outcome}))
     }
@@ -152,8 +147,12 @@ impl Request {
         native::cancel_biometric(&self.attempt.0);
         self.card = None;
         self.attempt.0.fill(0);
-        if self.recovery.is_some() {
-            if !matches!(self.state, State::Resolved(_) | State::Uncertain) {
+        if self.therapy.as_ref().is_some_and(|t| t.selected.is_some()) {
+            if !matches!(
+                self.state,
+                State::Therapy(ChatTherapyResolution::Confirmed(_))
+                    | State::Therapy(ChatTherapyResolution::Uncertain)
+            ) {
                 self.reconcile_therapy();
             }
             if let Some(t) = self.therapy.as_mut() {
@@ -167,21 +166,25 @@ impl Request {
         self.binding = None;
     }
     pub(crate) fn revoke(&mut self) {
-        if self.state == State::Uncertain {
+        if self.state == State::Therapy(ChatTherapyResolution::Uncertain) {
             self.reconcile_therapy();
         } else {
             self.withdraw();
         }
     }
     pub(crate) fn reconcile_therapy(&mut self) {
-        if let Some(recovery) = &self.recovery {
-            self.state = match recovery.reconcile() {
-                Ok(outcome) => State::Resolved(outcome),
-                Err(_) => State::Uncertain,
-            };
-            self.deadline = None;
+        self.state = State::Therapy(self.recovery.as_ref().map_or(
+            ChatTherapyResolution::Uncertain,
+            ChatTherapyRecovery::reconcile,
+        ));
+        self.deadline = None;
+        if let State::Therapy(ChatTherapyResolution::Confirmed(outcome)) = self.state
+            && let Some((_, id)) = self.therapy.as_ref().and_then(|t| t.selected.as_ref())
+        {
+            let _ = self.references.confirm(id, outcome);
         }
     }
+
     fn current(&self, now: Instant) -> bool {
         now.duration_since(self.created) < VIEW_IDLE
             && !native::screen_locked()
@@ -196,7 +199,9 @@ impl Request {
     pub(crate) fn status(&mut self) -> State {
         if !matches!(
             self.state,
-            State::Withdrawn | State::Uncertain | State::Resolved(_)
+            State::Withdrawn
+                | State::Therapy(ChatTherapyResolution::Uncertain)
+                | State::Therapy(ChatTherapyResolution::Confirmed(_))
         ) && !self.current((self.clock)())
         {
             self.withdraw();
@@ -209,6 +214,7 @@ impl Request {
             self.withdraw();
             return false;
         }
+        self.references = self.references.for_session(&session);
         self.binding = Some(Binding { session, context });
         self.state = State::Preparing;
         true
@@ -314,6 +320,10 @@ pub(crate) fn choose_therapy(pending: &Pending, index: usize) {
             return;
         }
         if let Ok((id, recovery)) = result {
+            if p.references.remember(&id).is_err() {
+                p.state = State::Therapy(recovery.reconcile());
+                return;
+            }
             p.recovery = Some(recovery);
             if let Some(t) = p.therapy.as_mut() {
                 t.selected = Some((index, id));
@@ -333,6 +343,7 @@ pub(crate) fn execute_therapy(pending: &Pending, attempt: Attempt, pin: &str) ->
         }
         let (_, id) = p.therapy.as_ref()?.selected.as_ref()?;
         let b = p.binding.as_ref()?;
+        p.references.remember(id).ok()?;
         let result = (b.session.clone(), b.context.clone(), id.clone());
         p.state = State::Consuming;
         Some(result)
@@ -382,23 +393,14 @@ pub(crate) fn prepare_card(pending: &Pending) {
             Some(t.selected.as_ref()?.1.clone())
         });
         if let Some(id) = recovery {
-            let result = session.chat_therapy_request(
-                &context,
-                &serde_json::json!({"operation":"receipt", "commandId":id}),
-            );
+            let recovery = session.chat_therapy_recovery(&context, &id);
             if let Ok(mut p) = pending.lock() {
                 if p.status() != State::Preparing {
                     return;
                 }
-                if let Ok(result) = result {
-                    if let Some(t) = p.therapy.as_mut() {
-                        t.result = Some(result);
-                    }
-                    p.state = State::Consumed;
-                    p.deadline = None;
-                } else {
-                    p.withdraw();
-                }
+                p.recovery = recovery.ok();
+                let _ = p.references.remember(&id);
+                p.reconcile_therapy();
             }
             return;
         }
@@ -475,7 +477,7 @@ impl Drop for Request {
 }
 
 #[cfg(all(test, target_os = "macos"))]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use mediflow_runtime_client::{PairingCredentials, RuntimeClient, RuntimeConfig};
     use serde_json::{Value, json};
@@ -485,7 +487,7 @@ mod tests {
         sync::atomic::{AtomicUsize, Ordering},
     };
 
-    struct Host {
+    pub(crate) struct Host {
         state: Arc<AtomicUsize>,
         worker: Option<std::thread::JoinHandle<()>>,
     }
@@ -496,7 +498,7 @@ mod tests {
         }
     }
 
-    fn native_session() -> (RuntimeSession, Host) {
+    pub(crate) fn native_session() -> (RuntimeSession, Host) {
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         listener.set_nonblocking(true).unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
@@ -688,7 +690,9 @@ mod tests {
         assert!(execute_therapy(&pending, attempt, "2468"));
         assert_eq!(
             pending.lock().unwrap().status(),
-            State::Resolved(ChatTherapyOutcome::Applied)
+            State::Therapy(ChatTherapyResolution::Confirmed(
+                ChatTherapyOutcome::Applied
+            ))
         );
         let safe = pending.lock().unwrap().safe_result().unwrap();
         assert_eq!(safe["outcome"], "applied");
@@ -1124,12 +1128,13 @@ mod tests {
         )
         .unwrap();
         assert!(
-            revoked["operations"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .any(|op| op == "revoke"),
-            "server never received revocation"
+            revoked["operations"].as_array().unwrap().iter().any(|op| op
+                == if scenario == "after-commit" {
+                    "receipt"
+                } else {
+                    "revoke"
+                }),
+            "server never received reconciliation"
         );
         assert_eq!(
             withdrawn,
@@ -1166,5 +1171,183 @@ mod tests {
             assert!(Instant::now() < deadline, "missing {key}");
             std::thread::sleep(Duration::from_millis(5));
         }
+    }
+    #[test]
+    #[ignore = "independent owned synthetic crash route"]
+    fn crash_recovery_retains_reference_and_true_outcome() {
+        let config: Value = serde_json::from_slice(
+            &std::fs::read(std::env::var("REVIEW_CONFIG").unwrap()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(config["synthetic"], true);
+        let address = config["baseURL"]
+            .as_str()
+            .unwrap()
+            .strip_prefix("http://")
+            .unwrap()
+            .parse::<std::net::SocketAddr>()
+            .unwrap();
+        assert_eq!(address.ip(), std::net::Ipv4Addr::LOCALHOST);
+        assert_ne!(address.port(), 3000);
+        let session = RuntimeClient::new(RuntimeConfig {
+            base_url: config["baseURL"].as_str().unwrap().into(),
+            tls_pin_sha256: None,
+        })
+        .unwrap()
+        .login(
+            PairingCredentials::new(
+                config["pairingId"].as_str().unwrap(),
+                config["pairingToken"].as_str().unwrap(),
+            )
+            .unwrap(),
+            config["username"].as_str().unwrap(),
+            config["passphrase"].as_str().unwrap(),
+        )
+        .unwrap();
+        let scope = config["scope"].as_str().unwrap();
+        let patient = config["patientId"].as_str().unwrap();
+        session.list_ambulatories().unwrap();
+        session.select_profile_patient(scope, patient).unwrap();
+        let intent = session.profile_query_intent();
+        session
+            .open_patient_profile(scope, patient, &intent)
+            .unwrap();
+        let context = session.chat_access_context(scope, patient).unwrap();
+
+        let phase = std::env::var("REVIEW_PHASE").unwrap();
+        let directory = std::path::PathBuf::from(std::env::var("REVIEW_CONFIG").unwrap())
+            .parent()
+            .unwrap()
+            .join("pending-commands");
+        let references = super::super::references::CommandReferences::new(Some(directory.clone()))
+            .for_session(&session);
+        let command_file = std::env::var("REVIEW_COMMAND").unwrap();
+        if phase == "send" {
+            let (a, _remote) = UnixStream::pair().unwrap();
+            let pending = Request::for_therapy(Peer::test_peer(), a, "suspended").unwrap();
+            pending.lock().unwrap().references = references;
+            assert!(pending.lock().unwrap().bind(session.clone(), context));
+            prepare_card(&pending);
+            choose_therapy(&pending, 0);
+            let id = pending
+                .lock()
+                .unwrap()
+                .therapy()
+                .unwrap()
+                .selected
+                .as_ref()
+                .unwrap()
+                .1
+                .clone();
+            std::fs::write(&command_file, &id).unwrap();
+            let (_, _, attempt) = pending.lock().unwrap().begin().unwrap();
+            let executing = pending.clone();
+            std::thread::spawn(move || execute_therapy(&executing, attempt, "2468"));
+            wait_file("REVIEW_PIN_BARRIER");
+            pending.lock().unwrap().withdraw();
+            assert_eq!(
+                pending.lock().unwrap().status(),
+                State::Therapy(ChatTherapyResolution::Uncertain)
+            );
+            std::fs::write(
+                std::env::var("REVIEW_KILL_READY").unwrap(),
+                "uncertain, revoke lost before route",
+            )
+            .unwrap();
+            loop {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        }
+
+        let ids = references.pending().unwrap();
+        assert_eq!(
+            ids.len(),
+            1,
+            "restart must rediscover unresolved command without a manually retained reference"
+        );
+        let id = ids[0].clone();
+        assert_eq!(id, std::fs::read_to_string(&command_file).unwrap());
+        let before = session
+            .chat_therapy_request(&context, &json!({"operation":"receipt", "commandId":id}))
+            .unwrap();
+        assert_eq!(before["outcome"], "unknown");
+        let (a, _remote) = UnixStream::pair().unwrap();
+        let pending = Request::for_receipt(Peer::test_peer(), a, &id).unwrap();
+        pending.lock().unwrap().references = references.clone();
+        assert!(
+            pending
+                .lock()
+                .unwrap()
+                .bind(session.clone(), context.clone())
+        );
+        prepare_card(&pending);
+        pending.lock().unwrap().revoke();
+        let state = pending.lock().unwrap().status();
+        let retired = std::env::var("MEDIFLOW_CHAT_WITHDRAW_SCENARIO").unwrap() == "crash-retired";
+        assert_eq!(
+            state,
+            State::Therapy(if retired {
+                ChatTherapyResolution::Confirmed(ChatTherapyOutcome::Retired)
+            } else {
+                ChatTherapyResolution::Uncertain
+            }),
+            "unknown receipt must not claim confirmed withdrawal"
+        );
+        if !retired {
+            assert_eq!(
+                references.pending().unwrap(),
+                [id.clone()],
+                "uncertainty erased the reference"
+            );
+            assert_eq!(
+                pending.lock().unwrap().safe_result().unwrap()["outcome"],
+                "unknown"
+            );
+        }
+        std::fs::write(std::env::var("REVIEW_PIN_RELEASE").unwrap(), "release").unwrap();
+        wait_file("REVIEW_RESULT");
+        pending.lock().unwrap().revoke();
+        let after = pending.lock().unwrap().safe_result().unwrap();
+        assert_eq!(
+            after["outcome"],
+            if retired { "retired" } else { "applied" }
+        );
+        assert!(references.pending().unwrap().is_empty());
+        let effect: Value = serde_json::from_slice(
+            &std::fs::read(std::env::var("REVIEW_RESULT").unwrap()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(effect["effects"]["audits"], if retired { 0 } else { 1 });
+        assert_eq!(
+            effect["effects"]["therapy"]["version"],
+            if retired { 1 } else { 2 }
+        );
+        assert_eq!(
+            effect["effects"]["therapy"]["status"],
+            if retired { "active" } else { "suspended" }
+        );
+        let observed = json!({"receiptBefore":before,"stateBeforeCommit":state.wire(),"receiptAfter":after,"durable":effect});
+        std::fs::write(
+            std::env::var("REVIEW_OBSERVED").unwrap(),
+            serde_json::to_vec_pretty(&observed).unwrap(),
+        )
+        .unwrap();
+        println!("CRASH RECOVERY: {observed}");
+    }
+
+    #[test]
+    fn recovered_unknown_reference_cannot_be_withdrawn_without_server_confirmation() {
+        let (a, _remote) = UnixStream::pair().unwrap();
+        let request =
+            Request::for_receipt(Peer::test_peer(), a, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+                .unwrap();
+        let mut request = request.lock().unwrap();
+        request.withdraw();
+        request.revoke();
+        assert_eq!(
+            request.status(),
+            State::Therapy(ChatTherapyResolution::Uncertain)
+        );
+        assert_eq!(request.safe_result().unwrap()["outcome"], "unknown");
     }
 }

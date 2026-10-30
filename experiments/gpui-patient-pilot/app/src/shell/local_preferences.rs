@@ -141,6 +141,14 @@ impl LocalPreferencesStore {
         }
     }
 
+    #[cfg(unix)]
+    pub(crate) fn chat_therapy_directory(&self) -> Option<PathBuf> {
+        self.path
+            .as_ref()?
+            .parent()
+            .map(|p| p.join("chat-therapy-pending"))
+    }
+
     pub(crate) fn ambulatory_command_directory(&self) -> io::Result<Option<PathBuf>> {
         if let Some(error) = &self.initial_error {
             return Err(io::Error::other(error.clone()));
