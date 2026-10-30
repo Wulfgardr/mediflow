@@ -251,7 +251,7 @@ test('a source owned by another session or creation scope cannot open a review',
 test('old operator receipt cannot be read in another scope or by another actor', async () => {
     const f = await preview(); await f.api.execute(f.host, f.view.commandId, pin);
     const other = randomUUID();
-    dbServer.insert(users).values({ id: other, username: `synthetic-other-${other}`, role: 'admin', passwordHash: 'synthetic-unusable', encryptedMasterKey: 'synthetic-unusable', salt: 'synthetic-unusable' }).run();
+    dbServer.insert(users).values({ id: other, username: ['synthetic', 'other', other].join('-'), role: 'admin', passwordHash: 'synthetic-unusable', encryptedMasterKey: 'synthetic-unusable', salt: 'synthetic-unusable' }).run();
     assert.deepEqual(service().receipt(f.host, f.view.commandId), { outcome: 'applied' });
     assert.throws(() => service().receipt({ ...f.host, actorRef: other }, f.view.commandId));
     const g = await fixture();
