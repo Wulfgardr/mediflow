@@ -10,6 +10,24 @@ sono una prova TLA né un'estensione implicita degli invarianti legacy sottostan
 
 Il recovery cifrato supporta lo schema corrente 6 e i predecessori canonici 4 e 5; le 24 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
+## Raccordo G-3 del 30 ottobre 2026: contratto dei campi cifrati
+
+Riesaminato `91acfa2f5abfbdb1c0029a0b89dac708da0bcab8` rispetto a
+`498658cbf`: fra le sorgenti coperte cambia soltanto `lib/db.ts`.
+Il literal `ENCRYPTED_FIELDS` viene trasferito in
+`lib/backup-encrypted-fields.json`, condiviso con il controllo delle chiavi
+nel client Rust. Il confronto strutturale attesta identità di tutte le
+collezioni, dei campi e del loro ordine; sottraendo import e dichiarazione,
+il resto di `lib/db.ts` è identico byte per byte alla base.
+
+Non cambiano letture, cifratura dei valori, HTTP, await, stato della terapia,
+controller, conferma, CAS, ledger o audit. Le altre sorgenti coperte mantengono
+le impronte precedenti. Sono aggiornati il solo digest di `lib/db.ts` e
+`syncCommit`; il JSON condiviso entra nelle sorgenti fissate per impedire
+future derive non riesaminate. Modello, invarianti, testimoni, mutanti e
+limiti restano invariati. Backup e ricevute G-3 restano fuori dal modello
+TLC e sono verificati dai rispettivi test di transazione, crash e trasporto.
+
 ## Raccordo WUL-757 del 29 ottobre 2026: copia locale della bozza
 
 Riesaminato il runtime `e9e170e4790159ae1f4d10922f7508c4c128981c`

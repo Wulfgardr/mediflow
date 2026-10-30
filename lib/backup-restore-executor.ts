@@ -1,6 +1,7 @@
+import { restoreSnapshot, writeRestoreReceipt, type RestoreIntent, type RestoreReceipt } from './backup-restore-receipt';
 import { planAmbulatoryCommandUnion, insertAmbulatoryCommandUnion } from './ambulatory-destructive-command-backup';
 import { planTherapyStatusCommandUnion, insertTherapyStatusCommandUnion } from './therapy-status-command-backup';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { assertExemptionImportReceiptRows } from './exemption-import-receipt';
 import { migrateProstheticsSources } from './reference-data/prosthetics-catalog-schema';
 import { assertProstheticsCatalogBackup } from './reference-data/prosthetics-catalog-backup';
@@ -157,7 +158,7 @@ type InsertRunner = Pick<typeof dbServer, 'insert'>;
 type InsertableTable = (typeof TABLE_LOOKUP)[BackupCollectionName] | typeof patientsToAmbulatories;
 export type BackupRestoreMutationFence = () => boolean;
 
-export type BackupRestoreBlockedReason = 'durable_review_commands' | 'audit' | 'runtime_fence' | 'therapy_status_commands' | 'ambulatory_destructive_commands';
+export type BackupRestoreBlockedReason = 'durable_review_commands' | 'audit' | 'runtime_fence' | 'therapy_status_commands' | 'ambulatory_destructive_commands' | 'snapshot';
 
 /* The restore stopped inside its transaction: the target archive is unchanged. Callers report it as blocked, not as failed. */
 export class BackupRestoreBlockedError extends Error {
@@ -213,6 +214,13 @@ function normalizeInsertRow<T extends Record<string, unknown>>(row: T): T {
     return normalized as T;
 }
 
+function clearRows(table: InsertableTable): void {
+    dbServer.delete(table).run();
+    if (dbServer.select({ present: sql<number>`1` }).from(table).limit(1).get()) {
+        throw new Error('RESTORE_ROWS_NOT_CLEARED');
+    }
+}
+
 function insertRows<T extends Record<string, unknown>>(
     runner: InsertRunner,
     table: InsertableTable,
@@ -225,7 +233,8 @@ function insertRows<T extends Record<string, unknown>>(
     }) : rows;
     for (const group of chunk(insertableRows, 250)) {
         /* Repertory dates are declared source text, not clinical timestamp columns. */
-        runner.insert(table).values((table === prostheticsCatalogEntries || table === prostheticsCatalogSources) ? group : group.map(normalizeInsertRow)).run();
+        const inserted = runner.insert(table).values((table === prostheticsCatalogEntries || table === prostheticsCatalogSources) ? group : group.map(normalizeInsertRow)).run();
+        if (inserted.changes !== group.length) throw new Error('RESTORE_ROWS_NOT_PERSISTED');
     }
 }
 
@@ -343,6 +352,7 @@ function soapAttestationsWithoutRestoredAuthority(rows: Record<string, unknown>[
 
 export type BackupRestoreResult = {
     sourceChecksum: string;
+    receipt?: RestoreReceipt;
     audit: { coverage: BackupAuditCoverage; inserted: number; reused: number };
 };
 
@@ -373,14 +383,19 @@ function insertBackupAudits(plan: AuditRestorePlan): void {
 export function restoreBackupArtifact(
     artifact: BackupArtifact,
     beforeMutation: BackupRestoreMutationFence,
+    intent?: RestoreIntent,
 ): BackupRestoreResult {
     assertExemptionImportReceiptRows(artifact.payload.exemptionImportReceipts ?? []);
     assertProstheticsCatalogBackup(artifact.payload.prostheticsCatalogEntries ?? [], artifact.payload.prostheticsCatalogReceipts ?? [], artifact.payload.prostheticsCatalogSources ?? [], artifact.payload.prostheticsCatalogDocuments ?? [], artifact.payload.prostheticPrescriptions ?? []);
 
     const coverage = backupAuditCoverage(artifact.payload);
     let audit: BackupRestoreResult['audit'] = { coverage, inserted: 0, reused: 0 };
+    let receipt: RestoreReceipt | undefined;
     revokeAttachmentExtractionLocatorGeneration();
     runDbServerImmediateTransaction(() => {
+        if (intent && restoreSnapshot(openDbServer()) !== intent.expectedSnapshot) {
+            throw new BackupRestoreBlockedError('snapshot', 'archive changed after preview.');
+        }
         assertCommandRecoveryIsRepresentable();
         const headlessSoapRows = artifact.payload.headlessSoapEntryCommits ?? [];
         preflightHeadlessSoapAuditCollisions(headlessSoapRows);
@@ -399,9 +414,9 @@ export function restoreBackupArtifact(
         rotateSqliteArchiveGeneration(openDbServer());
         clearAllSessions();
         for (const collection of CLEAR_ORDER) {
-            dbServer.delete(TABLE_LOOKUP[collection]).run();
+            clearRows(TABLE_LOOKUP[collection]);
         }
-        dbServer.delete(patientsToAmbulatories).run();
+        clearRows(patientsToAmbulatories);
 
         for (const collection of INSERT_ORDER) {
             insertRows(dbServer, TABLE_LOOKUP[collection], collection === 'headlessSoapActiveRoleAttestations'
@@ -414,7 +429,8 @@ export function restoreBackupArtifact(
         restoreHeadlessSoapEntryCommits(headlessSoapRows);
         insertTherapyStatusCommandUnion(openDbServer(), therapyCommands);
         insertAmbulatoryCommandUnion(openDbServer(), ambulatoryCommands);
+        if (intent) receipt = writeRestoreReceipt(openDbServer(), intent, backupArtifactInputChecksum(artifact));
         audit = { coverage, inserted: plan.filter(item => !item.reused).length, reused: plan.filter(item => item.reused).length };
     });
-    return { sourceChecksum: backupArtifactInputChecksum(artifact), audit };
+    return { sourceChecksum: backupArtifactInputChecksum(artifact), audit, ...(receipt ? { receipt } : {}) };
 }

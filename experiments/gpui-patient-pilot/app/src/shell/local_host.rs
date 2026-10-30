@@ -1,4 +1,6 @@
+mod archives;
 use super::*;
+use archives::ArchiveArea;
 pub(super) use mediflow_runtime_client::RETIREMENT_WARNING;
 use mediflow_runtime_client::{
     HostSettingKey, LocalHostAccess, PreparedDocumentDeletion, PreparedHostSetting,
@@ -27,6 +29,7 @@ enum Operation {
 }
 pub(super) struct LocalAdministration {
     pub(super) retirement: RetirementNotice,
+    archives: ArchiveArea,
     authority: Authority,
     operation: Operation,
     secret: Entity<TextInput>,
@@ -57,6 +60,13 @@ impl LocalAdministration {
         });
         let subscription = cx.subscribe(&secret, |_, _, _: &InputChanged, cx| cx.notify());
         Self {
+            archives: ArchiveArea::new(
+                theme,
+                retirement_path
+                    .as_ref()
+                    .map(|p| p.with_file_name("archive-restore-pending.json")),
+                cx,
+            ),
             retirement: RetirementNotice::new(retirement_path),
             authority: Authority::Closed,
             operation: Operation::Idle,
@@ -70,10 +80,11 @@ impl LocalAdministration {
         }
     }
     pub(super) fn command_visible(&self) -> bool {
-        !matches!(self.operation, Operation::Idle)
+        self.archives.has_work() || !matches!(self.operation, Operation::Idle)
     }
     pub(super) fn has_work(&self) -> bool {
-        matches!(self.authority, Authority::Authenticating)
+        self.archives.has_work()
+            || matches!(self.authority, Authority::Authenticating)
             || matches!(
                 self.operation,
                 Operation::Reading
@@ -93,6 +104,7 @@ impl LocalAdministration {
             .generation
             .checked_add(1)
             .expect("local authority generation exhausted");
+        self.archives.withdraw(cx);
         self.secret.update(cx, |input, cx| input.retire(cx));
         let access = match std::mem::replace(&mut self.authority, Authority::Closed) {
             Authority::Open(access) => Some(access.begin_retirement()),
@@ -115,6 +127,7 @@ impl LocalAdministration {
         window: &mut Window,
         cx: &mut Context<ClinicalApp>,
     ) {
+        self.archives.configure(theme, window, cx);
         self.secret.update(cx, |input, cx| {
             input.configure(
                 theme,
@@ -129,6 +142,19 @@ impl LocalAdministration {
     }
 }
 impl ClinicalApp {
+    pub(super) fn withdraw_local_host(&mut self, cx: &mut Context<Self>) {
+        if let Some(access) = self.local_host.withdraw(cx) {
+            let task = cx
+                .background_executor()
+                .spawn(async move { access.retire() });
+            cx.spawn(async move |this, cx| {
+                let _ = task.await;
+                let _ = this.update(cx, |_, cx| cx.notify());
+            })
+            .detach();
+        }
+    }
+
     fn run_local_host<T: Send + 'static>(
         &mut self,
         operation: impl FnOnce() -> Result<T, RuntimeError> + Send + 'static,
@@ -306,6 +332,7 @@ impl ClinicalApp {
         );
     }
     pub(super) fn cancel_local_command(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.cancel_archive_restore(cx);
         if matches!(
             self.local_host.operation,
             Operation::Review(_) | Operation::Failed(_) | Operation::Unconfirmed { .. }
@@ -370,7 +397,12 @@ impl ClinicalApp {
                     )
                     .on_click(cx.listener(|this, _, _, cx| this.close_local_host(cx))),
                 );
-                if let Some(rows) = self.local_host.switches.ready() {
+                if let Some(rows) = self
+                    .local_host
+                    .switches
+                    .ready()
+                    .filter(|_| self.settings_page != SettingsPage::Archives)
+                {
                     pane = pane.children(rows.iter().map(|&(key, enabled)| {
                         div()
                             .min_w_0()
@@ -543,6 +575,48 @@ impl ClinicalApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[gpui::test]
+    fn failed_retirement_keeps_the_restore_outcome_and_its_own_warning(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        let notice = RetirementNotice::new(None);
+        let access = Arc::new(
+            host.session
+                .authenticate_local_host("Synthetic scales fixture passphrase", notice.clone())
+                .unwrap(),
+        );
+        host.plan("POST /api/auth/local-client/logout")
+            .send((
+                503,
+                serde_json::json!({"error":"synthetic retirement fault"}),
+            ))
+            .unwrap();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let outcome = "Ripristino eseguito. Riapri l’archivio e rileggi la ricevuta.";
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.local_host.retirement = notice.clone();
+            app.local_host.authority = Authority::Open(access);
+            app.disconnect(cx);
+            app.message = Some((outcome.into(), true));
+        });
+        cx.run_until_parked();
+        view.read_with(cx, |app, _| {
+            assert_eq!(app.message.as_ref().unwrap().0, outcome);
+            assert!(app.local_host.retirement.pending());
+        });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert!(
+            cx.debug_bounds("local-session-retirement-warning")
+                .is_some()
+        );
+    }
+
     #[gpui::test]
     fn unconfirmed_retirement_is_visible_on_the_locked_login_screen(cx: &mut gpui::TestAppContext) {
         let (view, cx) =

@@ -151,6 +151,8 @@ pub fn button(
 ) -> Stateful<Div> {
     let id = id.into();
     let label = label.into();
+    #[cfg(test)]
+    crate::shell::rendered_command::record_button_id(&id);
     div()
         .id(id.clone())
         .accessibility_id(id)

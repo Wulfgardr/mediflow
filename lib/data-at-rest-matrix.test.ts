@@ -48,13 +48,11 @@ function matrixColumns(): Map<string, Classification> {
     return tables;
 }
 
-/* The contract is a private literal of the client module, which a Node test cannot import. */
 function encryptedFieldContract(): Record<string, string[]> {
-    const literal = fs.readFileSync(path.join(ROOT, 'lib/db.ts'), 'utf8')
-        .match(/const ENCRYPTED_FIELDS: Record<string, string\[\]> = (\{[\s\S]*?\n\});/u)?.[1];
-    assert.ok(literal, 'lib/db.ts must still declare ENCRYPTED_FIELDS as one literal');
-    return JSON.parse(literal.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/'/gu, '"')
-        .replace(/(\w+):\s*\[/gu, '"$1": [').replace(/,(\s*[}\]])/gu, '$1')) as Record<string, string[]>;
+    const client = fs.readFileSync(path.join(ROOT, 'lib/db.ts'), 'utf8');
+    assert.match(client, /import backupEncryptedFields from '\.\/backup-encrypted-fields\.json'/u);
+    assert.match(client, /const ENCRYPTED_FIELDS: Record<string, string\[\]> = backupEncryptedFields;/u);
+    return JSON.parse(fs.readFileSync(path.join(ROOT, 'lib/backup-encrypted-fields.json'), 'utf8'));
 }
 
 const snakeCase = (field: string) => field.replace(/[A-Z]/gu, (letter) => `_${letter.toLowerCase()}`);

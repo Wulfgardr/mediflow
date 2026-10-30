@@ -1,3 +1,5 @@
+import { readRestorePreviewSnapshot } from '@/lib/backup-restore-receipt';
+import { backupArtifactInputChecksum } from '@/lib/backup-artifact';
 import { NextResponse } from 'next/server';
 import {
     forbiddenResponse,
@@ -31,6 +33,8 @@ export async function POST(request: Request) {
         }
         const response = NextResponse.json({
             success: true,
+            expectedSnapshot: readRestorePreviewSnapshot(),
+            sourceChecksum: backupArtifactInputChecksum(artifact),
             format: artifact.format,
             version: artifact.version,
             createdAt: artifact.manifest.createdAt,

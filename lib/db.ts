@@ -1,3 +1,4 @@
+import backupEncryptedFields from './backup-encrypted-fields.json';
 import type { ProstheticsCatalogSelection, ProstheticsSnapshot } from './reference-data/prosthetics-catalog-contract';
 // API Client Facade for SQLite Backend
 // Replaces Dexie DB with Fetch calls
@@ -189,20 +190,7 @@ export interface SissHandoffEvent {
 }
 
 // Fields that should be encrypted for each table
-const ENCRYPTED_FIELDS: Record<string, string[]> = {
-    patients: ['address', 'phone', 'caregiver', 'exemptions', 'diagnoses', 'statusReason', 'notes', 'aiSummary', 'documentInsights', 'archiveReason', 'archiveNote', 'deletionReason'],
-    entries: ['title', 'content', 'metadata', 'attachments', 'deletionReason'],
-    therapies: ['motivation', 'deletionReason'],
-    checkups: ['notes', 'deletionReason'],
-    observations: ['notes', 'deletionReason'],
-    prosthetic_prescriptions: ['description', 'measures', 'clinicalReason', 'regionalPrescriptionId', 'supplier', 'collaudoOutcome', 'documentRefs', 'notes'],
-    service_prescriptions: ['serviceName', 'clinicalQuestion', 'provider', 'outcomeNote', 'requestReference', 'documentRefs', 'notes'],
-    service_prescription_items: ['serviceName', 'catalogDisplayName', 'evidence', 'notes', 'outcomeNote'],
-    siss_handoff_events: ['reason', 'nextAction', 'notes', 'correlationId'],
-    conversations: ['title'],
-    messages: ['content', 'metadata', 'attachmentBase64'],
-    attachments: ['name', 'path', 'data', 'summarySnapshot', 'parseEvidenceArtifactSnapshot']
-};
+const ENCRYPTED_FIELDS: Record<string, string[]> = backupEncryptedFields;
 
 /* STREAM B: serializable list-query params consumed by the server list handlers.
    Only plaintext columns may appear in orderBy (the server whitelists them and

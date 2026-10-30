@@ -34,7 +34,7 @@ export function isolatedRuntimeArguments(bundle: string): string[] {
   return [launcher, 'web'];
 }
 
-type IsolatedRuntime = Readonly<{ url: string;
+type IsolatedRuntime = Readonly<{ url: string; dataDirectory: string;
   offerPairing(options?: { nonce?: string; expiresIn?: number; instance?: string }): { nonce: string; host: string };
   usePairing(nonce: string, host: string, options?: { intent?: string; expiresAt?: number }): Promise<string>;
   cancelNavigation(): void;
@@ -130,7 +130,7 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
       expect(await initial.json()).toMatchObject({ status: 'ok', isSetup: false, hasSession: false, db: { state: 'ready' } });
       initialEmptyAccount = true;
       let lastNavigation: string | undefined;
-      await provide({ url,
+      await provide({ url, dataDirectory,
         cancelNavigation() {
           child.send(JSON.stringify({ schemaVersion: 'mediflow.local-ui.cancel.v1', requestId: lastNavigation }));
         },
