@@ -636,7 +636,7 @@ impl ClinicalApp {
         let content=div().id("document-create-content").max_w(px(820.)).w_full().flex_shrink_0().flex().flex_col().gap(px(16.))
             .child(heading("document-create-title","Nuova scheda da PDF",theme))
             .child(notice("document-create-identity","Identità ambigua e dati incerti. Inserisci e verifica personalmente ogni campo. Il testo del PDF è una fonte da controllare.",theme,true))
-            .when(phase==Phase::Selecting,|el|el.child(div().id("document-create-drop").border_1().border_color(theme.strong_rule).p(px(24.)).child(text!("Trascina qui un solo PDF, fino a 10 MiB."))
+            .when(phase==Phase::Selecting,|el|el.child(div().id("document-create-drop").debug_selector(|| "document-create-drop-target".into()).border_1().border_color(theme.strong_rule).p(px(24.)).child(text!("Trascina qui un solo PDF, fino a 10 MiB."))
                 .on_drop(cx.listener(|this,paths:&gpui::ExternalPaths,_,cx|this.stage_patient_document(paths.paths().to_vec(),cx))))
                 .child(button("document-create-pick","Scegli un PDF",theme,true,true).track_focus(&self.patient_document.actions[0].focus).anchor_scroll(Some(self.patient_document.actions[0].anchor.clone())).on_click(cx.listener(|this,_,_,cx|this.pick_patient_document(cx)))))
             .when(matches!(phase,Phase::Reading|Phase::Sending),|el|el.child(notice("document-create-progress",if phase==Phase::Reading{"Lettura ed estrazione locale del PDF…"}else{"Conferma e verifica dell’allegato in corso…"},theme,false)))
@@ -839,6 +839,58 @@ mod tests {
             app.patient_document.detach(cx);
         });
     }
+    #[gpui::test]
+    fn native_external_drop_rejects_multiple_files_before_reading_them(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use gpui::InputEvent as _;
+        let (session, _host) = crate::chat_access::owner::tests::native_session();
+        let (app, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        cx.simulate_resize(gpui::size(px(1200.), px(1000.)));
+        app.update(cx, |app, cx| {
+            seed(app, &session, Phase::Selecting, cx);
+            app.patient_document.work.as_mut().unwrap().command = None;
+            app.patient_document.work.as_mut().unwrap().original = None;
+            app.patient_document.work.as_mut().unwrap().stage = None;
+            app.patient_document.references = CommandReferences::default();
+        });
+        super::super::notes_recovery_tests::draw(cx);
+        let position = cx
+            .debug_bounds("document-create-drop-target")
+            .unwrap()
+            .center();
+        cx.update(|window, cx| {
+            window.dispatch_event(
+                gpui::FileDropEvent::Entered {
+                    position,
+                    paths: gpui::ExternalPaths(
+                        [
+                            PathBuf::from("/never-read/one.pdf"),
+                            PathBuf::from("/never-read/two.pdf"),
+                        ]
+                        .into_iter()
+                        .collect(),
+                    ),
+                }
+                .to_platform_input(),
+                cx,
+            );
+            window.draw(cx).clear(cx);
+            window.dispatch_event(
+                gpui::FileDropEvent::Submit { position }.to_platform_input(),
+                cx,
+            );
+        });
+        app.update(cx, |app, cx| {
+            let work = app.patient_document.work.as_ref().unwrap();
+            assert_eq!(work.phase, Phase::Selecting);
+            assert_eq!(work.message, "Scegli un solo PDF.");
+            assert!(work.command.is_none() && work.original.is_none() && work.stage.is_none());
+            app.patient_document.detach(cx);
+        });
+    }
+
     #[gpui::test]
     fn magnified_review_reveals_the_last_command_without_losing_the_draft(
         cx: &mut gpui::TestAppContext,
