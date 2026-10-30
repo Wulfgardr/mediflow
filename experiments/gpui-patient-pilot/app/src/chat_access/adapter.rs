@@ -37,6 +37,7 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
             "challenge",
             "approving",
             "approved",
+            "consuming",
             "consumed",
             "withdrawn",
         ]
