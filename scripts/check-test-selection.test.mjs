@@ -353,3 +353,67 @@ test('GPUI rendering rejects raw protected text and formatted title arguments', 
   assert.ok(gpuiTitleCallerInventory(new Map([['future.rs', 'use crate::title::title; let getter = PersonName::raw_for_editor;']])).errors.length);
   assert.deepEqual(gpuiTitleCallerInventory(new Map([['patient_text.rs', 'name.raw_for_search()']])).errors, []);
 });
+
+const appleWorkflow = '.github/workflows/apple-native.yml';
+const mobileUiFiles = [
+  'MediFlowMobileAppUITests.swift',
+  'MobilePairedStatusOverrideUITests.swift',
+  'MobileVisitProductUITests.swift',
+  'UIReadiness.swift',
+].map(file => `native/MediFlowAppleApp/Tests/MediFlowMobileAppUITests/${file}`);
+
+function xcodeFixture(t) {
+  const root = mkdtempSync(path.join(tmpdir(), 'mediflow-xcode-selection-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  for (const file of [appleWorkflow, 'native/MediFlowAppleApp/project.yml',
+    'scripts/generate-apple-xcodeproj.sh', ...mobileUiFiles]) {
+    mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    writeFileSync(path.join(root, file), readFileSync(path.join(sourceRoot, file)));
+  }
+  return root;
+}
+
+test('Xcode mobile UI selects all Swift files and shared readiness support with the reported-retry CI argv', t => {
+  const selection = collectNativeToolSelections(xcodeFixture(t))['xcode:mobile-ui'];
+  assert.deepEqual(selection.errors, []);
+  assert.deepEqual(selection.files, mobileUiFiles);
+  assert.deepEqual(selection.binding.ipadOnlyTesting, [
+    'testProjectSidebarPreservesPatientWorkspaceWidthOnIPad',
+    'testAccessibilityDynamicTypeUsesSinglePatientColumnOnIPad',
+    'testIPadListColumnFollowsTheContainerAcrossRotation',
+    'testScaleDraftKeepsOriginalPatientWhenSelectionChanges',
+    'testScaleRequiresSelectedPatientAndCanCancel',
+    'testScaleFormSubmitsAndAppearsInDiary',
+    'testIPadKeepsTheOpenChartAcrossRotation',
+  ].map(name => `MediFlowMobileAppUITests/MediFlowMobileAppUITests/${name}`));
+  assert.deepEqual(checkTestSelection(mobileUiFiles, { 'xcode:mobile-ui': selection }, []).errors, []);
+});
+
+test('Xcode mobile UI rejects divergent argv instead of claiming source coverage', async t => {
+  const expansion = '"${only_testing[@]}"';
+  for (const [name, original, replacement] of [
+    ['retries removed', '-retry-tests-on-failure -test-iterations 2', ''],
+    ['more retries', '-test-iterations 2', '-test-iterations 3'],
+    ['result bundle disconnected', '.xcresult"', '.other.xcresult"'],
+    ['additional argument', expansion, `${expansion} -quiet`],
+    ['test omitted', expansion, `${expansion} -skip-testing:MediFlowMobileAppUITests/MobileVisitProductUITests`],
+    ['target narrowed', expansion, '-only-testing:MediFlowMobileAppUITests/MediFlowMobileAppUITests'],
+    ['iPad filters disconnected', expansion, ''],
+  ]) {
+    await t.test(name, child => {
+      const root = xcodeFixture(child);
+      const file = path.join(root, appleWorkflow);
+      const source = readFileSync(file, 'utf8');
+      assert.ok(source.includes(original));
+      writeFileSync(file, source.replace(original, replacement));
+      const selection = collectNativeToolSelections(root)['xcode:mobile-ui'];
+      assert.deepEqual(selection.files, []);
+      assert.deepEqual(selection.errors, ['Xcode UI argv changed']);
+      assert.deepEqual(checkTestSelection(mobileUiFiles, { 'xcode:mobile-ui': selection }, []).errors, [
+        'INCOMPLETE_SELECTION: xcode:mobile-ui: Xcode UI argv changed',
+        'EMPTY_SELECTION: xcode:mobile-ui',
+        ...mobileUiFiles.map(file => `TEST_NOT_SELECTED: ${file}`),
+      ]);
+    });
+  }
+});

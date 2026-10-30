@@ -1,6 +1,10 @@
 import XCTest
 
 final class MobileVisitProductUITests: XCTestCase {
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+    }
+
     func testVisitEntryKeepsFirstPatientVisibleAtAX5() throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "compact-only layout contract")
         let app = XCUIApplication()
@@ -35,10 +39,35 @@ final class MobileVisitProductUITests: XCTestCase {
         app.launchEnvironment = ["MEDIFLOW_APPLE_UITEST_PATIENTS": "1", "MEDIFLOW_APPLE_UITEST_VISIT": run]
         app.launch()
         openVisit(app)
+        waitForUIReady(app.buttons["mobile-visit-choose-patient"], in: app)
         app.buttons["mobile-visit-choose-patient"].tap()
-        app.buttons["Sintetico Paziente"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["mobile-visit-prepare"].waitForExistence(timeout: 10))
+        waitForUIReady(app.buttons["Sintetico Paziente"].firstMatch, in: app)
+        let patientOption = app.buttons["Sintetico Paziente"].firstMatch
+        var previousFrame: CGRect?
+        let stableFrame = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let frame = patientOption.frame
+            defer { previousFrame = frame }
+            return !frame.isEmpty && frame == previousFrame
+        }, object: patientOption)
+        XCTAssertEqual(XCTWaiter.wait(for: [stableFrame], timeout: 10), .completed)
+        patientOption.tap()
+        let selectedPatient = app.staticTexts["Paziente scelto: Sintetico Paziente"]
+        var patientSelected = selectedPatient.waitForExistence(timeout: 10)
+        // XCUITest can drop a tap on a SwiftUI Menu item (run 40966198006: menu still open,
+        // item hittable, no selection). One more tap is allowed only while the same menu is
+        // still presented, which proves the first tap was not delivered to the app.
+        if !patientSelected, patientOption.exists, patientOption.isHittable {
+            attachUIReadinessDiagnostics(in: app, named: "Menu paziente ancora aperto dopo il primo tap")
+            patientOption.tap()
+            patientSelected = selectedPatient.waitForExistence(timeout: 20)
+        }
+        if !patientSelected {
+            attachUIReadinessDiagnostics(in: app, named: "Paziente non scelto dopo il tap")
+        }
+        XCTAssertTrue(patientSelected, "La scelta deve confermare il paziente prima di preparare la visita")
+        waitForUIReady(app.buttons["mobile-visit-prepare"], in: app)
         app.buttons["mobile-visit-prepare"].tap()
+        waitForUIReady(app.buttons["Acconsento e preparo il dossier"], in: app)
         app.buttons["Acconsento e preparo il dossier"].tap()
         let note = app.textViews["mobile-visit-note"]
         XCTAssertTrue(note.waitForExistence(timeout: 10))
@@ -48,6 +77,7 @@ final class MobileVisitProductUITests: XCTestCase {
         app.launchEnvironment["MEDIFLOW_APPLE_UITEST_VISIT_OFFLINE"] = "1"
         app.launch()
         openVisit(app)
+        waitForUIReady(app.buttons["mobile-visit-unlock"], in: app)
         app.buttons["mobile-visit-unlock"].tap()
         XCTAssertTrue(app.buttons["mobile-visit-open-note"].firstMatch.waitForExistence(timeout: 10))
         app.buttons["mobile-visit-open-note"].firstMatch.tap()
@@ -61,6 +91,7 @@ final class MobileVisitProductUITests: XCTestCase {
         app.launchEnvironment["MEDIFLOW_APPLE_UITEST_VISIT_OFFLINE"] = nil
         app.launch()
         openVisit(app)
+        waitForUIReady(app.buttons["mobile-visit-unlock"], in: app)
         app.buttons["mobile-visit-unlock"].tap()
         let review = app.buttons["mobile-visit-review"].firstMatch
         scrollTo(review, in: app)
@@ -90,6 +121,7 @@ final class MobileVisitProductUITests: XCTestCase {
         app.terminate()
         app.launch()
         openVisit(app)
+        waitForUIReady(app.buttons["mobile-visit-unlock"], in: app)
         app.buttons["mobile-visit-unlock"].tap()
         let receipt = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "registrato in cartella e confermato")).firstMatch
         scrollTo(receipt, in: app)
