@@ -1,4 +1,4 @@
-import { AifaReductionError, AifaUpdateError } from '@/lib/aifa-catalog-lock';
+import { AifaCatalogConflictError, AifaReductionError, AifaUpdateError } from '@/lib/aifa-catalog-lock';
 import { buildAuditWriteInputFromRequest } from '@/lib/security/audit';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server';
 import {
     recordAifaCatalogRejection,
     clearAifaCatalog,
-    getAifaCatalogStatus,
+    getAifaCatalogVersionedStatus,
     replaceAifaCatalog,
     searchAifaCatalog,
 } from '@/lib/aifa-catalog-server';
@@ -51,9 +51,9 @@ export async function GET(request: Request) {
 
     try {
         if (countOnly) {
-            const status = await getAifaCatalogStatus();
+            const status = getAifaCatalogVersionedStatus();
             return NextResponse.json(
-                { count: status.count, manifest: status.manifest, state: status.state },
+                status,
                 { headers: { [CATALOG_STATUS_HEADER]: status.state } },
             );
         }
@@ -89,11 +89,16 @@ export async function POST(request: Request) {
         if (!(file instanceof File) || !file.name.toLocaleLowerCase('it-IT').endsWith('.csv')) {
             return NextResponse.json({ error: 'CSV AIFA richiesto' }, { status: 400 });
         }
+        const expectedSnapshot = form.get('expectedSnapshot');
+        if (expectedSnapshot !== null && (typeof expectedSnapshot !== 'string' || !/^[a-f0-9]{64}$/.test(expectedSnapshot))) {
+            return NextResponse.json({ error: 'Versione attesa AIFA non valida' }, { status: 400 });
+        }
         const confirmation = form.get('reductionConfirmation');
         if (confirmation !== null && (typeof confirmation !== 'string' || !/^[a-f0-9]{64}:[a-f0-9]{64}$/.test(confirmation))) {
             return NextResponse.json({ error: 'Conferma della riduzione AIFA non valida' }, { status: 400 });
         }
         const result = await replaceAifaCatalog(file, manifestInputFromForm(form), undefined, {
+            expectedSnapshot: typeof expectedSnapshot === 'string' ? expectedSnapshot : undefined,
             confirmedReduction: typeof confirmation === 'string' ? confirmation : undefined,
             audit: buildAuditWriteInputFromRequest(request, session, { eventType: 'reference_data.aifa.updated', subjectType: 'reference_data', subjectRef: 'aifa' }),
         });
@@ -106,6 +111,9 @@ export async function POST(request: Request) {
         const message = error instanceof AifaUpdateError ? error.message
             : error instanceof Error && /^(CSV AIFA non valido:|URL fonte AIFA|Data di scarico AIFA|Versione dataset AIFA|File AIFA)/.test(error.message)
                 ? error.message : 'Importazione AIFA non riuscita; catalogo conservato';
+        if (error instanceof AifaCatalogConflictError) {
+            return NextResponse.json({ error: message, code: 'AIFA_CATALOG_CHANGED' }, { status: 409 });
+        }
         await recordAifaCatalogRejection(buildAuditWriteInputFromRequest(request, session, {
             eventType: 'reference_data.aifa.updated', subjectType: 'reference_data', subjectRef: 'aifa', outcome: 'failure',
             redactedMetadata: { flags: ['mode:manual'], reasonCode: 'import-rejected' },

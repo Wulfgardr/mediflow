@@ -3,6 +3,7 @@ mod chatgpt;
 mod governance;
 mod models;
 mod parameters;
+mod references;
 mod security;
 use crate::RetirementNotice;
 use crate::http::{authenticate_web_p3, control_cookie, operation_uuid, sensitive_header};
@@ -15,6 +16,7 @@ pub use chatgpt::*;
 pub use governance::*;
 pub use models::*;
 pub use parameters::*;
+pub use references::*;
 use reqwest::{
     Method,
     header::{COOKIE, HeaderMap},
