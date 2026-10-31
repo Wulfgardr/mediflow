@@ -134,7 +134,7 @@ test('scheduled serialization preserves audit seconds, NULL, text and determinis
 
 
 test('scheduled publication never overwrites an artifact or an interrupted temporary file', () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mf-g3-publish-'));
+  const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-g3-publish-')));
   try {
     const target = path.join(directory, 'mediflow-backup-v1-synthetic.mediflow');
     fs.writeFileSync(target, 'previous artifact');
@@ -154,7 +154,7 @@ test('scheduled publication never overwrites an artifact or an interrupted tempo
 
 for (const phase of ['before-link', 'after-link', 'after-unlink']) {
   test(`real process kill ${phase} preserves earlier artifacts and a complete recovery copy`, async () => {
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mf-g3-crash-'));
+    const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-g3-crash-')));
     const target = path.join(directory, 'new.mediflow');
     const previous = path.join(directory, 'previous.mediflow');
     fs.writeFileSync(previous, 'previous backup');
