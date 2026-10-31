@@ -460,16 +460,17 @@ impl ClinicalApp {
         let enabled = state == State::Challenge
             && (review.is_some() || therapy.as_ref().is_some_and(|t| t.2.is_some()));
         let therapy_mode = therapy.is_some();
+        let catalog_mode = pending.lock().is_ok_and(|p| p.is_catalog());
         let theme = self.theme;
         Some(div().id("native-chat-access-confirmation").role(Role::Group)
             .aria_label("Conferma accesso della chat").flex_1().min_h_0().overflow_y_scroll()
             .p(px(20.)).border_1().border_color(theme.rule)
             .flex().flex_col().gap(px(12.))
-            .child(heading("native-chat-access-title", if therapy_mode { "Conferma il cambio di stato della terapia" } else { "Condividi la scheda di prova nella chat?" }, theme))
+            .child(heading("native-chat-access-title", if therapy_mode { "Conferma il cambio di stato della terapia" } else if catalog_mode { "Mostra i farmaci nella vista della chat?" } else { "Condividi la scheda di prova nella chat?" }, theme))
             .child(text!(format!("App richiedente: {app}")).with_id("native-chat-access-app"))
             .child(text!(format!("Archivio: {}", self.chat_access.archive)).with_id("native-chat-access-archive"))
             .child(div().id("native-chat-access-patient").child(crate::title::title(crate::title::TitleText::patient_question("Paziente: ", self.chat_access.patient.clone(), ""), theme)))
-            .child(notice("native-chat-access-operation", if therapy_mode { "Scegli la terapia della cartella selezionata e controlla il nuovo stato. La scrittura usa il PIN nativo, una sola volta entro 30 secondi. I nomi restano qui. Touch ID per questa scrittura non è ancora abilitato." } else { "Scheda sintetica «basic», indipendente dalla cartella selezionata. Controlla i byte sotto: verranno mostrati soltanto nella vista della chat. Nomi e fonti restano qui. Hai 30 secondi per confermare una sola lettura; nessun rinnovo automatico." }, theme, false))
+            .child(notice("native-chat-access-operation", if therapy_mode { "Scegli la terapia della cartella selezionata e controlla il nuovo stato. La scrittura usa il PIN nativo, una sola volta entro 30 secondi. I nomi restano qui. Touch ID per questa scrittura non è ancora abilitato." } else if catalog_mode { "Ricerca nel catalogo AIFA locale, in sola lettura. Controlla query e risultati sotto. La data di aggiornamento non è verificata. Conferma una sola consultazione entro 30 secondi; nessuna prescrizione o invio al modello." } else { "Scheda sintetica «basic», indipendente dalla cartella selezionata. Controlla i byte sotto: verranno mostrati soltanto nella vista della chat. Nomi e fonti restano qui. Hai 30 secondi per confermare una sola lettura; nessun rinnovo automatico." }, theme, false))
             .when_some(therapy, |mut el, (target, rows, selected, result)| {
                 el = el.child(text!(format!("Nuovo stato: {target}")).with_id("native-chat-therapy-target"));
                 for (index, row) in rows.iter().enumerate() {

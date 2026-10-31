@@ -277,3 +277,71 @@ test('unconnected clinical functions and Treatment Reasoning are explicit before
     await expect(frame.getByRole('row').filter({ has: frame.getByRole('cell', { name: 'Treatment Reasoning', exact: true }) })).toContainText('Non disponibile in questa versione');
     await captureFrame(page, 'catalog.png');
 });
+
+const drugsPayload = () => JSON.stringify({ profile: 'mediflow.drug-catalog.v1', query: 'metformina', freshness: 'unverified', limit: 20,
+    rows: [{ aic: '012345678', name: '<b>metformina</b>', activePrinciple: 'metformina', packaging: null, atc: 'A10BA02', sourceRef: 'src_' + 'c'.repeat(32) }] });
+
+async function readDrugs(page: import('@playwright/test').Page, payload = drugsPayload()) {
+    const frame = page.frameLocator('#access');
+    await frame.getByLabel('Nome farmaco, principio attivo o AIC').fill('metformina');
+    await frame.getByRole('button', { name: 'Cerca farmaci', exact: true }).click();
+    await expect(frame.getByRole('status')).toContainText('Conferma nella finestra MediFlow');
+    await page.evaluate(payload => { Object.assign((window as unknown as { accessFixture: object }).accessFixture, { status: 'approved', payload }); }, payload);
+    await frame.getByRole('button', { name: 'Mostra scheda monouso' }).click();
+    return frame;
+}
+
+test('drug search reads the local catalog as text with keyboard sources and unverified freshness', async ({ page }) => {
+    const frame = await readDrugs(page);
+    await expect(frame.getByRole('heading', { name: 'Farmaci · metformina' })).toBeVisible();
+    await expect(frame.locator('#card b')).toHaveCount(0);
+    await expect(frame.locator('#card')).toContainText('<b>metformina</b>');
+    await expect(frame.locator('#card')).toContainText('Data di aggiornamento non verificata');
+    await frame.getByRole('link', { name: 'Fonte 1', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await expect(frame.locator('#drug-source-0')).toBeFocused();
+    const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: object }[] } }).accessFixture.calls);
+    expect(calls.map(c => c.arguments)).toContainEqual({ command: 'drugs', query: 'metformina' });
+    await frame.getByRole('button', { name: 'Revoca', exact: true }).click();
+    await expect(frame.locator('#card')).toBeHidden();
+    await expect(frame.getByRole('status')).toContainText('Ricerca non disponibile o accesso ritirato');
+});
+
+for (const scenario of ['empty', 'limit', 'unknown-field', 'bad-aic', 'wrong-query', 'too-many', 'token', 'source']) test(`drug catalog ${scenario}`, async ({ page }) => {
+    const value = JSON.parse(drugsPayload());
+    if (scenario === 'empty') value.rows = [];
+    if (scenario === 'limit') value.rows = Array.from({ length: 20 }, () => value.rows[0]);
+    if (scenario === 'unknown-field') value.rows[0].patientId = 'SENTINEL';
+    if (scenario === 'bad-aic') value.rows[0].aic = 'SENTINEL';
+    if (scenario === 'wrong-query') value.query = 'SENTINEL';
+    if (scenario === 'too-many') value.rows = Array.from({ length: 21 }, () => value.rows[0]);
+    if (scenario === 'source') value.rows[0].sourceRef = 'foreign';
+    if (scenario === 'token') value.rows[0].name = '{{MF_PII_' + 'a'.repeat(32) + '_1}}';
+    const frame = await readDrugs(page, JSON.stringify(value));
+    if (scenario === 'empty') await expect(frame.locator('#card')).toContainText('Nessun farmaco trovato');
+    else if (scenario === 'limit') await expect(frame.locator('#card')).toContainText('Limite di 20 risultati raggiunto');
+    else {
+        await expect(frame.locator('#card')).toBeHidden();
+        await expect.poll(() => page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: { command: string } }[] } }).accessFixture.calls.some(c => c.arguments.command === 'revoke'))).toBe(true);
+    }
+});
+
+for (const state of ['withdrawn', 'preparing', 'unknown']) test(`drug catalog clears on ${state}`, async ({ page }) => {
+    await page.clock.install();
+    const frame = await readDrugs(page);
+    await expect(frame.locator('#card')).toBeVisible();
+    await page.evaluate(status => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = status; }, state);
+    await page.clock.runFor(1000);
+    await expect(frame.locator('#card')).toBeHidden();
+});
+
+for (const scenario of ['expiry', 'new-turn', 'teardown']) test(`drug results retire on ${scenario}`, async ({ page }) => {
+    await page.clock.install();
+    const frame = await readDrugs(page);
+    await expect(frame.locator('#card')).toBeVisible();
+    if (scenario === 'expiry') await page.clock.runFor(300001);
+    else await page.locator('#access').evaluate((node, method) => {
+        (node as HTMLIFrameElement).contentWindow!.postMessage({ jsonrpc: '2.0', method, id: 'retire' }, '*');
+    }, scenario === 'new-turn' ? 'ui/notifications/tool-input' : 'ui/resource-teardown');
+    await expect(frame.locator('#card')).toBeHidden();
+});

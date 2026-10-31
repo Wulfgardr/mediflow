@@ -22,7 +22,7 @@ Il frame automatizzato a 390 e 1440 px non sostituisce queste due prove.
 | --- | --- | --- | --- | --- | --- |
 | Scheda | `createSyntheticCardBroker` | Storia, terapie e misure della fixture basic, mai archivio | Sessione paired, selezione, revisione byte e consenso nativo monouso | `synthetic-card-broker.test.ts`, `native-chat-access-frame.spec.ts`, Rust `chat_access::owner` | Scheda archivio non collegata; due host da qualificare |
 | Terapie in lettura | Stesso broker | Massimo due terapie sintetiche | Stesso consenso della scheda | Stesse prove | Lettura terapie archivio non collegata |
-| Farmaci | `lib/aifa-catalog.ts` | Nessuna ricerca chat | Nessun grant chat | Nessuna prova chat | Collegare ricerca e revisione nativa, freschezza e fonti |
+| Farmaci | `RuntimeSession.chat_drug_search` → `drug_count` / `search_drugs`, servizio AIFA comune | Ricerca AIC/nome/principio attivo, massimo 20 risultati, solo vista app | Sessione, scope e selezione correnti; revisione byte e conferma nativa monouso | Spec frame e test Rust catalogo | Data di aggiornamento non verificata; qualificare i due host, nessuna prescrizione |
 | Protesica | `lib/prosthetic-prescription-write.ts`, `lib/reference-data/prosthetics-catalog-service.ts` | Nessuna azione chat | Nessun grant chat; writer richiede scope, versione e audit | Nessuna prova chat | Ricerca, lettura e revisione nel writer comune |
 | Riassunto | Patient Insight, Document Synthesis | Nessuna generazione chat collegata | Nessun grant chat; proposta e consenso Fabric richiesti | Nessuna prova chat | Tre provider più ChatGPT per funzione, fonti e negativi C-7 |
 | Stato terapia | `createChatTherapyStatusService`, `executeTherapyStatusInTransaction` | active/suspended/completed e rilettura ricevuta | Native admin, tre capability network, selezione/archivio correnti, CAS, PIN e conferma nativa | `chat-therapy-status.test.ts`, `native-chat-write-approval.test.ts`, spec frame, Rust owner | Due host reali, disponibilità controlli per ruolo/versione/capacità |
@@ -47,7 +47,7 @@ raccordo nei due host.
 | `ocr` | `nessuno` | Indisponibile nel catalogo | Mostrare indisponibilità, non sostituire AnyDoc/Apple Vision |
 | `treatment_reasoning` | `app/api/ai/treatment-reasoning/preview/route.ts` | Esclusa dalla 0.9.1, diniego comune | Verificare diniego nei due host; nessuna generazione |
 | `icd_lookup` | `lib/icd-service.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
-| `aifa_drug_search` | `lib/aifa-catalog.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
+| `aifa_drug_search` | `RuntimeSession.chat_drug_search`, servizio AIFA comune | Ricerca locale in sola lettura, conferma nativa, risultato app-only | Qualifica nei due host; aggiornamento del catalogo non verificato |
 | `service_prescription_matching` | `lib/service-prescription-write.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
 | `evidence_absorption` | `lib/domain/documents/evidence-queue-contract.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
 | `patient_open_loops` | `lib/patient-open-loops.ts` | Non collegata | Raccordo e tutti i negativi C-7 nei due host |
@@ -98,7 +98,7 @@ I titoli provengono dal crosswalk congelato e non sono nuova ammissione runtime.
 `manual_only`, `not_grantable` e `applyPolicy: none` restano effettivi. Per ogni
 riga il servizio operativo è quindi **non risolto**, la vista/azione canonica
 chat è **assente**, il permesso è **negato** e la prova chat è **mancante nei due
-host**. Le azioni native terapia/PDF nella prima tabella hanno il proprio
+host**. La ricerca AIFA e le azioni native terapia/PDF nella prima tabella hanno il proprio
 raccordo nominato e non rendono operativi questi anchor. Non si usa una CLI
 storica per concedere un'azione chat.
 
@@ -127,7 +127,7 @@ storica per concedere un'azione chat.
 | 21 | Export FHIR paziente (con pre-check validazione FSE) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
 | 22 | Report PDF paziente | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
 | 23 | Esenzioni paziente (selezione/gestione codici cifrati) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
-| 24 | Catalogo farmaci AIFA (ricerca/validazione prontuario) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
+| 24 | Catalogo farmaci AIFA (ricerca/validazione prontuario) | Nessuno | Ricerca app-only tramite servizio catalogo comune e conferma nativa; descriptor manual_only invariato, freschezza e due host da qualificare |
 | 25 | Ricerca ICD in-app per codifica diagnosi | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
 | 26 | Ricerca terminologica generale (ICD/systems oltre in-app) | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
 | 27 | Selezione scope ambulatorio attivo | Nessuno | Servizio, azione, permesso e prova chat da risolvere |
@@ -192,3 +192,29 @@ writer viene introdotto. Contenuti di documenti e chat restano dati.
 
 Prove ed esiti della tranche sono nella PR e nel rapporto di consegna locale.
 Nessuna riga precedente diventa qualificata per effetto di questa descrizione.
+
+## Seconda tranche: consultazione farmaci
+
+Base della seconda tranche: `9694e5e4e60cde30953ae5e9a5f747d6a19f6d16`.
+
+La ricerca AIFA riusa il lettore del catalogo della sessione nativa. Non legge
+terapie o dati paziente e non invia query o risultati al modello. Il contesto
+della selezione attuale resta richiesto dal canale: sessione, scope, archivio
+e selezione vengono ricontrollati prima e dopo la lettura e prima del consumo.
+La conferma nativa revisiona i byte esatti, con SHA-256 e scadenza esistenti.
+I riferimenti fonte opachi sono per riga del risultato; AIC e provenienza
+sono consultabili da tastiera. Il broker della scheda mantiene l'autorità
+sui token PII; nessun token del catalogo viene ricomposto come dato paziente.
+
+Un catalogo vuoto o non accessibile nega la consultazione. Una ricerca senza
+corrispondenze mostra uno stato vuoto. Venti risultati segnalano il limite,
+senza dichiarare completa la ricerca. La data del catalogo non è verificata:
+la vista lo dichiara su risultati e fonti, senza attribuire freschezza. Revoca,
+scadenza, cambio turno, stato sconosciuto e teardown ritirano la vista.
+
+Questa PR non collega scheda archivio, lettura terapie archivio, protesica
+o riassunto. La grammatica del broker sintetico non autorizza prosa clinica
+arbitraria: occorre un raccordo dedicato ai servizi comuni con il confine di
+redazione qualificato. Non si amplia qui quel confine. Restano aperti C-7,
+C-8, tutte le celle generative e le prove desktop sul candidato. Treatment
+Reasoning resta indisponibile; Provider API fermi. Nessuna scrittura nuova.

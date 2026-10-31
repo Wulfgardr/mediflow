@@ -142,3 +142,18 @@ desktop. I claim crittografici e l'autorità del modello restano invariati.
 
 Riferimenti Apple: [SpeechTranscriber](https://developer.apple.com/documentation/speech/speechtranscriber)
 e [SpeechAnalyzer, WWDC25](https://developer.apple.com/videos/play/wwdc2025/277/).
+
+## Consultazione AIFA dalla vista app
+
+La seconda tranche C-7/C-8 aggiunge il comando app-only `drugs`, con query
+testuale di 2-80 caratteri e senza identificativo paziente. Il listener
+riusa la richiesta nativa, il binding di sessione e la conferma monouso.
+`RuntimeSession.chat_drug_search` compone esclusivamente conteggio e ricerca
+del servizio catalogo esistente, con un limite di 20 risultati. Nessuna route
+o contratto HTTP cambia. L'output `mediflow.drug-catalog.v1` è un risultato
+non generativo, app-only, con fonti opache per riga e aggiornamento dichiarato
+non verificato. Il frame valida schema chiuso, limiti e tipi, e renderizza
+soltanto testo. Non interpreta token PII e non aggiorna il contesto del modello.
+Il broker clinico conserva il proprio confine sintetico e la propria autorità.
+Il grant non autorizza prescrizioni, scritture o inferenza. Le prove sui due
+desktop reali restano alla qualifica, così come la negoziazione delle capacità.

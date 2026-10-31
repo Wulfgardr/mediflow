@@ -19,6 +19,8 @@ fn call(stream: &mut UnixStream, command: &str) -> io::Result<Value> {
     }
     let value = if command == "request" {
         json!({"command": command, "operation": OPERATION})
+    } else if let Some(query) = command.strip_prefix("drugs:") {
+        json!({"command":"drugs", "query":query})
     } else if let Some(id) = command.strip_prefix("receipt-") {
         json!({"command":"receipt", "commandId":id})
     } else if let Some(target) = command.strip_prefix("therapy-") {
@@ -124,7 +126,7 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                     "annotations":{"readOnlyHint":true,"destructiveHint":false,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["model"]}}},
                 {"name": CONTROL, "description":"Scheda sintetica monouso dopo consenso nella GPUI; payload riservato alla vista.",
-                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","patient-document","local-voice","receipt"]},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
+                    "inputSchema":{"type":"object","properties":{"command":{"type":"string","enum":["attach","request","status","consume","revoke","therapy-active","therapy-suspended","therapy-completed","patient-document","local-voice","receipt","drugs"]},"query":{"type":"string","minLength":2,"maxLength":80},"commandId":{"type":"string","pattern":"^[0-9a-f-]{36}$"}},"required":["command"],"additionalProperties":false},
                     "annotations":{"readOnlyHint":false,"destructiveHint":true,"openWorldHint":false},
                     "_meta":{"ui":{"resourceUri":URI,"visibility":["app"]}}}]}),
             "resources/list" => {
@@ -154,6 +156,24 @@ pub(crate) fn run_stdio(path: &Path) -> io::Result<()> {
                         json!({"status":"ready"})
                     };
                     json!({"content":[{"type":"text","text":"Stato della vista disponibile."}],"_meta":meta})
+                } else if attached
+                    && args["command"] == "drugs"
+                    && args.as_object().map(|v| v.len()) == Some(2)
+                    && args["query"].as_str().is_some_and(|q| {
+                        (2..=80).contains(&q.chars().count()) && !q.chars().any(char::is_control)
+                    })
+                {
+                    match call(
+                        &mut socket,
+                        &format!("drugs:{}", args["query"].as_str().unwrap()),
+                    ) {
+                        Ok(status) => {
+                            json!({"content":[{"type":"text","text":"Ricerca disponibile nella vista."}],"_meta":status})
+                        }
+                        Err(_) => {
+                            json!({"isError":true,"content":[{"type":"text","text":"Ricerca farmaci non disponibile."}]})
+                        }
+                    }
                 } else if attached
                     && args["command"] == "receipt"
                     && args.as_object().map(|v| v.len()) == Some(2)
