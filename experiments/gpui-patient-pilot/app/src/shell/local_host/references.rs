@@ -100,8 +100,22 @@ fn aifa_outcome(receipt: &Value) -> &'static str {
         "Operazione registrata."
     }
 }
+fn diagnostics_warning(value: &Value) -> Option<String> {
+    (value["diagnosticsTruncated"] == true).then(|| {
+        if !value["rejectedRecords"].is_number() {
+            return "Mostrati i primi 200 errori. Correggi il file e ripeti l’anteprima.".into();
+        }
+        let shown = value["diagnostics"].as_array().map_or(0, Vec::len);
+        let total = value["rejectedRecords"].as_u64().unwrap_or(0)
+            + value["duplicateRows"].as_u64().unwrap_or(0);
+        format!("Mostrati {shown} motivi su {total} totali. L’elenco è incompleto.")
+    })
+}
 fn details(value: &Value, theme: Theme) -> Div {
     let mut pane = div().min_w_0().flex().flex_col().gap(px(6.));
+    if let Some(warning) = diagnostics_warning(value) {
+        pane = pane.child(line("Diagnostiche", warning, theme));
+    }
     let exemption = value.get("isPharma").is_some()
         || value.get("isSpecialist").is_some()
         || value.get("isNational").is_some();
@@ -381,7 +395,7 @@ impl ClinicalApp {
             match result {
                 Ok((ReferenceImportResult::CatalogChanged,_)) => {
                     area.preview=Some(retained);
-                    area.message=Some("Il catalogo AIFA è cambiato dopo l’anteprima. Importazione non inviata; bozza conservata. Scarta l’anteprima e preparala di nuovo sul catalogo corrente.".into());
+                    area.message=Some("Il catalogo AIFA è cambiato dopo l’anteprima. Importazione non applicata; bozza conservata. Scarta l’anteprima e preparala di nuovo sul catalogo corrente.".into());
                 },
                 Ok((ReferenceImportResult::Reduction(p),_))=> {area.preview=Some(Arc::new(p));area.message=Some("Il file riduce il catalogo. Verifica i conteggi e conferma di nuovo solo se intendi applicare la riduzione.".into());},
                 Ok((ReferenceImportResult::Recorded(receipt),reread))=> {
@@ -525,12 +539,7 @@ impl ClinicalApp {
             pane = pane
                 .child(section("reference-preview", "Anteprima", theme))
                 .child(details(preview.data(), theme));
-            pane=pane.child(text!(if preview.data()["acquisition"]==true {"Scarica il feed ufficiale AIFA via Internet. Nessun dato clinico viene inviato. Il catalogo viene validato e sostituito al completamento; una riduzione richiede una seconda conferma."}else if area.catalog==ReferenceCatalog::Aifa {"Verifica righe scartate, motivi e duplicati. Le righe scartate non vengono importate. Il servizio sostituisce il catalogo con le righe importabili. Il catalogo viene riletto prima dell’invio; il servizio manuale non offre un controllo atomico della versione: una modifica concorrente durante l’invio può essere sovrascritta."}else if area.catalog==ReferenceCatalog::Exemptions {"Sono importate solo le otto colonne previste. I campi esclusi non sono interpretati. I codici assenti restano; le esenzioni dei pazienti non cambiano."}else{"Verifica fonte, versione, ambito e campi. Cambia solo il repertorio; i dati clinici salvati non cambiano."}));
-            if preview.data()["diagnosticsTruncated"] == true {
-                pane = pane.child(text!(
-                    "Mostrati i primi 200 errori. Correggi il file e ripeti l’anteprima."
-                ));
-            }
+            pane=pane.child(text!(if preview.data()["acquisition"]==true {"Scarica il feed ufficiale AIFA via Internet. Nessun dato clinico viene inviato. Il catalogo viene validato e sostituito al completamento; una riduzione richiede una seconda conferma."}else if area.catalog==ReferenceCatalog::Aifa {"Verifica righe scartate, motivi e duplicati. Le righe scartate non vengono importate. Il servizio sostituisce il catalogo con le righe importabili. Il servizio verifica la versione del catalogo prima di sostituirlo. Se è cambiata, l’importazione viene fermata e la bozza resta disponibile."}else if area.catalog==ReferenceCatalog::Exemptions {"Sono importate solo le otto colonne previste. I campi esclusi non sono interpretati. I codici assenti restano; le esenzioni dei pazienti non cambiano."}else{"Verifica fonte, versione, ambito e campi. Cambia solo il repertorio; i dati clinici salvati non cambiano."}));
             if preview.can_commit() {
                 pane = pane.child(
                     button(
@@ -648,6 +657,21 @@ impl ClinicalApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn truncated_aifa_review_reports_total_before_and_after_import() {
+        let review = json!({"diagnosticsTruncated":true,"rejectedRecords":201,"duplicateRows":0,"diagnostics":vec![json!({"message":"AIC non valido"});200]});
+        for value in [
+            json!({"review":review.clone()}),
+            json!({"count":1,"review":review}),
+        ] {
+            assert_eq!(
+                diagnostics_warning(&value["review"]).as_deref(),
+                Some("Mostrati 200 motivi su 201 totali. L’elenco è incompleto.")
+            );
+        }
+        assert!(diagnostics_warning(&json!({"diagnosticsTruncated":false})).is_none());
+    }
+
     #[gpui::test]
     fn references_render_partial_counts_reasons_and_exemption_fields(
         cx: &mut gpui::TestAppContext,
@@ -658,6 +682,7 @@ mod tests {
                 details(
                     &json!({
                         "count":9,"rejectedRecords":1,"totalRecords":10,
+                        "review":{"diagnosticsTruncated":true,"rejectedRecords":201,"diagnostics":vec![json!({"row":2,"message":"AIC non valido"});200]},
                         "diagnostics":[{"row":11,"message":"AIC non valido"}],
                         "sample":[{"code":"SYN","description":"Sintetica","type":"TYPE_A","isPharma":true,"isSpecialist":false,"isNational":null,"startDate":1767225600,"endDate":1798675200}]
                     }),
@@ -676,6 +701,7 @@ mod tests {
             .map(|(_, node)| node.value().unwrap_or_default().to_owned())
             .collect::<Vec<_>>();
         for expected in [
+            "Diagnostiche: Mostrati 200 motivi su 201 totali. L’elenco è incompleto.",
             "Righe scartate: 1",
             "Righe totali: 10",
             "Messaggio: AIC non valido",

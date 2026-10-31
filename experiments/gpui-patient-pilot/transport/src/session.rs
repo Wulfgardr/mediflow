@@ -8769,7 +8769,7 @@ mod g2_settings_tests {
                     local_host_reply(
                         &mut stream,
                         200,
-                        json!({"count":100,"state":"ready","manifest":{"version":"synthetic-before"}}),
+                        json!({"count":100,"state":"ready","snapshot":"a".repeat(64),"manifest":{"version":"synthetic-before"}}),
                         "",
                     );
                     (stream, _) = listener.accept().unwrap();
@@ -8781,6 +8781,7 @@ mod g2_settings_tests {
                 );
                 if path == "/api/drugs" {
                     assert!(request.contains("multipart/form-data; boundary=mediflow-"));
+                    assert!(request.contains("name=\"expectedSnapshot\""));
                     assert!(request.contains("filename=\"catalogo.csv\""));
                     if code == 200 {
                         assert!(request.contains("name=\"reductionConfirmation\""));
@@ -8842,7 +8843,7 @@ mod g2_settings_tests {
                 local_host_reply(
                     &mut stream,
                     200,
-                    json!({"count":10,"state":"ready","manifest":{"version":version}}),
+                    json!({"count":10,"state":"ready","snapshot":"a".repeat(64),"manifest":{"version":version}}),
                     "",
                 );
             }
@@ -8850,6 +8851,19 @@ mod g2_settings_tests {
             let request = read_request(&mut stream);
             assert!(request.starts_with("POST /api/drugs "));
             assert!(request.contains("bad;Invalido"));
+            assert!(request.contains("name=\"expectedSnapshot\""));
+            assert!(request.contains(&"a".repeat(64)));
+            local_host_reply(&mut stream, 409, json!({"code":"AIFA_CATALOG_CHANGED"}), "");
+            let (mut stream, _) = listener.accept().unwrap();
+            assert!(read_request(&mut stream).starts_with("GET /api/drugs?count=1 "));
+            local_host_reply(
+                &mut stream,
+                200,
+                json!({"count":10,"state":"ready","snapshot":"a".repeat(64),"manifest":{"version":"initial"}}),
+                "",
+            );
+            let (mut stream, _) = listener.accept().unwrap();
+            assert!(read_request(&mut stream).starts_with("POST /api/drugs "));
             local_host_reply(
                 &mut stream,
                 200,
@@ -8877,6 +8891,11 @@ mod g2_settings_tests {
             draft.data()["review"]["diagnostics"][0]["message"],
             "AIC non valido"
         );
+        assert!(matches!(
+            access.commit_reference_import(&draft),
+            Ok(ReferenceImportResult::CatalogChanged)
+        ));
+        assert!(draft.can_commit());
         assert!(matches!(
             access.commit_reference_import(&draft),
             Ok(ReferenceImportResult::CatalogChanged)
