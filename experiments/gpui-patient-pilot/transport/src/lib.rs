@@ -25,6 +25,10 @@ mod session;
 mod tls;
 mod who;
 
+#[cfg(test)]
+#[path = "../../test_support/loopback.rs"]
+mod test_loopback;
+
 pub use account_profile::*;
 pub use ai_preferences::*;
 pub use ambulatories::*;
