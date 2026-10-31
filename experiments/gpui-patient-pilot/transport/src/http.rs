@@ -1202,6 +1202,7 @@ fn dedicated_web_limit(path: &[&str], archive: bool) -> usize {
         ["api", "system", "backup-scheduler"] => JSON_LIMIT,
         // These reports carry their full Markdown beside the fields the panel reads.
         ["api", "system", "ai-parliament" | "ai-rollout-readiness"] => JSON_LIMIT,
+        ["api", "system", "audit" | "update-awareness"] => JSON_LIMIT,
         _ if archive => JSON_LIMIT,
         ["api", "attachments", _] => DOCUMENT_LIMIT,
         _ if reference_json_path(path) => JSON_LIMIT,

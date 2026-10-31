@@ -8661,6 +8661,67 @@ mod g2_settings_tests {
         }
     }
     #[test]
+    fn g2_controls_large_reports_partial_errors_cookie_and_lock() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            for (section, status, payload) in [
+                (
+                    "update-awareness",
+                    200,
+                    json!({"currentVersion":"0.9.1","source":"none","updateAvailable":false,"notes":["x".repeat(70000)]}),
+                ),
+                ("revision", 200, json!({"revision":"synthetic"})),
+                (
+                    "audit",
+                    200,
+                    json!([{"schemaVersion":1,"eventId":"00000000-0000-4000-8000-000000000001","eventType":"settings.updated","occurredAt":"2026-10-31T00:00:00Z","outcome":"success","actorType":"system","actorRef":"synthetic","subjectType":"settings","subjectRef":null,"sourceSurface":"web","requestId":null,"createdAt":"2026-10-31T00:00:00Z","redactedMetadata":{"flags":(0..1000).map(|n| format!("{n:04}{}","x".repeat(76))).collect::<Vec<_>>()}}]),
+                ),
+                ("redaction", 503, json!({"error":"synthetic"})),
+            ] {
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with(&format!("GET /api/system/{section} HTTP/1.1")));
+                let lower = request.to_lowercase();
+                assert!(lower.contains(&format!("mediflow_session={}", "b".repeat(64))));
+                assert!(!lower.contains("authorization:"));
+                assert!(!lower.contains("x-mediflow-paired-client"));
+                assert!(lower.contains("x-mediflow-archive-generation: synthetic-generation"));
+                local_host_reply(&mut stream, status, payload, "");
+            }
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let snapshot = access.read_controls().unwrap();
+        assert_eq!(
+            snapshot.updates.unwrap()["notes"][0]
+                .as_str()
+                .unwrap()
+                .len(),
+            70000
+        );
+        assert_eq!(
+            snapshot.audit.unwrap()[0]["redactedMetadata"]["flags"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1000
+        );
+        assert!(snapshot.revision.is_ok());
+        assert!(snapshot.redaction.is_err());
+        let listener = worker.join().unwrap();
+        session.lock();
+        assert!(matches!(access.read_controls(), Err(RuntimeError::Locked)));
+        listener.set_nonblocking(true).unwrap();
+        assert!(listener.accept().is_err());
+    }
+    #[test]
     fn g2_governance_uses_only_cookie_authenticated_reads_and_keeps_section_failures() {
         let fixture: Value =
             serde_json::from_str(include_str!("../../comparison/governance.json")).unwrap();
