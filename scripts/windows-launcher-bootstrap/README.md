@@ -5,7 +5,7 @@ native-free AIP/MCP/Mini delivery closure. Node 24 and trusted Windows are
 prerequisites; no report, environment-derived system root, FFI, runtime build
 or runtime download is used.
 
-`system-directory.c` exports exactly two C Node-API v1 functions: getSystemDirectory using
+`system-directory.c` exports exactly three C Node-API v1 functions: getSystemDirectory using
 [GetSystemDirectoryW](https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getsystemdirectoryw).
 getProcessCreationTimeTicks(pid) opens one non-inheritable process handle
 with QUERY_LIMITED_INFORMATION, reads GetProcessTimes and closes it once on
@@ -14,6 +14,14 @@ through FileTimeToSystemTime, integer Gregorian calendar arithmetic and its
 sub-millisecond 100 ns fraction to an ASCII .NET tick string. No floating
 point timestamp, pseudo-handle, wait, privilege elevation or subprocess is
 used. The same function serves own PID and previous owner PID.
+createJobForProcess(pid, start) checks the process creation time using the same
+handle that it assigns to a Job with KILL_ON_JOB_CLOSE. The returned object owns
+both handles and provides active, ownerExited, terminate and close. Methods reject
+foreign receivers and retain their owner until collected. The ordinary launcher
+runs the guardian with its own Node executable; no PowerShell or C# compilation
+is involved. The guardian confirms zero active processes before reporting drained;
+its unexpected death kills the tree but does not fabricate cleanup confirmation.
+The API rights follow [AssignProcessToJobObject](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-assignprocesstojobobject).
 Node-API version 1 uses the stable C ABI. The MSVC recipe links only Node and
 Kernel32, without a dynamic CRT dependency or DLL entry point. The producer
 checks the actual dependency list with dumpbin, the PE architecture, exact
@@ -39,8 +47,8 @@ non-TTY installation refusal, original exit and stderr close. It does not
 install dependencies or prove a GUI interaction.
 
 Output is exactly `prebuilds/win32-<arch>/{system-directory.node,manifest.json}`.
-Manifest schema 2 lists the exact ordered exports
-`getProcessCreationTimeTicks,getSystemDirectory` and identifies binary bytes, PE architecture, source/recipe/builder
+Manifest schema 3 lists the exact ordered exports
+`createJobForProcess,getProcessCreationTimeTicks,getSystemDirectory` and identifies binary bytes, PE architecture, source/recipe/builder
 digests, SDK and compiler provenance. Hashes attest identity/integrity, not
 source-to-binary equivalence. Review and commit both files for each admitted
 architecture before distributing source. The cross-platform workflow uploads

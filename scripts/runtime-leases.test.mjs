@@ -48,6 +48,52 @@ test('Windows Web exit drains its Job descendants and frees the process-bound lo
  assert.equal(idle,0);t.diagnostic(JSON.stringify({web:child.pid,descendant:pid,jobActive:0,lockReacquired:true}));
 });
 
+test('Windows native Job rejects another process generation and guards its handles', {skip:process.platform!=='win32',timeout:30000},async t=>{
+ const {loadSystemDirectoryBinding}=await import('./windows-launcher-bootstrap/index.mjs');
+ const binding=loadSystemDirectoryBinding();
+ const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});
+ const exited=new Promise(resolve=>child.once('exit',resolve));let job;
+ t.after(async()=>{job?.close();if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');await exited;});
+ const start=runtimeProcessIdentity(child.pid);
+ for(const args of [[],[child.pid],[child.pid,'1'],[child.pid,Number(start)],[child.pid,start,'extra'],[child.pid+0.5,start],[child.pid+0x100000000,start]]) assert.throws(()=>binding.createJobForProcess(...args));
+ assert.equal(child.exitCode,null);assert.equal(child.signalCode,null);
+ job=binding.createJobForProcess(child.pid,start);
+ assert.equal(job.active(),1);assert.equal(job.ownerExited(),false);
+ for(const name of ['active','ownerExited','terminate','close']) {
+  assert.throws(()=>job[name].call({}));assert.throws(()=>job[name]('extra'));
+  assert.equal(Object.getOwnPropertyDescriptor(job[name],'owner').value,job);
+  assert.equal(Object.getOwnPropertyDescriptor(job[name],'owner').writable,false);
+ }
+ job.terminate();await exited;await until(()=>job.active()===0);
+ assert.equal(job.ownerExited(),true);job.close();job.close();
+ assert.throws(()=>job.active());assert.throws(()=>job.ownerExited());assert.throws(()=>job.terminate());
+});
+
+test('Windows guardian death kills its Web tree and reports missing cleanup confirmation', {skip:process.platform!=='win32',timeout:60000},async t=>{
+ const directory=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'mf-guardian-death-')));
+ const child=spawn(process.execPath,['--input-type=module','-e',`
+ import {spawn} from 'node:child_process';
+ process.once('message',()=>{
+  const descendant=spawn(process.execPath,['-e',\`const http=require('http');const server=http.createServer((_,r)=>r.end('synthetic'));server.listen(0,'127.0.0.1',()=>process.send({pid:process.pid,port:server.address().port}));\`],{stdio:['ignore','ignore','ignore','ipc']});
+  descendant.once('message',frame=>process.send(frame));
+ });`],{stdio:['ignore','ignore','pipe','ipc']});
+ const exited=new Promise(resolve=>child.once('exit',resolve));let job;
+ t.after(async()=>{
+  if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');
+  await exited;if(job)await job.closed.catch(()=>{});fs.rmSync(directory,{recursive:true,force:true});
+ });
+ job=await containWindowsWeb(child,recordChildOwner(directory,child,runtimeProcessIdentity));
+ const descendant=new Promise(resolve=>child.once('message',resolve));child.send('start');
+ const {pid,port}=await descendant;
+ assert.equal(await fetch('http://127.0.0.1:'+port).then(r=>r.text()),'synthetic');
+ const rejected=assert.rejects(job.closed,/cleanup unconfirmed/);
+ assert.equal(runtimeProcessIdentity(job.owner.pid),job.owner.start);
+ process.kill(job.owner.pid,'SIGKILL');await rejected;await exited;
+ await until(()=>{try{process.kill(pid,0);return false;}catch(error){if(error.code==='ESRCH')return true;throw error;}});
+ await assert.rejects(fetch('http://127.0.0.1:'+port,{signal:AbortSignal.timeout(1000)}));
+ t.diagnostic(JSON.stringify({guardianKilled:true,webExited:true,descendant:pid,cleanupReportedUnconfirmed:true}));
+});
+
 test('SIGKILL of the first client preserves the second lease; last death closes idle once', async t => {
  const directory=temporary(t);let idle=0;
  const owner=await createRuntimeLeases({directory,identity:runtimeProcessIdentity,initialPlugin:true,onIdle:()=>idle++});t.after(()=>owner.close());

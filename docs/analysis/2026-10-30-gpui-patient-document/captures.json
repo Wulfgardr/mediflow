@@ -1,0 +1,16 @@
+{
+  "kind": "Finestra GPUI reale con host HTTP sintetico senza database; prove della route separate, nessuna qualificazione clinica.",
+  "sourceCommit": "0e7154720aec4d8c6331281a8e71ded83dc95eb6",
+  "captures": [
+    {
+      "theme": "giorno",
+      "file": "giorno-review.png",
+      "sha256": "6e92e3d01be5279f0bcabac233487f039518dceed11d627c8e2464c7848e2bf6"
+    },
+    {
+      "theme": "grafite",
+      "file": "grafite-review.png",
+      "sha256": "305a39ee6806444ad86b9ebf11ac0f5acc8794e730e162b48b1d210c300437a0"
+    }
+  ]
+}

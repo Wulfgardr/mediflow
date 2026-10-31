@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const defaultRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -22,6 +23,13 @@ export function assertNodeRuntime(contract, runtime = process.versions) {
         throw new Error(`Node ${contract.major}.x richiesto; runtime attuale ${runtime.node} (ABI ${runtime.modules}).`);
     }
     return { version: runtime.node, moduleVersion: String(runtime.modules) };
+}
+
+export function verifyNativeBindingInChild(root = defaultRoot) {
+    const env = { ...process.env };
+    for (const name of ['NODE_OPTIONS', 'NODE_PATH', 'LD_PRELOAD', 'LD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH']) delete env[name];
+    execFileSync(process.execPath, [fileURLToPath(import.meta.url), 'probe-native-binding', path.resolve(root)],
+        { env, windowsHide: true, timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
 export function verifyNativeBinding(root = defaultRoot) {
@@ -69,6 +77,11 @@ export function writeStandaloneManifest(root = defaultRoot) {
 
 function main() {
     const command = process.argv[2] || 'verify';
+    if (command === 'probe-native-binding') {
+        if (process.platform !== 'win32' || process.argv.length !== 4 || !path.isAbsolute(process.argv[3])) throw new Error('Invalid native binding probe arguments.');
+        verifyNativeBinding(process.argv[3]);
+        return;
+    }
     const contract = readNodeContract();
     const runtime = assertNodeRuntime(contract);
     if (command === 'verify') verifyNativeBinding();

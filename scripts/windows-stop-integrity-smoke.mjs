@@ -114,7 +114,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === script) {
     const insert = db.prepare('INSERT INTO synthetic_stop_rows VALUES (?,?)');
     for (let index = 0; index < 128; index++) insert.run('incomplete-' + index, 'synthetic-'.repeat(1024));
     assert.equal(db.inTransaction, true);
-    const server = http.createServer((_request, response) => response.end(generation));
+    const server = http.createServer((_request, response) => {
+      assert.equal(db.inTransaction, true);
+      response.end(generation);
+    });
+    server.once('close', () => lease.closeSync());
     server.listen(0, '127.0.0.1', () => process.send({ type: 'transaction-open', generation, writer: process.pid,
       port: server.address().port, openRows: 128, walBytes: fs.statSync(path.join(directory, 'synthetic.db-wal')).size }, error => {
       if (error) { record({ type: 'writer-delivery-error', message: error.message }); process.exitCode = 1; server.close(); }
