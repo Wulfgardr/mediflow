@@ -93,7 +93,7 @@ async function poll(){if(stopped)return;try{const r=await fetch(base+'/state');i
 </script></main></body></html>`;
 }
 
-export async function createChoiceServer({ root, state, choose, install, stop, navigate = undefined, cancelNavigation = undefined, nativeAvailable = false, development = false, version = '', folder = '' }) {
+export async function createChoiceServer({ root, state, choose, install, stop, navigate = undefined, cancelNavigation = undefined, nativeAvailable = false, development = false, version = '', folder = '', webPort = undefined }) {
   const token = crypto.randomBytes(24).toString('hex');
   const nonce = crypto.randomBytes(18).toString('base64');
   const base = `/${token}`;
@@ -105,7 +105,7 @@ export async function createChoiceServer({ root, state, choose, install, stop, n
     const timer = setTimeout(() => { controller.abort(); requests.delete(requestId); }, 8000);
     timer.unref(); requests.set(requestId, { controller, timer });
   };
-  const server = http.createServer(async (req, res) => {
+  const handleRequest = async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -171,10 +171,28 @@ export async function createChoiceServer({ root, state, choose, install, stop, n
       } else return respond(404, 'Pagina non trovata.');
       respond(202, 'Richiesta accettata.');
     } catch (error) { respond(400, escape(error.message)); }
+  };
+  const makeServer = () => {
+    const candidate = http.createServer(handleRequest);
+    candidate.requestTimeout = 5000;
+    candidate.headersTimeout = 5000;
+    return candidate;
+  };
+  const listen = candidate => new Promise((resolve, reject) => { candidate.once('error', reject); candidate.listen(0, '127.0.0.1', resolve); });
+  const close = candidate => new Promise(resolve => {
+    if (!candidate.listening) { resolve(); return; }
+    candidate.close(resolve); candidate.closeAllConnections();
   });
-  server.requestTimeout = 5000;
-  server.headersTimeout = 5000;
-  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  let server = makeServer();
+  try {
+    await listen(server);
+    if (server.address().port === webPort) {
+      // Keep the Web port occupied until the chooser has a distinct endpoint.
+      const reservation = server;
+      server = makeServer();
+      try { await listen(server); } finally { await close(reservation); }
+    }
+  } catch (error) { await close(server); throw error; }
   origin = `http://127.0.0.1:${server.address().port}`;
   return { server, url: `${origin}${base}/`, close: () => new Promise(resolve => {
     for (const { controller, timer } of requests.values()) { controller.abort(); clearTimeout(timer); }

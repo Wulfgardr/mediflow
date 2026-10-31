@@ -3314,6 +3314,39 @@ test('Windows native binding verification releases the binary before returning t
 });
 
 
+test('chooser excludes the Web port atomically and never retries failed binds', () => {
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+      import assert from 'node:assert/strict';import http from 'node:http';
+      import {createChoiceServer} from ${JSON.stringify(new URL('./mediflow-launcher-page.mjs',import.meta.url).href)};
+      const listen=http.Server.prototype.listen;
+      const bind=(server,port)=>new Promise((resolve,reject)=>{server.once('error',reject);listen.call(server,port,'127.0.0.1',resolve);});
+      const close=server=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});
+      for(const scenario of ['collision','first-failure','second-failure']) {
+        const probe=http.createServer();await bind(probe,0);const webPort=probe.address().port;await close(probe);
+        let calls=0,first,page,web;
+        http.Server.prototype.listen=function(port,host,done){
+          calls++;if(calls===1)first=this;
+          if(scenario==='first-failure'||scenario==='second-failure'&&calls===2){
+            process.nextTick(()=>this.emit('error',new Error('SYNTHETIC_BIND_FAILURE')));return this;
+          }
+          // Port zero may select the Web port again if its reservation was released.
+          return listen.call(this,calls===1||!first.listening?webPort:port,host,done);
+        };
+        try {
+          const pending=createChoiceServer({root:${JSON.stringify(repoRoot)},webPort,state:()=>({ready:false}),choose(){},install(){},stop(){}}).then(value=>(page=value));
+          if(scenario==='collision') {
+            await pending;assert.notEqual(page.server.address().port,webPort,'Chooser must not occupy its Web port');
+            assert.equal(calls,2);assert.equal((await fetch(new URL('state',page.url))).status,200);
+          } else {await assert.rejects(pending,/SYNTHETIC_BIND_FAILURE/);assert.equal(calls,scenario==='first-failure'?1:2);}
+          web=http.createServer((_,response)=>response.end('synthetic'));await bind(web,webPort);
+          assert.equal(await fetch('http://127.0.0.1:'+webPort).then(response=>response.text()),'synthetic');
+        } finally {if(web)await close(web);if(page)await page.close();http.Server.prototype.listen=listen;}
+      }
+      console.log(JSON.stringify({forcedCollision:true,webPortReleased:true,bindErrorsPropagated:true,failureRetries:0}));
+    `], {encoding:'utf8',timeout:10000});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+});
+
 test('ordinary Web startup waits for one cold identity proof within its startup deadline', async t => {
     const f = await ordinaryLauncherFixture(t, 'web', [], true, 'cold-identity');
     await f.until(() => f.output().includes('Pronto:'));
