@@ -36,11 +36,21 @@ export async function openTreatmentReasoningDenial(page: Page, value: 'enabled' 
     const calls: string[] = [];
     await page.route('**/*', async route => {
       const request = route.request(), url = new URL(request.url());
-      if (url.origin !== new URL(process.env.E2E_BASE_URL!).origin || /\/api\/(ai\/|proxy\/ollama\/(chat|generate))/.test(url.pathname)
-        || (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method()) && /^\/api\/(patients|therapies|entries|observations|attachments|settings)(\/|$)/.test(url.pathname))) {
+      if (url.pathname === '/api/ai/models' && request.method() === 'GET') {
+        await route.fulfill({ json: { models: [] } }); return;
+      }
+      if (url.pathname === '/api/settings' && request.method() === 'POST') {
+        const body = request.postDataJSON();
+        if (['uiReduceMotion', 'uiReduceTransparency'].includes(body?.key) && body.value === false) {
+          await route.fulfill({ json: body }); return;
+        }
+      }
+      const profileRead = request.method() === 'POST' && /^\/api\/patients\/[^/]+\/profile-query$/.test(url.pathname);
+      if (url.origin !== new URL(process.env.E2E_BASE_URL!).origin || (/\/api\/(ai\/|proxy\/ollama\/(chat|generate))/.test(url.pathname) && !(request.method() === 'GET' && url.pathname === '/api/ai/smart-import/selection'))
+        || (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method()) && !profileRead && /^\/api\/(patients|therapies|entries|observations|attachments|settings)(\/|$)/.test(url.pathname))) {
         calls.push(`${request.method()} ${url.href}`); await route.abort(); return;
       }
-      await route.continue();
+      await route.fallback();
     });
     await page.goto(`/patients/${fixture.patientId}/modules`);
     await openPatientSection(page, 'terapie');
@@ -49,16 +59,19 @@ export async function openTreatmentReasoningDenial(page: Page, value: 'enabled' 
     await proposals.click();
     await expect(proposals).toHaveAttribute('aria-expanded', 'true');
     const panel = page.getByTestId('treatment-reasoning-panel');
+    const assertNoEffects = async () => {
+      expect(calls).toEqual([]);
+      expect(await (await page.request.get(`/api/therapies?patientId=${fixture.patientId}`)).json()).toEqual(before);
+      expect((await (await page.request.get('/api/settings/aiTreatmentReasoningKillSwitch')).json()).value).toBe(value);
+    };
     const assertDenied = async () => {
       await expect(panel).toContainText('Non disponibile in questa versione');
       await expect(panel.getByRole('button')).toHaveCount(0);
       await expect(panel.getByTestId('model-picker-treatment_reasoning')).toHaveCount(0);
       await expect(panel.getByTestId('treatment-reasoning-proposal')).toHaveCount(0);
-      expect(calls).toEqual([]);
-      expect(await (await page.request.get(`/api/therapies?patientId=${fixture.patientId}`)).json()).toEqual(before);
-      expect((await (await page.request.get('/api/settings/aiTreatmentReasoningKillSwitch')).json()).value).toBe(value);
+      await assertNoEffects();
     };
     await assertDenied();
-    return { panel, proposals, assertDenied, restore };
+    return { panel, proposals, assertDenied, assertNoEffects, restore };
   } catch (error) { restore(); throw error; }
 }
