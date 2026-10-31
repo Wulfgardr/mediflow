@@ -153,6 +153,7 @@ fn build_voice(out: &std::path::Path, minimum: &str) {
         .unwrap()
         .join("lib/swift/macosx");
     println!("cargo:rustc-link-search=native={}", libraries.display());
+    println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/lib/swift");
     println!("cargo:rustc-link-lib=static=mediflow_voice");
     println!("cargo:rustc-cfg=local_voice_apple");
 }
