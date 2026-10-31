@@ -1,5 +1,5 @@
 {
-  "syncCommit": "826a4df3fc0ec069c0eabb5fb77c93fe3aa69757",
+  "syncCommit": "3ff78ad3c73edb269736ff3114d6b23df1e78ca1",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -32,24 +32,25 @@
   },
   "files": {
     "lib/therapy-status-confirmation.ts": "33eebc3197e988f3f1c134f1ac8499da1de95171e21d0ac7e3396c2a202c6486",
-    "components/therapy-manager.tsx": "b6f063e3434015ddf20f8c60797ab9d924ed05507d10acb2fd2bb1f9d3120e6e",
-    "lib/db.ts": "043d87d9ab0cb1c39a9b5e7329b7795721ec8dd688c3c330f43a9c910d18c534",
+    "components/therapy-manager.tsx": "9951373407eabf70501086cbc2852e04088da8da0085811b23b9906579fcd1ac",
+    "lib/db.ts": "bedd41c74084bd402e86fd6c28cb7900edfd19e73f265111ce865b74536b255a",
     "lib/security/client-auth-api.ts": "754aebaedb77bc9629a32d90f754ecc3ee7e89ead880c6add9088dd6449ee5ce",
     "lib/therapy-write-operation.ts": "f72e2fe81427c5b74a87db7fe79fc96f372553eff6e1ca0b6badf3fd0cd1f3ee",
     "app/api/therapies/[id]/route.ts": "3f4765cd55a13360965fae38bced33cec5cc69403dd0bbfd6d67417c5c40e4e2",
     "app/api/therapies/route.ts": "e13c48abb76cb0461eb1a9c1f23cf8724ec9cf34d32a7bd54909e58d4e251dac",
     "lib/locked-field-guard.ts": "a4b64b4db1968423169937a2b491add2d2a19b6fba2489b1515e37b358a55d3a",
-    "lib/therapy-status-command-service.ts": "626519d8fd06127ab0a21c8c4ced034ccee21cd60ed8fb24b0b491c6ee863764",
-    "lib/therapy-status-command-confirmation.ts": "f2445977f0d0cac518ff0ad7939f75a616053504083c9e3d3a2d13c37526a0a9",
+    "lib/therapy-status-command-service.ts": "25ebce8c7ec8cb6fe8dd3f6295b6c79e349ae5034e033161e6615e3d98e28e87",
+    "lib/therapy-status-command-confirmation.ts": "1699076bb1c4b772fdb509e72b2c154cba8061402724bcb6288a08381b1192e4",
     "lib/therapy-status-command-contract.ts": "3432124d9b5f8b3113265d9779fa12e1411e508b0964cfd2e1bc532f49f4a7fe",
-    "lib/therapy-status-command-client.ts": "c2b1b43b0caaee0c12ca5b784b19bf1caaf6f3685c31739e29b1ce22428331a9",
-    "lib/therapy-status-command-http.ts": "e48bafce3eb7b8bd280ea04c7afd5624cc73c5afee1d3e3abac04f4c19a8b955",
-    "lib/therapy-status-command-backup.ts": "2f63951192b92749658de3ae289fb7cc16cccd1a90202342e8bd949b98271f64",
+    "lib/therapy-status-command-client.ts": "cfda4bd0851b12f7c5e28c2d0ab299da099d513b41f31d79e32b07f6f17748de",
+    "lib/therapy-status-command-http.ts": "479b4434db907241f6e60048329477662d07ffd570641433bb83a73232b69703",
+    "lib/therapy-status-command-backup.ts": "189c18637dcc74cecda62b7b011b5f93172602df95ae7e7fd1b439afe1340cc5",
     "lib/therapy-status-command-schema.ts": "98c0aba0a361ef83655a632be41a257f8b9e99a950591113683a8094e26f4c87",
     "lib/therapy-status-command-recovery-schema.ts": "8231c04d505139c63f36f9657e2a2a0c964cd48b39d4ae4b2d2a0f2c552f5f4a",
     "lib/ambulatory-destructive-command-recovery-schema.ts": "2fc3ec7999981e606eefeedbe36ee1e9232b095d63c26054b1105f59d8c20910",
     "lib/api-table-response.ts": "5f19aab147a2d4459c1d2ec96e6c6d67bb20ad8c23b0cd9f38239771ffbb602c",
-    "lib/backup-encrypted-fields.json": "27d036cb546f048f96ac4f8f9a5eca6f8360a798ba8cf7d173deb19328ac77e3"
+    "lib/backup-encrypted-fields.json": "27d036cb546f048f96ac4f8f9a5eca6f8360a798ba8cf7d173deb19328ac77e3",
+    "lib/backup-import-provenance.ts": "881c805fbc63b56a19f14ba978936bf3b5849430e7e5be268329c439e2b9d115"
   },
   "verificationInputs": [
     "docs/formal/therapy-status/",
@@ -77,7 +78,8 @@
     "lib/chat-therapy-status.ts",
     "lib/chat-therapy-status.test.ts",
     "scripts/falsify-chat-therapy.mjs",
-    "app/api/auth/native/therapy-status/route.ts"
+    "app/api/auth/native/therapy-status/route.ts",
+    "lib/backup-import-provenance.test.ts"
   ],
   "durableProtocolCoverage": {
     "adr": "0168",

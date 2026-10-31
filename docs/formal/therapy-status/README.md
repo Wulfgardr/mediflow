@@ -623,3 +623,28 @@ servizio è aggiornato dopo il confronto del corpo estratto e le prove Web,
 PIN nativo, gare e crash. Il modello legacy non viene esteso ai grant nativi:
 scadenze, consumo e revoca sono provati separatamente con orologio iniettabile
 e mutazioni in `scripts/falsify-chat-therapy.mjs`.
+
+## Raccordo PR #768: provenienza delle ricevute e importazione portabile
+
+Riesaminata la correzione `3ff78ad3c` rispetto a `b81feca35` e al precedente
+head `a8d6e3f75`. Il delta iniziale di `lib/db.ts` riguarda soltanto l'header
+di credenziale del ripristino portabile. La conferma di una terapia continua
+a usare lo stesso protocollo, writer, CAS e legame audit/ledger; l'ammissione
+della superficie `native` nel validatore segue il writer esistente.
+
+Il lettore ricevute ora propaga `origin: local | imported`. Il controller
+mostra come registrazione locale soltanto una ricevuta locale e corrente;
+una ricevuta importata resta storico da esaminare, anche se lo stato della
+terapia coincide. Il client verifica il nuovo campo e rifiuta un'origine
+importata dichiarata corrente. Il modulo `backup-import-provenance.ts` entra
+nelle sorgenti fissate: collega marcatori di audit e comandi senza cambiare
+le righe originali. I comandi già presenti conservano la provenienza.
+
+Il modello TLC legacy non viene esteso a fiducia nella sorgente, backup o
+migrazioni. Il nuovo vincolo del controller durevole è coperto dai test del
+client, della conferma e da un vero ripristino di ledger ostile, incluso il
+caso di 650 audit importati con budget di lettura locale separato. Tale
+prova entra nel gruppo `code-current` del verificatore. Modello, invarianti,
+assunzioni, mutanti e testimoni legacy restano invariati. Le impronte vengono
+aggiornate dopo questo confronto; `verify:therapy-status` deve ancora
+rieseguire TLC, i mutanti e tutti i test causali sull'head consegnato.

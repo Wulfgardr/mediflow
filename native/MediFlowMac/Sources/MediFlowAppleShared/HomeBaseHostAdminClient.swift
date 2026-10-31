@@ -42,14 +42,7 @@ public actor HomeBaseHostAdminClient {
         try await get(HostNetworkOverview.self, path: ["api", "system", "network-overview"], sessionCookie: sessionCookie)
     }
 
-    /// Audit summary over a window of days.
-    ///
-    /// Read the cap before trusting the numbers: the route accepts `limit` up to
-    /// 1000, but `listAuditEvents` runs it through `normalizeLimit`, which clamps
-    /// to 200. Every figure in this summary is therefore computed over **at most
-    /// 200 records**, not over the window — and `isTruncated`, which the route
-    /// derives from its own unclamped limit, is false with the defaults even when
-    /// the clamp did bite. The UI has to say so.
+    /// Local activity and imported history use separate samples of at most 200 records.
     public func auditSummary(sessionCookie: String, days: Int = 30) async throws -> HostAuditSummary {
         try await get(
             HostAuditSummary.self,
@@ -353,14 +346,12 @@ public struct HostAuditSummary: Decodable, Equatable, Sendable {
         public var id: String { eventType ?? "-" }
     }
 
-    /// The local audit sample and the imported history each have their own cap.
-    /// it reads false even when the 200 clamp applied. This says what actually
-    /// happened.
     public var reachedRecordCap: Bool { (totalEvents ?? 0) >= 200 }
 }
 
 /// One element of the bare array returned by `GET /api/system/audit`.
 public struct HostAuditEvent: Decodable, Equatable, Sendable, Identifiable {
+    public let origin: String?
     public let eventId: String?
     public let eventType: String?
     public let occurredAt: String?
