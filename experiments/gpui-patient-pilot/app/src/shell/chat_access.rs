@@ -8,6 +8,7 @@ use mediflow_runtime_client::ChatWriteResolution;
 use std::{collections::BTreeMap, time::Duration};
 
 pub(super) struct ChatAccess {
+    pub(super) voice: super::local_voice::LocalVoice,
     listener: Option<chat_access::Listener>,
     references: CommandReferences,
     recovery_messages: BTreeMap<String, ChatWriteResolution>,
@@ -16,7 +17,7 @@ pub(super) struct ChatAccess {
     recovery_busy: bool,
     owner: Option<(String, RuntimeSession)>,
     recovery_epoch: u64,
-    pending: Option<Pending>,
+    pub(super) pending: Option<Pending>,
     patient: mediflow_patient_client::PersonName,
     archive: String,
     pin: Entity<TextInput>,
@@ -32,6 +33,7 @@ impl ChatAccess {
         cx: &mut Context<ClinicalApp>,
     ) -> Self {
         Self {
+            voice: super::local_voice::LocalVoice::new(theme, cx),
             listener: chat_access::Listener::configured(),
             references: CommandReferences::new(directory),
             recovery_messages: BTreeMap::new(),
@@ -91,6 +93,7 @@ impl ChatAccess {
         self.owner = None;
     }
     pub(super) fn retire(&mut self, cx: &mut App) {
+        self.voice.retire(cx);
         if let Some(pending) = self.pending.as_ref()
             && let Ok(mut pending) = pending.lock()
         {
@@ -140,6 +143,7 @@ impl ClinicalApp {
     }
 
     fn poll_chat_access(&mut self, cx: &mut Context<Self>) {
+        self.poll_chat_voice(cx);
         if self.chat_access.pending.is_some()
             && self
                 .session
@@ -175,6 +179,16 @@ impl ClinicalApp {
             .as_ref()
             .and_then(|l| l.incoming.try_recv().ok());
         if let Some(pending) = incoming {
+            if pending.lock().is_ok_and(|mut p| p.voice_requested()) {
+                self.open_chat_voice(&pending, cx);
+                return;
+            }
+            if self.chat_access.voice.is_open() {
+                if let Ok(mut p) = pending.lock() {
+                    p.withdraw();
+                }
+                return;
+            }
             if pending.lock().is_ok_and(|mut p| p.document_requested()) {
                 self.open_chat_patient_document(&pending, cx);
                 return;
