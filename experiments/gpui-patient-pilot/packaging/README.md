@@ -38,6 +38,13 @@ completo in Info.plist, `Resources/build.json` e `manifest.json`.
 La build rifiuta `runtime_shaders` e verifica che una libreria Metal
 precompilata sia contenuta nei byte dell'eseguibile. Verifica inoltre che
 le dipendenze dinamiche siano esclusivamente librerie Apple di sistema.
+Il ponte Swift aggiunge il rpath `/usr/lib/swift`. L'unico nome relativo
+ammesso è `@rpath/libswift_Concurrency.dylib`, solo con caricamento weak
+e quel rpath di sistema. Su macOS 11 la libreria può mancare: il ponte
+rifiuta i comandi voce prima di creare Task; il runtime voce richiede macOS 26.
+Non si incorpora una copia della libreria né si cambia il minimo del client.
+Il job macOS esistente costruisce il bundle release e ne esegue
+`--verify-bundled-assets`; non qualifica macOS 11 o hardware M1.
 L'icona viene dal brand Mac esistente, letto senza modificarlo. Font e SVG
 restano incorporati dal codice del client. I due marchi vengono decodificati
 prima del primo paint: il renderer riceve un `RenderImage` pronto, senza
