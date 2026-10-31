@@ -61,20 +61,55 @@ impl SecurityArea {
 impl ClinicalApp {
     pub(in crate::shell) fn access_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
-        let area = &self.local_host.security;
         let user = self.session.as_ref().map(RuntimeSession::user);
-        let mut pane = div().min_w_0().flex().flex_col().gap(px(16.))
+        div()
+            .min_w_0()
+            .flex()
+            .flex_col()
+            .gap(px(16.))
             .child(heading("settings-access-heading", "Accesso", theme))
-            .child(section("settings-current-session", "Sessione corrente", theme))
+            .child(section(
+                "settings-current-session",
+                "Sessione corrente",
+                theme,
+            ))
             .child(text!(user.map(|u| u.username.clone()).unwrap_or_default()))
-            .child(text!("Il blocco richiede la passphrase al prossimo accesso."))
-            .child(button("settings-access-lock", "Blocca sessione adesso", theme, false, true)
-                .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Lock, cx))))
+            .child(text!(
+                "Il blocco richiede la passphrase al prossimo accesso."
+            ))
+            .child(
+                button(
+                    "settings-access-lock",
+                    "Blocca sessione adesso",
+                    theme,
+                    false,
+                    true,
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Lock, cx))),
+            )
+            .child(
+                button(
+                    "settings-open-danger",
+                    "Credenziali e recupero…",
+                    theme,
+                    false,
+                    !self.local_host.has_work(),
+                )
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.select_settings_page(SettingsPage::Danger, window, cx)
+                })),
+            )
+    }
+    pub(in crate::shell) fn danger_view(&self, cx: &Context<Self>) -> Div {
+        let theme = self.theme;
+        let area = &self.local_host.security;
+        let mut pane = div().min_w_0().flex().flex_col().gap(px(16.))
+            .child(heading("settings-danger-heading", "Zona pericolo", theme))
             .child(self.local_host_panel(cx))
-            .child(section("settings-passphrase-heading", "Sblocco con passphrase", theme))
-            .child(text!("Questo archivio si sblocca con la passphrase. Il PIN resta per le conferme di revisione e di ruolo: non apre l’archivio."))
-            .child(text!("Il cambio aggiorna passphrase e kit di recupero. Il PIN di conferma rimane separato e invariato."))
-            .child(text!("Nuova passphrase: da 15 a 128 caratteri, anche spazi. I caratteri equivalenti sono normalizzati; gli spazi non vengono rimossi."));
+            .child(section("settings-passphrase-heading", "Cambia passphrase e kit", theme))
+            .child(text!("Richiede la passphrase attuale e la conservazione del nuovo kit e della chiave separata. Il PIN di conferma rimane invariato."))
+            .child(text!("Nuova passphrase: da 15 a 128 caratteri, anche spazi. I caratteri equivalenti sono normalizzati; gli spazi non vengono rimossi."))
+            .child(notice("danger-reset-unavailable", "Il reset degli account non è disponibile in questa finestra. Conserva account, kit e copie di recupero esistenti.", theme, false));
         if self.local_host.access().is_some() {
             for field in &area.fields {
                 pane = pane.child(crate::text_input::themed(field.clone(), theme));
@@ -288,10 +323,10 @@ mod tests {
                 editor.update(cx, |input, cx| {
                     input.set_content("New synthetic passphrase", cx)
                 });
-                app.select_settings_page(SettingsPage::Access, window, cx);
+                app.select_settings_page(SettingsPage::Danger, window, cx);
                 app.select_settings_page(SettingsPage::Overview, window, cx);
                 assert_eq!(editor.read(cx).value(), "New synthetic passphrase");
-                assert!(app.settings_targets[8].focus.is_focused(window));
+                assert!(app.settings_targets[13].focus.is_focused(window));
                 app.request_discard(Discard::Lock, cx);
                 assert!(editor.read(cx).value().is_empty());
             })
@@ -323,7 +358,7 @@ mod tests {
             app.session = Some(host.session.clone());
             app.local_host.retirement = notice.clone();
             app.area = Area::Settings;
-            app.settings_page = SettingsPage::Access;
+            app.settings_page = SettingsPage::Danger;
             app.local_host.authority = Authority::Open(access);
             app.local_host.security.operation = SecurityOperation::Review(command.clone());
             for (saved, paper) in [(false, true), (true, false), (false, false)] {
@@ -346,7 +381,7 @@ mod tests {
                 .filter(|id| id.as_str() == "security-save-kit")
                 .count(),
             1,
-            "the real Access page must expose exactly one recovery review"
+            "the real Danger page must expose exactly one recovery review"
         );
         view.update(cx, |app, cx| {
             app.local_host.security.saved = true;
@@ -380,11 +415,11 @@ mod tests {
             cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
         view.update(cx, |app, cx| {
             app.area = Area::Settings;
-            app.settings_page = SettingsPage::Access;
+            app.settings_page = SettingsPage::Danger;
             app.local_host.security.operation = SecurityOperation::Preparing;
             app.navigate(Area::Analytics, cx);
             assert_eq!(app.area, Area::Settings);
-            assert_eq!(app.settings_page, SettingsPage::Access);
+            assert_eq!(app.settings_page, SettingsPage::Danger);
             app.run_local_host(
                 || Ok(()),
                 |app, _, _| app.local_host.security.paper = true,
@@ -439,7 +474,7 @@ mod review738 {
                     app.session = Some(host.session.clone());
                     app.local_host.authority = Authority::Open(access.clone());
                     app.area = Area::Settings;
-                    app.settings_page = SettingsPage::Access;
+                    app.settings_page = SettingsPage::Danger;
                     for (field, value) in app.local_host.security.fields.iter().zip([
                         "Synthetic scales fixture passphrase",
                         new,

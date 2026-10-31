@@ -146,3 +146,8 @@ export function evaluateSettingsWrite(
         reason: `Il canale ${channel} non puo scrivere la chiave ${key}`,
     };
 }
+
+/** Enabling the exposed mode reactivates stored pairing tokens: only an admin on this computer may do it. */
+export function exposedNetworkModeAllowed(session: { role: string }, attestedLoopback: boolean): boolean {
+    return session.role === 'admin' && attestedLoopback;
+}

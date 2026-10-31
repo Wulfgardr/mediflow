@@ -90,7 +90,10 @@ export default function SettingsPage() {
                 body: JSON.stringify({ value: nextMode }),
             });
             if ([400, 401, 403, 409].includes(response.status)) {
-                setNetworkError('La richiesta è stata rifiutata. La modalità non è cambiata.');
+                const refusal = await response.json().catch(() => null) as { code?: string } | null;
+                setNetworkError(refusal?.code === 'NETWORK_MODE_LOCAL_ADMIN_REQUIRED'
+                    ? 'Solo un amministratore su questo computer può attivare il modo di rete. La modalità non è cambiata.'
+                    : 'La richiesta è stata rifiutata. La modalità non è cambiata.');
                 return;
             }
             if (!response.ok) throw new Error('network mode update not confirmed');
