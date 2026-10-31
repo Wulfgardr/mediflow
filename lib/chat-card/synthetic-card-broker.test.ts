@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, mock, test } from 'node:test';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { runInNewContext } from 'node:vm';
 import { mockOrdinaryModule } from '../chatgpt-execution/ordinary-module.test-support.ts';
 import corpus from '../../scripts/fixtures/chat-card-corpus.json' with { type: 'json' };
 import { evidenceHash, redactionIdentityDigest } from '../ai-redaction-evidence';
@@ -400,4 +402,21 @@ test('native recomposition rejects a foreign token and loses its map on revocati
     assert.equal('recompose' in first.b.reader, false);
     await first.b.owner.revoke();
     assert.throws(() => first.b.owner.recompose(first.token, note));
+});
+
+test('native frame accepts the broker serialized output and pins its executable bytes', async () => {
+    const html = readFileSync(new URL('./native-access.html', import.meta.url), 'utf8');
+    const start = html.indexOf('function checkedCard('), end = html.indexOf('function render(', start);
+    assert.ok(start > 0 && end > start);
+    const check = runInNewContext('(' + html.slice(start, end).trim() + ')') as (payload: string) => Card;
+    const { b, token, consent, review } = await ready();
+    const payload = b.reader.takeApprovedBytes(token, consent);
+    assert.equal(payload, review.payload);
+    assert.equal(JSON.stringify(check(payload)), payload);
+    assert.equal(cardSchema.safeParse(check(payload)).success, true);
+    for (const tag of ['script', 'style']) {
+        const body = html.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`))![1];
+        const hash = createHash('sha256').update(body).digest('base64');
+        assert.ok(html.includes(`${tag}-src 'sha256-${hash}'`), tag);
+    }
 });

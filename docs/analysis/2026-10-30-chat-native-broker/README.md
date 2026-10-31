@@ -99,7 +99,7 @@ Gli hash di report e log sono in `evidenze.csv`; i file completi restano nel
 | C-3b | Ricomposizione privata RAM, token e fonti separati dal bridge | Ciclo completo di lock/refresh/riavvio sui due desktop |
 | C-4 | PIN nativo collegato; test verifier, lockout e doppio biometrico | PIN interattivo finale, Touch ID reale con Leonardo e negativi Mac |
 | C-L | Corpus reale iniziale, protocollo in `carico.md` | Carichi completi e almeno 30 run caldo/freddo per scenario |
-| C-8 | Matrice in `catalogo.csv`, omissioni esplicite | Catalogo I-0 e qualifica funzione/host |
+| C-8 | Censimento iniziale in `catalogo.csv`; [matrice completa del 31 ottobre](../2026-10-31-chat-catalog-fabric/README.md) con 16 capability, 12 celle e 66 anchor | Raccordi mancanti e qualifica funzione/host |
 | C-10a | Matrice in `canali.csv`; incognito Claude osservato | Account/policy/retention e canali non osservabili; D2 per dati reali |
 
 Leonardo deve provare Touch ID vero, rifiuto, lockout biometrico, hardware

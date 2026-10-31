@@ -1,8 +1,18 @@
 <!doctype html>
-<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-3J5qXGa2ifm8N3dTZvVNclHrEjoVycW3m8FNFQVifwM='; style-src 'sha256-nDLYNGJAq2NN356ZfJgk8AcRaxZu6zn5pUDbxnDnGBM='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow: accesso nativo</title>
+<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-txMP8Paor/3sVC0Bm5EQxHZakt/9c+T3bs/6OuazOyE='; style-src 'sha256-nDLYNGJAq2NN356ZfJgk8AcRaxZu6zn5pUDbxnDnGBM='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow: accesso nativo</title>
 <style>html{color-scheme:light dark;font:17px system-ui}body{margin:24px;max-width:40rem}h1{font-size:1.4rem;font-weight:500}button{font:inherit;margin:8px 8px 8px 0;padding:10px 16px}p{line-height:1.5}section{overflow-wrap:anywhere;border-top:1px solid GrayText;margin-top:20px}h2{font-size:1.15rem}li{margin-block:12px;line-height:1.5}</style></head>
 <body><h1>MediFlow</h1><p>Conferma l’accesso nella finestra MediFlow già sbloccata. La scheda sintetica viene redatta localmente e condivisa dopo la tua revisione nella finestra nativa. I nomi restano in MediFlow.</p>
 <p id="status" role="status" aria-live="polite">Collegamento alla chat…</p>
+<details><summary>Funzioni nella chat</summary><table><caption>Ogni azione richiede la verifica dei permessi nella finestra MediFlow.</caption><tbody>
+<tr><th scope="row">Scheda e terapie</th><td>Solo scheda sintetica; lettura della cartella non collegata.</td></tr>
+<tr><th scope="row">Stato terapia</th><td>Selezione, revisione e conferma nella finestra MediFlow.</td></tr>
+<tr><th scope="row">Nuovo paziente da PDF</th><td>Scelta file, revisione dei campi e conferma nella finestra MediFlow.</td></tr>
+<tr><td>Farmaci</td><td>Ricerca non collegata alla chat.</td></tr>
+<tr><td>Protesica</td><td>Consultazione e comandi non collegati alla chat.</td></tr>
+<tr><td>Riassunto</td><td>Patient Insight e Document Synthesis non collegati alla chat.</td></tr>
+<tr><td>Treatment Reasoning</td><td>Non disponibile in questa versione.</td></tr>
+<tr><th scope="row">Altre funzioni e comandi</th><td>Non collegati alla chat. Continua in MediFlow.</td></tr>
+</tbody></table></details>
 <section id="card" hidden aria-label="Scheda sintetica"></section>
 <div id="therapy-controls"><p>Cambio di stato della terapia: selezione e conferma nella finestra MediFlow.</p><button id="therapy-active" disabled>Attiva terapia</button><button id="therapy-suspended" disabled>Sospendi terapia</button><button id="therapy-completed" disabled>Completa terapia</button><p>Per recuperare un esito dopo un riavvio, seleziona la stessa cartella in MediFlow e inserisci il riferimento del comando.</p><input id="command-id" aria-label="Riferimento del comando" maxlength="36"><button id="receipt" disabled>Rileggi esito</button><p id="therapy-receipt"></p></div>
 <p>Per creare un paziente, scegli il PDF nella finestra MediFlow. Gli allegati del compositore restano nella chat: non vengono scaricati né usati per creare la cartella.</p><button id="patient-document" disabled>Nuovo paziente da PDF</button>
@@ -17,7 +27,7 @@
     function stop() { terminal = true; generation++; clearTimeout(timer); for (const id of ['local-voice','patient-document', 'request', 'consume', 'revoke', 'therapy-active', 'therapy-suspended', 'therapy-completed', 'receipt'])
         element(id).disabled = true; }
     function show(state) {
-        if (state === 'withdrawn') { element('card').replaceChildren(); element('card').hidden = true; clearTimeout(expiry); }
+        if (state !== 'consumed' || therapyMode || documentMode) { element('card').replaceChildren(); element('card').hidden = true; clearTimeout(expiry); }
         element('status').textContent = labels[state] || labels.withdrawn;
         element('request').disabled = true;
         element('consume').disabled = state !== 'approved' || therapyMode;
@@ -25,17 +35,55 @@
         element('revoke').textContent = state === 'uncertain' ? 'Rileggi esito e completa il ritiro' : 'Revoca';
         if (['withdrawn','retired','applied','rejected','closed'].includes(state)) stop();
     }
+    function checkedCard(payload) {
+        if (typeof payload !== 'string' || payload.length > 60000) throw new Error('denied');
+        const card = JSON.parse(payload);
+        const exact = (value, keys) => value && typeof value === 'object' && !Array.isArray(value)
+            && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+        const text = value => typeof value === 'string' && value.length > 0 && value.length <= 4096;
+        const plain = value => text(value) && !/MF_PII|\{\{|\}\}/u.test(value);
+        const ref = value => typeof value === 'string' && /^src_[a-f0-9]{32}$/u.test(value);
+        const time = value => ['ultimi_6_mesi', 'attuale'].includes(value);
+        const rows = (values, limit, keys, valid) => Array.isArray(values) && values.length <= limit
+            && values.every(row => exact(row, keys) && ref(row.sourceRef) && valid(row));
+        if (!exact(card, ['profile','pseudonym','history','therapies','measures'])
+            || card.profile !== 'mediflow.synthetic-chat-card.v1' || typeof card.pseudonym !== 'string' || !/^card_[a-f0-9]{32}$/u.test(card.pseudonym)
+            || !rows(card.history, 1, ['condition','note','relativeTime','sourceRef'], row => plain(row.condition) && text(row.note)
+                && plain(row.note.replace(/\{\{MF_PII_[a-f0-9]{32}_[1-9][0-9]{0,3}\}\}/gu, '[redatto]')) && time(row.relativeTime))
+            || !rows(card.therapies, 2, ['medicine','dose','frequency','sourceRef'], row => plain(row.medicine) && plain(row.dose) && plain(row.frequency))
+            || !rows(card.measures, 2, ['kind','value','unit','relativeTime','sourceRef'], row => plain(row.kind) && plain(row.value) && plain(row.unit) && time(row.relativeTime))
+            || JSON.stringify(card) !== payload) throw new Error('denied');
+        return card;
+    }
     function render(card) {
         const target = element('card'); target.replaceChildren();
-        const add = (tag, text) => { const node = document.createElement(tag); node.textContent = text; target.append(node); };
+        const sources = [...new Set([...card.history, ...card.therapies, ...card.measures].map(row => row.sourceRef))];
+        const add = (tag, text) => { const node = document.createElement(tag); node.textContent = text; target.append(node); return node; };
         add('h2', 'Scheda di prova · ' + card.pseudonym);
         for (const [title, rows] of [
-            ['Storia', card.history.map(row => row.condition + ' · ' + row.relativeTime + '\n' + row.note)],
-            ['Terapie', card.therapies.map(row => row.medicine + ' · ' + row.dose + ' · ' + row.frequency)],
-            ['Misure', card.measures.map(row => row.kind + ': ' + row.value + ' ' + row.unit + ' · ' + row.relativeTime)]
-        ]) { add('h2', title); for (const row of rows) add('p', row); if (!rows.length) add('p', 'Nessuna voce nella selezione.'); }
-        add('p', 'Fonte sintetica; nomi e riferimenti originali disponibili soltanto nella finestra MediFlow.');
+            ['Storia', card.history.map(row => ({ text: row.condition + ' · ' + row.relativeTime + '\n' + row.note, source: row.sourceRef }))],
+            ['Terapie', card.therapies.map(row => ({ text: row.medicine + ' · ' + row.dose + ' · ' + row.frequency, source: row.sourceRef }))],
+            ['Misure', card.measures.map(row => ({ text: row.kind + ': ' + row.value + ' ' + row.unit + ' · ' + row.relativeTime, source: row.sourceRef }))]
+        ]) {
+            add('h2', title);
+            for (const row of rows) {
+                const p = add('p', row.text + ' '), source = sources.indexOf(row.source) + 1;
+                const link = document.createElement('a'); link.href = '#source-' + source; link.textContent = 'Fonte ' + source;
+                link.onclick = event => { event.preventDefault(); const node = element('source-' + source); node.focus(); node.scrollIntoView(); };
+                p.append(link);
+            }
+            if (!rows.length) add('p', 'Nessuna voce nella selezione.');
+        }
+        if (sources.length) add('h2', 'Fonti');
+        sources.forEach((ref, index) => {
+            const source = add('p', 'Fonte ' + (index + 1) + ' · Documento sintetico. Originale e nomi disponibili soltanto nella finestra MediFlow.');
+            source.id = 'source-' + (index + 1); source.tabIndex = -1;
+        });
         target.hidden = false;
+    }
+    function rejectCard() {
+        show('withdrawn');
+        rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'revoke' } }).catch(() => {});
     }
     function applyResult(value, command) {
         let state = value?._meta?.status;
@@ -78,9 +126,8 @@
         }
         if (state === 'consumed' && !therapyMode) {
             if (command === 'consume') {
-            if (typeof value?._meta?.payload !== 'string' || value._meta.payload.length > 60000) { show(therapyMode ? 'uncertain' : 'withdrawn'); return; }
-            const card = JSON.parse(value._meta.payload);
-            if (card.profile !== 'mediflow.synthetic-chat-card.v1' || !/^card_[a-f0-9]{32}$/.test(card.pseudonym)) { show(therapyMode ? 'uncertain' : 'withdrawn'); return; }
+            let card;
+            try { card = checkedCard(value?._meta?.payload); } catch { rejectCard(); return; }
             render(card);
             expiry = setTimeout(() => { rpc('tools/call', { name: 'mediflow_native_access', arguments: { command: 'revoke' } }).catch(() => {}); show('withdrawn'); }, 300000);
             } else if (command !== 'status' || element('card').hidden) { show(therapyMode ? 'uncertain' : 'withdrawn'); return; }

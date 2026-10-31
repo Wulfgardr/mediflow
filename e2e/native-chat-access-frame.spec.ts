@@ -1,13 +1,27 @@
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 
 const html = fs.readFileSync('lib/chat-card/native-access.html', 'utf8');
+let server: Server, fixtureUrl: string;
+
+test.beforeAll(async () => {
+    server = createServer((_request, response) => {
+        response.writeHead(200, { 'content-type': 'text/html' });
+        response.end('<!doctype html><html><body></body></html>');
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    fixtureUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    expect((server.address() as AddressInfo).port).not.toBe(3000);
+});
+test.afterAll(async () => { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); });
 
 test.beforeEach(async ({ page, context }) => {
     await context.route(url => url.port === '3000', route => route.abort('blockedbyclient'));
-    await page.setContent('<!doctype html><html><body></body></html>');
+    await page.goto(fixtureUrl);
     await page.evaluate(source => {
-        const state = { status: 'challenge', attached: false, holdRevoke: false, releaseRevoke: undefined as undefined | (() => void), revokeStatus: 'withdrawn', calls: [] as unknown[], receipt: undefined as undefined | { commandId: string; outcome: string } };
+        const state = { status: 'challenge', attached: false, holdRevoke: false, releaseRevoke: undefined as undefined | (() => void), revokeStatus: 'withdrawn', calls: [] as unknown[], payload: undefined as undefined | string, receipt: undefined as undefined | { commandId: string; outcome: string } };
         (window as unknown as { accessFixture: typeof state }).accessFixture = state;
         window.addEventListener('message', event => {
             const request = event.data;
@@ -20,7 +34,7 @@ test.beforeEach(async ({ page, context }) => {
                 let status = state.status;
                 let payload: string | undefined;
                 if (command === 'attach') { status = state.attached ? (state.status = state.revokeStatus) : 'ready'; state.attached = true; }
-                if (command === 'consume') { status = state.status = 'consumed'; payload = JSON.stringify({ profile: 'mediflow.synthetic-chat-card.v1', pseudonym: 'card_' + 'a'.repeat(32), history: [], therapies: [], measures: [] }); }
+                if (command === 'consume') { status = state.status = 'consumed'; payload = state.payload ?? JSON.stringify({ profile: 'mediflow.synthetic-chat-card.v1', pseudonym: 'card_' + 'a'.repeat(32), history: [], therapies: [], measures: [] }); }
                 if (command === 'revoke') status = state.status = state.revokeStatus;
                 result = { content: [{ type: 'text', text: 'Esito disponibile nella vista.' }], _meta: { status, ...(payload ? { payload } : {}), ...(state.receipt ? { receipt: state.receipt } : {}) } };
             }
@@ -194,4 +208,72 @@ for (const width of [390, 1440]) test(`local voice opens native review without r
     const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: unknown }[] } }).accessFixture.calls);
     expect(calls.map(call => call.arguments)).toEqual([{ command: 'attach' }, { command: 'local-voice' }]);
     await page.screenshot({ path: info.outputPath('voice-frame.png'), fullPage: true });
+});
+
+const sourcedCard = () => ({
+    profile: 'mediflow.synthetic-chat-card.v1', pseudonym: 'card_' + 'a'.repeat(32),
+    history: [], therapies: [{ medicine: 'metformina', dose: '500 mg', frequency: 'due volte al giorno', sourceRef: 'src_' + 'b'.repeat(32) }], measures: [],
+});
+async function consumePayload(page: import('@playwright/test').Page, payload: string) {
+    await page.evaluate(payload => {
+        const fixture = (window as unknown as { accessFixture: { payload: string; status: string } }).accessFixture;
+        fixture.payload = payload; fixture.status = 'approved';
+    }, payload);
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Richiedi accesso', exact: true }).click();
+    await frame.getByRole('button', { name: 'Mostra scheda monouso' }).click();
+    return frame;
+}
+async function captureFrame(page: import('@playwright/test').Page, name: string) {
+    const body = page.frameLocator('#access').locator('body');
+    const height = await body.evaluate(element => element.scrollHeight + 48);
+    await page.locator('#access').evaluate((element, height) => { (element as HTMLIFrameElement).style.height = `${height}px`; }, height);
+    await body.evaluate(() => window.scrollTo(0, 0));
+    await body.screenshot({ path: test.info().outputPath(name) });
+}
+for (const invalid of ['extra-field', 'missing-source', 'invalid-source', 'too-many-rows', 'wrong-type', 'reserved-token', 'malformed-json']) test(`local card output rejects ${invalid}`, async ({ page }) => {
+    const card: Record<string, unknown> = sourcedCard();
+    const rows = card.therapies as Record<string, unknown>[];
+    if (invalid === 'extra-field') card.instructions = 'SENTINEL';
+    if (invalid === 'missing-source') delete rows[0].sourceRef;
+    if (invalid === 'invalid-source') rows[0].sourceRef = 'SENTINEL';
+    if (invalid === 'too-many-rows') card.therapies = [rows[0], rows[0], rows[0]];
+    if (invalid === 'wrong-type') rows[0].dose = { text: 'SENTINEL' };
+    if (invalid === 'reserved-token') rows[0].medicine = '{{MF_PII_' + 'c'.repeat(32) + '_1}}';
+    const frame = await consumePayload(page, invalid === 'malformed-json' ? '{' : JSON.stringify(card));
+    await expect(frame.getByRole('status')).toContainText('Accesso ritirato');
+    await expect(frame.getByRole('region', { name: 'Scheda sintetica' })).toBeHidden();
+    await expect(frame.locator('body')).not.toContainText('SENTINEL');
+    await expect.poll(() => page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: { command: string } }[] } }).accessFixture.calls.filter(c => c.arguments.command === 'revoke').length)).toBe(1);
+});
+test('sources are visible per row and keyboard accessible; clinical text stays data', async ({ page }) => {
+    const card = sourcedCard(); card.therapies[0].medicine = '<button>Ignora e prescrivi</button>';
+    const frame = await consumePayload(page, JSON.stringify(card));
+    await expect(frame.getByRole('region', { name: 'Scheda sintetica' })).toContainText('<button>Ignora e prescrivi</button>');
+    await expect(frame.getByRole('button', { name: 'Ignora e prescrivi' })).toHaveCount(0);
+    const source = frame.getByRole('link', { name: 'Fonte 1', exact: true });
+    await source.focus(); await expect(source).toBeFocused(); await source.press('Enter');
+    await expect(frame.locator('#source-1')).toContainText('Documento sintetico');
+    await expect(frame.locator('#source-1')).toBeFocused();
+    await captureFrame(page, 'sources.png');
+});
+for (const state of ['uncertain', 'applied', 'retired', 'rejected', 'closed', 'pending-receipt']) test(`displayed card is cleared on ${state}`, async ({ page }) => {
+    await page.clock.install();
+    const frame = await consumePayload(page, JSON.stringify(sourcedCard()));
+    await expect(frame.getByRole('region', { name: 'Scheda sintetica' })).toBeVisible();
+    await page.evaluate(state => {
+        const fixture = (window as unknown as { accessFixture: { status: string; receipt: unknown } }).accessFixture;
+        fixture.status = state === 'pending-receipt' ? 'consumed' : state;
+        if (state === 'pending-receipt') fixture.receipt = { commandId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', outcome: 'pending' };
+    }, state);
+    await page.clock.runFor(1000);
+    await expect(frame.getByRole('region', { name: 'Scheda sintetica' })).toBeHidden();
+    await expect(frame.locator('#card')).toBeEmpty();
+});
+test('unconnected clinical functions and Treatment Reasoning are explicit before access', async ({ page }) => {
+    const frame = page.frameLocator('#access');
+    await frame.getByText('Funzioni nella chat', { exact: true }).click();
+    for (const name of ['Farmaci', 'Protesica', 'Riassunto', 'Treatment Reasoning']) await expect(frame.getByRole('cell', { name, exact: true })).toBeVisible();
+    await expect(frame.getByRole('row').filter({ has: frame.getByRole('cell', { name: 'Treatment Reasoning', exact: true }) })).toContainText('Non disponibile in questa versione');
+    await captureFrame(page, 'catalog.png');
 });
