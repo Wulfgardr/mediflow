@@ -1606,6 +1606,12 @@ public actor HomeBasePatientsClient {
                     throw HomeBaseClientError.httpStatus(httpResponse.statusCode,
                         failure?.publicMessage ?? AuthHealthFailure.unavailableMessage)
                 }
+                if url.path.hasPrefix("/api/v1/network/ai/"),
+                   let payload = try? JSONDecoder().decode(APIErrorPayload.self, from: data),
+                   payload.code == NativeOrdinaryFailureCode.treatmentReasoningUnavailableInRelease.rawValue,
+                   !url.path.hasPrefix("/api/v1/network/ai/fabric/") {
+                    throw NativeOrdinaryServerFailure(status: httpResponse.statusCode, code: .treatmentReasoningUnavailableInRelease)
+                }
                 if url.path.hasPrefix("/api/v1/network/ai/fabric/") {
                     let code = (try? JSONDecoder().decode(APIErrorPayload.self, from: data))?.code
                     throw NativeFabricFailure(status: httpResponse.statusCode, code: NativeFabricFailure.Code(rawValue: code ?? "") ?? .unavailable)

@@ -46,6 +46,7 @@ final class NativeAIConfigurationModel: ObservableObject {
         }
     }
     func prepare(_ command: NativeAIFunctionCommand) {
+        guard !command.affectsUnavailableFunction else { message = NativeOrdinaryFailureCode.treatmentReasoningUnavailableInRelease.safeReason; return }
         guard snapshotIdentity == connectionProvider()?.identity else { invalidate(); return }
         guard !isWorking, let snapshot, command.expectedRevision == snapshot.revision,
               command.expectedCatalogRevision == snapshot.catalogRevision else { return }
@@ -88,7 +89,8 @@ final class NativeAIConfigurationModel: ObservableObject {
             } catch {
                 guard !Task.isCancelled, self.generation == expected, self.connectionProvider()?.identity == connection.identity else { return }
                 self.snapshot = nil; self.preview = nil; self.snapshotIdentity = nil
-                if case HomeBaseClientError.httpStatus(let status, _) = error {
+                if let failure = error as? NativeOrdinaryServerFailure { self.message = failure.code.safeReason }
+                else if case HomeBaseClientError.httpStatus(let status, _) = error {
                     switch status {
                     case 401: self.message = "Sessione o pairing non più validi. Accedi nuovamente."
                     case 403: self.message = "L’amministratore deve autorizzare questo operatore e questo Mac sul computer host."
@@ -121,18 +123,12 @@ struct NativeAIConfigurationView: View {
                     NativeAIFunctionEditor(function: function, snapshot: snapshot, isWorking: model.isWorking || model.preview != nil, prepare: model.prepare)
                         .id(function.id + snapshot.revision + snapshot.catalogRevision)
                 }
-                HStack {
-                    Button("Anteprima valori host") { model.prepare(NativeAIFunctionCommand(snapshot: snapshot, presetId: "host_defaults")) }
-                    Button("Anteprima tutte disattivate") { model.prepare(NativeAIFunctionCommand(snapshot: snapshot, presetId: "all_off")) }
-                }.disabled(model.isWorking || model.preview != nil)
-                Text("Valori host ripristina i modelli mantenendo gli interruttori attuali. Tutte disattivate spegne le quattro funzioni.")
-                    .font(.caption).foregroundStyle(.secondary)
             }
             if let preview = model.preview {
                 GroupBox("Conferma configurazione dell’host") {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(preview.proposed.functions) { function in
-                            Text("\(function.title): \(function.enabled ? "attiva" : "disattivata") · \(function.options.first(where: { $0.id == function.defaultModelOptionId })?.label ?? "modello non disponibile")")
+                            Text(function.id == "treatment_reasoning" ? "\(function.title): Non disponibile in questa versione" : "\(function.title): \(function.enabled ? "attiva" : "disattivata") · \(function.options.first(where: { $0.id == function.defaultModelOptionId })?.label ?? "modello non disponibile")")
                         }
                         HStack {
                             Button("Conferma e salva sull’host") { model.confirm() }
@@ -172,22 +168,28 @@ private struct NativeAIFunctionEditor: View {
     var body: some View {
         GroupBox(function.title) {
             VStack(alignment: .leading, spacing: 8) {
-                Toggle("Funzione attiva", isOn: $enabled)
-                    .accessibilityLabel(function.title + ": funzione attiva")
-                Picker("Modello preferito", selection: $option) {
-                    Text("Valore configurato sull’host").tag("")
-                    ForEach(function.options) { value in
-                        Text("\(value.label)\(value.state == "unavailable" ? " — non disponibile" : "")").tag(value.id)
+                if function.id == "treatment_reasoning" {
+                    Text(NativeOrdinaryFailureCode.treatmentReasoningUnavailableInRelease.safeReason)
+                    Text("Valore salvato: \(function.enabled ? "attiva" : "disattivata")").font(.caption)
+                    Text("Modello salvato: " + (function.options.first { $0.id == function.defaultModelOptionId }?.label ?? function.defaultModelOptionId ?? "Valore host")).font(.caption)
+                } else {
+                    Toggle("Funzione attiva", isOn: $enabled)
+                        .accessibilityLabel(function.title + ": funzione attiva")
+                    Picker("Modello preferito", selection: $option) {
+                        Text("Valore configurato sull’host").tag("")
+                        ForEach(function.options) { value in
+                            Text("\(value.label)\(value.state == "unavailable" ? " · non disponibile" : "")").tag(value.id)
+                        }
                     }
+                    .pickerStyle(.menu)
+                    .accessibilityLabel("Modello preferito per " + function.title)
+                    if function.bindingState != "current" {
+                        Text("Associazione da verificare sull’host.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Button("Prepara modifica") {
+                        prepare(NativeAIFunctionCommand(snapshot: snapshot, functionId: function.id, enabled: enabled, defaultModelOptionId: option.isEmpty ? nil : option))
+                    }.accessibilityLabel("Prepara modifica: " + function.title)
                 }
-                .pickerStyle(.menu)
-                .accessibilityLabel("Modello preferito per " + function.title)
-                if function.bindingState != "current" {
-                    Text("Associazione da verificare sull’host.").font(.caption).foregroundStyle(.secondary)
-                }
-                Button("Prepara modifica") {
-                    prepare(NativeAIFunctionCommand(snapshot: snapshot, functionId: function.id, enabled: enabled, defaultModelOptionId: option.isEmpty ? nil : option))
-                }.accessibilityLabel("Prepara modifica: " + function.title)
             }.disabled(isWorking)
         }
         .buttonStyle(.bordered)

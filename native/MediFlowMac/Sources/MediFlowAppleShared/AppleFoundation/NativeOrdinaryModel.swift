@@ -78,8 +78,9 @@ final class NativeOrdinaryModel: ObservableObject {
               let fresh = try? snapshot() else { return false }
         return source.matches(fresh)
     }
-    var canPrepare: Bool { !isWorking && !preparationInFlight && (phase == .idle || phase == .completed) }
+    var canPrepare: Bool { function.isAvailableInRelease && !isWorking && !preparationInFlight && (phase == .idle || phase == .completed) }
     func prepare() {
+        guard function.isAvailableInRelease else { message = NativeOrdinaryFailureCode.treatmentReasoningUnavailableInRelease.safeReason; return }
         guard canPrepare else { return }
         do {
             let source = try snapshot().retained; generation &+= 1; let epoch = generation

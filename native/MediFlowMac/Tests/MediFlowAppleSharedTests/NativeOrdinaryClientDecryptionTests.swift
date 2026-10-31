@@ -99,6 +99,21 @@ final class NativeOrdinaryClientDecryptionTests: XCTestCase {
         let client = HomeBasePatientsClient(configuration:HomeBaseConnectionConfiguration(serverURLString:"https://localhost:3443"),session:session)
         let creds = HomeBasePairedCredentials(clientId:"synthetic-client",clientToken:"synthetic-token")
         let cookie = try XCTUnwrap(initial["cookie"] as? String), preparation = F.preparation(function)
+        if function == .treatmentReasoning {
+            do {
+                _ = try await client.prepareNativeOrdinary(preparation, credentials: creds, sessionCookie: cookie)
+                XCTFail("Release must deny Treatment Reasoning before source acquisition")
+            } catch let failure as NativeOrdinaryServerFailure {
+                XCTAssertEqual(failure.status, 403)
+                XCTAssertEqual(failure.code, .treatmentReasoningUnavailableInRelease)
+                XCTAssertEqual(failure.code.safeReason, "Non disponibile in questa versione")
+            }
+            let stats = try bridge.call(["action": "stats"])
+            for counter in ["reads", "projects", "admission", "provider", "clinicalWrites"] {
+                XCTAssertEqual(stats[counter] as? Int, 0, counter)
+            }
+            return
+        }
         let response = try await client.prepareNativeOrdinary(preparation,credentials:creds,sessionCookie:cookie)
         try response.validate(function:function);let plan = try XCTUnwrap(response.sourceProjection)
         if tamper { _ = try bridge.call(["action":"mutate"]) }
@@ -121,7 +136,7 @@ final class NativeOrdinaryClientDecryptionTests: XCTestCase {
     }
     func testRealSwiftCiphertextHTTPAndCanonicalPI() async throws { try await flow(.patientInsight) }
     func testRealSwiftCiphertextHTTPAndCanonicalSI() async throws { try await flow(.smartImport) }
-    func testRealSwiftCiphertextHTTPAndCanonicalTR() async throws { try await flow(.treatmentReasoning) }
+    func testRealHTTPDeniesTreatmentReasoningBeforeDecryption() async throws { try await flow(.treatmentReasoning) }
     func testWrongKeyNeverProjectsPartialText() async throws { try await flow(.patientInsight,wrongKey:true) }
     func testLockedClientNeverProjects() async throws { try await flow(.patientInsight,locked:true) }
     func testTamperedEnvelopeNeverProjects() async throws { try await flow(.patientInsight,tamper:true) }
