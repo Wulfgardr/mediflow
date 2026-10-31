@@ -3646,7 +3646,7 @@ mod tests {
             let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
             let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
             let server = thread::spawn(move || {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 assert!(read_request(&mut stream).starts_with("GET /api/v1/network/capabilities "));
                 send_reply(
                     &mut stream,
@@ -3668,7 +3668,7 @@ mod tests {
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
         let server = thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             assert!(read_request(&mut stream).starts_with("GET /api/v1/network/capabilities "));
             send_reply(
                 &mut stream,
@@ -3699,7 +3699,7 @@ mod tests {
             let (release_tx, release_rx) = mpsc::channel();
             let (closed_tx, closed_rx) = mpsc::channel();
             let server = thread::spawn(move || {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 read_request(&mut stream);
                 if body_started {
                     stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 10000\r\nConnection: close\r\n\r\n{").unwrap();
@@ -3745,7 +3745,7 @@ mod tests {
             let (seen_tx, seen_rx) = mpsc::channel();
             let (release_tx, release_rx) = mpsc::channel();
             let server = thread::spawn(move || {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
                 assert!(request.starts_with(if mutation {
                     "PUT /api/auth/profile "
@@ -3755,12 +3755,12 @@ mod tests {
                 seen_tx.send(()).unwrap();
                 release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
                 drop(stream);
-                let (mut fresh, _) = listener.accept().unwrap();
+                let (mut fresh, _) = crate::test_loopback::accept(&listener).unwrap();
                 assert!(read_request(&mut fresh).starts_with("GET /api/v1/network/ai-runtime "));
                 send_reply(&mut fresh, &ai_status_wire().to_string());
                 listener.set_nonblocking(true).unwrap();
                 assert!(
-                    listener.accept().is_err(),
+                    crate::test_loopback::accept(&listener).is_err(),
                     "cancellation must never retry a mutation"
                 );
             });
@@ -3809,10 +3809,10 @@ mod tests {
         let (seen_tx, seen_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
         let server = thread::spawn(move || {
-            let (mut pending, _) = listener.accept().unwrap();
+            let (mut pending, _) = crate::test_loopback::accept(&listener).unwrap();
             read_request(&mut pending);
             seen_tx.send(()).unwrap();
-            let (mut replaced, _) = listener.accept().unwrap();
+            let (mut replaced, _) = crate::test_loopback::accept(&listener).unwrap();
             read_request(&mut replaced);
             let body = r#"{"code":"ARCHIVE_REPLACED"}"#;
             write!(
@@ -3888,7 +3888,7 @@ mod tests {
                 .into_iter()
                 .enumerate()
                 {
-                    let (mut stream, _) = listener.accept().unwrap();
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                     let request = read_request(&mut stream);
                     assert!(request.starts_with(expected));
                     for header in [
@@ -3981,7 +3981,7 @@ mod tests {
             .unwrap();
             let preview = parse_preferences_preview(preview_wire(&command), &command).unwrap();
             let server = thread::spawn(move || {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 assert!(
                     read_request(&mut stream).starts_with("POST /api/v1/network/ai/functions ")
                 );
@@ -4001,7 +4001,7 @@ mod tests {
             let listener = server.join().unwrap();
             listener.set_nonblocking(true).unwrap();
             assert!(
-                matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
+                matches!(crate::test_loopback::accept(&listener), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
             );
         }
     }
@@ -4052,7 +4052,7 @@ mod tests {
             Err(RuntimeError::Locked)
         ));
         assert!(
-            matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
+            matches!(crate::test_loopback::accept(&listener), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
         );
     }
 
@@ -4094,7 +4094,7 @@ mod tests {
         let url = format!("http://{}", listener.local_addr().unwrap());
         let (seen_tx, seen_rx) = mpsc::channel();
         let worker = thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             let request = read_request(&mut stream);
             let body = body.to_string();
             write!(
@@ -4120,7 +4120,7 @@ mod tests {
                 let (release_tx, release_rx) = mpsc::channel();
                 let (closed_tx, closed_rx) = mpsc::channel();
                 let server = thread::spawn(move || {
-                    let (mut pending, _) = listener.accept().unwrap();
+                    let (mut pending, _) = crate::test_loopback::accept(&listener).unwrap();
                     let request = read_request(&mut pending);
                     assert!(request.starts_with(if mutation {
                         "PUT /api/auth/profile "
@@ -4195,7 +4195,7 @@ mod tests {
         let read_body = account_profile_read_wire();
         let server = thread::spawn(move || {
             for (index, response) in [read_body, expected_body].into_iter().enumerate() {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
                 seen_tx.send((index, request)).unwrap();
                 let body = response.to_string();
@@ -4270,7 +4270,7 @@ mod tests {
         let listener = server.join().unwrap();
         listener.set_nonblocking(true).unwrap();
         assert!(
-            matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock),
+            matches!(crate::test_loopback::accept(&listener), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock),
             "a conflict must never trigger an automatic retry"
         );
 
@@ -4284,7 +4284,7 @@ mod tests {
         let listener = server.join().unwrap();
         listener.set_nonblocking(true).unwrap();
         assert!(
-            matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
+            matches!(crate::test_loopback::accept(&listener), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
         );
 
         let (url, _, server) = profile_server(400, json!({"error":"Payload non valido"}));
@@ -4350,7 +4350,7 @@ mod tests {
         let listener = server.join().unwrap();
         listener.set_nonblocking(true).unwrap();
         assert!(
-            matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock),
+            matches!(crate::test_loopback::accept(&listener), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock),
             "a foreign-archive confirmation must not be retried"
         );
 
@@ -4388,7 +4388,7 @@ mod tests {
             let (seen_tx, seen_rx) = mpsc::channel();
             let (release_tx, release_rx) = mpsc::channel();
             let server = thread::spawn(move || {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 assert!(
                     read_request(&mut stream).starts_with("POST /api/v1/network/ai/functions ")
                 );
@@ -4415,7 +4415,7 @@ mod tests {
             let listener = server.join().unwrap();
             listener.set_nonblocking(true).unwrap();
             assert!(
-                matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
+                matches!(crate::test_loopback::accept(&listener), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
             );
         }
     }
@@ -4485,7 +4485,7 @@ mod tests {
             let (seen_tx, seen_rx) = mpsc::channel();
             let (release_tx, release_rx) = mpsc::channel();
             let server = thread::spawn(move || {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
                 assert!(request.starts_with("GET /api/v1/network/ai-runtime "));
                 assert!(request.contains("\r\nx-mediflow-paired-client-id: synthetic-device\r\n"));
@@ -4860,7 +4860,7 @@ mod tests {
         let worker = thread::spawn(move || {
             // The first ordinary request verifies the explicit scope against
             // the real identity response shape, before the gated request.
-            let (mut identity, _) = listener.accept().unwrap();
+            let (mut identity, _) = crate::test_loopback::accept(&listener).unwrap();
             let first = read_request(&mut identity);
             assert!(first.starts_with("GET /api/v1/network/identity "));
             assert!(first.contains("\r\nx-mediflow-expected-ambulatory-id: scope-a\r\n"));
@@ -4869,7 +4869,7 @@ mod tests {
                 r#"{"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}}"#,
             );
             drop(identity);
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             let request = read_request(&mut stream);
             assert!(request.contains("\r\nx-mediflow-expected-ambulatory-id: scope-a\r\n"));
             seen_tx.send(request).unwrap();
@@ -4885,7 +4885,7 @@ mod tests {
         let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
         assert_ne!(listener.local_addr().unwrap().port(), 3000);
         let mut client = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
-        let (mut server, _) = listener.accept().unwrap();
+        let (mut server, _) = crate::test_loopback::accept(&listener).unwrap();
         server.set_nonblocking(true).unwrap();
         let worker = std::thread::spawn(move || read_request(&mut server));
         std::thread::sleep(Duration::from_millis(50));
@@ -5065,13 +5065,13 @@ mod tests {
             let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
             admit_fixture_read(&session);
             let server = thread::spawn(move || {
-                let (mut identity, _) = listener.accept().unwrap();
+                let (mut identity, _) = crate::test_loopback::accept(&listener).unwrap();
                 assert!(read_request(&mut identity).starts_with("GET /api/v1/network/identity "));
                 send_reply(
                     &mut identity,
                     r#"{"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}}"#,
                 );
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
                 assert!(
                     request
@@ -5680,7 +5680,7 @@ mod tests {
         let worker = thread::spawn(move || {
             let mut index = 0;
             while index < steps.len() {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
                 assert!(request.contains("\r\nx-mediflow-expected-ambulatory-id: scope-a\r\n"));
                 assert!(
@@ -5758,7 +5758,7 @@ mod tests {
             let mut index = 0;
             let mut entry_body = Value::Null;
             while index < steps.len() {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
                 assert!(request.contains("\r\nx-mediflow-expected-ambulatory-id: scope-a\r\n"));
                 assert!(
@@ -6474,7 +6474,7 @@ mod tests {
             .into_iter()
             .enumerate()
             {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
                 assert!(request.starts_with(prefix));
                 if index == 2 {
@@ -6758,7 +6758,7 @@ mod tests {
                 .unwrap()
                 .deadline = deadline;
             let server = thread::spawn(move || {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 assert!(read_request(&mut stream).starts_with("GET /api/v1/network/identity "));
                 thread::sleep(
                     deadline.saturating_duration_since(Instant::now()) + Duration::from_millis(10),
@@ -6770,7 +6770,7 @@ mod tests {
                 listener.set_nonblocking(true).unwrap();
                 let until = Instant::now() + Duration::from_millis(150);
                 loop {
-                    match listener.accept() {
+                    match crate::test_loopback::accept(&listener) {
                         Ok((mut stream, _)) => {
                             let request = read_request(&mut stream);
                             send_reply(&mut stream, r#"{"success":true}"#);
@@ -6816,7 +6816,7 @@ mod tests {
         let (seen_tx, seen_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
         let server = thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             assert!(read_request(&mut stream).starts_with("GET /api/v1/network/identity "));
             seen_tx.send(()).unwrap();
             release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -6867,7 +6867,7 @@ mod tests {
         let (seen_tx, seen_rx) = mpsc::channel();
         let body = body.to_owned();
         let worker = thread::spawn(move || {
-            let (mut identity, _) = listener.accept().unwrap();
+            let (mut identity, _) = crate::test_loopback::accept(&listener).unwrap();
             let request = read_request(&mut identity);
             assert!(request.starts_with("GET /api/v1/network/identity "));
             assert!(request.contains("\r\nx-mediflow-expected-ambulatory-id: scope-a\r\n"));
@@ -6876,7 +6876,7 @@ mod tests {
                 r#"{"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}}"#,
             );
             drop(identity);
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             let request = read_request(&mut stream);
             seen_tx.send(request).unwrap();
             write!(
@@ -7077,13 +7077,13 @@ mod tests {
                 .unwrap()
                 .insert(crate::AMBULATORY_WRITE_CAPABILITY.into());
             let worker = thread::spawn(move || {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 assert!(read_request(&mut stream).starts_with("GET /api/v1/network/ambulatories "));
                 send_reply(
                     &mut stream,
                     r#"[{"id":"scope-a","name":"Prima","version":1,"isDefault":true}]"#,
                 );
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let identity = read_request(&mut stream);
                 assert!(identity.starts_with("GET /api/v1/network/identity "));
                 assert!(identity.contains("x-mediflow-expected-ambulatory-id: scope-a"));
@@ -7091,7 +7091,7 @@ mod tests {
                     &mut stream,
                     r#"{"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}}"#,
                 );
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
                 assert!(request.starts_with("PUT /api/v1/network/ambulatories/scope-a "));
                 assert!(request.contains("x-mediflow-expected-ambulatory-id: scope-a"));
@@ -7133,7 +7133,7 @@ mod tests {
             let listener = worker.join().unwrap();
             listener.set_nonblocking(true).unwrap();
             assert!(
-                listener.accept().is_err(),
+                crate::test_loopback::accept(&listener).is_err(),
                 "write retried without a new read"
             );
         }
@@ -7157,19 +7157,19 @@ mod tests {
             Err(RuntimeError::Forbidden)
         );
         let worker = thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             read_request(&mut stream);
             send_reply(
                 &mut stream,
                 r#"[{"id":"scope-a","name":"Prima","version":1,"isDefault":true}]"#,
             );
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             assert!(read_request(&mut stream).starts_with("GET /api/v1/network/identity "));
             send_reply(
                 &mut stream,
                 r#"{"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}}"#,
             );
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             let request = read_request(&mut stream);
             assert!(request.starts_with("POST /api/v1/network/ambulatories "));
             assert!(!request.contains("/clear"));
@@ -7276,7 +7276,7 @@ mod tests {
         response: &str,
     ) {
         for step in 0..3 {
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(listener).unwrap();
             let request = read_request(&mut stream);
             let lower = request.to_ascii_lowercase();
             assert!(!lower.contains("x-mediflow-paired-client"));
@@ -7340,11 +7340,11 @@ mod tests {
         let expected = artifact.clone();
         let worker = thread::spawn(move || {
             local_host_login(&listener);
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             assert!(read_request(&mut stream).starts_with("GET /api/system/backup-restore "));
             local_host_reply(&mut stream, 200, expected.clone(), "");
             for phase in 0..3 {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
                 let body: Value =
                     serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
@@ -7425,7 +7425,7 @@ mod tests {
         ));
         let listener = worker.join().unwrap();
         listener.set_nonblocking(true).unwrap();
-        assert!(listener.accept().is_err());
+        assert!(crate::test_loopback::accept(&listener).is_err());
     }
 
     #[test]
@@ -7437,7 +7437,7 @@ mod tests {
             let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
             let worker = thread::spawn(move || {
                 local_host_login(&listener);
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 assert!(
                     read_request(&mut stream)
                         .starts_with("POST /api/system/backup-restore/verify ")
@@ -7449,7 +7449,7 @@ mod tests {
                     "",
                 );
                 if status != 0 {
-                    let (mut stream, _) = listener.accept().unwrap();
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                     let request = read_request(&mut stream);
                     assert!(request.starts_with("POST /api/system/backup-restore "));
                     let lower = request.to_ascii_lowercase();
@@ -7510,7 +7510,7 @@ mod tests {
             let listener = worker.join().unwrap();
             listener.set_nonblocking(true).unwrap();
             assert!(
-                listener.accept().is_err(),
+                crate::test_loopback::accept(&listener).is_err(),
                 "cancel and consumed restore cannot send a request"
             );
         }
@@ -7522,7 +7522,7 @@ mod tests {
         let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
         let worker = thread::spawn(move || {
             local_host_login(&listener);
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             assert!(
                 read_request(&mut stream).starts_with("POST /api/system/backup-restore/verify ")
             );
@@ -7559,7 +7559,7 @@ mod tests {
         );
         let listener = worker.join().unwrap();
         listener.set_nonblocking(true).unwrap();
-        assert!(listener.accept().is_err());
+        assert!(crate::test_loopback::accept(&listener).is_err());
     }
     #[test]
     fn local_host_archive_receipt_must_be_reread_from_the_same_origin_and_current_generation() {
@@ -7578,7 +7578,7 @@ mod tests {
                 local_host_login(&listener);
                 listener.set_nonblocking(true).unwrap();
                 let mut stream = loop {
-                    if let Ok((stream, _)) = listener.accept() {
+                    if let Ok((stream, _)) = crate::test_loopback::accept(&listener) {
                         break stream;
                     }
                     assert!(
@@ -7640,7 +7640,7 @@ mod tests {
                 let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
                 let worker = thread::spawn(move || {
                     local_host_login_as(&listener, id, role, generation);
-                    let (mut stream, _) = listener.accept().unwrap();
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                     assert!(read_request(&mut stream).starts_with("GET /api/auth/check "));
                     local_host_reply(
                         &mut stream,
@@ -7648,7 +7648,7 @@ mod tests {
                         json!({"status":"ok","hasSession":true}),
                         &format!("ETag: \"{}\"\r\n", "f".repeat(64)),
                     );
-                    let (mut stream, _) = listener.accept().unwrap();
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                     let request = read_request(&mut stream);
                     assert!(request.starts_with("POST /api/auth/local-client/logout "));
                     assert!(request.contains(&format!("mediflow_session={}", "b".repeat(64))));
@@ -7665,7 +7665,7 @@ mod tests {
                         );
                     }
                     listener.set_nonblocking(true).unwrap();
-                    assert!(listener.accept().is_err());
+                    assert!(crate::test_loopback::accept(&listener).is_err());
                 });
                 let result = session
                     .authenticate_local_host("Local host synthetic passphrase", notice.clone());
@@ -7705,7 +7705,7 @@ mod tests {
                 if response == "lost" {
                     return;
                 }
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 assert!(read_request(&mut stream).starts_with("GET /api/auth/check "));
                 local_host_reply(
                     &mut stream,
@@ -7713,7 +7713,7 @@ mod tests {
                     json!({"status":"ok","hasSession":true}),
                     &format!("ETag: \"{}\"\r\n", "f".repeat(64)),
                 );
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
                 assert!(request.starts_with("POST /api/auth/local-client/logout "));
                 assert!(request.contains(&format!("mediflow_session={}", "b".repeat(64))));
@@ -7764,13 +7764,13 @@ mod tests {
             let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
             let worker = thread::spawn(move || {
                 local_host_login(&listener);
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
                 assert!(request.starts_with("GET /api/attachments/file-a "));
                 assert!(request.contains(&format!("mediflow_session={}", "b".repeat(64))));
                 assert!(!request.contains("x-mediflow-paired"));
                 local_host_reply(&mut stream, 200, local_host_document(), "");
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
                 assert!(request.starts_with("DELETE /api/attachments/file-a "));
                 let body: Value =
@@ -7781,7 +7781,7 @@ mod tests {
                 );
                 local_host_reply(&mut stream, mutation, json!({"success":mutation==200}), "");
                 if mutation == 200 {
-                    let (mut stream, _) = listener.accept().unwrap();
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                     assert!(read_request(&mut stream).starts_with("GET /api/attachments/file-a "));
                     local_host_reply(
                         &mut stream,
@@ -7795,7 +7795,10 @@ mod tests {
                     );
                 }
                 listener.set_nonblocking(true).unwrap();
-                assert!(listener.accept().is_err(), "one destructive dispatch only");
+                assert!(
+                    crate::test_loopback::accept(&listener).is_err(),
+                    "one destructive dispatch only"
+                );
             });
             let access = session
                 .authenticate_local_host(
@@ -7830,11 +7833,11 @@ mod tests {
             let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
             let worker = thread::spawn(move || {
                 local_host_login(&listener);
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 assert!(read_request(&mut stream).starts_with("GET /api/attachments/file-a "));
                 local_host_reply(&mut stream, status, local_host_document(), "");
                 listener.set_nonblocking(true).unwrap();
-                assert!(listener.accept().is_err());
+                assert!(crate::test_loopback::accept(&listener).is_err());
             });
             let access = session
                 .authenticate_local_host(
@@ -7874,7 +7877,7 @@ mod tests {
         let listener = worker.join().unwrap();
         listener.set_nonblocking(true).unwrap();
         assert!(
-            listener.accept().is_err(),
+            crate::test_loopback::accept(&listener).is_err(),
             "denied switch cannot read or write settings"
         );
     }
@@ -7887,7 +7890,7 @@ mod tests {
         let worker = thread::spawn(move || {
             local_host_login(&listener);
             for value in ["disabled", "enabled"] {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 assert!(
                     read_request(&mut stream)
                         .starts_with("GET /api/settings/aiPatientInsightKillSwitch ")
@@ -7901,7 +7904,7 @@ mod tests {
             }
             listener.set_nonblocking(true).unwrap();
             assert!(
-                listener.accept().is_err(),
+                crate::test_loopback::accept(&listener).is_err(),
                 "changed read precondition cannot PUT"
             );
         });
@@ -7929,12 +7932,12 @@ mod tests {
         let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
         let worker = thread::spawn(move || {
             local_host_login(&listener);
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             let request = read_request(&mut stream);
             assert!(request.starts_with("GET /api/attachments/file-a "));
             local_host_reply(&mut stream, 200, local_host_document(), "");
             listener.set_nonblocking(true).unwrap();
-            assert!(listener.accept().is_err());
+            assert!(crate::test_loopback::accept(&listener).is_err());
         });
         let access = session
             .authenticate_local_host(
@@ -7959,7 +7962,7 @@ mod tests {
             let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
             let worker = thread::spawn(move || {
                 local_host_login(&listener);
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
                 assert!(request.starts_with("GET /api/auth/check "));
                 assert!(request.contains(&format!("mediflow_session={}", "b".repeat(64))));
@@ -7969,7 +7972,7 @@ mod tests {
                     json!({"status":"ok","hasSession":true}),
                     &format!("ETag: \"{}\"\r\n", "f".repeat(64)),
                 );
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
                 assert!(request.starts_with("POST /api/auth/local-client/logout "));
                 assert!(!request.starts_with("POST /api/auth/logout "));
@@ -8086,7 +8089,7 @@ mod g2_settings_tests {
         (listener, session)
     }
     fn check(listener: &TcpListener) {
-        let (mut stream, _) = listener.accept().unwrap();
+        let (mut stream, _) = crate::test_loopback::accept(listener).unwrap();
         assert!(read_request(&mut stream).starts_with("GET /api/auth/check "));
         local_host_reply(
             &mut stream,
@@ -8112,7 +8115,7 @@ mod g2_settings_tests {
             let worker = thread::spawn(move || {
                 local_host_login(&listener);
                 check(&listener);
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
                 assert!(request.starts_with("POST /api/auth/passphrase/change "));
                 assert!(!request.contains("Local host synthetic passphrase"));
@@ -8126,7 +8129,7 @@ mod g2_settings_tests {
                 }
                 drop(stream);
                 if status == 200 {
-                    let (mut stream, _) = listener.accept().unwrap();
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                     assert!(read_request(&mut stream).starts_with("GET /api/auth/check "));
                     let mut checked = json!({"status":"ok","isSetup":true,"archiveGeneration":"synthetic-generation","unlock":{"credential":"passphrase","kdfVersion":3,"salt":body["salt"]}});
                     match readback {
@@ -8224,7 +8227,7 @@ mod g2_settings_tests {
             ("ollamaUrl", "http://127.0.0.1:11434/v1"),
             ("aiModelDefaultVersion", "qwen35-default-v1"),
         ] {
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(listener).unwrap();
             assert!(read_request(&mut stream).starts_with(&format!("GET /api/settings/{key} ")));
             local_host_reply(&mut stream, 200, json!({"key":key,"value":value}), "");
         }
@@ -8235,7 +8238,7 @@ mod g2_settings_tests {
         let worker = thread::spawn(move || {
             local_host_login(&listener);
             serve_config(&listener, false);
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             let request = read_request(&mut stream);
             assert!(request.starts_with("GET /api/ai/models "));
             assert!(request.contains("x-target-url: http://127.0.0.1:11434/v1"));
@@ -8298,7 +8301,7 @@ mod g2_settings_tests {
                 .into_iter()
                 .enumerate()
                 {
-                    let (mut stream, _) = listener.accept().unwrap();
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                     let request = read_request(&mut stream);
                     assert!(request.starts_with(&format!("PUT /api/settings/{key} ")));
                     let body: Value =
@@ -8328,7 +8331,7 @@ mod g2_settings_tests {
                         ("ollamaUrl", "http://127.0.0.1:11434/v1"),
                         ("aiModelDefaultVersion", "qwen35-default-v1"),
                     ] {
-                        let (mut stream, _) = listener.accept().unwrap();
+                        let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                         assert!(
                             read_request(&mut stream)
                                 .starts_with(&format!("GET /api/settings/{key} "))
@@ -8382,7 +8385,7 @@ mod g2_settings_tests {
         status: u16,
         value: serde_json::Value,
     ) -> String {
-        let (mut stream, _) = listener.accept().unwrap();
+        let (mut stream, _) = crate::test_loopback::accept(listener).unwrap();
         let request = read_request(&mut stream);
         assert!(
             request.starts_with(&format!("{method} {path} ")),
@@ -8737,7 +8740,7 @@ mod g2_settings_tests {
                     ("/api/system/ai-parliament", "parliament"),
                     ("/api/system/ai-rollout-readiness", "rollout"),
                 ] {
-                    let (mut stream, _) = listener.accept().unwrap();
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                     let request = read_request(&mut stream);
                     assert!(
                         request.starts_with(&format!("GET {path} HTTP/1.1")),
@@ -8782,7 +8785,10 @@ mod g2_settings_tests {
                 Err(RuntimeError::Locked)
             ));
             listener.set_nonblocking(true).unwrap();
-            assert!(listener.accept().is_err(), "read after lock reached host");
+            assert!(
+                crate::test_loopback::accept(&listener).is_err(),
+                "read after lock reached host"
+            );
         }
     }
     #[test]
@@ -8822,7 +8828,7 @@ mod g2_settings_tests {
                         json!({"count":1,"revision":"synthetic-revision","latestReceipt":null}),
                     ),
                 ] {
-                    let (mut stream, _) = listener.accept().unwrap();
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                     let request = read_request(&mut stream);
                     assert!(
                         request.starts_with(&format!("{method} {path} HTTP/1.1")),
@@ -8842,7 +8848,7 @@ mod g2_settings_tests {
                     local_host_reply(&mut stream, code, response, "");
                 }
                 if catalog == ReferenceCatalog::Prosthetics {
-                    let (mut stream, _) = listener.accept().unwrap();
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                     assert!(
                         read_request(&mut stream)
                             .starts_with(&format!("GET {root}/sources HTTP/1.1"))
@@ -8898,7 +8904,7 @@ mod g2_settings_tests {
                 Err(RuntimeError::Locked)
             ));
             listener.set_nonblocking(true).unwrap();
-            assert!(listener.accept().is_err());
+            assert!(crate::test_loopback::accept(&listener).is_err());
         }
     }
     #[test]
@@ -8930,7 +8936,7 @@ mod g2_settings_tests {
                     json!({"state":"ready","enabled":true,"previousAvailable":true,"revision":2,"manifest":{"categories":1}}),
                 ),
             ] {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let mut request = read_request(&mut stream);
                 while request.starts_with("GET /api/drugs?count=1 ") {
                     local_host_reply(
@@ -8939,7 +8945,7 @@ mod g2_settings_tests {
                         json!({"count":100,"state":"ready","snapshot":"a".repeat(64),"manifest":{"version":"synthetic-before"}}),
                         "",
                     );
-                    (stream, _) = listener.accept().unwrap();
+                    (stream, _) = crate::test_loopback::accept(&listener).unwrap();
                     request = read_request(&mut stream);
                 }
                 assert!(
@@ -8995,7 +9001,7 @@ mod g2_settings_tests {
             Err(RuntimeError::Locked)
         ));
         listener.set_nonblocking(true).unwrap();
-        assert!(listener.accept().is_err());
+        assert!(crate::test_loopback::accept(&listener).is_err());
     }
     #[test]
     fn g2_references_aifa_review_partial_and_stale_draft() {
@@ -9005,7 +9011,7 @@ mod g2_settings_tests {
         let worker = thread::spawn(move || {
             local_host_login(&listener);
             for version in ["initial", "concurrent", "initial"] {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 assert!(read_request(&mut stream).starts_with("GET /api/drugs?count=1 "));
                 local_host_reply(
                     &mut stream,
@@ -9014,14 +9020,14 @@ mod g2_settings_tests {
                     "",
                 );
             }
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             let request = read_request(&mut stream);
             assert!(request.starts_with("POST /api/drugs "));
             assert!(request.contains("bad;Invalido"));
             assert!(request.contains("name=\"expectedSnapshot\""));
             assert!(request.contains(&"a".repeat(64)));
             local_host_reply(&mut stream, 409, json!({"code":"AIFA_CATALOG_CHANGED"}), "");
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             assert!(read_request(&mut stream).starts_with("GET /api/drugs?count=1 "));
             local_host_reply(
                 &mut stream,
@@ -9029,7 +9035,7 @@ mod g2_settings_tests {
                 json!({"count":10,"state":"ready","snapshot":"a".repeat(64),"manifest":{"version":"initial"}}),
                 "",
             );
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             assert!(read_request(&mut stream).starts_with("POST /api/drugs "));
             local_host_reply(
                 &mut stream,
@@ -9081,7 +9087,7 @@ mod g2_settings_tests {
         ));
         let listener = worker.join().unwrap();
         listener.set_nonblocking(true).unwrap();
-        assert!(listener.accept().is_err());
+        assert!(crate::test_loopback::accept(&listener).is_err());
     }
     #[test]
     fn g2_references_aifa_missing_receipt_counts_is_not_recorded() {
@@ -9089,7 +9095,7 @@ mod g2_settings_tests {
         let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
         let worker = thread::spawn(move || {
             local_host_login(&listener);
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             assert!(read_request(&mut stream).starts_with("POST /api/drugs/update "));
             local_host_reply(
                 &mut stream,
@@ -9139,7 +9145,7 @@ mod g2_settings_tests {
                     json!({"state":"ready","count":1,"manifest":{"version":"synthetic"},"rejectedRecords":0,"totalRecords":1}),
                 ),
             ] {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = read_request(&mut stream);
                 assert!(
                     request.starts_with(&format!(
@@ -9187,7 +9193,7 @@ mod g2_settings_tests {
             Err(RuntimeError::Locked)
         ));
         listener.set_nonblocking(true).unwrap();
-        assert!(listener.accept().is_err());
+        assert!(crate::test_loopback::accept(&listener).is_err());
     }
     fn backup_schedule_wire(enabled: bool, installed: Value) -> Value {
         json!({"supported":true,"installed":installed,"plistPath":null,"scheduleKind":"launchd",
@@ -9248,7 +9254,7 @@ mod g2_settings_tests {
                     }
                 }
                 for (method, status, body) in steps {
-                    let (mut stream, _) = listener.accept().unwrap();
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                     let request = read_request(&mut stream);
                     assert!(
                         request.starts_with(&format!("{method} /api/system/backup-scheduler "))
@@ -9302,7 +9308,7 @@ mod g2_settings_tests {
             let listener = worker.join().unwrap();
             listener.set_nonblocking(true).unwrap();
             assert!(
-                listener.accept().is_err(),
+                crate::test_loopback::accept(&listener).is_err(),
                 "no retry or unconfirmed second submission"
             );
         }
@@ -9315,7 +9321,7 @@ mod g2_settings_tests {
             let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
             let worker = thread::spawn(move || {
                 local_host_login(&listener);
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 assert!(read_request(&mut stream).starts_with("GET /api/system/backup-scheduler "));
                 let mut status = backup_schedule_wire(
                     outcome == "stale",
@@ -9355,7 +9361,7 @@ mod g2_settings_tests {
             ));
             let listener = worker.join().unwrap();
             listener.set_nonblocking(true).unwrap();
-            assert!(listener.accept().is_err());
+            assert!(crate::test_loopback::accept(&listener).is_err());
         }
     }
 }

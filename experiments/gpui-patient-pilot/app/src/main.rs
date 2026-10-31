@@ -21,6 +21,10 @@ mod text_input;
 mod theme;
 mod title;
 
+#[cfg(test)]
+#[path = "../../test_support/loopback.rs"]
+mod test_loopback;
+
 use gpui::{App, AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions, px, size};
 use std::{borrow::Cow, path::PathBuf};
 
