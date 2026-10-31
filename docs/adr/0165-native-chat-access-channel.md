@@ -111,3 +111,34 @@ Il [rapporto del contributo](../analysis/2026-10-30-chat-native-broker/README.md
 distingue prove automatiche, GLiNER reale e prove desktop ancora aperte.
 Questa composizione resta esplicitamente sintetica, non modifica writer,
 ammissione clinica o stato Proposed dell'ADR.
+
+## Estensione del 31 ottobre 2026: dettatura locale
+
+Il comando app-only `local-voice` riusa il canale nativo e restituisce soltanto
+`requested`, `voice-opened` o un diniego. Non concede accesso alla scheda e non
+può consumare una trascrizione. La cattura inizia soltanto dopo il gesto nella
+finestra MediFlow. Il bundle dichiara lo scopo del permesso microfono.
+
+La GPUI collega staticamente il motore Apple già usato dal client Swift:
+preflight, limiti PCM, cattura, finalizzazione e contratto di stato restano gli
+stessi sorgenti. `SpeechTranscriber` esegue la trascrizione sul dispositivo;
+servono macOS 26 e risorse italiane già installate. Il raccordo ne verifica la
+presenza e non richiede download né usa `SFSpeechRecognizer` o servizi remoti.
+Toolchain non supportate espongono l'indisponibilità, senza un motore alternativo.
+
+Audio e trascrizione restano nel processo nativo, anche se contengono nomi o
+altri identificativi. Non esiste un payload voce nel bridge verso la chat o il
+modello. Il medico rilegge e corregge il testo, poi può trasferirlo a una bozza
+nel compositore di diario esistente. Il salvataggio continua a usare revisione,
+conferma e writer comuni. La fine della trascrizione non apre né esegue writer.
+La bozza voce appartiene ad archivio, sessione, ambulatorio, paziente, revisione
+ed epoca correnti: cambio contesto, revoca o blocco ne impediscono il trasferimento.
+Un'altra richiesta della chat non sostituisce una revisione voce aperta.
+
+Le prove automatiche usano un doppio dietro `VisitRecordingRuntimePort`, senza
+microfono, audio persistito o dati reali. Verificano il raccordo e i dinieghi;
+non qualificano la cattura hardware, l'accuratezza del riconoscimento o i due host
+desktop. I claim crittografici e l'autorità del modello restano invariati.
+
+Riferimenti Apple: [SpeechTranscriber](https://developer.apple.com/documentation/speech/speechtranscriber)
+e [SpeechAnalyzer, WWDC25](https://developer.apple.com/videos/play/wwdc2025/277/).

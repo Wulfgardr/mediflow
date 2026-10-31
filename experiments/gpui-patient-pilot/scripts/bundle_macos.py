@@ -96,6 +96,7 @@ def bundle_info(config, version, sha):
         "CFBundleShortVersionString": version, "CFBundleVersion": build_number(sha),
         "LSMinimumSystemVersion": config["minimum_macos"], "NSHighResolutionCapable": True,
         "MediFlowSourceRevision": sha,
+        "NSMicrophoneUsageDescription": "MediFlow usa il microfono dopo il tuo consenso per la dettatura locale. Audio e trascrizione restano nella finestra nativa fino alla revisione.",
     }
 
 
