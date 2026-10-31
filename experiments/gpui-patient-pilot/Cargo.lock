@@ -3146,6 +3146,7 @@ dependencies = [
  "mediflow-runtime-client",
  "raw-window-handle",
  "serde_json",
+ "sha2",
  "unicode-segmentation",
  "windows-sys 0.61.2",
  "zeroize",
