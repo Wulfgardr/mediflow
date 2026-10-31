@@ -129,3 +129,18 @@ final class HomeBaseAttachmentModelsTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: second), Data("second".utf8))
     }
 }
+
+final class HomeBaseLoopbackHostTests: XCTestCase {
+    func testLiteralAddressesAreParsedWithoutResolvingNames() {
+        for host in ["localhost", "LOCALHOST", "127.0.0.2", "127.255.255.254", "::1",
+                     "0:0:0:0:0:0:0:1", "::ffff:127.0.0.1", "::ffff:7f00:2",
+                     "[0:0:0:0:0:ffff:7f00:1]"] {
+            XCTAssertTrue(HomeBaseConnectionConfiguration.isLoopbackHost(host), host)
+        }
+        for host in ["", "127.0.0.1.attacker", "localhost.invalid", "127.0.0.999",
+                     "192.0.2.1", "::2", "::ffff:192.0.2.1", "[[::1]]", "[::1",
+                     "127.0.0.1\u{0}invalid"] {
+            XCTAssertFalse(HomeBaseConnectionConfiguration.isLoopbackHost(host), host)
+        }
+    }
+}
