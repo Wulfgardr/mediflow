@@ -8,7 +8,7 @@ Il test di composizione controlla il consumer reale e impedisce di ripristinare
 implicitamente una PUT dal nuovo controller. Le proprietà del nuovo ledger non
 sono una prova TLA né un'estensione implicita degli invarianti legacy sottostanti.
 
-Il recovery cifrato supporta lo schema corrente 6 e i predecessori canonici 4 e 5; le 24 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+Il recovery cifrato supporta lo schema corrente 7 e i predecessori canonici 4, 5 e 6; le 31 prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
 ## Raccordo PR #739 del 30 ottobre 2026: lettura degli allegati ENC2
 
@@ -637,14 +637,19 @@ mostra come registrazione locale soltanto una ricevuta locale e corrente;
 una ricevuta importata resta storico da esaminare, anche se lo stato della
 terapia coincide. Il client verifica il nuovo campo e rifiuta un'origine
 importata dichiarata corrente. Il modulo `backup-import-provenance.ts` entra
-nelle sorgenti fissate: collega marcatori di audit e comandi senza cambiare
-le righe originali. I comandi già presenti conservano la provenienza.
+nelle sorgenti fissate: consulta esclusivamente il registro locale `portable_import_origins`, senza
+cambiare le righe originali. Il ripristino assegna la provenienza solo alle
+righe nuove nella stessa transazione. I marcatori del file restano storia:
+non riclassificano righe locali, neppure dopo il percorso A → B → A. La
+migrazione allo schema 7 non ricostruisce autorità da marcatori preesistenti.
 
 Il modello TLC legacy non viene esteso a fiducia nella sorgente, backup o
 migrazioni. Il nuovo vincolo del controller durevole è coperto dai test del
 client, della conferma e da un vero ripristino di ledger ostile, incluso il
 caso di 650 audit importati con budget di lettura locale separato. Tale
-prova entra nel gruppo `code-current` del verificatore. Modello, invarianti,
+prova entra nel gruppo `code-current` del verificatore insieme alla migrazione
+6 → 7 e al suo rollback. Le prove HTTP su due server e l’aggiornamento da
+v0.9.0 restano evidenze separate dal modello. Modello, invarianti,
 assunzioni, mutanti e testimoni legacy restano invariati. Le impronte vengono
 aggiornate dopo questo confronto; `verify:therapy-status` deve ancora
 rieseguire TLC, i mutanti e tutti i test causali sull'head consegnato.
