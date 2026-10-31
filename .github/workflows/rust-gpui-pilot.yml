@@ -115,6 +115,11 @@ jobs:
       # checks do not exercise a window, input methods, accessibility or GPU UI.
       - name: Compile all native targets and run synthetic tests
         run: cargo test --manifest-path experiments/gpui-patient-pilot/Cargo.toml --workspace --all-targets --locked
+      - name: Build and launch the source-identified macOS package
+        if: runner.os == 'macOS'
+        run: |
+          python3 experiments/gpui-patient-pilot/scripts/bundle_macos.py --staging "$RUNNER_TEMP/gpui-bundle" --target-dir "$RUNNER_TEMP/gpui-release"
+          "$RUNNER_TEMP/gpui-bundle/MediFlow GPUI.app/Contents/MacOS/mediflow-gpui-patient-pilot" --verify-bundled-assets
       - name: Build the optimized patient document memory probe
         if: runner.os == 'Linux'
         run: cargo rustc --manifest-path experiments/gpui-patient-pilot/Cargo.toml -p mediflow-runtime-client --example patient_document_key_erasure --locked -- -C opt-level=2

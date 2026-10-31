@@ -32,6 +32,8 @@ final class ChatLocalVoice {
         self.makeCapture = makeCapture
     }
 
+    func denyUnavailableRuntime() { state = .unavailable }
+
     func start() async {
         guard state == .disclosure, !closed else { return }
         guard Self.lease == nil else { state = .unavailable; return }
@@ -109,6 +111,7 @@ func voiceCreate() -> UnsafeMutableRawPointer {
 @MainActor
 func voiceCommand(_ pointer: UnsafeMutableRawPointer, _ command: Int32) {
     let voice = Unmanaged<ChatLocalVoice>.fromOpaque(pointer).takeUnretainedValue()
+    guard #available(macOS 26.0, *) else { voice.denyUnavailableRuntime(); return }
     Task { @MainActor in
         switch command {
         case 1: await voice.start()
@@ -140,5 +143,7 @@ func voiceCopyText(_ pointer: UnsafeMutableRawPointer, _ output: UnsafeMutablePo
 func voiceRelease(_ pointer: UnsafeMutableRawPointer) {
     let voice = Unmanaged<ChatLocalVoice>.fromOpaque(pointer).takeRetainedValue()
     voice.invalidate()
-    Task { @MainActor in await voice.cancel() }
+    if #available(macOS 26.0, *) {
+        Task { @MainActor in await voice.cancel() }
+    }
 }

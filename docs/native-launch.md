@@ -54,31 +54,26 @@ ammette soltanto questa posizione nell'output corrente, con target esattamente
 alla radice fisica del package nelle dipendenze interamente censite. Non è
 un'eccezione per alias generici nella sorgente o nel payload finale.
 
-La checkout completa contiene una fixture SQLite dei test Swift. La produzione
-usa una checkout Git sparse separata che non materializza **soltanto** quella
-fixture, mantenendo SHA, branch e stato pulito genuini. Non eliminare file dalla
-checkout completa e non usare il database locale come input. Esempio, con
-destinazioni nuove fuori da cartelle sincronizzate:
+Le build usano una checkout Git completa e pulita. I test Swift materializzano
+la fixture SQL sintetica in un database temporaneo per ciascun test e lo
+rimuovono al termine. Nessun database binario è richiesto nella sorgente.
+Esempio, con destinazioni nuove fuori da cartelle sincronizzate:
 
 ```bash
-git clone --no-hardlinks --sparse --branch main <repository> <sorgente-pulita>
-git -C <sorgente-pulita> sparse-checkout set --no-cone '/*' \
-  '!/native/MediFlowMac/Tests/MediFlowCoreTests/Fixtures/medical_fixture.db'
+git clone --no-hardlinks --branch main <repository> <sorgente-pulita>
 cd <sorgente-pulita>
 npm ci
-node scripts/build-input-metadata.mjs --source .
+npm run prebuild
 MEDIFLOW_CODESIGN_IDENTITY=- bash scripts/build-apple-macos-app.sh
 ```
 
-La ricevuta di consegna registra anche `git sparse-checkout list`, oltre a SHA,
-tree, branch e stato pulito. I test Swift usano la checkout completa. La stessa
-selezione sparse vale per le build Web di produzione in CI. Se la fixture viene
-materializzata nuovamente, il preflight la rifiuta: non esiste un'eccezione per
-quel database. Un vecchio output o un archivio nella sorgente richiede un'area
-di build pulita; il preflight non lo rimuove.
+La ricevuta registra SHA, tree, branch e stato pulito. Il preflight continua
+a rifiutare qualsiasi database nella sorgente, incluse fixture materializzate
+per errore. Un vecchio output o un archivio richiede un'area di build pulita;
+il preflight non lo rimuove.
 
 Per una consegna sorgente finale, la seconda build pura Webpack avviene nella
-sorgente sparse pulita allo stesso merge e branch `main`. Payload e ledger
+sorgente completa pulita allo stesso merge e branch `main`. Payload e ledger
 genuini possono essere pubblicati nella primaria solo dopo le verifiche, senza
 ristampare l'identità; `verifySourceRuntime` e il launcher devono confermare la
 stessa revisione e `reuse`. Non compilare nella primaria contenente dati.
@@ -152,7 +147,7 @@ open "$(node scripts/build-input-metadata.mjs --derived "$PWD")/Build/Products/D
 baseline: una nuova pagina statica richiede una revisione esplicita.
 Non aggiungere eccezioni al guard per accettarla.
 
-Dopo `npm ci` e `npm run build` nella sorgente sparse pulita descritta sopra,
+Dopo `npm ci` e `npm run build` nella sorgente completa pulita descritta sopra,
 eseguire il comando seguente nella stessa sorgente. Il comando registra lo
 SHA effettivamente costruito e la provenienza locale; non usare l'URL di una
 run CI riferita a un'altra revisione. Conservare il log della build.

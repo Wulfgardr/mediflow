@@ -6,17 +6,10 @@ import Crypto
 /// DB by copying the patient fixture (which carries fixture-1 @ AMB-1, used by the
 /// in-scope join) and creating the sub-resource tables, then exercise the version-
 /// guarded update + soft-delete. Encrypted fields are checked decrypted AND at-rest.
-final class SQLiteClinicalStoreTests: XCTestCase {
+final class SQLiteClinicalStoreTests: SyntheticSQLiteFixtureTestCase {
 
     private let masterKey = SymmetricKey(
         data: Data(hexString: "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"))
-
-    private func fixturePath() -> String {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .appendingPathComponent("Fixtures/medical_fixture.db")
-            .path
-    }
 
     /// Copy the patient fixture (which now ships the four clinical tables, each with
     /// one pre-seeded row, for the AppleShared adapter tests that cannot create
