@@ -1,4 +1,5 @@
 export const SYNC_DIRECTORY_NAMES: readonly string[];
+export const LINUX_SINGLE_DEVICE_FILESYSTEMS: readonly string[];
 export const MOUNT_ROOTS: readonly string[];
 export class BackupDestinationError extends Error {}
 export function isSynchronizedBackupPath(value: string, options?: { platform?: string; homeDir?: string }): boolean;

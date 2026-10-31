@@ -51,7 +51,7 @@ test('volume protection distinguishes verified, known unencrypted and inaccessib
     assert.equal(probeBackupVolume('C:\\synthetic', { platform: 'win32', run: () => JSON.stringify({ VolumeStatus: 1, ProtectionStatus: 1 }) }), 'verified');
     assert.equal(probeBackupVolume('C:\\synthetic', { platform: 'win32', run: () => JSON.stringify({ VolumeStatus: 0, ProtectionStatus: 0 }) }), 'unencrypted');
     for (const platform of ['darwin', 'win32', 'linux', 'unknown']) assert.equal(probeBackupVolume('/synthetic', { platform, run: () => { throw new Error('Access denied'); } }), 'unverified');
-    for (const crypt of [true, false]) assert.equal(probeBackupVolume('/synthetic', { platform: 'linux', run: file => file === 'findmnt' ? JSON.stringify({ filesystems: [{ source: '/dev/mapper/synthetic' }] }) : JSON.stringify({ blockdevices: [{ type: 'lvm', children: [{ type: crypt ? 'crypt' : 'disk' }] }] }) }), crypt ? 'verified' : 'unencrypted');
+    for (const crypt of [true, false]) assert.equal(probeBackupVolume('/synthetic', { platform: 'linux', run: file => file === 'findmnt' ? JSON.stringify({ filesystems: [{ source: '/dev/mapper/synthetic', fstype: 'ext4' }] }) : JSON.stringify({ blockdevices: [{ type: 'lvm', children: [{ type: crypt ? 'crypt' : 'disk' }] }] }) }), crypt ? 'verified' : 'unencrypted');
 });
 
 
@@ -66,5 +66,13 @@ test('path-validation: an existing ordinary folder cannot substitute for an unmo
 
 
 test('Linux mixed storage chains never treat one encrypted leg as protection of the whole volume', () => {
-    assert.equal(probeBackupVolume('/synthetic', { platform: 'linux', run: file => file === 'findmnt' ? JSON.stringify({ filesystems: [{ source: '/dev/mapper/synthetic' }] }) : JSON.stringify({ blockdevices: [{ type: 'raid1', children: [{ type: 'crypt' }, { type: 'disk' }] }] }) }), 'unverified');
+    assert.equal(probeBackupVolume('/synthetic', { platform: 'linux', run: file => file === 'findmnt' ? JSON.stringify({ filesystems: [{ source: '/dev/mapper/synthetic', fstype: 'ext4' }] }) : JSON.stringify({ blockdevices: [{ type: 'raid1', children: [{ type: 'crypt' }, { type: 'disk' }] }] }) }), 'unverified');
+});
+
+
+test('Windows suspended protection and partial encryption are rejected; Linux multi-device filesystems require explicit acknowledgement', () => {
+    for (const info of [{ VolumeStatus: 1, ProtectionStatus: 0 }, { VolumeStatus: 2, ProtectionStatus: 1 }]) {
+        assert.equal(probeBackupVolume('C:\\synthetic', { platform: 'win32', run: () => JSON.stringify(info) }), 'unencrypted');
+    }
+    assert.equal(probeBackupVolume('/synthetic', { platform: 'linux', run: file => file === 'findmnt' ? JSON.stringify({ filesystems: [{ source: '/dev/mapper/synthetic', fstype: 'btrfs' }] }) : JSON.stringify({ blockdevices: [{ type: 'crypt' }] }) }), 'unverified');
 });

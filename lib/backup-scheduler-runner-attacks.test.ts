@@ -29,7 +29,7 @@ cp.spawnSync=(file,args,options)=> {
  if(file==='/usr/sbin/diskutil') return {status:0,stdout:'<plist/>',stderr:''};
  if(file==='/usr/bin/plutil') return {status:0,stdout:JSON.stringify({FileVault:process.env.FAULT!=='unencrypted'}),stderr:''};
  if(file==='powershell.exe'&&volumeProbe) return {status:0,stdout:JSON.stringify({VolumeStatus:process.env.FAULT==='unencrypted'?0:1,ProtectionStatus:1}),stderr:''};
- if(file==='findmnt') return {status:0,stdout:JSON.stringify({filesystems:[{source:'/dev/synthetic'}]}),stderr:''};
+ if(file==='findmnt') return {status:0,stdout:JSON.stringify({filesystems:[{source:'/dev/synthetic',fstype:'ext4'}]}),stderr:''};
  if(file==='lsblk') return {status:0,stdout:JSON.stringify({blockdevices:[{type:process.env.FAULT==='unencrypted'?'disk':'crypt'}]}),stderr:''};
  return spawn(file,args,options);
 };
