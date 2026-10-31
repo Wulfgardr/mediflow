@@ -75,6 +75,7 @@ public struct NativeAIFunctionCommand: Codable, Equatable, Sendable {
         self.commandId = commandId; expectedRevision = snapshot.revision; expectedCatalogRevision = snapshot.catalogRevision
         action = "set"; presetId = nil; self.functionId = functionId; self.enabled = enabled; self.defaultModelOptionId = defaultModelOptionId
     }
+    public var affectsUnavailableFunction: Bool { action == "preset" || functionId == "treatment_reasoning" }
     enum CodingKeys: String, CodingKey { case schemaVersion, commandId, expectedRevision, expectedCatalogRevision, action, functionId, enabled, defaultModelOptionId, presetId }
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)

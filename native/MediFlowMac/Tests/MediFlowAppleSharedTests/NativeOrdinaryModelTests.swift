@@ -25,6 +25,17 @@ final class NativeOrdinaryModelTests: XCTestCase {
             "schema": "mediflow.native-authority-retirement.v1", "previousAuthorityRef": reference,
             "currentAuthorityRef": NativeOrdinaryAuthority.reference(connection), "authorityRetired": true, "physicalCleanup": "not_attested"]))
     }
+    func testTreatmentReasoningNeverPreparesOrGenerates() async throws {
+        let model = NativeOrdinaryModel(function: .treatmentReasoning, snapshot: {
+            XCTFail("Unavailable function must not acquire sources")
+            throw NativeOrdinaryContractError.invalid
+        })
+        XCTAssertFalse(model.canPrepare)
+        model.prepare(); model.generate(); await settle(model)
+        XCTAssertEqual(model.phase, .idle)
+        XCTAssertEqual(model.message, "Non disponibile in questa versione")
+        XCTAssertNil(model.proposal)
+    }
     func testRetiredAuthorityReleasesSuspendedPrepareWithoutKeyAndLateReplyCannotRegressNewAttempt() async throws {
         var session: UInt = 1, key: SymmetricKey? = SymmetricKey(data: Data(repeating: 9, count: 32))
         var resume: CheckedContinuation<NativeOrdinaryResponse, Error>?, calls = 0, commands = 0
@@ -216,8 +227,8 @@ final class NativeOrdinaryModelTests: XCTestCase {
         model.invalidate(); XCTAssertNil(model.proposal); XCTAssertEqual(model.phase, .idle)
         XCTAssertEqual(model.message, "Il contesto è cambiato. Prepara una nuova proposta.")
     }
-    func testEverySharedFunctionDiscardsConsentAndProposalWhenContextIsInvalidated() async throws {
-        for function in NativeOrdinaryFunction.allCases {
+    func testEveryAvailableFunctionDiscardsConsentAndProposalWhenContextIsInvalidated() async throws {
+        for function in NativeOrdinaryFunction.allCases where function.isAvailableInRelease {
             let input: NativeOrdinaryInput
             switch function {
             case .patientInsight: input = .patientInsight

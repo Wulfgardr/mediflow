@@ -2847,6 +2847,30 @@ final class HomeBasePatientsClientTests: XCTestCase {
             XCTAssertEqual(failure, .init(status: 503, code: .preparationUnavailable))
         }
     }
+    func testNativeReleaseDenialPreservesCodeAndSanitizesHostText() async throws {
+        let input = NativeOrdinaryPreparation(functionId: .treatmentReasoning, patientId: "synthetic-patient",
+            ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .treatmentReasoning)
+        let client = makeClient { request in
+            let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 403, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(#"{"error":"untrusted host text","code":"treatment_reasoning_unavailable_in_release"}"#.utf8))
+        }
+        let credentials = HomeBasePairedCredentials(clientId: "synthetic-mac", clientToken: "synthetic-token")
+        do {
+            _ = try await client.prepareNativeOrdinary(input, credentials: credentials, sessionCookie: "mediflow_session=synthetic-native")
+            XCTFail("Expected release denial")
+        } catch let failure as NativeOrdinaryServerFailure {
+            XCTAssertEqual(failure, .init(status: 403, code: .treatmentReasoningUnavailableInRelease))
+            XCTAssertEqual(failure.code.safeReason, "Non disponibile in questa versione")
+        }
+        do {
+            _ = try await client.prepareNativeFabric(input, credentials: credentials, sessionCookie: "mediflow_session=synthetic-native")
+            XCTFail("Expected release denial")
+        } catch let failure as NativeFabricFailure {
+            XCTAssertEqual(failure.status, 403)
+            XCTAssertEqual(failure.code, .treatmentReasoningUnavailableInRelease)
+            XCTAssertEqual(failure.code.message, "Non disponibile in questa versione")
+        }
+    }
     func testNativeOrdinaryFailureRejectsUnknownCodeAndHostText() async throws {
         let input = NativeOrdinaryPreparation(functionId: .patientInsight, patientId: "synthetic-patient",
             ambulatoryId: "synthetic-ambulatory", patientRevision: 1, input: .patientInsight)

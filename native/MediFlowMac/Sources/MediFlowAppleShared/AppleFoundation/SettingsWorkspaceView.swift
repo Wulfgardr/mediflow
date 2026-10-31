@@ -762,13 +762,14 @@ struct SettingsWorkspaceView: View {
             .font(.subheadline)
             .foregroundStyle(.secondary)
 
+        settingsStatusRow("Treatment Reasoning", value: NativeOrdinaryFailureCode.treatmentReasoningUnavailableInRelease.safeReason)
+
         if aiFunctionsModel.state == .loading {
             ProgressView()
         } else if let runtime = aiFunctionsModel.runtime, aiFunctionsModel.state == .loaded {
             settingsStatusRow("Patient Insight", value: aiFunctionState(runtime.killSwitches.patientInsight))
             settingsStatusRow("Document Synthesis", value: aiFunctionState(runtime.killSwitches.documentSynthesis))
             settingsStatusRow("Smart Import", value: aiFunctionState(runtime.killSwitches.smartImport))
-            settingsStatusRow("Treatment Reasoning", value: aiFunctionState(runtime.killSwitches.treatmentReasoning))
             settingsStatusRow("Piano AI", value: runtime.plane)
             settingsStatusRow("Modalità", value: runtime.mode)
             settingsStatusRow("Runtime locale", value: "\(runtime.localRuntime.state), \(runtime.localRuntime.provider)")

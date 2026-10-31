@@ -23,6 +23,21 @@ final class NativeAIConfigurationTests: XCTestCase {
     private func settle(_ model: NativeAIConfigurationModel) async {
         for _ in 0..<100 where model.isWorking { await Task.yield() }
     }
+    func testTreatmentReasoningAndBulkPresetsCannotPrepareConfiguration() async throws {
+        let value = try snapshot()
+        let model = NativeAIConfigurationModel(connectionProvider: { self.connection() }, services: .init(
+            read: { _ in value }, preview: { _, _ in XCTFail("Unavailable configuration"); throw HomeBaseClientError.contract },
+            apply: { _, _ in XCTFail("Unavailable configuration"); throw HomeBaseClientError.contract }))
+        model.load(); await settle(model)
+        for command in [NativeAIFunctionCommand(snapshot: value, functionId: "treatment_reasoning", enabled: true, defaultModelOptionId: nil),
+                        NativeAIFunctionCommand(snapshot: value, presetId: "all_off"),
+                        NativeAIFunctionCommand(snapshot: value, presetId: "host_defaults")] {
+            model.prepare(command); await settle(model); model.confirm(); await settle(model)
+            XCTAssertNil(model.preview)
+            XCTAssertEqual(model.message, "Non disponibile in questa versione")
+            XCTAssertEqual(model.snapshot, value)
+        }
+    }
     func testCommandsEncodeExactKeysAndExplicitNullWithoutProviderOrCookie() throws {
         let value = try snapshot(); try value.validate()
         let command = NativeAIFunctionCommand(snapshot: value, functionId: "patient_insight", enabled: false, defaultModelOptionId: nil)
@@ -44,7 +59,7 @@ final class NativeAIConfigurationTests: XCTestCase {
             return NativeAIFunctionPreview(schemaVersion: "mediflow.function-preferences-preview.v1", command: command, proposed: updated, writesPerformed: 0)
         }, apply: { command, _ in applied = command; return updated }))
         model.load(); await settle(model)
-        let command = NativeAIFunctionCommand(snapshot: initial, presetId: "all_off")
+        let command = NativeAIFunctionCommand(snapshot: initial, functionId: "patient_insight", enabled: false, defaultModelOptionId: nil)
         model.prepare(command); await settle(model)
         XCTAssertEqual(previews, 1); XCTAssertNil(applied); XCTAssertEqual(model.preview?.command.commandId, command.commandId)
         model.confirm(); await settle(model)
@@ -70,7 +85,7 @@ final class NativeAIConfigurationTests: XCTestCase {
             await withCheckedContinuation { pending = $0 }
         }, apply: { _, _ in XCTFail("No apply expected"); return value }))
         model.load(); await settle(model)
-        let command = NativeAIFunctionCommand(snapshot: value, presetId: "all_off")
+        let command = NativeAIFunctionCommand(snapshot: value, functionId: "patient_insight", enabled: false, defaultModelOptionId: nil)
         model.prepare(command)
         for _ in 0..<100 where pending == nil { await Task.yield() }
         current = connection(generation: 1); model.invalidate()
@@ -84,7 +99,7 @@ final class NativeAIConfigurationTests: XCTestCase {
             NativeAIFunctionPreview(schemaVersion: "mediflow.function-preferences-preview.v1", command: command, proposed: value, writesPerformed: 0)
         }, apply: { _, _ in applies += 1; return value }))
         model.load(); await settle(model)
-        model.prepare(NativeAIFunctionCommand(snapshot: value, presetId: "all_off")); await settle(model)
+        model.prepare(NativeAIFunctionCommand(snapshot: value, functionId: "patient_insight", enabled: false, defaultModelOptionId: nil)); await settle(model)
         XCTAssertNotNil(model.preview)
         current = connection(generation: 2)
         model.confirm() // No view-driven invalidate has run yet.
@@ -99,7 +114,7 @@ final class NativeAIConfigurationTests: XCTestCase {
             let model = NativeAIConfigurationModel(connectionProvider: { self.connection() }, services: .init(read: { _ in value }, preview: { _, _ in
                 count += 1; throw HomeBaseClientError.httpStatus(status, nil)
             }, apply: { _, _ in XCTFail("No apply expected"); return value }))
-            model.load(); await settle(model); model.prepare(NativeAIFunctionCommand(snapshot: value, presetId: "all_off")); await settle(model)
+            model.load(); await settle(model); model.prepare(NativeAIFunctionCommand(snapshot: value, functionId: "patient_insight", enabled: false, defaultModelOptionId: nil)); await settle(model)
             XCTAssertNil(model.snapshot); XCTAssertNil(model.preview); XCTAssertEqual(count, 1)
         }
     }

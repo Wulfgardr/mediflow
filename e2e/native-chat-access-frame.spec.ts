@@ -197,6 +197,19 @@ for (const status of ['document-opened', 'withdrawn', 'applied']) test(`PDF hand
     await expect(frame.locator('body')).toContainText('Gli allegati del compositore restano nella chat');
 });
 
+for (const width of [390, 1440]) test(`local voice opens native review without returning private text at ${width}`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.evaluate(() => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = 'voice-opened'; });
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Detta in MediFlow' }).click();
+    await expect(frame.getByRole('status')).toContainText('Continua in MediFlow');
+    await expect(frame.getByRole('button', { name: 'Mostra scheda monouso' })).toBeDisabled();
+    await expect(frame.locator('#card')).toBeHidden();
+    const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: unknown }[] } }).accessFixture.calls);
+    expect(calls.map(call => call.arguments)).toEqual([{ command: 'attach' }, { command: 'local-voice' }]);
+    await page.screenshot({ path: info.outputPath('voice-frame.png'), fullPage: true });
+});
+
 const sourcedCard = () => ({
     profile: 'mediflow.synthetic-chat-card.v1', pseudonym: 'card_' + 'a'.repeat(32),
     history: [], therapies: [{ medicine: 'metformina', dose: '500 mg', frequency: 'due volte al giorno', sourceRef: 'src_' + 'b'.repeat(32) }], measures: [],

@@ -20,6 +20,7 @@ struct NativeOrdinarySnapshot {
 enum NativeOrdinaryInputs {
     static func build(_ function: NativeOrdinaryFunction, workspace: PairedPatientsWorkspaceModel,
                       attachmentId: String? = nil, now: Date = Date()) throws -> NativeOrdinarySnapshot {
+        guard function.isAvailableInRelease else { throw NativeOrdinaryServerFailure(status: 403, code: .treatmentReasoningUnavailableInRelease) }
         guard let connection = workspace.clinicalWorkspaceConnection, let patient = workspace.selectedPatient,
               workspace.selectedPatientID == patient.id, let ambulatory = connection.ambulatoryId,
               patient.ambulatoryId == ambulatory, patient.version > 0, patient.deletedAt == nil,

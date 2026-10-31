@@ -62,6 +62,17 @@ final class NativeFabricDTOTests: XCTestCase {
 
 @MainActor
 final class NativeFabricModelTests: XCTestCase {
+    func testTreatmentReasoningNeverPreparesOrGenerates() async throws {
+        let model = NativeFabricModel(function: .treatmentReasoning, snapshot: {
+            XCTFail("Unavailable function must not acquire sources")
+            throw NativeOrdinaryContractError.invalid
+        })
+        XCTAssertFalse(model.canPrepare)
+        model.prepare(); model.generate(); await settle(model)
+        XCTAssertEqual(model.phase, .idle)
+        XCTAssertEqual(model.message, "Non disponibile in questa versione")
+        XCTAssertNil(model.proposal)
+    }
     private func source(generation: UInt = 0, function: NativeOrdinaryFunction = .patientInsight, key: SymmetricKey? = nil) -> NativeOrdinarySnapshot {
         let connection = ClinicalWorkspaceConnection(dataSource: S6MockDataSource(details: [:]), credentials: .init(clientId: "synthetic-client", clientToken: "synthetic-token"),
             sessionCookie: "mediflow_session=synthetic-\(generation)", ambulatoryId: "synthetic-ambulatory", masterKey: key,
@@ -203,8 +214,8 @@ final class NativeFabricModelTests: XCTestCase {
         model.invalidate(); await settle(model)
     }
 
-    func testFourFunctionsRequireExplicitGenerateAndCloseWithoutWriting() async throws {
-        for function in NativeOrdinaryFunction.allCases {
+    func testAvailableFunctionsRequireExplicitGenerateAndCloseWithoutWriting() async throws {
+        for function in NativeOrdinaryFunction.allCases where function.isAvailableInRelease {
             let model = NativeFabricModel(function: function, snapshot: { self.source(function: function) }, services: services(function))
             model.prepare(); await settle(model); XCTAssertEqual(model.phase, .ready); XCTAssertNil(model.proposal)
             model.generate(); await settle(model); XCTAssertEqual(model.phase, .completed); XCTAssertNotNil(model.proposal)
