@@ -1,4 +1,4 @@
-// ADR 0071 Fase 2: generate a deterministic fixture medical.db for the read-only
+// ADR 0071 Fase 2: generate a deterministic synthetic SQL fixture for the read-only
 // SQLitePatientStore test. One patient with ENCRYPTED_FIELDS sealed as ENC:iv:data
 // using a KNOWN test master key (the same raw key as the crypto golden vectors),
 // so the Swift test can decrypt without an operator PIN and assert byte-equal
@@ -10,7 +10,7 @@
 import { webcrypto } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { existsSync, rmSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const { subtle } = webcrypto;
@@ -59,12 +59,11 @@ const patient = {
 };
 
 const here = dirname(fileURLToPath(import.meta.url));
-const dbPath = join(here, 'medical_fixture.db');
-if (existsSync(dbPath)) rmSync(dbPath);
+const sqlPath = join(here, 'medical_fixture.sql');
 
 const require = createRequire(import.meta.url);
 const Database = require(join(process.cwd(), 'node_modules/better-sqlite3'));
-const db = new Database(dbPath);
+const db = new Database(':memory:');
 
 // Real web schema for patients (verbatim from the live medical.db).
 // consume the existing nullable archive columns; old vectors stay unchanged.
@@ -172,5 +171,15 @@ const observation = {
 db.prepare(`INSERT INTO observations (${Object.keys(observation).map((c) => `"${c}"`).join(',')}) VALUES (${Object.keys(observation).map(() => '?').join(',')})`)
     .run(...Object.values(observation));
 
+const quote = value => value === null ? 'NULL' : typeof value === 'number' ? String(value) : "'" + value.replaceAll("'", "''") + "'";
+const statements = ['BEGIN TRANSACTION;'];
+for (const { name, sql } of db.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'table' ORDER BY name").all()) {
+    statements.push(sql + ';');
+    for (const row of db.prepare(`SELECT * FROM "${name}"`).all()) {
+        statements.push(`INSERT INTO "${name}" VALUES(${Object.values(row).map(quote).join(',')});`);
+    }
+}
+statements.push('COMMIT;');
+writeFileSync(sqlPath, statements.join('\n') + '\n');
 db.close();
-console.log('OK: wrote', dbPath, '(1 patient + 1 entry/therapy/checkup/observation, encrypted fields sealed with the golden-vector master key)');
+console.log('OK: wrote synthetic SQL fixture', sqlPath);
