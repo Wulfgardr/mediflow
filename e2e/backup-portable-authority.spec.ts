@@ -19,6 +19,7 @@ test('comando terapia nativo, backup e importazione portabile conservano storico
     await bootstrapUnlockedSession(page, pin);
     const headers = { ...await trustedArchiveWebRequestHeaders(page), 'Content-Type': 'application/json' };
     const db = new Database(join(dir, 'medical.db'), { fileMustExist: true });
+    const originalNetworkMode = (db.prepare('SELECT value FROM settings WHERE key=?').get('network.mode') as { value: string } | undefined)?.value ?? 'local-only';
     const patientId = randomUUID(), therapyId = randomUUID(), forgedId = randomUUID();
     const actor = db.prepare('SELECT id FROM users WHERE username=?').get(process.env.E2E_USERNAME || 'admin') as { id: string };
     const scope = db.prepare('SELECT id FROM ambulatories LIMIT 1').get() as { id: string };
@@ -107,7 +108,19 @@ test('comando terapia nativo, backup e importazione portabile conservano storico
         expect(readReceipt.status).toBe(200);
         expect(await readReceipt.json()).toMatchObject({ outcome: 'terminal', origin: 'imported', historical: true, receipt: { outcome: 'applied' } });
 
-    } finally { db.close(); }
+    } finally {
+        try {
+            const renewed = await loginWithWebAuthControl(baseURL, { username: process.env.E2E_USERNAME || 'admin', password: pin });
+            expect(renewed.response.status).toBe(200);
+            if (!renewed.webHeaders?.Cookie) throw new Error('Renewed synthetic cookie required');
+            const reset = await fetch(baseURL + '/api/settings/network.mode', {
+                method: 'PUT',
+                headers: { ...renewed.webHeaders, Cookie: renewed.webHeaders.Cookie, Origin: baseURL, 'Sec-Fetch-Site': 'same-origin', 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: originalNetworkMode }),
+            });
+            expect(reset.status, await reset.text()).toBe(200);
+        } finally { db.close(); }
+    }
 });
 
 test('la conferma UI conserva il file dopo una credenziale errata e richiede la credenziale prima della scrittura', async ({ page }, testInfo) => {
