@@ -53,3 +53,12 @@ test('native collector review fixture and Node normalization agree', async () =>
         assert.deepEqual(clinicalIdentifierSpans(value, fixture.currentNativeKnown), clinicalIdentifierSpans(value, fixture.nativeKnown), value);
     }
 });
+
+test('CF detection cannot concatenate ordinary clinical words and measurements into a code', async () => {
+    const { readFileSync } = await import('node:fs');
+    const corpus = JSON.parse(readFileSync(new URL('../../scripts/fixtures/clinical-chat-exact-corpus.json', import.meta.url), 'utf8'));
+    for (const entry of corpus.filter((entry: { id: string }) => entry.id.startsWith('mixed-positive'))) {
+        assert.deepEqual(clinicalIdentifierSpans(entry.texts.join('\n'), entry.known), [], entry.id);
+        assert.deepEqual(clinicalIdentifierSpans([...entry.texts, ...entry.texts].join('\n'), entry.known), [], entry.id + ' both sections');
+    }
+});

@@ -60,7 +60,9 @@ export function clinicalIdentifierSpans(text: string, known: KnownClinicalIdenti
     }
     for (let index = 0; index + 16 <= view.compact.length; index++) {
         if (!/^[a-z0-9]{6}[0-9oilzsbmnpqrstuv]{2}[a-z0-9][0-9oilzsbmnpqrstuv]{2}[a-z0-9][0-9oilzsbmnpqrstuv]{3}[a-z0-9]$/u.test(view.compact.slice(index, index + 16))) continue;
+        if ((view.compact.slice(index, index + 6).match(/[a-z]/gu) ?? []).length < 4) continue;
         const start = view.offsets[index].start, end = view.offsets[index + 15].end;
+        if (/\p{L}{7,}/u.test(text.slice(start, end))) continue;
         if (!/[\p{L}\p{N}]$/u.test(text.slice(0, start)) && !/^[\p{L}\p{N}]/u.test(text.slice(end))) add(start, end);
     }
     for (const pattern of [
