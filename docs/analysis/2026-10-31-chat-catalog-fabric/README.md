@@ -23,7 +23,7 @@ Il frame automatizzato a 390 e 1440 px non sostituisce queste due prove.
 | Scheda | `createSyntheticCardBroker` | Storia, terapie e misure della fixture basic, mai archivio | Sessione paired, selezione, revisione byte e consenso nativo monouso | `synthetic-card-broker.test.ts`, `native-chat-access-frame.spec.ts`, Rust `chat_access::owner` | Scheda archivio non collegata; due host da qualificare |
 | Terapie in lettura | Stesso broker | Massimo due terapie sintetiche | Stesso consenso della scheda | Stesse prove | Lettura terapie archivio non collegata |
 | Farmaci | `RuntimeSession.chat_drug_search` → `drug_count` / `search_drugs`, servizio AIFA comune | Ricerca AIC/nome/principio attivo, massimo 20 risultati, solo vista app | Sessione, scope e selezione correnti; revisione byte e conferma nativa monouso | Spec frame e test Rust catalogo | Data di aggiornamento non verificata; qualificare i due host, nessuna prescrizione |
-| Protesica | `lib/prosthetic-prescription-write.ts`, `lib/reference-data/prosthetics-catalog-service.ts` | Nessuna azione chat | Nessun grant chat; writer richiede scope, versione e audit | Nessuna prova chat | Ricerca, lettura e revisione nel writer comune |
+| Protesica | `RuntimeSession.chat_prosthetics_search` → `createProstheticsCatalog.search` | Ricerca repertorio locale, massimo 20 voci, solo vista app | Capability lettura protesica, sessione, scope, selezione e conferma nativa monouso | Spec frame, test route e Rust owner | Prescrizioni archivio non collegate; qualificare i due host |
 | Riassunto | Patient Insight, Document Synthesis | Nessuna generazione chat collegata | Nessun grant chat; proposta e consenso Fabric richiesti | Nessuna prova chat | Tre provider più ChatGPT per funzione, fonti e negativi C-7 |
 | Stato terapia | `createChatTherapyStatusService`, `executeTherapyStatusInTransaction` | active/suspended/completed e rilettura ricevuta | Native admin, tre capability network, selezione/archivio correnti, CAS, PIN e conferma nativa | `chat-therapy-status.test.ts`, `native-chat-write-approval.test.ts`, spec frame, Rust owner | Due host reali, disponibilità controlli per ruolo/versione/capacità |
 | Nuovo paziente da PDF | `lib/native-patient-document.ts`, `lib/patient-document-create-command.ts` | Apre revisione nativa; nessun allegato chat usato | Selezione file e campi visti dal medico, revisione e conferma nativa, writer comune | `native-patient-document.test.ts`, `patient-document-create-command.test.ts`, spec frame | Due host reali; apertura non equivale a creazione |
@@ -218,3 +218,25 @@ arbitraria: occorre un raccordo dedicato ai servizi comuni con il confine di
 redazione qualificato. Non si amplia qui quel confine. Restano aperti C-7,
 C-8, tutte le celle generative e le prove desktop sul candidato. Treatment
 Reasoning resta indisponibile; Provider API fermi. Nessuna scrittura nuova.
+
+## Terza tranche: repertorio protesico
+
+La ricerca protesica riusa il percorso AIFA di richiesta, binding di sessione,
+scope, selezione, revisione byte e consumo monouso. Il servizio comune del
+repertorio è esposto da una route nominata di sola lettura con la capability
+protesica esistente. La proiezione scarta chiavi interne e mantiene codice,
+sistema, descrizione, versione, fonte e ambito. Ogni riga riceve una fonte opaca.
+Il frame valida uno schema chiuso e mostra le fonti anche da tastiera. Query e
+risultati restano app-only, senza aggiornare il contesto del modello.
+
+Catalogo assente, zero corrispondenze, troncamento a 20 risultati e aggiornamento
+non verificato restano distinti. Revoca, scadenza e cambio selezione consumano
+o ritirano i byte secondo il percorso esistente. Nessuna scrittura introdotta.
+
+Consegna parziale C-8: scheda archivio, terapie archivio, prescrizioni protesiche
+e riassunto restano non collegati. Il broker monouso attuale accetta soltanto
+la grammatica sintetica; non costituisce un confine qualificato per prosa clinica
+arbitraria. Non si aggira quel limite inviando i campi direttamente al frame.
+Le celle generative e C-7 restano aperti. Treatment Reasoning indisponibile,
+Provider API fermi. Prove desktop e review indipendente del diff finale richieste
+prima dell'integrazione. Nessuna qualifica clinica implicita.

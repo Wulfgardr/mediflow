@@ -283,7 +283,7 @@ const drugsPayload = () => JSON.stringify({ profile: 'mediflow.drug-catalog.v1',
 
 async function readDrugs(page: import('@playwright/test').Page, payload = drugsPayload()) {
     const frame = page.frameLocator('#access');
-    await frame.getByLabel('Nome farmaco, principio attivo o AIC').fill('metformina');
+    await frame.getByLabel('Ricerca catalogo: nome, codice o principio attivo').fill('metformina');
     await frame.getByRole('button', { name: 'Cerca farmaci', exact: true }).click();
     await expect(frame.getByRole('status')).toContainText('Conferma nella finestra MediFlow');
     await page.evaluate(payload => { Object.assign((window as unknown as { accessFixture: object }).accessFixture, { status: 'approved', payload }); }, payload);
@@ -351,5 +351,37 @@ for (const scenario of ['expiry', 'new-turn', 'teardown']) test(`drug results re
     else await page.locator('#access').evaluate((node, method) => {
         (node as HTMLIFrameElement).contentWindow!.postMessage({ jsonrpc: '2.0', method, id: 'retire' }, '*');
     }, scenario === 'new-turn' ? 'ui/notifications/tool-input' : 'ui/resource-teardown');
+    await expect(frame.locator('#card')).toBeHidden();
+});
+
+const prostheticsPayload = () => ({ profile: 'mediflow.prosthetics-catalog.v1', query: 'ausilio', freshness: 'unverified', limit: 20, truncated: false,
+    rows: [{ codeSystem: 'DEMO', code: 'DEMO-1', description: '<b>Ausilio inventato</b>', version: 'demo-1', source: 'Fonte sintetica', scope: 'Dimostrazione', sourceRef: 'src_' + 'a'.repeat(32) }] });
+for (const scenario of ['valid', 'empty', 'limit', 'unknown-field', 'token', 'wrong-profile', 'source', 'too-many', 'wrong-query']) test(`prosthetics catalog ${scenario}`, async ({ page }) => {
+    const value = prostheticsPayload();
+    if (scenario === 'empty') value.rows = [];
+    if (scenario === 'limit') { value.rows = Array.from({ length: 20 }, () => value.rows[0]); value.truncated = true; }
+    if (scenario === 'unknown-field') Object.assign(value.rows[0], { patientId: 'SENTINEL' });
+    if (scenario === 'token') value.rows[0].description = '{{MF_PII_' + 'b'.repeat(32) + '_1}}';
+    if (scenario === 'wrong-profile') value.profile = 'mediflow.synthetic-chat-card.v1';
+    if (scenario === 'source') value.rows[0].sourceRef = 'foreign';
+    if (scenario === 'too-many') value.rows = Array.from({ length: 21 }, () => value.rows[0]);
+    if (scenario === 'wrong-query') value.query = 'foreign';
+    const frame = page.frameLocator('#access');
+    await frame.getByLabel('Ricerca catalogo: nome, codice o principio attivo').fill('ausilio');
+    await frame.getByRole('button', { name: 'Cerca protesica e ausili' }).click();
+    await expect(frame.getByRole('status')).toContainText('Conferma nella finestra MediFlow');
+    await page.evaluate(payload => { Object.assign((window as unknown as { accessFixture: object }).accessFixture, { status: 'approved', payload }); }, JSON.stringify(value));
+    await frame.getByRole('button', { name: 'Mostra scheda monouso' }).click();
+    if (['valid','empty','limit'].includes(scenario)) {
+        await expect(frame.locator('#card')).toBeVisible();
+        if (scenario === 'valid') {
+            await expect(frame.locator('#card b')).toHaveCount(0);
+            await frame.getByRole('link', { name: 'Fonte 1', exact: true }).focus(); await page.keyboard.press('Enter');
+            await expect(frame.locator('#prosthetics-source-0')).toBeFocused();
+        }
+        if (scenario === 'empty') await expect(frame.locator('#card')).toContainText('Nessun ausilio trovato');
+        if (scenario === 'limit') await expect(frame.locator('#card')).toContainText('Limite di 20');
+        await frame.getByRole('button', { name: 'Revoca', exact: true }).click();
+    }
     await expect(frame.locator('#card')).toBeHidden();
 });
