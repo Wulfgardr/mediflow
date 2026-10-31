@@ -102,8 +102,9 @@ test('sentinels follow real SQLite, scheduled backup and FHIR artifacts after su
                 .run('backupScheduler', JSON.stringify({ version: 1, config: { enabled: true, destinationDir } }));
         };
         const backup = () => {
-            if (!fs.existsSync(env.MEDIFLOW_BACKUP_DEST_DIR) || fs.statSync(env.MEDIFLOW_BACKUP_DEST_DIR).isDirectory()) prepareSyntheticBackupDestination(dataDir, env.MEDIFLOW_BACKUP_DEST_DIR);
-            const result = execFileSync(process.execPath, ['scripts/run-scheduled-backup.mjs'],
+            const preload = !fs.existsSync(env.MEDIFLOW_BACKUP_DEST_DIR) || fs.statSync(env.MEDIFLOW_BACKUP_DEST_DIR).isDirectory()
+                ? prepareSyntheticBackupDestination(dataDir, env.MEDIFLOW_BACKUP_DEST_DIR) : null;
+            const result = execFileSync(process.execPath, [...(preload ? ['--import', preload] : []), 'scripts/run-scheduled-backup.mjs'],
                 { cwd: ROOT, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
             fs.appendFileSync(path.join(directory, 'operations.log'), result, { mode: 0o600 });
             return JSON.parse(result) as { ok: boolean; artifactPath?: string };

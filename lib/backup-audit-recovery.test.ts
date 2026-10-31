@@ -45,7 +45,7 @@ const LOADER = path.join(ROOT, 'scripts/register-strip-types-loader.mjs');
 const checksum = (payload: unknown) => createHash('sha256').update(stableStringify(payload)).digest('hex');
 
 function runNode(dataDir: string, args: string[], extra: Record<string, string> = {}): string {
-    if (extra.MEDIFLOW_BACKUP_DEST_DIR) prepareSyntheticBackupDestination(dataDir, extra.MEDIFLOW_BACKUP_DEST_DIR);
+    if (extra.MEDIFLOW_BACKUP_DEST_DIR) args = ['--import', prepareSyntheticBackupDestination(dataDir, extra.MEDIFLOW_BACKUP_DEST_DIR), ...args];
     return execFileSync(process.execPath, args, {
         cwd: ROOT, encoding: 'utf8',
         env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', ...extra },

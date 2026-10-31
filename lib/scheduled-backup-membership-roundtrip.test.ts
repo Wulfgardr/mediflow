@@ -44,8 +44,8 @@ test('scheduled backup roundtrip restores both ambulatory memberships for one pa
         }
 
         fs.mkdirSync(backupDir, { recursive: true });
-        prepareSyntheticBackupDestination(sourceDataDir, backupDir);
-        const runnerResult = JSON.parse(execFileSync(process.execPath, ['scripts/run-scheduled-backup.mjs'], {
+        const preload = prepareSyntheticBackupDestination(sourceDataDir, backupDir);
+        const runnerResult = JSON.parse(execFileSync(process.execPath, ['--import', preload, 'scripts/run-scheduled-backup.mjs'], {
             cwd: ROOT_DIR,
             env: {
                 ...process.env,

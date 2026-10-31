@@ -21,8 +21,8 @@ function fixture() {
     db.close();
     return { dir, target, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
-function child(script: string, dir: string) {
-    const worker = spawn(process.execPath, ['--import', './scripts/register-strip-types-loader.mjs', '--input-type=module', '-e', script], {
+function child(script: string, dir: string, preloads: string[] = []) {
+    const worker = spawn(process.execPath, ['--import', './scripts/register-strip-types-loader.mjs', ...preloads.flatMap(file => ['--import', file]), '--input-type=module', '-e', script], {
         cwd: root, env: { ...process.env, MEDIFLOW_DATA_DIR: dir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1' },
         stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     });
@@ -606,7 +606,7 @@ const schedulerWorker = `
     process.disconnect();
 `;
 function schedulerChild(dir: string, barrier = false, fail = false) {
-    return child(`process.env.SCHEDULER_BARRIER = '${barrier ? '1' : '0'}'; process.env.SCHEDULER_FAIL = '${fail ? '1' : '0'}';\n` + schedulerWorker, dir);
+    return child(`process.env.SCHEDULER_BARRIER = '${barrier ? '1' : '0'}'; process.env.SCHEDULER_FAIL = '${fail ? '1' : '0'}';\n` + schedulerWorker, dir, [path.join(dir, 'synthetic-backup-volume.mjs')]);
 }
 
 for (const fail of [false, true]) {

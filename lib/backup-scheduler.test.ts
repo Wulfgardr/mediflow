@@ -68,8 +68,8 @@ function withScheduledBackupFixture(check: (fixture: {
         }
     };
     const run = (force = false) => {
-        prepareSyntheticBackupDestination(dataDir, destinationDir);
-        const child = spawnSync(process.execPath, ['scripts/run-scheduled-backup.mjs'], {
+        const preload = prepareSyntheticBackupDestination(dataDir, destinationDir);
+        const child = spawnSync(process.execPath, ['--import', preload, 'scripts/run-scheduled-backup.mjs'], {
             cwd: fileURLToPath(new URL('..', import.meta.url)),
             encoding: 'utf8',
             env: {

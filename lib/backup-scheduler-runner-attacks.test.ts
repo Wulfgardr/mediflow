@@ -1,3 +1,5 @@
+import { publishScheduledBackup } from '../scripts/run-scheduled-backup.mjs';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -40,7 +42,7 @@ syncBuiltinESMExports();`);
     const run = (destination: string, fault = '', acknowledged = true) => {
         const config = { enabled: true, hour: 2, minute: 0, destinationDir: destination, retentionKeepArtifacts: 1, volumeProtectionAcknowledged: acknowledged, volumeProtectionIdentity: fs.existsSync(destination) ? backupDestinationIdentity(fs.realpathSync(destination)) : '' };
         db.prepare('INSERT INTO settings VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run('backupScheduler', JSON.stringify({ version: 1, config, run: { lastArtifactPath: 'preserved-previous-artifact' } }));
-        const child = spawnSync(process.execPath, ['--import', preload, 'scripts/run-scheduled-backup.mjs'], { encoding: 'utf8', env: { ...process.env, MEDIFLOW_DATA_DIR: data, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', MEDIFLOW_BACKUP_FORCE: '0', MEDIFLOW_BACKUP_DEST_DIR: '', FAULT: fault, EXCHANGE_DEST: destination, EXCHANGE_CLOUD: cloud } });
+        const child = spawnSync(process.execPath, ['--import', preload, 'scripts/run-scheduled-backup.mjs'], { cwd: fileURLToPath(new URL('..', import.meta.url)), encoding: 'utf8', env: { ...process.env, MEDIFLOW_DATA_DIR: data, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', MEDIFLOW_BACKUP_FORCE: '0', MEDIFLOW_BACKUP_DEST_DIR: '', FAULT: fault, EXCHANGE_DEST: destination, EXCHANGE_CLOUD: cloud } });
         assert.ifError(child.error);
         const result = JSON.parse(child.stdout);
         const state = JSON.parse((db.prepare('SELECT value FROM settings').get() as { value: string }).value);
@@ -82,8 +84,7 @@ syncBuiltinESMExports();`);
 
 
 for (const phase of ['before-open', 'after-open', 'before-link', 'after-link', 'readback', 'published-inode', 'temporary-inode']) {
-    test(`runner-attacks: directory or file exchange at ${phase} never confirms publication`, async t => {
-        const { publishScheduledBackup } = await import(new URL('../scripts/run-scheduled-backup.mjs', import.meta.url).href);
+    test(`runner-attacks: directory or file exchange at ${phase} never confirms publication`, t => {
         const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'backup-exchange-')));
         const destination = path.join(root, 'safe');
         const cloud = path.join(root, 'OneDrive - Synthetic');
