@@ -160,6 +160,7 @@ for (const name of ['Resources', 'Resources/WebRuntime', 'Resources/WebRuntime/.
 for (const [relative, message] of [
   ['Resources/scripts/local-api-tls-proxy.mjs', 'Nonphysical proxy destination'],
   ['Resources/lib/security/loopback-ingress.mjs', 'Nonphysical ingress module destination'],
+  ['Resources/lib/security/network-ingress-policy.mjs', 'Nonphysical network policy destination'],
   ['Resources/mediflow-headless-supervisor.mjs', 'Nonphysical Headless launcher destination'],
   ['Resources/WebRuntime/native-first-install.mjs', 'Nonphysical native first-install destination'],
   ['Resources/WebRuntime/native-first-install-contract.json', 'Nonphysical native first-install contract destination'],
@@ -341,6 +342,7 @@ fi
 mkdir -p "$RES/scripts" "$RES/lib/security"
 cp "$ROOT_DIR/scripts/local-api-tls-proxy.mjs" "$RES/scripts/local-api-tls-proxy.mjs"
 cp "$ROOT_DIR/lib/security/loopback-ingress.mjs" "$RES/lib/security/loopback-ingress.mjs"
+cp "$ROOT_DIR/lib/security/network-ingress-policy.mjs" "$RES/lib/security/network-ingress-policy.mjs"
 node "$ROOT_DIR/scripts/check-standalone-runtime-bundle.mjs" --tls-proxy-resources "$RES"
 # split the copied standalone payload before the strict Resources guard.
 # The original standalone stays usable. No symlink and no native bytes change.
