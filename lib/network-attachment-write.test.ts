@@ -1,3 +1,5 @@
+import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } from './network-patient-authority-test-fixture';
+import { clearAllSessions } from './security/server-session';
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -37,12 +39,18 @@ function bootstrapDatabase(): void {
 bootstrapDatabase();
 
 const { dbServer } = await import('./db-server.ts');
-const archiveGeneration = bindSyntheticArchiveSessions('synthetic-network-attachment');
-const { createNetworkScopedAttachment } = await import('./network-attachment-write.ts');
+bindSyntheticArchiveSessions('synthetic-network-attachment');
 
 const SCOPE_AMBULATORY = 'amb-attachment-write-scope';
 const OTHER_AMBULATORY = 'amb-attachment-write-other';
 const PATIENT_ID = 'patient-attachment-write-1';
+const cookieState = { cookies: new Map([['ambulatory_id', SCOPE_AMBULATORY]]) };
+const cleanupCookies = installNetworkPatientCookieFixture(DATA_DIR, cookieState);
+const authority = syntheticNetworkPatientAuthority(dbServer, SCOPE_AMBULATORY, {
+    clientId: 'client-attachment-write-test', userId: 'user-attachment-write-test',
+    capabilities: ['network.replica.write-documents'],
+});
+const { createNetworkScopedAttachment } = await import('./network-attachment-write.ts');
 
 // Real client-of-origin projection (D3, ADR 0076): the paired client sends
 // only patientId (from the path)/name/path/data/type/size, a proper subset
@@ -64,14 +72,9 @@ function validCreateBody(overrides: Record<string, unknown> = {}): Record<string
     };
 }
 
-function makeContext() {
-    return {
-        request: new Request('https://localhost/api/v1/network/patients/' + PATIENT_ID + '/attachments'),
-        patientId: PATIENT_ID,
-        scopeAmbulatoryId: SCOPE_AMBULATORY,
-        pairedClient: { clientId: 'client-attachment-write-test' } as never,
-        session: { id: 'synthetic-network-attachment', authChannel: 'native', archiveGeneration, userId: 'user-attachment-write-test' } as never,
-    };
+function makeContext(scopeAmbulatoryId = SCOPE_AMBULATORY) {
+    cookieState.cookies.set('ambulatory_id', scopeAmbulatoryId);
+    return { ...authority, patientId: PATIENT_ID, scopeAmbulatoryId };
 }
 
 function resetDatabase(): void {
@@ -234,7 +237,7 @@ test('network attachment create enforces the shared wire size limit', async () =
 test('network attachment create returns 404 when the patient is outside scope or soft-deleted', async () => {
     resetDatabase();
 
-    const outOfScopeContext = { ...makeContext(), scopeAmbulatoryId: OTHER_AMBULATORY };
+    const outOfScopeContext = makeContext(OTHER_AMBULATORY);
     const outOfScope = await createNetworkScopedAttachment(outOfScopeContext, validCreateBody());
     assert.equal(outOfScope.status, 404);
     assert.deepEqual(outOfScope.value, { error: 'Not found' });
@@ -307,7 +310,7 @@ test('ignored paired attachment insert fails without an orphan creation event', 
     }
 });
 
-test.after(() => fs.rmSync(DATA_DIR, { recursive: true, force: true }));
+test.after(() => { clearAllSessions(); cleanupCookies(); dbServer.$client.close(); fs.rmSync(DATA_DIR, { recursive: true, force: true }); });
 
 
 test('reviewed creates across web and paired writers reject a stale collection atomically', async () => {
@@ -341,7 +344,7 @@ test('reviewed paired create checks currentness, scope and exact membership befo
     dbServer.update(attachments).set({ documentRevision: 2 }).where(eq(attachments.id, row.id)).run();
     const before = atomicSnapshot();
     assert.equal((await createNetworkScopedAttachment(makeContext(), validCreateBody({ expectedCollection }))).status, 409);
-    assert.equal((await createNetworkScopedAttachment({ ...makeContext(), scopeAmbulatoryId: OTHER_AMBULATORY },
+    assert.equal((await createNetworkScopedAttachment(makeContext(OTHER_AMBULATORY),
         validCreateBody({ expectedCollection }))).status, 404);
     assert.deepEqual(atomicSnapshot(), before);
     for (const malformed of [null, {}, [expectedCollection[0], expectedCollection[0]],
@@ -358,12 +361,16 @@ test('reviewed paired create checks currentness, scope and exact membership befo
 test('separate host processes racing the same reviewed collection commit one attachment and one audit', { timeout: 30000 }, async t => {
     resetDatabase();
     const before = dbServer.select().from(auditEvents).all().length;
-    const context = makeContext();
     const script = `
         import { once } from 'node:events';
+        const { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } = await import('./lib/network-patient-authority-test-fixture.ts');
+        installNetworkPatientCookieFixture(process.env.MEDIFLOW_DATA_DIR, { cookies: new Map([['ambulatory_id', ${JSON.stringify(SCOPE_AMBULATORY)}]]) });
+        const { dbServer, openDbServer } = await import('./lib/db-server.ts'); openDbServer();
+        const context = { ...syntheticNetworkPatientAuthority(dbServer, ${JSON.stringify(SCOPE_AMBULATORY)}, {
+            clientId: 'client-attachment-write-test', userId: 'user-attachment-write-test',
+            capabilities: ['network.replica.write-documents'],
+        }), patientId: ${JSON.stringify(PATIENT_ID)} };
         const { createNetworkScopedAttachment } = await import('./lib/network-attachment-write.ts');
-        const context = ${JSON.stringify({ ...context, request: undefined })};
-        context.request = new Request('http://localhost/synthetic');
         const go = once(process.stdin, 'data');
         console.log('READY');
         await go;

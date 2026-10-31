@@ -1,3 +1,4 @@
+import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
@@ -20,7 +21,7 @@ const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-scoped-profile-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server');
 openDbServer();
-const cookieState: { cookies: Map<string, string>; onCookies?: () => Promise<void> | void } = { cookies: new Map() };
+const cookieState: { cookies: Map<string, string>; headers: Headers; onCookies?: () => Promise<void> | void } = { cookies: new Map(), headers: syntheticLoopbackRequest('http://127.0.0.1').headers };
 const cleanup = installNetworkPatientCookieFixture(dataDir, cookieState);
 const web = load('../app/api/patients/[id]/profile-query/route.ts') as typeof import('../app/api/patients/[id]/profile-query/route');
 const network = load('../app/api/v1/network/patients/[id]/profile-query/route.ts') as typeof import('../app/api/v1/network/patients/[id]/profile-query/route');
@@ -75,7 +76,7 @@ function request(lane: 'web' | 'network', body?: unknown) {
     headers.set('content-type', 'application/json'); headers.set('origin', 'http://127.0.0.1'); headers.set('sec-fetch-site', 'same-origin');
     headers.set('x-mediflow-archive-generation', currentArchiveGeneration());
     headers.set('x-mediflow-expected-ambulatory-id', 'scope-a');
-    return new Request('http://127.0.0.1/api/patients/' + patientA + '/profile-query', {
+    return syntheticLoopbackRequest('http://127.0.0.1/api/patients/' + patientA + '/profile-query', {
         method: body === undefined ? 'GET' : 'POST', headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
 }
@@ -291,7 +292,7 @@ for (const lane of ['web', 'network'] as const) test(`${lane}: scoped open, real
     reset(); if (lane === 'network') grant('ipados', ['network.replica.readonly-patients', 'network.replica.write-patient-profile']); select(lane);
     const initial = await (await query(lane, open(await epoch(lane)))).json() as ProfileResult;
     const writer = lane === 'web' ? writerWeb : writerNetwork;
-    const base = request(lane); const req = new Request(base.url, { method: 'PUT', headers: base.headers,
+    const base = request(lane); const req = syntheticLoopbackRequest(base.url, { method: 'PUT', headers: base.headers,
         body: JSON.stringify({ version: initial.currentness.revision, notes: 'ENC:aXY=:dXBkYXRlZA==' }) });
     const update = await writer.PUT(req, { params: Promise.resolve({ id: patientA }) });
     assert.equal(update.status, 200, await update.clone().text());
@@ -338,7 +339,7 @@ test('real browser archive transport permits A then B epoch acquisition while mi
     const calls: Array<{ path: string; generation: string | null; status: number }> = []; let reloads = 0;
     const browser = { location: { origin: 'http://127.0.0.1', href: 'http://127.0.0.1/patients/synthetic/modules', reload() { reloads++; } },
         dispatchEvent() {}, fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
-            const req = new Request(new URL(input instanceof Request ? input.url : String(input), 'http://127.0.0.1'), init);
+            const req = syntheticLoopbackRequest(new URL(input instanceof Request ? input.url : String(input), 'http://127.0.0.1'), init);
             req.headers.set('origin', 'http://127.0.0.1'); req.headers.set('sec-fetch-site', 'same-origin');
             const path = new URL(req.url).pathname;
             const response = path === '/api/patient-profile/selection-epoch' ? await epochWeb.GET(req)

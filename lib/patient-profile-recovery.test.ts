@@ -1,3 +1,4 @@
+import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
 /* WUL-579: the real notes writer and complete C15 recovery, with synthetic data only. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -30,7 +31,7 @@ const sourceDir = mkdtempSync(join(tmpdir(), 'mediflow-profile-review-recovery-s
 process.env.MEDIFLOW_DATA_DIR = sourceDir;
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server');
 openDbServer();
-const cookieState = { cookies: new Map<string, string>() };
+const cookieState = { cookies: new Map<string, string>(), headers: syntheticLoopbackRequest('http://127.0.0.1').headers };
 const cleanupCookies = installNetworkPatientCookieFixture(sourceDir, cookieState);
 const commitRoute = load('../app/api/patients/[id]/notes-commit/route.ts') as typeof import('../app/api/patients/[id]/notes-commit/route');
 const ordinaryRoute = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route');
@@ -46,7 +47,7 @@ const context = { params: Promise.resolve({ id: patientId }) };
 const destinations: string[] = [];
 
 function request(body: unknown) {
-    return new Request(`http://127.0.0.1/api/patients/${patientId}/notes-commit`, { method: 'POST', headers: {
+    return syntheticLoopbackRequest(`http://127.0.0.1/api/patients/${patientId}/notes-commit`, { method: 'POST', headers: {
         'content-type': 'application/json', origin: 'http://127.0.0.1', 'sec-fetch-site': 'same-origin',
         'x-mediflow-archive-generation': currentArchiveGeneration(),
     }, body: JSON.stringify(body) });

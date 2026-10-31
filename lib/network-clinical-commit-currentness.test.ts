@@ -41,6 +41,14 @@ function clients(context: ReturnType<typeof syntheticNetworkPatientAuthority>, c
     const value = JSON.stringify({ ...JSON.parse(serializeNetworkPairingState({ clients: [{ ...context.pairedClient, ...change }], intents: [] })), archiveGeneration: currentArchiveGeneration() });
     dbServer.update(settings).set({ value }).where(eq(settings.key, NETWORK_PAIRING_STATE_KEY)).run();
 }
+const writers: Record<string, Record<string, (context: unknown, body: unknown) => Promise<{ status: number }>>> = {
+    './network-attachment-write.ts': load('./network-attachment-write.ts'),
+    './network-checkup-write.ts': load('./network-checkup-write.ts'),
+    './network-therapy-write.ts': load('./network-therapy-write.ts'),
+    './network-observation-write.ts': load('./network-observation-write.ts'),
+    './service-prescription-write.ts': load('./service-prescription-write.ts'),
+    './prosthetic-prescription-write.ts': load('./prosthetic-prescription-write.ts'),
+};
 const cases = [
     ['attachment', 'documents', './network-attachment-write.ts', 'createNetworkScopedAttachment', null, { name: sealed, path: sealed, data: sealed, type: 'text/plain', size: 4 }, {}],
     ['checkup', 'checkups', './network-checkup-write.ts', 'createNetworkScopedCheckup', 'updateNetworkScopedCheckup', { id: 'synthetic-row', date, title: 'Synthetic', status: 'pending', source: 'manual' }, { title: 'Changed' }],
@@ -56,7 +64,7 @@ for (const [domain, capability, file, create, update, payload, patch] of cases) 
             test(`${domain} ${operation}: ${revoke} changed after admission denies with no write or success receipt`, async () => {
                 const context = fixture(`network.replica.write-${capability}`);
                 if (domain === 'service-item') dbServer.insert(servicePrescriptions).values({ id: 'synthetic-parent', patientId: context.patientId, prescribedAt: new Date(date), serviceName: 'Synthetic parent', status: 'prescribed', category: 'other', source: 'manual' }).run();
-                const writer = load(file) as Record<string, (context: unknown, body: unknown) => Promise<{ status: number }>>;
+                const writer = writers[file];
                 if (operation !== 'create') assert.equal((await writer[create](context, payload)).status, 201);
                 if (revoke === 'pairing') clients(context, { clientId: 'different-client' });
                 if (revoke === 'token') clients(context, { tokenHash: '0'.repeat(64) });

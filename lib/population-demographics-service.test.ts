@@ -1,3 +1,4 @@
+import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -21,7 +22,7 @@ const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-demographics-host-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server'); openDbServer();
 const prepareSnapshot = openDbServer().prepare.bind(openDbServer());
-const cookieState: { cookies: Map<string, string>; onCookies?: () => Promise<void> | void } = { cookies: new Map() };
+const cookieState: { cookies: Map<string, string>; headers: Headers; onCookies?: () => Promise<void> | void } = { cookies: new Map(), headers: syntheticLoopbackRequest('http://127.0.0.1').headers };
 const cleanup = installNetworkPatientCookieFixture(dataDir, cookieState);
 const route = load('../app/api/v1/network/analytics/demographics/route.ts') as typeof import('../app/api/v1/network/analytics/demographics/route');
 const scopeA = 'synthetic-demographics-a', scopeB = 'synthetic-demographics-b';
@@ -63,7 +64,7 @@ function request(query = 'minAge=0&maxAge=120&timeZone=UTC', headerChanges: Reco
         'x-mediflow-archive-generation': currentArchiveGeneration(),
     });
     for (const [key, value] of Object.entries(headerChanges)) { if (value === null) headers.delete(key); else headers.set(key, value); }
-    return new Request(`http://127.0.0.1/api/v1/network/analytics/demographics?${query}`, { headers, signal });
+    return syntheticLoopbackRequest(`http://127.0.0.1/api/v1/network/analytics/demographics?${query}`, { headers, signal });
 }
 function addPatient(id: string, values: Partial<typeof patients.$inferInsert> = {}, scopes = [scopeA]) {
     dbServer.insert(patients).values({ id, firstName: 'Persona', lastName: 'Sintetica', taxCode: 'SYNTHETIC-ONLY',

@@ -1,3 +1,5 @@
+import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } from './network-patient-authority-test-fixture';
+import { clearAllSessions } from './security/server-session';
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* synthetic real-SQLite candidate oracle for eight ordinary observation mutations. */
 import assert from 'node:assert/strict';
@@ -15,7 +17,7 @@ const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-c05-observation-synthetic-'
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 process.env.MEDIFLOW_LOCAL_API_TOKEN = 'c05-observation-synthetic-token';
 const state = { session: { id: 'synthetic-web', userId: 'synthetic-admin', role: 'admin', authChannel: 'web' } as Record<string, unknown> | null,
-    scopeAmbulatoryId: 'c05-observation-a' };
+    scopeAmbulatoryId: 'c05-observation-a', networkContext: null as ReturnType<typeof syntheticNetworkPatientAuthority> | null };
 const stateKey = Symbol.for(`c05-observation-seam-${dataDir}`);
 (globalThis as unknown as Record<symbol, typeof state>)[stateKey] = state;
 function seam(name: string, source: string) {
@@ -31,7 +33,7 @@ exports.forbiddenResponse=()=>Response.json({error:'Forbidden'},{status:403});`)
 const token = seam('token.cjs', `exports.requireLocalApiToken=(request)=>request.headers.get('authorization')==='Bearer c05-observation-synthetic-token'?null:Response.json({error:'Unauthorized'},{status:401});
 exports.hasValidLocalApiToken=(request)=>request.headers.get('authorization')==='Bearer c05-observation-synthetic-token';`);
 const network = seam('network.cjs', `const state=globalThis[Symbol.for(${JSON.stringify(`c05-observation-seam-${dataDir}`)})];
-exports.requireNetworkWriteContext=async(request)=>({ok:true,context:{request,scopeAmbulatoryId:state.scopeAmbulatoryId,pairedClient:{clientId:'synthetic-paired'},session:{id:'synthetic-native',userId:'synthetic-admin',role:'admin',authChannel:'native'}}});`);
+exports.requireNetworkWriteContext=async(request)=>({ok:true,context:{...state.networkContext,request,scopeAmbulatoryId:state.scopeAmbulatoryId}});`);
 const { registerHooks } = load('node:module') as {
     registerHooks: (hooks: { resolve: (specifier: string, context: unknown,
         next: (specifier: string, context: unknown) => { url: string }) => { url: string; shortCircuit?: boolean } }) => { deregister: () => void };
@@ -48,6 +50,11 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
 const archiveGeneration = bindSyntheticArchiveSessions('synthetic-web', 'synthetic-local', 'synthetic-native');
 openDbServer();
+state.networkContext = syntheticNetworkPatientAuthority(dbServer, state.scopeAmbulatoryId, {
+    userId: 'synthetic-admin', clientId: 'synthetic-paired', capabilities: ['network.replica.write-observations'],
+});
+const cookieState = { cookies: new Map([['ambulatory_id', state.scopeAmbulatoryId]]) };
+const cleanupCookies = installNetworkPatientCookieFixture(dataDir, cookieState);
 const { ambulatories, patients, patientsToAmbulatories, observations, servicePrescriptions, servicePrescriptionItems } = load('./schema.ts') as typeof import('./schema.ts');
 const webCreate = load('../app/api/observations/route.ts') as typeof import('../app/api/observations/route.ts');
 const webItem = load('../app/api/observations/[id]/route.ts') as typeof import('../app/api/observations/[id]/route.ts');
@@ -63,7 +70,7 @@ const nextId = (name: string) => `c05-observation-${++serial}-${name}`;
 test.after(() => {
     const report = process.env.MEDIFLOW_OBSERVATION_CANDIDATE_REPORT;
     if (report) writeFileSync(report, `${JSON.stringify({ records }, null, 2)}\n`);
-    sql.close(); dbServer.$client.close(); hooks.deregister();
+    clearAllSessions(); cleanupCookies(); sql.close(); dbServer.$client.close(); hooks.deregister();
     delete (globalThis as unknown as Record<symbol, typeof state>)[stateKey];
     rmSync(dataDir, { recursive: true, force: true });
 });
@@ -72,6 +79,7 @@ function seed(name: string, withObservation: boolean, deleted = false, archived 
     const patientId = nextId(`${name}-patient`);
     const observationId = nextId(`${name}-observation`);
     dbServer.insert(ambulatories).values({ id: 'c05-observation-a', name: 'Synthetic observation ambulatory', type: 'live' }).onConflictDoNothing().run();
+    dbServer.insert(ambulatories).values({ id: 'c05-observation-other', name: 'Synthetic other scope', type: 'live' }).onConflictDoNothing().run();
     dbServer.insert(patients).values({ id: patientId, firstName: 'Synthetic', lastName: 'Patient',
         taxCode: `SYN${serial}`, deletedAt: deleted ? new Date('2026-01-01T00:00:00Z') : null,
         notes: 'ENC:synthetic:patient', isArchived: archived }).run();
@@ -117,6 +125,8 @@ async function invoke(surface: Surface, operation: Operation, ids: { patientId: 
     if (surface === 'v1') return operation === 'POST' ? v1Create.POST(req, { params: Promise.resolve({ id: ids.patientId }) })
         : operation === 'PUT' ? v1Item.PUT(req, { params: Promise.resolve({ id: ids.patientId, observationId: ids.observationId }) })
             : v1Item.DELETE(req, { params: Promise.resolve({ id: ids.patientId, observationId: ids.observationId }) });
+    cookieState.cookies.set('ambulatory_id', state.scopeAmbulatoryId);
+    for (const [key, value] of state.networkContext!.request.headers) req.headers.set(key, value);
     return operation === 'POST' ? networkCreate.POST(req, { params: Promise.resolve({ id: ids.patientId }) })
         : networkItem.PUT(req, { params: Promise.resolve({ id: ids.patientId, observationId: ids.observationId }) });
 }
