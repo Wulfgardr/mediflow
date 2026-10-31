@@ -197,11 +197,17 @@ test('constructed signed zero is rejected before mutation while zero seconds sup
         assert.equal(repeated.error, null);
         assert.deepEqual(repeated.result?.audit, { coverage: 'included', inserted: 0, reused: 1 });
         assert.notDeepEqual(repeated.after.archive_generation, repeated.before.archive_generation);
-        assert.deepEqual({ ...repeated.after, archive_generation: undefined }, { ...repeated.before, archive_generation: undefined });
+        assert.equal(repeated.after.audit_events.length, repeated.before.audit_events.length + 1);
+        assert.deepEqual({ ...withoutImportEvents(repeated.after), archive_generation: undefined }, { ...withoutImportEvents(repeated.before), archive_generation: undefined });
         assert.equal((repeated.after.audit_events as { occurred_at: number; created_at: number | null }[])
             .filter(row => row.occurred_at === 0 && row.created_at === 0).length, 1);
     } finally { fs.rmSync(work, { recursive: true, force: true }); }
 });
+
+function withoutImportEvents(snapshot: Record<string, unknown>): Record<string, unknown> {
+    return { ...snapshot, audit_events: (snapshot.audit_events as { event_type: string }[])
+        .filter(row => !['backup.portable.imported', 'backup.audit.imported'].includes(row.event_type)) };
+}
 
 for (const coverage of ['omitted', 'included'] as const) {
     test(`${coverage} empty audit restore preserves preexisting target history and coverage`, async () => {
@@ -224,14 +230,15 @@ for (const coverage of ['omitted', 'included'] as const) {
             assert.equal(first.error, null); assert.equal(first.fence, 1); assert.equal(first.appendOnly, true);
             assert.deepEqual(first.result?.audit, { coverage, inserted: 0, reused: 0 });
             assert.equal(first.result?.sourceChecksum, raw.manifest.checksum);
-            assert.deepEqual(first.after.audit_events, first.before.audit_events);
-            assert.equal(first.after.audit_events.length, 2);
+            assert.deepEqual(withoutImportEvents(first.after).audit_events, first.before.audit_events);
+            assert.equal(first.after.audit_events.length, 3);
             assert.deepEqual(first.after.ambulatories.map(row => (row as { id: string }).id), ['coverage-after']);
             const repeated = restore(dir, artifactPath, mode + '-repeat');
             assert.equal(repeated.error, null);
             assert.deepEqual(repeated.result?.audit, { coverage, inserted: 0, reused: 0 });
             assert.notDeepEqual(repeated.after.archive_generation, repeated.before.archive_generation);
-        assert.deepEqual({ ...repeated.after, archive_generation: undefined }, { ...repeated.before, archive_generation: undefined });
+        assert.equal(repeated.after.audit_events.length, repeated.before.audit_events.length + 1);
+        assert.deepEqual({ ...withoutImportEvents(repeated.after), archive_generation: undefined }, { ...withoutImportEvents(repeated.before), archive_generation: undefined });
             const evidence = process.env.MEDIFLOW_AUDIT_EVIDENCE_DIR;
             if (evidence) fs.copyFileSync(artifactPath, path.join(evidence, mode + '.mediflow'));
         } finally { fs.rmSync(work, { recursive: true, force: true }); }
@@ -297,18 +304,20 @@ test('scheduled snapshot restores original audits, preserves target history and 
             assert.equal(first.result?.sourceChecksum, raw.manifest.checksum);
             assert.equal(first.appendOnly, true);
             const sourceAudits = source.prepare('SELECT * FROM audit_events ORDER BY event_id').all();
-            const recovered = target.prepare("SELECT * FROM audit_events WHERE event_id != 'synthetic-target-only' ORDER BY event_id").all();
+            const recovered = target.prepare("SELECT * FROM audit_events WHERE event_id != 'synthetic-target-only' AND event_type NOT IN ('backup.portable.imported','backup.audit.imported') ORDER BY event_id").all();
             assert.deepEqual(recovered, [...sourceAudits, ...initialTargetAudits].sort((a, b) => (a as { event_id: string }).event_id.localeCompare((b as { event_id: string }).event_id)));
+            assert.equal((target.prepare("SELECT COUNT(*) AS n FROM audit_events WHERE event_type = 'backup.audit.imported'").get() as { n: number }).n, 5);
             assert.equal((target.prepare("SELECT COUNT(*) AS n FROM audit_events WHERE event_id = 'synthetic-target-only'").get() as { n: number }).n, 1);
             const repeated = restore(targetDir, exported.artifactPath, 'repeat');
             assert.deepEqual(repeated.result?.audit, { coverage: 'included', inserted: 0, reused: 5 });
             assert.notDeepEqual(repeated.after.archive_generation, repeated.before.archive_generation);
-        assert.deepEqual({ ...repeated.after, archive_generation: undefined }, { ...repeated.before, archive_generation: undefined });
+        assert.equal(repeated.after.audit_events.length, repeated.before.audit_events.length + 1);
+        assert.deepEqual({ ...withoutImportEvents(repeated.after), archive_generation: undefined }, { ...withoutImportEvents(repeated.before), archive_generation: undefined });
 
             const reexport = JSON.parse(runNode(targetDir, ['scripts/run-scheduled-backup.mjs'], {
                 MEDIFLOW_BACKUP_FORCE: '1', MEDIFLOW_BACKUP_DEST_DIR: path.join(work, 'union'),
             })) as { artifactPath: string };
-            assert.equal(JSON.parse(fs.readFileSync(reexport.artifactPath, 'utf8')).payload.auditEvents.length, 7);
+            assert.equal(JSON.parse(fs.readFileSync(reexport.artifactPath, 'utf8')).payload.auditEvents.length, 14);
 
             for (const mode of ['collision', 'abort', 'ignore']) {
                 const dir = path.join(work, mode); prepare(dir);
