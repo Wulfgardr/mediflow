@@ -223,43 +223,6 @@ impl BackupScheduleConfig {
         {
             return Err(RuntimeError::InvalidInput);
         }
-        if self.enabled
-            && self
-                .destination_dir
-                .replace('\\', "/")
-                .split('/')
-                .any(|part| {
-                    let part = part.to_lowercase();
-                    [
-                        "mobile documents",
-                        "cloudstorage",
-                        "dropbox",
-                        "onedrive",
-                        "google drive",
-                        "googledrive",
-                        "icloud drive",
-                        "iclouddrive",
-                        "com~apple~clouddocs",
-                        "nextcloud",
-                        "owncloud",
-                        "pcloud",
-                        "box",
-                        "box sync",
-                        "mega",
-                        "synologydrive",
-                        "documents",
-                        "desktop",
-                    ]
-                    .iter()
-                    .any(|name| {
-                        part == *name
-                            || part.starts_with(&format!("{name} - "))
-                            || part.starts_with(&format!("{name}-"))
-                    })
-                })
-        {
-            return Err(RuntimeError::InvalidInput);
-        }
         Ok(())
     }
 }
@@ -430,7 +393,7 @@ mod backup_destination_tests {
                 .join("synthetic-backups")
                 .to_string_lossy()
                 .into();
-            assert!(config.validate().is_err());
+            assert!(config.validate().is_ok());
             config.enabled = false;
             assert!(config.validate().is_ok());
             config.enabled = true;
