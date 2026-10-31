@@ -235,7 +235,7 @@ fn rollout(value: Value) -> Result<RolloutReadiness> {
     }
     Ok(row)
 }
-fn retain_section<T>(result: Result<T>) -> Result<Result<T>> {
+pub(super) fn retain_section<T>(result: Result<T>) -> Result<Result<T>> {
     match result {
         Err(error) if error.retires_session() => Err(error),
         result => Ok(result),

@@ -14,6 +14,7 @@ pub(super) enum SettingsPage {
     Archives,
     Governance,
     References,
+    Controls,
 }
 
 impl SettingsPage {
@@ -30,6 +31,7 @@ impl SettingsPage {
             Self::Access => 8,
             Self::Governance => 9,
             Self::References => 10,
+            Self::Controls => 11,
         }
     }
 }
@@ -55,6 +57,9 @@ impl ClinicalApp {
         self.area_scroll.set_offset(gpui::point(px(0.), px(0.)));
         if page == SettingsPage::Profile {
             self.ensure_account_profile_loaded(cx);
+        }
+        if page == SettingsPage::Controls {
+            self.read_controls(cx);
         }
         if page == SettingsPage::Governance {
             self.read_governance(cx);
@@ -117,6 +122,7 @@ impl ClinicalApp {
         match self.settings_page {
             SettingsPage::Access => view.child(self.access_view(cx)),
             SettingsPage::Governance => view.child(self.governance_view(cx)),
+            SettingsPage::Controls => view.child(self.controls_view(cx)),
             SettingsPage::Archives => view.child(self.archives_view(cx)),
             SettingsPage::References => view.child(self.reference_administration_view(cx)),
             SettingsPage::Profile => view.child(self.account_profile_view(cx)),
@@ -164,6 +170,7 @@ impl ClinicalApp {
                         (SettingsPage::Appearance, "Aspetto", "Tema, dimensione del testo e privacy"),
                         (SettingsPage::Ambulatories, "Ambulatori", "Sedi e contesti clinici"),
                         (SettingsPage::Archives, "Archivi e backup", "Esportazione, verifica e ripristino"),
+                        (SettingsPage::Controls, "Controlli", "Evidenze, aggiornamenti, audit e redazione"),
                         (SettingsPage::References, "Repertori", "Stato, fonti e importazione dei cataloghi"),
                     ].into_iter().map(|(page, label, description)| self.settings_item(page, label, description, cx)))
                     .child(section("clinical-workspace-settings-intelligenza", "Intelligenza", theme))
@@ -252,7 +259,7 @@ mod tests {
                 window.draw(cx).clear(cx);
             });
             let nodes = rendered_command::take_text_nodes();
-            assert_eq!(nodes.len(), 9);
+            assert_eq!(nodes.len(), 10);
             let mut unique = HashSet::new();
             for (id, node) in nodes {
                 assert!(
@@ -282,6 +289,7 @@ mod tests {
                     SettingsPage::Functions,
                     SettingsPage::Archives,
                     SettingsPage::Governance,
+                    SettingsPage::Controls,
                 ] {
                     app.settings_page = page;
                     let layout = Layout::for_window(1200., 1.);
