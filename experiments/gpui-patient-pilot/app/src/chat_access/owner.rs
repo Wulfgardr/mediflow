@@ -21,6 +21,7 @@ const VIEW_IDLE: Duration = Duration::from_secs(300);
 pub(crate) enum State {
     Requested,
     DocumentOpened,
+    VoiceOpened,
     Preparing,
     Challenge,
     Approving,
@@ -35,6 +36,7 @@ impl State {
         match self {
             Self::Requested => "requested",
             Self::DocumentOpened => "document-opened",
+            Self::VoiceOpened => "voice-opened",
             Self::Preparing => "preparing",
             Self::Challenge => "challenge",
             Self::Approving => "approving",
@@ -79,6 +81,7 @@ pub(crate) struct Request {
     cancelled: Arc<AtomicBool>,
     therapy: Option<TherapyWrite>,
     document: bool,
+    voice: bool,
     recovery: Option<ChatWriteRecovery>,
     pub(crate) references: super::references::CommandReferences,
 }
@@ -109,6 +112,7 @@ impl Request {
             cancelled: Arc::new(AtomicBool::new(false)),
             therapy: None,
             document: false,
+            voice: false,
             recovery: None,
             references: super::references::CommandReferences::default(),
         })))
@@ -127,6 +131,21 @@ impl Request {
             return;
         }
         self.state = State::DocumentOpened;
+    }
+    pub(super) fn for_voice(peer: Peer, stream: UnixStream) -> Option<Pending> {
+        let request = Self::new(peer, stream)?;
+        request.lock().ok()?.voice = true;
+        Some(request)
+    }
+    pub(crate) fn voice_requested(&mut self) -> bool {
+        self.voice && self.status() == State::Requested
+    }
+    pub(crate) fn finish_voice_open(&mut self, opened: bool) {
+        if !self.voice_requested() || !opened {
+            self.withdraw();
+            return;
+        }
+        self.state = State::VoiceOpened;
     }
     pub(super) fn for_therapy(peer: Peer, stream: UnixStream, target: &str) -> Option<Pending> {
         let request = Self::new(peer, stream)?;
@@ -728,6 +747,33 @@ pub(crate) mod tests {
             p.state = State::Write(ChatWriteResolution::Uncertain);
         }
         (pending, remote)
+    }
+
+    pub(crate) fn voice_request() -> (Pending, UnixStream) {
+        let (a, b) = UnixStream::pair().unwrap();
+        (Request::for_voice(Peer::test_peer(), a).unwrap(), b)
+    }
+    #[test]
+    fn voice_handoff_never_has_a_transcript_payload_grant_or_writer() {
+        for opened in [true, false] {
+            let (pending, _remote) = voice_request();
+            let mut p = pending.lock().unwrap();
+            assert!(p.voice_requested());
+            assert!(p.begin_confirmation(true).is_none());
+            p.finish_voice_open(opened);
+            assert_eq!(
+                p.status(),
+                if opened {
+                    State::VoiceOpened
+                } else {
+                    State::Withdrawn
+                }
+            );
+            assert!(p.safe_result().is_none());
+            assert!(p.review().is_none());
+            assert!(p.begin_consume().is_none());
+            assert_eq!(p.status(), State::Withdrawn);
+        }
     }
 
     #[test]

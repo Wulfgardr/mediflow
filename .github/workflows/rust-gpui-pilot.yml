@@ -3,6 +3,9 @@ name: Rust GPUI connected client
 on:
   pull_request:
     paths:
+      - 'native/MediFlowMac/Sources/MediFlowCore/VisitRecordingStateContract.swift'
+      - 'native/MediFlowMac/Sources/MediFlowAppleShared/VisitRecording*.swift'
+      - 'native/MediFlowMac/Sources/MediFlowAppleShared/AppleVisitRecordingRuntime.swift'
       - 'experiments/gpui-patient-pilot/**'
       - 'app/fonts/**'
       - 'native/MediFlowMac/Sources/MediFlowAppleShared/Resources/Fonts/**'
@@ -29,6 +32,9 @@ on:
   push:
     branches: [main]
     paths:
+      - 'native/MediFlowMac/Sources/MediFlowCore/VisitRecordingStateContract.swift'
+      - 'native/MediFlowMac/Sources/MediFlowAppleShared/VisitRecording*.swift'
+      - 'native/MediFlowMac/Sources/MediFlowAppleShared/AppleVisitRecordingRuntime.swift'
       - 'experiments/gpui-patient-pilot/**'
       - 'app/fonts/**'
       - 'native/MediFlowMac/Sources/MediFlowAppleShared/Resources/Fonts/**'
