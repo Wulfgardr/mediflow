@@ -1,5 +1,5 @@
 {
-  "syncCommit": "623c71a3af9d3eb31c55a21c72381be13128545e",
+  "syncCommit": "4be9f54c3bbaaff13bd6e444eb359cb93f3ffb7c",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -32,7 +32,7 @@
   },
   "files": {
     "lib/therapy-status-confirmation.ts": "33eebc3197e988f3f1c134f1ac8499da1de95171e21d0ac7e3396c2a202c6486",
-    "components/therapy-manager.tsx": "9a543f8fdd887e06cac9daaaf399962d0d9f6707fc7ec6972d8007b81b38a509",
+    "components/therapy-manager.tsx": "35ff8ae61fc0e21cf52a3c641b460c634601b879497dc2a0f53c81d23a727308",
     "lib/db.ts": "bedd41c74084bd402e86fd6c28cb7900edfd19e73f265111ce865b74536b255a",
     "lib/security/client-auth-api.ts": "754aebaedb77bc9629a32d90f754ecc3ee7e89ead880c6add9088dd6449ee5ce",
     "lib/therapy-write-operation.ts": "f72e2fe81427c5b74a87db7fe79fc96f372553eff6e1ca0b6badf3fd0cd1f3ee",
