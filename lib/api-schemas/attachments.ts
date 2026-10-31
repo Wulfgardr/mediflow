@@ -14,7 +14,7 @@ const ocrQueueStateSchema = z.enum(DOCUMENT_OCR_QUEUE_STATES).optional();
 const ocrQueueReasonSchema = z.enum(DOCUMENT_OCR_QUEUE_REASONS).optional();
 
 export const attachmentCollectionSchema = z.array(z.object({
-    id: z.string().min(1).max(256),
+    id: requiredTextSchema,
     currentness: z.object({
         sourceRef: z.string().regex(/^[0-9a-f]{64}$/u),
         revision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
