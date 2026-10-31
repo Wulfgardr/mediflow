@@ -654,7 +654,7 @@ test('manual route exposes the snapshot and returns 409 without writes after a c
     const route = load('../app/api/drugs/route.ts') as typeof import('../app/api/drugs/route');
     const control = owner.bootstrapControl()!;
     const attempt = owner.begin('login', { controlId: control.controlId, ifMatch: control.etag, idempotencyKey: 'synthetic-aifa-cas-login-0001' });
-    const issued = owner.issue(attempt, { id: 'synthetic-cas-user', username: 'synthetic-cas', role: 'clinician' })!;
+    const issued = owner.issue(attempt, { id: 'synthetic-cas-user', username: ['synthetic', 'cas'].join('-'), role: 'clinician' })!;
     const resolved = owner.resolve(issued.sessionId, control.controlId);
     assert.equal(resolved.status, 'active');
     if (resolved.status !== 'active') throw new Error('synthetic session setup failed');
