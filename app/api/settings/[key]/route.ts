@@ -1,6 +1,7 @@
 import { RESTORE_RECEIPT_PREFIX } from '@/lib/backup-restore-receipt-contract';
 import { writeSettingWithFunctionModelGeneration } from '@/lib/ai-providers/fabric/function-model-settings-write';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
+import { hasAttestedLoopbackIngress } from '@/lib/security/loopback-ingress.mjs';
 import { NextResponse } from 'next/server';
 import { dbServer, runDbServerImmediateTransaction } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
@@ -8,7 +9,7 @@ import { eq } from 'drizzle-orm';
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
 import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
 import { isValidInsightSetting, normalizeSettingValue } from '@/lib/settings-value';
-import { evaluateSettingsWrite } from '@/lib/security/settings-write-policy';
+import { evaluateSettingsWrite, exposedNetworkModeAllowed } from '@/lib/security/settings-write-policy';
 
 export async function GET(
     request: Request,
@@ -64,9 +65,15 @@ export async function PUT(
         }
         const persistedValue = normalizeSettingValue(value);
 
+        if (key === 'network.mode' && !['local-only', 'network-home-base'].includes(persistedValue)) {
+            return NextResponse.json({ error: 'Invalid network mode' }, { status: 400 });
+        }
+        if (key === 'network.mode' && persistedValue === 'network-home-base'
+            && !exposedNetworkModeAllowed(session, hasAttestedLoopbackIngress(request))) {
+            return NextResponse.json({ error: 'Local administrator required', code: 'NETWORK_MODE_LOCAL_ADMIN_REQUIRED' }, { status: 403 });
+        }
         if (key === 'network.mode' && Object.hasOwn(body, 'expectedValue')) {
-            if (!['local-only', 'network-home-base'].includes(persistedValue)
-                || !(body.expectedValue === null || typeof body.expectedValue === 'string')) {
+            if (!(body.expectedValue === null || typeof body.expectedValue === 'string')) {
                 return NextResponse.json({ error: 'Invalid network mode precondition' }, { status: 400 });
             }
             const applied = runDbServerImmediateTransaction(() => {
