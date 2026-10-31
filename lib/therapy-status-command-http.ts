@@ -30,7 +30,7 @@ export async function therapyStatusCommandHttp(request: Request, commandId: stri
         if (!command || command.commandId !== commandId) return respond({ code: 'invalid' }, 400);
         if (operation === 'receipt') return respond(readTherapyStatusReceipt(session, command));
         const receipt = operation === 'execute' ? executeTherapyStatusCommand(session, command as TherapyStatusExecute) : closeTherapyStatusCommand(session, command);
-        return respond({ outcome: 'terminal', historical: false, receipt });
+        return respond({ outcome: 'terminal', origin: 'local', historical: false, receipt });
     } catch (error) {
         if (error instanceof TherapyStatusCommandDenied) return respond({ code: error.code }, error.code === 'invalid' ? 400 : error.code === 'collision' ? 409 : 403);
         return apiInternalError(`therapy-status-command:${operation}`, error);

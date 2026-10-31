@@ -327,6 +327,8 @@ public struct HostNetworkOverview: Decodable, Equatable, Sendable {
 public struct HostAuditSummary: Decodable, Equatable, Sendable {
     public let days: Int?
     public let totalEvents: Int?
+    public let importedEvents: Int?
+    public let importedIsTruncated: Bool?
     public let distinctActors: Int?
     public let outcomes: Outcomes?
     public let sourceSurfaces: SourceSurfaces?
@@ -351,7 +353,7 @@ public struct HostAuditSummary: Decodable, Equatable, Sendable {
         public var id: String { eventType ?? "-" }
     }
 
-    /// The route's own `isTruncated` is computed against its unclamped limit, so
+    /// The local audit sample and the imported history each have their own cap.
     /// it reads false even when the 200 clamp applied. This says what actually
     /// happened.
     public var reachedRecordCap: Bool { (totalEvents ?? 0) >= 200 }

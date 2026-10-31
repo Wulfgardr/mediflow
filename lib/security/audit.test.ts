@@ -18,6 +18,7 @@ import { hasValidLocalApiToken } from './local-api-auth';
 
 function buildAuditRecord(overrides: Partial<AuditRecord>): AuditRecord {
     return {
+        origin: 'local',
         schemaVersion: 1,
         eventId: 'evt-1',
         eventType: 'patient.updated',
@@ -357,6 +358,7 @@ test('summarizeAuditEvents groups PHI-safe operational KPIs', () => {
     assert.deepEqual(summary.subjectTypes, {
         backup: 0,
         audit_event: 0,
+        therapy_command: 0,
         session: 1,
         active_role_attestation: 0,
         patient: 2,

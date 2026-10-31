@@ -994,7 +994,7 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
                     assert.deepEqual(markers.map(row => row.subject_ref).sort(), sourceRows.map(row => row.event_id).sort());
                     assert.ok(markers.every(row => row.request_id === imports[0].event_id));
                 }
-                const targetRows = table === 'audit_events' ? allTargetRows.filter(row => !['backup.portable.imported', 'backup.audit.imported'].includes(String(row.event_type))) : allTargetRows;
+                const targetRows = table === 'audit_events' ? allTargetRows.filter(row => !['backup.portable.imported', 'backup.audit.imported', 'backup.therapy-command.imported'].includes(String(row.event_type))) : allTargetRows;
                 // The activation is a grant of the source host: the attestation reaches the target inactive.
                 const expectedRows: Array<Record<string, unknown>> = table === 'headless_soap_active_role_attestations'
                     ? sourceRows.map((row) => ({ ...row, status: 'inactive', issuer_ref: null, expires_at: null, activated_at: null }))

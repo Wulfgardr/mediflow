@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { isAbsolute, join } from 'node:path';
 import { serializeBackupArtifact } from '../lib/backup-artifact';
 import { bootstrapUnlockedSession } from './utils';
+import { loginWithWebAuthControl } from '../scripts/web-auth-control-test-client.mjs';
 import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
 test('comando terapia nativo, backup e importazione portabile conservano storico senza importare autorità', async ({ page, baseURL }) => {
@@ -53,6 +54,15 @@ test('comando terapia nativo, backup e importazione portabile conservano storico
         const now = Math.floor(Date.now() / 1000);
         artifact.payload.auditEvents.push({ eventId: forgedId, schemaVersion: 1, eventType: 'patient.updated', occurredAt: now, outcome: 'success', actorType: 'user', actorRef: actor.id, subjectType: 'patient', subjectRef: patientId, sourceSurface: 'web', requestId: null, redactedMetadata: null, createdAt: now });
         artifact.payload.physicianReviewAttestations = [{ actorRef: actor.id, schemaVersion: 'mediflow.physician-review-attestation.v1', capability: 'physician_terminal_review', status: 'active', attestationVersion: 1, policyVersion: 'physician_terminal_review.v1', revokedAt: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }];
+        const forgedCommandId = randomUUID(), forgedTherapyAuditId = randomUUID();
+        const originalCommand = artifact.payload.therapyStatusCommands.find((row: { commandId: string }) => row.commandId === command.commandId);
+        const forgedCommand = { ...originalCommand, commandId: forgedCommandId, auditEventId: forgedTherapyAuditId };
+        const forgedTherapyAudit = { ...JSON.parse(originalCommand.auditSnapshot), eventId: forgedTherapyAuditId, requestId: forgedCommandId };
+        forgedCommand.auditSnapshot = JSON.stringify(forgedTherapyAudit);
+        artifact.payload.therapyStatusCommands.push(forgedCommand);
+        artifact.payload.auditEvents.push(forgedTherapyAudit, ...Array.from({ length: 250 }, (_, index) => ({
+            ...forgedTherapyAudit, eventId: `u2-flood-${randomUUID()}`, occurredAt: now + index + 1, requestId: null,
+        })));
         const hostile = await serializeBackupArtifact(artifact.payload);
         for (const credential of [undefined, { pin: '99999999' }]) {
             const denied = await page.request.post('/api/system/backup-restore', { headers: { ...headers, ...(credential ? { 'x-mediflow-restore-credential': JSON.stringify(credential) } : {}) }, data: hostile });
@@ -75,6 +85,20 @@ test('comando terapia nativo, backup e importazione portabile conservano storico
         expect(db.prepare('SELECT event_type,source_surface FROM audit_events WHERE event_id=?').get(forgedId)).toEqual({ event_type: 'patient.updated', source_surface: 'web' });
         const stale = await page.request.post('/api/system/backup-restore', { headers: { ...headers, 'x-mediflow-restore-credential': JSON.stringify({ pin }) }, data: hostile });
         expect([401, 409]).toContain(stale.status());
+        const renewed = await loginWithWebAuthControl(baseURL!, { username: process.env.E2E_USERNAME || 'admin', password: pin });
+        expect(renewed.response.status).toBe(200);
+        if (!renewed.webHeaders?.Cookie) throw new Error('Renewed synthetic cookie required');
+        const readHeaders = { ...renewed.webHeaders, Cookie: renewed.webHeaders.Cookie, Origin: baseURL!, 'Sec-Fetch-Site': 'same-origin' };
+        const listed = await (await fetch(baseURL + '/api/system/audit?eventType=therapy.updated&limit=2', { headers: readHeaders })).json();
+        expect(listed).toHaveLength(1); expect(listed[0].eventId).toBe(execute.json.auditEventId); expect(listed[0].origin).toBe('local');
+        const summary = await (await fetch(baseURL + '/api/system/audit?view=summary&eventType=therapy.updated', { headers: readHeaders })).json();
+        expect(summary.totalEvents).toBe(1); expect(summary.sourceSurfaces.native).toBe(1); expect(summary.importedEvents).toBe(200); expect(summary.importedIsTruncated).toBe(true);
+        const { commandId: importedCommandId, protocol, archiveGeneration, patientId: importedPatientId, therapyId: importedTherapyId, expectedVersion } = forgedCommand;
+        const query = new URLSearchParams({ commandId: importedCommandId, protocol, archiveGeneration, patientId: importedPatientId, therapyId: importedTherapyId, expectedVersion: String(expectedVersion) });
+        const readReceipt = await fetch(baseURL + `/api/therapy-status-commands/${importedCommandId}/receipt?${query}`, { headers: readHeaders });
+        expect(readReceipt.status).toBe(200);
+        expect(await readReceipt.json()).toMatchObject({ outcome: 'terminal', origin: 'imported', historical: true, receipt: { outcome: 'applied' } });
+
     } finally { db.close(); }
 });
 

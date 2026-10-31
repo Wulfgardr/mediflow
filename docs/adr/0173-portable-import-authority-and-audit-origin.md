@@ -39,3 +39,26 @@ Prima del download, la UI richiede conferma delle categorie leggibili in
 chiaro e della destinazione protetta. I limiti del formato e le affermazioni
 sulla cifratura restano invariati. I dati clinici del file continuano a poter
 sostituire quelli attuali dopo conferma: occorre scegliere una fonte fidata.
+
+## Consumer dello storico importato
+
+Il read model dell'audit espone `origin: local | imported` senza modificare i
+campi originali. La lista ordinaria legge soltanto gli eventi locali;
+`origin=imported` legge separatamente lo storico importato. I marcatori tecnici
+sono esclusi dalla lista ordinaria, salvo filtro esplicito per tipo evento.
+Il riepilogo legge due campioni con limiti indipendenti: gli importati non
+consumano la capacità del campione locale e non contribuiscono a superfici,
+attori, esiti o tipi più frequenti locali. La loro quantità esaminata e la
+relativa eventuale troncatura sono esposte separatamente. Il limite effettivo
+è 200 per campione e la troncatura viene calcolata su tale limite.
+
+La ricevuta terapia espone la stessa origine. Il controller non mostra una
+ricevuta importata come registrazione eseguita da questo host, anche quando
+lo stato corrente della terapia coincide. Per comandi importati senza audit,
+come chiusure e rifiuti, l'importazione scrive anche
+`backup.therapy-command.imported`, collegato al comando e all'importazione
+locale; i comandi già presenti e identici conservano la provenienza locale.
+Il lettore conserva inoltre la compatibilità con gli import precedenti che
+avevano già marcato l'audit del comando applicato. Nessun campo del ledger
+viene riscritto. I marcatori sono un confine conservativo: anche marcatori
+contenuti nel file non possono promuovere un evento importato a locale.
