@@ -73,8 +73,9 @@ final class NativeFabricModel: ObservableObject {
               let fresh = try? snapshot() else { return false }
         return source.matches(fresh)
     }
-    var canPrepare: Bool { phase == .idle && !isWorking && !preparationInFlight }
+    var canPrepare: Bool { function.isAvailableInRelease && phase == .idle && !isWorking && !preparationInFlight }
     func prepare() {
+        guard function.isAvailableInRelease else { message = NativeOrdinaryFailureCode.treatmentReasoningUnavailableInRelease.safeReason; return }
         guard canPrepare else { return }
         do {
             let source = try snapshot().retained; original = source; generation &+= 1; let epoch = generation
