@@ -3,6 +3,7 @@ mod chatgpt;
 mod controls;
 mod governance;
 mod models;
+mod network;
 mod parameters;
 mod references;
 mod security;
@@ -26,6 +27,7 @@ enum Command {
     Delete(Arc<PreparedDocumentDeletion>),
     Switch(Arc<PreparedHostSetting>),
     Parameters(Arc<mediflow_runtime_client::PreparedInsightParameters>),
+    Network(Arc<mediflow_runtime_client::PreparedNetworkMode>),
 }
 enum Operation {
     Idle,
@@ -40,6 +42,7 @@ pub(super) struct LocalAdministration {
     archives: ArchiveArea,
     governance: governance::GovernanceArea,
     controls: controls::ControlsArea,
+    network: network::NetworkArea,
     references: references::ReferencesArea,
     security: security::SecurityArea,
     chatgpt: chatgpt::ChatGptArea,
@@ -84,6 +87,7 @@ impl LocalAdministration {
             ),
             governance: governance::GovernanceArea::default(),
             controls: controls::ControlsArea::default(),
+            network: network::NetworkArea::default(),
             references: references::ReferencesArea::new(theme, cx),
             security: security::SecurityArea::new(theme, cx),
             chatgpt: chatgpt::ChatGptArea::default(),
@@ -138,6 +142,7 @@ impl LocalAdministration {
         self.archives.withdraw(cx);
         self.governance.withdraw();
         self.controls = controls::ControlsArea::default();
+        self.network = network::NetworkArea::default();
         self.references.withdraw(cx);
         self.security.withdraw(cx);
         self.models.withdraw(cx);
@@ -271,6 +276,9 @@ impl ClinicalApp {
                     };
                     if this.settings_page == SettingsPage::Functions {
                         this.read_local_switches(cx);
+                    }
+                    if this.settings_page == SettingsPage::Host {
+                        this.read_network_mode(cx);
                     }
                     if this.settings_page == SettingsPage::Controls {
                         this.read_controls(cx);
@@ -429,13 +437,14 @@ impl ClinicalApp {
         self.local_host.operation = Operation::Applying(command.clone());
         let deleting = matches!(command, Command::Delete(_));
         let parameters = matches!(command, Command::Parameters(_));
+        let network = matches!(command, Command::Network(_));
         let retained = command.clone();
-        self.run_local_host(move ||match command {Command::Delete(command)=>access.delete_document(&command),Command::Switch(command)=>access.apply_switch(&command),Command::Parameters(command)=>access.apply_insight_parameters(&command)},move |this,result,cx| {
+        self.run_local_host(move ||match command {Command::Delete(command)=>access.delete_document(&command),Command::Switch(command)=>access.apply_switch(&command),Command::Parameters(command)=>access.apply_insight_parameters(&command),Command::Network(command)=>access.apply_network_mode(&command)},move |this,result,cx| {
             match result {
                 Ok(true)=>{
                     this.local_host.operation=Operation::Idle;
-                    this.verified=Some(if deleting {"Documento eliminato e assenza riletta dall’archivio."}else if parameters {"Parametri aggiornati e riletti dall’host."}else{"Funzione aggiornata e riletta dall’host."}.into());
-                    if deleting {this.patient.document_details_id=None;this.load_sections(cx);}else if parameters {this.read_parameters(cx);}else{this.load_ai_status(cx);this.read_local_switches(cx);}
+                    this.verified=Some(if network {"Modo host aggiornato e riletto."}else if deleting {"Documento eliminato e assenza riletta dall’archivio."}else if parameters {"Parametri aggiornati e riletti dall’host."}else{"Funzione aggiornata e riletta dall’host."}.into());
+                    if network {this.read_network_mode(cx);}else if deleting {this.patient.document_details_id=None;this.load_sections(cx);}else if parameters {this.read_parameters(cx);}else{this.load_ai_status(cx);this.read_local_switches(cx);}
                 }
                 Ok(false)=>this.local_host.operation=Operation::Unconfirmed{command:retained,message:"L’esito non è confermato dalla rilettura. Verifica lo stato corrente prima di preparare una nuova operazione.".into()},
                 Err(error)=>this.local_host.operation=Operation::Unconfirmed{command:retained,message:format!("{} Nessun reinvio automatico. Rileggi prima di preparare una nuova operazione.",ui_error(error))},
@@ -494,6 +503,8 @@ impl ClinicalApp {
                         self.settings_page,
                         SettingsPage::Archives
                             | SettingsPage::Access
+                            | SettingsPage::Danger
+                            | SettingsPage::Host
                             | SettingsPage::Models
                             | SettingsPage::Controls
                             | SettingsPage::Governance
@@ -617,6 +628,7 @@ impl ClinicalApp {
                         }
                     ),
                     Command::Parameters(command) => command.description(),
+                    Command::Network(command) => format!("Passare a {}?", command.mode().title()),
                     Command::Switch(command) => format!(
                         "{} {}?",
                         if command.enabled() {
@@ -652,6 +664,7 @@ impl ClinicalApp {
                                     "Documento conservato nella richiesta: {}",
                                     command.document().name
                                 ),
+                                Command::Network(command) => format!("Scelta conservata: {}. Rileggi il modo host prima di ripreparare.", command.mode().title()),
                                 Command::Parameters(_) => "Parametri conservati nella bozza. Rileggi prima di ripreparare.".into(),
                                 Command::Switch(command) => format!(
                                     "Scelta conservata: {} · {}",
@@ -679,7 +692,7 @@ impl ClinicalApp {
                                 this.local_host.operation = Operation::Idle;
                                 this.verified = None;
                                 if this.area == Area::Settings {
-                                    if parameters {this.read_parameters(cx);} else {this.read_local_switches(cx);}
+                                    if this.settings_page == SettingsPage::Host {this.read_network_mode(cx);}else if parameters {this.read_parameters(cx);} else {this.read_local_switches(cx);}
                                 } else {
                                     this.load_sections(cx);
                                 }

@@ -3,6 +3,7 @@ mod chatgpt;
 mod controls;
 mod governance;
 mod models;
+mod network;
 mod parameters;
 mod references;
 mod security;
@@ -17,6 +18,7 @@ pub use chatgpt::*;
 pub use controls::*;
 pub use governance::*;
 pub use models::*;
+pub use network::*;
 pub use parameters::*;
 pub use references::*;
 use reqwest::{
