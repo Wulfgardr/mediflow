@@ -1216,18 +1216,31 @@ mod tests {
         use std::io::{Read, Write};
         let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let address = listener.local_addr().unwrap();
-        let send = |request: &'static str| {
-            let mut client = std::net::TcpStream::connect(address).unwrap();
-            client.write_all(request.as_bytes()).unwrap();
-            client
+        let send = |chunks: &'static [&'static str]| {
+            std::thread::spawn(move || {
+                let mut client = std::net::TcpStream::connect(address).unwrap();
+                for chunk in chunks {
+                    client.write_all(chunk.as_bytes()).unwrap();
+                    std::thread::sleep(std::time::Duration::from_millis(30));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(400));
+            })
         };
-        let _probe = send("GET / HTTP/1.1\r\nhost: localhost\r\nuser-agent: node\r\n\r\n");
-        let _tls = send("\u{16}\u{3}\u{1}");
-        let _client = send("GET / HTTP/1.1\r\nhost: localhost\r\nuser-agent: reqwest\r\n\r\n");
+        // Split on purpose: the first segment alone looks like an ordinary GET.
+        let probe = send(&[
+            "GET / HTTP/1.1\r\nhost: localhost\r\n",
+            "user-agent: node\r\n\r\n",
+        ]);
+        let tls = send(&["\u{16}", "\u{3}\u{1}"]);
+        std::thread::sleep(std::time::Duration::from_millis(150));
+        let client = send(&["GET / HTTP/1.1\r\nhost: localhost\r\nuser-agent: reqwest\r\n\r\n"]);
         let (mut kept, _) = crate::test_loopback::accept(&listener).unwrap();
         let mut request = [0; 128];
         let read = kept.read(&mut request).unwrap();
         assert!(String::from_utf8_lossy(&request[..read]).ends_with("reqwest\r\n\r\n"));
+        for worker in [probe, tls, client] {
+            worker.join().unwrap();
+        }
     }
 
     #[test]
