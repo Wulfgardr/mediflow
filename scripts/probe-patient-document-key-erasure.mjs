@@ -5,13 +5,16 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import assert from 'node:assert/strict';
 
-const [binary, out] = process.argv.slice(2);
-if (!binary || !out) throw new Error('Usage: node scripts/probe-patient-document-key-erasure.mjs <example-binary> <new-evidence-directory>');
+const [binary, out, selection] = process.argv.slice(2);
+if (selection !== undefined && selection !== '--ci') throw new Error('Unknown probe selection');
+const sizes = selection === '--ci' ? [5] : [5, 10];
+const modes = selection === '--ci' ? ['403'] : ['403', 'cancel'];
+if (!binary || !out) throw new Error('Usage: node scripts/probe-patient-document-key-erasure.mjs <example-binary> <new-evidence-directory> [--ci]');
 fs.mkdirSync(out, { recursive: false });
 const root = path.resolve(import.meta.dirname, '..');
 const vector = JSON.parse(fs.readFileSync(path.join(root, 'native/contracts/crypto-golden-vectors.v3.json')));
 const ports = JSON.parse(fs.readFileSync(path.join(root, 'experiments/gpui-patient-pilot/transport/tests/fixtures/host-ports.json')));
-for (const mib of [5, 10]) for (const mode of ['403', 'cancel']) {
+for (const mib of sizes) for (const mode of modes) {
   const received = path.join(out, `received-${mib}-${mode}`);
   let posts = 0;
   const server = http.createServer(async (req, res) => {

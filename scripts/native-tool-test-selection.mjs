@@ -72,7 +72,7 @@ const gpuiPaths = [`${gpuiDirectory}/**`, 'app/fonts/**', 'native/MediFlowMac/So
   'public/brand/mediflow/*.svg', 'native/contracts/crypto-golden-vectors.v3.json', 'native/contracts/recovery-backup-golden.v1.json', 'app/api/**', 'lib/**', 'drizzle/**',
   'packages/web-auth-lifecycle-owner/**', 'package.json', 'package-lock.json', 'scripts/prepare-e2e-db.mjs',
   'scripts/web-auth-control-test-client.mjs', 'scripts/chat-card-*.mjs', 'scripts/*chat-therapy*', 'scripts/fixtures/chat-card-owned-tree.mjs',
-  'scripts/native-tool-test-selection.mjs', 'scripts/check-test-selection.test.mjs', gpuiWorkflow];
+  'scripts/native-tool-test-selection.mjs', 'scripts/probe-patient-document-key-erasure.mjs', 'scripts/check-test-selection.test.mjs', gpuiWorkflow];
 const gpuiTriggers = { pull_request: { paths: gpuiPaths }, push: { branches: ['main'], paths: gpuiPaths }, workflow_dispatch: null };
 // Closed, single-line TOML tables for this pilot's explicit Cargo targets. A new
 // target/feature/overlay needs a modeled binding before it can select tests.
@@ -224,6 +224,20 @@ export function collectGpuiComparisonSelection(root) {
   } };
 }
 
+export function collectPatientDocumentKeyErasureSelection(root) {
+  const runner = 'scripts/probe-patient-document-key-erasure.mjs';
+  const example = `${gpuiDirectory}/transport/examples/patient_document_key_erasure.rs`;
+  const suite = { workflow: gpuiWorkflow, job: 'native-tests', triggers: gpuiTriggers };
+  const build = collectLiteralCiBinding(root, { ...suite, ciCall: `cargo rustc --manifest-path ${gpuiDirectory}/Cargo.toml -p mediflow-runtime-client --example patient_document_key_erasure --locked -- -C opt-level=2` });
+  const binding = collectLiteralCiBinding(root, { ...suite, ciCall: `node ${runner} ${gpuiDirectory}/target/debug/examples/patient_document_key_erasure key-erasure-ci --ci` });
+  if (binding.jobIf !== null || build.jobIf !== null || binding.stepIf !== "runner.os == 'Linux'"
+    || build.stepIf !== binding.stepIf || build.stepIndex >= binding.stepIndex) throw new Error('Key erasure CI binding changed');
+  read(root, example); read(root, runner);
+  return { files: [example, runner], errors: [], mode: 'conditional', conditional: true, binding: {
+    ...binding, build, scope: 'Dedicated optimized executable, 5 MiB/403; cancellation and 10 MiB remain manual',
+  } };
+}
+
 const uiTarget = 'MediFlowMobileAppUITests';
 function swiftSources(root, folder) {
   const files = [];
@@ -294,6 +308,8 @@ export function collectNativeToolSelections(root) {
     catch (error) { result['http:gpui-therapy-withdraw'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
     try { result['python:gpui-bundle'] = collectGpuiBundleSelection(root); }
     catch (error) { result['python:gpui-bundle'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
+    try { result['memory:patient-document-key'] = collectPatientDocumentKeyErasureSelection(root); }
+    catch (error) { result['memory:patient-document-key'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
     try { result['http:gpui-comparison'] = collectGpuiComparisonSelection(root); }
     catch (error) { result['http:gpui-comparison'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
   }

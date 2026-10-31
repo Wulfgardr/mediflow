@@ -261,13 +261,21 @@ nessun consumer chat. Tempo host e conservazione storica secondo ADR0168.
 
 `lib/security/ambulatory-destructive-service.ts` ricontrolla paired corrente e WebP3 admin dedicata insieme al piano sotto IMMEDIATE, poi compone i core sincroni di `ambulatory-write.ts`, audit obbligatori e receipt. Replay/closed/rejected non inventano audit clinici. Tutti gli eventi paziente/default e aggregati applicati restano nello snapshot di conservazione server, escluso dalla receipt pubblica (ADR0169).
 
-## Comando paziente da documento C-6, senza caller runtime
+## Comando paziente da documento C-6
 
 `lib/patient-document-create-command.ts` prepara il comando descritto
-nell'incremento del 30 ottobre dell'[ADR 0042](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md).
-La transazione unica inserisce paziente, membership, fonte con currentness,
-`attachment.created` e `patient.created`. L'ultimo evento è anche la ricevuta
-idempotente del comando. `patient.create.retired` conserva il ritiro senza
-creare cartelle. Gli eventi sono obbligatori; un errore dell'audit fa rollback.
-Il servizio è ancora privo di ingressi applicativi: questa riga non dichiara
-una nuova superficie Web o nativa disponibile.
+nell'[ADR 0042](./adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md),
+usato dalla route nativa autenticata `POST /api/auth/native/patient-document`.
+Prima di restituire il riferimento, `open` registra `patient.create.issued`
+in una transazione IMMEDIATE con autorità corrente. Una riga per comando,
+con chiave `${commandId}:issued`, operatore e soli riferimenti opachi ad archivio,
+ambulatorio e dispositivo paired; nessun paziente, fonte o contenuto clinico.
+Il suffisso separa la prova di emissione dal terminale senza cambiare lo schema.
+
+La transazione di esecuzione inserisce paziente, membership, fonte con currentness,
+`attachment.created` e `patient.created`. L'ultimo evento, indicizzato dal comando,
+è anche la ricevuta idempotente. `patient.create.retired` conserva il ritiro senza
+creare cartelle. Senza pending, la revoca richiede un'emissione dello stesso
+proprietario esatto; altrimenti restituisce `unknown` senza scritture. La lettura
+della ricevuta resta pura e il terminale `applied` ha precedenza sull'emissione.
+Gli eventi sono obbligatori; un errore dell'audit fa rollback.

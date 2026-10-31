@@ -492,7 +492,9 @@ test('durable native receipt permits only the same operator device archive and s
     await assert.rejects(restart.preview(fresh, view.commandId, view.viewId, review()));
     const unknown = randomUUID();
     assert.deepEqual(await restart.receipt(fresh, unknown), { outcome: 'unknown' });
-    assert.deepEqual(await restart.revoke(fresh, unknown), { outcome: 'retired' });
+    const beforeUnknown = dbServer.$client.prepare('SELECT count(*) n FROM audit_events').get();
+    assert.deepEqual(await restart.revoke(fresh, unknown), { outcome: 'unknown' });
+    assert.deepEqual(dbServer.$client.prepare('SELECT count(*) n FROM audit_events').get(), beforeUnknown);
     const otherOperator = () => {
         const other = fixture(context.scopeAmbulatoryId);
         const user = { id: randomUUID(), username: randomUUID(), role: 'admin' };
@@ -506,7 +508,10 @@ test('durable native receipt permits only the same operator device archive and s
     for (const makeOther of [() => fixture(randomUUID()), otherOperator, () => fixture(context.scopeAmbulatoryId, { clientId: 'other-document-device' })]) {
         const other = makeOther();
         assert.deepEqual(await restart.receipt(other, randomUUID()), { outcome: 'unknown' }, 'negative test must have valid authenticated authority');
+        const beforeForeign = dbServer.$client.prepare('SELECT count(*) n FROM audit_events').get();
         await assert.rejects(restart.receipt(other, view.commandId));
+        assert.deepEqual(await restart.revoke(other, view.commandId), { outcome: 'unknown' });
+        assert.deepEqual(dbServer.$client.prepare('SELECT count(*) n FROM audit_events').get(), beforeForeign);
     }
 });
 
@@ -529,7 +534,7 @@ for (const previewed of [false, true]) test(`same owner new login can retire liv
     pairingState.clients.push(...previousClients);
     dbServer.update(settings).set({ value: JSON.stringify(pairingState) }).where(eq(settings.key, NETWORK_PAIRING_STATE_KEY)).run();
     assert.deepEqual(await api.receipt(otherDevice, randomUUID()), { outcome: 'unknown' });
-    await assert.rejects(api.revoke(otherDevice, view.commandId));
+    assert.deepEqual(await api.revoke(otherDevice, view.commandId), { outcome: 'unknown' });
     const user = { id: randomUUID(), username: randomUUID(), role: 'admin' };
     dbServer.insert(users).values({ ...user, passwordHash: 'synthetic-unusable', encryptedMasterKey: 'synthetic-unusable', salt: 'synthetic-unusable' }).run();
     const foreignSession = createNativeServerSession(user, {
@@ -538,12 +543,27 @@ for (const previewed of [false, true]) test(`same owner new login can retire liv
     bindSessionToArchive(foreignSession, currentArchiveGeneration());
     const otherOperator = { ...context, session: foreignSession };
     assert.deepEqual(await api.receipt(otherOperator, randomUUID()), { outcome: 'unknown' });
-    await assert.rejects(api.revoke(otherOperator, view.commandId));
+    assert.deepEqual(await api.revoke(otherOperator, view.commandId), { outcome: 'unknown' });
     assert.deepEqual(await api.receipt(fresh, view.commandId), { outcome: 'unknown' });
     assert.deepEqual(await api.revoke(fresh, view.commandId), { outcome: 'retired' });
     assert.deepEqual(await api.revoke(fresh, view.commandId), { outcome: 'retired' });
     await assert.rejects(api.preview(context, view.commandId, view.viewId, review()));
     await assert.rejects(api.execute(context, view.commandId, pin));
+});
+
+test('real HTTP receipt and revoke of an invented UUID are indistinguishable and leave every table unchanged', async () => {
+    const context = fixture(), commandId = randomUUID();
+    const tables = dbServer.$client.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all() as { name: string }[];
+    const counts = () => tables.map(({ name }) => dbServer.$client.prepare(`SELECT count(*) n FROM "${name.replaceAll('"', '""')}"`).get());
+    const before = counts();
+    for (const operation of ['receipt', 'revoke']) {
+        const response = await localPost(new Request('http://127.0.0.1/api/auth/native/patient-document', {
+            method: 'POST', headers: context.request.headers, body: JSON.stringify({ operation, commandId }),
+        }));
+        assert.equal(response.status, 200);
+        assert.deepEqual(await response.json(), { outcome: 'unknown' });
+        assert.deepEqual(counts(), before);
+    }
 });
 
 test('common command receipt remains opaque for chat and MCP consumers', async () => {

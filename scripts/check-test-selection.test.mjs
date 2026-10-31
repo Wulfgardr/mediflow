@@ -116,6 +116,26 @@ test('GPUI bundle tests bind to CI and reject a removed, masked or conditional i
   }
 });
 
+test('patient document memory probe requires the optimized executable before the Linux CI run', t => {
+  const key = 'memory:patient-document-key';
+  const selection = collectNativeToolSelections(sourceRoot)[key];
+  assert.deepEqual(selection.errors, []);
+  assert.deepEqual(selection.files, [`${pilot}/transport/examples/patient_document_key_erasure.rs`, 'scripts/probe-patient-document-key-erasure.mjs']);
+  for (const [before, after] of [
+    ['--example patient_document_key_erasure --locked -- -C opt-level=2', '--example patient_document_key_erasure --locked'],
+    ['key-erasure-ci --ci', 'key-erasure-ci --ci || true'],
+  ]) {
+    const root = pilotFixture(t);
+    for (const file of selection.files) {
+      mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+      writeFileSync(path.join(root, file), readFileSync(path.join(sourceRoot, file)));
+    }
+    assert.deepEqual(collectNativeToolSelections(root)[key].errors, []);
+    changePilot(root, pilotWorkflow, before, after);
+    assert.ok(collectNativeToolSelections(root)[key].errors.length);
+  }
+});
+
 test('GPUI runtime comparison binds all adapters and preparer to the actual CI command', t => {
   const selection = collectNativeToolSelections(sourceRoot)['http:gpui-comparison'];
   assert.deepEqual(selection.errors, []);

@@ -360,3 +360,37 @@ interamente nulli, nei blocchi da 1 a meno di 32 MiB inizializzati dal suo alloc
 Non verifica buffer interni di hyper o TLS, registri e stack delle librerie
 crittografiche, dump o memoria dopo l'arresto del processo. Non è una prova
 di esfiltrazione o una garanzia sulla pulizia dell'intero processo.
+
+
+### Autorità durevole della revoca, 31 ottobre 2026
+
+La preparazione registra una sola riga `patient.create.issued` in `audit_events`
+prima che `open` restituisca il riferimento. Il commit IMMEDIATE precede quindi
+la conservazione del codice sul client e qualsiasi uso del PIN. Un arresto prima
+del commit non può aver consegnato il codice; dopo il commit la prova sopravvive
+alla perdita dello stato RAM. Non contiene dati clinici o identificativi personali
+in chiaro: conserva gli stessi riferimenti opachi dei terminali, senza paziente
+o fonte. La chiave `${commandId}:issued` consente la ricerca sul primary key
+esistente, separata dal terminale con chiave `commandId`. Nessuna migrazione.
+
+Senza pending la revoca ammette solo il proprietario nativo paired corrente che
+coincide con emissione, archivio, operatore, dispositivo e ambulatorio. UUID
+inventati e comandi di altri proprietari restituiscono entrambi `unknown`, senza
+scrivere audit o bloccare il comando legittimo. La lettura resta pura, l'emissione
+non concede preview o execute a una nuova sessione, e il controllo del terminale
+nella stessa transazione conserva la precedenza di `applied`.
+
+Il limite di 128 ritiri per ora non serve più: un chiamante non può fabbricare
+righe con UUID casuali. Restano il massimo di 128 viste vive del servizio comune
+e, nella route autenticata, due preparazioni simultanee, sedici fonti conservate
+e una prenotazione per sessione. Nessuna scrittura di emissione prima del controllo
+dell'autorità; il superamento del limite delle viste non scrive. Ogni preparazione
+ammessa aggiunge una riga append-only anche se abbandonata; non si introduce qui
+una cancellazione dello storico o una nuova policy di conservazione.
+
+La CI Linux esegue il caso 5 MiB con risposta 403 in un eseguibile Rust separato,
+compilato con `cargo rustc` e `-C opt-level=2`, attraverso il runner con `--ci`.
+Il runner completo senza opzioni mantiene cancellazione e 10 MiB nella procedura
+manuale sopra. L'inventario verifica build ottimizzata e invocazione successiva,
+senza dichiarare copertura automatica dei tre casi manuali. Restano invariati
+ambito e limiti della prova di memoria.

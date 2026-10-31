@@ -218,15 +218,5 @@
     "path": "lib/local-operation/specialist/acceptance.test-support.ts",
     "reason": "WUL-791: Harness interattivo per Leonardo con helper nativo e Touch ID reale; richiede selezione, diniego e gesto personale. Non registra test automatici. Procedura in docs/analysis/2026-10-30-cu-acceptance/accettazione-leonardo.md.",
     "owner": "@Wulfgardr"
-  },
-  {
-    "path": "experiments/gpui-patient-pilot/transport/examples/patient_document_key_erasure.rs",
-    "reason": "PR 749: probe manuale della memoria con allocatore globale strumentato e realloc forzata. Richiede un eseguibile dedicato ottimizzato, l’host loopback e la procedura da 5/10 MiB dell’ADR 0042. Cargo all-targets lo compila, ma non ne esegue main; non è una prova automatica CI.",
-    "owner": "@Wulfgardr"
-  },
-  {
-    "path": "scripts/probe-patient-document-key-erasure.mjs",
-    "reason": "PR 749: runner manuale del probe di memoria patient_document_key_erasure. Richiede il percorso esplicito del binario strumentato e una directory di evidenze nuova; avvia soltanto un host sintetico loopback per errore e cancellazione a 5/10 MiB. Procedura nell’ADR 0042; non eseguito dalle suite CI.",
-    "owner": "@Wulfgardr"
   }
 ]
