@@ -1,5 +1,5 @@
 {
-  "syncCommit": "ffe46c8144f2351502e903dd79aa47b3dfd1e216",
+  "syncCommit": "2896ab6bc5dd06fc94c1c0c9555d0887ffc147d2",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -50,10 +50,10 @@
     "lib/ambulatory-destructive-command-recovery-schema.ts": "a61f0d6f31854f516f3ed25eccae5561d251ccc99fbbde07e65ff594e5934c53",
     "lib/api-table-response.ts": "5f19aab147a2d4459c1d2ec96e6c6d67bb20ad8c23b0cd9f38239771ffbb602c",
     "lib/backup-encrypted-fields.json": "27d036cb546f048f96ac4f8f9a5eca6f8360a798ba8cf7d173deb19328ac77e3",
-    "lib/backup-import-provenance.ts": "8aaa96bbf6d056928ad727f46271c2277491defa1336570c3707a68a7c0dbba3",
+    "lib/backup-import-provenance.ts": "81f0d6e2d0e9676734c308986681c84bf5d4b928e24effa628390a3f3ff17581",
     "lib/sqlite-schema.ts": "66f2641796c558334f1aa90346b4c936949cd4abce2d0b30dd06e3a284fcaea1",
     "lib/sqlite-schema-open.ts": "fdc16db4864b6fbbcb69634b6f0ada87542fe1e03204036d8406fdcb62c1d9a4",
-    "lib/backup-restore-executor.ts": "e522f7e2ad2aba463c9c59beeeb88e574c3b31d556a256c8b15489d7f9c13287"
+    "lib/backup-restore-executor.ts": "227af5f5806ab46a081e660b4462a628db9e3f44ecfeff30ea3e14cf9dbe03ea"
   },
   "verificationInputs": [
     "docs/formal/therapy-status/",
