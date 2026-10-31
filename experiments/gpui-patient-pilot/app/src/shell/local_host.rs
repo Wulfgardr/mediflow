@@ -3,6 +3,7 @@ mod chatgpt;
 mod governance;
 mod models;
 mod parameters;
+mod references;
 mod security;
 use super::*;
 use archives::ArchiveArea;
@@ -37,6 +38,7 @@ pub(super) struct LocalAdministration {
     pub(super) retirement: RetirementNotice,
     archives: ArchiveArea,
     governance: governance::GovernanceArea,
+    references: references::ReferencesArea,
     security: security::SecurityArea,
     chatgpt: chatgpt::ChatGptArea,
     models: models::ModelsArea,
@@ -79,6 +81,7 @@ impl LocalAdministration {
                 cx,
             ),
             governance: governance::GovernanceArea::default(),
+            references: references::ReferencesArea::new(theme, cx),
             security: security::SecurityArea::new(theme, cx),
             chatgpt: chatgpt::ChatGptArea::default(),
             models: models::ModelsArea::new(theme, cx),
@@ -96,13 +99,16 @@ impl LocalAdministration {
         }
     }
     pub(super) fn command_visible(&self) -> bool {
-        self.models.command_visible()
+        self.references.preview.is_some()
+            || self.references.who_consent
+            || self.models.command_visible()
             || self.security.has_work()
             || self.archives.has_work()
             || !matches!(self.operation, Operation::Idle)
     }
     pub(super) fn has_work(&self) -> bool {
-        self.chatgpt.busy()
+        self.references.busy
+            || self.chatgpt.busy()
             || self.models.has_work()
             || self.security.has_work()
             || self.archives.has_work()
@@ -128,6 +134,7 @@ impl LocalAdministration {
             .expect("local authority generation exhausted");
         self.archives.withdraw(cx);
         self.governance.withdraw();
+        self.references.withdraw(cx);
         self.security.withdraw(cx);
         self.models.withdraw(cx);
         self.chatgpt.withdraw();
@@ -155,6 +162,7 @@ impl LocalAdministration {
         window: &mut Window,
         cx: &mut Context<ClinicalApp>,
     ) {
+        self.references.configure(theme, cx);
         self.archives.configure(theme, window, cx);
         self.security.configure(theme, cx);
         self.models.configure(theme, cx);
@@ -262,6 +270,9 @@ impl ClinicalApp {
                     }
                     if this.settings_page == SettingsPage::Governance {
                         this.read_governance(cx);
+                    }
+                    if this.settings_page == SettingsPage::References {
+                        this.read_reference_catalog(cx);
                     }
                     if this.settings_page == SettingsPage::Models {
                         this.read_model_configuration(cx);
@@ -375,6 +386,15 @@ impl ClinicalApp {
         );
     }
     pub(super) fn cancel_local_command(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.local_host.references.busy
+            && (self.local_host.references.preview.is_some()
+                || self.local_host.references.who_consent)
+        {
+            self.local_host.references.preview = None;
+            self.local_host.references.who_consent = false;
+            cx.notify();
+            return;
+        }
         self.cancel_archive_restore(cx);
         if self.cancel_security_change(window, cx) || self.cancel_models_review(window, cx) {
             return;
@@ -468,6 +488,7 @@ impl ClinicalApp {
                             | SettingsPage::Access
                             | SettingsPage::Models
                             | SettingsPage::Governance
+                            | SettingsPage::References
                     )
                 }) {
                     pane = pane.children(rows.iter().map(|&(key, enabled)| {
