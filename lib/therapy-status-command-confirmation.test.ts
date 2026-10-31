@@ -50,7 +50,7 @@ test('only explicit confirmation sends once, marker opaque, unknown does not ret
 test('close resolves only from terminal host response and retains historical/current distinction', async () => {
     const f = fixture(), owner = f.make(); owner.begin(therapy, 'suspended', 'Inventato'); await owner.confirm();
     const command = f.journal.get(therapy.patientId)!;
-    f.setResponse({ outcome: 'terminal', historical: true, receipt: { ...command, actorRef: 'synthetic-actor', target: null, outcome: 'closed', reason: null, committedAt: 10, resultVersion: null, resultEndDate: null, auditEventId: null } });
+    f.setResponse({ outcome: 'terminal', origin: 'local', historical: true, receipt: { ...command, actorRef: 'synthetic-actor', target: null, outcome: 'closed', reason: null, committedAt: 10, resultVersion: null, resultEndDate: null, auditEventId: null } });
     await owner.close(); assert.equal(f.state()?.phase, 'reviewed'); assert.equal(f.state()?.historical, true);
     assert.equal(f.state()?.current?.version, 3); assert.equal(f.journal.get(therapy.patientId), null);
     assert.deepEqual(f.operations, ['execute', 'close']); assert.equal(owner.blocked, false);
@@ -73,7 +73,7 @@ for (const stop of ['lock', 'patient', 'timeout'] as const) test(`late execute c
     owner.begin(therapy, 'completed', 'Inventato'); const pending = owner.confirm(); await turn();
     if (stop === 'lock') f.lock(); if (stop === 'patient') f.leave();
     const command = f.journal.get(therapy.patientId)!;
-    resolve({ outcome: 'terminal', historical: false, receipt: { ...command, actorRef: 'synthetic-actor', target: 'completed', outcome: 'applied', committedAt: 10, resultEndDate: 10, resultVersion: 4, reason: null, auditEventId: 'synthetic-audit' } });
+    resolve({ outcome: 'terminal', origin: 'local', historical: false, receipt: { ...command, actorRef: 'synthetic-actor', target: 'completed', outcome: 'applied', committedAt: 10, resultEndDate: 10, resultVersion: 4, reason: null, auditEventId: 'synthetic-audit' } });
     await pending; await turn(); if (stop !== 'patient') assert.equal(f.state()?.phase, 'uncertain'); assert(f.journal.get(therapy.patientId)); assert(owner.blocked); assert.equal(f.calls(), 1);
 });
 test('storage unavailable denies before transport', async () => {
@@ -93,4 +93,21 @@ for (const field of ['drugName', 'dosage', 'status'] as const) test(`ENC2 in the
     owner.begin({ ...therapy, [field]: 'ENC2:invalid-file-field' }, 'completed', 'Sintetico');
     await owner.confirm();
     assert.equal(h.state()?.phase, 'unavailable'); assert.equal(h.calls(), 0);
+});
+
+test('an imported applied receipt is shown as imported history even when the current therapy matches', async () => {
+    const f = fixture(), owner = f.make();
+    owner.begin(therapy, 'active', 'Persona sintetica');
+    const command = f.state()!.command!;
+    f.setVersion(4);
+    f.setResponse({ outcome: 'terminal', origin: 'imported', historical: true, receipt: {
+        ...command, actorRef: 'synthetic-actor', target: 'active', outcome: 'applied', reason: null,
+        committedAt: 10, resultVersion: 4, resultEndDate: null, auditEventId: 'synthetic-imported-audit',
+    } });
+    await owner.confirm();
+    assert.equal(f.state()?.phase, 'reviewed');
+    assert.equal(f.state()?.origin, 'imported');
+    assert.equal(f.state()?.historical, true);
+    const source = readFileSync(new URL('../components/therapy-manager.tsx', import.meta.url), 'utf8');
+    assert.match(source, /Ricevuta importata da un file portabile/);
 });

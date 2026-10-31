@@ -166,7 +166,7 @@ impl LocalHostAccess {
             .as_str()
             .ok_or(RuntimeError::InvalidResponse)?;
         let material = crate::crypto::derive_v3(passphrase, salt)?;
-        let credential = Zeroizing::new(format!(r#"{{"verifier":"{}"}}"#, &*material.verifier));
+        let credential = Zeroizing::new(format!(r#"{{"verifier":"{}"}}"#, *material.verifier));
         headers.insert(
             "x-mediflow-restore-credential",
             sensitive_header(&credential)?,

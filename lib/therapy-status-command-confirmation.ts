@@ -6,6 +6,7 @@ export type DurableStatusState<T> = {
     phase: 'confirm' | 'writing' | 'reading' | 'conflict' | 'rejected' | 'uncertain' | 'reviewed' | 'registered' | 'unavailable';
     patientLabel: string; original?: T; target?: Status; current?: T; conflict: boolean;
     reason?: 'admission' | 'journal' | 'therapy'; newAttemptNotSent?: boolean; checking?: boolean;
+    origin?: 'local' | 'imported';
     readFailed?: boolean; writePending?: boolean; historical?: boolean; legacy?: boolean;
     receipt?: TherapyStatusReceipt; command?: TherapyStatusCommand;
 };
@@ -79,8 +80,8 @@ export function createDurableTherapyStatusConfirmation<T extends StatusTherapy>(
         const item = items.find(value => value.id === command.therapyId);
         await ports.journal.remove(command);
         if (!current(token, signal)) return;
-        publish({ ...state!, command: undefined, current: item, receipt: response.receipt, historical: response.historical,
-            phase: response.receipt.outcome === 'applied' && !response.historical && item?.version === response.receipt.resultVersion && item?.status === response.receipt.target ? 'registered' : 'reviewed', writePending: false });
+        publish({ ...state!, command: undefined, current: item, receipt: response.receipt, origin: response.origin, historical: response.historical,
+            phase: response.receipt.outcome === 'applied' && response.origin === 'local' && !response.historical && item?.version === response.receipt.resultVersion && item?.status === response.receipt.target ? 'registered' : 'reviewed', writePending: false });
         ports.refreshed();
     }
     async function inspect(items: T[], patientLabel: string) {
