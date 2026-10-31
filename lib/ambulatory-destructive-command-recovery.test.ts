@@ -12,11 +12,13 @@ import { assertAmbulatoryCommandPredecessorRecoverySchema } from './ambulatory-d
 const canonical = new Map([
     [4, 'a998dad7b46c831f283032144f43cd690f68e962b199256ecd68c11736f867ed'],
     [5, '33ce371c41f4cb51033af18ef9a0f06bf8c81a248bca29f18b21d3db9f24ea46'],
+    [6, '4becef1521ec507b3da31047e01ab3e25562197c8a518472bb4cdef93ed3867b'],
 ]);
-for (const version of [4, 5]) {
+for (const version of [4, 5, 6]) {
     function predecessor() {
         const db = new Database(':memory:'); initializeSqliteSchema(db);
-        db.exec('DROP TABLE ambulatory_destructive_commands');
+        db.exec('DROP TABLE portable_import_origins');
+        if (version < 6) db.exec('DROP TABLE ambulatory_destructive_commands');
         if (version === 4) db.exec('DROP TABLE therapy_status_commands');
         db.pragma(`user_version=${version}`); return db;
     }
@@ -57,7 +59,7 @@ test('false predecessor stamps cannot hide later or missing terminal ledgers', (
 test('failure after the new v6 DDL rolls back the predecessor ledger, account bytes and stamp', () => {
     const root = mkdtempSync(join(process.env.MEDIFLOW_DATA_DIR!, 'canonical5-rollback-')), file = join(root, 'medical.db');
     const original = openVersionedSqliteDatabase(file);
-    original.exec('DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
+    original.exec('DROP TABLE portable_import_origins; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
     original.prepare("INSERT INTO users(id,username,role,password_hash,encrypted_master_key,salt) VALUES ('synthetic-v5','synthetic-v5','admin','synthetic-hash','v3:synthetic-wrapped-key','synthetic-salt')").run();
     const user = original.prepare("SELECT * FROM users WHERE id='synthetic-v5'").get(); original.close();
     assert.throws(() => openVersionedSqliteDatabase(file, name => {

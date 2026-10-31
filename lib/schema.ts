@@ -597,3 +597,13 @@ export const ambulatoryDestructiveCommands = sqliteTable('ambulatory_destructive
     deviceTokenHash: text('device_token_hash').notNull(), outcome: text('outcome').notNull(), reason: text('reason'),
     committedAt: integer('committed_at').notNull(), resultJson: text('result_json'), auditSnapshots: text('audit_snapshots'),
 });
+
+export const portableImportOrigins = sqliteTable('portable_import_origins', {
+    kind: text('kind').notNull(),
+    ref: text('ref').notNull(),
+    importEventId: text('import_event_id').notNull().references(() => auditEvents.eventId),
+}, table => [
+    primaryKey({ columns: [table.kind, table.ref] }),
+    check('portable_import_origin_kind', sql`${table.kind} IN ('audit', 'therapy_command')`),
+    check('portable_import_origin_ref', sql`length(${table.ref}) > 0`),
+]);

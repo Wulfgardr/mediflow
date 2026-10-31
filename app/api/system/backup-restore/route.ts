@@ -224,6 +224,7 @@ export async function POST(request: Request) {
             );
         }
 
+        assertArchiveGeneration(dbServer, archiveGeneration);
         let credential: unknown;
         try { credential = JSON.parse(request.headers.get('x-mediflow-restore-credential') ?? 'null'); }
         catch { return apiFailure('restore_credential_required', 'Inserisci di nuovo la credenziale amministrativa.', 401); }

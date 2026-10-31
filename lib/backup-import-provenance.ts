@@ -3,16 +3,25 @@ import { sql, type SQLWrapper } from 'drizzle-orm';
 
 export type BackupOrigin = 'local' | 'imported';
 
-export function importedAuditPredicate(eventId: SQLWrapper) {
-    return sql<number>`EXISTS (SELECT 1 FROM audit_events AS imported_audit
-        WHERE imported_audit.event_type = 'backup.audit.imported'
-        AND imported_audit.subject_type = 'audit_event' AND imported_audit.subject_ref = ${eventId})`;
+export function ensurePortableImportOriginsSchema(db: Database.Database): void {
+    db.exec(`CREATE TABLE IF NOT EXISTS portable_import_origins (
+        kind TEXT NOT NULL CHECK (kind IN ('audit', 'therapy_command')),
+        ref TEXT NOT NULL CHECK (length(ref) > 0),
+        import_event_id TEXT NOT NULL REFERENCES audit_events(event_id),
+        PRIMARY KEY (kind, ref)
+    );
+    CREATE TRIGGER IF NOT EXISTS portable_import_origins_no_update BEFORE UPDATE ON portable_import_origins
+        BEGIN SELECT RAISE(ABORT, 'portable import origins is append-only'); END;
+    CREATE TRIGGER IF NOT EXISTS portable_import_origins_no_delete BEFORE DELETE ON portable_import_origins
+        BEGIN SELECT RAISE(ABORT, 'portable import origins is append-only'); END;`);
 }
 
-export function therapyCommandOrigin(db: Database.Database, commandId: string, auditEventId: string | null): BackupOrigin {
-    const imported = db.prepare(`SELECT 1 FROM audit_events WHERE
-        (event_type = 'backup.therapy-command.imported' AND subject_type = 'therapy_command' AND subject_ref = ?)
-        OR (event_type = 'backup.audit.imported' AND subject_type = 'audit_event' AND subject_ref = ?) LIMIT 1`)
-        .get(commandId, auditEventId);
-    return imported ? 'imported' : 'local';
+export function importedAuditPredicate(eventId: SQLWrapper) {
+    return sql<number>`EXISTS (SELECT 1 FROM portable_import_origins AS imported_audit
+        WHERE imported_audit.kind = 'audit' AND imported_audit.ref = ${eventId})`;
+}
+
+export function therapyCommandOrigin(db: Database.Database, commandId: string): BackupOrigin {
+    return db.prepare("SELECT 1 FROM portable_import_origins WHERE kind = 'therapy_command' AND ref = ?").get(commandId)
+        ? 'imported' : 'local';
 }

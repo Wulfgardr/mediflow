@@ -66,7 +66,7 @@ test('Backup: avviso completo e annullamento raggiungibili al 400 percento', asy
         await expect(panel).toBeVisible();
         const warning = panel.locator('p').first();
         await expect(warning).toContainText('Account e chiavi restano invariati.');
-        await expect(warning).toContainText('Lo storico protetto delle operazioni viene conservato.');
+        await expect(warning).toContainText('Lo storico viene conservato;');
         await mkdir(directory, { recursive: true });
         for (const theme of ['giorno', 'grafite']) {
             await page.setViewportSize({ width: 1440, height: 1000 }); await zoom.setZoom(4);
