@@ -71,3 +71,28 @@ Adottiamo l'opzione 3.
 2. Aggiungere runner headless che genera artifact v1 da SQLite.
 3. Esporre UI minima per enable/time/destination + `run now`.
 4. Salvare esito ultimo run e coprire il runner con smoke automatico.
+
+
+## Controlli della destinazione durante la pubblicazione
+
+Il runner conserva device e inode della directory verificata. Crea il temporaneo
+con apertura esclusiva, riverifica percorso fisico, device e inode prima di
+scrivere e prima e dopo la pubblicazione esclusiva con hard link. Confronta
+device e inode del file pubblicato con il descrittore del temporaneo e verifica
+i byte riletti. Un cambio rilevato produce errore, conserva il riferimento alla
+copia precedente e permette di eliminare soltanto il proprio temporaneo ancora
+identificabile. Un percorso cambiato può lasciare un temporaneo da esaminare.
+
+Questi controlli rilevano scambi ai confini delle operazioni, ma Node non offre
+`openat`: le operazioni a percorso non sono vincolate atomicamente al descrittore
+della directory. Un attaccante locale con accesso in scrittura alla directory
+di destinazione o ai suoi antenati è fuori dal modello di protezione di questo
+runner. Può ancora intervenire fra due controlli, reindirizzare una scrittura
+o ripristinare il percorso prima della verifica. I controlli non garantiscono
+assenza di uscita dei byte contro tale attaccante.
+
+La preview GPUI verifica la forma della configurazione senza dedurre il filesystem
+o la home dell'host dalla macchina client. Il server decide l'ammissibilità della
+destinazione; il runner la riverifica a ogni esecuzione. Il confronto lessicale
+usa normalizzazione Unicode NFC e case folding uniforme, anche sui percorsi
+risolti e sui nomi delle cartelle sincronizzate.

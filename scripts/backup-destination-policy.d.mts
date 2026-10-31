@@ -9,4 +9,4 @@ export function isSynchronizedBackupPath(value: string, options?: { platform?: s
 export function resolveBackupDestination(value: string): string;
 export function probeBackupVolume(destination: string, options?: { platform?: string; run?: (file: string, args: string[], input?: string) => string }): 'verified' | 'unencrypted' | 'unverified';
 export function backupDestinationIdentity(destination: string): string;
-export function validateBackupDestination(value: string, acknowledged?: boolean, acknowledgedIdentity?: string): { destination: string; protection: 'verified' | 'unencrypted' | 'unverified' };
+export function validateBackupDestination(value: string, acknowledged?: boolean, acknowledgedIdentity?: string): { destination: string; protection: 'verified' | 'unencrypted' | 'unverified'; directoryIdentity: { dev: number; ino: number } };

@@ -76,3 +76,50 @@ test('Windows suspended protection and partial encryption are rejected; Linux mu
     }
     assert.equal(probeBackupVolume('/synthetic', { platform: 'linux', run: file => file === 'findmnt' ? JSON.stringify({ filesystems: [{ source: '/dev/mapper/synthetic', fstype: 'btrfs' }] }) : JSON.stringify({ blockdevices: [{ type: 'crypt' }] }) }), 'unverified');
 });
+
+
+test('path-validation: canonical Unicode and case folding apply to every component and cloud variant', () => {
+    for (const platform of ['darwin', 'linux', 'win32']) {
+        const api = platform === 'win32' ? path.win32 : path.posix;
+        const root = platform === 'win32' ? 'C:\\Users' : '/home';
+        for (const homeForm of ['NFC', 'NFD'] as const) {
+            for (const destinationForm of ['NFC', 'NFD'] as const) {
+                const homeDir = api.join(root, 'Café').normalize(homeForm);
+                for (const component of ['Documents', 'Desktop']) {
+                    const destination = api.join(root, 'CAFÉ', component, 'backup').normalize(destinationForm);
+                    assert.equal(isSynchronizedBackupPath(destination, { platform, homeDir }), true);
+                }
+                for (const component of ['OneDrive - Café', 'Dropbox-Café']) {
+                    assert.equal(isSynchronizedBackupPath(api.join(root, component, 'backup').normalize(destinationForm), { platform, homeDir }), true);
+                }
+                assert.equal(isSynchronizedBackupPath(api.join(root, 'archive', 'Documents'), { platform, homeDir }), false);
+            }
+        }
+    }
+});
+
+test('path-validation: real macOS NFC/NFD home aliases cannot bypass Documents/Desktop', { skip: process.platform !== 'darwin' }, t => {
+    const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'backup-unicode-')));
+    try {
+        const home = path.join(root, 'Café');
+        fs.mkdirSync(home);
+        const nfc = fs.statSync(home.normalize('NFC'));
+        const nfd = fs.statSync(home.normalize('NFD'));
+        assert.equal(nfc.dev, nfd.dev);
+        assert.equal(nfc.ino, nfd.ino);
+        for (const component of ['Documents', 'Desktop']) fs.mkdirSync(path.join(home, component));
+        for (const homeForm of ['NFC', 'NFD'] as const) {
+            t.mock.method(os, 'homedir', () => home.normalize(homeForm));
+            for (const destinationForm of ['NFC', 'NFD'] as const) {
+                for (const component of ['Documents', 'Desktop']) {
+                    assert.throws(() => resolveBackupDestination(path.join(home, component).normalize(destinationForm)), /sincronizzata/);
+                }
+            }
+            t.mock.restoreAll();
+        }
+        const alias = path.join(root, 'home-alias');
+        fs.symlinkSync(home, alias, 'dir');
+        t.mock.method(os, 'homedir', () => alias);
+        assert.throws(() => resolveBackupDestination(path.join(home, 'Documents')), /sincronizzata/);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});

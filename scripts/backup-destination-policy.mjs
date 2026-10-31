@@ -18,13 +18,17 @@ export class BackupDestinationError extends Error {
   }
 }
 
+function foldPath(value) {
+  return value.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC');
+}
+
 export function isSynchronizedBackupPath(value, { platform = process.platform, homeDir = os.homedir() } = {}) {
   const api = platform === 'win32' ? path.win32 : path.posix;
-  const normalized = api.resolve(value).replaceAll('\\', '/').toLowerCase();
-  const home = api.resolve(homeDir).replaceAll('\\', '/').toLowerCase();
+  const normalized = foldPath(api.resolve(value).replaceAll('\\', '/'));
+  const home = foldPath(api.resolve(homeDir).replaceAll('\\', '/'));
   if (['documents', 'desktop'].some(name => normalized === `${home}/${name}` || normalized.startsWith(`${home}/${name}/`))) return true;
   return normalized.split('/').some(component => SYNC_DIRECTORY_NAMES.some(name => {
-    const lower = name.toLowerCase();
+    const lower = foldPath(name);
     return component === lower || component.startsWith(`${lower} - `) || component.startsWith(`${lower}-`);
   }));
 }
@@ -34,7 +38,7 @@ export function resolveBackupDestination(value) {
     throw new BackupDestinationError('Scegli una cartella assoluta esistente sul computer host.');
   }
   const realPath = fs.realpathSync(value);
-  if (isSynchronizedBackupPath(value) || isSynchronizedBackupPath(realPath)) {
+  if (isSynchronizedBackupPath(value) || isSynchronizedBackupPath(realPath) || isSynchronizedBackupPath(realPath, { homeDir: fs.realpathSync(os.homedir()) })) {
     throw new BackupDestinationError('La destinazione dei backup è in una cartella sincronizzata. Scegli una cartella locale su un volume cifrato.');
   }
   if (!fs.statSync(realPath).isDirectory() || realPath.startsWith('\\\\')) throw new BackupDestinationError('Scegli una cartella locale esistente.');
@@ -101,8 +105,9 @@ export function validateBackupDestination(value, acknowledged = false, acknowled
     if (error instanceof BackupDestinationError) throw error;
     throw new BackupDestinationError('La cartella di destinazione non è disponibile. Scegli una cartella esistente su un volume montato.');
   }
+  const directoryIdentity = fs.statSync(destination);
   const protection = probeBackupVolume(destination);
   if (protection === 'unencrypted') throw new BackupDestinationError('Il volume della destinazione non risulta cifrato. Attiva la cifratura prima di programmare il backup.');
   if (protection !== 'verified' && (acknowledged !== true || (acknowledgedIdentity !== undefined && acknowledgedIdentity !== backupDestinationIdentity(destination)))) throw new BackupDestinationError('Cifratura del volume non verificabile da MediFlow. È richiesta la conferma esplicita del requisito del volume cifrato.');
-  return { destination, protection };
+  return { destination, protection, directoryIdentity };
 }
