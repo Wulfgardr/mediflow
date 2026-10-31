@@ -38,7 +38,7 @@ test('GPUI local authority restores with confirmation, atomic snapshot and durab
     };
     const restore = (headers: Record<string, string>, backup: unknown) => {
         syntheticDatabase().close();
-        return request.post('/api/system/backup-restore', { headers, data: backup });
+        return request.post('/api/system/backup-restore', { headers: { ...headers, 'x-mediflow-restore-credential': JSON.stringify({ pin: process.env.E2E_PIN || '1234' }) }, data: backup });
     };
     let headers = await login();
     const forge = async (key: string, value: string, auth: Record<string, string>) => {
@@ -56,7 +56,7 @@ test('GPUI local authority restores with confirmation, atomic snapshot and durab
     expect(created.status(), await created.text()).toBe(201);
     const patient = (await created.json()).id;
     const backup = await (await request.get('/api/system/backup-restore')).json();
-    const verified = await request.post('/api/system/backup-restore/verify', { headers, data: backup });
+    const verified = await request.post('/api/system/backup-restore/verify', { headers: { ...headers, 'x-mediflow-restore-credential': JSON.stringify({ pin: process.env.E2E_PIN || '1234' }) }, data: backup });
     expect(verified.status(), await verified.text()).toBe(200);
     const preview = await verified.json();
     const id = randomUUID();
@@ -81,7 +81,7 @@ test('GPUI local authority restores with confirmation, atomic snapshot and durab
         expect(conflict.status(), await conflict.text()).toBe(409);
         expect((await conflict.json()).reason).toBe('snapshot');
         expect((await request.get(`/api/system/backup-restore/receipts/${id}`)).status()).toBe(404);
-        const fresh = await (await request.post('/api/system/backup-restore/verify', { headers, data: backup })).json();
+        const fresh = await (await request.post('/api/system/backup-restore/verify', { headers: { ...headers, 'x-mediflow-restore-credential': JSON.stringify({ pin: process.env.E2E_PIN || '1234' }) }, data: backup })).json();
         intent = { ...intent, 'x-mediflow-restore-snapshot': fresh.expectedSnapshot };
         const restored = await restore(intent, backup);
         expect(restored.status(), await restored.text()).toBe(200);

@@ -13,8 +13,9 @@ test('comando terapia nativo, backup e importazione portabile conservano storico
         test.skip(true, 'Richiede un server sintetico isolato.'); return;
     }
     const pin = process.env.E2E_PIN || '1234';
+    await fetch(baseURL + '/api/auth/native/therapy-status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     await bootstrapUnlockedSession(page, pin);
-    const headers = await trustedArchiveWebRequestHeaders(page);
+    const headers = { ...await trustedArchiveWebRequestHeaders(page), 'Content-Type': 'application/json' };
     const db = new Database(join(dir, 'medical.db'), { fileMustExist: true });
     const patientId = randomUUID(), therapyId = randomUUID(), forgedId = randomUUID();
     const actor = db.prepare('SELECT id FROM users WHERE username=?').get(process.env.E2E_USERNAME || 'admin') as { id: string };
@@ -55,7 +56,7 @@ test('comando terapia nativo, backup e importazione portabile conservano storico
         const hostile = await serializeBackupArtifact(artifact.payload);
         for (const credential of [undefined, { pin: '99999999' }]) {
             const denied = await page.request.post('/api/system/backup-restore', { headers: { ...headers, ...(credential ? { 'x-mediflow-restore-credential': JSON.stringify(credential) } : {}) }, data: hostile });
-            expect(denied.status()).toBe(401);
+            expect(denied.status(), await denied.text()).toBe(401);
             expect(db.prepare('SELECT first_name FROM patients WHERE id=?').get(patientId)).toEqual({ first_name: 'Persona' });
             expect(db.prepare('SELECT * FROM therapy_status_commands WHERE command_id=?').get(command.commandId)).toEqual(ledger);
             expect(db.prepare('SELECT * FROM audit_events WHERE event_id=?').get(forgedId)).toBeUndefined();
