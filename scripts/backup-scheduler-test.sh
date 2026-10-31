@@ -9,10 +9,20 @@ OUT_DIR="$TMP_DIR/out"
 
 rm -rf "$TMP_DIR"
 mkdir -p "$OUT_DIR"
+PRELOAD=$(ROOT_DIR="$ROOT_DIR" TMP_DIR="$TMP_DIR" node --input-type=module <<'NODE'
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const { createSyntheticBackupVolumePreload } = await import(pathToFileURL(path.join(process.env.ROOT_DIR, 'lib/scheduled-backup.test-support.ts')).href);
+console.log(createSyntheticBackupVolumePreload(process.env.TMP_DIR));
+NODE
+)
+export NODE_OPTIONS="${NODE_OPTIONS:-} --import=$PRELOAD"
+export MEDIFLOW_DATA_DIR="$DATA_DIR" MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1
 
 MEDIFLOW_DATA_DIR="$DATA_DIR" MEDIFLOW_E2E_DATA_DIR="$DATA_DIR" node "$ROOT_DIR/scripts/prepare-e2e-db.mjs"
 
-DATA_DIR="$DATA_DIR" node --input-type=module <<'NODE'
+DATA_DIR="$DATA_DIR" OUT_DIR="$OUT_DIR" node --input-type=module <<'NODE'
+import fs from 'node:fs';
 import Database from 'better-sqlite3';
 import path from 'path';
 
@@ -34,12 +44,14 @@ db.prepare(`
   version: 1,
   config: {
     enabled: true,
+    volumeProtectionAcknowledged: true,
+    volumeProtectionIdentity: `${fs.realpathSync(process.env.OUT_DIR)}:${fs.statSync(process.env.OUT_DIR).dev}`,
     hour: 2,
     minute: 0,
-    destinationDir: path.join(dataDir, 'backups'),
+    destinationDir: process.env.OUT_DIR,
     retentionKeepArtifacts: 1,
   },
-  run: {},
+  run: { lastRetentionAt: '2026-01-01T00:00:00.000Z', lastRetentionDeletedCount: 7, lastRetentionDeletedBytes: 123, lastRetentionMode: 'manual' },
 }));
 db.close();
 NODE
@@ -69,11 +81,11 @@ if (!result.ok) {
 if (!result.artifactPath || !fs.existsSync(result.artifactPath)) {
   throw new Error('Scheduled backup artifact was not created.');
 }
-if (fs.existsSync(path.join(path.dirname(result.artifactPath), 'mediflow-backup-v1-2026-03-17T00-00-00.000Z.mediflow'))) {
-  throw new Error('Retention did not remove the stale backup artifact.');
+if (fs.readFileSync(path.join(path.dirname(result.artifactPath), 'mediflow-backup-v1-2026-03-17T00-00-00.000Z.mediflow'), 'utf8') !== 'old artifact') {
+  throw new Error('Scheduled backup changed an earlier artifact.');
 }
-if (fs.existsSync(path.join(path.dirname(result.artifactPath), 'mediflow-backup-v1-2026-03-17T00-00-00.000Z.mediflow.tmp'))) {
-  throw new Error('Retention did not remove the orphan temp file.');
+if (fs.readFileSync(path.join(path.dirname(result.artifactPath), 'mediflow-backup-v1-2026-03-17T00-00-00.000Z.mediflow.tmp'), 'utf8') !== 'orphan temp') {
+  throw new Error('Scheduled backup changed an orphan temp file.');
 }
 if (!fs.existsSync(path.join(path.dirname(result.artifactPath), 'mediflow-backup-v1-current.mediflow.tmp'))) {
   throw new Error('Retention removed a recent temp file.');
@@ -162,6 +174,20 @@ if (!result.ok || !result.artifactPath || !fs.existsSync(result.artifactPath)) {
 if (fs.existsSync(path.join(OUT_DIR, '.mediflow-backup.lock'))) {
   throw new Error('Runner did not release the recovered corrupted backup lock.');
 }
+NODE
+
+DATA_DIR="$DATA_DIR" node --input-type=module <<'NODE'
+import Database from 'better-sqlite3';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+const db = new Database(path.join(process.env.DATA_DIR, 'medical.db'), { readonly: true });
+try {
+  const state = JSON.parse(db.prepare('SELECT value FROM settings WHERE key = ?').get('backupScheduler').value);
+  assert.equal(state.run.lastRetentionAt, '2026-01-01T00:00:00.000Z');
+  assert.equal(state.run.lastRetentionDeletedCount, 7);
+  assert.equal(state.run.lastRetentionDeletedBytes, 123);
+  assert.equal(state.run.lastRetentionMode, 'manual');
+} finally { db.close(); }
 NODE
 
 node "$ROOT_DIR/scripts/run-strip-types.mjs" --test "$ROOT_DIR/lib/backup-scheduler.test.ts"

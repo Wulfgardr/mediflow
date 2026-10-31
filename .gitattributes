@@ -9,6 +9,7 @@ scripts/anydoc-pdf-renderer-profiles.json text eol=lf
 
 # @Codex: keep scheduled-backup source hashes stable across checkouts.
 scripts/run-scheduled-backup.mjs text eol=lf
+scripts/backup-destination-policy.mjs text eol=lf
 scripts/scheduled-backup-date-fields.mjs text eol=lf
 lib/sqlite-maintenance-admission.mjs text eol=lf
 lib/sqlite-durability.mjs text eol=lf

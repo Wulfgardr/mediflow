@@ -1,3 +1,4 @@
+import { createSyntheticBackupVolumePreload } from './scheduled-backup.test-support.ts';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -19,6 +20,7 @@ function runDrill(workDir: string, reportPath: string, options: { keep?: boolean
     for (const key of Object.keys(env)) {
         if (key.startsWith('MEDIFLOW_') || key.startsWith('NODE_TEST') || key === 'NODE_OPTIONS') delete env[key];
     }
+    env.NODE_OPTIONS = `--import=${createSyntheticBackupVolumePreload(path.dirname(workDir))}`;
     env.PATH = `${path.dirname(process.execPath)}${path.delimiter}${env.PATH || ''}`;
     if (options.callerDataDir) env.MEDIFLOW_DATA_DIR = options.callerDataDir;
     const result = spawnSync(process.execPath, [
@@ -44,7 +46,7 @@ function runDrill(workDir: string, reportPath: string, options: { keep?: boolean
     assert.equal(report.preflight.ok, true);
     assert.deepEqual(report.failures, []);
     assert.deepEqual(report.retention, {
-        staleArtifactRemoved: true, staleTempRemoved: true, unrelatedFilePreserved: true,
+        staleArtifactPreserved: true, staleTempPreserved: true, unrelatedFilePreserved: true,
     });
     return report;
 }
@@ -73,8 +75,9 @@ test('keep-work-dir retains fixtures whose bytes match the report', () => withFi
     assert.ok(fs.existsSync(path.join(workDir, 'target-data', 'medical.db')));
     const backups = path.join(workDir, 'backups');
     const artifacts = fs.readdirSync(backups).filter((file) => file.endsWith('.mediflow'));
-    assert.equal(artifacts.length, 1);
-    assert.equal(hashFile(path.join(backups, artifacts[0])), report.exportedArtifact.fileSha256);
+    assert.equal(artifacts.length, 2);
+    assert.equal(artifacts.filter(file => hashFile(path.join(backups, file)) === report.exportedArtifact.fileSha256).length, 1);
+    assert.equal(fs.readFileSync(path.join(backups, 'mediflow-backup-v1-2026-03-17T00-00-00.000Z.mediflow'), 'utf8'), 'stale artifact');
     assert.equal(hashFile(path.join(workDir, 'restored-payload-snapshot.json')), report.restore.restoredPayloadSnapshotHash);
     assert.equal(fs.readFileSync(path.join(backups, 'operator-note.txt'), 'utf8'), 'do not delete');
 }));
@@ -105,6 +108,7 @@ test('the drill never lets the database preparer copy a database from the checko
     for (const key of Object.keys(env)) {
         if (key.startsWith('MEDIFLOW_') || key.startsWith('NODE_TEST') || key === 'NODE_OPTIONS') delete env[key];
     }
+    env.NODE_OPTIONS = `--import=${createSyntheticBackupVolumePreload(root)}`;
     env.PATH = `${bin}${path.delimiter}${env.PATH || ''}`;
     // The caller asks for the legacy copy; the drill must not pass that on.
     env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY = '0';

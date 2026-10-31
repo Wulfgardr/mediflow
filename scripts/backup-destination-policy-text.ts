@@ -1,0 +1,1 @@
+export const VOLUME_ACKNOWLEDGEMENT = 'Il backup portabile contiene identificativi in chiaro. Se MediFlow non può verificare la cifratura, confermo di aver verificato che questa destinazione è su un volume cifrato e di conservare separatamente la chiave di ripristino. Questa conferma non è una verifica di MediFlow.';
