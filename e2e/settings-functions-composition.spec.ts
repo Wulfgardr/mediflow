@@ -80,14 +80,18 @@ for (const scenario of functionScenarios) test(`Funzioni baseline: ${scenario}`,
         } else if (scenario === 'auth-error' || scenario === 'read-error') {
             await expect(region(page).getByTestId('function-preferences').getByRole('alert')).toBeVisible();
         } else {
-            await expect(region(page).getByRole('switch')).toHaveCount(4);
+            await expect(region(page).getByRole('switch')).toHaveCount(3);
+            const treatment = region(page).locator('article').filter({ has: page.getByRole('heading', { name: 'Ragionamento terapeutico', exact: true }) });
+            await expect(treatment).toContainText('Non disponibile in questa versione');
+            await expect(treatment.getByRole('button')).toHaveCount(0);
+            await expect(treatment.getByRole('combobox')).toHaveCount(0);
             if (scenario === 'off' || scenario === 'configured') for (const toggle of await region(page).getByRole('switch').all()) await expect(toggle).toHaveAttribute('aria-checked', String(scenario === 'configured'));
             if (scenario === 'unavailable') await expect(region(page).getByText(/non disponibile/, { exact: false }).first()).toBeVisible();
             if (!baseline && ['off', 'configured', 'unavailable'].includes(scenario)) {
                 const status = region(page).locator(`span[data-state="${scenario}"]`);
                 const label = scenario === 'off' ? 'Disattivata' : scenario === 'configured'
                     ? 'Configurazione locale presente' : 'Configurazione locale non disponibile';
-                await expect(status).toHaveText([label, label, label, label]);
+                await expect(status).toHaveText([label, label, label]);
                 await expect(region(page).getByText('La configurazione non prova la disponibilità del modello: viene verificata alla richiesta.', { exact: true })).toBeVisible();
             }
         }
@@ -134,7 +138,7 @@ for (const scenario of functionScenarios) test(`Funzioni baseline: ${scenario}`,
         }
         expect(mock.settingsWrites).toEqual([]); expect(mock.preferenceWrites).toEqual([]); expect(mock.blocked).toEqual([]); expect(egress.blocked).toEqual([]);
         expect(errors).toEqual([]);
-        if (scenario === 'pending') { mock.releasePending(); await expect(region(page).getByRole('switch')).toHaveCount(4); }
+        if (scenario === 'pending') { mock.releasePending(); await expect(region(page).getByRole('switch')).toHaveCount(3); }
     } finally { await mock?.close(); await egress.close(); await zoom.close(); }
 });
 
@@ -148,9 +152,10 @@ test('Funzioni: anteprima, applicazione e salvataggio avanzato restano distinti;
     try {
         await page.goto('/settings/ai/funzioni');
         const preferences = region(page).getByTestId('function-preferences');
-        await expect(preferences.getByRole('switch')).toHaveCount(4);
+        await expect(preferences.getByRole('switch')).toHaveCount(3);
         const allOff = preferences.getByRole('button', { name: 'Spegni tutte', exact: true });
         const explanation = preferences.getByText('Ripristina predefiniti usa i modelli del computer senza cambiare gli interruttori. Spegni tutte conserva i modelli. I preset hardware restano separati.', { exact: true });
+        await expect(preferences.getByText('Queste azioni valgono per le tre funzioni disponibili: il Ragionamento terapeutico resta come è salvato.', { exact: true })).toBeVisible();
         expect(await explanation.evaluate((element, button) => Boolean(button && (element.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING)), await allOff.elementHandle())).toBe(true);
         await expect(preferences.getByRole('button', { name: 'Rileggi impostazioni', exact: true })).toHaveClass(/mf-button-text/u);
         await allOff.click();
@@ -213,4 +218,29 @@ test('Funzioni: anteprima, applicazione e salvataggio avanzato restano distinti;
             }
         } finally { await mock.close(); await egress.close(); }
     }
+});
+
+for (const preset of ['Ripristina predefiniti', 'Spegni tutte']) test(`Preset ${preset}: conserva Treatment Reasoning enabled senza renderlo disponibile`, async ({ page, baseURL }) => {
+    requireSynthetic(baseURL);
+    const egress = await installFunctionsEgressGuard(page, baseURL);
+    const mock = await installFunctionsMocks(page, baseURL, 'configured');
+    try {
+        await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+        await page.goto('/settings/ai/funzioni');
+        const preferences = region(page).getByTestId('function-preferences');
+        await expect(preferences.getByRole('switch')).toHaveCount(3);
+        await preferences.getByRole('button', { name: preset, exact: true }).click();
+        await expect(preferences.getByRole('region', { name: 'Anteprima impostazioni' })).toContainText('Non disponibile in questa versione');
+        expect(mock.preferenceWrites).toEqual([]);
+        await preferences.getByRole('button', { name: 'Applica alle impostazioni', exact: true }).click();
+        await expect(preferences.getByRole('status')).toContainText('Impostazioni salvate');
+        expect(mock.config.aiTreatmentReasoningKillSwitch).toBe('enabled');
+        expect(mock.preferenceWrites).toHaveLength(1);
+        expect(mock.preferenceWrites[0]).not.toHaveProperty('aiTreatmentReasoningKillSwitch');
+        const treatment = preferences.locator('article').filter({ has: page.getByRole('heading', { name: 'Ragionamento terapeutico', exact: true }) });
+        await expect(treatment).toContainText('Non disponibile in questa versione');
+        await expect(treatment).toContainText('Interruttore salvato: attivo');
+        if (preset === 'Spegni tutte') for (const toggle of await preferences.getByRole('switch').all()) await expect(toggle).toHaveAttribute('aria-checked', 'false');
+        expect(mock.settingsWrites).toEqual([]); expect(mock.blocked).toEqual([]); expect(egress.blocked).toEqual([]);
+    } finally { await mock.close(); await egress.close(); }
 });
