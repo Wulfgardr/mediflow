@@ -1,0 +1,106 @@
+{
+  "schemaVersion": "mediflow.compliance-evidence.v1",
+  "claimCeiling": "technical_evidence_inventory_only",
+  "legalVerdict": "not_assessed",
+  "records": [
+    {
+      "id": "data_protection_by_design",
+      "label": "Protezione dei dati per progettazione e impostazione predefinita",
+      "summary": "Confini local-first, minimizzazione ed egress disabilitato per impostazione predefinita sono documentati nel sorgente.",
+      "status": "source_evidence",
+      "evidence": [
+        "SECURITY.md",
+        "ARCHITECTURE.md",
+        "docs/STATE_OF_THE_SYSTEM.md"
+      ],
+      "limitation": "Configurazione del deployment, finalità e procedure dell’organizzazione non sono osservate da questa pagina.",
+      "owner": "Responsabile tecnico del deployment",
+      "externalReferences": []
+    },
+    {
+      "id": "security_controls",
+      "label": "Controlli tecnici di sicurezza",
+      "summary": "Il sorgente include cifratura per campo, sessione autenticata e confini fail-closed documentati e testabili.",
+      "status": "source_evidence_with_limit",
+      "evidence": [
+        "lib/security/security.ts",
+        "lib/security/server-auth.ts",
+        "SECURITY.md"
+      ],
+      "limitation": "Il file SQLite, i metadati e gli artefatti esportati non condividono tutti un perimetro whole-database verificato.",
+      "owner": "Responsabile tecnico e responsabile della sicurezza",
+      "externalReferences": []
+    },
+    {
+      "id": "backup_and_restore",
+      "label": "Backup e ripristino",
+      "summary": "Preflight, formato artefatto e drill locale forniscono evidenza tecnica ripetibile sul percorso di ripristino.",
+      "status": "source_evidence_with_limit",
+      "evidence": [
+        "lib/backup-artifact.ts",
+        "lib/backup-restore-preflight.ts",
+        "scripts/backup-restore-drill.mjs"
+      ],
+      "limitation": "Conservazione, copie esterne, frequenza dei drill e continuità operativa restano responsabilità del deployment.",
+      "owner": "Operatore e responsabile del deployment",
+      "externalReferences": []
+    },
+    {
+      "id": "data_subject_workflows",
+      "label": "Percorsi di accesso, portabilità ed erasure",
+      "summary": "Export, tombstone reversibile e purge amministrativo sono superfici tecniche distinte con limiti documentati.",
+      "status": "source_evidence_with_limit",
+      "evidence": [
+        "lib/patient-cascade.ts",
+        "lib/fhir/bundle-mapper.test.ts",
+        "lib/report-service.test.ts",
+        "docs/analysis/2026-09-06-086-regulatory-evidence.md",
+        "docs/COMPLIANCE.md",
+        "SECURITY.md"
+      ],
+      "limitation": "FHIR v0 e PDF esportano sottoinsiemi dei dati. Backup già esportati, tempi, identità del richiedente e completezza della risposta richiedono procedure organizzative separate.",
+      "owner": "Titolare del trattamento e DPO",
+      "externalReferences": []
+    },
+    {
+      "id": "ai_transparency",
+      "label": "Trasparenza delle funzioni AI",
+      "summary": "Il registro delle funzioni separa configurazione, esecuzione osservata, sede, uscita dei dati e proposte da rivedere: non applica modifiche cliniche.",
+      "status": "source_evidence_with_limit",
+      "evidence": [
+        "docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json",
+        "lib/ai-providers/fabric/status.ts",
+        "app/settings/ai/fabric/page.tsx"
+      ],
+      "limitation": "Senza prova dell’operazione corrente, esecuzione, sede e uscita dei dati effettive restano non osservati.",
+      "owner": "Responsabile tecnico e governance clinica",
+      "externalReferences": []
+    },
+    {
+      "id": "legal_applicability",
+      "label": "Applicabilità normativa e valutazione legale",
+      "summary": "Fonti ufficiali consultate il 06/09/2026; le date dei testi sono indicate nei riferimenti. La valutazione resta legata al deployment e al caso concreto.",
+      "status": "external_assessment_required",
+      "evidence": [
+        "docs/COMPLIANCE.md",
+        "docs/analysis/2026-09-06-086-regulatory-evidence.md"
+      ],
+      "limitation": "MediFlow non classifica il proprio deployment, non assegna ruoli privacy e non produce una certificazione o un parere legale.",
+      "owner": "Organizzazione, referente legale e DPO",
+      "externalReferences": [
+        {
+          "label": "GDPR, artt. 25 e 32 (consolidato 04/05/2016, rettifica 23/05/2018)",
+          "href": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02016R0679-20160504"
+        },
+        {
+          "label": "AI Act (consolidato 27/07/2026)",
+          "href": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727"
+        },
+        {
+          "label": "Commissione europea: AI Act (pagina aggiornata 03/08/2026)",
+          "href": "https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai"
+        }
+      ]
+    }
+  ]
+}
