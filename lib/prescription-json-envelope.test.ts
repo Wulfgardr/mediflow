@@ -1,3 +1,5 @@
+import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } from './network-patient-authority-test-fixture';
+import { clearAllSessions } from './security/server-session';
 import { bindSyntheticArchiveSessions, syntheticArchiveRequest } from './security/web-auth-lifecycle-owner-test-fixture';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -13,7 +15,7 @@ import { TERRITORIAL_PACK_SCHEMA } from './territorial-packs';
 const load = createRequire(import.meta.url);
 const dir = mkdtempSync(join(process.env.MEDIFLOW_DATA_DIR!, 'prescription-envelope-'));
 process.env.MEDIFLOW_DATA_DIR = dir;
-const state = { admitted: true };
+const state = { admitted: true, authority: null as ReturnType<typeof syntheticNetworkPatientAuthority> | null };
 (globalThis as unknown as Record<symbol, typeof state>)[Symbol.for(dir)] = state;
 const session = { id: 'synthetic-session', userId: 'synthetic-user', role: 'admin', authChannel: 'web' };
 function seam(name: string, source: string) {
@@ -24,7 +26,7 @@ function seam(name: string, source: string) {
 const auth = seam('auth.cjs', `exports.requireSession=async()=>state.admitted?session:null;
 exports.unauthorizedResponse=()=>Response.json({error:'Unauthorized'},{status:401});`);
 const paired = seam('paired.cjs', `exports.requireNetworkWriteContext=async(request)=>state.admitted?
-{ok:true,context:{request,session:{...session,authChannel:'native'},pairedClient:{clientId:'synthetic-client'},scopeAmbulatoryId:'synthetic-amb'}}:
+{ok:true,context:{...state.authority,request}}:
 {ok:false,response:Response.json({error:'Unauthorized'},{status:401})};`);
 const replacements: Record<string, string> = { '@/lib/security/server-auth': auth, '@/lib/network-write-context': paired };
 const { registerHooks } = load('node:module') as {
@@ -37,6 +39,10 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
 const archiveGeneration = bindSyntheticArchiveSessions('synthetic-session');
 openDbServer();
+state.authority = syntheticNetworkPatientAuthority(dbServer, 'synthetic-amb', {
+    userId: 'synthetic-user', capabilities: ['network.replica.write-service-prescriptions'],
+});
+const cleanupCookies = installNetworkPatientCookieFixture(dir, { cookies: new Map([['ambulatory_id', 'synthetic-amb']]) });
 const { ambulatories, patients, patientsToAmbulatories, prostheticPrescriptions } = load('./schema.ts') as typeof import('./schema.ts');
 const web = load('../app/api/prosthetic-prescriptions/[id]/route.ts') as typeof import('../app/api/prosthetic-prescriptions/[id]/route.ts');
 const network = load('../app/api/v1/network/service-prescriptions/route.ts') as typeof import('../app/api/v1/network/service-prescriptions/route.ts');
@@ -48,7 +54,7 @@ dbServer.insert(prostheticPrescriptions).values({ id: 'synthetic-prosthetic', pa
 const context = { params: Promise.resolve({ id: 'synthetic-prosthetic' }) };
 const cap = 4 * 1024 * 1024;
 function request(body?: string | ReadableStream<Uint8Array>, method = 'POST', headers: Record<string, string> = {}) {
-    return syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/prescriptions', { method, body, headers,
+    return syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/prescriptions', { method, body, headers: { ...Object.fromEntries(state.authority!.request.headers), ...headers },
         ...(body instanceof ReadableStream ? { duplex: 'half' } : {}) } as RequestInit);
 }
 function snapshot() {
@@ -58,7 +64,7 @@ function snapshot() {
     finally { fresh.close(); }
 }
 test.after(() => {
-    sql.close(); dbServer.$client.close(); hooks.deregister();
+    clearAllSessions(); cleanupCookies(); sql.close(); dbServer.$client.close(); hooks.deregister();
     delete (globalThis as unknown as Record<symbol, typeof state>)[Symbol.for(dir)];
     rmSync(dir, { recursive: true, force: true });
 });

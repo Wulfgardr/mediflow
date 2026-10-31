@@ -1,3 +1,4 @@
+import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
@@ -24,7 +25,7 @@ function call(route, { method = 'GET', headers = {}, body, remote = true, direct
             localAddress: remote ? peer : undefined, ca: fs.readFileSync(cert), servername: 'localhost', timeout: 30_000 }, response => {
             let text = ''; response.on('data', chunk => text += chunk); response.on('end', () => {
                 let json; try { json = JSON.parse(text); } catch { json = null; }
-                resolve({ status: response.statusCode, headers: response.headers, json });
+                resolve({ status: response.statusCode, headers: response.headers, json, text });
             });
         });
         request.on('error', reject); request.on('timeout', () => request.destroy(new Error('Synthetic ingress timeout')));
@@ -33,12 +34,24 @@ function call(route, { method = 'GET', headers = {}, body, remote = true, direct
 }
 const cookie = (response, name) => response.headers['set-cookie'].find(value => value.startsWith(`${name}=`)).split(';')[0];
 async function login(remote) {
+    if (!remote || before) {
+        const result = await loginWithWebAuthControl(base, { username: 'admin', password: '1234' }, async (input, init = {}) => {
+            const response = await call(new URL(input).pathname, { remote, method: init.method,
+                headers: init.headers, body: init.body ? JSON.parse(init.body) : undefined });
+            const headers = new Headers();
+            for (const [key, values] of Object.entries(response.headers)) {
+                for (const value of Array.isArray(values) ? values : [values]) if (value !== undefined) headers.append(key, value);
+            }
+            return new Response(response.text, { status: response.status, headers });
+        });
+        return { response: { status: result.response.status }, headers: result.webHeaders };
+    }
     const check = await call('/api/auth/check', { remote });
     assert.equal(check.status, 200);
     const control = cookie(check, 'mediflow_auth_control');
     const response = await call('/api/auth/login', { remote, method: 'POST', headers: { Cookie: control,
         'If-Match': check.headers.etag, 'Idempotency-Key': randomUUID() }, body: { username: 'admin', password: '1234' } });
-    return { response, control };
+    return { response, headers: { Cookie: response.status === 200 ? `${cookie(response, 'mediflow_session')}; ${control}` : control } };
 }
 
 test('a genuine non-loopback socket peer cannot issue or consume Web sessions through TLS or Next', async () => {
@@ -46,7 +59,7 @@ test('a genuine non-loopback socket peer cannot issue or consume Web sessions th
     assert.equal(remote.response.status, before ? 200 : 403);
     const active = before ? remote : await login(false);
     assert.equal(active.response.status, 200);
-    const headers = { Cookie: `${cookie(active.response, 'mediflow_session')}; ${active.control}` };
+    const headers = active.headers;
     for (const route of ['/api/patients', '/api/settings/network.mode']) {
         assert.equal((await call(route, { headers })).status, before ? 200 : 403, route);
         if (!before) assert.equal((await call(route, { headers, direct: true })).status, 401, `Next defense: ${route}`);

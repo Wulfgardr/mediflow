@@ -1,3 +1,5 @@
+import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } from './network-patient-authority-test-fixture';
+import { clearAllSessions } from './security/server-session';
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* ordinary route handlers with synthetic admission seams and real SQLite readback. */
 import assert from 'node:assert/strict';
@@ -27,8 +29,10 @@ exports.forbiddenResponse=()=>Response.json({error:'Forbidden'},{status:403});`)
 const local = seam('local.cjs', `
 exports.requireLocalApiToken=(request)=>request.headers.get('authorization')==='Bearer ${token}'?null:Response.json({error:'Unauthorized'},{status:401});
 exports.hasValidLocalApiToken=(request)=>request.headers.get('authorization')==='Bearer ${token}';`);
-const network = seam('network.cjs', `
-exports.requireNetworkWriteContext=async(request)=>({ok:true,context:{request,scopeAmbulatoryId:'synthetic-date-ambulatory',pairedClient:{clientId:'synthetic-paired'},session:{id:'synthetic-native',userId:'synthetic-admin',role:'admin',authChannel:'native'}}});`);
+const state = { networkContext: null as ReturnType<typeof syntheticNetworkPatientAuthority> | null };
+(globalThis as unknown as Record<symbol, typeof state>)[Symbol.for(dataDir)] = state;
+const network = seam('network.cjs', `const state=globalThis[Symbol.for(${JSON.stringify(dataDir)})];
+exports.requireNetworkWriteContext=async(request)=>({ok:true,context:{...state.networkContext,request}});`);
 const { registerHooks } = load('node:module') as {
     registerHooks: (hooks: { resolve: (specifier: string, context: unknown,
         next: (specifier: string, context: unknown) => { url: string }) => { url: string; shortCircuit?: boolean } }) => { deregister: () => void };
@@ -44,6 +48,10 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
 } });
 const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
 const archiveGeneration = bindSyntheticArchiveSessions('synthetic-web', 'synthetic-local', 'synthetic-native');
+state.networkContext = syntheticNetworkPatientAuthority(dbServer, 'synthetic-date-ambulatory', {
+    userId: 'synthetic-admin', capabilities: ['network.replica.write-checkups'],
+});
+const cleanupCookies = installNetworkPatientCookieFixture(dataDir, { cookies: new Map([['ambulatory_id', 'synthetic-date-ambulatory']]) });
 const { ambulatories, patients, patientsToAmbulatories, checkups } = load('./schema.ts') as typeof import('./schema.ts');
 const webCreate = load('../app/api/checkups/route.ts') as typeof import('../app/api/checkups/route.ts');
 const webItem = load('../app/api/checkups/[id]/route.ts') as typeof import('../app/api/checkups/[id]/route.ts');
@@ -52,6 +60,7 @@ const v1Item = load('../app/api/v1/patients/[id]/checkups/[checkupId]/route.ts')
 const networkCreate = load('../app/api/v1/network/patients/[id]/checkups/route.ts') as typeof import('../app/api/v1/network/patients/[id]/checkups/route.ts');
 const networkItem = load('../app/api/v1/network/patients/[id]/checkups/[checkupId]/route.ts') as typeof import('../app/api/v1/network/patients/[id]/checkups/[checkupId]/route.ts');
 test.after(() => {
+    clearAllSessions(); cleanupCookies(); delete (globalThis as unknown as Record<symbol, typeof state>)[Symbol.for(dataDir)];
     dbServer.$client.close();
     hooks.deregister();
     rmSync(dataDir, { recursive: true, force: true });
@@ -94,6 +103,7 @@ async function invoke(surface: Surface, operation: Operation, ids: ReturnType<ty
         : webItem.PUT(request, { params: Promise.resolve({ id: ids.checkupId }) });
     if (surface === 'v1') return operation === 'POST' ? v1Create.POST(request, { params: Promise.resolve({ id: ids.patientId }) })
         : v1Item.PUT(request, { params: Promise.resolve({ id: ids.patientId, checkupId: ids.checkupId }) });
+    for (const [key, value] of state.networkContext!.request.headers) request.headers.set(key, value);
     return operation === 'POST' ? networkCreate.POST(request, { params: Promise.resolve({ id: ids.patientId }) })
         : networkItem.PUT(request, { params: Promise.resolve({ id: ids.patientId, checkupId: ids.checkupId }) });
 }

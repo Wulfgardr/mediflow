@@ -31,14 +31,14 @@ exports.cookies=async()=>{await s.onCookies?.();return {get:(name)=>s.cookies.ha
 }
 
 export function syntheticNetworkPatientAuthority(db: typeof dbServer, scopeAmbulatoryId: string, options: {
-    clientId?: string; userId?: string; requestId?: string;
+    clientId?: string; userId?: string; requestId?: string; capabilities?: readonly string[];
 } = {}) {
     const user = { id: options.userId ?? 'synthetic-patient-operator',
         username: ['synthetic', 'patient', 'operator'].join('-'), role: 'admin' };
     const token = 'synthetic-patient-device-token';
     const pairedClient: StoredNetworkPairedClient = {
         clientId: options.clientId ?? 'synthetic-patient-device', deviceName: 'Synthetic device', clientPlatform: 'ipados',
-        appVersion: 'synthetic', grantedCapabilities: ['network.replica.write-patient-profile', 'network.replica.write-patient-lifecycle'],
+        appVersion: 'synthetic', grantedCapabilities: [...(options.capabilities ?? ['network.replica.write-patient-profile', 'network.replica.write-patient-lifecycle'])],
         pairedAt: new Date().toISOString(), lastSeenAt: null, sourceIntentId: 'synthetic-intent',
         tokenHash: hashNetworkPairedClientToken(token),
     };

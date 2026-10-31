@@ -1,3 +1,4 @@
+import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
 /* Synthetic SQLite conformance for the common host profile port. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -24,7 +25,7 @@ const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-profile-port-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server');
 openDbServer();
-const cookieState = { cookies: new Map<string, string>() };
+const cookieState = { cookies: new Map<string, string>(), headers: syntheticLoopbackRequest('http://127.0.0.1').headers };
 const cleanupCookies = installNetworkPatientCookieFixture(dataDir, cookieState);
 process.env.MEDIFLOW_LOCAL_API_TOKEN = 'profile-synthetic-local-token';
 const { readPatientProfile: admittedRead, updatePatientProfile } = load('./patient-profile-service.ts') as typeof import('./patient-profile-service');
@@ -58,7 +59,7 @@ function request(projection: 'web' | 'api-v1' | 'network', extraHeaders: Record<
     const headers = new Headers(projection === 'network' ? authority.request.headers : {});
     if (projection === 'api-v1') headers.set('authorization', 'Bearer profile-synthetic-local-token');
     for (const [key, value] of Object.entries(extraHeaders)) headers.set(key, value);
-    return new Request('http://127.0.0.1/api/patients/' + patientId, { headers });
+    return syntheticLoopbackRequest('http://127.0.0.1/api/patients/' + patientId, { headers });
 }
 async function readPatientProfile(input: { patientId: string; projection: 'web' | 'api-v1' | 'network'; scopeAmbulatoryId?: string }) {
     selectSession(input.projection === 'web' ? 'web' : 'native');
@@ -126,7 +127,7 @@ test('named notes commit is unavailable to local-token, native and paired capabi
         headers.set('x-mediflow-archive-generation', currentArchiveGeneration()); headers.set('content-type', 'application/json');
         const before = snapshot();
         let resolvedPatient = false;
-        const response = await notesCommitRoute.POST(new Request(`http://127.0.0.1/api/patients/${patientId}/notes-commit`, {
+        const response = await notesCommitRoute.POST(syntheticLoopbackRequest(`http://127.0.0.1/api/patients/${patientId}/notes-commit`, {
             method: 'POST', headers, body: JSON.stringify({ kind: 'prepare', expectedRevision: 4, expectedSelectionEpoch: 0, notes: null }),
         }), { params: Promise.resolve({ get id() { resolvedPatient = true; return patientId; } }) });
         assert.ok(response.status === 401 || response.status === 403, `${channel}: ${response.status}`);
@@ -307,13 +308,13 @@ test('unissued body principals and caller-supplied authority cannot admit a prof
     reset(); cookieState.cookies.clear();
     const before = snapshot();
     const forged = await admittedRead({ patientId: async () => patientId, projection: 'web',
-        request: new Request('http://127.0.0.1/api/patients/' + patientId + '?role=admin&scopeAmbulatoryId=profile-a'),
+        request: syntheticLoopbackRequest('http://127.0.0.1/api/patients/' + patientId + '?role=admin&scopeAmbulatoryId=profile-a'),
         actor: { userId: authority.session.userId, role: 'admin' }, session: authority.session, scopeAmbulatoryId: 'profile-a',
         receipt: { authorized: true },
     } as Parameters<typeof admittedRead>[0]);
     assert.equal(forged.ok, false);
     if (!forged.ok) assert.equal(forged.response.status, 401);
-    const unauthorized = await v1Route.GET(new Request('http://127.0.0.1/api/v1/patients/' + patientId,
+    const unauthorized = await v1Route.GET(syntheticLoopbackRequest('http://127.0.0.1/api/v1/patients/' + patientId,
         { headers: { 'x-mediflow-role': 'admin', 'x-mediflow-actor': authority.session.userId } }), { params: Promise.resolve({ id: patientId }) });
     assert.equal(unauthorized.status, 401);
     assert.deepEqual(snapshot(), before);
@@ -345,13 +346,13 @@ test('FSE reads preserve their own capability without requiring patient-replica 
     reset(); selectSession('native'); grant([NETWORK_FSE_VALIDATE_CAPABILITY]);
     const before = snapshot();
     const headers = authority.request.headers;
-    const response = await fseRoute.GET(new Request('http://127.0.0.1/api/v1/network/fse/validate-patient?patientId=' + patientId, { headers }));
+    const response = await fseRoute.GET(syntheticLoopbackRequest('http://127.0.0.1/api/v1/network/fse/validate-patient?patientId=' + patientId, { headers }));
     assert.equal(response.status, 200); assert.equal((await response.json()).patientId, patientId);
-    const missing = await fseRoute.GET(new Request('http://127.0.0.1/api/v1/network/fse/validate-patient', { headers }));
+    const missing = await fseRoute.GET(syntheticLoopbackRequest('http://127.0.0.1/api/v1/network/fse/validate-patient', { headers }));
     assert.equal(missing.status, 400); assert.deepEqual(await missing.json(), { error: 'patientId is required' });
     assert.deepEqual(snapshot(), before);
     grant(['network.replica.readonly-patients']); const denied = snapshot();
-    assert.equal((await fseRoute.GET(new Request('http://127.0.0.1/api/v1/network/fse/validate-patient?patientId=' + patientId, { headers }))).status, 403);
+    assert.equal((await fseRoute.GET(syntheticLoopbackRequest('http://127.0.0.1/api/v1/network/fse/validate-patient?patientId=' + patientId, { headers }))).status, 403);
     assert.deepEqual(snapshot(), denied);
 });
 
@@ -363,7 +364,7 @@ test('all profile HTTP adapters keep archived/missing/tombstone errors and ignor
     for (const [route, projection] of cases) {
         selectSession(projection === 'web' ? 'web' : 'native');
         const original = request(projection);
-        const spoof = new Request(original.url + '?patientId=wrong&projection=api-v1&scopeAmbulatoryId=profile-b&actorRef=wrong&role=doctor&receipt=accepted', { headers: original.headers });
+        const spoof = syntheticLoopbackRequest(original.url + '?patientId=wrong&projection=api-v1&scopeAmbulatoryId=profile-b&actorRef=wrong&role=doctor&receipt=accepted', { headers: original.headers });
         const before = snapshot();
         const response = await route.GET(spoof, { params: Promise.resolve({ id: patientId }) });
         assert.equal(response.status, 200); const body = await response.json();
@@ -392,7 +393,7 @@ test('mode, pairing and missing-session decisions cannot be replaced by caller c
     before = snapshot(); cookieState.cookies.clear();
     assert.equal((await networkRoute.GET(request('network'), params)).status, 401);
     selectSession('native');
-    assert.equal((await networkRoute.GET(new Request('http://127.0.0.1/api/v1/network/patients/' + patientId), params)).status, 401);
+    assert.equal((await networkRoute.GET(syntheticLoopbackRequest('http://127.0.0.1/api/v1/network/patients/' + patientId), params)).status, 401);
     assert.deepEqual(snapshot(), before);
 });
 
@@ -401,9 +402,9 @@ test('unauthorized adapters deny before resolving the host patient parameter', a
     reset(); cookieState.cookies.clear(); const before = snapshot();
     let reads = 0;
     const params = { params: Promise.resolve({ get id(): string { reads++; throw new Error('Patient parameter must remain unread'); } }) };
-    assert.equal((await webRoute.GET(new Request('http://127.0.0.1/api/patients/x'), params)).status, 401);
-    assert.equal((await v1Route.GET(new Request('http://127.0.0.1/api/v1/patients/x'), params)).status, 401);
-    assert.equal((await networkRoute.GET(new Request('http://127.0.0.1/api/v1/network/patients/x'), params)).status, 401);
+    assert.equal((await webRoute.GET(syntheticLoopbackRequest('http://127.0.0.1/api/patients/x'), params)).status, 401);
+    assert.equal((await v1Route.GET(syntheticLoopbackRequest('http://127.0.0.1/api/v1/patients/x'), params)).status, 401);
+    assert.equal((await networkRoute.GET(syntheticLoopbackRequest('http://127.0.0.1/api/v1/network/patients/x'), params)).status, 401);
     assert.equal(reads, 0); assert.deepEqual(snapshot(), before);
 });
 
@@ -412,10 +413,10 @@ test('FSE enforces request scope while preserving GET compatibility for untruste
     const before = snapshot();
     const headers = new Headers(authority.request.headers);
     headers.set('x-mediflow-expected-ambulatory-id', 'profile-b');
-    let response = await fseRoute.GET(new Request('http://127.0.0.1/api/v1/network/fse/validate-patient?patientId=' + patientId, { headers }));
+    let response = await fseRoute.GET(syntheticLoopbackRequest('http://127.0.0.1/api/v1/network/fse/validate-patient?patientId=' + patientId, { headers }));
     assert.equal(response.status, 403); assert.deepEqual(await response.json(), { error: 'Network scope unavailable' });
     headers.delete('x-mediflow-expected-ambulatory-id'); headers.set('x-mediflow-archive-generation', 'synthetic-stale-generation');
-    response = await fseRoute.GET(new Request('http://127.0.0.1/api/v1/network/fse/validate-patient?patientId=' + patientId, { headers }));
+    response = await fseRoute.GET(syntheticLoopbackRequest('http://127.0.0.1/api/v1/network/fse/validate-patient?patientId=' + patientId, { headers }));
     assert.equal(response.status, 200, 'GET never treated a caller generation header as authority or a write fence');
     assert.deepEqual(snapshot(), before);
 });
@@ -448,7 +449,7 @@ function updateRequest(projection: 'web' | 'api-v1' | 'network', body: unknown) 
     headers.set('x-request-id', 'synthetic-shared-correlation');
     headers.set('Content-Type', 'application/json');
     const prefix = projection === 'web' ? '/api' : projection === 'api-v1' ? '/api/v1' : '/api/v1/network';
-    return new Request('http://127.0.0.1' + prefix + '/patients/' + patientId,
+    return syntheticLoopbackRequest('http://127.0.0.1' + prefix + '/patients/' + patientId,
         { method: 'PUT', headers, body: JSON.stringify(body) });
 }
 
