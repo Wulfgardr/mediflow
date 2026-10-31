@@ -1,8 +1,8 @@
 # ADR 0165 — Canale di accesso della chat alla sessione GPUI
 
-Stato: **Proposed**. Data: 26 ottobre 2026. Refs WUL-788.
+Stato: **Accepted** per il contratto del canale, con qualificazione desktop separata. Data: 26 ottobre 2026. Refs WUL-788.
 
-## Decisione candidata
+## Decisione
 
 C4a aggiunge soltanto il protocollo e l'esito di accesso, senza proiezioni
 cliniche, mapping, inferenza o writer. Non completa C4 né il broker di ADR 0160.
@@ -110,7 +110,7 @@ nativa; non emette proof trasferibili né nuove sessioni.
 Il [rapporto del contributo](../analysis/2026-10-30-chat-native-broker/README.md)
 distingue prove automatiche, GLiNER reale e prove desktop ancora aperte.
 Questa composizione resta esplicitamente sintetica, non modifica writer,
-ammissione clinica o stato Proposed dell'ADR.
+ammissione clinica o qualificazione desktop del canale.
 
 ## Estensione del 31 ottobre 2026: dettatura locale
 
@@ -158,7 +158,7 @@ Il broker clinico conserva il proprio confine sintetico e la propria autorità.
 Il grant non autorizza prescrizioni, scritture o inferenza. Le prove sui due
 desktop reali restano alla qualifica, così come la negoziazione delle capacità.
 
-## Proiezioni cliniche dell'archivio: confine e selezione da approvare
+## Proiezioni cliniche dell'archivio: decisione del 31 ottobre 2026
 
 La grammatica `mediflow.synthetic-chat-card.v1` rimane riservata alle fixture.
 Non ammette letture dell'archivio né testo clinico arbitrario. Un raccordo ai
@@ -185,35 +185,55 @@ locale. Token estranei, altra sessione, lock, refresh e riavvio negano l'uso.
 Il frame app-only non aggiorna il contesto del modello. Questo raccordo non
 amplia le uscite già ammesse al modello, non modifica writer o claim crittografici.
 
-### Decisione sulla prima scheda
+### Prima scheda clinica
 
-Il contratto ammette farmaci, condizioni, storia e misure quando necessari,
-ma non stabilisce l'elenco dei campi della prima scheda archivio. La proiezione
-interna `mediflow.patient.profile-view.v1` contiene anche identità, caregiver,
-esenzioni e ragioni di stato o archiviazione: il suo schema chiuso regola la
-lettura locale, non l'uscita verso l'host della chat. In particolare, il campo
-`notes` non prova da solo che tutto il suo contenuto sia storia clinica ammessa.
+Leonardo ha deciso il 31 ottobre 2026: la prima scheda comprende diagnosi e
+passi delle note che il medico spunta a mano nella finestra nativa. Nessun
+estrattore automatico, nessuna nota intera. La selezione delle diagnosi usa le
+righe non vuote del campo comune; i passi sono sottostringhe esatte aggiunte dal
+medico e poi spuntate. Un testo modificato, la nota intera o l'insieme dei passi
+che copre tutta la nota sono negati. Il testo ostile resta dato, senza istruzioni
+eseguite o interpretazione HTML.
 
-La proposta per la prima verticale è un nuovo profilo
-`mediflow.clinical-chat-profile.v1`, limitato a diagnosi e storia clinica
-selezionata dalle note. Le due liste conterrebbero esclusivamente oggetti
-`{ text, sourceRef }`, oltre a versione e pseudonimo al livello principale.
-Il nome del profilo e questi campi sono una proposta, non uno schema attivo.
-Limiti, selezione temporale e trasformazioni dei formati strutturati vanno
-fissati insieme alla selezione, prima dell'implementazione.
+Il comando app-only `clinical-profile` apre questa selezione nella GPUI.
+`RuntimeSession.chat_clinical_profile` compone `open_patient_profile`, che usa
+il servizio comune `readPatientProfile` sul canale paired, senza nuovi accessi
+al database. Sessione, selezione ed epoch vengono rivalidati prima e dopo le
+attese; la revisione del profilo è controllata anche prima e dopo il consumo.
 
-| Campo del servizio comune | Trattamento proposto nella prima verticale |
-| --- | --- |
-| `diagnoses` | Solo testo clinico selezionato, senza ID o date originali; fonte opaca per voce |
-| `notes` | Solo storia clinica selezionata e classificata; non trasferimento integrale del campo |
-| `firstName`, `lastName`, `taxCode`, `birthDate`, `address`, `phone`, `caregiver` | Esclusi dall'uscita; identità e ricomposizione solo native |
-| `exemptions`, `isAdi`, `isArchived`, `statusReason`, `archiveReason`, `archiveNote` | Esclusi dalla proposta iniziale; nessuna ammissione implicita dalla loro presenza nella scheda locale |
+Il profilo attivo è `mediflow.clinical-chat-profile.v1`: oggetto chiuso con
+`profile`, `version: 1`, `pseudonym`, `diagnoses` e `noteExcerpts`. Le due liste
+contengono solo `{ text, sourceRef }`. Limiti: 16 diagnosi, 8 passi, 2048 unità
+UTF-16 per testo selezionato, 6000 complessive prima della redazione, 4096 per
+voce redatta e 16384 byte UTF-8 per il JSON finale canonico. Il superamento
+nega l'uscita, senza troncamenti. Le fonti sono casuali e opache, con testo
+originale e revisione disponibili soltanto all'owner nativo in RAM.
 
-Le alternative sono partire dalle sole diagnosi, con una vista dichiaratamente
-parziale, oppure includere ulteriori gruppi clinico-assistenziali con una
-decisione esplicita su ciascuno. La proposta diagnosi e storia mantiene separati
-i successivi raccordi di terapie, prescrizioni protesiche e risultati Fabric.
-La selezione richiede approvazione di prodotto: finché manca, nessuna lettura
-clinica dell'archivio è collegata al frame. C-8 resta aperto e la scheda completa
-rimane nella UI nativa. Queste esclusioni proposte non riducono il requisito
-di parità della release e non attestano una verticale implementata o qualificata.
+Sono esclusi nome, codice fiscale, nascita, contatti, caregiver, esenzioni,
+ADI e stato amministrativo. Nessuna data clinica esatta è ammessa implicitamente:
+se presente in un passo scelto, passa dalla redazione comune C-B. Date rilevate
+sono token di sessione, comprese quelle di valutazione e controllo. Il confine
+nega residui nei formati numerici controllati; il consenso autenticato riguarda
+soltanto i byte finali, senza eccezioni per la cronologia.
+
+La GPUI avvia `chat-card-clinical-owner.mjs` sul canale privato posseduto.
+`MEDIFLOW_CHAT_CLINICAL_INSTALLATION` indica il file locale di runner ed evidenze
+per questo profilo; non sostituisce la qualifica sintetica in
+`MEDIFLOW_CHAT_CARD_INSTALLATION`. Node e directory dell'owner restano quelli
+configurati esplicitamente per il processo GPUI. Il
+broker usa lo stesso runner GLiNER reale e gli stessi controlli di identità ed
+evidenza di #726, ma richiede il digest del nuovo corpus clinico. Una qualifica
+del solo corpus sintetico non basta. Oltre alla redazione dei testi, esamina il
+payload serializzato completo, valida schema e ricomposizione di ogni voce e
+nega entità residue. Il secondo esame non riscrive i byte revisionati.
+
+La conferma nativa PIN o Touch ID autorizza una sola lettura entro 30 secondi.
+Il frame valida il profilo distinto e mostra soltanto testo; non aggiorna il
+contesto del modello. Refresh, altra sessione, token estranei, lock, revoca e
+riavvio negano il riuso. Nessun ripiego quando runner, qualifica, schema o
+contesto non sono validi. La grammatica sintetica resta intatta.
+
+Terapie, prescrizioni protesiche e riassunto restano nella matrice C-8 per la
+tranche successiva. La consultazione dei cataloghi già consegnata resta distinta
+dalle prescrizioni. Questa decisione non ammette uso clinico o qualifica dei due
+desktop, non amplia l'autorità del modello e non modifica claim crittografici.

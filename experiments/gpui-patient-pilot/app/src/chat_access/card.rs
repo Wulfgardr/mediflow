@@ -21,22 +21,37 @@ pub(super) struct Card {
     pub(super) native_source: String,
 }
 impl Card {
-    pub(super) fn prepare(cancelled: Arc<AtomicBool>) -> Option<Self> {
+    pub(super) fn prepare(
+        cancelled: Arc<AtomicBool>,
+        selection: Option<serde_json::Value>,
+    ) -> Option<Self> {
         if cancelled.load(Ordering::Acquire) {
             return None;
         }
         let node = PathBuf::from(std::env::var_os("MEDIFLOW_CHAT_CARD_NODE")?);
-        let script = PathBuf::from(std::env::var_os("MEDIFLOW_CHAT_CARD_OWNER")?);
-        let installation = PathBuf::from(std::env::var_os("MEDIFLOW_CHAT_CARD_INSTALLATION")?);
+        let configured = PathBuf::from(std::env::var_os("MEDIFLOW_CHAT_CARD_OWNER")?);
+        let script = if selection.is_some() {
+            configured.parent()?.join("chat-card-clinical-owner.mjs")
+        } else {
+            configured
+        };
+        let installation = PathBuf::from(std::env::var_os(if selection.is_some() {
+            "MEDIFLOW_CHAT_CLINICAL_INSTALLATION"
+        } else {
+            "MEDIFLOW_CHAT_CARD_INSTALLATION"
+        })?);
         if ![&node, &script, &installation]
             .iter()
             .all(|p| p.is_absolute() && p.is_file())
         {
             return None;
         }
-        if std::fs::read(&script).ok()?.as_slice()
-            != include_bytes!("../../../../../scripts/chat-card-native-owner.mjs")
-        {
+        let expected: &[u8] = if selection.is_some() {
+            include_bytes!("../../../../../scripts/chat-card-clinical-owner.mjs")
+        } else {
+            include_bytes!("../../../../../scripts/chat-card-native-owner.mjs")
+        };
+        if std::fs::read(&script).ok()?.as_slice() != expected {
             return None;
         }
         let supervisor = script.parent()?.join("chat-card-process-owner.mjs");
@@ -48,7 +63,12 @@ impl Card {
         let mut command = Command::new(node);
         command.arg(supervisor).arg(script).arg(installation);
         let mut card = Self::spawn(&mut command, cancelled)?;
-        let review = card.call("prepare")?;
+        let request = if let Some(selection) = selection {
+            json!({"command":"prepare", "selection":selection})
+        } else {
+            json!({"command":"prepare"})
+        };
+        let review = card.exchange_value(&request, Duration::from_secs(90))?;
         if review.as_object()?.len() != 3 {
             return None;
         }
@@ -123,8 +143,11 @@ impl Card {
         result
     }
     fn exchange(&mut self, command: &str, timeout: Duration) -> Option<Value> {
+        self.exchange_value(&json!({"command":command}), timeout)
+    }
+    fn exchange_value(&mut self, command: &Value, timeout: Duration) -> Option<Value> {
         let input = self.input.as_mut()?;
-        writeln!(input, "{}", json!({"command":command})).ok()?;
+        writeln!(input, "{command}").ok()?;
         input.flush().ok()?;
         let deadline = Instant::now() + timeout;
         loop {
