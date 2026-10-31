@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.45.0
+  version: 1.46.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -4032,6 +4032,12 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: Reviewed attachment collection changed. No attachment or audit event was created; review again before another attempt.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '408':
           description: Total 30-second attachment body read deadline expired before materialization.
           content:
@@ -7987,6 +7993,22 @@ components:
         version:
           type: integer
           minimum: 1
+    AttachmentCurrentness:
+      type: object
+      additionalProperties: false
+      required: [sourceRef, revision, freshnessEpoch]
+      properties:
+        sourceRef:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+        revision:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        freshnessEpoch:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
     AttachmentSummary:
       type: object
       additionalProperties: false
@@ -8002,6 +8024,8 @@ components:
         Attachment metadata projection: mirrors the host list projection
         (`GET /api/attachments`) and omits the `data` payload.
       properties:
+        currentness:
+          $ref: '#/components/schemas/AttachmentCurrentness'
         id:
           type: string
         patientId:
@@ -8016,7 +8040,7 @@ components:
           minimum: 0
         path:
           type: string
-          description: Server-normalized attachment path derived from the sealed path token.
+          description: Opaque sealed logical path, preserved verbatim; legacy normalized paths remain readable.
         summarySnapshot:
           type:
             - string
@@ -8080,6 +8104,8 @@ components:
         Full attachment record, including the sealed `data` payload.
         Returned only from the single-attachment paired route.
       properties:
+        currentness:
+          $ref: '#/components/schemas/AttachmentCurrentness'
         id:
           type: string
         patientId:
@@ -8094,7 +8120,7 @@ components:
           minimum: 0
         path:
           type: string
-          description: Server-normalized attachment path derived from the sealed path token.
+          description: Opaque sealed logical path, preserved verbatim; legacy normalized paths remain readable.
         data:
           type:
             - string
@@ -8168,6 +8194,21 @@ components:
         `ocrQueueState`, `ocrQueueReason`, `createdAt`, and `updatedAt` are
         rejected by presence.
       properties:
+        expectedCollection:
+          type: array
+          maxItems: 10000
+          description: Optional reviewed collection. Exact membership and currentness are checked atomically with create. Changed collections return 409 without mutation. Legacy clients may omit it and do not get duplicate protection.
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, currentness]
+            properties:
+              id:
+                type: string
+                minLength: 1
+                maxLength: 256
+              currentness:
+                $ref: '#/components/schemas/AttachmentCurrentness'
         name:
           type: string
           description: Sealed opaque attachment name beginning with `ENC:`; the paired network boundary rejects plaintext.

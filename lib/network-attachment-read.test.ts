@@ -116,6 +116,7 @@ test('listNetworkScopedAttachments returns metadata without the data payload', a
     const list = await listNetworkScopedAttachments(PATIENT_ID, SCOPE_AMBULATORY);
     assert.equal(list.length, 1);
     const [summary] = list;
+    assert.deepEqual(summary.currentness, { sourceRef: 'b'.repeat(64), revision: 1, freshnessEpoch: 1 });
     assert.equal(summary.id, ATTACHMENT_ID);
     assert.equal(summary.patientId, PATIENT_ID);
     assert.equal(summary.name, SEALED_NAME);

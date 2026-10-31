@@ -410,3 +410,20 @@ test('ignored attachment insert fails without an orphan creation audit', async (
         sql.close();
     }
 });
+
+
+test('web reviewed creation validates collection revisions and preserves ciphertext paths', async () => {
+    reset();
+    const sealedPath = 'ENC:aXY=:cGF0aA==';
+    assert.equal((await invoke(request(payload({ path: sealedPath, expectedCollection: [] })))).status, 201);
+    const expectedCollection = rows().map(row => ({ id: row.id, currentness: { sourceRef: row.document_source_ref,
+        revision: row.document_revision, freshnessEpoch: row.document_freshness_epoch } }));
+    const before = snapshot();
+    const stale = await invoke(request(payload({ path: sealedPath, expectedCollection: [] })));
+    assert.equal(stale.status, 409);
+    assert.deepEqual(snapshot(), before);
+    assert.equal((await invoke(request(payload({ path: sealedPath, expectedCollection })))).status, 201);
+    const sql = new Database(dbPath);
+    try { assert.equal((sql.prepare('SELECT count(*) AS n FROM attachments WHERE path = ?').get(sealedPath) as { n: number }).n, 2); }
+    finally { sql.close(); }
+});
