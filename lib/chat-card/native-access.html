@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-PXE8hNL0LtT6ZD/qHP17TuEwA8Rmsr1jI79NaB5ZDl0='; style-src 'sha256-nDLYNGJAq2NN356ZfJgk8AcRaxZu6zn5pUDbxnDnGBM='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow: accesso nativo</title>
+<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-m2ZUA0wmuToxBUEQzLIIX/jeftp0y/TSSkNrlSLx4aI='; style-src 'sha256-nDLYNGJAq2NN356ZfJgk8AcRaxZu6zn5pUDbxnDnGBM='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow: accesso nativo</title>
 <style>html{color-scheme:light dark;font:17px system-ui}body{margin:24px;max-width:40rem}h1{font-size:1.4rem;font-weight:500}button{font:inherit;margin:8px 8px 8px 0;padding:10px 16px}p{line-height:1.5}section{overflow-wrap:anywhere;border-top:1px solid GrayText;margin-top:20px}h2{font-size:1.15rem}li{margin-block:12px;line-height:1.5}</style></head>
 <body><h1>MediFlow</h1><p>Conferma l’accesso nella finestra MediFlow già sbloccata. La scheda sintetica viene redatta localmente e condivisa dopo la tua revisione nella finestra nativa. I nomi restano in MediFlow.</p>
 <p id="status" role="status" aria-live="polite">Collegamento alla chat…</p>
@@ -46,7 +46,7 @@
             || !text(value.query) || value.query.length < 2 || value.query.length > 80 || /[\u0000-\u001f\u007f]/u.test(value.query)
             || value.query !== element('drug-query').value.trim() || value.freshness !== 'unverified' || value.limit !== 20
             || !Array.isArray(value.rows) || value.rows.length > 20 || !value.rows.every(r => exact(r, ['aic','name','activePrinciple','packaging','atc','sourceRef'])
-                && typeof r.sourceRef === 'string' && /^src_[a-f0-9]{32}$/u.test(r.sourceRef) && typeof r.aic === 'string' && /^[0-9]{9}$/u.test(r.aic) && text(r.name) && nullable(r.activePrinciple) && nullable(r.packaging) && nullable(r.atc))) throw new Error('denied');
+                && typeof r.sourceRef === 'string' && /^src_[a-f0-9]{32}$/u.test(r.sourceRef) && typeof r.aic === 'string' && /^[0-9]{6,9}$/u.test(r.aic) && text(r.name) && nullable(r.activePrinciple) && nullable(r.packaging) && nullable(r.atc))) throw new Error('denied');
         return value;
     }
     function renderDrugs(value) {
