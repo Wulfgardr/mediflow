@@ -12,6 +12,7 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-network-mode-'));
 process.env.MEDIFLOW_DATA_DIR = root;
 process.env.MEDIFLOW_LOCAL_API_TOKEN = randomBytes(32).toString('hex');
 const { PUT, GET } = await import('./[key]/route.ts');
+const { POST } = await import('./route.ts');
 const { dbServer } = await import('../../../lib/db-server.ts');
 const { settings } = await import('../../../lib/schema.ts');
 const { exposedNetworkModeAllowed } = await import('../../../lib/security/settings-write-policy.ts');
@@ -73,6 +74,13 @@ test('the exposed mode needs an admin on this computer, with or without a precon
         assert.equal((await PUT(request(body), context)).status, 403);
         assert.equal(value(), 'local-only');
     }
+    const generic = new Request('http://127.0.0.1/api/settings', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.MEDIFLOW_LOCAL_API_TOKEN}` },
+        body: JSON.stringify({ key: 'network.mode', value: 'network-home-base' }),
+    });
+    assert.equal((await POST(generic)).status, 403);
+    assert.equal(value(), 'local-only');
     assert.equal(exposedNetworkModeAllowed({ role: 'admin' }, true), true);
     assert.equal(exposedNetworkModeAllowed({ role: 'admin' }, false), false);
     assert.equal(exposedNetworkModeAllowed({ role: 'clinician' }, true), false);
@@ -80,5 +88,11 @@ test('the exposed mode needs an admin on this computer, with or without a precon
 });
 test('an out-of-domain mode is rejected without a precondition too', async () => {
     assert.equal((await PUT(request({ value: 'invalid' }), context)).status, 400);
+    const generic = new Request('http://127.0.0.1/api/settings', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.MEDIFLOW_LOCAL_API_TOKEN}` },
+        body: JSON.stringify({ key: 'network.mode', value: 'invalid' }),
+    });
+    assert.equal((await POST(generic)).status, 400);
     assert.equal(value(), 'local-only');
 });

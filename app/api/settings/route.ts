@@ -1,5 +1,6 @@
 import { writeSettingWithFunctionModelGeneration } from '@/lib/ai-providers/fabric/function-model-settings-write';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
+import { networkModeWriteDenial } from '@/lib/security/network-mode-write';
 
 import { NextResponse } from 'next/server';
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
@@ -31,6 +32,8 @@ export async function POST(request: Request) {
         }
 
         const persistedValue = normalizeSettingValue(value);
+        const networkModeDenial = networkModeWriteDenial(request, session, key, persistedValue);
+        if (networkModeDenial) return networkModeDenial;
 
         // Upsert (Insert or Update) logic
         // This allows db.settings.put({ key: '...', value: '...' }) to work via POST
