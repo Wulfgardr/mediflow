@@ -18,7 +18,7 @@ const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).tri
 async function fixture(page: Page, counts = { active: 0, suspended: 0, completed: 0 }, diagnoses: { system: string; code: string; description: string }[] = []) {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const patientId = await page.evaluate(async ({ counts, diagnoses }) => {
-        for (const key of ['aiPatientInsightKillSwitch', 'aiSmartImportKillSwitch', 'aiDocumentSynthesisKillSwitch', 'aiTreatmentReasoningKillSwitch']) {
+        for (const key of ['aiPatientInsightKillSwitch', 'aiSmartImportKillSwitch', 'aiDocumentSynthesisKillSwitch']) {
             const response = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value: 'disabled' }) });
             if (!response.ok) throw new Error(`Synthetic setting: ${response.status}`);
         }

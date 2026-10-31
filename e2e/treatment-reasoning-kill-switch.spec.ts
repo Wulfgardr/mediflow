@@ -1,98 +1,16 @@
-/* @Claude */
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession, openAiFunzioniSettings, openPatientSection, setAiLaneKillSwitch } from './utils';
+import { openTreatmentReasoningDenial } from './fixtures/treatment-reasoning-denial';
+import { openAiFunzioniSettings } from './utils';
 
-// This DB is shared across specs; leaving Treatment Reasoning disabled would break
-// specs that expect it enabled. Restore the switch after the test.
-test.afterEach(async ({ page }) => {
-  await page.evaluate(async () => {
-    await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: 'aiTreatmentReasoningKillSwitch', value: 'enabled' }),
-    }).catch(() => undefined);
-  });
-});
-
-test('treatment reasoning kill switch blocks new drafts on the Scheda', async ({ page }) => {
-  const pin = process.env.E2E_PIN || '1234';
-
-  await bootstrapUnlockedSession(page, pin);
-
-  // The lane is fail-closed when the setting row is absent (fresh e2e DB): pin it to
-  // 'enabled' so the toggle below always starts from the ON state.
-  await setAiLaneKillSwitch(page, 'aiTreatmentReasoningKillSwitch', 'enabled');
-
-  await openAiFunzioniSettings(page);
-
-  const killSwitch = page.getByRole('switch', { name: 'Ragionamento terapeutico nella proposta' });
-  await expect(killSwitch).toHaveAttribute('aria-checked', 'true');
-  await killSwitch.click();
-  await expect(killSwitch).toHaveAttribute('aria-checked', 'false');
-  const preferenceCard = killSwitch.locator('xpath=ancestor::article');
-  await preferenceCard.getByRole('button', { name: 'Anteprima modifica' }).click();
-  const settingsPreview = page.getByRole('region', { name: 'Anteprima impostazioni' });
-  await expect(settingsPreview).toContainText('Ragionamento terapeutico: spento');
-  await settingsPreview.getByRole('button', { name: 'Applica alle impostazioni' }).click();
-  await expect(page.getByTestId('function-preferences').getByRole('status').filter({
-    hasText: /^Impostazioni salvate e rilette\. Nessuna modifica clinica\.$/u,
-  })).toBeVisible();
-
-  const patientId = await page.evaluate(async () => {
-    const response = await fetch('/api/patients', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        firstName: 'Reasoning',
-        lastName: 'KillSwitch',
-        taxCode: `TRKILL${Date.now()}`,
-        address: 'Via Test 1',
-        phone: '1234567890',
-      }),
-    });
-
-    const payload = await response.json() as { id?: string; error?: string };
-    if (!response.ok || !payload.id) {
-      throw new Error(payload.error || `Patient creation failed with HTTP ${response.status}`);
-    }
-
-    return payload.id;
-  });
-
-  // The panel renders only when the patient has at least one reasoning source:
-  // seed one active therapy so the disabled state stays observable.
-  await page.evaluate(async (id: string) => {
-    const response = await fetch('/api/therapies', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        patientId: id,
-        drugName: 'Ramipril Test',
-        activePrinciple: 'Ramipril',
-        dosage: '5 mg 1 cp/die',
-        status: 'active',
-        startDate: new Date('2026-06-01T08:00:00Z').toISOString(),
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-  }, patientId);
-
-  // select the ordinary therapy pane before inspecting its disabled state.
-  await page.goto(`/patients/${patientId}/modules`);
-  await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
-  await openPatientSection(page, 'terapie');
-
-  const panel = page.getByTestId('treatment-reasoning-panel');
-  const proposals = page.locator('#terapie').getByRole('button', { name: 'Proposte', exact: true });
-  await expect(proposals).toHaveAttribute('aria-expanded', 'false');
-  await proposals.click();
-  await expect(proposals).toHaveAttribute('aria-expanded', 'true');
-  await expect(panel).toBeVisible();
-  await expect(panel).toContainText('Ragionamento terapeutico spento');
-  await expect(panel.getByRole('link', { name: 'Apri le funzioni cliniche' })).toHaveAttribute('href', '/settings/ai/funzioni');
-  await expect(panel.getByRole('button', { name: 'Prepara proposta' })).toHaveCount(0);
-  await expect(panel.getByTestId('model-picker-treatment_reasoning')).toHaveCount(0);
+for (const value of ['enabled', 'disabled'] as const) test(`Treatment Reasoning: diniego con valore salvato ${value}`, async ({ page }) => {
+  const run = await openTreatmentReasoningDenial(page, value);
+  try {
+    await openAiFunzioniSettings(page);
+    const preferences = page.getByTestId('function-preferences');
+    await expect(preferences).toContainText('Non disponibile in questa versione');
+    await expect(preferences.getByRole('switch', { name: 'Ragionamento terapeutico nella proposta' })).toHaveCount(0);
+    const denied = await page.request.post('/api/settings', { data: { key: 'aiTreatmentReasoningKillSwitch', value: value === 'enabled' ? 'disabled' : 'enabled' } });
+    expect(denied.status()).toBe(403);
+    expect((await (await page.request.get('/api/settings/aiTreatmentReasoningKillSwitch')).json()).value).toBe(value);
+  } finally { run.restore(); }
 });

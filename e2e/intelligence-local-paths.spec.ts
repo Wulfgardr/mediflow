@@ -26,7 +26,7 @@ test('I-1 Web: crea e rilegge una scheda con tutte le funzioni AI spente', async
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const originalSettings: { key: string; value: string | null }[] = [];
   try {
-    for (const key of ['aiPatientInsightKillSwitch', 'aiSmartImportKillSwitch', 'aiDocumentSynthesisKillSwitch', 'aiTreatmentReasoningKillSwitch'] as const) {
+    for (const key of ['aiPatientInsightKillSwitch', 'aiSmartImportKillSwitch', 'aiDocumentSynthesisKillSwitch'] as const) {
       const before = await page.request.get(`/api/settings/${key}`);
       expect(before.ok()).toBe(true);
       originalSettings.push({ key, value: (await before.json()).value });

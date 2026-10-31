@@ -180,7 +180,7 @@ export default function AiRolloutReadinessPanel() {
                                 </p>
                             </div>
                             <p className={styles.muted} data-testid="ai-rollout-local-control-summary">
-                                {formatCountLabel(disabledControlsCount, 'funzione spenta', 'funzioni spente')} su {localControls.length}
+                                {formatCountLabel(disabledControlsCount, 'funzione spenta', 'funzioni spente')} su {localControls.length} nelle impostazioni. Ragionamento terapeutico: Non disponibile in questa versione.
                             </p>
                         </div>
                         <div className={styles.rows}>
@@ -192,7 +192,7 @@ export default function AiRolloutReadinessPanel() {
                                             : styles.critical)}
                                     data-testid={`ai-rollout-local-control-${control.lane}`}>
                                     <p className={styles.title}>{LOCAL_CONTROL_LABELS[control.lane]}</p>
-                                    <p>{control.state === 'enabled' ? 'Non spenta nelle impostazioni' : 'Spenta nelle impostazioni'}</p>
+                                    <p>{control.lane === 'treatment_reasoning' ? 'Non disponibile in questa versione. ' : ''}{control.state === 'enabled' ? 'Non spenta nelle impostazioni' : 'Spenta nelle impostazioni'}</p>
                                     <details>
                                         <summary className={DISCLOSURE_SUMMARY_CLASS}>Dettagli per l’assistenza</summary>
                                         <p>{control.label} · <code>{control.key}</code> · <code>{control.state}</code></p>

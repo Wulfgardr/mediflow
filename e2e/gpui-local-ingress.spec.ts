@@ -66,7 +66,7 @@ test('server binds GPUI authority to its socket ingress across login, both write
         expect((await call(setting, 'PUT', session, {value: 'enabled'})).status).toBe(200);
         for (const extra of [{}, forged]) {
             const attack = { ...extra, ...session };
-            for (const key of ['aiPatientInsightKillSwitch', 'aiDocumentSynthesisKillSwitch', 'aiSmartImportKillSwitch', 'aiTreatmentReasoningKillSwitch']) {
+            for (const key of ['aiPatientInsightKillSwitch', 'aiDocumentSynthesisKillSwitch', 'aiSmartImportKillSwitch']) {
                 expect((await call(`/api/settings/${key}`, 'PUT', attack, {value: 'disabled'}, 'lan')).status).toBe(401);
             }
             expect((await call(`/api/attachments/${id}`, 'DELETE', attack, deletion, 'lan')).status).toBe(401);

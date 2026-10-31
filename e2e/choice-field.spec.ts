@@ -1,7 +1,7 @@
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { execFileSync } from 'node:child_process';
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
+import { bootstrapUnlockedSession, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 
 const longName = 'Modello sintetico con nome completo molto lungo per la revisione clinica e la verifica della scelta conservata';
 const optionId = `model_option_${'2'.repeat(32)}`;
@@ -140,32 +140,6 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
         await page.screenshot({ path: screenshot, fullPage: true, animations: 'disabled' });
         await test.info().attach(`choice-${sha}`, { path: screenshot, contentType: 'image/png' });
         await test.info().attach('revisione', { body: `${sha}\n${baseline ? 'prima' : 'dopo'}\nZoom Chromium tabs.setZoom/getZoom con viewport fisico 1440 per 200% e 400%.`, contentType: 'text/plain' });
-        noWrites();
-        await setAiLaneKillSwitch(page, 'aiTreatmentReasoningKillSwitch', 'enabled');
-        const patientId = await page.evaluate(async () => {
-            const response = await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ firstName: 'Ada sintetica', lastName: 'Scelta', taxCode: `SYN${crypto.randomUUID().slice(0, 12)}`, birthDate: '1972-04-12' }) });
-            if (!response.ok) throw new Error(`Paziente sintetico: ${response.status}`);
-            return (await response.json()).id as string;
-        });
-        await page.goto(`/patients/${patientId}/modules`);
-        await openPatientSection(page, 'terapie');
-        await page.evaluate(theme => {
-            document.documentElement.classList.toggle('dark', theme === 'grafite');
-            document.documentElement.classList.toggle('light', theme === 'giorno');
-        }, theme);
-        if (zoomFixture) await zoomFixture.setZoom(size === 'zoom-200' ? 2 : 4);
-        const proposals = page.locator('#terapie').getByRole('button', { name: 'Proposte', exact: true });
-        await expect(proposals).toHaveAttribute('aria-expanded', 'false');
-        await proposals.click();
-        await expect(proposals).toHaveAttribute('aria-expanded', 'true');
-        const clinical = await chooseLongName(page, 'treatment_reasoning');
-        await clinical.select.focus();
-        await assertNotClippedInViewport(clinical.select, 'Modello terapeutico');
-        await assertNoHorizontalOverflow(page, [{ label: 'documento clinico', selector: 'document' }]);
-        const clinicalScreenshot = test.info().outputPath(`clinical-${theme}-${size}.png`);
-        await page.screenshot({ path: clinicalScreenshot, animations: 'disabled' });
-        await test.info().attach(`clinical-${sha}`, { path: clinicalScreenshot, contentType: 'image/png' });
         noWrites();
     });
 }
