@@ -10,7 +10,7 @@ function sourceFixture(t) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-build-input-')));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const put = (name, value) => { const file = path.join(root, name); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, value); return file; };
-  for (const name of ['source-runtime.mjs', 'node-runtime-contract.mjs', 'generate-runtime-payload-ledger.mjs',
+  for (const name of ['source-runtime.mjs', 'windows-runtime-job-deadlines.mjs', 'node-runtime-contract.mjs', 'generate-runtime-payload-ledger.mjs',
     'launch-bundled-headless-supervisor.mjs', 'build-input-metadata.mjs']) {
     const source = path.join(repository, 'scripts', name);
     if (fs.existsSync(source)) put(`scripts/${name}`, fs.readFileSync(source));

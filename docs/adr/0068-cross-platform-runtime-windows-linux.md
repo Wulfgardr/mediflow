@@ -136,16 +136,19 @@ ricevuta non viene adottato. Non si arrestano PID trovati sulla rete.
 
 Arresta e Ctrl+C chiudono i figli posseduti e la pagina Avvio. Il runtime
 sorgente accetta anche un messaggio di arresto sul canale IPC del proprio
-padre per i suoi consumer cooperativi. Lo Stop del launcher ordinario Windows
-segue invece ADR0159: una taskkill di sistema `/T /F` e l'exit originale
-costituiscono insieme la prova richiesta, con costo di arresto forzato.
+padre per i suoi consumer cooperativi. Lo Stop del Web ordinario Windows segue
+ADR0171: il guardiano del Job conferma zero processi attivi prima del rilascio
+dei lock. Per gli altri figli Windows resta ADR0159: una taskkill di sistema
+`/T /F` e l'exit originale costituiscono insieme la prova richiesta.
 Il bootstrap Node-API precompilato del launcher deve essere distribuito prima
 di `npm ci`; non installa né compila componenti all'avvio e nega architetture
 o artefatti mancanti. La sua build di sviluppo/CI è distinta dal percorso
 utente source-first. Lo stesso artefatto espone GetSystemDirectoryW e la
 lettura del creation time per qualunque PID tramite OpenProcess con diritto
 limitato, GetProcessTimes e CloseHandle, senza subprocesso PowerShell nel
-prodotto. Manifest schema 2 ed export esatti sono obbligatori. I tick UTC
+prodotto. Lo stesso modulo espone la creazione del Job per una generazione di
+processo verificata sul medesimo handle, senza PowerShell o compilazione C#.
+Manifest schema 3 ed export esatti sono obbligatori. I tick UTC
 interi devono coincidere byte-per-byte con l’identità legacy: l’oracle
 PowerShell resta soltanto nel gate esterno (30 s per invocazione, nessun
 retry), insieme a verifica di receipt viva e stabilità degli handle. Senza

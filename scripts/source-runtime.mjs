@@ -3,10 +3,11 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { assertNodeRuntime, readNodeContract, standaloneDirectory, verifyNativeBinding } from './node-runtime-contract.mjs';
+import { assertNodeRuntime, readNodeContract, standaloneDirectory, verifyNativeBinding, verifyNativeBindingInChild } from './node-runtime-contract.mjs';
 import { generatePayloadLedger, verifyPayloadLedger } from './generate-runtime-payload-ledger.mjs';
 import { physicalFiles, physicalRecord } from './launch-bundled-headless-supervisor.mjs';
 import { assertBuildInputMetadata } from './build-input-metadata.mjs';
+import { WINDOWS_JOB_STARTUP_TIMEOUT_MS } from './windows-runtime-job-deadlines.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const ledgerPath = web => path.join(path.dirname(web), 'runtime-payload-ledger.json');
@@ -159,7 +160,8 @@ export function verifySourceRuntime(root = ROOT) {
     throw new Error('Source runtime build identity mismatch');
   }
   // This probe executes only the now-verified binding, against in-memory SQLite.
-  verifyNativeBinding(web);
+  if (process.platform === 'win32') verifyNativeBindingInChild(web);
+  else verifyNativeBinding(web);
   return { web, identity };
 }
 
@@ -178,7 +180,8 @@ export async function startSourceRuntime(mode, root = ROOT) {
     if (process.env.MEDIFLOW_WEB_OWNER_GATE) {
       if (!process.connected) throw new Error('Web owner required');
       await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => { process.off('message', receive); reject(new Error('Web owner timeout')); }, 30000);
+        const timer = setTimeout(() => { process.off('message', receive); reject(new Error('Web owner timeout')); },
+          process.platform === 'win32' ? WINDOWS_JOB_STARTUP_TIMEOUT_MS : 30000);
         const receive = frame => {
           if (frame?.type !== 'mediflow-web-owner-start' || frame.nonce !== process.env.MEDIFLOW_WEB_OWNER_GATE) return;
           clearTimeout(timer); process.off('message', receive); resolve();

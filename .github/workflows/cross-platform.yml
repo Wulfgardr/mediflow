@@ -38,6 +38,8 @@ jobs:
         run: node scripts/prepare-windows-launcher-bootstrap.mjs verify
       - name: Verify native bootstrap with hostile cwd PATH and root variables
         run: node scripts/prepare-windows-launcher-bootstrap.mjs verify-shadow
+      - name: Verify native Job containment and guardian death
+        run: node --test scripts/runtime-leases.test.mjs
       - name: Prove source-first before npm ci
         run: node scripts/prepare-windows-launcher-bootstrap.mjs source-first
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

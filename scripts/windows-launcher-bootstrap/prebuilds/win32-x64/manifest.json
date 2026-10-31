@@ -1,6 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "exports": [
+    "createJobForProcess",
     "getProcessCreationTimeTicks",
     "getSystemDirectory"
   ],
@@ -8,15 +9,15 @@
   "arch": "x64",
   "napiVersion": 1,
   "binary": "system-directory.node",
-  "bytes": 5120,
-  "sha256": "517987b01c4b81dcebc38eb23751508da5ef9003b9a7863cea6282974a8c476a",
+  "bytes": 8192,
+  "sha256": "d92c56c9e0bbc8aa4c40b41f64e7375403f94b04bddc2ed588ffa8558a2b7d8a",
   "dependencies": [
     "kernel32.dll",
     "node.exe"
   ],
-  "sourceSha256": "af84f4fa50b5d58aea74ff025d623d242d9c69785052f5fe3cdb3a2106aa1852",
+  "sourceSha256": "d225cabaca09fca34c103e93608963aca8bb01dfca4ff7df21b285147cb16e7c",
   "recipeSha256": "576c867a61525717b5bb5d613b92f195432357306ced21cdec07adae78c9c1f1",
-  "builderSha256": "06bb682508752468bb3244057c33665a12a0906bf1a576df0fbe1d71f6aeca22",
+  "builderSha256": "dac5c0648b21e5e1f4c085ceea902eb80c52a7eba5329abd909ec57f28a72089",
   "sdk": {
     "node": "24.22.0",
     "headersSha256": "00e9f08b9057f9f5428387a5ffd496e53f274565b40b144b7ba876700755352a",
@@ -27,7 +28,7 @@
     "arch": "x64",
     "machine": "x86_64",
     "uv": "1.52.1",
-    "compiler": "19.51.36260.0",
-    "architecture": "x64"
+    "architecture": "x64",
+    "compiler": "19.51.36260.0"
   }
 }
