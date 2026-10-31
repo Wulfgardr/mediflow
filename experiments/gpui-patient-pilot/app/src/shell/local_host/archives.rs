@@ -114,7 +114,7 @@ impl ArchiveArea {
         });
     }
 }
-fn read_selected(path: &Path, maximum: u64) -> std::io::Result<Zeroizing<Vec<u8>>> {
+pub(super) fn read_selected(path: &Path, maximum: u64) -> std::io::Result<Zeroizing<Vec<u8>>> {
     if !fs::metadata(path)?.is_file() {
         return Err(std::io::ErrorKind::InvalidInput.into());
     }

@@ -491,10 +491,14 @@ impl RuntimeClient {
             .map_err(|_| RuntimeError::InvalidInput)?
             .map(Zeroizing::new);
         let archive = path.starts_with(&["api", "system", "backup-restore"]);
-        if encoded
-            .as_ref()
-            .is_some_and(|v| v.len() > if archive { JSON_LIMIT } else { 4096 })
-        {
+        if encoded.as_ref().is_some_and(|v| {
+            v.len()
+                > if archive || reference_json_path(path) {
+                    JSON_LIMIT
+                } else {
+                    4096
+                }
+        }) {
             return Err(RuntimeError::TooLarge);
         }
         http_runtime().block_on(self.context.run(
@@ -509,7 +513,12 @@ impl RuntimeClient {
                 if let Some(body) = encoded {
                     request = request.body(body.to_vec());
                 }
-                if path == ["api", "ai", "local-provider", "onboarding"] {
+                if matches!(
+                    path,
+                    ["api", "ai", "local-provider", "onboarding"]
+                        | ["api", "icd", "catalog"]
+                        | ["api", "drugs", "update"]
+                ) {
                     request = request.timeout(Duration::from_secs(70));
                 }
                 let response = request.send().await.map_err(|_| uncertain(mutation))?;
@@ -526,8 +535,9 @@ impl RuntimeClient {
                     {
                         return Err(RuntimeError::ArchiveReplaced);
                     }
-                    if path == ["api", "ai", "local-provider", "onboarding"]
-                        && matches!(raw.status, 409 | 503)
+                    if (path == ["api", "ai", "local-provider", "onboarding"]
+                        && matches!(raw.status, 409 | 503))
+                        || (path == ["api", "drugs", "update"] && raw.status == 409)
                     {
                         return Ok(raw);
                     }
@@ -540,6 +550,51 @@ impl RuntimeClient {
                     });
                 }
                 Ok(raw)
+            },
+            mutation,
+        ))
+    }
+
+    pub(crate) fn aifa_catalog_raw(
+        &self,
+        headers: HeaderMap,
+        upload: Option<(String, Vec<u8>)>,
+    ) -> Result<RawResponse> {
+        if !self.is_local_bootstrap_origin() {
+            return Err(RuntimeError::Forbidden);
+        }
+        let mutation = upload.is_some();
+        http_runtime().block_on(self.context.run(
+            async {
+                let mut request = self
+                    .http
+                    .request(
+                        if mutation { Method::POST } else { Method::GET },
+                        self.endpoint(
+                            &["api", "drugs"],
+                            if mutation { &[] } else { &[("count", "1")] },
+                        )?,
+                    )
+                    .headers(headers)
+                    .header("origin", self.origin.origin().ascii_serialization())
+                    .header("sec-fetch-site", "same-origin");
+                if let Some((content_type, bytes)) = upload {
+                    if bytes.len() > 101 * 1024 * 1024 {
+                        return Err(RuntimeError::TooLarge);
+                    }
+                    request = request.header("content-type", content_type).body(bytes);
+                }
+                let response = request.send().await.map_err(|_| uncertain(mutation))?;
+                let raw = read_response_body(response, AUTH_LIMIT, mutation).await?;
+                if raw.status == 409
+                    && matches!(conflict_code(&raw.body), ConflictCode::ArchiveReplaced)
+                {
+                    return Err(RuntimeError::ArchiveReplaced);
+                }
+                if raw.status == 409 || (200..300).contains(&raw.status) {
+                    return Ok(raw);
+                }
+                Err(classify_status(raw.status, mutation))
             },
             mutation,
         ))
@@ -1124,6 +1179,23 @@ pub(crate) fn operation_uuid() -> Result<String> {
     ))
 }
 
+fn reference_json_path(path: &[&str]) -> bool {
+    matches!(
+        path,
+        [
+            "api",
+            "exemptions",
+            "import",
+            "status" | "preview" | "commit"
+        ] | [
+            "api",
+            "prosthetics",
+            "catalog",
+            "status" | "preview" | "commit" | "sources"
+        ] | ["api", "icd", "catalog"]
+    )
+}
+
 fn dedicated_web_limit(path: &[&str], archive: bool) -> usize {
     match path {
         ["api", "system", "recovery-backup"] => 512 * 1024 * 1024,
@@ -1131,12 +1203,39 @@ fn dedicated_web_limit(path: &[&str], archive: bool) -> usize {
         ["api", "system", "ai-parliament" | "ai-rollout-readiness"] => JSON_LIMIT,
         _ if archive => JSON_LIMIT,
         ["api", "attachments", _] => DOCUMENT_LIMIT,
+        _ if reference_json_path(path) => JSON_LIMIT,
         _ => AUTH_LIMIT,
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn reference_response_budgets_are_explicit_and_do_not_expand_other_routes() {
+        for path in [
+            vec!["api", "exemptions", "import", "status"],
+            vec!["api", "exemptions", "import", "preview"],
+            vec!["api", "exemptions", "import", "commit"],
+            vec!["api", "prosthetics", "catalog", "status"],
+            vec!["api", "prosthetics", "catalog", "preview"],
+            vec!["api", "prosthetics", "catalog", "commit"],
+            vec!["api", "prosthetics", "catalog", "sources"],
+            vec!["api", "icd", "catalog"],
+        ] {
+            assert_eq!(super::dedicated_web_limit(&path, false), super::JSON_LIMIT);
+        }
+        assert_eq!(
+            super::dedicated_web_limit(&["api", "unrelated"], false),
+            super::AUTH_LIMIT
+        );
+        assert!(!super::reference_json_path(&[
+            "api",
+            "prosthetics",
+            "catalog",
+            "unknown"
+        ]));
+    }
+
     #[test]
     fn private_json_has_exact_storage_and_preserves_the_budget() {
         let value = serde_json::json!({"source":{"fileKey":[1,2,3],"original":"a\\b\"c"}});

@@ -8618,4 +8618,408 @@ mod g2_settings_tests {
             assert!(listener.accept().is_err(), "read after lock reached host");
         }
     }
+    #[test]
+    fn g2_references_large_previews_sources_and_cookie_only_writers() {
+        use crate::{ReferenceCatalog, ReferenceImportResult};
+        for catalog in [ReferenceCatalog::Exemptions, ReferenceCatalog::Prosthetics] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                let root = if catalog == ReferenceCatalog::Exemptions {
+                    "/api/exemptions/import"
+                } else {
+                    "/api/prosthetics/catalog"
+                };
+                let diagnostics=(0..200).map(|i|json!({"line":i+1,"row":i+1,"column":"descrizione","code":"INVALID_ROW","message":"s".repeat(400)})).collect::<Vec<_>>();
+                let preview = json!({"valid":false,"manifest":{"sourceName":"synthetic.csv"},"diagnostics":diagnostics,"sample":[],"proof":null});
+                assert!(preview.to_string().len() > 65_536);
+                for (method, path, code, response) in [
+                    ("POST", format!("{root}/preview"), 200, preview),
+                    (
+                        "POST",
+                        format!("{root}/preview"),
+                        200,
+                        json!({"valid":true,"manifest":{"sourceName":"synthetic.csv"},"diagnostics":[],"sample":[],"proof":"synthetic-proof"}),
+                    ),
+                    (
+                        "POST",
+                        format!("{root}/commit"),
+                        200,
+                        json!({"receipt":{"operationKey":"synthetic-operation","revision":"synthetic-revision"},"replayed":false}),
+                    ),
+                    (
+                        "GET",
+                        format!("{root}/status"),
+                        200,
+                        json!({"count":1,"revision":"synthetic-revision","latestReceipt":null}),
+                    ),
+                ] {
+                    let (mut stream, _) = listener.accept().unwrap();
+                    let request = read_request(&mut stream);
+                    assert!(
+                        request.starts_with(&format!("{method} {path} HTTP/1.1")),
+                        "{request}"
+                    );
+                    let lower = request.to_lowercase();
+                    assert!(lower.contains(&format!("mediflow_session={}", "b".repeat(64))));
+                    assert!(lower.contains("x-mediflow-archive-generation: synthetic-generation"));
+                    assert!(
+                        !lower.contains("authorization:")
+                            && !lower.contains("x-mediflow-paired-client")
+                    );
+                    if path.ends_with("/commit") {
+                        assert!(request.contains("\"proof\":\"synthetic-proof\""));
+                        assert!(request.contains("\"acceptSubset\":true"));
+                    }
+                    local_host_reply(&mut stream, code, response, "");
+                }
+                if catalog == ReferenceCatalog::Prosthetics {
+                    let (mut stream, _) = listener.accept().unwrap();
+                    assert!(
+                        read_request(&mut stream)
+                            .starts_with(&format!("GET {root}/sources HTTP/1.1"))
+                    );
+                    let sources=(0..200).map(|i|json!({"id":format!("synthetic-{i}"),"name":"s".repeat(200),"authority":"a".repeat(200),"scope":"s","version":"v","date":null,"sha256":"a".repeat(64),"notes":"","documents":[]})).collect::<Vec<_>>();
+                    let body = json!({"revision":"synthetic-revision","sources":sources});
+                    assert!(body.to_string().len() > 65_536);
+                    local_host_reply(&mut stream, 200, body, "");
+                }
+                listener
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let invalid = access
+                .prepare_reference_file(catalog, "synthetic.csv", b"synthetic", json!({}))
+                .unwrap();
+            assert!(!invalid.can_commit());
+            assert!(matches!(
+                access.commit_reference_import(&invalid),
+                Err(RuntimeError::ReadRequired)
+            ));
+            let preview = access
+                .prepare_reference_file(catalog, "synthetic.csv", b"synthetic", json!({}))
+                .unwrap();
+            assert!(preview.can_commit());
+            assert!(matches!(
+                access.commit_reference_import(&preview),
+                Ok(ReferenceImportResult::Recorded(_))
+            ));
+            assert!(matches!(
+                access.commit_reference_import(&preview),
+                Err(RuntimeError::ReadRequired)
+            ));
+            let state = access.read_reference_catalog(catalog).unwrap();
+            assert_eq!(state.data["count"], 1);
+            if catalog == ReferenceCatalog::Prosthetics {
+                assert_eq!(
+                    state.sources.unwrap().unwrap()["sources"]
+                        .as_array()
+                        .unwrap()
+                        .len(),
+                    200
+                );
+            }
+            let listener = worker.join().unwrap();
+            session.lock();
+            assert!(matches!(
+                access.read_reference_catalog(catalog),
+                Err(RuntimeError::Locked)
+            ));
+            listener.set_nonblocking(true).unwrap();
+            assert!(listener.accept().is_err());
+        }
+    }
+    #[test]
+    fn g2_references_aifa_multipart_reduction_and_who_two_confirmations() {
+        use crate::{ReferenceCatalog, ReferenceImportResult};
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            for (path, code, body) in [
+                (
+                    "/api/drugs",
+                    409,
+                    json!({"code":"AIFA_REDUCTION_CONFIRMATION_REQUIRED","confirmation":format!("{}:{}","a".repeat(64),"b".repeat(64)),"previousCount":100,"nextCount":1}),
+                ),
+                (
+                    "/api/drugs",
+                    200,
+                    json!({"count":1,"state":"ready","manifest":{},"rejectedRecords":0,"totalRecords":1}),
+                ),
+                (
+                    "/api/icd/catalog",
+                    200,
+                    json!({"previewId":"synthetic-preview","expectedRevision":1,"manifest":{"categories":1,"releaseId":"2026-01"}}),
+                ),
+                (
+                    "/api/icd/catalog",
+                    200,
+                    json!({"state":"ready","enabled":true,"previousAvailable":true,"revision":2,"manifest":{"categories":1}}),
+                ),
+            ] {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut request = read_request(&mut stream);
+                while request.starts_with("GET /api/drugs?count=1 ") {
+                    local_host_reply(
+                        &mut stream,
+                        200,
+                        json!({"count":100,"state":"ready","snapshot":"a".repeat(64),"manifest":{"version":"synthetic-before"}}),
+                        "",
+                    );
+                    (stream, _) = listener.accept().unwrap();
+                    request = read_request(&mut stream);
+                }
+                assert!(
+                    request.starts_with(&format!("POST {path} HTTP/1.1")),
+                    "{request}"
+                );
+                if path == "/api/drugs" {
+                    assert!(request.contains("multipart/form-data; boundary=mediflow-"));
+                    assert!(request.contains("name=\"expectedSnapshot\""));
+                    assert!(request.contains("filename=\"catalogo.csv\""));
+                    if code == 200 {
+                        assert!(request.contains("name=\"reductionConfirmation\""));
+                    }
+                } else {
+                    assert!(request.contains("\"confirmed\":true"));
+                    assert!(request.contains(if body["previewId"].is_string() {
+                        "\"action\":\"preview\""
+                    } else {
+                        "\"action\":\"activate\""
+                    }));
+                }
+                local_host_reply(&mut stream, code, body, "");
+            }
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let first=access.prepare_reference_file(ReferenceCatalog::Aifa,"synthetic.csv",b"AIC;DENOMINAZIONE;ATC;PRINCIPIO_ATTIVO\n000000001;Inventato;X;Inventato",json!({"sourceUrl":"https://aifa.example/synthetic.csv","downloadedAt":"2026-10-31","version":"synthetic"})).unwrap();
+        let ReferenceImportResult::Reduction(second) =
+            access.commit_reference_import(&first).unwrap()
+        else {
+            panic!("reduction not shown")
+        };
+        assert_eq!(second.data()["reduction"]["nextCount"], 1);
+        assert!(matches!(
+            access.commit_reference_import(&second),
+            Ok(ReferenceImportResult::Recorded(_))
+        ));
+        let who = access.prepare_who_acquisition().unwrap();
+        assert!(who.can_commit());
+        assert!(matches!(
+            access.commit_reference_import(&who),
+            Ok(ReferenceImportResult::Recorded(_))
+        ));
+        let listener = worker.join().unwrap();
+        session.lock();
+        assert!(matches!(
+            access.prepare_who_acquisition(),
+            Err(RuntimeError::Locked)
+        ));
+        listener.set_nonblocking(true).unwrap();
+        assert!(listener.accept().is_err());
+    }
+    #[test]
+    fn g2_references_aifa_review_partial_and_stale_draft() {
+        use crate::{ReferenceCatalog, ReferenceImportResult};
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            for version in ["initial", "concurrent", "initial"] {
+                let (mut stream, _) = listener.accept().unwrap();
+                assert!(read_request(&mut stream).starts_with("GET /api/drugs?count=1 "));
+                local_host_reply(
+                    &mut stream,
+                    200,
+                    json!({"count":10,"state":"ready","snapshot":"a".repeat(64),"manifest":{"version":version}}),
+                    "",
+                );
+            }
+            let (mut stream, _) = listener.accept().unwrap();
+            let request = read_request(&mut stream);
+            assert!(request.starts_with("POST /api/drugs "));
+            assert!(request.contains("bad;Invalido"));
+            assert!(request.contains("name=\"expectedSnapshot\""));
+            assert!(request.contains(&"a".repeat(64)));
+            local_host_reply(&mut stream, 409, json!({"code":"AIFA_CATALOG_CHANGED"}), "");
+            let (mut stream, _) = listener.accept().unwrap();
+            assert!(read_request(&mut stream).starts_with("GET /api/drugs?count=1 "));
+            local_host_reply(
+                &mut stream,
+                200,
+                json!({"count":10,"state":"ready","snapshot":"a".repeat(64),"manifest":{"version":"initial"}}),
+                "",
+            );
+            let (mut stream, _) = listener.accept().unwrap();
+            assert!(read_request(&mut stream).starts_with("POST /api/drugs "));
+            local_host_reply(
+                &mut stream,
+                200,
+                json!({"count":9,"state":"ready","rejectedRecords":1,"totalRecords":10,"manifest":{"version":"synthetic"}}),
+                "",
+            );
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let mut csv = String::from("AIC;DENOMINAZIONE;ATC;PRINCIPIO_ATTIVO\n");
+        for i in 1..=9 {
+            csv.push_str(&format!("{i:09};Inventato;X;Inventato\n"));
+        }
+        csv.push_str("bad;Invalido;X;Inventato");
+        let draft = access.prepare_reference_file(ReferenceCatalog::Aifa, "synthetic.csv", csv.as_bytes(), json!({"sourceUrl":"https://aifa.example/synthetic.csv","downloadedAt":"2026-10-31","version":"synthetic"})).unwrap();
+        assert_eq!(draft.data()["review"]["rejectedRecords"], 1);
+        assert_eq!(draft.data()["review"]["totalRecords"], 10);
+        assert_eq!(draft.data()["review"]["count"], 9);
+        assert_eq!(
+            draft.data()["review"]["diagnostics"][0]["message"],
+            "AIC non valido"
+        );
+        assert!(matches!(
+            access.commit_reference_import(&draft),
+            Ok(ReferenceImportResult::CatalogChanged)
+        ));
+        assert!(draft.can_commit());
+        assert!(matches!(
+            access.commit_reference_import(&draft),
+            Ok(ReferenceImportResult::CatalogChanged)
+        ));
+        assert!(draft.can_commit());
+        let ReferenceImportResult::Recorded(receipt) =
+            access.commit_reference_import(&draft).unwrap()
+        else {
+            panic!("not recorded");
+        };
+        assert_eq!(receipt["rejectedRecords"], 1);
+        assert_eq!(receipt["review"]["diagnostics"][0]["row"], 11);
+        assert!(matches!(
+            access.commit_reference_import(&draft),
+            Err(RuntimeError::ReadRequired)
+        ));
+        let listener = worker.join().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert!(listener.accept().is_err());
+    }
+    #[test]
+    fn g2_references_aifa_missing_receipt_counts_is_not_recorded() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            let (mut stream, _) = listener.accept().unwrap();
+            assert!(read_request(&mut stream).starts_with("POST /api/drugs/update "));
+            local_host_reply(
+                &mut stream,
+                200,
+                json!({"count":9,"state":"ready","manifest":{}}),
+                "",
+            );
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let draft = access.prepare_aifa_update().unwrap();
+        assert!(matches!(
+            access.commit_reference_import(&draft),
+            Err(RuntimeError::Indeterminate)
+        ));
+        worker.join().unwrap();
+    }
+    #[test]
+    fn g2_references_sources_failure_keeps_the_catalog_and_never_invents_a_receipt() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            for (path, code, body) in [
+                (
+                    "/api/prosthetics/catalog/status",
+                    200,
+                    json!({"revision":"synthetic","count":0,"sourceCount":0,"latestReceipt":null}),
+                ),
+                (
+                    "/api/prosthetics/catalog/sources",
+                    404,
+                    json!({"error":"SYNTHETIC_UNAVAILABLE"}),
+                ),
+                (
+                    "/api/drugs?count=1",
+                    200,
+                    json!({"state":"not-imported","count":0,"manifest":null}),
+                ),
+                (
+                    "/api/drugs/update",
+                    200,
+                    json!({"state":"ready","count":1,"manifest":{"version":"synthetic"},"rejectedRecords":0,"totalRecords":1}),
+                ),
+            ] {
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(
+                    request.starts_with(&format!(
+                        "{} {path} HTTP/1.1",
+                        if path.ends_with("update") {
+                            "POST"
+                        } else {
+                            "GET"
+                        }
+                    )),
+                    "{request}"
+                );
+                local_host_reply(&mut stream, code, body, "");
+            }
+            listener
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let status = access
+            .read_reference_catalog(crate::ReferenceCatalog::Prosthetics)
+            .unwrap();
+        assert_eq!(status.data["count"], 0);
+        assert!(status.data["latestReceipt"].is_null());
+        assert!(matches!(status.sources, Some(Err(RuntimeError::Missing))));
+        assert_eq!(
+            access
+                .read_reference_catalog(crate::ReferenceCatalog::Aifa)
+                .unwrap()
+                .data["state"],
+            "not-imported"
+        );
+        let command = access.prepare_aifa_update().unwrap();
+        assert!(matches!(
+            access.commit_reference_import(&command),
+            Ok(crate::ReferenceImportResult::Recorded(_))
+        ));
+        let listener = worker.join().unwrap();
+        session.lock();
+        assert!(matches!(
+            access.commit_reference_import(&command),
+            Err(RuntimeError::Locked)
+        ));
+        listener.set_nonblocking(true).unwrap();
+        assert!(listener.accept().is_err());
+    }
 }

@@ -1,6 +1,6 @@
 
 import { createHash } from 'node:crypto';
-import { AifaUpdateError, AifaReductionError, acquireAifaCatalogOperation } from './aifa-catalog-lock';
+import { AifaUpdateError, AifaReductionError, AifaCatalogConflictError, acquireAifaCatalogOperation } from './aifa-catalog-lock';
 import { currentArchiveGeneration } from './security/archive-session-generation';
 import { writeAuditEventInTransaction, type buildAuditWriteInputFromRequest } from './security/audit';
 import { asc, eq, or, sql } from 'drizzle-orm';
@@ -39,21 +39,21 @@ export type AifaCatalogImportResult = AifaCatalogStatus & {
     totalRecords: number;
 };
 
-export async function getAifaCatalogStatus(): Promise<AifaCatalogStatus> {
-    const [countRow, manifestRow] = await Promise.all([
-        dbServer.select({ total: sql<number>`count(*)` }).from(drugs).get(),
-        dbServer.select({ value: settings.value })
-            .from(settings)
-            .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY))
-            .get(),
-    ]);
+function readCatalogStatus(connection: Pick<typeof dbServer, 'select'>): AifaCatalogStatus {
+    const countRow = connection.select({ total: sql<number>`count(*)` }).from(drugs).get();
+    const manifestRow = connection.select({ value: settings.value }).from(settings)
+        .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY)).get();
     const count = Number(countRow?.total || 0);
     const manifest = parseStoredAifaCatalogManifest(manifestRow?.value);
-    return {
-        count,
-        manifest,
-        state: count === 0 ? 'not-imported' : manifest ? 'ready' : 'unverified',
-    };
+    return { count, manifest, state: count === 0 ? 'not-imported' : manifest ? 'ready' : 'unverified' };
+}
+
+export async function getAifaCatalogStatus(): Promise<AifaCatalogStatus> {
+    return dbServer.transaction(readCatalogStatus);
+}
+
+export function getAifaCatalogVersionedStatus(): AifaCatalogStatus & { snapshot: string } {
+    return dbServer.transaction(tx => ({ ...readCatalogStatus(tx), snapshot: catalogSnapshot(tx) }));
 }
 
 /* Snapshot includes every stored drug field and the raw manifest, including legacy catalogs. */
@@ -116,7 +116,7 @@ export type AifaReplacementGuard = {
 };
 
 type AifaAuditInput = ReturnType<typeof buildAuditWriteInputFromRequest>;
-export type AifaReplacementOptions = { audit?: AifaAuditInput; confirmedReduction?: string };
+export type AifaReplacementOptions = { audit?: AifaAuditInput; confirmedReduction?: string; expectedSnapshot?: string };
 export const AIFA_MINIMUM_REPLACEMENT_RATIO = 0.9;
 
 function systemAifaAudit(): AifaAuditInput {
@@ -156,6 +156,12 @@ export async function replaceAifaCatalog(
                 currentSnapshot = catalogSnapshot(transaction);
                 if (currentSnapshot !== guard.snapshot) {
                     throw new AifaUpdateError('Catalogo modificato durante il download: rileggi lo stato', 409);
+                }
+            }
+            if (options.expectedSnapshot !== undefined) {
+                currentSnapshot ??= catalogSnapshot(transaction);
+                if (currentSnapshot !== options.expectedSnapshot) {
+                    throw new AifaCatalogConflictError();
                 }
             }
             const previous = parseStoredAifaCatalogManifest(transaction.select().from(settings)

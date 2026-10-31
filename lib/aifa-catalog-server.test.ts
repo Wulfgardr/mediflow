@@ -610,3 +610,79 @@ test('manual import excludes legacy replacement and clearing through services an
         assert.equal((await route.DELETE(request('DELETE'))).status, 200);
     });
 });
+
+
+test('manual expected snapshot rejects a real concurrent SQLite transaction after the status read', async () => {
+    const catalog = await loadCatalogModules();
+    const { getAifaCatalogVersionedStatus } = await import('./aifa-catalog-server');
+    const { AifaCatalogConflictError } = await import('./aifa-catalog-lock');
+    catalog.clearAifaCatalog();
+    catalog.replaceUnverifiedDrugCatalog([{ aic: '000000001', name: 'PRIMA' }]);
+    const baseline = getAifaCatalogVersionedStatus();
+    assert.equal(baseline.snapshot, catalog.getAifaCatalogSnapshot());
+    const csv = 'CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n000000001;BOZZA OBSOLETA;A01AA01;Inventato';
+    const file = new File([csv], 'synthetic.csv');
+    const sqlite = new Database(path.join(process.env.MEDIFLOW_DATA_DIR!, 'medical.db'));
+    let concurrentSnapshot = '';
+    const arrayBuffer = file.arrayBuffer.bind(file);
+    file.arrayBuffer = async () => {
+        sqlite.transaction(() => {
+            sqlite.prepare('UPDATE drugs SET name = ? WHERE aic = ?').run('CONCORRENTE', '000000001');
+        }).immediate();
+        concurrentSnapshot = catalog.getAifaCatalogSnapshot();
+        assert.notEqual(concurrentSnapshot, baseline.snapshot);
+        return arrayBuffer();
+    };
+    const manifest = { sourceUrl: AIFA_CATALOG_DEFAULT_SOURCE_URL, downloadedAt: '2026-10-31', version: 'synthetic-cas' };
+    try {
+        await assert.rejects(catalog.replaceAifaCatalog(file, manifest, undefined, { expectedSnapshot: baseline.snapshot }), AifaCatalogConflictError);
+        assert.equal(catalog.getAifaCatalogSnapshot(), concurrentSnapshot);
+        assert.equal((sqlite.prepare('SELECT name FROM drugs WHERE aic = ?').get('000000001') as { name: string }).name, 'CONCORRENTE');
+        const result = await catalog.replaceAifaCatalog(new File([csv], 'synthetic.csv'), manifest, undefined, { expectedSnapshot: concurrentSnapshot });
+        assert.equal(result.count, 1);
+        assert.equal((sqlite.prepare('SELECT name FROM drugs WHERE aic = ?').get('000000001') as { name: string }).name, 'BOZZA OBSOLETA');
+    } finally { sqlite.close(); catalog.clearAifaCatalog(); }
+});
+
+test('manual route exposes the snapshot and returns 409 without writes after a concurrent change', async t => {
+    const catalog = await loadCatalogModules();
+    catalog.clearAifaCatalog();
+    catalog.replaceUnverifiedDrugCatalog([{ aic: '000000001', name: 'PRIMA' }]);
+    const load = createRequire(import.meta.url);
+    const auth = load('./security/server-auth.ts') as typeof import('./security/server-auth');
+    const owner = load('./security/web-auth-lifecycle-owner-adapter.ts') as typeof import('./security/web-auth-lifecycle-owner-adapter');
+    const route = load('../app/api/drugs/route.ts') as typeof import('../app/api/drugs/route');
+    const control = owner.bootstrapControl()!;
+    const attempt = owner.begin('login', { controlId: control.controlId, ifMatch: control.etag, idempotencyKey: 'synthetic-aifa-cas-login-0001' });
+    const issued = owner.issue(attempt, { id: 'synthetic-cas-user', username: ['synthetic', 'cas'].join('-'), role: 'clinician' })!;
+    const resolved = owner.resolve(issued.sessionId, control.controlId);
+    assert.equal(resolved.status, 'active');
+    if (resolved.status !== 'active') throw new Error('synthetic session setup failed');
+    t.mock.method(auth, 'requireSession', async () => resolved.projection);
+    bindSyntheticArchiveSessions(resolved.projection.id);
+    const status = await (await route.GET(new Request('http://localhost/api/drugs?count=1'))).json();
+    assert.equal(status.snapshot, catalog.getAifaCatalogSnapshot());
+    const form = new FormData();
+    form.set('file', new File(['CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n000000001;OBSOLETO;A01AA01;Inventato'], 'synthetic.csv'));
+    form.set('sourceUrl', AIFA_CATALOG_DEFAULT_SOURCE_URL);
+    form.set('downloadedAt', '2026-10-31');
+    form.set('version', 'synthetic-route-cas');
+    form.set('expectedSnapshot', status.snapshot);
+    const sqlite = new Database(path.join(process.env.MEDIFLOW_DATA_DIR!, 'medical.db'));
+    try {
+        sqlite.transaction(() => sqlite.prepare('UPDATE drugs SET name = ?').run('CONCORRENTE')).immediate();
+        const snapshot = catalog.getAifaCatalogSnapshot();
+        const audit = sqlite.prepare('SELECT count(*) AS n FROM audit_events').get();
+        const request = syntheticExemptionRequest('http://localhost/api/drugs', { method: 'POST' });
+        t.mock.method(request, 'formData', async () => form);
+        const response = await route.POST(request);
+        assert.equal(response.status, 409);
+        assert.equal((await response.json()).code, 'AIFA_CATALOG_CHANGED');
+        assert.equal(catalog.getAifaCatalogSnapshot(), snapshot);
+        assert.deepEqual(sqlite.prepare('SELECT count(*) AS n FROM audit_events').get(), audit);
+        form.set('expectedSnapshot', 'invalid');
+        assert.equal((await route.POST(request)).status, 400);
+        form.delete('expectedSnapshot');
+        assert.equal((await route.POST(request)).status, 200, 'legacy Web clients remain compatible');
+    } finally { sqlite.close(); catalog.clearAifaCatalog(); }
+});

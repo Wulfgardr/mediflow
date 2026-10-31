@@ -13,6 +13,7 @@ pub(super) enum SettingsPage {
     Functions,
     Archives,
     Governance,
+    References,
 }
 
 impl SettingsPage {
@@ -28,6 +29,7 @@ impl SettingsPage {
             Self::Archives => 7,
             Self::Access => 8,
             Self::Governance => 9,
+            Self::References => 10,
         }
     }
 }
@@ -56,6 +58,9 @@ impl ClinicalApp {
         }
         if page == SettingsPage::Governance {
             self.read_governance(cx);
+        }
+        if page == SettingsPage::References {
+            self.read_reference_catalog(cx);
         }
         if page == SettingsPage::Models {
             self.read_model_configuration(cx);
@@ -113,6 +118,7 @@ impl ClinicalApp {
             SettingsPage::Access => view.child(self.access_view(cx)),
             SettingsPage::Governance => view.child(self.governance_view(cx)),
             SettingsPage::Archives => view.child(self.archives_view(cx)),
+            SettingsPage::References => view.child(self.reference_administration_view(cx)),
             SettingsPage::Profile => view.child(self.account_profile_view(cx)),
             SettingsPage::Appearance => view.child(heading("clinical-workspace-settings-heading", "Aspetto", theme))
             .child(div().flex().flex_col().gap(px(12.))
@@ -158,6 +164,7 @@ impl ClinicalApp {
                         (SettingsPage::Appearance, "Aspetto", "Tema, dimensione del testo e privacy"),
                         (SettingsPage::Ambulatories, "Ambulatori", "Sedi e contesti clinici"),
                         (SettingsPage::Archives, "Archivi e backup", "Esportazione, verifica e ripristino"),
+                        (SettingsPage::References, "Repertori", "Stato, fonti e importazione dei cataloghi"),
                     ].into_iter().map(|(page, label, description)| self.settings_item(page, label, description, cx)))
                     .child(section("clinical-workspace-settings-intelligenza", "Intelligenza", theme))
                     .children([
@@ -245,7 +252,7 @@ mod tests {
                 window.draw(cx).clear(cx);
             });
             let nodes = rendered_command::take_text_nodes();
-            assert_eq!(nodes.len(), 8);
+            assert_eq!(nodes.len(), 9);
             let mut unique = HashSet::new();
             for (id, node) in nodes {
                 assert!(
@@ -269,6 +276,7 @@ mod tests {
                     SettingsPage::Access,
                     SettingsPage::Appearance,
                     SettingsPage::Models,
+                    SettingsPage::References,
                     SettingsPage::Ambulatories,
                     SettingsPage::AiPreferences,
                     SettingsPage::Functions,
@@ -309,6 +317,7 @@ mod tests {
                     SettingsPage::Access,
                     SettingsPage::Appearance,
                     SettingsPage::Models,
+                    SettingsPage::References,
                 ] {
                     app.select_settings_page(page, window, cx);
                     assert_eq!(app.settings_page, page);
