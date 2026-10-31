@@ -1,5 +1,5 @@
 {
-  "syncCommit": "2896ab6bc5dd06fc94c1c0c9555d0887ffc147d2",
+  "syncCommit": "623c71a3af9d3eb31c55a21c72381be13128545e",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -32,28 +32,29 @@
   },
   "files": {
     "lib/therapy-status-confirmation.ts": "33eebc3197e988f3f1c134f1ac8499da1de95171e21d0ac7e3396c2a202c6486",
-    "components/therapy-manager.tsx": "9951373407eabf70501086cbc2852e04088da8da0085811b23b9906579fcd1ac",
+    "components/therapy-manager.tsx": "9a543f8fdd887e06cac9daaaf399962d0d9f6707fc7ec6972d8007b81b38a509",
     "lib/db.ts": "bedd41c74084bd402e86fd6c28cb7900edfd19e73f265111ce865b74536b255a",
     "lib/security/client-auth-api.ts": "754aebaedb77bc9629a32d90f754ecc3ee7e89ead880c6add9088dd6449ee5ce",
     "lib/therapy-write-operation.ts": "f72e2fe81427c5b74a87db7fe79fc96f372553eff6e1ca0b6badf3fd0cd1f3ee",
     "app/api/therapies/[id]/route.ts": "3f4765cd55a13360965fae38bced33cec5cc69403dd0bbfd6d67417c5c40e4e2",
     "app/api/therapies/route.ts": "e13c48abb76cb0461eb1a9c1f23cf8724ec9cf34d32a7bd54909e58d4e251dac",
     "lib/locked-field-guard.ts": "a4b64b4db1968423169937a2b491add2d2a19b6fba2489b1515e37b358a55d3a",
-    "lib/therapy-status-command-service.ts": "23850355128b499768e7287af8a8b78baa76f2d2be54751f72e7e8cf1d9c6701",
-    "lib/therapy-status-command-confirmation.ts": "1699076bb1c4b772fdb509e72b2c154cba8061402724bcb6288a08381b1192e4",
+    "lib/therapy-status-command-service.ts": "3f1c76807690a218d49e7bc8b1d3f149cd9ab9c38108a0b5216a3e5347472fdf",
+    "lib/therapy-status-command-confirmation.ts": "3e85eb1cef3d2ff16d28568218bff2dba24482418c400c9c81f9f92f19d370b1",
     "lib/therapy-status-command-contract.ts": "3432124d9b5f8b3113265d9779fa12e1411e508b0964cfd2e1bc532f49f4a7fe",
-    "lib/therapy-status-command-client.ts": "cfda4bd0851b12f7c5e28c2d0ab299da099d513b41f31d79e32b07f6f17748de",
-    "lib/therapy-status-command-http.ts": "479b4434db907241f6e60048329477662d07ffd570641433bb83a73232b69703",
-    "lib/therapy-status-command-backup.ts": "189c18637dcc74cecda62b7b011b5f93172602df95ae7e7fd1b439afe1340cc5",
+    "lib/therapy-status-command-client.ts": "e2f833b062db819108f9ffddc6443e4bfce321a7d8a359666b84bc6b9b4ad30f",
+    "lib/therapy-status-command-http.ts": "7b0a7a7780d5c98973a14f17fba32b722a3cb962cc2787c7e5edcf9789b43423",
+    "lib/therapy-status-command-backup.ts": "17bfa8c096092e5d62829a750b66e25cb64f149516e94bacbca38b67c16a2ee3",
     "lib/therapy-status-command-schema.ts": "98c0aba0a361ef83655a632be41a257f8b9e99a950591113683a8094e26f4c87",
     "lib/therapy-status-command-recovery-schema.ts": "8231c04d505139c63f36f9657e2a2a0c964cd48b39d4ae4b2d2a0f2c552f5f4a",
-    "lib/ambulatory-destructive-command-recovery-schema.ts": "a61f0d6f31854f516f3ed25eccae5561d251ccc99fbbde07e65ff594e5934c53",
+    "lib/ambulatory-destructive-command-recovery-schema.ts": "711da8179e8c0485047dab48dccd9b4845097f6ca77c0840d40912254054f5f7",
     "lib/api-table-response.ts": "5f19aab147a2d4459c1d2ec96e6c6d67bb20ad8c23b0cd9f38239771ffbb602c",
     "lib/backup-encrypted-fields.json": "27d036cb546f048f96ac4f8f9a5eca6f8360a798ba8cf7d173deb19328ac77e3",
-    "lib/backup-import-provenance.ts": "81f0d6e2d0e9676734c308986681c84bf5d4b928e24effa628390a3f3ff17581",
+    "lib/backup-import-provenance.ts": "08fcb18af678adccfdc485623febcb4cc8507e01c0dc310554433b1082a0824c",
     "lib/sqlite-schema.ts": "66f2641796c558334f1aa90346b4c936949cd4abce2d0b30dd06e3a284fcaea1",
-    "lib/sqlite-schema-open.ts": "fdc16db4864b6fbbcb69634b6f0ada87542fe1e03204036d8406fdcb62c1d9a4",
-    "lib/backup-restore-executor.ts": "227af5f5806ab46a081e660b4462a628db9e3f44ecfeff30ea3e14cf9dbe03ea"
+    "lib/sqlite-schema-open.ts": "b2a81d2ac4d09d2b3ecf87c7b3c1f74ce22e23d9d8d1a4e2be1249cadca7466e",
+    "lib/backup-restore-executor.ts": "227af5f5806ab46a081e660b4462a628db9e3f44ecfeff30ea3e14cf9dbe03ea",
+    "lib/security/archive-maintenance-owner.ts": "57a026cca85845bf2ed3ae5b8c47dbc88caa8184b3d41639ea7ad9e90a420802"
   },
   "verificationInputs": [
     "docs/formal/therapy-status/",
@@ -83,14 +84,15 @@
     "scripts/falsify-chat-therapy.mjs",
     "app/api/auth/native/therapy-status/route.ts",
     "lib/backup-import-provenance.test.ts",
-    "lib/portable-import-migration.test.ts"
+    "lib/portable-import-migration.test.ts",
+    "lib/security/archive-maintenance-owner.test.ts"
   ],
   "durableProtocolCoverage": {
     "adr": "0168",
     "baseRevision": "3828bb17d4883b28a646c16af10f9505fddded38",
     "proof": "causal controller/client/HTTP tests and real SQLite crashes/races/restore; TLC remains legacy ADR0156",
     "recoveryCompatibility": {
-      "reviewedRevision": "ffe46c8144f2351502e903dd79aa47b3dfd1e216",
+      "reviewedRevision": "623c71a3af9d3eb31c55a21c72381be13128545e",
       "contract": {
         "adrs": [
           "0168",
@@ -100,9 +102,10 @@
         "predecessorVersions": [
           4,
           5,
-          6
+          6,
+          7
         ],
-        "currentVersion": 7,
+        "currentVersion": 8,
         "exactPredecessorOnly": true,
         "currentPhysicalExtensions": "preserved"
       },
@@ -111,12 +114,14 @@
       "canonicalSchemaFingerprints": {
         "4": "a998dad7b46c831f283032144f43cd690f68e962b199256ecd68c11736f867ed",
         "5": "33ce371c41f4cb51033af18ef9a0f06bf8c81a248bca29f18b21d3db9f24ea46",
-        "6": "4becef1521ec507b3da31047e01ab3e25562197c8a518472bb4cdef93ed3867b"
+        "6": "4becef1521ec507b3da31047e01ab3e25562197c8a518472bb4cdef93ed3867b",
+        "7": "6f070ea8f87e6bb9ac4e03caa9e6b679c9ff6a1c66de5e23b6945fb235812d90"
       },
       "unitTestCases": {
         "v4Wrapper": 8,
-        "v4v5v6Helper": 23,
-        "portableImportMigration": 2
+        "v4v5v6v7Helper": 30,
+        "portableImportMigration": 8,
+        "managedOwner": 19
       },
       "validatorFiles": [
         "lib/therapy-status-command-recovery-schema.ts",
