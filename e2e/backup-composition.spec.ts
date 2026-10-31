@@ -15,7 +15,7 @@ test('Backup: composizione, tastiera, bozza di conferma e verifica senza riprist
     const errors: string[] = [], forbidden: string[] = [], schedulerPosts: unknown[] = [], surfaces: unknown[] = [];
     page.on('pageerror', error => errors.push(error.message));
     page.on('request', request => { if (request.method() === 'POST' && (/\/api\/(ai|visit-session)\//u.test(request.url()) || new URL(request.url()).pathname === '/api/system/backup-restore')) forbidden.push(request.url()); });
-    const schedule = { supported: true, installed: false, plistPath: null, state: { config: { enabled: false, hour: 2, minute: 0, destinationDir: `${process.env.MEDIFLOW_DATA_DIR}/invented-backups`, retentionKeepArtifacts: 14 }, run: { lastRunAt: null, lastRunStatus: null, lastRunMessage: null, lastArtifactPath: null, lastRetentionAt: null, lastRetentionDeletedCount: null, lastRetentionDeletedBytes: null, lastRetentionMode: null } } };
+    const schedule = { supported: true, installed: false, plistPath: null, state: { revision: 'synthetic-revision', config: { enabled: false, hour: 2, minute: 0, destinationDir: `${process.env.MEDIFLOW_DATA_DIR}/invented-backups`, retentionKeepArtifacts: 14 }, run: { lastRunAt: null, lastRunStatus: null, lastRunMessage: null, lastArtifactPath: null, lastRetentionAt: null, lastRetentionDeletedCount: null, lastRetentionDeletedBytes: null, lastRetentionMode: null } } };
     let release!: () => void, loading = true, failRead = false;
     const gate = new Promise<void>(resolve => { release = resolve; });
     await page.route('**/api/system/backup-scheduler', async route => {
@@ -100,4 +100,43 @@ test('Backup: composizione, tastiera, bozza di conferma e verifica senza riprist
         expect(schedulerPosts).toHaveLength(1); expect(forbidden).toEqual([]); expect(errors).toEqual([]);
         if (directory) await writeFile(`${directory}/receipt.json`, JSON.stringify({ surfaces, schedulerPosts, forbidden, errors, restoreSubmitted: false }, null, 2));
     } finally { release(); await zoom.close(); }
+});
+
+test('Backup automatici: il conflitto conserva la bozza e richiede rilettura prima della nuova conferma', async ({ page, baseURL }) => {
+    if (!baseURL || new URL(baseURL).hostname !== '127.0.0.1' || !process.env.MEDIFLOW_DATA_DIR) throw new Error('Runtime sintetico isolato richiesto');
+    let revision = 'synthetic-first';
+    const config = { enabled: false, hour: 2, minute: 0, destinationDir: `${process.env.MEDIFLOW_DATA_DIR}/invented`, retentionKeepArtifacts: 14 };
+    const posts: Array<{ expectedRevision: string; config: unknown }> = [];
+    const status = () => ({ supported: true, installed: false, plistPath: null, state: { revision, config, run: {} } });
+    await page.route('**/api/system/backup-scheduler', route => {
+        if (route.request().method() === 'GET') return route.fulfill({ json: status() });
+        posts.push(route.request().postDataJSON());
+        if (posts.length === 1) {
+            revision = 'synthetic-other-admin';
+            return route.fulfill({ status: 409, json: { error: 'Programmazione modificata. Bozza conservata.', code: 'backup_scheduler_conflict' } });
+        }
+        return route.fulfill({ json: status() });
+    });
+    await bootstrapUnlockedSession(page, '1234');
+    await page.goto('/settings/backup');
+    await page.getByRole('button', { name: 'Backup automatici', exact: true }).click();
+    const destination = page.getByRole('textbox', { name: 'Destinazione', exact: true });
+    await expect(destination).toHaveValue(config.destinationDir);
+    const draft = `${process.env.MEDIFLOW_DATA_DIR}/draft-preserved`;
+    await destination.fill(draft);
+    await page.getByLabel('Orario', { exact: true }).fill('04:30');
+    const save = page.getByRole('button', { name: 'Salva schedulazione', exact: true });
+    await save.click();
+    await expect(page.getByText('Programmazione modificata. Bozza conservata.', { exact: true })).toBeVisible();
+    await expect(save).toBeDisabled();
+    await expect(destination).toHaveValue(draft);
+    await page.getByRole('button', { name: 'Rileggi stato', exact: true }).click();
+    await expect(destination).toHaveValue(draft);
+    await expect(page.getByLabel('Orario', { exact: true })).toHaveValue('04:30');
+    await expect(save).toBeEnabled();
+    await save.click();
+    await expect(page.getByText('Backup automatico disattivato.', { exact: true })).toBeVisible();
+    expect(posts).toHaveLength(2);
+    expect(posts[0].expectedRevision).toBe('synthetic-first');
+    expect(posts[1]).toMatchObject({ expectedRevision: 'synthetic-other-admin', config: { destinationDir: draft, hour: 4, minute: 30 } });
 });

@@ -207,6 +207,8 @@ pub struct BackupScheduleConfig {
     pub minute: u8,
     pub destination_dir: String,
     pub retention_keep_artifacts: u64,
+    #[serde(default)]
+    pub volume_protection_acknowledged: bool,
 }
 impl BackupScheduleConfig {
     pub fn validate(&self) -> Result<()> {
@@ -218,6 +220,43 @@ impl BackupScheduleConfig {
             || self.destination_dir.trim() != self.destination_dir
             || !std::path::Path::new(&self.destination_dir).is_absolute()
             || !(1..=365).contains(&self.retention_keep_artifacts)
+        {
+            return Err(RuntimeError::InvalidInput);
+        }
+        if self.enabled
+            && self
+                .destination_dir
+                .replace('\\', "/")
+                .split('/')
+                .any(|part| {
+                    let part = part.to_lowercase();
+                    [
+                        "mobile documents",
+                        "cloudstorage",
+                        "dropbox",
+                        "onedrive",
+                        "google drive",
+                        "googledrive",
+                        "icloud drive",
+                        "iclouddrive",
+                        "com~apple~clouddocs",
+                        "nextcloud",
+                        "owncloud",
+                        "pcloud",
+                        "box",
+                        "box sync",
+                        "mega",
+                        "synologydrive",
+                        "documents",
+                        "desktop",
+                    ]
+                    .iter()
+                    .any(|name| {
+                        part == *name
+                            || part.starts_with(&format!("{name} - "))
+                            || part.starts_with(&format!("{name}-"))
+                    })
+                })
         {
             return Err(RuntimeError::InvalidInput);
         }
@@ -235,6 +274,7 @@ pub struct BackupScheduleRun {
 #[derive(Clone, Deserialize, Debug)]
 pub struct BackupScheduleState {
     pub version: u64,
+    pub revision: String,
     pub config: BackupScheduleConfig,
     pub run: BackupScheduleRun,
 }
@@ -250,11 +290,15 @@ impl BackupScheduleStatus {
     fn parse(value: Value) -> Result<Self> {
         let status: Self =
             serde_json::from_value(value).map_err(|_| RuntimeError::InvalidResponse)?;
-        status
-            .state
-            .config
+
+        let mut syntax = status.state.config.clone();
+        syntax.enabled = false;
+        syntax
             .validate()
             .map_err(|_| RuntimeError::InvalidResponse)?;
+        if status.state.revision.is_empty() || status.state.revision.len() > 128 {
+            return Err(RuntimeError::InvalidResponse);
+        }
         if status.state.version != 1
             || !matches!(
                 status.state.run.last_run_status.as_deref(),
@@ -269,6 +313,7 @@ impl BackupScheduleStatus {
 pub struct PreparedBackupSchedule {
     owner: Weak<()>,
     before: BackupScheduleConfig,
+    revision: String,
     after: BackupScheduleConfig,
     installed: bool,
     submitted: AtomicBool,
@@ -303,6 +348,7 @@ impl LocalHostAccess {
         }
         Ok(PreparedBackupSchedule {
             owner: Arc::downgrade(&self.owner),
+            revision: before.state.revision,
             before: before.state.config,
             after,
             installed: before.installed.ok_or(RuntimeError::ReadRequired)?,
@@ -321,7 +367,10 @@ impl LocalHostAccess {
             return Err(RuntimeError::ReadRequired);
         }
         let before = self.read_backup_schedule()?;
-        if before.state.config != command.before || before.installed != Some(command.installed) {
+        if before.state.revision != command.revision
+            || before.state.config != command.before
+            || before.installed != Some(command.installed)
+        {
             return Err(RuntimeError::Conflict);
         }
         if command.after.enabled && !before.supported {
@@ -330,7 +379,7 @@ impl LocalHostAccess {
         self.request(
             Method::POST,
             &["api", "system", "backup-scheduler"],
-            Some(&json!({"action":"save", "config":command.after})),
+            Some(&json!({"action":"save", "expectedRevision":command.revision, "config":command.after})),
             true,
         )?;
         let observed = self.read_backup_schedule().map_err(|error| {
@@ -346,5 +395,45 @@ impl LocalHostAccess {
             return Err(RuntimeError::Indeterminate);
         }
         Ok(observed)
+    }
+}
+
+#[cfg(test)]
+mod backup_destination_tests {
+    use super::*;
+
+    #[test]
+    fn backup_schedule_path_validation_is_preview_and_legacy_destinations_remain_readable() {
+        let mut config = BackupScheduleConfig {
+            enabled: true,
+            hour: 2,
+            minute: 0,
+            destination_dir: std::env::temp_dir()
+                .join("synthetic-safe")
+                .to_string_lossy()
+                .into(),
+            retention_keep_artifacts: 14,
+            volume_protection_acknowledged: false,
+        };
+        assert!(config.validate().is_ok());
+        for component in [
+            "Mobile Documents",
+            "CloudStorage",
+            "Dropbox",
+            "OneDrive - Organization",
+            "GoogleDrive-account",
+            "Documents",
+            "Desktop",
+        ] {
+            config.destination_dir = std::env::temp_dir()
+                .join(component)
+                .join("synthetic-backups")
+                .to_string_lossy()
+                .into();
+            assert!(config.validate().is_err());
+            config.enabled = false;
+            assert!(config.validate().is_ok());
+            config.enabled = true;
+        }
     }
 }

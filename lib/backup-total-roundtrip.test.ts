@@ -1,3 +1,4 @@
+import { prepareSyntheticBackupDestination } from './scheduled-backup.test-support.ts';
 import { isCiphertext, openPatientDocumentFile } from './security/attachment-file-envelope';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -67,6 +68,7 @@ const BACKUP_TABLES = {
 } as const;
 
 function runNode(args: string[], env: Record<string, string> = {}): string {
+    if (env.MEDIFLOW_BACKUP_DEST_DIR) prepareSyntheticBackupDestination(env.MEDIFLOW_DATA_DIR, env.MEDIFLOW_BACKUP_DEST_DIR);
     return execFileSync(process.execPath, args, {
         cwd: ROOT,
         env: { ...process.env, ...env },
@@ -962,7 +964,7 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             assert.equal(schedulerState.run.lastRunStatus, 'success');
             assert.equal(schedulerState.run.lastArtifactPath, runner.artifactPath);
             assert.equal(typeof schedulerState.run.lastRunAt, 'string');
-            assert.equal(schedulerState.run.lastRetentionMode, 'auto');
+            assert.equal(schedulerState.run.lastRetentionMode, null);
 
             const artifact = await parseBackupArtifact(JSON.parse(fs.readFileSync(runner.artifactPath, 'utf8')));
             for (const [collection, table] of Object.entries(BACKUP_TABLES)) {

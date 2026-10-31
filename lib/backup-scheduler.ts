@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { createHash } from 'node:crypto';
 import os from 'os';
 import path from 'path';
 import { spawnSync } from 'child_process';
@@ -40,6 +41,8 @@ export type BackupSchedulerConfig = {
     minute: number;
     destinationDir: string;
     retentionKeepArtifacts: number;
+    volumeProtectionAcknowledged?: boolean;
+    volumeProtectionIdentity?: string;
 };
 
 export type BackupSchedulerRunState = {
@@ -55,6 +58,7 @@ export type BackupSchedulerRunState = {
 
 export type BackupSchedulerState = {
     version: typeof BACKUP_SCHEDULER_STATE_VERSION;
+    revision?: string;
     config: BackupSchedulerConfig;
     run: BackupSchedulerRunState;
 };
@@ -173,6 +177,7 @@ export function getDefaultBackupSchedulerState(): BackupSchedulerState {
     return {
         version: BACKUP_SCHEDULER_STATE_VERSION,
         config: {
+            volumeProtectionAcknowledged: false,
             enabled: false,
             hour: 2,
             minute: 0,
@@ -203,7 +208,10 @@ export function readBackupSchedulerStateFromValue(value: string | null | undefin
 
         return {
             version: BACKUP_SCHEDULER_STATE_VERSION,
+            revision: typeof parsed.revision === 'string' ? parsed.revision : undefined,
             config: {
+                ...(typeof config.volumeProtectionIdentity === 'string' ? { volumeProtectionIdentity: config.volumeProtectionIdentity } : {}),
+                volumeProtectionAcknowledged: config.volumeProtectionAcknowledged === true,
                 enabled: config.enabled === true,
                 hour: clampInteger(config.hour, 2, 0, 23),
                 minute: clampInteger(config.minute, 0, 0, 59),
@@ -224,6 +232,8 @@ export function mergeBackupSchedulerConfig(
     return {
         ...current,
         config: {
+            volumeProtectionAcknowledged: patch.volumeProtectionAcknowledged === true
+                || (patch.volumeProtectionAcknowledged === undefined && (!patch.destinationDir || patch.destinationDir === current.config.destinationDir) && current.config.volumeProtectionAcknowledged === true),
             enabled: typeof patch.enabled === 'boolean' ? patch.enabled : current.config.enabled,
             hour: clampInteger(patch.hour, current.config.hour, 0, 23),
             minute: clampInteger(patch.minute, current.config.minute, 0, 59),
@@ -539,4 +549,8 @@ export function runBackupSchedulerScript(options?: {
         ok: false,
         message: raw,
     };
+}
+
+export function backupSchedulerRevision(state: BackupSchedulerState): string {
+    return state.revision ?? createHash('sha256').update(JSON.stringify(state.config)).digest('hex');
 }

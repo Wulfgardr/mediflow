@@ -1,3 +1,4 @@
+import { prepareSyntheticBackupDestination } from './scheduled-backup.test-support.ts';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -43,6 +44,7 @@ test('scheduled backup roundtrip restores both ambulatory memberships for one pa
         }
 
         fs.mkdirSync(backupDir, { recursive: true });
+        prepareSyntheticBackupDestination(sourceDataDir, backupDir);
         const runnerResult = JSON.parse(execFileSync(process.execPath, ['scripts/run-scheduled-backup.mjs'], {
             cwd: ROOT_DIR,
             env: {

@@ -44,7 +44,7 @@ function runDrill(workDir: string, reportPath: string, options: { keep?: boolean
     assert.equal(report.preflight.ok, true);
     assert.deepEqual(report.failures, []);
     assert.deepEqual(report.retention, {
-        staleArtifactRemoved: true, staleTempRemoved: true, unrelatedFilePreserved: true,
+        staleArtifactPreserved: true, staleTempPreserved: true, unrelatedFilePreserved: true,
     });
     return report;
 }
@@ -73,8 +73,9 @@ test('keep-work-dir retains fixtures whose bytes match the report', () => withFi
     assert.ok(fs.existsSync(path.join(workDir, 'target-data', 'medical.db')));
     const backups = path.join(workDir, 'backups');
     const artifacts = fs.readdirSync(backups).filter((file) => file.endsWith('.mediflow'));
-    assert.equal(artifacts.length, 1);
-    assert.equal(hashFile(path.join(backups, artifacts[0])), report.exportedArtifact.fileSha256);
+    assert.equal(artifacts.length, 2);
+    assert.equal(artifacts.filter(file => hashFile(path.join(backups, file)) === report.exportedArtifact.fileSha256).length, 1);
+    assert.equal(fs.readFileSync(path.join(backups, 'mediflow-backup-v1-2026-03-17T00-00-00.000Z.mediflow'), 'utf8'), 'stale artifact');
     assert.equal(hashFile(path.join(workDir, 'restored-payload-snapshot.json')), report.restore.restoredPayloadSnapshotHash);
     assert.equal(fs.readFileSync(path.join(backups, 'operator-note.txt'), 'utf8'), 'do not delete');
 }));

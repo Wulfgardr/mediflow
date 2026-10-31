@@ -8,6 +8,7 @@ import { assertProstheticsCatalogBackup, serializeProstheticsDocument } from '..
 
 import { assertBackupAuditSnapshots, canonicalizeBackupAuditRows } from '../lib/backup-audit.ts';
 import fs from 'fs';
+import { validateBackupDestination } from './backup-destination-policy.mjs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -322,11 +323,14 @@ export function publishScheduledBackup(finalPath, artifact) {
   if (fs.readFileSync(finalPath, 'utf8') !== artifact) throw new Error('Backup non confermato dalla rilettura.');
 }
 
-function saveState(db, state) {
-  db.prepare(`
-    INSERT INTO settings (key, value) VALUES (?, ?)
-    ON CONFLICT(key) DO UPDATE SET value = excluded.value
-  `).run(SETTINGS_KEY, JSON.stringify(state));
+function saveRunState(db, run) {
+  db.transaction(() => {
+    const current = readState(db);
+    db.prepare(`
+      INSERT INTO settings (key, value) VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run(SETTINGS_KEY, JSON.stringify({ ...current, run: { ...current.run, ...run } }));
+  }).immediate();
 }
 
 function formatTimestamp(now = new Date()) {
@@ -457,13 +461,13 @@ async function main() {
     participant = openAdmittedSqlite(dbPath, { role: 'scheduled-backup', sqliteOptions: { fileMustExist: true } });
     db = participant.database;
     const currentState = readState(db);
-    const destinationDir = process.env.MEDIFLOW_BACKUP_DEST_DIR || currentState.config.destinationDir;
+    const requestedDestination = process.env.MEDIFLOW_BACKUP_DEST_DIR || currentState.config.destinationDir;
 
     if (!currentState.config.enabled && !forced) {
       throw new Error('Backup automatico disabilitato.');
     }
 
-    fs.mkdirSync(destinationDir, { recursive: true, mode: 0o700 });
+    const destinationDir = validateBackupDestination(requestedDestination, currentState.config.volumeProtectionAcknowledged, currentState.config.volumeProtectionIdentity ?? '').destination;
     backupLockPath = acquireBackupLock(destinationDir);
 
     const createdAt = new Date();
@@ -475,28 +479,18 @@ async function main() {
     publishScheduledBackup(finalPath, artifact);
     restrictManagedBackupFiles(destinationDir);
 
-    const backedUpState = {
-      ...currentState,
-      config: {
-        ...currentState.config,
-        destinationDir,
-      },
-      run: {
-        ...currentState.run,
-        lastRunAt: createdAt.toISOString(),
-        lastRunStatus: 'success',
-        lastRunMessage: 'Backup completato.',
-        lastArtifactPath: finalPath,
-      },
-    };
-    const nextState = backedUpState;
-    saveState(db, nextState);
+    saveRunState(db, {
+      lastRunAt: createdAt.toISOString(),
+      lastRunStatus: 'success',
+      lastRunMessage: 'Backup completato.',
+      lastArtifactPath: finalPath,
+    });
 
     result = {
       ok: true,
       artifactPath: finalPath,
       createdAt: createdAt.toISOString(),
-      message: nextState.run.lastRunMessage,
+      message: 'Backup completato.',
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Backup fallito.';
@@ -504,18 +498,10 @@ async function main() {
     // An already admitted run may finish its state update before it drains.
     if (db?.open) {
       try {
-        const currentState = readState(db);
-        const destinationDir = process.env.MEDIFLOW_BACKUP_DEST_DIR || currentState.config.destinationDir;
-        saveState(db, {
-          ...currentState,
-          config: { ...currentState.config, destinationDir },
-          run: {
-            ...currentState.run,
-            lastRunAt: new Date().toISOString(),
-            lastRunStatus: 'error',
-            lastRunMessage: message,
-            lastArtifactPath: currentState.run.lastArtifactPath,
-          },
+        saveRunState(db, {
+          lastRunAt: new Date().toISOString(),
+          lastRunStatus: 'error',
+          lastRunMessage: message,
         });
       } catch {
         // best effort

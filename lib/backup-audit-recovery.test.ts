@@ -1,3 +1,4 @@
+import { prepareSyntheticBackupDestination } from './scheduled-backup.test-support.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createBackupArtifact, createEmptyDataset, parseBackupArtifact, serializeBackupArtifact } from './backup-artifact';
@@ -44,6 +45,7 @@ const LOADER = path.join(ROOT, 'scripts/register-strip-types-loader.mjs');
 const checksum = (payload: unknown) => createHash('sha256').update(stableStringify(payload)).digest('hex');
 
 function runNode(dataDir: string, args: string[], extra: Record<string, string> = {}): string {
+    if (extra.MEDIFLOW_BACKUP_DEST_DIR) prepareSyntheticBackupDestination(dataDir, extra.MEDIFLOW_BACKUP_DEST_DIR);
     return execFileSync(process.execPath, args, {
         cwd: ROOT, encoding: 'utf8',
         env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', ...extra },

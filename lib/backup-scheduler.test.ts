@@ -1,3 +1,4 @@
+import { prepareSyntheticBackupDestination } from './scheduled-backup.test-support.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
@@ -67,6 +68,7 @@ function withScheduledBackupFixture(check: (fixture: {
         }
     };
     const run = (force = false) => {
+        prepareSyntheticBackupDestination(dataDir, destinationDir);
         const child = spawnSync(process.execPath, ['scripts/run-scheduled-backup.mjs'], {
             cwd: fileURLToPath(new URL('..', import.meta.url)),
             encoding: 'utf8',
