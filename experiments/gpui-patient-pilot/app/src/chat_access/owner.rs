@@ -153,6 +153,9 @@ impl Request {
     pub(crate) fn is_catalog(&self) -> bool {
         self.catalog_query.is_some()
     }
+    pub(crate) fn is_prosthetics_catalog(&self) -> bool {
+        self.prosthetics
+    }
     pub(super) fn for_document(peer: Peer, stream: UnixStream) -> Option<Pending> {
         let request = Self::new(peer, stream)?;
         request.lock().ok()?.document = true;
@@ -1217,6 +1220,15 @@ pub(crate) mod tests {
         assert_eq!(consume_card(&pending), (State::Withdrawn, None));
     }
 
+    #[test]
+    fn native_confirmation_names_the_catalog_it_is_approving() {
+        let (a, _) = UnixStream::pair().unwrap();
+        let (b, _) = UnixStream::pair().unwrap();
+        let drugs = Request::for_drugs(Peer::test_peer(), a, "synthetic").unwrap();
+        let prosthetics = Request::for_prosthetics(Peer::test_peer(), b, "synthetic").unwrap();
+        assert!(!drugs.lock().unwrap().is_prosthetics_catalog());
+        assert!(prosthetics.lock().unwrap().is_prosthetics_catalog());
+    }
     #[test]
     fn prosthetics_catalog_read_requires_confirmation_and_retires_bytes_on_revoke() {
         for confirm in [false, true] {
