@@ -189,7 +189,7 @@ test('parsePatientData extracts name and birth date from signature-style dischar
     assert.equal(parsed.birthDate?.toISOString().slice(0, 10), '1932-02-23');
 });
 
-test('parsePatientData handles surname-first Piano Terapeutico patient labels and address', () => {
+test('parsePatientData keeps an unqualified patient identity unsplit and extracts clinical fields', () => {
     const parsed = parsePatientData([
         'Piano Terapeutico',
         'Paziente: ROSSI MARIA',
@@ -204,8 +204,8 @@ test('parsePatientData handles surname-first Piano Terapeutico patient labels an
         '500 mg x2',
     ].join('\n'));
 
-    assert.equal(parsed.firstName, 'MARIA');
-    assert.equal(parsed.lastName, 'ROSSI');
+    assert.equal(parsed.firstName, undefined);
+    assert.equal(parsed.lastName, undefined);
     assert.equal(parsed.taxCode, 'RSSMRA94T57A271J');
     assert.equal(parsed.birthDate?.toISOString().slice(0, 10), '1994-12-17');
     assert.equal(parsed.address, 'VIA TEST 25 MILANO');
@@ -274,11 +274,11 @@ test('parsePatientData recognizes birthplace dates without promoting partial or 
     assert.equal(parsePatientData('Referto del 05/03/2024').birthDate, undefined);
 });
 
-test('parsePatientData preserves name-first patient labels when casing is not surname-first', () => {
+test('parsePatientData does not guess name order from a generic patient label', () => {
     const parsed = parsePatientData('Paziente: Mario Rossi\nData di nascita: 01/02/1970');
 
-    assert.equal(parsed.firstName, 'Mario');
-    assert.equal(parsed.lastName, 'Rossi');
+    assert.equal(parsed.firstName, undefined);
+    assert.equal(parsed.lastName, undefined);
 });
 
 test('parsePatientData leaves birth date empty instead of promoting unanchored document dates', () => {
@@ -344,4 +344,19 @@ test('pdf import merges high-confidence OCR patient data with server text fallba
     assert.equal(merged.birthDate?.toISOString().slice(0, 10), '1958-02-17');
     assert.equal(merged.source, 'hybrid');
     assert.match(merged.rawText, /Codice fiscale/i);
+});
+
+for (const label of ['Paziente', 'Assistito']) for (const name of ['Rossi Mario', 'Mario Rossi', 'ROSSI MARIO', 'Mario De Rossi']) {
+    test(`unqualified identity ${label}: ${name} requires field review`, () => {
+        const parsed = parsePatientData(`${label}: ${name}`);
+        assert.equal(parsed.firstName, undefined);
+        assert.equal(parsed.lastName, undefined);
+    });
+}
+test('explicit name order remains available for review', () => {
+    for (const text of ['Cognome e nome: Rossi Mario', 'Nome e cognome: Mario Rossi', 'Nome: Mario\nCognome: Rossi']) {
+        const parsed = parsePatientData(text);
+        assert.equal(parsed.firstName, 'Mario');
+        assert.equal(parsed.lastName, 'Rossi');
+    }
 });

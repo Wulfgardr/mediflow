@@ -166,6 +166,19 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
                 pending = Some(request);
                 State::Requested
             }
+            Ok(value) if pending.is_none() && value == json!({"command":"patient-document"}) => {
+                let Ok(copy) = stream.try_clone() else {
+                    break;
+                };
+                let Some(request) = Request::for_document(peer, copy) else {
+                    break;
+                };
+                if incoming.try_send(request.clone()).is_err() {
+                    break;
+                }
+                pending = Some(request);
+                State::Requested
+            }
             Ok(value)
                 if pending.is_none()
                     && value.as_object().is_some_and(|v| v.len() == 2)

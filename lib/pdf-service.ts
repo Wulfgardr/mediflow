@@ -181,15 +181,6 @@ function stripPatientIdentityTail(value: string): string {
         .trim();
 }
 
-function isLikelySurnameFirstPatientValue(label: string, candidate: string): boolean {
-    if (/^cognome\b.*\bnome$/i.test(label)) return true;
-    if (!/^(paziente|assistito)$/i.test(label.trim())) return false;
-
-    const parts = candidate.split(/\s+/).filter(Boolean);
-    if (parts.length !== 2) return false;
-    return parts.every((part) => part === part.toLocaleUpperCase('it-IT') && /[A-ZÀ-Ý]{2,}/.test(part));
-}
-
 function extractPatientName(text: string): { firstName?: string; lastName?: string } {
     const lines = text
         .split(/\r?\n/)
@@ -212,14 +203,14 @@ function extractPatientName(text: string): { firstName?: string; lastName?: stri
             continue;
         }
 
-        const fullNameMatch = line.match(/^(cognome\s*(?:e|\/|-)?\s*nome|nome\s*(?:e|\/|-)?\s*cognome|paziente|assistito|sig(?:\.|\.ra)?|signor(?:a)?)\s*[:.]?\s*(.+)$/i);
+        const fullNameMatch = line.match(/^(cognome\s*(?:e|\/|-)?\s*nome|nome\s*(?:e|\/|-)?\s*cognome|sig(?:\.|\.ra)?|signor(?:a)?)\s*[:.]?\s*(.+)$/i);
         if (fullNameMatch) {
             const label = fullNameMatch[1].toLowerCase();
             const candidate = sanitizePersonValue(stripPatientIdentityTail(fullNameMatch[2]));
             if (!candidate) continue;
             const parts = candidate.split(/\s+/).filter(Boolean);
             if (parts.length >= 2) {
-                const surnameFirst = isLikelySurnameFirstPatientValue(label, candidate);
+                const surnameFirst = /^cognome\b/i.test(label);
                 const given = surnameFirst ? parts.slice(-1).join(' ') : parts.slice(0, -1).join(' ');
                 const family = surnameFirst ? parts.slice(0, -1).join(' ') : parts.slice(-1).join(' ');
                 firstName ||= sanitizePersonValue(given);
