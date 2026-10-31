@@ -475,8 +475,14 @@ impl ClinicalApp {
             && (review.is_some() || therapy.as_ref().is_some_and(|t| t.2.is_some()));
         let therapy_mode = therapy.is_some();
         let catalog_mode = pending.lock().is_ok_and(|p| p.is_catalog());
-        let (catalog_title, catalog_notice) =
-            catalog_copy(pending.lock().is_ok_and(|p| p.is_prosthetics_catalog()));
+        let (catalog_title, catalog_notice) = if pending.lock().is_ok_and(|p| p.is_agenda()) {
+            (
+                "Mostra l’agenda interna nella vista della chat?",
+                "Sola lettura dei primi 20 controlli interni, ordinati per data. Solo date e stato, senza nomi, titoli o note. Non sono candidati da calendario né prenotazioni confermate. Conferma una sola consultazione entro 30 secondi.",
+            )
+        } else {
+            catalog_copy(pending.lock().is_ok_and(|p| p.is_prosthetics_catalog()))
+        };
         let theme = self.theme;
         Some(div().id("native-chat-access-confirmation").role(Role::Group)
             .aria_label("Conferma accesso della chat").flex_1().min_h_0().overflow_y_scroll()
