@@ -31,3 +31,25 @@ test('structural detectors do not depend on known identifiers or neural entities
     }
     assert.deepEqual(clinicalIdentifierSpans('Ipertensione arteriosa. Terapia invariata.', { names: [], birthDates: [] }), []);
 });
+
+for (const value of ['Ma®ta', 'Va||i', 'M△rta', 'M4rta', 'M A R T A', 'M.a.r.t.a', 'RSSMRA', 'erre esse esse emme erre a otto zero', '347/123/45/67', 'trecentoquarantasette', 'uno due tre quattro', 'Tessera 123', 'Matricola alfa']) test(`blocks synthetic identifier form ${value}`, () => {
+    assert.ok(clinicalIdentifierSpans(`Terapia invariata. ${value}`, known).length);
+});
+for (const value of ['HbA1c 7,2%', 'FEV1 80%', 'CD4 500', 'T4 1,2', 'B12 450', 'vitamina D3 1000 UI', 'Pressione 130/80 mmHg. Peso 72 kg.', 'Metformina 1000 mg al mattino.', 'Creatinina 1,2 mg/dl.', 'Metformina mille mg.', 'Levotiroxina 50 µg.']) test(`preserves clinical form ${value}`, () => {
+    assert.deepEqual(clinicalIdentifierSpans(value, { names: ['01', '2026', 'Di'], birthDates: [] }), []);
+});
+test('known homonyms precede clinical exemptions and prefixes start at a word', () => {
+    assert.ok(clinicalIdentifierSpans('Diabete mellito', { names: ['Diabete'], birthDates: [] }).length);
+    assert.deepEqual(clinicalIdentifierSpans('Antimartellamento', { names: ['Marta'], birthDates: [] }), []);
+});
+test('native collector review fixture and Node normalization agree', async () => {
+    const { readFileSync } = await import('node:fs');
+    const fixture = JSON.parse(readFileSync(new URL('../../native/contracts/clinical-known-equivalence.json', import.meta.url), 'utf8'));
+    const corpus = JSON.parse(readFileSync(new URL('../../scripts/fixtures/clinical-chat-exact-corpus.json', import.meta.url), 'utf8'));
+    for (const entry of corpus.filter((entry: { id: string }) => fixture.comparison.some((value: { id: string }) => value.id === entry.id))) {
+        assert.deepEqual(clinicalIdentifierSpans(entry.texts.join('\n'), fixture.currentNativeKnown).sort((a, b) => a.start - b.start || a.end - b.end), clinicalIdentifierSpans(entry.texts.join('\n'), entry.known).sort((a, b) => a.start - b.start || a.end - b.end), entry.id);
+    }
+    for (const value of ['Marta', 'Mart', 'Vall', 'RSSMRA', 'PT-ALFA', 'Mаrtа', 'Μαρτα', 'Ada Lattesi', '1972-04-17', 'HbA1c 7,2. Peso 72 kg.']) {
+        assert.deepEqual(clinicalIdentifierSpans(value, fixture.currentNativeKnown), clinicalIdentifierSpans(value, fixture.nativeKnown), value);
+    }
+});

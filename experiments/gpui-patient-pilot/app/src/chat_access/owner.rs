@@ -70,6 +70,8 @@ pub(crate) struct TherapyWrite {
     pub(crate) result: Option<serde_json::Value>,
 }
 pub(crate) struct ClinicalSelection {
+    pub(crate) copies: std::collections::BTreeMap<usize, String>,
+    pub(crate) editing: Option<usize>,
     pub(crate) profile: Option<mediflow_runtime_client::PatientDetail>,
     pub(crate) diagnoses: Vec<String>,
     pub(crate) excerpts: Vec<String>,
@@ -307,6 +309,8 @@ impl Request {
     }
     pub(super) fn request_clinical(&mut self) {
         self.clinical = Some(ClinicalSelection {
+            copies: Default::default(),
+            editing: None,
             profile: None,
             diagnoses: Vec::new(),
             excerpts: Vec::new(),
@@ -329,6 +333,36 @@ impl Request {
         c.excerpts.push(text.into());
         true
     }
+    pub(crate) fn edit_clinical(&mut self, index: usize) -> Option<String> {
+        if self.status() != State::Selecting {
+            return None;
+        }
+        let c = self.clinical.as_mut()?;
+        let text = c
+            .copies
+            .get(&index)
+            .or_else(|| c.diagnoses.iter().chain(c.excerpts.iter()).nth(index))?
+            .clone();
+        c.editing = Some(index);
+        Some(text)
+    }
+    pub(crate) fn save_clinical_copy(&mut self, text: &str) -> bool {
+        if self.status() != State::Selecting
+            || text.trim().is_empty()
+            || text.encode_utf16().count() > 2048
+        {
+            return false;
+        }
+        let Some(c) = self.clinical.as_mut() else {
+            return false;
+        };
+        let Some(index) = c.editing.take() else {
+            return false;
+        };
+        c.copies.insert(index, text.to_owned());
+        self.clinical_denial = None;
+        true
+    }
     pub(crate) fn toggle_clinical(&mut self, index: usize) {
         if self.status() != State::Selecting {
             return;
@@ -349,7 +383,7 @@ impl Request {
     fn install_card(&mut self, card: Option<super::card::Card>) {
         if self.clinical.is_some() && self.status() == State::Preparing {
             if card.as_ref().is_none_or(|c| c.denial.is_some()) {
-                self.clinical_denial = Some(card.as_ref().and_then(|c| c.denial.clone()).unwrap_or_else(|| "Condivisione negata. Togli o riformula una delle righe selezionate: possibili identificativi, testo svuotato o rilevatore non disponibile. Nessun byte condiviso.".into()));
+                self.clinical_denial = Some(card.as_ref().and_then(|c| c.denial.clone()).unwrap_or_else(|| "Condivisione negata. Togli o riformula una delle righe selezionate: possibili identificativi o rilevatore non disponibile. Nessun byte condiviso.".into()));
                 self.state = State::Selecting;
                 return;
             }
@@ -671,6 +705,10 @@ pub(crate) fn prepare_clinical(pending: &Pending) {
         {
             return None;
         }
+        let diagnoses: Vec<_> = c.diagnoses.iter().enumerate().filter(|(i, _)| c.selected.contains(i))
+            .map(|(i, t)| c.copies.get(&i).unwrap_or(t).clone()).collect();
+        let excerpts: Vec<_> = c.excerpts.iter().enumerate().filter(|(i, _)| c.selected.contains(&(i + c.diagnoses.len())))
+            .map(|(i, t)| c.copies.get(&(i + c.diagnoses.len())).unwrap_or(t).clone()).collect();
         let b = p.binding.as_ref()?;
         let result = (
             b.session.clone(),
@@ -962,6 +1000,23 @@ pub(crate) mod tests {
         )
     }
 
+    #[test]
+    fn clinical_copy_changes_only_the_local_selection_and_requires_an_edit_target() {
+        let (pending, _remote, _session, _host) = clinical_request();
+        let mut p = pending.lock().unwrap();
+        let original = p.clinical.as_ref().unwrap().diagnoses[0].clone();
+        assert!(!p.save_clinical_copy("Diabete mellito"));
+        assert_eq!(p.edit_clinical(0), Some(original.clone()));
+        assert!(!p.save_clinical_copy(""));
+        assert!(p.save_clinical_copy("Diabete mellito"));
+        let c = p.clinical.as_ref().unwrap();
+        assert_eq!(c.diagnoses[0], original);
+        assert_eq!(c.copies[&0], "Diabete mellito");
+        assert!(c.selected.is_empty());
+        assert!(p.review().is_none());
+        assert!(!p.save_clinical_copy("altra copia"));
+        assert!(p.edit_clinical(999).is_none());
+    }
     #[test]
     fn clinical_denial_keeps_selection_local_and_never_enables_consent() {
         let (pending, _remote, _session, _host) = clinical_request();

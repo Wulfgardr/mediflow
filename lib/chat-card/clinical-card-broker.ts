@@ -3,12 +3,12 @@ import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { types } from 'node:util';
 import { z } from 'zod';
-import { createContentPreparation, readPreparedContent, type PreparedContent, type PreparedContentRead, type PreparationRunnerConfiguration } from '../ai-preparation/preparation-core';
+import { type PreparedContent, type PreparationRunnerConfiguration } from '../ai-preparation/preparation-core';
 import { evaluateRedactionRuntimeEvidence, evidenceHash } from '../ai-redaction-evidence';
-import { assertClinicalBoundary as assertCardSerializedBoundary, clinicalEmissionPlan as cardEmissionPlan, clinicalSelectionSchema as selectionSchema, type ClinicalProfile as Card, type ClinicalSelection as CardSelection, CLINICAL_PROFILE_VERSION } from './clinical-profile';
-import { ClinicalRowDenied, clinicalIdentifierSpans, knownClinicalIdentifiersSchema, type KnownClinicalIdentifiers } from './clinical-identifiers';
+import { assertClinicalBoundary as assertCardSerializedBoundary, clinicalSelectionSchema as selectionSchema, type ClinicalProfile as Card, type ClinicalSelection as CardSelection, CLINICAL_PROFILE_VERSION } from './clinical-profile';
+import { ClinicalRowDenied, knownClinicalIdentifiersSchema, type KnownClinicalIdentifiers } from './clinical-identifiers';
 import { CLINICAL_CORPUS_JSON } from './clinical-fixtures';
-import { createGlinerRedactionRunner, readGlinerRuntimeObservation } from '../gliner-redaction-runner';
+import { createClinicalPreparation, readPreparedContent, type ClinicalPreparedRead as PreparedContentRead } from './clinical-preparation';
 const SYNTHETIC_CARD_CORPUS_JSON = CLINICAL_CORPUS_JSON;
 
 export type PreparedClinicalCard = object;
@@ -35,8 +35,8 @@ function plainData(value: unknown, depth = 0): void {
     }
 }
 type Attempt = { token: object; id: string; generation: number; patient: string; selection: CardSelection;
-    controller: AbortController; job: ReturnType<typeof createContentPreparation>; core?: PreparedContent;
-    expected: Card; known: KnownClinicalIdentifiers; sourceRef: string; payloadSha256?: string; payload?: string; consumed: boolean };
+    controller: AbortController; job: ReturnType<typeof createClinicalPreparation>; core?: PreparedContent;
+    expected: Card; known: KnownClinicalIdentifiers; payloadSha256?: string; payload?: string; consumed: boolean };
 
 /** Only trusted local code receives owner. The future transport receives reader
  * and opaque handles, never fixture selection, mappings or an approval boolean. */
@@ -111,28 +111,17 @@ export function createClinicalCardBroker(input: ClinicalCardInstallation) {
                 const known = knownClinicalIdentifiersSchema.parse(knownInput);
                 const selection = Object.freeze(selectionSchema.parse(selectionInput));
                 const previousCleanup = retire();
-                const token = opaque(), controller = new AbortController(), sourceRef = random('src_');
+                const token = opaque(), controller = new AbortController();
                 const expected: Card = { profile: CLINICAL_PROFILE_VERSION, version: 1, pseudonym,
                     diagnoses: selection.diagnoses.map(text => ({ text, sourceRef: random('src_') })),
                     noteExcerpts: selection.noteExcerpts.map(text => ({ text, sourceRef: random('src_') })) };
-                const job = createContentPreparation(cardEmissionPlan(expected), installation.runner, text => JSON.parse(text), controller.signal, known, text => clinicalIdentifierSpans(text, known));
-                const attempt: Attempt = { token, id: random('attempt_'), generation, patient, selection, expected, known, sourceRef, job, controller, consumed: false };
+                const job = createClinicalPreparation(expected, installation.runner, controller.signal, known);
+                const attempt: Attempt = { token, id: random('attempt_'), generation, patient, selection, expected, known, job, controller, consumed: false };
                 active = attempt;
                 try {
                     await previousCleanup;
                     attempt.core = await job.ready;
                     const { read, evidenceExpiresAt } = boundary(attempt);
-                    const scanner = createGlinerRedactionRunner(installation.runner);
-                    try {
-                        const sentinel = 'Persona: Marta Valli. Nascita: 17/04/1972.';
-                        const health = await scanner.extract(sentinel, controller.signal);
-                        if (!['Marta Valli', '17/04/1972'].every(value => health.some(e => e.start <= sentinel.indexOf(value) && e.end >= sentinel.indexOf(value) + value.length))) return fail();
-                        const entities = await scanner.extract(read.payload, controller.signal);
-                        const allowed = [...read.payload.matchAll(/\{\{MF_PII_[a-f0-9]{32}_[1-9][0-9]{0,3}\}\}/gu)].map(m => [m.index!, m.index! + m[0].length]);
-                        const remaining = entities.filter(e => !allowed.some(([a, b]) => e.start >= a && e.end <= b));
-                        if (remaining.length || JSON.stringify(readGlinerRuntimeObservation(scanner)) !== JSON.stringify(read.redactionIdentity)) return fail();
-                    } finally { await scanner.close(); }
-                    boundary(attempt);
                     attempt.payloadSha256 = read.payloadSha256; attempt.payload = read.payload;
                     current(attempt, evidenceExpiresAt);
                     prepared.set(token, attempt);
@@ -166,14 +155,6 @@ export function createClinicalCardBroker(input: ClinicalCardInstallation) {
                 consents.set(consent, { attempt, digest: read.payloadSha256, expires: Math.min(time + CONSENT_MS, expires) });
                 return consent;
             } catch { return fail(); }
-        },
-        recompose(token: PreparedClinicalCard, text: string): string {
-            const attempt = prepared.get(handle(token)) ?? fail();
-            const { read, evidenceExpiresAt } = boundary(attempt);
-            if (typeof text !== 'string' || text.length > 4096) return fail();
-            const restored = read.restoreText(text);
-            current(attempt, evidenceExpiresAt);
-            return restored;
         },
         resolveSource(token: PreparedClinicalCard, reference: string) {
             const attempt = prepared.get(handle(token)) ?? fail();

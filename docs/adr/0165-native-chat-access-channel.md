@@ -191,7 +191,7 @@ Leonardo ha deciso il 31 ottobre 2026: la prima scheda comprende diagnosi e
 passi delle note che il medico spunta a mano nella finestra nativa. Nessun
 estrattore automatico, nessuna nota intera. La selezione delle diagnosi usa le
 righe non vuote del campo comune; i passi sono sottostringhe esatte aggiunte dal
-medico e poi spuntate. Un testo modificato, la nota intera o l'insieme dei passi
+medico e poi spuntate. La nota intera o l'insieme dei passi
 che copre tutta la nota sono negati. Il testo ostile resta dato, senza istruzioni
 eseguite o interpretazione HTML.
 
@@ -204,17 +204,18 @@ attese; la revisione del profilo è controllata anche prima e dopo il consumo.
 Il profilo attivo è `mediflow.clinical-chat-profile.v1`: oggetto chiuso con
 `profile`, `version: 1`, `pseudonym`, `diagnoses` e `noteExcerpts`. Le due liste
 contengono solo `{ text, sourceRef }`. Limiti: 16 diagnosi, 8 passi, 2048 unità
-UTF-16 per testo selezionato, 6000 complessive prima della redazione, 4096 per
-voce redatta e 16384 byte UTF-8 per il JSON finale canonico. Il superamento
+UTF-16 per testo selezionato, 6000 complessive nella selezione, 4096 per
+voce e 16384 byte UTF-8 per il JSON finale canonico. Il superamento
 nega l'uscita, senza troncamenti. Le fonti sono casuali e opache, con testo
 originale e revisione disponibili soltanto all'owner nativo in RAM.
 
 Sono esclusi nome, codice fiscale, nascita, contatti, caregiver, esenzioni,
-ADI e stato amministrativo. Nessuna data clinica esatta è ammessa implicitamente:
-se presente in un passo scelto, passa dalla redazione comune C-B. Date rilevate
-sono token di sessione, comprese quelle di valutazione e controllo. Il confine
-nega residui nei formati numerici controllati; il consenso autenticato riguarda
-soltanto i byte finali, senza eccezioni per la cronologia.
+ADI e stato amministrativo. La decisione di prodotto esclude le date complete,
+comprese quelle cliniche: una riga che le contiene viene bloccata prima del consenso.
+Non si riscrive mai il testo clinico: ogni riga esce esattamente come il medico
+la vede nella finestra nativa oppure non esce. Non vengono creati token PII.
+Il medico può togliere la spunta o modificare una copia locale nella stessa
+finestra; la cartella resta invariata e la copia deve superare tutti i controlli.
 
 La GPUI avvia `chat-card-clinical-owner.mjs` sul canale privato posseduto.
 `MEDIFLOW_CHAT_CLINICAL_INSTALLATION` indica il file locale di runner ed evidenze
@@ -223,9 +224,9 @@ per questo profilo; non sostituisce la qualifica sintetica in
 configurati esplicitamente per il processo GPUI. Il
 broker usa lo stesso runner GLiNER reale e gli stessi controlli di identità ed
 evidenza di #726, ma richiede il digest del nuovo corpus clinico. Una qualifica
-del solo corpus sintetico non basta. Oltre alla redazione dei testi, esamina il
-payload serializzato completo, valida schema e ricomposizione di ogni voce e
-nega entità residue. Il secondo esame non riscrive i byte revisionati.
+del solo corpus sintetico non basta. Esamina ciascun testo e il
+payload serializzato completo, valida schema e identità esatta di ogni voce e
+nega entità non esentate dalla lista clinica chiusa. Il secondo esame non riscrive i byte revisionati.
 
 La conferma nativa PIN o Touch ID autorizza una sola lettura entro 30 secondi.
 Il frame valida il profilo distinto e mostra soltanto testo; non aggiorna il
@@ -243,32 +244,46 @@ desktop, non amplia l'autorità del modello e non modifica claim crittografici.
 Gli identificativi strutturati del profilo letto dalla sessione nativa alimentano
 `knownIdentifiers` sul solo canale privato GPUI-Node: nome, cognome, CF, nascita,
 indirizzo, telefono, caregiver, identificativi e date dei metadati disponibili.
-Il core riceve i valori nel campo storico `names` e le date in `birthDates`;
+Il broker riceve i valori nel campo storico `names` e le date in `birthDates`;
 non sono campi del payload condiviso. Valori fuori limite negano la preparazione.
 
-Il broker clinico affianca a GLiNER controlli deterministici sul testo normalizzato:
-NFKC, minuscole, rimozione di separatori e caratteri invisibili, equivalenze OCR
-cifra-lettera e offset riconducibili ai byte originali. Questi controlli redigono
-identificativi noti, CF anche OCR/omocodici, sequenze numeriche, contatti e forme
-spaziate o miste. Una seconda applicazione ai testi effettivamente emessi nega
-residui; forme non trattabili e span tra due voci negano l'intera selezione.
-La verifica di salute neurale con nome e nascita sintetici nega l'uscita se il
-runner non li rileva. Soglia e identità del worker qualificato restano invariate.
+Il confronto degli identificativi noti precede ogni esenzione clinica. Usa NFKC,
+case folding, rimozione di spazi, punteggiatura, accenti e invisibili, omoglifi
+cirillici e greci ed equivalenze OCR cifra-lettera. Blocca prefissi di almeno
+quattro caratteri dei nomi e sei di CF e altri ID, all'inizio di una parola.
+I frammenti più corti dei metadati, come `01`, non partecipano. Un paziente di
+cognome Diabete blocca anche «Diabete mellito»: l'omonimia non è una deroga.
 
-Una voce che dopo la redazione contiene solo token o punteggiatura nega l'intera
-uscita. Anche ogni sostituzione che non sia interamente giustificata dai
-controlli locali degli identificativi nega l'uscita: una rilevazione solo neurale
-potrebbe aver sostituito contenuto clinico e non costituisce una prova della sua
-conservazione. Non esiste una lista di diagnosi che esenti omonimi dalla redazione.
-La finestra nativa indica diagnosi o passo selezionato e numero della riga quando
-la causa è localizzabile; negli altri dinieghi chiede di togliere o riformulare
-le righe selezionate. Il consenso non viene abilitato e nessun dato della riga
-viene riportato alla chat.
+Il controllo strutturale blocca lettere mescolate a cifre o simboli, lettere
+singole spaziate o puntate, CF separati, OCR e pronunciati, contatti anche a voce,
+date complete, tessera e matricola etichettate, quattro o più numeri in lettere
+e parole composte per numeri di almeno tre cifre. Una lista chiusa ammette forme
+cliniche come HbA1c, FEV1, CD4, T4, B12 e D3; numeri con unità cliniche ammesse
+non vengono trattati come telefoni. La verifica si ripete sulle righe e sulla
+loro concatenazione, anche per frammenti divisi tra righe. Nessuna trasformazione
+è applicata ai byte clinici emessi.
 
-Il corpus di qualifica neurale resta distinto dalle regressioni di ammissione
-`clinical-chat-review-corpus.json`, che comprendono i 24 casi sintetici della
-review. Il requisito di zero falsi negativi viene verificato sui casi di
-accettazione, non estrapolato a qualunque prosa futura. Controlli, doppia scansione
-e prova di salute non dimostrano anonimato né conservazione clinica universale:
-il medico è responsabile di controllare i byte prima del consenso. I limiti del
-rilevatore e la qualifica sui desktop reali restano espliciti.
+GLiNER esamina i testi e il JSON finale. Soltanto uno span che coincide con un
+termine clinico locale chiuso viene esentato. Il repo contiene ICD-11 MMS 2026-01
+in inglese (`assets/reference-data/icd11`), non un dizionario italiano di diagnosi;
+LOINC e UCUM locali sono riusati tramite `searchStaticTerminology`, con uguaglianza
+esatta, e `clinical-terms.ts` aggiunge poche diagnosi italiane comuni e abbreviazioni.
+Non vengono lette diagnosi del paziente per generare esenzioni. Un identificativo
+noto non può essere esentato. L'identità qualificata e la sentinella sintetica
+nome/nascita devono essere valide; rilevatore, identificativi o normalizzazione
+degradati negano l'uscita. La sentinella non dimostra recall universale.
+
+Il diniego indica sezione e riga nella finestra nativa, quando localizzabile.
+Nessuna causa dettagliata o riga originale viene consegnata alla chat, il consenso
+resta disabilitato. Le regressioni delle due review e i positivi clinici sono in
+`clinical-chat-exact-corpus.json`, distinti dal corpus di qualifica neurale.
+
+### Modello di minaccia e responsabilità
+
+Il testo viene dalle note del medico, con possibili refusi ed errori OCR. Non è
+un avversario. Il controllo è un aiuto e non è anonimizzazione. Un dato sconosciuto
+offuscato di proposito può sfuggire, così come un riferimento indiretto nei fatti
+clinici. La responsabilità di ciò che esce resta del medico, che vede i byte
+esatti prima del consenso. Revocare non cancella dati già acquisiti dall'host.
+Le prove sintetiche non attestano anonimato universale, qualifica dei desktop o
+accettazione clinica. I claim su cifratura e zero-knowledge restano invariati.

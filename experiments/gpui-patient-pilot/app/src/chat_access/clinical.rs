@@ -23,11 +23,19 @@ pub(super) fn known_identifiers(profile: &PatientDetail) -> serde_json::Value {
         names.extend(
             value
                 .split(|c: char| !c.is_alphanumeric())
-                .filter(|v| v.chars().count() >= 2)
+                .filter(|v| v.chars().count() >= 4)
                 .map(str::to_owned),
         );
     }
-    names.retain(|v| !v.trim().is_empty());
+    names.retain(|v| {
+        let compact: String = v.chars().filter(|c| c.is_alphanumeric()).collect();
+        compact.chars().count()
+            >= if compact.chars().any(|c| c.is_numeric()) {
+                6
+            } else {
+                4
+            }
+    });
     names.sort();
     names.dedup();
     let birth_dates: Vec<_> = profile.birth_date.iter().collect();
@@ -74,7 +82,6 @@ mod tests {
             "RSSMRA80D12F205X",
             "3471234567",
             "Via Fittizia 42",
-            "Ada",
             "Lattesi",
             "Ada Lattesi ada@example.test",
             "synthetic-scope",
@@ -85,6 +92,15 @@ mod tests {
         assert_eq!(known["birthDates"], serde_json::json!(["1972-04-17"]));
         assert!(known.get("diagnoses").is_none());
         assert!(known.get("notes").is_none());
+    }
+    #[test]
+    fn native_known_equivalence_matches_the_shared_review_fixture() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../../native/contracts/clinical-known-equivalence.json"
+        ))
+        .unwrap();
+        let profile: PatientDetail = serde_json::from_value(fixture["profile"].clone()).unwrap();
+        assert_eq!(known_identifiers(&profile), fixture["currentNativeKnown"]);
     }
     #[test]
     fn manual_passages_are_exact_bounded_and_never_the_whole_note() {

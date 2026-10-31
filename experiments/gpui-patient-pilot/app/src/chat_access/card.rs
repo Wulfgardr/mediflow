@@ -78,7 +78,7 @@ impl Card {
             };
             let row = review["row"].as_u64().filter(|v| (1..=16).contains(v))?;
             card.denial = Some(format!(
-                "Condivisione negata per la riga selezionata: {section} n. {row}. La redazione ha svuotato il testo o restano possibili identificativi. Togli questa riga o riformula la selezione, poi riprova. Nessun byte condiviso."
+                "Condivisione negata per la riga selezionata: {section} n. {row}. Possibili identificativi nel testo. Togli la spunta o modifica una copia della riga qui, poi riprova. Nessun byte condiviso."
             ));
             return Some(card);
         }

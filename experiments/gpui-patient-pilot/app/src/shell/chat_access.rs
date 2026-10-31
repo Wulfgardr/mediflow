@@ -480,7 +480,8 @@ impl ClinicalApp {
                     c.diagnoses
                         .iter()
                         .chain(c.excerpts.iter())
-                        .cloned()
+                        .enumerate()
+                        .map(|(i, t)| c.copies.get(&i).unwrap_or(t).clone())
                         .collect::<Vec<_>>(),
                     c.selected.clone(),
                 )
@@ -500,7 +501,7 @@ impl ClinicalApp {
             .child(text!(format!("App richiedente: {app}")).with_id("native-chat-access-app"))
             .child(text!(format!("Archivio: {}", self.chat_access.archive)).with_id("native-chat-access-archive"))
             .child(div().id("native-chat-access-patient").child(crate::title::title(crate::title::TitleText::patient_question("Paziente: ", self.chat_access.patient.clone(), ""), theme)))
-            .child(notice("native-chat-access-operation", if therapy_mode { "Scegli la terapia della cartella selezionata e controlla il nuovo stato. La scrittura usa il PIN nativo, una sola volta entro 30 secondi. I nomi restano qui. Touch ID per questa scrittura non è ancora abilitato." } else if catalog_mode { "Ricerca nel catalogo AIFA locale, in sola lettura. Controlla query e risultati sotto. La data di aggiornamento non è verificata. Conferma una sola consultazione entro 30 secondi; nessuna prescrizione o invio al modello." } else if clinical_mode { "Spunta le diagnosi e i passi da condividere. Copia un passo esatto delle note nel campo sotto e aggiungilo, poi spuntalo. La nota intera non è ammessa. Il rilevatore può sbagliare: sei responsabile di controllare i byte prima della conferma monouso. Non è una garanzia di anonimato." } else { "Scheda sintetica «basic», indipendente dalla cartella selezionata. Controlla i byte sotto: verranno mostrati soltanto nella vista della chat. Nomi e fonti restano qui. Hai 30 secondi per confermare una sola lettura; nessun rinnovo automatico." }, theme, false))
+            .child(notice("native-chat-access-operation", if therapy_mode { "Scegli la terapia della cartella selezionata e controlla il nuovo stato. La scrittura usa il PIN nativo, una sola volta entro 30 secondi. I nomi restano qui. Touch ID per questa scrittura non è ancora abilitato." } else if catalog_mode { "Ricerca nel catalogo AIFA locale, in sola lettura. Controlla query e risultati sotto. La data di aggiornamento non è verificata. Conferma una sola consultazione entro 30 secondi; nessuna prescrizione o invio al modello." } else if clinical_mode { "Spunta le diagnosi e i passi da condividere. Copia un passo esatto delle note nel campo sotto e aggiungilo, poi spuntalo. La nota intera non è ammessa. Il testo viene dalle tue note, anche con refusi o errori OCR. Il controllo è un aiuto e non è anonimizzazione. Un dato sconosciuto offuscato di proposito può sfuggire. Sei responsabile di ciò che esce: controlla i byte esatti prima della conferma. Il testo non viene riscritto. Puoi togliere la spunta o modificare una copia qui, senza cambiare la cartella. Le date complete sono escluse." } else { "Scheda sintetica «basic», indipendente dalla cartella selezionata. Controlla i byte sotto: verranno mostrati soltanto nella vista della chat. Nomi e fonti restano qui. Hai 30 secondi per confermare una sola lettura; nessun rinnovo automatico." }, theme, false))
             .when_some(clinical.filter(|_| state == State::Selecting), |mut el, (notes, rows, selected)| {
                 el = el.child(notice("chat-clinical-notes", notes, theme, false)).child(self.chat_access.excerpt.clone());
                 el = el.child(button("chat-clinical-add", "Aggiungi passo", theme, false, true)
@@ -511,10 +512,25 @@ impl ClinicalApp {
                         if added { this.chat_access.excerpt.update(cx, |input, cx| input.set_content("", cx)); }
                         cx.notify();
                     })));
+                el = el.child(button("chat-clinical-save-copy", "Usa il campo come copia modificata", theme, false, true)
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        let text = this.chat_access.excerpt.read(cx).value().to_owned();
+                        let saved = this.chat_access.pending.as_ref().is_some_and(|p| p.lock().is_ok_and(|mut p| p.save_clinical_copy(&text)));
+                        this.chat_access.message = if saved { None } else { Some("Scegli prima Modifica copia sulla riga, poi inserisci un testo da 1 a 2048 caratteri.".into()) };
+                        cx.notify();
+                    })));
                 for (index, row) in rows.into_iter().enumerate() {
                     let request = pending.clone();
                     el = el.child(button(format!("chat-clinical-select-{index}"), format!("{} {}", if selected.contains(&index) { "☑" } else { "☐" }, row), theme, false, true)
                         .on_click(cx.listener(move |_, _, _, cx| { if let Ok(mut p) = request.lock() { p.toggle_clinical(index); } cx.notify(); })));
+                    let request = pending.clone();
+                    el = el.child(button(format!("chat-clinical-edit-{index}"), "Modifica copia", theme, false, true)
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            if let Some(text) = request.lock().ok().and_then(|mut p| p.edit_clinical(index)) {
+                                this.chat_access.excerpt.update(cx, |input, cx| input.set_content(&text, cx));
+                            }
+                            cx.notify();
+                        })));
                 }
                 let request = pending.clone();
                 el.child(button("chat-clinical-prepare", "Prepara selezione", theme, true, !selected.is_empty())
@@ -699,6 +715,28 @@ mod tests {
             pending.lock().unwrap().clinical.as_ref().unwrap().selected,
             [1]
         );
+        assert_eq!(
+            pending.lock().unwrap().edit_clinical(1),
+            Some("Passo clinico.".into())
+        );
+        app.update(cx, |app, cx| {
+            app.chat_access.excerpt.update(cx, |input, cx| {
+                input.set_content("Passo clinico senza nomi.", cx)
+            })
+        });
+        super::super::notes_recovery_tests::draw(cx);
+        let save = cx
+            .debug_bounds("control-label:Usa il campo come copia modificata")
+            .expect("native copy action rendered");
+        cx.simulate_click(save.center(), gpui::Modifiers::default());
+        cx.run_until_parked();
+        {
+            let p = pending.lock().unwrap();
+            let c = p.clinical.as_ref().unwrap();
+            assert_eq!(c.excerpts, ["Passo clinico."]);
+            assert_eq!(c.copies[&1], "Passo clinico senza nomi.");
+            assert!(p.review().is_none());
+        }
         app.update(cx, |app, cx| app.disconnect(cx));
         assert_eq!(pending.lock().unwrap().status(), State::Withdrawn);
         assert!(pending.lock().unwrap().clinical.is_none());
