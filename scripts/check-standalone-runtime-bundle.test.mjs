@@ -335,10 +335,10 @@ test('packaged TLS proxy starts outside the checkout and fails if its shared imp
         const scripts = path.join(resources, 'scripts');
         fs.mkdirSync(scripts, { recursive: true });
         fs.copyFileSync(path.join(root, 'scripts/local-api-tls-proxy.mjs'), path.join(scripts, 'local-api-tls-proxy.mjs'));
-        for (const module of ['loopback-ingress.mjs', 'network-ingress-policy.mjs'].filter(name => name !== omitted)) {
+        for (const file of ['loopback-ingress.mjs', 'network-ingress-policy.mjs'].filter(name => name !== omitted)) {
           const security = path.join(resources, 'lib', 'security');
           fs.mkdirSync(security, { recursive: true });
-          fs.copyFileSync(path.join(root, 'lib/security', module), path.join(security, module));
+          fs.copyFileSync(path.join(root, 'lib/security', file), path.join(security, file));
         }
         const result = spawnSync(node, [checker, '--tls-proxy-resources', resources], {
           cwd: directory, env: { ...process.env, NODE_OPTIONS: '' }, encoding: 'utf8', timeout: 25_000,
