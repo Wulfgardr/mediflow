@@ -1,11 +1,80 @@
 use super::governance::{fact, section_state};
 use super::*;
-use mediflow_runtime_client::ControlsSnapshot;
+use mediflow_runtime_client::{
+    AiLocalState, AiRuntimeStatus, ControlsSnapshot, WhoReadiness, WhoReadinessStatus,
+};
 use serde_json::Value;
 
 #[derive(Default)]
 pub(super) struct ControlsArea {
     snapshot: Option<ControlsSnapshot>,
+    services: Option<HostServices>,
+}
+struct HostServices {
+    address: String,
+    authentication: Result<Value, RuntimeError>,
+    runtime: Result<AiRuntimeStatus, RuntimeError>,
+    who: Option<Result<WhoReadiness, RuntimeError>>,
+}
+fn local_runtime_label(state: AiLocalState) -> &'static str {
+    match state {
+        AiLocalState::Configured => "Configurazione presente",
+        AiLocalState::Misconfigured => "Configurazione da correggere",
+    }
+}
+fn who_label(status: WhoReadinessStatus) -> &'static str {
+    match status {
+        WhoReadinessStatus::Disabled => "Spento",
+        WhoReadinessStatus::ConfigurationRequired => "Configurazione richiesta",
+        WhoReadinessStatus::Configured => "Configurato, non ancora raggiunto",
+        WhoReadinessStatus::Available => "Raggiunto",
+        WhoReadinessStatus::Unavailable => "Non raggiunto",
+    }
+}
+fn services_view(services: &HostServices, theme: Theme) -> Div {
+    let mut pane = div()
+        .flex()
+        .flex_col()
+        .gap(px(8.))
+        .child(section("controls-services", "Servizi della postazione", theme))
+        .child(text!("Risposte dei controlli di questa lettura. Non provano che un modello possa eseguire un’analisi."))
+        .child(fact("Indirizzo dell’host", &services.address, theme));
+    if let Some(error) = section_state("controls-auth-error", &services.authentication, theme) {
+        pane = pane.child(error);
+    }
+    if let Ok(value) = &services.authentication {
+        pane = pane.child(fact(
+            "Controllo di autenticazione",
+            value["status"].as_str().unwrap_or("Non indicato"),
+            theme,
+        ));
+    }
+    if let Some(error) = section_state("controls-runtime-error", &services.runtime, theme) {
+        pane = pane.child(error);
+    }
+    if let Ok(status) = &services.runtime {
+        pane = pane.child(fact(
+            "Runtime AI locale",
+            local_runtime_label(status.local_runtime.state),
+            theme,
+        ));
+    }
+    match &services.who {
+        None => pane.child(fact(
+            "ICD-11 WHO",
+            "Seleziona un ambulatorio per leggerne lo stato",
+            theme,
+        )),
+        Some(result) => {
+            if let Some(error) = section_state("controls-who-error", result, theme) {
+                pane = pane.child(error);
+            }
+            if let Ok(readiness) = result {
+                pane = pane.child(fact("ICD-11 WHO", who_label(readiness.status), theme));
+            }
+            pane
+        }
+    }
 }
 fn fields(value: &Value, keys: &[(&str, &str)], theme: Theme) -> Div {
     div()
@@ -72,14 +141,31 @@ impl ClinicalApp {
         let Some(access) = self.local_host.access() else {
             return;
         };
+        let Some(session) = self.session.clone() else {
+            return;
+        };
+        let scope = self.scope.clone();
         self.local_host.operation = Operation::Reading;
         self.local_host.controls.snapshot = None;
+        self.local_host.controls.services = None;
         self.run_local_host(
-            move || access.read_controls(),
+            move || {
+                let snapshot = access.read_controls()?;
+                let services = HostServices {
+                    address: session.base_url().to_owned(),
+                    authentication: access.read_authentication_health(),
+                    runtime: session.read_ai_runtime_status(),
+                    who: scope.map(|scope| session.read_who_readiness(&scope)),
+                };
+                Ok((snapshot, services))
+            },
             |this, result, cx| {
                 this.local_host.operation = Operation::Idle;
                 match result {
-                    Ok(snapshot) => this.local_host.controls.snapshot = Some(snapshot),
+                    Ok((snapshot, services)) => {
+                        this.local_host.controls.snapshot = Some(snapshot);
+                        this.local_host.controls.services = Some(services);
+                    }
                     Err(error) => this.local_host.operation = Operation::Failed(ui_error(error)),
                 }
                 cx.notify();
@@ -127,6 +213,9 @@ impl ClinicalApp {
                 false,
             ));
         };
+        if let Some(services) = &self.local_host.controls.services {
+            pane = pane.child(services_view(services, theme));
+        }
         pane = pane.child(section("controls-updates","Aggiornamenti e revisione",theme))
             .child(text!("Informazioni del manifest locale. La lettura non cerca release in rete e non installa aggiornamenti."));
         for (id, result, keys) in [
@@ -242,6 +331,18 @@ impl ClinicalApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn service_labels_do_not_claim_more_than_the_read_observed() {
+        assert_eq!(
+            who_label(WhoReadinessStatus::Configured),
+            "Configurato, non ancora raggiunto"
+        );
+        assert_eq!(who_label(WhoReadinessStatus::Available), "Raggiunto");
+        assert_eq!(
+            local_runtime_label(AiLocalState::Configured),
+            "Configurazione presente"
+        );
+    }
     fn snapshot() -> ControlsSnapshot {
         ControlsSnapshot {
             updates: Ok(serde_json::json!({"currentVersion":"0.9.1","notes":[]})),
@@ -274,6 +375,12 @@ mod tests {
                 } else {
                     Some(snapshot())
                 };
+                app.local_host.controls.services = (scenario != 0).then(|| HostServices {
+                    address: "http://127.0.0.1:0".into(),
+                    authentication: Ok(serde_json::json!({"status":"ok"})),
+                    runtime: Err(RuntimeError::Forbidden),
+                    who: None,
+                });
                 if scenario == 2 {
                     app.local_host.controls.snapshot.as_mut().unwrap().audit =
                         Ok(serde_json::json!([]));
