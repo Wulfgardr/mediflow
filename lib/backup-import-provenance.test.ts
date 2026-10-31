@@ -19,7 +19,8 @@ const { executeTherapyStatusCommand, readTherapyStatusReceipt } = load('./therap
 const { restoreBackupArtifact } = load('./backup-restore-executor.ts') as typeof import('./backup-restore-executor.ts');
 const { listAuditEvents, summarizeAuditEvents } = load('./security/audit.ts') as typeof import('./security/audit.ts');
 const generation = bindSyntheticArchiveSessions('synthetic-origin-bootstrap');
-const actor = { id: 'synthetic-origin-admin', username: 'synthetic-origin-admin', role: 'admin' };
+const syntheticUsername = 'synthetic-origin-admin';
+const actor = { id: 'synthetic-origin-admin', username: syntheticUsername, role: 'admin' };
 dbServer.insert(users).values({ ...actor, passwordHash: 'synthetic', encryptedMasterKey: 'synthetic', salt: 'synthetic' }).run();
 const session = issueSyntheticWebSession(actor, 'origin-before');
 const sql = openDbServer();
@@ -78,3 +79,22 @@ test('imported events and their markers cannot occupy the local read limit or in
 });
 
 test.after(() => sql.close());
+
+test('portable audit and command markers cannot reclassify an existing local row', async () => {
+    const before = sql.prepare('SELECT * FROM audit_events WHERE event_id=?').get(localReceipt.auditEventId);
+    const now = Math.floor(Date.now() / 1000);
+    const payload = createEmptyDataset();
+    payload.auditEvents = ['backup.audit.imported', 'backup.therapy-command.imported'].map((eventType, index) => ({
+        eventId: randomUUID(), schemaVersion: 1, eventType, occurredAt: now, outcome: 'success', actorType: 'system', actorRef: 'claimed-local-host',
+        subjectType: index ? 'therapy_command' : 'audit_event', subjectRef: index ? localCommand.commandId : localReceipt.auditEventId,
+        sourceSurface: 'web', requestId: null, redactedMetadata: null, createdAt: now,
+    }));
+    restoreBackupArtifact(await createBackupArtifact(payload), () => false);
+    const renewed = issueSyntheticWebSession(actor, 'origin-poisoned-markers');
+    const result = readTherapyStatusReceipt(renewed, localCommand);
+    assert.equal(result.outcome, 'terminal');
+    if (result.outcome === 'terminal') assert.equal(result.origin, 'local');
+    assert.deepEqual(sql.prepare('SELECT * FROM audit_events WHERE event_id=?').get(localReceipt.auditEventId), before);
+    assert.equal((await listAuditEvents({ eventType: 'therapy.updated', limit: 2 })).some(row => row.eventId === localReceipt.auditEventId), true);
+    assert.equal(sql.prepare("SELECT 1 FROM portable_import_origins WHERE kind='therapy_command' AND ref=?").get(localCommand.commandId), undefined);
+});

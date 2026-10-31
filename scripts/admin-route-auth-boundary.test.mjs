@@ -79,6 +79,8 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
                 'servicePrescriptions', 'sissHandoffEvents', 'therapies', 'therapyStatusCommands', 'ambulatoryDestructiveCommands',
             ].map((name) => `${name} = Object.freeze({})`).join(', ')};`))}],
             ['@/lib/security/server-auth', ${JSON.stringify(toDataModule("export async function requireSession() { globalThis.sessionCalls = (globalThis.sessionCalls ?? 0) + 1; if (globalThis.sessionMode === 'anonymous') return null; return Object.freeze({ id: 'session.synthetic.restore', userId: 'user.synthetic.restore', role: globalThis.sessionMode ?? 'admin' }); } export function unauthorizedResponse() { return new Response(null, { status: 401 }); } export function forbiddenResponse() { return new Response(null, { status: 403 }); }"))}],
+            ['@/lib/security/host-credential-verification', ${JSON.stringify(toDataModule("export async function verifyUnlockCredentials() { return { kind: 'verified', account: { id: 'user.synthetic.restore', role: 'admin' } }; }"))}],
+            ['@/lib/security/current-session-authority', ${JSON.stringify(toDataModule("export function isCurrentServerSession() { return true; }"))}],
             ['@/lib/security/archive-session-generation', ${JSON.stringify(toDataModule("export function archiveGenerationForSession() { return 'synthetic-generation'; }"))}],
             ['@/lib/archive-generation', ${JSON.stringify(toDataModule("export function assertArchiveGeneration() {}"))}],
             ['@/lib/security/archive-write-request', ${JSON.stringify(toDataModule("export function archiveWriteRequestDenial() { return null; }"))}],
@@ -125,7 +127,7 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
         globalThis.blockRestore = true;
         const blocked = await POST(new Request('http://127.0.0.1:3000/api/system/backup-restore', {
             method: 'POST', body: '{}',
-            headers: { origin: 'http://127.0.0.1:3000', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' },
+            headers: { origin: 'http://127.0.0.1:3000', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json', 'x-mediflow-restore-credential': JSON.stringify({pin:'synthetic-pin'}) },
         }));
         const blockedObserved = { status: blocked.status, cacheControl: blocked.headers.get('cache-control'), body: await blocked.json() };
         const blockedExpected = { status: 409, cacheControl: 'no-store', body: { success: false, code: 'restore_blocked',

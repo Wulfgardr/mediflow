@@ -98,6 +98,8 @@ async function fixture(paddingBytes = 0) {
     insertAmbulatory.run(ambulatoryAudit.requestId, readSqliteArchiveGeneration(db), 'a'.repeat(64), actor, digest('synthetic-paired-token'), 'applied', null, result, JSON.stringify([ambulatoryAudit]));
     insertAmbulatory.run('71111111-1111-4111-8111-111111111111', readSqliteArchiveGeneration(db), 'b'.repeat(64), actor, digest('synthetic-paired-token'), 'closed', null, null, null);
     insertAmbulatory.run('81111111-1111-4111-8111-111111111111', readSqliteArchiveGeneration(db), 'c'.repeat(64), actor, digest('synthetic-paired-token'), 'rejected', 'plan_changed', null, null);
+    db.prepare("INSERT INTO audit_events(event_id,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,subject_ref,source_surface) VALUES ('synthetic-import-root','backup.portable.imported',1783000001,'success','system','synthetic-host','backup','synthetic-checksum','web')").run();
+    db.prepare("INSERT INTO portable_import_origins(kind,ref,import_event_id) VALUES ('audit',?,'synthetic-import-root')").run(event);
     const snapshot = createRecoverySnapshot(db, actor);
     const resident = await crypto.subtle.importKey('raw', await crypto.subtle.exportKey('raw', key), 'AES-GCM', false, ['encrypt', 'decrypt']);
     const artifact = await encryptRecoveryBackup(snapshot, resident);
@@ -264,7 +266,7 @@ test(`therapy command predecessor encrypted v4 recovery ${alteration}`, async ()
         const oldFile = path.join(path.dirname(f.source), 'v4-snapshot.db');
         fs.writeFileSync(oldFile, f.snapshot);
         const old = new Database(oldFile);
-        old.exec('DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands; PRAGMA user_version=4;');
+        old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands; PRAGMA user_version=4;');
         if (alteration === 'extra-table') old.exec('CREATE TABLE synthetic_extension(value TEXT)');
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN synthetic_drift TEXT');
         if (alteration === 'index') old.exec('CREATE INDEX synthetic_drift ON therapies(status)');
@@ -302,7 +304,7 @@ test(`ambulatory command encrypted predecessor v5 recovery ${alteration}`, async
     try {
         const oldFile = path.join(f.root, 'canonical5.db'); fs.writeFileSync(oldFile, f.snapshot);
         const old = new Database(oldFile);
-        old.exec('DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
+        old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
         if (alteration === 'extra-table') old.exec('CREATE TABLE synthetic_extension(value TEXT)');
         if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN synthetic_drift TEXT');
         if (alteration === 'index') old.exec('CREATE INDEX synthetic_drift ON therapies(status)');
@@ -319,7 +321,7 @@ test(`ambulatory command encrypted predecessor v5 recovery ${alteration}`, async
                 assert.deepEqual(actual.ambulatory_destructive_commands, []);
                 for (const key of ['users','patients','therapy_status_commands','durable_review_command_operations']) assert.deepEqual(actual[key], expected[key]);
                 assert.deepEqual((actual.audit_events as unknown[]).slice(0, -1), expected.audit_events);
-                assert.equal(restored.pragma('user_version', { simple: true }), 6);
+                assert.equal(restored.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
             } finally { restored.close(); }
         }
         assert.equal(digest(fs.readFileSync(oldFile)), before); assert.equal(digest(await decryptRecoveryBackup(artifact, f.key)), before);
@@ -332,4 +334,29 @@ test('GPUI and Web share the authenticated recovery envelope golden', async () =
     const key = await crypto.subtle.importKey('raw', Buffer.from(golden.masterKey, 'base64'), 'AES-GCM', false, ['decrypt']);
     const decrypted = await decryptRecoveryBackup(Buffer.from(golden.artifact, 'base64'), key);
     assert.deepEqual(Buffer.from(decrypted), Buffer.from(golden.database, 'base64'));
+});
+
+for (const alteration of ['none', 'column', 'index', 'view', 'authority-table']) test(`encrypted v6 predecessor ${alteration} preserves its immutable schema contract`, async () => {
+    const f = await fixture();
+    try {
+        const file = path.join(f.root, 'canonical6.db'); fs.writeFileSync(file, f.snapshot);
+        const old = new Database(file);
+        old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; PRAGMA user_version=6;');
+        if (alteration === 'column') old.exec('ALTER TABLE therapies ADD COLUMN drift TEXT');
+        if (alteration === 'index') old.exec('CREATE INDEX drift ON therapies(status)');
+        if (alteration === 'view') old.exec('CREATE VIEW drift AS SELECT id FROM therapies');
+        if (alteration === 'authority-table') old.exec('CREATE TABLE portable_import_origins (kind TEXT, ref TEXT, import_event_id TEXT)');
+        const expected = contents(old); old.pragma('wal_checkpoint(TRUNCATE)'); old.pragma('journal_mode=DELETE'); old.close();
+        const bytes = fs.readFileSync(file), artifact = await encryptRecoveryBackup(bytes, f.key);
+        if (alteration !== 'none') { await assert.rejects(f.restore({ artifact })); assert.equal(fs.existsSync(f.destination), false); }
+        else {
+            await f.restore({ artifact }); const restored = openVersionedSqliteDatabase(f.destination);
+            try {
+                assert.equal(restored.pragma('user_version', { simple: true }), 7);
+                for (const table of ['users','patients','therapy_status_commands','ambulatory_destructive_commands']) assert.deepEqual(contents(restored)[table], expected[table]);
+                assert.deepEqual(restored.prepare('SELECT * FROM portable_import_origins').all(), []);
+            } finally { restored.close(); }
+        }
+        assert.deepEqual(fs.readFileSync(file), bytes);
+    } finally { f.cleanup(); }
 });
