@@ -92,6 +92,26 @@ fn build_voice(out: &std::path::Path, minimum: &str) {
     }
     let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
     let arch = if arch == "aarch64" { "arm64" } else { &arch };
+    // A selected SDK may predate the Speech types even under a recent compiler.
+    let probe = out.join("local_voice_sdk_probe.swift");
+    std::fs::write(
+        &probe,
+        "import Speech\n@available(macOS 26.0, *) func probe() { _ = (SpeechTranscriber.self, SpeechAnalyzer.self, AssetInventory.self) }\n",
+    )
+    .unwrap();
+    let sdk_ready = Command::new("xcrun")
+        .args(["swiftc", "-typecheck", "-parse-as-library", "-target"])
+        .arg(format!("{arch}-apple-macos{minimum}"))
+        .arg(&probe)
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success());
+    if !sdk_ready {
+        println!(
+            "cargo:warning=Local Apple voice unavailable: Swift 6.2 and macOS 26 SDK required"
+        );
+        return;
+    }
     assert!(
         Command::new("xcrun")
             .args([
