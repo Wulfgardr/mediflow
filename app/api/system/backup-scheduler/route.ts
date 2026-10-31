@@ -2,13 +2,16 @@ import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
-import { dbServer } from '@/lib/db-server';
+import { randomUUID } from 'node:crypto';
+import { backupDestinationIdentity, BackupDestinationError, validateBackupDestination } from '@/scripts/backup-destination-policy.mjs';
+import { dbServer, runDbServerImmediateTransaction } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
 import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
 import {
     BACKUP_SCHEDULER_SETTINGS_KEY,
+    backupSchedulerRevision,
     BackupSchedulerOutcomeUnknownError,
     applyBackupRetention,
     applyRetentionResultToState,
@@ -22,16 +25,16 @@ import { apiInternalError } from '@/lib/api-error-response';
 
 export const dynamic = 'force-dynamic';
 
-async function loadSchedulerSettingValue(): Promise<string | null> {
-    const row = await dbServer.select().from(settings).where(eq(settings.key, BACKUP_SCHEDULER_SETTINGS_KEY)).get();
+function loadSchedulerSettingValue(): string | null {
+    const row = dbServer.select().from(settings).where(eq(settings.key, BACKUP_SCHEDULER_SETTINGS_KEY)).get();
     return row?.value ?? null;
 }
 
-async function saveSchedulerSettingValue(value: string): Promise<void> {
-    await dbServer
+function saveSchedulerSettingValue(value: string): void {
+    dbServer
         .insert(settings)
         .values({ key: BACKUP_SCHEDULER_SETTINGS_KEY, value })
-        .onConflictDoUpdate({ target: settings.key, set: { value } });
+        .onConflictDoUpdate({ target: settings.key, set: { value } }).run();
 }
 
 export async function GET() {
@@ -40,7 +43,7 @@ export async function GET() {
     if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
-        const value = await loadSchedulerSettingValue();
+        const value = loadSchedulerSettingValue();
         return NextResponse.json(buildBackupSchedulerStatus(value));
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
@@ -60,25 +63,12 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
         const action = typeof body?.action === 'string' ? body.action : 'save';
-        const currentValue = await loadSchedulerSettingValue();
-        const currentState = readBackupSchedulerStateFromValue(currentValue);
-        const configPatch = body?.config && typeof body.config === 'object'
-            ? body.config as Record<string, unknown>
-            : {};
-        const draftState = mergeBackupSchedulerConfig(currentState, {
-            enabled: typeof configPatch.enabled === 'boolean' ? configPatch.enabled : currentState.config.enabled,
-            hour: configPatch.hour as number | undefined,
-            minute: configPatch.minute as number | undefined,
-            destinationDir: configPatch.destinationDir as string | undefined,
-            retentionKeepArtifacts: configPatch.retentionKeepArtifacts as number | undefined,
-        });
-
         if (action === 'run-now') {
             const result = runBackupSchedulerScript({
                 force: true,
-                destinationDir: currentState.config.destinationDir,
+                destinationDir: readBackupSchedulerStateFromValue(loadSchedulerSettingValue()).config.destinationDir,
             });
-            const refreshedValue = await loadSchedulerSettingValue();
+            const refreshedValue = loadSchedulerSettingValue();
             return NextResponse.json(
                 {
                     result,
@@ -88,79 +78,111 @@ export async function POST(request: Request) {
             );
         }
 
-        if (action === 'preview-retention') {
-            return NextResponse.json({
-                retention: previewBackupRetention(draftState.config),
-            });
-        }
-
-        if (action === 'apply-retention') {
-            const retention = applyBackupRetention(draftState.config);
-            const nextState = applyRetentionResultToState(draftState, retention, 'manual');
-            await saveSchedulerSettingValue(JSON.stringify(nextState));
-
-            return NextResponse.json({
-                retention,
-                status: buildBackupSchedulerStatus(JSON.stringify(nextState)),
-            });
-        }
-
-        const nextState = draftState;
-
-        const adapter = getSchedulerAdapter();
-        if (nextState.config.enabled) {
-            if (!adapter.isSupported()) {
-                return NextResponse.json(
-                    {
-                        error: 'Scheduling automatico del backup non disponibile su questa piattaforma.',
-                        detail: `Nessuno scheduler supportato rilevato su ${process.platform} (launchd su macOS, Task Scheduler su Windows, systemd-timer o cron su Linux). Il backup manuale "Esegui adesso" e la retention restano disponibili.`,
-                        supported: false,
-                    },
-                    { status: 501 },
-                );
-            }
-            adapter.install(nextState);
-        } else {
-            adapter.uninstall();
-        }
-
-        if (adapter.getStatus().installed !== nextState.config.enabled) throw new BackupSchedulerOutcomeUnknownError();
-        await saveSchedulerSettingValue(JSON.stringify(nextState));
-
-        try {
-            const context = auditContextFromSession(session);
-            await writeAuditEvent({
-                eventType: 'settings.updated',
-                outcome: 'success',
-                actorType: context.actorType,
-                actorRef: context.actorRef,
-                subjectType: 'settings',
-                subjectRef: BACKUP_SCHEDULER_SETTINGS_KEY,
-                sourceSurface: context.sourceSurface,
-                requestId: requestIdFromRequest(request),
-                redactedMetadata: withAuditContextMetadata(context, {
-                    changedFields: ['enabled', 'hour', 'minute', 'destinationDir', 'retentionKeepArtifacts'],
-                    flags: [`action:${action}`],
-                }),
-            });
-        } catch (error) {
-            console.error('Audit backup scheduler write failed:', error);
-        }
-
-        const observed = buildBackupSchedulerStatus(JSON.stringify(nextState));
-        if (observed.installed !== nextState.config.enabled) throw new BackupSchedulerOutcomeUnknownError();
-        return NextResponse.json(observed);
+        return runDbServerImmediateTransaction(() => mutateScheduler(body, request, session));
     } catch (error) {
-        if (error instanceof BackupSchedulerOutcomeUnknownError) {
-            return NextResponse.json({
-                error: 'Esito del backup automatico non confermato. Rileggi lo stato prima di ripetere l’operazione.', code: 'backup_scheduler_outcome_unconfirmed',
-                status: buildBackupSchedulerStatus(await loadSchedulerSettingValue()),
-            }, { status: 503 });
-        }
-        /* Il messaggio grezzo qui contiene la destinazione del backup. */
-        return apiInternalError('POST backup scheduler', error, {
-            code: 'backup_scheduler_save_failed',
-            message: 'Salvataggio delle impostazioni di backup non riuscito.',
+        if (error instanceof BackupDestinationError) return NextResponse.json({ error: error.userMessage, code: 'backup_destination_rejected' }, { status: 422 });
+        return schedulerError(error);
+    }
+}
+
+function mutateScheduler(body: Record<string, unknown>, request: Request, session: NonNullable<Awaited<ReturnType<typeof requireSession>>>) {
+    const action = typeof body.action === 'string' ? body.action : 'save';
+    const currentValue = loadSchedulerSettingValue();
+    const currentState = readBackupSchedulerStateFromValue(currentValue);
+    const configPatch = body?.config && typeof body.config === 'object'
+        ? body.config as Record<string, unknown>
+        : {};
+    if (action !== 'preview-retention' && body.expectedRevision !== backupSchedulerRevision(currentState)) return NextResponse.json({
+        error: 'La programmazione è stata modificata. La bozza è conservata: rileggi lo stato prima di confermare.', code: 'backup_scheduler_conflict',
+    }, { status: 409 });
+    const draftState = mergeBackupSchedulerConfig(currentState, {
+        volumeProtectionAcknowledged: configPatch.volumeProtectionAcknowledged === true,
+        enabled: typeof configPatch.enabled === 'boolean' ? configPatch.enabled : currentState.config.enabled,
+        hour: configPatch.hour as number | undefined,
+        minute: configPatch.minute as number | undefined,
+        destinationDir: configPatch.destinationDir as string | undefined,
+        retentionKeepArtifacts: configPatch.retentionKeepArtifacts as number | undefined,
+    });
+
+    if (action === 'preview-retention') {
+        return NextResponse.json({
+            retention: previewBackupRetention(draftState.config),
         });
     }
+
+    if (action === 'apply-retention') {
+        const retention = applyBackupRetention(draftState.config);
+        const nextState = applyRetentionResultToState(currentState, retention, 'manual');
+        saveSchedulerSettingValue(JSON.stringify(nextState));
+
+        return NextResponse.json({
+            retention,
+            status: buildBackupSchedulerStatus(JSON.stringify(nextState)),
+        });
+    }
+
+    const nextState = { ...draftState, revision: randomUUID() };
+    if (nextState.config.enabled && typeof configPatch.destinationDir === 'string' && configPatch.destinationDir !== nextState.config.destinationDir) throw new BackupDestinationError('Scegli una cartella assoluta esistente.');
+    if (nextState.config.enabled) {
+        const validated = validateBackupDestination(nextState.config.destinationDir, nextState.config.volumeProtectionAcknowledged);
+        nextState.config.volumeProtectionIdentity = backupDestinationIdentity(validated.destination);
+    }
+
+    const adapter = getSchedulerAdapter();
+    if (nextState.config.enabled) {
+        if (!adapter.isSupported()) {
+            return NextResponse.json(
+                {
+                    error: 'Scheduling automatico del backup non disponibile su questa piattaforma.',
+                    detail: `Nessuno scheduler supportato rilevato su ${process.platform} (launchd su macOS, Task Scheduler su Windows, systemd-timer o cron su Linux). Il backup manuale "Esegui adesso" e la retention restano disponibili.`,
+                    supported: false,
+                },
+                { status: 501 },
+            );
+        }
+        adapter.install(nextState);
+    } else {
+        adapter.uninstall();
+    }
+
+    if (adapter.getStatus().installed !== nextState.config.enabled) throw new BackupSchedulerOutcomeUnknownError();
+    saveSchedulerSettingValue(JSON.stringify(nextState));
+
+    try {
+        const context = auditContextFromSession(session);
+        void writeAuditEvent({
+            eventType: 'settings.updated',
+            outcome: 'success',
+            actorType: context.actorType,
+            actorRef: context.actorRef,
+            subjectType: 'settings',
+            subjectRef: BACKUP_SCHEDULER_SETTINGS_KEY,
+            sourceSurface: context.sourceSurface,
+            requestId: requestIdFromRequest(request),
+            redactedMetadata: withAuditContextMetadata(context, {
+                changedFields: ['enabled', 'hour', 'minute', 'destinationDir', 'retentionKeepArtifacts'],
+                flags: [`action:${action}`],
+            }),
+        }).catch(error => console.error('Audit backup scheduler write failed:', error));
+    } catch (error) {
+        console.error('Audit backup scheduler write failed:', error);
+    }
+
+    const observed = buildBackupSchedulerStatus(JSON.stringify(nextState));
+    if (observed.installed !== nextState.config.enabled) throw new BackupSchedulerOutcomeUnknownError();
+    return NextResponse.json(observed);
+}
+
+function schedulerError(error: unknown) {
+    if (error instanceof BackupSchedulerOutcomeUnknownError) {
+        return NextResponse.json({
+            error: 'Esito del backup automatico non confermato. Rileggi lo stato prima di ripetere l’operazione.', code: 'backup_scheduler_outcome_unconfirmed',
+            status: buildBackupSchedulerStatus(loadSchedulerSettingValue()),
+        }, { status: 503 });
+    }
+    /* Il messaggio grezzo qui contiene la destinazione del backup. */
+    return apiInternalError('POST backup scheduler', error, {
+        code: 'backup_scheduler_save_failed',
+        message: 'Salvataggio delle impostazioni di backup non riuscito.',
+    });
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { backupDestinationIdentity } from './backup-destination-policy.mjs';
 
 import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -65,6 +66,8 @@ function configureSchedulerState(dataDir, backupDir) {
         hour: 2,
         minute: 0,
         destinationDir: backupDir,
+        volumeProtectionAcknowledged: true,
+        volumeProtectionIdentity: backupDestinationIdentity(fs.realpathSync(backupDir)),
         retentionKeepArtifacts: 1,
       },
       run: {},
@@ -298,16 +301,19 @@ async function main() {
     });
 
     const retention = {
-      staleArtifactRemoved: !fs.existsSync(staleArtifact),
-      staleTempRemoved: !fs.existsSync(staleTemp),
+      staleArtifactPreserved: fs.existsSync(staleArtifact),
+      staleTempPreserved: fs.existsSync(staleTemp),
       unrelatedFilePreserved: fs.existsSync(unrelatedFile),
     };
-    if (!retention.staleArtifactRemoved || !retention.staleTempRemoved || !retention.unrelatedFilePreserved) {
-      failures.push({ step: 'retention', message: 'Retention evidence did not match keep-last-N expectations.', remediation: 'Check applyBackupRetention before trusting cleanup.' });
+    if (!retention.staleArtifactPreserved || !retention.staleTempPreserved || !retention.unrelatedFilePreserved) {
+      failures.push({ step: 'retention', message: 'Scheduled backup removed earlier recovery artifacts.', remediation: 'Preserve earlier backups and temporary artifacts.' });
     }
     const realRestoreStartedAt = process.hrtime.bigint();
     const realRestore = await (async () => {
       const restoreResult = restoreIntoTarget(targetDataDir, schedulerResult.artifactPath);
+      const restoredDestination = path.join(options.workDir, 'restored-backups');
+      fs.mkdirSync(restoredDestination, { recursive: true, mode: 0o700 });
+      configureSchedulerState(targetDataDir, restoredDestination);
       const reexport = JSON.parse(command(
         [process.execPath, '--experimental-strip-types', 'scripts/run-scheduled-backup.mjs'],
         { MEDIFLOW_DATA_DIR: targetDataDir, MEDIFLOW_BACKUP_DEST_DIR: path.join(options.workDir, 'restored-backups'), MEDIFLOW_BACKUP_FORCE: '1' },
