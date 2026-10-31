@@ -31,7 +31,7 @@ prepare_workspace() {
     fi
   done
 
-  for entry in package.json package-lock.json tsconfig.json next-env.d.ts postcss.config.mjs; do
+  for entry in instrumentation.ts package.json package-lock.json tsconfig.json next-env.d.ts postcss.config.mjs; do
     if [[ -e "$ROOT_DIR/$entry" ]]; then
       cp "$ROOT_DIR/$entry" "$WORKSPACE_DIR/$entry"
     fi

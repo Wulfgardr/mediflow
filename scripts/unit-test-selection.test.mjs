@@ -11,7 +11,7 @@ test('registration: route, behavior and private-loader suites each occur once in
   for (const filename of ['app/api/patients/route.test.ts', 'scripts/checkup-parent-lifecycle.test.mjs', 'scripts/checkup-parent-lifecycle-harness.test.mjs']) {
     assert.equal(selection.filter(file => file === filename).length, 1, `${filename} must be selected exactly once`);
   }
-  assert.deepEqual(selection.filter(file => file.startsWith('app/')), ['app/api/patients/route.test.ts']);
+  assert.deepEqual(selection.filter(file => file.startsWith('app/')), ['app/api/patients/route.test.ts', 'app/api/settings/network-mode.test.ts']);
 });
 
 function fixture(t) {
