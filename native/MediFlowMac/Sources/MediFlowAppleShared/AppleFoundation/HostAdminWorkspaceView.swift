@@ -309,7 +309,8 @@ struct HostAdminWorkspaceView: View {
                     if let value = local.targetPolicy { InfoRow("Politica di rete", value) }
                     if let value = local.hardwareProfile { InfoRow("Profilo hardware", value) }
                     InfoRow("Modello clinico", local.clinicalModel ?? "Non impostato")
-                    InfoRow("Modello ragionamento", local.reasoningModel ?? "Non impostato")
+                    InfoRow("Treatment Reasoning", NativeOrdinaryFailureCode.treatmentReasoningUnavailableInRelease.safeReason)
+                    InfoRow("Modello ragionamento salvato", local.reasoningModel ?? "Non impostato")
                     InfoRow("OCR", "Non disponibile nella 0.8.5")
                 }
             }

@@ -15,6 +15,7 @@ public enum NativeOrdinaryContractError: Error, LocalizedError {
 }
 /// Closed server codes allowed at the ordinary operation boundary. Host error text is never retained.
 public enum NativeOrdinaryFailureCode: String, CaseIterable, Equatable, Sendable {
+    case treatmentReasoningUnavailableInRelease = "treatment_reasoning_unavailable_in_release"
     case unqualifiedBoundary = "unqualified_boundary", sessionExpired = "session_expired"
     case notConnected = "not_connected", unsupportedAccount = "unsupported_account", busy, canceled, revoked
     case quotaExhausted = "quota_exhausted", limitsUnavailable = "limits_unavailable", catalogStale = "catalog_stale"
@@ -23,6 +24,7 @@ public enum NativeOrdinaryFailureCode: String, CaseIterable, Equatable, Sendable
     case protocolError = "protocol_error", upstreamError = "upstream_error", preparationUnavailable = "preparation_unavailable", invalidState = "invalid_state", forbidden
     public var safeReason: String {
         switch self {
+        case .treatmentReasoningUnavailableInRelease: return "Non disponibile in questa versione"
         case .unqualifiedBoundary: return "runtime locale non qualificato per questa operazione"
         case .sessionExpired: return "sessione o pairing non più validi"
         case .notConnected: return "accesso OpenAI non disponibile"
@@ -56,6 +58,7 @@ public struct NativeOrdinaryServerFailure: Error, Equatable, Sendable {
 public enum NativeOrdinaryFunction: String, Codable, CaseIterable, Sendable {
     case patientInsight = "patient_insight", smartImport = "smart_import"
     case documentSynthesis = "document_synthesis", treatmentReasoning = "treatment_reasoning"
+    public var isAvailableInRelease: Bool { self != .treatmentReasoning }
     public var title: String {
         switch self {
         case .patientInsight: return "Quadro paziente"
