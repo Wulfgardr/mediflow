@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { expect, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection } from '../utils';
@@ -13,13 +13,15 @@ export function seedTreatmentReasoningSetting(value: 'enabled' | 'disabled') {
   const root = realpathSync(directory);
   if (!existsSync(path.join(root, 'SYNTHETIC_ONLY'))) throw new Error('Marcatore SYNTHETIC_ONLY richiesto');
   if (/Antigravity\/medical-record-app|MediFlowCoreTests\/Fixtures/.test(root)) throw new Error('Archivio non autorizzato');
-  const db = new Database(path.join(root, 'medical.db'), { fileMustExist: true });
+  const file = path.join(root, 'medical.db');
+  if (!lstatSync(file).isFile() || realpathSync(file) !== file) throw new Error('Archivio non autorizzato');
+  const db = new Database(file, { fileMustExist: true });
   const key = 'aiTreatmentReasoningKillSwitch';
   const before = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined;
   db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
   db.close();
   return () => {
-    const connection = new Database(path.join(root, 'medical.db'), { fileMustExist: true });
+    const connection = new Database(file, { fileMustExist: true });
     try {
       if (before) connection.prepare('UPDATE settings SET value = ? WHERE key = ?').run(before.value, key);
       else connection.prepare('DELETE FROM settings WHERE key = ?').run(key);
