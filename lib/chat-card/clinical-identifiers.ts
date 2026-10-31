@@ -34,6 +34,22 @@ function normalized(text: string) {
     return { compact, folded, offsets };
 }
 
+/** Optimal string alignment distance, stopping early above the limit. */
+function withinEdits(a: string, b: string, limit: number) {
+    if (Math.abs(a.length - b.length) > limit) return false;
+    let before: number[] = [], previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+    for (let i = 1; i <= a.length; i++) {
+        const current = [i];
+        for (let j = 1; j <= b.length; j++) {
+            current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+            if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) current[j] = Math.min(current[j], before[j - 2] + 1);
+        }
+        before = previous;
+        previous = current;
+    }
+    return previous[b.length] <= limit;
+}
+
 export function clinicalIdentifierSpans(text: string, known: KnownClinicalIdentifiers): RedactionSessionEntity[] {
     const spans: RedactionSessionEntity[] = [];
     const add = (start: number, end: number) => spans.push({ start, end, text: text.slice(start, end), type: 'identifier', confidence: 1 });
@@ -45,6 +61,15 @@ export function clinicalIdentifierSpans(text: string, known: KnownClinicalIdenti
         const full = normalized(identifier);
         if (!full.folded) throw new Error('clinical_card_denied');
         const minimum = /\p{N}/u.test(full.compact) ? 6 : 4;
+        // A known name is compared whole at any length; a typo of it is still that name.
+        if (!/\p{N}/u.test(full.compact) && !/[^\p{L}\p{M}]/u.test(identifier.normalize('NFKC'))) {
+            const edits = full.folded.length >= 8 ? 2 : full.folded.length >= 5 ? 1 : 0;
+            for (const word of text.normalize('NFKC').matchAll(/[\p{L}\p{M}\p{N}]+/gu)) {
+                const candidate = normalized(word[0]);
+                if (candidate.compact === full.compact || candidate.folded === full.folded && full.folded.length >= minimum
+                    || (edits > 0 && withinEdits(candidate.folded, full.folded, edits))) add(0, text.length);
+            }
+        }
         if (full.folded.length < minimum) continue;
         const needle = full.folded.slice(0, minimum);
         if (spoken.folded.includes(needle) && spoken.folded !== view.folded) add(0, text.length);
@@ -79,7 +104,8 @@ export function clinicalIdentifierSpans(text: string, known: KnownClinicalIdenti
         for (const m of text.matchAll(pattern)) if (!unit.test(text.slice(m.index + m[0].length))) add(m.index, m.index + m[0].length);
     }
     const numericText = text.normalize('NFKC');
-    for (const m of numericText.matchAll(/(?<![\p{L}\p{N}])\d(?:[\d\s()+./-]*\d)?/gu)) {
+    for (const m of numericText.matchAll(/(?<![\p{L}\p{N}])\d(?:[\d\s()+.,/-]*\d)?/gu)) {
+        if (/^(?:[01]?\d|2[0-3])[.:][0-5]\d$/u.test(m[0])) continue;
         if (m[0].replace(/\D/gu, '').length >= 4 && !unit.test(numericText.slice(m.index + m[0].length))) {
             if (numericText !== text) add(0, text.length); else add(m.index, m.index + m[0].length);
         }
@@ -87,6 +113,8 @@ export function clinicalIdentifierSpans(text: string, known: KnownClinicalIdenti
     for (const m of text.normalize('NFKC').matchAll(/[\p{L}\p{N}]+(?:[^\s\p{L}\p{N}]+[\p{L}\p{N}]+)*/gu)) {
         const word = m[0].toLowerCase();
         if (clinicalWords.has(word)) continue;
+        // Compounds such as amoxicillina/acido, dell'asma: their parts are read as words.
+        if (/^[\p{L}\p{M}]+(?:['’/-][\p{L}\p{M}]+)*$/u.test(word)) continue;
         if (/\p{L}/u.test(word) && ( /\p{N}/u.test(word) || /[^\p{L}\p{M}]/u.test(word))) add(0, text.length);
     }
     if (/\p{Cf}|[^\p{Script=Latin}\p{M}\p{N}\p{P}\p{Z}\p{S}\s]/u.test(text.replace(/(?<!\p{L})[µμ]g(?!\p{L})/gu, 'mg'))) add(0, text.length);
