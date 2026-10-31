@@ -16,6 +16,8 @@ import { parsePatientDocumentCreateJournal, type PatientDocumentCreateJournal } 
 export const AUDIT_SCHEMA_VERSION = 1 as const;
 
 export const AUDIT_EVENT_TYPES = [
+    'backup.portable.imported',
+    'backup.audit.imported',
     'auth.login.succeeded',
     'auth.login.failed',
     'auth.logout',
@@ -86,7 +88,7 @@ export const AUDIT_EVENT_TYPES = [
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
 export type AuditOutcome = 'success' | 'failure' | 'denied';
 export type AuditActorType = 'user' | 'system';
-export type AuditSubjectType = 'session' | 'active_role_attestation' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'attachment' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings' | 'ai_review' | 'agent_operation' | 'reference_data';
+export type AuditSubjectType = 'backup' | 'audit_event' | 'session' | 'active_role_attestation' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'attachment' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings' | 'ai_review' | 'agent_operation' | 'reference_data';
 export type AuditSourceSurface = 'web' | 'native' | 'api' | 'job';
 export type AuditAuthContext = 'session' | 'local-token' | 'anonymous';
 
@@ -463,6 +465,8 @@ export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false
         job: 0,
     };
     const subjectTypes: Record<AuditSubjectType, number> = {
+        backup: 0,
+        audit_event: 0,
         session: 0,
         active_role_attestation: 0,
         patient: 0,

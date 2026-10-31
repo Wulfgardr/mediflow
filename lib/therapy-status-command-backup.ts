@@ -37,7 +37,7 @@ export function validateTherapyStatusCommandRows(values: unknown, audits: unknow
                 if (!audit || !backupAuditsEqual(snapshot, audit) || snapshot.eventId !== row.auditEventId
                     || snapshot.actorType !== 'user' || snapshot.actorRef !== row.actorRef || snapshot.eventType !== 'therapy.updated'
                     || snapshot.subjectType !== 'therapy' || snapshot.subjectRef !== row.therapyId || snapshot.outcome !== 'success'
-                    || snapshot.sourceSurface !== 'web' || snapshot.requestId !== row.commandId || snapshot.occurredAt !== row.committedAt
+                    || !['web', 'native'].includes(snapshot.sourceSurface) || snapshot.requestId !== row.commandId || snapshot.occurredAt !== row.committedAt
                     || metadata?.resourceVersion !== row.resultVersion) throw new Error('Therapy command audit missing or divergent');
             } else throw new Error('Invalid therapy command outcome');
         }

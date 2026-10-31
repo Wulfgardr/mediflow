@@ -1,3 +1,5 @@
+import { verifyUnlockCredentials } from '@/lib/security/host-credential-verification';
+import { isCurrentServerSession } from '@/lib/security/current-session-authority';
 import { parseRestoreIntent } from '@/lib/backup-restore-receipt';
 import { isLocalClientSession } from '@/lib/security/loopback-ingress.mjs';
 import { serializeProstheticsDocument } from '@/lib/reference-data/prosthetics-catalog-backup';
@@ -222,10 +224,22 @@ export async function POST(request: Request) {
             );
         }
 
+        let credential: unknown;
+        try { credential = JSON.parse(request.headers.get('x-mediflow-restore-credential') ?? 'null'); }
+        catch { return apiFailure('restore_credential_required', 'Inserisci di nuovo la credenziale amministrativa.', 401); }
+        if (!credential || typeof credential !== 'object' || Array.isArray(credential)
+            || Object.keys(credential).length !== 1 || !['pin', 'verifier'].includes(Object.keys(credential)[0])) {
+            return apiFailure('restore_credential_required', 'Inserisci di nuovo la credenziale amministrativa.', 401);
+        }
+        const verified = await verifyUnlockCredentials({ ...credential, username: session.username });
+        if (verified.kind === 'denied') return NextResponse.json(verified.body, { status: verified.status });
+        if (verified.account.id !== session.userId || verified.account.role !== 'admin'
+            || !isCurrentServerSession(session)) return forbiddenResponse();
+
         const restored = restoreBackupArtifact(artifact, () => {
             assertArchiveGeneration(dbServer, archiveGeneration);
             return disposeCheckupStatusTransitionForHostV1();
-        }, intent ?? undefined);
+        }, intent ?? undefined, session.userId);
 
         return NextResponse.json({
             success: true,

@@ -160,3 +160,4 @@ prima porzione di lavoro verificabile:
 - [ADR 0170: Punti di innesto territoriali](0170-territorial-service-extension-points.md): Proposed; estende 0158 con contratti dei servizi e raccordo WUL-587.
 - [ADR 0171: Proprietà del runtime locale e lease dei client](0171-local-runtime-ownership-and-client-leases.md): proposto; ognuno ferma solo ciò che ha avviato, un server per archivio, recupero senza segnali a PID su disco.
 - [ADR 0172: Sessione Web locale del client GPUI](0172-gpui-local-web-session.md): proposta; route Web esistenti per interruttori e cancellazione con precondizioni, sessione separata e ritiro locale esatto senza Supervisor.
+- [ADR 0173: Autorità e provenienza del ripristino portabile](0173-portable-import-authority-and-audit-origin.md): proposto; credenziale fresca, attestazioni inattive e storico importato identificato con eventi locali.
