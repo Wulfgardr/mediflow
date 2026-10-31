@@ -38,8 +38,9 @@ protocollo di generazioni esistente: un processo morto o un PID riciclato non
 conservano la proprietà. Un file sconosciuto non autorizza cancellazioni o segnali.
 
 Web attende un messaggio IPC con nonce prima di eseguire il server. Un helper
-PowerShell locale lo associa prima a un Job Object Windows senza breakaway e con
-kill-on-close. L'helper verifica PID, tempo di creazione e token, conserva l'handle
+Node locale, con il modulo nativo del launcher, lo associa prima a un Job Object
+Windows senza breakaway e con kill-on-close. Non compila C# e non avvia PowerShell.
+L'helper verifica PID, tempo di creazione e token, conserva l'handle
 del Job e osserva il numero di processi attivi. Quando il Web esce, elimina gli
 eventuali discendenti nel Job e comunica zero processi prima del rilascio delle
 proprietà di checkout e archivio. Non usa il PID di un capogruppo già morto come

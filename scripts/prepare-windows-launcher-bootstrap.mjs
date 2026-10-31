@@ -47,7 +47,7 @@ async function build() {
     const dependencies = [...read(path.join(output, 'dependencies.txt')).toString('utf8').matchAll(/^\s+([\w.-]+\.(?:dll|exe))\s*$/gimu)].map(match => match[1].toLowerCase()).sort();
     assert.deepEqual(dependencies, ['kernel32.dll', 'node.exe'], 'Bootstrap must not acquire CRT, symbol, network or other runtime dependencies');
     const binary = read(path.join(output, 'system-directory.node'));
-    const manifest = { schemaVersion: 2, exports: ['getProcessCreationTimeTicks', 'getSystemDirectory'], platform: 'win32', arch, napiVersion: 1, binary: 'system-directory.node',
+    const manifest = { schemaVersion: 3, exports: ['createJobForProcess', 'getProcessCreationTimeTicks', 'getSystemDirectory'], platform: 'win32', arch, napiVersion: 1, binary: 'system-directory.node',
       bytes: binary.length, sha256: sha(binary), dependencies,
       sourceSha256: sha(read(path.join(directory, 'system-directory.c'))), recipeSha256: sha(read(path.join(directory, 'build.ps1'))),
       builderSha256: sha(read(fileURLToPath(import.meta.url))),

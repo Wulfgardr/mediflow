@@ -1965,7 +1965,7 @@
       "file": "scripts/node-runtime-contract.mjs",
       "kind": "require-base",
       "expression": "createRequire(path.join(runtimeRoot, 'package.json'))",
-      "sourceSha256": "f3f72a3c8c6fd766513b799704ada1269a87bf74c15fa743a5d3838be75ead65",
+      "sourceSha256": "4e5b0ae3e368191abd8c6c547fa9001f30ae51376a4236a3e9c8abbaf2f7192d",
       "count": 1,
       "reason": "Native ABI verification resolves the installed better-sqlite3 entry before requiring it. This exact file digest freezes the resolution logic."
     },
@@ -1973,7 +1973,7 @@
       "file": "scripts/source-runtime.mjs",
       "kind": "require-base",
       "expression": "createRequire(path.join(web, 'package.json'))",
-      "sourceSha256": "d09813ff0a78da2b9da7c2f4e24495e73d3f2c5b13c75b2c7fd7f890c0fbc18b",
+      "sourceSha256": "47dbb754ddcd87091d3f4c7b597255ec099837471a13ad44106f257fb87cabfc",
       "count": 1,
       "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
     },
@@ -1981,7 +1981,7 @@
       "file": "scripts/source-runtime.mjs",
       "kind": "require",
       "expression": "createRequire(path.join(web, 'package.json'))(path.join(web, 'server.js'))",
-      "sourceSha256": "d09813ff0a78da2b9da7c2f4e24495e73d3f2c5b13c75b2c7fd7f890c0fbc18b",
+      "sourceSha256": "47dbb754ddcd87091d3f4c7b597255ec099837471a13ad44106f257fb87cabfc",
       "count": 1,
       "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
     },
@@ -2005,7 +2005,7 @@
       "file": "scripts/source-runtime.mjs",
       "kind": "dynamic",
       "expression": "import(pathToFileURL(path.join(web, 'scripts/mediflow-headless-supervisor.mjs')).href)",
-      "sourceSha256": "d09813ff0a78da2b9da7c2f4e24495e73d3f2c5b13c75b2c7fd7f890c0fbc18b",
+      "sourceSha256": "47dbb754ddcd87091d3f4c7b597255ec099837471a13ad44106f257fb87cabfc",
       "count": 1,
       "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
     },
@@ -2013,7 +2013,7 @@
       "file": "scripts/source-runtime.mjs",
       "kind": "dynamic",
       "expression": "import(pathToFileURL(path.join(web, 'scripts/register-strip-types-loader.mjs')).href)",
-      "sourceSha256": "d09813ff0a78da2b9da7c2f4e24495e73d3f2c5b13c75b2c7fd7f890c0fbc18b",
+      "sourceSha256": "47dbb754ddcd87091d3f4c7b597255ec099837471a13ad44106f257fb87cabfc",
       "count": 1,
       "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
     },
@@ -2029,7 +2029,7 @@
       "file": "scripts/node-runtime-contract.mjs",
       "kind": "require",
       "expression": "requireFromRoot(entry)",
-      "sourceSha256": "f3f72a3c8c6fd766513b799704ada1269a87bf74c15fa743a5d3838be75ead65",
+      "sourceSha256": "4e5b0ae3e368191abd8c6c547fa9001f30ae51376a4236a3e9c8abbaf2f7192d",
       "count": 1,
       "reason": "Native ABI verification resolves the installed better-sqlite3 entry before requiring it. This exact file digest freezes the resolution logic."
     }

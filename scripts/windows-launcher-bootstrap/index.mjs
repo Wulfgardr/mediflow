@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
-const exports = ['getProcessCreationTimeTicks', 'getSystemDirectory'];
+const exports = ['createJobForProcess', 'getProcessCreationTimeTicks', 'getSystemDirectory'];
 const deny = () => { throw new Error('Windows bootstrap artifact unavailable or invalid.'); };
 const regular = file => {
   const stat = fs.lstatSync(file);
@@ -21,7 +21,7 @@ export function loadSystemDirectoryBinding() {
   const manifest = JSON.parse(regular(path.join(directory, 'manifest.json')).toString('utf8'));
   const binary = path.join(directory, 'system-directory.node');
   const bytes = regular(binary);
-  if (manifest.schemaVersion !== 2 || manifest.platform !== 'win32' || manifest.arch !== arch
+  if (manifest.schemaVersion !== 3 || manifest.platform !== 'win32' || manifest.arch !== arch
     || !Array.isArray(manifest.exports) || manifest.exports.length !== exports.length
     || manifest.exports.some((name, index) => name !== exports[index])
     || manifest.napiVersion !== 1 || manifest.binary !== 'system-directory.node'

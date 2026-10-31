@@ -1586,7 +1586,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 }
             };
             cp.spawn = (executable, argv, options) => {
-                if (${Boolean(lifecycle?.job)} && argv.includes(${JSON.stringify(path.join(source,'scripts/windows-runtime-job.ps1'))})) {
+                if (${Boolean(lifecycle?.job)} && argv.includes(${JSON.stringify(path.join(source,'scripts/windows-runtime-job-helper.mjs'))})) {
                     const helper = spawn(executable, argv, options);
                     record({type:'job-helper-created',pid:helper.pid});
                     helper.once('close',()=>record({type:'job-helper-exit',pid:helper.pid}));
@@ -1786,7 +1786,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 return result;
             }});`);
     }
-    for (const name of ['local-ui-navigation-deadline.mjs', 'mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job.ps1', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs']) {
+    for (const name of ['local-ui-navigation-deadline.mjs', 'mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job-deadlines.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job-helper.mjs', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs']) {
         const rawBytes = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
         const bytes = name === 'mediflow.mjs' && !lifecycle?.job
             ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", 'false') : lifecycle?.job === 'simulated' && name === 'mediflow.mjs'
@@ -1855,7 +1855,8 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     const proof = ${JSON.stringify(webIdentity)} === 'invalid-delayed' ? '0'.repeat(64) : webIdentityProof(process.env.MEDIFLOW_LOCAL_UI_WEB_SECRET, challenge);
                     process.stderr.write('FIXTURE_IDENTITY_PROOF\\n');
                     res.setHeader('Content-Length', '64');
-                    if (${JSON.stringify(webIdentity)}.toString().endsWith('delayed')) setTimeout(() => res.end(proof), 100); else res.end(proof); return;
+                    if (${JSON.stringify(webIdentity)} === 'cold-identity') setTimeout(() => res.end(proof), 1250);
+                    else if (${JSON.stringify(webIdentity)}.toString().endsWith('delayed')) setTimeout(() => res.end(proof), 100); else res.end(proof); return;
                 }
                 res.setHeader('Content-Type', 'application/json');
                 res.end(JSON.stringify({ ...${JSON.stringify(identity)}, fingerprint: 'synthetic' })); });
@@ -2040,8 +2041,8 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         if (failures.length) throw new AggregateError(failures, failures.map(error => error.message).join('\n'));
     })();
     registerOrdinaryFixtureCleanup(t, cleanup);
-    const until = async predicate => {
-        const deadline = Date.now() + 10_000;
+    const until = async (predicate, timeoutMs = 10_000) => {
+        const deadline = Date.now() + timeoutMs;
         while (!predicate()) {
             assert.equal(child.exitCode, null, output);
             if (Date.now() > deadline) assert.fail(output);
@@ -3060,9 +3061,10 @@ test('IPC cancellation during the Web identity proof cannot dispatch a late inte
 });
 
 
-test('Windows launcher frees checkout and archive locks after autonomous Web exit', {skip:process.platform!=='win32',timeout:30000},async t=>{
+test('Windows launcher frees checkout and archive locks after autonomous Web exit', {skip:process.platform!=='win32',timeout:120000},async t=>{
+    const { WINDOWS_JOB_STARTUP_TIMEOUT_MS } = await import('./windows-runtime-job.mjs');
     const f=await ordinaryLauncherFixture(t,'web',[],true,true,{},null,{platform:'win32',job:true});
-    await f.until(()=>f.output().includes('Pronto:'));
+    await f.until(()=>f.output().includes('Pronto:'), WINDOWS_JOB_STARTUP_TIMEOUT_MS + 10000);
     const receipt=JSON.parse(readFileSync(f.runtimePid));
     assert.ok(receipt.pid>0);
     process.kill(receipt.pid,'SIGKILL');
@@ -3208,4 +3210,189 @@ test('navigation deadlines tolerate Windows clock skew without extending the loc
     for (const expiry of [now - 1, now, now + 8101, Number.MAX_SAFE_INTEGER, NaN, undefined]) {
         assert.equal(localUiNavigationDeadline(expiry, now), null);
     }
+});
+
+
+test('Windows Job startup follows bounded phases and rejects stalled or invalid helpers without retry', () => {
+    const moduleUrl = new URL('./windows-runtime-job.mjs', import.meta.url).href;
+    const sourceRuntimeUrl = new URL('./source-runtime.mjs', import.meta.url).href;
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+      import assert from 'node:assert/strict';
+      import { EventEmitter } from 'node:events';
+      import { registerHooks } from 'node:module';
+      const timers = new Map(); let now = 0, next = 0, helper, spawns = 0;
+      globalThis.setTimeout = (fn, delay) => { const id = ++next; timers.set(id, {fn, at:now + delay}); return id; };
+      globalThis.clearTimeout = id => timers.delete(id);
+      const advance = ms => { now += ms; for (const [id, timer] of [...timers]) if (timer.at <= now) { timers.delete(id); timer.fn(); } };
+      globalThis.fixture = {
+        spawn(executable,args,options) { assert.equal(executable,process.execPath);assert.ok(args[0].endsWith('windows-runtime-job-helper.mjs'));assert.equal(args.length,2);assert.equal(options.env.NODE_OPTIONS,undefined);spawns++; return helper; },
+        fs:{lstatSync(){ return {isFile:()=>true,isSymbolicLink:()=>false}; }},
+
+        verifyChildOwner(){}, processOwner:()=>({pid:123}), runtimeProcessIdentity:()=> 'synthetic',
+        verifySourceRuntime:()=>({web:'/synthetic',identity:{revision:'synthetic',branch:'synthetic',worktreeHash:'clean',sourceFingerprint:'synthetic'}}),
+        createRequire:()=>()=>{globalThis.serverStarted=true;}
+      };
+      registerHooks({load(url,context,next){ const result=next(url,context); if(url === ${JSON.stringify(moduleUrl)}) {
+        result.source=String(result.source)
+          .replace("import fs from 'node:fs';", 'const {fs} = globalThis.fixture;')
+          .replace("import { spawn } from 'node:child_process';", 'const {spawn} = globalThis.fixture;')
+
+          .replace("import { processOwner, runtimeProcessIdentity, verifyChildOwner } from './runtime-leases.mjs';", 'const {processOwner,runtimeProcessIdentity,verifyChildOwner} = globalThis.fixture;');
+      } else if(url === ${JSON.stringify(sourceRuntimeUrl)}) {
+        result.source=String(result.source)
+          .replace("import { createRequire } from 'node:module';", 'const {createRequire} = globalThis.fixture;')
+          .replace('const { web, identity } = verifySourceRuntime(root);', 'const { web, identity } = globalThis.fixture.verifySourceRuntime(root);');
+      } return result; }});
+      const {containWindowsWeb,WINDOWS_JOB_PHASE_TIMEOUT_MS:budget}=await import(${JSON.stringify(moduleUrl)});
+      const {startSourceRuntime}=await import(${JSON.stringify(sourceRuntimeUrl)});
+      Object.defineProperty(process,'platform',{value:'win32'});
+      Object.defineProperty(process,'connected',{value:true});
+      process.chdir=()=>{};process.env.MEDIFLOW_WEB_OWNER_GATE='synthetic';
+      const make = () => {
+        helper=new EventEmitter(); helper.pid=123;helper.exitCode=null;helper.signalCode=null;helper.kill=()=>{helper.killed=true;};
+        helper.stdin=new EventEmitter();helper.stdin.destroy=()=>{helper.destroyed=true;};helper.stdin.end=()=>{};
+        helper.stdout=new EventEmitter();helper.stdout.setEncoding=()=>{};helper.stderr=new EventEmitter();
+        return containWindowsWeb({}, {token:{nonce:'synthetic'},file:'synthetic'});
+      };
+      const frame = (type,extra={}) => helper.stdout.emit('data',JSON.stringify({type,nonce:'synthetic',...extra})+'\\n');
+      process.env.NODE_OPTIONS='--import foreign';
+      const runtime=startSourceRuntime('web');runtime.catch(()=>{});
+      let pending=make();
+      advance(budget-1);frame('bootstrap');advance(budget-1);frame('assigning');advance(budget-1);frame('ready');
+      const job=await pending;assert.equal(spawns,1);
+      assert.equal(globalThis.serverStarted,undefined);
+      process.emit('message',{type:'mediflow-web-owner-start',nonce:'foreign'});
+      assert.equal(globalThis.serverStarted,undefined);
+      process.emit('message',{type:'mediflow-web-owner-start',nonce:'synthetic'});
+      await runtime;assert.equal(globalThis.serverStarted,true);assert.equal(timers.size,0);
+      frame('drained',{active:0});helper.emit('close',0);await job.closed;
+      const missingOwner=assert.rejects(startSourceRuntime('web'),/Web owner timeout/);
+      advance(3*budget);await missingOwner;assert.equal(process.listenerCount('message'),0);
+      for (const phase of ['node','bootstrap','assigning']) {
+        pending=make();const rejected=assert.rejects(pending,new RegExp('phase='+phase));
+        if(phase!=='node') frame('bootstrap');if(phase==='assigning') frame('assigning');
+        advance(budget);await rejected;assert.equal(helper.destroyed,true);assert.equal(helper.killed,true);assert.equal(timers.size,0);
+        frame('ready');assert.equal(timers.size,0);
+      }
+      for (const scenario of ['duplicate','out-of-order','nonce','early-close']) {
+        pending=make();const rejected=assert.rejects(pending,/Invalid Windows Job transition|nonce mismatch|cleanup unconfirmed/);
+        if(scenario==='duplicate'){frame('bootstrap');frame('bootstrap');}
+        if(scenario==='out-of-order')frame('ready');
+        if(scenario==='nonce')frame('bootstrap',{nonce:'foreign'});
+        if(scenario==='early-close')helper.emit('close',0);
+        await rejected;assert.equal(timers.size,0);
+      }
+      assert.equal(spawns,8);
+      console.log(JSON.stringify({simulatedHelper:true,slowProgressAccepted:true,stalledPhases:3,invalidTransitions:4,retries:0}));
+    `], {encoding:'utf8',timeout:10000});
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
+
+test('Windows native binding verification releases the binary before returning to the launcher', {skip:process.platform!=='win32'}, async t => {
+    const { cpSync } = await import('node:fs');
+    const directory = mkdtempSync(path.join(tmpdir(), 'mf-binding-release-'));
+    t.after(() => rmSync(directory, {recursive:true,force:true}));
+    mkdirSync(path.join(directory,'node_modules'));
+    writeFileSync(path.join(directory,'package.json'),'{}');
+    for (const dependency of ['better-sqlite3','bindings','file-uri-to-path']) {
+        cpSync(path.join(repoRoot,'node_modules',dependency),path.join(directory,'node_modules',dependency),{recursive:true});
+    }
+    const binary = path.join(directory,'node_modules/better-sqlite3/build/Release/better_sqlite3.node');
+    const { chmodSync } = await import('node:fs');
+    chmodSync(binary,0o600);
+    const result = spawnSync(process.execPath,['--input-type=module','-e',`
+      import fs from 'node:fs';
+      import {verifyNativeBindingInChild} from ${JSON.stringify(new URL('./node-runtime-contract.mjs',import.meta.url).href)};
+      verifyNativeBindingInChild(${JSON.stringify(directory)});
+      if (process.report.getReport().sharedObjects.some(file => file.toLowerCase().endsWith(${JSON.stringify(binary.toLowerCase())}))) throw new Error('Native binding remains mapped in the launcher.');
+      fs.unlinkSync(${JSON.stringify(binary)});
+      console.log(JSON.stringify({binaryReleased:true,node:process.version}));
+    `],{encoding:'utf8',timeout:30000});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+    assert.match(result.stdout,/"binaryReleased":true/u);
+});
+
+
+test('chooser excludes the Web port atomically and never retries failed binds', () => {
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+      import assert from 'node:assert/strict';import http from 'node:http';
+      import {createChoiceServer} from ${JSON.stringify(new URL('./mediflow-launcher-page.mjs',import.meta.url).href)};
+      const listen=http.Server.prototype.listen;
+      const bind=(server,port)=>new Promise((resolve,reject)=>{server.once('error',reject);listen.call(server,port,'127.0.0.1',resolve);});
+      const close=server=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});
+      for(const scenario of ['collision','first-failure','second-failure']) {
+        const probe=http.createServer();await bind(probe,0);const webPort=probe.address().port;await close(probe);
+        let calls=0,first,page,web;
+        http.Server.prototype.listen=function(port,host,done){
+          calls++;if(calls===1)first=this;
+          if(scenario==='first-failure'||scenario==='second-failure'&&calls===2){
+            process.nextTick(()=>this.emit('error',new Error('SYNTHETIC_BIND_FAILURE')));return this;
+          }
+          // Port zero may select the Web port again if its reservation was released.
+          return listen.call(this,calls===1||!first.listening?webPort:port,host,done);
+        };
+        try {
+          const pending=createChoiceServer({root:${JSON.stringify(repoRoot)},webPort,state:()=>({ready:false}),choose(){},install(){},stop(){}}).then(value=>(page=value));
+          if(scenario==='collision') {
+            await pending;assert.notEqual(page.server.address().port,webPort,'Chooser must not occupy its Web port');
+            assert.equal(calls,2);assert.equal((await fetch(new URL('state',page.url))).status,200);
+          } else {await assert.rejects(pending,/SYNTHETIC_BIND_FAILURE/);assert.equal(calls,scenario==='first-failure'?1:2);}
+          web=http.createServer((_,response)=>response.end('synthetic'));await bind(web,webPort);
+          assert.equal(await fetch('http://127.0.0.1:'+webPort).then(response=>response.text()),'synthetic');
+        } finally {if(web)await close(web);if(page)await page.close();http.Server.prototype.listen=listen;}
+      }
+      console.log(JSON.stringify({forcedCollision:true,webPortReleased:true,bindErrorsPropagated:true,failureRetries:0}));
+    `], {encoding:'utf8',timeout:10000});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+});
+
+test('ordinary Web startup waits for one cold identity proof within its startup deadline', async t => {
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, 'cold-identity');
+    await f.until(() => f.output().includes('Pronto:'));
+    assert.equal((f.output().match(/FIXTURE_IDENTITY_PROOF/gu) ?? []).length, 1, f.output());
+});
+
+
+test('synthetic crash writer retains its open transaction across garbage collection', async t => {
+    const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mf-writer-gc-')));
+    const loader = path.join(directory, 'force-gc.mjs');
+    writeFileSync(loader, `import http from 'node:http';
+      const listen=http.Server.prototype.listen;
+      http.Server.prototype.listen=function(...args) {
+        const callback=args.at(-1);
+        if(typeof callback==='function') args[args.length-1]=function(...values) {
+          global.gc(); setImmediate(()=>{global.gc();setImmediate(()=>callback.apply(this,values));});
+        };
+        return listen.apply(this,args);
+      };`);
+    const generation = crypto.randomUUID();
+    const child = spawn(process.execPath, ['--expose-gc', ...fixtureImportArguments(loader),
+        path.join(repoRoot,'scripts/windows-stop-integrity-smoke.mjs'),'--transaction-writer',directory,generation], {
+        env:{...process.env,MEDIFLOW_DATA_DIR:directory,MEDIFLOW_E2E_DISABLE_LEGACY_COPY:'1'},
+        stdio:['ignore','ignore','pipe','ipc'],windowsHide:true,
+    });
+    let stderr = '';
+    child.stderr.on('data', bytes => { stderr += bytes; });
+    const closed = new Promise(resolve => child.once('close', resolve));
+    t.after(async () => {
+        if(child.pid && child.exitCode===null && child.signalCode===null) child.kill('SIGKILL');
+        await closed;
+        rmSync(directory,{recursive:true,force:true});
+    });
+    const ready = new Promise((resolve,reject) => {
+        child.once('message',resolve);child.once('error',reject);
+        closed.then(()=>reject(new Error('Synthetic writer closed before transaction readiness: '+stderr)));
+    });
+    const frame = await waitForFixtureClose(ready,10000);
+    assert.equal(frame.type,'transaction-open');assert.equal(frame.generation,generation);
+    assert.equal(frame.writer,child.pid);assert.equal(frame.openRows,128);assert.ok(frame.walBytes>0);
+    assert.equal(await (await fetch('http://127.0.0.1:'+frame.port,{signal:AbortSignal.timeout(3000)})).text(),generation);
+    child.kill('SIGKILL');await closed;
+    const {openAdmittedSqlite} = await import('../lib/sqlite-maintenance-admission.mjs');
+    const lease = openAdmittedSqlite(path.join(directory,'synthetic.db'),{role:'synthetic-gc-check',sqliteOptions:{fileMustExist:true}});
+    try {
+        assert.equal(lease.database.pragma('integrity_check',{simple:true}),'ok');
+        assert.deepEqual(lease.database.prepare('SELECT id,value FROM synthetic_stop_rows ORDER BY id').all(),[{id:'committed',value:generation}]);
+    } finally {lease.closeSync();}
 });
