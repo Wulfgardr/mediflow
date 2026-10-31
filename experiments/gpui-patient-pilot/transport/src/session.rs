@@ -503,6 +503,35 @@ impl RuntimeSession {
         }
     }
 
+    pub fn chat_agenda(&self, context: &ChatAccessContext) -> Result<Value> {
+        self.revalidate_chat_access_context(context)?;
+        let rows = self.list_agenda_with_filter(
+            &context.scope,
+            &AgendaFilter {
+                limit: Some(20),
+                ..Default::default()
+            },
+        )?;
+        self.revalidate_chat_access_context(context)?;
+        if rows.len() > 20 {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        let truncated = rows.len() == 20;
+        let rows: Vec<_> = rows
+            .iter()
+            .filter(|r| r.deleted_at.is_none())
+            .map(|r| {
+                if chrono::DateTime::parse_from_rfc3339(&r.date).is_err()
+                    || !["pending", "completed", "cancelled"].contains(&r.status.as_str())
+                {
+                    return Err(RuntimeError::InvalidResponse);
+                }
+                Ok(json!({"date":r.date,"status":r.status}))
+            })
+            .collect::<Result<_>>()?;
+        Ok(json!({"rows":rows,"truncated":truncated}))
+    }
+
     pub fn chat_prosthetics_search(
         &self,
         context: &ChatAccessContext,

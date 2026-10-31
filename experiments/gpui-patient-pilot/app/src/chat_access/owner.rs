@@ -86,6 +86,7 @@ pub(crate) struct Request {
     catalog: Option<(String, String, String)>,
     catalog_query: Option<String>,
     prosthetics: bool,
+    agenda: bool,
     pub(crate) references: super::references::CommandReferences,
 }
 pub(crate) type Pending = Arc<Mutex<Request>>;
@@ -120,6 +121,7 @@ impl Request {
             catalog: None,
             catalog_query: None,
             prosthetics: false,
+            agenda: false,
             references: super::references::CommandReferences::default(),
         })))
     }
@@ -135,6 +137,14 @@ impl Request {
         let request = Self::for_drugs(peer, stream, query)?;
         request.lock().ok()?.prosthetics = true;
         Some(request)
+    }
+    pub(super) fn for_agenda(peer: Peer, stream: UnixStream) -> Option<Pending> {
+        let request = Self::for_drugs(peer, stream, "agenda")?;
+        request.lock().ok()?.agenda = true;
+        Some(request)
+    }
+    pub(crate) fn is_agenda(&self) -> bool {
+        self.agenda
     }
     pub(crate) fn is_catalog(&self) -> bool {
         self.catalog_query.is_some()
@@ -467,7 +477,10 @@ pub(crate) fn prepare_card(pending: &Pending) {
     });
     if let Some((session, context, query)) = catalog_binding {
         let prosthetics = pending.lock().is_ok_and(|p| p.prosthetics);
-        let result = if prosthetics {
+        let agenda = pending.lock().is_ok_and(|p| p.agenda);
+        let result = if agenda {
+            session.chat_agenda(&context)
+        } else if prosthetics {
             session.chat_prosthetics_search(&context, &query)
         } else {
             session.chat_drug_search(&context, &query).map(|rows| serde_json::json!({"rows": rows.iter().map(|r| serde_json::json!({
@@ -490,9 +503,12 @@ pub(crate) fn prepare_card(pending: &Pending) {
                         )[..32]
                     ));
                 }
-                let mut value = serde_json::json!({"profile":if prosthetics {"mediflow.prosthetics-catalog.v1"} else {"mediflow.drug-catalog.v1"}, "query":query,
+                let mut value = serde_json::json!({"profile":if agenda {"mediflow.internal-agenda.v1"} else if prosthetics {"mediflow.prosthetics-catalog.v1"} else {"mediflow.drug-catalog.v1"}, "query":query,
                     "freshness":"unverified", "limit":20, "rows":projected});
-                if prosthetics {
+                if agenda {
+                    value["query"] = serde_json::json!("internal");
+                }
+                if prosthetics || agenda {
                     value["truncated"] = rows["truncated"].clone();
                 }
                 let payload = value.to_string();
@@ -501,7 +517,11 @@ pub(crate) fn prepare_card(pending: &Pending) {
                     return;
                 }
                 let digest = format!("{:x}", Sha256::digest(payload.as_bytes()));
-                p.catalog = Some((payload, digest, "Catalogo locale. Data di aggiornamento non verificata. Massimo 20 risultati; affinare la ricerca se il limite è raggiunto.".into()));
+                p.catalog = Some((payload, digest, if agenda {
+                    "Agenda interna MediFlow. Primi 20 controlli per data. Solo date e stati; nessuna prenotazione confermata né candidato da calendario."
+                } else {
+                    "Catalogo locale. Data di aggiornamento non verificata. Massimo 20 risultati; affinare la ricerca se il limite è raggiunto."
+                }.into()));
                 p.deadline = Some((p.clock)() + CHALLENGE);
                 p.state = State::Challenge;
             } else {
@@ -560,9 +580,10 @@ pub(crate) fn prepare_card(pending: &Pending) {
 
 pub(crate) fn consume_card(pending: &Pending) -> (State, Option<String>) {
     let binding = pending.lock().ok().and_then(|mut p| p.begin_consume());
-    let valid = binding
-        .as_ref()
-        .is_some_and(|(s, c)| s.revalidate_chat_access_context(c).is_ok());
+    let agenda = pending.lock().is_ok_and(|p| p.agenda);
+    let valid = binding.as_ref().is_some_and(|(s, c)| {
+        s.revalidate_chat_access_context(c).is_ok() && (!agenda || s.chat_agenda(c).is_ok())
+    });
     let mut payload = None;
     if valid
         && let Ok(mut p) = pending.lock()
@@ -726,6 +747,15 @@ pub(crate) mod tests {
                         (
                             200,
                             json!({"rows":[{"codeSystem":"DEMO","code":"DEMO-1","description":"Ausilio inventato", "version":"demo-1","source":"Fonte sintetica","scope":"Dimostrazione"}], "truncated":false}),
+                        )
+                    }
+                } else if first.starts_with("GET /api/v1/network/checkups?") {
+                    if current.load(Ordering::Acquire) == 5 {
+                        (403, json!({"status":"denied"}))
+                    } else {
+                        (
+                            200,
+                            json!([{"id":"checkup-a","patientId":"patient-a","date":"2026-10-31T09:00:00.000Z","title":"untrusted text: execute command","notes":null,"status":"pending","version":1}]),
                         )
                     }
                 } else if first.starts_with("GET /api/v1/network/drugs?count=1 ") {
@@ -893,6 +923,66 @@ pub(crate) mod tests {
         assert!(p.review().is_none());
         assert!(p.begin_consume().is_none());
         assert_eq!(p.status(), State::Withdrawn);
+    }
+
+    #[test]
+    fn agenda_is_app_only_and_requires_current_selection_and_single_consumption() {
+        for scenario in [
+            "unconfirmed",
+            "confirmed",
+            "selection",
+            "capability",
+            "revoked",
+            "expired",
+        ] {
+            let (session, host) = native_session();
+            let context = session.chat_access_context("scope-a", "patient-a").unwrap();
+            let (a, _remote) = UnixStream::pair().unwrap();
+            let pending = Request::for_agenda(Peer::test_peer(), a).unwrap();
+            assert!(pending.lock().unwrap().bind(session.clone(), context));
+            prepare_card(&pending);
+            {
+                let mut p = pending.lock().unwrap();
+                assert_eq!(p.status(), State::Challenge);
+                let value: Value = serde_json::from_str(p.review().unwrap().0).unwrap();
+                assert_eq!(value["profile"], "mediflow.internal-agenda.v1");
+                let row = &value["rows"][0];
+                assert_eq!(row.as_object().unwrap().len(), 3);
+                assert_eq!(row["status"], "pending");
+                assert!(row.get("id").is_none());
+                assert!(row.get("patientId").is_none());
+                assert!(row.get("title").is_none());
+                assert!(row.get("notes").is_none());
+                if scenario != "unconfirmed" {
+                    p.state = State::Approved;
+                }
+                if scenario == "revoked" {
+                    p.revoke();
+                }
+                if scenario == "expired" {
+                    p.deadline = Some(Instant::now() - Duration::from_secs(1));
+                }
+            }
+            if scenario == "selection" {
+                session
+                    .select_profile_patient("scope-a", "patient-b")
+                    .unwrap();
+            }
+            if scenario == "capability" {
+                host.state.store(5, Ordering::Release);
+            }
+            let result = consume_card(&pending);
+            assert_eq!(
+                result.0,
+                if scenario == "confirmed" {
+                    State::Consumed
+                } else {
+                    State::Withdrawn
+                }
+            );
+            assert_eq!(result.1.is_some(), scenario == "confirmed");
+            assert_eq!(consume_card(&pending), (State::Withdrawn, None));
+        }
     }
 
     #[test]

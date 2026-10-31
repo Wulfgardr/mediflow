@@ -240,3 +240,39 @@ arbitraria. Non si aggira quel limite inviando i campi direttamente al frame.
 Le celle generative e C-7 restano aperti. Treatment Reasoning indisponibile,
 Provider API fermi. Prove desktop e review indipendente del diff finale richieste
 prima dell'integrazione. Nessuna qualifica clinica implicita.
+
+
+## C-9b: agenda e prenotazione
+
+Censimento della base `7c9d33ddf`. La tranche collega la sola consultazione
+app-only dell’agenda interna al lettore comune
+`RuntimeSession.list_agenda_with_filter` e a `/api/v1/network/checkups`.
+L’operazione nominata `agenda` non accetta campi dal modello. Proietta al massimo
+20 date e stati con fonti opache per riga. Titoli, note, chiavi e nomi non
+entrano nel payload del frame né nel contenuto restituito al modello.
+La conferma nativa riguarda i byte finali con hash, scadenza e consumo singolo.
+Sessione, archivio e selezione sono ricontrollati; il consumo richiede anche
+una nuova lettura autorizzata dell’agenda. Nessuna nuova route e nessun
+cambiamento dei contratti consumati da Swift.
+
+| Percorso | Servizio esistente | Stato chat | Residuo C-9b |
+| --- | --- | --- | --- |
+| Agenda interna | `lib/network-checkup-read.ts`, `RuntimeSession.list_agenda_with_filter` | Lettura app-only con consenso nativo, massimo 20 controlli, data e stato | Prova desktop sui due host; limite distinto da elenco completo |
+| Candidati da calendario | `lib/clinical-agenda-bridge.ts`, `/api/clinical-agenda/candidates` | Non collegati; nessuna lettura dei calendari introdotta | Restano candidati da revisionare, senza equivalenza con appuntamenti confermati |
+| Prenotazione confermata | `lib/network-checkup-write.ts`, `lib/checkup-write-operation.ts` | Non collegata, nessun comando di scrittura ammesso | Occorre comando durevole con PIN e approvazione monouso di `lib/native-chat-write-approval.ts`, binding della selezione, CAS, audit e ricevuta riconciliabile attorno al writer comune |
+| Attività territoriali | `lib/territorial-pack-store.ts`, writer territoriali nominati | Nessun grant chat e nessuna azione esposta | Collegare soltanto operazioni nominate con controllo del pacchetto sotto la transazione del writer; pacchetto spento deve negarle |
+| Invio istituzionale | Nessun servizio ammesso da questo raccordo | Non disponibile | Nessun invio autorizzato |
+
+Il lettore dell’agenda interna appartiene al nucleo comune e non abilita una
+capacità territoriale. Non si impone un pacchetto regionale per consultare
+controlli interni. Nessun comando territoriale è aggiunto al canale.
+Il percorso Web/native ordinario di creazione e aggiornamento dei controlli
+ha un writer comune con audit obbligatorio e CAS sugli aggiornamenti; non è
+una prenotazione chat confermata. Il solo `201` della creazione non fornisce
+la ricevuta durevole del comando e non viene presentato come tale.
+
+C-9b resta aperto: questa tranche consegna soltanto la lettura, non la coppia
+minima lettura/prenotazione richiesta. La prenotazione deve mantenere campi
+scelti e visti dal medico nella finestra nativa, consumo prima delle attese,
+nessuna nuova esecuzione dopo un esito indeterminato e riconciliazione senza
+secondo writer. Il profilo clinico della PR #765 non viene modificato.
