@@ -115,7 +115,7 @@ test('treatment_reasoning: enabled salvato nega begin e preview senza trasporto'
     await client.read(); client.choose(optionId('b'));
     const before = calls.length;
     await assert.rejects(client.begin(), { name: 'AiFunctionUnavailableError', message: 'Non disponibile in questa versione' });
-    await assert.rejects(client.fetch('/api/ai/treatment-reasoning/preview', { method: 'POST', body: '{}' }), { name: 'AiFunctionUnavailableError' });
+    await assert.rejects(client.fetch('/api/ai/treatment-reasoning/preview', { method: 'POST', body: '{}' }), { message: 'stale' });
     assert.equal(calls.length, before);
     assert.ok(calls.every(call => call.path.includes('/settings/')));
 });
