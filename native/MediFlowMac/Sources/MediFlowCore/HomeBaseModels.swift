@@ -32,6 +32,12 @@ public struct HomeBaseConnectionConfiguration: Hashable, Sendable {
         guard url.scheme?.lowercased() == "https" else {
             throw HomeBaseClientError.insecureTransport
         }
+        let host = url.host?.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]")) ?? ""
+        let loopback = host == "localhost" || host == "::1" || host == "127.0.0.1"
+        let pin = normalizedTLSPin
+        guard loopback || (pin.utf8.count == 64 && pin.utf8.allSatisfy({
+            (48...57).contains($0) || (97...102).contains($0)
+        })) else { throw HomeBaseClientError.invalidServerURL }
         return url
     }
 

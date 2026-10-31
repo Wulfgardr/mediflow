@@ -1,3 +1,4 @@
+import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
 import { archiveGenerationForSession } from './security/archive-session-generation';
 /* paired observation boundary delegates ordinary writes to the single required-audit operation. */
 import { v4 as uuidv4 } from 'uuid';
@@ -10,7 +11,7 @@ import { observationChangedFields, observationJsonObject, safeObservationExpecte
 import { isSealedValue, validateNetworkDeletionReason } from './network-patient-lifecycle';
 
 export const NETWORK_OBSERVATION_WRITE_CAPABILITY = 'network.replica.write-observations';
-type MutationResponse = { status: 200 | 201 | 400 | 403 | 404 | 409 | 422; value: Record<string, unknown> };
+type MutationResponse = { status: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 422; value: Record<string, unknown> };
 type MutationContext = NetworkWriteContext & { patientId: string };
 type UpdateContext = MutationContext & { observationId: string };
 const FORBIDDEN_WRITE_FIELDS = new Set(['aiSummary', 'documentInsights', 'documentInsightId', 'sourceDocumentId']);
@@ -49,6 +50,7 @@ export async function createNetworkScopedObservation(context: MutationContext, v
     const normalized = normalizeObservationCreateInput(body, { id: observationId, patientId: context.patientId });
     if (!normalized.ok) return { status: 400, value: { error: normalized.error } };
     return createObservationOperation({
+        authorizeCommit: await prepareNetworkPatientCommitGuard(context, NETWORK_OBSERVATION_WRITE_CAPABILITY),
         patientId: context.patientId, observationId, values: normalized.values, mode: 'network',
         scopeAmbulatoryId: context.scopeAmbulatoryId,
         changedFields: observationChangedFields(normalized.values, body), audit: auditFor(context),
@@ -67,6 +69,7 @@ export async function updateNetworkScopedObservation(context: UpdateContext, val
     const normalized = normalizeObservationUpdateInput(body);
     if (!normalized.ok) return { status: 400, value: { error: normalized.error } };
     return updateObservationOperation({
+        authorizeCommit: await prepareNetworkPatientCommitGuard(context, NETWORK_OBSERVATION_WRITE_CAPABILITY),
         patientId: context.patientId, observationId: context.observationId, expectedVersion,
         values: normalized.values, mode: 'network', scopeAmbulatoryId: context.scopeAmbulatoryId,
         changedFields: observationChangedFields(normalized.values, body), audit: auditFor(context),

@@ -802,6 +802,24 @@
         "scripts/falsify-chat-therapy.mjs"
       ],
       "prerequisites": "Node 24 e dipendenze locali; copie temporanee del servizio e test sintetici, nessuna mutazione del worktree."
+    },
+    {
+      "id": "scripts/network-home-base-revocation.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-revocation.test.mjs"
+      ],
+      "prerequisites": "Owned synthetic HTTP wrapper and archive, loopback, installed runtime. Slow-body revocation and persistent row/audit checks."
+    },
+    {
+      "id": "scripts/network-home-base-ingress.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/network-home-base-ingress.test.mjs"
+      ],
+      "prerequisites": "Owned synthetic Next and TLS proxies on loopback, E2E_TLS_URL, E2E_BASE_URL, MEDIFLOW_TLS_CERT_PATH and local API token. A non-loopback source address assigned on this host, with destination still 127.0.0.1."
     }
   ]
 }

@@ -1,3 +1,4 @@
+import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
 import { createProstheticsCatalog, ProstheticsCatalogError } from './reference-data/prosthetics-catalog-service';
 import type { ProstheticsCatalogSelection } from './reference-data/prosthetics-catalog-contract';
 import { and, desc, eq } from 'drizzle-orm';
@@ -52,7 +53,7 @@ export function readProstheticsCatalog(query: string) {
 type MutationResponse =
     | { status: 200; value: { success: true } }
     | { status: 201; value: { id: string; version: number } }
-    | { status: 400 | 403 | 404 | 409 | 412; value: Record<string, unknown> };
+    | { status: 400 | 401 | 403 | 404 | 409 | 412; value: Record<string, unknown> };
 
 type HostContext = {
     request: Request;
@@ -291,7 +292,10 @@ async function updateProstheticPrescription(
     const normalized = normalizeUpdate(body);
     if (!normalized.ok) return badRequest(normalized.error);
 
+    const authorizeCommit = surface === 'network' ? await prepareNetworkPatientCommitGuard(context as NetworkWriteContext, NETWORK_PROSTHETIC_PRESCRIPTION_WRITE_CAPABILITY) : null;
     const commit = dbServer.transaction((tx): MutationResponse => {
+        const denial = authorizeCommit?.(tx);
+        if (denial) return denial;
         const territorialDenial = territorialWriteDenial();
         if (territorialDenial) return territorialDenial;
         const existing = surface === 'network'
@@ -346,7 +350,10 @@ export async function createNetworkScopedProstheticPrescription(context: Network
     const normalized = normalizeCreate(parsed.data);
     if (!normalized.ok) return badRequest(normalized.error);
 
+    const authorizeCommit = await prepareNetworkPatientCommitGuard(context as NetworkWriteContext, NETWORK_PROSTHETIC_PRESCRIPTION_WRITE_CAPABILITY);
     const commit = dbServer.transaction((tx): MutationResponse => {
+        const denial = authorizeCommit?.(tx);
+        if (denial) return denial;
         const territorialDenial = territorialWriteDenial();
         if (territorialDenial) return territorialDenial;
         if (!activeParentExists(tx, context.patientId) || !patientIsInScope(tx, context.patientId, context.scopeAmbulatoryId)) return { status: 404, value: { error: 'Not found' } };

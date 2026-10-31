@@ -1,3 +1,4 @@
+import { syntheticLoopbackRequest as localRequest } from './loopback-ingress-test-fixture';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { fork } from 'node:child_process';
@@ -17,7 +18,7 @@ import { beginWebAuthControl, issueWebAuthControl, resolveWebAuthControlSession 
 const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(process.env.MEDIFLOW_DATA_DIR!, 'bootstrap-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
-const cookieState = { cookies: new Map<string, string>() };
+const cookieState = { cookies: new Map<string, string>(), headers: localRequest('http://127.0.0.1').headers };
 const cleanup = installNetworkPatientCookieFixture(dataDir, cookieState);
 const { dbServer, openDbServer } = load('../db-server.ts') as typeof import('../db-server'); openDbServer();
 const { createAmbulatoryBootstrapService, ambulatoryBootstrapService } = load('./ambulatory-bootstrap-service.ts') as typeof import('./ambulatory-bootstrap-service');
@@ -38,7 +39,7 @@ function seed() {
     return native;
 }
 function request(path = '', headers: Record<string, string> = {}, method = 'POST') {
-    return new Request(`${origin}/api/auth/ambulatory-bootstrap${path}`, { method, headers: {
+    return localRequest(`${origin}/api/auth/ambulatory-bootstrap${path}`, { method, headers: {
         origin, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json',
         'x-mediflow-archive-generation': currentArchiveGeneration(), ...headers,
     } });
@@ -253,7 +254,7 @@ test('HTTP gate rejects CSRF, query and malformed input before a writer can run'
     for (const headers of [{ origin: 'http://127.0.0.1:32000' }, { 'sec-fetch-site': 'cross-site' }, { 'content-type': 'text/plain' }] as Array<Record<string, string>>) {
         assert.equal((await ambulatoryBootstrapHttp(request('/begin', headers), 'begin')).status, 403);
     }
-    assert.equal((await ambulatoryBootstrapHttp(new Request(`${origin}/api/auth/ambulatory-bootstrap?x=1`, { headers: { origin, 'sec-fetch-site': 'same-origin' } }), 'read')).status, 403);
+    assert.equal((await ambulatoryBootstrapHttp(localRequest(`${origin}/api/auth/ambulatory-bootstrap?x=1`, { headers: { origin, 'sec-fetch-site': 'same-origin' } }), 'read')).status, 403);
     assert.deepEqual(snapshot(), before);
 });
 
@@ -266,14 +267,14 @@ test('HTTP begin, real Web P3 login and the named commit/read/retire compose wit
     cookieState.cookies.set('mediflow_session', native.session.id);
     const payload = draft();
     const initialHeaders = Object.fromEntries(native.request.headers);
-    const opened = await ambulatoryBootstrapHttp(new Request(`${origin}/api/auth/ambulatory-bootstrap/begin`, {
+    const opened = await ambulatoryBootstrapHttp(localRequest(`${origin}/api/auth/ambulatory-bootstrap/begin`, {
         method: 'POST', headers: Object.fromEntries(request('/begin', initialHeaders).headers), body: JSON.stringify(payload),
     }), 'begin');
     assert.equal(opened.status, 200);
     const value = await opened.json() as { reference: string };
     const control = opened.headers.get('set-cookie')!.match(/mediflow_auth_control=([^;]+)/u)![1];
     const login = load('../../app/api/auth/login/route.ts') as typeof import('../../app/api/auth/login/route');
-    const logged = await login.POST(new Request(`${origin}/api/auth/login`, { method: 'POST',
+    const logged = await login.POST(localRequest(`${origin}/api/auth/login`, { method: 'POST',
         headers: { origin, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json', cookie: `mediflow_auth_control=${control}`,
             'if-match': opened.headers.get('etag')!, 'idempotency-key': randomUUID() },
         body: JSON.stringify({ username: native.session.username, password: pin }) }));
@@ -281,11 +282,11 @@ test('HTTP begin, real Web P3 login and the named commit/read/retire compose wit
     const web = logged.headers.get('set-cookie')!.match(/mediflow_session=([^;]+)/u)![1];
     const headers = { 'x-mediflow-bootstrap-reference': value.reference, cookie: `mediflow_session=${web}; mediflow_auth_control=${control}` };
     const before = snapshot();
-    const created = await ambulatoryBootstrapHttp(new Request(request('', headers), { body: JSON.stringify(confirm) }), 'commit');
+    const created = await ambulatoryBootstrapHttp(localRequest(request('', headers), { body: JSON.stringify(confirm) }), 'commit');
     assert.equal(created.status, 201);
     assert.equal(snapshot().audit.length - before.audit.length, 1);
     assert.equal((await ambulatoryBootstrapHttp(request('', headers, 'GET'), 'read')).status, 200);
-    assert.equal((await ambulatoryBootstrapHttp(new Request(request('/retire', headers), { body: JSON.stringify({ operation: 'first-ambulatory.retire.v1' }) }), 'retire')).status, 204);
+    assert.equal((await ambulatoryBootstrapHttp(localRequest(request('/retire', headers), { body: JSON.stringify({ operation: 'first-ambulatory.retire.v1' }) }), 'retire')).status, 204);
 });
 
 
@@ -304,7 +305,7 @@ test('HTTP commit rechecks Web revocation, role and archive after a paused body'
         const native = seed(), flow = bind(ambulatoryBootstrapService, native);
         let controller!: ReadableStreamDefaultController<Uint8Array>;
         const body = new ReadableStream<Uint8Array>({ start(value) { controller = value; } });
-        const input = new Request(request('', flow.headers), { body, duplex: 'half' } as RequestInit);
+        const input = localRequest(request('', flow.headers), { body, duplex: 'half' } as RequestInit);
         const pending = ambulatoryBootstrapHttp(input, 'commit');
         controller.enqueue(new TextEncoder().encode('{'));
         await new Promise<void>(resolve => setImmediate(resolve));
