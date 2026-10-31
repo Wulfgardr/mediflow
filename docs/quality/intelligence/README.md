@@ -119,3 +119,11 @@ Il [secondo rapporto](2026-10-30-local-runs/giro2.md) e i
 con Ollama.app 0.40.6 e il nuovo confronto ATHENA dopo la correzione del prompt.
 La prima misura resta storica. ADR 0166 resta Proposed e la revisione semantica
 resta aperta. I fallimenti della misura e della suite unitaria restano visibili.
+
+## Diagnosi I-2 del 31 ottobre 2026
+
+La [nuova misura](2026-10-31-i2-causes/README.md) riproduce i dinieghi del banco
+a route fredde e li risolve preparando le route prima della selezione. Document
+Synthesis richiede inoltre un formato supportato: stesso testo sintetico in PDF.
+Le tre funzioni restituiscono HTTP 200 con una inferenza ciascuna; la copertura
+RSS resta incompleta, senza qualifica o accettazione semantica.

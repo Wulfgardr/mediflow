@@ -1,0 +1,71 @@
+{
+  "sourceRevision": "d3e6ee265dcf1954d62f2f431f0ea993a8eb54d1",
+  "node": "24.22.0",
+  "qualification": false,
+  "status": "three_executed_resource_coverage_incomplete",
+  "model": {
+    "name": "qwen3.5:35b-a3b",
+    "digest": "3460ffeede5453ead027dbd2f821b12ad0aa3de54630971993babdb2165221f7",
+    "ollamaVersion": "0.40.6",
+    "venue": "local_process"
+  },
+  "cells": [
+    {
+      "cell": "patient_insight",
+      "httpStatus": 200,
+      "status": "available",
+      "elapsedMs": 16888,
+      "inferenceAttempts": 1,
+      "writesPerformed": 0,
+      "rawResponseSha256": "eaf97f69419ac35bc4b414caaaa9b341435b53b3083e2a1b1c6db468307f9944",
+      "cancellationObserved": false,
+      "semanticReview": "pending",
+      "memoryCoverage": "not_observed"
+    },
+    {
+      "cell": "smart_import",
+      "httpStatus": 200,
+      "status": "available",
+      "elapsedMs": 12829,
+      "inferenceAttempts": 1,
+      "writesPerformed": 0,
+      "rawResponseSha256": "701d51d625e91be6b1ad2dff2a8a21a24cb8a943cc7b7cdd2abacddbecf7cf57",
+      "cancellationObserved": false,
+      "semanticReview": "pending",
+      "memoryCoverage": "not_observed"
+    },
+    {
+      "cell": "document_synthesis",
+      "httpStatus": 200,
+      "status": "available",
+      "elapsedMs": 15757,
+      "inferenceAttempts": 1,
+      "writesPerformed": 0,
+      "rawResponseSha256": "f6f4c757e8e2a97f66d8689e33a2e045be59ac746d9a768f515712212ec87e1d",
+      "cancellationObserved": false,
+      "semanticReview": "pending",
+      "memoryCoverage": "tail_only"
+    }
+  ],
+  "minFreeDiskBytes": 32682172416,
+  "partialPeakRssBytes": 24081088512,
+  "rssCoverage": "missing_patient_insight_and_smart_import_partial_document_synthesis",
+  "limits": {
+    "maxProcessMemoryBytes": 32212254720,
+    "maxCaseTimeMs": 600000,
+    "minFreeDiskBytes": 26843545600,
+    "maxRunsPerCell": 1,
+    "downloadsAllowed": false,
+    "remoteInferenceAllowed": false
+  },
+  "checks": {
+    "targetedPass": 22,
+    "registerPass": 2,
+    "neverRegress": "pass",
+    "databaseImportBoundary": "pass",
+    "testSelection": "pass",
+    "unit": "not_required_no_lib_changes"
+  },
+  "sourceTextSha256": "3e87d0299d8af2eb5a0c6b2ee9de0b9c47a98f372787400cf9c6ed8fb67f31d7",
+  "pdfSha256": "1c1d35138dc69d227a2580f7610d827e118a662cd06c46c745b4ac232888bb3f"
+}
