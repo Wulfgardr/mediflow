@@ -3,8 +3,15 @@
 // name the current /api/v1/network contract; names are kept verbatim for now
 // (the future GRDB persistence layer may introduce separate domain models). The
 // URLSession transport stays in the Apple layer. Payload encoders use PatchValue
-// (same module). Foundation-only: no CryptoKit/URLSession here.
+// (same module). No CryptoKit/URLSession here.
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif os(Windows)
+import WinSDK
+#endif
 
 public struct HomeBaseConnectionConfiguration: Hashable, Sendable {
     public var serverURLString: String
@@ -32,13 +39,40 @@ public struct HomeBaseConnectionConfiguration: Hashable, Sendable {
         guard url.scheme?.lowercased() == "https" else {
             throw HomeBaseClientError.insecureTransport
         }
-        let host = url.host?.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]")) ?? ""
-        let loopback = host == "localhost" || host == "::1" || host == "127.0.0.1"
+        let loopback = Self.isLoopbackHost(url.host ?? "")
         let pin = normalizedTLSPin
         guard loopback || (pin.utf8.count == 64 && pin.utf8.allSatisfy({
             (48...57).contains($0) || (97...102).contains($0)
         })) else { throw HomeBaseClientError.invalidServerURL }
         return url
+    }
+
+    public static func isLoopbackHost(_ value: String) -> Bool {
+        var host = value.lowercased()
+        if host.hasPrefix("["), host.hasSuffix("]") {
+            host.removeFirst()
+            host.removeLast()
+        }
+        if host == "localhost" { return true }
+        guard !host.utf8.contains(0) else { return false }
+        for family in [Int32(AF_INET), Int32(AF_INET6)] {
+            var bytes = [UInt8](repeating: 0, count: 16)
+            let valid = host.withCString { literal in
+                bytes.withUnsafeMutableBytes { address in
+                    #if os(Windows)
+                    InetPtonA(family, literal, address.baseAddress) == 1
+                    #else
+                    inet_pton(family, literal, address.baseAddress) == 1
+                    #endif
+                }
+            }
+            guard valid else { continue }
+            if family == Int32(AF_INET) { return bytes[0] == 127 }
+            return (bytes.prefix(15).allSatisfy { $0 == 0 } && bytes[15] == 1)
+                || (bytes.prefix(10).allSatisfy { $0 == 0 } && bytes[10] == 255
+                    && bytes[11] == 255 && bytes[12] == 127)
+        }
+        return false
     }
 
     public func apiBaseURL() throws -> URL {

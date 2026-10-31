@@ -44,7 +44,8 @@ var targets: [Target] = [
             // swift-crypto: one crypto source path for all OSes. Re-exports
             // CryptoKit on Apple; BoringSSL-backed on Linux/Windows.
             .product(name: "Crypto", package: "swift-crypto")
-        ]
+        ],
+        linkerSettings: [.linkedLibrary("ws2_32", .when(platforms: [.windows]))]
     ),
     .testTarget(
         name: "MediFlowCoreTests",
