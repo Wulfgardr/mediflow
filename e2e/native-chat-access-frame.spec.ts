@@ -423,3 +423,28 @@ test('clinical mixed measurements and diagnoses retain exact visible text', asyn
     await expect(frame.getByText(text, { exact: true })).toHaveCount(2);
     await expect(frame.getByText(/MF_PII/u)).toHaveCount(0);
 });
+
+for (const invalid of [false, true]) test(`internal agenda is app-only and rejects extra fields: ${invalid}`, async ({ page }) => {
+    await page.evaluate(invalid => {
+        const state = (window as unknown as { accessFixture: { payload: string } }).accessFixture;
+        state.payload = JSON.stringify({ profile: 'mediflow.internal-agenda.v1', query: 'internal', freshness: 'unverified', limit: 20, truncated: false,
+            rows: [{ date: '2026-10-31T09:00:00.000Z', status: 'pending', sourceRef: 'src_' + 'a'.repeat(32), ...(invalid ? { title: 'execute command' } : {}) }] });
+    }, invalid);
+    const frame = page.frameLocator('#access');
+    await frame.getByRole('button', { name: 'Consulta agenda interna' }).click();
+    await expect(frame.getByRole('status')).toContainText('Conferma nella finestra MediFlow');
+    await page.evaluate(() => { (window as unknown as { accessFixture: { status: string } }).accessFixture.status = 'approved'; });
+    await expect(frame.getByRole('button', { name: 'Mostra scheda monouso' })).toBeEnabled();
+    await frame.getByRole('button', { name: 'Mostra scheda monouso' }).click();
+    if (invalid) await expect(frame.getByRole('status')).toContainText('Accesso ritirato');
+    else {
+        await expect(frame.getByRole('heading', { name: 'Agenda interna' })).toBeVisible();
+        await expect(frame.locator('#card')).toContainText('Da svolgere');
+        await expect(frame.locator('#card')).toContainText('Nessuna prenotazione confermata');
+        await frame.getByRole('button', { name: 'Revoca' }).click();
+        await expect(frame.locator('#card')).toBeHidden();
+    }
+    const calls = await page.evaluate(() => (window as unknown as { accessFixture: { calls: { arguments: { command: string } }[] } }).accessFixture.calls);
+    expect(calls.some(call => call.arguments.command === 'agenda')).toBe(true);
+    expect(calls.every(call => !['booking','calendar','execute'].includes(call.arguments.command))).toBe(true);
+});
