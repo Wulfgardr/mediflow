@@ -13,6 +13,66 @@ use zeroize::{Zeroize, Zeroizing};
 
 pub(crate) const JSON_LIMIT: usize = 8 * 1024 * 1024;
 pub(crate) const DOCUMENT_LIMIT: usize = 24 * 1024 * 1024;
+#[derive(Clone, Copy)]
+pub(crate) struct JsonLimits {
+    pub request: usize,
+    pub response: usize,
+}
+impl From<usize> for JsonLimits {
+    fn from(limit: usize) -> Self {
+        Self {
+            request: limit,
+            response: limit,
+        }
+    }
+}
+fn encode_private_json<T: Serialize + ?Sized>(
+    value: &T,
+    limit: usize,
+) -> Result<Zeroizing<Vec<u8>>> {
+    struct Count {
+        len: usize,
+        limit: usize,
+        too_large: bool,
+    }
+    impl std::io::Write for Count {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            let Some(len) = self
+                .len
+                .checked_add(bytes.len())
+                .filter(|len| *len <= self.limit)
+            else {
+                self.too_large = true;
+                return Err(std::io::Error::other("JSON limit"));
+            };
+            self.len = len;
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut count = Count {
+        len: 0,
+        limit,
+        too_large: false,
+    };
+    serde_json::to_writer(&mut count, value).map_err(|_| {
+        if count.too_large {
+            RuntimeError::TooLarge
+        } else {
+            RuntimeError::InvalidInput
+        }
+    })?;
+    let mut encoded = Zeroizing::new(vec![0; count.len]);
+    let mut remaining = encoded.as_mut_slice();
+    serde_json::to_writer(&mut remaining, value).map_err(|_| RuntimeError::InvalidInput)?;
+    if !remaining.is_empty() {
+        return Err(RuntimeError::InvalidInput);
+    }
+    Ok(encoded)
+}
+
 const AUTH_LIMIT: usize = 64 * 1024;
 
 #[derive(Clone)]
@@ -238,17 +298,41 @@ impl RuntimeClient {
         cookie: &str,
         body: Option<&Value>,
         mutation: bool,
-        limit: usize,
+        limit: impl Into<JsonLimits>,
         archive_generation: Option<&str>,
     ) -> Result<Value> {
+        self.json_serializable(
+            method,
+            path,
+            query,
+            scope,
+            pairing,
+            cookie,
+            body,
+            mutation,
+            limit,
+            archive_generation,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn json_serializable<T: Serialize + ?Sized>(
+        &self,
+        method: Method,
+        path: &[&str],
+        query: &[(&str, &str)],
+        scope: Option<&str>,
+        pairing: &PairingCredentials,
+        cookie: &str,
+        body: Option<&T>,
+        mutation: bool,
+        limit: impl Into<JsonLimits>,
+        archive_generation: Option<&str>,
+    ) -> Result<Value> {
+        let limits = limit.into();
         let encoded = body
-            .map(serde_json::to_vec)
-            .transpose()
-            .map_err(|_| RuntimeError::InvalidInput)?
-            .map(Zeroizing::new);
-        if encoded.as_ref().is_some_and(|v| v.len() > limit) {
-            return Err(RuntimeError::TooLarge);
-        }
+            .map(|value| encode_private_json(value, limits.request))
+            .transpose()?;
         let response = self.raw(
             method,
             path,
@@ -258,7 +342,7 @@ impl RuntimeClient {
             Some(cookie),
             encoded.as_deref().map(Vec::as_slice),
             mutation,
-            limit,
+            limits.response,
             archive_generation,
         )?;
         if response.body.is_empty() {
@@ -334,7 +418,7 @@ impl RuntimeClient {
                 if let Some(body) = body {
                     request = request
                         .header("content-type", "application/json")
-                        .body(body.to_owned());
+                        .body(bytes::Bytes::from_owner(Zeroizing::new(body.to_owned())));
                 }
                 let response = request.send().await.map_err(|_| uncertain(mutation))?;
                 let status = response.status().as_u16();
@@ -1053,6 +1137,63 @@ pub(crate) fn operation_uuid() -> Result<String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn private_json_has_exact_storage_and_preserves_the_budget() {
+        let value = serde_json::json!({"source":{"fileKey":[1,2,3],"original":"a\\b\"c"}});
+        let expected = serde_json::to_vec(&value).unwrap();
+        let body = super::encode_private_json(&value, expected.len()).unwrap();
+        assert_eq!(body.as_slice(), expected);
+        assert_eq!(body.len(), body.capacity());
+        assert_eq!(
+            super::encode_private_json(&value, expected.len() - 1).unwrap_err(),
+            crate::RuntimeError::TooLarge
+        );
+    }
+
+    #[test]
+    fn private_json_fails_closed_on_partial_or_changing_serialization() {
+        struct Changing {
+            calls: std::cell::Cell<usize>,
+            second: &'static str,
+        }
+        impl serde::Serialize for Changing {
+            fn serialize<S: serde::Serializer>(
+                &self,
+                serializer: S,
+            ) -> std::result::Result<S::Ok, S::Error> {
+                let calls = self.calls.get();
+                self.calls.set(calls + 1);
+                serializer.serialize_str(if calls == 0 { "counted" } else { self.second })
+            }
+        }
+        for second in ["longer than counted", "short"] {
+            assert_eq!(
+                super::encode_private_json(
+                    &Changing {
+                        calls: std::cell::Cell::new(0),
+                        second
+                    },
+                    1024
+                )
+                .unwrap_err(),
+                crate::RuntimeError::InvalidInput
+            );
+        }
+        struct Invalid;
+        impl serde::Serialize for Invalid {
+            fn serialize<S: serde::Serializer>(
+                &self,
+                _: S,
+            ) -> std::result::Result<S::Ok, S::Error> {
+                Err(serde::ser::Error::custom("synthetic failure"))
+            }
+        }
+        assert_eq!(
+            super::encode_private_json(&Invalid, 1024).unwrap_err(),
+            crate::RuntimeError::InvalidInput
+        );
+    }
+
     use super::*;
     use std::io::Read;
 

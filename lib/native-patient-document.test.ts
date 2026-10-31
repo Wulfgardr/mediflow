@@ -30,6 +30,11 @@ const cleanup = installNetworkPatientCookieFixture(data, cookies);
 const { dbServer, openDbServer } = nodeRequire('./db-server.ts') as typeof import('./db-server'); openDbServer();
 const { createNativePatientDocumentService } = nodeRequire('./native-patient-document.ts') as typeof import('./native-patient-document');
 const { POST } = nodeRequire('../app/api/auth/native/patient-document/route.ts') as typeof import('../app/api/auth/native/patient-document/route');
+function expectedReceipt(commandId: string) {
+    const row = dbServer.$client.prepare('SELECT redacted_metadata FROM audit_events WHERE event_id=?').get(commandId) as { redacted_metadata: string };
+    const journal = JSON.parse(row.redacted_metadata).patientDocumentCreate;
+    return { outcome: 'applied', patientId: journal.patientId, attachmentId: journal.sourceId, attachmentReadback: 'client-verification-required' };
+}
 const master = randomBytes(32), pin = ['2', '4', '6', '8'].join('');
 function seal(value: string) {
     const iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', master, iv);
@@ -59,10 +64,10 @@ async function scan(blank: boolean) {
     return { name: seal('scansione-inventata.pdf'), path: seal('scansione-inventata.pdf'), original: bytes.toString('base64'),
         ...await file(bytes) };
 }
-function fixture(scope = randomUUID()) {
+function fixture(scope: string = randomUUID(), options: Parameters<typeof syntheticNetworkPatientAuthority>[2] = {}) {
     dbServer.insert(ambulatories).values({ id: scope, name: 'Ambulatorio inventato', isDefault: true }).onConflictDoNothing().run();
-    const context = syntheticNetworkPatientAuthority(dbServer, scope);
-    context.pairedClient.grantedCapabilities.push('network.replica.write-documents');
+    const context = syntheticNetworkPatientAuthority(dbServer, scope, options);
+    context.pairedClient.grantedCapabilities.push('network.replica.write-documents', 'network.replica.readonly-documents');
     const row = dbServer.select().from(settings).where(eq(settings.key, NETWORK_PAIRING_STATE_KEY)).get()!;
     const state = JSON.parse(row.value!); state.clients[0].grantedCapabilities = context.pairedClient.grantedCapabilities;
     dbServer.update(settings).set({ value: JSON.stringify(state) }).where(eq(settings.key, row.key)).run();
@@ -118,14 +123,14 @@ test('real AnyDoc text PDF, native current host, PIN and readback use the single
     assert.match(view.text, /Mario/u); assert.equal(view.identity, 'ambiguous'); assert.equal(view.quality, 'uncertain');
     assert.deepEqual(view.candidates, {}); assert.deepEqual(effects(), before);
     await api.preview(context, view.commandId, view.viewId, review());
-    assert.deepEqual(await api.execute(context, view.commandId, pin), { outcome: 'applied', attachmentReadback: 'client-verification-required' });
+    assert.deepEqual(await api.execute(context, view.commandId, pin), expectedReceipt(view.commandId));
     assert.deepEqual(effects(), before.map(n => n + 1));
     const restarted = createNativePatientDocumentService(dbServer);
-    assert.deepEqual(await restarted.receipt(context, view.commandId), { outcome: 'applied', attachmentReadback: 'client-verification-required' });
-    assert.deepEqual(await restarted.execute(context, view.commandId, 'invalid'), { outcome: 'applied', attachmentReadback: 'client-verification-required' });
+    assert.deepEqual(await restarted.receipt(context, view.commandId), expectedReceipt(view.commandId));
+    await assert.rejects(restarted.execute(context, view.commandId, pin));
     assert.deepEqual(effects(), before.map(n => n + 1));
     const receipt = JSON.stringify(await restarted.receipt(context, view.commandId));
-    assert.equal(receipt, '{"outcome":"applied","attachmentReadback":"client-verification-required"}');
+    assert.deepEqual(JSON.parse(receipt), expectedReceipt(view.commandId));
 });
 test('multiple identities and hostile instructions remain text requiring explicit corrections', async () => {
     const context = fixture(), api = createNativePatientDocumentService(dbServer), before = effects();
@@ -145,7 +150,7 @@ test('real scanned PDF uses local Apple Vision, stays uncertain and needs manual
     assert.match(view.text, /Mario/u); assert.equal(view.quality, 'uncertain');
     assert.deepEqual(effects(), before);
     await api.preview(context, view.commandId, view.viewId, review());
-    assert.deepEqual(await api.execute(context, view.commandId, pin), { outcome: 'applied', attachmentReadback: 'client-verification-required' });
+    assert.deepEqual(await api.execute(context, view.commandId, pin), expectedReceipt(view.commandId));
 });
 test('empty scan blocks native review with explicit OCR error and no patient', { skip: process.platform !== 'darwin' }, async () => {
     const context = fixture(), before = effects();
@@ -168,15 +173,15 @@ test('native route rejects URLs, source IDs and caller candidates; returns only 
     assert.equal(staged.status, 200); assert.match(staged.body.text, /Mario/u);
     assert.deepEqual(await send({ operation: 'preview', commandId: staged.body.commandId, viewId: staged.body.viewId, review: review() }),
         { status: 200, body: { commandId: staged.body.commandId, status: 'preview' } });
-    assert.deepEqual(await send({ operation: 'execute', commandId: staged.body.commandId, pin }), { status: 200, body: { outcome: 'applied', attachmentReadback: 'client-verification-required' } });
-    assert.deepEqual(await send({ operation: 'receipt', commandId: staged.body.commandId }), { status: 200, body: { outcome: 'applied', attachmentReadback: 'client-verification-required' } });
+    assert.deepEqual(await send({ operation: 'execute', commandId: staged.body.commandId, pin }), { status: 200, body: expectedReceipt(staged.body.commandId) });
+    assert.deepEqual(await send({ operation: 'receipt', commandId: staged.body.commandId }), { status: 200, body: expectedReceipt(staged.body.commandId) });
 });
-test('unknown after service restart stays unknown, including retirement', async () => {
+test('unknown receipt is pure and explicit retirement works across service instances', async () => {
     const context = fixture(), api = createNativePatientDocumentService(dbServer);
     const view = await api.stage(context, await document());
     const restarted = createNativePatientDocumentService(dbServer);
     assert.deepEqual(await restarted.receipt(context, view.commandId), { outcome: 'unknown' });
-    assert.deepEqual(await restarted.revoke(context, view.commandId), { outcome: 'unknown' });
+    assert.deepEqual(await restarted.revoke(context, view.commandId), { outcome: 'retired' });
     await api.revoke(context, view.commandId);
 });
 test('duplicate requires a separate explicit choice and never changes the existing patient', async () => {
@@ -188,7 +193,7 @@ test('duplicate requires a separate explicit choice and never changes the existi
     const view = await api.stage(context, await document());
     await assert.rejects(api.preview(context, view.commandId, view.viewId, values), /Possible duplicate/u);
     await api.preview(context, view.commandId, view.viewId, { ...values, duplicate: 'create-separate' });
-    assert.deepEqual(await api.execute(context, view.commandId, pin), { outcome: 'applied', attachmentReadback: 'client-verification-required' });
+    assert.deepEqual(await api.execute(context, view.commandId, pin), expectedReceipt(view.commandId));
     assert.deepEqual(dbServer.select().from(patients).where(eq(patients.id, existingId)).get(), before);
 });
 for (const fault of ['source-missing', 'patient-changed'] as const) test(`readback detects ${fault} and rolls back before declaring success`, async () => {
@@ -203,7 +208,7 @@ for (const fault of ['source-missing', 'patient-changed'] as const) test(`readba
     try { await assert.rejects(api.execute(context, view.commandId, pin)); }
     finally { dbServer.$client.exec('DROP TRIGGER synthetic_readback_failure'); }
     assert.deepEqual(effects(), before);
-    assert.deepEqual(await api.receipt(context, view.commandId), { outcome: 'unknown' });
+    assert.deepEqual(await api.receipt(context, view.commandId), { outcome: 'retired' });
 });
 for (const fault of ['logout', 'scope', 'grant', 'expiry', 'abort'] as const) test(`source cannot be used after ${fault}`, async () => {
     const context = fixture(); let clock = Date.now();
@@ -372,7 +377,7 @@ test('good file reads identical saved bytes; false wrapping is unreadable with h
         assert(key.every(byte => byte === 0));
         await api.preview(context, view.commandId, view.viewId, review());
         const receipt = await api.execute(context, view.commandId, pin);
-        assert.deepEqual(receipt, { outcome: 'applied', attachmentReadback: 'client-verification-required' });
+        assert.deepEqual(receipt, expectedReceipt(view.commandId));
         const saved = dbServer.$client.prepare('SELECT data FROM attachments WHERE id = ?').get(view.commandId);
         // Source id is deliberately distinct from the command id.
         assert.equal(saved, undefined);
@@ -400,14 +405,61 @@ for (const size of [5 * 1024 * 1024, 10 * 1024 * 1024]) test(`valid ${size}-byte
     const masterKey = await crypto.subtle.importKey('raw', master, 'AES-GCM', false, ['decrypt']);
     assert.equal(await openPatientDocumentFile(sealedFile.data, masterKey), `data:application/pdf;base64,${bytes.toString('base64')}`);
     const source = { name: seal('grande-sintetico.pdf'), path: seal('grande-sintetico.pdf'), original: bytes.toString('base64'), ...sealedFile };
-    const view = await api.stage(context, source);
-    assert.match(view.text, /Mario/u);
+    const json = JSON.stringify({ operation: 'stage', source });
+    assert(Buffer.byteLength(json) < 28 * 1024 * 1024);
+    const direct = await api.stage(context, source);
     assert.ok(source.fileKey.every(byte => byte === 0));
-    await api.preview(context, view.commandId, view.viewId, review());
-    assert.deepEqual(await api.execute(context, view.commandId, pin), { outcome: 'applied', attachmentReadback: 'client-verification-required' });
+    await api.revoke(context, direct.commandId);
+    const response = await localPost(new Request('http://127.0.0.1/api/auth/native/patient-document', {
+        method: 'POST', headers: context.request.headers, body: json,
+    }));
+    assert.equal(response.status, 200);
+    const view = await response.json();
+    assert.match(view.text, /Mario/u);
+    const send = async (body: unknown) => localPost(new Request('http://127.0.0.1/api/auth/native/patient-document', {
+        method: 'POST', headers: context.request.headers, body: JSON.stringify(body),
+    }));
+    assert.equal((await send({ operation: 'preview', commandId: view.commandId, viewId: view.viewId, review: review() })).status, 200);
+    const applied = await send({ operation: 'execute', commandId: view.commandId, pin });
+    assert.equal(applied.status, 200);
+    assert.deepEqual(await applied.json(), expectedReceipt(view.commandId));
     assert.deepEqual(effects(), before.map(n => n + 1));
     const stored = dbServer.$client.prepare('SELECT data FROM attachments ORDER BY rowid DESC LIMIT 1').get() as { data: string };
     assert.equal(stored.data, sealedFile.data);
+});
+
+test('wrong PIN has a durable retired receipt and the same owner can start again', async () => {
+    const context = fixture(), api = createNativePatientDocumentService(dbServer), before = effects();
+    const view = await api.stage(context, await document());
+    await api.preview(context, view.commandId, view.viewId, review());
+    await assert.rejects(api.execute(context, view.commandId, '0000'));
+    assert.deepEqual(effects(), before);
+    for (const service of [api, createNativePatientDocumentService(dbServer)]) {
+        assert.deepEqual(await service.receipt(context, view.commandId), { outcome: 'retired' });
+        assert.deepEqual(await service.revoke(context, view.commandId), { outcome: 'retired' });
+    }
+    const next = await api.stage(context, await document());
+    await api.preview(context, next.commandId, next.viewId, review());
+    assert.deepEqual(await api.execute(context, next.commandId, pin), expectedReceipt(next.commandId));
+});
+test('native stage rejects one byte over the PDF maximum and the route bounds the JSON body', async () => {
+    const context = fixture(), api = createNativePatientDocumentService(dbServer), before = effects();
+    const bytes = createSyntheticPdf(10 * 1024 * 1024 + 1);
+    const source = { name: seal('limite.pdf'), path: seal('limite.pdf'), original: bytes.toString('base64'), ...await file(bytes) };
+    await assert.rejects(api.stage(context, source));
+    assert(source.fileKey.every(byte => byte === 0));
+    const view = await api.stage(context, await document());
+    await api.revoke(context, view.commandId);
+    const receipt = JSON.stringify({ operation: 'receipt', commandId: view.commandId });
+    for (const extra of [0, 1]) {
+        const response = await localPost(new Request('http://127.0.0.1/api/auth/native/patient-document', {
+            method: 'POST', headers: context.request.headers,
+            body: receipt.padEnd(35 * 1024 * 1024 + extra),
+        }));
+        assert.equal(response.status, extra ? 403 : 200);
+        if (!extra) assert.deepEqual(await response.json(), { outcome: 'retired' });
+    }
+    assert.deepEqual(effects(), before);
 });
 
 test('native route opts into HTTP buffer erasure even when stage denies the source', async () => {
@@ -421,4 +473,109 @@ test('native route opts into HTTP buffer erasure even when stage denies the sour
     const assembly = captured.filter(bytes => bytes.length === Buffer.byteLength(body));
     assert.ok(assembly.length > 0);
     assert.ok(assembly.every(bytes => bytes.every(byte => byte === 0)), 'route did not erase HTTP assembly');
+});
+
+test('durable native receipt permits only the same operator device archive and scope after login', async () => {
+    const context = fixture(), api = createNativePatientDocumentService(dbServer);
+    const view = await api.stage(context, await document());
+    await api.preview(context, view.commandId, view.viewId, review());
+    await api.execute(context, view.commandId, pin);
+    const restart = createNativePatientDocumentService(dbServer);
+    const newSession = createNativeServerSession({ id: context.session.userId, username: context.session.username, role: 'admin' }, {
+        clientId: context.pairedClient.clientId, clientPlatform: context.pairedClient.clientPlatform, tokenHash: context.pairedClient.tokenHash,
+    }, captureNativeLoginSessionFence());
+    bindSessionToArchive(newSession, currentArchiveGeneration());
+    const fresh = { ...context, session: newSession };
+    assert.deepEqual(await restart.receipt(fresh, view.commandId), expectedReceipt(view.commandId));
+    assert.deepEqual(await restart.revoke(fresh, view.commandId), expectedReceipt(view.commandId));
+    await assert.rejects(restart.execute(fresh, view.commandId, pin));
+    await assert.rejects(restart.preview(fresh, view.commandId, view.viewId, review()));
+    const unknown = randomUUID();
+    assert.deepEqual(await restart.receipt(fresh, unknown), { outcome: 'unknown' });
+    const beforeUnknown = dbServer.$client.prepare('SELECT count(*) n FROM audit_events').get();
+    assert.deepEqual(await restart.revoke(fresh, unknown), { outcome: 'unknown' });
+    assert.deepEqual(dbServer.$client.prepare('SELECT count(*) n FROM audit_events').get(), beforeUnknown);
+    const otherOperator = () => {
+        const other = fixture(context.scopeAmbulatoryId);
+        const user = { id: randomUUID(), username: randomUUID(), role: 'admin' };
+        dbServer.insert(users).values({ ...user, passwordHash: 'synthetic-unusable', encryptedMasterKey: 'synthetic-unusable', salt: 'synthetic-unusable' }).run();
+        const session = createNativeServerSession(user, {
+            clientId: other.pairedClient.clientId, clientPlatform: other.pairedClient.clientPlatform, tokenHash: other.pairedClient.tokenHash,
+        }, captureNativeLoginSessionFence());
+        bindSessionToArchive(session, currentArchiveGeneration());
+        return { ...other, session };
+    };
+    for (const makeOther of [() => fixture(randomUUID()), otherOperator, () => fixture(context.scopeAmbulatoryId, { clientId: 'other-document-device' })]) {
+        const other = makeOther();
+        assert.deepEqual(await restart.receipt(other, randomUUID()), { outcome: 'unknown' }, 'negative test must have valid authenticated authority');
+        const beforeForeign = dbServer.$client.prepare('SELECT count(*) n FROM audit_events').get();
+        await assert.rejects(restart.receipt(other, view.commandId));
+        assert.deepEqual(await restart.revoke(other, view.commandId), { outcome: 'unknown' });
+        assert.deepEqual(dbServer.$client.prepare('SELECT count(*) n FROM audit_events').get(), beforeForeign);
+    }
+});
+
+for (const previewed of [false, true]) test(`same owner new login can retire live ${previewed ? 'preview' : 'stage'} without resuming it`, async () => {
+    const context = fixture(), api = createNativePatientDocumentService(dbServer);
+    const view = await api.stage(context, await document());
+    if (previewed) await api.preview(context, view.commandId, view.viewId, review());
+    const session = createNativeServerSession({ id: context.session.userId, username: context.session.username, role: 'admin' }, {
+        clientId: context.pairedClient.clientId, clientPlatform: context.pairedClient.clientPlatform, tokenHash: context.pairedClient.tokenHash,
+    }, captureNativeLoginSessionFence());
+    bindSessionToArchive(session, currentArchiveGeneration());
+    const fresh = { ...context, session };
+    assert.deepEqual(await api.receipt(fresh, view.commandId), { outcome: 'unknown' });
+    await assert.rejects(api.preview(fresh, view.commandId, view.viewId, review()));
+    await assert.rejects(api.execute(fresh, view.commandId, pin));
+    const pairingRow = dbServer.select().from(settings).where(eq(settings.key, NETWORK_PAIRING_STATE_KEY)).get()!;
+    const previousClients = JSON.parse(pairingRow.value!).clients;
+    const otherDevice = fixture(context.scopeAmbulatoryId, { clientId: 'other-live-document-device' });
+    const pairingState = JSON.parse(dbServer.select().from(settings).where(eq(settings.key, NETWORK_PAIRING_STATE_KEY)).get()!.value!);
+    pairingState.clients.push(...previousClients);
+    dbServer.update(settings).set({ value: JSON.stringify(pairingState) }).where(eq(settings.key, NETWORK_PAIRING_STATE_KEY)).run();
+    assert.deepEqual(await api.receipt(otherDevice, randomUUID()), { outcome: 'unknown' });
+    assert.deepEqual(await api.revoke(otherDevice, view.commandId), { outcome: 'unknown' });
+    const user = { id: randomUUID(), username: randomUUID(), role: 'admin' };
+    dbServer.insert(users).values({ ...user, passwordHash: 'synthetic-unusable', encryptedMasterKey: 'synthetic-unusable', salt: 'synthetic-unusable' }).run();
+    const foreignSession = createNativeServerSession(user, {
+        clientId: context.pairedClient.clientId, clientPlatform: context.pairedClient.clientPlatform, tokenHash: context.pairedClient.tokenHash,
+    }, captureNativeLoginSessionFence());
+    bindSessionToArchive(foreignSession, currentArchiveGeneration());
+    const otherOperator = { ...context, session: foreignSession };
+    assert.deepEqual(await api.receipt(otherOperator, randomUUID()), { outcome: 'unknown' });
+    assert.deepEqual(await api.revoke(otherOperator, view.commandId), { outcome: 'unknown' });
+    assert.deepEqual(await api.receipt(fresh, view.commandId), { outcome: 'unknown' });
+    assert.deepEqual(await api.revoke(fresh, view.commandId), { outcome: 'retired' });
+    assert.deepEqual(await api.revoke(fresh, view.commandId), { outcome: 'retired' });
+    await assert.rejects(api.preview(context, view.commandId, view.viewId, review()));
+    await assert.rejects(api.execute(context, view.commandId, pin));
+});
+
+test('real HTTP receipt and revoke of an invented UUID are indistinguishable and leave every table unchanged', async () => {
+    const context = fixture(), commandId = randomUUID();
+    const tables = dbServer.$client.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all() as { name: string }[];
+    const counts = () => tables.map(({ name }) => dbServer.$client.prepare(`SELECT count(*) n FROM "${name.replaceAll('"', '""')}"`).get());
+    const before = counts();
+    for (const operation of ['receipt', 'revoke']) {
+        const response = await localPost(new Request('http://127.0.0.1/api/auth/native/patient-document', {
+            method: 'POST', headers: context.request.headers, body: JSON.stringify({ operation, commandId }),
+        }));
+        assert.equal(response.status, 200);
+        assert.deepEqual(await response.json(), { outcome: 'unknown' });
+        assert.deepEqual(counts(), before);
+    }
+});
+
+test('common command receipt remains opaque for chat and MCP consumers', async () => {
+    const context = fixture(), api = createNativePatientDocumentService(dbServer), view = await api.stage(context, await document());
+    await api.preview(context, view.commandId, view.viewId, review());
+    await api.execute(context, view.commandId, pin);
+    const { createPatientDocumentCommandService } = nodeRequire('./patient-document-create-command.ts') as typeof import('./patient-document-create-command');
+    const common = createPatientDocumentCommandService(dbServer);
+    const host = { session: context.session, actorRef: context.session.userId, ambulatoryId: context.scopeAmbulatoryId,
+        archiveGeneration: currentArchiveGeneration(), epoch: 0, surface: 'native' as const, pairedClientId: context.pairedClient.clientId,
+        assertCurrent() {}, confirm: async () => false, retain: () => () => {} };
+    assert.deepEqual(common.receipt(host, view.commandId), { outcome: 'applied' });
+    const wire = JSON.stringify(common.receipt(host, view.commandId));
+    assert(!/patientId|attachmentId|sourceId|text|name|path/u.test(wire));
 });

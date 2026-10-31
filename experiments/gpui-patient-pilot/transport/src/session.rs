@@ -1,3 +1,4 @@
+pub mod patient_document;
 use crate::{ChatWriteOutcome, ChatWriteResolution};
 use crate::{
     account_profile::{
@@ -986,7 +987,7 @@ impl RuntimeSession {
         scope: Option<&str>,
         body: Option<&Value>,
         mutation: bool,
-        limit: usize,
+        limit: impl Into<crate::http::JsonLimits>,
     ) -> Result<Value> {
         self.request_with_profile_intent(method, path, query, scope, body, mutation, limit, None)
     }
@@ -1000,7 +1001,22 @@ impl RuntimeSession {
         scope: Option<&str>,
         body: Option<&Value>,
         mutation: bool,
-        limit: usize,
+        limit: impl Into<crate::http::JsonLimits>,
+        intent: Option<&ProfileQueryIntent>,
+    ) -> Result<Value> {
+        self.request_serializable(method, path, query, scope, body, mutation, limit, intent)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn request_serializable<T: serde::Serialize + ?Sized>(
+        &self,
+        method: Method,
+        path: &[&str],
+        query: &[(&str, &str)],
+        scope: Option<&str>,
+        body: Option<&T>,
+        mutation: bool,
+        limit: impl Into<crate::http::JsonLimits>,
         intent: Option<&ProfileQueryIntent>,
     ) -> Result<Value> {
         self.ensure_open()?;
@@ -1065,7 +1081,7 @@ impl RuntimeSession {
             .inner
             .client
             .with_request_context(context.clone())
-            .json(
+            .json_serializable(
                 method,
                 path,
                 query,
