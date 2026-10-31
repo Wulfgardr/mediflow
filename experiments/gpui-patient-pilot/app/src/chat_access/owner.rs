@@ -570,7 +570,7 @@ pub(crate) mod tests {
             ))
             .unwrap();
             while current.load(Ordering::Acquire) != 2 {
-                let Ok((mut socket, _)) = listener.accept() else {
+                let Ok((mut socket, _)) = crate::test_loopback::accept(&listener) else {
                     std::thread::sleep(Duration::from_millis(2));
                     continue;
                 };
