@@ -23,11 +23,12 @@ test('runner-attacks: direct cloud, symlink retarget, missing volume, revoked ac
     fs.writeFileSync(preload, `import fs from 'node:fs'; import cp from 'node:child_process'; import {createRequire} from 'node:module'; import {syncBuiltinESMExports} from 'node:module';
 const spawn=cp.spawnSync,link=fs.linkSync,read=fs.readFileSync;
 cp.spawnSync=(file,args,options)=> {
- if(process.env.FAULT==='unverified') return {status:1,stdout:'',stderr:'Access denied'};
+ const volumeProbe=['/bin/df','/usr/sbin/diskutil','/usr/bin/plutil','findmnt','lsblk'].includes(file)||(file==='powershell.exe'&&args.some(arg=>String(arg).includes('Get-BitLockerVolume')));
+ if(process.env.FAULT==='unverified'&&volumeProbe) return {status:1,stdout:'',stderr:'Access denied'};
  if(file==='/bin/df') return {status:0,stdout:'Filesystem Blocks Used Available Capacity Mounted on\\n/dev/disk9s1 1 1 1 1% /synthetic',stderr:''};
  if(file==='/usr/sbin/diskutil') return {status:0,stdout:'<plist/>',stderr:''};
  if(file==='/usr/bin/plutil') return {status:0,stdout:JSON.stringify({FileVault:process.env.FAULT!=='unencrypted'}),stderr:''};
- if(file==='powershell.exe') return {status:0,stdout:JSON.stringify({VolumeStatus:process.env.FAULT==='unencrypted'?0:1,ProtectionStatus:1}),stderr:''};
+ if(file==='powershell.exe'&&volumeProbe) return {status:0,stdout:JSON.stringify({VolumeStatus:process.env.FAULT==='unencrypted'?0:1,ProtectionStatus:1}),stderr:''};
  if(file==='findmnt') return {status:0,stdout:JSON.stringify({filesystems:[{source:'/dev/synthetic'}]}),stderr:''};
  if(file==='lsblk') return {status:0,stdout:JSON.stringify({blockdevices:[{type:process.env.FAULT==='unencrypted'?'disk':'crypt'}]}),stderr:''};
  return spawn(file,args,options);
