@@ -128,11 +128,11 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
         {
             break;
         }
-        match std::io::Read::take(&mut reader, (257 - bytes.len()) as u64)
+        match std::io::Read::take(&mut reader, (513 - bytes.len()) as u64)
             .read_until(b'\n', &mut bytes)
         {
             Ok(0) => break,
-            Ok(_) if bytes.len() > 256 => break,
+            Ok(_) if bytes.len() > 512 => break,
             Ok(_) if bytes.last() != Some(&b'\n') => break,
             Ok(_) => {}
             Err(error)
@@ -141,7 +141,7 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
                     std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
                 ) =>
             {
-                if bytes.len() > 256 {
+                if bytes.len() > 512 {
                     break;
                 }
                 continue;
@@ -158,6 +158,26 @@ fn handle(mut stream: UnixStream, incoming: SyncSender<Pending>, active: Arc<Ato
                     break;
                 };
                 let Some(request) = Request::new(peer, copy) else {
+                    break;
+                };
+                if incoming.try_send(request.clone()).is_err() {
+                    break;
+                }
+                pending = Some(request);
+                State::Requested
+            }
+            Ok(value)
+                if pending.is_none()
+                    && value.as_object().is_some_and(|v| v.len() == 2)
+                    && value["command"] == "drugs" =>
+            {
+                let Ok(copy) = stream.try_clone() else {
+                    break;
+                };
+                let Some(query) = value["query"].as_str() else {
+                    break;
+                };
+                let Some(request) = Request::for_drugs(peer, copy, query) else {
                     break;
                 };
                 if incoming.try_send(request.clone()).is_err() {
