@@ -479,7 +479,7 @@ mod tests {
             let stopping = stop.clone();
             let worker = thread::spawn(move || {
                 loop {
-                    let (mut stream, _) = listener.accept().unwrap();
+                    let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                     if stopping.load(Ordering::Acquire) {
                         break;
                     }

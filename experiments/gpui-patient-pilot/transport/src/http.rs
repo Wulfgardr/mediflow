@@ -1213,6 +1213,25 @@ fn dedicated_web_limit(path: &[&str], archive: bool) -> usize {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn fixture_accept_discards_only_the_loopback_port_probe() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let send = |request: &'static str| {
+            let mut client = std::net::TcpStream::connect(address).unwrap();
+            client.write_all(request.as_bytes()).unwrap();
+            client
+        };
+        let _probe = send("GET / HTTP/1.1\r\nhost: localhost\r\nuser-agent: node\r\n\r\n");
+        let _tls = send("\u{16}\u{3}\u{1}");
+        let _client = send("GET / HTTP/1.1\r\nhost: localhost\r\nuser-agent: reqwest\r\n\r\n");
+        let (mut kept, _) = crate::test_loopback::accept(&listener).unwrap();
+        let mut request = [0; 128];
+        let read = kept.read(&mut request).unwrap();
+        assert!(String::from_utf8_lossy(&request[..read]).ends_with("reqwest\r\n\r\n"));
+    }
+
+    #[test]
     fn reference_response_budgets_are_explicit_and_do_not_expand_other_routes() {
         for path in [
             vec!["api", "exemptions", "import", "status"],
@@ -1382,7 +1401,7 @@ mod tests {
         let sent = draft.clone();
         let worker = thread::spawn(move || {
             for step in 0..4 {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 let request = bootstrap_request(&mut stream);
                 let lower = request.to_lowercase();
                 assert!(lower.contains(&format!("origin: {url}\r\n")));
@@ -1471,12 +1490,12 @@ mod tests {
         let draft = FirstAmbulatoryDraft::new("Sede inventata".into(), None, None).unwrap();
         let observed = draft.clone();
         let worker = thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             assert!(
                 bootstrap_request(&mut stream).starts_with("POST /api/auth/ambulatory-bootstrap ")
             );
             drop(stream);
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             assert!(
                 bootstrap_request(&mut stream).starts_with("GET /api/auth/ambulatory-bootstrap ")
             );
@@ -1490,7 +1509,7 @@ mod tests {
         assert_eq!(fresh.readback(), Ok(draft.id));
         let listener = worker.join().unwrap();
         listener.set_nonblocking(true).unwrap();
-        assert!(listener.accept().is_err());
+        assert!(crate::test_loopback::accept(&listener).is_err());
     }
     #[test]
     fn bootstrap_readback_divergence_and_redirect_never_confirm_or_follow() {
@@ -1501,7 +1520,7 @@ mod tests {
             let draft = FirstAmbulatoryDraft::new("Sede inventata".into(), None, None).unwrap();
             let observed = draft.clone();
             let worker = thread::spawn(move || {
-                let (mut stream, _) = listener.accept().unwrap();
+                let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 bootstrap_request(&mut stream);
                 let mut body = bootstrap_observation(&observed);
                 body["version"] = serde_json::json!(2);
@@ -1554,7 +1573,7 @@ mod tests {
         let (started, receive) = mpsc::channel();
         let (release, wait) = mpsc::channel();
         let server = thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             bootstrap_request(&mut stream);
             started.send(()).unwrap();
             wait.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -1582,7 +1601,7 @@ mod tests {
         .unwrap();
         let response = format!("HTTP/1.1 409 Conflict\r\n{framing}Connection: close\r\n\r\n{body}");
         let worker = thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
             stream
                 .set_read_timeout(Some(Duration::from_secs(5)))
                 .unwrap();
@@ -1611,7 +1630,7 @@ mod tests {
         let listener = worker.join().unwrap();
         listener.set_nonblocking(true).unwrap();
         assert!(
-            matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
+            matches!(crate::test_loopback::accept(&listener), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
         );
         result.map(|_| ())
     }
