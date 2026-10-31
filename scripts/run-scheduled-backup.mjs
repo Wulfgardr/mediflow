@@ -8,6 +8,7 @@ import { assertProstheticsCatalogBackup, serializeProstheticsDocument } from '..
 
 import { assertBackupAuditSnapshots, canonicalizeBackupAuditRows } from '../lib/backup-audit.ts';
 import fs from 'fs';
+import { validateBackupDestination } from './backup-destination-policy.mjs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -19,13 +20,11 @@ const SETTINGS_KEY = 'backupScheduler';
 const BACKUP_ARTIFACT_FORMAT = 'mediflow-backup';
 const BACKUP_ARTIFACT_VERSION = 1;
 const BACKUP_ARTIFACT_SCOPE = 'mediflow-web-local-backup';
-const DEFAULT_BACKUP_RETENTION_KEEP_ARTIFACTS = 14;
 const BACKUP_ARTIFACT_FILE_PREFIX = 'mediflow-backup-v1-';
 const BACKUP_ARTIFACT_FILE_SUFFIX = '.mediflow';
 const BACKUP_ARTIFACT_TEMP_SUFFIX = '.mediflow.tmp';
 const BACKUP_LOCK_FILE_NAME = '.mediflow-backup.lock';
 const BACKUP_LOCK_STALE_MS = 6 * 60 * 60 * 1000;
-const BACKUP_TEMP_MIN_AGE_MS = 15 * 60 * 1000;
 const PATIENT_AMBULATORY_TABLE = 'patients_to_ambulatories';
 
 /* @Codex */
@@ -198,12 +197,6 @@ export async function serializeBackupArtifact(payload, createdAt = new Date()) {
   return JSON.stringify(normalizeJson(artifact), null, 2);
 }
 
-function clampRetentionKeepArtifacts(value, fallback = DEFAULT_BACKUP_RETENTION_KEEP_ARTIFACTS) {
-  const parsed = typeof value === 'number' ? value : Number.parseInt(String(value ?? ''), 10);
-  if (Number.isNaN(parsed)) return fallback;
-  return Math.min(Math.max(parsed, 1), 365);
-}
-
 function classifyManagedBackupFile(name) {
   if (name.startsWith(BACKUP_ARTIFACT_FILE_PREFIX) && name.endsWith(BACKUP_ARTIFACT_TEMP_SUFFIX)) {
     return 'temp';
@@ -233,11 +226,6 @@ function listManagedBackupFiles(destinationDir) {
   });
 }
 
-function isRecentTemp(file, nowMs = Date.now()) {
-  return file.kind === 'temp' && nowMs - file.modifiedAtMs < BACKUP_TEMP_MIN_AGE_MS;
-}
-
-/* @Codex */
 function readBackupLock(lockPath) {
   try {
     const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
@@ -286,10 +274,10 @@ function acquireBackupLock(destinationDir) {
       const descriptor = fs.openSync(lockPath, 'wx');
       try {
         fs.writeFileSync(descriptor, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
+        return { path: lockPath, identity: fs.fstatSync(descriptor) };
       } finally {
         fs.closeSync(descriptor);
       }
-      return lockPath;
     } catch (error) {
       if (error?.code !== 'EEXIST' || isBackupLockActive(destinationDir)) {
         throw new Error('Backup automatico gia in esecuzione.');
@@ -300,8 +288,8 @@ function acquireBackupLock(destinationDir) {
   throw new Error('Impossibile acquisire il lock del backup automatico.');
 }
 
-function releaseBackupLock(lockPath) {
-  if (lockPath) fs.rmSync(lockPath, { force: true });
+function releaseBackupLock(lock) {
+  if (lock && fs.existsSync(lock.path) && sameFile(fs.lstatSync(lock.path), lock.identity)) fs.unlinkSync(lock.path);
 }
 
 // A backup holds names, identifiers and therapies in clear: only the owning account may read it.
@@ -313,78 +301,71 @@ function restrictManagedBackupFiles(destinationDir) {
   }
 }
 
-function applyBackupRetention(config, options = {}) {
-  const preservePaths = new Set((options.preservePaths ?? []).map((value) => path.resolve(value)));
-  const nowMs = options.nowMs ?? Date.now();
-  const activeBackupLock = !options.ignoreBackupLock && isBackupLockActive(config.destinationDir, nowMs);
-  const managedFiles = listManagedBackupFiles(config.destinationDir).sort((left, right) => {
-    if (left.modifiedAtMs !== right.modifiedAtMs) return right.modifiedAtMs - left.modifiedAtMs;
-    return right.name.localeCompare(left.name);
-  });
-  const artifacts = managedFiles.filter((file) => file.kind === 'artifact');
-  const orphanTemps = managedFiles
-    .filter((file) => file.kind === 'temp')
-    .filter((file) => !preservePaths.has(path.resolve(file.path)))
-    .filter((file) => !isRecentTemp(file, nowMs))
-    .filter(() => !activeBackupLock);
-  const staleArtifacts = artifacts
-    .slice(clampRetentionKeepArtifacts(config.retentionKeepArtifacts))
-    .filter((file) => !preservePaths.has(path.resolve(file.path)));
-  const items = [
-    ...staleArtifacts.map((file) => ({
-      path: file.path,
-      kind: file.kind,
-      reason: 'keep-last-n',
-      sizeBytes: file.sizeBytes,
-      modifiedAt: file.modifiedAt,
-    })),
-    ...orphanTemps.map((file) => ({
-      path: file.path,
-      kind: file.kind,
-      reason: 'orphan-temp',
-      sizeBytes: file.sizeBytes,
-      modifiedAt: file.modifiedAt,
-    })),
-  ];
-  for (const item of items) {
-    if (fs.existsSync(item.path)) fs.unlinkSync(item.path);
+function syncBackupDirectory(directory) {
+  if (process.platform === 'win32') return;
+  const descriptor = fs.openSync(directory, 'r');
+  try { fs.fsyncSync(descriptor); } finally { fs.closeSync(descriptor); }
+}
+
+function sameFile(left, right) {
+  return left.dev === right.dev && left.ino === right.ino;
+}
+
+function assertBackupDirectory(directory, identity) {
+  if (fs.realpathSync(directory) !== directory || !sameFile(fs.statSync(directory), identity)) {
+    throw new Error('La cartella di destinazione è cambiata durante il backup. Backup non confermato.');
   }
-  return {
-    destinationDir: config.destinationDir,
-    keepArtifacts: clampRetentionKeepArtifacts(config.retentionKeepArtifacts),
-    artifactCount: artifacts.length,
-    orphanTempCount: orphanTemps.length,
-    deleteCount: items.length,
-    deleteBytes: items.reduce((sum, item) => sum + item.sizeBytes, 0),
-    items,
-    deletedCount: items.length,
-    deletedBytes: items.reduce((sum, item) => sum + item.sizeBytes, 0),
-  };
 }
 
-function applyRetentionResultToState(current, result, mode, occurredAt = new Date()) {
-  const retainedArtifactPath = current.run.lastArtifactPath
-    && result.items.some((item) => item.path === current.run.lastArtifactPath)
-    ? null
-    : current.run.lastArtifactPath;
-  return {
-    ...current,
-    run: {
-      ...current.run,
-      lastArtifactPath: retainedArtifactPath,
-      lastRetentionAt: occurredAt.toISOString(),
-      lastRetentionDeletedCount: result.deletedCount,
-      lastRetentionDeletedBytes: result.deletedBytes,
-      lastRetentionMode: mode,
-    },
+export function publishScheduledBackup(finalPath, artifact, directoryIdentity = fs.statSync(path.dirname(finalPath))) {
+  const directory = path.dirname(finalPath);
+  const tempPath = `${finalPath}.tmp`;
+  const descriptor = fs.openSync(tempPath, 'wx', 0o600);
+  const ownFile = fs.fstatSync(descriptor);
+  const assertOwnFile = file => {
+    if (!sameFile(fs.lstatSync(file), ownFile)) throw new Error('Il file di backup è cambiato. Backup non confermato.');
   };
+  try {
+    assertBackupDirectory(directory, directoryIdentity);
+    assertOwnFile(tempPath);
+    fs.writeFileSync(descriptor, artifact, { encoding: 'utf8' });
+    fs.fsyncSync(descriptor);
+    assertBackupDirectory(directory, directoryIdentity);
+    assertOwnFile(tempPath);
+    fs.linkSync(tempPath, finalPath);
+    assertBackupDirectory(directory, directoryIdentity);
+    assertOwnFile(finalPath);
+    syncBackupDirectory(directory);
+    if (fs.readFileSync(finalPath, 'utf8') !== artifact) throw new Error('Backup non confermato dalla rilettura.');
+    assertOwnFile(finalPath);
+    assertBackupDirectory(directory, directoryIdentity);
+  } finally {
+    fs.closeSync(descriptor);
+    let canRemoveTemp = false;
+    try {
+      assertBackupDirectory(directory, directoryIdentity);
+      assertOwnFile(tempPath);
+      canRemoveTemp = true;
+    } catch {
+      // A changed path cannot safely identify our temporary file for cleanup.
+    }
+    if (canRemoveTemp) {
+      fs.unlinkSync(tempPath);
+      syncBackupDirectory(directory);
+    }
+  }
+  assertBackupDirectory(directory, directoryIdentity);
+  assertOwnFile(finalPath);
 }
 
-function saveState(db, state) {
-  db.prepare(`
-    INSERT INTO settings (key, value) VALUES (?, ?)
-    ON CONFLICT(key) DO UPDATE SET value = excluded.value
-  `).run(SETTINGS_KEY, JSON.stringify(state));
+function saveRunState(db, run) {
+  db.transaction(() => {
+    const current = readState(db);
+    db.prepare(`
+      INSERT INTO settings (key, value) VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run(SETTINGS_KEY, JSON.stringify({ ...current, run: { ...current.run, ...run } }));
+  }).immediate();
 }
 
 function formatTimestamp(now = new Date()) {
@@ -502,7 +483,7 @@ async function main() {
   const dataDir = getDefaultDataDir();
   const dbPath = path.join(dataDir, 'medical.db');
   const forced = process.env.MEDIFLOW_BACKUP_FORCE === '1';
-  let backupLockPath = null;
+  let backupLock = null;
   let participant = null;
   let db = null;
   let result;
@@ -515,14 +496,14 @@ async function main() {
     participant = openAdmittedSqlite(dbPath, { role: 'scheduled-backup', sqliteOptions: { fileMustExist: true } });
     db = participant.database;
     const currentState = readState(db);
-    const destinationDir = process.env.MEDIFLOW_BACKUP_DEST_DIR || currentState.config.destinationDir;
+    const requestedDestination = process.env.MEDIFLOW_BACKUP_DEST_DIR || currentState.config.destinationDir;
 
     if (!currentState.config.enabled && !forced) {
       throw new Error('Backup automatico disabilitato.');
     }
 
-    fs.mkdirSync(destinationDir, { recursive: true, mode: 0o700 });
-    backupLockPath = acquireBackupLock(destinationDir);
+    const { destination: destinationDir, directoryIdentity } = validateBackupDestination(requestedDestination, currentState.config.volumeProtectionAcknowledged, currentState.config.volumeProtectionIdentity ?? '');
+    backupLock = acquireBackupLock(destinationDir);
 
     const createdAt = new Date();
     const payload = buildDataset(db, Object.keys(BACKUP_TABLES));
@@ -530,43 +511,22 @@ async function main() {
     const artifact = await serializeBackupArtifact(payload, createdAt);
     const fileName = `mediflow-backup-v1-${formatTimestamp(createdAt)}.mediflow`;
     const finalPath = path.join(destinationDir, fileName);
-    const tempPath = `${finalPath}.tmp`;
-
-    fs.writeFileSync(tempPath, artifact, { encoding: 'utf8', mode: 0o600 });
-    fs.renameSync(tempPath, finalPath);
+    publishScheduledBackup(finalPath, artifact, directoryIdentity);
     restrictManagedBackupFiles(destinationDir);
+    assertBackupDirectory(destinationDir, directoryIdentity);
 
-    const backedUpState = {
-      ...currentState,
-      config: {
-        ...currentState.config,
-        destinationDir,
-      },
-      run: {
-        lastRunAt: createdAt.toISOString(),
-        lastRunStatus: 'success',
-        lastRunMessage: 'Backup completato.',
-        lastArtifactPath: finalPath,
-      },
-    };
-    const retentionResult = applyBackupRetention(
-      {
-        destinationDir,
-        retentionKeepArtifacts: currentState.config.retentionKeepArtifacts,
-      },
-      { preservePaths: [finalPath], ignoreBackupLock: true },
-    );
-    const nextState = applyRetentionResultToState(backedUpState, retentionResult, 'auto', createdAt);
-    nextState.run.lastRunMessage = retentionResult.deletedCount > 0
-      ? `Backup completato. Retention: rimossi ${retentionResult.deletedCount} file.`
-      : 'Backup completato.';
-    saveState(db, nextState);
+    saveRunState(db, {
+      lastRunAt: createdAt.toISOString(),
+      lastRunStatus: 'success',
+      lastRunMessage: 'Backup completato.',
+      lastArtifactPath: finalPath,
+    });
 
     result = {
       ok: true,
       artifactPath: finalPath,
       createdAt: createdAt.toISOString(),
-      message: nextState.run.lastRunMessage,
+      message: 'Backup completato.',
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Backup fallito.';
@@ -574,17 +534,10 @@ async function main() {
     // An already admitted run may finish its state update before it drains.
     if (db?.open) {
       try {
-        const currentState = readState(db);
-        const destinationDir = process.env.MEDIFLOW_BACKUP_DEST_DIR || currentState.config.destinationDir;
-        saveState(db, {
-          ...currentState,
-          config: { ...currentState.config, destinationDir },
-          run: {
-            lastRunAt: new Date().toISOString(),
-            lastRunStatus: 'error',
-            lastRunMessage: message,
-            lastArtifactPath: currentState.run.lastArtifactPath,
-          },
+        saveRunState(db, {
+          lastRunAt: new Date().toISOString(),
+          lastRunStatus: 'error',
+          lastRunMessage: message,
         });
       } catch {
         // best effort
@@ -596,7 +549,7 @@ async function main() {
     catch (error) {
       result = { ok: false, message: error instanceof Error ? error.message : 'Chiusura database non verificata.' };
     }
-    try { releaseBackupLock(backupLockPath); }
+    try { releaseBackupLock(backupLock); }
     catch { result = { ok: false, message: 'Pulizia lock backup non completata.' }; }
   }
   console.log(JSON.stringify(result));

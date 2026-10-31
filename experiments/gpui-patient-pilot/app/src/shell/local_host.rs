@@ -395,6 +395,7 @@ impl ClinicalApp {
             cx.notify();
             return;
         }
+        self.cancel_backup_schedule(cx);
         self.cancel_archive_restore(cx);
         if self.cancel_security_change(window, cx) || self.cancel_models_review(window, cx) {
             return;

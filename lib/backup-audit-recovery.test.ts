@@ -1,3 +1,4 @@
+import { prepareSyntheticBackupDestination } from './scheduled-backup.test-support.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createBackupArtifact, createEmptyDataset, parseBackupArtifact, serializeBackupArtifact } from './backup-artifact';
@@ -33,6 +34,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
 import { backupArtifactInputChecksum, stableStringify } from './backup-artifact';
 import { runBackupRestorePreflight } from './backup-restore-preflight';
@@ -40,10 +42,11 @@ import { canonicalizeBackupAuditRows, type BackupAuditRow } from './backup-audit
 import { serializeBackupArtifact as serializeScheduledBackupArtifact } from '../scripts/run-scheduled-backup.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const LOADER = path.join(ROOT, 'scripts/register-strip-types-loader.mjs');
+const LOADER = pathToFileURL(path.join(ROOT, 'scripts/register-strip-types-loader.mjs')).href;
 const checksum = (payload: unknown) => createHash('sha256').update(stableStringify(payload)).digest('hex');
 
 function runNode(dataDir: string, args: string[], extra: Record<string, string> = {}): string {
+    if (extra.MEDIFLOW_BACKUP_DEST_DIR) args = ['--import', prepareSyntheticBackupDestination(dataDir, extra.MEDIFLOW_BACKUP_DEST_DIR), ...args];
     return execFileSync(process.execPath, args, {
         cwd: ROOT, encoding: 'utf8',
         env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', ...extra },

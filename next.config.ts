@@ -79,6 +79,7 @@ const nextConfig: NextConfig = {
       "./licenses/who-icd11/*.md",
       // Raw scheduler closure; checked against the canonical runtime roster in tests.
       "./scripts/run-scheduled-backup.mjs",
+      "./scripts/backup-destination-policy.mjs",
       "./scripts/scheduled-backup-date-fields.mjs",
       "./lib/sqlite-maintenance-admission.mjs",
       "./lib/sqlite-durability.mjs",

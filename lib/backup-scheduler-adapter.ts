@@ -1,3 +1,5 @@
+import { validateBackupDestination } from '../scripts/backup-destination-policy.mjs';
+import { backupSchedulerRevision } from './backup-scheduler';
 // Cross-platform backup scheduling. The nightly backup runner
 // (scripts/run-scheduled-backup.mjs) is already OS-agnostic; this module
 // abstracts ONLY the OS-specific registration of a recurring job behind a
@@ -434,6 +436,10 @@ export function buildBackupSchedulerStatus(value: string | null | undefined): Ba
         if (!(error instanceof BackupSchedulerOutcomeUnknownError)) throw error;
         status = { installed: null, schedulePath: null, observationMessage: error.message };
     }
+    if (state.config.enabled) {
+        try { validateBackupDestination(state.config.destinationDir, state.config.volumeProtectionAcknowledged, state.config.volumeProtectionIdentity ?? ''); }
+        catch (error) { status.observationMessage = error instanceof Error ? error.message : 'Destinazione non verificata.'; }
+    }
     return {
         supported,
         installed: status.installed,
@@ -441,6 +447,6 @@ export function buildBackupSchedulerStatus(value: string | null | undefined): Ba
         plistPath: process.platform === 'darwin' ? status.schedulePath : null,
         schedulePath: status.schedulePath,
         scheduleKind: supported ? adapter.kind : null,
-        state,
+        state: { ...state, revision: backupSchedulerRevision(state) },
     };
 }
