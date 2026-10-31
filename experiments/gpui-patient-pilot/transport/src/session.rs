@@ -9359,3 +9359,154 @@ mod g2_settings_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod g3_network_tests {
+    use super::tests::{local_host_login, local_host_reply, read_request, session_at};
+    use super::*;
+    use crate::NetworkMode;
+    use std::{net::TcpListener, thread};
+
+    #[test]
+    fn g3_network_mode_confirmation_conflict_uncertainty_and_no_replay() {
+        for scenario in [
+            "success", "conflict", "lost", "readback", "replaced", "invalid",
+        ] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            let worker = thread::spawn(move || {
+                local_host_login(&listener);
+                for _ in 0..2 {
+                    let (mut stream, _) = listener.accept().unwrap();
+                    assert!(
+                        read_request(&mut stream).starts_with("GET /api/settings/network.mode ")
+                    );
+                    local_host_reply(
+                        &mut stream,
+                        200,
+                        json!({"key":"network.mode","value":null}),
+                        "",
+                    );
+                }
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with("PUT /api/settings/network.mode "));
+                let body: Value =
+                    serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+                assert_eq!(
+                    body,
+                    json!({"value":"network-home-base","expectedValue":null})
+                );
+                match scenario {
+                    "lost" => return,
+                    "conflict" | "replaced" => {
+                        local_host_reply(
+                            &mut stream,
+                            409,
+                            json!({"code": if scenario == "replaced" {"ARCHIVE_REPLACED"} else {"NETWORK_MODE_CONFLICT"}}),
+                            "",
+                        );
+                        return;
+                    }
+                    "invalid" => {
+                        local_host_reply(&mut stream, 200, json!({"success":false}), "");
+                        return;
+                    }
+                    _ => local_host_reply(
+                        &mut stream,
+                        200,
+                        json!({"success":true,"key":"network.mode","value":"network-home-base"}),
+                        "",
+                    ),
+                }
+                let (mut stream, _) = listener.accept().unwrap();
+                assert!(read_request(&mut stream).starts_with("GET /api/settings/network.mode "));
+                local_host_reply(
+                    &mut stream,
+                    200,
+                    json!({"key":"network.mode","value":if scenario == "readback" {"local-only"} else {"network-home-base"}}),
+                    "",
+                );
+            });
+            let access = session
+                .authenticate_local_host(
+                    "Local host synthetic passphrase",
+                    crate::RetirementNotice::new(None),
+                )
+                .unwrap();
+            let snapshot = access.read_network_mode().unwrap();
+            assert_eq!(snapshot.mode().unwrap(), NetworkMode::LocalOnly);
+            let command = access
+                .prepare_network_mode(&snapshot, NetworkMode::HomeBase)
+                .unwrap();
+            assert_eq!(
+                access.apply_network_mode(&command),
+                match scenario {
+                    "success" => Ok(true),
+                    "conflict" => Err(RuntimeError::Conflict),
+                    "replaced" => Err(RuntimeError::ArchiveReplaced),
+                    "lost" => Err(RuntimeError::Indeterminate),
+                    _ => Ok(false),
+                }
+            );
+            assert_eq!(
+                access.apply_network_mode(&command),
+                Err(RuntimeError::ReadRequired)
+            );
+            worker.join().unwrap();
+        }
+    }
+    #[test]
+    fn g3_network_mode_changed_draft_cancellation_foreign_owner_and_lock_do_not_write() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let worker = thread::spawn(move || {
+            for _ in 0..2 {
+                local_host_login(&listener);
+            }
+            for value in [Value::Null, Value::Null, json!("network-home-base")] {
+                let (mut stream, _) = listener.accept().unwrap();
+                assert!(read_request(&mut stream).starts_with("GET /api/settings/network.mode "));
+                local_host_reply(
+                    &mut stream,
+                    200,
+                    json!({"key":"network.mode","value":value}),
+                    "",
+                );
+            }
+            listener.set_nonblocking(true).unwrap();
+            assert!(listener.accept().is_err());
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let other = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        let snapshot = access.read_network_mode().unwrap();
+        let command = access
+            .prepare_network_mode(&snapshot, NetworkMode::HomeBase)
+            .unwrap();
+        assert_eq!(
+            other.apply_network_mode(&command),
+            Err(RuntimeError::ReadRequired)
+        );
+        assert!(matches!(
+            access.prepare_network_mode(&snapshot, NetworkMode::HomeBase),
+            Err(RuntimeError::Conflict)
+        ));
+        session.lock();
+        assert_eq!(
+            access.apply_network_mode(&command),
+            Err(RuntimeError::Locked)
+        );
+        drop(command);
+        worker.join().unwrap();
+    }
+}

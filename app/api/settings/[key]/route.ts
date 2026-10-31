@@ -2,7 +2,7 @@ import { RESTORE_RECEIPT_PREFIX } from '@/lib/backup-restore-receipt-contract';
 import { writeSettingWithFunctionModelGeneration } from '@/lib/ai-providers/fabric/function-model-settings-write';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
-import { dbServer } from '@/lib/db-server';
+import { dbServer, runDbServerImmediateTransaction } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
@@ -64,7 +64,21 @@ export async function PUT(
         }
         const persistedValue = normalizeSettingValue(value);
 
-        writeSettingWithFunctionModelGeneration(key, persistedValue);
+        if (key === 'network.mode' && Object.hasOwn(body, 'expectedValue')) {
+            if (!['local-only', 'network-home-base'].includes(persistedValue)
+                || !(body.expectedValue === null || typeof body.expectedValue === 'string')) {
+                return NextResponse.json({ error: 'Invalid network mode precondition' }, { status: 400 });
+            }
+            const applied = runDbServerImmediateTransaction(() => {
+                const before = dbServer.select().from(settings).where(eq(settings.key, key)).get()?.value ?? null;
+                if (before !== body.expectedValue) return false;
+                writeSettingWithFunctionModelGeneration(key, persistedValue);
+                return true;
+            });
+            if (!applied) return NextResponse.json({ error: 'Network mode changed', code: 'NETWORK_MODE_CONFLICT' }, { status: 409 });
+        } else {
+            writeSettingWithFunctionModelGeneration(key, persistedValue);
+        }
 
         try {
             const context = auditContextFromRequest(request, session);
