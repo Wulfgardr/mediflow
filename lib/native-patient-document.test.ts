@@ -208,7 +208,7 @@ for (const fault of ['source-missing', 'patient-changed'] as const) test(`readba
     try { await assert.rejects(api.execute(context, view.commandId, pin)); }
     finally { dbServer.$client.exec('DROP TRIGGER synthetic_readback_failure'); }
     assert.deepEqual(effects(), before);
-    assert.deepEqual(await api.receipt(context, view.commandId), { outcome: 'unknown' });
+    assert.deepEqual(await api.receipt(context, view.commandId), { outcome: 'retired' });
 });
 for (const fault of ['logout', 'scope', 'grant', 'expiry', 'abort'] as const) test(`source cannot be used after ${fault}`, async () => {
     const context = fixture(); let clock = Date.now();
@@ -405,14 +405,61 @@ for (const size of [5 * 1024 * 1024, 10 * 1024 * 1024]) test(`valid ${size}-byte
     const masterKey = await crypto.subtle.importKey('raw', master, 'AES-GCM', false, ['decrypt']);
     assert.equal(await openPatientDocumentFile(sealedFile.data, masterKey), `data:application/pdf;base64,${bytes.toString('base64')}`);
     const source = { name: seal('grande-sintetico.pdf'), path: seal('grande-sintetico.pdf'), original: bytes.toString('base64'), ...sealedFile };
-    const view = await api.stage(context, source);
-    assert.match(view.text, /Mario/u);
+    const json = JSON.stringify({ operation: 'stage', source });
+    assert(Buffer.byteLength(json) < 28 * 1024 * 1024);
+    const direct = await api.stage(context, source);
     assert.ok(source.fileKey.every(byte => byte === 0));
-    await api.preview(context, view.commandId, view.viewId, review());
-    assert.deepEqual(await api.execute(context, view.commandId, pin), expectedReceipt(view.commandId));
+    await api.revoke(context, direct.commandId);
+    const response = await localPost(new Request('http://127.0.0.1/api/auth/native/patient-document', {
+        method: 'POST', headers: context.request.headers, body: json,
+    }));
+    assert.equal(response.status, 200);
+    const view = await response.json();
+    assert.match(view.text, /Mario/u);
+    const send = async (body: unknown) => localPost(new Request('http://127.0.0.1/api/auth/native/patient-document', {
+        method: 'POST', headers: context.request.headers, body: JSON.stringify(body),
+    }));
+    assert.equal((await send({ operation: 'preview', commandId: view.commandId, viewId: view.viewId, review: review() })).status, 200);
+    const applied = await send({ operation: 'execute', commandId: view.commandId, pin });
+    assert.equal(applied.status, 200);
+    assert.deepEqual(await applied.json(), expectedReceipt(view.commandId));
     assert.deepEqual(effects(), before.map(n => n + 1));
     const stored = dbServer.$client.prepare('SELECT data FROM attachments ORDER BY rowid DESC LIMIT 1').get() as { data: string };
     assert.equal(stored.data, sealedFile.data);
+});
+
+test('wrong PIN has a durable retired receipt and the same owner can start again', async () => {
+    const context = fixture(), api = createNativePatientDocumentService(dbServer), before = effects();
+    const view = await api.stage(context, await document());
+    await api.preview(context, view.commandId, view.viewId, review());
+    await assert.rejects(api.execute(context, view.commandId, '0000'));
+    assert.deepEqual(effects(), before);
+    for (const service of [api, createNativePatientDocumentService(dbServer)]) {
+        assert.deepEqual(await service.receipt(context, view.commandId), { outcome: 'retired' });
+        assert.deepEqual(await service.revoke(context, view.commandId), { outcome: 'retired' });
+    }
+    const next = await api.stage(context, await document());
+    await api.preview(context, next.commandId, next.viewId, review());
+    assert.deepEqual(await api.execute(context, next.commandId, pin), expectedReceipt(next.commandId));
+});
+test('native stage rejects one byte over the PDF maximum and the route bounds the JSON body', async () => {
+    const context = fixture(), api = createNativePatientDocumentService(dbServer), before = effects();
+    const bytes = createSyntheticPdf(10 * 1024 * 1024 + 1);
+    const source = { name: seal('limite.pdf'), path: seal('limite.pdf'), original: bytes.toString('base64'), ...await file(bytes) };
+    await assert.rejects(api.stage(context, source));
+    assert(source.fileKey.every(byte => byte === 0));
+    const view = await api.stage(context, await document());
+    await api.revoke(context, view.commandId);
+    const receipt = JSON.stringify({ operation: 'receipt', commandId: view.commandId });
+    for (const extra of [0, 1]) {
+        const response = await localPost(new Request('http://127.0.0.1/api/auth/native/patient-document', {
+            method: 'POST', headers: context.request.headers,
+            body: receipt.padEnd(35 * 1024 * 1024 + extra),
+        }));
+        assert.equal(response.status, extra ? 403 : 200);
+        if (!extra) assert.deepEqual(await response.json(), { outcome: 'retired' });
+    }
+    assert.deepEqual(effects(), before);
 });
 
 test('native route opts into HTTP buffer erasure even when stage denies the source', async () => {

@@ -100,7 +100,8 @@ test('duplicate needs distinct choice, never merges, and a new collision after r
     const id = randomUUID();
     dbServer.insert(patients).values({ id, firstName: 'Mario', lastName: 'Rossi', taxCode: randomUUID() }).run();
     await assert.rejects(f.api.execute(f.host, f.view.commandId, pin));
-    assert.deepEqual(effects(), { ...before, patients: before.patients + 1 });
+    assert.deepEqual(effects(), { ...before, patients: before.patients + 1, audit_events: before.audit_events + 1 });
+    assert.deepEqual(service().receipt(f.host, f.view.commandId), { outcome: 'retired' });
 });
 for (const fault of ['source-retired', 'source-changed', 'logout', 'scope', 'epoch', 'pin', '30s', '5min', 'grant'] as const) test(`positive reviewed command then ${fault} cannot create`, async () => {
     const f = await preview(), before = effects();
@@ -114,7 +115,9 @@ for (const fault of ['source-retired', 'source-changed', 'logout', 'scope', 'epo
     if (fault === '5min') tick += 300_000;
     if (fault === 'grant') dbServer.update(settings).set({ value: '{}' }).where(eq(settings.key, NETWORK_PAIRING_STATE_KEY)).run();
     await assert.rejects(f.api.execute(host, f.view.commandId, fault === 'pin' ? '0000' : pin));
-    assert.deepEqual(effects(), before);
+    const retired = ['source-changed', 'epoch', 'pin', '30s', '5min'].includes(fault);
+    assert.deepEqual(effects(), { ...before, audit_events: before.audit_events + Number(retired) });
+    if (retired) assert.deepEqual(service().receipt(host, f.view.commandId), { outcome: 'retired' });
 });
 for (const table of ['patients_to_ambulatories', 'attachments', 'audit_events']) test(`failure at ${table} rolls back patient and source`, async () => {
     const f = await preview(), before = effects();
@@ -167,8 +170,9 @@ for (const table of ['patients', 'patients_to_ambulatories', 'attachments', 'aud
     dbServer.$client.exec(`CREATE TEMP TRIGGER synthetic_ignore BEFORE INSERT ON ${table} BEGIN SELECT RAISE(IGNORE); END;`);
     try { await assert.rejects(f.api.execute(f.host, f.view.commandId, pin)); }
     finally { dbServer.$client.exec('DROP TRIGGER synthetic_ignore'); }
-    assert.deepEqual(effects(), before);
-    assert.deepEqual(service().receipt(f.host, f.view.commandId), { outcome: 'unknown' });
+    const retired = table !== 'audit_events';
+    assert.deepEqual(effects(), { ...before, audit_events: before.audit_events + Number(retired) });
+    assert.deepEqual(service().receipt(f.host, f.view.commandId), { outcome: retired ? 'retired' : 'unknown' });
 });
 test('five minute view cannot enter preview even with a fresh PIN', async () => {
     const f = await fixture(), before = effects();
@@ -189,17 +193,28 @@ test('owner denial after the source/audit writes rolls back the complete command
     assert.deepEqual(effects(), before);
     assert.deepEqual(service().receipt(f.host, f.view.commandId), { outcome: 'unknown' });
 });
-test('expiration during confirmation and failed retirement never invent a terminal receipt', async () => {
+test('expiration retires authoritatively; a failed retirement never invents a terminal receipt', async () => {
     const f = await preview(), before = effects();
     await assert.rejects(f.api.execute({ ...f.host, confirm: async () => { tick += 30_000; return true; } }, f.view.commandId, pin));
-    assert.deepEqual(effects(), before);
-    assert.deepEqual(service().receipt(f.host, f.view.commandId), { outcome: 'unknown' });
+    assert.deepEqual(effects(), { ...before, audit_events: before.audit_events + 1 });
+    assert.deepEqual(service().receipt(f.host, f.view.commandId), { outcome: 'retired' });
     const g = await preview(), state = effects();
     dbServer.$client.exec("CREATE TEMP TRIGGER synthetic_retire_failure BEFORE INSERT ON audit_events BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;");
     try { assert.throws(() => g.api.revoke(g.host, g.view.commandId)); }
     finally { dbServer.$client.exec('DROP TRIGGER synthetic_retire_failure'); }
     assert.deepEqual(effects(), state);
     assert.deepEqual(service().receipt(g.host, g.view.commandId), { outcome: 'unknown' });
+});
+test('failed PIN terminal write keeps an authoritative revoke path without inventing a receipt', async () => {
+    const f = await preview(), before = effects();
+    dbServer.$client.exec("CREATE TEMP TRIGGER synthetic_terminal_failure BEFORE INSERT ON audit_events WHEN NEW.event_type = 'patient.create.retired' BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;");
+    try { await assert.rejects(f.api.execute(f.host, f.view.commandId, '0000')); }
+    finally { dbServer.$client.exec('DROP TRIGGER synthetic_terminal_failure'); }
+    assert.deepEqual(effects(), before);
+    assert.deepEqual(service().receipt(f.host, f.view.commandId), { outcome: 'unknown' });
+    assert.deepEqual(f.api.revoke(f.host, f.view.commandId), { outcome: 'retired' });
+    assert.deepEqual(service().receipt(f.host, f.view.commandId), { outcome: 'retired' });
+    assert.deepEqual(effects(), { ...before, audit_events: before.audit_events + 1 });
 });
 test('journal schema keeps only opaque references and rejects malformed partial receipts', () => {
     const journal = { commandId: randomUUID(), archiveGeneration: randomUUID(), ambulatoryId: randomUUID(), patientId: randomUUID(), sourceId: randomUUID() };
@@ -227,7 +242,8 @@ test('revocation before preview cannot be renewed and a reused source cannot cre
     const api = service(), view = api.open(g.host, g.port), before = effects();
     api.preview(g.host, view.viewId, { ...g.review, duplicate: 'create-separate' });
     await assert.rejects(api.execute(g.host, view.commandId, pin));
-    assert.deepEqual(effects(), before);
+    assert.deepEqual(effects(), { ...before, audit_events: before.audit_events + 1 });
+    assert.deepEqual(service().receipt(g.host, view.commandId), { outcome: 'retired' });
 });
 test('duplicate review recognizes accented names and repeated whitespace without choosing an identity', async () => {
     const f = await fixture();

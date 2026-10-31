@@ -2,6 +2,7 @@ use super::*;
 use zeroize::Zeroize;
 
 pub const PATIENT_DOCUMENT_MAX_BYTES: usize = 10 * 1024 * 1024;
+const STAGE_JSON_LIMIT: usize = 28 * 1024 * 1024;
 const PATH: &[&str] = &["api", "auth", "native", "patient-document"];
 
 pub struct PatientDocumentStage {
@@ -116,7 +117,10 @@ impl RuntimeSession {
             Some(scope),
             Some(&body.0),
             true,
-            DOCUMENT_LIMIT,
+            crate::http::JsonLimits {
+                request: STAGE_JSON_LIMIT,
+                response: JSON_LIMIT,
+            },
         )?);
         let r = &mut result.0;
         if r["identity"] != "ambiguous"

@@ -283,3 +283,29 @@ riservate a Leonardo la prova Touch ID sul client reale e la qualificazione.
 Una risposta asincrona deve anche conservare il contesto locale non cancellato:
 annullare e riaprire nello stesso ambulatorio non riabilita il vecchio selettore
 o il risultato di una precedente acquisizione.
+
+
+### Correzioni di recupero e trasporto, 31 ottobre 2026
+
+Dopo il consumo dell'approvazione, un rifiuto definitivo noto senza effetti
+(PIN errato, approvazione scaduta, fonte o insieme dei duplicati cambiato)
+registra `retired` sotto transazione e con autorità corrente prima di liberare
+lo stato. Un secondo invio durante la verifica non ritira la prima esecuzione.
+Se la scrittura del terminale fallisce, il pending rimane disponibile alla
+revoca del proprietario; nessun errore HTTP autorizza da solo la cancellazione
+del riferimento locale. Dopo un errore GPUI rilegge la ricevuta autorevole.
+`unknown` conserva il deposito e consente rilettura o ritiro.
+
+Il corpo HTTP Rust è posseduto da `Bytes::from_owner(Zeroizing<Vec<u8>>)`:
+l'ultima copia condivisa ne azzera l'allocazione alla distruzione, compresi
+errore e cancellazione. I buffer interni di hyper e TLS restano fuori da
+questa garanzia. Lo stage riserva 28 MiB al JSON in uscita, separati dagli
+8 MiB della risposta e dai limiti delle letture ordinarie. Il file resta
+limitato a 10 MiB; il server limita il corpo JSON a 35 MiB.
+
+La doppia rappresentazione `original` e `data` resta nel protocollo corrente:
+il verificatore confronta il PDF ricevuto con quello decifrato prima
+dell'estrazione. Non è un requisito crittografico generale: estrarre dal solo
+PDF decifrato potrebbe eliminare `original`, ma cambierebbe questo contratto
+e le prove di corrispondenza. È un candidato al debloating successivo, senza
+modifiche al formato ENC2 o ai claim di cifratura.
