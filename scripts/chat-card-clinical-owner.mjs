@@ -4,6 +4,8 @@ import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 const { createClinicalCardBroker } = await import('../lib/chat-card/clinical-card-broker.ts');
 
+const { ClinicalRowDenied } = await import('../lib/chat-card/clinical-identifiers.ts');
+
 const denied = () => { throw new Error('clinical_card_denied'); };
 
 /** Private stdio child of GPUI. Never register this process as an MCP server. */
@@ -16,11 +18,11 @@ export function createNativeClinicalOwner(installation) {
     async command(input) {
       try {
         now();
-        if (!input || (input.command === 'prepare' ? Object.keys(input).sort().join(',') !== 'command,selection' : Object.keys(input).join(',') !== 'command')) return denied();
+        if (!input || (input.command === 'prepare' ? Object.keys(input).sort().join(',') !== 'command,knownIdentifiers,selection' : Object.keys(input).join(',') !== 'command')) return denied();
         if (input.command === 'prepare' && state === 'new') {
           state = 'preparing';
           await broker.owner.selectPatient('native-selection');
-          token = await broker.owner.prepare(input.selection);
+          token = await broker.owner.prepare(input.selection, input.knownIdentifiers);
           review = broker.owner.review(token);
           if (state !== 'preparing') return denied();
           reviewedAt = now();
@@ -34,7 +36,9 @@ export function createNativeClinicalOwner(installation) {
           return { payload: broker.reader.takeApprovedBytes(token, consent) };
         }
         return denied();
-      } catch { state = 'closed'; await broker.owner.close(); return denied(); }
+      } catch (error) { state = 'closed'; await broker.owner.close();
+        if (error instanceof ClinicalRowDenied) return { status: 'denied', section: error.section, row: error.row };
+        return denied(); }
     },
     async close() { state = 'closed'; await broker.owner.close(); },
   });

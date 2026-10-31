@@ -237,3 +237,38 @@ Terapie, prescrizioni protesiche e riassunto restano nella matrice C-8 per la
 tranche successiva. La consultazione dei cataloghi già consegnata resta distinta
 dalle prescrizioni. Questa decisione non ammette uso clinico o qualifica dei due
 desktop, non amplia l'autorità del modello e non modifica claim crittografici.
+
+### Controlli locali della proiezione clinica
+
+Gli identificativi strutturati del profilo letto dalla sessione nativa alimentano
+`knownIdentifiers` sul solo canale privato GPUI-Node: nome, cognome, CF, nascita,
+indirizzo, telefono, caregiver, identificativi e date dei metadati disponibili.
+Il core riceve i valori nel campo storico `names` e le date in `birthDates`;
+non sono campi del payload condiviso. Valori fuori limite negano la preparazione.
+
+Il broker clinico affianca a GLiNER controlli deterministici sul testo normalizzato:
+NFKC, minuscole, rimozione di separatori e caratteri invisibili, equivalenze OCR
+cifra-lettera e offset riconducibili ai byte originali. Questi controlli redigono
+identificativi noti, CF anche OCR/omocodici, sequenze numeriche, contatti e forme
+spaziate o miste. Una seconda applicazione ai testi effettivamente emessi nega
+residui; forme non trattabili e span tra due voci negano l'intera selezione.
+La verifica di salute neurale con nome e nascita sintetici nega l'uscita se il
+runner non li rileva. Soglia e identità del worker qualificato restano invariate.
+
+Una voce che dopo la redazione contiene solo token o punteggiatura nega l'intera
+uscita. Anche ogni sostituzione che non sia interamente giustificata dai
+controlli locali degli identificativi nega l'uscita: una rilevazione solo neurale
+potrebbe aver sostituito contenuto clinico e non costituisce una prova della sua
+conservazione. Non esiste una lista di diagnosi che esenti omonimi dalla redazione.
+La finestra nativa indica diagnosi o passo selezionato e numero della riga quando
+la causa è localizzabile; negli altri dinieghi chiede di togliere o riformulare
+le righe selezionate. Il consenso non viene abilitato e nessun dato della riga
+viene riportato alla chat.
+
+Il corpus di qualifica neurale resta distinto dalle regressioni di ammissione
+`clinical-chat-review-corpus.json`, che comprendono i 24 casi sintetici della
+review. Il requisito di zero falsi negativi viene verificato sui casi di
+accettazione, non estrapolato a qualunque prosa futura. Controlli, doppia scansione
+e prova di salute non dimostrano anonimato né conservazione clinica universale:
+il medico è responsabile di controllare i byte prima del consenso. I limiti del
+rilevatore e la qualifica sui desktop reali restano espliciti.
