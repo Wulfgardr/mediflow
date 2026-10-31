@@ -215,8 +215,23 @@ nativa può aggiungere i riferimenti verificati secondo l’appendice GPUI.
 
 Un processo riavviato legge l'audit prima di cercare la conferma RAM. Senza
 ricevuta, `unknown` resta incerto e non rinnova il comando. Il ritiro di un
-comando sconosciuto resta `unknown`; il servizio non attribuisce un esito a
-uno stato perso. Le ricevute seguono l'audit esistente nei backup: la
+comando sconosciuto richiede una richiesta esplicita: la ricevuta resta lettura
+pura e restituisce `unknown`. Per il solo ingresso nativo paired, la revoca
+ricontrolla il journal sotto transazione `IMMEDIATE` e può registrare `retired`
+anche senza pending. Paziente e journal sono atomici: una creazione concorrente
+committa prima del ritiro e restituisce `applied`, oppure trova `retired` prima
+di scrivere e non crea nulla. Il terminale non rinnova alcuna approvazione.
+
+Le istanze nello stesso processo condividono i proprietari pending e in volo,
+anche durante la verifica asincrona del PIN: un altro operatore, dispositivo o
+ambulatorio non può ritirarli. Dopo un arresto non rimangono approvazioni
+eseguibili. Il journal di ritiro è legato all'operatore autenticato, al dispositivo,
+alla generazione e all'ambulatorio correnti. Per limitare identificativi inventati,
+i ritiri senza proprietario RAM sono ammessi solo finché gli audit di ritiro
+dell'operatore nell'ultima ora sono meno di 128, su tutti i dispositivi e ambulatori.
+La verifica del limite e l'inserimento sono nella stessa transazione; il limite
+persiste al riavvio, non limita letture e replay e non introduce tabelle.
+Un comando con journal di altro proprietario resta negato senza scritture. Le ricevute seguono l'audit esistente nei backup: la
 conservazione non concede autorità nella generazione successiva al restore.
 Il deposito opaco e il recupero nativo esistenti restano da collegare a questo
 comando; nessun comando paziente viene ancora aperto dalla chat.
@@ -309,3 +324,39 @@ dell'estrazione. Non è un requisito crittografico generale: estrarre dal solo
 PDF decifrato potrebbe eliminare `original`, ma cambierebbe questo contratto
 e le prove di corrispondenza. È un candidato al debloating successivo, senza
 modifiche al formato ENC2 o ai claim di cifratura.
+
+### Recupero e memoria del corpo GPUI, 31 ottobre 2026
+
+La prova nativa di processo interrompe davvero con SIGKILL l'inserimento di
+`patient.create.retired` dopo il rifiuto del PIN reale. Un processo nuovo con lo
+stesso operatore e dispositivo legge `unknown`, ritira esplicitamente, rifiuta
+l'esecuzione del vecchio comando e crea una nuova scheda: alla fine paziente,
+membership e allegato sono esattamente uno. I test concorrenti verificano anche
+il ritiro durante il PIN e la precedenza di `applied` dopo il commit.
+
+Il corpo stage Rust è tipizzato e prende in prestito i 32 byte custoditi in
+`Zeroizing`, senza copiarli in un array `serde_json::Value` o in una stringa
+base64 della chiave. ENC2 codifica in base64 soltanto la chiave già avvolta.
+La serializzazione conta i byte senza conservarli, applica il budget, poi scrive
+in una slice di lunghezza esatta dentro `Zeroizing<Vec<u8>>`. Lo scrittore non
+può crescere: un errore o una seconda serializzazione diversa distrugge e azzera
+anche un corpo parziale. Il trasporto mantiene il proprietario azzerabile fino
+alla distruzione dell'ultimo riferimento.
+
+Il probe eseguibile `patient_document_key_erasure` usa un allocatore che forza
+lo spostamento di realloc e osserva anche la liberazione del vecchio blocco.
+Una calibrazione positiva controlla il rilevatore prima delle prove. Avvio:
+
+```sh
+cd experiments/gpui-patient-pilot
+cargo rustc -p mediflow-runtime-client --example patient_document_key_erasure --locked -- -C opt-level=2
+cd ../..
+node scripts/probe-patient-document-key-erasure.mjs /percorso/target/debug/examples/patient_document_key_erasure /percorso/nuove-evidenze
+```
+
+L'host sintetico loopback prova 5 e 10 MiB con 403 e cancellazione e non stampa
+la chiave. Il probe cerca il frammento JSON con tutti i 32 byte numerici non
+interamente nulli, nei blocchi da 1 a meno di 32 MiB inizializzati dal suo allocatore.
+Non verifica buffer interni di hyper o TLS, registri e stack delle librerie
+crittografiche, dump o memoria dopo l'arresto del processo. Non è una prova
+di esfiltrazione o una garanzia sulla pulizia dell'intero processo.

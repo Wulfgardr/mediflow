@@ -609,7 +609,7 @@ impl ClinicalApp {
                 !*opened && *resolution != ChatWriteResolution::Confirmed(ChatWriteOutcome::Retired)
             });
         Some(div().id("document-create-recovery").flex().flex_col().gap(px(8.)).p(px(16.))
-            .child(notice("document-create-recovery-warning", if unresolved { "Una lavorazione da PDF richiede verifica. Rileggi l’esito o ritirala prima di creare un’altra scheda." } else { "Esiti verificati delle lavorazioni da PDF." }, self.theme, unresolved))
+            .child(notice("document-create-recovery-warning", if unresolved { "Una lavorazione da PDF richiede verifica. Rileggi l’esito oppure premi Ritira per impedirne la creazione e iniziare una nuova scheda. Se la scheda esiste già, ne verifichiamo l’allegato." } else { "Esiti verificati delle lavorazioni da PDF." }, self.theme, unresolved))
             .children(outcomes.iter().map(|(id,(resolution,opened))|notice(format!("document-create-recovery-{id}"),format!("Comando {id}. {}",readback_message(Some(&PatientDocumentReadback{resolution:*resolution,attachment_opened:*opened}))),self.theme,!*opened && *resolution != ChatWriteResolution::Confirmed(ChatWriteOutcome::Retired))))
             .when(storage_error,|el|el.child(notice("document-create-storage-error","Problema di conservazione dei riferimenti. Non eliminare i comandi da verificare.",self.theme,true)))
             .child(button("document-create-reread","Rileggi esito e allegato",self.theme,false,!self.patient_document.recovery_busy).on_click(cx.listener(|this,_,_,cx|this.reread_patient_documents(false,cx))))
@@ -843,6 +843,76 @@ mod tests {
             );
             std::fs::remove_dir_all(directory).unwrap();
         }
+    }
+
+    #[gpui::test]
+    fn recovered_unknown_blocks_intake_until_explicit_retirement_clears_the_deposit(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use serde_json::json;
+        let host = super::super::notes_recovery_tests::Host::new();
+        let route = "POST /api/auth/native/patient-document";
+        for outcome in ["unknown", "retired"] {
+            host.plan(route)
+                .send((200, json!({"outcome":outcome})))
+                .unwrap();
+        }
+        let (app, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let directory = std::env::temp_dir().canonicalize().unwrap().join(format!(
+            "mf-document-recovered-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        app.update(cx, |app, cx| {
+            seed(app, &host.session, Phase::Sending, cx);
+            app.patient_document.references = CommandReferences::new(Some(directory.clone()));
+            app.patient_document
+                .references
+                .for_session(&host.session)
+                .remember(ID)
+                .unwrap();
+            app.patient_document = PatientDocument::new(app.theme, Some(directory.clone()), cx);
+            app.open_patient_document(cx);
+            assert!(app.patient_document.work.is_none());
+            app.reread_patient_documents(false, cx);
+        });
+        cx.run_until_parked();
+        app.update(cx, |app, cx| {
+            assert_eq!(
+                app.patient_document
+                    .references
+                    .for_session(&host.session)
+                    .pending()
+                    .unwrap(),
+                [ID]
+            );
+            app.open_patient_document(cx);
+            assert!(app.patient_document.work.is_none());
+            app.reread_patient_documents(true, cx);
+        });
+        cx.run_until_parked();
+        app.update(cx, |app, cx| {
+            assert!(
+                app.patient_document
+                    .references
+                    .for_session(&host.session)
+                    .pending()
+                    .unwrap()
+                    .is_empty()
+            );
+            app.open_patient_document(cx);
+            assert!(app.patient_document.work.is_some());
+            app.patient_document.detach(cx);
+        });
+        assert_eq!(
+            host.routes().iter().filter(|r| r.as_str() == route).count(),
+            2
+        );
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[gpui::test]
